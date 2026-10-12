@@ -16,6 +16,8 @@ Lines:
                                  DGROUP bytes, 64 KiB at LOAD_SEG
   spells  | slot | digests       29CF:0691: changed DGROUP bytes, segment
                                  3276:0000..3520
+  province | slot province | ax digest  1194:2E14: AL, changed DGROUP
+                                 bytes
   level   | slot noscreen c398 planes | digests   25FD:0844 on SAVEGAME's
                                  name, then 0000:A9A6..AA4A (0000:946A and
                                  9B56, which write to the VGA, stubbed):
@@ -170,4 +172,20 @@ for slot in (int(SLOT), int(SLOT) + 1):
             except (Fault, AssertionError):
                 res = 'fault'
             out.write(f'level | {slot:x} {noscreen:x} {c398:x} {planes:x} | {res}\n')
+
+for slot in (int(SLOT), 2, 64, 65):
+    for prov in list(range(9)) + [rng.randint(9, 255)]:
+        a.restore(BASE)
+        a.mu.mem_write(a.lin(a.ds, 0x1A6C), bytes([slot]))
+        before = a.seg_bytes(a.ds)
+        try:
+            r = a.call_far(0x1194, 0x2E14, eax=prov)
+            if a.r16(0xA90A) == a.ds:
+                a.w16(0xA90A, a.ds - LOAD_SEG)
+            after = a.seg_bytes(a.ds)
+            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            res = f'{r & 0xff:x} {fnv(changed):x}'
+        except (Fault, AssertionError):
+            res = 'fault'
+        out.write(f'province | {slot:x} {prov:x} | {res}\n')
 out.close()

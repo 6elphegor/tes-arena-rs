@@ -169,6 +169,18 @@ fn matches_original() {
                     None => "fault".into(),
                 }
             }
+            "province" => {
+                if save.is_none() && p[0] == 1 {
+                    continue;
+                }
+                m.mem.w8(DS, 0x1A6C, p[0] as u8);
+                let before = m.clone();
+                let mut fs = files.clone();
+                match m.city_load_province(&mut fs, p[1] as u8) {
+                    Some(al) => format!("{al:x} {:x}", changed(&m, &before)),
+                    None => "fault".into(),
+                }
+            }
             _ => panic!("unknown vector {line}"),
         };
         assert_eq!(f[2], got, "{line}");

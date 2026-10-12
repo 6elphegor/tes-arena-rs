@@ -296,6 +296,11 @@ pub mod record {
     pub const W36: u16 = 0x36;
 }
 
+/// "citydata.nn", a province's block in it and where it is loaded.
+const CITYDATA_NAME: u16 = 0x135E;
+const PROVINCE_BYTES: u16 = 0x4CC;
+const PROVINCE_DATA: u16 = 0x1429;
+
 /// Province data in DGROUP.
 const PROV_BOUNDS: u16 = 0x143D;
 const PROV_LOCATIONS: u16 = 0x1445;
@@ -410,6 +415,26 @@ impl Machine {
             let c = PLAN.wrapping_add(b as u16);
             self.mem.w8(DS, c, self.mem.r8(DS, c).wrapping_add(1));
         }
+    }
+
+    /// 1194:2E18 (far 2E14). Loads province `province`'s block of
+    /// CITYDATA.nn (the current save slot's digits from DGROUP 1A6C) to
+    /// DGROUP 1429: 0x4CC bytes at province * 0x4CC. Returns the block's
+    /// first byte (its name's). None where the file is missing (the
+    /// original goes on reading from whatever handle is current).
+    pub fn city_load_province(&mut self, files: &mut crate::bsa::Files, province: u8) -> Option<u8> {
+        self.mem.w8(DS, 0x191E, province);
+        let slot = self.mem.r8(DS, 0x1A6C);
+        let digits = (((slot % 10) as u16) << 8 | (slot / 10) as u16).wrapping_add(0x3030);
+        self.mem.w16(DS, CITYDATA_NAME + 9, digits);
+        let path = self.save_path(CITYDATA_NAME);
+        self.file_open(files, path)?;
+        if province != 0 {
+            self.file_seek(files, 0, province as u32 * PROVINCE_BYTES as u32);
+        }
+        self.file_read(files, DS, PROVINCE_DATA, PROVINCE_BYTES);
+        self.file_close(files);
+        Some(self.mem.r8(DS, PROVINCE_DATA))
     }
 
     /// 1194:3B84. Fills the location record at seg:rec for location `id`
