@@ -66,6 +66,7 @@ fn matches_original() {
                 m.city_reserve_blocks(regs["ax"] as u16);
                 Some("ok".into())
             }
+            "plan_for_record" => m.city_plan_for_record(DS, regs["di"] as u16).map(|_| "ok".into()),
             "build_location" => m
                 .city_build_location(DS, regs["di"] as u16, regs["ax"] as u16, regs["climate"] as u8)
                 .map(|_| "ok".into()),
@@ -107,6 +108,7 @@ fn matches_original() {
         "template",
         "reserve_blocks",
         "build_location",
+        "plan_for_record",
     ] {
         assert!(count.keys().any(|k| k.starts_with(n)), "no cases for {n}");
     }

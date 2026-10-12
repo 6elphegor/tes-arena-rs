@@ -55,6 +55,15 @@ pub mod table {
 use table::*;
 use var::*;
 
+/// City-info pass (1194:3EF4): record far pointer (segment, offset),
+/// saved seed, dimension, cell count, and three counters it clears
+/// (written in the order 138B, 1389, 1387).
+const INFO_REC: u16 = 0x124E;
+const INFO_SEED: u16 = 0x8B98;
+const INFO_DIM: u16 = 0x113B;
+const INFO_CELLS: u16 = 0x1141;
+const INFO_COUNTS: [u16; 3] = [0x138B, 0x1389, 0x1387];
+
 /// Map write offset step per block across, and per row of blocks.
 const BLOCK_STEP: u16 = 0x28;
 const ROW_STEP: u16 = 0x1400;
@@ -69,7 +78,13 @@ impl Machine {
     /// None where the original faults (no cells) or spins forever (no
     /// empty cell).
     pub fn city_place_block(&mut self, ty: u8) -> Option<()> {
-        let cells = self.mem.r16(DS, WORK_CELLS);
+        self.city_place_in(WORK_CELLS, ty)
+    }
+
+    /// `city_place_block` with the cell count taken from DGROUP
+    /// `cells_var` (1194:421C uses 1141).
+    fn city_place_in(&mut self, cells_var: u16, ty: u8) -> Option<()> {
+        let cells = self.mem.r16(DS, cells_var);
         if cells == 0 {
             return None;
         }
@@ -90,10 +105,15 @@ impl Machine {
     /// type from the fill table. With no such cell the original's
     /// `loop` runs 65536 times.
     pub fn city_plan(&mut self) -> Option<()> {
+        self.city_plan_in(WORK_CELLS)
+    }
+
+    /// `city_plan` with the cell count in DGROUP `cells_var`.
+    fn city_plan_in(&mut self, cells_var: u16) -> Option<()> {
         for ty in 0..6 {
-            self.city_place_block(ty)?;
+            self.city_place_in(cells_var, ty)?;
         }
-        let cells = self.mem.r16(DS, WORK_CELLS);
+        let cells = self.mem.r16(DS, cells_var);
         let zeros = (0..cells).filter(|&i| self.mem.r8(DS, PLAN.wrapping_add(i)) == 0).count() as u16;
         let n = if zeros == 0 { 0x10000 } else { zeros as u32 };
         for _ in 0..n {
@@ -103,9 +123,41 @@ impl Machine {
                 e = e.wrapping_add(3);
             }
             let ty = self.mem.r8(DS, e.wrapping_add(2));
-            self.city_place_block(ty)?;
+            self.city_place_in(cells_var, ty)?;
         }
         Some(())
+    }
+
+    /// 1194:3EF4..3F96: the plan as built for a location record by the
+    /// city-info pass (which then reads each block's .MIF header and sums
+    /// three counts into 1387/138B/1389; that file I/O is not ported).
+    /// Seeds the RNG from the record's (X << 16) | Y, also kept at 8B98,
+    /// with the dimension from +21 squared in 8 bits, and the cell count
+    /// at 113B/1141 instead of A886/A88C.
+    pub fn city_plan_for_record(&mut self, seg: u16, rec: u16) -> Option<()> {
+        self.mem.w16(DS, INFO_REC, seg);
+        self.mem.w16(DS, INFO_REC + 2, rec);
+        let seed = (self.mem.r16(seg, rec.wrapping_add(record::X)) as u32) << 16
+            | self.mem.r16(seg, rec.wrapping_add(record::Y)) as u32;
+        self.rng.seed = seed;
+        self.mem.w32(DS, RNG_SEED, seed);
+        self.mem.w32(DS, INFO_SEED, seed);
+        let dim = self.mem.r8(seg, rec.wrapping_add(record::DIM));
+        self.mem.w16(DS, INFO_DIM, dim as u16);
+        let cells = dim as u16 * dim as u16;
+        self.mem.w16(DS, INFO_CELLS, cells);
+        for c in INFO_COUNTS {
+            self.mem.w16(DS, c, 0);
+        }
+        // `loop` with CX=0 runs 65536 times.
+        let n = if cells == 0 { 0x10000 } else { cells as u32 };
+        for i in 0..n {
+            let p = PLAN.wrapping_add(i as u16);
+            if self.mem.r8(DS, p) != 1 {
+                self.mem.w8(DS, p, 0);
+            }
+        }
+        self.city_plan_in(INFO_CELLS)
     }
 
     /// 1194:03A2..03FA. Chooses the .MIF file for a plan byte: writes the

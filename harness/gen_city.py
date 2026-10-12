@@ -23,6 +23,7 @@ rng = random.Random(1994_11)
 out = open(sys.argv[2], 'w')
 S = 0x1194
 LO, HI = 0x3276 * 16, 0x3BA0 * 16 + 0x10000  # image-relative
+DGROUP_LIN = 0x3BA0 * 16
 PLAN = 0x486B
 LOAD_AT = a.lin(LOAD_SEG + S, 0x03FA)
 
@@ -123,9 +124,12 @@ def run(off, far=False, stop=None, **regs):
 base = None
 
 
-def case(name, writes, off, far=False, stop=None, rets=None, climate=None, **regs):
+def case(name, writes, off, far=False, stop=None, rets=None, climate=None, seg_words=(), **regs):
     """rets: registers to report as the result. climate: the byte the
-    stubbed 1194:3D91 returns."""
+    stubbed 1194:3D91 returns. seg_words: DGROUP words where the routine
+    stores a segment; the emulator's values are relocated, so they are
+    turned back into image-relative segments (as the port uses) before
+    diffing."""
     global base, stop_at_load
     writes = [(0x91F0, 2, 0), (0x91F6, 4, rng.getrandbits(32))] + writes
     region = lambda: bytes(a.mu.mem_read(LOAD_SEG * 16 + LO, HI - LO))
@@ -141,6 +145,13 @@ def case(name, writes, off, far=False, stop=None, rets=None, climate=None, **reg
     stop_at_load = name == 'block_name'
     r = run(off, far, stop, **regs)
     after = region()
+    if seg_words:
+        after = bytearray(after)
+        for o in seg_words:
+            i = DGROUP_LIN + o - LO
+            v = (struct.unpack_from('<H', after, i)[0] - LOAD_SEG) & 0xffff
+            struct.pack_into('<H', after, i, v)
+        after = bytes(after)
     if r in ('fault', 'hang'):
         result, diff = r, ''
     else:
@@ -239,3 +250,8 @@ for _ in range(400):
     rec = 0xA22 if rng.random() < 0.7 else rng.choice([0x5000, 0x6100, 0x7F00])
     w = [(0xA46, 1, 8 if rng.random() < 0.1 else rng.randint(0, 7))] + bounds() + entry(lid & 0x1F)
     case('build_location', w, 0x3B84, far=True, climate=rng.getrandbits(8), es=a.ds, di=rec, ax=lid)
+for _ in range(400):
+    rec = 0xA22 if rng.random() < 0.6 else rng.choice([0x5000, 0x6100, 0x7F00])
+    d = dim()
+    w = [(rec + 0x26, 2, rng.getrandbits(16)), (rec + 0x28, 2, rng.getrandbits(16)), (rec + 0x21, 1, d)]
+    case('plan_for_record', w + plan_writes(d * d), 0x3EF4, stop=0x3F96, seg_words=(0x124E,), es=a.ds, di=rec)
