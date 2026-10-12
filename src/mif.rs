@@ -14,7 +14,7 @@
 
 use crate::bsa::Files;
 use crate::machine::Machine;
-use crate::mem::{Heap, DS};
+use crate::mem::DS;
 
 /// DGROUP variables.
 pub mod var {
@@ -60,110 +60,143 @@ const T: usize = N_CHAR * 2 - 1;
 const R: usize = T - 1;
 const MAX_FREQ: u16 = 0x8000;
 
+/// The decoder's tables: DGROUP far pointer and size in bytes, in the
+/// order they are allocated and freed: the ring (N + F - 1 bytes), the
+/// encoder's three trees (unused by the decoder), prnt, son and freq.
+const TABLES: [(u16, u16); 7] =
+    [(TEXT, 0x103B), (0xEEC2, 0x2002), (0xEEBE, 0x2202), (0xEEBA, 0x2002), (PRNT, 0x75A), (SON, 0x4E6), (FREQ, 0x4E8)];
+const TEXT: u16 = 0xEEC6;
+const PRNT: u16 = 0xEEDA;
+const SON: u16 = 0xEED6;
+const FREQ: u16 = 0xEEDE;
+
 /// Block size in plane words, and the plane row stride in bytes.
 const BLOCK: u16 = 20;
 const ROW: u16 = 0x100;
 
-/// The decoder's heap tables (malloc'd by the original, freed at the end).
+/// The decoder's tables: far pointers (segment, offset) to their heap
+/// blocks, read and written in place as the original does (the ring as
+/// bytes, the rest as words).
+#[derive(Clone, Copy)]
 struct Huff {
-    text: Vec<u8>,
-    freq: Vec<u16>,
-    prnt: Vec<u16>,
-    son: Vec<u16>,
+    text: (u16, u16),
+    freq: (u16, u16),
+    prnt: (u16, u16),
+    son: (u16, u16),
 }
 
-impl Huff {
-    /// StartHuff (3065:0550); the ring holds spaces except the last F
-    /// bytes, which the original leaves as whatever the heap held (the
-    /// port, like the test harness, has zeros).
-    fn new() -> Self {
-        let mut h = Huff { text: vec![0; N], freq: vec![0; T + 1], prnt: vec![0; T + N_CHAR], son: vec![0; T] };
-        h.text[..N - F].fill(b' ');
+impl Machine {
+    fn huff_get(&self, t: (u16, u16), i: usize) -> u16 {
+        self.mem.r16(t.0, t.1.wrapping_add((i * 2) as u16))
+    }
+
+    fn huff_set(&mut self, t: (u16, u16), i: usize, v: u16) {
+        self.mem.w16(t.0, t.1.wrapping_add((i * 2) as u16), v);
+    }
+
+    fn huff_text(&self, h: &Huff, i: usize) -> u8 {
+        self.mem.r8(h.text.0, h.text.1.wrapping_add(i as u16))
+    }
+
+    fn huff_set_text(&mut self, h: &Huff, i: usize, b: u8) {
+        self.mem.w8(h.text.0, h.text.1.wrapping_add(i as u16), b);
+    }
+
+    /// StartHuff (3065:0550).
+    fn huff_start(&mut self, h: &Huff) {
         for i in 0..N_CHAR {
-            h.freq[i] = 1;
-            h.son[i] = (i + T) as u16;
-            h.prnt[i + T] = i as u16;
+            self.huff_set(h.freq, i, 1);
+            self.huff_set(h.son, i, (i + T) as u16);
+            self.huff_set(h.prnt, i + T, i as u16);
         }
         let (mut i, mut j) = (0, N_CHAR);
         while j <= R {
-            h.freq[j] = h.freq[i].wrapping_add(h.freq[i + 1]);
-            h.son[j] = i as u16;
-            h.prnt[i] = j as u16;
-            h.prnt[i + 1] = j as u16;
+            let f = self.huff_get(h.freq, i).wrapping_add(self.huff_get(h.freq, i + 1));
+            self.huff_set(h.freq, j, f);
+            self.huff_set(h.son, j, i as u16);
+            self.huff_set(h.prnt, i, j as u16);
+            self.huff_set(h.prnt, i + 1, j as u16);
             i += 2;
             j += 1;
         }
-        h.freq[T] = 0xFFFF;
-        h.prnt[R] = 0;
-        h
+        self.huff_set(h.freq, T, 0xFFFF);
+        self.huff_set(h.prnt, R, 0);
     }
 
     /// reconst (3065:060D): halves the frequencies and rebuilds the tree.
-    fn reconst(&mut self) {
+    /// Its moves are memmove (0000:7718), so they copy backwards here.
+    fn huff_reconst(&mut self, h: &Huff) {
         let mut j = 0;
         for i in 0..T {
-            if self.son[i] as usize >= T {
-                self.freq[j] = self.freq[i].wrapping_add(1) >> 1;
-                self.son[j] = self.son[i];
+            if self.huff_get(h.son, i) as usize >= T {
+                let f = self.huff_get(h.freq, i).wrapping_add(1) >> 1;
+                self.huff_set(h.freq, j, f);
+                let s = self.huff_get(h.son, i);
+                self.huff_set(h.son, j, s);
                 j += 1;
             }
         }
         let mut i = 0;
         for j in N_CHAR..T {
-            let f = self.freq[i].wrapping_add(self.freq[i + 1]);
-            self.freq[j] = f;
+            let f = self.huff_get(h.freq, i).wrapping_add(self.huff_get(h.freq, i + 1));
+            self.huff_set(h.freq, j, f);
             let mut k = j - 1;
-            while self.freq[k] > f {
+            while self.huff_get(h.freq, k) > f {
                 k -= 1;
             }
             k += 1;
-            self.freq.copy_within(k..j, k + 1);
-            self.freq[k] = f;
-            self.son.copy_within(k..j, k + 1);
-            self.son[k] = i as u16;
+            for t in [h.freq, h.son] {
+                for x in (k..j).rev() {
+                    let v = self.huff_get(t, x);
+                    self.huff_set(t, x + 1, v);
+                }
+            }
+            self.huff_set(h.freq, k, f);
+            self.huff_set(h.son, k, i as u16);
             i += 2;
         }
         for i in 0..T {
-            let k = self.son[i] as usize;
-            self.prnt[k] = i as u16;
+            let k = self.huff_get(h.son, i) as usize;
+            self.huff_set(h.prnt, k, i as u16);
             if k < T {
-                self.prnt[k + 1] = i as u16;
+                self.huff_set(h.prnt, k + 1, i as u16);
             }
         }
     }
 
     /// update (3065:07A4).
-    fn update(&mut self, c: usize) {
-        if self.freq[R] == MAX_FREQ {
-            self.reconst();
+    fn huff_update(&mut self, h: &Huff, c: usize) {
+        if self.huff_get(h.freq, R) == MAX_FREQ {
+            self.huff_reconst(h);
         }
-        let mut c = self.prnt[c + T] as usize;
+        let mut c = self.huff_get(h.prnt, c + T) as usize;
         loop {
-            self.freq[c] = self.freq[c].wrapping_add(1);
-            let k = self.freq[c];
+            let k = self.huff_get(h.freq, c).wrapping_add(1);
+            self.huff_set(h.freq, c, k);
             let mut l = c + 1;
-            if k > self.freq[l] {
+            if k > self.huff_get(h.freq, l) {
                 // while (k > freq[++l]); l--;
-                while k > self.freq[l + 1] {
+                while k > self.huff_get(h.freq, l + 1) {
                     l += 1;
                 }
-                self.freq[c] = self.freq[l];
-                self.freq[l] = k;
-                let i = self.son[c] as usize;
-                self.prnt[i] = l as u16;
+                let fl = self.huff_get(h.freq, l);
+                self.huff_set(h.freq, c, fl);
+                self.huff_set(h.freq, l, k);
+                let i = self.huff_get(h.son, c) as usize;
+                self.huff_set(h.prnt, i, l as u16);
                 if i < T {
-                    self.prnt[i + 1] = l as u16;
+                    self.huff_set(h.prnt, i + 1, l as u16);
                 }
-                let j = self.son[l] as usize;
-                self.son[l] = i as u16;
-                self.prnt[j] = c as u16;
+                let j = self.huff_get(h.son, l) as usize;
+                self.huff_set(h.son, l, i as u16);
+                self.huff_set(h.prnt, j, c as u16);
                 if j < T {
-                    self.prnt[j + 1] = c as u16;
+                    self.huff_set(h.prnt, j + 1, c as u16);
                 }
-                self.son[c] = j as u16;
+                self.huff_set(h.son, c, j as u16);
                 c = l;
             }
-            c = self.prnt[c] as usize;
+            c = self.huff_get(h.prnt, c) as usize;
             if c == 0 {
                 break;
             }
@@ -227,14 +260,14 @@ impl Machine {
     }
 
     /// 3065:09A1.
-    fn mif_decode_char(&self, h: &mut Huff, io: &mut Io) -> usize {
-        let mut c = h.son[R] as usize;
+    fn mif_decode_char(&mut self, h: &Huff, io: &mut Io) -> usize {
+        let mut c = self.huff_get(h.son, R) as usize;
         while c < T {
             c += self.mif_getbit(io) as usize;
-            c = h.son[c] as usize;
+            c = self.huff_get(h.son, c) as usize;
         }
         c -= T;
-        h.update(c);
+        self.huff_update(h, c);
         c
     }
 
@@ -258,12 +291,23 @@ impl Machine {
     /// 3065:0D2D. Decodes `len` bytes at `src_seg`:`src_off` into
     /// `dst_seg`:`dst_off` and returns the original's AX: the low word of
     /// the number of bytes written. The first input word is the size to
-    /// decode; 0 returns at once (the original then also leaks its
-    /// tables). The size is only checked between matches, so a match can
-    /// overshoot it, and output offsets wrap within the segment. The
-    /// size word is read even when `len` < 2, which leaves the read
-    /// pointer past the end, so the input runs on through the segment.
-    pub fn mif_decompress(&mut self, src_seg: u16, src_off: u16, dst_seg: u16, dst_off: u16, len: u16) -> u16 {
+    /// decode; 0 returns at once, leaking the tables. The size is only
+    /// checked between matches, so a match can overshoot it, and output
+    /// offsets wrap within the segment. The size word is read even when
+    /// `len` < 2, which leaves the read pointer past the end, so the
+    /// input runs on through the segment.
+    ///
+    /// The tables are heap blocks (`TABLES`), used in place as in the
+    /// original: the ring holds whatever the heap left past its spaces,
+    /// and where a table overlaps the input (a freed buffer reused) the
+    /// decoder's writes change what it reads next. None where the heap
+    /// reports an error.
+    pub fn mif_decompress(&mut self, src_seg: u16, src_off: u16, dst_seg: u16, dst_off: u16, len: u16) -> Option<u16> {
+        for (slot, size) in TABLES {
+            let (seg, off) = self.heap_alloc_bytes(size)?;
+            self.mem.w16(DS, slot, off);
+            self.mem.w16(DS, slot + 2, seg);
+        }
         self.mem.w8(DS, lz::PUTLEN, 0);
         self.mem.w16(DS, lz::PUTBUF, 0);
         self.mem.w8(DS, lz::GETLEN, 0);
@@ -287,33 +331,53 @@ impl Machine {
         };
         let mut count = 0u32;
         if textsize != 0 {
-            let mut h = Huff::new();
+            let (ts, to) = self.mif_table(TEXT);
+            for i in 0..(N - F) as u16 {
+                self.mem.w8(ts, to.wrapping_add(i), b' ');
+            }
+            let h = Huff { text: (ts, to), freq: self.mif_table(FREQ), prnt: self.mif_table(PRNT), son: self.mif_table(SON) };
+            self.huff_start(&h);
             let mut r = N - F;
             while (textsize as u32) > count {
-                let c = self.mif_decode_char(&mut h, &mut io);
+                let c = self.mif_decode_char(&h, &mut io);
                 if c < 256 {
                     self.mif_putc(&mut io, c as u8);
-                    h.text[r] = c as u8;
+                    self.huff_set_text(&h, r, c as u8);
                     r = (r + 1) & (N - 1);
                     count = count.wrapping_add(1);
                 } else {
                     let i = (r as u16).wrapping_sub(self.mif_decode_position(&mut io)).wrapping_sub(1) as usize & (N - 1);
                     for k in 0..c - 253 {
-                        let b = h.text[(i + k) & (N - 1)];
+                        let b = self.huff_text(&h, (i + k) & (N - 1));
                         self.mif_putc(&mut io, b);
-                        h.text[r] = b;
+                        self.huff_set_text(&h, r, b);
                         r = (r + 1) & (N - 1);
                         count = count.wrapping_add(1);
                     }
                 }
             }
+            self.mif_free_tables();
         }
         self.mem.w8(DS, lz::GETLEN, io.getlen);
         self.mem.w16(DS, lz::GETBUF, io.getbuf);
         self.mem.w16(DS, lz::IN_PTR, io.in_ptr);
         self.mem.w16(DS, lz::IN_PTR + 2, src_seg);
         self.mem.w16(DS, lz::OUT_PTR, io.out_ptr);
-        count as u16
+        Some(count as u16)
+    }
+
+    /// The far pointer (segment, offset) of a decoder table.
+    fn mif_table(&self, slot: u16) -> (u16, u16) {
+        (self.mem.r16(DS, slot + 2), self.mem.r16(DS, slot))
+    }
+
+    /// The end of 3065:0D2D: the tables are freed in allocation order
+    /// (through 0000:6C26, by segment).
+    fn mif_free_tables(&mut self) {
+        for (slot, _) in TABLES {
+            let seg = self.mem.r16(DS, slot + 2);
+            self.heap_free(seg);
+        }
     }
 
     /// The copy loop shared by 1194:04DD, 0542 and 051A: 20 rows of 20
@@ -412,19 +476,17 @@ impl Machine {
         }
     }
 
-    /// 1194:0488. Reads the chunk into a fresh (zeroed) buffer and
-    /// decompresses it to the buffer segment, offset 0.
-    fn mif_read_chunk(&mut self, files: &mut Files) {
+    /// 1194:0488. Reads the chunk into a heap block (not cleared) and
+    /// decompresses it to the buffer segment, offset 0. None where the
+    /// heap reports an error.
+    fn mif_read_chunk(&mut self, files: &mut Files) -> Option<()> {
         let len = self.mem.r16(DS, CHUNK_LEN);
-        // The chunk is read to a heap block of len bytes; it is staged
-        // in a scratch segment here, past the end of the image.
-        let scratch = CHUNK_SCRATCH;
-        for i in 0..((len as u32 + 15) & !15) {
-            self.mem.w8(scratch, i as u16, 0);
-        }
-        self.file_read(files, scratch, 0, len);
+        let (seg, _) = self.heap_alloc_bytes(len)?;
+        self.file_read(files, seg, 0, len);
         let dst = self.mem.r16(DS, BUFFER_SEG);
-        self.mif_decompress(scratch, 0, dst, 0, len);
+        self.mif_decompress(seg, 0, dst, 0, len)?;
+        self.heap_free(seg);
+        Some(())
     }
 
     /// 1194:03FA..0487. Loads the .MIF named at DS:`name` into the planes
@@ -442,15 +504,15 @@ impl Machine {
             self.file_read(files, DS, CHUNK_LEN, 2);
             match &self.mem.r32(DS, TAG).to_le_bytes() {
                 b"FLOR" => {
-                    self.mif_read_chunk(files);
+                    self.mif_read_chunk(files)?;
                     self.mif_copy_floor();
                 }
                 b"MAP1" => {
-                    self.mif_read_chunk(files);
+                    self.mif_read_chunk(files)?;
                     self.mif_copy_map1();
                 }
                 b"MAP2" => {
-                    self.mif_read_chunk(files);
+                    self.mif_read_chunk(files)?;
                     self.mif_copy_map2();
                 }
                 _ => {
@@ -469,7 +531,7 @@ impl Machine {
     /// The Imperial City (province 8) is its template alone. None where
     /// the original faults or hangs, or reaches code not ported (see
     /// `level_load`).
-    pub fn mif_build_city(&mut self, files: &mut Files, heap: &mut impl Heap) -> Option<()> {
+    pub fn mif_build_city(&mut self, files: &mut Files) -> Option<()> {
         // 0000:5C86 maps the EMS page in DGROUP 1030, before and after
         // the template.
         self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
@@ -479,7 +541,7 @@ impl Machine {
         // is generated first. Each name is put back in the template it
         // was opened through, and the templates restored after.
         let blocks = self.generate_city()?;
-        self.level_load(files, heap, crate::city::var::TEMPLATE)?;
+        self.level_load(files, crate::city::var::TEMPLATE)?;
         self.mif_wall_pass();
         if self.mem.r8(DS, crate::city::var::PROVINCE) == 8 {
             return Some(());
@@ -514,8 +576,6 @@ const MAP_HEIGHT: u16 = 0xC359;
 const WALL_VARIANT: u16 = 0xBB09;
 const CLEARED_TYPES: [u16; 5] = [0xC945, 0xC946, 0xC947, 0xC948, 0xC951];
 
-/// Where `mif_read_chunk` stages a chunk (the original's heap block).
-pub const CHUNK_SCRATCH: u16 = 0x5C00;
 /// The two block-name templates (long then short), 0x370C..0x3723.
 const CITY_NAME: u16 = crate::city::table::NAME_LONG;
 const NAME_BYTES: u16 = 0x3723 - 0x370C;

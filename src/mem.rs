@@ -69,22 +69,3 @@ impl Memory {
     }
 }
 
-/// The game's heap allocator, 0000:51F2 (not ported): a block of `paras`
-/// paragraphs (0 meaning 0x1000), returned as a segment with offset 0;
-/// 0 when out of memory. Callers clear what they use.
-pub trait Heap {
-    fn alloc(&mut self, paras: u16) -> u16;
-}
-
-/// Hands out consecutive blocks from a start segment, never reusing one:
-/// what the harness's first-fit allocator (harness/dos.py, from
-/// paragraph 0xA000) does while nothing is freed.
-pub struct Bump(pub u16);
-
-impl Heap for Bump {
-    fn alloc(&mut self, paras: u16) -> u16 {
-        let seg = self.0;
-        self.0 = self.0.wrapping_add(if paras == 0 { 0x1000 } else { paras });
-        seg
-    }
-}

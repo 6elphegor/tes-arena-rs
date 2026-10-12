@@ -22,7 +22,7 @@
 
 use crate::bsa::Files;
 use crate::machine::Machine;
-use crate::mem::{Heap, DS};
+use crate::mem::DS;
 use crate::mif::var::{BUFFER_SEG, CHUNK_LEN, FLOOR_SEG, MAP1_SEG, MAP2_SEG, TAG};
 
 /// DGROUP variables.
@@ -74,9 +74,12 @@ pub mod var {
     pub const W_C8ED: u16 = 0xC8ED;
     /// Far pointer called after a load with LEVEL_OVERRIDE, when set.
     pub const LEVEL_HOOK: u16 = 0xCD36;
-    /// Set by the reload path (0000:A548), which frees and reallocates
-    /// the buffer around each plane.
+    /// Set by the reload path (0000:A548): each plane then frees the
+    /// buffer block (far pointer BUFFER_BLOCK, normally the buffer
+    /// segment) first and allocates a new one of BUFFER_SIZE bytes after.
     pub const RELOAD: u16 = 0xBA16;
+    pub const BUFFER_BLOCK: u16 = 0xBA54;
+    pub const BUFFER_SIZE: u16 = 0xCB8E;
     /// EMS: enabled flag and page count (0000:5C8A).
     pub const EMS_ON: u16 = 0x8FA6;
     pub const EMS_PAGES: u16 = 0x9032;
@@ -105,14 +108,11 @@ impl Machine {
     /// unless FLAGS bit 9 is set.
     ///
     /// Assumes ES = DGROUP on entry, as from both callers seen. None
-    /// where the original faults (a LOCK chunk of 768 bytes or more) or
-    /// hangs (see CHUNK_LIMIT), the file is missing,
-    /// or it reaches code not ported: the reload path
-    /// (RELOAD set), EMS, or the level and open hooks.
-    pub fn level_load(&mut self, files: &mut Files, heap: &mut impl Heap, name: u16) -> Option<()> {
-        if self.mem.r8(DS, RELOAD) != 0 {
-            return None;
-        }
+    /// where the heap reports an error, the original faults (a LOCK
+    /// chunk of 768 bytes or more) or hangs (see CHUNK_LIMIT), the file
+    /// is missing, or it reaches code not ported: EMS, or the level and
+    /// open hooks.
+    pub fn level_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
         self.mem.w8(DS, TARGET_COUNT, 0);
         let handle = self.file_open_handle(files, name)?;
         self.mem.w16(DS, HANDLE, handle);
@@ -120,9 +120,9 @@ impl Machine {
         for i in 0..0x600 {
             self.mem.w8(DS, LIGHTS + i, 0);
         }
-        let seg = self.level_alloc(heap, PLANE_BYTES);
+        let seg = self.level_alloc(PLANE_BYTES)?;
         self.mem.w16(DS, MAP1_SEG, seg);
-        let seg = self.level_alloc(heap, PLANE_BYTES);
+        let seg = self.level_alloc(PLANE_BYTES)?;
         self.mem.w16(DS, FLOOR_SEG, seg);
         self.file_read(files, DS, CHUNK_LEN, 4);
         self.file_read(files, DS, CHUNK_LEN, 2);
@@ -132,7 +132,7 @@ impl Machine {
         let level = if over == 0xFF { self.mem.r8(DS, START_LEVEL) } else { over };
         self.mem.w8(DS, LEVEL, level);
         self.level_skip(files, level as u16);
-        self.level_chunks(files, heap)?;
+        self.level_chunks(files)?;
         if self.mem.r8(DS, LEVEL_OVERRIDE) != 0xFF && self.mem.r16(DS, LEVEL_HOOK + 2) != 0 {
             return None;
         }
@@ -150,16 +150,14 @@ impl Machine {
         Some(())
     }
 
-    /// 0000:533C. Allocates and clears `bytes` bytes; returns the segment
-    /// (0 if the heap is out of memory, left uncleared).
-    pub fn level_alloc(&mut self, heap: &mut impl Heap, bytes: u16) -> u16 {
-        let seg = heap.alloc(bytes.wrapping_add(15) >> 4);
-        if seg != 0 {
-            for i in 0..bytes {
-                self.mem.w8(seg, i, 0);
-            }
+    /// 0000:533C. Allocates `bytes` bytes on the heap and clears them;
+    /// returns the segment. None where the heap reports an error.
+    pub fn level_alloc(&mut self, bytes: u16) -> Option<u16> {
+        let (seg, off) = self.heap_alloc_bytes(bytes)?;
+        for i in 0..bytes {
+            self.mem.w8(seg, off.wrapping_add(i), 0);
         }
-        seg
+        Some(seg)
     }
 
     /// 0000:5C8A, with EMS off: nothing to do. None when EMS is on and
@@ -173,7 +171,7 @@ impl Machine {
 
     /// 0000:EB88. Reads a level header, then skips `n` levels, reading
     /// the next header after each.
-    fn level_skip(&mut self, files: &mut Files, n: u16) {
+    pub(crate) fn level_skip(&mut self, files: &mut Files, n: u16) {
         self.file_read(files, DS, CHUNK_LEN, 6);
         for _ in 0..n {
             let len = self.mem.r16(DS, LEVEL_LEN);
@@ -183,7 +181,7 @@ impl Machine {
     }
 
     /// 0000:E930. The chunk loop.
-    fn level_chunks(&mut self, files: &mut Files, heap: &mut impl Heap) -> Option<()> {
+    fn level_chunks(&mut self, files: &mut Files) -> Option<()> {
         for _ in 0..CHUNK_LIMIT {
             if self.file_read(files, DS, TAG, 4) == 0 {
                 return Some(());
@@ -231,7 +229,7 @@ impl Machine {
                     let f = self.mem.r16(DS, MAP_FLAGS) | 4;
                     self.mem.w16(DS, MAP_FLAGS, f);
                     if self.mem.r16(DS, MAP2_SEG) == 0 {
-                        let seg = self.level_alloc(heap, PLANE_BYTES);
+                        let seg = self.level_alloc(PLANE_BYTES)?;
                         self.mem.w16(DS, MAP2_SEG, seg);
                     }
                     let seg = self.mem.r16(DS, MAP2_SEG);
@@ -266,21 +264,29 @@ impl Machine {
         len
     }
 
-    /// 0000:EAE4 (RELOAD clear). Reads a compressed plane chunk to the
-    /// buffer, decompresses it to the end of the plane at `seg` (the
+    /// 0000:EAE4. Reads a compressed plane chunk to the buffer,
+    /// decompresses it to the end of the plane at `seg` (the
     /// decoded size is the chunk's first word) and copies it, MAP_DEPTH
     /// rows of MAP_WIDTH words, to rows of 0x100 bytes from offset 0,
     /// adding `add` to every word. Source and destination share the
     /// segment, so a large map overwrites source words before reading
     /// them, as in the original.
+    ///
+    /// With RELOAD set the buffer block is freed first, yet the chunk is
+    /// still read to the buffer segment: the decompressor's tables may
+    /// then be allocated over the input it is reading.
     fn level_plane(&mut self, files: &mut Files, seg: u16, add: u16) -> Option<()> {
+        let reload = self.mem.r8(DS, RELOAD) != 0;
+        if reload {
+            self.heap_free(self.mem.r16(DS, BUFFER_BLOCK + 2));
+        }
         self.file_read(files, DS, CHUNK_LEN, 2);
         self.ems_map(PLANE_PAGE)?;
         let buf = self.mem.r16(DS, BUFFER_SEG);
         let len = self.mem.r16(DS, CHUNK_LEN);
         self.file_read(files, buf, 0, len);
         let start = PLANE_BYTES.wrapping_sub(self.mem.r16(buf, 0));
-        self.mif_decompress(buf, 0, seg, start, len);
+        self.mif_decompress(buf, 0, seg, start, len)?;
         let width = self.mem.r16(DS, MAP_WIDTH);
         let depth = self.mem.r16(DS, MAP_DEPTH);
         // `loop` with CX = 0 runs 65536 times.
@@ -295,6 +301,11 @@ impl Machine {
                 di = di.wrapping_add(2);
             }
             row = row.wrapping_add(0x100);
+        }
+        if reload {
+            let (s, o) = self.heap_alloc_bytes(self.mem.r16(DS, BUFFER_SIZE))?;
+            self.mem.w16(DS, BUFFER_BLOCK, o);
+            self.mem.w16(DS, BUFFER_BLOCK + 2, s);
         }
         Some(())
     }

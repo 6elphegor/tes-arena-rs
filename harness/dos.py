@@ -2,17 +2,18 @@
 
 int 21h open (3D), read (3F), seek (42) and close (3E) are served from
 the user's game directory, matching names case-insensitively, as DOS
-would. The game's heap allocator (0000:51F2) is replaced by a first-fit
-allocator that hands out zeroed blocks; the free routines (0000:6C26,
-6C32) return blocks to it. Everything else that raises an interrupt is
-a fault, as in emu.py.
+would. Everything else that raises an interrupt is a fault, as in
+emu.py. The game's own heap runs unmodified once `init_heap` has set it
+up (src/heap.rs ports it).
 """
 import os
 import struct
 from emu import Arena, LOAD_SEG
 from unicorn.x86_const import *
 
-HEAP_START, HEAP_END = 0xA000, 0x10F00  # paragraphs (emulator linear / 16)
+# Heap paragraphs (absolute, outside the image in the emulator and the
+# port alike; the stack is at 9000h).
+HEAP_START, HEAP_TOP = 0xA000, 0xF000
 
 
 class DosArena(Arena):
@@ -21,16 +22,12 @@ class DosArena(Arena):
         self.game_dir = game_dir
         self.names = {n.upper(): n for n in os.listdir(game_dir)}
         self.handles = {}
-        # Allocator stubs; patched before any code runs (unicorn caches
-        # translated code, so patches must not come later).
-        self.mu.mem_write(self.lin(LOAD_SEG, 0x51F2), b'\xcd\xf1\xc3')  # alloc AX paras -> DX
-        self.mu.mem_write(self.lin(LOAD_SEG, 0x6C26), b'\xcd\xf2\xcb')  # free(far ptr) cdecl
-        self.mu.mem_write(self.lin(LOAD_SEG, 0x6C32), b'\xcd\xf3\xcb')  # free(AX = segment)
-        self.reset_heap()
 
-    def reset_heap(self):
-        self.free_list = [(HEAP_START, HEAP_END - HEAP_START)]
-        self.used = {}
+    def init_heap(self, start=HEAP_START, top=HEAP_TOP):
+        """Startup's heap setup (0000:00CC): one free block start..top."""
+        self.w16(0x159, start)
+        self.w16(0x15D, top)
+        self.call_near(0, 0x00CC)
 
     def patch(self, seg, off, code):
         """Replace code at image seg:off; call before running anything."""
@@ -40,12 +37,6 @@ class DosArena(Arena):
 
     def _intr(self, mu, intno, _):
         if intno == 0x21 and self._dos():
-            return
-        if intno == 0xF1:
-            self._alloc()
-            return
-        if intno in (0xF2, 0xF3):
-            self._free(intno)
             return
         self.fault = intno
         mu.emu_stop()
@@ -104,33 +95,6 @@ class DosArena(Arena):
             return True
         return False
 
-    def _alloc(self):
-        paras = self._reg('ax') or 0x10000 >> 4
-        for i, (s, n) in enumerate(self.free_list):
-            if n >= paras:
-                self.free_list[i] = (s + paras, n - paras)
-                self.used[s] = paras
-                self.mu.mem_write(s * 16, bytes(paras * 16))
-                self._wreg('dx', s)
-                self._wreg('ax', 0)
-                self._set_cf(False)
-                return
-        raise MemoryError('emulated heap exhausted')
-
-    def _free(self, intno):
-        if intno == 0xF2:
-            sp = self._reg('sp')
-            seg = struct.unpack('<H', self.mu.mem_read(self.lin(self._reg('ss'), sp + 6), 2))[0]
-        else:
-            seg = self._reg('ax')
-        n = self.used.pop(seg, None)
-        if n is not None:
-            self.free_list.insert(0, (seg, n))
-        # Callers here free everything they allocate; starting over when
-        # nothing is in use avoids fragmenting this simple allocator.
-        if not self.used:
-            self.reset_heap()
-
     # --- snapshots ----------------------------------------------------------
 
     def snapshot(self):
@@ -139,4 +103,3 @@ class DosArena(Arena):
     def restore(self, snap):
         self.mu.mem_write(0, snap[0])
         self.handles = dict((h, list(f)) for h, f in snap[1].items())
-        self.reset_heap()

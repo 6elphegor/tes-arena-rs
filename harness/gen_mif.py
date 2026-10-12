@@ -3,7 +3,8 @@
 Usage: gen_mif.py ACD_unpacked.EXE GAME_DIR OUT
 
 Runs the original under a minimal DOS file layer (harness/dos.py) backed
-by the user's game directory, so the file code (0000:67C4.., the BSA
+by the user's game directory and with the game's heap set up (the
+decompressor and block loader allocate from it), so the file code (0000:67C4.., the BSA
 directory scan) runs unmodified. No game data goes into the vectors:
 real inputs are named (BSA file names, chunk indices) and outputs are
 FNV-1a digests.
@@ -27,7 +28,7 @@ from emu import Fault, LOAD_SEG, STUB_SEG
 
 EXE, GAME, OUT = sys.argv[1:4]
 rng = random.Random(0x1994_0B5A)
-out = open(OUT, 'w')
+out = open(OUT, 'w', buffering=1)
 
 FLOOR_SEG, MAP1_SEG, MAP2_SEG, DECODE_SEG = 0x7000, 0x7800, 0x8000, 0x8800
 SRC_SEG = 0x5C00
@@ -49,6 +50,7 @@ def fill(i):
 PLANE_FILL = bytes(fill(i) for i in range(0x10000))
 
 a = DosArena(EXE, GAME)
+a.init_heap()
 a.run_range(0, 0x6F3A, 0x6F87)
 out.write(f'open | {a.r16(0xA926):x} {a.r16(0xA922) | a.r16(0xA924) << 16:x}\n')
 

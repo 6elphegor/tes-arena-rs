@@ -6,13 +6,13 @@ mod common;
 
 use arena::bsa::Files;
 use arena::machine::Machine;
-use arena::mem::{Bump, DS};
+use arena::mem::DS;
 use std::path::PathBuf;
 
 const PLANE_VARS: [u16; 4] = [0xCCD0, 0xD806, 0xD748, 0x9030];
 const BUFFER_SEG: u16 = 0x8800;
-/// First paragraph of the harness's heap (harness/dos.py).
-const HEAP: u16 = 0xA000;
+/// The harness's heap (harness/dos.py).
+const HEAP: (u16, u16) = (0xA000, 0xF000);
 const NAME: u16 = 0x0A36;
 
 fn game_dir() -> PathBuf {
@@ -35,14 +35,11 @@ fn put(m: &mut Machine, off: u16, bytes: &[u8]) {
     }
 }
 
-/// The decompressor's table pointers, which the harness leaves out.
-const LZ_PTRS: std::ops::Range<u16> = 0xEEBA..0xEEE2;
-
 /// Changed DGROUP bytes (offset, value), then the planes (32 KB blocks)
 /// and the buffer segment.
 fn digests(m: &Machine, before: &Machine) -> String {
     let changed = (0..=0xFFFFu16)
-        .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o) && !LZ_PTRS.contains(&o))
+        .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
         .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
     let mut out = format!("{:x}", fnv(changed));
     for (v, n) in PLANE_VARS.into_iter().zip([0x8000u32, 0x8000, 0x8000, 0x10000]) {
@@ -64,13 +61,13 @@ fn matches_original() {
     let mut base = Machine::new(&img);
     assert!(base.bsa_open(&mut files));
     base.mem.w16(DS, 0x9030, BUFFER_SEG);
+    base.heap_init(HEAP.0, HEAP.1).unwrap();
     let vectors = include_str!("vectors/level.txt");
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in vectors.lines() {
         let f: Vec<&str> = line.split(" | ").collect();
         let mut m = base.clone();
         let mut fs = files.clone();
-        let mut heap = Bump(HEAP);
         let p: Vec<&str> = f[1].split(' ').collect();
         let got = match f[0] {
             "level" => {
@@ -82,7 +79,7 @@ fn matches_original() {
                 m.mem.w16(DS, 0xCB88, hex(p[5]) as u16);
                 m.mem.w16(DS, 0xC398, hex(p[6]) as u16);
                 let before = m.clone();
-                m.level_load(&mut fs, &mut heap, NAME).map(|()| digests(&m, &before))
+                m.level_load(&mut fs, NAME).map(|()| digests(&m, &before))
             }
             "city" => {
                 put(&mut m, NAME, format!("{}\0", p[0]).as_bytes());
@@ -97,10 +94,24 @@ fn matches_original() {
                 m.mem.w16(DS, 0x91F0, 0);
                 m.load_rng();
                 let before = m.clone();
-                m.mif_build_city(&mut fs, &mut heap).map(|()| {
+                m.mif_build_city(&mut fs).map(|()| {
                     m.store_rng();
                     digests(&m, &before)
                 })
+            }
+            "reload" => {
+                let size = hex(p[2]) as u16;
+                m.mem.w16(DS, 0xCB8E, size);
+                let (buf, _) = m.heap_alloc(0x1000).unwrap();
+                m.mem.w16(DS, 0x9030, buf);
+                let (seg, off) = m.heap_alloc_bytes(size).unwrap();
+                m.mem.w16(DS, 0xBA54, off);
+                m.mem.w16(DS, 0xBA56, seg);
+                m.mem.w8(DS, 0xBA16, 1);
+                m.mem.w8(DS, 0xBB0B, hex(p[1]) as u8);
+                put(&mut m, NAME, format!("{}\0", p[0]).as_bytes());
+                let before = m.clone();
+                m.level_load(&mut fs, NAME).map(|()| digests(&m, &before))
             }
             _ => panic!("unknown vector {line}"),
         };
@@ -115,5 +126,5 @@ fn matches_original() {
         *counts.entry(f[0]).or_default() += 1;
     }
     eprintln!("{counts:?}");
-    assert_eq!(counts.len(), 2);
+    assert_eq!(counts.len(), 3);
 }

@@ -129,6 +129,8 @@ fn matches_original() {
     let bsa = Dir::new(std::fs::read(dir.join("GLOBAL.BSA")).unwrap());
     let mut base = Machine::new(&img);
     assert!(base.bsa_open(&mut files));
+    // The harness's heap (harness/dos.py).
+    base.heap_init(0xA000, 0xF000).unwrap();
     for (v, s) in PLANE_VARS.iter().zip(PLANES) {
         base.mem.w16(DS, *v, s);
     }
@@ -190,7 +192,7 @@ fn matches_original() {
                     _ => panic!("{line}"),
                 };
                 put(&mut m, SRC_SEG, 0, &src);
-                let ax = m.mif_decompress(SRC_SEG, 0, PLANES[3], 0, src.len() as u16);
+                let ax = m.mif_decompress(SRC_SEG, 0, PLANES[3], 0, src.len() as u16).expect("heap");
                 assert_eq!(hex(f[2]), ax as u64, "{line}");
                 assert_eq!(hex(f[3]), seg_digest(&m, PLANES[3]), "{line}");
                 let mut g = vec![m.mem.r8(DS, 0xB53E) as u16, m.mem.r8(DS, 0xB53F) as u16];
