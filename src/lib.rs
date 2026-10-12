@@ -12,6 +12,7 @@ pub mod effects;
 pub mod exe;
 pub mod haggle;
 pub mod heap;
+pub mod info;
 pub mod inventory;
 pub mod item;
 pub mod level;

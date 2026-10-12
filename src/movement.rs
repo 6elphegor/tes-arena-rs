@@ -8,6 +8,7 @@
 //! shape is stamped into the mask at the neighbour's offset (11 cells
 //! away, or 13 in creature mode). The cell under the position decides.
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -33,9 +34,10 @@ pub mod var {
     /// Map flags (C398) and level flags (C39A).
     pub const MAP_FLAGS: u16 = 0xC398;
     pub const LEVEL_FLAGS: u16 = 0xC39A;
-    /// Door table base for type 8 walls (bytes, 5 per door).
-    pub const DOOR_BASE: u16 = 0xC38E;
-    pub const DOORS: u16 = 0xCDA1;
+    /// Flats (type 8 walls): the first flat record of the level, and the
+    /// records' F: field (byte 3 of 5; bit 0 blocks). See `crate::info`.
+    pub const FLAT_BASE: u16 = 0xC38E;
+    pub const FLAT_FLAGS: u16 = 0xCDA1;
     /// Hooks called on a trigger square (far pointers).
     pub const TRIGGER_HOOK: u16 = 0xCD62;
     pub const OPEN_HOOK: u16 = 0xCD46;
@@ -58,6 +60,10 @@ pub mod var {
     pub const LEVELS: u16 = 0xC355;
     pub const EXIT_HOOK: u16 = 0xCD4E;
     pub const STAIRS_HOOK: u16 = 0xCD6E;
+    /// Called after a level change when set (far pointer).
+    pub const LEVEL_HOOK: u16 = 0xC3B8;
+    /// Set to 0xFFFE by a level change.
+    pub const W_A850: u16 = 0xA850;
     /// Climb counter set when climbing out of a low area.
     pub const CLIMB: u16 = 0xE39F;
 }
@@ -82,9 +88,9 @@ use var::*;
 /// for the player and for creatures.
 const NEIGHBOURS: u16 = 0xE7B8;
 const NEIGHBOURS_CREATURE: u16 = 0xE7EE;
-/// Shapes (16 x 16 bytes): solid, a door's, and two halves.
+/// Shapes (16 x 16 bytes): solid, a flat's, and two halves.
 const SOLID: u16 = 0xE3A2;
-const DOOR_SHAPE: u16 = 0xE4A2;
+const FLAT_SHAPE: u16 = 0xE4A2;
 const HALF_A: u16 = 0xE5A2;
 const HALF_B: u16 = 0xE6A2;
 /// Wall heights: bottoms by the low 3 bits of the high byte (three sets
@@ -195,11 +201,11 @@ impl Machine {
                     return None;
                 }
                 let fill = (0x80 | lo).wrapping_add(1);
-                let door = (lo as u16).wrapping_add(self.mem.r16(DS, DOOR_BASE));
-                if self.mem.r8(DS, DOORS.wrapping_add(door.wrapping_mul(5))) & 1 == 0 {
+                let flat = (lo as u16).wrapping_add(self.mem.r16(DS, FLAT_BASE));
+                if self.mem.r8(DS, FLAT_FLAGS.wrapping_add(flat.wrapping_mul(5))) & 1 == 0 {
                     return None;
                 }
-                Some((DOOR_SHAPE, fill))
+                Some((FLAT_SHAPE, fill))
             }
             0xD => Some((if w & 0x100 == 0 { HALF_A } else { HALF_B }, 0x80 | lo)),
             0xA => (w & 0x100 != 0).then_some((SOLID, lo)),
@@ -267,9 +273,10 @@ impl Machine {
     /// 0000:F8E1 (far F8DD). Moves the player by `speed` along heading
     /// `angle` (0..511): x and y get the high words of 2 * speed * sin and
     /// * cos, then `move_resolve` settles where the player ends up.
-    /// Returns the candidate taken (0 the full move .. 3 none). None
-    /// where a level change would happen (not ported) or a hook is set.
-    pub fn move_step(&mut self, speed: u16, angle: u16) -> Option<u16> {
+    /// Returns the candidate taken (0 the full move .. 3 none). Stairs
+    /// may change level on the way (`move_trigger`). None where a hook is
+    /// set, or a level change fails (see `move_change_level`).
+    pub fn move_step(&mut self, files: &mut Files, speed: u16, angle: u16) -> Option<u16> {
         let (ox, oy) = (self.mem.r16(DS, X), self.mem.r16(DS, Y));
         let a = speed.wrapping_add(speed) as i16 as i32;
         let b = angle.wrapping_add(angle);
@@ -279,7 +286,7 @@ impl Machine {
         let ny = oy.wrapping_add(((a * c) >> 16) as u16);
         self.mem.w16(DS, X, nx);
         self.mem.w16(DS, Y, ny);
-        let (x, y, k) = self.move_resolve(nx, ny, ox, oy)?;
+        let (x, y, k) = self.move_resolve(files, nx, ny, ox, oy)?;
         self.mem.w16(DS, X, x);
         self.mem.w16(DS, Y, y);
         Some(k)
@@ -288,14 +295,14 @@ impl Machine {
     /// 0000:F478. Tries (nx, ny), (nx, oy) and (ox, ny) in turn and takes
     /// the first the test allows; a test that says stop, or one that
     /// refuses while map flag 0x80 is set, ends at (ox, oy).
-    fn move_resolve(&mut self, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
+    fn move_resolve(&mut self, files: &mut Files, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
         self.mem.w8(DS, CHANGED, 0);
         self.mem.w16(DS, TRIGGER, 0);
         for (i, w) in [nx, ny, nx, oy, ox, ny, ox, oy].into_iter().enumerate() {
             self.mem.w16(DS, CANDIDATES + i as u16 * 2, w);
         }
         for k in 0..3u16 {
-            match self.move_test(CANDIDATES + k * 4)? {
+            match self.move_test(files, CANDIDATES + k * 4)? {
                 Test::Take => {
                     let p = CANDIDATES + k * 4;
                     return Some((self.mem.r16(DS, p), self.mem.r16(DS, p + 2), k));
@@ -312,7 +319,7 @@ impl Machine {
     }
 
     /// 0000:F60A. Tests the candidate at DS:`pos`.
-    fn move_test(&mut self, pos: u16) -> Option<Test> {
+    fn move_test(&mut self, files: &mut Files, pos: u16) -> Option<Test> {
         let creature = self.mem.r8(DS, CREATURE_MODE) != 0;
         if !creature && self.mem.r16(DS, TEST_HOOK + 2) != 0 {
             return None;
@@ -323,7 +330,7 @@ impl Machine {
             return Some(free(al));
         }
         if al & 0x80 == 0 && self.mem.r16(DS, HEIGHT) as i16 >= LOW {
-            let t = self.move_trigger(al)?;
+            let t = self.move_trigger(files, al)?;
             if t != 0 {
                 if self.move_heading_square() {
                     self.mem.w16(DS, TRIGGER, t);
@@ -359,37 +366,70 @@ impl Machine {
         }
     }
 
-    /// 0000:F76F for a cell that isn't a stair: the trigger byte's index
-    /// + 1 in TRIGGERS, or 0. A stair the player faces (0000:FDAA) when
-    /// no level change happened yet this move is a level change: None.
-    fn move_trigger(&mut self, al: u8) -> Option<u16> {
+    /// 0000:F76F. For a trigger byte, its index + 1 in TRIGGERS (0 if
+    /// none). For a stair byte, 0, after a level change when the player
+    /// faces the stair square (0000:FDAA) and no level changed yet this
+    /// move: up from the first level, or down from the last (or down
+    /// with level flag 0x100), there is none.
+    fn move_trigger(&mut self, files: &mut Files, al: u8) -> Option<u16> {
         let stairs = [self.mem.r8(DS, STAIRS_UP), self.mem.r8(DS, STAIRS_DOWN)];
-        if let Some(i) = stairs.iter().position(|&s| s == al) {
-            if !self.move_facing(al) || self.mem.r8(DS, CHANGED) != 0 {
+        let Some(i) = stairs.iter().position(|&s| s == al) else {
+            return Some((0..16).find(|&i| self.mem.r8(DS, TRIGGERS + i) == al).map_or(0, |i| i + 1));
+        };
+        if !self.move_facing(al) || self.mem.r8(DS, CHANGED) != 0 {
+            return Some(0);
+        }
+        let hooked = |m: &Self, h: u16| m.mem.r16(DS, h + 2) != 0;
+        let level = self.mem.r8(DS, LEVEL);
+        let to = if i == 0 {
+            // dec, then the sign of the byte.
+            let to = level.wrapping_sub(1);
+            if to & 0x80 != 0 {
+                return if hooked(self, EXIT_HOOK) { None } else { Some(0) };
+            }
+            to
+        } else {
+            if self.mem.r16(DS, LEVEL_FLAGS) & 0x100 != 0 {
                 return Some(0);
             }
-            if i == 1 && self.mem.r16(DS, LEVEL_FLAGS) & 0x100 != 0 {
-                return Some(0);
+            if hooked(self, STAIRS_HOOK) {
+                return None;
             }
-            // Up from the first level, or down from the last, only calls
-            // the exit hook (and for down, the stairs hook first).
-            let level = self.mem.r8(DS, LEVEL);
-            let hooked = |m: &Self, h: u16| m.mem.r16(DS, h + 2) != 0;
-            let edge = if i == 0 {
-                level == 0 || level > 0x7F
-            } else {
-                if hooked(self, STAIRS_HOOK) {
-                    return None;
-                }
-                level.wrapping_add(1) >= self.mem.r8(DS, LEVELS)
-            };
-            if edge && !hooked(self, EXIT_HOOK) {
-                return Some(0);
+            let to = level.wrapping_add(1);
+            if to >= self.mem.r8(DS, LEVELS) {
+                return if hooked(self, EXIT_HOOK) { None } else { Some(0) };
             }
-            // A level change (0000:EBB5 and the hooks around it).
+            to
+        };
+        if hooked(self, STAIRS_HOOK) {
             return None;
         }
-        Some((0..16).find(|&i| self.mem.r8(DS, TRIGGERS + i) == al).map_or(0, |i| i + 1))
+        self.mem.w8(DS, LEVEL, to);
+        self.move_change_level(files)?;
+        Some(0)
+    }
+
+    /// 0000:F7B5..F7F5 (and F85E..F89E). After the level's planes and
+    /// chunks are reloaded (`level_change`), the player turns round and
+    /// the new level's INF, if one was loaded, is loaded. The view update
+    /// (0000:DA8E) and the wait for the mouse buttons to be released
+    /// (8FC8) are skipped. None where the reload or the INF load fails,
+    /// or the hook at C3B8 is set.
+    fn move_change_level(&mut self, files: &mut Files) -> Option<()> {
+        self.level_change(files)?;
+        self.mem.w8(DS, CHANGED, 1);
+        self.mem.w16(DS, W_A850, 0xFFFE);
+        let h = self.mem.r16(DS, HEADING).wrapping_add(0x100) & 0x1FF;
+        self.mem.w16(DS, HEADING, h);
+        let info = self.mem.r16(DS, crate::info::var::INFO_PTR);
+        if info != 0 {
+            self.info_load(files, info)?;
+            self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        }
+        if self.mem.r16(DS, LEVEL_HOOK + 2) != 0 {
+            return None;
+        }
+        Some(())
     }
 
     /// 0000:FDAA. Whether the wall square ahead (by heading, from the

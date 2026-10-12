@@ -6,7 +6,7 @@ Lines:
   cell | x y seed flags | result   0000:F697 on the position at DGROUP F000:
        the cell value, and FNV-1a of the mask (929E, 256 bytes), E3A0,
        E8C2 and the wall plane. `flags` are the state written first
-       (key=value pairs, hex); the planes and the door table (CDA1, 0x200 bytes) come from `seed`.
+       (key=value pairs, hex); the planes and the flat flags (CDA1, 0x200 bytes) come from `seed`.
 """
 import os
 import random
@@ -50,7 +50,7 @@ def plane_words(seed):
 
 
 def door_bytes(seed):
-    """0x200 door-table bytes from the same LCG (mirrored in the test)."""
+    """0x200 flat-flag bytes (CDA1) from the same LCG (mirrored in the test)."""
     x, b = seed ^ 0x33333333, bytearray()
     for _ in range(0x200):
         x = (x * 1103515245 + 12345) & 0xffffffff

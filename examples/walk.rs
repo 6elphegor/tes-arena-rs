@@ -7,8 +7,9 @@
 //! the level's start position, at full height. Each step it moves
 //! forward (`move_step`); when blocked it turns by a random number of
 //! quarters, and now and then it turns anyway, so it wanders. The
-//! level's INFO setup (wall heights, stairs, doors) and door opening are
-//! not ported yet, so the image's defaults apply and doors stay shut.
+//! level's INF is loaded too (stairs, triggers, textures); door opening
+//! isn't ported yet, so doors stay shut. The walk stops at stairs,
+//! after the level change (the map drawn is then the new level).
 
 use arena::bsa::Files;
 use arena::exe;
@@ -33,10 +34,29 @@ fn main() {
     m.heap_init(0xA000, 0xF000).expect("heap");
     let (buf, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x9030, buf);
+    // EMS on (32 banks through the buffer segment), and the INF buffer,
+    // as tests/info.rs sets them up.
+    m.mem.w8(DS, 0x8FA6, 1);
+    m.mem.w16(DS, 0x9032, 0x20);
+    let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
+    m.mem.w16(DS, 0xBA54, off);
+    m.mem.w16(DS, 0xBA56, seg);
+    m.mem.w16(DS, 0xCB8A, buf);
+    m.mem.w16(DS, 0xCB88, 0x8000);
     for (i, b) in format!("{}\0", args[2]).bytes().enumerate() {
         m.mem.w8(DS, 0xF000 + i as u16, b);
     }
     m.level_load(&mut files, 0xF000).expect("level");
+    // The level file's name, for level changes on stairs.
+    for (i, b) in format!("{}\0", args[2]).bytes().enumerate() {
+        m.mem.w8(DS, 0xC37F + i as u16, b);
+    }
+    let info = m.mem.r16(DS, 0xCB84);
+    if info != 0 {
+        m.info_load(&mut files, info).expect("INF");
+        println!("INF {}: stairs up {:#x}, down {:#x}", String::from_utf8_lossy(m.mem.cstr(DS, 0xC2B5)),
+            m.mem.r8(DS, 0xC932), m.mem.r8(DS, 0xC933));
+    }
     m.mem.w16(DS, 0xC3D2, 0x3C);
     m.rng.seed = 1994;
 
@@ -51,8 +71,13 @@ fn main() {
             heading = (heading.wrapping_add((m.rng.next() % 4) * 0x80)) & 0x1FF;
             m.mem.w16(DS, 0xC3DA, heading);
         }
-        if m.move_step(0x30, heading).is_none() {
-            println!("a level change: stopping");
+        let level = m.mem.r8(DS, 0xBB0A);
+        if m.move_step(&mut files, 0x30, heading).is_none() {
+            println!("stopped: a hook or a failed level change");
+            break;
+        }
+        if m.mem.r8(DS, 0xBB0A) != level {
+            println!("stairs: level {level} -> {}", m.mem.r8(DS, 0xBB0A));
             break;
         }
         let after = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));

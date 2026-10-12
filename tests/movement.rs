@@ -2,6 +2,7 @@
 //! against vectors from the original code (harness/gen_move.py).
 mod common;
 
+use arena::bsa::Files;
 use arena::machine::Machine;
 use arena::mem::DS;
 
@@ -81,7 +82,9 @@ fn matches_original() {
             m.mem.w16(DS, 0xC3D0, hex(p[0]) as u16);
             m.mem.w16(DS, 0xC3D4, hex(p[1]) as u16);
             let before = m.clone();
-            let got = m.move_step(hex(p[3]) as u16, hex(p[4]) as u16).map(|_| {
+            // No files: the cases never reach a level change.
+            let mut files = Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+            let got = m.move_step(&mut files, hex(p[3]) as u16, hex(p[4]) as u16).map(|_| {
                 let changed = (0..=0xFFFFu16)
                     .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
                     .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);

@@ -32,11 +32,19 @@ No game code or data is included: everything is loaded from your own copy.
   seed, location records and templates (1194:0292, 3B84). Loading the
   MIFs is in `src/mif.rs`.
 - `src/bsa.rs`, `src/mif.rs` – GLOBAL.BSA access (including the XOR
-  decryption of .INF/.TXT entries), the MIF decompressor (LZHUF), city
-  block loading, the wall pass and whole cities (1194:0292).
+  decryption of .INF/.TXT entries and the directory cached in EMS), the
+  MIF decompressor (LZHUF), city block loading, the wall pass and whole
+  cities (1194:0292).
 - `src/level.rs` – the .MIF level loader (0000:E87C) used for city
   templates, interiors and dungeons: header, level selection, planes,
-  locks, triggers, lights, text and info chunks.
+  locks, triggers, lights, text and info chunks; reloading a level on
+  stairs (0000:EBB5); EMS (0000:5C8A), modelled as 64 KB banks swapped
+  through the frame.
+- `src/info.rs` – the level .INF loader (0000:EC03): which textures the
+  map uses, texture files read into EMS banks, wall and floor roles
+  (stairs, chasms, triggers, box sides and caps, ceiling), flat
+  records, sounds and texts. Loading the flats themselves (0000:BED8)
+  is not ported.
 - `src/heap.rs` – the game's heap: startup setup, first-fit and last-fit
   allocation, free with merging. Loaders and the decompressor allocate
   from it as the original does; set it up with `heap_init` first.
@@ -51,8 +59,8 @@ No game code or data is included: everything is loaded from your own copy.
   `ARENA_SAVE` set to its folder.
 - `src/movement.rs` – the movement step and collision (0000:F8DD,
   F478, F60A, F697, FB3A): the 16 x 16 cell mask around a square,
-  sliding along walls, triggers, climbing out of low areas. Level
-  changes on stairs are not ported yet (None).
+  sliding along walls, triggers, climbing out of low areas, and level
+  changes on stairs.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).
@@ -68,10 +76,13 @@ No game code or data is included: everything is loaded from your own copy.
   prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
   writes a save's stored screenshot and the map of the level it is in;
   `examples/wild_map.rs` draws a location's wilderness grid and four of
-  its blocks as terrain; `examples/travel.rs` plans a journey.
+  its blocks as terrain; `examples/travel.rs` plans a journey;
+  `examples/walk.rs` lets a walker wander a level with the movement code
+  and draws its path.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
-  routines can run unmodified against the user's own game files, and
-  `init_heap` to set up the game's heap.
+  routines can run unmodified against the user's own game files,
+  `init_heap` to set up the game's heap, and `enable_ems` for EMS bank
+  switching (int 67h 4E02).
 - `harness/emu.py` – runs original routines under unicorn (far, near or a
   code range); CPU faults are reported as `Fault`.
 - `harness/xref.py` – static helpers: data xrefs, pointer tables,
