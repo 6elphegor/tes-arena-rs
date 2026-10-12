@@ -13,6 +13,7 @@ const CREATURES: u16 = 0x7000;
 const BUFFER: u16 = 0x7400;
 const EXTRA: (u16, u16) = (0x8800, 0x0010);
 const LOAD: u16 = 0x7800;
+const SCREEN: u16 = 0x6000;
 
 fn game_dir() -> PathBuf {
     std::env::var("ARENA_EXE")
@@ -57,6 +58,8 @@ fn matches_original() {
         files.add_dir(s).expect("ARENA_SAVE");
     }
     let mut base = Machine::new(&img);
+    // The harness's heap (harness/dos.py).
+    base.heap_init(0xA000, 0xF000).unwrap();
     assert!(base.bsa_open(&mut files));
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in include_str!("vectors/save.txt").lines() {
@@ -131,6 +134,38 @@ fn matches_original() {
                         changed(&m, &before),
                         fnv((0..0x3520u16).map(|i| m.mem.r8(0x3276, i)))
                     ),
+                    None => "fault".into(),
+                }
+            }
+            "level" => {
+                if save.is_none() {
+                    eprintln!("skipping level case: ARENA_SAVE not set");
+                    continue;
+                }
+                m.save_set_slot(p[0] as u8);
+                m.mem.w16(DS, 0x9030, BUFFER);
+                m.mem.w16(DS, 0xA8FE, 0);
+                m.mem.w16(DS, 0xA900, SCREEN);
+                m.mem.w8(DS, 0xC995, p[1] as u8);
+                m.mem.w16(DS, 0xC398, p[2] as u16);
+                if p[3] != 0 {
+                    for var in [0xD806, 0xCCD0, 0xD748] {
+                        let (sg, _) = m.heap_alloc_bytes(0x8000).unwrap();
+                        m.mem.w16(DS, var, sg);
+                    }
+                }
+                let before = m.clone();
+                let mut fs = files.clone();
+                match m.save_load_level(&mut fs) {
+                    Some(()) => {
+                        let mut parts = vec![changed(&m, &before)];
+                        for var in [0xD806, 0xCCD0, 0xD748] {
+                            let sg = m.mem.r16(DS, var);
+                            parts.push(if sg == 0 { 0 } else { fnv((0..0x8000u16).map(|i| m.mem.r8(sg, i))) });
+                        }
+                        parts.push(fnv((0..0xFA00u16).map(|i| m.mem.r8(SCREEN, i))));
+                        parts.iter().map(|p| format!("{p:x}")).collect::<Vec<_>>().join(" ")
+                    }
                     None => "fault".into(),
                 }
             }

@@ -234,3 +234,11 @@ load | START.MIF 0 | 0 b03ad5ea2d53dbb7 7b86852d5afc5dcd
 load | START.MIF 100 | 100 b03ad5ea2d53dbb7 52c458f14129bdcd
 spells | 1 | b9da19be2c79caa8 8090ce23c3b8e01d
 spells | 2 | f80dac9303396bdb 44edd6f7e93899a5
+level | 1 0 659d 0 | 513716dd1d43599f 44bef0559e637761 c5172f2cd7a411e4 0 cabb0838d88650ad
+level | 1 0 61f5 1 | 49c25bc34ca6c4a1 44bef0559e637761 c5172f2cd7a411e4 0 cabb0838d88650ad
+level | 1 1 d394 0 | db21eb1ed8929a40 44bef0559e637761 c5172f2cd7a411e4 0 dd14fcc6528cab25
+level | 1 1 d535 1 | a51e690e0827b01e 44bef0559e637761 c5172f2cd7a411e4 0 dd14fcc6528cab25
+level | 2 0 39f5 0 | fault
+level | 2 0 e7a 1 | fault
+level | 2 1 7cc 0 | fault
+level | 2 1 ee47 1 | fault

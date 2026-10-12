@@ -40,8 +40,9 @@ No game code or data is included: everything is loaded from your own copy.
   selection.
 - `src/creature.rs` – NPC and monster generation, corpse loot,
   monster spawning.
-- `src/save.rs` – saved games: slot file names, paths, and loading the
-  engine save (SAVEENGN.nn, decrypted). Tests with a save need
+- `src/save.rs` – saved games: slot file names, paths, the engine save
+  (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
+  palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
 - `src/names.rs` – random NPC names from NAMECHNK.DAT (1194:080B);
   `expand_npc_named` builds a whole NPC with its name.
@@ -49,7 +50,8 @@ No game code or data is included: everything is loaded from your own copy.
   dungeon from your game files with the ported code and write its map as
   a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
   imperial.ppm`. `examples/character_sheet.rs` loads a saved game and
-  prints the character.
+  prints the character, inventory and spells; `examples/save_view.rs`
+  writes a save's stored screenshot and the map of the level it is in.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
   routines can run unmodified against the user's own game files, and
   `init_heap` to set up the game's heap.

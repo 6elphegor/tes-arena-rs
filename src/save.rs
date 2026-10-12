@@ -38,6 +38,19 @@ pub mod var {
     /// more), loaded whole into segment 3276 at 0000 and 2A80.
     pub const SPELLBOOK: u16 = 0x7F0C;
     pub const SPELLS: u16 = 0x7F17;
+    /// SAVEGAME.nn: handle, the screen buffer (far pointer) and palette
+    /// the screenshot goes to, the flag that skips them, the game state
+    /// block (0xDE7 bytes from BB08), and the saved position copy.
+    pub const LEVEL_HANDLE: u16 = 0xBA6C;
+    pub const SCREEN: u16 = 0xA8FE;
+    pub const PALETTE: u16 = 0x929E;
+    pub const NO_SCREEN: u16 = 0xC995;
+    pub const LEVEL_STATE: u16 = 0xBB08;
+    pub const LEVEL_STATE_BYTES: u16 = 0x0DE7;
+    pub const SAVED_POSITION: u16 = 0xBA62;
+    /// Far pointers called around the plane loads when set (0000:A8EF).
+    pub const LOAD_HOOK_1: u16 = 0xBA72;
+    pub const LOAD_HOOK_2: u16 = 0xBA76;
 }
 use var::*;
 
@@ -79,6 +92,76 @@ impl Machine {
                 return None;
             }
         }
+        Some(())
+    }
+
+    /// 25FD:032F..0335 then 0000:A9A6..AA4A: loads SAVEGAME for the
+    /// current slot names (see `save_set_slot`): the screenshot (0xFA00
+    /// bytes to the screen buffer, then a 0x300-byte palette; skipped
+    /// when NO_SCREEN is set), the game state block, and the planes:
+    /// walls, floor (its words get the buffer segment number added back;
+    /// the saver took it off) and, if the state's MAP_FLAGS bit 2 says
+    /// the level has one, the ceiling. The old planes are freed first,
+    /// the walls are allocated cleared and the others not. The screen and
+    /// palette are not shown (0000:946A and 9B56 write to the VGA), and
+    /// the world is not rebuilt (0000:AA4B on). None where the file is
+    /// missing, the heap reports an error, EMS is on or a hook is set.
+    pub fn save_load_level(&mut self, files: &mut Files) -> Option<()> {
+        use crate::level::var::MAP_FLAGS;
+        use crate::mif::var::{BUFFER_SEG, FLOOR_SEG, MAP1_SEG, MAP2_SEG};
+        let path = self.save_path(SAVEGAME);
+        let handle = self.file_open_handle(files, path)?;
+        self.mem.w16(DS, LEVEL_HANDLE, handle);
+        if self.mem.r8(DS, crate::level::var::EMS_ON) != 0 {
+            return None;
+        }
+        let ceiling = self.mem.r16(DS, MAP_FLAGS) & 4 != 0;
+        for (var, free) in [(MAP1_SEG, true), (FLOOR_SEG, true), (MAP2_SEG, ceiling)] {
+            if free {
+                self.heap_free(self.mem.r16(DS, var));
+                self.mem.w16(DS, var, 0);
+            }
+        }
+        if self.mem.r8(DS, NO_SCREEN) != 0 {
+            self.file_seek(files, 1, 0xFD00);
+        } else {
+            let (off, seg) = (self.mem.r16(DS, SCREEN), self.mem.r16(DS, SCREEN + 2));
+            self.file_read(files, seg, off, 0xFA00);
+            self.file_read(files, DS, PALETTE, 0x300);
+        }
+        self.file_read(files, DS, LEVEL_STATE, LEVEL_STATE_BYTES);
+        if self.mem.r16(DS, LOAD_HOOK_1 + 2) != 0 {
+            return None;
+        }
+        for i in 0..3 {
+            let w = self.mem.r16(DS, crate::level::var::PLAYER_X + i * 2);
+            self.mem.w16(DS, SAVED_POSITION + i * 2, w);
+        }
+        // 0000:A72E: the planes.
+        let seg = self.level_alloc(0x8000)?;
+        self.mem.w16(DS, MAP1_SEG, seg);
+        self.file_read(files, seg, 0, 0x8000);
+        let (seg, _) = self.heap_alloc_bytes(0x8000)?;
+        self.mem.w16(DS, FLOOR_SEG, seg);
+        self.file_read(files, seg, 0, 0x8000);
+        let add = self.mem.r16(DS, BUFFER_SEG);
+        for i in 0..0x4000u16 {
+            let w = self.mem.r16(seg, i * 2).wrapping_add(add);
+            self.mem.w16(seg, i * 2, w);
+        }
+        if self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
+            let (seg, _) = self.heap_alloc_bytes(0x8000)?;
+            self.mem.w16(DS, MAP2_SEG, seg);
+            self.file_read(files, seg, 0, 0x8000);
+        } else {
+            self.file_seek(files, 1, 0x8000);
+        }
+        self.file_close(files);
+        if self.mem.r16(DS, LOAD_HOOK_2 + 2) != 0 {
+            return None;
+        }
+        self.mem.w16(DS, crate::level::var::W_C8ED, 0xFFFF);
+        self.mem.w8(DS, 0xCB5B, 0xFF);
         Some(())
     }
 

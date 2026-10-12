@@ -16,6 +16,11 @@ Lines:
                                  DGROUP bytes, 64 KiB at LOAD_SEG
   spells  | slot | digests       29CF:0691: changed DGROUP bytes, segment
                                  3276:0000..3520
+  level   | slot noscreen c398 planes | digests   25FD:0844 on SAVEGAME's
+                                 name, then 0000:A9A6..AA4A (0000:946A and
+                                 9B56, which write to the VGA, stubbed):
+                                 changed DGROUP bytes, the three planes,
+                                 the screen buffer
 """
 import os
 import random
@@ -49,6 +54,9 @@ def lcg_bytes(n, seed):
 
 
 a = DosArena(EXE, GAME, SAVE)
+for off in (0x946A, 0x9B56):  # screen copy and palette: VGA only
+    a.patch(0, off, b'\xc3')
+a.init_heap()
 a.run_range(0, 0x6F3A, 0x6F87)  # open GLOBAL.BSA
 BASE = a.snapshot()
 
@@ -126,4 +134,40 @@ for slot in (int(SLOT), int(SLOT) + 1):
     except (Fault, AssertionError):
         res = 'fault'
     out.write(f'spells | {slot:x} | {res}\n')
+
+SCREEN = 0x6000
+for slot in (int(SLOT), int(SLOT) + 1):
+    for noscreen in (0, 1):
+        for planes in (0, 1):
+            a.restore(BASE)
+            c398 = rng.getrandbits(16)
+            a.run_range(0x25FD, 0x028D, 0x02A0, eax=slot)
+            a.w16(0x9030, BUFFER)
+            a.w16(0xA8FE, 0)
+            a.w16(0xA900, SCREEN)
+            a.mu.mem_write(a.lin(a.ds, 0xC995), bytes([noscreen]))
+            a.w16(0xC398, c398)
+            if planes:
+                for var in (0xD806, 0xCCD0, 0xD748):
+                    r = a.call_near(0, 0x51EC, eax=0x8000)
+                    a.w16(var, r['dx'])
+            before = a.seg_bytes(a.ds)
+            try:
+                a.call_far(0x25FD, 0x0844, esi=0x5E92)
+                from unicorn.x86_const import UC_X86_REG_SI
+                si = a.mu.reg_read(UC_X86_REG_SI)
+                a.run_range(0, 0xA9A6, 0xAA4B, esi=si)
+                if a.r16(0xA90A) == a.ds:
+                    a.w16(0xA90A, a.ds - LOAD_SEG)
+                after = a.seg_bytes(a.ds)
+                changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+                parts = [fnv(changed)]
+                for var in (0xD806, 0xCCD0, 0xD748):
+                    sg = a.r16(var)
+                    parts.append(fnv(a.mu.mem_read(a.lin(sg, 0), 0x8000)) if sg else 0)
+                parts.append(fnv(a.mu.mem_read(a.lin(SCREEN, 0), 0xFA00)))
+                res = ' '.join(f'{p:x}' for p in parts)
+            except (Fault, AssertionError):
+                res = 'fault'
+            out.write(f'level | {slot:x} {noscreen:x} {c398:x} {planes:x} | {res}\n')
 out.close()
