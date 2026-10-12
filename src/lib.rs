@@ -24,5 +24,6 @@ pub mod names;
 pub mod progression;
 pub mod random;
 pub mod save;
+pub mod wild;
 pub mod scale;
 pub mod shop;

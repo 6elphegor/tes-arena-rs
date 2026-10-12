@@ -49,6 +49,7 @@ No game code or data is included: everything is loaded from your own copy.
   (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
   palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
+- `src/wild.rs` – the wilderness grid around a location (217B:0004).
 - `src/log.rs` – the calendar (dates from the minute counter) and
   logbook entries; appending them to LOG.nn is not ported.
 - `src/names.rs` – random NPC names from NAMECHNK.DAT (1194:080B);
@@ -58,7 +59,8 @@ No game code or data is included: everything is loaded from your own copy.
   a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
   imperial.ppm`. `examples/character_sheet.rs` loads a saved game and
   prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
-  writes a save's stored screenshot and the map of the level it is in.
+  writes a save's stored screenshot and the map of the level it is in;
+  `examples/wild_map.rs` draws a location's wilderness grid.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
   routines can run unmodified against the user's own game files, and
   `init_heap` to set up the game's heap.
