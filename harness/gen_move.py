@@ -59,6 +59,7 @@ def door_bytes(seed):
 
 
 a = Arena(EXE)
+a.mu.mem_write(a.lin(0x1000, 0xDA8E), b'\xc3')  # view update: stubbed
 a.w16(0xD806, WALLS)
 a.w16(0xCCD0, FLOOR)
 BASE = bytes(a.mu.mem_read(0, 0x110000))
@@ -86,4 +87,37 @@ for _ in range(1500):
         res = 'fault'
     flags = ','.join(f'{o:x}={vals[o]:x}' for o, _ in VARS)
     out.write(f'cell | {x:x} {y:x} {seed:x} {flags} | {res}\n')
+
+SVARS = VARS + [(0xC3DA, 2), (0xC932, 1), (0xC933, 1), (0xCB90, 2)]
+for _ in range(1500):
+    a.mu.mem_write(0, BASE)
+    seed = rng.getrandbits(32)
+    a.mu.mem_write(WALLS * 16, struct.pack('<16384H', *plane_words(seed)))
+    a.mu.mem_write(FLOOR * 16, struct.pack('<16384H', *plane_words(seed ^ 0x5A5A5A5A)))
+    a.mu.mem_write(a.lin(a.ds, 0xCDA1), door_bytes(seed))
+    x, y = rng.randint(0x100, 0x7E00), rng.randint(0x100, 0x7E00)
+    vals = {0xE3A1: 0, 0xC3D2: rng.choice([0x3C, 0x3C, 0x20, 0x36, 0x50, rng.getrandbits(8)]),
+            0xC39A: rng.getrandbits(16) & 0x4702, 0xC398: rng.getrandbits(16) & 0x0085,
+            0xCCCE: rng.choice([0, 0x100, rng.getrandbits(16)]), 0xD80C: rng.choice([0x96, rng.getrandbits(9)]),
+            0xE8C0: rng.choice([0x30, rng.getrandbits(7)]), 0xC38E: rng.getrandbits(4),
+            0xC3DA: rng.getrandbits(9), 0xC932: rng.getrandbits(8), 0xC933: rng.getrandbits(8),
+            0xCB90: (y >> 7 << 8) + (x >> 7 << 1)}
+    for (o, n) in SVARS:
+        a.mu.mem_write(a.lin(a.ds, o), vals[o].to_bytes(n, 'little'))
+    trig = bytes(rng.getrandbits(8) for _ in range(16))
+    a.mu.mem_write(a.lin(a.ds, 0xC917), trig)
+    a.w16(0xC3D0, x)
+    a.w16(0xC3D4, y)
+    speed = rng.choice([0x10, 0x20, 0x40, 0x80, rng.getrandbits(9)])
+    angle = rng.getrandbits(9)
+    before = a.seg_bytes(a.ds)
+    try:
+        a.call_far(0, 0xF8DD, eax=speed, ebx=angle)
+        d = a.seg_bytes(a.ds)
+        changed = b''.join(struct.pack('<HB', i, d[i]) for i in range(0x10000) if d[i] != before[i])
+        res = f'{a.r16(0xC3D0):x} {a.r16(0xC3D4):x} {fnv(changed):x}'
+    except (Fault, AssertionError):
+        res = 'fault'
+    flags = ','.join(f'{o:x}={vals[o]:x}' for o, _ in SVARS)
+    out.write(f'step | {x:x} {y:x} {seed:x} {speed:x} {angle:x} {flags},c917={trig.hex()} | {res}\n')
 out.close()

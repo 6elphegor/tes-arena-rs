@@ -62,14 +62,34 @@ fn matches_original() {
         for (i, x) in lcg(seed ^ 0x3333_3333, 0x200).enumerate() {
             m.mem.w8(DS, 0xCDA1 + i as u16, (x >> 16) as u8);
         }
-        for kv in p[3].split(',') {
+        let step = f[0] == "step";
+        let kvs = if step { p[5] } else { p[3] };
+        for kv in kvs.split(',') {
             let (k, v) = kv.split_once('=').unwrap();
-            let (k, v) = (hex(k) as u16, hex(v));
-            if k == 0xE3A1 {
-                m.mem.w8(DS, k, v as u8);
+            let k = hex(k) as u16;
+            if k == 0xC917 {
+                for i in 0..16 {
+                    m.mem.w8(DS, k + i as u16, hex(&v[2 * i..2 * i + 2]) as u8);
+                }
+            } else if matches!(k, 0xE3A1 | 0xC932 | 0xC933) {
+                m.mem.w8(DS, k, hex(v) as u8);
             } else {
-                m.mem.w16(DS, k, v as u16);
+                m.mem.w16(DS, k, hex(v) as u16);
             }
+        }
+        if step {
+            m.mem.w16(DS, 0xC3D0, hex(p[0]) as u16);
+            m.mem.w16(DS, 0xC3D4, hex(p[1]) as u16);
+            let before = m.clone();
+            let got = m.move_step(hex(p[3]) as u16, hex(p[4]) as u16).map(|_| {
+                let changed = (0..=0xFFFFu16)
+                    .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+                    .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+                format!("{:x} {:x} {:x}", m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4), fnv(changed))
+            });
+            assert_eq!(f[2], got.as_deref().unwrap_or("fault"), "{line}");
+            n += 1;
+            continue;
         }
         m.mem.w16(DS, 0xF000, hex(p[0]) as u16);
         m.mem.w16(DS, 0xF002, hex(p[1]) as u16);

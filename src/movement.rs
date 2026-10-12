@@ -39,6 +39,42 @@ pub mod var {
     /// Hooks called on a trigger square (far pointers).
     pub const TRIGGER_HOOK: u16 = 0xCD62;
     pub const OPEN_HOOK: u16 = 0xCD46;
+    /// Hook asked before testing a player position (far pointer).
+    pub const TEST_HOOK: u16 = 0xCD6A;
+    /// Candidate positions (4 x (x, y)): new, new x, new y, old; the old
+    /// position is also at +0xC.
+    pub const CANDIDATES: u16 = 0xE8A6;
+    /// Set by a level change during a move; the trigger found (index+1
+    /// into TRIGGERS, 0 none); stair markers (up, down) and the trigger
+    /// bytes (16).
+    pub const CHANGED: u16 = 0xE39E;
+    pub const TRIGGER: u16 = 0xCB6A;
+    pub const STAIRS_UP: u16 = 0xC932;
+    pub const STAIRS_DOWN: u16 = 0xC933;
+    pub const TRIGGERS: u16 = 0xC917;
+    /// The level (byte), the level count (byte of C355), and the hooks
+    /// called at stairs: leaving the dungeon, and taking stairs.
+    pub const LEVEL: u16 = 0xBB0A;
+    pub const LEVELS: u16 = 0xC355;
+    pub const EXIT_HOOK: u16 = 0xCD4E;
+    pub const STAIRS_HOOK: u16 = 0xCD6E;
+    /// Climb counter set when climbing out of a low area.
+    pub const CLIMB: u16 = 0xE39F;
+}
+
+/// Sine and cosine (words, 512 entries) of a heading.
+const SIN: u16 = 0xB03C;
+const COS: u16 = 0xB13C;
+
+/// What a position test tells the resolver (the original's ZF and CF).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Test {
+    /// ZF: take this position.
+    Take,
+    /// CF: stop at the old position.
+    Stop,
+    /// Neither: try the next candidate.
+    Next,
 }
 use var::*;
 
@@ -55,6 +91,10 @@ const HALF_B: u16 = 0xE6A2;
 /// of 8 by map flags), tops by its high 4 bits (two sets of 16).
 const BOTTOMS: u16 = 0xCB94;
 const TOPS: u16 = 0xCBC4;
+/// Offsets of the square ahead by heading quarter, and the player's
+/// square (map offset).
+const AHEAD: u16 = 0xE384;
+const SQUARE: u16 = 0xCB90;
 /// Low down means under this height.
 const LOW: i16 = 0x3C;
 
@@ -222,5 +262,189 @@ impl Machine {
             src = src.wrapping_add(16);
             row = row.wrapping_add(16);
         }
+    }
+
+    /// 0000:F8E1 (far F8DD). Moves the player by `speed` along heading
+    /// `angle` (0..511): x and y get the high words of 2 * speed * sin and
+    /// * cos, then `move_resolve` settles where the player ends up.
+    /// Returns the candidate taken (0 the full move .. 3 none). None
+    /// where a level change would happen (not ported) or a hook is set.
+    pub fn move_step(&mut self, speed: u16, angle: u16) -> Option<u16> {
+        let (ox, oy) = (self.mem.r16(DS, X), self.mem.r16(DS, Y));
+        let a = speed.wrapping_add(speed) as i16 as i32;
+        let b = angle.wrapping_add(angle);
+        let s = self.mem.r16(DS, SIN.wrapping_add(b)) as i16 as i32;
+        let c = self.mem.r16(DS, COS.wrapping_add(b)) as i16 as i32;
+        let nx = ox.wrapping_add(((a * s) >> 16) as u16);
+        let ny = oy.wrapping_add(((a * c) >> 16) as u16);
+        self.mem.w16(DS, X, nx);
+        self.mem.w16(DS, Y, ny);
+        let (x, y, k) = self.move_resolve(nx, ny, ox, oy)?;
+        self.mem.w16(DS, X, x);
+        self.mem.w16(DS, Y, y);
+        Some(k)
+    }
+
+    /// 0000:F478. Tries (nx, ny), (nx, oy) and (ox, ny) in turn and takes
+    /// the first the test allows; a test that says stop, or one that
+    /// refuses while map flag 0x80 is set, ends at (ox, oy).
+    fn move_resolve(&mut self, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
+        self.mem.w8(DS, CHANGED, 0);
+        self.mem.w16(DS, TRIGGER, 0);
+        for (i, w) in [nx, ny, nx, oy, ox, ny, ox, oy].into_iter().enumerate() {
+            self.mem.w16(DS, CANDIDATES + i as u16 * 2, w);
+        }
+        for k in 0..3u16 {
+            match self.move_test(CANDIDATES + k * 4)? {
+                Test::Take => {
+                    let p = CANDIDATES + k * 4;
+                    return Some((self.mem.r16(DS, p), self.mem.r16(DS, p + 2), k));
+                }
+                Test::Stop => return Some((ox, oy, 3)),
+                Test::Next => {
+                    if self.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 {
+                        return Some((ox, oy, 3));
+                    }
+                }
+            }
+        }
+        Some((ox, oy, 3))
+    }
+
+    /// 0000:F60A. Tests the candidate at DS:`pos`.
+    fn move_test(&mut self, pos: u16) -> Option<Test> {
+        let creature = self.mem.r8(DS, CREATURE_MODE) != 0;
+        if !creature && self.mem.r16(DS, TEST_HOOK + 2) != 0 {
+            return None;
+        }
+        let al = self.move_cell(pos)?;
+        let free = |al: u8| if al == 0 { Test::Take } else { Test::Next };
+        if creature || al == 0 {
+            return Some(free(al));
+        }
+        if al & 0x80 == 0 && self.mem.r16(DS, HEIGHT) as i16 >= LOW {
+            let t = self.move_trigger(al)?;
+            if t != 0 {
+                if self.move_heading_square() {
+                    self.mem.w16(DS, TRIGGER, t);
+                }
+                return Some(free(al));
+            }
+        }
+        // F649
+        let f = self.mem.r16(DS, MAP_FLAGS) & !0x200;
+        self.mem.w16(DS, MAP_FLAGS, f);
+        if self.mem.r16(DS, HEIGHT) as i16 >= LOW {
+            return Some(free(al));
+        }
+        let ox = self.mem.r16(DS, CANDIDATES + 0xC);
+        let oy = self.mem.r16(DS, CANDIDATES + 0xE);
+        let mut dxs = 0u16;
+        let mut ax = self.mem.r16(DS, pos).wrapping_sub(ox);
+        if (ax as i16) < 0 {
+            dxs = 0xFFFF;
+            ax = ax.wrapping_neg();
+        }
+        let mut dys = 0u16;
+        let mut bx = self.mem.r16(DS, pos + 2).wrapping_sub(oy);
+        if (bx as i16) < 0 {
+            dys = 0xFFFF;
+            bx = bx.wrapping_neg();
+        }
+        let heading = self.mem.r16(DS, HEADING);
+        if ax >= bx {
+            self.move_climb(dxs, heading.wrapping_sub(0x80) & 0x1FF, pos)
+        } else {
+            self.move_climb(dys, heading, pos)
+        }
+    }
+
+    /// 0000:F76F for a cell that isn't a stair: the trigger byte's index
+    /// + 1 in TRIGGERS, or 0. A stair the player faces (0000:FDAA) when
+    /// no level change happened yet this move is a level change: None.
+    fn move_trigger(&mut self, al: u8) -> Option<u16> {
+        let stairs = [self.mem.r8(DS, STAIRS_UP), self.mem.r8(DS, STAIRS_DOWN)];
+        if let Some(i) = stairs.iter().position(|&s| s == al) {
+            if !self.move_facing(al) || self.mem.r8(DS, CHANGED) != 0 {
+                return Some(0);
+            }
+            if i == 1 && self.mem.r16(DS, LEVEL_FLAGS) & 0x100 != 0 {
+                return Some(0);
+            }
+            // Up from the first level, or down from the last, only calls
+            // the exit hook (and for down, the stairs hook first).
+            let level = self.mem.r8(DS, LEVEL);
+            let hooked = |m: &Self, h: u16| m.mem.r16(DS, h + 2) != 0;
+            let edge = if i == 0 {
+                level == 0 || level > 0x7F
+            } else {
+                if hooked(self, STAIRS_HOOK) {
+                    return None;
+                }
+                level.wrapping_add(1) >= self.mem.r8(DS, LEVELS)
+            };
+            if edge && !hooked(self, EXIT_HOOK) {
+                return Some(0);
+            }
+            // A level change (0000:EBB5 and the hooks around it).
+            return None;
+        }
+        Some((0..16).find(|&i| self.mem.r8(DS, TRIGGERS + i) == al).map_or(0, |i| i + 1))
+    }
+
+    /// 0000:FDAA. Whether the wall square ahead (by heading, from the
+    /// player's square) holds byte `al`.
+    fn move_facing(&self, al: u8) -> bool {
+        let h = self.mem.r16(DS, HEADING).wrapping_add(0x40) & 0x1FF;
+        let step = self.mem.r16(DS, AHEAD.wrapping_add((h >> 7) * 2));
+        let at = step.wrapping_add(self.mem.r16(DS, SQUARE));
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        self.mem.r8(walls, at) == al
+    }
+
+    /// 0000:F913. True (carry) when the heading points within 16 of an
+    /// axis.
+    fn move_heading_square(&self) -> bool {
+        let h = self.mem.r16(DS, HEADING);
+        // Bands alternate: below 0x10 carry, 0x10..0x70 none, ..0x90
+        // carry, ..0xF0 none, and so on to 0x1F0.
+        let bands = [0x10, 0x70, 0x90, 0xF0, 0x110, 0x170, 0x190, 0x1F0];
+        match bands.iter().position(|&b| h < b) {
+            Some(i) => i % 2 == 0,
+            None => true,
+        }
+    }
+
+    /// 0000:F955. Climbing out of a low area: when moving along an axis
+    /// (`sign` set turns the heading round first; within 16 of north or
+    /// south), the position is tested at height 0x3C, and if free (and
+    /// level flag 0x4000 isn't set) the player rises by 6 (24 with map
+    /// flag 1), up to 0x3C.
+    fn move_climb(&mut self, sign: u16, heading: u16, pos: u16) -> Option<Test> {
+        let h = if sign != 0 { heading.wrapping_sub(0x100) & 0x1FF } else { heading };
+        if (0x10..0x1F0).contains(&h) {
+            return Some(Test::Next);
+        }
+        let height = self.mem.r16(DS, HEIGHT);
+        self.mem.w16(DS, HEIGHT, 0x3C);
+        let al = self.move_cell(pos);
+        self.mem.w16(DS, HEIGHT, height);
+        if al? != 0 || self.mem.r16(DS, LEVEL_FLAGS) & 0x4000 != 0 {
+            return Some(Test::Next);
+        }
+        let mut h = height.wrapping_add(6);
+        if self.mem.r16(DS, MAP_FLAGS) & 1 != 0 {
+            h = h.wrapping_add(0x12);
+        }
+        self.mem.w16(DS, HEIGHT, h);
+        // (0000:DA8E, the view update when above 0, is not ported.)
+        if (h as i16) >= LOW {
+            self.mem.w16(DS, HEIGHT, 0x3C);
+            self.mem.w8(DS, CLIMB, 6);
+            return Some(if h == 0x3C { Test::Take } else { Test::Next });
+        }
+        let f = self.mem.r16(DS, MAP_FLAGS) | 0x200;
+        self.mem.w16(DS, MAP_FLAGS, f);
+        Some(Test::Stop)
     }
 }
