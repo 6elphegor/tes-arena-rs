@@ -5,6 +5,7 @@ pub mod bsa;
 pub mod character;
 pub mod city;
 pub mod combat;
+pub mod creature;
 pub mod dice;
 pub mod dungeon;
 pub mod effects;
