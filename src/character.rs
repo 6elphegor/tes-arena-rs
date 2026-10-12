@@ -47,7 +47,8 @@ pub mod field {
     pub const LCK_MOD: u16 = 0x57;
     pub const HP: u16 = 0x59;
     pub const MAX_HP: u16 = 0x5B;
-    pub const FATIGUE_MAX: u16 = 0x5D; // ?
+    /// Current fatigue (effects ticks step it; scaled by 64).
+    pub const FATIGUE: u16 = 0x5D;
     pub const B_5F: u16 = 0x5F;
     /// +60..+64 are set per level tier by `level_tier_stats` (meaning
     /// unknown; they fall as level rises, like target numbers). +62 and
@@ -108,7 +109,13 @@ impl Machine {
     /// 1194:37D3. Spell points for a class from INT in percent.
     /// Returns (max, current); Sorcerers get triple max and start at 0.
     pub fn spell_points(&self, rec: u16, int: u16) -> (u16, u16) {
-        let class = self.class(rec);
+        self.spell_points_at(DS, rec, int)
+    }
+
+    /// `spell_points` for a record in any segment (creatures live outside
+    /// DGROUP).
+    pub fn spell_points_at(&self, seg: u16, rec: u16, int: u16) -> (u16, u16) {
+        let class = self.mem.r8(seg, rec.wrapping_add(CLASS));
         let sp = if class & 0x20 == 0 || class == 0x23 {
             0
         } else if class == 0xE6 {
@@ -126,13 +133,19 @@ impl Machine {
 
     /// 1194:3621. Attribute modifiers; attributes must be on the 256 scale.
     pub fn attribute_modifiers(&mut self, rec: u16) {
-        let b: [u8; 8] = std::array::from_fn(|i| self.mem.r8(DS, rec.wrapping_add(ATTRS + i as u16)));
+        self.attribute_modifiers_at(DS, rec)
+    }
+
+    /// `attribute_modifiers` for a record in any segment (1194:361D is the
+    /// far entry the effects engine uses for creatures).
+    pub fn attribute_modifiers_at(&mut self, seg: u16, rec: u16) {
+        let b: [u8; 8] = std::array::from_fn(|i| self.mem.r8(seg, rec.wrapping_add(ATTRS + i as u16)));
         let [str, int, wil, agi, spd, end, per, lck] = b.map(|v| v as i16);
-        let w = |m: &mut Self, f: u16, v: i16| m.mem.w16(DS, rec.wrapping_add(f), v as u16);
+        let w = |m: &mut Self, f: u16, v: i16| m.mem.w16(seg, rec.wrapping_add(f), v as u16);
 
         w(self, DAMAGE_MOD, (str - 128 + 6) / 13);
         w(self, MAX_WEIGHT, str * 2);
-        let (max_sp, _) = self.spell_points(rec, to100(int) as u16);
+        let (max_sp, _) = self.spell_points_at(seg, rec, to100(int) as u16);
         w(self, MAX_SPELL_POINTS, max_sp as i16);
         w(self, MAX_SPELL_POINTS_2, max_sp as i16);
         w(self, INT_MOD, int - 128);
@@ -154,10 +167,10 @@ impl Machine {
         w(self, LCK_MOD, 50);
         // 8-bit sums that wrap, divided so they are always 0.
         let (str_b, int_b, wil_b, end_b) = (b[0], b[1], b[2], b[5]);
-        self.mem.w8(DS, rec.wrapping_add(B_5F), ((wil_b.wrapping_add(end_b) as u16 + 0x200) / 0x400) as u8);
-        self.mem.w8(DS, rec.wrapping_add(B_6A), ((str_b.wrapping_add(int_b) as u16 + 0x400) / 0x800) as u8);
-        self.mem.w8(DS, rec.wrapping_add(TIER_B), (end >> 2) as u8);
-        self.mem.w8(DS, rec.wrapping_add(TIER_C), self.mem.r16(DS, rec.wrapping_add(MAGIC_DEF)) as u8);
+        self.mem.w8(seg, rec.wrapping_add(B_5F), ((wil_b.wrapping_add(end_b) as u16 + 0x200) / 0x400) as u8);
+        self.mem.w8(seg, rec.wrapping_add(B_6A), ((str_b.wrapping_add(int_b) as u16 + 0x400) / 0x800) as u8);
+        self.mem.w8(seg, rec.wrapping_add(TIER_B), (end >> 2) as u8);
+        self.mem.w8(seg, rec.wrapping_add(TIER_C), self.mem.r16(seg, rec.wrapping_add(MAGIC_DEF)) as u8);
     }
 
     /// 1194:1408. Derived stats for the player. While the flag at DGROUP
@@ -185,7 +198,7 @@ impl Machine {
         self.mem.w8(DS, rec + B_5F, (b(self, 2).wrapping_add(b(self, 5)) as u16 / 200) as u8);
         self.mem.w8(DS, rec + B_6A, (b(self, 0).wrapping_add(b(self, 1)) as u16 / 400) as u8);
         let fatigue = (b(self, 0) as u16 + b(self, 5) as u16) << 6;
-        self.mem.w16(DS, rec + FATIGUE_MAX, fatigue);
+        self.mem.w16(DS, rec + FATIGUE, fatigue);
         self.mem.w8(DS, rec + TIER_B, to100_u(b(self, 5) as u16 >> 2) as u8);
 
         for i in 0..8 {

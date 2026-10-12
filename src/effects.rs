@@ -26,7 +26,7 @@
 use crate::character::field::*;
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
-use crate::scale::{to100, to256};
+use crate::scale::to256;
 
 pub const SLOTS: u16 = 0x0660;
 pub const SLOT_SIZE: u16 = 0x3C;
@@ -461,7 +461,7 @@ impl Machine {
         }
         // 1194:361D on the record as it is: player attributes are in
         // percent, not the 256 scale that routine expects.
-        self.fx_attribute_modifiers(seg, off);
+        self.attribute_modifiers_at(seg, off);
         self.level_tier_stats(seg, off);
 
         let d = self.mem.r16(DS, blk + block::SP);
@@ -594,58 +594,6 @@ impl Machine {
             }
         }
         if negative { through.wrapping_neg() } else { through }
-    }
-
-    /// 1194:3621 (via 361D) on a record in any segment; the same formulas
-    /// as `attribute_modifiers`, which only handles DGROUP records.
-    pub fn fx_attribute_modifiers(&mut self, seg: u16, off: u16) {
-        if seg == DS {
-            self.attribute_modifiers(off);
-            return;
-        }
-        let r = |f: u16| off.wrapping_add(f);
-        let b: [u8; 8] = std::array::from_fn(|i| self.mem.r8(seg, r(ATTRS + i as u16)));
-        let [str, int, wil, agi, spd, end, per, _lck] = b.map(|v| v as i16);
-        let w = |m: &mut Self, f: u16, v: i16| m.mem.w16(seg, r(f), v as u16);
-        w(self, DAMAGE_MOD, (str - 128 + 6) / 13);
-        w(self, MAX_WEIGHT, str * 2);
-        let max_sp = self.fx_spell_points(seg, off, to100(int) as u16);
-        w(self, MAX_SPELL_POINTS, max_sp as i16);
-        w(self, MAX_SPELL_POINTS_2, max_sp as i16);
-        w(self, INT_MOD, int - 128);
-        w(self, MAGIC_DEF, -(wil - 128));
-        w(self, WIL_MOD_HALF, ((wil - 128) as u16 >> 1) as i16);
-        for f in [ATTACK_MOD, DEFENCE_MOD, AGI_MOD_4B] {
-            w(self, f, agi - 128);
-        }
-        w(self, SPD_MOD, (256 - spd + 12) / 25);
-        let hp_mod = (end - 128 + 12) / 25;
-        w(self, HP_MOD, hp_mod);
-        w(self, HEAL_MOD, hp_mod);
-        w(self, END_X2, end * 2);
-        w(self, PER_MOD, per - 128);
-        w(self, LCK_MOD, 50);
-        self.mem.w8(seg, r(B_5F), ((b[2].wrapping_add(b[5]) as u16 + 0x200) / 0x400) as u8);
-        self.mem.w8(seg, r(B_6A), ((b[0].wrapping_add(b[1]) as u16 + 0x400) / 0x800) as u8);
-        self.mem.w8(seg, r(TIER_B), (end >> 2) as u8);
-        self.mem.w8(seg, r(TIER_C), self.mem.r16(seg, r(MAGIC_DEF)) as u8);
-    }
-
-    /// 1194:37D3 for a record in any segment; returns the maximum.
-    fn fx_spell_points(&self, seg: u16, off: u16, int: u16) -> u16 {
-        let class = self.mem.r8(seg, off.wrapping_add(CLASS));
-        let sp = if class & 0x20 == 0 || class == 0x23 {
-            0
-        } else if class == 0xE6 {
-            int
-        } else {
-            match self.mem.r8(DATA, crate::character::SPELL_KIND.wrapping_add((class & 0x1f) as u16)) {
-                2 => int.wrapping_add(int),
-                0 => int.wrapping_add(int >> 1),
-                _ => int.wrapping_add(int >> 2).wrapping_add(int >> 1),
-            }
-        };
-        if class == 0x23 { int.wrapping_mul(3) } else { sp }
     }
 
     /// 2EBD:0597. Disease timing: (period, duration, phase B mode). The
