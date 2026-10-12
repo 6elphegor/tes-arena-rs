@@ -20,7 +20,10 @@ No game code or data is included: everything is loaded from your own copy.
   (segment 2AA1).
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
 - `src/shop.rs` – shop stock, potions and magic items (1194:FAD9, B7FA,
-  B848). Buy/sell haggling is not ported (interactive).
+  B848).
+- `src/haggle.rs` – haggling when buying or selling (1194:8020); the
+  player's answers come from a `HaggleIo`. Temple and guild services
+  (modes 5, 6) are not ported.
 - `src/inventory.rs` – inventory slots, equipment lookups (armour per
   location, weapon, shields, missile), class usability, add/remove/sort.
 - `src/city.rs` – city block plans and block file names from a city's
