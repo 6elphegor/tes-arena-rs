@@ -283,6 +283,24 @@ impl Machine {
         found.then_some(())
     }
 
+    /// `file_open` for callers that go on after a failed open (0000:67C8
+    /// returns with carry set after 0000:74E5): Some(false) when nothing
+    /// was found, and the handle left at CS:6837 is then DOS's error code
+    /// 2, a character device, which reads nothing and seeks to 0 (as
+    /// `file_read` and `file_seek` do with no file open). None where the
+    /// open or the error hook is set.
+    pub fn file_open_or_device(&mut self, files: &mut Files, name: u16) -> Option<bool> {
+        let (handle, found) = self.file_open_any(files, name)?;
+        self.mem.w16(0, CS_HANDLE, handle);
+        if !found {
+            files.loose = None;
+            if self.mem.r32(DS, ERROR_HOOK) != 0 {
+                return None;
+            }
+        }
+        Some(found)
+    }
+
     /// 0000:6B26. `file_open` for callers that keep the handle themselves:
     /// returns it instead of storing it at CS:6837. For a BSA entry it is
     /// DOS's "file not found" code, 2, which the directory scan preserves.

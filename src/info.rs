@@ -13,7 +13,7 @@
 //!   LEVELDOWN, MENU n (trigger n), BOXSIDE n, BOXCAP n, TOP.
 //! - @FLATS ('A'): sprite lines, a name and fields (Y: H: N: F: and
 //!   others) into 5-byte records; `*ITEM n` gives item n that flat. The
-//!   sprites themselves are loaded by 0000:BED8, not ported (skipped).
+//!   flat files are read whole into the flat banks (0000:BED8).
 //! - @SOUND ('U'): sound names and their numbers; loaded by the hook at
 //!   CD4A, if set.
 //! - @TEXT ('X'): texts the level's triggers show (`*TEXT n`), copied to
@@ -24,7 +24,7 @@
 //! its buffer, as the game loads it.
 
 use crate::bsa::Files;
-use crate::level::var::{FLAGS, MAP_FLAGS, MAP_DEPTH, MAP_WIDTH};
+use crate::level::var::{BANK_FREE, FLAGS, MAP_DEPTH, MAP_FLAGS, MAP_WIDTH};
 use crate::machine::Machine;
 use crate::mem::DS;
 use crate::mif::var::{BUFFER_SEG, FLOOR_SEG, MAP1_SEG, MAP2_SEG};
@@ -43,9 +43,8 @@ pub mod var {
     /// Flat records (5 bytes, from index DOOR_BASE on), 0x316 bytes.
     pub const FLATS: u16 = 0xCD9E;
     pub const FLAT_BASE: u16 = 0xC38E;
-    /// EMS bank owners (a word per bank), and the banks for textures
-    /// (first, count), a second range, the flats and the texts.
-    pub const BANK_OWNERS: u16 = 0x8FAA;
+    /// The banks for textures (first, count), a second range, the flats
+    /// and the texts. (Bank free counts: `crate::level::var::BANK_FREE`.)
     pub const TEXTURE_BANKS: u16 = 0xC8F0;
     pub const OTHER_BANKS: u16 = 0xC8F4;
     pub const FLAT_BANKS: u16 = 0xC8F6;
@@ -95,9 +94,14 @@ pub mod var {
     /// the fill for the rest.
     pub const SHADES: u16 = 0xCCC2;
     pub const SHADE_FILL: u16 = 0xC3C6;
-    pub const W_CCC0: u16 = 0xCCC0;
-    pub const W_D432: u16 = 0xD432;
-    pub const SAVED_OWNERS: u16 = 0xE2CC;
+    /// Flats loaded: far pointers (offset, bank) by flat number from
+    /// FLAT_BASE, the number of the next, and a byte each (a DFA's frame
+    /// count, a CFA's byte 11 | 0x80, else 0) with a pointer to the next.
+    pub const FLAT_DATA: u16 = 0xD0B8;
+    pub const FLAT_NUMBER: u16 = 0xD432;
+    pub const FLAT_KINDS: u16 = 0xCA97;
+    pub const FLAT_KIND_PTR: u16 = 0xCCC0;
+    pub const SAVED_FREE: u16 = 0xE2CC;
     /// Hooks: the end of the load, the sounds.
     pub const DONE_HOOK: u16 = 0xCD2E;
     pub const SOUND_HOOK: u16 = 0xCD4A;
@@ -108,9 +112,28 @@ use var::*;
 
 /// The bank the directory is cached in during the load.
 const DIR_PAGE: u16 = 0x1F;
-/// Steps of a scan, and of the parse, taken to hang.
+/// Steps of a scan, of the parse, and 4 KB reads of one texture file
+/// (a real one has a few), taken to hang; and the steps of all of them in
+/// one load (nested loops would otherwise multiply). A garbage directory
+/// entry can make a "file" of up to 4 GB.
 const SCAN_LIMIT: u32 = 0x10000;
 const PARSE_LIMIT: u32 = 1 << 20;
+const READ_LIMIT: u32 = 0x1000;
+const LOAD_LIMIT: u32 = 1 << 22;
+
+thread_local! {
+    /// Steps left in the current load.
+    static STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// One step of a loop; None when the load's steps are used up.
+fn tick() -> Option<()> {
+    STEPS.with(|s| {
+        let n = s.get().checked_sub(1)?;
+        s.set(n);
+        Some(())
+    })
+}
 
 /// `loop` with CX = 0 runs 65536 times.
 fn count(n: u16) -> u32 {
@@ -118,12 +141,16 @@ fn count(n: u16) -> u32 {
 }
 
 impl Machine {
-    /// 0000:EC03. Loads the .INF file named at DS:`name`. None where the
-    /// file or a texture is missing, a hook is set (end CD2E, sounds
-    /// CD4A), a scan runs on without end (the original hangs), or a
-    /// *TOP line has no number (its value is then whatever AX held).
-    /// The flats (0000:BED8) are skipped.
+    /// 0000:EC03. Loads the .INF file named at DS:`name`. A missing
+    /// texture or flat file reads as empty (see `file_open_or_device`):
+    /// several flats the INFs name, such as rat.dfa, are not in the data.
+    /// A missing INF leaves the buffer's old text, which is parsed. None
+    /// where the flats don't fit in their banks (the original stops at
+    /// an INT 3), a hook is set (end CD2E, sounds CD4A), a scan runs on
+    /// without end (the original hangs), or a *TOP line has no number
+    /// (its value is then whatever AX held).
     pub fn info_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
+        STEPS.with(|s| s.set(LOAD_LIMIT));
         self.bsa_cache_dir(files, DIR_PAGE);
         let mut i = 0u16;
         loop {
@@ -145,10 +172,10 @@ impl Machine {
         for i in 0..0x316 {
             self.mem.w8(DS, FLATS + i, 0);
         }
-        self.info_clear_owners(TEXTURE_BANKS, 0);
+        self.info_reserve_banks(TEXTURE_BANKS, 0);
         self.mem.w8(DS, STAIRS, 0xFF);
         self.mem.w8(DS, STAIRS + 1, 0xFF);
-        self.info_clear_owners(OTHER_BANKS, 0);
+        self.info_reserve_banks(OTHER_BANKS, 0);
         for (at, n) in [(ITEM_FLATS, 0x60), (SOUNDS, 0x40), (TRIGGERS, 0x10)] {
             for i in 0..n {
                 self.mem.w8(DS, at + i, 0xFF);
@@ -167,7 +194,15 @@ impl Machine {
         if off >= 0xFFFD {
             return None;
         }
-        self.file_load(files, name, seg, off)?;
+        // A failed load (no such file, 64 KiB or more, nothing read) is
+        // ignored: the text left in the buffer is parsed, up to the last
+        // size stored at OPEN_SIZE.
+        if self.mem.r16(DS, crate::bsa::var::OPEN_HOOK + 2) != 0 {
+            return None;
+        }
+        if self.file_load(files, name, seg, off).is_none() && self.mem.r32(DS, crate::bsa::var::ERROR_HOOK) != 0 {
+            return None;
+        }
         let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
         self.mem.w16(DS, END, size);
         self.mem.w16(DS, SLOT, 0);
@@ -192,12 +227,12 @@ impl Machine {
         }
     }
 
-    /// Clears the owner words of the banks in the range at `range`
-    /// (first, count bytes).
-    fn info_clear_owners(&mut self, range: u16, v: u16) {
+    /// Sets the free counts of the banks in the range at `range` (first,
+    /// count bytes) to `v`, so nothing is allocated there.
+    fn info_reserve_banks(&mut self, range: u16, v: u16) {
         let first = self.mem.r8(DS, range) as u16;
         for i in 0..self.mem.r8(DS, range + 1) as u16 {
-            self.mem.w16(DS, BANK_OWNERS.wrapping_add((first + i) * 2), v);
+            self.mem.w16(DS, BANK_FREE.wrapping_add((first + i) * 2), v);
         }
     }
 
@@ -309,6 +344,7 @@ impl Machine {
     /// 0000:ECED. The parse loop over the text at `es`:`di`.
     fn info_parse(&mut self, files: &mut Files, es: u16, mut di: u16) -> Option<()> {
         for _ in 0..PARSE_LIMIT {
+            tick()?;
             if !self.info_skip(es, &mut di)? {
                 return Some(());
             }
@@ -317,7 +353,7 @@ impl Machine {
                     let section = self.mem.r8(es, di.wrapping_add(3)) & 0xDF;
                     self.info_next_line(es, &mut di)?;
                     match section {
-                        b'A' => self.info_flats(es, &mut di)?,
+                        b'A' => self.info_flats(files, es, &mut di)?,
                         b'U' => {
                             if self.info_sounds(es, &mut di)? {
                                 return Some(());
@@ -364,6 +400,7 @@ impl Machine {
     fn info_skip(&self, es: u16, di: &mut u16) -> Option<bool> {
         let end = self.mem.r16(DS, END);
         for _ in 0..PARSE_LIMIT {
+            tick()?;
             if *di >= end {
                 return Some(false);
             }
@@ -383,6 +420,7 @@ impl Machine {
     /// Moves to the next CR.
     fn info_to_cr(&self, es: u16, di: &mut u16) -> Option<()> {
         for _ in 0..SCAN_LIMIT {
+            tick()?;
             if self.mem.r8(es, *di) == 0x0D {
                 return Some(());
             }
@@ -577,6 +615,7 @@ impl Machine {
             } else {
                 let mut q = di;
                 for _ in 0..SCAN_LIMIT {
+                    tick()?;
                     if self.mem.r8(es, q) == b'#' {
                         break;
                     }
@@ -628,14 +667,15 @@ impl Machine {
     /// transposed unless SECTION has both the floors flag and other bits
     /// set; a full bank moves on to the next.
     fn info_read_textures(&mut self, files: &mut Files) -> Option<()> {
-        self.file_open(files, LIST)?;
+        self.file_open_or_device(files, LIST)?;
         let off = self.mem.r16(DS, BUFFER).wrapping_add(10000);
         let seg = self.mem.r16(DS, BUFFER + 2);
         self.mem.w16(DS, READ_PTR, off);
         self.mem.w16(DS, READ_PTR + 2, seg);
         let frame = self.mem.r16(DS, BUFFER_SEG);
         let mut di = self.mem.r16(DS, SLOT);
-        for _ in 0..PARSE_LIMIT {
+        for _ in 0..READ_LIMIT {
+            tick()?;
             if self.file_read(files, seg, off, 0x1000) == 0 {
                 self.mem.w16(DS, SLOT, di);
                 self.file_close(files);
@@ -660,12 +700,14 @@ impl Machine {
     }
 
     /// 0000:ED0D. The @FLATS section: flat lines into records and the
-    /// name list at LIST, and `*ITEM n` lines; then the bank owner table
-    /// around the flats load (not ported).
-    fn info_flats(&mut self, es: u16, di: &mut u16) -> Option<()> {
+    /// name list at LIST, and `*ITEM n` lines; then the flats are loaded
+    /// into the flat banks: the other banks' free counts are set to 0 for
+    /// the load and put back after, the flat banks' to 0xFFFF.
+    fn info_flats(&mut self, files: &mut Files, es: u16, di: &mut u16) -> Option<()> {
         self.mem.w8(DS, COUNT, 0);
         let mut si = LIST;
         for _ in 0..PARSE_LIMIT {
+            tick()?;
             let c = self.mem.r8(es, *di);
             if c == b'*' {
                 self.info_word_end(es, di);
@@ -688,32 +730,88 @@ impl Machine {
                 }
             }
             let base = self.mem.r16(DS, FLAT_BASE);
-            self.mem.w16(DS, W_CCC0, base.wrapping_add(0xCA97));
+            self.mem.w16(DS, FLAT_KIND_PTR, base.wrapping_add(FLAT_KINDS));
             let (first, n) = (self.mem.r8(DS, FLAT_BANKS) as u16, self.mem.r8(DS, FLAT_BANKS + 1) as u16);
             for i in 0..0x20 {
-                let w = self.mem.r16(DS, BANK_OWNERS + 2 * i);
-                self.mem.w16(DS, SAVED_OWNERS + 2 * i, w);
+                let w = self.mem.r16(DS, BANK_FREE + 2 * i);
+                self.mem.w16(DS, SAVED_FREE + 2 * i, w);
             }
             let outside = |bx: u16| bx < first.wrapping_mul(2) || bx >= first.wrapping_mul(2).wrapping_add(n.wrapping_mul(2));
             for bx in (0..0x40).step_by(2) {
                 if outside(bx) {
-                    self.mem.w16(DS, BANK_OWNERS + bx, 0);
+                    self.mem.w16(DS, BANK_FREE + bx, 0);
                 }
             }
             let mut bx = first.wrapping_mul(2);
             for _ in 0..count(n) {
-                self.mem.w16(DS, BANK_OWNERS.wrapping_add(bx), 0xFFFF);
+                self.mem.w16(DS, BANK_FREE.wrapping_add(bx), 0xFFFF);
                 bx = bx.wrapping_add(2);
             }
-            self.mem.w16(DS, W_D432, base);
-            // (0000:BED8 loads the flats listed at LIST here.)
+            self.mem.w16(DS, FLAT_NUMBER, base);
+            self.info_load_flats(files)?;
             for bx in (0..0x40).step_by(2) {
                 if outside(bx) {
-                    let w = self.mem.r16(DS, SAVED_OWNERS + bx);
-                    self.mem.w16(DS, BANK_OWNERS + bx, w);
+                    let w = self.mem.r16(DS, SAVED_FREE + bx);
+                    self.mem.w16(DS, BANK_FREE + bx, w);
                 }
             }
             return Some(());
+        }
+        None
+    }
+
+    /// 0000:BED8. Loads the flats named in the list at LIST (names
+    /// separated by a NUL, ended by an empty one; with flag 0x400, names
+    /// starting `-` are skipped): each file is read whole into EMS
+    /// (`ems_alloc`), its far pointer stored at FLAT_DATA, and a byte
+    /// from its header in the kinds table. The extension is the
+    /// character after the first `.` in the first 13.
+    fn info_load_flats(&mut self, files: &mut Files) -> Option<()> {
+        let mut si = LIST;
+        for _ in 0..PARSE_LIMIT {
+            tick()?;
+            if self.mem.r8(DS, si) == 0 {
+                return Some(());
+            }
+            if self.mem.r16(DS, FLAGS) & 0x400 == 0 || self.mem.r8(DS, si) != b'-' {
+                let mut di = si;
+                for _ in 0..13 {
+                    let c = self.mem.r8(DS, di);
+                    di = di.wrapping_add(1);
+                    if c == b'.' {
+                        break;
+                    }
+                }
+                let ext = self.mem.r8(DS, di) & 0xDF;
+                let slot = self.mem.r16(DS, FLAT_NUMBER).wrapping_shl(2).wrapping_add(FLAT_DATA);
+                self.file_open_or_device(files, si)?;
+                let size = self.file_seek(files, 2, 0) as u16;
+                self.file_seek(files, 0, 0);
+                let (off, bank) = self.ems_alloc(size)?;
+                let frame = self.mem.r16(DS, BUFFER_SEG);
+                self.file_read(files, frame, off, size);
+                self.file_close(files);
+                self.mem.w16(DS, slot, off);
+                self.mem.w16(DS, slot.wrapping_add(2), bank);
+                let p = self.mem.r16(DS, FLAT_KIND_PTR);
+                self.mem.w8(DS, p, 0);
+                match ext {
+                    b'D' => self.mem.w8(DS, p, self.mem.r8(frame, off)),
+                    b'C' => self.mem.w8(DS, p, self.mem.r8(frame, off.wrapping_add(0xB)) | 0x80),
+                    _ => {}
+                }
+            }
+            let p = self.mem.r16(DS, FLAT_KIND_PTR).wrapping_add(1);
+            self.mem.w16(DS, FLAT_KIND_PTR, p);
+            let n = self.mem.r16(DS, FLAT_NUMBER).wrapping_add(1);
+            self.mem.w16(DS, FLAT_NUMBER, n);
+            for _ in 0..0xFF {
+                let c = self.mem.r8(DS, si);
+                si = si.wrapping_add(1);
+                if c == 0 {
+                    break;
+                }
+            }
         }
         None
     }
@@ -746,6 +844,7 @@ impl Machine {
         self.mem.w16(DS, *si, 0);
         *si = si.wrapping_add(1);
         for _ in 0..SCAN_LIMIT {
+            tick()?;
             let c = self.mem.r8(es, *di);
             if c == 0x0D {
                 return self.info_next_line(es, di);
@@ -778,6 +877,7 @@ impl Machine {
         let mut si = LIST;
         let end = self.mem.r16(DS, END);
         for _ in 0..PARSE_LIMIT {
+            tick()?;
             let c = self.mem.r8(es, *di);
             if *di >= end || c == b'@' {
                 if self.mem.r16(DS, SOUND_HOOK + 2) != 0 {
@@ -818,6 +918,7 @@ impl Machine {
         *si = si.wrapping_add(1);
         let mut n = 0u8;
         for _ in 0..SCAN_LIMIT {
+            tick()?;
             let c = self.mem.r8(es, *di);
             if c == 0x0D {
                 break;
@@ -850,6 +951,7 @@ impl Machine {
         let mut si = start;
         let end = self.mem.r16(DS, END);
         for _ in 0..PARSE_LIMIT {
+            tick()?;
             if *di >= end {
                 self.mem.w8(seg, si, 0);
                 return Some(true);
@@ -882,6 +984,7 @@ impl Machine {
                 _ => {
                     self.mem.w8(DS, TEXT_FLAG, 0);
                     for _ in 0..SCAN_LIMIT {
+                        tick()?;
                         let c = self.mem.r8(es, *di);
                         self.mem.w8(seg, si, c);
                         *di = di.wrapping_add(1);

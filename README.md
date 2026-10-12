@@ -43,8 +43,8 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/info.rs` – the level .INF loader (0000:EC03): which textures the
   map uses, texture files read into EMS banks, wall and floor roles
   (stairs, chasms, triggers, box sides and caps, ceiling), flat
-  records, sounds and texts. Loading the flats themselves (0000:BED8)
-  is not ported.
+  records, sounds and texts, and the flat files read whole into EMS
+  (0000:BED8, through the EMS allocator 0000:5C26).
 - `src/heap.rs` – the game's heap: startup setup, first-fit and last-fit
   allocation, free with merging. Loaders and the decompressor allocate
   from it as the original does; set it up with `heap_init` first.

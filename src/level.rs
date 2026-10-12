@@ -89,6 +89,8 @@ pub mod var {
     pub const EMS_PAGES: u16 = 0x9032;
     /// The bank mapped, times 4 (an index into the driver's page maps).
     pub const EMS_MAPPED: u16 = 0x8FA8;
+    /// Free bytes in each bank (words; see `Machine::ems_alloc`).
+    pub const BANK_FREE: u16 = 0x8FAA;
 }
 use var::*;
 
@@ -191,6 +193,29 @@ impl Machine {
             self.ems[old][o as usize] = self.mem.r8(frame, o);
             self.mem.w8(frame, o, self.ems[page][o as usize]);
         }
+    }
+
+    /// 0000:5C26. Allocates `size` bytes of EMS: from the first bank
+    /// whose free count (a word per bank at BANK_FREE, counting down from
+    /// 0xFFFF) is at least `size`, at offset 0xFFFF - free; the bank is
+    /// mapped. Returns (offset, bank). None with EMS off or no room (the
+    /// original calls the hook at 8F70, if set, and returns 0).
+    pub fn ems_alloc(&mut self, size: u16) -> Option<(u16, u16)> {
+        if self.mem.r8(DS, EMS_ON) == 0 {
+            return None;
+        }
+        let banks = self.mem.r16(DS, EMS_PAGES);
+        for i in 0..if banks == 0 { 0x10000 } else { banks as u32 } {
+            let at = BANK_FREE.wrapping_add((i as u16).wrapping_mul(2));
+            let free = self.mem.r16(DS, at);
+            if free >= size {
+                self.mem.w16(DS, at, free - size);
+                let bank = i as u16 & 0xFF;
+                self.ems_map(bank);
+                return Some((!free, bank));
+            }
+        }
+        None
     }
 
     /// Bank `page` as the program sees it: the frame when it is mapped.

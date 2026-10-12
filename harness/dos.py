@@ -29,6 +29,10 @@ class DosArena(Arena):
             self.names.update({n.upper(): os.path.join(d, n) for n in os.listdir(d)})
         self.handles = {}
         self.ems = None
+        # With this set, handles 0..2 act as DOS's character devices: a
+        # seek gives 0, a read 0 bytes, a close succeeds. Code that goes
+        # on after a failed open uses handle 2 (the open's error code).
+        self.std_devices = False
 
     def enable_ems(self, frame, banks=0x20, maps_seg=0x0600):
         """EMS on, `banks` 64 KB banks, bank 0 mapped into `frame` (also
@@ -101,6 +105,12 @@ class DosArena(Arena):
             return True
         h = self._reg('bx')
         if h not in self.handles:
+            if self.std_devices and h <= 2 and ah in (0x3F, 0x42, 0x3E):
+                self._wreg('ax', 0)
+                if ah == 0x42:
+                    self._wreg('dx', 0)
+                self._set_cf(False)
+                return True
             return False
         f = self.handles[h]
         if ah == 0x3F:

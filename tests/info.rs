@@ -109,7 +109,7 @@ fn matches_original() {
             "stairs" => {
                 put(&mut m, NAME, format!("{}\0", p[0]).as_bytes());
                 m.mem.w8(DS, 0xBB0B, 0xFF);
-                m.mem.w16(DS, 0xC39A, 0);
+                m.mem.w16(DS, 0xC39A, 0x400);
                 m.mem.w16(DS, 0xCB84, 0);
                 m.mem.w16(DS, 0xCB88, 0x8000);
                 m.mem.w8(DS, 0xC8EF, 0x80);

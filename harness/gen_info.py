@@ -8,19 +8,23 @@ Runs under the DOS file layer (harness/dos.py) with EMS on: 32 banks of
 segment. Each case loads a level (0000:E87C, ported and tested in
 tests/level.rs) and then runs the INF loader on the INF its INFO chunk
 names, or on another INF written over that name: every level file whose
-first level has an INFO chunk, then random pairs of those and INFs. The flats loader
-(0000:BED8) is stubbed with a RET, as the port skips it. The INF is read
-to a 16000-byte heap block (BA54), allocated once.
+first level has an INFO chunk, then random pairs of those and INFs. The
+INF is read to a 16000-byte heap block (BA54), allocated once; the flats
+go to EMS banks 8..12 (the image's C8F6/C8F7).
 
 Lines (fields separated by " | "):
   info | mif override flags section shades fill base sides caps inf | digests
   stairs | mif x y heading speed | digests  after loading the level and
-         its INF (settings as for info, all 0 but section 0x80): the
+         its INF (settings as for info, all 0 but flags 0x400 and section
+         0x80): the
          movement step 0000:F8DD from (x, y), next to a stair square,
          facing it; the view update (0000:DA8E) and the mouse wait
          (8FC8) stubbed. The level file's name (C37F) is the level's.
          Digests as for info, then the x and y after, and FNV-1a of the
-         floor, wall and ceiling planes (32 KB each).
+         floor, wall and ceiling planes (32 KB each). "hang" where the
+         budget runs out: with flag 0x400 the directory stays cached in
+         EMS bank 0x1F, which the level reload decompresses its planes
+         into, so later lookups search garbage.
   ceiling | mif inf flags | digests  as info (other settings as for
          stairs), with a ceiling: no level with an INFO chunk has one, so
          a ceiling plane at 8000h, word i = (i * 9E37h) ^ (i >> 5), and map
@@ -61,7 +65,7 @@ def fnv(b):
 
 
 a = DosArena(EXE, GAME)
-a.patch(0, 0xBED8, b'\xc3')  # the flats loader: not ported
+a.std_devices = True  # a missing flat is read from handle 2 (see src/info.rs)
 a.patch(0, 0xDA8E, b'\xc3')  # the view update (stairs)
 a.patch(0, 0x8FC8, b'\xc3')  # the mouse (stairs wait for its buttons)
 a.init_heap()
@@ -72,7 +76,7 @@ a.w16(0xBA54, r['ax'])
 a.w16(0xBA56, r['dx'])
 a.w16(0xCB8A, FRAME)
 a.mu.mem_write(SHADES * 16, bytes((i * 7 + (i >> 8)) & 0xFF for i in range(0x1000)))
-for hook in (0xCD2E, 0xCD4A, 0xCD36, 0xA904):
+for hook in (0xCD2E, 0xCD4A, 0xCD36, 0xA904, 0x8F70):
     assert a.r16(hook + 2) == 0, hex(hook)
 BASE = a.snapshot()
 
@@ -130,7 +134,10 @@ cases += [(rng.choice(INFO_MIFS), rng.choice(INFS)) for _ in range(200)]
 for mif, inf in cases:
     a.restore(BASE)
     override = rng.choice([0xFF] * 6 + [0])  # (a level past the last spins until the budget runs out)
-    flags = rng.choice([0, 0x200, 0x400, 0x600, rng.getrandbits(16)])
+    # Mostly with flag 0x400: flats the map doesn't use are then skipped,
+    # as the game needs (60 flats the INFs name are not in the data, and
+    # without it the original stops at the missing file).
+    flags = rng.choice([0x400, 0x400, 0x600, 0x400 | rng.getrandbits(16), 0, 0x200])
     section = rng.choice([0, 0x80, 0x01, 0x81, rng.getrandbits(8)])
     shades = rng.choice([0, SHADES])
     fill = rng.getrandbits(8)
@@ -178,7 +185,7 @@ def load(mif, section):
     a.restore(BASE)
     a.mu.mem_write(a.lin(a.ds, NAME), mif.lower() + b'\0')
     a.mu.mem_write(a.lin(a.ds, 0xBB0B), b'\xff')
-    a.w16(0xC39A, 0)
+    a.w16(0xC39A, 0x400)
     a.w16(0xCB84, 0)
     a.w16(0xCB88, 0x8000)
     a.mu.mem_write(a.lin(a.ds, 0xC8EF), bytes([section]))
@@ -237,8 +244,10 @@ for mif in INFO_MIFS:
         a._run(0, 0xF8DD, STUB_SEG, 0)  # a level change takes more than call_far's budget
         res = digests(before) + f' {a.r16(0xC3D0):x} {a.r16(0xC3D4):x} ' + ' '.join(
             f'{fnv(a.seg_bytes(a.r16(v))[:0x8000]) if a.r16(v) else 0:x}' for v in (0xCCD0, 0xD806, 0xD748))
-    except (Fault, AssertionError):
+    except Fault:
         res = 'fault'
+    except AssertionError:
+        res = 'hang'
     stairs += 1
     out.write(f'stairs | {mif.lower().decode()} {x:x} {y:x} {heading:x} {speed:x} | {res}\n')
 
@@ -246,7 +255,7 @@ CEILING = 0x8000
 plane = b''.join(struct.pack('<H', ((i * 0x9E37) ^ (i >> 5)) & 0xFFFF) for i in range(0x4000))
 for _ in range(60):
     mif, inf = rng.choice(INFO_MIFS), rng.choice([None, rng.choice(INFS)])
-    flags = rng.choice([0, 0x400, rng.getrandbits(16) & ~0x200])
+    flags = rng.choice([0x400, (rng.getrandbits(16) | 0x400) & ~0x200])
     done += 1
     if done <= SKIP:
         continue
