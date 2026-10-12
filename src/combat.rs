@@ -12,6 +12,7 @@
 //! Several routines call inventory code in segment 1194 that is not
 //! ported yet; its results are passed in through `Gear`.
 
+use crate::character::field;
 use crate::machine::Machine;
 use crate::mem::DS;
 use crate::scale::to256;
@@ -92,8 +93,6 @@ pub mod item {
     pub const MATERIAL: u16 = 0x10;
 }
 
-const CREATURE: u16 = 0x1000;
-
 impl Machine {
     fn rec_b(&self, p: Ptr, f: u16) -> u8 {
         self.mem.r8(p.seg, p.off.wrapping_add(f))
@@ -104,7 +103,7 @@ impl Machine {
     }
 
     fn is_creature(&self, p: Ptr) -> bool {
-        self.rec_w(p, 0x40D) & CREATURE != 0
+        self.rec_w(p, field::FLAGS) & field::FLAG_CREATURE != 0
     }
 
     /// The current creature target: offset 0 of the creature segment.
@@ -122,7 +121,7 @@ impl Machine {
     pub fn hit_base(&self, att: Ptr, def: Ptr) -> u16 {
         let diff = self.rec_b(att, 6).wrapping_sub(self.rec_b(def, 6)) as i8 as i16;
         let mut ax = (to256(diff * 5) as u16).wrapping_add(0x80);
-        ax = ax.wrapping_add(self.rec_w(att, 0x57).wrapping_sub(self.rec_w(def, 0x57)));
+        ax = ax.wrapping_add(self.rec_w(att, field::LCK_MOD).wrapping_sub(self.rec_w(def, field::LCK_MOD)));
         if !self.is_creature(att) && matches!(self.rec_b(att, 4), 1 | 3 | 5) {
             ax = ax.wrapping_add(to256(self.rec_b(att, 6) as i16) as u16);
         }
@@ -132,7 +131,7 @@ impl Machine {
     /// 2AA1:060F. `hit_base` minus armor plus attack (+49) minus defence (+47).
     pub fn hit_chance(&self, att: Ptr, def: Ptr, gear: &Gear) -> u16 {
         let ax = self.hit_base(att, def).wrapping_sub(to256(gear.armor) as u16);
-        ax.wrapping_add(self.rec_w(att, 0x49).wrapping_sub(self.rec_w(def, 0x47)))
+        ax.wrapping_add(self.rec_w(att, field::ATTACK_MOD).wrapping_sub(self.rec_w(def, field::DEFENCE_MOD)))
     }
 
     /// 2AA1:058B. Rolls 0..255 against the hit chance; returns (hit, roll).
@@ -353,7 +352,7 @@ impl Machine {
         if gear.weapon.is_some() {
             r = r.wrapping_add(gear.weapon_bonus);
         }
-        let mut dmg = r.wrapping_add(self.rec_w(att, 0x39)).wrapping_mul(mult);
+        let mut dmg = r.wrapping_add(self.rec_w(att, field::DAMAGE_MOD)).wrapping_mul(mult);
         if self.mem.r16(DS, var::FLAGS_5CA) & 0x20 == 0 {
             dmg = self.ranger_bonus(att, dmg);
         }
@@ -382,6 +381,6 @@ impl Machine {
 
     /// 2AA1:0112..0122. A creature's attack damage: its +09..+0A range.
     pub fn creature_damage(&mut self, att: Ptr) -> Option<u16> {
-        self.rng.range(self.rec_b(att, 9) as u16, self.rec_b(att, 0x0A) as u16)
+        self.rng.range(self.rec_b(att, field::CREATURE_MIN_DAMAGE) as u16, self.rec_b(att, field::CREATURE_MAX_DAMAGE) as u16)
     }
 }

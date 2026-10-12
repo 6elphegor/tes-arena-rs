@@ -14,10 +14,16 @@ pub const PLAYER: u16 = 0x01A4;
 
 /// Record field offsets. Names marked `?` are guesses from usage.
 pub mod field {
+    /// Race for characters; creature type for creatures.
     pub const RACE: u16 = 0x04;
     /// Low 5 bits: class index (see `CLASS_IDS`); 0x20: spellcaster.
     pub const CLASS: u16 = 0x05;
+    /// Level, 0-based (8-bit).
+    pub const LEVEL: u16 = 0x06;
     pub const SEX: u16 = 0x07;
+    /// Creature damage range, 8-bit.
+    pub const CREATURE_MIN_DAMAGE: u16 = 0x09;
+    pub const CREATURE_MAX_DAMAGE: u16 = 0x0A;
     /// STR INT WIL AGI SPD END PER LCK.
     pub const ATTRS: u16 = 0x29;
     pub const DAMAGE_MOD: u16 = 0x39;
@@ -26,24 +32,41 @@ pub mod field {
     pub const INT_MOD: u16 = 0x3F;
     pub const MAGIC_DEF: u16 = 0x43; // ?
     pub const WIL_MOD_HALF: u16 = 0x45;
-    pub const AGI_MOD_47: u16 = 0x47;
-    pub const AGI_MOD_49: u16 = 0x49;
+    /// AGI - 128, subtracted from an attacker's chance to hit.
+    pub const DEFENCE_MOD: u16 = 0x47;
+    /// AGI - 128, added to the chance to hit.
+    pub const ATTACK_MOD: u16 = 0x49;
     pub const AGI_MOD_4B: u16 = 0x4B;
     pub const SPD_MOD: u16 = 0x4D;
     pub const HP_MOD: u16 = 0x4F;
     pub const END_X2: u16 = 0x51;
     pub const HEAL_MOD: u16 = 0x53; // ?
     pub const PER_MOD: u16 = 0x55;
+    /// Always 50 (see `attribute_modifiers`); enters to-hit as a
+    /// difference, so it cancels out.
     pub const LCK_MOD: u16 = 0x57;
     pub const HP: u16 = 0x59;
     pub const MAX_HP: u16 = 0x5B;
     pub const FATIGUE_MAX: u16 = 0x5D; // ?
     pub const B_5F: u16 = 0x5F;
-    pub const B_62: u16 = 0x62;
-    pub const B_64: u16 = 0x64;
+    /// +60..+64 are set per level tier by `level_tier_stats` (meaning
+    /// unknown; they fall as level rises, like target numbers). +62 and
+    /// +64 are first written by `attribute_modifiers`.
+    pub const TIER_A1: u16 = 0x60;
+    pub const TIER_A2: u16 = 0x61;
+    pub const TIER_B: u16 = 0x62;
+    pub const TIER_A3: u16 = 0x63;
+    pub const TIER_C: u16 = 0x64;
     pub const SPELL_POINTS: u16 = 0x66;
     pub const MAX_SPELL_POINTS: u16 = 0x68;
     pub const B_6A: u16 = 0x6A;
+    /// Gold a creature carries (word).
+    pub const CREATURE_GOLD: u16 = 0x407;
+    /// Experience points (dword).
+    pub const XP: u16 = 0x409;
+    /// Status flags: `FLAG_CREATURE`, 0x100 dead/defeated (inferred).
+    pub const FLAGS: u16 = 0x40D;
+    pub const FLAG_CREATURE: u16 = 0x1000;
 }
 use field::*;
 
@@ -116,7 +139,7 @@ impl Machine {
         w(self, MAGIC_DEF, -(wil - 128));
         // Logical shift: negative modifiers become large positive values.
         w(self, WIL_MOD_HALF, ((wil - 128) as u16 >> 1) as i16);
-        for f in [AGI_MOD_49, AGI_MOD_47, AGI_MOD_4B] {
+        for f in [ATTACK_MOD, DEFENCE_MOD, AGI_MOD_4B] {
             w(self, f, agi - 128);
         }
         w(self, SPD_MOD, (256 - spd + 12) / 25);
@@ -133,8 +156,8 @@ impl Machine {
         let (str_b, int_b, wil_b, end_b) = (b[0], b[1], b[2], b[5]);
         self.mem.w8(DS, rec.wrapping_add(B_5F), ((wil_b.wrapping_add(end_b) as u16 + 0x200) / 0x400) as u8);
         self.mem.w8(DS, rec.wrapping_add(B_6A), ((str_b.wrapping_add(int_b) as u16 + 0x400) / 0x800) as u8);
-        self.mem.w8(DS, rec.wrapping_add(B_62), (end >> 2) as u8);
-        self.mem.w8(DS, rec.wrapping_add(B_64), self.mem.r16(DS, rec.wrapping_add(MAGIC_DEF)) as u8);
+        self.mem.w8(DS, rec.wrapping_add(TIER_B), (end >> 2) as u8);
+        self.mem.w8(DS, rec.wrapping_add(TIER_C), self.mem.r16(DS, rec.wrapping_add(MAGIC_DEF)) as u8);
     }
 
     /// 1194:1408. Derived stats for the player. While the flag at DGROUP
@@ -158,12 +181,12 @@ impl Machine {
 
         let b = |m: &Self, i: u16| m.mem.r8(DS, attrs + i);
         let v = to100(self.mem.r16(DS, rec + MAGIC_DEF) as i16);
-        self.mem.w8(DS, rec + B_64, v as u8);
+        self.mem.w8(DS, rec + TIER_C, v as u8);
         self.mem.w8(DS, rec + B_5F, (b(self, 2).wrapping_add(b(self, 5)) as u16 / 200) as u8);
         self.mem.w8(DS, rec + B_6A, (b(self, 0).wrapping_add(b(self, 1)) as u16 / 400) as u8);
         let fatigue = (b(self, 0) as u16 + b(self, 5) as u16) << 6;
         self.mem.w16(DS, rec + FATIGUE_MAX, fatigue);
-        self.mem.w8(DS, rec + B_62, to100_u(b(self, 5) as u16 >> 2) as u8);
+        self.mem.w8(DS, rec + TIER_B, to100_u(b(self, 5) as u16 >> 2) as u8);
 
         for i in 0..8 {
             self.mem.w8(DS, attrs + i, self.mem.r8(DS, ATTR_SCRATCH + i));

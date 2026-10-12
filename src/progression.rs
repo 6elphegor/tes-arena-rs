@@ -10,21 +10,7 @@ use crate::dice::roll;
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
 
-/// Record fields used here.
-pub mod field {
-    pub const LEVEL: u16 = 0x06;
-    /// Status flags; 0x1000 marks a creature (not a classed character).
-    pub const FLAGS: u16 = 0x40D;
-    pub const XP: u16 = 0x409;
-    /// Per-level-tier values from `level_tier_stats` (meaning unknown;
-    /// they fall as level rises, like target numbers).
-    pub const TIER_A1: u16 = 0x60;
-    pub const TIER_A2: u16 = 0x61;
-    pub const TIER_B: u16 = 0x62;
-    pub const TIER_A3: u16 = 0x63;
-    pub const TIER_C: u16 = 0x64;
-}
-use field::*;
+use crate::character::field::*;
 
 /// DGROUP dword: player XP (PLAYER + XP).
 pub const PLAYER_XP: u16 = 0x05AD;
@@ -78,7 +64,7 @@ impl Machine {
     /// and stored as 8 bits.
     pub fn check_level_up(&mut self) -> Option<u16> {
         self.mem.w32(DS, THRESH_MUL, 30);
-        let class = (self.mem.r8(DS, PLAYER + crate::character::field::CLASS) & 0x1f) as u16;
+        let class = (self.mem.r8(DS, PLAYER + CLASS) & 0x1f) as u16;
         let base = self.mem.r16(DATA, BASE_XP + class * 2);
         self.mem.w32(DS, THRESH, base as u32);
         let xp = self.mem.r32(DS, PLAYER_XP);
@@ -111,13 +97,13 @@ impl Machine {
         self.mem.w16(DS, PENDING_FLAGS, f);
         let Some(n) = self.check_level_up() else { return Some(None) };
         for _ in 0..n {
-            let class = (self.mem.r8(DS, PLAYER + crate::character::field::CLASS) & 0x1f) as u16;
+            let class = (self.mem.r8(DS, PLAYER + CLASS) & 0x1f) as u16;
             let die = self.mem.r8(DS, crate::character::HIT_DIE + class) as u16;
             let gain = roll(&mut self.rng, die)?
                 .wrapping_add(1)
-                .wrapping_add(self.mem.r16(DS, PLAYER + crate::character::field::HP_MOD));
-            let max = self.mem.r16(DS, PLAYER + crate::character::field::MAX_HP).wrapping_add(gain);
-            self.mem.w16(DS, PLAYER + crate::character::field::MAX_HP, max);
+                .wrapping_add(self.mem.r16(DS, PLAYER + HP_MOD));
+            let max = self.mem.r16(DS, PLAYER + MAX_HP).wrapping_add(gain);
+            self.mem.w16(DS, PLAYER + MAX_HP, max);
             self.level_tier_stats(DS, PLAYER);
         }
         Some(Some(n))
@@ -133,8 +119,8 @@ impl Machine {
     /// group 0) and step by 6 although the tables hold 8 tiers per group.
     pub fn level_tier_stats(&mut self, seg: u16, rec: u16) {
         let r8 = |m: &Self, f: u16| m.mem.r8(seg, rec.wrapping_add(f));
-        let mut group = r8(self, crate::character::field::CLASS) & 0x1f;
-        if self.mem.r16(seg, rec.wrapping_add(FLAGS)) & 0x1000 != 0 {
+        let mut group = r8(self, CLASS) & 0x1f;
+        if self.mem.r16(seg, rec.wrapping_add(FLAGS)) & FLAG_CREATURE != 0 {
             group = 0;
         }
         let level = r8(self, LEVEL);
@@ -157,14 +143,14 @@ impl Machine {
         let c = self.mem.r8(seg, TIER_C_TAB + tier);
         self.mem.w8(seg, rec.wrapping_add(TIER_C), c);
         // Barbarian (class byte exactly 0x0F).
-        if r8(self, crate::character::field::CLASS) == 0x0F {
+        if r8(self, CLASS) == 0x0F {
             self.mem.w8(seg, rec.wrapping_add(TIER_B), 0);
         }
     }
 
     /// 2686:02CE. Is the player's class byte `class`?
     pub fn player_class_is(&self, class: u8) -> bool {
-        self.mem.r8(DS, PLAYER + crate::character::field::CLASS) == class
+        self.mem.r8(DS, PLAYER + CLASS) == class
     }
 
     /// 1194:5585. Skips `n` NUL-terminated strings at seg:off, scanning at
@@ -185,11 +171,11 @@ impl Machine {
     /// 2686:0645. Name of a record's class, or for creatures the name of
     /// its type (by the race byte). Returns (segment, offset).
     pub fn class_name(&self, seg: u16, rec: u16) -> (u16, u16) {
-        if self.mem.r16(seg, rec.wrapping_add(FLAGS)) & 0x1000 != 0 {
-            let kind = self.mem.r8(seg, rec.wrapping_add(crate::character::field::RACE)) as u16;
+        if self.mem.r16(seg, rec.wrapping_add(FLAGS)) & FLAG_CREATURE != 0 {
+            let kind = self.mem.r8(seg, rec.wrapping_add(RACE)) as u16;
             (DATA, self.skip_strings(DATA, 0x465D, kind))
         } else {
-            let class = (self.mem.r8(seg, rec.wrapping_add(crate::character::field::CLASS)) & 0x1f) as u16;
+            let class = (self.mem.r8(seg, rec.wrapping_add(CLASS)) & 0x1f) as u16;
             (DS, self.skip_strings(DS, 0x2A62, class))
         }
     }
@@ -247,7 +233,6 @@ impl Machine {
     /// (e.g. an NPC): one hit die per level (`roll_hit_die`, at least 1),
     /// counting level 0, plus 25.
     pub fn roll_level_hit_points(&mut self, rec: u16) -> Option<()> {
-        use crate::character::field::{HP, MAX_HP};
         self.mem.w16(DS, rec.wrapping_add(MAX_HP), 0);
         self.mem.w16(DS, rec.wrapping_add(HP), 0);
         let n = self.mem.r8(DS, rec.wrapping_add(LEVEL)) as u16 + 1;

@@ -13,7 +13,12 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/random.rs` – random number generator (0000:6E10, 6EA8, 6EEA).
 - `src/dice.rs`, `src/scale.rs` – dice rolls and percent/256-scale conversions.
 - `src/character.rs` – character creation stats, attribute modifiers, hit
-  and spell points (segment 1194).
+  and spell points (segment 1194). `character::field` is the one place
+  character/creature record offsets are named.
+- `src/progression.rs` – levels from XP, level-up, XP awards (segment 2686).
+- `src/combat.rs` – to-hit, hit location, criticals, damage, weapon wear
+  (segment 2AA1).
+- `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
 - `harness/emu.py` – runs original routines under unicorn (far, near or a
   code range); CPU faults are reported as `Fault`.
 - `harness/xref.py` – static helpers: data xrefs, pointer tables,
@@ -30,12 +35,22 @@ No game code or data is included: everything is loaded from your own copy.
 2. Port it, keeping 16-bit semantics explicit (`wrapping_*`, exact widths)
    and keeping the original's bugs. State goes in a typed struct if
    understood, otherwise in `Memory` at the original segment:offset. Where
-   the original faults, return `None`.
+   the original faults or hangs, return `None`.
 3. Add cases to a `harness/gen_*.py` and regenerate its vectors. Each case
    records the writes made before the call, the returned registers and
    every changed byte; the Rust test replays it and must match exactly.
 
-Note: capstone prints opcode 99 as `cdq` in 16-bit code; it is `cwd`.
+Pitfalls:
+
+- capstone mislabels sign extensions in 16-bit code: opcode 99 prints as
+  `cdq` but is `cwd`, and 98 prints as `cwde` but is `cbw`.
+- unicorn caches translated code, so patching code bytes after it has run
+  has no effect. Stub calls with fixed code that reads its result from
+  data (see `harness/gen_combat.py`).
+- The image's RNG seed is 0, a fixed point of the LCG. Seed the machine
+  before running anything that rerolls.
+- Private helpers on `Machine` share one namespace across modules; give
+  them module-specific names.
 
 ## Running tests
 

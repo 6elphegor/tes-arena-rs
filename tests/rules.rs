@@ -2,7 +2,6 @@
 //! running the original code (harness/gen_rules.py).
 mod common;
 
-use arena::character::PLAYER;
 use arena::dice::dice;
 use arena::machine::Machine;
 use arena::mem::DS;

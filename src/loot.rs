@@ -107,8 +107,7 @@ const CORPSE_OFF: u16 = 0x4F00;
 pub const LOOT_FLAGS: u16 = 0x4F02;
 const LOOT_CHANCE: u16 = 0x4EA5;
 const MONSTER_GOLD_CHANCE: u16 = 0x4F0D;
-/// Creature record offset of the gold it carries (word).
-pub const CREATURE_GOLD: u16 = 0x407;
+pub use crate::character::field::CREATURE_GOLD;
 
 impl Machine {
     fn b(&self, off: u16) -> u8 {
