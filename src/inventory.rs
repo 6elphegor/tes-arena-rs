@@ -69,6 +69,24 @@ const NOT_MISSILE: u16 = 0x12B8;
 /// Player armour class per location (7 bytes), from `player_armor_class`.
 pub const ARMOR_CLASS: u16 = 0x942E;
 
+/// Item name lists (DGROUP offsets; the strings lie in segment 3276's
+/// tables past DGROUP's start) and the formatted-name buffer.
+const WEAPON_NAMES: u16 = 0x2204;
+const ARMOR_LISTS: u16 = 0x5D7C;
+const ARMOR_PARTS: u16 = 0x2424;
+const ARMOR_SUFFIXES: u16 = 0x254D;
+const WEAPON_SUFFIXES: u16 = 0x231F;
+const MATERIALS: u16 = 0x263F;
+const POTION: u16 = 0x5E30;
+const POTION_NAMES: u16 = 0x28CD;
+const RING_NAMES: u16 = 0x1DD1;
+const RING_SUFFIXES_0: u16 = 0x1E03;
+const RING_SUFFIXES_1: u16 = 0x1F0A;
+const RING_SUFFIXES_2: u16 = 0x1F9F;
+const BRACELET_NAMES: u16 = 0x2028;
+const ATTRIBUTE_SUFFIXES: u16 = 0x2052;
+pub const NAME_BUF: u16 = 0x1395;
+
 /// Tables in segment 3276.
 const MISSILE_TYPES: u16 = 0x6CC0;
 const CLASS_WEAPONS: u16 = 0x3C25;
@@ -694,4 +712,126 @@ impl Machine {
             si = si.wrapping_add(SLOT_SIZE);
         }
     }
+
+    /// 1194:7390. Name of the item at seg:`it`, as an offset in DGROUP
+    /// (the caller's DS). Plain items, and enchanted armour and weapons
+    /// not yet identified (flags bit 1), take a string from a list:
+    /// weapons by type, armour by type from its material's list, potions
+    /// by type. Others are built by 27CE:000C (`item_name_format`) at
+    /// offset 1395 of the item's own segment, while 1395 is returned:
+    /// for an item outside DGROUP the name read is whatever DGROUP holds
+    /// there. The type byte is sign-extended, so types from 0x80 skip
+    /// nearly 65536 strings. None where the original calls through a
+    /// jump table entry that isn't code (accessory kind 3).
+    pub fn item_name(&mut self, seg: u16, it: u16) -> Option<u16> {
+        let ty = self.mem.r8(seg, it.wrapping_add(item::TYPE)) as i8 as u16;
+        let flags = self.inv_flags(seg, it);
+        let cat = ((flags & 0x0C) >> 2) as u16;
+        let plain = |m: &Self, cat: u16| {
+            let list = if cat != 0 {
+                WEAPON_NAMES
+            } else {
+                m.mem.r16(DS, ARMOR_LISTS.wrapping_add((((flags & 0x30) >> 4) as u16) * 2))
+            };
+            m.skip_strings(DS, list, ty)
+        };
+        if flags & item::ENCHANTED == 0 {
+            return Some(plain(self, cat));
+        }
+        match cat {
+            3 => Some(if flags & 2 != 0 { POTION } else { self.skip_strings(DS, POTION_NAMES, ty) }),
+            2 => {
+                let kind = (flags & 0x30) >> 4;
+                let b10 = self.mem.r8(seg, it.wrapping_add(0x10));
+                let mut suffix = self.mem.r8(seg, it.wrapping_add(item::ENCHANT));
+                if kind == 2 {
+                    suffix = 0;
+                }
+                if flags & 2 != 0 {
+                    suffix = 0xFF;
+                }
+                let ah = if kind == 0 { b10 } else { 0 };
+                self.item_name_format(seg, 2, kind, ah, b10 as u16, ty as u8, suffix)?;
+                Some(NAME_BUF)
+            }
+            _ if flags & 2 != 0 => Some(plain(self, cat)),
+            _ => {
+                let material = self.mem.r8(seg, it.wrapping_add(0x10));
+                let suffix = self.mem.r8(seg, it.wrapping_add(item::ENCHANT));
+                self.item_name_format(seg, cat as u8, material, 0, ty, 0, suffix)?;
+                Some(NAME_BUF)
+            }
+        }
+    }
+
+    /// 27CE:000C. Builds a name at seg:1395. For armour (`dl` 0) and
+    /// weapons (1): a material (`al`, 0xFF none) and a space, the type's
+    /// name (`bx`) and a suffix ("of ...", `suffix`, 0xFF none). For
+    /// accessories (2), `al` picks the handler: 0 a ring-like name with a
+    /// spell suffix chosen by `ah` (0, 1 or other), 1 a bracelet-like
+    /// name with an attribute suffix, 2 a material (`bx` + 3) and the
+    /// bracelet-like name; `cl` is the type and `suffix` the suffix.
+    fn item_name_format(&mut self, seg: u16, dl: u8, al: u8, ah: u8, bx: u16, cl: u8, suffix: u8) -> Option<()> {
+        let mut di = NAME_BUF;
+        let copy = |m: &mut Self, list: u16, n: u16, di: &mut u16| {
+            let mut si = m.skip_strings(DS, list, n);
+            loop {
+                let c = m.mem.r8(DS, si);
+                m.mem.w8(seg, *di, c);
+                si = si.wrapping_add(1);
+                *di = di.wrapping_add(1);
+                if c == 0 {
+                    break;
+                }
+            }
+        };
+        let space = |m: &mut Self, di: u16| m.mem.w8(seg, di.wrapping_sub(1), b' ');
+        if dl == 2 {
+            // AH is kept in DGROUP while the handler is looked up.
+            self.mem.w8(DS, 0x1258, ah);
+            match al {
+                0 => {
+                    copy(self, RING_NAMES, cl as u16, &mut di);
+                    let list = match ah {
+                        0 => RING_SUFFIXES_0,
+                        1 => RING_SUFFIXES_1,
+                        _ => RING_SUFFIXES_2,
+                    };
+                    if suffix != 0xFF {
+                        space(self, di);
+                        copy(self, list, suffix as u16, &mut di);
+                    }
+                }
+                1 => {
+                    copy(self, BRACELET_NAMES, cl as u16, &mut di);
+                    if suffix != 0xFF {
+                        space(self, di);
+                        copy(self, ATTRIBUTE_SUFFIXES, suffix as u16, &mut di);
+                    }
+                }
+                2 => {
+                    if suffix == 0 {
+                        copy(self, MATERIALS, (bx as u8 as u16).wrapping_add(3), &mut di);
+                        space(self, di);
+                    }
+                    copy(self, BRACELET_NAMES, cl as u16, &mut di);
+                }
+                _ => return None,
+            }
+            return Some(());
+        }
+        if al != 0xFF {
+            copy(self, MATERIALS, al as u16, &mut di);
+            space(self, di);
+        }
+        let (names, suffixes) = if dl == 0 { (ARMOR_PARTS, ARMOR_SUFFIXES) } else { (WEAPON_NAMES, WEAPON_SUFFIXES) };
+        copy(self, names, bx, &mut di);
+        space(self, di);
+        if suffix != 0xFF {
+            copy(self, suffixes, suffix as u16, &mut di);
+        }
+        self.mem.w8(seg, di.wrapping_sub(1), 0);
+        Some(())
+    }
+
 }

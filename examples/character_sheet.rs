@@ -9,6 +9,7 @@ use arena::bsa::Files;
 use arena::character::field::*;
 use arena::character::PLAYER;
 use arena::exe;
+use arena::inventory::{item, SLOT_COUNT, SLOT_SIZE};
 use arena::machine::Machine;
 use arena::mem::DS;
 use std::path::PathBuf;
@@ -73,4 +74,18 @@ fn main() {
         r16(FATIGUE)
     );
     println!("  experience {}  gold {}", m.mem.r32(DS, PLAYER + XP), m.mem.r32(DS, GOLD));
+    println!("  carrying (* equipped):");
+    for i in 0..SLOT_COUNT {
+        let it = PLAYER + ITEMS + i * SLOT_SIZE;
+        let flags = m.mem.r8(DS, it + item::FLAGS);
+        if flags & item::OCCUPIED == 0 {
+            continue;
+        }
+        let Some(name) = m.item_name(DS, it) else { continue };
+        let name = s(&m, DS, name);
+        let has_condition = m.mem.r16(DS, it + item::MAX_HEALTH) != 0;
+        let condition = if has_condition { format!(" ({})", s(&m, DS, m.condition_name(DS, it))) } else { String::new() };
+        let mark = if flags & item::EQUIPPED != 0 { '*' } else { ' ' };
+        println!("   {mark} {name}{condition}");
+    }
 }
