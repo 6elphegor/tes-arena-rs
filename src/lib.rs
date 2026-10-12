@@ -20,6 +20,7 @@ pub mod loot;
 pub mod machine;
 pub mod mem;
 pub mod mif;
+pub mod movement;
 pub mod names;
 pub mod progression;
 pub mod random;

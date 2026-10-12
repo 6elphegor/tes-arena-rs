@@ -49,6 +49,8 @@ No game code or data is included: everything is loaded from your own copy.
   (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
   palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
+- `src/movement.rs` – collision: the 16 x 16 cell mask around a square
+  and the cell test (0000:F697, FB3A); the movement step comes next.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).
