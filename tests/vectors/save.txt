@@ -212,3 +212,25 @@ path | ff 7d06 | 2f0f3c7d60b0c32f 1b3b
 path | 1 7d06 | 23fe62d8678853f1 1b3b
 engine | 1 | b9eefb28682fd5c0 b4043daa78e1f54a 4291f750b78e8eba 3b67c800b3154125
 engine | 2 | fault
+load | CLASSES.DAT 0 | 0 2f4cd5c7cbb970a 2710f0e4fffe8f2a
+load | CLASSES.DAT 100 | 100 2f4cd5c7cbb970a a6ad553dd6017b2a
+load | NAMECHNK.DAT 0 | 0 ad6a97a572fe42db aed42b5e7d8a119
+load | NAMECHNK.DAT 100 | 100 ad6a97a572fe42db 30e3f6abf3ccd119
+load | CITYDATA.65 0 | 0 e741d158d4f7f7c1 9096f0fd9948effc
+load | CITYDATA.65 100 | 100 e741d158d4f7f7c1 4b496e65012693fc
+load | SPELLSG.65 0 | 0 38a11b5848eaa802 dcd3862ef1dee657
+load | SPELLSG.65 100 | 100 38a11b5848eaa802 f771a3ab38d01e57
+load | BS5.MIF 0 | 0 f05364c2ef538923 4da536dda8847398
+load | BS5.MIF 100 | 100 f05364c2ef538923 7b625420b457a798
+load | nosuch.dat 0 | fault
+load | nosuch.dat 100 | fault
+load | GLOBAL.BSA 0 | fault
+load | GLOBAL.BSA 100 | fault
+load | TVBD1A.MIF 0 | 0 d2472dac8188622a 51f3b4efbab85500
+load | TVBD1A.MIF 100 | 100 d2472dac8188622a c2404b06215de900
+load | ARENA.BAT 0 | 0 2f47a5c7cbb0a01 c3c679a2c777b3e
+load | ARENA.BAT 100 | 100 2f47a5c7cbb0a01 f7eb86066196173e
+load | START.MIF 0 | 0 b03ad5ea2d53dbb7 7b86852d5afc5dcd
+load | START.MIF 100 | 100 b03ad5ea2d53dbb7 52c458f14129bdcd
+spells | 1 | b9da19be2c79caa8 8090ce23c3b8e01d
+spells | 2 | f80dac9303396bdb 44edd6f7e93899a5

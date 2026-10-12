@@ -34,6 +34,10 @@ pub mod var {
     pub const STATE_BYTES: u16 = 0x0E4F;
     /// Far pointer to the last block.
     pub const EXTRA: u16 = 0x1020;
+    /// "spellsg.nn" (the spellbook, 128 spells) and "spells.nn" (32
+    /// more), loaded whole into segment 3276 at 0000 and 2A80.
+    pub const SPELLBOOK: u16 = 0x7F0C;
+    pub const SPELLS: u16 = 0x7F17;
 }
 use var::*;
 
@@ -46,7 +50,45 @@ const EXTRA_BYTES: u16 = 0x120;
 /// EMS page mapped while the buffer block is read.
 const BUFFER_PAGE: u16 = 6;
 
+/// Spell records: 0x55 bytes each, the base cost (word) at +0x32 and the
+/// name at +0x34.
+pub mod spell {
+    pub const SIZE: u16 = 0x55;
+    pub const COST: u16 = 0x32;
+    pub const NAME: u16 = 0x34;
+    /// Where the two files are loaded.
+    pub const SEG: u16 = 0x3276;
+    pub const SECOND: u16 = 0x2A80;
+}
+
 impl Machine {
+    /// 29CF:0691: loads the current slot's spell files into segment
+    /// 3276 (their digits come from SLOT). A load that fails is skipped,
+    /// as in the original; None only where the file error hook is set
+    /// (not ported).
+    pub fn spells_load(&mut self, files: &mut Files) -> Option<()> {
+        let slot = self.mem.r8(DS, SLOT);
+        let digits = (((slot % 10) as u16) << 8 | (slot / 10) as u16).wrapping_add(0x3030);
+        self.mem.w16(DS, SPELLS + 7, digits);
+        self.mem.w16(DS, SPELLBOOK + 8, digits);
+        for (name, off) in [(SPELLBOOK, 0), (SPELLS, spell::SECOND)] {
+            let path = self.save_path(name);
+            if self.file_load(files, path, spell::SEG, off).is_none()
+                && self.mem.r16(DS, crate::bsa::var::ERROR_HOOK + 2) != 0
+            {
+                return None;
+            }
+        }
+        Some(())
+    }
+
+    /// 29CF:0679: the record of spell `index` (bit 7 picks the second
+    /// file), as (segment, offset).
+    pub fn spell_record(&self, index: u8) -> (u16, u16) {
+        let base = if index & 0x80 != 0 { spell::SECOND } else { 0 };
+        (spell::SEG, base.wrapping_add((index & 0x7F) as u16 * spell::SIZE))
+    }
+
     /// 25FD:028D..029F: makes `slot` current and writes its two digits
     /// (slot / 10, slot % 10, as ASCII; a slot above 99 gives a first
     /// "digit" past '9') into the save file names.

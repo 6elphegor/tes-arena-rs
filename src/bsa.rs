@@ -48,6 +48,8 @@ pub mod var {
     pub const OPEN_SIZE: u16 = 0xA90C;
     /// Far pointer called before every open when its segment is set.
     pub const OPEN_HOOK: u16 = 0xA904;
+    /// Far pointer called on a file error when set (0000:74E5).
+    pub const ERROR_HOOK: u16 = 0xA90E;
 }
 use var::*;
 
@@ -313,6 +315,28 @@ impl Machine {
             bsa.1 = pos.wrapping_add(data);
         }
         pos
+    }
+
+    /// 0000:7428 with ES:DI a buffer (DI not 0xFFFD..0xFFFF, which
+    /// allocate): loads the whole file named at DS:`name` to seg:off,
+    /// leaves its size at OPEN_SIZE and returns the buffer (DX:AX). None
+    /// where the file is missing, is 64 KiB or larger, or reads as 0
+    /// bytes: the original then returns 0:0 with carry set, after
+    /// 0000:74E5, which only calls the hook at ERROR_HOOK if set. A
+    /// segment of 0 reads nothing, which also counts as 0 bytes.
+    pub fn file_load(&mut self, files: &mut Files, name: u16, seg: u16, off: u16) -> Option<(u16, u16)> {
+        self.file_open_handle(files, name)?;
+        let size = self.file_seek(files, 2, 0);
+        if size > 0xFFFF {
+            self.file_close(files);
+            return None;
+        }
+        self.mem.w16(DS, OPEN_SIZE, size as u16);
+        self.file_seek(files, 0, 0);
+        // AX after the close is the read's result (0 if nothing was read).
+        let n = if seg != 0 { self.file_read(files, seg, off, size as u16) } else { 0 };
+        self.file_close(files);
+        (n != 0).then_some((seg, off))
     }
 
     /// 0000:6742.

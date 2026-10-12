@@ -12,6 +12,7 @@ use arena::exe;
 use arena::inventory::{item, SLOT_COUNT, SLOT_SIZE};
 use arena::machine::Machine;
 use arena::mem::DS;
+use arena::save::spell;
 use std::path::PathBuf;
 
 /// Race names in race order, and the player's gold (dword).
@@ -42,6 +43,7 @@ fn main() {
     m.mem.w16(DS, 0x1020, off);
     m.mem.w16(DS, 0x1022, extra);
     m.save_load_engine(&mut files, slot).expect("SAVEENGN for that slot");
+    m.spells_load(&mut files).expect("spells");
 
     let s = |m: &Machine, seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
     let r8 = |f: u16| m.mem.r8(DS, PLAYER + f);
@@ -87,5 +89,21 @@ fn main() {
         let condition = if has_condition { format!(" ({})", s(&m, DS, m.condition_name(DS, it))) } else { String::new() };
         let mark = if flags & item::EQUIPPED != 0 { '*' } else { ' ' };
         println!("   {mark} {name}{condition}");
+    }
+    // SPELLSG.nn holds the spells in the game (128); SPELLS.nn, reached
+    // with bit 7 set, 32 more.
+    for (title, indices) in [("spells (base cost)", 0..128u8), ("SPELLS.nn spells", 0x80..0xA0)] {
+        let mut list = Vec::new();
+        for i in indices {
+            let (seg, rec) = m.spell_record(i);
+            let name = s(&m, seg, rec + spell::NAME);
+            if !name.is_empty() {
+                list.push(format!("{name} ({})", m.mem.r16(seg, rec + spell::COST)));
+            }
+        }
+        println!("  {title}:");
+        for line in list.chunks(4) {
+            println!("    {}", line.join(", "));
+        }
     }
 }

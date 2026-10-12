@@ -12,6 +12,7 @@ use std::path::PathBuf;
 const CREATURES: u16 = 0x7000;
 const BUFFER: u16 = 0x7400;
 const EXTRA: (u16, u16) = (0x8800, 0x0010);
+const LOAD: u16 = 0x7800;
 
 fn game_dir() -> PathBuf {
     std::env::var("ARENA_EXE")
@@ -60,7 +61,7 @@ fn matches_original() {
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in include_str!("vectors/save.txt").lines() {
         let f: Vec<&str> = line.split(" | ").collect();
-        let p: Vec<u32> = f[1].split(' ').map(hex).collect();
+        let p: Vec<u32> = f[1].split(' ').map(|x| u32::from_str_radix(x, 16).unwrap_or(0)).collect();
         let mut m = base.clone();
         let got = match f[0] {
             "decrypt" => {
@@ -96,6 +97,40 @@ fn matches_original() {
                         ];
                         format!("{:x} {:x} {:x} {:x}", changed(&m, &before), blocks[0], blocks[1], blocks[2])
                     }
+                    None => "fault".into(),
+                }
+            }
+            "load" => {
+                let (name, off) = f[1].split_once(' ').unwrap();
+                let off = hex(off) as u16;
+                for (i, c) in format!("{name}\0").bytes().enumerate() {
+                    m.mem.w8(DS, 0xF000 + i as u16, c);
+                }
+                let before = m.clone();
+                let mut fs = files.clone();
+                match m.file_load(&mut fs, 0xF000, LOAD, off) {
+                    Some((_, ax)) => format!(
+                        "{ax:x} {:x} {:x}",
+                        changed(&m, &before),
+                        fnv((0..=0xFFFFu16).map(|i| m.mem.r8(LOAD, i)))
+                    ),
+                    None => "fault".into(),
+                }
+            }
+            "spells" => {
+                if save.is_none() {
+                    eprintln!("skipping spells case: ARENA_SAVE not set");
+                    continue;
+                }
+                m.mem.w8(DS, 0x1A6C, p[0] as u8);
+                let before = m.clone();
+                let mut fs = files.clone();
+                match m.spells_load(&mut fs) {
+                    Some(()) => format!(
+                        "{:x} {:x}",
+                        changed(&m, &before),
+                        fnv((0..0x3520u16).map(|i| m.mem.r8(0x3276, i)))
+                    ),
                     None => "fault".into(),
                 }
             }

@@ -12,6 +12,10 @@ Lines:
   engine  | slot | digests       25FD:028D..029F, 035A..03F8: changed
                                  DGROUP bytes, creature block, buffer
                                  block, extra block
+  load    | name off | ax digests  0000:7428 into LOAD_SEG:off: AX, changed
+                                 DGROUP bytes, 64 KiB at LOAD_SEG
+  spells  | slot | digests       29CF:0691: changed DGROUP bytes, segment
+                                 3276:0000..3520
 """
 import os
 import random
@@ -86,4 +90,40 @@ for slot in (int(SLOT), int(SLOT) + 1):
     except Fault:
         res = 'fault'
     out.write(f'engine | {slot:x} | {res}\n')
+
+LOAD = 0x7800
+names = ['CLASSES.DAT', 'NAMECHNK.DAT', 'CITYDATA.65', 'SPELLSG.65', 'BS5.MIF', 'nosuch.dat',
+         'GLOBAL.BSA', 'TVBD1A.MIF', 'ARENA.BAT', 'START.MIF']
+for name in names:
+    for off in (0, 0x100):
+        a.restore(BASE)
+        a.mu.mem_write(a.lin(a.ds, 0xF000), name.encode() + b'\0')
+        before = a.seg_bytes(a.ds)
+        try:
+            r = a.call_far(0, 0x7428, esi=0xF000, es=LOAD, edi=off)
+            if a.r16(0xA90A) == a.ds:
+                a.w16(0xA90A, a.ds - LOAD_SEG)
+            after = a.seg_bytes(a.ds)
+            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            from unicorn.x86_const import UC_X86_REG_EFLAGS
+            cf = a.mu.reg_read(UC_X86_REG_EFLAGS) & 1
+            res = 'fault' if cf else f'{r:x} {fnv(changed):x} {fnv(a.seg_bytes(LOAD)):x}'
+        except (Fault, AssertionError):
+            res = 'fault'
+        out.write(f'load | {name} {off:x} | {res}\n')
+
+for slot in (int(SLOT), int(SLOT) + 1):
+    a.restore(BASE)
+    a.mu.mem_write(a.lin(a.ds, 0x1A6C), bytes([slot]))
+    before = a.seg_bytes(a.ds)
+    try:
+        a.call_far(0x29CF, 0x0691)
+        if a.r16(0xA90A) == a.ds:
+            a.w16(0xA90A, a.ds - LOAD_SEG)
+        after = a.seg_bytes(a.ds)
+        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        res = f'{fnv(changed):x} {fnv(a.mu.mem_read(a.lin(LOAD_SEG + 0x3276, 0), 0x3520)):x}'
+    except (Fault, AssertionError):
+        res = 'fault'
+    out.write(f'spells | {slot:x} | {res}\n')
 out.close()
