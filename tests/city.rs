@@ -89,7 +89,7 @@ fn matches_original() {
             assert_eq!(m.mem.diff(&before, LO..HI), want, "{name}: memory differs\n{line}");
             if let Some(b) = blocks {
                 let have: Vec<String> =
-                    b.iter().map(|(p, n)| format!("{p:x}={}", String::from_utf8_lossy(n))).collect();
+                    b.iter().map(|b| format!("{:x}={}", b.pos, String::from_utf8_lossy(&b.name))).collect();
                 let want: Vec<&str> = f.get(5).map(|s| s.split_whitespace().collect()).unwrap_or_default();
                 assert_eq!(have, want, "{name}: blocks\n{line}");
             }

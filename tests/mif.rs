@@ -237,28 +237,10 @@ fn matches_original() {
                 };
                 assert_eq!(f[2], got, "{line}");
             }
-            "city" => {
-                let p: Vec<&str> = f[1].split(' ').collect();
-                let plan: Vec<u8> = (0..p[6].len() / 2).map(|i| hex(&p[6][2 * i..2 * i + 2]) as u8).collect();
-                put(&mut m, DS, 0x486B, &plan);
-                m.mem.w8(DS, 0x0A43, hex(p[2]) as u8);
-                m.mem.w16(DS, 0x0A44, hex(p[4]) as u16);
-                m.mem.w8(DS, 0x0A46, hex(p[3]) as u8);
-                m.mem.w16(DS, 0x0A48, hex(p[0]) as u16);
-                m.mem.w16(DS, 0x0A4A, hex(p[1]) as u16);
-                m.mem.w32(DS, 0x91F6, hex(p[5]) as u32);
-                m.mem.w16(DS, 0x91F0, 0);
-                m.load_rng();
-                let got = match m.mif_build_city(&mut fs) {
-                    Some(()) => plane_digests(&m),
-                    None => "fault".into(),
-                };
-                assert_eq!(f[2], got, "{line}");
-            }
             _ => panic!("unknown vector {line}"),
         }
         *counts.entry(f[0]).or_default() += 1;
     }
     eprintln!("{counts:?}");
-    assert_eq!(counts.len(), 8);
+    assert_eq!(counts.len(), 7);
 }

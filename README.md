@@ -28,8 +28,11 @@ No game code or data is included: everything is loaded from your own copy.
   MIFs is in `src/mif.rs`.
 - `src/bsa.rs`, `src/mif.rs` – GLOBAL.BSA access (including the XOR
   decryption of .INF/.TXT entries), the MIF decompressor (LZHUF), city
-  block loading and the wall pass. The template loader 0000:E87C is
-  not ported yet.
+  block loading, the wall pass and whole cities (1194:0292).
+- `src/level.rs` – the .MIF level loader (0000:E87C) used for city
+  templates, interiors and dungeons: header, level selection, planes,
+  locks, triggers, lights, text and info chunks. The game's heap
+  allocator is not ported; callers pass a `mem::Heap`.
 - `src/dungeon.rs` – dungeon records and seeds, level count, layout,
   stairs, main-quest dungeon selection.
 - `src/creature.rs` – NPC and monster generation, corpse loot,
@@ -72,6 +75,8 @@ Pitfalls:
   emulator (loaded at 1000h) and the port (image-relative). Keep test
   pointers in memory the case writes, and convert stored segment values
   back to image-relative before diffing.
+- capstone reports near branch targets past offset 0xFFFF unwrapped;
+  `xref.py` wraps them (a `call 0x1533c` in segment 0 is 0000:533C).
 - unicorn stops silently on a faulting `div` and on an exhausted
   instruction budget; check where it stopped before trusting a result.
 - Reroll loops that can only end on a different RNG value hang when the

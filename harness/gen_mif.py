@@ -15,7 +15,6 @@ Lines (fields separated by " | "):
   lzhuf | src | ax | digest | globals     decoder (3065:0D2D)
   copy  | kind pos seed | digest          plane copies (1194:04DD, 0542, 051A)
   block | name pos | digests             block load (1194:03FA..0487)
-  city  | x y dim prov start plan | digests  whole city (1194:0292)
 """
 import os
 import random
@@ -50,12 +49,6 @@ def fill(i):
 PLANE_FILL = bytes(fill(i) for i in range(0x10000))
 
 a = DosArena(EXE, GAME)
-# City: the template loader, the MAP1 post-pass and the EMS mapper are
-# stubbed (not ported here); they all run after or around the blocks.
-a.patch(0, 0xE87C, b'\xcb')
-a.patch(0x1194, 0x05A9, b'\xc3')
-a.patch(0, 0x5C86, b'\xcb')
-
 a.run_range(0, 0x6F3A, 0x6F87)
 out.write(f'open | {a.r16(0xA926):x} {a.r16(0xA922) | a.r16(0xA924) << 16:x}\n')
 
@@ -248,8 +241,7 @@ def wall_words(seed):
     return words
 
 
-# `a` has 05A9 stubbed for the city runs (and unicorn caches translated
-# code, so it can't be unpatched), so the pass runs on its own machine.
+# The pass runs on its own machine (whole cities are in gen_level.py).
 wa = DosArena(EXE, GAME)
 for var, seg in ((0xCCD0, FLOOR_SEG), (0xD806, MAP1_SEG), (0xD748, MAP2_SEG), (0x9030, DECODE_SEG)):
     wa.w16(var, seg)
@@ -292,29 +284,3 @@ for name in rng.sample(blocks, 60) + rng.sample(others, 15):
         res = 'fault'
     out.write(f'block | {lname.decode()} {pos:x} | {res}\n')
 
-
-# --- whole cities ---------------------------------------------------------------
-
-for _ in range(25):
-    fresh()
-    dim = rng.choice([4, 5, 6])
-    x, y = rng.getrandbits(16), rng.getrandbits(16)
-    prov = rng.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
-    start = rng.choice([0, 0x28, 0x1428, 0x2850])
-    plan = bytes(1 if rng.random() < 0.15 else 0 for _ in range(dim * dim))
-    a.mu.mem_write(a.lin(a.ds, 0x486B), plan)
-    a.mu.mem_write(a.lin(a.ds, 0xA43), bytes([dim]))
-    a.w16(0xA44, start)
-    a.mu.mem_write(a.lin(a.ds, 0xA46), bytes([prov]))
-    a.w16(0xA48, x)
-    a.w16(0xA4A, y)
-    seed = rng.getrandbits(32)
-    a.w32(0x91F6, seed)
-    a.w16(0x91F0, 0)
-    try:
-        a._setup([0, STUB_SEG], {})
-        a._run(0x1194, 0x0292, STUB_SEG, 0)  # 50M-instruction budget
-        res = plane_digests()
-    except Fault:
-        res = 'fault'
-    out.write(f'city | {x:x} {y:x} {dim:x} {prov:x} {start:x} {seed:x} {plan.hex()} | {res}\n')

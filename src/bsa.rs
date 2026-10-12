@@ -46,6 +46,8 @@ pub mod var {
     /// Name of the last opened file (far pointer) and low word of its size.
     pub const OPEN_NAME: u16 = 0xA908;
     pub const OPEN_SIZE: u16 = 0xA90C;
+    /// Far pointer called before every open when its segment is set.
+    pub const OPEN_HOOK: u16 = 0xA904;
 }
 use var::*;
 
@@ -194,20 +196,39 @@ impl Machine {
 
     /// 0000:67C4. Opens the file named at DS:`name`: a loose file if one
     /// exists, otherwise the BSA entry. None where neither exists (the
-    /// original reports the error through 0000:74E5).
+    /// original reports the error through 0000:74E5) or where the open
+    /// hook at DGROUP A904 is set (not ported).
     pub fn file_open(&mut self, files: &mut Files, name: u16) -> Option<()> {
+        let (handle, found) = self.file_open_any(files, name)?;
+        self.mem.w16(0, CS_HANDLE, handle);
+        found.then_some(())
+    }
+
+    /// 0000:6B26. `file_open` for callers that keep the handle themselves:
+    /// returns it instead of storing it at CS:6837. For a BSA entry it is
+    /// DOS's "file not found" code, 2, which the directory scan preserves.
+    /// None where nothing is found (the original returns with carry set
+    /// and its callers read from handle 2) or the open hook is set.
+    pub fn file_open_handle(&mut self, files: &mut Files, name: u16) -> Option<u16> {
+        let (handle, found) = self.file_open_any(files, name)?;
+        found.then_some(handle)
+    }
+
+    /// The part of 67C4 and 6B26 they share: (handle, found).
+    fn file_open_any(&mut self, files: &mut Files, name: u16) -> Option<(u16, bool)> {
         self.mem.w8(0, CS_IN_BSA, 0);
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
+        if self.mem.r16(DS, OPEN_HOOK + 2) != 0 {
+            return None;
+        }
         let raw = self.mem.cstr(DS, name).to_vec();
         if let Some(bytes) = files.read_loose(&raw) {
-            self.mem.w16(0, CS_HANDLE, LOOSE_DOS_HANDLE);
             self.mem.w16(DS, OPEN_SIZE, bytes.len() as u16);
             files.loose = Some((bytes, 0));
-            return Some(());
+            return Some((LOOSE_DOS_HANDLE, true));
         }
-        self.mem.w16(0, CS_HANDLE, 2);
-        self.bsa_find(files, name).then_some(())
+        Some((2, self.bsa_find(files, name)))
     }
 
     /// 0000:6BEC. Reads up to `n` bytes to DS... at `seg`:`off`; returns

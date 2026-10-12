@@ -1,4 +1,5 @@
-//! .MIF level files: the decompressor and the city block loader.
+//! .MIF level files: the decompressor, the city block loader and the
+//! whole city (template and blocks; the template loader is `level`).
 //!
 //! A city block (1194:03FA..0487) is read as a 6-byte, a 0x3D-byte and
 //! another 6-byte header, then chunks of a 4-byte tag and a word length.
@@ -13,7 +14,7 @@
 
 use crate::bsa::Files;
 use crate::machine::Machine;
-use crate::mem::DS;
+use crate::mem::{Heap, DS};
 
 /// DGROUP variables.
 pub mod var {
@@ -462,25 +463,36 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:0292 with its block loads: generates the city's block plan
-    /// (`generate_city`) and loads every block into the planes. The
-    /// template load (0000:E87C) and the wall post-pass (1194:05A9) that
-    /// bracket it are not ported. None where the original faults or
-    /// hangs.
-    pub fn mif_build_city(&mut self, files: &mut Files) -> Option<()> {
+    /// 1194:0292: builds the current location's city in the planes. It
+    /// generates the block plan (`generate_city`), loads the location's
+    /// template (`level_load`), runs the wall pass and loads every block.
+    /// The Imperial City (province 8) is its template alone. None where
+    /// the original faults or hangs, or reaches code not ported (see
+    /// `level_load`).
+    pub fn mif_build_city(&mut self, files: &mut Files, heap: &mut impl Heap) -> Option<()> {
+        // 0000:5C86 maps the EMS page in DGROUP 1030, before and after
+        // the template.
+        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
+        // The original loads the template after clearing the plan and
+        // each block right after naming it. Neither the template nor a
+        // block touches the RNG or the plan and name tables, so the plan
+        // is generated first. Each name is put back in the template it
+        // was opened through, and the templates restored after.
         let blocks = self.generate_city()?;
-        // The original loads each block right after naming it; loading
-        // touches neither the RNG nor the name templates, so loading
-        // afterwards gives the same result. Names are put back in the
-        // template for each load, and the templates restored after.
+        self.level_load(files, heap, crate::city::var::TEMPLATE)?;
+        self.mif_wall_pass();
+        if self.mem.r8(DS, crate::city::var::PROVINCE) == 8 {
+            return Some(());
+        }
+        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
         let pos = self.mem.r16(DS, WRITE_POS);
         let names: Vec<u8> = (0..NAME_BYTES).map(|i| self.mem.r8(DS, CITY_NAME + i)).collect();
-        for (at, name) in blocks {
-            self.mem.w16(DS, WRITE_POS, at);
-            for (i, &b) in name.iter().chain(std::iter::once(&0)).enumerate() {
-                self.mem.w8(DS, CITY_NAME + i as u16, b);
+        for b in blocks {
+            self.mem.w16(DS, WRITE_POS, b.pos);
+            for (i, &c) in b.name.iter().chain(std::iter::once(&0)).enumerate() {
+                self.mem.w8(DS, b.name_off + i as u16, c);
             }
-            self.mif_load_block(files, CITY_NAME)?;
+            self.mif_load_block(files, b.name_off)?;
         }
         for (i, &b) in names.iter().enumerate() {
             self.mem.w8(DS, CITY_NAME + i as u16, b);
@@ -489,6 +501,9 @@ impl Machine {
         Some(())
     }
 }
+
+/// EMS page mapped around the template load.
+const EMS_PAGE: u16 = 0x1030;
 
 /// Wall pass inputs: map width and height in words (DGROUP, through ES),
 /// a byte that enables clearing (2 or 0x82; its meaning is not

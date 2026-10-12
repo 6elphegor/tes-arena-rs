@@ -11,6 +11,7 @@ pub mod dungeon;
 pub mod effects;
 pub mod exe;
 pub mod inventory;
+pub mod level;
 pub mod loot;
 pub mod machine;
 pub mod mem;

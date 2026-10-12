@@ -66,10 +66,18 @@ def data_refs(targets):
 def dis(seg, off, n=60):
     out = []
     for ins in md.disasm(IMG[seg * 16 + off: seg * 16 + off + n * 8], off):
-        out.append(f'{seg:04X}:{ins.address:04X}  {ins.bytes.hex():<14} {ins.mnemonic} {ins.op_str}{farname(seg, ins)}')
+        out.append(f'{seg:04X}:{ins.address:04X}  {ins.bytes.hex():<14} {ins.mnemonic} {wrap(ins)}{farname(seg, ins)}')
         if len(out) >= n:
             break
     return '\n'.join(out)
+
+def wrap(ins):
+    """Operands, with relative branch targets wrapped to 16 bits as the
+    CPU does (capstone reports them unwrapped past offset 0xFFFF)."""
+    if ins.bytes[0] in (0xe8, 0xe9) or ins.mnemonic.startswith('j') and ins.operands \
+            and ins.operands[0].type == X86_OP_IMM:
+        return f'0x{ins.operands[0].imm & 0xffff:x}'
+    return ins.op_str
 
 def farname(seg, ins):
     if ins.bytes[0] == 0x9a and len(ins.bytes) == 5:
@@ -86,7 +94,7 @@ def call_sites(seg, off):
             if s * 16 + o == lin:
                 yield ('far',) + seg_of(r - 3)
     for s, ins in linear_sweep():
-        if s == seg and ins.mnemonic == 'call' and ins.bytes[0] == 0xe8 and ins.operands[0].imm == off:
+        if s == seg and ins.mnemonic == 'call' and ins.bytes[0] == 0xe8 and ins.operands[0].imm & 0xffff == off:
             yield ('near', s, ins.address)
 
 if __name__ == '__main__':

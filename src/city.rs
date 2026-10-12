@@ -16,8 +16,21 @@
 use crate::machine::Machine;
 use crate::mem::DS;
 
+/// A block to load, as named by `city_block_name`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Block {
+    /// Map write offset.
+    pub pos: u16,
+    /// The name template it was loaded through (NAME_LONG or NAME_SHORT).
+    pub name_off: u16,
+    /// File name.
+    pub name: Vec<u8>,
+}
+
 /// DGROUP variables.
 pub mod var {
+    /// The current location's template file name (record +14).
+    pub const TEMPLATE: u16 = 0x0A36;
     /// Province of the current location (record +24). Province 8, the
     /// Imperial Province, has a fixed city and skips generation.
     pub const PROVINCE: u16 = 0x0A46;
@@ -195,10 +208,10 @@ impl Machine {
 
     /// 1194:0292 without its I/O: the screen/loader calls (0000:5C86,
     /// 0000:E87C, 1194:05A9) and the per-block file load after 03FA.
-    /// Returns, in load order, each block's map write offset and file
-    /// name; None where the original faults or hangs. The RNG seed is
-    /// saved and restored around the whole routine, as in the original.
-    pub fn generate_city(&mut self) -> Option<Vec<(u16, Vec<u8>)>> {
+    /// Returns the blocks in load order; None where the original faults
+    /// or hangs. The RNG seed is saved and restored around the whole
+    /// routine, as in the original.
+    pub fn generate_city(&mut self) -> Option<Vec<Block>> {
         let seg = self.mem.r16(DS, 0x9030);
         self.mem.w32(DS, 0xBA54, (seg as u32) << 16);
         let f = self.mem.r16(DS, 0xC398) | 0x8000;
@@ -229,7 +242,7 @@ impl Machine {
                     let b = self.mem.r8(DS, cell);
                     if let Some(name) = self.city_block_name(b)? {
                         let pos = self.mem.r16(DS, WRITE_POS);
-                        out.push((pos, self.mem.cstr(DS, name).to_vec()));
+                        out.push(Block { pos, name_off: name, name: self.mem.cstr(DS, name).to_vec() });
                     }
                     let pos = self.mem.r16(DS, WRITE_POS).wrapping_add(BLOCK_STEP);
                     self.mem.w16(DS, WRITE_POS, pos);
