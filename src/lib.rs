@@ -6,5 +6,6 @@ pub mod dice;
 pub mod exe;
 pub mod machine;
 pub mod mem;
+pub mod progression;
 pub mod random;
 pub mod scale;
