@@ -19,6 +19,13 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/combat.rs` – to-hit, hit location, criticals, damage, weapon wear
   (segment 2AA1).
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
+- `src/shop.rs` – shop stock, potions and magic items (1194:FAD9, B7FA,
+  B848). Buy/sell haggling is not ported (interactive).
+- `src/inventory.rs` – inventory slots, equipment lookups (armour per
+  location, weapon, shields, missile), class usability, add/remove/sort.
+- `src/city.rs` – city block plans and block file names from a city's
+  seed, location records and templates (1194:0292, 3B84). Loading the
+  MIFs from GLOBAL.BSA is not ported.
 - `harness/emu.py` – runs original routines under unicorn (far, near or a
   code range); CPU faults are reported as `Fault`.
 - `harness/xref.py` – static helpers: data xrefs, pointer tables,
@@ -51,6 +58,12 @@ Pitfalls:
   before running anything that rerolls.
 - Private helpers on `Machine` share one namespace across modules; give
   them module-specific names.
+- DGROUP holds relocated segment words, which differ between the
+  emulator (loaded at 1000h) and the port (image-relative). Keep test
+  pointers in memory the case writes, and convert stored segment values
+  back to image-relative before diffing.
+- unicorn stops silently on a faulting `div` and on an exhausted
+  instruction budget; check where it stopped before trusting a result.
 
 ## Running tests
 
