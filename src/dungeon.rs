@@ -16,6 +16,7 @@
 
 use crate::city::record;
 use crate::machine::Machine;
+use crate::random::CycleCheck;
 use crate::mem::DS;
 
 /// DGROUP variables.
@@ -122,27 +123,6 @@ pub struct Pick {
 }
 
 impl Machine {
-    /// Brent's cycle check over the RNG seed, for reroll loops that only
-    /// end when the RNG yields a different value. Returns true once the
-    /// seed has come back to a saved one, i.e. the loop would repeat the
-    /// same values forever. Without the RNG table the seed is the whole
-    /// RNG state.
-    fn dun_cycled(&self, saved: &mut u32, power: &mut u32, lam: &mut u32) -> bool {
-        if self.rng.table.is_some() {
-            return false;
-        }
-        *lam += 1;
-        if self.rng.seed == *saved {
-            return true;
-        }
-        if *lam == *power {
-            *saved = self.rng.seed;
-            *power *= 2;
-            *lam = 0;
-        }
-        false
-    }
-
     /// 0000:75B0. Writes `v` in decimal at DS:di, NUL-terminated; the
     /// digits are first written backwards into DGROUP ending at 94F6.
     fn dun_ultoa(&mut self, v: u32, di: u16) {
@@ -282,13 +262,13 @@ impl Machine {
         di += 1;
         for left in (1..=levels).rev() {
             let prev = self.mem.r8(DS, di - 1);
-            let (mut saved, mut power, mut lam) = (self.rng.seed, 1, 0);
+            let mut cycle = CycleCheck::new(&self.rng);
             loop {
                 cell = self.dun_cell(w, h)?;
                 if cell != prev {
                     break;
                 }
-                if self.dun_cycled(&mut saved, &mut power, &mut lam) {
+                if cycle.cycled(&self.rng) {
                     return None;
                 }
             }
@@ -403,13 +383,13 @@ impl Machine {
         let step = self.mem.r8(DS, QUEST_STEP);
         let p = self.mem.r8(DS, QUEST_PROVINCES.wrapping_add(step as u16));
         self.mem.w8(DS, QUEST_PROVINCE, p);
-        let (mut saved, mut power, mut lam) = (self.rng.seed, 1, 0);
+        let mut cycle = CycleCheck::new(&self.rng);
         let other = loop {
             let r = self.rng.range(0, 8).expect("nonzero span") as u8;
             if r != self.mem.r8(DS, QUEST_PROVINCE) {
                 break r;
             }
-            if self.dun_cycled(&mut saved, &mut power, &mut lam) {
+            if cycle.cycled(&self.rng) {
                 return None;
             }
         };
@@ -463,13 +443,13 @@ impl Machine {
             if (0..14).all(|i| used(self, first + i * ENTRY_SIZE)) {
                 si = self.dun_random_entry();
             } else {
-                let (mut saved, mut power, mut lam) = (self.rng.seed, 1, 0);
+                let mut cycle = CycleCheck::new(&self.rng);
                 loop {
                     si = self.dun_random_entry();
                     if !used(self, si) {
                         break;
                     }
-                    if self.dun_cycled(&mut saved, &mut power, &mut lam) {
+                    if cycle.cycled(&self.rng) {
                         return None;
                     }
                 }

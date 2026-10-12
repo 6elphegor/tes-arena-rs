@@ -25,7 +25,17 @@ No game code or data is included: everything is loaded from your own copy.
   location, weapon, shields, missile), class usability, add/remove/sort.
 - `src/city.rs` – city block plans and block file names from a city's
   seed, location records and templates (1194:0292, 3B84). Loading the
-  MIFs from GLOBAL.BSA is not ported.
+  MIFs is in `src/mif.rs`.
+- `src/bsa.rs`, `src/mif.rs` – GLOBAL.BSA access (including the XOR
+  decryption of .INF/.TXT entries), the MIF decompressor (LZHUF), city
+  block loading and the wall pass. The template loader 0000:E87C is
+  not ported yet.
+- `src/dungeon.rs` – dungeon records and seeds, level count, layout,
+  stairs, main-quest dungeon selection.
+- `src/creature.rs` – NPC and monster generation, corpse loot,
+  monster spawning.
+- `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
+  routines can run unmodified against the user's own game files.
 - `harness/emu.py` – runs original routines under unicorn (far, near or a
   code range); CPU faults are reported as `Fault`.
 - `harness/xref.py` – static helpers: data xrefs, pointer tables,
@@ -64,6 +74,10 @@ Pitfalls:
   back to image-relative before diffing.
 - unicorn stops silently on a faulting `div` and on an exhausted
   instruction budget; check where it stopped before trusting a result.
+- Reroll loops that can only end on a different RNG value hang when the
+  seed sits on a short cycle; use `random::CycleCheck` and return None.
+- In an agent worktree the game is not at `../ESarena`; set `ARENA_EXE`
+  or the game-dependent tests skip silently.
 
 ## Running tests
 

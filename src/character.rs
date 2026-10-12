@@ -21,11 +21,18 @@ pub mod field {
     /// Level, 0-based (8-bit).
     pub const LEVEL: u16 = 0x06;
     pub const SEX: u16 = 0x07;
+    /// Portrait: race × 32 + 0..31 (0..30 for race 7).
+    pub const PORTRAIT: u16 = 0x08;
+    /// Name, written by 1194:080B (not ported).
+    pub const NAME: u16 = 0x09;
     /// Creature damage range, 8-bit.
     pub const CREATURE_MIN_DAMAGE: u16 = 0x09;
     pub const CREATURE_MAX_DAMAGE: u16 = 0x0A;
     /// STR INT WIL AGI SPD END PER LCK.
     pub const ATTRS: u16 = 0x29;
+    /// Base attributes, a copy of ATTRS made at creation; status effects
+    /// snapshot and restore against them.
+    pub const BASE_ATTRS: u16 = 0x31;
     pub const DAMAGE_MOD: u16 = 0x39;
     pub const MAX_WEIGHT: u16 = 0x3B; // ?
     pub const MAX_SPELL_POINTS_2: u16 = 0x3D;
@@ -61,6 +68,13 @@ pub mod field {
     pub const SPELL_POINTS: u16 = 0x66;
     pub const MAX_SPELL_POINTS: u16 = 0x68;
     pub const B_6A: u16 = 0x6A;
+    /// Face roll 0..9, unique among DGROUP 0FD4.
+    pub const FACE: u16 = 0x6B;
+    /// First inventory slot.
+    pub const ITEMS: u16 = 0x6E;
+    /// Creature special-attack kind and its data.
+    pub const SPECIAL: u16 = 0x366;
+    pub const SPECIAL_DATA: u16 = 0x367;
     /// Gold a creature carries (word).
     pub const CREATURE_GOLD: u16 = 0x407;
     /// Experience points (dword).
@@ -68,6 +82,12 @@ pub mod field {
     /// Status flags: `FLAG_CREATURE`, 0x100 dead/defeated (inferred).
     pub const FLAGS: u16 = 0x40D;
     pub const FLAG_CREATURE: u16 = 0x1000;
+    /// Per-kind counters of active status effects (9 bytes).
+    pub const EFFECT_COUNTS: u16 = 0x40F;
+    /// Timed spell flags.
+    pub const SPELL_FLAGS: u16 = 0x41A;
+    /// Magic shield points, absorbed before HP.
+    pub const MAGIC_SHIELD: u16 = 0x41C;
 }
 use field::*;
 
@@ -83,25 +103,32 @@ pub const SPELL_KIND: u16 = 0x6150;
 const ATTR_SCRATCH: u16 = 0x10A8;
 
 impl Machine {
-    fn class(&self, rec: u16) -> u8 {
-        self.mem.r8(DS, rec.wrapping_add(CLASS))
+    fn hit_die(&self, rec: u16) -> u16 {
+        self.hit_die_at(DS, rec)
     }
 
-    fn hit_die(&self, rec: u16) -> u16 {
-        self.mem.r8(DS, HIT_DIE.wrapping_add((self.class(rec) & 0x1f) as u16)) as u16
+    /// Hit die of the class of a record in any segment (table DGROUP 2BD5).
+    pub fn hit_die_at(&self, seg: u16, rec: u16) -> u16 {
+        let class = self.mem.r8(seg, rec.wrapping_add(CLASS)) & 0x1f;
+        self.mem.r8(DS, HIT_DIE.wrapping_add(class as u16)) as u16
     }
 
     /// 1194:370C. Rolls the 8 attributes for the record's race and sex.
     pub fn roll_attributes(&mut self, rec: u16) -> Option<()> {
+        self.roll_attributes_at(DS, rec)
+    }
+
+    /// `roll_attributes` for a record in any segment (NPCs and creatures).
+    pub fn roll_attributes_at(&mut self, seg: u16, rec: u16) -> Option<()> {
         // The race byte is not masked.
-        let mut base = RACE_BASE.wrapping_add((self.mem.r8(DS, rec.wrapping_add(RACE)) as u16) << 4);
-        if self.mem.r8(DS, rec.wrapping_add(SEX)) != 0 {
+        let mut base = RACE_BASE.wrapping_add((self.mem.r8(seg, rec.wrapping_add(RACE)) as u16) << 4);
+        if self.mem.r8(seg, rec.wrapping_add(SEX)) != 0 {
             base = base.wrapping_add(8);
         }
         for i in 0..8 {
             let r = dice(&mut self.rng, 20)?.wrapping_add(1);
             let v = (to256(r as i16) as u8).wrapping_add(self.mem.r8(DATA, base.wrapping_add(i)));
-            self.mem.w8(DS, rec.wrapping_add(ATTRS + i), v);
+            self.mem.w8(seg, rec.wrapping_add(ATTRS + i), v);
         }
         Some(())
     }

@@ -16,13 +16,12 @@
 //! NPC names (1194:080B) are not generated: that routine saves and
 //! restores the seed, so skipping it changes nothing else.
 
-use std::collections::HashSet;
 
 use crate::character::field::*;
-use crate::character::HIT_DIE;
 use crate::dice::{dice, roll};
 use crate::effects::Applied;
 use crate::machine::Machine;
+use crate::random::CycleCheck;
 use crate::mem::{DATA, DS};
 use crate::scale::{to100, to256};
 
@@ -50,18 +49,8 @@ pub mod seed {
 
 /// Record fields used here that `character::field` does not name.
 pub mod rec {
-    /// Portrait: race × 32 + 0..31 (0..30 for race 7).
-    pub const PORTRAIT: u16 = 0x08;
-    /// Name, written by 1194:080B (not ported).
-    pub const NAME: u16 = 0x09;
+    pub use crate::character::field::{BASE_ATTRS, FACE, NAME, PORTRAIT, SPECIAL, SPECIAL_DATA};
     pub const B_28: u16 = 0x28;
-    /// Base attributes, a copy of +29..+30 made at creation.
-    pub const BASE_ATTRS: u16 = 0x31;
-    /// Face roll 0..9, unique among DGROUP 0FD4.
-    pub const FACE: u16 = 0x6B;
-    /// Creature special-attack kind and data (+367: 6 bytes for type 2A).
-    pub const SPECIAL: u16 = 0x366;
-    pub const SPECIAL_DATA: u16 = 0x367;
     /// The XP the creature is worth, for creatures (dword at XP).
     pub const XP_VALUE: u16 = super::XP;
 }
@@ -178,13 +167,13 @@ impl Machine {
     /// loops forever when the LCG cycles without success (seed 0 and the
     /// other multiples of 2^30 are fixed points); that returns None.
     fn cr_retry<T>(&mut self, mut attempt: impl FnMut(&mut Self) -> Option<Option<T>>) -> Option<T> {
-        let mut seen = HashSet::new();
+        let mut cycle = CycleCheck::new(&self.rng);
         loop {
-            if seen.len() < 1 << 20 && !seen.insert(self.rng.seed) {
-                return None;
-            }
             if let Some(v) = attempt(self)? {
                 return Some(v);
+            }
+            if cycle.cycled(&self.rng) {
+                return None;
             }
         }
     }
@@ -314,27 +303,6 @@ impl Machine {
         })
     }
 
-    /// 1194:370C for a record in any segment: the 8 attributes for its race
-    /// and sex (see `Machine::roll_attributes`).
-    fn cr_roll_attributes(&mut self, seg: u16, rec: u16) -> Option<()> {
-        let mut base = data::RACE_BASE.wrapping_add((self.mem.r8(seg, rec.wrapping_add(RACE)) as u16) << 4);
-        if self.mem.r8(seg, rec.wrapping_add(SEX)) != 0 {
-            base = base.wrapping_add(8);
-        }
-        for i in 0..8 {
-            let r = dice(&mut self.rng, 20)?.wrapping_add(1);
-            let v = (to256(r as i16) as u8).wrapping_add(self.mem.r8(DATA, base.wrapping_add(i)));
-            self.mem.w8(seg, rec.wrapping_add(ATTRS + i), v);
-        }
-        Some(())
-    }
-
-    /// Hit die of a record's class (DGROUP 2BD5).
-    fn cr_hit_die(&self, seg: u16, rec: u16) -> u16 {
-        let c = (self.mem.r8(seg, rec.wrapping_add(CLASS)) & 0x1f) as u16;
-        self.mem.r8(DS, HIT_DIE.wrapping_add(c)) as u16
-    }
-
     /// 1194:379F. Derived stats of a record in any segment: level-tier
     /// values, spell points from INT, attribute modifiers, hit points
     /// (1194:374E: hit die + HP modifier, at least 1 unsigned) and
@@ -346,7 +314,7 @@ impl Machine {
         self.mem.w16(seg, rec.wrapping_add(SPELL_POINTS), cur);
         self.mem.w16(seg, rec.wrapping_add(MAX_SPELL_POINTS), max);
         self.attribute_modifiers_at(seg, rec);
-        let die = self.cr_hit_die(seg, rec);
+        let die = self.hit_die_at(seg, rec);
         let mut hp = dice(&mut self.rng, die)?.wrapping_add(self.mem.r16(seg, rec.wrapping_add(HP_MOD)));
         if hp < 1 {
             hp = 1;
@@ -365,7 +333,7 @@ impl Machine {
     /// the rolled value). Then derived stats, and hit points as one hit
     /// die (at least 1) per level counting level 0, plus 25.
     fn cr_npc_attributes(&mut self, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
-        self.cr_roll_attributes(seg, rec)?;
+        self.roll_attributes_at(seg, rec)?;
         for i in 0..8 {
             let v = self.mem.r8(seg, rec.wrapping_add(ATTRS + i));
             self.mem.w8(seg, rec.wrapping_add(rec::BASE_ATTRS + i), v);
@@ -377,7 +345,7 @@ impl Machine {
         self.mem.w16(seg, rec.wrapping_add(HP), 0);
         let n = self.mem.r8(seg, rec.wrapping_add(LEVEL)) as u16 + 1;
         for _ in 0..n {
-            let die = self.cr_hit_die(seg, rec);
+            let die = self.hit_die_at(seg, rec);
             let hd = dice(&mut self.rng, die)?.max(1);
             let v = self.mem.r16(seg, rec.wrapping_add(MAX_HP)).wrapping_add(hd);
             self.mem.w16(seg, rec.wrapping_add(MAX_HP), v);

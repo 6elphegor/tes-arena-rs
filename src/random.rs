@@ -89,3 +89,40 @@ impl ArenaRandom {
         Some((r % span).wrapping_add(lo))
     }
 }
+
+/// Detects a reroll loop that can never end. Such loops reroll until the
+/// RNG yields an acceptable value; the LCG only multiplies, so some seeds
+/// (0, 2^30, 2^31 ...) are fixed points and every seed lies on a cycle.
+/// Once the seed repeats, the loop has seen every value it will ever see
+/// and the original would spin forever. Brent's algorithm: constant
+/// memory, no extra RNG use. Call `cycled` once per failed attempt.
+#[derive(Clone, Debug)]
+pub struct CycleCheck {
+    saved: u32,
+    power: u32,
+    lam: u32,
+}
+
+impl CycleCheck {
+    pub fn new(rng: &ArenaRandom) -> Self {
+        Self { saved: rng.seed, power: 1, lam: 0 }
+    }
+
+    /// True once the seed has come back to a saved one. With the table
+    /// active the seed is not the whole RNG state, so this never fires.
+    pub fn cycled(&mut self, rng: &ArenaRandom) -> bool {
+        if rng.table.is_some() {
+            return false;
+        }
+        self.lam += 1;
+        if rng.seed == self.saved {
+            return true;
+        }
+        if self.lam == self.power {
+            self.saved = rng.seed;
+            self.power *= 2;
+            self.lam = 0;
+        }
+        false
+    }
+}
