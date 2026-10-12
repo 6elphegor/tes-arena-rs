@@ -13,6 +13,7 @@ pub mod exe;
 pub mod haggle;
 pub mod heap;
 pub mod inventory;
+pub mod item;
 pub mod level;
 pub mod log;
 pub mod loot;

@@ -19,31 +19,8 @@ pub const ITEM: u16 = 0x13DA;
 /// Item template (13 bytes).
 pub const TEMPLATE: u16 = 0x13F3;
 
-/// Item record fields (offsets from `ITEM`). `?` marks guesses.
-pub mod item {
-    /// Weapon or armour type index.
-    pub const TYPE: u16 = 0x00;
-    /// Condition code from the type tables (see `set_condition`).
-    pub const CONDITION_CODE: u16 = 0x01;
-    /// Weapons: hands needed (1 or 2).
-    pub const HANDS: u16 = 0x03;
-    /// Weapons: damage min/max bytes. Armour: armour rating.
-    pub const DAMAGE_MIN: u16 = 0x04;
-    pub const DAMAGE_MAX: u16 = 0x05;
-    pub const HEALTH: u16 = 0x06;
-    pub const MAX_HEALTH: u16 = 0x08;
-    /// Price (dword).
-    pub const PRICE: u16 = 0x0A;
-    /// Bit 0: magic; 0x04: weapon; 0x30: armour kind; 0x40: set by both
-    /// finishers.
-    pub const FLAGS: u16 = 0x0E;
-    pub const ENCHANT: u16 = 0x0F;
-    /// Material index (0 Iron .. 7 Ebony), or armour kind for plain armour,
-    /// or 0xFF.
-    pub const MATERIAL: u16 = 0x10;
-    pub const ENCHANT_VALUE: u16 = 0x11; // ?
-    pub const ENCHANT_SPELL: u16 = 0x12; // ?
-}
+/// Item record fields (offsets from `ITEM`): the shared layout.
+pub use crate::item;
 
 /// Template fields (offsets from `TEMPLATE`).
 pub mod template {

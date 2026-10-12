@@ -24,6 +24,8 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/haggle.rs` – haggling when buying or selling (1194:8020); the
   player's answers come from a `HaggleIo`. Temple and guild services
   (modes 5, 6) are not ported.
+- `src/item.rs` – the 19-byte item slot layout shared by loot, inventory
+  and combat.
 - `src/inventory.rs` – inventory slots, equipment lookups (armour per
   location, weapon, shields, missile), class usability, add/remove/sort.
 - `src/city.rs` – city block plans and block file names from a city's

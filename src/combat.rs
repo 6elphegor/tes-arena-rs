@@ -82,16 +82,8 @@ pub struct Gear {
     pub missile: bool,
 }
 
-/// Item record fields used here.
-pub mod item {
-    pub const MIN_DAMAGE: u16 = 0x04;
-    pub const MAX_DAMAGE: u16 = 0x05;
-    /// Condition, worn down by hits; 0 is broken.
-    pub const CONDITION: u16 = 0x06;
-    /// Bit 0: has a material (+10 is meaningful).
-    pub const FLAGS: u16 = 0x0E;
-    pub const MATERIAL: u16 = 0x10;
-}
+/// Item record fields (the shared layout).
+pub use crate::item;
 
 impl Machine {
     fn rec_b(&self, p: Ptr, f: u16) -> u8 {
@@ -301,10 +293,10 @@ impl Machine {
         if self.mem.r8(es, weapon.off) & 0x80 != 0 {
             ax >>= 1;
         }
-        let cond = self.rec_w(weapon, item::CONDITION).wrapping_sub(ax);
-        self.mem.w16(weapon.seg, weapon.off.wrapping_add(item::CONDITION), cond);
+        let cond = self.rec_w(weapon, item::HEALTH).wrapping_sub(ax);
+        self.mem.w16(weapon.seg, weapon.off.wrapping_add(item::HEALTH), cond);
         if (cond as i16) < 0 && cond > 50000 {
-            self.mem.w16(weapon.seg, weapon.off.wrapping_add(item::CONDITION), 0);
+            self.mem.w16(weapon.seg, weapon.off.wrapping_add(item::HEALTH), 0);
         }
         saved
     }
@@ -337,7 +329,7 @@ impl Machine {
         let (lo, hi) = match gear.weapon {
             Some(w) => {
                 let w = Ptr::new(seg, w);
-                (self.rec_b(w, item::MIN_DAMAGE), self.rec_b(w, item::MAX_DAMAGE))
+                (self.rec_b(w, item::DAMAGE_MIN), self.rec_b(w, item::DAMAGE_MAX))
             }
             None => {
                 let i = match gear.gauntlets {

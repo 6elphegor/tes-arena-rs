@@ -27,26 +27,12 @@ use crate::mem::{DATA, DS};
 /// Record offset of the first item slot.
 pub const SLOTS: u16 = 0x6E;
 pub const SLOT_COUNT: u16 = 40;
-pub const SLOT_SIZE: u16 = 0x13;
+pub const SLOT_SIZE: u16 = item::SIZE;
 /// DGROUP offset of the player's first item slot.
 pub const PLAYER_SLOTS: u16 = 0x0212;
 
-/// Item fields used here (see the module docs).
-pub mod item {
-    pub const TYPE: u16 = 0x00;
-    pub const COUNT: u16 = 0x01;
-    pub const RATING: u16 = 0x04;
-    pub const HEALTH: u16 = 0x06;
-    pub const MAX_HEALTH: u16 = 0x08;
-    pub const FLAGS: u16 = 0x0E;
-    pub const ENCHANT: u16 = 0x0F;
-    pub const ENCHANT_VALUE: u16 = 0x11;
-    pub const ENCHANT_ATTR: u16 = 0x12;
-
-    pub const ENCHANTED: u8 = 0x01;
-    pub const OCCUPIED: u8 = 0x40;
-    pub const EQUIPPED: u8 = 0x80;
-}
+/// Item record fields (the shared layout).
+pub use crate::item;
 
 /// Item categories, `(flags & 0x0C) >> 2`.
 pub mod category {
