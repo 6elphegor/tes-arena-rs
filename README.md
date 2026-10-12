@@ -60,7 +60,8 @@ No game code or data is included: everything is loaded from your own copy.
   imperial.ppm`. `examples/character_sheet.rs` loads a saved game and
   prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
   writes a save's stored screenshot and the map of the level it is in;
-  `examples/wild_map.rs` draws a location's wilderness grid.
+  `examples/wild_map.rs` draws a location's wilderness grid and four of
+  its blocks as terrain.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
   routines can run unmodified against the user's own game files, and
   `init_heap` to set up the game's heap.

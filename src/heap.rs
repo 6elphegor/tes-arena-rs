@@ -249,4 +249,29 @@ impl Machine {
     fn heap_far(&self, seg: u16, off: u16) -> (u16, u16) {
         (self.mem.r16(seg, off.wrapping_add(2)), self.mem.r16(seg, off))
     }
+
+    /// 2294:11F2. Checks the heap list: every header must have a non-zero
+    /// size under 0x6000 paragraphs, zero offsets in both links and a
+    /// flags byte of 0 or 1. False where the original stops at an int3.
+    /// A list that cycles is followed up to WALK_LIMIT steps.
+    pub fn heap_check(&self) -> bool {
+        let (mut ds, mut si) = self.heap_far(DS, FIRST);
+        for _ in 0..WALK_LIMIT {
+            let size = self.mem.r16(ds, si.wrapping_add(SIZE));
+            let flags = self.mem.r8(ds, si.wrapping_add(FLAGS));
+            if size == 0
+                || self.mem.r16(ds, si.wrapping_add(NEXT)) != 0
+                || self.mem.r16(ds, si.wrapping_add(PREV)) != 0
+                || size >= 0x6000
+                || flags > 1
+            {
+                return false;
+            }
+            if self.mem.r32(ds, si.wrapping_add(NEXT)) == 0 {
+                return true;
+            }
+            (ds, si) = self.heap_far(ds, si.wrapping_add(NEXT));
+        }
+        false
+    }
 }

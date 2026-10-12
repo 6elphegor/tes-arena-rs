@@ -23,6 +23,12 @@ pub mod var {
     /// quadrants' offsets.
     pub const MASKS: u16 = 0x3882;
     pub const QUADRANTS: u16 = 0x38F8;
+    /// "wild001.rmd" (digits at +4..+6), the window positions' map
+    /// offsets (0, 80h, 4000h, 4080h), and where blocks decompress to
+    /// (offset; the segment is the buffer segment's).
+    pub const BLOCK_NAME: u16 = 0x3889;
+    pub const WINDOW_OFFSETS: u16 = 0x3963;
+    pub const UNPACK_OFF: u16 = 0x902E;
 }
 use var::*;
 
@@ -115,5 +121,97 @@ impl Machine {
                 di = di.wrapping_add(0x40);
             }
         }
+    }
+
+    /// 217B:0189. Loads block `block` (wildNNN.rmd) into window position
+    /// `slot` (0..3: the quarters of the 128 x 128 map): the file is
+    /// loaded whole into the block at BUFFER_BLOCK, decompressed
+    /// (`wild_unpack`) into the buffer segment, and its three 64 x 64
+    /// planes copied to the floor (plus the buffer segment number),
+    /// walls and ceiling. Blocks 1..4, the location's own, are opened
+    /// through the game's directory, where a save's copies are put; the
+    /// others come from GLOBAL.BSA. A file that fails to load leaves the
+    /// block as it was, and is unpacked and copied anyway. Between the
+    /// steps the heap is checked (2294:11F2); None where a check fails
+    /// (the original stops), the unpacking runs away, or EMS is on.
+    pub fn wild_load_block(&mut self, files: &mut crate::bsa::Files, slot: u8, block: u8) -> Option<()> {
+        use crate::level::var::BUFFER_BLOCK;
+        use crate::mif::var::{BUFFER_SEG, FLOOR_SEG, MAP1_SEG, MAP2_SEG};
+        self.heap_check().then_some(())?;
+        let dest = self.mem.r16(DS, WINDOW_OFFSETS.wrapping_add(slot as u16 * 2));
+        let digits = [block / 100 % 10, block / 10 % 10, block % 10].map(|d| b'0' + d);
+        for (i, &d) in digits.iter().enumerate() {
+            self.mem.w8(DS, BLOCK_NAME + 4 + i as u16, d);
+        }
+        self.ems_map(self.mem.r16(DS, 0x1030))?;
+        let (bseg, boff) = (self.mem.r16(DS, BUFFER_BLOCK + 2), self.mem.r16(DS, BUFFER_BLOCK));
+        let mut name = BLOCK_NAME;
+        if digits[0] == b'0' && digits[1] == b'0' && digits[2] < b'5' {
+            name = self.save_path(BLOCK_NAME);
+        }
+        self.file_load(files, name, bseg, boff);
+        for _ in 0..2 {
+            self.heap_check().then_some(())?;
+        }
+        let buf = self.mem.r16(DS, BUFFER_SEG);
+        let out = self.mem.r16(DS, UNPACK_OFF);
+        self.wild_unpack(bseg, boff, buf, out)?;
+        for _ in 0..2 {
+            self.heap_check().then_some(())?;
+        }
+        let mut si = 0u16;
+        for (var, add) in [(FLOOR_SEG, buf), (MAP1_SEG, 0), (MAP2_SEG, 0)] {
+            let plane = self.mem.r16(DS, var);
+            let mut di = dest;
+            for _ in 0..64 {
+                for _ in 0..64 {
+                    let w = self.mem.r16(buf, si).wrapping_add(add);
+                    self.mem.w16(plane, di, w);
+                    si = si.wrapping_add(2);
+                    di = di.wrapping_add(2);
+                }
+                di = di.wrapping_add(0x80);
+            }
+        }
+        self.heap_check().then_some(())
+    }
+
+    /// 2294:0CBD. Word run-length decoding from src_seg:src to dst_seg:dst:
+    /// a total in words, then runs of a count word, negative for that
+    /// many copies of the next word, positive for that many literal
+    /// words, until the total reaches exactly 0. Offsets wrap within the
+    /// segments. None where the total never lands on 0 (the original
+    /// reads on for ever; cut off after 0x20000 runs).
+    pub fn wild_unpack(&mut self, src_seg: u16, src: u16, dst_seg: u16, dst: u16) -> Option<()> {
+        let (mut si, mut di) = (src, dst);
+        let read = |m: &Self, si: &mut u16| {
+            let w = m.mem.r16(src_seg, *si);
+            *si = si.wrapping_add(2);
+            w
+        };
+        let mut total = read(self, &mut si);
+        for _ in 0..0x20000 {
+            let n = read(self, &mut si);
+            if (n as i16) < 0 {
+                let count = n.wrapping_neg();
+                total = total.wrapping_sub(count);
+                let w = read(self, &mut si);
+                for _ in 0..count {
+                    self.mem.w16(dst_seg, di, w);
+                    di = di.wrapping_add(2);
+                }
+            } else {
+                total = total.wrapping_sub(n);
+                for _ in 0..n {
+                    let w = read(self, &mut si);
+                    self.mem.w16(dst_seg, di, w);
+                    di = di.wrapping_add(2);
+                }
+            }
+            if total == 0 {
+                return Some(());
+            }
+        }
+        None
     }
 }
