@@ -10,6 +10,7 @@ pub mod dice;
 pub mod dungeon;
 pub mod effects;
 pub mod exe;
+pub mod heap;
 pub mod inventory;
 pub mod level;
 pub mod loot;
