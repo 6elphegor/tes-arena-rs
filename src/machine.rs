@@ -8,13 +8,16 @@ use crate::random::ArenaRandom;
 pub struct Machine {
     pub mem: Memory,
     pub rng: ArenaRandom,
+    /// EMS: the 64 KB banks not mapped into the frame (see
+    /// `Machine::ems_map`), created as zeros when first needed.
+    pub ems: Vec<Vec<u8>>,
 }
 
 impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng }
+        Self { mem, rng, ems: Vec::new() }
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.

@@ -72,6 +72,10 @@ pub mod var {
     pub const RETURN_Y: u16 = 0xC3CE;
     /// Set to 0xFFFF on every load.
     pub const W_C8ED: u16 = 0xC8ED;
+    /// The level file's name (kept by the caller), and a far pointer
+    /// called after a level change, when set.
+    pub const LEVEL_FILE: u16 = 0xC37F;
+    pub const CHANGE_HOOK: u16 = 0xCD32;
     /// Far pointer called after a load with LEVEL_OVERRIDE, when set.
     pub const LEVEL_HOOK: u16 = 0xCD36;
     /// Set by the reload path (0000:A548): each plane then frees the
@@ -83,6 +87,8 @@ pub mod var {
     /// EMS: enabled flag and page count (0000:5C8A).
     pub const EMS_ON: u16 = 0x8FA6;
     pub const EMS_PAGES: u16 = 0x9032;
+    /// The bank mapped, times 4 (an index into the driver's page maps).
+    pub const EMS_MAPPED: u16 = 0x8FA8;
 }
 use var::*;
 
@@ -110,8 +116,8 @@ impl Machine {
     /// Assumes ES = DGROUP on entry, as from both callers seen. None
     /// where the heap reports an error, the original faults (a LOCK
     /// chunk of 768 bytes or more) or hangs (see CHUNK_LIMIT), the file
-    /// is missing, or it reaches code not ported: EMS, or the level and
-    /// open hooks.
+    /// is missing, or it reaches code not ported: the level and open
+    /// hooks.
     pub fn level_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
         self.mem.w8(DS, TARGET_COUNT, 0);
         let handle = self.file_open_handle(files, name)?;
@@ -160,10 +166,60 @@ impl Machine {
         Some(seg)
     }
 
-    /// 0000:5C8A, with EMS off: nothing to do. None when EMS is on and
-    /// `page` exists (the mapping is not ported).
-    pub fn ems_map(&mut self, page: u16) -> Option<()> {
-        if self.mem.r8(DS, EMS_ON) != 0 && page < self.mem.r16(DS, EMS_PAGES) {
+    /// 0000:5C8A. With EMS on, maps 64 KB bank `page` into the frame (the
+    /// buffer segment, 9030) if it exists and isn't mapped already; the
+    /// bank mapped is kept at EMS_MAPPED, times 4. The original asks the
+    /// EMS driver (INT 67h 4E02) to switch four 16 KB pages; here the
+    /// frame's bytes are swapped with the stored banks, which reads the
+    /// same as long as the frame segment doesn't change.
+    pub fn ems_map(&mut self, page: u16) {
+        if self.mem.r8(DS, EMS_ON) == 0 || page >= self.mem.r16(DS, EMS_PAGES) {
+            return;
+        }
+        let old = self.mem.r16(DS, EMS_MAPPED);
+        let new = page.wrapping_shl(2);
+        if old == new {
+            return;
+        }
+        self.mem.w16(DS, EMS_MAPPED, new);
+        let frame = self.mem.r16(DS, BUFFER_SEG);
+        let (old, page) = ((old >> 2) as usize, page as usize);
+        if self.ems.len() <= old.max(page) {
+            self.ems.resize(old.max(page) + 1, vec![0; 0x10000]);
+        }
+        for o in 0..=0xFFFFu16 {
+            self.ems[old][o as usize] = self.mem.r8(frame, o);
+            self.mem.w8(frame, o, self.ems[page][o as usize]);
+        }
+    }
+
+    /// Bank `page` as the program sees it: the frame when it is mapped.
+    pub fn ems_bank(&self, page: u16) -> Vec<u8> {
+        if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
+            let frame = self.mem.r16(DS, BUFFER_SEG);
+            return (0..=0xFFFFu16).map(|o| self.mem.r8(frame, o)).collect();
+        }
+        self.ems.get(page as usize).cloned().unwrap_or_else(|| vec![0; 0x10000])
+    }
+
+    /// 0000:EBB5. Reloads the chunks of level LEVEL from the level file
+    /// named at LEVEL_FILE (the planes into the planes there are), as
+    /// stairs do: the file is reopened, read from 0x43 (past a header of
+    /// the usual 0x3D bytes), and the levels before skipped. A name
+    /// starting `#` (a generated dungeon) only calls the hook at CD32.
+    /// None where the file is missing, the chunk loop fails (see
+    /// `level_load`) or that hook is set.
+    pub fn level_change(&mut self, files: &mut Files) -> Option<()> {
+        self.mem.w8(DS, TRIGGER_COUNT, 0);
+        if self.mem.r8(DS, LEVEL_FILE) != b'#' {
+            let handle = self.file_open_handle(files, LEVEL_FILE)?;
+            self.mem.w16(DS, HANDLE, handle);
+            self.file_seek(files, 0, 0x43);
+            self.level_skip(files, self.mem.r8(DS, LEVEL) as u16);
+            self.level_chunks(files)?;
+            self.file_close(files);
+        }
+        if self.mem.r16(DS, CHANGE_HOOK + 2) != 0 {
             return None;
         }
         Some(())
@@ -206,7 +262,7 @@ impl Machine {
                     self.mem.w8(DS, TARGET_COUNT, (n >> 1) as u8);
                 }
                 b"TEXT" => {
-                    self.ems_map(self.mem.r8(DS, TEXT_PAGE) as u16)?;
+                    self.ems_map(self.mem.r8(DS, TEXT_PAGE) as u16);
                     let (seg, off) = (self.mem.r16(DS, BUFFER_SEG), self.mem.r16(DS, TEXT_OFF));
                     self.level_read(files, seg, off);
                 }
@@ -281,7 +337,7 @@ impl Machine {
             self.heap_free(self.mem.r16(DS, BUFFER_BLOCK + 2));
         }
         self.file_read(files, DS, CHUNK_LEN, 2);
-        self.ems_map(PLANE_PAGE)?;
+        self.ems_map(PLANE_PAGE);
         let buf = self.mem.r16(DS, BUFFER_SEG);
         let len = self.mem.r16(DS, CHUNK_LEN);
         self.file_read(files, buf, 0, len);

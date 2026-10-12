@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::level::var::EMS_MAPPED;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -136,30 +137,55 @@ impl Machine {
         true
     }
 
-    /// 0000:692E, scanning the directory on disk (DGROUP 9192 = 0xFFFF;
-    /// the in-memory directory at 6AC1 searches the same records). Looks
-    /// up the NUL-terminated name at DS:`name` and, if found, makes it
-    /// the current entry. Names compare case-insensitively (0000:69F1)
-    /// up to the first NUL; a name of 14 or more characters runs on into
-    /// the record's size bytes. The entry is encrypted when the last
-    /// three characters of the requested name (read from the 4 bytes
-    /// before its end, so they may precede a short name) are INF or TXT.
-    /// A count of 0 scans 65536 records.
+    /// 0000:692E. Looks up the NUL-terminated name at DS:`name` and, if
+    /// found, makes it the current entry: in the directory on disk, or
+    /// with DIR_CACHE set (not 0xFFFF), in the copy `bsa_cache_dir` read
+    /// to that EMS bank (0000:6AC1; the bank is mapped for the search and
+    /// the previous one mapped back). Names compare up to the first NUL
+    /// (0000:69F1), with only the requested name's letters made upper
+    /// case; a name of 14 or more characters runs on into the record's
+    /// size bytes. The entry is encrypted when the last three characters
+    /// of the requested name (read from the 4 bytes before its end, so
+    /// they may precede a short name) are INF or TXT. A count of 0 scans
+    /// 65536 records.
     pub fn bsa_find(&mut self, files: &mut Files, name: u16) -> bool {
         if (self.mem.r16(DS, BSA_HANDLE) as i16) < 0 {
             return false;
         }
-        let Some(bsa) = files.bsa.as_mut() else { return false };
-        bsa.1 = self.mem.r32(DS, BSA_DIR);
         let count = self.mem.r16(DS, BSA_COUNT);
         let n = if count == 0 { 0x10000 } else { count as u32 };
         let mut offset = 0u32;
+        let cache = self.mem.r16(DS, DIR_CACHE);
+        if cache != 0xFFFF {
+            let mapped = self.mem.r16(DS, EMS_MAPPED);
+            self.ems_map(cache);
+            let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+            let mut di = 0u16;
+            let mut found = None;
+            for _ in 0..n {
+                if let Some(end) = self.bsa_dir_match(name, frame, di) {
+                    for i in 0..18 {
+                        self.mem.w8(DS, DIR_ENTRY + i, self.mem.r8(frame, di.wrapping_add(i)));
+                    }
+                    found = Some(end);
+                    break;
+                }
+                offset = offset.wrapping_add(self.mem.r32(frame, di.wrapping_add(0xE)));
+                di = di.wrapping_add(18);
+            }
+            self.ems_map(mapped >> 2);
+            let Some(end) = found else { return false };
+            self.bsa_select(files, offset, end);
+            return true;
+        }
+        let Some(bsa) = files.bsa.as_mut() else { return false };
+        bsa.1 = self.mem.r32(DS, BSA_DIR);
         for _ in 0..n {
             let rec = Files::dos_read(bsa, 18);
             for (i, &b) in rec.iter().enumerate() {
                 self.mem.w8(DS, DIR_ENTRY + i as u16, b);
             }
-            if let Some(end) = self.bsa_names_match(name, DIR_ENTRY) {
+            if let Some(end) = self.bsa_dir_match(name, DS, DIR_ENTRY) {
                 self.bsa_select(files, offset, end);
                 return true;
             }
@@ -168,8 +194,48 @@ impl Machine {
         false
     }
 
-    /// 0000:69F1 (and 9C30): compares DS:`a` with DS:`b` ignoring case;
-    /// on a match returns the offset just past `a`'s NUL.
+    /// 0000:6A61. With a BSA open and no cached directory, reads the
+    /// directory (count x 18 bytes, the product in 16 bits) to the start
+    /// of EMS bank `page` and sets DIR_CACHE to `page`, so lookups search
+    /// memory; the bank mapped before is mapped back.
+    pub fn bsa_cache_dir(&mut self, files: &mut Files, page: u16) {
+        if (self.mem.r16(DS, BSA_HANDLE) as i16) < 0 || self.mem.r16(DS, DIR_CACHE) != 0xFFFF {
+            return;
+        }
+        self.mem.w16(DS, DIR_CACHE, page);
+        let mapped = self.mem.r16(DS, EMS_MAPPED);
+        self.ems_map(page);
+        let n = self.mem.r16(DS, BSA_COUNT).wrapping_mul(18);
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        if let Some(bsa) = files.bsa.as_mut() {
+            bsa.1 = self.mem.r32(DS, BSA_DIR);
+            for (i, &b) in Files::dos_read(bsa, n).iter().enumerate() {
+                self.mem.w8(frame, i as u16, b);
+            }
+        }
+        self.ems_map(mapped >> 2);
+    }
+
+    /// 0000:69F1: compares the name at DS:`a` with a directory name at
+    /// `seg`:`b`, making only the former's letters upper case; on a match
+    /// returns the offset just past `a`'s NUL.
+    fn bsa_dir_match(&self, mut a: u16, seg: u16, mut b: u16) -> Option<u16> {
+        loop {
+            let x = self.mem.r8(DS, a).to_ascii_uppercase();
+            let y = self.mem.r8(seg, b);
+            a = a.wrapping_add(1);
+            b = b.wrapping_add(1);
+            if x != y {
+                return None;
+            }
+            if x == 0 {
+                return Some(a);
+            }
+        }
+    }
+
+    /// 0000:9C30: compares DS:`a` with DS:`b` ignoring case; on a match
+    /// returns the offset just past `a`'s NUL.
     fn bsa_names_match(&self, mut a: u16, mut b: u16) -> Option<u16> {
         let up = |c: u8| if c.is_ascii_lowercase() { c - 0x20 } else { c };
         loop {

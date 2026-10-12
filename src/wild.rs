@@ -53,7 +53,7 @@ impl Machine {
         let seed = self.mem.r32(DS, LOCATION);
         self.rng.seed = seed;
         self.mem.w32(DS, SEED, seed);
-        self.ems_map(GRID_PAGE)?;
+        self.ems_map(GRID_PAGE);
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         for i in 0..GRID_SIZE * GRID_SIZE {
             let b = self.wild_pick()?;
@@ -143,7 +143,7 @@ impl Machine {
         for (i, &d) in digits.iter().enumerate() {
             self.mem.w8(DS, BLOCK_NAME + 4 + i as u16, d);
         }
-        self.ems_map(self.mem.r16(DS, 0x1030))?;
+        self.ems_map(self.mem.r16(DS, 0x1030));
         let (bseg, boff) = (self.mem.r16(DS, BUFFER_BLOCK + 2), self.mem.r16(DS, BUFFER_BLOCK));
         let mut name = BLOCK_NAME;
         if digits[0] == b'0' && digits[1] == b'0' && digits[2] < b'5' {

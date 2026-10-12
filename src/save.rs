@@ -230,7 +230,7 @@ impl Machine {
     /// 25FD:028D..029F then 035A..03F8: loads SAVEENGN for `slot` (the
     /// teardown before it, 034B..0359, and the rebuild after it, from
     /// 03F9, are the caller's). Then clears a few engine flags and
-    /// DGROUP 1294..12BB. None where the file is missing or EMS is on.
+    /// DGROUP 1294..12BB. None where the file is missing.
     pub fn save_load_engine(&mut self, files: &mut Files, slot: u8) -> Option<()> {
         self.save_set_slot(slot);
         let path = self.save_path(SAVEENGN);
@@ -244,7 +244,7 @@ impl Machine {
         self.mem.w16(DS, ENGINE_FLAGS2, f);
         let seg = self.mem.r16(DS, CREATURE_SEG);
         self.file_read(files, seg, 0, CREATURE_BYTES);
-        self.ems_map(BUFFER_PAGE)?;
+        self.ems_map(BUFFER_PAGE);
         let seg = self.mem.r16(DS, BUFFER_SEG);
         self.file_read(files, seg, BUFFER_OFF, BUFFER_BYTES);
         let (off, seg) = (self.mem.r16(DS, EXTRA), self.mem.r16(DS, EXTRA + 2));

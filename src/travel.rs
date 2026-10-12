@@ -75,9 +75,9 @@ impl Machine {
     /// totals in DGROUP. Province data is (re)loaded from the current
     /// slot's CITYDATA as the line crosses provinces. None where a
     /// province file is missing, the heap reports an error, a total
-    /// overflows a division (the original faults) or EMS is on.
+    /// overflows a division (the original faults).
     pub fn travel_days(&mut self, files: &mut Files) -> Option<u16> {
-        self.ems_map(self.mem.r16(DS, 0x1030))?;
+        self.ems_map(self.mem.r16(DS, 0x1030));
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         self.file_load(files, TERRAIN_IMG, buf, 0);
         let (dx, dy) = self.travel_global(files, DEST_X, DEST_Y, DEST_PROVINCE)?;

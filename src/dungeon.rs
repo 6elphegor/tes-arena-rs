@@ -461,11 +461,11 @@ impl Machine {
     /// offset is three times the count in 8 bits; targets that would take
     /// the list past 0x40 skip the chunk; a TARG of fewer than 2 bytes
     /// adjusts 65536 words. None where the original faults (a LOCK chunk
-    /// of 768 bytes or more), the heap reports an error or EMS is on.
+    /// of 768 bytes or more) or the heap reports an error.
     fn dun_load_chunk(&mut self, files: &mut Files, at: u16) -> Option<()> {
         self.mem.w16(DS, CHUNK_AT, at);
         self.mem.w16(DS, LIGHT_COUNT, 0);
-        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
+        self.ems_map(self.mem.r16(DS, EMS_PAGE));
         loop {
             if self.file_read(files, DS, TAG, 4) == 0 {
                 return Some(());

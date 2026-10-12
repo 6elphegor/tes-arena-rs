@@ -534,7 +534,7 @@ impl Machine {
     pub fn mif_build_city(&mut self, files: &mut Files) -> Option<()> {
         // 0000:5C86 maps the EMS page in DGROUP 1030, before and after
         // the template.
-        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
+        self.ems_map(self.mem.r16(DS, EMS_PAGE));
         // The original loads the template after clearing the plan and
         // each block right after naming it. Neither the template nor a
         // block touches the RNG or the plan and name tables, so the plan
@@ -546,7 +546,7 @@ impl Machine {
         if self.mem.r8(DS, crate::city::var::PROVINCE) == 8 {
             return Some(());
         }
-        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
+        self.ems_map(self.mem.r16(DS, EMS_PAGE));
         let pos = self.mem.r16(DS, WRITE_POS);
         let names: Vec<u8> = (0..NAME_BYTES).map(|i| self.mem.r8(DS, CITY_NAME + i)).collect();
         for b in blocks {
