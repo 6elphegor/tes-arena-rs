@@ -8,12 +8,14 @@ Each line: name | writes | regs | returned regs | memory diff
   rets:   name:value; "cf" is the carry flag on return
   diff:   linear:new for every changed byte in 3276..DGROUP end and in
           the list segment, linear being image-relative (unrelocated)
-  A call that faults returns "fault" and no diff.
+  A call that faults returns "fault" and no diff; one that is still
+  running after HANG_STEPS instructions returns "hang" (the original
+  loops forever there).
 """
 import random, sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
-from unicorn.x86_const import UC_X86_REG_EFLAGS
+from unicorn.x86_const import *
 
 a = Arena(sys.argv[1])
 rng = random.Random(1994_11)
@@ -24,6 +26,11 @@ REGIONS = [(0x3276 * 16, 0x3BA0 * 16 + 0x10000), (LIST * 16, LIST * 16 + 0x10000
 T, ITEM = 0x13F3, 0x13DA
 CLASS_IDS = list(a.mu.mem_read(a.lin(a.ds, 0x2A50), 18))
 base = None
+HANG_STEPS = 2_000_000
+
+
+class Hang(Exception):
+    pass
 
 
 def snap():
@@ -53,17 +60,20 @@ def case(name, writes, call, rets=(), **regs):
             a.mu.mem_write(a.lin(a.ds, off), v.to_bytes(size, 'little'))
             enc.append(f'{off:x}:{size}:{v:x}')
     before = snap()
+    hang = False
     try:
         r = call(**regs)
     except Fault:
         r = None
+    except Hang:
+        r, hang = None, True
     after = snap()
     diff = ''
     if r is not None:
         diff = ' '.join(f'{lo + i:x}:{y:x}' for (lo, _), b0, b1 in zip(REGIONS, before, after)
                         for i, (x, y) in enumerate(zip(b0, b1)) if x != y)
     rg = ' '.join(f'{k}:{v:x}' for k, v in regs.items())
-    rv = 'fault' if r is None else ' '.join(f'{k}:{r[k]:x}' for k in rets)
+    rv = 'hang' if hang else 'fault' if r is None else ' '.join(f'{k}:{r[k]:x}' for k in rets)
     out.write(f'{name} | {" ".join(enc)} | {rg} | {rv} | {diff}\n')
 
 
@@ -79,8 +89,19 @@ def near(off):
 def far(off):
     def call(**regs):
         a._setup([0, 0x0800], regs)
-        r = a._run(0x1194, off, 0x0800, 0)
-        return r
+        mu = a.mu
+        mu.reg_write(UC_X86_REG_CS, LOAD_SEG + 0x1194)
+        mu.reg_write(UC_X86_REG_IP, off)
+        a.fault = None
+        mu.emu_start(a.lin(LOAD_SEG + 0x1194, off), a.lin(0x0800, 0), count=HANG_STEPS)
+        if a.fault is not None:
+            raise Fault(a.fault)
+        if (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)) != (0x0800, 0):
+            op, modrm = mu.mem_read(a.lin(mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)), 2)
+            if op in (0xF6, 0xF7) and (modrm >> 3) & 7 in (6, 7):
+                raise Fault(0)
+            raise Hang()
+        return {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in ('ax', 'bx', 'cx', 'dx')}
     return call
 
 
@@ -147,3 +168,8 @@ for _ in range(60):
     case('open', shop_state(1) + [(0x12E0, 4, rng.choice([0, rng.getrandbits(32)])),
                                   (0x0A22 + 0x25, 1, rng.choice([0, 1, 2])),
                                   (0x137F, 1, rng.choice([4, 6, 0xFF]))], near(0xFAD9))
+for _ in range(300):
+    case('magic_item', [(0x13CC, 1, 0), (0x12C9, 2, rng.getrandbits(16)), (0x7109, 1, 0)] +
+         [(ITEM + i, 1, rng.getrandbits(8)) for i in range(19)], far(0xB848),
+         ax=rng.choice([lvl(1, 6), lvl(7, 40), lvl(1, 255)]),
+         bx=rng.choice([0xFF, 0xFF, rng.randint(0, 8), rng.getrandbits(8)]))

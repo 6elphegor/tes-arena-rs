@@ -34,6 +34,7 @@ fn run(m: &mut Machine, name: &str, regs: &HashMap<String, u32>) -> Option<HashM
         "magic_armor" => m.shop_magic_armor()?,
         "generate_stock" => m.shop_generate_stock()?,
         "open" => m.shop_open()?,
+        "magic_item" => m.shop_magic_item(reg("ax") as u8, reg("bx") as u8)?,
         _ => panic!("unknown routine {name}"),
     }
     Some(out)
@@ -66,8 +67,8 @@ fn matches_original() {
         let before = m.mem.clone();
         let got = run(&mut m, name, &regs);
 
-        if rets == "fault" {
-            assert!(got.is_none(), "{name}: original faults, port returned {got:?}\n{line}");
+        if rets == "fault" || rets == "hang" {
+            assert!(got.is_none(), "{name}: original {rets}s, port returned {got:?}\n{line}");
         } else {
             let got = got.unwrap_or_else(|| panic!("{name}: port faulted, original did not\n{line}"));
             for (key, want) in named(rets) {
@@ -87,5 +88,5 @@ fn matches_original() {
         *count.entry(name.to_string()).or_default() += 1;
     }
     eprintln!("{count:?}");
-    assert_eq!(count.len(), 10);
+    assert_eq!(count.len(), 11);
 }

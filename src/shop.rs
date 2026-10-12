@@ -71,6 +71,15 @@ const WEAPON_LISTS: u16 = 0x3C25;
 const SHIELD_LISTS: u16 = 0x3C71;
 const ARMOR_MIN_KIND: u16 = 0x3CA4;
 
+/// Magic item template (11 bytes): +0 kind, +1 sub-kind, +2 variant,
+/// +3 type, +4 rolled value, +5 price (dword), +9/+A spells.
+pub const MAGIC_TEMPLATE: u16 = 0x7033;
+/// Set while generating a magic item.
+const MAGIC_ACTIVE: u16 = 0x7109;
+/// Running key of the magic item (shares the word at 12C9 with the
+/// armour list pointer).
+const MAGIC_KEY: u16 = 0x12C9;
+
 /// Potion tables (DGROUP).
 const POTION_PRICE: u16 = 0x2A20;
 const POTION_SPELL: u16 = 0x2A11;
@@ -508,6 +517,212 @@ impl Machine {
         }
         self.shop_generate_stock()?;
         self.rng.seed = saved;
+        Some(())
+    }
+
+    /// 1194:5572. d100 from the RNG's next value: 0..=99.
+    fn shop_d100(&mut self) -> u16 {
+        self.rng.next() % 100
+    }
+
+    /// 1194:B5AB. Index of the first entry of the table at `table` that
+    /// is above `v`. None where the original scans forever.
+    fn shop_step(&self, table: u16, v: u8) -> Option<u16> {
+        (0..=0xFFFFu16).find(|&i| v < self.shop_b(table.wrapping_add(i)))
+    }
+
+    /// Rerolls `roll(n)` until the item level reaches the entry's minimum
+    /// in `mins`. None where no entry allows it (the original hangs).
+    fn shop_roll_allowed(&mut self, n: u16, mins: u16) -> Option<u16> {
+        if !self.shop_any_allowed(mins, n) {
+            return None;
+        }
+        loop {
+            let r = self.shop_rand(0, n)?;
+            if self.shop_b(LEVEL) >= self.shop_b(mins + r) {
+                return Some(r);
+            }
+        }
+    }
+
+    fn shop_mt(&mut self, f: u16, v: u8) {
+        self.shop_setb(MAGIC_TEMPLATE + f, v)
+    }
+
+    fn shop_add_key16(&mut self, v: u16) {
+        let k = self.mem.r16(DS, MAGIC_KEY).wrapping_add(v);
+        self.mem.w16(DS, MAGIC_KEY, k);
+    }
+
+    /// 1194:B566. Trinket (kind 0): a sub-kind by d100 against 1DEB (or
+    /// forced by 13C8), then one of three variants (B718/B74B/B77E) each
+    /// with its own type table, then the price (B5B5).
+    fn shop_magic_kind0(&mut self) -> Option<()> {
+        self.shop_add_key16(10);
+        self.shop_mt(0, 0);
+        let forced = self.shop_b(SHOP_FLAG);
+        let sub = if self.shop_b(MAGIC_ACTIVE) == 1 && forced != 0xFF {
+            forced as u16
+        } else {
+            let r = self.shop_d100() as u8;
+            self.shop_step(0x1DEB, r)?
+        };
+        self.shop_add_key16(sub);
+        self.shop_mt(1, sub as u8);
+        let (key, variant, n, mins, spells) = match self.shop_rand(0, 3)? {
+            0 => (5, 0, 15, 0x1EDD, 0x1ECE),
+            1 => (10, 1, 9, 0x1F84, 0x1F7B),
+            _ => (15, 2, 8, 0x2010, 0x2008),
+        };
+        self.shop_add_key16(key);
+        self.shop_mt(2, variant);
+        let ty = self.shop_roll_allowed(n, mins)?;
+        // The third variant doesn't add its type to the key.
+        if variant != 2 {
+            self.shop_add_key16(ty);
+        }
+        self.shop_mt(3, ty as u8);
+        let spell = self.shop_b(spells + ty);
+        self.shop_mt(0x0A, spell);
+        self.shop_mt(0x09, 0xFF);
+        // 1194:B5B5
+        let sub = self.shop_b(MAGIC_TEMPLATE + 1) as u16;
+        let price = self.mem.r16(DS, 0x1DF3 + sub * 2) as u32;
+        self.mem.w32(DS, MAGIC_TEMPLATE + 5, price);
+        let table = match self.shop_b(MAGIC_TEMPLATE + 2) {
+            0 => 0x1EEC,
+            1 => 0x1F8D,
+            _ => 0x2018,
+        };
+        let ty = self.shop_b(MAGIC_TEMPLATE + 3) as u16;
+        let per = self.mem.r16(DS, table + ty * 2);
+        self.mem.w16(DS, 0xA840, per);
+        let (lo, hi) = (self.shop_b(0x1DFB + sub * 2) as u16, self.shop_b(0x1DFC + sub * 2) as u16);
+        let v = self.shop_rand(lo, hi)?;
+        self.shop_mt(4, v as u8);
+        // 16-bit product; only its low word is added.
+        let add = v.wrapping_mul(per) as u32;
+        let p = self.mem.r32(DS, MAGIC_TEMPLATE + 5).wrapping_add(add);
+        self.mem.w32(DS, MAGIC_TEMPLATE + 5, p);
+        Some(())
+    }
+
+    /// 1194:B617. Kind 1, only from item level 7; Some(false) (CF set)
+    /// below that.
+    fn shop_magic_kind1(&mut self) -> Option<bool> {
+        if self.shop_b(LEVEL) < 7 {
+            return Some(false);
+        }
+        self.shop_mt(0, 1);
+        self.shop_add_key16(100);
+        let forced = self.shop_b(SHOP_FLAG);
+        let sub = if self.shop_b(MAGIC_ACTIVE) == 1 && forced != 0xFF {
+            forced as u16
+        } else {
+            let r = self.shop_d100() as u8;
+            self.shop_step(0x2042, r)?
+        };
+        self.shop_mt(1, sub as u8);
+        self.shop_add_key16(sub);
+        let ty = self.shop_roll_allowed(8, 0x20B3)?;
+        self.shop_add_key16(ty);
+        self.shop_mt(3, ty as u8);
+        match self.shop_b(0x20CB + ty) {
+            0xFF => self.shop_mt(9, ty as u8),
+            v => {
+                self.shop_mt(0x0A, v);
+                self.shop_mt(9, 0xFF);
+            }
+        }
+        // 1194:B68C
+        let mut p = self.mem.r32(DS, MAGIC_TEMPLATE + 5);
+        p = p.wrapping_add(self.mem.r16(DS, 0x20BB + ty * 2) as u32);
+        p = p.wrapping_add(self.mem.r16(DS, 0x204A + sub * 2) as u32);
+        self.mem.w32(DS, MAGIC_TEMPLATE + 5, p);
+        Some(true)
+    }
+
+    /// 1194:B6B0. Kind 2: a sub-kind of 4, and a grade from 76..=99
+    /// against 20D3; the price is the grade's table entry × 50, cut to
+    /// 16 bits.
+    fn shop_magic_kind2(&mut self) -> Option<()> {
+        self.shop_add_key16(1000);
+        self.shop_mt(0, 2);
+        // B848 always sets 7109 = 1, so the sub-kind is always rolled.
+        let sub = self.shop_rand(0, 4)?;
+        self.shop_mt(1, sub as u8);
+        self.shop_add_key16(sub);
+        let r = self.shop_rand(0x4C, 0x64)? as u8;
+        let grade = self.shop_step(0x20D3, r)?;
+        self.shop_mt(4, grade as u8);
+        self.shop_mt(3, 0xFF);
+        self.shop_add_key16(grade);
+        // 1194:B702
+        let p = self.mem.r16(DS, 0x20D8 + grade * 2).wrapping_mul(50) as u32;
+        self.mem.w32(DS, MAGIC_TEMPLATE + 5, p);
+        Some(())
+    }
+
+    /// 1194:B436. Builds the item record at 13DA from the magic template
+    /// at 7033.
+    fn shop_magic_item_record(&mut self) {
+        self.clear_item();
+        let t = |m: &Self, f: u16| m.shop_b(MAGIC_TEMPLATE + f);
+        let mut flags = 0x40 | 1 | 8;
+        self.mem.w16(DS, ITEM + it::HEALTH, 1);
+        self.mem.w16(DS, ITEM + 8, 1);
+        match t(self, 0) {
+            0 => {
+                self.shop_setb(ITEM + 0x10, t(self, 2));
+                self.shop_setb(ITEM + 3, t(self, 4));
+                self.mem.w16(DS, ITEM + it::HEALTH, t(self, 4) as u16);
+                self.shop_setb(ITEM + 0x0F, t(self, 3));
+            }
+            2 => {
+                flags |= 0x20;
+                let g = t(self, 4);
+                self.shop_setb(ITEM + 0x10, g);
+                let v = self.shop_b(0x2678u16.wrapping_add(g as u16 + 3));
+                self.shop_setb(ITEM + it::VALUE, v);
+                self.shop_setb(ITEM + 0x0F, 0xFF);
+            }
+            _ => {
+                flags |= 0x10;
+                self.shop_setb(ITEM + 0x0F, t(self, 3));
+            }
+        }
+        self.shop_setb(ITEM + it::FLAGS, flags);
+        self.shop_setb(ITEM + it::TYPE, t(self, 1));
+        let p = (self.mem.r32(DS, MAGIC_TEMPLATE + 5) >> 2).wrapping_mul(3);
+        self.mem.w32(DS, ITEM + it::PRICE, p);
+        self.shop_setb(ITEM + it::SPELL_2, t(self, 9));
+        self.shop_setb(ITEM + it::SPELL, t(self, 0x0A));
+    }
+
+    /// 1194:B848. A random magic item of item level `level` into the item
+    /// record at 13DA (kind 1 needs level 7; below that the record is
+    /// left as it was). `forced` (13C8) fixes the trinket sub-kind unless
+    /// it is 0xFF. The RNG seed is copied to 7238 first.
+    pub fn shop_magic_item(&mut self, level: u8, forced: u8) -> Option<()> {
+        self.mem.w32(DS, 0x7238, self.rng.seed);
+        self.shop_setb(LEVEL, level);
+        self.shop_setb(SHOP_FLAG, forced);
+        self.shop_setb(0x12BE, 1);
+        self.shop_setb(MAGIC_ACTIVE, 1);
+        let kind = self.shop_rand(0, 3)?;
+        for i in 0..11 {
+            self.shop_mt(i, 0);
+        }
+        self.mem.w32(DS, MAGIC_TEMPLATE + 5, 0);
+        let made = match kind {
+            0 => self.shop_magic_kind0().map(|_| true)?,
+            1 => self.shop_magic_kind1()?,
+            _ => self.shop_magic_kind2().map(|_| true)?,
+        };
+        if made {
+            self.shop_magic_item_record();
+        }
+        self.shop_setb(MAGIC_ACTIVE, 0);
         Some(())
     }
 
