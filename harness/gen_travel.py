@@ -10,6 +10,7 @@ random.
 
 Lines: travel | slot dprov dx dy hprov hx hy minutes weather_hex | days digest
        (FNV-1a of the changed DGROUP bytes), or "fault".
+       weather | minutes seed | digest   1194:2FB3, the weather roll
 """
 import os
 import random
@@ -79,4 +80,17 @@ for _ in range(300):
     except (Fault, AssertionError):
         res = 'fault'
     out.write(f'travel | {slot} {dp:x} {dx:x} {dy:x} {hp:x} {hx:x} {hy:x} {minutes:x} {weather.hex()} | {res}\n')
+
+for _ in range(300):
+    a.restore(BASE)
+    minutes = rng.choice([rng.getrandbits(32), rng.randrange(360 * 1440 * 10)])
+    seed = rng.getrandbits(32) | 1
+    a.w32(0x5CC, minutes)
+    a.w32(0x91F6, seed)
+    a.w16(0x91F0, 0)
+    before = a.seg_bytes(a.ds)
+    a.call_far(0x1194, 0x2FB3)
+    after = a.seg_bytes(a.ds)
+    changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+    out.write(f'weather | {minutes:x} {seed:x} | {fnv(changed):x}\n')
 out.close()

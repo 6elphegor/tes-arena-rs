@@ -4,8 +4,8 @@
 //! Usage: travel GAME_DIR FROM_PROVINCE FROM_INDEX TO_PROVINCE TO_INDEX
 //!
 //! Locations are entries of the game's CITYDATA.65 (index 0..47 in the
-//! province's list). The journey starts on the first day of 3E 389, in
-//! fair weather.
+//! province's list). The journey starts on the first day of 3E 389, with
+//! the weather rolled for that month (seed 1994).
 
 use arena::bsa::Files;
 use arena::exe;
@@ -29,6 +29,8 @@ fn main() {
     let (buf, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x9030, buf);
     m.mem.w8(DS, 0x1A6C, 65);
+    m.rng.seed = 1994;
+    m.weather_roll().expect("weather");
     // A location's name and position from its province's list.
     let mut place = |m: &mut Machine, prov: u16, idx: u16| {
         m.city_load_province(&mut files, prov as u8).expect("CITYDATA.65");

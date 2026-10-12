@@ -50,7 +50,8 @@ No game code or data is included: everything is loaded from your own copy.
   palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
 - `src/travel.rs` – fast travel: days and distance between two places,
-  over the terrain map and the weather (1194:2E69).
+  over the terrain map and the weather (1194:2E69), and the monthly
+  weather roll (1194:2FB3).
 - `src/wild.rs` – the wilderness grid around a location (217B:0004).
 - `src/log.rs` – the calendar (dates from the minute counter) and
   logbook entries; appending them to LOG.nn is not ported.

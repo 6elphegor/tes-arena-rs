@@ -32,6 +32,21 @@ fn matches_original() {
         let f: Vec<&str> = line.split(" | ").collect();
         let p: Vec<&str> = f[1].split(' ').collect();
         let mut m = base.clone();
+        if f[0] == "weather" {
+            m.mem.w32(DS, 0x5CC, hex(p[0]));
+            m.mem.w32(DS, 0x91F6, hex(p[1]));
+            m.mem.w16(DS, 0x91F0, 0);
+            m.load_rng();
+            let before = m.clone();
+            m.weather_roll().unwrap();
+            m.store_rng();
+            let changed = (0..=0xFFFFu16)
+                .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+                .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+            assert_eq!(f[2], format!("{:x}", fnv(changed)), "{line}");
+            n += 1;
+            continue;
+        }
         let mut fs = files.clone();
         m.mem.w8(DS, 0x1A6C, p[0].parse().unwrap());
         m.mem.w8(DS, 0x193D, hex(p[1]) as u8);

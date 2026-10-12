@@ -62,6 +62,12 @@ const CLASS_COLOURS: u16 = 0x1920;
 const BASE: u16 = 0x349A;
 const WEATHER_PCT: u16 = 0x34EE;
 const LINE_BYTES: u16 = 500;
+/// Weather tables: the season of each month, each zone's climate, each
+/// climate's rows of five weathers by season; the season rolled for.
+const SEASONS: u16 = 0x3526;
+const CLIMATES: u16 = 0x3532;
+const CLIMATE_ROWS: u16 = 0x3556;
+const SEASON: u16 = 0xA84C;
 
 impl Machine {
     /// 1194:2E69. The days a journey from the current location to the
@@ -265,6 +271,39 @@ impl Machine {
         }
         self.mem.w16(DS, DAYS, days as u16);
         self.mem.w32(DS, MINUTES, minutes * 1440);
+        Some(())
+    }
+}
+
+impl Machine {
+    /// 1194:2FB3. Rolls the weather of all 36 zones for the current
+    /// month: each zone's climate (table 3532) and the month's season
+    /// (table 3526) pick a row of five weathers (table 3556), and
+    /// dice(100) (0..=100) picks one of them: under 10, under 30, up to
+    /// 69, up to 89, else the last. None where the dice faults.
+    pub fn weather_roll(&mut self) -> Option<()> {
+        let month = travel_month(self.mem.r32(DS, 0x05CC));
+        let season = self.mem.r8(DS, SEASONS.wrapping_add(month)) as u16;
+        self.mem.w16(DS, SEASON, season);
+        for zone in 0..36u16 {
+            self.mem.w16(DS, crate::city::var::WRITE_POS, zone);
+            let climate = self.mem.r8(DS, CLIMATES + zone) as u16;
+            let row = self.mem.r16(DS, CLIMATE_ROWS + climate * 2).wrapping_add(season * 5);
+            let d = crate::dice::dice(&mut self.rng, 100)? as i16;
+            let k = if d > 0x59 {
+                4
+            } else if d > 0x45 {
+                3
+            } else if d < 0x0A {
+                0
+            } else if d < 0x1E {
+                1
+            } else {
+                2
+            };
+            let w = self.mem.r8(DS, row.wrapping_add(k));
+            self.mem.w8(DS, WEATHER + zone, w);
+        }
         Some(())
     }
 }
