@@ -23,7 +23,7 @@ pub mod field {
     pub const SEX: u16 = 0x07;
     /// Portrait: race × 32 + 0..31 (0..30 for race 7).
     pub const PORTRAIT: u16 = 0x08;
-    /// Name, written by 1194:080B (not ported).
+    /// Name, written by 1194:080B (`npc_name`).
     pub const NAME: u16 = 0x09;
     /// Creature damage range, 8-bit.
     pub const CREATURE_MIN_DAMAGE: u16 = 0x09;

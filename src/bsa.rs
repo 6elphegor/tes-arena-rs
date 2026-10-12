@@ -71,16 +71,27 @@ pub struct Files {
 
 impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
-        let mut names = HashMap::new();
-        for e in std::fs::read_dir(dir)? {
-            let e = e?;
-            names.insert(e.file_name().to_string_lossy().to_uppercase().into_bytes(), e.path());
-        }
-        Ok(Self { names, bsa: None, loose: None })
+        let mut files = Self { names: HashMap::new(), bsa: None, loose: None };
+        files.add_dir(dir)?;
+        Ok(files)
     }
 
+    /// Makes the files in `dir` available too (a save game's folder, for
+    /// instance); a name found in both is taken from `dir`.
+    pub fn add_dir(&mut self, dir: &Path) -> std::io::Result<()> {
+        for e in std::fs::read_dir(dir)? {
+            let e = e?;
+            self.names.insert(e.file_name().to_string_lossy().to_uppercase().into_bytes(), e.path());
+        }
+        Ok(())
+    }
+
+    /// A loose file by DOS name. A path ("C:\ARENA_CD\SAVEENGN.01") is
+    /// looked up by its last component: the game's directories all map
+    /// to the directories given here.
     fn read_loose(&self, name: &[u8]) -> Option<Rc<[u8]>> {
-        std::fs::read(self.names.get(&name.to_ascii_uppercase())?).ok().map(Rc::from)
+        let base = name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name);
+        std::fs::read(self.names.get(&base.to_ascii_uppercase())?).ok().map(Rc::from)
     }
 
     /// DOS read: bytes from `pos`, fewer at the end of the file.

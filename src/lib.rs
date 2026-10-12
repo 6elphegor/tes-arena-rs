@@ -20,5 +20,6 @@ pub mod mif;
 pub mod names;
 pub mod progression;
 pub mod random;
+pub mod save;
 pub mod scale;
 pub mod shop;

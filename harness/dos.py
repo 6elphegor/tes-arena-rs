@@ -17,10 +17,14 @@ HEAP_START, HEAP_TOP = 0xA000, 0xF000
 
 
 class DosArena(Arena):
-    def __init__(self, exe_path, game_dir):
+    def __init__(self, exe_path, game_dir, *more_dirs):
         super().__init__(exe_path)
         self.game_dir = game_dir
-        self.names = {n.upper(): n for n in os.listdir(game_dir)}
+        # Paths by upper-case name; later directories win (src/bsa.rs
+        # Files::add_dir does the same).
+        self.names = {}
+        for d in (game_dir,) + more_dirs:
+            self.names.update({n.upper(): os.path.join(d, n) for n in os.listdir(d)})
         self.handles = {}
 
     def init_heap(self, start=HEAP_START, top=HEAP_TOP):
@@ -56,7 +60,8 @@ class DosArena(Arena):
         if ah == 0x3D:
             lin = self.lin(self._reg('ds'), self._reg('dx'))
             raw = bytes(self.mu.mem_read(lin, 128)).split(b'\0')[0].decode('latin1')
-            name = self.names.get(raw.upper())
+            # A DOS path is looked up by its last component.
+            name = self.names.get(raw.replace(':', '\\').split('\\')[-1].upper())
             if name is None:
                 self._wreg('ax', 2)
                 self._set_cf(True)
@@ -64,7 +69,7 @@ class DosArena(Arena):
             h = 5
             while h in self.handles:
                 h += 1
-            self.handles[h] = [open(os.path.join(self.game_dir, name), 'rb').read(), 0]
+            self.handles[h] = [open(name, 'rb').read(), 0]
             self._wreg('ax', h)
             self._set_cf(False)
             return True
