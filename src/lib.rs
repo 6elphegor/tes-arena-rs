@@ -11,3 +11,4 @@ pub mod mem;
 pub mod progression;
 pub mod random;
 pub mod scale;
+pub mod shop;
