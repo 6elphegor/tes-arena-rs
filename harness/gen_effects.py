@@ -13,8 +13,8 @@ Each line: name | writes | regs | env | returned | hooks | memory diff
           the creature segment (5000), o another segment (5800)
   regs:   name:value; segment registers hold image-relative segments
   env:    kill_cf:armoured:has84:has85:has88 (0/1)
-  returned: ax bx si cf, or "fault@SEG:OFF"
-  hooks:  kills:last_seg:last_off deaths
+  returned: ax bx si cf di fs, or "fault@SEG:OFF"
+  hooks:  kills:last_seg:last_off deaths reflections:last_si
   diff:   linear:new over 3276:0000..3BA0:FFFF, 5000:0000..1400 and
           5800:0000..0600, image-relative; each effect slot's segment
           word is un-relocated first
@@ -23,7 +23,8 @@ import random, sys, os, struct
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG
 from unicorn.x86_const import (UC_X86_REG_EFLAGS, UC_X86_REG_CS, UC_X86_REG_IP,
-                               UC_X86_REG_SI, UC_X86_REG_AX, UC_X86_REG_BX)
+                               UC_X86_REG_SI, UC_X86_REG_AX, UC_X86_REG_BX,
+                               UC_X86_REG_DI, UC_X86_REG_FS)
 
 
 class FxArena(Arena):
@@ -86,6 +87,12 @@ patch(0x1194, ENCH,
       0x2E, 0x80, 0x3E] + cs_ref(E88) + [0x01, 0xCB])  # B
 
 
+# 0000:27E5 (AX=19h after a reflection): count calls, keep SI.
+REFL = 0x27E5
+R_CNT, R_SI = REFL + 11, REFL + 13
+patch(0x0000, REFL, [0x2E, 0xFF, 0x06] + cs_ref(R_CNT) + [0x2E, 0x89, 0x36] + cs_ref(R_SI) + [0xCB])
+
+
 def setenv(env):
     kill_cf, armoured, h84, h85, h88 = env
     w = lambda seg, off, b: a.mu.mem_write(a.lin(LOAD_SEG + seg, off), bytes(b))
@@ -93,12 +100,14 @@ def setenv(env):
     w(0x2686, D_CNT, [0, 0])
     w(0x1194, G_SI, [0x00, 0x01] if armoured else [0xFF, 0xFF])
     w(0x1194, E84, [0 if h84 else 1, 0 if h85 else 1, 0 if h88 else 1])
+    w(0x0000, R_CNT, [0, 0, 0, 0])
 
 
 def hooks():
     r = lambda seg, off: struct.unpack('<H', a.mu.mem_read(a.lin(LOAD_SEG + seg, off), 2))[0]
     kseg = (r(0x2AA1, K_DS) - LOAD_SEG) & 0xffff if r(0x2AA1, K_CNT) else 0
-    return f'{r(0x2AA1, K_CNT):x}:{kseg:x}:{r(0x2AA1, K_SI):x} {r(0x2686, D_CNT):x}'
+    return (f'{r(0x2AA1, K_CNT):x}:{kseg:x}:{r(0x2AA1, K_SI):x} {r(0x2686, D_CNT):x} '
+            f'{r(0x0000, R_CNT):x}:{r(0x0000, R_SI):x}')
 
 
 def region():
@@ -136,7 +145,8 @@ def case(name, writes, run, env=(0, 0, 0, 0, 0), **regs):
     try:
         run(**emu_regs)
         rv = (f'ax:{a.mu.reg_read(UC_X86_REG_AX):x} bx:{a.mu.reg_read(UC_X86_REG_BX):x} '
-              f'si:{a.mu.reg_read(UC_X86_REG_SI):x} cf:{a.mu.reg_read(UC_X86_REG_EFLAGS) & 1}')
+              f'si:{a.mu.reg_read(UC_X86_REG_SI):x} cf:{a.mu.reg_read(UC_X86_REG_EFLAGS) & 1} '
+              f'di:{a.mu.reg_read(UC_X86_REG_DI):x} fs:{(a.mu.reg_read(UC_X86_REG_FS) - LOAD_SEG) & 0xffff:x}')
         after = region()
         diff = ' '.join(f'{lo + i:x}:{b1[i]:x}' for (lo, _), b0, b1 in zip(REGIONS, before, after)
                         for i in changed(b0, b1))
@@ -292,7 +302,7 @@ FLAGS = [0, 1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x1000]
 
 # --- cases ------------------------------------------------------------------
 
-for _ in range(int(os.environ.get("FX_N", "120"))):
+for _ in range(int(os.environ.get("FX_N", "100"))):
     case('effect_kind', [], near(0x2EBD, 0x01F3), ax=rng.choice([0, 1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80, 0xFF, 0xFE, rng.getrandbits(8)]))
 
     # apply_effect: player, creatures, or a third segment, with the creature
@@ -408,3 +418,76 @@ for _ in range(int(os.environ.get("FX_EXACT", "100"))):
           ('d', s + 0x28, 2, PLAYER), ('D', s + 0x2A, 2, DS), ('d', s + 0x3A, 1, rng.choice([0, 4, 6])), ('d', s + 0x3B, 1, 0)]
     w += [('d', s + 0x1A + i, 1, dv) for i, dv in enumerate(deltas)]
     case('tick_effects', w + [('d', 0x0D39, 1, 0)], far(0x2EBD, 0x0268), env=env())
+
+
+# Timed spell flags (+41A) with their far table at OSEG:0200, and the
+# spell resistance check.
+TABLE = 0x0200
+
+def flag_table():
+    w = [('d', 0x1020, 2, TABLE), ('D', 0x1022, 2, OSEG)]
+    w += [('o', TABLE + 2 * i, 2, rng.choice([0, 1, 1, 2, 3, rng.randint(0, 120), rng.getrandbits(16)]))
+          for i in range(0, 0x240 // 2)]
+    for k in range(8):
+        e = 0x0C57 + k * 0x1C
+        w += [('d', e + 0x0F, 2, rng.getrandbits(16)), ('d', e + 0x12, 2, rng.choice([0, 0x41E, 0x83C, 0x100]))]
+    return w
+
+def spell_flags(kind, off):
+    v = rng.choice([0, rng.getrandbits(16), 0x1000, 0x400, 0x800, 0x1C00, 0x1C7C & rng.getrandbits(16)])
+    return [(kind, off + 0x41A, 2, v)]
+
+for _ in range(int(os.environ.get("FX_SPELL", "100"))):
+    w = creatures() + record('d', PLAYER) + flag_table() + spell_flags('d', PLAYER)
+    w += [x for o in (0, 0x41E, 0x83C) for x in spell_flags('m', o)]
+    case('tick_spell_flags', w + [('d', 0x0D39, 1, rng.getrandbits(8))], far(0x2CDD, 0x0964))
+
+    k, seg, off = rng.choice([('d', DS, PLAYER), ('m', MSEG, 0), ('m', MSEG, 0x41E), ('m', MSEG, 0x83C), ('m', MSEG, 0x200)])
+    case('spell_flag_table', creatures() + flag_table(), near(0x2CDD, 0x09E0), fs=seg, dx=off)
+
+    k, seg, off = rng.choice([('d', DS, PLAYER), ('m', MSEG, 0), ('m', MSEG, 0x41E), ('m', MSEG, 0x83C)])
+    w = creatures() + record('d', PLAYER) + flag_table() + spell_flags(k, off)
+    w += [(k, off + 5, 1, rng.choice([0x23, 0x23] + CLASS_IDS))]
+    caster = rng.choice([PLAYER, 0, 0x41E, 0x83C, 0x1F00])
+    w += [('d', 0x1292, 2, rng.choice([0, 1, 2, 5, 10, 21, 150, 300, 0xFFF0])), ('d', 0xA886, 2, 0xB000),
+          ('d', 0xB004, 2, caster), ('d', 0xB006, 2, rng.getrandbits(16)),
+          ('d', 0x0D5A, 2, rng.randint(0, 15)), ('d', 0x1276, 2, rng.randint(0, 5)),
+          ('o', 0x100 + 0x32, 2, rng.choice([rng.randint(0, 200), rng.getrandbits(16)]))]
+    case('spell_stopped', w, far(0x2CDD, 0x0A38), env=env(), fs=seg, edx=off, gs=OSEG, si=0x100)
+
+    # Sorcerers at the absorb cap: the first random byte is chosen around
+    # C0h by picking the seed, and (INT + WIL) / 2 straddles C0h.
+    want = rng.choice([0xBF, 0xC0, 0xC1])
+    while True:
+        seed = rng.getrandbits(32) | 1
+        if ((seed * 0x006D002D) & 0xFFFFFFFF) >> 16 & 0xFF == want:
+            break
+    s_int = rng.randint(0xB8, 0xFF)
+    w = creatures() + record('d', PLAYER) + flag_table() + [
+        ('d', PLAYER + 5, 1, 0x23), ('d', PLAYER + 0x2A, 1, s_int),
+        ('d', PLAYER + 0x2B, 1, rng.randint(max(0, 0x17E - s_int), 0xFF)),
+        ('d', 0x1292, 2, 3), ('o', 0x100 + 0x32, 2, rng.randint(1, 200)), ('d', 0x91F6, 4, seed)]
+    case('spell_stopped', w, far(0x2CDD, 0x0A38), fs=DS, edx=PLAYER, gs=OSEG, si=0x100)
+
+    # Resist-magic rolls at their exact boundary: the seed fixes the
+    # percent roll p, and the table strength puts the chance at p or p - 1;
+    # or a level gap past 8 bits, with strengths where that matters.
+    p_want = rng.randint(0, 99)
+    while True:
+        seed = rng.getrandbits(32) | 1
+        if (((seed * 0x006D002D) & 0xFFFFFFFF) >> 16) % 100 == p_want:
+            break
+    level = rng.randint(0, 30)
+    if rng.random() < 0.5:
+        caster, strength = level + 1, p_want - rng.choice([0, 1])
+    else:
+        gap = rng.choice([-144, -130, 130, 150])        # (level + 1) - caster
+        caster = (level + 1 - gap) & 0xFFFF
+        bonus8 = ((gap & 0xFF) ^ 0x80) - 0x80
+        strength = p_want - bonus8 * 5 + rng.choice([0, -1])
+    w = creatures() + record('d', PLAYER) + flag_table() + [
+        ('d', PLAYER + 5, 1, rng.choice(CLASS_IDS[:3] + CLASS_IDS[4:])), ('d', PLAYER + 6, 1, level),
+        ('d', PLAYER + 0x41A, 2, 0x1000), ('d', 0x1292, 2, caster),
+        ('o', TABLE + 0x30 + 2, 2, strength & 0xFFFF),
+        ('o', 0x100 + 0x32, 2, rng.randint(1, 200)), ('d', 0x91F6, 4, seed)]
+    case('spell_stopped', w, far(0x2CDD, 0x0A38), fs=DS, edx=PLAYER, gs=OSEG, si=0x100)

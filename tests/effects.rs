@@ -30,6 +30,8 @@ struct Hooks {
     kills: u16,
     last: (u16, u16),
     deaths: u16,
+    reflections: u16,
+    reflected: u16,
 }
 
 impl FxHooks for Hooks {
@@ -40,6 +42,10 @@ impl FxHooks for Hooks {
     }
     fn player_died(&mut self, _: &mut Machine) {
         self.deaths += 1;
+    }
+    fn spell_reflected(&mut self, _: &mut Machine, actor: u16) {
+        self.reflections += 1;
+        self.reflected = actor;
     }
 }
 
@@ -80,6 +86,17 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>, env: [bool; 5], h:
         "drain_death_check" => m.drain_death_check(h),
         "rebase_drain_snapshots" => m.rebase_drain_snapshots(reg("ax"), reg("bx")),
         "attr_drained" => drop(out.insert("cf", m.attr_drained(reg("bp")) as u32)),
+        "tick_spell_flags" => m.tick_spell_flags(),
+        "spell_flag_table" => {
+            let (seg, di) = m.spell_flag_table(reg("fs"), reg("dx"));
+            out.insert("fs", seg as u32);
+            out.insert("di", di as u32);
+        }
+        "spell_stopped" => {
+            let cost = m.mem.r16(reg("gs"), reg("si").wrapping_add(0x32));
+            let stopped = m.spell_stopped(reg("fs"), reg("edx"), cost, h)?;
+            out.insert("cf", stopped as u32);
+        }
         _ => panic!("unknown routine {name}"),
     }
     Some(out)
@@ -152,8 +169,13 @@ fn matches_original() {
             assert_eq!((h.last.0 as u32, h.last.1 as u32), (k[1], k[2]), "{name}: kill handler target\n{line}");
         }
         assert_eq!(h.deaths as u32, hex(hk[1]), "{name}: player deaths\n{line}");
+        let rf: Vec<u32> = hk[2].split(':').map(hex).collect();
+        assert_eq!(h.reflections as u32, rf[0], "{name}: reflections\n{line}");
+        if rf[0] != 0 {
+            assert_eq!(h.reflected as u32, rf[1], "{name}: reflecting actor\n{line}");
+        }
         *count.entry(name.to_string()).or_default() += 1;
     }
     eprintln!("{count:?}");
-    assert_eq!(count.len(), 15);
+    assert_eq!(count.len(), 18);
 }

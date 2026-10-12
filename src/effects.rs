@@ -98,16 +98,19 @@ pub mod var {
     pub const CREATURE_SEG: u16 = 0x1042;
     pub const DEFENDER: u16 = 0x1402;
     pub const CREATURE_COUNT: u16 = 0x0FF9;
-    /// Bit 0x10: drain effects active; bit 0x100: check creatures for
-    /// drained attributes.
+    /// The player's record flags (01A4 + 40D): bit 0x10 is effect kind 4
+    /// (drain); with bit 0x100 the drain check also covers creatures.
     pub const STATE_5B1: u16 = 0x05B1;
-    /// Bit 0x40: the player is immune to paralysis and disease.
+    /// The player's spell flags (01A4 + 41A): bit 0x40 stops paralysis and
+    /// disease.
     pub const IMMUNE_5BE: u16 = 0x05BE;
     /// Bit 0x80 is set whenever effects change (redraw).
     pub const CHANGED: u16 = 0x0D39;
     /// Set to 0x0F when an effect message was written to 1405.
     pub const MESSAGE: u16 = 0x1428;
     pub const SCRATCH_1296: u16 = 0x1296;
+    /// Level + 1 of the spell's caster, it seems (resistance and absorb).
+    pub const CASTER: u16 = 0x1292;
     /// Tick bookkeeping: deltas applied, and "in phase B".
     pub const APPLIED: u16 = 0xA836;
     pub const RESTORING: u16 = 0xA838;
@@ -128,6 +131,21 @@ pub mod var {
 /// fields it changes, ending in 0xFF.
 pub const DISEASE_FIELDS: u16 = 0x78B0;
 
+/// Timed spell flags in record +41A (16 bits, see `spell_flag`), with a
+/// far table at DGROUP 1020 of 4-byte entries per flag (timer, strength):
+/// 16 for the player, then 16 for each of the 8 active creatures listed
+/// at DGROUP 0C57 (1Ch bytes each: +0F flags, +12 record offset).
+pub mod spell_flag {
+    pub const DRUNK: u16 = 1 << 0; // ? order of the status strings at 6862
+    pub const ABSORB: u16 = 1 << 10;
+    pub const REFLECT: u16 = 1 << 11;
+    pub const RESIST_SPELLS: u16 = 1 << 12;
+    pub const TABLE: u16 = 0x1020;
+    pub const ACTIVE: u16 = 0x0C57;
+    pub const ACTIVE_SIZE: u16 = 0x1C;
+    pub const ACTIVE_COUNT: u16 = 8;
+}
+
 /// Size of a creature record in the creature segment.
 pub const CREATURE_SIZE: u16 = 0x41E;
 
@@ -138,6 +156,9 @@ pub trait FxHooks {
     fn vitals_changed(&mut self, m: &mut Machine, seg: u16, rec: u16) -> bool;
     /// 2686:02B4, the player died.
     fn player_died(&mut self, m: &mut Machine);
+    /// 0000:27E5 with AX = 19h, after a creature reflected a spell; `actor`
+    /// is its entry in the actor table (DGROUP 0AB3, 1Ch bytes each).
+    fn spell_reflected(&mut self, _m: &mut Machine, _actor: u16) {}
 }
 
 /// Outcome of `apply_effect`, mirroring the original's flags.
@@ -854,5 +875,141 @@ impl Machine {
                 let s = SLOTS + i * SLOT_SIZE;
                 self.mem.r8(DS, s + slot::KIND) == 4 && self.mem.r8(DS, attr.wrapping_add(s + block::ATTRS)) != 0
             })
+    }
+
+    /// 2CDD:0964. One tick of the timed spell flags (+41A): the player's,
+    /// then each active creature's whose entry lacks flag 4000h. Creature
+    /// k's timers are block k + 1 of the table, or block k when the player
+    /// has no flags (unlike `spell_flag_table`).
+    pub fn tick_spell_flags(&mut self) {
+        let (tseg, mut toff) = (self.mem.r16(DS, spell_flag::TABLE + 2), self.mem.r16(DS, spell_flag::TABLE));
+        // The player's block is only stepped over when the player has
+        // flags; otherwise the creatures' blocks start one too early.
+        if self.mem.r16(DS, crate::character::PLAYER + 0x41A) != 0 {
+            self.fx_tick_flags(DS, crate::character::PLAYER, tseg, toff);
+            toff = toff.wrapping_add(0x40);
+        }
+        for k in 0..spell_flag::ACTIVE_COUNT {
+            let e = spell_flag::ACTIVE + k * spell_flag::ACTIVE_SIZE;
+            if self.mem.r16(DS, e + 0x0F) & 0x4000 == 0 {
+                let seg = self.mem.r16(DS, var::CREATURE_SEG);
+                let off = self.mem.r16(DS, e + 0x12);
+                self.fx_tick_flags(seg, off, tseg, toff);
+            }
+            toff = toff.wrapping_add(0x40);
+        }
+    }
+
+    /// 2CDD:0999. Counts down the timer of each set flag and clears the
+    /// flag when it reaches 0 (or was 0); timers of clear flags are zeroed.
+    fn fx_tick_flags(&mut self, seg: u16, off: u16, tseg: u16, mut t: u16) {
+        let at = off.wrapping_add(0x41A);
+        let flags = self.mem.r16(seg, at);
+        if flags == 0 {
+            return;
+        }
+        for i in 0..16 {
+            if flags & (1 << i) != 0 {
+                let timer = self.mem.r16(tseg, t);
+                let expired = timer == 0 || {
+                    self.mem.w16(tseg, t, timer - 1);
+                    timer == 1
+                };
+                if expired {
+                    let f = self.mem.r16(seg, at) & !(1u16 << i);
+                    self.mem.w16(seg, at, f);
+                    self.fx_or8(DS, var::CHANGED, 0x80);
+                }
+            } else {
+                self.mem.w16(tseg, t, 0);
+            }
+            t = t.wrapping_add(4);
+        }
+    }
+
+    /// 2CDD:09E0. The spell-flag table entries (segment, offset) of the
+    /// record at seg:off: the player's (DGROUP:01A4), or an active
+    /// creature's (in the creature segment). For anyone else the original
+    /// hits an INT 3 and carries on with the record's own segment and
+    /// offset 0D37.
+    pub fn spell_flag_table(&self, seg: u16, off: u16) -> (u16, u16) {
+        let (tseg, toff) = (self.mem.r16(DS, spell_flag::TABLE + 2), self.mem.r16(DS, spell_flag::TABLE));
+        if seg == DS && off == crate::character::PLAYER {
+            return (tseg, toff);
+        }
+        for k in 0..spell_flag::ACTIVE_COUNT {
+            let e = spell_flag::ACTIVE + k * spell_flag::ACTIVE_SIZE;
+            if self.mem.r16(DS, e + 0x12) == off && seg == self.mem.r16(DS, var::CREATURE_SEG) {
+                return (tseg, toff.wrapping_add(0x40).wrapping_add(k << 6));
+            }
+        }
+        (seg, spell_flag::ACTIVE + spell_flag::ACTIVE_COUNT * spell_flag::ACTIVE_SIZE)
+    }
+
+    /// 2CDD:0B46. Whether the record at seg:off resists through spell flag
+    /// entry `entry` (flag number × 4): a percent roll up to the flag's
+    /// strength plus 5 per level the target has over DGROUP 1292 (computed
+    /// in 8 bits).
+    fn fx_resist_roll(&mut self, seg: u16, off: u16, entry: u16) -> bool {
+        let lvl = (self.mem.r8(seg, off.wrapping_add(LEVEL)) as u16 + 1).wrapping_sub(self.mem.r16(DS, var::CASTER));
+        let bonus = (lvl as u8 as i8 as i16 * 5) as u16;
+        let (tseg, toff) = self.spell_flag_table(seg, off);
+        let chance = self.mem.r16(tseg, entry.wrapping_add(toff).wrapping_add(2)).wrapping_add(bonus);
+        self.percent() < chance.wrapping_add(1)
+    }
+
+    /// 2CDD:0A38. Whether the record at seg:off stops a spell costing
+    /// `cost` (spell +32): Sorcerers (class byte 23h) absorb it on a random
+    /// byte under (INT + WIL) / 2 (at most C0h), regaining cost / (level +
+    /// 1) SP; then resist magic (flag 1000h), absorb (400h, regaining
+    /// cost / [1292] SP) and reflect (800h, queueing the projectile at
+    /// [A886] back). Absorb and reflect are only tried if one of 1C00h is
+    /// set. None where the original faults ([1292] = 0).
+    pub fn spell_stopped(&mut self, seg: u16, off: u16, cost: u16, hooks: &mut dyn FxHooks) -> Option<bool> {
+        let r = |f: u16| off.wrapping_add(f);
+        let max_sp = |m: &mut Self, gain: u16| {
+            let sp = m.fx_add16(seg, r(SPELL_POINTS), gain);
+            let max = m.mem.r16(seg, r(MAX_SPELL_POINTS));
+            if sp > max {
+                m.mem.w16(seg, r(SPELL_POINTS), max);
+            }
+        };
+        if self.mem.r8(seg, r(CLASS)) == 0x23 {
+            let a = self.mem.r8(seg, r(ATTRS + 1)) as u16 + self.mem.r8(seg, r(ATTRS + 2)) as u16;
+            let limit = ((a >> 1) as u8).min(0xC0);
+            if (self.rng.next() as u8) < limit {
+                let level = self.mem.r8(seg, r(LEVEL)) as u16 + 1;
+                max_sp(self, cost / level);
+                return Some(true);
+            }
+        }
+        let flags = self.mem.r16(seg, r(0x41A));
+        if flags & 0x1C7C == 0 || flags & 0x1C00 == 0 {
+            return Some(false);
+        }
+        if flags & spell_flag::RESIST_SPELLS != 0 && self.fx_resist_roll(seg, off, 0x30) {
+            return Some(true);
+        }
+        if self.mem.r16(seg, r(0x41A)) & spell_flag::ABSORB != 0 && self.fx_resist_roll(seg, off, 0x28) {
+            let div = self.mem.r16(DS, var::CASTER);
+            if div == 0 {
+                return None;
+            }
+            max_sp(self, cost / div);
+            return Some(true);
+        }
+        if self.mem.r16(seg, r(0x41A)) & spell_flag::REFLECT == 0 || !self.fx_resist_roll(seg, off, 0x2C) {
+            return Some(false);
+        }
+        let projectile = self.mem.r16(DS, 0xA886);
+        let source = self.mem.r32(DS, projectile.wrapping_add(4));
+        let at = (self.mem.r16(DS, 0x0D5A) << 2).wrapping_add(0x0D5C);
+        self.mem.w32(DS, at, source);
+        self.fx_add16(DS, 0x1276, 1);
+        let caster = source as u16;
+        if caster != crate::character::PLAYER {
+            hooks.spell_reflected(self, (caster / CREATURE_SIZE).wrapping_mul(0x1C).wrapping_add(0x0AB3));
+        }
+        Some(true)
     }
 }
