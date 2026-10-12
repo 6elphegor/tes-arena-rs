@@ -1,0 +1,4 @@
+/target
+# Derived from the game; never commit or distribute.
+/re/
+__pycache__/
