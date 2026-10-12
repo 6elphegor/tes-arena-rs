@@ -1,4 +1,4 @@
-//! Equipment shop stock and potions (segment 1194).
+//! Equipment shop stock, potions and magic items (segment 1194).
 //!
 //! A shop's stock is generated from the shop's own seed (DGROUP 12E0):
 //! the RNG seed is swapped for it and restored afterwards, so a shop
