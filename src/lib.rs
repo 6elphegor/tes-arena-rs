@@ -2,6 +2,7 @@
 //! Addresses in comments are segment:offset in the unpacked image.
 
 pub mod character;
+pub mod combat;
 pub mod dice;
 pub mod exe;
 pub mod loot;
