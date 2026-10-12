@@ -31,14 +31,22 @@ No game code or data is included: everything is loaded from your own copy.
   block loading, the wall pass and whole cities (1194:0292).
 - `src/level.rs` – the .MIF level loader (0000:E87C) used for city
   templates, interiors and dungeons: header, level selection, planes,
-  locks, triggers, lights, text and info chunks. The game's heap
-  allocator is not ported; callers pass a `mem::Heap`.
+  locks, triggers, lights, text and info chunks.
+- `src/heap.rs` – the game's heap: startup setup, first-fit and last-fit
+  allocation, free with merging. Loaders and the decompressor allocate
+  from it as the original does; set it up with `heap_init` first.
 - `src/dungeon.rs` – dungeon records and seeds, level count, layout,
-  stairs, main-quest dungeon selection.
+  stairs, whole levels built from random1.mif, main-quest dungeon
+  selection.
 - `src/creature.rs` – NPC and monster generation, corpse loot,
   monster spawning.
+- `examples/city_map.rs`, `examples/dungeon_map.rs` – build a city or a
+  dungeon from your game files with the ported code and write its map as
+  a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
+  imperial.ppm`.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
-  routines can run unmodified against the user's own game files.
+  routines can run unmodified against the user's own game files, and
+  `init_heap` to set up the game's heap.
 - `harness/emu.py` – runs original routines under unicorn (far, near or a
   code range); CPU faults are reported as `Fault`.
 - `harness/xref.py` – static helpers: data xrefs, pointer tables,
@@ -81,6 +89,9 @@ Pitfalls:
   instruction budget; check where it stopped before trusting a result.
 - Reroll loops that can only end on a different RNG value hang when the
   seed sits on a short cycle; use `random::CycleCheck` and return None.
+- Vector runs that decompress under unicorn are slow (an hour for
+  `gen_level.py`): write output line-buffered and make long generators
+  resumable.
 - In an agent worktree the game is not at `../ESarena`; set `ARENA_EXE`
   or the game-dependent tests skip silently.
 

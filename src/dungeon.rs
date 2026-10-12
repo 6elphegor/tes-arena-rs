@@ -6,15 +6,25 @@
 //! file per group), and every chunk of the grid copies a random level of
 //! the group. Stairs connect consecutive levels at random chunks: the
 //! up stairs of a level sit where the previous level's down stairs were.
-//! Reading `random1.mif` and copying its floors into the map is file I/O
-//! and is not ported; `dungeon_level` returns which level of the file
-//! each chunk loads instead, like `generate_city` does for city blocks.
+//! `dungeon_create` sets a dungeon up and loads blank.mif for its planes;
+//! `dungeon_build_level` builds a level with the chunks read from
+//! random1.mif, and `dungeon_level` is the same without the file I/O,
+//! returning which level of the file each chunk loads.
+//!
+//! random1.mif has no LOCK or LITE chunks, so those branches of the chunk
+//! loader (and their quirks) are ported from the code alone; the game's
+//! data never reaches them.
 //!
 //! Interiors use the 64 KiB map segment whose segment is in DGROUP D806:
 //! a 128x128 grid of words, cleared to 0x0101. Stairs are marked with
 //! two bytes 0x1D (up) or 0x1C (down) at an offset from table 6564.
 
+use crate::bsa::Files;
 use crate::city::record;
+use crate::level::var::{
+    BUFFER_BLOCK, LIGHTS, LIGHT_COUNT, LOCKS, LOCK_COUNT, TARGETS, TARGET_COUNT, TRIGGERS, TRIGGER_COUNT,
+};
+use crate::mif::var::{BUFFER_SEG, CHUNK_LEN, FLOOR_SEG, TAG};
 use crate::machine::Machine;
 use crate::random::CycleCheck;
 use crate::mem::DS;
@@ -103,6 +113,18 @@ const ULTOA_END: u16 = 0x94F6;
 const ENTRY_SIZE: u16 = 25;
 /// Entry flag: the dungeon has been handed out.
 const ENTRY_USED: u8 = 2;
+/// "random1.mif" and where its levels start (past the 6-byte, 0x3D-byte
+/// header and its tag and length).
+const RANDOM_MIF: u16 = 0x6540;
+/// "blank.mif".
+const BLANK_MIF: u16 = 0x654C;
+const MIF_HEADER: u32 = 0x43;
+/// The edge wall.
+const WALL: u16 = 0x7800;
+/// The current chunk's map offset while it loads.
+const CHUNK_AT: u16 = 0xA864;
+/// EMS page mapped before each chunk.
+const EMS_PAGE: u16 = 0x1030;
 const STAIRS_UP: u8 = 0x1D;
 const STAIRS_DOWN: u8 = 0x1C;
 
@@ -283,12 +305,39 @@ impl Machine {
         Some(())
     }
 
+    /// 0000:28BC..2938: `dungeon_setup`, then blank.mif loaded with the
+    /// level loader for the dungeon's map planes, the map size and level
+    /// count kept around the load. None where either fails.
+    pub fn dungeon_create(&mut self, files: &mut Files, ax: u16, bx: u16, levels: u16) -> Option<()> {
+        self.dungeon_setup(ax, bx, levels)?;
+        let saved = [WIDTH, HEIGHT, LEVELS].map(|v| self.mem.r16(DS, v));
+        self.level_load(files, BLANK_MIF)?;
+        for (v, w) in [WIDTH, HEIGHT, LEVELS].into_iter().zip(saved) {
+            self.mem.w16(DS, v, w);
+        }
+        Some(())
+    }
+
     /// 0000:0DE6..0E2C: the dungeon part of entering a location, without
     /// the load of blank.mif. Seeds the RNG with the location's dungeon
     /// seed (plus (B << 6) + A in 16 bits when game flag 0x80 is set,
     /// which also sets flag 0x4000), rolls the level count and sets up a
     /// 2x1 dungeon, or 2x2 with flag 0x4000.
     pub fn dungeon_enter(&mut self) -> Option<()> {
+        let (bx, levels) = self.dun_enter_roll();
+        self.dungeon_setup(1, bx, levels)
+    }
+
+    /// 0000:0DE6..0E2C with the load of blank.mif: `dungeon_enter`
+    /// through `dungeon_create`.
+    pub fn dungeon_enter_load(&mut self, files: &mut Files) -> Option<()> {
+        let (bx, levels) = self.dun_enter_roll();
+        self.dungeon_create(files, 1, bx, levels)
+    }
+
+    /// `dungeon_enter` up to the setup: the seed, flags and level count;
+    /// returns the setup's BX (1 for 2x2) and the level count.
+    fn dun_enter_roll(&mut self) -> (u16, u16) {
         let mut seed = self.mem.r32(DS, LOCATION_SEED);
         if self.mem.r16(DS, GAME_FLAGS) & 0x80 != 0 {
             let extra = (self.mem.r16(DS, SEED_B) << 6).wrapping_add(self.mem.r16(DS, SEED_A));
@@ -301,7 +350,7 @@ impl Machine {
         self.mem.w16(DS, FLAGS_C39A, f);
         let levels = self.dungeon_level_count();
         let bx = (self.mem.r16(DS, GAME_FLAGS) & 0x4000 != 0) as u16;
-        self.dungeon_setup(1, bx, levels)
+        (bx, levels)
     }
 
     /// 0000:299F without its file I/O. Builds level `level` of the current
@@ -316,6 +365,38 @@ impl Machine {
     pub fn dungeon_level(&mut self, level: u8, handle: u16) -> Option<Vec<Chunk>> {
         self.mem.w8(DS, LEVEL, level);
         self.mem.w16(DS, HANDLE, handle);
+        let chunks = self.dun_plan(level)?;
+        self.dun_mark_stairs(level);
+        Some(chunks)
+    }
+
+    /// 0000:299F. Builds level `level` of the current dungeon in the map,
+    /// as `dungeon_level` describes, loading each chunk from random1.mif
+    /// (`dun_load_chunk`) before the stairs are marked, then closes the
+    /// file and walls in the map's edges (`dun_border`). None where the
+    /// file is missing, a grid dimension is 0, or a chunk load fails (see
+    /// `dun_load_chunk`).
+    pub fn dungeon_build_level(&mut self, files: &mut Files, level: u8) -> Option<()> {
+        self.mem.w8(DS, LEVEL, level);
+        let handle = self.file_open_handle(files, RANDOM_MIF)?;
+        self.mem.w16(DS, HANDLE, handle);
+        // The rolls don't depend on the loads, so the plan comes first;
+        // each chunk's roll is made right after its seek in the original.
+        let chunks = self.dun_plan(level)?;
+        for c in chunks {
+            self.file_seek(files, 0, MIF_HEADER);
+            self.level_skip(files, c.block);
+            self.dun_load_chunk(files, c.offset)?;
+        }
+        self.dun_mark_stairs(level);
+        self.file_close(files);
+        self.dun_border();
+        Some(())
+    }
+
+    /// The first part of 299F: clears the map, sets the group and rolls
+    /// each chunk's level of random1.mif.
+    fn dun_plan(&mut self, level: u8) -> Option<Vec<Chunk>> {
         let rows = self.mem.r16(DS, HEIGHT) >> 5;
         if rows == 0 || self.mem.r16(DS, WIDTH) >> 5 == 0 {
             return None;
@@ -345,7 +426,13 @@ impl Machine {
             row_off = row_off.wrapping_add(0x2000);
         }
         self.rng.seed = saved;
+        Some(chunks)
+    }
 
+    /// The end of 299F: stairs up at this level's cell, and down at the
+    /// next one unless this is the last level.
+    fn dun_mark_stairs(&mut self, level: u8) {
+        let map = self.mem.r16(DS, MAP_SEG);
         let si = STAIRS.wrapping_add((level as u16) * 2);
         let mark = |m: &mut Self, cell: u8, v: u8| {
             let off = m.mem.r16(DS, STAIR_OFFSETS.wrapping_add(cell as u16));
@@ -359,7 +446,129 @@ impl Machine {
             let down = self.mem.r8(DS, si.wrapping_add(1));
             mark(self, down, STAIRS_DOWN);
         }
-        Some(chunks)
+    }
+
+    /// 0000:2A73. Loads the chunks of one random1.mif level into the
+    /// 32x32 squares at map offset `at`. Unlike the level loader it
+    /// appends: LOCK, TARG and TRIG records go after those already
+    /// loaded, and target positions get the chunk's offset added (its low
+    /// byte halved). FLOR and MAP1 are decompressed into the block at
+    /// BUFFER_BLOCK and copied 32 words a row (floor words plus the
+    /// buffer segment number); MAP2, NAME and the rest are skipped.
+    ///
+    /// Quirks kept: the light count is reset for every chunk, so lights
+    /// are always written from the start of the list; the lock list
+    /// offset is three times the count in 8 bits; targets that would take
+    /// the list past 0x40 skip the chunk; a TARG of fewer than 2 bytes
+    /// adjusts 65536 words. None where the original faults (a LOCK chunk
+    /// of 768 bytes or more), the heap reports an error or EMS is on.
+    fn dun_load_chunk(&mut self, files: &mut Files, at: u16) -> Option<()> {
+        self.mem.w16(DS, CHUNK_AT, at);
+        self.mem.w16(DS, LIGHT_COUNT, 0);
+        self.ems_map(self.mem.r16(DS, EMS_PAGE))?;
+        loop {
+            if self.file_read(files, DS, TAG, 4) == 0 {
+                return Some(());
+            }
+            let tag = self.mem.r32(DS, TAG).to_le_bytes();
+            if &tag == b"LEVL" {
+                return Some(());
+            }
+            self.file_read(files, DS, CHUNK_LEN, 2);
+            let len = self.mem.r16(DS, CHUNK_LEN);
+            match &tag {
+                b"LOCK" => {
+                    let q = len / 3;
+                    if q > 0xFF {
+                        return None;
+                    }
+                    let n = self.mem.r8(DS, LOCK_COUNT);
+                    let at = n.wrapping_mul(3) as u16;
+                    self.mem.w8(DS, LOCK_COUNT, n.wrapping_add(q as u8));
+                    self.file_read(files, DS, LOCKS + at, len);
+                }
+                b"TARG" => {
+                    let al = (len >> 1) as u8;
+                    let n = self.mem.r8(DS, TARGET_COUNT);
+                    if al.wrapping_add(n) > 0x40 {
+                        self.file_seek(files, 1, len as u32);
+                        continue;
+                    }
+                    self.mem.w8(DS, TARGET_COUNT, n.wrapping_add(al));
+                    let mut si = TARGETS.wrapping_add(n as u16 * 2);
+                    self.file_read(files, DS, si, len);
+                    let add = (at & 0xFF00) | ((at & 0xFF) >> 1);
+                    let words = len >> 1;
+                    for _ in 0..if words == 0 { 0x10000 } else { words as u32 } {
+                        let v = self.mem.r16(DS, si).wrapping_add(add);
+                        self.mem.w16(DS, si, v);
+                        si = si.wrapping_add(2);
+                    }
+                }
+                b"TRIG" => {
+                    let n = self.mem.r8(DS, TRIGGER_COUNT);
+                    self.mem.w8(DS, TRIGGER_COUNT, n.wrapping_add((len >> 2) as u8));
+                    self.file_read(files, DS, TRIGGERS.wrapping_add((n as u16) << 2), len);
+                }
+                b"LITE" => {
+                    let n = self.mem.r16(DS, LIGHT_COUNT);
+                    self.mem.w16(DS, LIGHT_COUNT, n.wrapping_add(len / 6));
+                    self.file_read(files, DS, LIGHTS.wrapping_add(n.wrapping_mul(6)), len);
+                }
+                b"FLOR" | b"MAP1" => {
+                    let buf = self.mem.r16(DS, BUFFER_SEG);
+                    self.file_read(files, buf, 0, len);
+                    let (bs, bo) = (self.mem.r16(DS, BUFFER_BLOCK + 2), self.mem.r16(DS, BUFFER_BLOCK));
+                    self.mif_decompress(buf, 0, bs, bo, len)?;
+                    let (plane, add) = if &tag == b"FLOR" {
+                        (self.mem.r16(DS, FLOOR_SEG), buf)
+                    } else {
+                        (self.mem.r16(DS, MAP_SEG), 0)
+                    };
+                    // Copied from offset 0 of the block's segment,
+                    // whatever BUFFER_BLOCK's offset.
+                    let (mut si, mut row) = (0u16, at);
+                    for _ in 0..32 {
+                        let mut di = row;
+                        for _ in 0..32 {
+                            let w = self.mem.r16(bs, si).wrapping_add(add);
+                            self.mem.w16(plane, di, w);
+                            si = si.wrapping_add(2);
+                            di = di.wrapping_add(2);
+                        }
+                        row = row.wrapping_add(0x100);
+                    }
+                }
+                _ => {
+                    self.file_seek(files, 1, len as u32);
+                }
+            }
+        }
+    }
+
+    /// 0000:2CC6. Walls (0x7800) along the map's first and last rows and
+    /// columns, WIDTH x HEIGHT squares.
+    fn dun_border(&mut self) {
+        let map = self.mem.r16(DS, MAP_SEG);
+        let width = self.mem.r16(DS, WIDTH);
+        let height = self.mem.r16(DS, HEIGHT);
+        let mut di = 0u16;
+        for _ in 0..width {
+            self.mem.w16(map, di, WALL);
+            di = di.wrapping_add(2);
+        }
+        let mut di = (height << 8).wrapping_sub(0x100);
+        for _ in 0..width {
+            self.mem.w16(map, di, WALL);
+            di = di.wrapping_add(2);
+        }
+        let right = width.wrapping_sub(1).wrapping_mul(2);
+        let mut di = 0u16;
+        for _ in 0..if height == 0 { 0x10000 } else { height as u32 } {
+            self.mem.w16(map, di, WALL);
+            self.mem.w16(map, di.wrapping_add(right), WALL);
+            di = di.wrapping_add(0x100);
+        }
     }
 
     /// 0000:2978..299E. The player's start position on the first level,
