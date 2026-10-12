@@ -1,6 +1,7 @@
 //! Port of The Elder Scrolls: Arena (ACD.EXE, CD version 1.07) to Rust.
 //! Addresses in comments are segment:offset in the unpacked image.
 
+pub mod bsa;
 pub mod character;
 pub mod city;
 pub mod combat;
@@ -11,6 +12,7 @@ pub mod inventory;
 pub mod loot;
 pub mod machine;
 pub mod mem;
+pub mod mif;
 pub mod progression;
 pub mod random;
 pub mod scale;
