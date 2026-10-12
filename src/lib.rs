@@ -13,6 +13,7 @@ pub mod exe;
 pub mod heap;
 pub mod inventory;
 pub mod level;
+pub mod log;
 pub mod loot;
 pub mod machine;
 pub mod mem;

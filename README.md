@@ -44,13 +44,15 @@ No game code or data is included: everything is loaded from your own copy.
   (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
   palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
+- `src/log.rs` – the calendar (dates from the minute counter) and
+  logbook entries; appending them to LOG.nn is not ported.
 - `src/names.rs` – random NPC names from NAMECHNK.DAT (1194:080B);
   `expand_npc_named` builds a whole NPC with its name.
 - `examples/city_map.rs`, `examples/dungeon_map.rs` – build a city or a
   dungeon from your game files with the ported code and write its map as
   a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
   imperial.ppm`. `examples/character_sheet.rs` loads a saved game and
-  prints the character, inventory and spells; `examples/save_view.rs`
+  prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
   writes a save's stored screenshot and the map of the level it is in.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
   routines can run unmodified against the user's own game files, and

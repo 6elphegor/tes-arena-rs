@@ -44,6 +44,11 @@ fn main() {
     m.mem.w16(DS, 0x1022, extra);
     m.save_load_engine(&mut files, slot).expect("SAVEENGN for that slot");
     m.spells_load(&mut files).expect("spells");
+    // The current date, through the ported calendar (DGROUP 05CC holds
+    // the time in minutes).
+    let minutes = m.mem.r32(DS, 0x05CC);
+    m.log_date(minutes, 0xF000);
+    let date = String::from_utf8_lossy(m.mem.cstr(DS, 0xF000)).trim_end_matches('\r').to_string();
 
     let s = |m: &Machine, seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
     let r8 = |f: u16| m.mem.r8(DS, PLAYER + f);
@@ -60,6 +65,7 @@ fn main() {
         r8(LEVEL) as u16 + 1
     );
     println!("  in {}", s(&m, DS, LOCATION));
+    println!("  {date}");
     let names = ["STR", "INT", "WIL", "AGI", "SPD", "END", "PER", "LCK"];
     let attrs: Vec<String> = names
         .iter()
@@ -89,6 +95,22 @@ fn main() {
         let condition = if has_condition { format!(" ({})", s(&m, DS, m.condition_name(DS, it))) } else { String::new() };
         let mark = if flags & item::EQUIPPED != 0 { '*' } else { ' ' };
         println!("   {mark} {name}{condition}");
+    }
+    // The logbook: "&" date CR LF text " *" per entry (see arena::log).
+    let log_name = format!("LOG.{slot:02}\0");
+    for (i, c) in log_name.bytes().enumerate() {
+        m.mem.w8(DS, 0xF000 + i as u16, c);
+    }
+    if let Some((seg, off)) = m.file_load(&mut files, 0xF000, buffer, 0x8000) {
+        let size = m.mem.r16(DS, 0xA90C);
+        let text: Vec<u8> = (0..size).map(|i| m.mem.r8(seg, off + i)).collect();
+        println!("  logbook:");
+        for entry in String::from_utf8_lossy(&text).split('&').filter(|e| !e.trim().is_empty()) {
+            let entry = entry.trim_end().trim_end_matches('*').trim_end();
+            let (date, body) = entry.split_once("\r\n").unwrap_or((entry, ""));
+            println!("    {date}");
+            println!("      {}", body.split_whitespace().collect::<Vec<_>>().join(" "));
+        }
     }
     // SPELLSG.nn holds the spells in the game (128); SPELLS.nn, reached
     // with bit 7 set, 32 more.
