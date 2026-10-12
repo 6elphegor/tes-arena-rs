@@ -13,10 +13,11 @@
 //! record's segment, it uses whatever lies at that segment's 91F0..91F9
 //! as RNG state; `cr_range_in` reproduces that.
 //!
-//! NPC names (1194:080B) are not generated: that routine saves and
-//! restores the seed, so skipping it changes nothing else.
+//! `expand_npc` leaves the name out (1194:080B saves and restores the
+//! seed, so nothing else changes); `expand_npc_named` writes it.
 
 
+use crate::bsa::Files;
 use crate::character::field::*;
 use crate::dice::{dice, roll};
 use crate::effects::Applied;
@@ -377,6 +378,18 @@ impl Machine {
     /// full record at seg:rec. The caller's RNG seed is restored at the
     /// end. None where the original faults (a hit die of 0) or hangs.
     pub fn expand_npc(&mut self, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
+        self.cr_expand(None, seed_seg, seed_off, seg, rec)
+    }
+
+    /// `expand_npc` with the name (1194:080B, `npc_name`) written as the
+    /// original does: from the record's race, sex and seed, before byte
+    /// 0x28 is cleared, which cuts names at 31 characters. None also
+    /// where the name can't be made (see `npc_name`).
+    pub fn expand_npc_named(&mut self, files: &mut Files, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
+        self.cr_expand(Some(files), seed_seg, seed_off, seg, rec)
+    }
+
+    fn cr_expand(&mut self, files: Option<&mut Files>, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
         let saved = self.rng.seed;
         for i in 0..RECORD_SIZE {
             self.mem.w8(seg, rec.wrapping_add(i), 0);
@@ -392,7 +405,11 @@ impl Machine {
         let face = self.npc_face(race as u16)?;
         self.mem.w8(seg, rec.wrapping_add(rec::FACE), face as u8);
         self.rng.seed = self.mem.r32(seg, rec.wrapping_add(seed::SEED));
-        // 1194:080B would write the name here; it restores the seed.
+        if let Some(files) = files {
+            let sex = self.mem.r8(seg, rec.wrapping_add(SEX));
+            let seed = self.mem.r32(seg, rec.wrapping_add(seed::SEED));
+            self.npc_name(files, race, sex, seed, seg, rec.wrapping_add(NAME))?;
+        }
         self.mem.w8(seg, rec.wrapping_add(rec::B_28), 0);
         self.cr_npc_attributes(seed_seg, seed_off, seg, rec)?;
         self.npc_xp_value(seg, rec);

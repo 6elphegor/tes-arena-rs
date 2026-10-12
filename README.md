@@ -40,6 +40,8 @@ No game code or data is included: everything is loaded from your own copy.
   selection.
 - `src/creature.rs` – NPC and monster generation, corpse loot,
   monster spawning.
+- `src/names.rs` – random NPC names from NAMECHNK.DAT (1194:080B);
+  `expand_npc_named` builds a whole NPC with its name.
 - `examples/city_map.rs`, `examples/dungeon_map.rs` – build a city or a
   dungeon from your game files with the ported code and write its map as
   a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
