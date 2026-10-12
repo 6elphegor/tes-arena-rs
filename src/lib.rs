@@ -4,6 +4,7 @@
 pub mod character;
 pub mod dice;
 pub mod exe;
+pub mod loot;
 pub mod machine;
 pub mod mem;
 pub mod random;
