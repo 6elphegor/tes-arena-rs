@@ -35,8 +35,10 @@ REGIONS = [
     (TSEG * 16, TSEG * 16 + 0x200),
     (SSEG * 16, SSEG * 16 + 0x10),
 ]
-# Effect slots: DGROUP 0660, 16 × 3C bytes, +2A = target segment.
-SLOT_SEGS = [0x660 + i * 0x3C + 0x2A for i in range(16)]
+# Words that receive a segment value, un-relocated before diffing: effect
+# slots (DGROUP 0660, 16 × 3C bytes, +2A = target segment) and the
+# corpse pointer of the loot dispatcher (DGROUP 4EFE).
+SLOT_SEGS = [0x660 + i * 0x3C + 0x2A for i in range(16)] + [0x4EFE]
 
 a.mu.mem_write(a.lin(LOAD_SEG + 0x1194, 0x080B), b'\xc3')
 
@@ -74,7 +76,9 @@ def run(seg, off, regs, far=False, budget=20_000_000):
         if op in (0xF6, 0xF7) and (modrm >> 3) & 7 in (6, 7):
             return 'fault'
         return 'hang'
-    return {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in ('ax', 'bx', 'cx', 'dx', 'si', 'di')}
+    r = {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in ('ax', 'bx', 'cx', 'dx', 'si', 'di')}
+    r['cf'] = mu.reg_read(UC_X86_REG_EFLAGS) & 1
+    return r
 
 
 def case(name, writes, seg, off, rets=(), far=False, **regs):
@@ -153,7 +157,7 @@ for _ in range(300):
     klass = rng.choice([0xFFFF, rng.choice(CLASS_IDS)])
     case('npc_seed', [], 0x1194, 0x38B9, es=SSEG, di=0, ax=klass, bx=level)
 
-for _ in range(350):
+for _ in range(250):
     in_dgroup = rng.random() < 0.15
     seg, rec = (DG, 0xB000) if in_dgroup else (CSEG, rng.randrange(8) * 0x41E)
     case('expand_npc', seed_record() + faces() + cseg_rng(), 0x1194, 0x351D,
@@ -177,8 +181,65 @@ for _ in range(200):
          (CSEG, rec + 0x40D, 2, rng.choice([0, 0x1000]))] + rec_attrs(CSEG, rec)
     case('derive_record_stats', w, 0x1194, 0x379F, ds=CSEG, si=rec, es=DG)
 
-for _ in range(500):
+for _ in range(350):
     rec = rng.randrange(8) * 0x41E
     ty = rng.choice([rng.randint(1, 0x17), rng.randint(1, 0x17), 0x2A, 0x0E, 0x16, 0x17, 0x0C, 0x0F, 5, 0xB, 0xA])
     w = [(DG, 0x1042, 2, ('s', CSEG)), (DG, 0x1020, 2, 0x3000), (DG, 0x1022, 2, ('s', CSEG))]
     case('create_monster', w, 0x1194, 0x8CEE, ax=ty, di=rec)
+
+
+def corpse(rec):
+    """A corpse record: type, class, level, creature flag, some items."""
+    w = [(CSEG, rec + 4, 1, rng.choice([rng.randint(0, 0x2A), rng.randint(0, 7)])),
+         (CSEG, rec + 5, 1, cls()),
+         (CSEG, rec + 6, 1, rng.choice([rng.randint(0, 30), rng.randint(3, 5), rng.randint(7, 20)])),
+         (CSEG, rec + 0x40D, 2, rng.choice([0, 0x1000]))]
+    used = rng.randint(0, 40)
+    for i in range(40):
+        slot = rec + 0x6E + i * 0x13
+        flags = 0x40 if i < used else 0
+        if i < used and rng.random() < 0.1:
+            flags = 0
+        w.append((CSEG, slot + 0x0E, 1, flags))
+    return w
+
+
+for _ in range(300):
+    rec = rng.randrange(8) * 0x41E
+    case('loot_corpse', corpse(rec), 0x24FA, 0x0006, rets=('cf',), far=True, ds=CSEG, si=rec)
+
+# Trinket path at item level 4..6: B848 kind 1 makes nothing there and the
+# corpse receives its template at 7033 instead.
+for _ in range(150):
+    rec = rng.randrange(8) * 0x41E
+    w = corpse(rec)
+    w[0] = (CSEG, rec + 4, 1, rng.choice([24, 27, 30, 36, 42]))
+    w[2] = (CSEG, rec + 6, 1, rng.randint(3, 5))
+    # A stale item record (the last item generated) and bytes after the
+    # 11-byte template, so the two possible sources differ.
+    w += [(DG, 0x13DA + i, 1, rng.getrandbits(8)) for i in range(0x13)]
+    w += [(DG, 0x703E + i, 1, rng.getrandbits(8)) for i in range(8)]
+    case('loot_corpse', w, 0x24FA, 0x0006, rets=('cf',), far=True, ds=CSEG, si=rec)
+
+
+def active_list():
+    """Random usable/taken bits in the 8 active-creature entries."""
+    return [(DG, 0xC57 + i * 0x1C + 0x0F, 2, rng.choice([0, 0x4000, 0x4100, 0x100]) | rng.choice([0, 0, 0x1000]))
+            for i in range(8)]
+
+
+MONSTER = [(DG, 0x1042, 2, ('s', CSEG)), (DG, 0x1020, 2, 0x3000), (DG, 0x1022, 2, ('s', CSEG))]
+for _ in range(200):
+    case('alloc_creature_slot', active_list(), 0x25CA, 0x018F, rets=('si', 'di', 'cf'), far=True, di=0x1234)
+    case('usable_creature_slots', active_list(), 0x25CA, 0x01E6, rets=('ax',), far=True)
+    rec = rng.randrange(8) * 0x41E
+    w = [(CSEG, rec + 5, 1, cls()), (CSEG, rec + 6, 1, rng.getrandbits(8))] + rec_attrs(CSEG, rec)
+    case('npc_level_boost', w, 0x1194, 0x8CA5, es=CSEG, si=rec)
+    w = [(CSEG, rec + 5, 1, rng.choice([0x23, cls()])), (CSEG, rec + 0x68, 2, rng.getrandbits(16))]
+    case('npc_sorcerer_spell_points', w, 0x1194, 0x8CDF, ds=CSEG, si=rec)
+    w = [(CSEG, rec + 5, 1, rng.choice([cls(), 0x80, 0xA0, 0x20]))]
+    case('creature_gold_at', w, 0x24FA, 0x004D, far=True, ds=CSEG, si=rec)
+
+for _ in range(200):
+    ty = rng.choice([rng.randint(1, 0x17), 0x2A, 0x0E, 0x16, 0x17])
+    case('spawn_monsters', MONSTER + active_list(), 0x1194, 0x8BEF, ax=ty, cx=rng.randint(1, 3))

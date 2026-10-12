@@ -547,3 +547,275 @@ impl Machine {
         Some(())
     }
 }
+
+/// DGROUP variables of the corpse loot dispatcher (segment 24FA).
+mod loot_var {
+    /// Far pointer to the corpse being looted (segment, offset).
+    pub const CORPSE_SEG: u16 = 0x4EFE;
+    pub const CORPSE_OFF: u16 = 0x4F00;
+    /// Four loot flags: gold, trinket, equipment, magic equipment.
+    pub const FLAGS: u16 = 0x4F02;
+    /// Condition steps (vs roll(7)) and the percentage for each.
+    pub const COND_STEPS: u16 = 0x4F07;
+    pub const COND_PCT: u16 = 0x4F0A;
+    /// Item level for the generators.
+    pub const ITEM_LEVEL: u16 = 0x13CC;
+    /// Item record the generators build.
+    pub const ITEM: u16 = 0x13DA;
+    pub const ITEM_HEALTH: u16 = 0x13E0;
+    pub const ITEM_MAX_HEALTH: u16 = 0x13E2;
+    pub const ITEM_FLAGS: u16 = 0x13E8;
+    /// Magic-item template of 1194:B848.
+    pub const MAGIC_TEMPLATE: u16 = 0x7033;
+    /// Forced armour kind for 1194:E889 (0xFF = none).
+    pub const FORCE_KIND: u16 = 0x101E;
+    pub const W_17E7: u16 = 0x17E7;
+}
+
+/// 3276:4EA5: loot chances, 4 per creature type.
+const LOOT_CHANCE: u16 = 0x4EA5;
+
+impl Machine {
+    /// 24FA:0233..0263. Scales the item's condition: max health / 100 ×
+    /// a percentage picked by roll(7) against the steps at DGROUP 4F07,
+    /// at least 1, into health and max health. None where the step scan
+    /// would never end.
+    fn cr_loot_condition(&mut self) -> Option<()> {
+        let r = self.rng.range(0, 7)? as u8;
+        let mut i = 0u16;
+        let mut n = 0u32;
+        while r > self.mem.r8(DS, loot_var::COND_STEPS.wrapping_add(i)) {
+            i = i.wrapping_add(1);
+            n += 1;
+            if n > 0x10000 {
+                return None;
+            }
+        }
+        let pct = self.mem.r8(DS, loot_var::COND_PCT.wrapping_add(i)) as u16;
+        let mut v = (self.mem.r16(DS, loot_var::ITEM_MAX_HEALTH) / 100).wrapping_mul(pct);
+        if v == 0 {
+            v = 1;
+        }
+        self.mem.w16(DS, loot_var::ITEM_MAX_HEALTH, v);
+        self.mem.w16(DS, loot_var::ITEM_HEALTH, v);
+        Some(())
+    }
+
+    fn cr_corpse(&self) -> (u16, u16) {
+        (self.mem.r16(DS, loot_var::CORPSE_SEG), self.mem.r16(DS, loot_var::CORPSE_OFF))
+    }
+
+    /// 24FA:02C4. Copies 19 bytes from DGROUP `src` into the corpse.
+    fn cr_loot_add(&mut self, src: u16) {
+        let (seg, rec) = self.cr_corpse();
+        self.add_item(DS, src, seg, rec);
+    }
+
+    fn cr_corpse_class(&self) -> u16 {
+        let (seg, rec) = self.cr_corpse();
+        self.mem.r8(seg, rec.wrapping_add(CLASS)) as u16
+    }
+
+    /// 24FA:028F. A magic trinket (1194:B848) or a potion (B7FA), half
+    /// each. When B848 makes nothing (kind 1 below item level 7) it leaves
+    /// SI on its template at 7033, and those 19 bytes are what the corpse
+    /// receives.
+    fn cr_loot_trinket(&mut self) -> Option<()> {
+        let src = if self.rng.range(0, 2)? != 0 {
+            let level = self.mem.r8(DS, loot_var::ITEM_LEVEL);
+            let kind = self.rng.clone().range(0, 3);
+            self.shop_magic_item(level, 0xFF)?;
+            if kind == Some(1) && level < 7 { loot_var::MAGIC_TEMPLATE } else { loot_var::ITEM }
+        } else {
+            self.shop_potion()?;
+            loot_var::ITEM
+        };
+        let v = self.mem.r16(DS, loot_var::W_17E7) | 2;
+        self.mem.w16(DS, loot_var::W_17E7, v);
+        self.cr_loot_add(src);
+        Some(())
+    }
+
+    /// 24FA:01C4. Up to 20 tries at a plain weapon or armour (half each)
+    /// the corpse's class can use. Armour is skipped for a character
+    /// class that wears none; creatures are not checked. Each item's
+    /// condition is scaled. If all 20 are unusable the last one is added
+    /// anyway; if the last try was skipped armour, nothing is.
+    fn cr_loot_equipment(&mut self) -> Option<()> {
+        let (seg, rec) = self.cr_corpse();
+        for left in (1..=20u16).rev() {
+            if self.rng.range(0, 2)? == 0 {
+                let creature = self.mem.r16(seg, rec.wrapping_add(FLAGS)) & FLAG_CREATURE != 0;
+                if !creature && self.class_wears_no_armor(self.cr_corpse_class()) {
+                    continue;
+                }
+                self.mem.w8(DS, loot_var::FORCE_KIND, 0xFF);
+                let level = self.mem.r8(DS, loot_var::ITEM_LEVEL);
+                self.loot_armor(level, 0xFF);
+            } else {
+                let level = self.mem.r8(DS, loot_var::ITEM_LEVEL);
+                self.loot_weapon(level, 0xFF)?;
+            }
+            self.cr_loot_condition()?;
+            if self.class_can_use(DS, loot_var::ITEM, self.cr_corpse_class())? || left == 1 {
+                self.cr_loot_add(loot_var::ITEM);
+                return Some(());
+            }
+        }
+        Some(())
+    }
+
+    /// 24FA:0150. Up to 20 tries at a magic weapon or armour (half each)
+    /// the corpse's class can use. The item level is forced to 16 (the
+    /// corpse's level is computed and overwritten).
+    fn cr_loot_magic_equipment(&mut self) -> Option<()> {
+        for _ in 0..20 {
+            self.mem.w8(DS, loot_var::ITEM_LEVEL, 0x10);
+            if self.rng.range(0, 2)? != 0 {
+                self.loot_magic_weapon(0x10, 0xFFFF)?;
+            } else {
+                self.loot_magic_armor(0x10, 0xFFFF)?;
+            }
+            let class = self.cr_corpse_class();
+            let f = self.mem.r8(DS, loot_var::ITEM_FLAGS) | 2;
+            self.mem.w8(DS, loot_var::ITEM_FLAGS, f);
+            if self.class_can_use(DS, loot_var::ITEM, class)? {
+                self.cr_loot_add(loot_var::ITEM);
+                return Some(());
+            }
+        }
+        Some(())
+    }
+
+    /// 24FA:0006. Loots the corpse at seg:rec: records it as the corpse
+    /// (DGROUP 4EFE), rolls the four loot flags by creature type (d100 at
+    /// most the chance at 3276:4EA5), then with item level = level + 1
+    /// (8-bit) runs the handlers: gold (`roll_corpse_gold`), a trinket
+    /// above item level 3, equipment, and magic equipment above item
+    /// level 7. Returns whether any flag was set (the original's CF
+    /// clear). None where a generator faults or hangs.
+    pub fn loot_corpse(&mut self, seg: u16, rec: u16) -> Option<bool> {
+        self.mem.w16(DS, loot_var::CORPSE_SEG, seg);
+        self.mem.w16(DS, loot_var::CORPSE_OFF, rec);
+        let chances = LOOT_CHANCE.wrapping_add((self.mem.r8(seg, rec.wrapping_add(RACE)) as u16) << 2);
+        self.mem.w32(DS, loot_var::FLAGS, 0);
+        for i in 0..4 {
+            let r = self.d100() as u8;
+            if r <= self.mem.r8(DATA, chances.wrapping_add(i)) {
+                self.mem.w8(DS, loot_var::FLAGS + i, 1);
+            }
+        }
+        let level = self.mem.r8(seg, rec.wrapping_add(LEVEL)).wrapping_add(1);
+        self.mem.w8(DS, loot_var::ITEM_LEVEL, level);
+        if self.mem.r32(DS, loot_var::FLAGS) == 0 {
+            return Some(false);
+        }
+        let flag = |m: &Self, i: u16| m.mem.r8(DS, loot_var::FLAGS + i) != 0;
+        let item_level = |m: &Self| m.mem.r8(DS, loot_var::ITEM_LEVEL);
+        if flag(self, 0) {
+            self.roll_corpse_gold();
+        }
+        if flag(self, 1) && item_level(self) > 3 {
+            self.cr_loot_trinket()?;
+        }
+        if flag(self, 2) {
+            self.cr_loot_equipment()?;
+        }
+        if flag(self, 3) && item_level(self) > 7 {
+            self.cr_loot_magic_equipment()?;
+        }
+        Some(true)
+    }
+}
+
+/// DGROUP 0C57: the active-creature list, 8 entries of 1C bytes; entry
+/// i's record is at i × 41E in the creature segment.
+pub const ACTIVE_LIST: u16 = 0x0C57;
+const ACTIVE_ENTRY: u16 = 0x1C;
+/// Entry flags (word at +0F): 0x4000 usable, 0x100 taken.
+const ACTIVE_FLAGS: u16 = 0x0F;
+
+impl Machine {
+    /// 25CA:018F. Takes the first entry of the active list that is usable
+    /// (0x4000) and not taken (0x100), marking it taken: Ok((record
+    /// offset, entry)). With none, Err(SI): the original sets CF and
+    /// leaves SI just past the list (0D37), which callers use as a record
+    /// offset anyway.
+    pub fn alloc_creature_slot(&mut self) -> Result<(u16, u16), u16> {
+        let mut si = ACTIVE_LIST;
+        let mut dx = 0u16;
+        for _ in 0..8 {
+            let f = self.mem.r16(DS, si + ACTIVE_FLAGS);
+            if f & 0x4000 != 0 && f & 0x100 == 0 {
+                self.mem.w16(DS, si + ACTIVE_FLAGS, f | 0x100);
+                return Ok((dx, si));
+            }
+            dx = dx.wrapping_add(RECORD_SIZE);
+            si += ACTIVE_ENTRY;
+        }
+        Err(si)
+    }
+
+    /// 25CA:01E6. Entries of the active list marked usable (0x4000),
+    /// whether taken or not.
+    pub fn usable_creature_slots(&self) -> u16 {
+        (0..8).filter(|&i| self.mem.r16(DS, ACTIVE_LIST + i * ACTIVE_ENTRY + ACTIVE_FLAGS) & 0x4000 != 0).count() as u16
+    }
+
+    /// 1194:8BEF. Spawns `count` monsters of type `ty` (`count` 0 means
+    /// 65536, as `loop` counts): each takes a creature slot, is built by
+    /// `create_monster` and gets its loot. A failed slot allocation is
+    /// not checked, so the monster is built at offset 0D37.
+    pub fn spawn_monsters(&mut self, ty: u16, count: u16) -> Option<()> {
+        let n = if count == 0 { 0x10000u32 } else { count as u32 };
+        for _ in 0..n {
+            let rec = match self.alloc_creature_slot() {
+                Ok((rec, _)) => rec,
+                Err(si) => si,
+            };
+            self.create_monster(ty, rec)?;
+            let seg = self.mem.r16(DS, CREATURE_SEG);
+            self.loot_corpse(seg, rec)?;
+        }
+        Some(())
+    }
+
+    /// 1194:8CA5. Raises an NPC record's attributes by level + 11 (on the
+    /// 256 scale), each capped at 255, then recomputes its modifiers.
+    pub fn npc_level_boost(&mut self, seg: u16, rec: u16) {
+        let level = self.mem.r8(seg, rec.wrapping_add(LEVEL)) as u16;
+        let add = to256(level.wrapping_add(11) as i16) as u16;
+        for i in 0..8 {
+            let v = (self.mem.r8(seg, rec.wrapping_add(ATTRS + i)) as u16).wrapping_add(add);
+            self.mem.w8(seg, rec.wrapping_add(ATTRS + i), v.min(0xFF) as u8);
+        }
+        self.attribute_modifiers_at(seg, rec);
+    }
+
+    /// 1194:8CDF. A Sorcerer (class byte exactly 23h) starts with half
+    /// its maximum spell points.
+    pub fn npc_sorcerer_spell_points(&mut self, seg: u16, rec: u16) {
+        if self.mem.r8(seg, rec.wrapping_add(CLASS)) == 0x23 {
+            let v = self.mem.r16(seg, rec.wrapping_add(MAX_SPELL_POINTS)) >> 1;
+            self.mem.w16(seg, rec.wrapping_add(SPELL_POINTS), v);
+        }
+    }
+
+    /// 24FA:004D for a record in any segment (`Machine::roll_creature_gold`
+    /// handles DGROUP records): gold carried, by class byte (80h set / 20h
+    /// set / other) a d100 against DGROUP 4F0D, then 1..=50.
+    pub fn creature_gold_at(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let class = self.mem.r8(seg, rec.wrapping_add(CLASS));
+        let kind = if class & 0x80 != 0 {
+            0
+        } else if class & 0x20 != 0 {
+            2
+        } else {
+            1
+        };
+        let chance = self.mem.r8(DS, 0x4F0D + kind) as u16;
+        let gold = if self.d100() > chance { 0 } else { self.rng.range(1, 0x33)? };
+        self.mem.w16(seg, rec.wrapping_add(CREATURE_GOLD), gold);
+        Some(())
+    }
+}

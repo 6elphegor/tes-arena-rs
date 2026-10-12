@@ -46,6 +46,22 @@ fn run(m: &mut Machine, name: &str, regs: &HashMap<String, u32>) -> Option<HashM
         "npc_xp_value" => m.npc_xp_value(reg("es"), reg("di")),
         "derive_record_stats" => m.derive_record_stats(reg("ds"), reg("si"))?,
         "create_monster" => m.create_monster(reg("ax"), reg("di"))?,
+        "alloc_creature_slot" => {
+            let (si, di, cf) = match m.alloc_creature_slot() {
+                Ok((rec, entry)) => (rec, entry, 0),
+                Err(si) => (si, reg("di"), 1),
+            };
+            out.insert("si", si);
+            out.insert("di", di);
+            out.insert("cf", cf);
+        }
+        "usable_creature_slots" => drop(out.insert("ax", m.usable_creature_slots())),
+        "spawn_monsters" => m.spawn_monsters(reg("ax"), reg("cx"))?,
+        "npc_level_boost" => m.npc_level_boost(reg("es"), reg("si")),
+        "npc_sorcerer_spell_points" => m.npc_sorcerer_spell_points(reg("ds"), reg("si")),
+        "creature_gold_at" => m.creature_gold_at(reg("ds"), reg("si"))?,
+        // CF set means no loot flag was set.
+        "loot_corpse" => drop(out.insert("cf", !m.loot_corpse(reg("ds"), reg("si"))? as u16)),
         _ => panic!("unknown routine {name}"),
     }
     Some(out)
@@ -108,5 +124,5 @@ fn matches_original() {
         *count.entry(name.to_string()).or_default() += 1;
     }
     eprintln!("{count:?}");
-    assert_eq!(count.len(), 9);
+    assert_eq!(count.len(), 16);
 }
