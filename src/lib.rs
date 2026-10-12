@@ -5,6 +5,7 @@ pub mod character;
 pub mod combat;
 pub mod dice;
 pub mod exe;
+pub mod inventory;
 pub mod loot;
 pub mod machine;
 pub mod mem;
