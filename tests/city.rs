@@ -50,6 +50,25 @@ fn matches_original() {
                 blocks = Some(b);
                 "ok".into()
             }),
+            "local_to_global" => m
+                .city_local_to_global(regs["ax"] as u16, regs["bx"] as u16)
+                .map(|(x, y)| format!("ax:{x:x} bx:{y:x}")),
+            "quadrant" => {
+                let q = m.city_quadrant(regs["ax"] as u16, regs["bx"] as u16, regs["cx"] as u8);
+                Some(format!("ax:{q:x}"))
+            }
+            "map_y" => m.city_map_y(regs["ax"] as u16, regs["bx"] as u16).map(|(x, y)| format!("ax:{x:x} bx:{y:x}")),
+            "template" => {
+                let t = m.city_template(regs["ax"] as u8);
+                Some(format!("ax:{:x} si:{:x} dx:{:x} bx:{:x} cx:{:x}", t.starts, t.format, t.flag, t.kind, t.count))
+            }
+            "reserve_blocks" => {
+                m.city_reserve_blocks(regs["ax"] as u16);
+                Some("ok".into())
+            }
+            "build_location" => m
+                .city_build_location(DS, regs["di"] as u16, regs["ax"] as u16, regs["climate"] as u8)
+                .map(|_| "ok".into()),
             _ => panic!("unknown routine {name}"),
         };
 
@@ -77,7 +96,18 @@ fn matches_original() {
         *count.entry(format!("{name}:{result}")).or_default() += 1;
     }
     eprintln!("{count:?}");
-    for n in ["place_block", "city_plan", "block_name", "generate_city"] {
+    for n in [
+        "place_block",
+        "city_plan",
+        "block_name",
+        "generate_city",
+        "local_to_global",
+        "quadrant",
+        "map_y",
+        "template",
+        "reserve_blocks",
+        "build_location",
+    ] {
         assert!(count.keys().any(|k| k.starts_with(n)), "no cases for {n}");
     }
 }

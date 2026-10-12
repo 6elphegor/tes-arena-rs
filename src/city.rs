@@ -18,8 +18,9 @@ use crate::mem::DS;
 
 /// DGROUP variables.
 pub mod var {
-    /// Location type; 8 skips generation (no random layout).
-    pub const LOCATION_TYPE: u16 = 0x0A46;
+    /// Province of the current location (record +24). Province 8, the
+    /// Imperial Province, has a fixed city and skips generation.
+    pub const PROVINCE: u16 = 0x0A46;
     /// City grid dimension (blocks per side).
     pub const DIM: u16 = 0x0A43;
     /// Map offset of the first block, copied to `WRITE_POS`.
@@ -152,7 +153,7 @@ impl Machine {
         self.mem.w16(DS, 0xC398, f);
         let saved = self.rng.seed;
         let mut out = Vec::new();
-        if self.mem.r8(DS, LOCATION_TYPE) != 8 {
+        if self.mem.r8(DS, PROVINCE) != 8 {
             self.rng.seed = (self.mem.r16(DS, X) as u32) << 16 | self.mem.r16(DS, Y) as u32;
             let dim = self.mem.r8(DS, DIM) as u16;
             self.mem.w16(DS, WORK_DIM, dim);
@@ -189,5 +190,245 @@ impl Machine {
         }
         self.rng.seed = saved;
         Some(out)
+    }
+}
+
+/// Location records (0x38 bytes; the current one is DGROUP 0A22) and
+/// the province data they come from (1194:3B84 and helpers).
+///
+/// The save's per-province `citydata` block is loaded at DGROUP 1429:
+/// 20-byte name, bounds words at 143D (x offset), 143F (y offset), 1441
+/// (width), 1443 (height), then 25-byte location entries from 1445 (a
+/// 20-byte name, x and y words, a flags byte). Location ids are
+/// province * 32 + local index; 0x100 means the Imperial City.
+pub mod record {
+    pub const NAME: u16 = 0x00;
+    /// Template file name, e.g. "city3.mif".
+    pub const TEMPLATE: u16 = 0x14;
+    /// Blocks per side: 6 - KIND.
+    pub const DIM: u16 = 0x21;
+    /// Map offset of the first block.
+    pub const START_POS: u16 = 0x22;
+    pub const PROVINCE: u16 = 0x24;
+    /// 0 city-state, 1 town, 2 village.
+    pub const KIND: u16 = 0x25;
+    pub const X: u16 = 0x26;
+    pub const Y: u16 = 0x28;
+    pub const ID: u16 = 0x2A;
+    /// Location entry flags; the high nibble scales the world position.
+    pub const FLAGS: u16 = 0x2B;
+    /// Map row from `city_map_y`.
+    pub const MAP_Y: u16 = 0x2C;
+    /// Byte read from a map file by 1194:3D91 (climate).
+    pub const CLIMATE: u16 = 0x2E;
+    /// Quadrant of the province map plus province * 4.
+    pub const QUADRANT: u16 = 0x2F;
+    /// World position, scaled by the flags.
+    pub const WORLD_X: u16 = 0x30;
+    pub const WORLD_Y: u16 = 0x32;
+    /// World y * province (16-bit) and (world x & 0xFF) * province.
+    pub const W34: u16 = 0x34;
+    pub const W36: u16 = 0x36;
+}
+
+/// Province data in DGROUP.
+const PROV_BOUNDS: u16 = 0x143D;
+const PROV_LOCATIONS: u16 = 0x1445;
+const LOCATION_SIZE: u16 = 25;
+/// Scales computed by `city_local_to_global`.
+const SCALE_X: u16 = 0x3FFC;
+const SCALE_Y: u16 = 0x3FFE;
+/// Location ids that use the plain templates (58 bytes); all others use
+/// the "w" variants.
+const PLAIN_IDS: u16 = 0x47E2;
+/// Reserved block lists: NUL-terminated byte strings of plan indices.
+const RESERVED_LISTS: u16 = 0x48C8;
+const IMPERIAL_MIF: u16 = 0x48BB;
+
+/// Result of 1194:3D05: which family of city templates a location uses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Template {
+    /// DGROUP list of (x, y) start positions, one pair per variant (AX).
+    pub starts: u16,
+    /// DGROUP printf format of the file name (SI).
+    pub format: u16,
+    /// 0 when the id is in the plain-template list (DX).
+    pub flag: u16,
+    /// 0 city-state, 1 town, 2 village (BX).
+    pub kind: u16,
+    /// Number of variants (CX).
+    pub count: u16,
+}
+
+/// End of the decimal conversion buffer used by 0000:7028.
+const UTOA_END: u16 = 0xA933;
+
+impl Machine {
+    /// 0000:7028, as the game's sprintf uses it for %d: writes the
+    /// decimal digits of `v` backwards into DGROUP, ending at A933, and
+    /// returns them in order.
+    fn city_utoa(&mut self, mut v: u16) -> Vec<u8> {
+        let mut p = UTOA_END;
+        loop {
+            self.mem.w8(DS, p, b'0' + (v % 10) as u8);
+            p = p.wrapping_sub(1);
+            v /= 10;
+            if v == 0 {
+                break;
+            }
+        }
+        (p.wrapping_add(1)..=UTOA_END).map(|o| self.mem.r8(DS, o)).collect()
+    }
+
+    /// 1194:3183 without the province load (1194:2E18) it starts with.
+    /// Converts a location's province-map position to world coordinates
+    /// from the province bounds; stores the scales at 3FFC/3FFE. None
+    /// where a quotient overflows 16 bits (divide error).
+    pub fn city_local_to_global(&mut self, x: u16, y: u16) -> Option<(u16, u16)> {
+        let div = |n: u32, d: u32| u16::try_from(n / d).ok();
+        let sx = div(self.mem.r16(DS, PROV_BOUNDS + 4) as u32 * 100, 320)?;
+        self.mem.w16(DS, SCALE_X, sx);
+        let sy = div(self.mem.r16(DS, PROV_BOUNDS + 6) as u32 * 100, 200)?;
+        self.mem.w16(DS, SCALE_Y, sy);
+        let gy = div(y as u32 * sy as u32, 100)?.wrapping_add(self.mem.r16(DS, PROV_BOUNDS + 2));
+        let gx = div(x as u32 * sx as u32, 100)?.wrapping_add(self.mem.r16(DS, PROV_BOUNDS));
+        Some((gx, gy))
+    }
+
+    /// 1194:3E7C. (x >= 160) + 2 * (y >= 100), compared signed, plus
+    /// `province` * 4; the low byte.
+    pub fn city_quadrant(&self, x: u16, y: u16, province: u8) -> u8 {
+        let q = (x as i16 >= 0xA0) as u16 + 2 * ((y as i16) >= 0x64) as u16 + ((province as u16) << 2);
+        q as u8
+    }
+
+    /// 1194:3E9E. World position, with y turned into a map row:
+    /// (0x200 - (y - 100)) & 0x1FF. Returns (AX, BX).
+    pub fn city_map_y(&mut self, x: u16, y: u16) -> Option<(u16, u16)> {
+        let (gx, gy) = self.city_local_to_global(x, y)?;
+        Some((gx, gy.wrapping_sub(100).wrapping_neg().wrapping_add(0x200) & 0x1FF))
+    }
+
+    /// 1194:3D05. Template family for location `id` (its low byte).
+    pub fn city_template(&self, id: u8) -> Template {
+        if self.mem.r8(DS, PROVINCE) == 8 {
+            return Template { starts: 0, format: IMPERIAL_MIF, flag: 0, kind: 0, count: 1 };
+        }
+        let listed = (0..0x3A).any(|i| self.mem.r8(DS, PLAIN_IDS + i) == id);
+        let flag = !listed as u16;
+        let local = id & 0x1F;
+        let kind = if local < 8 { 0 } else if local < 16 { 1 } else { 2 };
+        let (count, format, starts) = match (kind, listed) {
+            (0, false) => (5, 0x484F, 0x48AB),
+            (0, true) => (3, 0x485A, 0x48B5),
+            (1, false) => (5, 0x481C, 0x488F),
+            (1, true) => (2, 0x4827, 0x4899),
+            (_, false) => (5, 0x4833, 0x489D),
+            (_, true) => (2, 0x4841, 0x48A7),
+        };
+        Template { starts, format, flag, kind, count }
+    }
+
+    /// 1194:3CD3. Clears the first 36 plan bytes, then adds 1 to every
+    /// plan index in reserved list `n` (n strings into the lists).
+    pub fn city_reserve_blocks(&mut self, n: u16) {
+        for i in 0..0x24 {
+            self.mem.w8(DS, PLAN + i, 0);
+        }
+        let mut p = self.skip_strings(DS, RESERVED_LISTS, n);
+        loop {
+            let b = self.mem.r8(DS, p);
+            p = p.wrapping_add(1);
+            if b == 0 {
+                break;
+            }
+            let c = PLAN.wrapping_add(b as u16);
+            self.mem.w8(DS, c, self.mem.r8(DS, c).wrapping_add(1));
+        }
+    }
+
+    /// 1194:3B84. Fills the location record at seg:rec for location `id`
+    /// (0x100 for the Imperial City) from the loaded province data. The
+    /// province load (1194:2E18) is assumed done, and the climate byte
+    /// that 1194:3D91 reads from a map file is passed in. Reserved blocks
+    /// are set up only when DGROUP 0A46 (the current record's province)
+    /// is not 8. None where the original faults.
+    pub fn city_build_location(&mut self, seg: u16, rec: u16, id: u16, climate: u8) -> Option<()> {
+        use record::*;
+        let w8 = |m: &mut Self, f: u16, v: u8| m.mem.w8(seg, rec.wrapping_add(f), v);
+        let w16 = |m: &mut Self, f: u16, v: u16| m.mem.w16(seg, rec.wrapping_add(f), v);
+        let r8 = |m: &Self, f: u16| m.mem.r8(seg, rec.wrapping_add(f));
+        let r16 = |m: &Self, f: u16| m.mem.r16(seg, rec.wrapping_add(f));
+
+        let al = if id == 0x100 {
+            w8(self, ID, 0);
+            w8(self, PROVINCE, 8);
+            0
+        } else {
+            w8(self, ID, id as u8);
+            w8(self, PROVINCE, (id as u8) >> 5);
+            id as u8
+        };
+        let t = self.city_template(al);
+        w8(self, KIND, t.kind as u8);
+        let v = if r8(self, PROVINCE) != 8 { r8(self, ID) as u16 } else { 0x100 };
+        let variant = v % t.count;
+        let list = variant + if t.flag == 0 { 5 } else { 0 };
+        if self.mem.r8(DS, var::PROVINCE) != 8 {
+            self.city_reserve_blocks(list);
+        }
+        // sprintf(rec + TEMPLATE, format, variant + 1); formats hold one %d.
+        let fmt = self.mem.cstr(DS, t.format).to_vec();
+        let mut name = Vec::new();
+        let mut i = 0;
+        while i < fmt.len() {
+            if fmt[i] == b'%' && fmt.get(i + 1) == Some(&b'd') {
+                let digits = self.city_utoa(variant + 1);
+                name.extend_from_slice(&digits);
+                i += 2;
+            } else {
+                name.push(fmt[i]);
+                i += 1;
+            }
+        }
+        name.push(0);
+        for (k, &c) in name.iter().enumerate() {
+            w8(self, TEMPLATE + k as u16, c);
+        }
+        let p = t.starts.wrapping_add(variant * 2);
+        let start = ((self.mem.r8(DS, p) as u16) << 1).wrapping_add((self.mem.r8(DS, p.wrapping_add(1)) as u16) << 8);
+        w16(self, START_POS, start);
+
+        let entry = PROV_LOCATIONS.wrapping_add((r8(self, ID) & 0x1F) as u16 * LOCATION_SIZE);
+        w16(self, X, self.mem.r16(DS, entry.wrapping_add(0x14)));
+        w16(self, Y, self.mem.r16(DS, entry.wrapping_add(0x16)));
+        w8(self, FLAGS, self.mem.r8(DS, entry.wrapping_add(0x18)));
+        // strcpy(rec, entry name)
+        let mut k = 0u16;
+        loop {
+            let c = self.mem.r8(DS, entry.wrapping_add(k));
+            self.mem.w8(seg, rec.wrapping_add(k), c);
+            k = k.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+        }
+        w8(self, DIM, 6u8.wrapping_sub(r8(self, KIND)));
+        let (x, y, prov) = (r16(self, X), r16(self, Y), r8(self, PROVINCE));
+        let q = self.city_quadrant(x, y, prov);
+        w8(self, QUADRANT, q);
+        w8(self, CLIMATE, climate);
+        let (_, row) = self.city_map_y(x, y)?;
+        w16(self, MAP_Y, row);
+        let (gx, gy) = self.city_local_to_global(x, y)?;
+        // SHL by 2 * (flags >> 4); 16-bit shifts of 16 or more give 0.
+        let sh = (r8(self, FLAGS) >> 4) as u32 * 2;
+        let shl = |v: u16| if sh >= 16 { 0 } else { v << sh };
+        w16(self, WORLD_X, shl(gx));
+        w16(self, WORLD_Y, shl(gy));
+        let prov = r8(self, PROVINCE);
+        w16(self, W34, gy.wrapping_mul(prov as u16));
+        w16(self, W36, (gx as u8 as u16) * prov as u16);
+        Some(())
     }
 }
