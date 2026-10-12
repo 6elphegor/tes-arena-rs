@@ -22,12 +22,12 @@ fn run(m: &mut Machine, name: &str, regs: &HashMap<String, u32>) -> HashMap<&'st
     let reg = |r: &str| regs.get(r).copied().unwrap_or(0) as u16;
     let mut out = HashMap::new();
     match name {
-        "loot_weapon" => m.loot_weapon(reg("ax") as u8, reg("bx") as u8),
+        "loot_weapon" => m.loot_weapon(reg("ax") as u8, reg("bx") as u8).expect("original returned"),
         "loot_armor" => m.loot_armor(reg("ax") as u8, reg("bx") as u8),
-        "loot_magic_weapon" => m.loot_magic_weapon(reg("ax") as u8, reg("bx")),
-        "loot_magic_armor" => m.loot_magic_armor(reg("ax") as u8, reg("bx")),
+        "loot_magic_weapon" => m.loot_magic_weapon(reg("ax") as u8, reg("bx")).expect("original returned"),
+        "loot_magic_armor" => m.loot_magic_armor(reg("ax") as u8, reg("bx")).expect("original returned"),
         "roll_material" => m.roll_material(),
-        "roll_enchantment" => m.roll_enchantment(reg("cf") & 1 != 0),
+        "roll_enchantment" => m.roll_enchantment(reg("cf") & 1 != 0).expect("original returned"),
         "set_condition" => m.set_condition(reg("ax")),
         "finish_weapon" => m.finish_weapon(),
         "finish_armor" => m.finish_armor(),
@@ -80,4 +80,28 @@ fn matches_original() {
     }
     eprintln!("{count:?}");
     assert_eq!(count.len(), 14);
+}
+
+/// Where the original loops forever the port returns None.
+#[test]
+fn reports_hangs() {
+    use arena::loot::{LEVEL, TEMPLATE, template};
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    // The image's seed is 0, a fixed point of the LCG (the game seeds it
+    // at startup); with it every reroll would repeat forever.
+    m.rng = arena::random::ArenaRandom::new(0x1994_0325);
+    m.mem.w8(DS, TEMPLATE + template::WEAPON, 1);
+    // Weapon enchantments need item level 7 or more (min levels at 23E9).
+    let lowest = (0..14).map(|e| m.mem.r8(DS, 0x23E9 + e)).min().unwrap();
+    assert!(lowest > 0);
+    m.mem.w8(DS, LEVEL, lowest - 1);
+    assert_eq!(m.clone().roll_enchantment(false), None);
+    m.mem.w8(DS, LEVEL, lowest);
+    assert_eq!(m.clone().roll_enchantment(false), Some(()));
+    // The forced type is retried unchanged; one above level 20 never fits.
+    let w_min = |m: &Machine, ty: u16| m.mem.r8(DS, 0x22E6 + ty);
+    if let Some(ty) = (0..18).find(|&ty| w_min(&m, ty) > 20) {
+        assert_eq!(m.clone().loot_weapon(0, ty as u8), None);
+    }
 }

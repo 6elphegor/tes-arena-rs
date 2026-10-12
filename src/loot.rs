@@ -64,7 +64,7 @@ use item as it;
 use template as t;
 
 /// DGROUP variables.
-const LEVEL: u16 = 0x13CC;
+pub const LEVEL: u16 = 0x13CC;
 const FORCED_TYPE: u16 = 0x86B0;
 const FORCED_ARMOR_KIND: u16 = 0x101E;
 const BASE_PRICE: u16 = 0x1391;
@@ -141,6 +141,13 @@ impl Machine {
     fn rand(&mut self, lo: u16, hi: u16) -> u16 {
         self.rng.range(lo, hi).expect("nonzero span")
     }
+    /// Whether a reroll loop over `0..n` can ever stop: some entry of the
+    /// min-level `table` is at or below the item level. The original loops
+    /// forever when none is; the port returns None instead.
+    fn any_allowed(&self, table: u16, n: u16) -> bool {
+        (0..n).any(|i| self.b(table.wrapping_add(i)) <= self.b(LEVEL))
+    }
+
     /// Number of leading `steps` entries that `v` reaches.
     fn steps(&self, table: u16, n: u16, v: u8) -> u16 {
         (0..n).take_while(|&i| v >= self.b(table + i)).count() as u16
@@ -179,8 +186,9 @@ impl Machine {
     }
 
     /// 1194:EE1D. Rolls an enchantment the item level allows. Without
-    /// `keep_material` the item is marked as having none.
-    pub fn roll_enchantment(&mut self, keep_material: bool) {
+    /// `keep_material` the item is marked as having none. None where the
+    /// original hangs: no enchantment is allowed at this level (below 7).
+    pub fn roll_enchantment(&mut self, keep_material: bool) -> Option<()> {
         if !keep_material {
             self.set_tb(t::MATERIAL, 0xFF);
             self.add_key(0x14);
@@ -191,6 +199,9 @@ impl Machine {
         } else {
             (A_ENCH_MIN_LEVEL, A_ENCH_PRICE, A_ENCH_SPELL)
         };
+        if !self.any_allowed(min_level, 14) {
+            return None;
+        }
         let e = loop {
             let e = self.rand(0, 14);
             if self.b(min_level + e) <= self.b(LEVEL) {
@@ -208,25 +219,28 @@ impl Machine {
                 self.set_tb(t::ENCHANT_SPELL, 0xFF);
             }
         }
+        Some(())
     }
 
     /// 1194:EC67..EC84 (and ED43..ED60): d10 against 22F8 picks material
     /// only, enchantment only, or both (handler table at 86B1).
-    fn roll_quality(&mut self) {
+    fn roll_quality(&mut self) -> Option<()> {
         let r = self.rand(1, 11) as u8;
         match self.steps(QUALITY_STEPS, 2, r) {
             0 => self.roll_material(),
-            1 => self.roll_enchantment(false),
+            1 => self.roll_enchantment(false)?,
             _ => {
                 // 1194:EEC3
                 self.roll_material();
-                self.roll_enchantment(true);
+                self.roll_enchantment(true)?;
             }
         }
+        Some(())
     }
 
     /// 1194:EC02, loot mode only. `forced` is a weapon type or 0xFFFF.
-    pub fn magic_weapon_template(&mut self, forced: u16) {
+    /// None where the original hangs (no type or enchantment allowed).
+    pub fn magic_weapon_template(&mut self, forced: u16) -> Option<()> {
         assert_eq!(self.b(LOOT_MODE), 1, "shop path not ported");
         let saved = self.mem.r16(DS, RETRIES);
         self.mem.w16(DS, RETRIES, 0);
@@ -236,6 +250,9 @@ impl Machine {
         let mut forced_try = forced != 0xFFFF;
         loop {
             if !forced_try {
+                if !self.any_allowed(W_MIN_LEVEL, 18) {
+                    return None;
+                }
                 self.setb(DEDUP_KEY, 10);
                 ty = self.rand(0, 18);
             }
@@ -251,14 +268,16 @@ impl Machine {
         let price = self.b(W_PRICE.wrapping_add(ty)) as u32;
         self.mem.w32(DS, TEMPLATE + t::PRICE, price);
         self.mem.w32(DS, BASE_PRICE, price);
-        self.roll_quality();
+        self.roll_quality()?;
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
         self.mem.w32(DS, BASE_PRICE, p);
         self.mem.w16(DS, RETRIES, saved);
+        Some(())
     }
 
     /// 1194:ECED, loot mode only. `forced` is an armour type or 0xFFFF.
-    pub fn magic_armor_template(&mut self, forced: u16) {
+    /// None where the original hangs (no type or enchantment allowed).
+    pub fn magic_armor_template(&mut self, forced: u16) -> Option<()> {
         assert_eq!(self.b(LOOT_MODE), 1, "shop path not ported");
         self.clear_template();
         self.set_tb(t::WEAPON, 0);
@@ -266,6 +285,9 @@ impl Machine {
         let mut forced_try = forced != 0xFFFF;
         loop {
             if !forced_try {
+                if !self.any_allowed(A_MIN_LEVEL, 11) {
+                    return None;
+                }
                 ty = self.rand(0, 11);
             }
             forced_try = false;
@@ -279,9 +301,10 @@ impl Machine {
         let price = self.b(A_PLATE_PRICE.wrapping_add(ty)) as u32;
         self.mem.w32(DS, TEMPLATE + t::PRICE, price);
         self.set_tb(t::MAGIC, 1);
-        self.roll_quality();
+        self.roll_quality()?;
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
         self.mem.w32(DS, BASE_PRICE, p);
+        Some(())
     }
 
     /// 1194:F312. Health from a condition code: 0x80 -> 50, 0x40 -> 25,
@@ -476,13 +499,16 @@ impl Machine {
 
     /// 1194:E8B2. Plain weapon of the given level; `forced` is a type or
     /// 0xFF (forcing raises the level to 20).
-    pub fn loot_weapon(&mut self, level: u8, forced: u8) {
+    pub fn loot_weapon(&mut self, level: u8, forced: u8) -> Option<()> {
         self.setb(FORCED_TYPE, forced);
         self.setb(LEVEL, level);
         self.clear_item();
         self.clear_template();
         loop {
             let ty = if self.b(FORCED_TYPE) == 0xFF {
+                if !self.any_allowed(W_MIN_LEVEL, 18) {
+                    return None;
+                }
                 self.rand(0, 18)
             } else {
                 self.setb(LEVEL, 0x14);
@@ -496,39 +522,46 @@ impl Machine {
                 self.mem.w32(DS, BASE_PRICE, p);
                 break;
             }
+            if self.b(FORCED_TYPE) != 0xFF {
+                // The forced type is retried unchanged: the original hangs.
+                return None;
+            }
         }
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
         self.mem.w32(DS, BASE_PRICE, p);
         self.setb(ARMOR_PASS, 1);
         self.finish_weapon();
+        Some(())
     }
 
     /// 1194:E922. Magic weapon; `forced` is a type or 0xFFFF (forcing
     /// raises the level to 20).
-    pub fn loot_magic_weapon(&mut self, level: u8, forced: u16) {
+    pub fn loot_magic_weapon(&mut self, level: u8, forced: u16) -> Option<()> {
         self.setb(LEVEL, level);
         self.clear_item();
         self.setb(LOOT_MODE, 1);
         if forced != 0xFFFF {
             self.setb(LEVEL, 0x14);
         }
-        self.magic_weapon_template(forced);
+        self.magic_weapon_template(forced)?;
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
         self.mem.w32(DS, BASE_PRICE, p);
         self.finish_weapon();
         self.setb(LOOT_MODE, 0);
+        Some(())
     }
 
     /// 1194:E94E. Magic armour; `forced` is a type or 0xFFFF.
-    pub fn loot_magic_armor(&mut self, level: u8, forced: u16) {
+    pub fn loot_magic_armor(&mut self, level: u8, forced: u16) -> Option<()> {
         self.setb(LEVEL, level);
         self.clear_item();
         self.setb(LOOT_MODE, 1);
-        self.magic_armor_template(forced);
+        self.magic_armor_template(forced)?;
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
         self.mem.w32(DS, BASE_PRICE, p);
         self.finish_armor();
         self.setb(LOOT_MODE, 0);
+        Some(())
     }
 
     /// 24FA:0300. 1..=100.
