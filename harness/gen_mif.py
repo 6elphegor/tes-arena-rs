@@ -228,6 +228,53 @@ for _ in range(90):
     out.write(f'copy | {kind[1]} {pos:x} {seed:x} | {plane_digests()}\n')
 
 
+# --- wall post-pass (1194:05A9) ---------------------------------------------
+
+def wall_words(seed):
+    """0x4000 wall-plane words from the copy LCG (mirrored in tests/mif.rs),
+    biased to the 8xxx and 9x34/9x35 words the pass rewrites."""
+    words, x = [], seed
+    for _ in range(0x4000):
+        x = (x * 1103515245 + 12345) & 0xffffffff
+        t, v = (x >> 16) & 7, (x >> 4) & 0xffff
+        if t < 2:
+            words.append(0x8000 | (v & 0x0f00) | (v & 0x1f))
+        elif t < 4:
+            words.append(0x9000 | (v & 0x0f00) | (0x34 + (v & 1)))
+        elif t < 5:
+            words.append(0x9000 | (v & 0x0fff))
+        else:
+            words.append(v)
+    return words
+
+
+# `a` has 05A9 stubbed for the city runs (and unicorn caches translated
+# code, so it can't be unpatched), so the pass runs on its own machine.
+wa = DosArena(EXE, GAME)
+for var, seg in ((0xCCD0, FLOOR_SEG), (0xD806, MAP1_SEG), (0xD748, MAP2_SEG), (0x9030, DECODE_SEG)):
+    wa.w16(var, seg)
+WALL_BASE = wa.snapshot()
+for _ in range(40):
+    wa.restore(WALL_BASE)
+    for s in PLANES:
+        wa.mu.mem_write(s * 16, PLANE_FILL)
+    seed = rng.getrandbits(32)
+    wa.mu.mem_write(MAP1_SEG * 16, struct.pack('<16384H', *wall_words(seed)))
+    variant = rng.choice([2, 0x82, 0, 1, 3])
+    w = rng.choice([0, 1, 2, 64, 128, rng.randint(1, 300)])
+    h = rng.choice([0, 1, 64, 128, rng.randint(1, 300)])
+    types = [rng.randint(0, 0x1f) for _ in range(5)]
+    # 05A9 reads these with DS = the wall plane, so they go there.
+    wa.mu.mem_write(wa.lin(MAP1_SEG, 0xBB09), bytes([variant]))
+    wa.w16(0xC357, w)
+    wa.w16(0xC359, h)
+    for o, t in zip((0xC945, 0xC946, 0xC947, 0xC948, 0xC951), types):
+        wa.mu.mem_write(wa.lin(MAP1_SEG, o), bytes([t]))
+    wa.call_near(0x1194, 0x05A9)
+    digests = ' '.join(f'{fnv(wa.seg_bytes(s)):x}' for s in PLANES)
+    out.write(f'wall | {seed:x} {variant:x} {w:x} {h:x} {" ".join(f"{t:x}" for t in types)} | {digests}\n')
+
+
 # --- block loads --------------------------------------------------------------
 
 blocks = [n for n in mifs if len(n) >= 6 and n[2:4].upper() == b'BD']

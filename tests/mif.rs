@@ -100,6 +100,24 @@ fn copy_words(seed: u32) -> Vec<u16> {
         .collect()
 }
 
+/// The wall plane for the wall-pass tests (same LCG and bias as the
+/// generator).
+fn wall_words(seed: u32) -> Vec<u16> {
+    let mut x = seed;
+    (0..0x4000)
+        .map(|_| {
+            x = x.wrapping_mul(1103515245).wrapping_add(12345);
+            let (t, v) = ((x >> 16) & 7, (x >> 4) as u16);
+            match t {
+                0 | 1 => 0x8000 | (v & 0x0F00) | (v & 0x1F),
+                2 | 3 => 0x9000 | (v & 0x0F00) | (0x34 + (v & 1)),
+                4 => 0x9000 | (v & 0x0FFF),
+                _ => v,
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn matches_original() {
     let Some(img) = common::image() else { return };
@@ -195,6 +213,20 @@ fn matches_original() {
                 }
                 assert_eq!(f[2], plane_digests(&m), "{line}");
             }
+            "wall" => {
+                let p: Vec<u64> = f[1].split(' ').map(hex).collect();
+                for (i, w) in wall_words(p[0] as u32).iter().enumerate() {
+                    m.mem.w16(PLANES[1], 2 * i as u16, *w);
+                }
+                m.mem.w8(PLANES[1], 0xBB09, p[1] as u8);
+                m.mem.w16(DS, 0xC357, p[2] as u16);
+                m.mem.w16(DS, 0xC359, p[3] as u16);
+                for (o, t) in [0xC945, 0xC946, 0xC947, 0xC948, 0xC951].iter().zip(&p[4..9]) {
+                    m.mem.w8(PLANES[1], *o, *t as u8);
+                }
+                m.mif_wall_pass();
+                assert_eq!(f[2], plane_digests(&m), "{line}");
+            }
             "block" => {
                 let (name, pos) = f[1].split_once(' ').unwrap();
                 m.mem.w16(DS, 0xA888, hex(pos) as u16);
@@ -228,5 +260,5 @@ fn matches_original() {
         *counts.entry(f[0]).or_default() += 1;
     }
     eprintln!("{counts:?}");
-    assert_eq!(counts.len(), 7);
+    assert_eq!(counts.len(), 8);
 }

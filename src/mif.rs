@@ -352,6 +352,65 @@ impl Machine {
         self.mif_copy(MAP2_SEG, |w| w);
     }
 
+    /// 1194:05A9. Pass over the whole wall plane (0x4000 words) that
+    /// 1194:0292 runs after loading the city template and before the
+    /// blocks. Words 8xxx are cleared when BB09 is 2 or 0x82 and their
+    /// low byte is one of the five type bytes at C945..C948, C951. These
+    /// look like DGROUP variables but are read with DS set to the wall
+    /// plane, so they come from the plane's segment, 0x3B09 and more
+    /// bytes past the end of its 32 KB.
+    /// Words 9x34 and 9x35 become A534/A535 with flags by position, the
+    /// row width and height being DGROUP C357/C359; the position tested
+    /// is the offset just past the word:
+    /// - first row (offset <= 2 * width): bit 0 flipped, | 0x80;
+    /// - last row (offset >= 2 * width * height - 2 * width, 16-bit): | 0;
+    /// - left column ((offset - 2) % width == 0, a byte offset taken
+    ///   modulo the width in words): | 0x40;
+    /// - anywhere else: bit 0 flipped (the original skips the flip for
+    ///   0x33, which these never are), | 0xC0.
+    ///
+    /// A width of 0 never reaches the division: every offset then counts
+    /// as the last row.
+    pub fn mif_wall_pass(&mut self) {
+        let seg = self.mem.r16(DS, MAP1_SEG);
+        let width = self.mem.r16(DS, MAP_WIDTH);
+        let height = self.mem.r16(DS, MAP_HEIGHT);
+        let mut si = 0u16;
+        for _ in 0..0x4000 {
+            let w = self.mem.r16(seg, si);
+            si = si.wrapping_add(2);
+            if (w as i16) >= 0 {
+                continue;
+            }
+            let low = w as u8;
+            match w >> 12 {
+                8 => {
+                    // DS is the wall plane here: these DGROUP offsets are
+                    // read from the plane's segment instead.
+                    let variant = self.mem.r8(seg, WALL_VARIANT);
+                    if (variant == 0x82 || variant == 2) && CLEARED_TYPES.iter().any(|&o| self.mem.r8(seg, o) == low) {
+                        self.mem.w16(seg, si.wrapping_sub(2), 0);
+                    }
+                }
+                9 if (0x34..=0x35).contains(&low) => {
+                    let base = (w & 0x3F) | 0xA500;
+                    let last = width.wrapping_add(width).wrapping_mul(height).wrapping_sub(width).wrapping_sub(width);
+                    let flags = if si <= width.wrapping_add(width) {
+                        (base ^ 1) | 0x80
+                    } else if si >= last {
+                        base
+                    } else if si.wrapping_sub(2) % width == 0 {
+                        base | 0x40
+                    } else {
+                        (base ^ 1) | 0xC0
+                    };
+                    self.mem.w16(seg, si.wrapping_sub(2), flags);
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// 1194:0488. Reads the chunk into a fresh (zeroed) buffer and
     /// decompresses it to the buffer segment, offset 0.
     fn mif_read_chunk(&mut self, files: &mut Files) {
@@ -430,6 +489,15 @@ impl Machine {
         Some(())
     }
 }
+
+/// Wall pass inputs: map width and height in words (DGROUP, through ES),
+/// a byte that enables clearing (2 or 0x82; its meaning is not
+/// established) and the bytes listing which 8xxx walls it clears (both
+/// at these offsets in the wall plane's segment; see `mif_wall_pass`).
+const MAP_WIDTH: u16 = 0xC357;
+const MAP_HEIGHT: u16 = 0xC359;
+const WALL_VARIANT: u16 = 0xBB09;
+const CLEARED_TYPES: [u16; 5] = [0xC945, 0xC946, 0xC947, 0xC948, 0xC951];
 
 /// Where `mif_read_chunk` stages a chunk (the original's heap block).
 pub const CHUNK_SCRATCH: u16 = 0x5C00;
