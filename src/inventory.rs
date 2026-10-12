@@ -771,6 +771,7 @@ impl Machine {
     /// spell suffix chosen by `ah` (0, 1 or other), 1 a bracelet-like
     /// name with an attribute suffix, 2 a material (`bx` + 3) and the
     /// bracelet-like name; `cl` is the type and `suffix` the suffix.
+    #[allow(clippy::too_many_arguments)]
     fn item_name_format(&mut self, seg: u16, dl: u8, al: u8, ah: u8, bx: u16, cl: u8, suffix: u8) -> Option<()> {
         let mut di = NAME_BUF;
         let copy = |m: &mut Self, list: u16, n: u16, di: &mut u16| {
