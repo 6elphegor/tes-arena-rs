@@ -2,3 +2,5 @@
 # Derived from the game; never commit or distribute.
 /re/
 __pycache__/
+# Agent worktrees.
+/.claude/
