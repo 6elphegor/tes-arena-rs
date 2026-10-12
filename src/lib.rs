@@ -4,6 +4,7 @@
 pub mod character;
 pub mod city;
 pub mod combat;
+pub mod creature;
 pub mod dice;
 pub mod effects;
 pub mod exe;

@@ -1,0 +1,549 @@
+//! Creature and NPC generation (segment 1194).
+//!
+//! Human NPCs start as a 16-byte seed record (`npc_seed`, 1194:38B9):
+//! level, class, sex, race, an INT roll and the RNG seed they will be
+//! expanded from. `expand_npc` (1194:351D) turns that into a full 0x41E
+//! character record, reseeding the RNG from the seed record so the same
+//! NPC always comes out the same, and restoring the caller's seed after.
+//! Monsters are built from per-type tables by `create_monster`
+//! (1194:8CEE) into the creature segment (DGROUP 1042).
+//!
+//! Records may live outside DGROUP (creatures do); routines take the
+//! record's segment. Where the original runs the RNG with DS set to the
+//! record's segment, it uses whatever lies at that segment's 91F0..91F9
+//! as RNG state; `cr_range_in` reproduces that.
+//!
+//! NPC names (1194:080B) are not generated: that routine saves and
+//! restores the seed, so skipping it changes nothing else.
+
+use std::collections::HashSet;
+
+use crate::character::field::*;
+use crate::character::HIT_DIE;
+use crate::dice::{dice, roll};
+use crate::effects::Applied;
+use crate::machine::Machine;
+use crate::mem::{DATA, DS};
+use crate::scale::{to100, to256};
+
+/// Size of a character or creature record.
+pub const RECORD_SIZE: u16 = 0x41E;
+/// DGROUP word: segment of the creature records.
+pub const CREATURE_SEG: u16 = 0x1042;
+
+/// Seed record fields (16 bytes).
+pub mod seed {
+    /// RNG seed the NPC is expanded from (dword).
+    pub const SEED: u16 = 0x00;
+    /// Race; bit 0x80 is stripped on expansion.
+    pub const RACE: u16 = 0x04;
+    pub const CLASS: u16 = 0x05;
+    pub const LEVEL: u16 = 0x06;
+    pub const SEX: u16 = 0x07;
+    /// INT (256 scale), copied over the rolled INT on expansion.
+    pub const INT: u16 = 0x08;
+    /// A random byte other than 0xFF (meaning unknown).
+    pub const B_0B: u16 = 0x0B;
+    /// Cleared dword.
+    pub const D_0C: u16 = 0x0C;
+}
+
+/// Record fields used here that `character::field` does not name.
+pub mod rec {
+    /// Portrait: race × 32 + 0..31 (0..30 for race 7).
+    pub const PORTRAIT: u16 = 0x08;
+    /// Name, written by 1194:080B (not ported).
+    pub const NAME: u16 = 0x09;
+    pub const B_28: u16 = 0x28;
+    /// Base attributes, a copy of +29..+30 made at creation.
+    pub const BASE_ATTRS: u16 = 0x31;
+    /// Face roll 0..9, unique among DGROUP 0FD4.
+    pub const FACE: u16 = 0x6B;
+    /// Creature special-attack kind and data (+367: 6 bytes for type 2A).
+    pub const SPECIAL: u16 = 0x366;
+    pub const SPECIAL_DATA: u16 = 0x367;
+    /// The XP the creature is worth, for creatures (dword at XP).
+    pub const XP_VALUE: u16 = super::XP;
+}
+
+/// DGROUP tables.
+mod table {
+    /// Cumulative NPC level chances (3 bytes).
+    pub const NPC_LEVEL: u16 = 0x419A;
+    /// NPC XP multiplier by class-byte group (3 bytes).
+    pub const NPC_XP: u16 = 0x419D;
+    /// Faces in use (9 bytes, 0xFF = free).
+    pub const FACES: u16 = 0x0FD4;
+    /// Per monster type (index type - 1).
+    pub const M_LEVEL: u16 = 0x2C6A;
+    pub const M_XP: u16 = 0x2D12;
+    pub const M_DBE: u16 = 0x2C3A;
+    pub const M_100D: u16 = 0x2BF2;
+    pub const M_FF3: u16 = 0x2C0A;
+    pub const M_F83: u16 = 0x2C22;
+    pub const M_DAMAGE: u16 = 0x2D8A;
+    pub const M_HP: u16 = 0x2CB2;
+    pub const M_XP_PER_HP: u16 = 0x2D72;
+    pub const M_SPELL_FLAGS: u16 = 0x2C82;
+    pub const M_SPECIAL: u16 = 0x2DBA;
+    pub const M_SPECIAL_DATA: u16 = 0x2DC4;
+    pub const M_CLASS: u16 = 0x2DD3;
+    pub const M_PORTRAIT: u16 = 0x2DDD;
+    pub const TYPE_2A_DATA: u16 = 0x2DCD;
+}
+
+/// 3276 tables.
+mod data {
+    /// Cumulative NPC class chances (18 bytes).
+    pub const NPC_CLASS: u16 = 0x6157;
+    /// Monster attributes, 8 per type.
+    pub const M_ATTRS: u16 = 0x3B2B;
+    /// Race base attributes (as character::RACE_BASE).
+    pub const RACE_BASE: u16 = 0x3A63;
+}
+
+/// DGROUP variables.
+mod var {
+    pub const FACE_BASE: u16 = 0x128A;
+    pub const FACE_ROLL: u16 = 0x128C;
+    pub const A898: u16 = 0xA898;
+    pub const A886: u16 = 0xA886;
+    pub const F74: u16 = 0x0F74;
+    pub const F75: u16 = 0x0F75;
+    pub const DBE: u16 = 0x0DBE;
+    pub const B_100D: u16 = 0x100D;
+    pub const FF3: u16 = 0x0FF3;
+    pub const F83: u16 = 0x0F83;
+    /// Far pointer (offset, segment) used by type 2A.
+    pub const P_1020: u16 = 0x1020;
+}
+
+const RNG_TABLE_OFF: u16 = 0x91EE;
+const RNG_TABLE_SEG: u16 = 0x91F0;
+const RNG_LEFT: u16 = 0x91F2;
+const RNG_REFILL: u16 = 0x91F4;
+const RNG_SEED: u16 = 0x91F6;
+
+impl Machine {
+    /// 0000:6E10 with DS = `seg`: steps the LCG stored at seg:91F6.
+    fn cr_step_in(&mut self, seg: u16) -> u16 {
+        let s = self.mem.r32(seg, RNG_SEED).wrapping_mul(0x006D_002D);
+        self.mem.w32(seg, RNG_SEED, s);
+        (s >> 16) as u16
+    }
+
+    /// 0000:6EA8 with DS = `seg`. DGROUP uses the machine's RNG.
+    fn cr_next_in(&mut self, seg: u16) -> u16 {
+        if seg == DS {
+            return self.rng.next();
+        }
+        let tseg = self.mem.r16(seg, RNG_TABLE_SEG);
+        if tseg == 0 {
+            return self.cr_step_in(seg);
+        }
+        let off = self.mem.r16(seg, RNG_TABLE_OFF);
+        let mut v = self.mem.r16(tseg, off);
+        self.mem.w16(seg, RNG_TABLE_OFF, off.wrapping_add(2));
+        let left = self.mem.r16(seg, RNG_LEFT).wrapping_sub(1);
+        self.mem.w16(seg, RNG_LEFT, left);
+        if left == 0 {
+            self.mem.w16(seg, RNG_TABLE_OFF, 0);
+            let n = self.mem.r16(seg, RNG_REFILL);
+            self.mem.w16(seg, RNG_LEFT, n);
+            let count = match n >> 1 {
+                0 => 0x10000u32,
+                c => c as u32,
+            };
+            let mut di = 0u16;
+            for _ in 0..count {
+                v = self.cr_step_in(seg);
+                self.mem.w16(tseg, di, v);
+                di = di.wrapping_add(2);
+            }
+        }
+        v
+    }
+
+    /// 0000:6EEA with DS = `seg`: [lo, hi), None on a zero span.
+    fn cr_range_in(&mut self, seg: u16, lo: u16, hi: u16) -> Option<u16> {
+        let r = self.cr_next_in(seg);
+        let span = hi.wrapping_sub(lo);
+        if span == 0 {
+            return None;
+        }
+        Some((r % span).wrapping_add(lo))
+    }
+
+    /// Runs `attempt` on the DGROUP RNG until it succeeds. The original
+    /// loops forever when the LCG cycles without success (seed 0 and the
+    /// other multiples of 2^30 are fixed points); that returns None.
+    fn cr_retry<T>(&mut self, mut attempt: impl FnMut(&mut Self) -> Option<Option<T>>) -> Option<T> {
+        let mut seen = HashSet::new();
+        loop {
+            if seen.len() < 1 << 20 && !seen.insert(self.rng.seed) {
+                return None;
+            }
+            if let Some(v) = attempt(self)? {
+                return Some(v);
+            }
+        }
+    }
+
+    /// 1194:5572: next() % 100.
+    fn cr_percent(&mut self) -> u16 {
+        self.rng.next() % 100
+    }
+
+    /// 1194:391F. NPC level: the first of the three cumulative chances at
+    /// DGROUP 419A (summed in 8 bits, compared signed) that d% reaches;
+    /// 0..3.
+    pub fn npc_roll_level(&mut self) -> u16 {
+        let r = self.cr_percent();
+        let mut sum = 0u8;
+        for i in 0..3u16 {
+            sum = sum.wrapping_add(self.mem.r8(DS, table::NPC_LEVEL + i));
+            if r as i16 <= sum as i16 {
+                return i;
+            }
+        }
+        3
+    }
+
+    /// 1194:3937. NPC class byte: d% against 18 cumulative chances at
+    /// 3276:6157; past the last it reads the byte after the class list.
+    pub fn npc_roll_class(&mut self) -> u8 {
+        let r = self.cr_percent();
+        let mut sum = 0u8;
+        let mut i = 0u16;
+        while i < 18 {
+            sum = sum.wrapping_add(self.mem.r8(DATA, data::NPC_CLASS + i));
+            if r as i16 <= sum as i16 {
+                break;
+            }
+            i += 1;
+        }
+        self.mem.r8(DS, crate::character::CLASS_IDS + i)
+    }
+
+    /// 1194:3965. 1 (female) a quarter of the time.
+    pub fn npc_roll_sex(&mut self) -> u8 {
+        (self.cr_percent() < 25) as u8
+    }
+
+    /// 1194:3973. An INT roll for an NPC seed: dice(20) (no +1, unlike
+    /// player creation) on the 256 scale plus the race/sex base INT.
+    fn cr_roll_int(&mut self, race: u16, sex: u8) -> Option<u8> {
+        let mut base = data::RACE_BASE.wrapping_add(race << 4);
+        if sex != 0 {
+            base = base.wrapping_add(8);
+        }
+        // AL = 20; AH is the high byte of race << 4.
+        let n = ((race << 4) & 0xFF00) | 0x14;
+        let r = dice(&mut self.rng, n)?;
+        Some((to256(r as i16) as u8).wrapping_add(self.mem.r8(DATA, base.wrapping_add(1))))
+    }
+
+    /// 0000:0250. A random byte other than 0xFF.
+    fn cr_byte_not_ff(&mut self) -> Option<u8> {
+        self.cr_retry(|m| {
+            let v = m.rng.next() as u8;
+            Some((v != 0xFF).then_some(v))
+        })
+    }
+
+    /// 1194:38B9. Fills the 16-byte NPC seed record at seg:off. `level` 0
+    /// rolls the level and then always rolls the class, ignoring `class`;
+    /// otherwise `class` 0xFFFF rolls it.
+    pub fn npc_seed(&mut self, seg: u16, off: u16, class: u16, level: u16) -> Option<()> {
+        let w8 = |m: &mut Self, f: u16, v: u8| m.mem.w8(seg, off.wrapping_add(f), v);
+        let class_byte = if level == 0 {
+            let l = self.npc_roll_level();
+            w8(self, seed::LEVEL, l as u8);
+            None
+        } else {
+            w8(self, seed::LEVEL, level as u8);
+            (class != 0xFFFF).then_some(class as u8)
+        };
+        let c = match class_byte {
+            Some(c) => c,
+            None => self.npc_roll_class(),
+        };
+        w8(self, seed::CLASS, c);
+        self.mem.w16(DS, var::A898, 0);
+        self.mem.w32(seg, off.wrapping_add(seed::SEED), self.rng.seed);
+        let sex = self.npc_roll_sex();
+        w8(self, seed::SEX, sex);
+        let race = roll(&mut self.rng, 8)?;
+        w8(self, seed::RACE, race as u8);
+        let int = self.cr_roll_int(race, sex)?;
+        w8(self, seed::INT, int);
+        self.mem.w32(seg, off.wrapping_add(seed::D_0C), 0);
+        let b = self.cr_byte_not_ff()?;
+        w8(self, seed::B_0B, b);
+        self.mem.w16(DS, var::A886, 1);
+        Some(())
+    }
+
+    /// 1194:35FF. Portrait: race × 32 + roll(32), roll(31) for race 7,
+    /// with the RNG state of the record's segment.
+    fn cr_portrait(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let race = self.mem.r8(seg, rec.wrapping_add(RACE));
+        let n = if race == 7 { 31 } else { 32 };
+        let r = self.cr_range_in(seg, 0, n)?;
+        let v = 0x20u16.wrapping_mul(race as u16).wrapping_add(r);
+        self.mem.w8(seg, rec.wrapping_add(rec::PORTRAIT), v as u8);
+        Some(())
+    }
+
+    /// 1194:3829 (far, 1194:3825 entry is retf). Rolls 0..9 until
+    /// race × 10 + roll (low byte) is none of the faces at DGROUP 0FD4
+    /// (0xFF entries are skipped). Leaves race × 10 in 128A and the roll in
+    /// 128C, and returns the roll.
+    pub fn npc_face(&mut self, race: u16) -> Option<u16> {
+        let base = race.wrapping_mul(10);
+        self.mem.w16(DS, var::FACE_BASE, base);
+        self.cr_retry(|m| {
+            let r = roll(&mut m.rng, 10)?;
+            m.mem.w16(DS, var::FACE_ROLL, r);
+            let al = r.wrapping_add(m.mem.r16(DS, var::FACE_BASE)) as u8;
+            let taken = (0..9).any(|i| {
+                let f = m.mem.r8(DS, table::FACES + i);
+                f != 0xFF && f == al
+            });
+            Some((!taken).then_some(r))
+        })
+    }
+
+    /// 1194:370C for a record in any segment: the 8 attributes for its race
+    /// and sex (see `Machine::roll_attributes`).
+    fn cr_roll_attributes(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let mut base = data::RACE_BASE.wrapping_add((self.mem.r8(seg, rec.wrapping_add(RACE)) as u16) << 4);
+        if self.mem.r8(seg, rec.wrapping_add(SEX)) != 0 {
+            base = base.wrapping_add(8);
+        }
+        for i in 0..8 {
+            let r = dice(&mut self.rng, 20)?.wrapping_add(1);
+            let v = (to256(r as i16) as u8).wrapping_add(self.mem.r8(DATA, base.wrapping_add(i)));
+            self.mem.w8(seg, rec.wrapping_add(ATTRS + i), v);
+        }
+        Some(())
+    }
+
+    /// Hit die of a record's class (DGROUP 2BD5).
+    fn cr_hit_die(&self, seg: u16, rec: u16) -> u16 {
+        let c = (self.mem.r8(seg, rec.wrapping_add(CLASS)) & 0x1f) as u16;
+        self.mem.r8(DS, HIT_DIE.wrapping_add(c)) as u16
+    }
+
+    /// 1194:379F. Derived stats of a record in any segment: level-tier
+    /// values, spell points from INT, attribute modifiers, hit points
+    /// (1194:374E: hit die + HP modifier, at least 1 unsigned) and
+    /// fatigue (STR + END) << 6.
+    pub fn derive_record_stats(&mut self, seg: u16, rec: u16) -> Option<()> {
+        self.level_tier_stats(seg, rec);
+        let int = to100(self.mem.r8(seg, rec.wrapping_add(ATTRS + 1)) as i16) as u16;
+        let (max, cur) = self.spell_points_at(seg, rec, int);
+        self.mem.w16(seg, rec.wrapping_add(SPELL_POINTS), cur);
+        self.mem.w16(seg, rec.wrapping_add(MAX_SPELL_POINTS), max);
+        self.attribute_modifiers_at(seg, rec);
+        let die = self.cr_hit_die(seg, rec);
+        let mut hp = dice(&mut self.rng, die)?.wrapping_add(self.mem.r16(seg, rec.wrapping_add(HP_MOD)));
+        if hp < 1 {
+            hp = 1;
+        }
+        self.mem.w16(seg, rec.wrapping_add(MAX_HP), hp);
+        self.mem.w16(seg, rec.wrapping_add(HP), hp);
+        let str = self.mem.r8(seg, rec.wrapping_add(ATTRS)) as u16;
+        let end = self.mem.r8(seg, rec.wrapping_add(ATTRS + 5)) as u16;
+        self.mem.w16(seg, rec.wrapping_add(FATIGUE), (str + end) << 6);
+        Some(())
+    }
+
+    /// 1194:3869..38B8. Attributes for an NPC record from its seed record:
+    /// rolled for race and sex, copied to the base attributes, then INT
+    /// replaced by the seed's INT roll (after the copy, so base INT keeps
+    /// the rolled value). Then derived stats, and hit points as one hit
+    /// die (at least 1) per level counting level 0, plus 25.
+    fn cr_npc_attributes(&mut self, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
+        self.cr_roll_attributes(seg, rec)?;
+        for i in 0..8 {
+            let v = self.mem.r8(seg, rec.wrapping_add(ATTRS + i));
+            self.mem.w8(seg, rec.wrapping_add(rec::BASE_ATTRS + i), v);
+        }
+        let int = self.mem.r8(seed_seg, seed_off.wrapping_add(seed::INT));
+        self.mem.w8(seg, rec.wrapping_add(ATTRS + 1), int);
+        self.derive_record_stats(seg, rec)?;
+        self.mem.w16(seg, rec.wrapping_add(MAX_HP), 0);
+        self.mem.w16(seg, rec.wrapping_add(HP), 0);
+        let n = self.mem.r8(seg, rec.wrapping_add(LEVEL)) as u16 + 1;
+        for _ in 0..n {
+            let die = self.cr_hit_die(seg, rec);
+            let hd = dice(&mut self.rng, die)?.max(1);
+            let v = self.mem.r16(seg, rec.wrapping_add(MAX_HP)).wrapping_add(hd);
+            self.mem.w16(seg, rec.wrapping_add(MAX_HP), v);
+        }
+        let v = self.mem.r16(seg, rec.wrapping_add(MAX_HP)).wrapping_add(25);
+        self.mem.w16(seg, rec.wrapping_add(MAX_HP), v);
+        self.mem.w16(seg, rec.wrapping_add(HP), v);
+        Some(())
+    }
+
+    /// 1194:399A. XP an NPC is worth: level² × the multiplier for its class
+    /// byte (DGROUP 419D: below 6, below 12, else; the raw byte with its
+    /// flag bits, so spellcasters count as the last group), each product
+    /// kept to 16 bits.
+    pub fn npc_xp_value(&mut self, seg: u16, rec: u16) {
+        let class = self.mem.r8(seg, rec.wrapping_add(CLASS));
+        let group = match class {
+            0..=5 => 0,
+            6..=11 => 1,
+            _ => 2,
+        };
+        let mul = self.mem.r8(DS, table::NPC_XP + group) as u16;
+        let level = self.mem.r8(seg, rec.wrapping_add(LEVEL)) as u16;
+        let xp = level.wrapping_mul(level).wrapping_mul(mul);
+        self.mem.w32(seg, rec.wrapping_add(XP), xp as u32);
+    }
+
+    /// 1194:351D. Expands the NPC seed record at seed_seg:seed_off into a
+    /// full record at seg:rec. The caller's RNG seed is restored at the
+    /// end. None where the original faults (a hit die of 0) or hangs.
+    pub fn expand_npc(&mut self, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
+        let saved = self.rng.seed;
+        for i in 0..RECORD_SIZE {
+            self.mem.w8(seg, rec.wrapping_add(i), 0);
+        }
+        for i in 0..8 {
+            let v = self.mem.r8(seed_seg, seed_off.wrapping_add(i));
+            self.mem.w8(seg, rec.wrapping_add(i), v);
+        }
+        let race = self.mem.r8(seg, rec.wrapping_add(RACE)) & 0x7f;
+        self.mem.w8(seg, rec.wrapping_add(RACE), race);
+        self.rng.seed = self.mem.r32(seg, rec.wrapping_add(seed::SEED));
+        self.cr_portrait(seg, rec)?;
+        let face = self.npc_face(race as u16)?;
+        self.mem.w8(seg, rec.wrapping_add(rec::FACE), face as u8);
+        self.rng.seed = self.mem.r32(seg, rec.wrapping_add(seed::SEED));
+        // 1194:080B would write the name here; it restores the seed.
+        self.mem.w8(seg, rec.wrapping_add(rec::B_28), 0);
+        self.cr_npc_attributes(seed_seg, seed_off, seg, rec)?;
+        self.npc_xp_value(seg, rec);
+        self.rng.seed = saved;
+        Some(())
+    }
+
+    /// 1194:8EA9. Starts the effect a monster type carries (flag 0x80, one
+    /// pulse every tick for `duration` pulses, then endless phase B) and
+    /// stores `value` at +0E of the slot, or of the record when the effect
+    /// was not applied (the original writes through whatever DS:SI the
+    /// effect routine returned).
+    fn cr_monster_effect(&mut self, seg: u16, rec: u16, value: u16, duration: u16) {
+        match self.apply_effect(seg, rec, 0x80, 1, duration, 1, 0xFFFB) {
+            Applied::Slot(Some(s)) => self.mem.w16(DS, s.wrapping_add(0x0E), value),
+            Applied::Slot(None) => unreachable!("flag 0x80 always takes a slot"),
+            Applied::Refused | Applied::AlreadyActive => self.mem.w16(seg, rec.wrapping_add(0x0E), value),
+        }
+    }
+
+    /// 1194:8ED4. Type 2A: four words at 0x40 past the far pointer at
+    /// DGROUP 1020, six special-attack bytes from DGROUP 2DCD, kind 6.
+    fn cr_type_2a(&mut self, seg: u16, rec: u16) {
+        let (off, s) = (self.mem.r16(DS, var::P_1020), self.mem.r16(DS, var::P_1020 + 2));
+        let p = off.wrapping_add(0x40);
+        for (f, v) in [(0x2C, 0xFFFF), (0x2E, 0x19), (0x30, 0xFFFF), (0x32, 0x32)] {
+            self.mem.w16(s, p.wrapping_add(f), v);
+        }
+        for i in 0..6 {
+            let v = self.mem.r8(DS, table::TYPE_2A_DATA + i);
+            self.mem.w8(seg, rec.wrapping_add(rec::SPECIAL_DATA + i), v);
+        }
+        self.mem.w8(seg, rec.wrapping_add(rec::SPECIAL), 6);
+    }
+
+    /// 1194:8CEE. Builds a monster of type `ty` (1-based) at offset `rec`
+    /// of the creature segment (DGROUP 1042) from the per-type tables:
+    /// level, XP, attributes (3276:3B2B), damage, hit points (a range),
+    /// spell flags and special attacks. Types 0E, 16 and 17 start an
+    /// effect. Type 2A is built as type 18 with extra data. None where the
+    /// original faults (an empty HP range).
+    pub fn create_monster(&mut self, ty: u16, rec: u16) -> Option<()> {
+        let seg = self.mem.r16(DS, CREATURE_SEG);
+        let (f74, f75) = match ty {
+            0x0C => (0x9E, 0x9E),
+            0x0F => (0x9E, 0x9F),
+            _ => (0, 0),
+        };
+        self.mem.w8(DS, var::F74, f74);
+        self.mem.w8(DS, var::F75, f75);
+        for i in 0..RECORD_SIZE {
+            self.mem.w8(seg, rec.wrapping_add(i), 0);
+        }
+        let w8 = |m: &mut Self, f: u16, v: u8| m.mem.w8(seg, rec.wrapping_add(f), v);
+        w8(self, RACE, ty as u8);
+        let mut bx = ty;
+        if ty as u8 == 0x2A {
+            self.cr_type_2a(seg, rec);
+            bx = (bx & 0xFF00) | 0x18;
+        }
+        let bx = bx.wrapping_sub(1);
+        let f = self.mem.r16(seg, rec.wrapping_add(FLAGS)) | FLAG_CREATURE;
+        self.mem.w16(seg, rec.wrapping_add(FLAGS), f);
+        let ds8 = |m: &Self, t: u16, i: u16| m.mem.r8(DS, t.wrapping_add(i));
+        w8(self, LEVEL, ds8(self, table::M_LEVEL, bx));
+        let xp = self.mem.r32(DS, table::M_XP.wrapping_add(bx << 2));
+        self.mem.w32(seg, rec.wrapping_add(XP), xp);
+        let v = self.mem.r16(DS, table::M_DBE.wrapping_add(bx << 1));
+        self.mem.w16(DS, var::DBE, v);
+        self.mem.w8(DS, var::B_100D, ds8(self, table::M_100D, bx));
+        self.mem.w16(DS, var::FF3, ds8(self, table::M_FF3, bx) as i8 as u16);
+        self.mem.w8(DS, var::F83, ds8(self, table::M_F83, bx));
+        for i in 0..8 {
+            let v = self.mem.r8(DATA, data::M_ATTRS.wrapping_add(bx << 3).wrapping_add(i));
+            w8(self, ATTRS + i, v);
+        }
+        for i in 0..8 {
+            let v = self.mem.r8(seg, rec.wrapping_add(ATTRS + i));
+            w8(self, rec::BASE_ATTRS + i, v);
+        }
+        self.derive_record_stats(seg, rec)?;
+        w8(self, CREATURE_MIN_DAMAGE, ds8(self, table::M_DAMAGE, bx << 1));
+        w8(self, CREATURE_MAX_DAMAGE, ds8(self, table::M_DAMAGE.wrapping_add(1), bx << 1));
+        let lo = self.mem.r16(DS, table::M_HP.wrapping_add(bx << 2));
+        let hi = self.mem.r16(DS, table::M_HP.wrapping_add(2).wrapping_add(bx << 2)).wrapping_add(1);
+        let hp = self.rng.range(lo, hi)?;
+        self.mem.w16(seg, rec.wrapping_add(HP), hp);
+        self.mem.w16(seg, rec.wrapping_add(MAX_HP), hp);
+        // 16-bit product, added to the dword.
+        let per = ds8(self, table::M_XP_PER_HP, bx) as u16;
+        let xp = self.mem.r32(seg, rec.wrapping_add(XP)).wrapping_add(per.wrapping_mul(hp) as u32);
+        self.mem.w32(seg, rec.wrapping_add(XP), xp);
+        let flags = self.mem.r16(seg, rec.wrapping_add(0x41A)) | self.mem.r16(DS, table::M_SPELL_FLAGS.wrapping_add(bx << 1));
+        self.mem.w16(seg, rec.wrapping_add(0x41A), flags);
+        if bx as u8 == 0x17 {
+            return Some(());
+        }
+        match self.mem.r8(seg, rec.wrapping_add(RACE)) {
+            0x16 => self.cr_monster_effect(seg, rec, 1, 1),
+            0x0E => self.cr_monster_effect(seg, rec, 1, 2),
+            0x17 => self.cr_monster_effect(seg, rec, 2, 3),
+            _ => {}
+        }
+        w8(self, rec::SPECIAL, 0);
+        for (t, data, portrait, class) in [(4u16, 0x0Cu8, 0xFFu8, 6u8), (0x0B, 0x3F, 0xFF, 5), (0x0A, 0x10, 0xFF, 6)] {
+            if bx == t {
+                w8(self, rec::SPECIAL, 1);
+                w8(self, rec::SPECIAL_DATA, data);
+                w8(self, rec::PORTRAIT, portrait);
+                w8(self, CLASS, class);
+            }
+        }
+        if bx >= 0x0E {
+            let i = bx - 0x0E;
+            w8(self, rec::SPECIAL, ds8(self, table::M_SPECIAL, i));
+            w8(self, rec::SPECIAL_DATA, ds8(self, table::M_SPECIAL_DATA, i));
+            w8(self, rec::PORTRAIT, ds8(self, table::M_PORTRAIT, i));
+            w8(self, CLASS, ds8(self, table::M_CLASS, i));
+        }
+        Some(())
+    }
+}
