@@ -236,6 +236,20 @@ for _ in range(150):
          (0x2AA1, 0x060F, False), ('ax',), fs=DG, si=P, es=ALT, di=0)
 
 for _ in range(150):
+    # Accessory clashes: the candidate and a few worn accessories of the
+    # same type, with assorted armour kinds (and special 8Ah/8Bh items).
+    ty = rng.randrange(4)
+    idx = rng.sample(range(40), 4)
+    w = [('inv', lin(DG, PSLOTS), rng.getrandbits(32)),
+         (lin(DG, PSLOTS + 19 * idx[0]), 1, ty),
+         (lin(DG, PSLOTS + 19 * idx[0] + 14), 1, rng.choice([0x49, 0x48, 0xC9]) | rng.randrange(4) << 4)]
+    for i in idx[1:]:
+        w += [(lin(DG, PSLOTS + 19 * i), 1, rng.choice([ty, ty, 0x8A, 0x8B, rng.randrange(4)])),
+              (lin(DG, PSLOTS + 19 * i + 14), 1, 0xC8 | rng.randrange(4) << 4)]
+    case('accessory_clash', w, near(0x7804), ('cf',), si=PSLOTS + 19 * idx[0])
+    case('sort_inventory', [('inv', lin(DG, PSLOTS), rng.getrandbits(32))], far(0x790D), ())
+
+for _ in range(150):
     # memmove within and between two areas, overlapping and onto itself.
     areas = [(DG, 0x6000), (ALT, 0x100)]
     blobs = [('blob', lin(sg, o), bytes(rng.getrandbits(8) for _ in range(0x140))) for sg, o in areas]

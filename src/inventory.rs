@@ -143,17 +143,24 @@ impl Machine {
 
     /// 1194:745A. Like `find_item`, but only an equipped match counts. With
     /// `cx` 0 it returns `carry` unchanged (the caller's CF).
-    pub fn find_equipped(&self, seg: u16, mut si: u16, mut cx: u16, ty: u16, cat: u16, carry: bool) -> (bool, u16) {
+    pub fn find_equipped(&self, seg: u16, si: u16, cx: u16, ty: u16, cat: u16, carry: bool) -> (bool, u16) {
+        let (f, si, _) = self.inv_find_equipped_cx(seg, si, cx, ty, cat, carry);
+        (f, si)
+    }
+
+    /// `find_equipped`, also returning the CX it leaves (slots left to
+    /// walk), which 1194:7804 continues from.
+    fn inv_find_equipped_cx(&self, seg: u16, mut si: u16, mut cx: u16, ty: u16, cat: u16, carry: bool) -> (bool, u16, u16) {
         if cx == 0 {
-            return (carry, si);
+            return (carry, si, cx);
         }
         loop {
             let (found, s, c) = self.find_item(seg, si, cx, ty, cat);
             if !found {
-                return (false, s);
+                return (false, s, c);
             }
             if self.inv_flags(seg, s) & item::EQUIPPED != 0 {
-                return (true, s);
+                return (true, s, c);
             }
             si = s.wrapping_add(SLOT_SIZE);
             cx = c;
@@ -544,5 +551,147 @@ impl Machine {
             si = si.wrapping_add(SLOT_SIZE);
         }
         si
+    }
+
+    /// 1194:7804. Does the player's item at `it` (DGROUP) clash with an
+    /// accessory already worn? Only enchanted, unequipped, non-special
+    /// accessories are checked. An equipped accessory of the same base
+    /// type clashes if its armour kind matches, or if neither kind is 0;
+    /// but for type 3 with a kind other than 0, special items 8Ah/8Bh
+    /// (which can map to base type 3) do not. The original returns CF
+    /// clear on a clash and walks as many slots as are occupied. Leaves
+    /// the kind and type at DGROUP 12A0/12A2.
+    pub fn accessory_clash(&mut self, it: u16) -> bool {
+        let f = self.inv_flags(DS, it);
+        let ty = self.inv_b(DS, it, item::TYPE);
+        if ty & 0x80 != 0
+            || f & item::EQUIPPED != 0
+            || f & item::ENCHANTED == 0
+            || self.item_category(DS, it) != category::ACCESSORY
+        {
+            return false;
+        }
+        let kind = self.armor_kind(DS, it);
+        self.mem.w16(DS, 0x12A0, kind);
+        self.mem.w16(DS, 0x12A2, ty as u16);
+        let (n, carry) = self.count_items(DS, PLAYER_SLOTS);
+        let (mut si, mut cx, mut carry) = (PLAYER_SLOTS, n, carry);
+        loop {
+            let ty = self.mem.r16(DS, 0x12A2);
+            let (found, s, c) = self.inv_find_equipped_cx(DS, si, cx, ty, category::ACCESSORY, carry);
+            if !found {
+                return false;
+            }
+            let k = self.armor_kind(DS, s);
+            let want = self.mem.r16(DS, 0x12A0);
+            if k == want || (k != 0 && want != 0) {
+                // 1194:786D
+                let exempt = want != 0
+                    && self.mem.r16(DS, 0x12A2) == 3
+                    && matches!(self.inv_b(DS, s, item::TYPE), 0x8A | 0x8B);
+                return !exempt;
+            }
+            si = s.wrapping_add(SLOT_SIZE);
+            if c == 0 {
+                return false;
+            }
+            (cx, carry) = (c, false);
+        }
+    }
+
+    /// 1194:7A78. Swaps `n` bytes between DS:si and DS:di.
+    fn inv_swap(&mut self, si: u16, di: u16, n: u16) {
+        if si == di {
+            return;
+        }
+        for i in 0..n {
+            let (a, b) = (self.mem.r8(DS, si.wrapping_add(i)), self.mem.r8(DS, di.wrapping_add(i)));
+            self.mem.w8(DS, si.wrapping_add(i), b);
+            self.mem.w8(DS, di.wrapping_add(i), a);
+        }
+    }
+
+    /// 1194:7A0D. Appends to the order list at `di` the slot numbers of
+    /// all items of base type `ty` and category `cat`, walking as many
+    /// slots as are occupied. Returns the new end of the list.
+    fn inv_list_items(&mut self, mut di: u16, ty: u16, cat: u16) -> u16 {
+        let mut cx = self.mem.r8(DS, LAST_COUNT) as u16;
+        let mut si = PLAYER_SLOTS;
+        loop {
+            let (found, s, c) = self.find_item(DS, si, cx, ty, cat);
+            if !found {
+                return di;
+            }
+            self.mem.w8(DS, di, (s.wrapping_sub(PLAYER_SLOTS) / SLOT_SIZE) as u8);
+            di = di.wrapping_add(1);
+            si = s.wrapping_add(SLOT_SIZE);
+            cx = c;
+        }
+    }
+
+    /// 1194:7A35. `inv_list_items` for accessories, keeping those of
+    /// armour kind 0 (`nonzero_kind` false) or of any other kind (true).
+    fn inv_list_accessories(&mut self, mut di: u16, ty: u16, nonzero_kind: bool) -> u16 {
+        let mut cx = self.mem.r8(DS, LAST_COUNT) as u16;
+        self.mem.w16(DS, 0x12A0, nonzero_kind as u16);
+        let mut si = PLAYER_SLOTS;
+        loop {
+            let (found, s, c) = self.find_item(DS, si, cx, ty, category::ACCESSORY);
+            if !found {
+                return di;
+            }
+            if (self.armor_kind(DS, s) != 0) == nonzero_kind {
+                self.mem.w8(DS, di, (s.wrapping_sub(PLAYER_SLOTS) / SLOT_SIZE) as u8);
+                di = di.wrapping_add(1);
+            }
+            si = s.wrapping_add(SLOT_SIZE);
+            cx = c;
+        }
+    }
+
+    /// 1194:7911 (far entry 790D). Sorts the player's items: body armour
+    /// in location order 2, 6, 0, 3, 4, 1, 5, shields, weapons 0..17,
+    /// accessories 0..3 of kind 0 then of other kinds, stacks 0..14. The
+    /// order list of slot numbers is built at DGROUP 110C, its length at
+    /// 110A, then slots are swapped into place. Only as many slots as are
+    /// occupied are walked, so items after a gap are left out of the list.
+    pub fn sort_inventory(&mut self) {
+        const LIST: u16 = 0x110C;
+        let (n, _) = self.count_items(DS, PLAYER_SLOTS);
+        if n == 0 {
+            return;
+        }
+        self.mem.w8(DS, LAST_COUNT, n as u8);
+        let mut di = LIST;
+        for ty in [2, 6, 0, 3, 4, 1, 5] {
+            di = self.inv_list_items(di, ty, category::ARMOR);
+        }
+        for ty in 7..=10 {
+            di = self.inv_list_items(di, ty, category::ARMOR);
+        }
+        for ty in 0..18 {
+            di = self.inv_list_items(di, ty, category::WEAPON);
+        }
+        for nonzero in [false, true] {
+            for ty in 0..4 {
+                di = self.inv_list_accessories(di, ty, nonzero);
+            }
+        }
+        for ty in 0..15 {
+            di = self.inv_list_items(di, ty, category::STACK);
+        }
+        let len = di.wrapping_sub(LIST);
+        self.mem.w16(DS, 0x110A, len);
+        let mut si = PLAYER_SLOTS;
+        for bx in 0..len {
+            let want = self.mem.r8(DS, LIST.wrapping_add(bx));
+            // repne scasb for bx's low byte; when it is absent DI ends one
+            // past the list, so the last entry is overwritten.
+            let pos = (0..len).find(|&i| self.mem.r8(DS, LIST.wrapping_add(i)) == bx as u8).unwrap_or(len - 1);
+            self.mem.w8(DS, LIST.wrapping_add(pos), want);
+            self.inv_swap(si, PLAYER_SLOTS.wrapping_add((want as u16).wrapping_mul(SLOT_SIZE)), SLOT_SIZE);
+            self.mem.w8(DS, LIST.wrapping_add(bx), bx as u8);
+            si = si.wrapping_add(SLOT_SIZE);
+        }
     }
 }

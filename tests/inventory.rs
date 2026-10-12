@@ -134,6 +134,9 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>) -> HashMap<&'stati
             put("si", si);
             put("di", di);
         }
+        // The original returns CF clear on a clash.
+        "accessory_clash" => put("cf", !m.accessory_clash(reg("si")) as u16),
+        "sort_inventory" => m.sort_inventory(),
         "hit_chance" => {
             use arena::combat::{Gear, Ptr};
             let (att, def) = (Ptr::new(reg("fs"), reg("si")), Ptr::new(reg("es"), reg("di")));
@@ -186,7 +189,7 @@ fn matches_original() {
         *count.entry(name.to_string()).or_default() += 1;
     }
     eprintln!("{count:?}");
-    assert_eq!(count.len(), 22);
+    assert_eq!(count.len(), 24);
 }
 
 /// The scan in `class_can_use` stops at an FFh or a match; with neither
