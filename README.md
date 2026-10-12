@@ -49,6 +49,8 @@ No game code or data is included: everything is loaded from your own copy.
   (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
   palette, state and planes) and spell files. Tests with a save need
   `ARENA_SAVE` set to its folder.
+- `src/travel.rs` – fast travel: days and distance between two places,
+  over the terrain map and the weather (1194:2E69).
 - `src/wild.rs` – the wilderness grid around a location (217B:0004).
 - `src/log.rs` – the calendar (dates from the minute counter) and
   logbook entries; appending them to LOG.nn is not ported.
@@ -61,7 +63,7 @@ No game code or data is included: everything is loaded from your own copy.
   prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
   writes a save's stored screenshot and the map of the level it is in;
   `examples/wild_map.rs` draws a location's wilderness grid and four of
-  its blocks as terrain.
+  its blocks as terrain; `examples/travel.rs` plans a journey.
 - `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
   routines can run unmodified against the user's own game files, and
   `init_heap` to set up the game's heap.
