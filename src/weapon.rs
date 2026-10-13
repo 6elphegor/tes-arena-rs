@@ -304,21 +304,7 @@ impl Machine {
         {
             return;
         }
-        // 1194:42B5: everyone calms down; creatures' spell effects end.
-        self.mem.w16(DS, 0x0FF9, 0);
-        self.mem.w16(DS, 0x0FFB, 0);
-        for i in 0..0x17u16 {
-            let si = 0x0AB3 + i * 0x1C;
-            let fl = self.mem.r16(DS, si + 0xF);
-            if si >= 0x0C57 {
-                if fl & 0x4000 != 0 {
-                    continue;
-                }
-                self.actor_forget(si);
-            }
-            let fl = self.mem.r16(DS, si + 0xF) | 0x4000;
-            self.mem.w16(DS, si + 0xF, fl);
-        }
+        self.calm_everyone();
         self.mem.w8(DS, 0x680F, 0x0F);
         self.mem.w16(DS, 0x67EA, 0x3F0C);
         self.mem.w16(DS, 0x67EC, 0);

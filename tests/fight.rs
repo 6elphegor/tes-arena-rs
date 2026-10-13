@@ -29,7 +29,7 @@ struct Hooks;
 
 impl FightHooks for Hooks {
     fn fight_graphics(&mut self, m: &mut Machine, _files: &mut Files, people: bool) -> Option<()> {
-        count(m, if people { 0xFFE2 } else { 0xFFE0 });
+        count(m, if people { 0xFFE0 } else { 0xFFE2 });
         Some(())
     }
     fn fight_music(&mut self, m: &mut Machine, _music: u8) {

@@ -54,9 +54,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A36C: the message box of text number [137A].
     fn message_box_number(&mut self, _m: &mut Machine) {}
-    /// The routine at GUARDS_HOOK (0000:3F0C or 3F3B): the guards arrive.
-    fn guards_arrive(&mut self, _m: &mut Machine, _files: &mut Files, _hook: u32) -> Option<()> {
-        Some(())
+    /// The routine at GUARDS_HOOK (0000:3F0C or 3F3B): the guards arrive
+    /// (`encounter::guards_hook`, with the fight's graphics, music and
+    /// text left out; override to draw them).
+    fn guards_arrive(&mut self, m: &mut Machine, files: &mut Files, hook: u32) -> Option<()> {
+        m.guards_hook(files, &mut crate::encounter::NoFightHooks, hook)
     }
     /// 1194:DB6C: a click left for the actors (talk, loot, steal).
     fn actor_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {

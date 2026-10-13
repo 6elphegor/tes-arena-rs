@@ -127,7 +127,9 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/encounter.rs` – fights starting (segment 25CA): the fight set up
   for monsters or people (25CA:0000, the graphics and music as hooks),
   and the creatures placed in the free creature slots around the player
-  (25CA:006A: a random free square near the player, facing the player).
+  (25CA:006A: a random free square near the player, facing the player);
+  the guards arriving (1194:33C0: one to three named guards of the
+  province's race, rank and level, in armour with a weapon and shield).
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the wall spells' squares,
