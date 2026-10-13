@@ -561,7 +561,7 @@ impl Machine {
 /// 2DA2:111C. The holiday on the day of `minutes` (day of the year from
 /// 518400 minutes a year and 1440 a day), as its number in the table at
 /// 33AD (sorted days), if any.
-fn holiday(m: &Machine, minutes: u32) -> Option<u16> {
+pub(crate) fn holiday(m: &Machine, minutes: u32) -> Option<u16> {
     let day = (minutes % 518_400 / 1440) as u16;
     if day > 0x158 {
         return None;

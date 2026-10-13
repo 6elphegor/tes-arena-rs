@@ -58,9 +58,9 @@ pub trait WeaponHooks {
         Some(())
     }
     /// 1194:4FB8: whether the building of trigger kind `kind` is closed
-    /// now (the original's carry).
-    fn building_closed(&mut self, _m: &mut Machine, _kind: u8) -> Option<bool> {
-        Some(false)
+    /// now (`Machine::building_closed`).
+    fn building_closed(&mut self, m: &mut Machine, kind: u8) -> Option<bool> {
+        Some(m.building_closed(kind))
     }
     /// 29CF:037F: the bow fires an arrow (flat 1Bh) from the player,
     /// aimed by the cursor (`projectile::fire_missile`).
@@ -289,6 +289,27 @@ impl Machine {
             self.mem.w16(walls, at, v);
         }
         Some(())
+    }
+
+    /// 1194:4FB8. Whether a building of kind `kind` is closed now (137F
+    /// keeps the kind, or FFh): today's holiday (1194:4A4A) closes the
+    /// kind it names when its next byte is 0; houses and shops (kinds 1,
+    /// 5, 6, 7) are open from time of day 100h to 2FFh; others always.
+    pub fn building_closed(&mut self, kind: u8) -> bool {
+        self.mem.w8(DS, 0x137F, kind);
+        if let Some(n) = crate::frame::holiday(self, self.mem.r32(DS, 0x05CC)) {
+            let si = 0x3353u16.wrapping_add(n.wrapping_mul(6));
+            if self.mem.r8(DS, si) == kind && self.mem.r8(DS, si + 1) == 0 {
+                self.mem.w8(DS, 0x137F, 0xFF);
+                return true;
+            }
+        }
+        if matches!(kind, 1 | 5 | 6 | 7) {
+            let tod = self.mem.r16(DS, 0xCCFE);
+            return !(0x100..0x300).contains(&tod);
+        }
+        self.mem.w8(DS, 0x137F, 0xFF);
+        false
     }
 
     /// 0000:3EBE. Unless a fight is on (0FFB) or this is not a town (a
