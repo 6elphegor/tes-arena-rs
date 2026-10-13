@@ -1,0 +1,14 @@
+[package]
+name = "arena-view"
+version = "0.1.0"
+edition = "2024"
+description = "A wgpu renderer for the arena port: the 3D world drawn from the engine's state."
+
+[dependencies]
+arena = { path = ".." }
+wgpu = "24"
+winit = "0.30"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+glam = "0.29"
+png = "0.17"

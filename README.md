@@ -191,6 +191,36 @@ No game code or data is included: everything is loaded from your own copy.
 - `tools/` – the original C/Python unpacking scripts; `re/` holds the rebuilt
   `ACD_unpacked.EXE` for disassembly (git-ignored).
 
+## The renderer (view/)
+
+`arena-view` is a new wgpu renderer, not a port of the original's: the
+port's engine runs the game, and the renderer draws what is in its memory.
+The core crate stays free of dependencies; the view crate is a workspace
+member using wgpu, winit, glam and png.
+
+- `world.rs` loads a level the way `examples/play.rs` does. It reads the
+  palette (PAL.COL), the textures from the EMS banks the INF loader filled
+  (64 x 64, stored transposed, 15 to a bank) and the shading table (F000 in
+  the first texture bank). It builds triangles from the map planes:
+  - solid walls (equal bytes), with the faces between walls culled;
+  - raised platforms (the box side and cap tables, with heights from
+    `move_wall_height`);
+  - doors and the other wall kinds;
+  - floors (FLOOR words), and the *CEILING texture.
+- `render.rs` and `shader.wgsl` keep the textures as palette indices,
+  shade them by distance through the original's table, then colour them
+  with the palette.
+- `main.rs` turns the keys and the mouse into an `Intent` for
+  `Engine::frame`, run at the game's pace.
+
+```
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF --shot out.png [FRAMES [TURN]]
+```
+
+Not drawn yet: flats (creatures, items, decorations), doors as they open,
+chasms and water, the sky, and the interface.
+
 ## Porting a routine
 
 1. Disassemble it from `re/ACD_unpacked.EXE` (rebuild with

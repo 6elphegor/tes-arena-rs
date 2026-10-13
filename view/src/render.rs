@@ -1,0 +1,235 @@
+//! Drawing the world with wgpu: one pipeline, the level's mesh, its
+//! textures as a 2D array of palette indices, the shading table, and a
+//! uniform block with the camera and the palette.
+
+use crate::world::Vertex;
+use glam::{Mat4, Vec3};
+use wgpu::util::DeviceExt;
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct Globals {
+    view_proj: [[f32; 4]; 4],
+    eye: [f32; 4],
+    shade: [f32; 4],
+    palette: [[f32; 4]; 256],
+}
+
+/// Where the player stands and looks (map units; heading 0..511 a turn,
+/// 0 facing +y).
+#[derive(Clone, Copy, Debug)]
+pub struct Camera {
+    pub x: f32,
+    pub y: f32,
+    pub height: f32,
+    pub heading: f32,
+}
+
+pub const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+pub struct Renderer {
+    pipeline: wgpu::RenderPipeline,
+    globals: wgpu::Buffer,
+    bind: wgpu::BindGroup,
+    vertices: wgpu::Buffer,
+    count: u32,
+    palette: [[f32; 4]; 256],
+    depth: Option<(wgpu::TextureView, u32, u32)>,
+}
+
+pub struct Scene<'a> {
+    pub palette: [[u8; 4]; 256],
+    pub textures: &'a [[u8; 4096]],
+    pub shading: &'a [u8],
+    pub mesh: &'a [Vertex],
+}
+
+impl Renderer {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, scene: &Scene) -> Self {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("world"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+        let layers = scene.textures.len() as u32;
+        let tex = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("textures"),
+            size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let flat: Vec<u8> = scene.textures.iter().flat_map(|t| t.iter().copied()).collect();
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            &flat,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(64), rows_per_image: Some(64) },
+            wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
+        );
+        let shade = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("shading"),
+            size: wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &shade, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            &scene.shading[..0x1000],
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(256), rows_per_image: Some(16) },
+            wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
+        );
+        let mut palette = [[0f32; 4]; 256];
+        for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
+            *p = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
+        }
+        let globals = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("globals"),
+            size: std::mem::size_of::<Globals>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("world"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
+        let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
+        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("world"),
+            layout: &layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: globals.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex_view) },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&shade_view) },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("world"),
+            bind_group_layouts: &[&layout],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("world"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Uint32, 3 => Float32],
+                }],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+            }),
+            primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
+        let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mesh"),
+            contents: bytemuck::cast_slice(scene.mesh),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        Self { pipeline, globals, bind, vertices, count: scene.mesh.len() as u32, palette, depth: None }
+    }
+
+    /// Draws the world seen from `cam` into `target` (`width` x `height`).
+    pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::TextureView, width: u32, height: u32, cam: Camera) {
+        if !matches!(self.depth, Some((_, w, h)) if w == width && h == height) {
+            let tex = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("depth"),
+                size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: DEPTH,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.depth = Some((tex.create_view(&Default::default()), width, height));
+        }
+        let a = cam.heading / 512.0 * std::f32::consts::TAU;
+        let eye = Vec3::new(cam.x, cam.height, cam.y);
+        let forward = Vec3::new(a.sin(), 0.0, a.cos());
+        let view = Mat4::look_at_lh(eye, eye + forward, Vec3::Y);
+        let proj = Mat4::perspective_lh(60f32.to_radians(), width as f32 / height as f32, 4.0, 8192.0);
+        let globals = Globals {
+            view_proj: (proj * view).to_cols_array_2d(),
+            eye: [cam.x, cam.height, cam.y, 0.0],
+            shade: [96.0, 12.0, 0.0, 0.0],
+            palette: self.palette,
+        };
+        queue.write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
+        let mut enc = device.create_command_encoder(&Default::default());
+        {
+            let depth = &self.depth.as_ref().unwrap().0;
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("world"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth,
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.bind, &[]);
+            pass.set_vertex_buffer(0, self.vertices.slice(..));
+            pass.draw(0..self.count, 0..1);
+        }
+        queue.submit([enc.finish()]);
+    }
+}
