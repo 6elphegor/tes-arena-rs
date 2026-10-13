@@ -2,17 +2,21 @@
 //! handler every kind of damage goes through (2AA1:06A0): death, the
 //! corpse, experience, and quest targets that die or give up.
 //!
-//! Choosing whom a swing hits (0000:3988's loop over the actors in
-//! reach) is not ported here; `strike_actor` is what it calls for an
-//! actor in a creature slot. Not ported: the sound (23BA:002A) and the
-//! text a quest target says when giving up (0000:9AE6, 9CA0, 2DA2:000A,
+//! A swing (0000:3988, driven by the mouse) lands on every actor in
+//! reach in front of the player (`swing_hits`): people die at once
+//! (`strike_person`), others take a blow (`strike_actor`). A swing that
+//! reaches no actor hits the wall ahead (0000:3D43, not ported: doors,
+//! locks and crime). Not ported: the sound (23BA:002A) and the text a
+//! quest target says when giving up (0000:9AE6, 9CA0, 2DA2:000A,
 //! 1194:59C8), which only shows a message.
 
 use crate::character::{field, PLAYER};
 use crate::combat::{var, Gear, Ptr};
 use crate::effects::FxHooks;
+use crate::format::Arg;
 use crate::machine::Machine;
 use crate::mem::DS;
+use crate::travel::travel_heading;
 
 /// DGROUP variables.
 pub mod svar {
@@ -42,6 +46,16 @@ pub mod svar {
     pub const QUEST_ITEM_BASE: u16 = 0x0A46;
     pub const PICK_BASE: u16 = 0x128A;
     pub const PICK: u16 = 0x128C;
+    /// The player: position, height above the floor, heading, gold.
+    pub const PX: u16 = 0xC3D0;
+    pub const PY: u16 = 0xC3D4;
+    pub const HEIGHT: u16 = 0xC3D2;
+    pub const HEADING: u16 = 0xC3DA;
+    pub const GOLD: u16 = 0x05C2;
+    /// Actors a swing reached.
+    pub const HITS: u16 = 0x67DA;
+    pub const GOLD_TEXT: u16 = 0x6702;
+    pub const GOLD_FORMAT: u16 = 0x6728;
     /// The critical-hit message pointer and time.
     pub const MESSAGE: u16 = 0x061A;
     pub const MESSAGE_TIME: u16 = 0x061E;
@@ -58,6 +72,98 @@ mod f {
 }
 
 impl Machine {
+    /// 0000:39D8..3A82, when a swing lands: every actor not peaceful
+    /// (flag 0x4000) nor a corpse, within 0xBE (the larger distance plus
+    /// a quarter of the smaller) and 0x30 of the player's heading, is
+    /// struck, people (slots before 0C57) by `strike_person`. Nothing
+    /// happens when the player is not above the floor (C3D2 <= 0).
+    /// Returns false when the swing reached no actor: the original then
+    /// hits the wall ahead (0000:3D43, not ported). None where a strike
+    /// faults or hangs.
+    pub fn swing_hits(&mut self) -> Option<bool> {
+        self.mem.w16(DS, svar::HITS, 0);
+        if self.mem.r16(DS, svar::HEIGHT) as i16 <= 0 {
+            return Some(true);
+        }
+        let (px, py) = (self.mem.r16(DS, svar::PX), self.mem.r16(DS, svar::PY));
+        let corpse = self.corpse();
+        for i in 0..23u16 {
+            let si = svar::ACTORS + i * 0x1C;
+            let sprite = self.mem.r8(DS, si + f::SPRITE);
+            if self.mem.r16(DS, si + f::FLAGS) & 0x4000 != 0 || sprite == 0xC5 || sprite == corpse {
+                continue;
+            }
+            let (x, y) = (self.mem.r16(DS, si), self.mem.r16(DS, si + 4));
+            let abs = |v: u16| if (v as i16) < 0 { v.wrapping_neg() } else { v };
+            let (dx, dy) = (abs(px.wrapping_sub(x)), abs(py.wrapping_sub(y)));
+            let (lo, hi) = if dx > dy { (dy, dx) } else { (dx, dy) };
+            if (lo >> 2).wrapping_add(hi) > 0xBE {
+                continue;
+            }
+            let mut a = abs(travel_heading(px, py, x, y).wrapping_sub(self.mem.r16(DS, svar::HEADING)));
+            if a >= 0x100 {
+                a = 0x200u16.wrapping_sub(a);
+            }
+            if a > 0x30 {
+                continue;
+            }
+            let n = self.mem.r16(DS, svar::HITS).wrapping_add(1);
+            self.mem.w16(DS, svar::HITS, n);
+            if si < svar::CREATURE_ACTORS {
+                self.strike_person(si, 0)?;
+            } else {
+                self.strike_actor(si)?;
+            }
+        }
+        Some(self.mem.r16(DS, svar::HITS) != 0)
+    }
+
+    /// The corpse sprite: DGROUP C936 plus the level's first flat (C38E).
+    fn corpse(&self) -> u8 {
+        (self.mem.r8(DS, 0xC936) as u16).wrapping_add(self.mem.r16(DS, 0xC38E)) as u8
+    }
+
+    /// 0000:3AED. A person struck (by the player's swing, `arg` 0) dies at
+    /// once: a corpse, blood, and with `arg` 0 one to four gold pieces
+    /// ("On this body you find %d gold pieces."). Someone may have seen
+    /// it (`crime_seen`), which with no creatures about calls the guards.
+    pub fn strike_person(&mut self, si: u16, arg: u16) -> Option<()> {
+        let corpse = self.corpse();
+        self.mem.w8(DS, si + f::SPRITE, corpse);
+        let fl = self.mem.r16(DS, si + f::FLAGS) & !0x20;
+        self.mem.w16(DS, si + f::FLAGS, fl);
+        self.mem.w8(DS, si + f::FRAME, 0xFF);
+        self.blood(si, 0x18);
+        if arg == 0 {
+            let gold = self.rng.range(0, 4)?.wrapping_add(1);
+            let total = self.mem.r32(DS, svar::GOLD).wrapping_add(gold as u32);
+            self.mem.w32(DS, svar::GOLD, total);
+            self.sprintf((DS, svar::GOLD_TEXT), (DS, svar::GOLD_FORMAT), &[Arg::Int(gold)]);
+        }
+        if self.crime_seen() && self.mem.r16(DS, 0x0FF9) == 0 {
+            // 0000:3F21: the guards come (through the hook at 67EA).
+            self.mem.w8(DS, 0x680F, 0x0F);
+            self.mem.w16(DS, 0x67EA, 0x3F3B);
+            self.mem.w16(DS, 0x67EC, 0);
+        }
+        if arg == 0 {
+            self.mem.w16(DS, svar::MESSAGE, svar::GOLD_TEXT);
+            self.mem.w16(DS, svar::MESSAGE + 2, DS);
+            self.mem.w16(DS, svar::MESSAGE_TIME, 0x1E);
+        }
+        Some(())
+    }
+
+    /// 0000:3F50. Whether a crime was seen: a percent roll under 100 -
+    /// 10 x the player's level, at least 50. The product is 8-bit times
+    /// 8-bit but the subtraction is unsigned 16-bit, so from level 11 on
+    /// the chance wraps to over 65000: always seen.
+    fn crime_seen(&mut self) -> bool {
+        let level = self.mem.r8(DS, PLAYER + field::LEVEL) as u16;
+        let chance = 100u16.wrapping_sub(level * 10).max(50);
+        self.percent() < chance
+    }
+
     /// 0000:3B6D. The player hits the actor in slot `si` (a creature
     /// slot). It works out whether the player is behind the actor
     /// (0000:3D17, from the heading to the actor's target pointer), but

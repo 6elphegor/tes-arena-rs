@@ -330,26 +330,7 @@ pub struct Template {
     pub count: u16,
 }
 
-/// End of the decimal conversion buffer used by 0000:7028.
-const UTOA_END: u16 = 0xA933;
-
 impl Machine {
-    /// 0000:7028, as the game's sprintf uses it for %d: writes the
-    /// decimal digits of `v` backwards into DGROUP, ending at A933, and
-    /// returns them in order.
-    fn city_utoa(&mut self, mut v: u16) -> Vec<u8> {
-        let mut p = UTOA_END;
-        loop {
-            self.mem.w8(DS, p, b'0' + (v % 10) as u8);
-            p = p.wrapping_sub(1);
-            v /= 10;
-            if v == 0 {
-                break;
-            }
-        }
-        (p.wrapping_add(1)..=UTOA_END).map(|o| self.mem.r8(DS, o)).collect()
-    }
-
     /// 1194:3183 without the province load (1194:2E18) it starts with.
     /// Converts a location's province-map position to world coordinates
     /// from the province bounds; stores the scales at 3FFC/3FFE. None
@@ -473,7 +454,7 @@ impl Machine {
         let mut i = 0;
         while i < fmt.len() {
             if fmt[i] == b'%' && fmt.get(i + 1) == Some(&b'd') {
-                let digits = self.city_utoa(variant + 1);
+                let digits = self.utoa(variant + 1);
                 name.extend_from_slice(&digits);
                 i += 2;
             } else {

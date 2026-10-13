@@ -21,13 +21,15 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/attack.rs` – a blow at the player (2AA1:00D8): a creature's damage
   range and special attacks or a person's weapon, wear on the armour hit
   and broken items ("Your %s is broken."), the magic shield, and death.
-- `src/strike.rs` – the player's strike on a creature-slot actor
+- `src/strike.rs` – a landing swing (0000:39D8): every actor in reach in
+  front of the player is struck; people die at once (0000:3AED: gold,
+  and maybe the guards); the player's strike on a creature-slot actor
   (0000:3B6D, 2AA1:0000): blood, criticals, damage and weapon
   enchantments; and the kill handler all damage goes through (2AA1:06A0):
   death, corpses moved off doors, experience, quest targets that die or
   give up. `GameHooks` gives the effects engine these handlers.
-- `src/format.rs` – the game's sprintf for `%s` formats (line feeds
-  become CR LF).
+- `src/format.rs` – the game's sprintf for `%s` and `%d` formats (line
+  feeds become CR LF).
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
 - `src/shop.rs` – shop stock, potions and magic items (1194:FAD9, B7FA,
   B848).
