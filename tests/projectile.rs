@@ -311,3 +311,97 @@ fn missiles_match_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 1000);
 }
+
+/// The player casting (29CF:071F then 29CF:0000, harness/gen_cast.py):
+/// the same world, a random player spell cast from the spellbook, and a
+/// waiting cast resolved by a touch.
+#[test]
+fn casts_match_original() {
+    use arena::cast::{NoCastHooks, Touch};
+    let Some(img) = common::image() else { return };
+    let dir = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena"));
+    let Ok(mut files) = arena::bsa::Files::new(&dir) else { return };
+    let mut base = Machine::new(&img);
+    assert!(base.bsa_open(&mut files));
+    base.mem.w16(DS, 0x1042, CSEG);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w16(DS, 0x91F0, 0);
+    base.mem.w16(DS, 0xC3D6, 0xA0);
+    base.mem.w16(DS, 0x1020, 0);
+    base.mem.w16(DS, 0x1022, 0x5C00);
+    let classes: Vec<u8> = (0..18).map(|i| base.mem.r8(DS, 0x2A50 + i)).collect();
+    let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    for line in include_str!("vectors/cast.txt").lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        assert_eq!(f[0], "cast", "{line}");
+        let p: Vec<&str> = f[1].split(' ').collect();
+        if std::env::var("CAST_DUMP").is_ok_and(|v| v != p[0]) {
+            continue;
+        }
+        let (seed, k) = (hex(p[0]) as u32, hex(p[1]) as u16);
+        let (idx, touch, slot, mx) = (hex(p[2]) as u8, hex(p[3]), hex(p[4]) as u16, hex(p[5]) as u16);
+        let (sp, flags, town) = (hex(p[6]) as u16, hex(p[7]) as u16, hex(p[8]) as u8);
+        let spell: Vec<u8> = (0..p[9].len() / 2).map(|i| u8::from_str_radix(&p[9][2 * i..2 * i + 2], 16).unwrap()).collect();
+        let mut m = base.clone();
+        let mut s = setup(&mut m, seed, k, &classes);
+        strike(&mut m, &mut s, k * RSIZE);
+        let plan = flight(&mut m, &mut s);
+        m.mem.w16(DS, 0x8F92, mx);
+        m.mem.w16(DS, 0x020A, sp);
+        let v = m.mem.r16(DS, 0x05BE) & !0x200 | flags;
+        m.mem.w16(DS, 0x05BE, v);
+        m.mem.w8(DS, 0x05E6, town);
+        for (i, &b) in spell.iter().enumerate() {
+            m.mem.w8(arena::mem::DATA, 0x2A80 + 0x55 * idx as u16 + i as u16, b);
+        }
+        if std::env::var("CAST_DUMP").is_ok() {
+            eprintln!("lvl {} sp {:#x}", m.mem.r8(DS, 0x1AA), m.mem.r16(DS, 0x20A));
+        }
+        m.load_rng();
+        let before = m.clone();
+        let run = |m: &mut Machine, files: &mut arena::bsa::Files| -> Option<()> {
+            m.cast_spell(files, &mut NoCastHooks, 0x80 | idx)?;
+            if m.mem.r16(DS, 0x0620) != 0 {
+                let t = if touch == 0 { Touch::Actor(slot) } else { Touch::Record(DS, 0x1A4) };
+                m.resolve_cast(files, t)?;
+            }
+            for _ in 0..plan.frames {
+                m.projectiles_update()?;
+            }
+            Some(())
+        };
+        let got = run(&mut m, &mut files).map(|()| {
+            m.store_rng();
+            let changed = (0..=0xFFFFu16)
+                .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+                .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+            format!(
+                "{:x} {:x} {:x}",
+                fnv(changed),
+                fnv((0..0x8000u16).map(|o| m.mem.r8(CSEG, o))),
+                fnv((0..0x8000u16).map(|o| m.mem.r8(WSEG, o)))
+            )
+        });
+        if std::env::var("CAST_DUMP").is_ok_and(|v| v == p[0]) {
+            for o in 0..=0xFFFFu16 {
+                if m.mem.r8(DS, o) != before.mem.r8(DS, o) {
+                    eprintln!("{o:04x} {:02x} {:02x}", before.mem.r8(DS, o), m.mem.r8(DS, o));
+                }
+            }
+        }
+        match got {
+            _ if f[2] == "hang" || f[2] == "invalid" || f[2] == "lowmem" => {}
+            Some(d) => assert_eq!(f[2], d, "{line}"),
+            None => assert_eq!(f[2], "fault", "{line}"),
+        }
+        *counts.entry(match f[2] {
+            "fault" => "fault",
+            "hang" => "hang",
+            _ => "ran",
+        })
+        .or_default() += 1;
+    }
+    eprintln!("{counts:?}");
+    assert!(counts.get("ran").copied().unwrap_or(0) > 1500);
+}

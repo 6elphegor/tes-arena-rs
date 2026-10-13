@@ -141,9 +141,11 @@ pub trait ControlHooks {
     fn wall_trigger(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    /// 29CF:0000: the spell waiting for a target is cast.
-    fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// 29CF:0000: the spell waiting for a target is cast (`cast::
+    /// resolve_cast`; only aimed and area spells come this way, so the
+    /// touch is never used).
+    fn cast_at_target(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.resolve_cast(files, crate::cast::Touch::Record(crate::mem::DS, crate::character::PLAYER)).map(|_| ())
     }
     /// 1194:42EA, 59C8: the text at DGROUP `text` in a message box.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
@@ -190,7 +192,11 @@ pub struct Intent {
 /// `ControlHooks` that do nothing.
 pub struct NoControlHooks;
 
-impl ControlHooks for NoControlHooks {}
+impl ControlHooks for NoControlHooks {
+    fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+}
 
 /// Classic controls as the physics frame's input hook.
 pub struct Classic<'a>(pub &'a mut dyn ControlHooks);

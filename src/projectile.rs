@@ -89,6 +89,16 @@ impl Machine {
     /// the actor. None where the original reads a flat from file (not a
     /// creature's) or finds no free slot (it searches on without end).
     pub fn launch(&mut self, cast: u16, actor: u16, dx: u16) -> Option<()> {
+        self.launch_with(None, cast, actor, dx)
+    }
+
+    /// `launch` for the player's spells, whose casting hands' graphic
+    /// loads from the game files (see `projectile_flat`).
+    pub fn launch_player(&mut self, files: &mut crate::bsa::Files, cast: u16, actor: u16, dx: u16) -> Option<()> {
+        self.launch_with(Some(files), cast, actor, dx)
+    }
+
+    fn launch_with(&mut self, files: Option<&mut crate::bsa::Files>, cast: u16, actor: u16, dx: u16) -> Option<()> {
         let si = self.free_projectile()?;
         let w = |m: &mut Self, o: u16, v: u16| m.mem.w16(DS, si.wrapping_add(o), v);
         w(self, f::FLAGS, 0x200);
@@ -101,7 +111,7 @@ impl Machine {
             w(self, f::Z, 0x3C);
         }
         let (spell_off, spell_seg) = (self.mem.r16(DS, cast), self.mem.r16(DS, cast.wrapping_add(2)));
-        let (al, dx) = self.projectile_flat(spell_seg, spell_off, creature, dx)?;
+        let (al, dx) = self.projectile_flat(files, spell_seg, spell_off, creature, dx)?;
         self.mem.w8(DS, si + f::FLAT, al.wrapping_add(0xC));
         w(self, f::CAST, cast);
         w(self, f::F16, 0);
@@ -187,19 +197,41 @@ impl Machine {
 
     /// 29CF:08DA. The flat of a spell's projectile, from its element
     /// (+26): element 5 gives 5 and leaves DX as it was; others pick one
-    /// of two from ELEMENT_FLATS by a random bit, with DX = 1. A player's
-    /// spell (not `creature`) first loads the flat from file: None.
-    fn projectile_flat(&mut self, seg: u16, spell: u16, creature: bool, dx: u16) -> Option<(u8, u16)> {
+    /// of two from ELEMENT_FLATS by a random bit, with DX = 1. For a
+    /// player's spell (not `creature`) the casting hands' graphic of the
+    /// element (fire.cfa, ice.cfa, ... at 7D49) loads first into the EMS
+    /// frame ([902E], bank C8F4), their animation starts (7F80 = 0, 8038 =
+    /// the file's size / 4 rounded up) and DX is its frame count. None for
+    /// a player's spell without the game files.
+    fn projectile_flat(
+        &mut self,
+        files: Option<&mut crate::bsa::Files>,
+        seg: u16,
+        spell: u16,
+        creature: bool,
+        dx: u16,
+    ) -> Option<(u8, u16)> {
         let element = self.mem.r8(seg, spell.wrapping_add(0x26)) as u16;
         if element == 5 {
             return Some((5, dx));
         }
+        let mut bp = 1;
         if !creature {
-            return None;
+            let files = files?;
+            let name = self.skip_strings(DS, 0x7D49, element);
+            let bank = self.mem.r8(DS, 0xC8F4) as u16;
+            self.ems_map(bank);
+            let (off, fseg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+            // A missing file leaves the frame and the size as they were.
+            let _ = self.file_load(files, name, fseg, off);
+            bp = self.mem.r8(fseg, off.wrapping_add(0xB)) as u16;
+            let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+            self.mem.w16(DS, 0x8038, size.wrapping_add(3) >> 2);
+            self.mem.w8(DS, 0x7F80, 0);
         }
         let r = self.rng.next() & 1;
         let at = ELEMENT_FLATS.wrapping_add(element.wrapping_shl(2)).wrapping_add(r * 2 + 1);
-        Some((self.mem.r8(DS, at), 1))
+        Some((self.mem.r8(DS, at), bp))
     }
 
     /// 0000:FDEA. Sets up the sprite object at `si`: position, flat, a

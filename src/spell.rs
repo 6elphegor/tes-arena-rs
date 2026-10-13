@@ -63,7 +63,7 @@ pub mod svar {
 }
 
 /// The cast records (8 of 16h bytes).
-const CASTS: u16 = 0x7F86;
+pub(crate) const CASTS: u16 = 0x7F86;
 
 /// Message texts in DGROUP.
 const FAILED: u16 = 0x7BFA;

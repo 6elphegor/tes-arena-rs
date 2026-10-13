@@ -124,6 +124,13 @@ No game code or data is included: everything is loaded from your own copy.
   holiday's message, breath in deep water, the night's creatures in
   towns, the clock (a minute every 90 timer ticks) and the hurt flash.
   Drawing, sound, menus and message boxes are `FrameHooks`.
+- `src/cast.rs` – the player casting (segment 29CF): from the
+  spellbook (29CF:071F: silence, the cost by level, the crime of casting
+  at someone in town), a spell takes effect on the player or waits for a
+  target with its prompt; a click resolves it (29CF:0000): a touch on an
+  actor or the player, an aimed spell launched along the cursor's
+  direction (`projectile::launch_player`, which loads the casting hands'
+  graphic), or an area around the player.
 - `src/encounter.rs` – fights starting (segment 25CA): the fight set up
   for monsters or people (25CA:0000, the graphics and music as hooks),
   and the creatures placed in the free creature slots around the player

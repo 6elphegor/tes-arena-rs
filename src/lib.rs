@@ -4,6 +4,7 @@
 pub mod actors;
 pub mod attack;
 pub mod bsa;
+pub mod cast;
 pub mod character;
 pub mod city;
 pub mod click;

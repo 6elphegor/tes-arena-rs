@@ -202,4 +202,8 @@ impl arena::controls::ControlHooks for Pick {
         let v = m.mem.r16(DS, 0xFFF0);
         (v != 0xFFFF).then_some(v)
     }
+    // The generators stub 29CF:0000.
+    fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        Some(())
+    }
 }
