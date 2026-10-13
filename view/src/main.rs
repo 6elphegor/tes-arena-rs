@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
@@ -11,7 +11,7 @@
 //! frames (default 0) of walking forward, and exits; --wait stands still
 //! N frames before the walk, --click clicking first; --at puts the
 //! player in a square's centre, facing HEADING, a debugging aid. --fight brings a random encounter at the
-//! start (F does in the window).
+//! start (F does in the window); --people (P) rolls until people come.
 
 mod archive;
 mod flats;
@@ -115,7 +115,8 @@ fn main() {
     let mut args: Vec<String> = std::env::args().collect();
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
-    args.retain(|a| a != "--fight" && a != "--click");
+    let people = args.iter().any(|a| a == "--people");
+    args.retain(|a| a != "--fight" && a != "--click" && a != "--people");
     let mut wait = 0;
     if let Some(i) = args.iter().position(|a| a == "--wait") {
         wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
@@ -128,7 +129,7 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
@@ -141,6 +142,9 @@ fn main() {
     }
     if fight {
         world::summon(&mut engine);
+    }
+    if people {
+        world::summon_people(&mut engine);
     }
     if args.get(3).map(String::as_str) == Some("--shot") {
         let out = args.get(4).expect("--shot needs a file");
@@ -370,6 +374,7 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::ArrowRight => k.turn_right = down,
                         KeyCode::Space => k.jump = down,
                         KeyCode::KeyF if down => world::summon(&mut self.engine),
+                        KeyCode::KeyP if down => world::summon_people(&mut self.engine),
                         KeyCode::KeyE if down => self.click = true,
                         KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
                         KeyCode::Escape if down => {

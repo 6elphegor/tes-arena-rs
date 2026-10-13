@@ -12,8 +12,7 @@ the random seed; then runs 1194:887A with the game's heap set up and
 DOS handle 5 taken (GLOBAL.BSA's in the game).
 
 Stubbed as gen_guards.py: the fight's graphics and music count calls at
-DGROUP FFE0..FFE4; the fight's text 2686:0423 (its count lands in the
-creature segment).
+DGROUP FFE0..FFE4. The people's graphics list (2686:0423) runs.
 
   encounter | seed | result
 
@@ -87,7 +86,7 @@ def main():
     out = open(OUT, 'w', buffering=1)
     a = DosArena(EXE, GAME)
     for seg, off, code in [(0, 0x1AF9, counter(0xFFE0, True)), (0, 0x1A5C, counter(0xFFE2, True)),
-                           (0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2686, 0x0423, counter(0xFFE6, True))]:
+                           (0x23BA, 0x01C7, counter(0xFFE4, True))]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     for o, v in [(0xD806, WSEG), (0xCCD0, FSEG), (0x1042, CSEG), (0x9030, FRAME), (0xCCCE, FRAME + 0xC00),
                  (0x91F0, 0), (0x05C8, 0), (0xC38E, 0xC0), (0xC357, 0x80), (0xC359, 0x80)]:

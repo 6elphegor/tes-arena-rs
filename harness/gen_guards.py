@@ -9,9 +9,8 @@ walls and floors around the player and the random seed, then runs
 1194:33C0 with the game's heap set up (A000..F000).
 
 Stubbed (counting calls at DGROUP FFE0..FFE4, as the port's test hooks
-do): the graphics 0000:1AF9 and 1A5C, the music 23BA:01C7; and the
-fight's text 2686:0423 (its count lands in the creature segment, as DS
-is set there for the call, outside the digest). The guards' names come
+do): the graphics 0000:1AF9 and 1A5C, the music 23BA:01C7. The people's
+graphics list (2686:0423) runs. The guards' names come
 from NAMECHNK.DAT; the name buffer's segment (A90A) is compared
 image-relative.
 
@@ -67,7 +66,7 @@ def main():
     out = open(OUT, 'w', buffering=1)
     a = DosArena(EXE, GAME)
     for seg, off, code in [(0, 0x1AF9, counter(0xFFE0, True)), (0, 0x1A5C, counter(0xFFE2, True)),
-                           (0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2686, 0x0423, counter(0xFFE6, True))]:
+                           (0x23BA, 0x01C7, counter(0xFFE4, True))]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     for o, v in [(0xD806, WSEG), (0xCCD0, FSEG), (0x1042, CSEG), (0x9030, FRAME), (0xCCCE, FRAME + 0xC00),
                  (0x91F0, 0), (0x05C8, 0), (0xC38E, 0xC0), (0xC357, 0x80), (0xC359, 0x80)]:

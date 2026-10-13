@@ -166,24 +166,31 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:7316. The player's weapon class into DGROUP 0D49: by base
-    /// type, 0 for type 0, 1 below 0Bh, 2..5 for 0Bh..0Eh, 5 for 0Fh and
-    /// 6 above; 1 for a weapon whose condition is FFFF. Bare-handed, 7
-    /// plus the armour kind of equipped gauntlets (2 without), searched
-    /// from SI = FFFF over the occupied-slot count.
+    /// 1194:7316 for the player.
     pub fn player_weapon_class(&mut self) {
-        let w = self.equipped_weapon(DS, PLAYER);
+        self.weapon_class(DS, PLAYER);
+    }
+
+    /// 1194:7316. The weapon class of the record `rec` in `seg` into
+    /// DGROUP 0D49, and returned: by base type, 0 for type 0, 1 below
+    /// 0Bh, 2..5 for 0Bh..0Eh, 5 for 0Fh and 6 above; 1 for a weapon
+    /// whose condition is FFFF. Bare-handed, 7 plus the armour kind of
+    /// equipped gauntlets (2 without), searched from SI = FFFF over the
+    /// occupied-slot count, both read in `seg` (the count meant is
+    /// DGROUP's, the same for the player).
+    pub fn weapon_class(&mut self, seg: u16, rec: u16) -> u16 {
+        let w = self.equipped_weapon(seg, rec);
         let class = if w == 0xFFFF {
-            let n = self.mem.r8(DS, LAST_COUNT) as u16;
-            let kind = match self.find_equipped(DS, 0xFFFF, n, 3, 1, false) {
-                (true, s) => self.armor_kind(DS, s),
+            let n = self.mem.r8(seg, LAST_COUNT) as u16;
+            let kind = match self.find_equipped(seg, 0xFFFF, n, 3, 1, false) {
+                (true, s) => self.armor_kind(seg, s),
                 _ => 2,
             };
             kind.wrapping_add(7)
-        } else if self.mem.r16(DS, w.wrapping_add(item::HEALTH)) == 0xFFFF {
+        } else if self.mem.r16(seg, w.wrapping_add(item::HEALTH)) == 0xFFFF {
             1 // AX as 1194:7510 leaves it on a find
         } else {
-            match self.base_type(self.mem.r8(DS, w)).0 {
+            match self.base_type(self.mem.r8(seg, w)).0 {
                 0 => 0,
                 b if b < 0xB => 1,
                 b if b > 0xF => 6,
@@ -192,6 +199,7 @@ impl Machine {
             }
         };
         self.mem.w8(DS, avar::WEAPON_CLASS, class as u8);
+        class
     }
 
     /// 2686:02B4. The player dies: flags 05B1 bit 0x100 and C398 bit

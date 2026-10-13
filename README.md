@@ -141,6 +141,12 @@ No game code or data is included: everything is loaded from your own copy.
   area and night, an entry by the player's level; monsters, or people
   with their equipment, 24FA:0313). The quests' encounters (86F2) are
   not ported.
+- `src/outfit.rs` – what people in a fight are drawn as (2686:0423): the
+  list of graphics files at 1044 the fight loads, from the first
+  person's record. Their look comes from the armour mostly worn, or from
+  their class (mage, monk, barbarian, unarmoured). The list holds the
+  walk, the attack (a bow, a monk's kick, a mage's sword or staff), the
+  weapon drawn over it, and the shield; a woman's files start with 1.
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the state the start of the
@@ -229,7 +235,11 @@ member using wgpu, winit, glam and png.
   - the map's flats (MAP1 words 8xxx), in their squares, raised by the
     flat record's Y;
   - the creatures in the actor slots: sprite C0h + view, mirrored with
-    flag 2, at the actor's frame.
+    flag 2, at the actor's frame;
+  - people in a fight, from the list `person_outfit` built: the walk for
+    frames 0..5, from frame 6 the attack with the weapon over it, placed
+    by the files' headers as 0000:1B7F places it. Every person's file in
+    GLOBAL.BSA is packed into the atlas at load.
 
   `world::doors` draws the doors each frame, swung open by their state.
   How the original drew a door ajar isn't ported: a panel on each side
@@ -237,7 +247,8 @@ member using wgpu, winit, glam and png.
 
   The examples `flats` (every frame on one sheet), `formats` (what the
   decoders miss, by level), `actors` (the slots in use) and `doors` (the
-  doors nearest the start, their surroundings and locks) check them.
+  doors nearest the start, their surroundings and locks) and `people` (a
+  person's attack frames with the weapon over them) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
   with the palette.
@@ -248,16 +259,17 @@ member using wgpu, winit, glam and png.
   the view for a click: the first square that isn't empty along the
   heading, and for a door its square and span, as the original's
   drawing left them under the cursor. E or a left click clicks there
-  (`view_click`), which opens a door within reach. F (or `--fight`) rolls random encounters until
+  (`view_click`), which opens a door within reach. P (or `--people`)
+  rolls until people come. F (or `--fight`) rolls random encounters until
   creatures come, a debugging aid.
 
 ```
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
-Not drawn yet: people (their graphics come from a list, 0000:1AF9),
-cities (their flats load elsewhere), the other door kinds moving, chasms
+Not drawn yet: the townspeople (MLGEN/FMGEN files by climate, with the
+cities), cities (their flats load elsewhere), the other door kinds moving, chasms
 and water, the sky, and the interface. How a dungeon's placed creatures
 (map flats naming creature files, such as rat.dfa) come to life is not
 found yet.

@@ -33,6 +33,11 @@ impl Archive {
         Archive { dir: dir.to_path_buf(), bsa, members }
     }
 
+    /// The members' names (upper case).
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.members.keys().map(String::as_str)
+    }
+
     pub fn read(&self, name: &str) -> Option<Vec<u8>> {
         let upper = name.to_ascii_uppercase();
         if let Ok(entries) = std::fs::read_dir(&self.dir) {

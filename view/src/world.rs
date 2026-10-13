@@ -87,6 +87,26 @@ pub fn summon(engine: &mut Engine) {
     engine.m.mem.w8(DS, 0x05E6, area);
 }
 
+/// `summon` until people come (a fight of kind 8000h), sending monsters
+/// away (their slots freed) up to 200 times.
+pub fn summon_people(engine: &mut Engine) {
+    use arena::encounter::var::{CREATURE_SLOTS, FIGHTING, FIGHT_KIND};
+    for _ in 0..200 {
+        summon(engine);
+        let m = &mut engine.m;
+        if m.mem.r16(DS, FIGHT_KIND) == 0x8000 {
+            return;
+        }
+        for i in 0..8u16 {
+            let at = CREATURE_SLOTS + i * 0x1C + 0xF;
+            let f = m.mem.r16(DS, at) | 0x4000;
+            m.mem.w16(DS, at, f);
+        }
+        m.mem.w16(DS, FIGHTING, 0);
+    }
+    eprintln!("no people came");
+}
+
 fn summon_rolls(engine: &mut Engine) {
     let active = |m: &Machine| (0..8u16).any(|i| m.mem.r16(DS, 0x0C57 + i * 0x1C + 0xF) & 0x4000 == 0);
     for _ in 0..1000 {
@@ -380,6 +400,18 @@ pub struct SpriteSheet {
     pub flats: Vec<Option<Frames>>,
     /// The creatures' images, by type: views 1..5 (front to back) and 6.
     pub creatures: Vec<[Option<Frames>; 6]>,
+    /// The people's images by file name (upper case), with their CFA
+    /// header's height and offsets (+2, +6, +8).
+    pub people: std::collections::HashMap<String, (Frames, [i16; 3])>,
+}
+
+/// Whether a file is a person's image: a view (`01PLTWLK.CFA`: a woman's
+/// with 1 first, the view 1..5, then the look and the action, or a
+/// weapon or shield) or a townsperson's (`MLGEN01W.CFA`, `FMGEN01.CFA`).
+fn is_person_file(name: &str) -> bool {
+    let b = name.as_bytes();
+    let view = b.len() > 6 && matches!(b[0], b'0' | b'1') && (b'1'..=b'5').contains(&b[1]) && b[2].is_ascii_alphabetic();
+    (view || name.starts_with("MLGEN") || name.starts_with("FMGEN")) && name.ends_with(".CFA")
 }
 
 pub const ATLAS: u32 = 4096;
@@ -443,7 +475,7 @@ pub fn creature_names(m: &Machine) -> Vec<String> {
 }
 
 pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archive::Archive, names: &[String]) -> SpriteSheet {
-    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![] };
+    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![], people: Default::default() };
     let mut p = Packer { x: 0, y: 0, shelf: 0, sheet };
     for f in flats {
         let frames = f.as_ref().map(|f| p.add(f));
@@ -459,15 +491,52 @@ pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archi
         }
         p.sheet.creatures.push(views);
     }
+    let mut people: Vec<&str> = archive.names().filter(|n| is_person_file(n)).collect();
+    people.sort_unstable();
+    for name in people {
+        let Some(d) = archive.read(name) else { continue };
+        if let Some(f) = crate::flats::cfa(&d) {
+            let at = |o: usize| i16::from_le_bytes([d[o], d[o + 1]]);
+            let frames = p.add(&f);
+            p.sheet.people.insert(name.to_string(), (frames, [at(2), at(6), at(8)]));
+        }
+    }
     let mut sheet = p.sheet;
     sheet.h = ((sheet.pixels.len() as u32).div_ceil(ATLAS)).max(1);
     sheet.pixels.resize((sheet.h * ATLAS) as usize, 0);
     sheet
 }
 
+/// The graphics list of the people in a fight (2686:0423, at 1044,
+/// names with `@` for the view), while one is on (FFF 8000h).
+fn people_list(m: &Machine) -> Vec<String> {
+    let mut names = Vec::new();
+    if m.mem.r16(DS, arena::encounter::var::FIGHT_KIND) != 0x8000 {
+        return names;
+    }
+    let mut at = arena::outfit::var::LIST;
+    while m.mem.r8(DS, at) != 0 && names.len() < 8 {
+        let mut s = String::new();
+        while m.mem.r8(DS, at) != 0 {
+            s.push(m.mem.r8(DS, at) as char);
+            at = at.wrapping_add(1);
+        }
+        at = at.wrapping_add(1);
+        names.push(s);
+    }
+    names
+}
+
 /// A billboard: the frame `rect` standing at (x, y) from `lo` up, a unit
 /// per pixel, facing a camera whose right is (rx, rz).
 fn billboard(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, (rx, rz): (f32, f32), mirror: bool) {
+    billboard_at(out, rect, x, y, lo, 0.0, (rx, rz), mirror)
+}
+
+/// `billboard`, its centre moved `shift` along the camera's right.
+#[allow(clippy::too_many_arguments)]
+fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shift: f32, (rx, rz): (f32, f32), mirror: bool) {
+    let (x, y) = (x + rx * shift, y + rz * shift);
     let hw = rect.w as f32 / 2.0;
     let hi = lo + rect.h as f32;
     let p = [
@@ -522,6 +591,7 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
         }
     }
     let seg = m.mem.r16(DS, 0x1042);
+    let list = people_list(m);
     for slot in 0..23u16 {
         let si = 0x0AB3 + slot * 0x1C;
         let flags = m.mem.r16(DS, si + 0xF);
@@ -534,6 +604,28 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
         let sprite = m.mem.r8(DS, si + 0xC);
         let frame = m.mem.r8(DS, si + 0xD) as usize;
         let mirror = flags & 2 != 0;
+        // A person in a fight (0000:1C9A): the walk, or from frame 6 the
+        // attack with the weapon over it.
+        let person = slot >= 15 && m.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x1000 == 0;
+        if person && (0xC0..0xC5).contains(&sprite) && !list.is_empty() {
+            let view = (sprite - 0xC0 + 1).to_string();
+            let file = |k: usize| list.get(k).and_then(|n| sheet.people.get(&n.replace('@', &view).to_ascii_uppercase())).copied();
+            if frame < 6 {
+                if let Some((f, _)) = file(0) {
+                    billboard(&mut out, frame_of(f, frame), x, y, -z, right, mirror);
+                }
+            } else if let Some((f, a)) = file(1) {
+                billboard(&mut out, frame_of(f, frame - 6), x, y, 0.0, right, mirror);
+                if m.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x400 != 0 {
+                    if let Some((wf, w)) = file(2) {
+                        let z = (w[2] - a[2]) + (w[0] - a[0]) + 0xE;
+                        let shift = ((w[1] - a[1]) + 4) as f32;
+                        billboard_at(&mut out, frame_of(wf, frame - 6), x, y, -z as f32, if mirror { -shift } else { shift }, right, mirror);
+                    }
+                }
+            }
+            continue;
+        }
         let art = if (0xC0..=0xC5).contains(&sprite) {
             let t = m.mem.r8(seg, rec + 4) as usize;
             sheet.creatures.get(t.wrapping_sub(1)).and_then(|v| v[(sprite - 0xC0) as usize])

@@ -44,9 +44,6 @@ pub trait FightHooks {
     }
     /// 23BA:01C7: the fight's music (`MUSIC`).
     fn fight_music(&mut self, _m: &mut Machine, _music: u8) {}
-    /// 2686:0423: the text naming who comes (the record at `rec` in the
-    /// creature segment), written at 1044 for the front end.
-    fn fight_text(&mut self, _m: &mut Machine, _rec: u16) {}
 }
 
 /// `FightHooks` that do nothing.
@@ -184,7 +181,8 @@ impl Machine {
         for k in 0..n {
             self.build_guard(files, k.wrapping_mul(0x41E))?;
         }
-        hooks.fight_text(self, 0);
+        let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
+        self.person_outfit(seg, 0);
         self.fight_prepare(files, hooks, 1)?;
         self.place_creatures(n)
     }
@@ -445,7 +443,7 @@ impl Machine {
             }
         }
         let n = self.encounter_spawn(files, si)?;
-        let people = self.encounter_text(hooks, n);
+        let people = self.encounter_text(n);
         self.fight_prepare(files, hooks, people as u8)?;
         self.place_creatures(n)
     }
@@ -564,10 +562,10 @@ impl Machine {
     }
 
     /// 1194:8B12. Unless already fighting, the text for the first creature
-    /// (the fight's text through the hook for a person, whose guard bits
+    /// (a person's graphics list, `person_outfit`, whose guard bits
     /// then go to all eight records; a monster's type name at 1044).
     /// Returns whether they are people (the fight's AL).
-    fn encounter_text(&mut self, hooks: &mut dyn FightHooks, n: u16) -> bool {
+    fn encounter_text(&mut self, n: u16) -> bool {
         if self.mem.r16(DS, FIGHTING) != 0 {
             return n & 0xFF != 0;
         }
@@ -577,7 +575,7 @@ impl Machine {
             .map_or(0, |i| i * 0x41E);
         let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
         if self.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x1000 == 0 {
-            hooks.fight_text(self, rec);
+            self.person_outfit(seg, rec);
             let bits = self.mem.r16(seg, rec.wrapping_add(0x40D)) & 0xC00;
             for k in 0..8u16 {
                 let at = (k * 0x41E).wrapping_add(0x40D);
