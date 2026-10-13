@@ -60,7 +60,13 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/movement.rs` – the movement step and collision (0000:F8DD,
   F478, F60A, F697, FB3A): the 16 x 16 cell mask around a square,
   sliding along walls, triggers, climbing out of low areas, and level
-  changes on stairs.
+  changes on stairs. Creatures that walk into a closed door open it
+  unless it is locked (the game's lock check for creatures).
+- `src/actors.rs` – the people and creatures of a level and their frame
+  (0000:1854): idle walking, facing and chasing the player, side steps
+  when blocked, line of sight, respawning near the player, animation
+  states and the sprite seen. Attacks and spells are not ported (None),
+  nor sound and the draw list.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).

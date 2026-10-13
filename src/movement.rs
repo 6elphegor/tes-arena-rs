@@ -38,9 +38,15 @@ pub mod var {
     /// records' F: field (byte 3 of 5; bit 0 blocks). See `crate::info`.
     pub const FLAT_BASE: u16 = 0xC38E;
     pub const FLAT_FLAGS: u16 = 0xCDA1;
-    /// Hooks called on a trigger square (far pointers).
-    pub const TRIGGER_HOOK: u16 = 0xCD62;
-    pub const OPEN_HOOK: u16 = 0xCD46;
+    /// Hooks called when a creature meets a closed door (far pointers):
+    /// the lock check and the sound. The game sets them to 2826:0AAB and
+    /// 23BA:002A (`LOCK_CHECK`, `SOUND`).
+    pub const LOCK_HOOK: u16 = 0xCD62;
+    pub const SOUND_HOOK: u16 = 0xCD46;
+    /// Locks: 3-byte records (square word: row << 8 | column, then the
+    /// lock), and their count (byte).
+    pub const LOCKS: u16 = 0xC624;
+    pub const LOCK_COUNT: u16 = 0xC6E4;
     /// Hook asked before testing a player position (far pointer).
     pub const TEST_HOOK: u16 = 0xCD6A;
     /// Candidate positions (4 x (x, y)): new, new x, new y, old; the old
@@ -97,6 +103,12 @@ const HALF_B: u16 = 0xE6A2;
 /// of 8 by map flags), tops by its high 4 bits (two sets of 16).
 const BOTTOMS: u16 = 0xCB94;
 const TOPS: u16 = 0xCBC4;
+/// The routines the game installs in the door hooks, as (segment << 16)
+/// | offset: the lock check and the sound player (which changes no game
+/// state).
+pub const LOCK_CHECK: u32 = 0x2826_0AAB;
+pub const SOUND: u32 = 0x23BA_002A;
+
 /// Offsets of the square ahead by heading quarter, and the player's
 /// square (map offset).
 const AHEAD: u16 = 0xE384;
@@ -108,10 +120,10 @@ impl Machine {
     /// 0000:F697. The mask value of the cell under the position at
     /// DS:`pos` (x, then y): 0 free, otherwise what blocks it. Walls are
     /// taken from the wall plane, or for the player low down from the
-    /// floor plane. A trigger square (0xB0) met by a creature on a level
-    /// with flag 2 calls the trigger hook, and if it lets it, marks the
-    /// square (0x200) and calls the open hook. None where a hook is set
-    /// (not ported).
+    /// floor plane. A closed door (0xB0) met by a creature on a level
+    /// with flag 2 is opened (0x200) unless the lock hook refuses: the
+    /// game's lock check (2826:0AAB) refuses a creature a door with a
+    /// lock. None where a hook is set to anything else (not ported).
     pub fn move_cell(&mut self, pos: u16) -> Option<u8> {
         let x = self.mem.r16(DS, pos);
         let y = self.mem.r16(DS, pos.wrapping_add(2));
@@ -127,11 +139,23 @@ impl Machine {
         let cell = (((y & 0x7F) >> 3) << 4) + ((x & 0x7F) >> 3);
         let al = self.mem.r8(DS, MASK + cell);
         if al == 0xB0 && creature && self.mem.r16(DS, LEVEL_FLAGS) & 2 != 0 {
-            if self.mem.r16(DS, TRIGGER_HOOK + 2) != 0 || self.mem.r16(DS, OPEN_HOOK + 2) != 0 {
+            let sq = self.mem.r16(DS, TRIGGER_SQUARE);
+            match self.mem.r32(DS, LOCK_HOOK) {
+                0 => {}
+                LOCK_CHECK => {
+                    // 2826:0AAB with E3A1 set: a lock on the square refuses.
+                    let key = ((sq >> 8) << 8) | ((sq as u8) >> 1) as u16;
+                    let n = self.mem.r8(DS, LOCK_COUNT) as u16;
+                    if (0..n).any(|i| self.mem.r16(DS, LOCKS.wrapping_add(3 * i)) == key) {
+                        return Some(al);
+                    }
+                }
+                _ => return None,
+            }
+            if !matches!(self.mem.r32(DS, SOUND_HOOK), 0 | SOUND) {
                 return None;
             }
             let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
-            let sq = self.mem.r16(DS, TRIGGER_SQUARE);
             let w = self.mem.r16(walls, sq) | 0x200;
             self.mem.w16(walls, sq, w);
             return Some(0);
@@ -295,7 +319,7 @@ impl Machine {
     /// 0000:F478. Tries (nx, ny), (nx, oy) and (ox, ny) in turn and takes
     /// the first the test allows; a test that says stop, or one that
     /// refuses while map flag 0x80 is set, ends at (ox, oy).
-    fn move_resolve(&mut self, files: &mut Files, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
+    pub(crate) fn move_resolve(&mut self, files: &mut Files, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
         self.mem.w8(DS, CHANGED, 0);
         self.mem.w16(DS, TRIGGER, 0);
         for (i, w) in [nx, ny, nx, oy, ox, ny, ox, oy].into_iter().enumerate() {
