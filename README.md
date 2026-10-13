@@ -28,6 +28,12 @@ No game code or data is included: everything is loaded from your own copy.
   enchantments; and the kill handler all damage goes through (2AA1:06A0):
   death, corpses moved off doors, experience, quest targets that die or
   give up. `GameHooks` gives the effects engine these handlers.
+- `src/spell.rs` – a cast applied to its targets (29CF:0941): their
+  defences, then the spell's three effects (2CDD:000C and some 25
+  handlers): damage and healing (through the magic shield and elemental
+  resistance, 29CF:0B35), status effects, cures (2EBD:0004), timed spell
+  flags, attribute, HP, SP and fatigue changes and transfers, instant
+  death, levitation. A projectile spawned by an effect is not ported.
 - `src/format.rs` – the game's sprintf for `%s` and `%d` formats (line
   feeds become CR LF).
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).

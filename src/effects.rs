@@ -196,7 +196,7 @@ impl Machine {
         x
     }
 
-    fn fx_target(&self, s: u16) -> (u16, u16) {
+    pub(crate) fn fx_target(&self, s: u16) -> (u16, u16) {
         (self.mem.r16(DS, s + slot::TARGET_SEG), self.mem.r16(DS, s + slot::TARGET_OFF))
     }
 
@@ -545,7 +545,7 @@ impl Machine {
     /// 2EBD:04AB. Clamps a 32-bit value moving in direction `ax` to
     /// `bound`, counting the delta in DGROUP A836 and, if the bound is
     /// reached (or passed), in `bounded`.
-    fn fx_clamp(&mut self, v: u32, bound: u16, ax: u16, bounded: &mut u16) -> u16 {
+    pub(crate) fn fx_clamp(&mut self, v: u32, bound: u16, ax: u16, bounded: &mut u16) -> u16 {
         if ax == 0 {
             return v as u16;
         }

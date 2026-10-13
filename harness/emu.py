@@ -73,7 +73,11 @@ class Arena:
         # it; F6/F7 with reg field 6 or 7 is DIV/IDIV.
         cs, ip = mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)
         if (cs, ip) != (stop_seg, stop_off):
-            op, modrm = mu.mem_read(self.lin(cs, ip), 2)
+            code = mu.mem_read(self.lin(cs, ip), 8)
+            i = 0
+            while code[i] in (0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0x66, 0x67):  # prefixes
+                i += 1
+            op, modrm = code[i], code[i + 1]
             if op in (0xF6, 0xF7) and (modrm >> 3) & 7 in (6, 7):
                 raise Fault(0)
         assert (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)) == (stop_seg, stop_off), 'did not return'

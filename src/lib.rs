@@ -33,4 +33,5 @@ pub mod travel;
 pub mod wild;
 pub mod scale;
 pub mod shop;
+pub mod spell;
 pub mod strike;

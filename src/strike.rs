@@ -270,7 +270,8 @@ impl Machine {
         self.mem.w16(DS, e.wrapping_add(4), y);
         self.mem.w8(DS, e.wrapping_add(f::SPRITE), sprite as u8);
         self.mem.w16(DS, e.wrapping_add(f::FLAGS), 0);
-        let entry = svar::FLAT_DATA.wrapping_add(sprite.wrapping_shl(2));
+        // CBW: the flat number's byte is sign-extended.
+        let entry = svar::FLAT_DATA.wrapping_add((sprite as u8 as i8 as i16 as u16).wrapping_shl(2));
         let off = self.mem.r16(DS, entry);
         self.ems_map(self.mem.r16(DS, entry.wrapping_add(2)));
         let frame = self.mem.r16(DS, svar::FRAME);
