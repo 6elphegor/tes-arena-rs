@@ -12,6 +12,7 @@
 //! level-up screen (1194:1034) and what happens when the player runs out
 //! of fatigue (2901:0014..) are reached through `ClockHooks`.
 
+use crate::bsa::Files;
 use crate::character::{field, PLAYER};
 use crate::machine::Machine;
 use crate::mem::DS;
@@ -55,9 +56,11 @@ pub trait ClockHooks {
     fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
-    /// 1194:887A: a random encounter check.
-    fn encounter(&mut self, _m: &mut Machine) -> Option<()> {
-        Some(())
+    /// 1194:887A: a random encounter check (`encounter::random_encounter`,
+    /// with the fight's graphics, music and text left out; override to
+    /// show them).
+    fn encounter(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.random_encounter(files, &mut crate::encounter::NoFightHooks)
     }
     /// 1194:86F2: the per-minute encounter check (also while resting).
     fn encounter_minute(&mut self, _m: &mut Machine) -> Option<()> {
@@ -77,7 +80,7 @@ impl Machine {
     /// is being left (C398 bit 0x80), checked before each. The count
     /// runs in CX, so only its low 16 bits count, and 0 means 65536 (a
     /// whole dword of 0 does nothing).
-    pub fn advance_minutes(&mut self, minutes: u32, hooks: &mut dyn ClockHooks) -> Option<()> {
+    pub fn advance_minutes(&mut self, files: &mut Files, minutes: u32, hooks: &mut dyn ClockHooks) -> Option<()> {
         if minutes == 0 {
             return Some(());
         }
@@ -89,16 +92,16 @@ impl Machine {
             if self.mem.r16(DS, var::AREA_FLAGS) & 0x80 != 0 {
                 return Some(());
             }
-            self.minute_passes(hooks)?;
+            self.minute_passes(files, hooks)?;
         }
         Some(())
     }
 
     /// 0000:1459. One minute: the calendar, the sky, and the week.
-    fn minute_passes(&mut self, hooks: &mut dyn ClockHooks) -> Option<()> {
+    fn minute_passes(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
         let t = self.mem.r32(DS, var::MINUTES).wrapping_add(1);
         self.mem.w32(DS, var::MINUTES, t);
-        self.calendar(t, hooks)?;
+        self.calendar(files, t, hooks)?;
         self.sky_time()?;
         let week = (self.mem.r32(DS, var::MINUTES) / 10080) as u8;
         if self.mem.r8(DS, var::WEEK) != week {
@@ -111,7 +114,7 @@ impl Machine {
     /// 0000:1570. Splits `t` into year (from 389), month, day, hour and
     /// minute, and runs the handler of each field that changed (year and
     /// month have none).
-    fn calendar(&mut self, t: u32, hooks: &mut dyn ClockHooks) -> Option<()> {
+    fn calendar(&mut self, files: &mut Files, t: u32, hooks: &mut dyn ClockHooks) -> Option<()> {
         let year = ((t / 518_400) as u16).wrapping_add(0x185);
         self.mem.w16(DS, var::YEAR, year);
         let mut rem = t % 518_400;
@@ -138,10 +141,10 @@ impl Machine {
             self.day_passes(hooks)?;
         }
         if changed(self, var::HOUR, (rem / 60) as u16) {
-            self.hour_passes(hooks)?;
+            self.hour_passes(files, hooks)?;
         }
         if changed(self, var::MINUTE, (rem % 60) as u16) {
-            self.minute_tick(hooks)?;
+            self.minute_tick(files, hooks)?;
         }
         Some(())
     }
@@ -193,19 +196,19 @@ impl Machine {
     /// 0000:1622. A new hour: quest progress, then an encounter check
     /// (unless 5C8 bit 0x20) in areas with level flag 200h or while 1013
     /// is set.
-    fn hour_passes(&mut self, hooks: &mut dyn ClockHooks) -> Option<()> {
+    fn hour_passes(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
         hooks.quests_hourly(self)?;
         if self.mem.r16(DS, 0x05C8) & 0x20 != 0 {
             return Some(());
         }
         if self.mem.r16(DS, var::LEVEL_FLAGS) & 0x200 != 0 || self.mem.r8(DS, 0x1013) != 0 {
-            hooks.encounter(self)?;
+            hooks.encounter(self, files)?;
         }
         Some(())
     }
 
     /// 0000:1644. The minute tick.
-    fn minute_tick(&mut self, hooks: &mut dyn ClockHooks) -> Option<()> {
+    fn minute_tick(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
         self.auras();
         self.tick_spell_flags();
         self.tick_effects(&mut GameHooks);
@@ -236,7 +239,7 @@ impl Machine {
         let check = mode == 0
             || (self.mem.r16(DS, var::AREA_FLAGS) & 4 == 0 && (mode == 4 || self.mem.r8(DS, 0x1013) == 0));
         if check {
-            hooks.encounter(self)?;
+            hooks.encounter(self, files)?;
         }
         Some(())
     }
@@ -315,4 +318,8 @@ impl Machine {
 /// `ClockHooks` that do nothing (the harness stubs those routines).
 pub struct NoClockHooks;
 
-impl ClockHooks for NoClockHooks {}
+impl ClockHooks for NoClockHooks {
+    fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+}

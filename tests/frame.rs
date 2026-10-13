@@ -44,7 +44,12 @@ impl WeaponHooks for Hooks {
     }
 }
 
-impl ClockHooks for Hooks {}
+impl ClockHooks for Hooks {
+    // The generator stubs the encounters (gen_clock.py's stubs).
+    fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+}
 
 impl FrameHooks for Hooks {
     fn message_box(&mut self, m: &mut Machine, _text: u16) {

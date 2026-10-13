@@ -160,13 +160,13 @@ fn matches_original() {
         if std::env::var("CLOCK_STEPS").is_ok_and(|v| v == f[1]) {
             let mut t = m.clone();
             for i in 0..minutes {
-                let r = t.advance_minutes(1, &mut NoClockHooks);
+                let r = t.advance_minutes(&mut arena::bsa::Files::default(), 1, &mut NoClockHooks);
                 t.store_rng();
                 eprintln!("minute {i} {:?} seed {:08x} t {:x}", r, t.mem.r32(DS, 0x91F6), t.mem.r32(DS, 0x05CC));
             }
         }
         let before = m.clone();
-        let got = m.advance_minutes(minutes, &mut NoClockHooks).map(|()| {
+        let got = m.advance_minutes(&mut arena::bsa::Files::default(), minutes, &mut NoClockHooks).map(|()| {
             m.store_rng();
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))

@@ -92,7 +92,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
 pub struct NoFrameHooks;
 
 impl WeaponHooks for NoFrameHooks {}
-impl ClockHooks for NoFrameHooks {}
+impl ClockHooks for NoFrameHooks {
+    fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+}
 impl FrameHooks for NoFrameHooks {}
 
 impl Machine {
@@ -274,7 +278,7 @@ impl Machine {
         let now = self.mem.r16(DS, TICKS);
         if now.wrapping_sub(self.mem.r16(DS, MINUTE_TICK)) >= 0x5A {
             self.mem.w16(DS, MINUTE_TICK, now);
-            self.advance_minutes(1, hooks)?;
+            self.advance_minutes(files, 1, hooks)?;
         }
         self.hurt_flash();
         let v = self.mem.r16(DS, 0x0D37);
