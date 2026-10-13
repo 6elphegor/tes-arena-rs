@@ -1,0 +1,3000 @@
+flight | d8fac0e9 6 | a0bb64c1a9faaa97 fbf29e03f0944d3d 436ecf8b0eaa6ec1
+flight | 990f37dc 0 | fault
+flight | be2aa91b 0 | 99a0fd5988c7dab0 cc6cdbc5b620dcb9 1ce419a4313dc97b
+flight | 2cb6c9aa 0 | 1788acaf76e75aed 9cb3c3d77bae6b8e ea78364252140a24
+flight | 48b6eb32 7 | 1e71d60687d204b4 9275093b26fe4dc9 bdcdf9dcf8055e17
+flight | a460b4a4 6 | fault
+flight | e5f6c191 2 | b6562894fd62c9ee 777d8eef48f4afcd 7ba0a29bef53d2c2
+flight | b83cdaa 0 | fault
+flight | 497a1811 1 | b4450583c6628276 f9dfa0963da85c5 23bcabcdc2bad2f5
+flight | 37a18be1 2 | fault
+flight | c4d97ab4 7 | fault
+flight | 46b6e2cc 6 | cb85ebede813f010 cf12acad676dca94 9f7b151167ba8865
+flight | e0c03d71 7 | bee8a6a4d75dcd92 2a3dce0dc8a0975 943ceb232117d2f5
+flight | 1538a223 2 | fault
+flight | 35157e8b 5 | d81ff0aa12c18b33 5ac7f901f41ea50a 7d65872c5203210c
+flight | 2c85abc4 4 | fault
+flight | f49e3a7d 5 | eb1a7deb5322b70 583a2e309912911f 981597dbf4fef96d
+flight | af601972 2 | fault
+flight | aa33b5be 6 | 26453da2ee266ece 8589785005462a09 b96de5c3e647bf07
+flight | 8396010a 5 | fault
+flight | d2ee139a 3 | fault
+flight | 3a4b7913 1 | 9302e60e445577fd e0fa97da1ea97031 f4c164a8ff806823
+flight | d7effda5 7 | 33a9c5dbfae116cb 5ed80061391c820c f875e1831a4a77b6
+flight | b9fe8831 3 | 816d7b3504ec86d4 f9ee46c04ea4d9b7 c53d413cc8897295
+flight | 35bf8c3b 4 | 5a8eee3be7c3ff08 d0cb9a01228fff6a a880713f20802f55
+flight | 54ad444e 5 | 7daddf4069333253 9d69b30071ca50d7 a10bcb78e1c72896
+flight | 54007bfe 1 | fault
+flight | 5b59467 1 | 65327367d7ab7215 177f569c7093ec2e 1c602ef68f6e5164
+flight | 497dcf8e 6 | 544cdda4529c6c04 4b5f4a5300ae63ed cc9028c7887d3f66
+flight | 838e3916 3 | 4caf0077fb2c3e5a bed29036d422e7ba 10a1fae6ee28b6ca
+flight | 29c4a42d 3 | fault
+flight | b00fa04 7 | fault
+flight | d27c62dc 4 | fault
+flight | 867609a 6 | 51680a04cbd32fe6 b727e7d72a430a2d aa84ba2f0dc63a96
+flight | 17dec0 2 | 17b35f8cd2847114 f9013ada470e6d8b 6d1f83c19c29bfeb
+flight | a425b0bf 7 | 6e32eeb522fd8802 2d9b7690bce11cbd ba685d6ce23dbef9
+flight | 3b65f7cb 5 | 6ae3e71a71709aca 37feeee4d7cc1ff2 d7efc129109b7669
+flight | 91062b20 4 | fault
+flight | 385d0759 1 | fault
+flight | f8059316 0 | fault
+flight | 5cf5797b 7 | 23c68ba764c9ab72 1f5a0867fbe2b84e 45cbe22d64eb9e87
+flight | 924078ec 3 | fault
+flight | 44e6c938 1 | bc85781ec82154ae 67efdd31284d5ae0 478fcdb1617a4592
+flight | 73c8816 5 | fault
+flight | ca99d534 4 | b7e062f3cd821000 4e1e23105280ff31 946828640b45b853
+flight | ec6a0cf6 5 | fault
+flight | 774a20ec 6 | fault
+flight | 9dd79b8 6 | ee00992d6a78857d 2a9f6697d1105c41 4b053fdc629de46e
+flight | e820bf14 2 | fault
+flight | 35624eb4 6 | 7befda174d304a21 72eae17b43ef5869 8e20270a2185c383
+flight | 259cd353 5 | 2c20ee346d654989 8a56fbf5fb135071 158c23ae933927ca
+flight | 652eb64d 2 | 87eaaad08707d95c 815d533cef22022 c92d1f8e5ba59aa9
+flight | 6f905fa7 1 | e71c0ab28d44c3c5 9e59d319ed38efc2 4fa9812ae9df80b4
+flight | 5c0b1d26 0 | fault
+flight | 640cc77f 6 | fault
+flight | 66bb0c9c 4 | fault
+flight | 499abdc3 2 | fault
+flight | 1b26cf25 0 | 2533aeae97be36c 1456aed70bbd20dd 2344b47a3a5d58f3
+flight | 54cb7064 2 | 5e12d73edc349bc6 12aa020968ff38c6 b8e02a25f737be12
+flight | c2611c62 3 | fault
+flight | fd833805 0 | fault
+flight | 8962512c 0 | 79ce7e1078bce5d9 934b758dcf09e96f 71ac30e7b9c8b471
+flight | 821112dd 2 | fault
+flight | c2a818c5 7 | 903e8db30b4b38e3 723ac423e1e0de1e c485325b341e852
+flight | 5a515be5 3 | fault
+flight | 832c6024 2 | 7b2ef9abef5108b6 9b21e94b67e5e2a6 9b497f36b13a2002
+flight | f224d03c 2 | 1038f2fa03061169 2eed7ada1289a0d9 98cc35bd15c57bf5
+flight | 49673eb7 3 | fault
+flight | 9ecd19a7 0 | fault
+flight | d213feba 1 | fe944af7e584a057 815f582d1431f9fa 769942ac77a7d8bc
+flight | 7cf31920 1 | d790018fee1292 5dc619a29e95ece8 388fdb0376f1e7db
+flight | d367574d 6 | fault
+flight | e5ec4396 0 | fault
+flight | 76f0faf8 6 | e75ae9296638ca03 693430c617cc4373 449c9aa180dd819c
+flight | c1b28395 7 | bef4e9eb048edea5 40cdf22687ad2cfb b4150babb9b0fea4
+flight | 23de6449 1 | 764973851387a832 5800d8fe53920b58 b4d59a5f98f8f5b3
+flight | 429a614b 1 | 5ccd740acb4cb2d7 1365c0f581c10401 c2a81f47a5449
+flight | 5c48e51e 1 | 54f51e047b376e23 65673cc637c583cd 5ecba6826ad0f2af
+flight | 110d62b0 1 | fault
+flight | e7a3491e 7 | fault
+flight | a352572f 6 | 5fd7853682367631 96a69cdeb0741b72 fefbca9f7dad7bb1
+flight | 47eb4cca 3 | 803ddecefdc494b0 50c2fce676556698 2afcc7092f902650
+flight | 989b44f1 2 | fault
+flight | ddb9fdc8 3 | 7199487c95751186 2e6bf34daeb1a364 ac05883d7aea80e0
+flight | 6b0631b1 4 | fault
+flight | 24fbc937 4 | fault
+flight | 9ba8e62c 6 | 9b9c87d11bdeb1fc e7b45c85e3b8521c 855ed75c6309d380
+flight | 54442dd8 5 | fault
+flight | cbaa28af 1 | f8c9eab308125f0e 54abae47d9a716fe 973144abac31de13
+flight | b3debe10 5 | 17bd4692d47e60aa 3e2bb6b41227bc56 4ed08136dc6d1136
+flight | 63104f9d 0 | 309bab5c15799445 d4d3440c79675a43 3a156e469cbd256e
+flight | c46f779c 1 | fault
+flight | 5984f37d 2 | fault
+flight | 210c06b1 2 | 5b265045afed9231 b9da4ae325910360 97682260f9ff4ea4
+flight | d6416689 3 | 5e334992a2bedca4 bff7576adab3417a 471a52dc479973cd
+flight | 59a27bfc 3 | ff0126db3923c6f0 f2c12b5e8233cd13 c273313f92597a6
+flight | 6027eef5 0 | fault
+flight | dfc9a000 7 | fault
+flight | acf87d73 7 | fault
+flight | ff41fe0f 4 | fault
+flight | cd5aa50c 1 | 6d7817cbea8a4ed0 fd6315da233b774d 6a9e86545b990221
+flight | d5236215 6 | fault
+flight | 46beda45 4 | fault
+flight | 17a6c6f7 7 | fault
+flight | ee76781 3 | fault
+flight | e0d41249 6 | 67ce0a2f6e0c89d7 2733c5d8cde1d105 a810b92bd8561bdb
+flight | a6502b47 5 | fault
+flight | 7b2a9ae3 7 | fault
+flight | 285d79c9 1 | 3068e327fcd8f47f 82f381289f480681 35dcadda7329bd44
+flight | d76280b9 3 | 40a8e96bd3bf9c4d feaa0f0b5e13bd9a 5bf66aa9a674cfc6
+flight | e6e607e6 7 | 2f9995b3f57b8365 fc51cff043b1b223 b2c714bad324c64e
+flight | beab5200 5 | fault
+flight | f12b8704 2 | fault
+flight | 1889795f 5 | fault
+flight | eab3d169 3 | d4d7cc74effb0773 66d12bf9acfd0dc0 7306f93f68a9c3b0
+flight | b2345de6 2 | b79b2e3a264dbc47 420f4bb9e92c0a4f ed26a270c2427d52
+flight | 7785625a 5 | fault
+flight | 583354d 5 | fault
+flight | 3eb71493 2 | fault
+flight | cd4bb748 3 | fault
+flight | 7670456b 2 | 6702ddc61c1dd36d 51005994dec2434f 8cd829d5b6214cd9
+flight | 2d5b2f26 4 | fault
+flight | 1e59c080 1 | fault
+flight | 758136f1 0 | da41fca1279de59e 3c6b7735219c586 ef4aee28e8442210
+flight | 1b20e8e0 1 | a9de19d9ff52c79b 4e2c1c542732d459 f32ff0ce484faebb
+flight | 4f9c6d10 3 | b3794a16f861adbb ab0a4e2e8ff1615d c701c837e9a2efd6
+flight | 51292b35 7 | fault
+flight | f012e963 2 | fault
+flight | bf7e432b 6 | 126f223d359dc8fa 8e5d5088982aa5ad bcc14c07296cf169
+flight | 2d787388 5 | fault
+flight | 8448e1f 7 | 3c7fce859de6b65f e9749fae3cbc37f5 548a6950379bb3b8
+flight | 413d5ba3 0 | fault
+flight | ca11644c 7 | fault
+flight | 2c3bea7c 3 | fault
+flight | dbc84ff4 5 | b26612bf7afffde3 23a78c64ade8b088 eb8fb3adf28c56a3
+flight | 9a5b72b3 6 | 883f68017bcba4a4 d24390987839fe2f bdfb3ab867ab8d0f
+flight | 2c28458b 4 | 38dea9bca7c307ef 382529a5c6f3c45 f2f9e5bac56d51c6
+flight | 7c5fe80b 7 | 85c0b05bf8b8907 9a0a2c7fc812e18b 9583e1320877e58c
+flight | 4806c7aa 1 | a9e02d288904d3b5 d22818b721baf485 a6bdb936cb8d1120
+flight | 56d53fca 6 | fault
+flight | 58d3bc07 4 | f938d5eef8f96618 473f9f64b9ac99fc 197b8b70e209ef51
+flight | e50d4609 0 | fault
+flight | d7208a99 0 | bf3b70ce01936aa4 b3e67060677411ab cd967d2e4915f2c1
+flight | f2f745d2 3 | 7c2077159a29c2b8 a14a654e905b71c3 eefbc27c1a09c344
+flight | 72ac5178 6 | fault
+flight | 2bf088e4 6 | fault
+flight | 32821254 3 | 60e3f3dba067621e b16e3c354f68d8a b217fc385a2b7b1f
+flight | efe6015b 3 | c667d34b40910b4f 9d7ddfbcbf1ecc2d cdd688f8734b57bf
+flight | 3a9f8583 3 | 6ec21363e37ac51a 856546f338839b7a 4e537edc5867b57a
+flight | 53c574c8 7 | 3261281e13cddd13 971df2074eaca33e cd92cbc55429bc64
+flight | cd2aa987 6 | f684ddb75729a948 15780fd50daca994 10bd7a3d791e1c68
+flight | d413e9d7 1 | cb647e31ec62f41 e8cae2a066b35493 23236390ce23bb48
+flight | ff9fb282 1 | f27ab7334dcd8c1 413d6d5fcf20012c ea16af912925093b
+flight | a0e048eb 6 | fault
+flight | 55c8e181 3 | fault
+flight | 155d70b 4 | 5dde7b03b0430843 a56e8cb7a2dc7d2 1707ab61ab997736
+flight | 897a3fa0 3 | 52fb26a9952207c6 9d2aa4bdd10cb232 32b4693debc92b2f
+flight | 7c428416 6 | 6f94d544dbb3c2a0 d23fd3916be020ff fd45783e05cbedbf
+flight | a2948d3e 4 | 33e0c95070253792 fc27e8d5ae0752cc cf2adbb07a359121
+flight | 4372fea1 4 | e16b03405b4554fb 3d20fba6090c471b ffa5a93a8225ef2b
+flight | 2715ecf9 2 | 278627a76e2c5379 a7386c76a7c4b432 4e76805ab72c93a5
+flight | cc9a17fd 2 | 44bc66fe6f6d5ede 5180e3722dee51a1 c8a0b73300457fec
+flight | 35d167e3 1 | fault
+flight | 3e79cec7 0 | 4e9bc0bab8685f3c 3efdeca724d1ef47 23229dc1542a746a
+flight | e883c088 0 | fault
+flight | 58219a79 0 | fault
+flight | 9dd79984 6 | d14c838ae92f6b72 893afbdae2de1681 3c77037a9252500a
+flight | eef73b9f 5 | fault
+flight | f5508ed9 4 | f5178da819c429d2 fba2d2a878854f19 82cbb12ff190d56b
+flight | d941d295 7 | 2cea5c42508f8b13 84e3826d11843a01 7553cc11cdaf1cf0
+flight | c9db3b7f 2 | cc2ed5333763c313 d0dc693cae8e416 df714bfd2a8aef21
+flight | 4ac52f9b 0 | fault
+flight | c684d7e9 0 | fault
+flight | bf86be4 3 | fedb6d54d6077a3c eef3660dfc0f30d5 685104f25fc8b8bd
+flight | c5989e36 1 | a24492c3e67a4d71 5f94bd33d2cc209b b618f82619eede64
+flight | 39b1aa6e 6 | fault
+flight | 913635d0 2 | 36e626c53ec9e19a 232c92a99f127665 3d63c9899d32bbac
+flight | 7358b29c 4 | fault
+flight | 79472998 7 | fault
+flight | 4743aaff 7 | 4692241ab079ccf3 edcb3a9609991e6c e3501a22af340a0e
+flight | ccf991cb 2 | fault
+flight | 12c0c74b 5 | 9b35cc1543ce5c2 70e05320c7e95b 64c7fbc141bee081
+flight | 3045cbf8 0 | fault
+flight | 375c0820 3 | c119572df7b67843 c49e0566e5dcb749 43f665b2f1ecfb13
+flight | 2e450e2 4 | 6d05ee0d2a4c4ca7 30c6da031f6a465 227d14d71cfe2df8
+flight | 2bc7f090 0 | 31d116dabd340ee8 c4078afc88741ae9 ea29304b86761abe
+flight | a4765af1 1 | eb3d158df3cbd9d8 7768dcb48541455b cbd9880616b1c08c
+flight | 80b3c285 1 | fault
+flight | eebc0b64 5 | fault
+flight | 2d8b4233 1 | 520978ec1c323d6d dfde45b834bb9751 4ca069e6df467797
+flight | d13a6194 0 | fault
+flight | ebc7cce5 0 | fault
+flight | a4e1f492 6 | 943ab04b5fa36038 a226793d9311d848 56f3d60e0143934
+flight | 24ed2cea 0 | d416de05e0c7d45e 12a5032906206a9 77cdd32626fbf8e5
+flight | 695d23 6 | fault
+flight | fc615be2 7 | fault
+flight | 22641fbc 1 | fault
+flight | 520ccdbc 5 | fault
+flight | cac59318 2 | cb4e4b2afb38ca2 db502eebc1924970 158fe1c551df7c2b
+flight | 1c27bb3b 4 | 7db61969c8af8509 4e21ccfb01d64427 1ed57ab91bc85060
+flight | 1f1c0d54 2 | fault
+flight | e5833fb1 2 | a26877ec60545bdb f55c847ebacfe8f1 d0f6a0e7bf5e8760
+flight | be96bde1 0 | fault
+flight | db2276de 2 | c18cfe4b5a871cc5 435faa763ca4bdd 18446a02a5787c07
+flight | 7adf9502 5 | 191b80f4c32d9d9e 495d175ee59d4171 b096a55b1067fcd1
+flight | 81cdb3ab 0 | d5ff2ba8200c951d 5ea1e60f03fc1909 b043ef26ad3ee405
+flight | a259a7ec 5 | fault
+flight | d933a216 7 | fault
+flight | 2086a991 5 | fault
+flight | d8894a15 3 | 7ca9fbcf79bbaf00 6597cd417794dbb b5d47e151128fad2
+flight | f09d1f5f 6 | fault
+flight | 10e1c941 2 | fault
+flight | c7d2b21a 4 | 714a7cc6d4dc310c 9ea89e78e4533735 b49192f2fe98313a
+flight | a6c88486 3 | fault
+flight | 65595fc6 3 | fault
+flight | 6ab40d1b 5 | fault
+flight | f96553d6 6 | 416a16f27459513d a7d6531353af50a6 cb734f0bbac5f6ba
+flight | e05782e4 7 | ef94a7be0b5f52e0 613da79fdd610af8 613c59ca4a2d8c6d
+flight | d3492ae8 5 | 5535c56c2947624b a076a840e77122ca 248abc5780f19ad0
+flight | 356fbaf6 4 | 899a1c898d96d021 29b5ae387926944c 3c72152e78db7681
+flight | 9627b6b8 5 | 99ad7c36f1ab1510 ef214606613d5a63 49f5acc72c6cd1ef
+flight | f57a864a 5 | 9357570b9972461c 975e1b95c4515492 a13f3e053cb988c9
+flight | a046f1e4 1 | fault
+flight | ac1ee7d6 4 | fault
+flight | 26b268f5 4 | c83a1ee5e031c65f ff53e6338a8ccecf 97f579531761dfda
+flight | de1f0e6b 2 | fault
+flight | 66e36a7e 2 | b6f8c647630e52da 7d369e0a041ddc49 2536d1e451fd699
+flight | a705e2f0 4 | fault
+flight | de1a3794 2 | c0a25b0b823dc0b6 e0457e40e01cb62 7addf0209bfba416
+flight | 7e2bcd24 1 | f6ba317aa3be21b8 2d81130429ec82d8 3131fe4235ee31df
+flight | 6bbbb052 4 | c2156b25e8566570 71defa3812f5c57e a5f5ee87a0be8e4b
+flight | 86efded8 4 | fault
+flight | f35bbe5 0 | fault
+flight | a9de00d0 7 | fault
+flight | 88c64836 0 | b746165e794c2f7 d15c1a57319a4f03 d333dca90b1f1749
+flight | da91cac3 3 | 8671552bd7e757b4 10d18efabe22bce5 9e99486483fe2002
+flight | de34578f 5 | 43749ed96a89c2de 3455300e4bb7d64d 2da35abc7dab36e
+flight | e74b2489 5 | fault
+flight | 1b57eb10 5 | 6c384445137ae52c 922497bba9df0ed1 7a6fb4ca587fc84b
+flight | 2a51d9d8 6 | fault
+flight | aa1eb65d 2 | fault
+flight | 8eac4fab 7 | fault
+flight | 22a2fb7c 0 | 68b61e551aefd56e 393f98362224a77d 342e4c26d4d109a3
+flight | a75fbbd6 2 | 377663fcfa0ce235 448441a43cb070d4 be0f0790a11ca501
+flight | d90d1425 2 | 136fdd052cd2fe9d 5a85c0814c153dd9 6df8a1d691f374f0
+flight | 2a727d7e 2 | fault
+flight | b3f6703 1 | dfef5842d132a1ce da47d97041ab77cf bab02c0d6b599786
+flight | 903357d9 2 | 8c9ebc7b248d7bf8 54ff6fc06ca66df5 4717811ad5f66e6c
+flight | 4bffbe00 5 | 7e8301b7e610ba28 d61ee9e0e8a611eb b3f95d85713c0e33
+flight | 530f04a 0 | fault
+flight | 26d9c395 7 | d991f63b17037354 a3f12091185ed01a 296e8a722c63e95c
+flight | f2cbf43f 1 | fault
+flight | cdbedcab 1 | ddc8e72f4fe868a1 e1a949e67c3e210 39f99e8a351239f6
+flight | b28a1298 3 | fault
+flight | 828e69bb 2 | fault
+flight | 8189f399 4 | fault
+flight | 93fbb30d 4 | b118a38dc51be068 43c05f02caf3e691 94435ad805e19cb2
+flight | 9a4e70c4 0 | 4ace92a0ddf2b3f7 e2658b96ae2c47a6 f6834c685f792de
+flight | 46107871 1 | 396a963fdbbed3d1 c2d7cd4f80645c75 e6ba6928c09606e0
+flight | f7216c6b 1 | a90a8afeb1fa138f 4ef71e5f915d26ab 735269d634a76b39
+flight | a53334e2 5 | fault
+flight | e7228601 1 | fault
+flight | 376d4c49 7 | fault
+flight | c0c4c859 7 | 36788bff9f3e0b30 d206f16cb7166ce2 e6fb7f1ccbce5400
+flight | c4351ac5 3 | fault
+flight | 675da29 3 | 3697bb8cd742b948 48aa670d06999fba 2b4dd278d79a9333
+flight | ee376150 4 | fault
+flight | a57d487e 4 | fault
+flight | 7b465b72 7 | fault
+flight | 2df6b20b 0 | d52ac31c00345610 8a0fb845f2436117 11b04e18f2480231
+flight | 28f75a2e 3 | 2e53a0b58bc5e382 daa744c6ff2b053c 661a884e27aa56a5
+flight | c94e146b 6 | fault
+flight | dbe44fc7 5 | fault
+flight | 80071a5 3 | 699b9ffb47713520 84f710032e7782bb 1f8cace8c2187b11
+flight | 30d42af4 0 | 4b91b67dbd8c8ba9 55ce1d8505182bb9 78f72d5e749e64cd
+flight | a2afd852 0 | fault
+flight | 2aee2b83 0 | e7cebf9678baf8d8 eaf0988556071064 28628ab065633300
+flight | 944994cd 0 | 76746b77b5a9cb52 cd172d143c90d07a 6e2c6cef8c1d4357
+flight | 4bd1b646 5 | 88a9539a93352b03 60bbe7f4b57942f4 826837ca189c087a
+flight | 770b04e4 4 | 554d80c249fee029 bd74739af2b60c59 f678a2691d459d14
+flight | 4563c5bf 5 | a7b80e44d7752fa 4b4e2ef291d17c65 2b676795dc7ecfff
+flight | d690f14c 0 | 59399c4a1fa34a58 bc8d6837cad4ccfb bbf79f641c7a58d1
+flight | 7869e497 2 | fault
+flight | f8666393 2 | fault
+flight | 1864c9f4 6 | 3a6dffa2c508b53d cd3666b0cb1f3de3 54f359741ac0da22
+flight | a97c561a 5 | fault
+flight | 278433fb 2 | fault
+flight | 2c59f863 4 | fault
+flight | 4b5ed873 7 | 3c6ced7c4326a8a8 92efefebda797bb8 b4ebd844e09bb648
+flight | 1333d1a5 6 | 8ac7586e7d822a86 ff1f01f8a988491b 3681b1ec0f2f3c59
+flight | 8e9e9def 7 | 7baa9af1c92e2ddc d90df9d21716fceb 7822ad32b2f09fa7
+flight | d6a14f1b 5 | fault
+flight | d8a7ab3a 0 | 4207a88cd494ff7a 5a3a95d8c5d9c068 35885cd9669f7cab
+flight | cf7f728 2 | f6077895dc10166e 3f37f72d2da548fc e0d24beb8d9bb89f
+flight | df39b69f 3 | 933a3f72ddb78d9c d8f100a2a166d9b1 9bcc409d62b419cb
+flight | 1cf51b61 1 | fault
+flight | 508e29f9 5 | 49ca30849cd84bb2 2aeacf91774b2f33 855f482d0d5561c
+flight | 93b395ea 2 | fault
+flight | 90991759 2 | fault
+flight | 4ddbefd7 3 | 35e73c680f6610b7 e0b6d3d27494ea2a 9780f3935007872d
+flight | 2d342cf9 1 | 728a615a2a762760 20298a09ef02178f fe6c4d5164a68c43
+flight | e58c62a1 1 | fault
+flight | 931b4d2b 1 | 10c8f4bc8786f336 d253a48f21064122 16b14198abb42b36
+flight | 741800f6 1 | a1faf10af1f02c2f d12b0769b5c519b7 a73e6c7225bd3592
+flight | b7d35859 4 | 17bfc04c407528f2 5d74d560e252c139 ce67887e5c4721f6
+flight | 70a1b69a 4 | bf0c284c375f3c5a 97d60229b579befd 654689280064e62c
+flight | e4949204 1 | d2c610936233f480 f9b6da6dee60073f 16e4c8185c9bbed0
+flight | 6e10ea81 4 | d2807fab727a4e6f 2e11f2bc6cf560fe 80ed128580c1d361
+flight | 2d53cec7 4 | fault
+flight | 9b9e0e65 5 | 4746d6773f99b447 4e12f6c503b57085 5c4568e6ae83b039
+flight | 2d979886 0 | fault
+flight | 81563b5e 4 | fault
+flight | b480045c 2 | fault
+flight | c7b065e6 7 | 157170ad3aebaad6 6c7446552e4c8ee2 14b0f91e15217c2b
+flight | d2918336 7 | fault
+flight | d6016a3 3 | fault
+flight | 64875375 0 | 24d010ee18882853 fe401c88d2848486 536b33b176cc3904
+flight | e4ca3e56 0 | fault
+flight | 489a39db 5 | fault
+flight | dcd3907d 0 | 5a70a512a5bbf199 5791213a66a41c4d 1578b0a70728631b
+flight | aa8e8999 0 | fault
+flight | a02f48df 0 | a61b6e008e85ec1f f6b467de857cd4a b1e96cfd081114b2
+flight | 8a7e9922 3 | fault
+flight | 7d8f43d6 2 | 83ed9889a75d5b7d 99f40f4e35221cce 7cb463554bc8684b
+flight | 8da02470 3 | ee8f42b743bb3086 5ab6e272d3796f44 674cbeb2bbb3dfef
+flight | 8bf08b07 4 | d8afda06bffa3d1d 6863d128733f3b94 e06d7ffabee39278
+flight | 5bcbe5af 1 | 1ec54850637b8f2 2bab2a5c1e0742a3 36029d69abb102ac
+flight | 99b968a7 5 | fault
+flight | 7c55ca3 1 | fault
+flight | de023be3 4 | fault
+flight | e98e1cab 1 | 11adbfa0846b2095 3a7cd292e958be4f 8895dd0b4ac8e0a2
+flight | bcb7a9b 1 | fault
+flight | 4a4185ef 0 | 539b924965db4c40 2666a580c300d0f5 7c077ad9672f549
+flight | 24197a56 4 | fault
+flight | fb25e274 1 | fault
+flight | 608778de 7 | 114beef093eaa0ad 32fd4cb227cb877e acf95c563287eb10
+flight | 13e84232 4 | 252ee0c6f7a32b22 cfc3ff0ad38bccd 191032ea3fd0b6f
+flight | 5dc2a261 5 | fault
+flight | fc5663a5 5 | fault
+flight | aff55615 4 | 462a8e30d0ee03e5 62ac12bd6d862b18 976c5a03b5cb66c7
+flight | f1d8213a 7 | ddeb55f631df4310 d6f85d70bad4ff7 82484633191df41e
+flight | 460d6e4c 7 | 9f818fa677442b59 3222a4e532bba735 2096b15bb6406ca0
+flight | d1deb406 6 | 620df1d5a75cb6d3 c590ccd011a86074 462102594001e372
+flight | 450c97e3 4 | f9229ec68d1ec505 c46ce2c2001bfcaf 73f86cd1095784f6
+flight | 655c0520 7 | 9346b6695c1d7f76 3a7d826ad70ec178 59a2eaad7591c5f5
+flight | 980f2466 0 | fault
+flight | 7b735194 4 | 32d613120f3cfff7 79bee0c9804d1de2 e1ef8cc35e71d18
+flight | b2cea694 6 | 427e0169cf6f4c6d 4dc50957355aeb7 818805abb0ac8f39
+flight | 78541705 5 | af8faf7e4530c5dd 475db0e64d70810f 9695bb7ff42f36ad
+flight | 2bac5d91 5 | fault
+flight | 93c3bd1f 3 | b310fe7202d92f60 a5ba05d2bd86cce2 f1b5bee74d794e51
+flight | 1c0d2993 2 | f3ebacad558a8826 f4cbf4b796d3b33e 1c77e41187e920c4
+flight | 5d89780e 1 | 26e0bf0b9f26eba8 c5ed631082a9d965 b9e00378f08351b
+flight | ab2a2c6 5 | fault
+flight | 83a91acf 5 | adc99d3d8d4677c7 b36848037424402a be91d0e10df95911
+flight | a54b5b12 0 | 1459f619c6b35f3b dd64e66862fb4243 236a414cc3c8599f
+flight | 13be763e 5 | fault
+flight | 407f066d 6 | 212fe08d38737c84 8072f9755088faf1 1a7f4b6b90da0c86
+flight | 3ea07199 6 | fault
+flight | feab9af5 3 | fault
+flight | ddbcc944 2 | fault
+flight | 54b0a5fd 7 | fault
+flight | 1249ada5 0 | 989f5c7baffe347f 1dc13a31933a525f 405e2bc47674432
+flight | 7cd1f6ed 0 | b8cc04ece7773b12 ac05d4e316dd7189 649b4ca1bb95ce0c
+flight | e71523b9 4 | c1c45b7248f26ed8 fa90ab87ec78a53c f48ffaf0ace835bd
+flight | 3b257c6a 6 | 8ec9e19e1ba59083 bfd3dadde3c499df 295f78591496ae93
+flight | 6bda1c0c 0 | fault
+flight | 87c847b1 0 | fault
+flight | 64a97825 3 | fault
+flight | e9d9341b 2 | ad97133f3717d3c 7fc69c8a35e54f66 fb0ba7ec25b6d71c
+flight | 66fa06c0 5 | fault
+flight | 229708d6 7 | fault
+flight | f86a5e0 0 | da59ffe45b6456fe 7bcf798baffcb7fc ed7212019c8e8fce
+flight | 4b531d9 3 | 105a0b6c2e3392f2 7cec43aa041a37ca 707bb693307f7f3f
+flight | fcbf41c7 3 | fault
+flight | faf1ecfa 1 | fault
+flight | b9de37a5 7 | fault
+flight | f14f834b 6 | 79cc9f2163b73f8b 79e002ae104d1e1e 2ce73b318b0a30c4
+flight | 6e727344 6 | fault
+flight | 9695df47 6 | 1da8f46159c712f3 26e22f12c88c7741 6a9a5036358456f6
+flight | 9b09c344 4 | c686c1524a39599e 17e2e42f1134404b 62dd7073263189e0
+flight | e0194035 6 | fa8207b3f1c0893e b1742fd6cd9f0243 9d52449b5fac98e6
+flight | 8d872d59 1 | fault
+flight | ff1269d3 3 | 97a364a94bc33fe3 159dbd0c561e5a2a b9e846ee1d5b1c2c
+flight | ccb1ad3c 0 | 54ae2bb2689e8714 eb32da242c331d32 4f41c4138b40650f
+flight | 5d49fce7 2 | 5c198c6b7edf4036 2503bc03742f7582 d475e3d39e357a00
+flight | 126b31d5 2 | fault
+flight | cd6633c2 0 | fault
+flight | 75e5d25d 1 | 7d8678ad9f46f58c e3722a57162ca847 2601f10831ad0e75
+flight | 5338fd73 0 | cb0ad224112747c 6768a39d31545639 cdfaf01a39ac5eaa
+flight | de990d2a 1 | c692c0defcdf5208 52e6c6c4d055ee02 63488f36e9ebad14
+flight | 408040a2 6 | 1430ac3034fa828e d83653ce82378d23 fdbb55206891ef12
+flight | a760780 3 | 386d99139d7d2219 b6b96d27180b393e 761b1f0a173c533f
+flight | 3e1f64e4 0 | 6fb031bbc66337ee 7c9efa11ec92a12 335d504eacf58c33
+flight | b4d37f70 2 | 166e57fb09e36a4a 2da36c420ad029f0 1b5c8608e451ded5
+flight | 88b932b3 2 | fault
+flight | 8ec8978e 0 | a5b824dcde7ccfbe a520773102a45e98 e1211dc4185ed06e
+flight | 473f326d 7 | fault
+flight | 85f61048 2 | 15b38b1edca34691 9d18f8521b598232 cd4c1e740f9dd4af
+flight | 7b58ad8c 5 | 4a6f1afdb76cf6ff 7b0ab7003096bf4a 3cdca2444852d9ad
+flight | 1f4d28fe 1 | fault
+flight | d89bb887 6 | fault
+flight | a2557f7 0 | d17070476469226c 759286b2277cde3d c18c71eae11523d5
+flight | 19e1ebb4 2 | 24f9a8dc60a0754a 38286715ecef2dbd d119fca7c6360837
+flight | 91aabb5 4 | fault
+flight | c724d60a 0 | e9cb0eb629a4d29f 50b57503aaf1271b 926cddefa8b8b5fd
+flight | 54193d5b 7 | e5791df62c10b223 da382496b4d87efd b99028fd8022f950
+flight | 4fe0510d 7 | 6ab1e1412d58b74f e48f21467de37623 e6bcd147fc45ffdf
+flight | fa207afc 2 | 188084042e1d2096 3760f570fc6f78b4 3a9b25a2e1722f8a
+flight | b26fb7d0 3 | fault
+flight | 396c70b1 2 | fault
+flight | 615f6e08 7 | 1ac23bef1b607de4 3175708d09aaca8d 946f4ef62274da93
+flight | a7192e7a 4 | fault
+flight | 24dc67b8 4 | 7f2792a5be864d81 10f291ceb2986a1c 85424466faeb9629
+flight | c8686016 5 | 38793ce5532d6458 4bb2d27f8341fb6c 535f3077fe2be0dc
+flight | 141855f 2 | 8b73a922ccdd6b1f a90dfee9486a2088 5330023b3011d950
+flight | b1d43401 4 | 93172c7f130d1785 6c92f73cac160951 fc1b9e1f611ee6ab
+flight | 2299e83d 4 | 48a05c653cdc57c0 e3847671c9c5c7ad 335db7662245ea33
+flight | 9aff63e 7 | 4f34ea60e6111cc0 62d17f7cae2378f5 505b180e35be11e6
+flight | 3610fced 2 | 20b90ecb77f3fa2b d0527bd6fb68501a 22f5d0366f9ae1e3
+flight | 39b675cc 2 | fault
+flight | 65038792 1 | fault
+flight | 4f74ecb6 7 | fault
+flight | 18c95f5d 7 | 85f1176f73ab7a0e 96b98100f25ff0db 3f5b3cd6ef7e3b5e
+flight | 3f376ee2 1 | fault
+flight | 19e4a91c 4 | fault
+flight | 99ced311 1 | fault
+flight | 412b1250 1 | 4a82d98fd81b02c3 cc9a66a8d8b9f6e0 835200aa506f11fe
+flight | 2cfdb29d 5 | fault
+flight | 9c4d7ef8 4 | 5190a7a01850cecb 237fddb8208f0010 731ebadbeffb0e36
+flight | 51afc83a 7 | b854561671de76ba a19c6f069c3a7a80 5f5fc83f935d1e8f
+flight | 4d804610 0 | 20cd4736ae4d3966 f297cd7701e7030f 59808ad4c58cdc3c
+flight | f008f319 5 | 784901cabfa0dddf 9aa64cee47dcaa40 de3c7f9224309b3f
+flight | f9a2c4c2 4 | fault
+flight | d596c8ad 0 | fault
+flight | fff09ec0 0 | fault
+flight | 3cf403ee 0 | fault
+flight | b2bb59df 1 | cf7c26f8d6a14cc4 a4192dcd54afa1ee 484e67388089372d
+flight | be589026 4 | c6233d2e4ad7dab0 e281642626d5fcc3 83ca563421bd4d84
+flight | 52f12ba5 3 | 1c56500267388432 44a1f2ba6195db0a fb44008a0ded76d9
+flight | e8e60225 6 | 8c77a9d9abd15c4c af9df2411188a994 7b8efebdff2964d9
+flight | 42e32e43 3 | fault
+flight | d2f3ea62 7 | 7b4db622242855eb c1617501896ff5f2 7a676347e7e64de1
+flight | 488fa640 7 | fault
+flight | 1048604c 0 | 5ce9e1f70485d7db 894604971109ffda 55c51d493a8b273f
+flight | c8be30c1 5 | 36772d1e56e76402 7cfcefa638b5a24 af1a45cce6cd626e
+flight | 5d7eac8d 6 | fault
+flight | ebd38e58 3 | 753029a62303b2f3 e443cc673b7f8471 d13ae32950126765
+flight | 8bfd71c1 7 | 2e8d6ffafd50e5a2 85905d4ebd46f8ce d6293ce731043e72
+flight | 60d9bc1b 1 | fault
+flight | af30e451 3 | fault
+flight | 7354ba35 7 | fault
+flight | 983244b7 7 | 7c76497d4227641 ecc41c63dba888d4 f6c26d598597938d
+flight | 8b97a199 6 | ae1d6df4372eca91 f6628146f3769ce4 6fe39268da0b420
+flight | 44a479b7 6 | fault
+flight | d6d5e95d 1 | fault
+flight | a043dad4 3 | fault
+flight | 14e4b628 5 | cc347cd60b7d18b2 7eb8775d7a6c3cc8 bb9cf28a97089127
+flight | 8e59acb 1 | 12af2feee4f0d289 7ef1579a46c3000a 41803614bec1e4fd
+flight | 325d21f6 6 | fault
+flight | adcee188 1 | 47089b26935fc0e6 cc48094294c86e61 a7da993745d898b9
+flight | 5de69b62 3 | 9c2e0aa461cad51d 689c69d815e2ad83 8fb4e8f56cee0a8a
+flight | 4e005b10 5 | 62370080482fde54 bf13387141823164 8dda6f32c7408edd
+flight | 17c64067 1 | fault
+flight | 4ec6d6a3 5 | fault
+flight | 32e2a92f 4 | ab9009dfae674c28 67ed6200e6a824a8 618d14b9f3ba26dd
+flight | dc7dbb2b 5 | fault
+flight | cb5fba7e 1 | 40d4f8b0cdb317da c62289b6bfb36e6a 3a5f3eeebd3b59ed
+flight | 333945ec 2 | 2621fdc2a36c1977 4538694668643e44 663e8eaab05a7d82
+flight | 7f7bcc22 5 | fault
+flight | 1cacc60e 6 | 462ac5769774833f 68d8c1199c8c4550 f7ebd65baa54c40b
+flight | 17238e45 1 | 9927ac86bc2b45b1 689c163f59486d71 2055d749bf0ac7d7
+flight | 7ab1ef11 5 | fault
+flight | 189fa34b 7 | 5116d41c3ef0f177 eb424a5d6c46643c 988052b651f4e36d
+flight | 82581d19 6 | fault
+flight | d1e53bc5 5 | 161a40254b6b1a6d 807fdf6cb3dc5f98 ed75c3c8e138db4b
+flight | 690eb28b 3 | 10e59e7e54c21365 b411f375cc9774d7 92938cc0131fcca5
+flight | 1bc72e16 2 | fault
+flight | dbe88975 3 | fault
+flight | e03d96c4 1 | b7511e7038779d76 9fad6e84a8bee531 c99ea2bc1d4de05c
+flight | 1afca7de 5 | d3f2a700b220e679 2277d6997f745017 226a335d326d5902
+flight | aab7482b 7 | 22d1237776551e43 427f414bfb772a9 4ba273966372f025
+flight | 9ce1dc7c 6 | fault
+flight | 2a74c942 5 | 5c41e3fe8b943fcb 9bfb489031ae9535 447893ab70b7cb1d
+flight | 8058b7a1 6 | 54b749f1c53bed5e ab89a811d8a2ffbb 2b54bee3a2db9e30
+flight | 350c81ee 6 | fault
+flight | 72a93293 3 | fault
+flight | b818812d 5 | f7c9deb7ff13139 2de942d3f33e9490 e12c5ad916b6ab79
+flight | 3015ca5 6 | 6879344e67b2d358 698590027f8a893 768e4bf3d45c86c3
+flight | 721f8482 1 | 6b4d1d1e83085993 fe0dfbe28b02f4a6 702040c9729d7fe5
+flight | 33aab40f 7 | a3c4a23b65e50487 5b68bda941045e29 27f9559733a808d3
+flight | de976af1 6 | 99890b808f6239d5 c28897e6f48f5579 795aab211e143c55
+flight | 736152f5 5 | fault
+flight | a7563664 7 | fault
+flight | f98f8cb2 4 | fault
+flight | bd3206fe 3 | fault
+flight | cd7c0a47 1 | fault
+flight | ec900203 6 | fault
+flight | 641826eb 4 | fault
+flight | 7d122249 6 | d3038225805ea66a f0223563026120b2 1223ba3a6dc4ad70
+flight | 5bcdefb1 2 | a70666cb968fbbb6 744e2bc5bb1cc363 81fd03e98273d178
+flight | e3ce5744 5 | fault
+flight | 9c84211d 1 | dde989ef443a0621 9cf4f934aa039135 524a0c3764bd09b6
+flight | 213817b9 0 | 11b668ffa5332f65 bd0aded8b304c73 13bc7635a3c3352c
+flight | 2adf9a16 5 | fault
+flight | 165441bc 2 | fault
+flight | 4a37d057 4 | fault
+flight | a7d8c27d 6 | cd795e371b46c960 55f2faf56015b4fc f64739e1c6a6affd
+flight | 90181d70 4 | fault
+flight | f185e670 6 | fault
+flight | 919de244 3 | 7718fd2338a89918 6fc0b7e7384ab5ec 12b556e48d4befdc
+flight | 666b89d9 6 | 87acfafe8b5f47d 69f8c8309ba7445f d6f8c251cbb0284b
+flight | 3aeb24b0 2 | b712930276145af0 7d3133fed29d3bd7 771e188f1bd8a915
+flight | 1ea7ec36 3 | cac6c07d8af45928 9b13c77474d8620a 7e4b27d6c9ec2b3
+flight | 8490e6e1 4 | c222564de39a3d69 78c7cbaa4d480db5 1981776c6332d137
+flight | bdb58264 0 | c401231f7cc2f2ad 7c432ca37dd03778 f312a18687f04c10
+flight | d8985dae 4 | 17c37c1093e5f42a 229bd13e6a519e92 9f7f97e0b0f3c956
+flight | b345159f 7 | 2139c1d0fa82b5e7 92ca0123b1b183db cb08649334415250
+flight | 58a72bd3 4 | fault
+flight | 3737deda 2 | 615a1972245352c1 73ad2cac48a8507e 89347813f7e89e15
+flight | 320c47df 1 | 9e879a1b37d0d0d1 cf2c5bbef164a46e 823b5ea841dd6599
+flight | deffd34f 6 | fault
+flight | a971424d 6 | 57a576f7e3886b70 c96d0496520293d8 a5ccc2994369c3d9
+flight | 5b27ce9f 1 | fault
+flight | ae719b14 0 | 8229376a54ec7c63 b1d410e93dc90cd2 84be8d9fc1f549a7
+flight | 765ea050 2 | fault
+flight | 33ebe382 3 | fault
+flight | 7d562a5a 7 | bddca9fd062d4046 b0ae206060d937b1 3221cb889ea0b3fd
+flight | 961c7a1f 2 | 7d593ac8bc777907 144c9580f4b5dd45 d7507d9b959b0817
+flight | 3998dfa9 0 | 4ca96521d0eb34e5 5e3351226b3fbb77 1f5f7b756ce8de0e
+flight | 359a68e 4 | fault
+flight | d57f949c 1 | 26a2cb59b56325bf 1ead5d5a26f22323 bf9e9dd625cba81a
+flight | 8959a7f2 2 | fault
+flight | de21b285 4 | fault
+flight | ff7bf50c 1 | 35b0478a6429c7cf 546d783bdc98308b e70d6c3a27e01dd5
+flight | e8a963c4 6 | fault
+flight | 1d2cd527 5 | 71eedab5a111e6cc b538520db29e69e7 f20fd09f1cc609e6
+flight | 3ed2dd34 1 | fault
+flight | 31f65594 5 | fault
+flight | be9eb54f 1 | fault
+flight | f06c1477 5 | 59cf232ba781ee06 acef864aa86f16ef e8dfa09701a49bdb
+flight | 743b3b2f 7 | fault
+flight | 7d8d5353 7 | e6e0f19dd8b2423a 848e69acd9dc7bcf 4485402a10a7afed
+flight | d55a790d 7 | fault
+flight | fb159d57 5 | fault
+flight | 46d28776 0 | d6bb4ba9cd3f5194 45e2b6b6349e37f7 5a76defc6f3690de
+flight | b6d26298 3 | c68fdb9e3e0a0582 14615a18d5705b7 cec7c60088f604f3
+flight | 9b78120d 7 | b2fd52c023741bb4 6e40d6a05b81c01e d54b9e1651fdc831
+flight | db039624 6 | 32e9a448b9c32573 c0ead887a8ba7fa7 e154c0150d6a0855
+flight | dfa5518a 2 | af7b529fa02006c3 775b98433935e87c 2a5fd263b82a2af3
+flight | 3684613f 0 | fault
+flight | 26d97676 1 | fault
+flight | 5710d4c2 6 | fault
+flight | 17eb51a 6 | 99421f553b51970b 7a6fa5f3d762184a 32bf6b2ac54abef
+flight | d1145eb5 5 | fault
+flight | c4d887e7 3 | 856ac3b45dd9ad20 1ee0f8ef54a28db 7697af38d5411d91
+flight | 3174de55 1 | e3711d7ab3a664d6 538c1343c8ea2d52 d2d307bc2ce08092
+flight | e681c2e9 1 | fault
+flight | 9e55f325 0 | fab26342d8782d45 78118e4a20794125 75356a59d9fbf1c0
+flight | abe94da0 0 | 79756bd899c339c8 ee59bbec66ee695 c5c9e45bdee6714f
+flight | 5459b392 0 | 54f6192cf6c03aa1 494af7a5ae132c1d 4c4738a00871611e
+flight | a89f4d37 1 | fault
+flight | 8e317619 7 | fault
+flight | 504626ab 0 | fault
+flight | 63cb6bf7 6 | 1efa1b8b8b633f52 9e7cf61b7546ad7e fbd43b29e40fc906
+flight | 61721adc 3 | fault
+flight | 1cb76193 7 | b9471bd9d8a08ac6 50e2ac9d253095be c966864e1178a952
+flight | 62a341e3 2 | ce2a4eec6d1862fe 8261e2addf8efdbe 206b7f9e8854c505
+flight | 5b8c50a0 5 | fault
+flight | de99918c 1 | fault
+flight | 15331b4b 0 | fault
+flight | 4a603e1d 5 | fault
+flight | 831876c8 5 | b12eaef523a39fc4 40d16ee9512e190c 30189d77ab0356d7
+flight | cdf01812 2 | d5fd24db45d59d8f e3982e06b1e05038 9515c2735ba33b36
+flight | 2b03884a 5 | 3959df5b7f193584 1828c1171c7d6694 792682e17305dc04
+flight | c00232a7 0 | ad0be99d5d824d7b 226511ac1411bf49 7e96df8fd96b03cd
+flight | 19d7563f 6 | fault
+flight | 199ecedf 4 | a8f8a541a86fab60 a032e0bdf0ae55a8 8fb25cb47f34a17
+flight | 7b87c18b 1 | 4720e02194c5a0f 6c4406ba3bee346f c1fc506f397afd00
+flight | 1cca0c06 2 | ab9e601dda28a05d 97dbc1f39cac443c 6af792b918859941
+flight | f5edc250 6 | fde65472986a2b01 14a3be6663b6ee8f 40bb75af52844498
+flight | 8d11800d 4 | fault
+flight | e0c10e26 7 | f1ffb1b81386b2d0 4eb7d1e6c7d4afde 75d755770f7d97e9
+flight | ed7a4a18 5 | fault
+flight | e5e3c657 4 | 3e24c17db6c17d4d a0fe9b5b5f4a6ffc fa9029c71bd173b6
+flight | b5f7e29e 7 | fault
+flight | 941e8ca7 5 | d55752ae14c00826 1cf209d10ea48e39 cfbaa40b3022f538
+flight | 8a3fbeb 0 | b0f5f83ae847916a 150638faa00fbe25 407267296eceadf5
+flight | a31661cf 6 | 58a0d0886bb0ebfc 99e8db58068b2577 114be20067efc9a0
+flight | 1bd6acb 7 | fault
+flight | 731c3052 0 | fa361a6fd1f3c0f4 918c7d566715fbe8 264d565872350c74
+flight | 73991f6c 2 | bf546c10dd93048 e350280e4241bc7e 509e018468190cc3
+flight | 2ad6c7e3 0 | c08c97ba3df36fe0 f9f654d9d7261469 5e63cde3018e79cd
+flight | f1f79425 5 | d5d766f311bd8615 be82099c9ea4188f 7cd84d7f88a8383c
+flight | 489610ad 6 | fault
+flight | ae3da141 1 | fault
+flight | 6b600a06 0 | ef5990554ab01928 a418974cc2af6d96 a1261b0686183238
+flight | c038faf5 5 | fault
+flight | 31f50911 4 | 3bcdfb6c54f5768a b5e9be176f647677 b758731324a429ce
+flight | b600dcce 0 | 67312b778da89979 394cb14d879f7c44 740894540cf5c87b
+flight | 57a917b2 4 | 1a725eb28e08e0dd decaf720d77ac43f 929df21ac24978d1
+flight | c1baf1ce 0 | fault
+flight | 49ec79bf 2 | 1a31c0c47e55a487 9b5117f107fcb2ba ed9b3157006cf91a
+flight | 1aed208b 7 | 9558d4e4060e9e4f 251eeb633fa30dd9 f505a03320c3a2dd
+flight | 812952ca 5 | fault
+flight | 93b871c4 0 | c7e303b521e9fd20 7075c653e416a87a faa9aa634cdea4e4
+flight | 62dae1dc 5 | fault
+flight | eefa3860 5 | df78bf2f911d0e00 569a6cbc4482ecda f93e8bf303a689d4
+flight | f99c1654 0 | 61fff496fca01443 8fbf343816962d5d 1b11471b519bcfe2
+flight | c98c301a 1 | fault
+flight | 78099a31 7 | fault
+flight | eaa11c8 5 | ba31e5fcb4a1a7e4 5eed8ccbbbeb719f af1fefbf932b493a
+flight | fcbebf00 3 | fault
+flight | 90d1d0ec 1 | fault
+flight | 2ab1f8b6 0 | fault
+flight | 356da981 3 | fault
+flight | ddf59887 7 | 22c52b6e12645c21 c8b3308669a11850 a7f06a6460ffe249
+flight | fecf06fe 3 | fault
+flight | 5a108a2c 1 | fault
+flight | a76dc858 1 | 971cfa3c893023ce 5335d4796a87837a a2fde80b312984f4
+flight | bfb70d36 3 | 4096f0bc57d16546 99393686bc7789f2 dcb71ee2305ce8e9
+flight | 9cf991fb 4 | fault
+flight | 34449236 2 | fault
+flight | 40515a22 3 | 3a522f2b055af508 bc0c213d488466be db20b1d450077ce5
+flight | 5c311410 3 | fd604872a01fee38 979b2247fb2ea1f1 869269e9fea62532
+flight | 8d0e2c76 3 | 85c1b709951d75f0 1f40e25d10ee3eef a8e6a817f82ca332
+flight | b9a25593 2 | 7e28826ed13c529b dab75c350de05ef7 fd42f4cd55c96657
+flight | 1a0fd196 5 | 32d35a3139639e3a be499386fc50610d 69bc099f3999287e
+flight | 4f203d05 3 | fault
+flight | 8e45aaa2 0 | ee53111aa4dd328 8ae0bc419b6cecdb 9394e8472391d5d3
+flight | 8c21fda6 5 | 6cd1bfed15e84b53 d055e14708987c56 ba658cb2a914f3ed
+flight | 158e6ac0 5 | cf7b7743dd0e1473 b7c097ecd499d26f 6e93977eb9887f5d
+flight | ff22be86 6 | f545cfe82d9800d3 5a267bc1889f34f9 99a30e94e7048f98
+flight | 9f849e1e 5 | b7ab633fe88d58d8 b07ae08637a6fc61 299ac5863bb96ab0
+flight | 879ead14 5 | d4ce14f20e2cf858 3902b6937e1c9408 a6e1be134a77d669
+flight | 3223b7fa 4 | 7223ca1f129eaae1 ee867cbf212fc3bd c0ecc168450db453
+flight | d66675ff 7 | fault
+flight | 5188e6b 6 | d84852bc292e1a7b ba91764f03618d60 89c4a8b1a6565dd0
+flight | 773c4c5d 7 | fault
+flight | 7ec056f3 6 | fault
+flight | f3762b5b 1 | fault
+flight | f7c42c8d 5 | 64696b6e28005eef 36445158ba9c2293 7433fe930c87a176
+flight | 806fa22 5 | 9a4b9016ce575eb0 4d41b2e99ba94ec9 8fd5f8909fe140b9
+flight | 6cd1c04a 4 | ed3540e503fbf234 8f799e17da6127fa 730fe6bccd39228
+flight | c5273de7 2 | d072a5e67cd0a683 c4c46b6299a8920f 35e5b01fc9bda936
+flight | 36d1964 1 | 721b6b774e208d18 1f798f941525e891 8d0deeab1bc488f1
+flight | 5b99da23 6 | b0195dd5c1276f2d f8fa389e0e3c08c2 f10f24c1103b3684
+flight | 4f0dc98f 4 | fault
+flight | af3a8eb 3 | 424a017f1d7d22dd d97b6f93a8e2745b 66907648e7269e39
+flight | 866685b7 0 | 5f38720cf64b045b 5b2d80f02200ee08 a52f5ae06dfe0a74
+flight | 679d98fd 3 | a143e8d7a3fb9a79 e31702866f1c11de 3b0a7164754e174
+flight | 671ca21b 2 | fault
+flight | e09afc5e 0 | cec78a737f4e271c 8a77822f2458267a 5e952944e0c6408e
+flight | ff046022 5 | fault
+flight | a3de809e 0 | ecfb49f0de177cc8 5ce3f947ebfaaa6f fdbfedc4c7ac56a4
+flight | 7d36664d 7 | 2ee80705a5bd5967 25c03cfd09065903 19273f26240ef12
+flight | 7e6399d1 2 | fault
+flight | 16259796 3 | 63db68d6b56281e7 4868d5044aff62cc 7ab4788fc4b8b3ea
+flight | c0b07578 2 | ea20b485f7728958 1642a0cfd9f275ea e5d91bef8179a23f
+flight | 9b7af5bb 1 | a1b2819737eaebc9 d685bec4ff1c6c88 bcc96a1ce1fa3126
+flight | 97c03fc6 2 | 602ffc1cb2081e2 d5afbeba46b010aa f02f266cd57f53ac
+flight | fd681bf9 3 | fault
+flight | 6ad165fb 3 | fault
+flight | 498d1c19 3 | 1125a07a353a9ad5 6210658a2986e320 4fe79a8ce02be86f
+flight | d8a2b384 4 | fault
+flight | a107d36e 4 | 72b8bc401b389e19 c0c2b6e30807e526 30a953307aa3742b
+flight | ba53e37d 4 | fault
+flight | 3d92be5e 6 | fault
+flight | eaf08d33 4 | fault
+flight | cb414703 6 | fault
+flight | 6aa215d1 4 | 503f59c5dc01b38c cf6252dfaf97b663 bf7db751b757de7d
+flight | 20ca3229 0 | fault
+flight | a1b8800 3 | fault
+flight | 2aa2dab7 4 | a7fac0e03ac4af93 ccef95df991bb57f d6a19086a60504a9
+flight | ab87d754 3 | fault
+flight | 20992cd4 5 | d876428f73c62913 2c736668080a26f 1bd83c69c69f7fb5
+flight | de8af7b8 4 | 204fea32a893791 e80437a63ae90068 95b252f45b93759d
+flight | 548db510 2 | 25ec2b11f6156913 4f73669a1e346a4 636d9e90382c2456
+flight | 1f350771 1 | fault
+flight | 6877bddb 2 | fault
+flight | b331d69b 0 | 68bb847815ef77e7 73a70ee4a5770db9 48c4d6df78812a2f
+flight | 780b715c 1 | affebe5dfea0678f 86d926aebaf69b39 ef8851441d1fa326
+flight | c121e958 3 | fault
+flight | b517cfd5 3 | 835fc8010db9197 c974d0ee32055f91 e3b1fd9396a9b3b1
+flight | 5189d095 2 | 3481d4f31a961158 61332e26dc74fa9a 37d52b00f784a87f
+flight | 1616123 0 | fault
+flight | 6e7d919b 1 | 50b9030d5ecff77b d2400c7f52fcab29 76d92f90c22851a6
+flight | da65fef3 7 | fault
+flight | 3164c4e3 1 | 63aee64fc3572104 794490676fb415ac 4bd30d329d0f08d1
+flight | 9c096334 7 | fault
+flight | 6b366041 2 | 33d4d9c946eb5648 27849c7eec499684 5215b7628763b233
+flight | 3835d72f 3 | fault
+flight | c3525603 6 | 4775e63f5ed7f673 950c51a0a8df1128 e78d21be84136059
+flight | 8d4c14a1 6 | fault
+flight | 6fffdea0 1 | 6871308a6cb0be93 412a545b528c9334 7c7a6dc4bb1e503e
+flight | 58e01cfb 5 | c18a2a084802b0cc 666fbc92c9fb301 aa7c903e1d6b141f
+flight | 1dae0b6a 4 | eb39f37c8902cd5a 95aae5a4424c29ab 3a865c61b9603d3f
+flight | 5c6b91 1 | 749217ea506c68d4 c75c8c9e8d7ab5c6 277c0354541b9bf9
+flight | ae1ecabd 6 | fault
+flight | 3ca37cd1 2 | 78f3e13e30b7603d 7018ed40b17db56a 89aa091b753f2028
+flight | f307d4c 0 | fault
+flight | e73e0ba0 3 | fault
+flight | 41814bf0 1 | 4e62b2c1966e5e55 a633458cdc75d25f f71e0ff5f62ced8c
+flight | 70253253 3 | a6469ea3b7f00c25 b96cfa648f6fe27c e93d88eee080c4e2
+flight | d0f79f4a 5 | e62c4ce010cbe92d 91567ce77187e093 3f2a65f483cd8be0
+flight | d80e03b8 6 | fault
+flight | 5461427f 6 | cebcb99481b65539 185e80511c15972f cc133f9e1d500bce
+flight | bc761a2a 1 | fault
+flight | 46247b39 0 | fault
+flight | 7cbdf3ea 0 | fault
+flight | 4f51e91d 4 | b8c910e2b4f2ee9b e5db74ddf7787843 9c1076493ef6147f
+flight | 59e21147 3 | d4e8b30aa9a61e68 4ae7e6cc23713ef9 d4bae00dbe9d1bc4
+flight | 7e10e0f7 3 | 99a6aeb885d0804e 685a188978976635 7e176c9c03b4f6a5
+flight | dfd33325 5 | e6c44fb07df7f92e a6d3f8c5aebd48f cc0cc4df3ac364a4
+flight | 6550cca2 1 | 4ae995e96eb238c2 d27503e8300d33d9 6f6e07993cf41171
+flight | 4a61d372 1 | 59cf2ca6606bc6ea 37e2e31c3fcdbeea 313452f9633d65b7
+flight | 7d367f02 3 | fault
+flight | fd75cb22 1 | 64821d4b681548ae 2866ec6af755d4f c4cb03bd92a028b8
+flight | b0c1ae33 2 | 8b49100e0f65cbee 61bed619c2353c8c d1eb98542864da5f
+flight | 36779015 5 | e0c28f61b6029232 f379417a48599048 3dcfa219585d674f
+flight | e69d82b1 5 | 65ad65199d2c917f c0ac81e48090ff29 d2744d5d638a787c
+flight | 53d63bf5 6 | d0513a0d1739f159 d93751920fbba1c5 7478b5aabe4433b7
+flight | 298db263 2 | fault
+flight | 3e424dac 2 | fault
+flight | 94d17afc 5 | 4e079e47e1b7a16a f0c05bc78114f46e 947d32dc8b304a0
+flight | ba7f09ec 6 | 4235da437bc82ded ac213a48e81cbe8d ab307b8f61bbaf78
+flight | 189d05f2 0 | 98e33057815ecb96 d858c4ea3ed2f8c3 343d357bf5529aa9
+flight | ab4b95f1 1 | fault
+flight | 55595791 3 | 40b517b5f0429a2b 75554b6756b0c22 efcbfbaa09219572
+flight | a3106459 4 | fault
+flight | cc341c3a 4 | f8b4b67abbab2b08 232bb57d0b928c02 bf94c9d8986c4da3
+flight | 32a89c8c 7 | f3603412a50704d9 232cb9bacb1825ca d091319091dceeb8
+flight | 4419d78f 7 | fault
+flight | 4295407e 3 | b0acc9ec14430901 69c325e0f9da72a8 1a5191ea82c2de18
+flight | a6c1052a 6 | fault
+flight | 308fea2 3 | fault
+flight | 44212580 4 | e91c54bd49bce713 a663999a29858bd6 e1e99971882cb6a8
+flight | 4a86eba3 4 | 74e2947954832d82 c6f43884ecb75d7f 4446a45a13b9f53a
+flight | 8f69bd0d 7 | fault
+flight | c62f42ed 1 | 28388c60db6f2c05 800f105a65979a6b 955bdd52a8fab57c
+flight | 67a876f3 0 | 8fb3b77e8ab87b3 b0df07b1d54766a6 3399b71f624a0b19
+flight | 3a16bd1f 4 | fault
+flight | 85001555 7 | ccc7ceae9635f3ae 60bbad3505e26075 f4882fde8d4b192f
+flight | 8afd9268 3 | c8e16dddd75319a5 66d4b532d7ff0bf7 9acd335f2a051870
+flight | 82cc76e1 7 | de5723f260fb6dd8 324b1b041abbe9a0 5088320e67109af
+flight | e0e300dc 1 | fault
+flight | 9d6eae79 7 | 7b0c2416efd61b3d 587ecd9db0ec9719 ece5d196e199ed0c
+flight | a46aaab6 5 | e74b8b7ead184a40 ac0cc2ec171add78 77ff1df2bdc4015f
+flight | 3033ac81 0 | fault
+flight | c4aef895 6 | fault
+flight | 7cfa4f85 4 | 61b024dac85013f7 75e6b2aee496464 f4cde629028072be
+flight | 243b2855 7 | 940e9c097100f800 659be1625dd71c43 f8ed205cc5c1c8ea
+flight | ad051a7 0 | b550ef294f1122f3 1995058adf9db958 3b6b9c294c39fb30
+flight | fc75301a 3 | fault
+flight | 346cfb7a 7 | fault
+flight | 1742bad2 1 | fault
+flight | 55592fae 7 | fault
+flight | fd7be1ff 5 | 9d81ff839ee0df5f 36ca0d581e9aef85 f54d3371c94a4f40
+flight | d2b256b8 6 | fault
+flight | d540e599 0 | b3dee64b07d1067e 29a7e5ddeda3637d 32399c72ef0443d8
+flight | c69804f2 4 | 998cd12143a2bceb 95389bb350911927 d894f96d43eafc5e
+flight | 4d76356c 7 | b92500994ec28953 8460c31f361fa048 a2583296105eae51
+flight | c4825730 6 | fault
+flight | af322842 0 | 7b74dfacff264865 54cf97a431c7d170 5377dd196a9ae6ed
+flight | 3d6d9da9 0 | a7e4e0b8dffb9010 518ed8625a28dbb5 4c7eb75f65036572
+flight | efff7a4c 2 | fault
+flight | 86b2c9fe 0 | 91c22bf8be7918d8 3a6f291e18b4ceb8 3e3169d127f66aed
+flight | c5b067ef 7 | 470b38d256c485e2 3f84efdbcd2b06a2 4f11c12e308abfe
+flight | c4470a5c 4 | 13e18ae8a79b5307 5eda9dbeb8e4eef6 1ea900011414ef15
+flight | 2a7c9633 5 | 4651d89767d921e1 1f2b8576c6fd8147 6dda51aeea4641a1
+flight | 6d06da11 4 | fault
+flight | 6285bc35 6 | fault
+flight | 5f828ccc 1 | fault
+flight | 8dff1643 5 | fault
+flight | 6a5b9a72 4 | fault
+flight | c321c5b8 0 | 2ad1eac8ab58948b 7a4cb88573b093c7 b456541964ccadd5
+flight | 59bb576e 2 | fault
+flight | f09813cd 6 | a583fd4ac3c9556 4a0a00cc370290fc 68dbc8ebf69e819f
+flight | 93f21b11 3 | 424f8450ae13d80e 152d1c0db8077202 69b538b24b83080a
+flight | ea3d0221 0 | 6289ae83199c9b9a a5aef35428119ff3 eb8503216558ff9
+flight | 6ea47b7d 7 | fault
+flight | d353184c 0 | c9585d99ecb44b87 a059f34294a44545 ec25ce7a08ce2a88
+flight | e0f0323d 1 | fault
+flight | ad9f84cc 3 | fault
+flight | afeb6fe8 2 | 7652a3098dbff941 5b9b40182ddfa257 cc1916ed8b0a1080
+flight | 42012f67 5 | fault
+flight | a0486b75 0 | c3629e84ef56c4b8 f68b27c1808ecb88 6f2dd11fa73f5aa7
+flight | 9004caf0 1 | fault
+flight | f324babd 5 | c1a70118ecab94b8 c6402cde0116a93b e1b39bc3854bcb97
+flight | dc5018d0 3 | fault
+flight | becdfe89 5 | fault
+flight | fb5440f 1 | bf178314120753dc 3c572b2e469bafa 8db3c64c4efc4b06
+flight | c9bf194d 6 | 314d9176eec60871 855156e17972498d aafab26ff0dbd21f
+flight | 91c6bd80 3 | 5cc7e66caae1e232 c2c0f7e6291de872 b2a6168cd4922f44
+flight | 1de3ac4f 2 | 6ebd8bf65d920719 4778a83f1f2536f8 fe3dd900d1310451
+flight | e7368e55 7 | fault
+flight | 306d50f8 3 | 3f0c85fecd8a9fd8 e643755d8a8006e1 9c0efc57c2aef725
+flight | b6d4513f 3 | fault
+flight | d92f3289 4 | e5ee80d27691ac2d 8aa9685af9bf9044 83a7d8f1fb0e66bd
+flight | 1e245bc0 4 | d909432094979bbd 801bca2cc45d6d5d a010cf45dd16d79f
+flight | e4ad4048 6 | fault
+flight | f5aae1bd 7 | baa3126c17bb96e3 fadd02f782a1a767 50b745c4583160fb
+flight | 823435ad 0 | bed63ed49443ae59 857f10e0f1368763 79de09fb8ed91a07
+flight | 50ebe3fe 0 | 3ae73e30f6afef2d 4cb82237d51eb6bd fd6d6f80bc3fd014
+flight | cf52eee2 2 | fault
+flight | 8cde7d5f 5 | fault
+flight | f6138a7e 2 | fault
+flight | ae9d7144 6 | fault
+flight | 2d01edb0 0 | e055deba0d6bf1de aaa9e34440d04d1a 19d01e3866f7e06e
+flight | 34a8456a 5 | fault
+flight | 19eb5d82 6 | fault
+flight | c82684b2 2 | 93d385834641c2ee c4b86b2b137d1ba7 f5bf269946caed59
+flight | aff975e9 4 | fault
+flight | 57c34246 6 | fault
+flight | 5c355d69 4 | fault
+flight | 2e3dcb2c 1 | fault
+flight | 8e85ca4c 0 | c1945b44ede12cc5 347407cc290b8622 9bc3b444e98938ed
+flight | 8167e272 4 | f6d91b1bc1ab15dc 58eb76ea2b02c47 bde7a296e4e82525
+flight | 7e17b039 2 | 98337b6ceae1d39e c137ec2fe5e8295a 8b727c110c77e65e
+flight | fd7677f5 7 | fault
+flight | 27af24f5 1 | fault
+flight | faaf68f3 5 | d36133f1bd9ec511 35e73978f5994c0d 61f67136dcd2554c
+flight | d01b2346 7 | 16ced584a9e7e8e0 485937797128d2e5 726aab61db27eb88
+flight | de670ae8 6 | fault
+flight | e3b3702a 5 | fault
+flight | 8144a991 1 | fault
+flight | 28b8b31d 3 | e2d0f695e829e8c6 379fda21cbfcb73c a36b56e6e0c98763
+flight | 84bf0cb5 7 | b8231f635565e8a7 78017e1df4a18fdd 3d7c35603c22a41
+flight | 6efa53f7 4 | fault
+flight | acab321b 3 | fault
+flight | 7bb7c34d 3 | b62e30d907054bed b31535bb69b64b24 d9d2a5e674652c7e
+flight | a8f89b6b 1 | b9653d4146402be5 dd276601792f8f05 6a524463d8927f82
+flight | ce008771 6 | e942d24be0e7dae7 1b69314a37e796a9 dae81612636c42ee
+flight | 7cf01321 3 | c243c84931d55e44 cf326841dc77d178 8edb7cf09b8e8c98
+flight | eb362e6f 2 | fdf89fdae54e154 34ee95969bfd7bae 3d619dc013f078a
+flight | 7d2ebff0 2 | cc67d0653c80dd80 6e0a7db069094b15 90d037277005313a
+flight | 90d915bb 5 | fault
+flight | 31ba0569 2 | fault
+flight | d963315f 0 | fault
+flight | 44f07b6d 1 | fault
+flight | 96e8b196 4 | fault
+flight | 1087c565 7 | 3aa3384710f6cbcc ec4a6343ac624028 df55803b8ecb181d
+flight | 565a0392 5 | d061520fbb2aec02 6e8fa4398a78119a 1db968b0ee0ca346
+flight | c811e3fa 1 | 12360689d11ab6cb c9ed5894311e384e f5e3af73f7521c72
+flight | fadf1dcb 0 | f8061e0e7084959e c134322f6d00d777 1ea4e48878e24291
+flight | 524d0dc9 7 | a4b6f8f3435b5c3 294b65312cc3191c 3265481acfaa5d25
+flight | 84f6fab4 1 | 69ab1d2d107b6d47 50009af2cb152519 2215b58f5999d014
+flight | 82035146 0 | e3cf0801c6456e2 f6cf86fe3159e1cc 5514cc9d770e856b
+flight | 6890eead 0 | 1da5e78ea740f21f cd65357aff0a57d4 92dc232f20391487
+flight | 1369ff0a 5 | c1c89f759e71f22 47a65a8828beeab6 480bf371f94e88e
+flight | 26fb0275 7 | fault
+flight | e19a56ad 3 | a10fea7b990c3d96 13a2ae2b73e066b 28a8aae7b8bcf45a
+flight | d36323db 5 | fault
+flight | 243feb50 2 | fault
+flight | 86595287 2 | ecf12dd90ba00d54 3f0133b1a280a2f3 5cc74d840b4ef457
+flight | 81c898a1 5 | 9a7eeca23e2b5e3f 6316907be36fca98 7ee38e5ca321cd05
+flight | b3c1e285 0 | 6d48cef8a49ff751 9dd18cb454f3712f 5f02fdba874467d5
+flight | 12b012cf 5 | fault
+flight | f78d403e 0 | d0102f5412142293 6a57928acd1bf590 e90f13bcb5d60aec
+flight | cd4a1e56 3 | 7a54a1c0e0cf0485 b46fa472e8d00e52 a4852e4fb18c46d7
+flight | 44d0101e 0 | 1153ae2269ab70de c21aa07e369e0727 1a6d3fb066bbc4a1
+flight | 47920d5d 0 | 593fa8c778dab1ea b0eb41d28f9b09f3 bede89411411e3a1
+flight | b3ed4c1e 0 | fa96854a4b9e2f42 625be546f2fd479 60e8232529d951b6
+flight | 57b0c7b0 4 | fault
+flight | 9371eec8 1 | fault
+flight | bc64fc34 3 | de237d66dd5eabad eb98fb98c66beee1 1a9cf84722f2b2be
+flight | 14863a06 6 | 63e0e08683c3675d fbff8f0da6cbef30 1390b3ab7a374755
+flight | a4283be4 2 | 9e2f4130566696b1 3130e5ec60cb2494 3a517be6ade714c5
+flight | 377eabe3 1 | fault
+flight | 794d7a2a 1 | 5ff48ee10b599132 9c9760b6c21064e3 79010e9db8a5554d
+flight | c7d8fe7 0 | a97f6df6c95198b4 45bbb3b029cb8f9 11e2dbe589cad6ae
+flight | 9ea28555 5 | fault
+flight | 211eeabe 1 | 62c10794ad855e1a 5dd328a304526caa 5a2806b1742048e0
+flight | 7c9990d3 0 | fault
+flight | 4bf9f2ff 2 | fault
+flight | bb666e88 0 | 864bb4e54981d49 d5ebd54847ab4b71 2fdaff5b6182d8bf
+flight | 835e64e 4 | fault
+flight | 7322524a 7 | 7165394c5945020c f686b8fed2b833b 904632a558829c66
+flight | 2e77226f 1 | 94818b394e41fda6 7ef3e3efb586706a 1eec263fb421318b
+flight | 45bc71ba 4 | 507033add1f43071 40666610f4cba0a3 7b826ec00c1291be
+flight | ed3f78a 0 | fault
+flight | 2dee2d04 2 | 6339598f28e2bbc0 20ce2a5defc9b502 70bc6f0ae3045c7d
+flight | 67f90c67 6 | fault
+flight | 41fcc1e 6 | fault
+flight | 8402dbab 2 | fault
+flight | 7464ad3b 2 | fault
+flight | 23dc6fca 4 | fault
+flight | 9d1ed30c 1 | fault
+flight | 29a7694f 5 | fault
+flight | 4abbc9fc 0 | fault
+flight | 3a1b4d3 3 | fault
+flight | 19b8d7dd 2 | fault
+flight | c1534fdd 0 | 7e5f9ddfbe1203fd 44eb460c6786e36c 61bc986c04428dad
+flight | 73475806 4 | fault
+flight | 542e604e 5 | fault
+flight | 44f8ce51 0 | 2142c3c67dae9b08 c6ec298a4939dbed 587b6a7b810f6813
+flight | daa89049 0 | fault
+flight | 2b92f058 2 | fault
+flight | 52ca8175 0 | fault
+flight | f31af4a9 7 | 3898580a3228a369 701a646fb64914f8 c8bbdf15639c989
+flight | ef8a19f4 3 | 7bf7f7ebbdec21ff f760957ce7adc05d 254e292b2bd3b9a7
+flight | 4fce4d0f 3 | fault
+flight | 42bd2810 5 | 9b7016ed29cac5a6 7757dfa127a89068 ca9da16ce2d865cd
+flight | e4a4108e 3 | 1d8c47fb1edafa9e d20dfc8a0c0f114f bde925efd2a53033
+flight | f98ae8a0 1 | fault
+flight | ce5bd849 3 | fault
+flight | 5a5ebbed 7 | 542380cf6cc22ad9 d10b5247cdf70c46 a27930adda8a4673
+flight | 8a955edb 4 | 171e5febeea4892b c2f8ef6884420e6 1eb3a81c959d7b2a
+flight | c2236edd 4 | cb53aa8843e40be3 ae2782d2e90d20ff 75ddc578cb8b0ad2
+flight | 90a00d6a 4 | c151ef70d8a1c1b7 605cb06464986794 c046673ad49a4692
+flight | 958d4c47 1 | fault
+flight | 702f64e5 2 | fault
+flight | feaa5af7 7 | fault
+flight | 422f98c6 1 | fault
+flight | c33601fc 3 | 798314b536431669 d937304e8509d654 987e5daad74cca65
+flight | d6c74fd0 1 | db8717dacb50c966 43dab84675b06089 eb7955297b21a7b
+flight | babd120a 1 | fault
+flight | 42028a67 6 | fault
+flight | 1adbf5b2 4 | e6a029c3d8031e94 509f9a2f61c44ae7 8c4b0622f6052459
+flight | 6fe477b 3 | fault
+flight | 71b9eb4 4 | fault
+flight | 558e4ff9 6 | fault
+flight | dc65fe62 6 | 9118daf2caf04ca5 c678e46f6151742 e23afcbe723591f
+flight | e79630e4 4 | ea1bf5b2108d94dd a8f5ee0d1a6d978a 897aec4f9e2a6261
+flight | 2421be33 0 | b3f3a1328b53c17b 30238468e265b8ef 61eeb169ab1a21d6
+flight | 5013dc2f 5 | fault
+flight | d973fde1 0 | 6eb0c30047061539 608ff2c41e16163 1ad74060d3ec6011
+flight | 28634d84 6 | 3501c8b16696e720 d94e4b51ce774e12 7400710e9292112c
+flight | fdf99c77 0 | 1b5f585526e9bf38 5fddc4f7b41f7288 4fa2cf2cfaae3614
+flight | 1755ba54 4 | fault
+flight | c08832a0 2 | fault
+flight | 7d234216 7 | fault
+flight | a6ecb2b6 5 | 2f740c62085ae247 a33042141c3c76e4 fa8e7c2058597fdd
+flight | cd8db3a6 7 | fault
+flight | 93e36165 4 | fault
+flight | e70995af 7 | d59aa7415eacde85 726d15099d46cf45 416092bd8818e7ba
+flight | 14bec696 0 | 977fdcbce2fb63a2 e191ae0f56df618a 7be3a5005157ae0b
+flight | bf7d651b 2 | 64c4a92699433932 edf57c042f022592 8718c5cc09680c7b
+flight | eb586f98 4 | fault
+flight | 89a9ad96 2 | fault
+flight | 24225d27 7 | fault
+flight | b0ac04b9 3 | fault
+flight | 4a08c360 1 | fault
+flight | 4c05ddb 4 | fault
+flight | 822b0785 1 | 51b19537055ed6f1 e6b9694119d05f5e a9c724be2a421d42
+flight | c828f72b 4 | fault
+flight | 8b16e42d 0 | fault
+flight | fc205259 3 | fault
+flight | 77fd366b 7 | fault
+flight | bc1d06f8 4 | fault
+flight | 9d76fb5 1 | cf50ec6f0be5fd0a 2298088d108701fd c959b1f8a7e8e263
+flight | ac5f44d1 1 | 45876de02ced7fc9 e663bfe6115ef1c7 af6cb0f511a704a3
+flight | 60f8dc37 4 | 77712971cf32de6 65d02356f90d09bf 714d39a50d732236
+flight | 7aed768f 4 | fffe6ca041b49ad8 6614eb65a3a05d17 ba741c614995c721
+flight | aa28bc03 5 | 2f7436f44c372f7 4bc48c821702a1b2 8e2191081e22fe57
+flight | ef6222ad 5 | fault
+flight | 229e133 0 | cc5de1168e35ff91 bee2242c32502076 2a0a506b2dd18ee4
+flight | 9ed90dc8 2 | fault
+flight | 685b7da0 6 | fault
+flight | f511b771 2 | fault
+flight | 34f2a93 3 | f2b264b512283736 120277e6c7b52c41 2cad576b1bbc2234
+flight | 6cd6fdd 7 | 91e1bab85047e14f 97715da968161058 1ab9f0223ab66e1d
+flight | 6d7ea1fb 6 | 4be4494637b5d5ed 7e536a1e3c788ca9 3772a7cf49cba894
+flight | 6f0dc030 7 | fault
+flight | 48df5c5 7 | 84230f6ee4be2c51 39f2c652c34fbf7d d6dcbd7672cc9551
+flight | 9ad50384 2 | fault
+flight | fe50d17f 6 | 3e3513e808e779a5 5e10723f84a0c8c2 cc00c98cae7d8ea
+flight | 1634a1c3 1 | 7dc18ae354d1e729 973c5f68071af0b5 6080a89ef8d774b8
+flight | 56f3fac8 6 | fault
+flight | 9e209358 4 | fault
+flight | ed4ed9ea 1 | 4dae830f83633858 8d55ff2e94124634 bb7af824843210f5
+flight | ee71fd7d 1 | fault
+flight | ae592c31 3 | 5f3653dc016fb528 15c475838244a206 3e1d0534f31ac8f9
+flight | b8bb1973 4 | f0bbbbcc5a51023 77deb1bbf950d9e3 65d5c70d4901191
+flight | 131057d1 4 | fault
+flight | 478e28c9 4 | fault
+flight | 9c372ff3 5 | fault
+flight | e8019ec7 4 | 3c6c1e733ed70b88 6f855a1ce366ac7a eec93222326bf7d6
+flight | eaf8e14 7 | 7c8d7ea8e113a531 c8f22ab098463f50 960832240f704eb
+flight | ff4ce53c 0 | fault
+flight | 42709ed5 3 | fault
+flight | 3fca8860 2 | a73db0f1eab3535f befaaa592f568b7b 29dab28b2eb2972a
+flight | 34e96c9e 5 | b382ce9e4cfadc63 5b7613528f85459b 164d1becc03ee204
+flight | 7e68102d 2 | fault
+flight | 2e41e09 6 | 5b1a173b232fdb8b 39592b76e8507763 301e09659ebd484d
+flight | fe651f7e 7 | 157e97eed952c270 22b27b6d817d0c1f 2d23ffd51a0de854
+flight | a73b6fbd 0 | dcb0f39580376fe2 ef00f4eaf10ba9ac 6ef9f93d2c4ffb93
+flight | 30fec71c 6 | fault
+flight | c6a60989 5 | fault
+flight | 4f147938 4 | 40f0a3a34eaaed28 6b56c402d687baf6 5a2edef469745ff2
+flight | c993b3f8 7 | b0627daa8facc14e 7cc99f1f41175397 9311f383a08a5f78
+flight | fac4d7dc 1 | eece91c7efa0ae70 9b1bff24a8f52512 84c8e8ee9f3f99e2
+flight | 44ea1dbb 5 | fault
+flight | a96aef26 5 | 8358467391025ff 712a4dab622c4ad5 4e46ab7d384b0be1
+flight | 689e49e9 4 | fault
+flight | f039cc0c 0 | e162d38f03e0f086 60182de44e7bb777 e4362400a32b95a7
+flight | 8b8bc572 7 | fault
+flight | 7d7a34b7 1 | fault
+flight | 9f68aa5e 0 | fault
+flight | e1ffa574 1 | fault
+flight | a9eb2893 4 | fault
+flight | 281a0b5 0 | 268fd9f31892f70d 565342e8825f384d bcabef1fd7860f6c
+flight | 25a71852 3 | fault
+flight | 525f7625 1 | e91e4a1233420567 96df31ddcb55f8f0 857653389925c9fe
+flight | 1cd41bbf 5 | fde8be4bf8d99575 6638d40c73fc56ca c172a56dbca3b651
+flight | 24dac405 5 | fault
+flight | 7e6f1a8b 7 | fault
+flight | 41e83869 6 | fault
+flight | 36f53f05 7 | d7bccbfdd579b0ca 47b862793ca4792f 3bb9d9a82a5f5209
+flight | e52de891 7 | fault
+flight | f4d9e15a 0 | 4918da476164014 434338f37a5c2677 f4fcbfb44e4309c5
+flight | 7a234988 0 | fault
+flight | e91f22ed 3 | fault
+flight | 4486e5b9 4 | 36aa19b2cb42658d 95f37cd2cb5d0b66 14ca3639333c9abf
+flight | ba460a3f 3 | fault
+flight | d8782387 4 | 1bfc559005ce7483 7beab6871c415b1d 932de6efbb39279
+flight | e1c81a5c 1 | fault
+flight | 1dc9e964 6 | 730667ff863f371f e29780600e3aea43 6d0213d8a11a2bea
+flight | aa0ac586 6 | fault
+flight | 5b1093ea 5 | fault
+flight | 8354b676 0 | a7ba4be6a0234d9a 2917759fac2a6f19 a1b7487fcbb99e03
+flight | e4fae600 6 | fault
+flight | 244b26a5 1 | fault
+flight | 86a43047 5 | 276451945e5c5e7e 34b7250d9e5bdf1e 6773fcbf7cfd2bc6
+flight | 472ca7d0 3 | ff68a1951a15f105 7c2a7a886b95f9fe bc327846aaa6d34f
+flight | 1b62aac1 1 | fault
+flight | 1cd11ab6 0 | bf4345d93f45edd9 6760d27157b77058 4003522f9cc2295c
+flight | c405f951 0 | d6abaeea47252f46 6bdc9e0d29716060 251e39a0e893e94b
+flight | c67301d8 1 | 64f49f3f1a8c0b48 5525b50fccfcdb2 61ec00cc4d07232a
+flight | 5950fd7d 4 | cae378c446e7410 769ab93e1d59614b dc690c0bb50512b7
+flight | e61ec6b5 7 | 6496735b2b5fd095 7566c11fa3722271 637d9f520356ca9c
+flight | 1d99d69 2 | ea628bee5ebad03b 76f95c219288f059 e7f4bab5be107fc0
+flight | 9057d879 6 | 8a036b4eae5f87c5 dbb055f7b2eb3b78 d6b49f6242966b5b
+flight | e734fcd9 2 | 7c0c7e604b72d99e 71ebb9acf2ea9a09 2d68a2a999379040
+flight | d04fbfdd 5 | c3de61f5eabc4291 fcacf9c5ab4dc6a9 7eeead43627ba10c
+flight | 22b2e0e5 1 | df9f8699b70c75f5 71ad6ffcc3966211 733394bda8b1d963
+flight | 74fc84c6 2 | d5d04397c21fc490 ca3b2068e15be95f 8934e090a9d905f2
+flight | 69fc5023 5 | fault
+flight | 1c271472 2 | fault
+flight | 299a2b3 5 | fault
+flight | d78c2a7d 2 | ad95ce00b9621424 c423f24ad9be52b9 cccb45d6d94ba1a
+flight | 466f355d 2 | 149fa32f5890a97a 67b64b2b77fb32e 720ac1ec4a8cf9f2
+flight | 81209564 0 | fault
+flight | 85fb3387 2 | b26fe93ef5cf45a6 81e40040b6722eaa cd6a0558987cf211
+flight | 14e20e9c 6 | e073292a822df03e 13f10286ec2a90b8 12fe8c2f25a34ddf
+flight | a5816ffd 0 | 83e8de62001eb669 e7a9c7a23139758a 955ffa7ab87f5201
+flight | 540fbebe 1 | fault
+flight | c8f276e 2 | 1f7588032dcff38f 4be5276c6c736348 53df85da842faa59
+flight | cbc1d1ba 3 | fault
+flight | 91bd2bb2 3 | fault
+flight | c725e61f 5 | fault
+flight | e990463c 4 | 7cb690ee55237fb0 5c5b0fcb33779944 5c385417475d7349
+flight | 432cf019 1 | fault
+flight | 493af032 1 | fault
+flight | 42f35c2b 4 | 141f40852a8cc637 c771496c3e5168c4 a85b630349652d78
+flight | 786cc997 1 | 2c9cf66ddde5bcbd 871eb3364da38a46 cb8ecbe473b1c232
+flight | 6866e60e 1 | fault
+flight | d90dfcd2 4 | 2503188292a2539c 7c75c28fb139b9ac 353bb9ad8cf4b61f
+flight | eab76cc0 2 | dd235da7dbb0d58c 90d7b8e8c80f2f1e b73e102a70b0db48
+flight | 315368b7 3 | fault
+flight | a9c7065b 1 | fault
+flight | b3d30d23 1 | b728c6913abf0d32 b7d030adfe87361c 82c53899005f81ee
+flight | 5722ced2 3 | 6e25b7a4433464e5 bf315e58f42bce00 db05310ffacefb87
+flight | c9d832c1 3 | be206a0e481dbc27 cccdf2b53cf13e70 61b120fb223b4cda
+flight | 641dfa55 0 | 6f4fc4d795654100 e16bef58138b1f42 db978a09df773a1f
+flight | 7093d309 1 | fault
+flight | 632f60ff 4 | 68bcba485f0f14f3 910da2115ab95a91 1279bbfa9ef4a382
+flight | 30f7d404 1 | e235cc83a9e93cfd 9c607426d136c914 bef7e60a98b48072
+flight | e8d50077 7 | 94b2268fd155391d 4c130a89bbb30272 7254996a8a1dad61
+flight | e5859400 0 | 3d2bedb70f2b96cc 20818420e801e103 5b6babaa0616a5b0
+flight | 33cfec5e 1 | fault
+flight | 84a5fdb1 3 | 78d982ed2b872f71 44ce13f9f8db2673 2af0e6240febc58c
+flight | a2bb2e1a 6 | f4af4ca78b4dd293 3ec2cf7db98c615d 688d4122f7e4a4b8
+flight | eb5e49ec 0 | fault
+flight | e8e8e44a 7 | 3431fbe327b00ea9 63079b3578c64219 69c543af92f483ff
+flight | 9ac57e0a 4 | da78dcd3430ab3df 404e40e2a5d85a48 4a76b1f5a844aa2
+flight | 191f0825 7 | 82021fdbcb7cfb55 fe5240163b79e316 2cec36fdace07e87
+flight | b7cbbc3e 3 | fault
+flight | 72895260 6 | cbd6b7535a96700e 690feab19e5456f9 40b1553586a936bd
+flight | e89ca278 2 | fault
+flight | 6b7bb05d 3 | a7d0b7207442e7d 6ac6d8e11c17b871 19f1568e370ac4c2
+flight | 82fc30ef 1 | 5c8e1640684b49b9 f7d247d0d59b7052 5ad6fd19a6cb1cf1
+flight | d7278c21 5 | 1b7425f1b8edcc64 c999d6d026925f45 145075532b40660
+flight | 2836f3dd 0 | 2d97d25e315d18c0 18d8cbb1090620e8 a3fc08b534797cad
+flight | 2f87a671 4 | fault
+flight | be3156ad 1 | 3d38a02cefb27234 df534d434ed073e5 ac60b8916b9653a3
+flight | 4257513c 3 | fault
+flight | 2a1668c3 7 | 123183278ccd2c8f c8d1a3b05a85252e a9eb7c1f25726fbc
+flight | d47aa28f 2 | fault
+flight | 8dc2dabf 6 | fault
+flight | a226ce54 5 | fault
+flight | eed04c93 0 | f8a07c01b22b1774 74907291433ab9eb 27741f68a1512e
+flight | e1777c50 0 | c83d01bf6294dccd 645d7dbb6baacee0 90c59d23ca2d5af7
+flight | b9111baf 7 | 6a46c971c04336c5 15e54bd4143f2234 827934e2b33e7852
+flight | 5fb901c6 2 | fault
+flight | bcc1cb53 1 | fault
+flight | 4840c75a 6 | fault
+flight | 601ca629 4 | f5c9079d58d04ac7 d786f8dcd8bfa745 8b1eb4538549e38b
+flight | 83102a61 6 | fault
+flight | d19db13 1 | 74cbf2991c3909e7 d3a8b32f67f98231 e7d2c26cd53f39d0
+flight | 7fcf63cb 0 | 5c1df56a919b19c1 664857e1e11098e2 f63676ad86f1deb0
+flight | 55b91e56 5 | fault
+flight | c7b5c730 0 | 7c6704087a0cd525 8fc7c5b35a58ea8b 95e2c3eba95d363e
+flight | b6ee2b31 5 | 27c0125a052ae6af 4e919749c312e1cb 39585b6b76b021eb
+flight | 79ec6d9a 3 | f76ab9346be51a9c 6f49f7afafe0aa55 2ab2d3c11b208b61
+flight | 680e16f4 3 | fault
+flight | 98d680d6 3 | fault
+flight | 2cf0a033 4 | 4fea1586a83a7c29 30a9dc087bf6c584 14d1c501852d9c48
+flight | 9a360ec7 2 | fault
+flight | f981cf81 6 | fault
+flight | 89d542b9 0 | 2d3f9a2a1816487a 1537359469766b1e ea7f0375dc6cd2f1
+flight | 528bcf6d 2 | 2c74721a3f4af3b9 b9abc74e6116a480 291af60fdc93e8d3
+flight | 10b0b47d 1 | 18b4deab128bbc9f a12d95021e486609 fc50ef4bfd25b46d
+flight | e23c7428 1 | 3b25a3347d227a99 9a49f3764e0860d 11c32803a4ccc3cc
+flight | 196daa98 6 | fault
+flight | 1f5a51b1 0 | 4b03fe315e0d19d4 db5976cd486f5f0f 87eb55f1051e7129
+flight | 1276870c 5 | 7675bbe70c6365c6 8c04e26dd9eb9e71 80c5e0781658d97f
+flight | 1ca82455 6 | 4960c8701ce2ade5 6e6b0e63d69024f6 918b2c7d3334a522
+flight | a3ce009a 7 | e13c4d9a0be8de70 603f095b9eba98b1 86511aac75930da2
+flight | 76018b6d 3 | fault
+flight | 510e6488 1 | 9b555cd23bc6652 787cf97f2cc56ea3 abf2a2a74bb50c8f
+flight | 9e31c63d 0 | fault
+flight | 65a99083 6 | 83e183c6ea38d287 d58e10000fd8771d eb508484104e6ad5
+flight | 3ee0e369 0 | fault
+flight | 79470d81 5 | 9320feb95f497dc5 59d378a8991e29d6 9a841d8f66e3b7a3
+flight | 98e323e0 7 | 58506d310daf81de 8f969d346aa8cd56 ec71fa015efd6b09
+flight | 56cd3588 3 | e0ee57d042bc13aa 1eaa072f361187e2 e19a86a7d08b96d
+flight | 6731faf5 3 | fault
+flight | 758019a2 4 | fault
+flight | 46949a02 3 | fault
+flight | dc452aa8 4 | e2fb54a32116f824 8243ee41f88cec2d 9a76b1f1bf798a37
+flight | de0a6cf9 5 | 55300f0c5a88fd3c 606d5fa4fd6d91b1 480f209b59a81cde
+flight | ab498a0c 7 | 8dc26cdde92ea5d6 28f641f574c1068a f70f0c2abdb4ebd5
+flight | f4d4f494 7 | fault
+flight | 9e7d27d8 1 | fault
+flight | a294580d 3 | 8176ec899842e630 bb0fa8c1588f2da0 335d961d59b1cea7
+flight | e82affd9 6 | f0cc5f1951bb8121 f878047f6654237b 2f939ceb11710f39
+flight | 7a235cd8 3 | 332d3333adf44368 447bd30f3a22fc99 ad611ce691100269
+flight | 91f68c54 4 | fault
+flight | 92edd260 4 | fault
+flight | 88bf1cee 2 | 216f8119fbc83cd3 8ec3d1456113f95b 5b441f5f8530c8ec
+flight | eb84b65d 3 | dc612c32d81ab18b 9d8570d740262490 5da3973d46a73b8b
+flight | fd4f242b 2 | fault
+flight | 58b556c1 2 | fault
+flight | 9b798869 7 | 83de969ba256eb98 284e6046c55368ee 66b008e29ed06905
+flight | 82f605f8 7 | fault
+flight | c7f4a554 5 | fault
+flight | ffb109b7 4 | 82f0de4b0aeb2644 64ae6194d8433c11 353b5a9270c4c25d
+flight | b851371b 4 | fault
+flight | 8330e721 5 | fault
+flight | 439e25aa 1 | 66219da4aa9c9392 e94e651cb58aada5 3b4e642dc097332e
+flight | 3c9f2a6c 4 | fault
+flight | c97d3be1 3 | 645382318142bed3 658244d5e905697 d648deac4b2a2a7d
+flight | c45ce39e 1 | fault
+flight | 828e3d0e 1 | 9958a3827541db02 8fe10d3e9d2b2064 a3f3821bd962f27f
+flight | d9e8644a 0 | df48d6ebd856049d fc82a0d25bf2a30c 7ae4678e6baf9867
+flight | af39984d 4 | 4a67d0835ad544e3 48dba1b498576f32 aef25299158f12b4
+flight | 7baa05eb 4 | f5cdb59fc44d55ca fd0e9373edab6da3 fd662bf8285041da
+flight | 617e9367 2 | 621f4aa2a84c75bf 68b2c329d6d393 26541f2c8d14761c
+flight | 52b3ac3d 0 | fault
+flight | 7fc0fa56 0 | 8daef4c6420de530 bce243b061662128 337d019d5b301e3c
+flight | 55ea62fe 6 | 392c3e6a06814262 8d0adfceb8bf3850 7c5ab22df1031fc0
+flight | 75d4a3cf 1 | 5b880f66347be289 9795806177cc511b 8167cdb6c3bae1fc
+flight | d6d383e 4 | fault
+flight | 313ef4fc 0 | fault
+flight | c8e45c0f 3 | fault
+flight | 25164827 5 | dae44117cec77cf e07fb8dc94daafe2 59c02a8b141211cf
+flight | 7ab43caf 7 | 5c69678fe24315b4 f0ec961cf30da80b c6f4211749e72de
+flight | 77d3d8fc 0 | fault
+flight | 6018b17a 6 | a0b4bc3bf62fdd86 b13c3b9214b3e43c f127c5672b2a963a
+flight | 856c5cfa 1 | fault
+flight | 9023e0c8 3 | 30bb466edaaf5eae 39b9ab3b2fde2dae 48d8e725302ef9f0
+flight | f416725e 1 | eda8f6947de7450d a983ed3b8f016cec 99c223a5cea0e775
+flight | 5226d384 0 | 577faf2e2fc1a4b9 83efb2441cb10b50 60742fa29a19474d
+flight | e8477a6f 2 | 59e3458f38bcbc91 daa432ff6fc8832f c3f2c53aa2c87ae1
+flight | d1ddea72 1 | fault
+flight | 9d8ea770 3 | fault
+flight | f3d8ff06 2 | a0df78f6cada325a 5b2ad853e3f2ceff af64de6bba3921c5
+flight | 106a44ec 6 | fault
+flight | d28cf176 5 | c8551a955d13199e 8b605100c8926566 860bcc13154abf43
+flight | bdc3434b 6 | 9734923fb623c7bf 50d570d98bcf6824 de7ed668b6f50726
+flight | 602f5c2e 0 | f19a4988a774d7dd 9c9f35d86733d6a1 5a2772e0f2b81794
+flight | 315a3a8 7 | fault
+flight | b6ead44 0 | 4afa1edf6e82e892 4463725c95ddf0fc e710d43625af9fb
+flight | f7b900c3 3 | fault
+flight | 5dfa8d65 1 | 700f9bfa46d23d0d 10e2ea4b3a7a42e3 d240505d3d4a93bc
+flight | 38092fc7 1 | fault
+flight | bf832512 0 | fault
+flight | 38464b2b 3 | 9125a87496aa9354 9cff04c73ef8a6c9 30668be5ca005118
+flight | ef6532fb 0 | fault
+flight | 94ece47c 7 | fault
+flight | 1fe88ee2 7 | 753f2d77fea74538 c00cf1748e3a1d77 5f8f5230e0266da9
+flight | 5471d435 7 | ca51570b60f4a601 60b00a073df531a6 eddc39df7c7b584b
+flight | 91f2226b 7 | 5879df608c7fba07 30b4750240f96043 cd566c95a5a2d35f
+flight | 1a473df 7 | afe8d41775f205ff 786342716bfbd8cc 1fd87f0baa8e1d1
+flight | a150a514 5 | 840163222fcf0e22 b306434389b5c40c 4315601a8a28fea9
+flight | 619cca56 7 | 378f253e0cece48 13513bbe043e5c5c 7f29364a142e77cc
+flight | 91cf074b 0 | d7b64fe96a08b4ec fd29e6dd031a423d 977ef8133d9c9618
+flight | cd660f7 2 | fault
+flight | f2013bff 1 | b7c7aa8db948e334 bf20fda732ab08a5 9dc7344aa35c486d
+flight | bbeec94a 4 | fault
+flight | 203e6b11 7 | fault
+flight | 1a55d2c4 0 | fault
+flight | f46c7e93 5 | fault
+flight | 89c5afc5 7 | bf768380fa3cd05d 553b75aa30bc809a 4ebd933340be03e6
+flight | 34efac83 1 | fault
+flight | 5148460c 7 | 5861ed35d3a5dcf5 3e8e47bd0c4af829 cdf232ee70a1593
+flight | 5252a491 1 | fault
+flight | 15844e44 2 | fault
+flight | d60401ca 1 | fault
+flight | 3a87fe20 6 | 96b835a59eadd9ff 60dce283458eff29 8e3432fae9b332e8
+flight | 4cf2ceff 2 | 43a569c26a69afa7 fc0f89b8eeccc628 cf6bf1981bbdf6e5
+flight | e55fc031 2 | fault
+flight | 60da181a 4 | fault
+flight | f64cb08 4 | 2046861b6d62c5d4 12127181bd9a54ad a4a53f5c091bf3e
+flight | 4f54cdcc 3 | e12bffa04408f85c 1cba275570408bc9 f3673576f5e52aec
+flight | ea715dc2 4 | fault
+flight | f6194049 4 | 1ea6e1725ac16bfd f4b87e403c391dfe 28bc0a6f99da4507
+flight | 180a3476 0 | fault
+flight | c10426d 3 | 6ad4ba9f0234d27b 5a6707f88070bb58 abae882b1eb2aaf6
+flight | cef80880 2 | b280ea0b80be52dd 726c2cadfe77af94 b2ccf4c96e3fc8fa
+flight | fa540885 0 | ab61f031463e7bb8 d9642627813dc388 a367fc5c466323f5
+flight | b0196e96 1 | 608bda536febcfca 8c2c4d2276222032 7ace2ab595e1fd4d
+flight | 5c784819 0 | fault
+flight | 506dd69d 1 | dbdcad347faedfd4 9ebf28fed139b049 c03d53a12da8b92c
+flight | 1073d314 7 | b71ee780eb283c1c 175d4291796ca5c9 5849daf65fae90b8
+flight | 1e5375ef 4 | fault
+flight | 55fa3ea4 7 | fault
+flight | 47230659 4 | 52fb6dcc281f4f0c 3fb07babd341f30c 655529baca91b3a6
+flight | 42517d10 7 | fault
+flight | 24dade2 6 | fault
+flight | 7dbb8ef2 2 | f6d16af03e379a57 998c8e2791a8edd2 c4e90968809f1c6f
+flight | b0382b24 2 | 495b0257b501cdf 417ce0e99134c33a e4ec039a30bd93fd
+flight | dd73f54b 1 | 29ed0bbe807a0f79 59099c581e0f3805 497ce52250de24cd
+flight | 90ff1ecd 4 | 4c56731898c29c27 3535a4b4fd54e358 8b4f7c8fbfd10662
+flight | 391a65c8 3 | d61846d5b0aede79 b54bdda068da1348 ac1a8d2a9f0492c2
+flight | 3fabc1a0 3 | 50bb42c832064e65 d3e95897507a2999 4935eb96c07a9eb
+flight | 5285e63f 7 | a5903ff9a8b3b6d3 a8c74eefcc422d65 89b76da2437f74d
+flight | 5e9f0fe9 5 | fault
+flight | 488b9edf 7 | d2927fb6b5faea9b d09dc321d7793381 8f3c503c22a71fd8
+flight | f2b060a8 1 | fault
+flight | ba430cae 6 | fault
+flight | c9d69cb4 1 | 477094de1dd5e471 e701c8509588ccd4 39da9ffb7c0c4343
+flight | 7c461343 4 | fault
+flight | 306dc93b 0 | 4a3f4a2e5268ac99 be4089de0aa9fd48 79f051777467372e
+flight | 35072292 4 | ea9541c51d87980 2030e87532e85496 9dda0998006206b7
+flight | e29056da 2 | fault
+flight | a46d5b71 7 | cefaa7134e9cd99e a9f1bb2e73cbb0a0 daddc3ebd3da8fe5
+flight | 9ff825b7 0 | fault
+flight | 902988f7 6 | 1f06cedfa2cd13e5 127187a2f6aa3b04 200eccde09438be8
+flight | 2e96de05 3 | 953489ad6e00eb1e 43cb63ce23f00f27 e5e5f1ff9e181477
+flight | 44fcbdaf 3 | b64d05eb7a6f21eb 22ecbf27dbd4209f b34df244db6131f7
+flight | cb7f60f4 2 | 9ae6e6bb08a51abb d18870d43174977b 7b003ef1f4cef6e9
+flight | ff06e2ea 7 | fault
+flight | ceb4f8 4 | fault
+flight | 2ab2e6c7 0 | fault
+flight | c69be613 0 | fault
+flight | 79700d67 7 | a03c5aebc8f34296 4760aab2493f5f41 f95f60500c5400e4
+flight | 9d5c5dc7 7 | 194b49ab667bdca8 298f0ffeaef50b33 d2cad68e2ada8e57
+flight | 3d91e324 4 | eda27809135cd28 8c45e543a9114ce4 ece839ba91156505
+flight | d592fc0d 3 | 4dd7b0331517e190 1109b5d252d74bbd 6afe318715e859d
+flight | c93c5363 2 | fault
+flight | d61abfa9 5 | fault
+flight | 3a0f3880 4 | fault
+flight | f224951c 7 | 94f32b7355acb5a2 c9d14a5889a1daff 5e6102284907730a
+flight | 14ff575c 4 | 52ecdaf96284da4 199f2814ae8af348 4ff0f47ff4bd1e2d
+flight | 704e874b 1 | 9c16efb2389f04e1 1029030500bb91c2 a407e20d0eeedcce
+flight | 24623d68 4 | c993441ad942386d dc06a5d51776f786 c1e9340742b39a66
+flight | f878e3c3 1 | 36a58f881e14973d ffc85430e1aebfc0 db979e8bfa153f62
+flight | b744ad18 5 | fault
+flight | f67cc0fb 7 | fault
+flight | 7f17de81 6 | 29ec85b0e9d2f58a 4ef759a8a4745d6d f1b1af86eaaff8a0
+flight | a80b603f 0 | 2111dbbd3c3c5077 c201e23a064f4cd8 c8c42fb64d1f8a73
+flight | d582e8f6 5 | 16b2a241cf60e87b d0b950e5a816ec4d 1f4d443b22e391ff
+flight | 97711cf8 0 | fault
+flight | f8c2949 7 | fault
+flight | acc6132c 3 | fault
+flight | 4403714a 0 | fault
+flight | 8fd8ef2 7 | 26b197b64d95815e 17b84d135caea33e 717f35fd7d75277a
+flight | e67bd4b0 0 | 476daa3359dba30c 1978082fb1fcad1e d8530ce526316a33
+flight | 15876254 0 | d0f4e1b24c0bde0a cee743ad571cf9d8 854e7fede8a4f6be
+flight | 40a5cf1f 0 | 28121137bd7e8bd9 f469f9ad4d0e1a31 8a2672715ce4d51
+flight | 3e18151f 7 | fault
+flight | 66f77b51 3 | c502f165b590f0a 27855a1c7dc6a044 17d38154498cf8fe
+flight | e04b6575 5 | fault
+flight | b438b8f9 5 | fault
+flight | 3b84774d 7 | fault
+flight | e1443dd5 2 | fault
+flight | e199429d 7 | 345ff96380fa2cce da3e88ea42252cb4 9f62775270a8ca97
+flight | 4c6c395c 6 | fault
+flight | ea511469 3 | fault
+flight | 31edb2f2 3 | 39f180712068981f bf05ce834531a68e 1e834386ce655873
+flight | ed809fc4 3 | b29792fc019f183f 358d358647607f4f 8c2b14a2d2782fb2
+flight | bfe3bd6 5 | 5ca997a5fa727b8f c339b0e697bf3e03 9863c80270d561a5
+flight | 6e4e3b1e 3 | fault
+flight | e05779d5 3 | cd3568c7c5e2a72d 8d92b3068e914514 9506d67eea04b5ab
+flight | ab324261 5 | ea036ae2670c1f40 ac7c2932b63e63c5 767117e350cb426d
+flight | 2f17c610 2 | 45b39473b5746606 7841fc7ea2d52dc 2044c9a56f775b48
+flight | fedcb759 6 | 9252c5db40953448 4a877f484fe05c12 bada74754e99fe29
+flight | 31426080 6 | 92c60c3fb4d2eec6 2b3eb983c732cf30 df56b7a7971541df
+flight | 105a6069 6 | c32b7fc1bce29d77 ab2f5dc968cf2515 dba2a2c2de768d10
+flight | 5fc30f80 7 | fault
+flight | 2c2ed09f 5 | 89b42081069f33b7 f74e08c6e50d5e24 a3340fb5e687320
+flight | 117c5fcb 1 | c38b270d21c87572 867a31c7c4edede6 2a949a920ef1dca2
+flight | d6735a30 3 | a4f215e41ee66080 f19970cf1d10143 def73725b9267a27
+flight | 3df512ba 6 | fault
+flight | 4d4b2d01 1 | fault
+flight | 8b569b2a 0 | 47e759de63089aa8 28044819bc046a5b 364fc11efaf9a722
+flight | 22088ac9 0 | fault
+flight | 1c90566f 3 | 769cb2bae5109ce5 31653ba8042b32d9 cdaaf5111602594b
+flight | 74f5a56b 2 | 32784cc36ba9f3c7 b2ac519caba736d4 480710f3102c4fa7
+flight | 119c7aad 4 | 4c14ff64545e7a96 3d910bc6f56fcfe9 7b9d395302fa14a5
+flight | 23670ed3 4 | fault
+flight | f661478a 0 | 4688bfcd9286779e 4964a34b51a58c10 48bd3b6a86aaae4a
+flight | 1474a4a6 2 | 6e7457277a29638 7bbd0d115377791 639b38c10fe4f989
+flight | aaf0730c 6 | bc609c183799ac1f c3ff1a08d00abd62 c7dc0423db632ae2
+flight | a77ecc48 4 | fault
+flight | 91459a5f 4 | 7fee26cb6eae42cc ba8bbdd0de4e7242 81f0c6b1c33b39e2
+flight | 45f78978 1 | fault
+flight | 3d0063d6 7 | fault
+flight | f8c5b44b 4 | fault
+flight | f7bcdf26 6 | fault
+flight | ce85398c 3 | 95a6653ed5695479 bc9981bd2f2238b2 644715b421b23833
+flight | 2a112a47 7 | 519edae1729222d8 f70b714e82fab91b c5637cf4049fe151
+flight | 270b4be5 1 | 590fa2529ce9aa75 ef988b5d65669455 e36f2d392c86a50b
+flight | db806656 3 | fault
+flight | b9dba96a 2 | fault
+flight | e166e5fc 3 | fault
+flight | e4c16ada 7 | b0c1fa0f4ded9bf0 b32ea07bbee17cf8 c3fe95b24c8b842
+flight | 8651b980 0 | 6c26067d3ba9c889 bf07ad9abe3227ac bbd66844298988c1
+flight | 9f75685d 5 | fault
+flight | 8189ac55 6 | fault
+flight | 330f9512 2 | fault
+flight | 14fc3bc2 1 | 3c075e05c59a19e8 51608f48d521aa4c d75536257790ebf7
+flight | 47fef2e1 3 | fault
+flight | 5ba461a 1 | b6d3a706109aad73 e9e7d90f0f065e59 885c13cc68e2dc1b
+flight | 71c0f171 1 | f1c546066117371 a47e8df656df025b fe85e945e7988eb9
+flight | 9374940a 2 | c961ddf6346fb386 bed2943584b908f6 c9c5f3f5ab09405c
+flight | 1ff950ec 0 | fault
+flight | dc2e71c 4 | c58e05baa5d2a43b 9561b35034675b2 ba8ef3ce361a1c48
+flight | 7ab48093 5 | fault
+flight | c83f8007 4 | fault
+flight | f77f8cda 1 | fault
+flight | b83e3ef7 2 | fault
+flight | 33ae03ad 1 | 34ea526bd6ee082c ea6a08072cb83d7b 70fa749300b5eedd
+flight | fe733eab 0 | fead1103fbf6888 6daf1aabe3b3fb08 3c302352755e7b5e
+flight | ce09c4c6 0 | 70e51b8d7bcefcea a1fabb367151eaf5 fcd730d43a101b9f
+flight | a56141f0 5 | 3afdb2c754eefde1 bb42705e2234af52 f9262c37ecc2068d
+flight | 32815660 1 | e50cda94e8a0ba2b b3b2ccf0a89b8a55 56997b10bbfc1291
+flight | b9f19c23 6 | cf5198506ef61c98 111bf21d9b380188 e66c09d04a85b73b
+flight | 51c179d2 4 | 19e5be27331ed267 71e9a8a09ab193da 91caab44e109645f
+flight | 58ec411e 0 | c6b00ab469be814d 287c7410e2427263 c6decfdd2ba0737c
+flight | 16cbbf25 4 | 5de16d598a108b50 3a8ceb4e843cc800 700a2676f7213638
+flight | e82c27c5 6 | b0403145fed30e 14954a1b49f3be97 42ee25edff209e7e
+flight | 367525f 1 | fault
+flight | 1572136a 6 | fault
+flight | 95c4a6e9 0 | 61c40109f3d2a2df 81250c0a69a7b987 ac79d02ec78f2ec4
+flight | 3ab00180 0 | fault
+flight | f92decec 5 | fault
+flight | 22d9c161 5 | fault
+flight | 9d41e5ba 1 | 160a9487131e4649 ab0419c923481dbf 7291cf6319b64648
+flight | add29e09 0 | fault
+flight | 709c4c3b 0 | fault
+flight | d22a07b 5 | fdfc818b8ef98547 7f4ce2ae761d31a3 67b7394653910b57
+flight | b42c2f94 2 | fault
+flight | 7031623a 3 | fault
+flight | 126b5732 3 | 3d924455fe0b14ce 44c77d6f558ecec8 6ccdaccefd0f03eb
+flight | 3f7a36cb 7 | fault
+flight | c0d87ee3 4 | a1c0ab5ac816c33c 6427fc78cd80b57a cd4687f237aaee6f
+flight | 8a395345 4 | fault
+flight | 5b3f28af 0 | fault
+flight | bac98c1d 2 | 4297102b4fdb107f aaa9d3f09fd975d6 47de2e416475755c
+flight | f5194bd3 2 | d065c17810a6eaa7 30bb0fa508e25e1d a0db0ab6c30caf92
+flight | 70fab1ff 1 | fault
+flight | edf8e22b 2 | fault
+flight | 46c92ea4 7 | 8e73fb03a601c991 d714e1bf7b5c39d3 adc019662276a21f
+flight | 3d765951 3 | fault
+flight | 8044d4b1 4 | 477be918c32c1a37 7eb5cfa32674cb50 93c0d3d804d2da74
+flight | 8858043d 6 | 386f61be9d229934 3f9a8b36b453618 2bd00f9f0b18fe62
+flight | 71327527 7 | d0a169540897ebe5 8245d0e3292eab16 8a08da409a9c5712
+flight | 13fe55c0 1 | da0f19d9bbdeda33 b0e550e792ff728b 5074e1efdca3810e
+flight | f62b0613 1 | 9157f56531cf5170 b0ffdd3bce232723 288dd34546318b62
+flight | e34ce8ae 4 | cb8cd5d8dab6d97 b5638427b4210b46 51ef66c666145f84
+flight | c1920175 0 | fault
+flight | e64238fc 0 | d79d78bd1497be53 3517c98ddb37a5db 8b4162db3bf323fe
+flight | 3dda989c 0 | fault
+flight | 4ae4125a 1 | c755aef5e79d1144 92b7e3f34ce10b13 a564e76be2676085
+flight | 3e36f472 2 | fault
+flight | f954e6b5 1 | 2b5fe9988271059 6f3ffaf644175608 1bb5e62da3179bd
+flight | 8ac9c62a 7 | 4b87c37e1851b137 1fac36cc5f2230fc 3541c8f347f440d8
+flight | 823b6bb4 0 | f9916904dda38409 50a693c53fb56daa 5feb0301e6418652
+flight | 77250957 5 | 7ee58e40c12cecfb 6f494f6665e30ad0 1ba66027fa94f026
+flight | 9465f0fa 1 | 55674019ed15f1ec b7407f20e98d279d 6745fdfc2f216ea1
+flight | eafc0548 1 | fault
+flight | 283c506f 4 | 30e33fb88c0ef716 6299bfbbfbbb5ba4 cef9c16af34fef61
+flight | e9a3873d 5 | fault
+flight | bfea4fb9 1 | fault
+flight | c47d91ab 7 | fault
+flight | 2492e3db 7 | fault
+flight | d9263629 7 | fault
+flight | 121cd86d 7 | 426becdeffe0df5 5264c64e8d1ed8a4 2c3de7695e2db1c3
+flight | e0068cce 4 | fault
+flight | 65b226a 1 | c8c618347986697b 6b9d06363b19d42b 53fbf82534f61a1a
+flight | 6f1a374 6 | fault
+flight | 596edf3d 1 | 23677cf7b6df438a 6ae76eb5e3dd7ed3 551b4a7a14ad11cc
+flight | 85a2b72d 1 | 15abf46d610833bd f6a0b896e8f8c34d 437b635b0664939e
+flight | ad86f8a7 7 | 3ee5761239df006e c738897b89bb20b3 7d6bb648ee60c97f
+flight | 7243d2e3 3 | dd4f2800649a8b90 13765e11d6d0480e e0d9e2215ad4fb68
+flight | 205fbeac 2 | 995a7ac0510c8bc1 30d08637792b8a40 dfd8871985407c7d
+flight | 751cef04 6 | fault
+flight | 4ba60ac7 7 | fault
+flight | 3e65e9c6 5 | fault
+flight | cfe098da 0 | 5350434d0838e492 1a9ece5ed2518dac 9bea896c4afd05e8
+flight | e6cc532b 3 | cfd442a8ab6543b5 d51e67ad8e454bdc 1c3a784557671a39
+flight | d51a8ef0 3 | fault
+flight | 4b0e5116 3 | 296045dd2f3ef8cb 74ce1e7860a42bde 54f5c4fcaebc0161
+flight | d33ccaf4 6 | 3cf33a65a662c3ce 9d8e8f94cacd6305 46aa088f1fb44508
+flight | 926d0e68 0 | fd531c1c544386d9 f66c14409d9da1c0 aff5dae402f987c8
+flight | 80b7961f 6 | fault
+flight | b60f0de6 6 | fault
+flight | 9d3e80e0 2 | fault
+flight | e5b7cd2b 1 | d9190db5bcb3f314 5369068b6ea39318 44972c5e314e11a6
+flight | ea8faf7e 6 | fault
+flight | eae4f9f7 1 | fault
+flight | 1e8cc84 4 | 8dbe9a161811237e 1ffa6cd3a8f98d70 866f5ce8645f42f3
+flight | c18652e0 3 | 2f62d0052f53cb00 484ceb9a110d7090 bd77cebf2b9e2fe5
+flight | 4efd1e24 5 | fault
+flight | 8b5e4816 6 | 5a442e2adfca6b1 d466c849a44299cf 615b7452e72a8094
+flight | e25f51ce 5 | fault
+flight | ed22f84f 3 | fault
+flight | 74324c2b 4 | 5dec7ed712aafac1 25702228e6a514f1 7c6e01f59ae61db6
+flight | 711c3343 5 | bf3c439d0ac32ba6 c3d3ef075c8da68c 824d96b0875197bf
+flight | 261bf299 6 | 44cfd6b74d433dde 87725cb495312977 3fddd40eba14cf35
+flight | 94cc46b8 7 | 53f3ecc5ce22e50c 4efdd71a0b5e6993 4f69f8402c1d3eb0
+flight | 4afa2b13 4 | fault
+flight | 28d5870 0 | fault
+flight | 10cfb954 3 | fault
+flight | 2f002a36 2 | b78c2465e9b484c8 756342e16ce57885 8d678da2c193155
+flight | 18ac8337 2 | 2d9a647f7f82152f 140e8d1705766faf ae1c51b6e30131d9
+flight | 52d8bb70 2 | fault
+flight | 1b976c07 7 | 35e2365612704990 3544cfe0d59dd925 3757bccb89789087
+flight | f07930f6 0 | fault
+flight | bb54ecec 6 | 89990e766fc24fef 1e9c8643683046e 7debd9bce395f0a
+flight | 91cb4dec 2 | 3cbb6f11a69a14dd 13f23eb2faed675a 84838a35f88b8425
+flight | 81d71169 1 | 539aa77228689d4c bc643f8d27325547 11d10392b19725e7
+flight | f43bcd18 5 | d15e8a0953f3f4a8 881cab197f648826 d93857406eedd63f
+flight | a1bbf57d 6 | fault
+flight | 8da02d7a 2 | a59c9027708c191b c508198cf2255665 93ec578538c4c691
+flight | 64493f5c 0 | df3c17ee25534726 f3a57f04672f40cf ec7bca3e853f0043
+flight | a4bf1f40 7 | fault
+flight | 2dae0f39 1 | 6234fbeb0215c16a 9917a1e8ceb2b43e 2eacea1f90cdcafb
+flight | f433033a 4 | acd3cf74e5d5c4a 2d85cd81a9d16dd2 ff5dc8555ab0329b
+flight | b9f92245 5 | fault
+flight | 6e8fbb01 4 | fault
+flight | 6e6c46e6 7 | fault
+flight | 370d1511 0 | a0ed0973da3f47d5 3d04485657f6d75f dee29196c3c010
+flight | 8d23c06e 2 | b69cde951e9ba2be 66ea9da9b3b2e2fa 454f1936793e2ee3
+flight | ecc9d9e2 7 | fault
+flight | 73f82851 7 | 3ec655ba3839e846 e0f1196c48b3268c 9cf22f48a73ec203
+flight | 5957f710 4 | c648a3b666948be9 257049ba13c565d4 2f69462e018ea669
+flight | e24a0086 3 | fault
+flight | c86cfe39 1 | e8c7d469a13eceb7 c34333f1c8a109df 2193f63fce66c316
+flight | 30e72a27 3 | fault
+flight | c64c258f 6 | fault
+flight | ac8ae539 7 | 91c8df2d7d8c47ec 462df0d397b27aa0 b86c785f24e7627b
+flight | 46a45809 2 | e84c4d84dc946173 6f65c7e7d7ba196c fa96724fee00fbd8
+flight | 3f8abbaf 6 | fault
+flight | e120c38d 0 | fault
+flight | 9c27169d 6 | 3fd3a3ab9ad630cc cad8ce1c9a9e66e4 54a59714fc66f2c8
+flight | c94179e2 0 | 8fd03f635c96010d 3ab39321b1ce8308 e4d4af5e9cf96d94
+flight | 29737f7a 6 | fault
+flight | 974e55d2 0 | fault
+flight | 813ee0a3 5 | 8dc7fbb3dd063c8 7906630e5ffe9a1e 6aac3ea8d0fef3b7
+flight | e7096f80 6 | 1fd02c3727d5e5b3 4b67c60b322431c 1649144e4b38da1d
+flight | 55b3c4a5 0 | 3bd8eba888eb962e 4b15560739556e94 70a5f4ac1b02bfb2
+flight | f208286 6 | fault
+flight | 7e478af4 4 | 8f6e3e3325a74609 58fa8b0039a980c2 fd075ee44e0282f9
+flight | 16fcebf5 7 | 60be49a45e22b280 3a299131a557f9f8 edc907246f2a1d62
+flight | 3cfb5913 6 | fault
+flight | 533d210a 0 | 68ea137c0778e055 95103626d3f7dce2 3d72e046d1b65e81
+flight | 7be621f3 2 | d6ad87d116f5cda5 313aa2da5f707dbc 83003a944ec2c68c
+flight | 7818db27 3 | 6ca6848ed33f9f6 a53cc67a63f74765 656cb5639f77715e
+flight | 8c277ce3 6 | 8beba4b97a088a0b 92b04e0bd72b7d22 79fef9b7ed14f38
+flight | f3020c29 5 | 8882bbeb14ea279c ea5776bdfca2b1a8 ceff0bb0bd8ee5e7
+flight | 8976fc73 0 | d608e729a953983e 621bc36504c523c e14c86520cb0db59
+flight | 63c198a7 3 | 3337b127d05aafff 4005e9f29385acf4 c444f6c01f514430
+flight | 48f42e9b 0 | 30e787331e30565d c7049989719dfbf2 9a48e0aaea5c014d
+flight | 9cb5af07 5 | 476270c6f77b4170 4e1d1b76d3190d45 184287bffef02ba
+flight | b0b478c8 0 | 6d248fd0bdd12be1 4b1cf33ba81a3f64 1e98567370cd1e1c
+flight | c36dc075 2 | fault
+flight | d566c1fa 0 | dfde87937699f992 ce98bd0a8ffbdc1d 87623f7a4ad8c7f0
+flight | 61615e8b 6 | b197b9edbae08469 e3fe2fdd0f3c7da9 612e8cff44b4149e
+flight | 83b5484f 5 | 8cddea20713d65b2 6b9f49eb39c66705 cf2cd608ab5577c3
+flight | 295f5eb9 3 | fd0dae1ba0c63137 f0e661e1107ea910 b647357a970c3698
+flight | a7dd821a 2 | 934eabc3f82c7e22 a48bd6b00bbea77c 923cc5a0cffb5193
+flight | 3c6f55b0 3 | fault
+flight | 36f9c8c5 0 | af9315fe7a9c8b03 9036ad13e408d56 11ddee1548576f73
+flight | e16a4242 1 | fault
+flight | bb2cb512 6 | fault
+flight | ac65e7f6 3 | 377b7c1719e97827 7710c4beb0a6c6bd c963582f13dd3feb
+flight | 859ee8d 7 | fault
+flight | 1dc38f67 7 | fault
+flight | 37e86c05 3 | 91a28f09c5aa7b19 fbe08c251ba7d320 ce423d5dda59826f
+flight | 53a5e7a7 7 | fault
+flight | cf0591bd 0 | fault
+flight | d53ae1e4 5 | fault
+flight | 10bba7ea 6 | 8b11c8b9b06893a4 1822fe4b7e505b93 cca5b6ec9e314fa2
+flight | 9e360dba 6 | fault
+flight | a87f4afa 6 | 620ed0ec726a9a4e ccb06706ef42eeaa 7abc26de20733c26
+flight | b3f0e0f1 7 | fault
+flight | 31a76031 0 | fault
+flight | 7a7c3802 7 | 9040326c9e289e9e 8689081b4acd1b77 a33d79c0d448ac59
+flight | 99aa1160 0 | ea2d20b40f1caf34 2d7734770140cad8 7406862f5bb67d22
+flight | 14046b51 3 | fault
+flight | 71864e02 0 | f046bbd96d68bd9a 6e4bdc29e0fb66e5 abd8c0a36e2a04bd
+flight | 89e9c259 0 | fault
+flight | e92dd38d 4 | 3c4cc1b19d95990e 7d692201b25776f5 13310cfed7344bba
+flight | 4e06429a 3 | fault
+flight | 4844d0a1 2 | fault
+flight | f3007dfd 3 | fault
+flight | 6abaa992 0 | ee305d3a89b023f8 2d46e46135578947 9f17f6b684d5744e
+flight | d884a6b5 7 | fault
+flight | fdfb54a3 2 | bbce4284506f8626 95860d312e84660c afd095e5a17f2966
+flight | d49a9d62 3 | fault
+flight | ae28c242 6 | df82e64e609832f5 531fa277fedcd384 c54ddacc94acb
+flight | b73df76f 6 | fault
+flight | e2ac0a26 4 | fault
+flight | 16b98faf 5 | fault
+flight | d59a3405 3 | 4f5a9fda52013736 a4411e4f667528db c178bcb6a6373eb1
+flight | a1222709 4 | fault
+flight | 458b90a5 3 | fde4fb2cd962efdd aa9230688e495fd4 e99d494cdcf08f18
+flight | 9cf44877 5 | e3643d9c0b756649 2ba8effcc7bf11a9 9cdf0ced6e92ba12
+flight | b3aa4cfe 1 | 58b7738da0c4d846 c047f3989a2bef1d db00c16f81ea3a04
+flight | 433fdea 1 | fault
+flight | fbe7923 0 | fault
+flight | f0c8870b 5 | dcf4bbaffedb822 2b5936838899d1d9 70918f358e368ad2
+flight | f9b45ea1 4 | fault
+flight | d24c56ec 0 | fault
+flight | 8a75ec9 5 | fault
+flight | 2eb98c33 5 | fault
+flight | dbc86a28 2 | fb11b307bd60890e 5347e3c7228e0eab 2e805b93ec7f7db0
+flight | 5ae99579 4 | fault
+flight | d524da6e 0 | bdc0703229ed1ae6 f3d32d7e819ff656 d6cd0111596a0d19
+flight | dde27918 2 | a898c8b899563ef0 760153de89087f2c 419851540df49cdd
+flight | ab680527 4 | 875daa92cd4bf3a8 acf3f9a1dc4bc03d 34fe5dfb69381316
+flight | 60251a04 7 | fe5c444fb95a215d e110badee8990246 6edb9a4693e20d5e
+flight | 451fb33c 5 | 3ed36d1fd967734a 947f4f481ebb6ed1 502c1103931331ad
+flight | 5f69ecf5 7 | fault
+flight | 6b4e868 6 | 3aaf0a6a2755243b cad97db592a923c1 f0ac419700eab19e
+flight | cd022c5d 2 | fault
+flight | dd8af338 6 | fault
+flight | 29133437 0 | fault
+flight | d92300ac 3 | fault
+flight | 9065cf36 1 | b31db218c489e5a0 5f25f7f64a4c527e 3c96da0b242968fe
+flight | d8c6de0c 5 | fault
+flight | 4b8a047a 0 | 251d38033eec0cd3 5108153d55179cba b6a41c3807bbac55
+flight | 9b404826 2 | a355987caebad26 308299100cc6e52d ac5d6a38cef809f8
+flight | 98fc4679 6 | fbca68d7042e30c8 2f6f3409aa969a2f 6f15f81920984086
+flight | 5d7867b7 7 | 58783ce7b3959e9a 8902d8c30866b3fc eb346e926b2d3e9c
+flight | acd15c8b 3 | fault
+flight | ba8446d4 5 | fd285c14f542456c 2af0ee508441b5a2 8f4c97dff8463b37
+flight | ccca59bf 3 | 3269580c459f0745 5eda16c86a5a61c7 100179d473ec51e1
+flight | e957d9f9 3 | fault
+flight | 7d27eb8b 1 | cc7f4808c9ff7e96 7dce558c646f6be9 edec613c00064266
+flight | 5b3d9dda 7 | fault
+flight | 3d0b6f6c 3 | fault
+flight | e463ec2e 7 | 5efd8b25e2d19803 792392c35dc39e6f 285a72d0be73b977
+flight | b0147adf 2 | 22540366b3ed5cb6 342643b837f9acf3 17d5f3a7033efebc
+flight | 40144565 5 | 76817f7d5bbfa32a 81b5b0c0bde5a2b8 8789eea74952f66b
+flight | cc56d738 5 | 417c8e3e31c6c445 86645dbdb139c40d 7b30ed8237f1c1be
+flight | 79ee0197 0 | af5e1fe76242470b bcf49380b3320c8a a6a1f6b6bbfa0e33
+flight | 501bcf55 6 | f3f617bf8595bfe cfe30eea053f156 1e436ef1c4b4f0dd
+flight | 1d33c956 1 | 37c252536c44821d 13a5fc3435165d65 37ac7f6f7f218901
+flight | 6420cb43 5 | df67377e83f7a482 891a9e9126051713 802276be1384f086
+flight | be05a49d 6 | fault
+flight | c7c3c628 0 | fault
+flight | 15f06a5f 0 | fault
+flight | e6ec4ae1 6 | fault
+flight | 1cd32ee5 6 | b0b7bd5089ccc850 8669f467cc03ef84 daa8c09a6d06dcc2
+flight | e70e58d4 2 | 8600777f06f7651c 5e5a657d3454e0f8 9f99e5fc304a705d
+flight | 5d9771ba 5 | b475c5ec8a0b471b 76e24be9a849392a b7b6c64bcd9646f1
+flight | a8bb953c 4 | fault
+flight | f125bbfb 3 | fault
+flight | 39401427 7 | 5818453d33188101 df2dcda834cd597e 22818571ced26cc0
+flight | 81fa341e 6 | fault
+flight | 132ccd5d 0 | 35c640fc658002df 2d8fdf7aa84616ea 18ed0fcdb04c7c4f
+flight | 1209d086 2 | fault
+flight | 801afd6b 6 | fault
+flight | 7e95df63 2 | fault
+flight | 6e9b2e4d 4 | fault
+flight | 484a6919 4 | ac4859ea0826fa56 9aa67bffd4fa6400 6e5abd4da70ef591
+flight | 102325f4 4 | fault
+flight | c441b9a1 5 | bd14ec62d73d2b5c a1079c74b9d2071c 12d89212526ce7ec
+flight | f483a833 6 | fault
+flight | 3c799af3 3 | fault
+flight | e3b719ac 6 | e06230ea70bf898f dcb0abc33fc96cd5 f0294960f0970457
+flight | 6c578517 0 | 4e9b15780dd5467d baa29e1bd23b4f86 500cb0d0f12c3d4b
+flight | dbffc87a 7 | fault
+flight | 3218322d 6 | e09df57a06706610 5575edc6b6bc6d86 264981019bca4190
+flight | 424997b4 5 | 19da2276bbf68766 90445871196246a5 de71bb81f39a7e80
+flight | 496ebc1f 2 | afb046fbd8963e90 343f998d9db73d21 d2c09fd54d9eb60e
+flight | e10ffda9 4 | fault
+flight | 38bc4bb0 1 | fault
+flight | f82c3214 3 | fault
+flight | b47ce75d 1 | fault
+flight | 98928039 1 | 7ae9fe9150ffafec 71d5826f4cf8072b 6a2a6bc4388cfa98
+flight | 4929da7f 5 | a29a9d074f3cb3f4 e9d9720d96dab5c3 b241d449a7bb754
+flight | c4238f47 0 | fault
+flight | 54e26a4f 7 | 9f11fefd17f13ce3 2cfeae1d1dfa45e6 450a9fe2110de752
+flight | 17be6be2 7 | fault
+flight | aa4133e1 4 | 6a7d77d199e7ff5b e95f4471804dd037 6d24a3f659f93fdf
+flight | 92e09de5 6 | fault
+flight | c786ca8 3 | a5285ad85880a8af 5d75f21c27fbbeeb 531811da8b5a0e99
+flight | d0f6e623 5 | a8d043abc11be69 f5785b358799396 68421e5096606ce6
+flight | b5d7bf00 5 | fault
+flight | 664e5f83 1 | fault
+flight | f7d05732 1 | b4d1db076f6db941 a3510fcbd4877e15 c446cfbe09baa3bd
+flight | f147d967 4 | 5eeeaa166cfe9fd 96125fc5c95a0086 3377ec1a5fab7fac
+flight | 56d61ba0 1 | ddf85bfb253dc403 801c0e16343b6d0f 446014c5c54c72ff
+flight | 57199568 0 | fault
+flight | 3758e866 5 | 2fc11aaa10282333 2b51f6356bbfca70 b104c39594a3beac
+flight | 139ba7e1 1 | e137d6d66b8bf81d 39755ce5ee9549af 189cf3e41e46b0c1
+flight | d9b96a10 7 | 4bd1424e730c6046 8d9ae4626104a32f 942eb092c9b60119
+flight | 8ac7db78 2 | 7c274f617f3cc314 96d6ce8441623e1e 774f9a4d33fa208d
+flight | 4f5a26b9 3 | fault
+flight | c7e3a829 7 | fault
+flight | 5c83cc90 1 | fault
+flight | d204caa5 2 | fault
+flight | 30e981b3 4 | 2bd175719ac10c30 3bb2d5efeecae8a0 72dbfe79f1027334
+flight | a2f81cdd 1 | fault
+flight | f24025d 5 | fault
+flight | cf47b576 2 | fault
+flight | 2f78d8f5 1 | ebe9b32a00d199d0 c5b122b84e51b645 60f9929d89a29390
+flight | 5e46af1e 4 | f55c3bc67a374c2f 2762ff0af3138342 d1f0be68153df1ec
+flight | bca5542 7 | fault
+flight | 8f9267e8 6 | a264330c23d9a5f3 11fd0834eab2c643 f8c19354f8644d26
+flight | 54f489aa 4 | 23d7ee34173711f8 46665780c35e7485 4fdb0a7b78ef24b1
+flight | af986f55 4 | fault
+flight | 2444ebf0 0 | e85d99909a2795f4 2b87a3cb19dda91d dc884ac8cab0eeff
+flight | 36cac771 0 | 8c4cca4ac36dbd9e 12a7fb934cfd13d8 a86662831bd795b0
+flight | df39f60 3 | 61868c007dd87910 492d735f49eee09d af2e6bd2b49779f8
+flight | f546ca8a 3 | fault
+flight | 6f5e9434 4 | 17af1512c0969a65 1817abfe0bf4a6b7 c59673b5645be240
+flight | ff113a67 2 | fault
+flight | d0786530 2 | 9dc278c3effb8a55 2d2ce09b7900d4e6 b0030ed210b52da8
+flight | 6497dc21 3 | fault
+flight | dac102c9 7 | 2341127ff3d22ec6 d47eb41a5abe900a 675d80a0362e94de
+flight | 550965d 2 | fault
+flight | 8501eba6 3 | fault
+flight | 8b4fb46a 1 | 12d2cf6caa79f346 6a18605051d55492 cc90da35af46616e
+flight | 38cd291 1 | 81298540dc1efe6c 9cc338c91878bb5a 706192a9fb29d674
+flight | dd02657c 5 | fault
+flight | 4d4240c4 3 | 4121732cd8d81de7 866a1d8aeab8ec75 b88fb59a4d88224
+flight | 824a439b 5 | 1f267e9e3c51fa04 17397257627e926f ed79b926a8d1abd1
+flight | 1b557986 2 | fault
+flight | e67e352e 2 | fault
+flight | 17855ae9 5 | da80b452a7b0eb3c 19e819f924bfc121 233d435684b44c26
+flight | ddaaaf9f 7 | fault
+flight | 3732dd8b 6 | c9f0d5cf526e15b2 dd37102314ab105e 9354734483756a4a
+flight | 75ec7c2a 4 | d12edf6b10b646b7 89bc4eb3738f47d1 99e7bb84f6f7a72c
+flight | a56a549e 4 | fault
+flight | 77be8de7 6 | c8550b133f3492bf 2777164df47f9ab9 de32cd77cdc00fa6
+flight | 3d5f5071 0 | fault
+flight | 230f86b5 3 | fault
+flight | 686d249a 1 | fault
+flight | 4eb2193 2 | e67139aaa9c09ed9 270070ac3654efc3 69d1f0e2f218405a
+flight | 19e28ab9 4 | fault
+flight | 645e4fcc 0 | 26ec22119e24e4a5 45e2c4fd9059061c a75dac11f2510a39
+flight | 1f6a61f4 0 | e6d36cb87c88fa6f 590541b3f22b9c8d 3c8c69a36f24bede
+flight | f474ca38 6 | ec1f640409537da8 6ad9543edb8eba3e 97d108b41ffda588
+flight | 608ba0a9 0 | 82fc2e20c0c1e6e5 8b16c910a25d438a 451481431353e9e3
+flight | b27b597f 5 | 6c2fed4abfdbd6ec fabb9b9365826782 46722ceeebce7d99
+flight | 1b02723c 0 | dbe752e481a46d5f c530ba4f41e06b56 df543e39b769d270
+flight | 4b0fec94 3 | fault
+flight | d5f58655 2 | fault
+flight | f6cc56f5 2 | 6726847d88af9958 57f09434c3b9b735 4c33d76f5d7affe1
+flight | e92671b1 5 | 6bce27ef64d56b2e e4428c6a05ee08b2 6f79437e1dcdbe07
+flight | 8b335438 0 | 99d6f57db452aa0 e04f2281459919dd 8a8aa9674a395a1f
+flight | c175ba67 2 | 21afe90d5ca80ff1 f4fcea7b95937ae0 8bdd595d6630bca4
+flight | ccfd9298 5 | fault
+flight | 27723a03 0 | fault
+flight | 7229294b 0 | e24a388606498a6b a2b8158633a16a6b a4f849a09ebe702e
+flight | 1621add6 0 | a57ac36f80b982e 4ccee74d37e0c7c0 e99fba2a19bdfe79
+flight | cb8fa2ac 4 | cdaba7dffdaec2f0 82572298c489e8df 9a60830c2c60f3a5
+flight | 2b186d3c 0 | fault
+flight | e8dbe563 4 | 1c45a0538f3b65c6 ad887f68e504ca68 ec989c34e5332bd3
+flight | 122ae39b 4 | cd4825a9de507045 8687a2a0e7de69ff d1f193c0e88155cc
+flight | 29e39f08 0 | fault
+flight | fa331cc0 7 | ff53cf9137cf0891 5e74e834c86bc24a 497cb767132142b9
+flight | 9eb23061 1 | fault
+flight | c0c9390 7 | fault
+flight | 6e22a2e5 0 | fault
+flight | 5dee1077 7 | 40f1a16c1df29332 99b8606b67652808 2d56dccef5f8df37
+flight | 93979254 7 | fault
+flight | 13aa52ad 4 | 424aa2105c65aae8 a27d6f3b99ff7120 4e3afaf0f4991f68
+flight | eb54ace3 3 | d71a79f4d42d06ef 55a75cda31d5337c 28d67b24dcaeccae
+flight | 65aeab1a 2 | fault
+flight | c63c8757 3 | fault
+flight | bbe87cc5 5 | b13f760743e2557d c6e011ae63a7f34b 7767cda40b5a01f6
+flight | 5ed08f3a 6 | fault
+flight | 94991edd 3 | c15ef7cad87658a7 a60f8d6c4de8dc8a 49b63261ab3a938d
+flight | b43282ea 7 | fault
+flight | d971ac1e 2 | 5846b43818938e72 f46e38636949e57 518816acc645718f
+flight | b25f88b1 6 | fault
+flight | a6c10f89 1 | c3d475e559584ce6 6ce0d115a69568eb 4902e668bc4622c5
+flight | 3e71a701 1 | 15ad10cb03a6e665 eb998dd3dc2244de 4282825453b75181
+flight | 897a351c 5 | fault
+flight | 36a912d 6 | fault
+flight | 5d5c84f3 3 | fault
+flight | cce2d229 5 | fault
+flight | f62d52d4 4 | f8bbb7572ccdb3b4 fad7e6a16914b005 5a96f92c1b13ede0
+flight | 4b0aa139 4 | af8b96ad528e35e3 76ca445adc6e1d75 225082a35a912963
+flight | dd75ff58 7 | fault
+flight | 2983ee08 3 | fault
+flight | 116649e5 4 | fault
+flight | 455061e 7 | fault
+flight | bfbbffd2 5 | f57da3e8b1600014 5dbf8fb511ed7dda 262851e8e68f1247
+flight | 473da6d4 5 | 6563f5dea8a6c174 42629f279a28be46 9f8573e1283b88c3
+flight | 1a3fc2ab 3 | 24898d1f482be9f8 afc795738154f247 f26a7fd251fead6
+flight | e5ddaa8 7 | fault
+flight | fd0e30ed 2 | 9f8ba508451d509b 9c871a6ba7626139 22c514a56e87e1b6
+flight | 727768be 5 | fault
+flight | 99bc99a5 6 | fault
+flight | da81d1a6 6 | c20cec36a7138729 761a47f7cc3e1875 22c3cfdab9691dcb
+flight | b769b03b 3 | fault
+flight | 6cc72b9f 3 | fault
+flight | 111bd8b1 5 | 7a59e2c7ec005a1a be4dc74e236c1a42 fa251491db2f9e69
+flight | 58e42874 7 | 323b527656a2721c bb756603a6676c9b 16a140180bb198a
+flight | db2e4896 7 | 84a093ebc2cd2a0a 8ebff222fcbfd2d ee0e34c218cc4513
+flight | 5b6dbd23 6 | afe125903b74b221 b7e36138ebfcab69 85e68c7485f557da
+flight | 62be3a40 1 | fault
+flight | b356e7a7 3 | 889f41da9299103d 1f12794e6e32497d 5e51ab1c8cfd49fd
+flight | ca50b622 3 | fault
+flight | fbf937bb 4 | fault
+flight | e884ef8c 7 | 57ccb769d61c415d c9bc0d468491e4f1 360506f38b591e81
+flight | c128789a 7 | 191acb9d9a31d9a1 817116adb65b38ce eb8912886db16e40
+flight | e6aafc6d 2 | fault
+flight | 66926546 0 | 68609b054736f1b5 666cabc46f917045 80c38291d63b47f8
+flight | 9d1c448f 6 | fault
+flight | 283fe348 5 | 4126c175ed0326af 4c5346e9f7e868f8 53e1171a7eb0ef1d
+flight | 1aecb3a1 6 | f9cedec22c72344d 8722351d57b71b45 7558510d51bef75b
+flight | a4cbb344 5 | fault
+flight | dba0a4c2 0 | 4e96a08dfbdcc3d3 1911aa269fe57d75 b2e3914c6f99ba07
+flight | 47ca5202 2 | fault
+flight | f4d1f527 5 | a4c3d6f61432a523 4947ef5e15e41fed 6be8b01da17f5bb9
+flight | 1c8512a6 2 | 80ea03c468ed2ea7 ed92ca679c60ecbb e035c5879b27c38c
+flight | 3d747a16 6 | fault
+flight | 7c90cf95 0 | fault
+flight | 15480fc3 5 | 5e3ceb596b9cd43e bd9b828492d3c586 2418cda8a5fedb4b
+flight | 126591ec 4 | fault
+flight | 23549813 6 | fault
+flight | 827e4a8f 1 | 2c8e9293394a22e0 997d0c5d94db2c5a 5d483048940f86f7
+flight | 69978fd3 6 | fault
+flight | ff3712e0 1 | fault
+flight | 8973d06d 2 | c10a0e741056365b 908fbfc575519700 74d0379db508f8e
+flight | c2c87c0c 4 | d52569e0c3b8949b 14a3bd343c6c2bc1 e367ebdc1989cf04
+flight | 7f3640b5 2 | fault
+flight | 6b6097fc 0 | fault
+flight | 133316d4 5 | b3fbe71136694c5d 3758b40a1cc27dec b973343cbd954579
+flight | b3491fcf 3 | eb1edbe94b5507b1 2d40a3bca7009d39 5a101aa27fd0a424
+flight | bf4766d5 0 | fault
+flight | 56317d79 5 | fault
+flight | 9c7c7ae5 6 | fault
+flight | e5f7d8d6 5 | fault
+flight | 23682be9 0 | 48b6cb758c60dca1 67cd4fdb52abc857 5f0ac46f68bb9864
+flight | 9b941e1a 6 | 53805600be707016 f56e6cc4d0e5182e ab7302e3602bc47c
+flight | 6f5edfa6 4 | b7fe618248323940 c755a8908df7646e ac91f11eb84b6bb9
+flight | 2e93a1a6 7 | fault
+flight | 987bbf9e 1 | fault
+flight | 263f4928 1 | f16714d1b66ffca6 22beafcbf23a49df 7bbd40dfe8b2893c
+flight | 58760fa3 3 | 520b822ec20526d8 745b9e22a6ddb6a9 f3216c3e38f68478
+flight | 4ebbf406 2 | a0fece3727cb2178 66126970fb239d27 511eaaf9984c5be2
+flight | a0ef77f1 4 | 28702ae746acd3a0 e1bcfff98a7c2429 96c12fba71923ef2
+flight | 28119257 4 | 156d57fff00ce859 2bcdeb2577e5f6da dde303c3ec1c5485
+flight | b28d7a33 7 | 3a31c28a2b4ff01e 86130ef49dddfe5a 16cbbebae565f6d1
+flight | 710e77cf 2 | 4cde9341c6e962ff 5cbe2f1ec5173b6b 87610615f6d68610
+flight | 2f769b01 0 | fault
+flight | 5016529e 0 | 5ce2ed5377688130 6d80633a7d7fe2d9 9c64574b5f2c9237
+flight | 668c74a0 6 | 64eb5d4b19ec4367 12d56e78ca720589 331a6f101f359703
+flight | e750c0d9 2 | dd3e35f6ea931901 968ce2d8a4db74e0 4ab78ef72d45f71d
+flight | 30acefa7 1 | 2023aad3fbd922ee 5f5b3982a8f05462 5779a7a23f17304a
+flight | 37521dbf 5 | 4f3ae5a9d3c4a21d 7cf87fe953d1b2aa f7565e097c9c6d2a
+flight | ec9a5be1 2 | dd09f552e926d0db 35d56ceec8fb7488 25161d2e296e6fe5
+flight | 8c51e69f 6 | fault
+flight | 67cb5edf 3 | 7c14e09981de271a 1112bd3978384dfb 410bfd8336c84bf4
+flight | e763e3f5 6 | b3bb2483a50c6d34 23b54739072af379 40594343b1d906fe
+flight | b2816552 6 | 45e10ecda71ae5cd db907481a9efe10e 86b363cc9b30e007
+flight | d2956732 2 | fault
+flight | c33999b9 7 | e99d578a24931025 f34fa919aa0c5b45 c174d544fd725576
+flight | 3e74701f 4 | 17b37940c30e089e 3f079282d5f6615e 305193d46c7ab610
+flight | 9b9d5426 2 | fault
+flight | 47eb2e04 0 | fault
+flight | 964ce77e 6 | fault
+flight | a21ebc85 2 | 32e6ad73be57f072 7d1bcd2108830bb9 605d9d7ca253709f
+flight | 88258e78 3 | c788c2c791eb1971 f986907ab8c5febd 3a47dd8da0f8f03c
+flight | a94f2779 1 | a05c089021f7cde4 6d97bfb5d73c8de2 7d9e60e72377f7d2
+flight | fd5dc275 3 | fault
+flight | 72e43c8d 1 | fault
+flight | cd3d9ad7 5 | fault
+flight | 730c61d8 2 | fault
+flight | 1f511091 2 | d79a850620bb98c 9c55feda24a4fa6e 261b3320ae2f36e3
+flight | 4d1a5a6a 7 | aa9e4b398b17ce6f a06ccecde4b30a8a fe08cc4aa4824f49
+flight | e2e379c7 6 | fault
+flight | c8d151e1 5 | 9798beff7830d468 be57eaeea52a91cf 9864ac574b1395e6
+flight | f7d2f667 1 | fault
+flight | b0fafd97 4 | fault
+flight | 5318faf9 2 | 837c199934f338d8 58aa018779274c75 7efefd03f3439fb0
+flight | affc23e6 6 | fault
+flight | 763d0960 5 | fault
+flight | f735fdd6 5 | b3079907b62d1f0c a80fe0666fa03089 6026d1b4a1c7794
+flight | b171a5f8 4 | ccff46a1e7e72a2b b85c2a041f8beda5 4473db62c9af5002
+flight | f5b9a33f 4 | 28d80e393349eaba 19ea46fc2f633d84 40cc56dbf2da4e8e
+flight | 4677fcf3 3 | 529a171699710859 e850e56b783502f9 259c30b90a9b9447
+flight | eb5c78ac 5 | 1e08e0ff0b90c4e6 520b57970e091465 123e1719104782e3
+flight | ee347a3 2 | 55d799f3c4344c3f 2d155ac64ecf93d8 651e51c7fe1083c6
+flight | c7b020d7 6 | fault
+flight | a16854e 2 | 5c265d949452887e 9b631b675d4b1be2 52d4576eae120859
+flight | 66f94bdf 3 | fault
+flight | ac6a18b 4 | fault
+flight | b7a04ce8 7 | 448a3aa2aa309c50 635d9c83147fc226 fc8093c1d4c165eb
+flight | 8df5bd83 1 | fault
+flight | 6efb7e8e 4 | 54c432bc25dce5ed 915eacade4e4c81 756e78646e3454cb
+flight | 9fc2ae12 5 | fbd2aa97e4305a71 9502a22556e00f8c ce12dfaba575fb76
+flight | 9fc6d59e 6 | 3a9a08a96fd99a74 922605615637320a 97647861d3376ccb
+flight | 201fb7c2 3 | fault
+flight | 23f95e2a 0 | fault
+flight | 8a988c25 5 | fault
+flight | 8efb4c3a 3 | a3ce0e97a2598081 d7bcbdd3a92241f c15101a1477b547f
+flight | 141efbec 1 | fault
+flight | ccbf5e24 2 | a199a9a15296dc12 4e1405b48b7116b5 fe4a055281a67df3
+flight | e7b422ed 1 | fault
+flight | a51f5924 6 | 4290f4464b6d3350 c5b69f463c071284 2abac2a801671b1
+flight | 860ceadd 5 | de838b244c082f16 d75d95c57b4303d8 a36baea59d77c360
+flight | fc3c1963 3 | e23eb4ef9e7527b3 3e8019348a2c559c 277a74da95f32993
+flight | 608c5769 0 | 582435f52de6f41e a8f600394086e35e db57792a75c86d75
+flight | 8fbbb669 6 | 25cb6cdaf649f552 6184712d49d2afe8 428dd1a5fba50597
+flight | 1ebe653 4 | fault
+flight | c9e759bb 5 | fault
+flight | e743e574 1 | 3178972f81077009 87da0fa8704d83e9 729dc5842fb4f7ff
+flight | 3cf30275 4 | 96021c850686bee0 628033b6e0de954 2549b1e23728ba17
+flight | fb882dd5 5 | e413d888b4d2b8fa 8b1282b8322bba32 cfa4d85c926e88df
+flight | deb2a947 7 | fault
+flight | 8aba4b80 7 | fault
+flight | 460066c8 5 | fault
+flight | 98e2ca70 5 | f3cd1c82e3f93a18 9c13fdc48aab2d11 3346d4c4639101a2
+flight | 7b280865 0 | 23dfc4af30e2e0bf 81634d60b355d089 318792d342eadc7
+flight | 4334273f 2 | ed230ebd348929e ef5da85750ae848c a4ef438d01d95c40
+flight | 438b8f40 5 | 4df67212f2c07a2f 7a08cd7d894308a9 24ce27258c1c8ebc
+flight | a5d334f1 5 | fault
+flight | cd93787 0 | fault
+flight | 1f28cdde 6 | 45eda17f4bed3f87 dbed9d4552238d04 9c8393ad72734c7c
+flight | 301cb3c0 5 | fault
+flight | f6086359 0 | be16a087ce7e4311 bc39824c21181119 c4a35ba3749511e
+flight | d9849c72 5 | fault
+flight | afb3d10e 1 | 45799ccd8ed3ed2c 6f51e21fd53ba44f 47078aa5000b17f2
+flight | ca72325b 1 | fault
+flight | 2ce7f5c0 6 | 3d1c4f2e8760eda8 c7a66e42a8baefc8 e777aeff2acacb7b
+flight | 2d0bc913 0 | fault
+flight | 2aad6416 0 | cdde1e3a2100933f eb2d30d44604b199 91cd1f2669c9d788
+flight | 1631f6ff 6 | fault
+flight | 58082ccc 0 | e849597c35bfb11 a32a971b4be2295f 78a9ab760914a88c
+flight | a6df2e41 5 | fault
+flight | 12f3f555 1 | fault
+flight | 772502ac 7 | fault
+flight | a772c767 1 | fault
+flight | 83a9de9c 0 | fault
+flight | 88a4195d 7 | f3aafbad592e61e4 2373a9e48d6910cd f0f952f02ef2c36a
+flight | 3eff145f 3 | fault
+flight | c8b3f7ea 7 | fault
+flight | 1f7f109a 0 | fault
+flight | 5320e75e 0 | fault
+flight | d05265e1 4 | fault
+flight | 2337b487 2 | b41da59ed3856d4d 671a20c09251f62 4bebf1f3cc9bbe33
+flight | afae5ba2 2 | 859fec6fd8ee8a66 44c89a8661c54429 e1aa69fa48c280b2
+flight | c16ab2a9 0 | fault
+flight | db53b737 7 | dc05c1343b6a555a b900daeb6eaf1d68 a45961dee99442f1
+flight | b9054657 2 | ae683b78aa49bbb3 72feafcf5191e68c b3b316e871774a13
+flight | b9f970a3 5 | fault
+flight | 542ba3c2 0 | fault
+flight | 2b74a7e0 2 | 9c17b3bb61703fbb 18142c0c3e92b841 a92655608fa4d6e3
+flight | 62262da5 1 | 10ce8fd4e71726a2 874b1d6e4df3d9d 864d02df454becdd
+flight | f2a1a11b 2 | fault
+flight | 6d4005a5 6 | 88d89d427396452 71f90697f5d36ad e3419278fb5d29f5
+flight | 170fe204 6 | c64d6c5e8617f96a 15ff141afed53a5c 24595474d244d90b
+flight | 1805319e 3 | 5d44095a055c0b0e e2de0b3eeecff338 e08488809b17e6c6
+flight | b22b47aa 0 | fault
+flight | 16757416 5 | 7defa462b05257c2 be9e5361fb49972b 904112ba088b94af
+flight | 294a5504 1 | 860c2104e6c92720 1afbd2d6b38582ce c7b04a5933a47c2d
+flight | 4eef3865 1 | fault
+flight | 439770c3 2 | fault
+flight | 964c135d 3 | fault
+flight | 80185224 7 | fault
+flight | 87e86ff9 4 | fault
+flight | 853e26d7 1 | fault
+flight | 359d8530 5 | 76e1589a3e683bb0 e72da3fd9d9b391f b68227ad111144c8
+flight | 96fe66fd 5 | fault
+flight | 3fa0be3b 1 | fault
+flight | e9210c3c 0 | fault
+flight | b41338eb 0 | 2ba4475d315c57c0 7c0047405a6c4189 359df19ec4f339a6
+flight | ef8ef703 0 | 1494c53d6e00b459 a925cc5f16d0964f d4793adde5b4297c
+flight | a79730d2 4 | 7e024bf8026b22ba 562328c29ef38636 388917a8c0255c67
+flight | 81be4c6d 3 | fault
+flight | 285780c7 3 | fault
+flight | 3a0a772e 7 | 54f268d9d7511713 7bddcb50260f077a a6558bfdb1ea7e30
+flight | 2d7c6df9 0 | fault
+flight | 3e3a2180 2 | fault
+flight | 52a75d8b 6 | fced898e585d55f0 afbdf4e517c491a3 dc48b0a01cb3f3f1
+flight | f909fad1 0 | cc082e60797800be 7cbccb29e7b9b84e 7d230b95f1604ae1
+flight | d4c63328 0 | fault
+flight | c5db621f 0 | 78e19a9c7054b171 ad3f96514f15f738 5af365342962adb8
+flight | 4f536f74 3 | 8ccbedd0aa5ee2cf cd4c76a3be009cfd cb2eeed44f0d3556
+flight | a5d7b631 6 | a8b270544adec8df d580dbc2a213d1c5 3b626b0b40758b19
+flight | eb11cfab 1 | 5d17051a17ec4a60 f97367993a1a880f 65bf89684c8832c0
+flight | d64f6b34 1 | 4433ee6f6ab9021f c929414ff5031b45 e50cfae4491a430d
+flight | 9527de2 2 | fault
+flight | 4a81e077 6 | db8a68de957592c3 13ae51ef63ce9e4f 89a4bd888f73722a
+flight | 1f87f773 3 | fault
+flight | 377f8dd6 5 | 86aa3b88831f2f77 c3435154bea21f72 43d22a04df9af758
+flight | 9620356e 4 | fault
+flight | 84c6f743 1 | 2eac8e95450d0c8c 1ccce888df78a63c 70b968b968636187
+flight | f3f637a2 3 | bfdea6adab3fadc6 7f40ad01a8600f39 faff18f490e94df
+flight | 97339bb1 5 | 87e3f2d7be3f4ef8 eafd6c7cda68a75 63cfea5fb7a8595c
+flight | 76f18df 1 | fault
+flight | 2a9dce32 6 | fault
+flight | 326ac2e0 2 | f2005426cd28064a eea043dc4eede6df 3c28b3d1e5b9e7a3
+flight | 91e83ff6 5 | fault
+flight | 1276a2f7 5 | ee8031f961e92e4e 51eaa70475aff838 a862289adf33df10
+flight | a0fb50ca 1 | fault
+flight | 847a0851 5 | fault
+flight | feebdddd 1 | f8a8f468173cfcb1 2204a51b157bd754 b191d42d753145dd
+flight | acfd6885 5 | 2f33fc0ae4190214 f94039ca83aff62f b2d4416a044e0ae7
+flight | 701e8bfa 5 | fault
+flight | 385d467e 7 | fault
+flight | d0a2acb0 6 | d2f5464ee09108cc c26d8f003e8bbfaa 5c092f6f55569516
+flight | 4843a4f8 7 | f8f725b57f3bd4d3 dc289e4a2a74134 942d29515bfaf255
+flight | 9914b91c 5 | fault
+flight | ac44f486 1 | fault
+flight | bec82a80 5 | 6043a033b02deaf b8fcbbb48736579b ab6f5ccb750df601
+flight | aaf06e88 4 | fault
+flight | dbece85 6 | aa5dbe7803706af0 434bdcdf4353d3f1 a00e2d769e182e7a
+flight | a691fd11 1 | cf577c810f2bc4d cad53032a7c965db 8de4526de317bc32
+flight | b1461701 7 | fault
+flight | fd3b70ef 3 | 865345a55f9fb67e 619c7d4da7a2530 c726f735becbbb4a
+flight | f37192f9 7 | e588ca5ce7bab8a7 9fef68791960d1fd e6e85b7166492cf6
+flight | 9c409db8 5 | fault
+flight | 5914a846 4 | fault
+flight | e9756a85 3 | fault
+flight | f477cf8f 6 | fault
+flight | 7697fbb2 2 | fault
+flight | a71924b3 4 | 6da3ca00a16ea40c 75e7b13e950c4d2d 8486cb566339d181
+flight | 308bc3f8 7 | 8d21681327164e9c 950cfb141a828069 b752c222327c1c97
+flight | f8f02fb0 0 | ed58a9c86afc8066 7e98cb0a177047e2 48d8345861e00f6a
+flight | af3665be 0 | 5cf5d41ed71ebdad c7fe2e7640defc10 97b16cc186aba841
+flight | ef262f28 7 | bd0794090c6ca3d4 4339b1eb7e76a1fa 10b188a0bf691b1a
+flight | a58afd81 4 | fault
+flight | 5059ea4d 2 | fault
+flight | 70e24446 4 | 8b787dd77f6d12f3 69738c25c86ce38c 6d7bc7649f84d822
+flight | 869fed5b 3 | fault
+flight | b024fb8c 4 | fault
+flight | 1475661e 4 | fault
+flight | 1c82195c 4 | ea0872bc8bfafca 5050207c542c6bb0 9437cdb4810f661a
+flight | 5225d101 3 | fault
+flight | ddabc2c8 2 | 76e76af5ae1f962c fe638b705c9fdf1d e1a043a9ea4452de
+flight | aa0aaae7 7 | fault
+flight | 2a492fb3 0 | b8b1308b3b7d3437 80454b17bd98b81f 2118261aa442dbd1
+flight | dfad995b 5 | fault
+flight | 6ff41864 7 | f07b461832ed3297 610acb8a18f846c3 5da481f20d0b3c0c
+flight | 2a644838 3 | bc8e918f29ff142a fa4412d2109bd58d bfa7684e7f0247de
+flight | 80f2deba 1 | c39bd83bee5892de 79fd5c378fff2525 d196a4560ad85fca
+flight | 4e0bad32 7 | fault
+flight | a1918981 1 | fault
+flight | 50d72d69 1 | fault
+flight | f0ac1d39 4 | ff391e42e523c1d2 b50f1a7192431bac 87c9c31092fad0f2
+flight | e5857a99 4 | fault
+flight | 440c2a7b 7 | fault
+flight | d786e650 5 | 6b6a6c486f22e074 c6388a274ddf347a f1b589c3e2d7b8c5
+flight | 59d85b16 1 | 6f0fb797d8ec823f 52b317a4cce459e6 e2fa6e024418ce68
+flight | 9a9172de 4 | fault
+flight | f0fd6645 1 | c3f589259e45ce0e c46f47b050bbe6bf fc2531ea2f809a6a
+flight | fcb2be0 5 | 4d9bacb9c1d8b326 ba31392866990161 f3d6ed03f2aa8a4c
+flight | c4de65d4 5 | 9df11419438b4a91 5023008145932052 d03e176b42db6eda
+flight | de383143 3 | fault
+flight | 9e7eb815 2 | fault
+flight | 5b24eb9a 7 | fault
+flight | 52662b28 1 | fault
+flight | c2bb7c53 3 | fault
+flight | aa344e78 2 | 824c563c0ee9343f 49d01e94bed0bf50 db1a5e01cc50f3f3
+flight | e70630f 1 | 9a6ec738da8dda7b cb395eab9b808d27 493b0945dcb87437
+flight | 59f488ef 5 | edc17901dd65e6c4 a7db72541e8431ca 8aec6e4bb15da4b6
+flight | 71206856 3 | 4eeefe569c9b1249 900a1d6acc9a0423 e4360af34c5f141c
+flight | 1ead67a4 1 | c052c14d7b62f4b2 50165fe39a72813 bf965bb523ea9aa0
+flight | cb208a01 3 | a25249f1a8365dc4 7bd09a3d397df801 f45941a8cd8c7600
+flight | ce332e71 4 | fault
+flight | 1a104cfe 7 | 2304a74fc167c74b 14c0849897f92d6 af439e272859fcc7
+flight | ee70644d 4 | 4e10fe7467eba7bd 7fb40ab1a961d6c8 f1e7a284697b5881
+flight | 2e7cded6 4 | fault
+flight | e450bf5a 5 | eea96c66401c7a1e 6b34dbdab8ba31b1 be6f83ecf66cffa
+flight | e5f74159 0 | 10ec32b2d195c28a 63497571d54dcb12 ea771f34953479f6
+flight | 5a7360a6 5 | fault
+flight | df3cb62e 1 | da8d96638f124a1c bca5e903de5fc202 a4ac59f02b2ee8ae
+flight | b86521ce 5 | 1babbbc8ffaf585d b49257095e088ee7 a9c86de7ac2c0df
+flight | 3af11c28 5 | 169e2d0df4658b67 2b85c9b87dd40575 2e584f6dd09bfca5
+flight | dabe99cd 7 | fault
+flight | 67ebc447 3 | fault
+flight | aa6c7fd9 3 | ac900a0122480309 d5139c0e4c62b46 7a7753cec539187f
+flight | 287667f3 4 | fault
+flight | dedd8a68 0 | f446c40c38cc1946 141825505c3eeb59 3069c55e0e2a84f6
+flight | 3a2f0b42 0 | cc94ccbaedec2e8 921ad10359026ed6 a5db5d0c4bf3ff43
+flight | 2c7d27a5 3 | fault
+flight | 72674397 2 | 45fde2aefba3d614 40397cb01286c77c 3f06869540cf4033
+flight | 6b79be45 5 | ec5dcb0b1e891df7 cc69e5691b57bfd b4db0b5ff590239f
+flight | 3a940ba2 4 | a30468e14c0f127c 441e12459f04c4c7 53a512b127511cf5
+flight | 366f9b14 2 | fault
+flight | db861a93 2 | 255d5a00aee6967d a43fcb22849d4ac2 9a02e83f584197dd
+flight | 7dbefd4a 7 | 6025a2bf3861376b 5b01bd85ee71de0f edf9d446a6990b8c
+flight | e5ae5e59 2 | d87a7a99db5b6653 58d39c51d780b195 3f0e890d73ff1b85
+flight | db12be3 0 | 592827bb01530209 e320e9395fe3a7dc 29e30046ef44a869
+flight | 8a535b79 7 | fault
+flight | 2b739724 1 | fault
+flight | 9f5e96fd 5 | 99abfe3657e6729 f4ada356347fa3d0 175aed05a29ee6f9
+flight | 4fd4e07c 1 | b33093821018904e 236b05f7463c44e7 1a5f86c895358296
+flight | 7d4c2467 5 | a5a55c526cec4586 29b134336b6b0eff ead5bd911f65543e
+flight | a86181a5 6 | fabfb9d95e7f1dd0 4924bbf24c0b63e6 83206bc132fab907
+flight | 68e65e60 3 | fault
+flight | 52062913 0 | 8f1416afb89dd566 903618773402751a a24cd9671f772a0d
+flight | f5c6bee3 3 | fault
+flight | e8491251 1 | fault
+flight | 4195199f 2 | fault
+flight | ad6285dc 0 | 5c660f562e5374ca 1ae398400ae0c6c7 7a3e314111b1fb2b
+flight | 12d5fdf5 2 | dfe16f1b16c32895 80861e496907a3dc ac688b12f293c8af
+flight | 56f548eb 7 | a898269f305667ea 4d908b61d5babcb9 780a1928b8d6dbd3
+flight | 144df7bf 6 | fault
+flight | fa09aa0f 3 | fault
+flight | aae9c62f 2 | fault
+flight | f070c518 7 | fault
+flight | 54b9ed7f 2 | fault
+flight | 1b288fca 3 | 3f4e86a76829042b 78303ce3faa8a754 d847eeac4ec70c66
+flight | 7bfd5710 0 | fault
+flight | b71279e7 0 | 3b6d07aa4a9f99e7 45bba00fb83c9608 c9c2e56a5928c1b1
+flight | e7648887 3 | fault
+flight | bf2c29d0 7 | fault
+flight | 86856b64 5 | fault
+flight | d99bf5b5 6 | 64eb71e64064c47a 5da74f2231978d0 814812413722fb0
+flight | 7e331610 6 | a5d96a86fbcfa38d e315365aac08f869 96b0251fabe1d934
+flight | 9b1be62d 2 | a8eee6f78cbacece 22c99ffb77dd3268 7f495934aa082b12
+flight | 3f13fe11 7 | 27af644f8a5f8a8e a877b379be0dffa7 c1b1621acdd2348a
+flight | 86ac853c 6 | 4aa898db6f650c39 b386e48fd45015a0 d6abb71b9a1881d2
+flight | 6788d3eb 7 | fault
+flight | b4e5ae07 1 | fault
+flight | 6a0b9f82 4 | 24752f6701b8d60c 2067e1bbfc43fec3 2eee4013de89ca78
+flight | 6bc5968f 7 | fault
+flight | d299fc5d 0 | fault
+flight | 34579259 5 | acd0c53470239685 1ebdb6221d18c875 e3ee9b1d315f1e7b
+flight | 69d04736 4 | fault
+flight | 5f082147 2 | 62fe2b2e2dc85e6d d09bee0f2b0a9eef e6e0bed051a7848b
+flight | ebb67af9 2 | d3d80eae2e993cc2 8bc0d253dcfbb196 de35eb4898a855b1
+flight | ffaf1204 0 | 3a02e5f78e16d128 2d6d3ab816830dc9 1eb2e9d8c3e14328
+flight | 9ca566fe 2 | fault
+flight | d1922bfe 5 | a4228c71cbaca142 4e5823f8294129f5 607f92cddbfcb3bb
+flight | 3bf7b30c 1 | 4f89c60cdb308043 e01f268559eaa8c2 786314794d05e08e
+flight | 3becf5ca 4 | fault
+flight | 220cc99e 4 | dc97d89f760dea7 293516f21a0734da 6e41ee1e7089e33d
+flight | b50e705 3 | 54f1af53fa2d1336 6585034fff7e0b16 abd3afa32464fc51
+flight | d98a9822 1 | c3007ebfb88c0055 a59a4a5eb00d857a 5214346efc240f05
+flight | 559684cd 5 | de76fcddc370756e b514cdf58bd49220 f1163e520bcacc69
+flight | 3f411a16 5 | 9e278eede23ccccd afc3b1c90fde2f3 d8190cc9222754a4
+flight | 7968c0ca 3 | fault
+flight | 792a012 2 | 81957fb44c52bea0 dd09074e117b6b14 4113983606f3d1cc
+flight | 8f266631 2 | fault
+flight | b8c2de66 2 | fault
+flight | bec5b54b 2 | f033fb79cfccbce0 257bd544c955a3a6 ef46b8e902aab1e2
+flight | a154b807 2 | fault
+flight | 1bfdafb9 2 | fault
+flight | 9ace7943 2 | b59d10e62762133c 44216345116ea3ac 84562b948b339fde
+flight | 7e825bef 2 | 859d910a3af56b63 a38248faf74f8300 2709e72b86062b3f
+flight | db86aab8 6 | e37433bd3310c759 4ee8cb21ea196902 b7d053d69f3a0da1
+flight | a70361ca 0 | fault
+flight | 1fd04a2e 6 | fault
+flight | 58c8ccad 2 | 7faea5acc770981c af8356f9d296408f b9176f7b36129a93
+flight | f236e20e 1 | 11aea9c4362a217b 10dc9b9bccc4e7ad 5f61ac8802f444f7
+flight | 54d8db43 4 | fault
+flight | bdab148b 4 | fault
+flight | 7783a506 5 | 93b2756a36da68f5 acea6292ab6e63b2 6821e122d8027bd6
+flight | 62ed8881 0 | fault
+flight | e32734ca 7 | d19c27cdce7fc2bd 1b1d6a5c7bb5810c fa73477fbec00eba
+flight | 9dafc3ff 7 | fault
+flight | b00cf349 5 | fault
+flight | 742cbf82 2 | fault
+flight | 8abe289e 5 | dfa600d25a192aff f1c28756d64351a7 e133d176c75840c3
+flight | 9e6411e5 3 | fault
+flight | c4760e15 0 | fault
+flight | 8acf2eb3 6 | 6fcf521e97f1424d 368eaa7deba5c46 251b9b1ec66512e5
+flight | 8068bf04 1 | f34faeda40ebac21 a87859d3f88f7703 e75ab65f2c9db65d
+flight | d03ce18c 0 | 20c884eea730aa05 f08576e112c4a1e3 627940d93d00c447
+flight | 5bfa7970 0 | 8665228126037649 bbaa561dfe51827b 9929a096f953ca7a
+flight | 2b85bce1 7 | fault
+flight | 9da362f8 4 | 4eeac84ab5068b44 55d2d92e07296347 e019ca087ef8737a
+flight | ec566dc0 4 | 35eb52baf24e7a12 cfd41bb697eecd59 aefdf248f308e38
+flight | a596f860 6 | 87739d4c865f3ebd 3f4fbee5c6fca968 2ecd787b643baab
+flight | ac741e65 2 | d1a61b53cdfe0733 a2b32638a377e4e6 d7a0976bb66ce84b
+flight | 28152117 1 | 9327af6fa3ca3e4f 38fe3cb292754aa 53c630f41c1a0b04
+flight | f5c6cde0 1 | 8b86acc8f3ddb924 182a1f0ff859166 b305df27e85062ca
+flight | 9c91e3f6 1 | a274b5af8038d635 66a9f39597e1ec0b ac76e77a315bc5f5
+flight | a79c2ce8 4 | 59d3402370ef3cb0 704e7dbb77352f4b 8f3eeb74870b4448
+flight | 7c89048d 6 | 88c5ae446bf45d6d a2236d2c91190c7b 238b78bc41dafaac
+flight | ef113956 0 | 23a9b5306125ea54 486b4f6f2339f198 c17a64791a30a2bd
+flight | ac11e228 0 | fault
+flight | ca96fed 2 | fault
+flight | 559c02c1 7 | fault
+flight | e77f6f0 5 | b2b2127a5fe44170 dea7ef427966caf8 c229688960b116e8
+flight | aa6c0abf 5 | 4415875f88320e6c 478ab70e93786b4e afe25bcb2cd3b930
+flight | e5961d04 6 | fault
+flight | 84a5d6f5 5 | b6a5005f0ab31276 67b110994f5bb67d 1d8318b006477282
+flight | d0bed537 4 | fault
+flight | 5f9dab86 1 | fault
+flight | 4ea84fd8 5 | 21ee6fffa041328b a3223bcfa346dbcd 3aa4dda1f2221d1f
+flight | 43f6426b 3 | 4d5a1d4b237476f3 3cd13941bf27d7ce 9acd50ff3001ad2b
+flight | 6a358c88 2 | 27fdd8778f1190a5 378076e069356812 69c9d5e7624127c0
+flight | d54631c9 6 | fault
+flight | 305a0f33 4 | 63a8e9d97a144348 525947e74a341a88 6bc39bacafc9e5f0
+flight | 5b3b5023 2 | fault
+flight | 1d818110 7 | fault
+flight | ff0c0e26 6 | 333477abe8fe34ad 188af37133f17f61 2ec5351ab575d695
+flight | a3428c0d 7 | 6ec5c9c6d89259c2 99bbf0839d6a2fbb a8caf212e45a7b17
+flight | bf51fa94 3 | fault
+flight | 36b2c169 2 | fault
+flight | 538f2858 6 | fault
+flight | 29665703 0 | 976e8aab74c58ca0 cea775db0b61b8dc 676c86cd4058ad22
+flight | 37635e6 1 | fault
+flight | e2b998fe 1 | 31cf8c1ceed2aac 7d60ae94e53ce8f e9d35822d9d20189
+flight | 6cf9ad5d 7 | 29b9701b65522afe 48500a503e9f0a41 9e1da3645e330c5d
+flight | be2170f 0 | 248e7bcece1bf0bd ed0ce09a1ffdf8cb 166f58392b28b5c8
+flight | 12dfbad0 2 | fault
+flight | a01eccf6 4 | fault
+flight | d8bccbcb 6 | fault
+flight | c8c34243 3 | fault
+flight | 9d964c47 0 | fault
+flight | 10a19219 3 | fault
+flight | ba7b32de 4 | 5bdeb3dc348740e6 ce12bac779361659 97f10be31973dac3
+flight | ee280ac2 5 | 6ba0bb461b917685 c61331643810adf2 3687dce3cf1ffee4
+flight | 646ac78b 2 | fault
+flight | 663da1eb 1 | 87d298316ff4c31f 38d3576096559ccf 38a40ffdccf8e313
+flight | 1c1e62d8 0 | 54ccc1a992322dbc d7f58f5d4150dd5d f0cd818deebef202
+flight | 706b0dd1 5 | fcbf95831c8305b1 4ea94cf46b383d8d 70716801b108abd3
+flight | 59c3947f 1 | 760b77c0a112f7f2 7ab581d868e7663 449fa3044e605244
+flight | bd9162e3 7 | fault
+flight | 16899dda 6 | f7f6fa6cedc54b09 96fc4b1305dabcd1 94b3eefd7b4802c8
+flight | 4036aab1 0 | fault
+flight | cd9ef1da 1 | d6760cd8d4ae2beb ce6664a442102513 29f7a31744d81e09
+flight | fce9b6c4 1 | c37094f7ad380129 cf19171b946041b7 f512c9927c623f0e
+flight | e107e034 5 | fault
+flight | a7dd4f34 0 | f491ca077eac3e64 d733bb3b6e70111d a220f2ca14773459
+flight | 2bbd1930 2 | fault
+flight | fb98cfd3 7 | fault
+flight | 45a42ba4 5 | fault
+flight | b1f7decf 7 | fault
+flight | f691d615 5 | fault
+flight | 7e5826cb 3 | fault
+flight | 31b78b60 3 | ce0c614b6a79b4a1 885c07f72ff0fbb5 63b8e55f9a813a9f
+flight | ba3db7d3 4 | e4c51904a41c3ae0 f48d90ecad1ef3db b882ca2d9ff42aad
+flight | b166d666 2 | 919e211c1c445933 fa29fb84ff8585b6 f9dcda1eae15fc4
+flight | b88778d 1 | fault
+flight | 98636ba1 6 | fault
+flight | 8df2367d 5 | f7a0e9e97bd96ee1 65e47151e660959c ca95d90e7fd3c97d
+flight | 3e4ba6b1 0 | ed5c479179e62d90 a57b118620a8564f d650bc4a55b950a8
+flight | c6124f00 4 | cf2245414e0eba40 f3775f4230cfdba2 584969e6dd6364e
+flight | f70f8461 2 | fault
+flight | bda7ffb4 6 | fault
+flight | a1cff16c 3 | fault
+flight | 5ddcd9fa 1 | fault
+flight | 3f40a065 1 | a1462b7e6ffefcef bed9df67da6ac750 5e58cf3a8b8e0f82
+flight | 79eb814a 2 | fault
+flight | d62dc784 5 | fault
+flight | 80d74d2 0 | fault
+flight | 93a8409 1 | d4152acb73855f2c 43a749f03037c009 cbac1dfb0ae72bf9
+flight | 9f36a4bb 2 | fault
+flight | bb661ce2 6 | fault
+flight | 88ddb7fd 3 | fault
+flight | cd600a4 3 | 5096173b277cfbbe d2e4a513dd4bb21b 63b28b7437ed520b
+flight | 6c2f9dd0 0 | fault
+flight | dc5e71f3 7 | 4b11db1bc714e6f5 5034f8f1870b1fa5 944f81ef3d01e03
+flight | 84663b10 0 | a4d95b0d94d1eb38 e04dd4bc3b3e3649 ce413a668728ea9
+flight | de02487d 3 | fault
+flight | 251332ea 7 | 9af2e6aff6e296c4 8b39fbf892768547 c048a9e4752af0a7
+flight | 83c4ecb1 4 | fault
+flight | ac5806b6 6 | fault
+flight | d819468d 5 | fault
+flight | da376cff 5 | fault
+flight | 5b60fa09 3 | 71cf5b808d2ad3cc 93b4345aae85e79b 90c79f4f20931d0a
+flight | 45a966d7 1 | fault
+flight | 957eb1fe 5 | fault
+flight | 1525665c 5 | fault
+flight | 68925d74 6 | fault
+flight | 81df28cd 0 | 63b84bcbe5569eda b7b91f4ce216569a dbd7e442a1582790
+flight | af850c39 0 | fault
+flight | 19bb2487 3 | d9cc9ae0ceed897e eb903cf21ac21b2e b2138849556d13a9
+flight | 85f72da4 6 | 1effb7c559b8fd1b e06223deb24451bf f9092757434d337d
+flight | 257a34a3 3 | fault
+flight | 5edbf949 0 | d5bb041b4bffa016 5d995cd80b15f65b 429ea90f1ef8cffb
+flight | 6fca87cc 5 | 7a9b2e8943ab517f a2a12649b673adcc 57f9420cccc1a521
+flight | f276a0a7 4 | fault
+flight | 632a55e2 7 | f4a481b61d4cf630 d14662341fd6cd35 1fc7e496c494b157
+flight | 2d92813b 4 | a1ad2e8157b20154 2f7b39c82632c2ac c68f14c68b07ad4a
+flight | 7d95bf1b 0 | fault
+flight | 39ec0ad8 1 | 4b02dba70201a71b 7b5a61201d8bc449 8998f4b56f160fdd
+flight | 4e61cb9a 0 | fault
+flight | 8e88a813 0 | fault
+flight | 1878d5a9 3 | fault
+flight | 5aa0d8ba 1 | fault
+flight | e320e250 2 | fault
+flight | bdfec3fa 6 | fault
+flight | 288ecddb 4 | fault
+flight | e15e2a57 7 | 8a2e14552ac92ebb cacfc0c3bab06a17 de7de96025ccf574
+flight | 7e4dec04 6 | 7837513b6378baf5 6edb0b0be3ccc156 59d6c333ec00b7f1
+flight | 74201746 0 | c451dd0444490228 50bf3c9ef4ce0e8b 71ff2fe084ae5d37
+flight | 1f54e88e 3 | 51e5e4d0500fcc71 605d48beb79dcf1c 67d8fb02f7ecae8b
+flight | 659b82b 3 | 2f5901057e897d85 610ad1377dda846b 3d0c6fff0986e6c1
+flight | b413937e 1 | fault
+flight | b1ca964 0 | 24c7f2eed5069631 cb10053087f82009 40e42775438fca3
+flight | ff6c200d 0 | fault
+flight | 10bbad0b 3 | b1e58e7cb6854cac 1df16be1b9bd7241 474242faf576be3e
+flight | a3ad537b 5 | 4a9ea6ae8606ad6d cccc33c2d9ca0b2e d5e57a76088d4d42
+flight | 36565e9 0 | 1d80b20a710a85 4ba1b0e19e2ed1ef b54acc1bc491644a
+flight | 40ec76bc 0 | fault
+flight | baac73b4 2 | a0dc5db15315a47c 476b2e7f22ad94fa b2dda959a8b28daf
+flight | b2eceed8 2 | fault
+flight | b92844ed 6 | acec2aab120f237b 6a64f31c6417d567 46c230c2e83600c5
+flight | 21d2f7e4 0 | 51c05e038bbdceb5 ab6c9285ca19387c 912956139d6c0ec
+flight | 32e07532 2 | 3e3ebb8eea59cd2a d9c9ce39acea51f5 5df21ce425c1af40
+flight | 963a7efb 0 | fault
+flight | f48d3156 0 | ad1e217e33c1a6a9 405cfc466a3dddf2 52fd80fe4f86424d
+flight | 8f363710 0 | 23464d09e902ab1a 9cdd87f624f27d9e fa11c99f0c58a599
+flight | f2f01bc0 3 | fault
+flight | ef199475 7 | fault
+flight | 854674e6 2 | fault
+flight | 2651c910 2 | 61dd5846ff27c52e 41433262fd6b1030 b7246f87566e6749
+flight | 2b400568 1 | fault
+flight | 2e4becce 6 | fault
+flight | 5afcc3c3 5 | fault
+flight | 54023106 2 | fault
+flight | 8d9c008a 5 | a63276cec319c1a9 2c9dc168adcaf51b 6ca50d37383b9fa1
+flight | 1c241821 6 | de9620cc398027e7 fb8a0949769a7c27 add3a8cfb5abef13
+flight | 60c1ba7b 7 | fault
+flight | caabce23 0 | 911a94f4a5629053 b7e9a4b4aa1d88a0 20658436cbeed87c
+flight | 16a88c9d 6 | fault
+flight | fdffa7e3 1 | fault
+flight | efe29491 6 | 473f899de1bf4a9c 66b5aef93f160804 4f53b320cf77c867
+flight | c8683055 6 | 3a207fbe920796b efb93752a1eb5cd0 5b610389884ff022
+flight | 151c31ac 2 | fault
+flight | e55dc6fe 7 | ac0c746532e0a1b1 ffe545ec4987d11a 23695cad462c7c11
+flight | 561c248a 6 | fault
+flight | 92e5b2c5 3 | 1e41fed797f12834 94422bbba9cd2fdd 5d5cd1cf31a76d25
+flight | 67656c92 7 | fault
+flight | fa18e569 6 | c25ec3d0f3eaf7e4 681814ebd3dcc5d1 bb020c6ee130f4d9
+flight | f359c298 7 | a9c00fe7e9198549 a31775b4e229bd2a cab012095e101d2f
+flight | 6e126cb3 7 | 9473f5972ef0be10 16b6440c77b756f5 7db63032accff162
+flight | 1298661e 0 | 7da5a4ed1238222a 9d48438507e83857 2695be7d2fe306c1
+flight | fb3bf440 0 | fault
+flight | 607e8547 5 | 242204e2e833d64a 804cfa80c46e78f0 509fcea414836ba0
+flight | a0c483de 0 | fault
+flight | 2dbe273f 0 | 2e8d8b0bfa4ed2a4 f1e49bf1399a417b d162e95a992fee1c
+flight | 40d9c8c9 2 | fault
+flight | 9000d8e8 3 | fault
+flight | 7f51beb6 6 | fault
+flight | 7acf5c18 4 | f4f48c265cadb945 3684f4c6ca59eca4 6c06af5f55063b34
+flight | f9af1e5b 3 | fda91e5471ea2041 f453ee99ebfe84bc 758d7a696c0cdf34
+flight | 1f7a307 6 | fault
+flight | eae3f9a 1 | fault
+flight | b05bf78b 7 | acee1faedc110306 14018817e310775e af0f378363805c04
+flight | 7e8e0b19 6 | fault
+flight | ac19da5e 0 | a8a0d13befb01caa 7a291b42c4b561ba f368b6fc5bea51d2
+flight | d197e4a2 5 | fault
+flight | 3aaa84a8 6 | fault
+flight | ac59e50a 1 | fault
+flight | 9dd7bd57 6 | fault
+flight | 9e1340d9 7 | fault
+flight | 3d807595 7 | fault
+flight | 9505798a 7 | c09ad12a4dd35985 c5fdc8ade20ce559 c72112b12a2f6858
+flight | 1f3b40e0 1 | 67eecb5d8757d036 13908b19e1093ca2 151c78f690adafe
+flight | 7c453fa0 0 | 9e6e5b3b0c3fa1b0 9d8a929040b25797 5d84b4e4e69772b
+flight | b06206c6 2 | 4d4b209554e428be 8c71170ad38527e5 1c034694fe4e880d
+flight | fd306eae 4 | 7945c78256f768e8 8eec27e98b26a6f0 807d5436f76b8ae7
+flight | 21cace3 7 | 58ee534c89f687e 229ff5812bb0a38 8d362a0c07adfe83
+flight | 2a360538 3 | fault
+flight | bc254af7 2 | fault
+flight | 1f50ec88 2 | fault
+flight | f0a3c1e9 0 | 539bc2b85b800d4a 9b7f4600a8ebcf82 df851c3460642b5e
+flight | 47896f46 2 | 5079ab6039bc1fe0 621f84e409e586d5 ebaa4045e43a377d
+flight | ccfb8eaa 5 | aee2b631e0b362c4 bc236477ba38c5db 91d2a4693770ed73
+flight | c4c9c46d 1 | fault
+flight | 29c9d2f0 6 | 6a9e6bbc7c81c6b4 86a6cebd3e9292d 8169d58185d4d69f
+flight | ac071ad5 5 | fault
+flight | 951adf81 3 | 5b571ad367cfbacc a8a936cb7703897a 96c6bfc79bb5c13b
+flight | 798adbda 3 | fault
+flight | f14c9cdd 0 | 7313b1f08a6c79c 4a5f05067e776090 f33f70a5bf82636b
+flight | 4dc971c0 2 | 1a3ad3839bf19e13 483a8570b0d07b7f 5296b537e7daf561
+flight | 32a53520 5 | 362688a2ab1b7b74 79fd3766f333ae36 e8dfa381ed88bd05
+flight | a0f2dc71 7 | fault
+flight | ff875afd 2 | fault
+flight | 68302fc6 7 | 921b817dec15cfc7 33f29847cd8708b1 f4008bd40fb65d60
+flight | a0435fbd 5 | bc1b02cf6e588f52 f2895ebb57614377 842fd7cd6c4d2cdc
+flight | 70850e86 0 | ff258b2d57672eb6 dda89e7e251e31ca ccaa6a6f7d833e02
+flight | bda6fb3d 4 | ed07a0b1661044b2 fd8e9707da649249 521c6f3a28bdf976
+flight | 8b836bc8 6 | 9b7af2181217716b 8cb87d211d87020e 145addbe646cf848
+flight | ff621a93 1 | fault
+flight | ae9d2917 3 | 11e047460289d108 be50dbcd0401cd65 aa348d5e9b745e3c
+flight | 60b64d2c 7 | 8b6f5cb67b1e1842 74265250a44e9239 e4d2f85feb0e49a6
+flight | 37f38632 1 | a2d4ed0e3e2a57a7 19ad8251efa06ca a6d71a68b940afd9
+flight | 706ee9e1 1 | fault
+flight | 5da7d233 1 | 7f8cea061bc7c5ef 3794a4d3566f2a53 fc26200422c41ca9
+flight | 49c8fb2 5 | fault
+flight | fa179b6b 2 | c226e539a12ab17d d1c7d63fb10b22bc 46c182691488f2a5
+flight | 38b78350 1 | fault
+flight | b128129e 2 | 75557f2e2e355f30 f2095e1f511cf02f 8c1c41a1b695a69
+flight | bd7e1b91 1 | fault
+flight | 782f82bb 6 | 7b916c45fe233044 ce5e4dd6b967a165 fc507da292875082
+flight | 82717482 1 | fault
+flight | 50e3800b 4 | 768480f01e61597f b769df13abe52b9d f38d42dd492e688d
+flight | 5626da58 7 | 4a0f61d931517b84 84a858c318d0db3a ac70128387a5ca01
+flight | 2ad588ed 7 | 84274a2746977a82 a6275371dfa04a5c 8308ba052e3217c1
+flight | 47dc0c62 2 | 853bd731deeefb53 e717afc6ac239c45 9ad7d7f3de4e7f6
+flight | 9ea48a1 1 | 1cd01209a4f236d5 4947576d8479ac7f b3dfc7e397ca1546
+flight | ef7532d1 0 | cc3f83ffe0a2f75b 2827cf1fbf1c4d0d ad97431731fc1abf
+flight | 3f7713f6 6 | 735e74ccb1d185bd 86b9c2e057ee9763 189b8b02e74be2a2
+flight | f933cdda 3 | fault
+flight | eb77c454 2 | fault
+flight | 9ae93038 0 | e3a12d31c33ca2e7 62a0edd61caea962 5116f8114f59a995
+flight | 462d20a7 0 | b9de5f8b36b94bd0 c29383f5c340e041 679cac527bd3b547
+flight | 6dafac24 7 | fault
+flight | a0e9e755 4 | df58c61689b7bdfc 898f1bcb9d6811b0 c1b0f31036c3bcb8
+flight | c9927c70 2 | fault
+flight | 9afcb830 5 | fault
+flight | ef391448 2 | fault
+flight | 3e874b55 6 | fault
+flight | 936b3ae3 2 | 2d649170699083b9 a5b019e29800080 8816e271ba852c5b
+flight | 384ad5c5 4 | fault
+flight | 69eee9ff 0 | 3a76f18dcc0d9295 ce54c100cbcce518 4c52ee2442e1709d
+flight | 63e5cbe7 3 | fault
+flight | 347c867d 6 | fault
+flight | 62bfc419 0 | 9497976e00c38852 9f87218fcdd70e30 97c4ec0a6e0836ec
+flight | c2e63d45 2 | 7c85bd128c710463 bd76b1c53d203f3f 5b7e0205ddd8de2e
+flight | a89b54f6 5 | fault
+flight | 474adc5 5 | d524f97cc4121117 98cf127baa0df8b8 423aaaa59eea07d7
+flight | 50229b82 7 | 30c940ab0299d24a 80c1c3cae3522bc5 786b4339e2fb74d9
+flight | 1593768 4 | 68af8c134b74ebe8 5d7255bb2f88c0b3 643dac346132ab99
+flight | fc33e0b6 6 | 44de847e5e73b4e 2c755b6ebbbf3bbe 6de13dfe2254ce6e
+flight | d9a2a06 1 | 50d6ac8b71ef47d2 ae6394d15e93ebfb 7d57fb1710499a07
+flight | ed2db5c0 0 | fault
+flight | dc0f39f8 4 | fault
+flight | 269629de 2 | fd92b54ad2d3db9a 8cdc6fc4d3b9c2d4 cbcdb63542bb13ca
+flight | a5fc8273 7 | fault
+flight | 5a92ff0f 4 | fault
+flight | 6e53e89c 2 | fault
+flight | 49ddfa88 4 | 4e6e2eab4348709a a6c498fc252b3257 5e8613d35bf23a88
+flight | fdde0524 7 | fault
+flight | 7fff241b 3 | cfa28595c7547cb7 ac5f7de07821fe0d a56ee1e472c6c34d
+flight | 77ea634e 4 | fault
+flight | 1afc09e6 6 | fault
+flight | 51581dbe 2 | a247dc15c53d451e e59f8a328d66ee3f fb8c1f4edb344753
+flight | 58d98ac1 6 | d1aedd9cdf7eacb4 be395fe07386a092 43ce9d2701d24cc7
+flight | b5879536 5 | fault
+flight | 50fce5d7 0 | fault
+flight | adc0802c 5 | fault
+flight | 2113ae22 3 | fault
+flight | a123fa4f 2 | fault
+flight | 2a14ff2e 3 | fault
+flight | 28f0d70 4 | eeb69fb39edd9979 2fdac47ac8d9c093 b4643332e285b55a
+flight | 9780cd8f 1 | fault
+flight | d1d8478d 3 | d6ee7be9ec998fa7 6619a768c3966f6b 5a6556ea06dea9b8
+flight | ed617980 3 | d1fc3ec098835cd4 97b6d84991b1672e e6b0428d3da4ea4c
+flight | c52743e7 4 | f1c3d9163e8eaba2 4af9ac445313f3dd 51d3e80533c637fd
+flight | 87033f8 2 | fault
+flight | 61201856 0 | fault
+flight | ef6baedb 3 | c6422698db90374d ecf9f9ee1390494e 6bc1f988adaca14d
+flight | d15e4238 2 | fault
+flight | ca974f03 6 | fault
+flight | 6ef877f4 7 | fault
+flight | 90c4ae8e 7 | fault
+flight | 879d9e98 2 | e0ff3093daa5ec03 f0290ace9a2482ef 87b26fc14d3ed1ed
+flight | 3b40bc4a 0 | fault
+flight | 10a1ac53 3 | a26d8ba5dbbc9a59 1de0207d9e79273 fd859c6ebc743a73
+flight | 4cdbeb70 4 | 5273e886f6d82630 662bfbc46f75dff8 34e9863a243fbb1c
+flight | ffea1c12 5 | 68af9bd5e597e2a3 2876a5bb95309a3b 8e78779edb2e23c4
+flight | 65b4647e 6 | fault
+flight | fad9af8 5 | fault
+flight | c2a6e408 6 | ca56df40a8a7192f 744c8727ffe40f07 6ee3cc5b77f462fb
+flight | 4f3d9675 6 | fault
+flight | 5b8f8160 1 | fault
+flight | 6ba1a00f 0 | 8c2a884961ce4286 30cefa91398b104c f15f762b622989fe
+flight | 9cc35519 5 | fault
+flight | c0787ae0 2 | f88ef6634a13d92b b0da4c5fc54e1e15 bcbced7e26f6cb8b
+flight | 4153f9cd 7 | fault
+flight | ae6358e1 7 | 1bef93f5dbe484ad 58a7a753be36925a 2a0ec964a1795e60
+flight | e85b93bf 4 | fault
+flight | 23753bf2 6 | fault
+flight | 554c0512 2 | 352ffd440f191b d1d8a7db5fc8ad3f f2b81f1604610825
+flight | 10c58ddd 4 | 81031e8bf05142a8 ca585e697ede99f5 42f53ece96098c76
+flight | 16262229 1 | 223f871ff5cc9139 6a45a1516f2fd799 890e20227288efb9
+flight | f16ed1f7 4 | d15dbf196226d224 b980120b07a4e2a1 58845de502d7448d
+flight | 33ce8db0 1 | 1f7b5cf83c600d24 1cfa7fd68244defc 533908e2b1f570b7
+flight | 613ba5fb 4 | 67929ee9a4304a41 d0bf1eb6ec9ffcd2 ef81492556b4c8b4
+flight | f21656ce 3 | fault
+flight | 8b37ed1c 6 | 8833cc031ac2c326 737a949e045cde31 3cc2d2550248e795
+flight | 672fe9ef 1 | fb3bdaf8e9c9edb9 4537b737c90ab4dc 6f8a10111342704f
+flight | d4d49aa2 3 | fault
+flight | 9c4515db 3 | c1ef4efecf63ab0c 159feb6ac7f384d1 3c16e13fdc5bc577
+flight | f6254552 7 | 9e58ee865df71462 4ddc900b40b84d5a 46d4db936f20807f
+flight | 879db059 6 | fault
+flight | a49e2130 3 | fault
+flight | 6d499a89 0 | 24ca2166a87665b3 3eebafb8e774fb13 cc43e843c1fdb3e5
+flight | acfe8381 6 | fault
+flight | 620319da 7 | fault
+flight | 36421567 5 | fault
+flight | 1ffef546 5 | e555c78d3fc4f7b9 758445e58b477196 da9fa41033145e4f
+flight | 92bedc6d 5 | ac57b4bb85966c78 3aec47b09e62e1e8 f9daadc5d540e6c8
+flight | 5a6e5cea 5 | 97bda997df913377 ebfff1711e528f6e ae3242d7887d0914
+flight | 6ec5919a 1 | f44aeac68dce89da ecf88282012ec367 93fcb18458d5afc9
+flight | 110a32c2 1 | 7d572f1edce78f59 48366f33756b59d8 5d3b4ff04fb3bac1
+flight | f741f940 2 | 74405a0a67e9dac6 62222c26bde02a87 9f17e13871b56662
+flight | f935ed5d 2 | b671eb485effd0c0 c7d0ae04f5043d8e a199ed47809b38b3
+flight | 72c3501b 5 | 6a79007cab6d98c1 e81bd9c6b3e4356 5a71d23466a7f9f0
+flight | 903e43ec 0 | efbbddbc2042b808 fc8c74431286868b 4192934f385d1e0
+flight | 7e063c17 2 | e8a8ca5bd4e8e8ed 1d6aa1553434c0dc cc55b871d0134d24
+flight | c39f3fc8 6 | fault
+flight | 88493fc0 0 | fault
+flight | 9b2d802b 2 | e6d90e9529807b07 103ee237ad271a31 b635d9312e5d8806
+flight | 737d0c39 7 | aa306b3bda588059 c0a656de078d002d c5aef57019c6fdcd
+flight | 77a6ce93 6 | fault
+flight | d94ac66d 7 | fault
+flight | 6c35baf6 0 | 825c362635a57fbe 27f01ae347f0fc29 57ce490846f3831d
+flight | 7c9d5af5 4 | fault
+flight | 51d12389 6 | fault
+flight | 4a23663a 4 | eeafc37e3847c1b2 7df888c1cf197c 224dfd5a3ff9f1e0
+flight | b32cb3ae 5 | 866a4eba16a8c57a 80ded92a056fdc4e 95354317b8520dc4
+flight | 9e2b2129 0 | fault
+flight | 3bda5645 5 | fault
+flight | 6c3e7944 3 | bd75a80948b3fb41 30e9a8b1832b0c64 5e754ad632897034
+flight | 84db9075 0 | 25abc5216d09b6e2 201b064109b687b2 a3a3c8ccfafdd79d
+flight | d112bb7d 4 | fault
+flight | d838b18f 0 | bcfb57b65fdf594e afb48ca4dd45e668 ec686498b673b475
+flight | abc30db6 5 | b45acf059530a7a7 f42a0d418ea92915 36029aa5b9805d3b
+flight | 9a192648 4 | decbb2760de4609d 551a9dc64c60dce7 19073e5807687b7c
+flight | f0769af4 0 | 100e1d18cb420e0 b575d5d4f31e95f0 5c5430b22b7b8489
+flight | 123a057e 4 | fault
+flight | 1b7b44c4 7 | 5c1bea123733b958 9633d68b0243fda9 c12607c77b4488dc
+flight | 50635f1f 1 | fault
+flight | 8ca80527 0 | 9d3cea010dcfa616 efdeb51537497aba 7b95247bb444d5a3
+flight | 62195864 7 | d4370d6095f16510 940dfa1a9c166e6d d4701001b0d178ef
+flight | 49f4487e 6 | fault
+flight | 7eef37da 4 | fault
+flight | d1009c75 0 | d0c5395b0cd74aaa 587d0ca2e6172458 dd6c482291649f46
+flight | 21930dab 3 | fault
+flight | 377a3120 0 | fault
+flight | 7ec28fec 1 | fault
+flight | e84a6e51 7 | a681f66c3d6bbba6 147768470ef978f 74a596ea452b18b2
+flight | 1e5fcf6d 0 | fault
+flight | 2678d16 5 | fault
+flight | 152b038a 7 | 80cb070564b8eabe c105330a8a9ab732 6484642e1707649c
+flight | 4ee7e027 0 | 6f9bce65a3ff60a0 6729d1b11fb6cae2 c4741acd990890de
+flight | 7bf285be 6 | a4bcc82053547c8d cd448fbe46a10a8b 744e28934f1547fd
+flight | 1f4a0baa 4 | fault
+flight | 48fe1499 5 | fault
+flight | ca48d3d2 1 | 2ccac3ac2feada0b 9f8a3cc910c15759 53394e5abfedffa0
+flight | f51d27de 2 | 3cd970ad99488925 3a1ad08a276f1e42 cc20d5994354aaf0
+flight | 898f7958 6 | fault
+flight | 9fa391bc 3 | f375de3f255ce430 ba4881af60a76963 e36166c449ff692
+flight | a38c7ce2 3 | fault
+flight | 8667c9f2 0 | 2c63000410f2db0d a67b005b5404ff4f 163175b6351a2dd9
+flight | 882e1d42 6 | fault
+flight | 36479965 7 | 7dbcd5d7ff93b5a1 a14d15fb085729f1 2e224e350976951a
+flight | 7e536f16 6 | 9ab9a44ef1f460d bfa556a7205c101a 26018ab021760a57
+flight | 8d3b8a7 0 | fault
+flight | ba0501e2 0 | fault
+flight | 6557e4c8 2 | 69bcf76989cc0015 4dc7466122d5e96f 26439d0de53e3555
+flight | 53bc8931 5 | e455621313981526 29f648f280b5d8c0 8623a51665b46856
+flight | 9c4b76 6 | 170c10fd1059cfa1 11c0cb0059aa1e87 438e0dba023a6c5b
+flight | bc3218c5 5 | 236a0d79ec7ae560 8d6f06d3c19cdfb4 1684d33f3dca0df6
+flight | 3fed350c 4 | 86c4114086888bc6 af3c473ea2a01a61 50bd6081474ea1e9
+flight | ab9367cf 3 | fault
+flight | 23b5ac5a 1 | fault
+flight | 95a199a4 7 | fault
+flight | 7b175b9b 5 | fault
+flight | 900608ee 3 | ec46b3e54b97c013 2ba2dc406a7f09fa 9266fc3c1d36e96e
+flight | 7159f241 2 | fault
+flight | 34259b8e 5 | fault
+flight | 1e54e387 6 | 8fc445b1b9e6d298 7f9a5e133016067e 453e5d2b7ee2cd92
+flight | 985a962 6 | 8e71ad50c59907ad 4a4acbbcfa7e8625 d447b556ae012507
+flight | f8ad42de 1 | a15cb551c4c1ab79 a1d67ddc7e84f0b4 5f0cb4f642557f08
+flight | 3aaf8c47 6 | fault
+flight | 689ac008 3 | fault
+flight | dc36e58a 2 | fault
+flight | 99835718 4 | 69a0f72f1bf9a5c3 a304ffc3ac650b20 9347540f8d0e4044
+flight | 1fe267dc 7 | 9fb3ecd4d82b7a2d 9296fd710fd9cede 44be03c7c04a6547
+flight | d59cd49f 0 | fault
+flight | 216cf6fd 7 | fault
+flight | 84a4be0c 6 | fault
+flight | 9e7df3b8 4 | fault
+flight | 10bbf5c 0 | 1fde16cbe558b8d1 3edbed70f0338400 bb2d07c850f4402f
+flight | 460a2567 4 | d0cb0a7463c641ee 6d9c17a88b4da71c b1ab7a56c2212d0e
+flight | ce639dab 2 | 7de14b7ddc33b60 3e74ac609da9aaed d3186612eaa88406
+flight | 58664163 3 | fault
+flight | ed2e4e89 4 | 9d132a0634de672a b583cd4fa3ae19b2 99e3f1a02dcaa211
+flight | 1e3846a1 6 | d7a64ecba443195b cf805ee1b4c742df f44c4cb95817c5e3
+flight | 5ad861dc 3 | fault
+flight | d2928da9 1 | fault
+flight | 3859eccd 6 | fault
+flight | 5f36926d 5 | fault
+flight | 8b7d4b24 6 | da09a769620e3066 26870d3a1cb9f602 9a8e18369d8077fb
+flight | ab3c6427 4 | fault
+flight | 44cb63d6 3 | ab348a20ace7902a 9cd1126baf64f9f7 9352f3d0419b24e1
+flight | 47f910b 0 | 9c79fe36b28d9819 e6a19ec7762a5078 a384aa59e5d66a53
+flight | d8434940 4 | 4690983f0c0991eb 3eaebdf8a8f68e5c 1f525315160efb9a
+flight | 2cc782da 6 | fault
+flight | 29056e6d 6 | afc11ab30bc71dfd 7b24bcc7b145b8fb eb38344c91c9c191
+flight | d2b38357 5 | c8bc847a417f4746 d8fdc5c087b3119c 7db19acf48f7456f
+flight | 7ec98b7c 2 | fault
+flight | 475ad4bc 4 | 4a2f3fd1b3a711cf d7bc7a48bb296395 511b89d406a5b336
+flight | 50e8cd52 2 | a17a863aba5cf262 be18db66573af2a1 f285b41509764b65
+flight | 1a5036cc 4 | fault
+flight | 4c9a8476 5 | 3c8bda85ec40bf1 d1e2373ed711289c 7dc251fa83ac6d45
+flight | d09dae4c 1 | a0635b11775711ad 99b7e313177497df cff58455bc0f79b7
+flight | 52176b40 3 | fault
+flight | d2898e63 5 | fault
+flight | 90a3dd8f 0 | fault
+flight | e76d3477 6 | e8786732369fa690 ecac158811685e0e 26c4e38483ac6a76
+flight | 41fd5f53 1 | fault
+flight | d26928d 7 | fault
+flight | e9ccc9ab 3 | fault
+flight | 7bab7598 7 | fault
+flight | a84544ed 1 | fault
+flight | 4c86ad5d 2 | fault
+flight | 8d011d6e 6 | 6d3536205a22bf50 8520ebd3b62a4d6b e0bc9d475213fff3
+flight | f2eb9ce9 3 | fault
+flight | 9882fefb 0 | 8ce55fe75e4e4e4c 83c0b6983008d7cf f78cb92adf6d90d6
+flight | af13d121 1 | fault
+flight | f2420017 7 | 8990283fc8054946 c2660f2beeaa1c85 53530e64caf30ae5
+flight | 28292c11 5 | 2058027bbd7a31e8 7bc449ad4cd2c67c e4e61dd67f4bbea1
+flight | c411d219 6 | fault
+flight | 64326d6a 4 | e273172fa82edaa1 58ce20cdabd2d669 e097ce046ed15318
+flight | 4af6457e 4 | a490d6691800bb5d 9e0634a021a5f6b0 aba6d192c1a630a1
+flight | 3e4ca214 7 | fault
+flight | dacccf3a 1 | 40e6325394c318dc 533656858b67bc36 9a98367d0af995cd
+flight | 35274ed0 3 | 388a508e02b62179 748771befc8025aa da1550e691de4f16
+flight | 49670b91 6 | fault
+flight | 4b81b82a 5 | 25b93cc8fdb3a7df 8a9e136917c48f8b 1c727dc693c4a14b
+flight | f6aeea51 2 | fault
+flight | 9cd85633 3 | fault
+flight | 3a007a9 5 | fault
+flight | dba3dcdb 7 | fault
+flight | 2ca4aa40 5 | fault
+flight | 260fc9ce 2 | 785a9992de1273a6 521520a81288fb86 348e6e0e578cd865
+flight | 22871eb4 3 | fault
+flight | 60f818a8 4 | 6d2aa7fa16b247a6 d2d572086f197ca4 b8252dc39c49af2b
+flight | b8c62f6d 1 | fault
+flight | 900c67f6 6 | fa4cd171295748cd 134e1d56498f9105 6f3107f16015bd
+flight | 4e581528 0 | 47a27f9c93b8ccd8 df42f11f9e3367de ea33ae75865ef96e
+flight | a54c7cc1 2 | fault
+flight | 581422c5 6 | a36767bd554d7aac e72e48ddd0189c3f 9130404c199f0740
+flight | 981a6745 0 | fault
+flight | 3632e115 5 | a5f6e162d6f424be 636c6359257c5b8e 941b5017be822ce6
+flight | b776b71f 7 | fault
+flight | 5bfe34d1 6 | b7cc65ff21117ea2 87ab05d5dd2f0a08 417a0354d1475b34
+flight | 52799f28 1 | 951d0ae2eea67e67 463dfc345f66e678 b971b2005f6c44b
+flight | 470cd9a 4 | fault
+flight | 2175118c 6 | 88006db28690084b ae4ce6a7d5d7174d 9df51c54d12669b7
+flight | 66b9359a 4 | 73bb4c424eecdd1b 6888b8c5c3205ad 9a382f5f9c428d71
+flight | b16b5f8f 3 | 74b707499055060d c018019371eb2454 bb50ab1cc2f58074
+flight | 2ec104ee 3 | fault
+flight | 6e044608 7 | 97c32eb052a272d8 a9ba2addcac19eea 88d1ae4ad6b0459a
+flight | 1e774b2b 0 | c69d761bbb1e8d1 1cce7dfbbe7d341b afafa36df463565b
+flight | c136f6a6 6 | 49974849dd2fab64 6fbaaaa3dd3e1197 5e8e0ec5b35bbca6
+flight | 32545f39 1 | fault
+flight | 34b7c4a8 2 | 5c28e51bec717851 516e4903b572bc77 41b4bec014ed6026
+flight | fda7351b 4 | fault
+flight | 5193777 4 | 4a4b95f2164590e1 576df5a4655b7e51 9179150caa7cdaaf
+flight | 125b411c 2 | fault
+flight | a40c712b 1 | fault
+flight | 3c11a5e2 5 | fault
+flight | 4ec8b868 1 | fault
+flight | 131147e5 3 | fault
+flight | 303c228a 4 | fault
+flight | 6e195e15 0 | cf894abe4f7d9c31 d15fadc8d6e14b78 f507c48a10e405
+flight | 7ca884c6 1 | de4a308dc6bf3bda d0267b984873ae62 9e5021fe539cf871
+flight | 7cd29a1f 4 | fault
+flight | ab58ca23 2 | 9efa7652b8e442ed cb59fa16aac7ffcb 8600fd034b89bfa5
+flight | f4a84e42 0 | a8920393483654df 8945953e7ed79663 28e52488f9e612e4
+flight | ab5ffbfc 4 | fault
+flight | 943a9a1d 1 | b6391c6d1bc24181 3261fe7cdfeece21 370a459987eae83f
+flight | 91f35593 5 | fault
+flight | 32cdac24 2 | fd7fed56fcf77b79 ed13e44afb56375e d00f30563ab1d176
+flight | d20f4022 1 | fault
+flight | a1e832a6 3 | 87d7fb031234d742 8187de186e8740a6 17e2c82133523453
+flight | a75b8d4e 5 | 78f5accf0f428efb 6dcb8b8eab21885c a091997552f09925
+flight | 36d8a436 2 | 204158e2b0ad25f7 6f7a28eb9e3f22ab 67dce9d27b76ef46
+flight | ea870784 5 | fault
+flight | 62914604 5 | b4af07c07b1ecdb9 50652e4cfbe88aba fcf35e13e2ecc918
+flight | 11aa1712 6 | fault
+flight | 8b431e73 3 | d479219ef08a6568 1a304fe8da6b16d6 2f00394a44302081
+flight | c6417d83 5 | 13be20042cb8227 19a3cdc5b34e4b4d db5665cb9c1f52bf
+flight | c2d2c2ca 0 | fault
+flight | 4ed016f 3 | fault
+flight | 23a97a6d 2 | fault
+flight | 4edaca47 6 | fault
+flight | 176bfdea 0 | 6da228f2c8bbd73d ffcfdb3f8a87db33 97edd29526e89f3
+flight | fbb593c0 7 | 1d6b559204b78a0f e476bcf504f302df 77f5c6f348084ac7
+flight | d8091f54 4 | 139f20d3d5d28a2a 2ace73ca9df64a4c cfcc298d2d20af7f
+flight | cdb4661d 4 | 2885c0e72b6a92e4 1dc5f0d8af95ff15 6f86603a5c94917c
+flight | 93388a79 2 | 7034bd9fd7455a9 994519a924b4e12 c0ba6882604bde45
+flight | f6071a12 3 | fault
+flight | bcd87c1c 0 | fault
+flight | 29c18a90 4 | a2cbc77b10afd119 fcfb0a6f4d7af484 16ad44cfa831212b
+flight | 144e84bf 1 | 7bb492cbdb009d92 c41b9b775c06aff9 1286a960fad02783
+flight | 1986a9bb 3 | b52dc884ed1c776a ffd03ba8731df7c9 ef6e0af169b2d603
+flight | efb86b26 7 | c5f1f7ffb10b4245 47fd2776378098a4 5038d32228e577c9
+flight | 9967af10 0 | 5dcb7984dceaf0bb 872f7612256619d2 ed7e94fcc3819b02
+flight | 49df7d0e 1 | fault
+flight | e09a1b50 6 | fault
+flight | 31cf42d7 6 | fault
+flight | 1dc9eeb1 1 | fault
+flight | 4901049e 6 | ff7b87623edfc6eb 5f143089cb16d1be f6e65ea08d1510b2
+flight | bc61d9f7 2 | fault
+flight | 3d195e2 0 | 2ae183ee0f0609d1 6035b17693a958b5 78a6803bfc528557
+flight | a852abe6 2 | fault
+flight | 97642fe1 5 | fault
+flight | 4fd60c0b 1 | fault
+flight | 1f770501 7 | 9daa64aff4daa407 ef9c0b55ad6f3bcf c2691c018b633bc7
+flight | c45bc6bb 5 | 31d13d254ce2d9ce a180e12b0e4ea3f6 c05fd978a5fcf80e
+flight | a60bfcf3 4 | fault
+flight | 28617eb1 5 | fault
+flight | f7f1f9fe 7 | 2db4f94959b2eb21 96ad94060855eeae 4784ac9534fe6842
+flight | 3122f054 3 | ce99b6629f7a8326 17cf23a5cc688695 43260d8a028c96e4
+flight | 47cd5bac 5 | 6280d1fad0664752 d208d2ba90c98df1 6bdb85c8717ad208
+flight | d6a5a86c 3 | 9ea060f52179c1e2 2a10ef2d17155d22 bc3b89bede0200af
+flight | bc0b9e98 3 | fault
+flight | bed018fe 3 | 80804f9dda872981 fd7d750c49df0f17 9e59bbc63a4d802
+flight | 76513c4 0 | 6a6319db653c9299 8ccc51e4d29210db 531194e388d61334
+flight | 75d224b0 3 | fault
+flight | c88b8086 5 | 603c720b699099d8 43a192b2b21c3215 5325d5a401ff1a6c
+flight | d39d6684 0 | e1f13dfe39ed59b 588a6753a13cfc0 1cb315a18d6e5eda
+flight | 876c0633 5 | 38083362965c550e 55887c556a17054c 7b140063af12680d
+flight | 913600e9 0 | 78ddabd17bb8839b a677412094c8e1e9 318e3fd7057a9aa4
+flight | f44c7bfb 6 | fault
+flight | 5ef4335a 3 | cce422c9ed12d8c3 a2759076d5ad354b 3aeb21e53a13dd03
+flight | b440a87 5 | 24cb0732536f106d 7bc920ec09011dcf 9acc9485d1544875
+flight | c842bbfb 7 | 86bd2b1b101f2f04 414fbb2c96aacbf3 8c3a4688e5cfacde
+flight | 53c749e8 3 | fault
+flight | 6e2998bc 3 | 95ce4f4a19ca4b05 afef64be121a620a dd18df2ee4e97721
+flight | cb86703f 4 | 8943452544cccd87 38b1a11547909056 be36c86003a89f31
+flight | d2bef759 7 | fault
+flight | bbb5e12 7 | fault
+flight | 223ef881 1 | 51ae280391d2bce3 96fa712789fb4b82 8c7c751cfb9d5af1
+flight | 9e62f7db 7 | 5e9374364d60cbba 186e502c1c2420f1 9eacf85a124580a
+flight | 8d101577 0 | fault
+flight | 4ed16be4 2 | e20e760c6a58c4b9 fb2dede63b1b01d7 818efe3b0fded2ca
+flight | 3ed1fd33 3 | cc47ac664957d4ef d7a7f0700a393b27 b9b565bc88423837
+flight | 3c9b415d 2 | 8ab6f5398f8412ac 7e4675a62fd2e442 de98e0e810ce7319
+flight | 442ac023 7 | fault
+flight | 2790110f 2 | fault
+flight | 37be2ec6 2 | 9191ef7f45737ebd 5e24c63ea4e6ff2 d7b3e16f5af59d13
+flight | 4aa0fb37 6 | fault
+flight | 14dbddba 7 | f36e574a210e9840 d7f696f2aae3ac93 b40415b2c1f531a9
+flight | 225c3ddf 3 | fault
+flight | c41be3e5 0 | 8e98fc9544a6caf5 d9fc3171c621037e 564d68f7f44bcbf2
+flight | 38ec063 5 | 2e709f8325f484e0 b2aaacd8100001 6876f58f456656ae
+flight | 638aa43c 4 | 93b67f40110f4f0d 68a9183871b24c26 fe1496a5a6493ae3
+flight | 5d202887 0 | fault
+flight | 2f29de5e 0 | f62e8ec70231d071 2a70a5d68e508096 bdf46c29695e0d4f
+flight | 6c781611 6 | fault
+flight | 750b889 2 | fault
+flight | ffd29f3b 6 | fault
+flight | 8d2e3716 4 | 7753c4f05602d440 54a86285a4edbe75 e3da1ee08a2fd374
+flight | d50015ec 7 | fault
+flight | e193f993 2 | fault
+flight | 32bf9c76 7 | 615c0bca08508d52 ab338c58813300a9 4e0e7d36409b46ae
+flight | d55b91b8 2 | fault
+flight | 6eba94b3 0 | fault
+flight | c142ee19 3 | fa9ac4d15f84d218 b4820044e2fd5378 da2638d3c4e83dbb
+flight | ec669f49 7 | fault
+flight | 8081a23 2 | fault
+flight | 99e97e5f 2 | fault
+flight | ea3d0ec2 3 | 18ee36f3b0a18b5c fabea89c8f10d3bc 842e21b7d994ec6e
+flight | dd327dbf 1 | feb4c20ed56693cc a5de7e69892e1d49 6c5a00f9fa1e09af
+flight | d19eddbc 1 | fec359e279b0206c b600115e91c0bba2 15fdd464c3fbed71
+flight | 16999e49 7 | bca716401b592ff2 6a16e8a4735a9c63 58ecec5380ad58e2
+flight | 26e9bfb0 6 | fault
+flight | 4258d725 0 | e81d971b6b7f1e2c eb48c1673c2ef069 c082683cb4fce29b
+flight | a5ffd990 5 | d010b194eb96f0da 7967e30f927871a2 9ea21d143cc72fb0
+flight | a32d44a3 6 | 7dabe05fc7926622 12ef9b40cd9712ab c1fb71561277aaa
+flight | ffbc6799 0 | 7573249d7d60477f f7558d41b0c2594e c8dfc40e369c3dee
+flight | ddb5c497 4 | 49a12fc991f7d8d3 af2cfcc0f6a3d61f 460554be2b331ee4
+flight | 70872ee0 1 | a65771f45858919d 4db681b259fb17a8 90421c84d71c8d0d
+flight | 8660c077 3 | fault
+flight | 353e5a11 7 | fault
+flight | 93ca974e 3 | fault
+flight | 78d0f7b1 3 | d2e3ecf9d62ab8cc da71165d74795786 9a1b2d956f5b0f8c
+flight | cc5a0422 5 | fault
+flight | 4f907c37 0 | 17712e1af200bb3e c47de3483c86306 ea7414a5c668dea0
+flight | 3c0eef07 5 | fault
+flight | 934ca72 1 | b2e8120205e4341f a87f432b6fac551a 6449f8f582b4a296
+flight | 85962e56 3 | d5e48de48eff27f6 6f5cebf6cb658754 de87b9f727c53a03
+flight | ae2a5777 4 | fault
+flight | e309a635 5 | fault
+flight | cdfcc7ac 4 | fault
+flight | abca6dc8 4 | de9403bbfdffe4ba 51271d9f8e229990 a8108567b56d576b
+flight | 2a91c933 0 | 7f17e929a4fe9b67 9f0a386abe704370 e5c0c490c645c8b8
+flight | b333d43b 0 | fault
+flight | f2283888 0 | fault
+flight | bf292ebe 6 | fault
+flight | 8109e353 7 | fault
+flight | 3143efbe 4 | fault
+flight | ca3195aa 6 | 58269c81a9802593 8bd2fa32aa94c480 b894e902d1479e9c
+flight | e2832a40 5 | fault
+flight | 2f3e342 1 | e378f8fa6d32fa61 7db1bfbe91fc0cd7 34a7eaf085998dbc
+flight | 5bde8cfb 1 | df7f6c7674002bd1 ac2e627c0ccb045c bff0a4f0db398164
+flight | 88ed38e2 7 | 8694d9577ed9657 1ae2b0eaac8df1c1 d5fdeb0afb517092
+flight | 6297eac6 7 | fault
+flight | 76cbfcbd 6 | ce0bb3ed7c1ad6a8 ff409ecc5e685a64 483b5d448e629f21
+flight | cbb604f5 3 | ab3c3e9bfebe326 4205b276dd36bc7b 7e1517318b959ed4
+flight | 7892beb8 7 | fault
+flight | 38becac5 5 | 8db6818a38a27577 cc139030120ca8ea a2acb8cd4ff4f717
+flight | a1cf8e7f 3 | acb837df5db49d26 39687a035fc379ea c1b6467dbff3e315
+flight | e7f7d79e 3 | 43a5f11a718536d 963766b1b9f5b0db 88372d8eb3c9358b
+flight | 7f85ba65 3 | fault
+flight | d326c5de 2 | e87c79ae595f7304 971485bdeb18da09 b07796a2a7624f8b
+flight | 40aed22f 3 | 13b9a4d421beebce 1254a7b56f46de25 8e136fa6b815078a
+flight | c78c91a2 4 | ae75eafc51cf1237 6fdba60ff3d4f41c 1811ae3b4007f389
+flight | de12789a 7 | fault
+flight | 7b20e9cd 3 | fault
+flight | 7db4cbe4 6 | fault
+flight | 89357ccb 5 | fab68fb2b1218a5f a6ae15054b86f38 e0db8d4fbdca557e
+flight | e62f2dc9 2 | 7c97e4e89c519d14 230efd2afbe6c56f 7222eefc3aef385f
+flight | 8c963d5 0 | 6de60b629737bb9d 5736e0efbe86da93 8124b0b0d76522fb
+flight | 10208059 6 | fault
+flight | ceb639e8 6 | 362167d53b369e93 662ec635332c64ee 416834f20a721481
+flight | 90f346fa 6 | cc630ebcada45f8a 237416b45e183425 5356306ba3004ce1
+flight | f34aff4 1 | d7db5a857e40655a f90d3996e7a78528 949269d3afa138f
+flight | 4122a432 1 | 4ea8866ddbb46822 6a1f62886c77f259 db31cbcf24d7d905
+flight | 1bf1268 4 | fault
+flight | 806971b4 6 | fault
+flight | 2e62cd59 2 | 5c7ada53944f68fa 5dfa48dfe2e2079b b582d0ec02a272c4
+flight | c26fd266 5 | fault
+flight | 72172abc 2 | 1edcc6ac121f5aef 7c489662eba671d7 2be76acfb4edaf07
+flight | d2c927c 6 | 9da6e3a9fde968f1 423459d5d9637bde b0ffc98d1029ee31
+flight | 4c82b64c 7 | fault
+flight | 7f81d357 2 | fault
+flight | d04fb307 2 | 801ec9541a3f3f96 7a76caf7ba8eb6bc f9811d2400afb45b
+flight | 175036cc 6 | fault
+flight | 14d8a2b6 1 | 4563b17c44acbf21 b688144d6d3409 30b403979bbf364
+flight | ba5d2d8 6 | 2b9af61b21c72044 d0f88165b281fcc2 704b12881b1675a6
+flight | c8aac345 6 | fault
+flight | 582d3968 4 | fault
+flight | 1a8d5067 2 | 57374e9ddc96945 8047e482af00700b a431d212429d51e7
+flight | 3beb7619 3 | 10a97c38ae7a0934 74294dae95d32f8b 81c7b3c6b03b1de2
+flight | 9eb62119 3 | 9ce399cca39ea467 1e4d4a7230a93e5b 5a8a3373fdd3272a
+flight | e8c557a2 2 | cb88e7f14da95a95 5583fdb70b703d31 b4bf322346ce1518
+flight | f00d6a43 4 | fault
+flight | d10b88bf 4 | fault
+flight | d0ba9681 7 | fault
+flight | 39dfa64 5 | fault
+flight | 2c40af88 2 | 9bb4aa568584092d bbb0a8f215e90482 245aa35b85fa8502
+flight | bf061be5 4 | fault
+flight | 5c9e0ad0 7 | ddb9a6000b3d0b8c 46dd7a3fd55b6de0 299038a5c812dcee
+flight | 3c8a22dc 2 | bbb3dac145268777 d283ccdeb70a6630 617083798d3969ec
+flight | e8f1df2c 4 | fault
+flight | fcf2df32 4 | b224078bed8767a0 f02edcdfaaaedeba 640217f8393eb59c
+flight | e8ecdb41 1 | 1c8c45c29b9826ab 6a8e7d18095ae7d3 429c372c0a7c222
+flight | 69486186 3 | a195fdcaa2047e37 85a01fdc048d6495 2a3cbe7e10070268
+flight | 10e46b 4 | 901d17fc7bd41b5f fe76595e41b4308c 1a2afbec2b8689b1
+flight | fc0a6b07 1 | 1f93673761ca7213 eacd03bad50d383 ecaffb46766b8249
+flight | bc7b089d 1 | fault
+flight | e98296a7 7 | 87990fb93b6a2018 d28abc19e6870d73 d404a422acbbe467
+flight | 1a8584eb 1 | fault
+flight | 9ba3a705 5 | 8f7e04fa36116b44 e34b95ff4a5be034 f3cc5bc955d705cb
+flight | 7f77cca0 1 | 919841ed9598fba2 f8722925acd19c75 a856ef35bd197345
+flight | 52c25d4b 5 | fault
+flight | 25c3c324 6 | 651c762fd5cdd741 4e9a57cc1bab073a a1429d2cd34cf9cc
+flight | 61db0c10 0 | 24cde37bf76de34b 21f7151fa162fda9 fb541cb7ff7bdddf
+flight | b8dbccaa 7 | a008be89e49696b6 44d27ccfac4572c1 716557a8908eacf3
+flight | 8dea98e0 0 | fault
+flight | 6872cfc4 4 | fault
+flight | be30de4e 3 | 8e81b6f5f27b0559 336184b3e3715fcb 88dec58996defdfd
+flight | 54e7ab81 3 | fault
+flight | 1c82688a 5 | fault
+flight | 7232c3fe 3 | 14f48e86072dfa5c 7382fb4375d7c0a5 5900614886ad6870
+flight | 91b4f6c4 2 | e42f03d910c9cef0 df3b82876a0d0425 1eade97b9e7c15f4
+flight | 3d23028d 4 | fault
+flight | 33d2bcf7 0 | fault
+flight | cabdc8c3 0 | a703f1e51ef1dce9 39c532eb9de4873e ab07e761bbe0f6ff
+flight | 63b7e75 1 | fault
+flight | 3f6e3a59 0 | dc3c04528bead178 1df95b7555f84dcc e944b612606ac361
+flight | 2469fbe7 7 | 8d7ab5d7804ae7d0 2db0b44087da28f9 b0478f3800b5da24
+flight | 1f33e6d3 5 | fault
+flight | db3cdc73 2 | 1861a2855fe81173 8c199b24d5202ec4 b821bf52623e1642
+flight | 6a2a35fb 4 | fault
+flight | 6fefcc67 3 | fault
+flight | 62098a6c 4 | cbd22b30ef16d42f 60db0196f2d2a958 1bb18d8f21cb93c3
+flight | 4d86b94a 2 | fault
+flight | 54c685b1 0 | b0d6cd3880705670 9ff1d7ab2c95616d 4c84b40f5c11cdf8
+flight | 129f088f 2 | fault
+flight | 7bac8aaf 3 | c651893c20351895 de6f416d21b00125 bfcba892f7d7b61f
+flight | 796a6fff 3 | fault
+flight | 5f7beb1a 2 | d3c35384c01d50d4 d468eea15fc87ca3 d0497b3c78c9080c
+flight | fa272738 5 | 7de7d218e08fb065 7c66e2d616671f73 fbe16e71756acc38
+flight | f6ff5fc5 0 | fault
+flight | a0e920ce 6 | 3522a256b722ace9 24d686f58a09f0c4 69d4d1ffe99b9959
+flight | 41fde8cb 5 | 2639ab2fda242c82 4d2083fe665bd1b9 825f83659f712516
+flight | 2b138f98 7 | fault
+flight | f00c3664 4 | 9480a6ce9aa1ec92 726676b9e437ce4f 27061c1b7986754e
+flight | e150dfb2 5 | fault
+flight | 65d3dec9 3 | fd2ca1dc81a5cf3b 233251fb0d588d2c 431753f68b279126
+flight | 3080fb8a 6 | c6430a5aa9bd46a 3dca7827406e1d11 c7afe72a9298f02e
+flight | fdd43afa 2 | 24052fb682bc2331 e3d567623a7f3241 e3cad5c89ece820
+flight | 52fae101 4 | fault
+flight | 8b284432 4 | fault
+flight | 970d77d7 7 | 288e4e633f318a5d 7fc0a353f253e397 e32c79935b0d65e6
+flight | d481fe99 3 | ba1cb5ddc4b64a55 4d047cb840ddf77d 8f06e06ff1d41afd
+flight | a41796f3 4 | 76048b7184511e42 e34415c10cc6a85 132c4e0e85bf5300
+flight | e85290c7 5 | e7169fdbe7c4e61d 85363e76875af08c 38ae2de9c1758c85
+flight | 60d8d168 5 | 8056ea8a9ef802f9 78c4208cea48ecf3 ad2186988a16597d
+flight | 6038c5f7 0 | fault
+flight | 8400a24c 4 | fault
+flight | a592a932 7 | fault
+flight | 119285bd 1 | fault
+flight | 6efe54c 0 | 17035145a3e0b424 775f6f87cef1219f d7d93ad65c54f1cc
+flight | 9ec71e78 1 | d23287dc13601c45 5d5da11c66449864 3e064642bc0c105d
+flight | 2f34151a 3 | fault
+flight | 191cb4d1 7 | fault
+flight | c644f7c5 7 | 9f1e89d3527e0a07 77f68b629288b2ad bdced872457ad81e
+flight | 9510bbd6 4 | 298939e39f691cfa 6949ea4649f28af6 2dfba6f49520c589
+flight | 347ea7ef 2 | fde176cad80ebce1 348cbcb71f3dfcd2 b6686dc75fe1d890
+flight | 9999d03c 5 | a5b23256e2681fe8 7ebfdb6bde6fcf9e ab3ddfc73e60cfcd
+flight | 5827457 3 | fault
+flight | c1f81759 4 | fault
+flight | 10f09690 6 | ffd9c08013fdecd0 ed81a19bbc7b500d 1b79973033ce40f
+flight | 802536c2 4 | fault
+flight | d09abaf7 1 | fault
+flight | 891a84b8 7 | 967736368bb47ab4 e054c3614f8bcfbd f35c7bf7e0030c79
+flight | edda1fdb 3 | 6de4dce2ff931132 4f147798d6485c80 975422d2ecf23d4f
+flight | 91ca5710 7 | fault
+flight | 67b0ad6f 1 | fault
+flight | d0c04aff 7 | 2a293dea0e60e916 f5be720fc005861 abe316dc5e37ba7a
+flight | 3b6b47ba 4 | 2f317b7f482e8f29 6deb78f1fb79b1e4 240cc1e48b57c837
+flight | dabe9b7d 5 | fault
+flight | 9c9b08b0 3 | 9c138a7cb98ad645 b09db631e1be9ea0 83e851f767225dbc
+flight | 11ce3da8 6 | ad34efc13fd0c046 e7b8c11204f09f59 4bb548734450f7ad
+flight | 132b42e7 1 | f59733c89556d025 d6b701ff8097b9af a4fc789aead60c72
+flight | 2bd0a7df 2 | fault
+flight | 469bafa2 5 | fault
+flight | 9d124f8e 2 | 8e68a568694b0b26 5dccf818f2cfa825 e3129cc1e3bf4c
+flight | 85b0e3a3 2 | fault
+flight | 643d355e 5 | e45385324b06555a 22de1cb6b9a1de00 92b372402bdce1e8
+flight | 1e4189d4 6 | fault
+flight | 16a3e716 5 | a5f02d721ebcfd56 b932c064e8ebd33 8ee72ea77fc26adf
+flight | 93e3ce81 7 | fault
+flight | f04d88cd 4 | fault
+flight | 8e9d782c 0 | 3ca7dec25697b955 6ac2d3ca835cb8f8 e7dde0144fe0ae0f
+flight | 682dbdce 6 | 6db5f0732c38dcbd baa1f4e8af832de7 8777bfdd88da2614
+flight | 7f310e73 7 | 9db389f9ba931b8 441eefb5ee44066d 4bf65bf22a03266a
+flight | fd7dda7b 3 | fault
+flight | e61b9c4a 6 | be94205f458ebf22 7a8e9bb557a59bb8 fc881f9ec251b3fc
+flight | ff05854e 1 | fault
+flight | 33920b3b 0 | fault
+flight | a23c5183 1 | 972762d3eac0cc99 a340b3a5da477d77 f92a55bb40e29213
+flight | 21cfacb4 0 | 58fb4862a694b4a7 a4e9991585ed2906 609a872ba4ad4dfe
+flight | 4ee8a9ff 4 | fault
+flight | ed93addf 4 | fault
+flight | 92a2ed7b 2 | 733cf3794ad29fdc 8cbc07df736c3100 ff6cb4049bb1a38
+flight | e66c03e8 2 | fault
+flight | 61324ec 0 | fault
+flight | 19d199de 1 | fault
+flight | aae0bbe6 1 | fault
+flight | f161a5ff 0 | cc37b35d947a3e93 bb33ed0dc8485be2 896b04a560abf57b
+flight | c292029 2 | fault
+flight | 7721e45 4 | c7f08cacb8e72d43 80fdd957d438c98a 1f4cbe2b02231524
+flight | d9f4efad 6 | 2be424c373c9e2b2 a0ba2241883306dd cc68545bf4abfb8c
+flight | a6f3da70 6 | 27b0040ae0e1395f 5dd0c1f9deb22389 714b362726c197c4
+flight | a0bc2dcc 6 | fault
+flight | eda11f9b 7 | fault
+flight | b3605244 0 | 58a6a7b4a18bf64d 76a9beebf11906b7 98fc4b349bc3aa52
+flight | 544e7ae5 1 | fault
+flight | 68e84aca 5 | 58749ded7e476e1f e215c35dba6ed279 48ebd3c36b9c63d
+flight | 5470b54f 5 | fault
+flight | 1f8db9eb 5 | fault
+flight | 28ebd40 0 | c2df3a5fcab88869 4b6775ce82f2df16 3b4c085c8160215d
+flight | 91d0d894 7 | fault
+flight | 651ae447 3 | fcffaa3cb459760f 44e492bc5e23e2e4 84ee9c65718c814c
+flight | ab544c90 7 | fault
+flight | 2e623417 6 | fault
+flight | dd5fd8eb 2 | fault
+flight | 667ca146 7 | 9f96efd9686931e1 731c930f31324d71 a7d8074d24241261
+flight | 38189821 0 | fault
+flight | 62270038 6 | fault
+flight | 3a28a19f 0 | fault
+flight | cb81a19a 3 | fault
+flight | ed2f7006 7 | fault
+flight | ffa7c722 2 | fault
+flight | f22e701c 3 | fault
+flight | fcc67a97 6 | fault
+flight | 4991502 2 | 954b66b940cde721 6941da44992df1ae a3aaed5ab3a100de
+flight | 7b2ee094 7 | 9057c0b9e29aedf 4209c5f546cc806 2ff44721e29f6ed
+flight | 139c7736 6 | 9e96f2a5cd80f395 af59ff3313a71526 6af0fccfd0c9278b
+flight | 8f116bb9 1 | cc9b07f05d5bb861 63481685748b1900 8a33ebbaa7d70516
+flight | a0be172b 2 | fault
+flight | f770f09a 4 | c9e018fe0c7109ac cf97551e2fc611d 87900e4f8e25d229
+flight | 2a308a28 4 | b5547f4a95881269 485bcf07bfdabbb1 36e8cc111cf83abb
+flight | b0c394fe 2 | 17ee97ebe6d13070 9ddb235875e3a150 304efb4bec4517b3
+flight | ea2bf828 6 | 8bf503df7b184d5d 8825f4e927bbf51d 743de2784667afed
+flight | fb53d438 4 | fault
+flight | b2420886 2 | 594348e9c505ed20 5fa5ab688e14295 c767c219f1d16a43
+flight | 56c5eb96 5 | fault
+flight | d92abfd0 5 | fault
+flight | d3376c5b 3 | b9177a6395b11f09 b81698b79550d86b df0757bd785ee9bd
+flight | d762188d 3 | d4da354a40afd531 962878cb1e12a4ea 810fb641a9a77d0f
+flight | 78292f6a 5 | fault
+flight | f1227696 1 | edbc77a38d56b4d8 861bf2f0442b5a32 60fb44410330ffc9
+flight | b7d735ce 6 | 8b7a7aa746a37469 e9f741afd4393a7 c62fbfb60c9aea26
+flight | 7f7c810 1 | 8d053c2ad235c248 8b493a950259cde6 3ecbaab8b8abd79b
+flight | 9b5cf6d2 0 | fault
+flight | e7608eab 4 | fault
+flight | 74bb2c8b 1 | 7cc0a5611b2adc96 e8be46a1bd349e05 6fad7d05be87499c
+flight | 9435b0cf 2 | 9a298d61964c1a14 212b298d40a38395 ad656e5506386d2c
+flight | 166a7851 3 | df7f4d2c1a8bb2f6 5214c69e12078fbd 7f5e97458923777
+flight | fafac87d 2 | fault
+flight | ca5d55bd 2 | 9253d717788dfb6d 27101ec72896c5d2 325b230c58b9ffd3
+flight | 9b0f756 5 | ead6a102db0c57a3 e06234ce560b401d 8d3f309796172be2
+flight | 9068ec6 5 | 2b8f83d483b27355 1e295d708fe6b2d1 e78f1cb45aec7cf5
+flight | c9df1189 1 | fault
+flight | 76270083 4 | 1e33d523e34ad849 964c812ad09adb5c 64e50c22c9d47a5d
+flight | ff009619 5 | cd898447c709e69b 27e0f5dea05fc49b 3277ccb5024f8d86
+flight | 3967fbbc 7 | b672cc1317d04ad5 8b54a50bdc5e98f5 e942cffc6cb7b609
+flight | d8abd927 3 | 6f97146963448241 ce5654980aba0ea8 9445dff4956cea0a
+flight | 3a27f6cc 6 | fault
+flight | f87d7740 7 | d10b8d6c2c920b30 c981d997e6518a8a f4878d22f2784c85
+flight | ab34c52a 1 | fault
+flight | af4f31e 7 | 52fc68ffaa193fb4 3d2a2b823c896c76 822886ef6086f1c2
+flight | 68c22889 6 | 517994144bdceecb 7b90bca9c195d0ed 33083b5edb43be66
+flight | dfd59420 5 | b2311f63c5474e54 6c40b742cea46286 9cc689c014e38a71
+flight | 546e94cb 2 | d90b5f54945b7d84 6da2d7b6b5a95594 b22c090f2c5d2b2b
+flight | a092acdd 6 | fault
+flight | 9ac6a275 1 | 3c0dd795c3985b9e 1c9d1b7c89a46298 16d1aad36312c2ca
+flight | 36a4d167 2 | 272b9a74550b50d0 d2b6ded9d7f91f41 7f3748602f4cbda5
+flight | b901d6f4 7 | 551de88ea5772a4d 693af7bac4b6e0bf 4185f16a7db4a0cc
+flight | bb510769 7 | 2b65c0f7fdb4dff9 18a0a2a4b6655e4e fe836042d2f67fbe
+flight | cab6e126 7 | a18aa3e9411356a4 47c38accd462a54b ce1558b76684e53c
+flight | c99c404c 3 | fault
+flight | ff86d26 0 | fault
+flight | ab99fccb 3 | c16cf343f0113c5c 794d19cbfa5e71ee fb43efe9cec3a73c
+flight | 5e0aee2c 1 | fault
+flight | 3a9b28d 3 | 805a30f0a428fb3e ef68e3b2748f157a c1f9075f778b18d1
+flight | 543f1ef0 5 | d81db2e5b929197c ed97dc579c484513 e828fef411fd1a3e
+flight | 4afdeabf 6 | fault
+flight | 41ed85bc 5 | 2acf015ae24c45aa b96b370bf51e9505 f12f3f425fdc9790
+flight | 154921c7 1 | 1d74320a4001a15d 9209c3ae6346daee 539b33f206800c6b
+flight | ce87c6a0 2 | fault
+flight | 1808aa08 2 | 648da597e7bd162f 43fdd67578e2534 e81c6cc7b23e5f09
+flight | 35d67109 4 | 57d8b6c37ef6f337 46f0121341e962d2 bb8c2ab9a71eddd0
+flight | a3324f64 4 | 754a7cf647ec2ef4 95767e9990240609 808f957e41c55766
+flight | 4cb842ac 3 | fault
+flight | b5258839 6 | af97dc396c7a4f3a 686f71af52fca3e9 1144e62f661b7b3a
+flight | cb1aa7e6 2 | 110b9b479d8afa30 6fb7839243524f14 e4f847d51c28b0fa
+flight | cc1711 7 | fault
+flight | 5a2e7bb5 2 | fault
+flight | ffe5c4d 6 | fault
+flight | 8b5eb05e 2 | fault
+flight | 768ceecd 6 | fault
+flight | cd85b52d 1 | fault
+flight | bbb414d 7 | fault
+flight | ce163fca 6 | bfedf2eb4691ceef ce59e96efc500193 dd2c9010c13c558c
+flight | 79be449b 4 | 7f4e0d35878b4bbb a00e91018962fcc7 977253ba1869266b
+flight | 42e8c9b6 2 | fault
+flight | 7545c837 2 | fault
+flight | f270ff2d 1 | 37118401c9dfac90 603674839843caae aa9f502fe1ced2d1
+flight | 2e9f23fd 0 | fault
+flight | 1b54cfc6 5 | 4628c720f667574a a13669685cf2e316 d56c8a5d44b472f7
+flight | e83a5913 4 | fault
+flight | 35ff72ed 0 | fault
+flight | fa0c4cae 6 | e7f43c1f00dbcfdc a2a0a54a24c24561 22eb2f67bf7c2d93
+flight | bb263667 4 | fault
+flight | 301570d9 6 | db863fc048f0ccec 54241aa43834301b 2459f587a601d2cf
+flight | 9c994437 1 | 7cf829cdc2c20ded a03ed327d0fc9e12 38427eb6182320b9
+flight | abc69d3b 2 | 17573f5859dcd927 e0c04ce4af939461 918632e554a107ba
+flight | 30e30dc5 2 | e874b7d358fa31b9 a81dbaa7d4473ea8 c0d4ef90022b1706
+flight | 4d035821 5 | fault
+flight | c6d983b8 7 | 95f9768982cc45a5 3128f1cee34c977a 551982c9a8b6ac4c
+flight | b05123ae 3 | 4bdcadbf7d988af 596052efdd74690c e5618be98f8186f7
+flight | 4814bd4f 0 | fault
+flight | 64b729ce 2 | fault
+flight | 68f06e8d 2 | 461d92f56d13e01c 15a3e9f44fbf923b dfd71750b03aab6b
+flight | ebd62185 1 | fault
+flight | 14f83b01 6 | 136d3d3fe7815387 a1a7485f2c8e284e b0d20dcb64890717
+flight | b38f58c7 5 | ee3440905ac72615 be9e0a14ca19df42 6d31309b27bc9d4e
+flight | da295f90 6 | fault
+flight | 403804cb 4 | a88fafed460ddf74 2affbfe1246d918c 3ef7efaf9faee67a
+flight | a23f0ee7 5 | fault
+flight | 9194424e 7 | 6e577ca0393caba8 3f9d1e6a2e3570af c0f233cb7ca83
+flight | 1de6d0d2 2 | e70d15aa45218dd6 ee5a3ba690e44a77 9ad9dd57d441c0
+flight | 743d7d77 2 | e97ba9c85034c345 b21dcc1d91bfce17 a1808467aed93f17
+flight | b87c4881 0 | 246a723a3d36614d 63d1f19ac1eeba96 cd0a0dc8de737227
+flight | c96a9cb2 2 | fault
+flight | f9ebb078 5 | 2f132520e4a19042 9950825ef9a94096 8acc7d3a3b46e483

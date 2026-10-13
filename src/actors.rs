@@ -475,7 +475,7 @@ impl Machine {
 
     /// 2826:0A87. Whether an actor stands on square `sq` (by the squares
     /// table); its index goes to OCCUPANT (0xFFFF if none).
-    fn square_occupied(&mut self, sq: u16) -> bool {
+    pub(crate) fn square_occupied(&mut self, sq: u16) -> bool {
         self.mem.w16(DS, OCCUPANT, 0xFFFF);
         match (0..COUNT).find(|&i| self.mem.r16(DS, SQUARES + 2 * i) == sq) {
             Some(i) => {
