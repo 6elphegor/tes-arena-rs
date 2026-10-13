@@ -436,7 +436,7 @@ impl Machine {
     /// 0000:2054. Puts the actor on a random free square 0x800..0xBFF
     /// units from the player, inside the map, at its centre; a person
     /// also gets a new record number (random) and heading (a quarter).
-    fn actor_respawn(&mut self, si: u16) -> Option<()> {
+    pub(crate) fn actor_respawn(&mut self, si: u16) -> Option<()> {
         for _ in 0..RESPAWN_LIMIT {
             let h = self.rng.next() & 0x1FF;
             let r1 = ((self.rng.next() & 0x3FF) + 0x800) as i16 as i32;

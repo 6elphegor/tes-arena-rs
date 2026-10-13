@@ -116,6 +116,19 @@ No game code or data is included: everything is loaded from your own copy.
   town (a crime that may bring the guards), or bashing a breakable flat
   or a locked door by the blow's damage and strength. The bow's shot and
   the drawing of the hands are hooks.
+- `src/frame.rs` – the world loop's frame body (0000:481E): the detail
+  and debug keys, the acceleration's decay, walking and turning speeds
+  from speed and fatigue, the wilderness flats, levitation and the light
+  radius, the weapon, the message and guards' countdowns, drowning, a
+  holiday's message, breath in deep water, the night's creatures in
+  towns, the clock (a minute every 90 timer ticks) and the hurt flash.
+  Drawing, sound, menus and message boxes are `FrameHooks`.
+- `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
+  without its drawing): actors and projectiles, physics with the input
+  step (`Input::Classic` or `Input::Steer`), the wall spells' squares,
+  the frame body, a pending INF. `Engine::view` gives the renderer the
+  player's position, heading, light, time of day and message;
+  `examples/play.rs` runs it on a level with scripted modern controls.
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation

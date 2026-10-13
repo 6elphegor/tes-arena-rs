@@ -336,7 +336,10 @@ impl Machine {
     /// builds; going back is at half speed. Nothing moving, the speed is
     /// 0 at once (as with the keys and the cursor in the centre).
     fn intent_step(&mut self, files: &mut Files, it: &Intent) -> Option<()> {
-        let f = self.mem.r16(DS, 0x05E0) & !0x2000;
+        // Moving or turning holds 5E0 bit 2000h as the arrow keys do, so
+        // the frame body doesn't brake the acceleration.
+        let held = it.forward != 0 || it.strafe != 0 || it.turn != 0;
+        let f = self.mem.r16(DS, 0x05E0) & !0x2000 | if held { 0x2000 } else { 0 };
         self.mem.w16(DS, 0x05E0, f);
         if it.look != 0 {
             self.turn(it.look as u16);
