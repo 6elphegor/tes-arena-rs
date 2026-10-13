@@ -81,7 +81,8 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>, env: [bool; 5], h:
         "tick_effects" => m.tick_effects(h),
         "apply_disease" => drop(m.apply_disease(reg("ds"), reg("si"), reg("ax"))?),
         "creature_special_attack" => m.creature_special_attack(reg("ds"), reg("si"), armoured)?,
-        "weapon_enchantments" => drop(out.insert("ax", m.weapon_enchantments(reg("ax"), h85, h88) as u32)),
+        // The harness's 7C69 stub leaves SI at 0212, and 021B is stubbed.
+        "weapon_enchantments" => drop(out.insert("ax", m.weapon_enchantments(reg("ax"), h85, h88.then_some(0x212)).0 as u32)),
         "vampiric_heal" => m.vampiric_heal(reg("ax"), h84),
         "drain_death_check" => m.drain_death_check(h),
         "rebase_drain_snapshots" => m.rebase_drain_snapshots(reg("ax"), reg("bx")),

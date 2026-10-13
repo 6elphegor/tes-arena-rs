@@ -45,7 +45,7 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>, g: &Gear) -> Optio
             let g = Gear { missile_cx: m.mem.r8(att.seg, att.off + 6) as u16, ..*g };
             (Some(m.critical_multiplier(att, &g)), None)
         }
-        "weapon_damage" => (Some(m.weapon_damage(reg("ds"), reg("es"), reg("ax"), g)?), None),
+        "weapon_damage" => (Some(m.weapon_damage(reg("ds"), reg("es"), reg("ax"), g)?.0), None),
         "weapon_wear" => (Some(m.weapon_wear(p("ds", "si"), reg("es"), reg("ax"))), None),
         "creature_damage_taken" => (Some(m.creature_damage_taken(reg("ax"))), None),
         "creature_damage" => (Some(m.creature_damage(p("ds", "si"))?), None),

@@ -212,7 +212,7 @@ impl Machine {
 
     /// 2AA1:0298. Creature types 0x11..0x13 need a weapon with a material
     /// of at least type-0x11+3. Returns (can hurt, type index or FFFF).
-    fn special_low(&self, weapon: Ptr) -> (bool, u16) {
+    pub(crate) fn special_low(&self, weapon: Ptr) -> (bool, u16) {
         let mon = self.creature_target();
         let ty = self.rec_b(mon, 4);
         if !self.is_creature(mon) || !(0x11..=0x13).contains(&ty) {
@@ -225,7 +225,7 @@ impl Machine {
 
     /// 2AA1:02DB. Creature types 0x14 and up need a minimum material from
     /// a table (read through the weapon's segment). Returns (can hurt, AX).
-    fn special_high(&self, weapon: Ptr) -> (bool, u16) {
+    pub(crate) fn special_high(&self, weapon: Ptr) -> (bool, u16) {
         let mon = self.creature_target();
         let ty = self.rec_b(mon, 4);
         if !self.is_creature(mon) || ty < 0x14 {
@@ -261,7 +261,7 @@ impl Machine {
     /// byte (read through `es`) has bit 0x80. When the weapon can't hurt
     /// a special creature, the type index left in AX is used as the wear
     /// instead. A condition that drops to 0, or below 0 by less than
-    /// 15536, breaks the weapon (the message is not ported).
+    /// 15536, breaks the weapon (`wear_item` handles that).
     pub fn weapon_wear(&mut self, weapon: Ptr, es: u16, damage: u16) -> u16 {
         let mut saved = damage;
         let (cf, t) = self.special_low(weapon);
@@ -328,10 +328,12 @@ impl Machine {
     ///
     /// Rolls the weapon's (or fists') damage range, adds the weapon bonus
     /// and the damage modifier (+39), multiplies by `mult` (criticals),
-    /// then applies the Ranger bonus and weapon wear. Bare-handed with
+    /// then applies the Ranger bonus and weapon wear. Also returns the
+    /// weapon if it is the player's (DS = FS = DGROUP) and wore to 0: it
+    /// breaks then (2AA1:021B, `item_broken`, the caller's). Bare-handed with
     /// flag 5CA bit 0x20 set, the player loses 1 HP 80% of the time.
     /// None where the original divides by zero (min == max).
-    pub fn weapon_damage(&mut self, seg: u16, es: u16, mult: u16, gear: &Gear) -> Option<u16> {
+    pub fn weapon_damage(&mut self, seg: u16, es: u16, mult: u16, gear: &Gear) -> Option<(u16, Option<u16>)> {
         let (lo, hi) = match gear.weapon {
             Some(w) => {
                 let w = Ptr::new(seg, w);
@@ -355,7 +357,13 @@ impl Machine {
             dmg = self.ranger_bonus(att, dmg);
         }
         match gear.weapon {
-            Some(w) => dmg = self.weapon_wear(Ptr::new(seg, w), es, dmg),
+            Some(w) => {
+                let w = Ptr::new(seg, w);
+                dmg = self.weapon_wear(w, es, dmg);
+                if seg == DS && self.rec_w(w, item::HEALTH) == 0 {
+                    return Some((dmg, Some(w.off)));
+                }
+            }
             None => {
                 if self.mem.r16(DS, var::FLAGS_5CA) & 0x20 != 0 && self.percent() >= 20 {
                     let hp = self.mem.r16(DS, var::PLAYER_HP).wrapping_sub(1);
@@ -363,7 +371,7 @@ impl Machine {
                 }
             }
         }
-        Some(dmg)
+        Some((dmg, None))
     }
 
     /// 2AA1:0325. Creature type 7 takes half damage while DGROUP 0D49 is

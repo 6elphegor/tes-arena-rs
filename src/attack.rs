@@ -72,9 +72,10 @@ impl Machine {
         } else {
             let mult = self.person_critical(att);
             let gear = self.attacker_gear(att);
-            self.weapon_damage(att.seg, DS, mult, &gear)?
+            // A person's weapon is in the creature segment: it can't break.
+            self.weapon_damage(att.seg, DS, mult, &gear)?.0
         };
-        let damage = self.armor_wear(location, damage)?;
+        let damage = self.armor_wear(DS, PLAYER, location, damage)?;
         // 0000:07F7
         if self.mem.r16(DS, avar::PALETTE_LOCK) == 0 {
             self.mem.w16(DS, avar::PALETTE, if damage >= 15 { 0x3C42 } else { 0x3C62 });
@@ -107,22 +108,24 @@ impl Machine {
         Gear { weapon: Some(w), weapon_bonus: self.weapon_bonus(att.seg, att.off), ..Gear::default() }
     }
 
-    /// 2AA1:046E. The armour at the hit location takes wear: a shield
-    /// covering it, else the piece worn there. When a shield doesn't
-    /// cover the location the search starts from the shield's slot.
-    /// Returns the damage (doubled by `weapon_wear` in its odd case).
-    fn armor_wear(&mut self, location: u16, damage: u16) -> Option<u16> {
-        let slots = PLAYER + crate::inventory::SLOTS;
-        let (covered, si) = self.shield_at(DS, slots, location);
+    /// 2AA1:046E. The armour of record `rec` at the hit location takes
+    /// wear: a shield covering it, else the piece worn there (looked up
+    /// through the player's slot offsets, in `seg`). When a shield
+    /// doesn't cover the location the search starts from the shield's
+    /// slot. Returns the damage (doubled by `weapon_wear` in its odd
+    /// case). ES is DGROUP throughout.
+    pub(crate) fn armor_wear(&mut self, seg: u16, rec: u16, location: u16, damage: u16) -> Option<u16> {
+        let slots = rec.wrapping_add(crate::inventory::SLOTS);
+        let (covered, si) = self.shield_at(seg, slots, location);
         let piece = if covered {
             si
         } else {
-            match self.find_player_equipped(DS, si, location, 0) {
+            match self.find_player_equipped(seg, si, location, 0) {
                 (true, p) => p,
                 _ => return Some(damage),
             }
         };
-        self.wear_item(Ptr::new(DS, piece), DS, damage)
+        self.wear_item(Ptr::new(seg, piece), DS, damage)
     }
 
     /// `weapon_wear`, then 2AA1:01EF: an item of the player's (DS =
@@ -152,32 +155,7 @@ impl Machine {
         let flags = self.mem.r8(DS, si.wrapping_add(item::FLAGS));
         self.mem.w8(DS, si.wrapping_add(item::FLAGS), flags | item::UNIDENTIFIED);
         let name = self.item_name(DS, si)?;
-        // sprintf(7979, "Your %s is broken.", name)
-        let mut di = avar::MESSAGE_BUF;
-        let mut put = |m: &mut Self, src: u16| {
-            let mut p = src;
-            loop {
-                let c = m.mem.r8(DS, p);
-                if c == 0 {
-                    break;
-                }
-                if c == b'%' && src == avar::BROKEN_FORMAT && m.mem.r8(DS, p.wrapping_add(1)) == b's' {
-                    let mut q = name;
-                    while m.mem.r8(DS, q) != 0 {
-                        m.mem.w8(DS, di, m.mem.r8(DS, q));
-                        di = di.wrapping_add(1);
-                        q = q.wrapping_add(1);
-                    }
-                    p = p.wrapping_add(2);
-                    continue;
-                }
-                m.mem.w8(DS, di, c);
-                di = di.wrapping_add(1);
-                p = p.wrapping_add(1);
-            }
-        };
-        put(self, avar::BROKEN_FORMAT);
-        self.mem.w8(DS, di, 0);
+        self.sprintf_s((DS, avar::MESSAGE_BUF), (DS, avar::BROKEN_FORMAT), &[(DS, name)]);
         self.mem.w16(DS, avar::MESSAGE, avar::MESSAGE_BUF);
         self.mem.w16(DS, avar::MESSAGE + 2, DS);
         self.mem.w16(DS, avar::MESSAGE_TIME, 0x1E);

@@ -29,7 +29,8 @@ CLASS_IDS = list(a.mu.mem_read(a.lin(a.ds, 0x2A50), 18))
 def patch(seg, off, code):
     a.mu.mem_write(a.lin(LOAD_SEG + seg, off), bytes(code))
 
-# UI calls: critical-hit message and weapon-broken message.
+# UI calls: the critical-hit message, and the broken-item message
+# (tests/strike.rs covers it).
 patch(0x292B, 0x047C, [0xCB])
 patch(0x2AA1, 0x021B, [0xCB])
 
@@ -163,7 +164,8 @@ for _ in range(400):
     case('critical_multiplier', crit, near(0x0852), gear(), ds=SEG[ak], si=ao)
 
     ak, ao, dk, do = pair()
-    io = 0xF000 if ak == 'd' else 0x0800
+    # The player's item is in an inventory slot, as a broken one leaves it.
+    io = 0x0212 + 0x13 * rng.randrange(40) if ak == 'd' else 0x0800
     g = list(gear())
     choice = rng.random()
     if choice < 0.6:
@@ -190,7 +192,7 @@ for _ in range(400):
     ty = rng.choice([0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 7, 10])
     need = ty - 0x11 + 3 if ty <= 0x13 else rng.randint(0, 8)
     mat = rng.choice([need - 1, need, need + 1, 2, 0xFF]) & 0xff
-    io = rng.choice([(DS, 'd', 0xF000), (MSEG, 'm', 0x0800)])
+    io = rng.choice([(DS, 'd', 0x0212 + 0x13 * rng.randrange(40)), (MSEG, 'm', 0x0800)])
     target = [('D', 0x1042, 2, MSEG)] + rec('m', 0, [
         (4, 1, ty), (0x40D, 2, rng.getrandbits(16) | (0x1000 if rng.random() < 0.9 else 0))])
     wpn = rec(io[1], io[2], [

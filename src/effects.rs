@@ -20,8 +20,9 @@
 //! The record flags word (+40D) carries one bit per effect kind, and
 //! +40F.. counts how many slots hold each kind (see `EFFECT_BITS`).
 //!
-//! The kill handler (2AA1:06A0) and the player-death handler
-//! (2686:02B4) are not ported; they are reached through `FxHooks`.
+//! The kill handler (2AA1:06A0), the player-death handler (2686:02B4)
+//! and the reflected-spell flash are reached through `FxHooks`, which
+//! tests stub; `crate::strike::GameHooks` is the game's.
 
 use crate::character::field::*;
 use crate::machine::Machine;
@@ -159,7 +160,7 @@ pub mod spell_flag {
 /// Size of a creature record in the creature segment.
 pub const CREATURE_SIZE: u16 = 0x41E;
 
-/// Handlers the effect code calls but that are not ported here.
+/// Handlers the effect code calls (see `crate::strike::GameHooks`).
 pub trait FxHooks {
     /// 2AA1:06A0, the kill handler, after a record's HP changed (it
     /// checks for death and awards XP). Returns its carry flag.
@@ -309,30 +310,7 @@ impl Machine {
             };
             vec![(DATA, IS), name, (DATA, effect)]
         };
-        // sprintf(1405, format, ...): the formats hold only %s.
-        let mut di = var::MESSAGE_TEXT;
-        let (fseg, mut p) = parts[0];
-        let mut args = parts[1..].iter();
-        loop {
-            let c = self.mem.r8(fseg, p);
-            if c == 0 {
-                break;
-            }
-            if c == b'%' && self.mem.r8(fseg, p.wrapping_add(1)) == b's' {
-                let &(aseg, mut q) = args.next().expect("format arguments");
-                while self.mem.r8(aseg, q) != 0 {
-                    self.mem.w8(DS, di, self.mem.r8(aseg, q));
-                    di = di.wrapping_add(1);
-                    q = q.wrapping_add(1);
-                }
-                p = p.wrapping_add(2);
-                continue;
-            }
-            self.mem.w8(DS, di, c);
-            di = di.wrapping_add(1);
-            p = p.wrapping_add(1);
-        }
-        self.mem.w8(DS, di, 0);
+        self.sprintf_s((DS, var::MESSAGE_TEXT), parts[0], &parts[1..]);
         self.mem.w8(DS, var::MESSAGE, 0x0F);
     }
 
@@ -779,27 +757,29 @@ impl Machine {
     }
 
     /// 2AA1:08DC. Player weapon enchantments on a hit for `damage`:
-    /// `has_85`/`has_88` are 1194:7C69 for enchantments 0x85 and 0x88 on
-    /// the equipped items. Either triples the damage; 0x88 also tries to
-    /// paralyse the defender (DGROUP 1402 in the creature segment) for 10
-    /// on a percent roll under the player's TIER_C, costing the weapon at
-    /// DGROUP 0212 800 condition (a broken-weapon message is not shown).
-    pub fn weapon_enchantments(&mut self, damage: u16, has_85: bool, has_88: bool) -> u16 {
+    /// `has_85` is 1194:7C69 for enchantment 0x85 on the equipped items,
+    /// `item_88` the item 7C69 finds for 0x88 (looked for only without
+    /// 0x85). Either triples the damage; 0x88 also tries to paralyse the
+    /// defender (DGROUP 1402 in the creature segment) for 10 on a percent
+    /// roll under the player's TIER_C, costing that item 800 condition.
+    /// Also returns the item if that wore it to 0 or below, which then
+    /// breaks (2AA1:021B, the caller's).
+    pub fn weapon_enchantments(&mut self, damage: u16, has_85: bool, item_88: Option<u16>) -> (u16, Option<u16>) {
+        let mut broken = None;
         if !has_85 {
-            if !has_88 {
-                return damage;
-            }
+            let Some(it) = item_88 else { return (damage, None) };
             let seg = self.mem.r16(DS, var::CREATURE_SEG);
             let off = self.mem.r16(DS, var::DEFENDER);
             let flags = self.fx_flags(seg, off);
             let immune = self.mem.r8(seg, off.wrapping_add(CLASS)) == 0x11 && flags & FLAG_CREATURE == 0;
             if !immune && (self.percent() as u8) < self.mem.r8(DS, crate::character::PLAYER + TIER_C) {
                 self.apply_effect(seg, off, PARALYSIS, 1, 10, 1, B_FREE_AT_ONCE);
-                let weapon = crate::character::PLAYER + rec::ITEMS;
-                self.fx_add16(DS, weapon + 6, 800u16.wrapping_neg());
+                if self.fx_add16(DS, it.wrapping_add(6), 800u16.wrapping_neg()) as i16 <= 0 {
+                    broken = Some(it);
+                }
             }
         }
-        damage.wrapping_mul(3)
+        (damage.wrapping_mul(3), broken)
     }
 
     /// 2AA1:0956. With enchantment 0x84 (`has_84`), the player heals half

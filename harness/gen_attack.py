@@ -27,8 +27,6 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG, DGROUP
 
-EXE, OUT = sys.argv[1:3]
-out = open(OUT, 'w', buffering=1)
 CSEG, PLAYER, RSIZE = 0x7800, 0x01A4, 0x500
 
 
@@ -46,9 +44,10 @@ def stream(seed):
         yield x >> 16 & 0xFF
 
 
-def setup(seed, k, classes):
-    """(segment or None for DGROUP, offset, bytes) writes, in order.
-    Mirrored in tests/attack.rs."""
+def setup(seed, k, classes, extra=None):
+    """(segment or None for DGROUP, offset, bytes) writes, in order;
+    `extra(byte, word, w)` continues the stream. Mirrored in
+    tests/common/blow.rs."""
     s = stream(seed)
     byte = lambda: next(s)
     word = lambda: byte() | byte() << 8
@@ -133,74 +132,83 @@ def setup(seed, k, classes):
         elif o == 0x1949:
             v = bytes([0, 0]) if v[0] < 0xC0 else v
         w.append((None, o, v))
+    if extra:
+        extra(byte, word, w)
     return w
 
 
-a = Arena(EXE)
-for seg, off in [(0x23BA, 0x002A), (0x1194, 0xA36C)]:
-    a.mu.mem_write(a.lin(LOAD_SEG + seg, off), b'\xcb')
-a.w16(0x1042, CSEG)
-a.w16(0x91F0, 0)
-CLASSES = list(a.mu.mem_read(a.lin(a.ds, 0x2A50), 18))
-BASE_DS = a.seg_bytes(a.ds)
-BASE_C = bytes(0x10000)
+def main():
+    EXE, OUT = sys.argv[1:3]
+    out = open(OUT, 'w', buffering=1)
+    a = Arena(EXE)
+    for seg, off in [(0x23BA, 0x002A), (0x1194, 0xA36C)]:
+        a.mu.mem_write(a.lin(LOAD_SEG + seg, off), b'\xcb')
+    a.w16(0x1042, CSEG)
+    a.w16(0x91F0, 0)
+    CLASSES = list(a.mu.mem_read(a.lin(a.ds, 0x2A50), 18))
+    BASE_DS = a.seg_bytes(a.ds)
+    BASE_C = bytes(0x10000)
 
 
-RELOC = [0x061C] + [0x0660 + i * 0x3C + 0x2A for i in range(16)]
+    RELOC = [0x061C] + [0x0660 + i * 0x3C + 0x2A for i in range(16)]
 
 
-def relocate():
-    """Effect slots aimed at the player hold DGROUP's segment."""
-    for o in RELOC:
-        if a.r16(o) == DGROUP:
-            a.w16(o, a.ds)
+    def relocate():
+        """Effect slots aimed at the player hold DGROUP's segment."""
+        for o in RELOC:
+            if a.r16(o) == DGROUP:
+                a.w16(o, a.ds)
 
 
-def unrelocated(mem):
-    """DGROUP bytes with its segment image-relative where it is stored."""
-    mem = bytearray(mem)
-    for o in RELOC:
-        if struct.unpack_from('<H', mem, o)[0] == a.ds:
-            struct.pack_into('<H', mem, o, DGROUP)
-    return bytes(mem)
+    def unrelocated(mem):
+        """DGROUP bytes with its segment image-relative where it is stored."""
+        mem = bytearray(mem)
+        for o in RELOC:
+            if struct.unpack_from('<H', mem, o)[0] == a.ds:
+                struct.pack_into('<H', mem, o, DGROUP)
+        return bytes(mem)
 
 
-SPECIAL = [3, 9] + list(a.mu.mem_read(a.lin(a.ds, 0x82BB), 4))
+    SPECIAL = [3, 9] + list(a.mu.mem_read(a.lin(a.ds, 0x82BB), 4))
 
 
-def special(k, ty):
-    """A special case: the attacker is a creature of type `ty` (one that
-    paralyses or spreads disease), the player has TIER_B 255 and no
-    immunity flag."""
-    return [(CSEG, k * RSIZE + 4, bytes([ty])), (CSEG, k * RSIZE + 0x40D, struct.pack('<H', 0x1000)),
-            (None, PLAYER + 0x62, b'\xff'), (None, 0x05BE, b'\0\0')]
+    def special(k, ty):
+        """A special case: the attacker is a creature of type `ty` (one that
+        paralyses or spreads disease), the player has TIER_B 255 and no
+        immunity flag."""
+        return [(CSEG, k * RSIZE + 4, bytes([ty])), (CSEG, k * RSIZE + 0x40D, struct.pack('<H', 0x1000)),
+                (None, PLAYER + 0x62, b'\xff'), (None, 0x05BE, b'\0\0')]
 
 
-seed_rng = __import__('random').Random(0x1994_00D8)
-for n in range(4000):
-    seed = seed_rng.getrandbits(32)
-    k = seed_rng.randrange(8)
-    ty = SPECIAL[seed_rng.randrange(len(SPECIAL))] if n >= 3000 else None
-    a.mu.mem_write(a.lin(a.ds, 0), BASE_DS)
-    a.mu.mem_write(a.lin(CSEG, 0), BASE_C)
-    for seg, off, data in setup(seed, k, CLASSES) + (special(k, ty) if ty is not None else []):
-        a.mu.mem_write(a.lin(a.ds if seg is None else seg, off), data)
-    a.w16(0x1400, k * RSIZE)
-    a.w16(0x1402, PLAYER)
-    relocate()
-    before = unrelocated(a.seg_bytes(a.ds))
-    try:
-        a._setup([0, STUB_SEG], {})
-        a._run(0x2AA1, 0x00D8, STUB_SEG, 0)
-        after = unrelocated(a.seg_bytes(a.ds))
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
-        res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
-    except Fault:
-        res = 'fault'
-    except AssertionError:
-        res = 'hang'
-    if ty is None:
-        out.write(f'creature | {seed:x} {k} | {res}\n')
-    else:
-        out.write(f'special | {seed:x} {k} {ty:x} | {res}\n')
-out.close()
+    seed_rng = __import__('random').Random(0x1994_00D8)
+    for n in range(4000):
+        seed = seed_rng.getrandbits(32)
+        k = seed_rng.randrange(8)
+        ty = SPECIAL[seed_rng.randrange(len(SPECIAL))] if n >= 3000 else None
+        a.mu.mem_write(a.lin(a.ds, 0), BASE_DS)
+        a.mu.mem_write(a.lin(CSEG, 0), BASE_C)
+        for seg, off, data in setup(seed, k, CLASSES) + (special(k, ty) if ty is not None else []):
+            a.mu.mem_write(a.lin(a.ds if seg is None else seg, off), data)
+        a.w16(0x1400, k * RSIZE)
+        a.w16(0x1402, PLAYER)
+        relocate()
+        before = unrelocated(a.seg_bytes(a.ds))
+        try:
+            a._setup([0, STUB_SEG], {})
+            a._run(0x2AA1, 0x00D8, STUB_SEG, 0)
+            after = unrelocated(a.seg_bytes(a.ds))
+            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
+        except Fault:
+            res = 'fault'
+        except AssertionError:
+            res = 'hang'
+        if ty is None:
+            out.write(f'creature | {seed:x} {k} | {res}\n')
+        else:
+            out.write(f'special | {seed:x} {k} {ty:x} | {res}\n')
+    out.close()
+
+
+if __name__ == '__main__':
+    main()
