@@ -94,6 +94,12 @@ No game code or data is included: everything is loaded from your own copy.
   states and the sprite seen, blows at the player, and casting (people
   pick an affordable spell, creatures one of theirs). Sound and the draw
   list are not ported.
+- `src/clock.rs` – the game clock (0000:142D): minutes pass one at a
+  time, the calendar is recomputed and each changed field's handler runs:
+  the minute tick (auras, timed spell flags, effects, the drain check,
+  countdowns, level-up, fatigue, encounter checks), the day (weather,
+  Knights' repairs), the hour; and the sky's time of day. Quests,
+  encounters, the level-up screen and exhaustion go through `ClockHooks`.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).

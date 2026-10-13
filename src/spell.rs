@@ -691,17 +691,13 @@ impl Machine {
         self.kill_check(seg, off).map(drop)
     }
 
-    /// 2CDD:09E0. The target's block in the timed-spell-flag table: the
-    /// player's (DGROUP:01A4), or that of the creature slot (of the 8 at
-    /// 0C57) showing it. None where the original hits its INT 3.
+    /// 2CDD:09E0 (`spell_flag_table`): the target's block in the
+    /// timed-spell-flag table. For a record that is neither the player
+    /// nor in an active creature slot the original executes an INT 3 (a
+    /// no-op under DOS) and goes on with the record's segment and offset
+    /// 0D37.
     fn timer_block(&self, seg: u16, off: u16) -> Option<(u16, u16)> {
-        let (toff, tseg) = (self.mem.r16(DS, svar::TIMERS), self.mem.r16(DS, svar::TIMERS + 2));
-        if seg == DS && off == PLAYER {
-            return Some((tseg, toff));
-        }
-        (0..8u16)
-            .find(|&k| self.mem.r16(DS, 0x0C57 + k * 0x1C + 0x12) == off && seg == self.mem.r16(DS, 0x1042))
-            .map(|k| (tseg, toff.wrapping_add(0x40).wrapping_add(k << 6)))
+        Some(self.spell_flag_table(seg, off))
     }
 
     /// 2CDD:0885. The target's timer block (as FS:DI) and `h089a` × +6 +

@@ -72,8 +72,7 @@ class DosArena(Arena):
             return
         if intno == 0x67 and self._ems_call():
             return
-        self.fault = intno
-        mu.emu_stop()
+        super()._intr(mu, intno, _)
 
     def _set_cf(self, cf):
         f = self.mu.reg_read(UC_X86_REG_EFLAGS)

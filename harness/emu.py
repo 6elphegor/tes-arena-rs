@@ -28,7 +28,17 @@ class Arena:
         self.fault = None
         self.mu.hook_add(UC_HOOK_INTR, self._intr)
 
+    # INT 3s the game itself executes, which DOS's default handler makes
+    # no-ops (CS:IP after them, image-relative): 2EBD:0696 in the effect
+    # tick and 2CDD:0A1B in the timed-flag lookup. Elsewhere an INT 3 is
+    # a harness stub marking a fault.
+    GAME_INT3 = {(0x2EBD, 0x0697), (0x2CDD, 0x0A1C)}
+
     def _intr(self, mu, intno, _):
+        if intno == 3:
+            at = (mu.reg_read(UC_X86_REG_CS) - LOAD_SEG, mu.reg_read(UC_X86_REG_IP))
+            if at in self.GAME_INT3:
+                return
         self.fault = intno
         mu.emu_stop()
 

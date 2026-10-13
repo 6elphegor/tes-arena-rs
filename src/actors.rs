@@ -123,7 +123,7 @@ mod f {
 /// The approximate length of (`a`, `b`): the larger plus a quarter of
 /// the smaller (0000:122A, without the subtraction it is sometimes used
 /// for).
-fn approx(a: u16, b: u16) -> u16 {
+pub(crate) fn approx(a: u16, b: u16) -> u16 {
     let (a, b) = (if (a as i16) < 0 { a.wrapping_neg() } else { a }, if (b as i16) < 0 { b.wrapping_neg() } else { b });
     let (lo, hi) = if a < b { (a, b) } else { (b, a) };
     (lo >> 2).wrapping_add(hi)

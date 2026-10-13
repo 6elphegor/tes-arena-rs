@@ -6,6 +6,7 @@ pub mod attack;
 pub mod bsa;
 pub mod character;
 pub mod city;
+pub mod clock;
 pub mod combat;
 pub mod creature;
 pub mod dice;
