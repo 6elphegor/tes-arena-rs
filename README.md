@@ -129,7 +129,11 @@ No game code or data is included: everything is loaded from your own copy.
   and the creatures placed in the free creature slots around the player
   (25CA:006A: a random free square near the player, facing the player);
   the guards arriving (1194:33C0: one to three named guards of the
-  province's race, rank and level, in armour with a weapon and shield).
+  province's race, rank and level, in armour with a weapon and shield);
+  random encounters (1194:887A: the area's chance, a row of the table by
+  area and night, an entry by the player's level; monsters, or people
+  with their equipment, 24FA:0313). The quests' encounters (86F2) are
+  not ported.
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the wall spells' squares,

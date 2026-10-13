@@ -27,6 +27,8 @@ pub mod var {
     pub const MUSIC: u16 = 0x100D;
     /// Tries at the current spread (`place_near`).
     pub const TRIES: u16 = 0xA886;
+    /// Whether it is night for an encounter (1238).
+    pub const NIGHT: u16 = 0x1238;
     /// The guards' rank and level.
     pub const GUARD_RANK: u16 = 0x1294;
     pub const GUARD_LEVEL: u16 = 0x1298;
@@ -298,6 +300,451 @@ impl Machine {
             self.mem.w8(seg, di.wrapping_add(i), b);
         }
         di.wrapping_add(0x13)
+    }
+
+    /// 1194:887A, hourly from the clock: a random encounter. Not during
+    /// a quest's scene (5CA bit 200h), a fight (0FF7, 0FFB), or inside a
+    /// building's square; the area's chance (`encounter_odds`, 25% on the
+    /// nights of days F3h and 11Bh) against d100 picks a row of the
+    /// encounter table (7 more at night), and `encounter` brings it.
+    /// None where unported code is met (a quest's encounter, 5C8 bit
+    /// 8000h) or a roll faults.
+    pub fn random_encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks) -> Option<()> {
+        if self.mem.r16(DS, 0x05CA) & 0x200 != 0 || self.mem.r16(DS, 0x0FF7) != 0 || self.mem.r16(DS, 0x0FFB) != 0 {
+            return Some(());
+        }
+        if self.in_building() {
+            return Some(());
+        }
+        let night = self.night();
+        self.mem.w16(DS, NIGHT, night);
+        let (mut chance, row) = self.encounter_odds(night);
+        if chance != 0 && self.night() != 0 {
+            let day = self.mem.r32(DS, 0x05CC) % 518_400 / 1440;
+            if day == 0xF3 || day == 0x11B {
+                chance = 0x19;
+            }
+        }
+        if chance == 0 {
+            return Some(());
+        }
+        let roll = self.rng.next() % 100;
+        if roll as u8 >= chance as u8 {
+            return Some(());
+        }
+        let mut row = row;
+        if self.mem.r16(DS, NIGHT) != 0 {
+            row = row.wrapping_add(7);
+        }
+        let f = self.mem.r16(DS, 0x05C8) & !0x1000;
+        self.mem.w16(DS, 0x05C8, f);
+        self.mem.w16(DS, GUARD_RANK, 1);
+        if row > 0xC {
+            return Some(());
+        }
+        self.encounter(files, hooks, row)
+    }
+
+    /// 1194:8F09. The player's square is a building's (a wall word above
+    /// 0 with differing bytes: a raised platform).
+    fn in_building(&self) -> bool {
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        let w = self.mem.r16(walls, self.mem.r16(DS, 0xCB90));
+        (w as i16) > 0 && (w >> 8) as u8 != w as u8
+    }
+
+    /// 1194:561C. 1 at night (before 6 or from 18 o'clock).
+    fn night(&self) -> u16 {
+        let h = self.mem.r16(DS, 0x05D6);
+        (!(6..0x12).contains(&h)) as u16
+    }
+
+    /// 1194:88DA. The encounter chance (d100 under it) and the table row
+    /// by area kind (5E6): towns and the like by the table at 6810 (5 on
+    /// with an overlay up, 1013), the wild by its terrain (A50) and night;
+    /// dungeons (kind 4) by their kind (D48): 8 only with an overlay,
+    /// above 8 as kind 3, below 8 only once 191D is set (a flat 14h).
+    /// NIGHT gets what the table's choice leaves in AX.
+    fn encounter_odds(&mut self, night: u16) -> (u16, u16) {
+        let mut dx = 7u16;
+        let mut bx = self.mem.r8(DS, 0x05E6) as u16;
+        let overlay = self.mem.r8(DS, 0x1013) != 0;
+        let mut ax = night;
+        let table = |m: &mut Machine, bx: u16, ax: u16, dx: u16| {
+            let chance = m.mem.r8(DS, 0x6810u16.wrapping_add(bx)) as u16;
+            m.mem.w16(DS, NIGHT, ax);
+            (chance, dx)
+        };
+        if bx as u8 == 4 {
+            let kind = self.mem.r8(DS, 0x0D48) as u16;
+            if kind >= 8 {
+                if kind == 8 {
+                    self.mem.w16(DS, NIGHT, 1);
+                    if overlay {
+                        return table(self, 7, 0, dx);
+                    }
+                    return (0, dx);
+                }
+                bx = 3;
+            } else {
+                if self.mem.r8(DS, 0x191D) == 0 {
+                    return (0, dx);
+                }
+                if kind != 7 {
+                    dx = 6;
+                }
+                self.mem.w16(DS, NIGHT, 0);
+                return (0x14, dx);
+            }
+        }
+        if bx >= 2 {
+            ax = 0;
+            if overlay {
+                bx += 5;
+            }
+            return table(self, bx, ax, dx);
+        }
+        dx = 6;
+        if bx == 1 {
+            dx = self.mem.r8(DS, 0x0A50) as u16;
+        } else {
+            ax = 0;
+        }
+        if self.mem.r16(DS, NIGHT) != 0 {
+            bx += 5;
+        }
+        table(self, bx, ax, dx)
+    }
+
+    /// 1194:89D4 (row 0..12; the quests' FFFFh is not ported). By the
+    /// player's level an entry of the row is chosen (`encounter_entry`);
+    /// a creature a quest waits for (1194:A19C, A1D1) doesn't come, nor
+    /// another kind than those already fighting; otherwise the creatures
+    /// are made (`encounter_spawn`), named (`encounter_text`), and placed.
+    fn encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, row: u16) -> Option<()> {
+        self.mem.w16(DS, 0x12AC, 0);
+        let level = self.mem.r8(DS, 0x01AA) as u16;
+        if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 {
+            return None;
+        }
+        let si = self.encounter_entry(level, row)?;
+        let data = crate::mem::DATA;
+        let ty = self.mem.r8(data, si.wrapping_add(1));
+        if self.quest_matching(6, 0x30, ty).is_some() || self.quest_matching(4, 0x2F, ty).is_some() {
+            return Some(());
+        }
+        if self.mem.r16(DS, FIGHTING) != 0 {
+            let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
+            let cur = if self.mem.r16(seg, 0x40D) & 0x1000 != 0 {
+                self.mem.r8(seg, 4)
+            } else {
+                self.mem.r8(seg, 5).wrapping_add(0x18)
+            };
+            if ty != cur {
+                return Some(());
+            }
+        }
+        let n = self.encounter_spawn(files, si)?;
+        let people = self.encounter_text(hooks, n);
+        self.fight_prepare(files, hooks, people as u8)?;
+        self.place_creatures(n)
+    }
+
+    /// 1194:8A47. The entry for level + 1 (at most 20) in row `row` of the
+    /// table at 3276:40B8 (55h entries a row, each a level): a level near
+    /// it (`dice`-rolled, folded back below it), whose first two entries
+    /// in the row (A836, A838; as they were if fewer) are chosen between
+    /// at random. Returns the entry's offset in the list at 3276:455E (3
+    /// bytes: count, type, class).
+    fn encounter_entry(&mut self, level: u16, row: u16) -> Option<u16> {
+        let data = crate::mem::DATA;
+        let lv = (level + 1).min(0x14);
+        let si = 0x40B8u16.wrapping_add(row.wrapping_mul(0x55));
+        let mut v = crate::dice::roll(&mut self.rng, 4)?.wrapping_add(lv);
+        let mut ax;
+        loop {
+            // 1194:487E
+            let r = crate::dice::dice(&mut self.rng, v.wrapping_shl(1))?;
+            ax = if r > v { v.wrapping_sub(r.wrapping_sub(v)) } else { r };
+            let half = v >> 1;
+            if ax >= half {
+                break;
+            }
+            v = half.wrapping_add(half);
+            let _ = &mut v;
+        }
+        if ax == 0 {
+            ax = 1;
+        }
+        if self.mem.r8(DS, 0x01AA) == 0 && ax >= 2 {
+            ax = crate::dice::roll(&mut self.rng, 3)?;
+        }
+        let mut found = 0;
+        for k in 0..0x55u16 {
+            if self.mem.r8(data, si.wrapping_add(k)) == ax as u8 {
+                self.mem.w16(DS, 0xA836 + 2 * found, k);
+                found += 1;
+                if found == 2 {
+                    break;
+                }
+            }
+        }
+        let pick = if self.rng.next() & 1 != 0 { 0xA838 } else { 0xA836 };
+        let k = self.mem.r16(DS, pick);
+        Some(0x455Eu16.wrapping_add(k.wrapping_mul(3)))
+    }
+
+    /// 1194:8B8D. The entry's creatures, as many as it says but no more
+    /// than the free slots: monsters (types below 18h, and 2Ah) by
+    /// `spawn_monsters`, people by `spawn_people`. Returns the count.
+    fn encounter_spawn(&mut self, files: &mut Files, si: u16) -> Option<u16> {
+        let src = if self.mem.r16(DS, GUARD_RANK) != 0 { crate::mem::DATA } else { DS };
+        let mut n = self.mem.r8(src, si) as u16;
+        let free = self.usable_creature_slots();
+        if free == 0 {
+            return Some(0);
+        }
+        if free < n {
+            n = free;
+        }
+        let ty = self.mem.r8(src, si.wrapping_add(1)) as u16;
+        let f = self.mem.r16(DS, 0x05C8) & !8;
+        self.mem.w16(DS, 0x05C8, f);
+        if ty >= 0x18 && ty != 0x2A {
+            let level = self.mem.r8(src, si.wrapping_add(2)) as u16;
+            self.spawn_people(files, ty, level, n)?;
+        } else {
+            self.spawn_monsters(ty, n)?;
+        }
+        let f = self.mem.r16(DS, 0x05C8) & !8;
+        self.mem.w16(DS, 0x05C8, f);
+        Some(n)
+    }
+
+    /// 1194:8C13. `n` people of type `ty` (class from the table at 2A50
+    /// by type - 18h) at level `level`: the first built as a named NPC,
+    /// boosted, with spell points, gold and equipment (`npc_equip`); the
+    /// others are copies of it with their own gold.
+    fn spawn_people(&mut self, files: &mut Files, ty: u16, level: u16, n: u16) -> Option<()> {
+        self.mem.w16(DS, REMAP, 0);
+        self.mem.w16(DS, NEW_16, 0);
+        self.mem.w8(DS, MUSIC, 0xFF);
+        let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
+        let rec = self.alloc_creature_slot().map(|(r, _)| r).unwrap_or_else(|e| e);
+        let class = self.mem.r8(DS, 0x2A50u16.wrapping_add(ty.wrapping_sub(0x18))) as u16;
+        let seed = self.heap_alloc_high(0x10)?;
+        self.mem.w16(DS, 0x4198, seed);
+        self.npc_seed(seed, 0, class, level)?;
+        self.expand_npc_named(files, seed, 0, seg, rec)?;
+        let s = self.mem.r16(DS, 0x4198);
+        self.heap_free(s);
+        self.npc_level_boost(seg, rec);
+        if self.mem.r16(DS, 0x05CA) & 0x40 != 0 {
+            self.mem.w8(seg, rec.wrapping_add(7), 0);
+        }
+        self.npc_sorcerer_spell_points(seg, rec);
+        self.creature_gold_at(seg, rec)?;
+        self.npc_equip(seg, rec)?;
+        // `dec cx` then `loop`: a count of 0 makes 65535 copies.
+        let copies = n.wrapping_sub(1);
+        if copies == 0 {
+            return Some(());
+        }
+        self.mem.w16(DS, 0x12A8, rec);
+        for _ in 0..copies {
+            let di = self.alloc_creature_slot().map(|(r, _)| r).unwrap_or_else(|e| e);
+            self.mem.w16(DS, 0x12AA, di);
+            for i in 0..0x41E {
+                let b = self.mem.r8(seg, rec.wrapping_add(i));
+                self.mem.w8(seg, di.wrapping_add(i), b);
+            }
+            self.creature_gold_at(seg, di)?;
+        }
+        Some(())
+    }
+
+    /// 1194:8B12. Unless already fighting, the text for the first creature
+    /// (the fight's text through the hook for a person, whose guard bits
+    /// then go to all eight records; a monster's type name at 1044).
+    /// Returns whether they are people (the fight's AL).
+    fn encounter_text(&mut self, hooks: &mut dyn FightHooks, n: u16) -> bool {
+        if self.mem.r16(DS, FIGHTING) != 0 {
+            return n & 0xFF != 0;
+        }
+        // 25CA:0170: the first creature slot in use.
+        let rec = (0..8u16)
+            .find(|&i| self.mem.r16(DS, CREATURE_SLOTS + i * 0x1C + 0xF) & 0x4000 == 0)
+            .map_or(0, |i| i * 0x41E);
+        let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
+        if self.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x1000 == 0 {
+            hooks.fight_text(self, rec);
+            let bits = self.mem.r16(seg, rec.wrapping_add(0x40D)) & 0xC00;
+            for k in 0..8u16 {
+                let at = (k * 0x41E).wrapping_add(0x40D);
+                let v = self.mem.r16(seg, at) | bits;
+                self.mem.w16(seg, at, v);
+            }
+            true
+        } else {
+            let mut cx = self.mem.r8(seg, rec.wrapping_add(4)) as u16;
+            if cx == 0x2A {
+                cx = 0x18;
+            }
+            let mut si = self.skip_strings(DS, 0x2DFE, cx);
+            let mut di = 0x1044u16;
+            loop {
+                let b = self.mem.r8(DS, si);
+                self.mem.w8(DS, di, b);
+                si = si.wrapping_add(1);
+                di = di.wrapping_add(1);
+                if b == 0 {
+                    break;
+                }
+            }
+            self.mem.w8(DS, di, 0);
+            false
+        }
+    }
+
+    /// 24FA:0313. A person's equipment at the record `rec` (from +6Eh):
+    /// unless the class wears none (1194:7757), four armour pieces (types
+    /// at 4F10) and up to three more by level (4F14, at levels 5, 10, 15),
+    /// each of "level" d100 (the roll left in AL); a weapon by class
+    /// (`npc_weapon`, rerolled over the same place while it comes out as
+    /// type 0 for a class that isn't 0); and a shield unless the weapon is
+    /// two-handed (by class, the list at 3276:3C71).
+    pub fn npc_equip(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let class = self.mem.r8(seg, rec.wrapping_add(5)) as u16;
+        let mut di = rec.wrapping_add(0x6E);
+        if !self.class_wears_no_armor(class) {
+            let level = self.mem.r8(seg, rec.wrapping_add(6)) as u16;
+            let q = self.npc_armor_quality(seg, rec);
+            self.mem.w8(DS, 0x101E, q as u8);
+            for b in 0..4 {
+                let forced = self.mem.r8(DS, 0x4F10 + b);
+                di = self.npc_armor(forced, di);
+            }
+            let mut dx = 5u16;
+            for b in 0..3 {
+                if level < dx {
+                    break;
+                }
+                let forced = self.mem.r8(DS, 0x4F14 + b);
+                di = self.npc_armor(forced, di);
+                dx += 5;
+            }
+        }
+        let mut bx = class;
+        let mut tries = 0u32;
+        let (ax, weapon) = loop {
+            // The original rerolls without end for a class whose weapons
+            // all come out as type 0.
+            tries += 1;
+            if tries > 0x10000 {
+                return None;
+            }
+            let (ax, w, next) = self.npc_weapon(bx, di)?;
+            if w == 0 && ax != 0 {
+                bx = ax;
+                di = next.wrapping_sub(0x13);
+                continue;
+            }
+            di = next;
+            break (ax, w);
+        };
+        // 24FA:0405: the shield.
+        if self.mem.r8(DS, 0x229Eu16.wrapping_add(weapon)) == 2 {
+            return Some(());
+        }
+        let data = crate::mem::DATA;
+        let list = self.mem.r16(data, 0x3C71u16.wrapping_add(ax.wrapping_add(ax)));
+        let Some(forced) = self.pick_from_list(list)? else {
+            return Some(());
+        };
+        self.mem.w8(DS, 0x101E, 0);
+        self.npc_armor(forced as u8, di);
+        Some(())
+    }
+
+    /// 1194:7C1D. How good a person's armour is (0..2, into 101E): one
+    /// less for each d100 at most level x 10 (classes 10h and 11h roll
+    /// once; for the classes in the list at 5D78 the level is read at
+    /// the list's place + 6 instead of the record's, in the record's
+    /// segment; others get 2).
+    fn npc_armor_quality(&mut self, seg: u16, rec: u16) -> u16 {
+        let class = self.mem.r8(seg, rec.wrapping_add(5));
+        let mut dx = 2u16;
+        let at = if class == 0x10 || class == 0x11 {
+            dx -= 1;
+            rec
+        } else {
+            match (0..4u16).find(|&k| self.mem.r8(DS, 0x5D78 + k) == class) {
+                Some(k) => 0x5D78 + k,
+                None => return dx,
+            }
+        };
+        let threshold = self.mem.r8(seg, at.wrapping_add(6)) as u16 * 10;
+        let roll = self.rng.next() % 100;
+        if roll <= threshold {
+            dx -= 1;
+        }
+        dx
+    }
+
+    /// 24FA:0453. A piece of plain armour of type `forced` (at "level" the
+    /// d100 roll: AL holds it) put at `di`; returns the next place.
+    fn npc_armor(&mut self, forced: u8, di: u16) -> u16 {
+        let roll = self.rng.next() % 100;
+        self.loot_armor(roll as u8, forced);
+        self.put_item(di)
+    }
+
+    /// 24FA:03AA. A weapon for class `bx` (&1Fh) at `di`: class 0Dh takes
+    /// type 11h; otherwise a type from the class's list (3276:3C25) or,
+    /// with none, 2..16 at random; magic on a d100 of 2 or less (the
+    /// roll is its level, AL). Returns (the class, the type, the next
+    /// place).
+    fn npc_weapon(&mut self, bx: u16, di: u16) -> Option<(u16, u16, u16)> {
+        let class = bx & 0x1F;
+        let data = crate::mem::DATA;
+        let ty = if class == 0xD {
+            0x11
+        } else {
+            let list = self.mem.r16(data, 0x3C25u16.wrapping_add(class.wrapping_add(class)));
+            if list == 0 {
+                crate::dice::roll(&mut self.rng, 0xF)?.wrapping_add(2)
+            } else {
+                self.pick_from_list(list)?.unwrap_or(0)
+            }
+        };
+        self.mem.w16(DS, GUARD_RANK, ty);
+        let roll = self.rng.next() % 100;
+        let ty = self.mem.r16(DS, GUARD_RANK);
+        if roll <= 2 {
+            self.loot_magic_weapon(roll as u8, ty)?;
+        } else {
+            self.loot_weapon(roll as u8, ty as u8)?;
+        }
+        let next = self.put_item(di);
+        Some((class, self.mem.r16(DS, GUARD_RANK), next))
+    }
+
+    /// 24FA:0434. A random byte of the FFh-terminated list at 3276:`si`,
+    /// None (the original's carry) for an empty list.
+    fn pick_from_list(&mut self, si: u16) -> Option<Option<u16>> {
+        let data = crate::mem::DATA;
+        let mut n = 0u16;
+        while self.mem.r8(data, si.wrapping_add(n)) != 0xFF {
+            n = n.wrapping_add(1);
+            if n == 0 {
+                return None;
+            }
+        }
+        if n == 0 {
+            return Some(None);
+        }
+        let k = crate::dice::roll(&mut self.rng, n)?;
+        Some(Some(self.mem.r8(data, si.wrapping_add(k)) as u16))
     }
 
     /// 0000:1B19. A random square near the player (each axis the player's

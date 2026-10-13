@@ -443,7 +443,7 @@ impl Machine {
     /// 1194:A19C / A1D1: the first quest of kind 1 (word +4 bits 6-7) at
     /// `stage` (bits 9-11); it counts only if its byte at `field` is
     /// `v`, and the search ends there either way.
-    fn quest_matching(&self, stage: u16, field: u16, v: u8) -> Option<u16> {
+    pub(crate) fn quest_matching(&self, stage: u16, field: u16, v: u8) -> Option<u16> {
         let mut q = svar::QUESTS;
         for _ in 0..4 {
             let w = self.mem.r16(DS, q.wrapping_add(4));
