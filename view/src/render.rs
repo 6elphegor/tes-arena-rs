@@ -33,6 +33,7 @@ pub struct Renderer {
     bind: wgpu::BindGroup,
     vertices: wgpu::Buffer,
     count: u32,
+    sprites: Option<(wgpu::Buffer, u64)>,
     palette: [[f32; 4]; 256],
     depth: Option<(wgpu::TextureView, u32, u32)>,
 }
@@ -42,6 +43,7 @@ pub struct Scene<'a> {
     pub textures: &'a [[u8; 4096]],
     pub shading: &'a [u8],
     pub mesh: &'a [Vertex],
+    pub sprites: &'a crate::world::SpriteSheet,
 }
 
 impl Renderer {
@@ -84,6 +86,25 @@ impl Renderer {
             wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(256), rows_per_image: Some(16) },
             wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
         );
+        let sheet = scene.sprites;
+        let sprite_layers = sheet.layers.len() as u32;
+        let sprite_tex = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("sprites"),
+            size: wgpu::Extent3d { width: sheet.w as u32, height: sheet.h as u32, depth_or_array_layers: sprite_layers },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let flat: Vec<u8> = sheet.layers.iter().flat_map(|l| l.iter().copied()).collect();
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &sprite_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            &flat,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(sheet.w as u32), rows_per_image: Some(sheet.h as u32) },
+            wgpu::Extent3d { width: sheet.w as u32, height: sheet.h as u32, depth_or_array_layers: sprite_layers },
+        );
         let mut palette = [[0f32; 4]; 256];
         for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
             *p = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
@@ -123,10 +144,21 @@ impl Renderer {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
             ],
         });
         let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
         let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
+        let sprite_view = sprite_tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("world"),
             layout: &layout,
@@ -134,6 +166,7 @@ impl Renderer {
                 wgpu::BindGroupEntry { binding: 0, resource: globals.as_entire_binding() },
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex_view) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&shade_view) },
+                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&sprite_view) },
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -151,7 +184,7 @@ impl Renderer {
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Uint32, 3 => Float32],
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Uint32, 3 => Float32, 4 => Uint32],
                 }],
             },
             fragment: Some(wgpu::FragmentState {
@@ -177,11 +210,26 @@ impl Renderer {
             contents: bytemuck::cast_slice(scene.mesh),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        Self { pipeline, globals, bind, vertices, count: scene.mesh.len() as u32, palette, depth: None }
+        Self { pipeline, globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
     }
 
-    /// Draws the world seen from `cam` into `target` (`width` x `height`).
-    pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::TextureView, width: u32, height: u32, cam: Camera) {
+    /// Draws the world seen from `cam` into `target` (`width` x `height`),
+    /// with this frame's billboards.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::TextureView, width: u32, height: u32, cam: Camera, sprites: &[Vertex]) {
+        let bytes: &[u8] = bytemuck::cast_slice(sprites);
+        if !matches!(self.sprites, Some((_, cap)) if cap >= bytes.len() as u64) {
+            let cap = (bytes.len() as u64).next_power_of_two().max(4096);
+            let buf = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("sprites"),
+                size: cap,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.sprites = Some((buf, cap));
+        }
+        let sprite_buf = &self.sprites.as_ref().unwrap().0;
+        queue.write_buffer(sprite_buf, 0, bytes);
         if !matches!(self.depth, Some((_, w, h)) if w == width && h == height) {
             let tex = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("depth"),
@@ -229,6 +277,10 @@ impl Renderer {
             pass.set_bind_group(0, &self.bind, &[]);
             pass.set_vertex_buffer(0, self.vertices.slice(..));
             pass.draw(0..self.count, 0..1);
+            if !sprites.is_empty() {
+                pass.set_vertex_buffer(0, sprite_buf.slice(..bytes.len() as u64));
+                pass.draw(0..sprites.len() as u32, 0..1);
+            }
         }
         queue.submit([enc.finish()]);
     }

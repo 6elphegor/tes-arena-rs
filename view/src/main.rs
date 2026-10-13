@@ -9,6 +9,7 @@
 //! picture after turning by TURN (heading units, 512 a turn) and FRAMES
 //! frames (default 0) of walking forward, and exits.
 
+mod flats;
 mod render;
 mod world;
 
@@ -33,9 +34,43 @@ fn camera(engine: &Engine) -> Camera {
     Camera { x: v.x as f32, y: v.y as f32, height: v.height as f32 + v.bob as f32, heading: v.heading as f32 }
 }
 
-fn scene_parts(dir: &std::path::Path, engine: &Engine) -> ([[u8; 4]; 256], Vec<[u8; 4096]>, Vec<u8>, Vec<world::Vertex>) {
-    (world::palette(dir), world::textures(&engine.m), world::shading(&engine.m), world::mesh(&engine.m))
+/// What drawing a level needs, read once from the engine after loading.
+struct Assets {
+    palette: [[u8; 4]; 256],
+    textures: Vec<[u8; 4096]>,
+    shading: Vec<u8>,
+    mesh: Vec<world::Vertex>,
+    flats: Vec<Option<flats::Flat>>,
+    sheet: world::SpriteSheet,
 }
+
+impl Assets {
+    fn new(dir: &std::path::Path, engine: &Engine) -> Self {
+        let flats = world::flats(&engine.m);
+        let sheet = world::sprite_sheet(&flats);
+        Assets {
+            palette: world::palette(dir),
+            textures: world::textures(&engine.m),
+            shading: world::shading(&engine.m),
+            mesh: world::mesh(&engine.m),
+            flats,
+            sheet,
+        }
+    }
+
+    fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
+        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet };
+        Renderer::new(device, queue, format, &scene)
+    }
+
+    /// This frame's billboards, animations stepping every `ANIMATE` ticks.
+    fn sprites(&self, engine: &Engine, cam: Camera, ticks: usize) -> Vec<world::Vertex> {
+        world::sprites(&engine.m, &self.flats, &self.sheet, cam.heading, ticks / ANIMATE)
+    }
+}
+
+/// Timer ticks an animation frame lasts.
+const ANIMATE: usize = 4;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -53,7 +88,8 @@ fn main() {
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
-    let mut app = App { dir, engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, next: Instant::now() };
+    let assets = Assets::new(&dir, &engine);
+    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, next: Instant::now() };
     event_loop.run_app(&mut app).expect("run");
 }
 
@@ -77,9 +113,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, frames: usize, tur
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
-    let (pal, tex, shade, mesh) = scene_parts(dir, &engine);
+    let assets = Assets::new(dir, &engine);
     let format = wgpu::TextureFormat::Rgba8Unorm;
-    let mut r = Renderer::new(&device, &queue, format, &Scene { palette: pal, textures: &tex, shading: &shade, mesh: &mesh });
+    let mut r = assets.renderer(&device, &queue, format);
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("shot"),
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -90,7 +126,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, frames: usize, tur
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
-    r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, camera(&engine));
+    let cam = camera(&engine);
+    let sprites = assets.sprites(&engine, cam, frames * 4);
+    r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, cam, &sprites);
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
         size: (w * h * 4) as u64,
@@ -116,7 +154,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, frames: usize, tur
     enc.set_depth(png::BitDepth::Eight);
     enc.write_header().expect("png").write_image_data(&data).expect("png");
     let v = engine.view();
-    println!("{out}: at ({:#x}, {:#x}) heading {:#x}, {} triangles", v.x, v.y, v.heading, mesh.len() / 3);
+    println!("{out}: at ({:#x}, {:#x}) heading {:#x}, {} triangles", v.x, v.y, v.heading, assets.mesh.len() / 3);
 }
 
 struct Gpu {
@@ -141,7 +179,8 @@ struct Keys {
 }
 
 struct App {
-    dir: PathBuf,
+    assets: Assets,
+    start: Instant,
     engine: Engine,
     gpu: Option<Gpu>,
     keys: Keys,
@@ -206,8 +245,7 @@ impl winit::application::ApplicationHandler for App {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
-        let (pal, tex, shade, mesh) = scene_parts(&self.dir, &self.engine);
-        let renderer = Renderer::new(&device, &queue, format, &Scene { palette: pal, textures: &tex, shading: &shade, mesh: &mesh });
+        let renderer = self.assets.renderer(&device, &queue, format);
         self.gpu = Some(Gpu { window, surface, device, queue, config, renderer });
     }
 
@@ -266,7 +304,9 @@ impl winit::application::ApplicationHandler for App {
                         return;
                     };
                     let view = frame.texture.create_view(&Default::default());
-                    g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam);
+                    let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
+                    let sprites = self.assets.sprites(&self.engine, cam, ticks);
+                    g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     frame.present();
                 }
             }

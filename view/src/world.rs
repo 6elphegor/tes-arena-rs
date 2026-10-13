@@ -11,8 +11,9 @@ use arena::mem::DS;
 use std::path::Path;
 
 /// One vertex: position (map units: x, height, y), texture coordinates
-/// in texels (64 a texture; they repeat), the texture layer and a light
-/// factor (1 lit, darker for some faces).
+/// in texels (64 a wall texture, where they repeat), the layer (of the
+/// wall textures, or with SPRITE of the flats' frames) and a light factor
+/// (1 lit, darker for some faces).
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
@@ -20,7 +21,11 @@ pub struct Vertex {
     pub uv: [f32; 2],
     pub layer: u32,
     pub light: f32,
+    pub flags: u32,
 }
+
+/// Vertex flag: a flat, drawn from the sprite layers, index 0 clear.
+pub const SPRITE: u32 = 1;
 
 /// Map squares are 128 units across.
 pub const SQUARE: f32 = 128.0;
@@ -157,7 +162,7 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
     let mut out = Vec::new();
     let mut quad = |p: [[f32; 3]; 4], uv: [[f32; 2]; 4], layer: u32, light: f32| {
         for i in [0, 1, 2, 0, 2, 3] {
-            out.push(Vertex { pos: p[i], uv: uv[i], layer, light });
+            out.push(Vertex { pos: p[i], uv: uv[i], layer, light, flags: 0 });
         }
     };
     for row in 0..d as i32 {
@@ -220,6 +225,101 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                 if let Some(t) = ceiling_tex {
                     quad([[x0, ceiling, z0], [x1, ceiling, z0], [x1, ceiling, z1], [x0, ceiling, z1]], uv, t, 0.8);
                 }
+            }
+        }
+    }
+    out
+}
+
+/// The level's flats by number (from 0, FLAT_BASE being the level's
+/// first), decoded where the loader read a file the decoders know.
+pub fn flats(m: &Machine) -> Vec<Option<crate::flats::Flat>> {
+    let n = m.mem.r16(DS, arena::info::var::FLAT_NUMBER).min(0x100);
+    (0..n)
+        .map(|f| {
+            let off = m.mem.r16(DS, arena::info::var::FLAT_DATA + f * 4) as usize;
+            let bank = m.mem.r16(DS, arena::info::var::FLAT_DATA + f * 4 + 2);
+            if off == 0xFFFF {
+                return None;
+            }
+            let data = m.ems_bank(bank);
+            crate::flats::decode(m.mem.r8(DS, arena::info::var::FLAT_KINDS + f), &data[off..])
+        })
+        .collect()
+}
+
+/// The flats' frames as sprite layers: the first layer of each flat (by
+/// number), and every frame padded to the largest size.
+pub struct SpriteSheet {
+    pub w: usize,
+    pub h: usize,
+    pub layers: Vec<Vec<u8>>,
+    pub first: Vec<Option<u32>>,
+}
+
+pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>]) -> SpriteSheet {
+    let w = flats.iter().flatten().map(|f| f.w).max().unwrap_or(1);
+    let h = flats.iter().flatten().map(|f| f.h).max().unwrap_or(1);
+    let mut layers = Vec::new();
+    let mut first = Vec::new();
+    for f in flats {
+        let Some(f) = f else {
+            first.push(None);
+            continue;
+        };
+        first.push(Some(layers.len() as u32));
+        for frame in &f.frames {
+            let mut l = vec![0u8; w * h];
+            for y in 0..f.h {
+                l[y * w..y * w + f.w].copy_from_slice(&frame[y * f.w..(y + 1) * f.w]);
+            }
+            layers.push(l);
+        }
+    }
+    if layers.is_empty() {
+        layers.push(vec![0; w * h]);
+    }
+    SpriteSheet { w, h, layers, first }
+}
+
+/// Billboards for the flats standing in the map (MAP1 words 8xxx: flat
+/// low byte + FLAT_BASE), at their squares' centres, facing a camera
+/// turned to `heading`; animations at frame `tick`. A flat is a unit
+/// per pixel, raised by its record's Y.
+pub fn sprites(m: &Machine, flats: &[Option<crate::flats::Flat>], sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
+    let w = m.mem.r16(DS, 0xC357).min(128);
+    let d = m.mem.r16(DS, 0xC359).min(128);
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let base = m.mem.r16(DS, arena::info::var::FLAT_BASE);
+    let a = heading / 512.0 * std::f32::consts::TAU;
+    // The camera's right, along which a billboard spreads.
+    let (rx, rz) = (a.cos(), -a.sin());
+    let mut out = Vec::new();
+    for row in 0..d {
+        for col in 0..w {
+            let v = m.mem.r16(walls, (row << 8) | (col << 1));
+            if v >> 12 != 8 {
+                continue;
+            }
+            let n = ((v & 0xFF) + base) as usize;
+            let (Some(Some(f)), Some(Some(layer))) = (flats.get(n), sheet.first.get(n)) else {
+                continue;
+            };
+            let lift = m.mem.r8(DS, arena::info::var::FLATS + n as u16 * 5) as i8 as f32;
+            let (cx, cz) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
+            let hw = f.w as f32 / 2.0;
+            let (lo, hi) = (lift, lift + f.h as f32);
+            let layer = layer + (tick % f.frames.len()) as u32;
+            let p = [
+                [cx - rx * hw, lo, cz - rz * hw],
+                [cx + rx * hw, lo, cz + rz * hw],
+                [cx + rx * hw, hi, cz + rz * hw],
+                [cx - rx * hw, hi, cz - rz * hw],
+            ];
+            let (u, t) = (f.w as f32, f.h as f32);
+            let uv = [[0.0, t], [u, t], [u, 0.0], [0.0, 0.0]];
+            for i in [0, 1, 2, 0, 2, 3] {
+                out.push(Vertex { pos: p[i], uv: uv[i], layer, light: 1.0, flags: SPRITE });
             }
         }
     }

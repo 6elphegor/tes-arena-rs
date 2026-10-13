@@ -207,6 +207,12 @@ member using wgpu, winit, glam and png.
     `move_wall_height`);
   - doors and the other wall kinds;
   - floors (FLOOR words), and the *CEILING texture.
+- `flats.rs` decodes the flats the INF loader read into the flat banks:
+  raw .IMGs and .DFA animations (a run-length coded first frame, then
+  chunks of updates to it). `world::sprites` stands the map's flats (MAP1
+  words 8xxx) in their squares as billboards, a unit per pixel, raised by
+  the flat record's Y. The examples `flats` (every frame on one sheet)
+  and `formats` (what the decoders miss, by level) check the decoders.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
   with the palette.
@@ -218,8 +224,9 @@ cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF --shot out.png [FRAMES [TURN]]
 ```
 
-Not drawn yet: flats (creatures, items, decorations), doors as they open,
-chasms and water, the sky, and the interface.
+Not drawn yet: creatures and people (CFA), cities (their flats load
+elsewhere), doors as they open, chasms and water, the sky, and the
+interface.
 
 ## Porting a routine
 
