@@ -19,6 +19,8 @@
 //! then one per kind indexed by sub-kind, which run into each other);
 //! the port reads the same tables and dispatches on the handler address.
 //!
+//! Creatures and people cast through `actor_cast` (29CF:0145).
+//!
 //! Not ported: a spell effect that launches a projectile from the player
 //! (kind 17 with flag 0x80, 29CF:0270), which returns None.
 
@@ -59,6 +61,9 @@ pub mod svar {
     pub const TIMERS: u16 = 0x1020;
     pub const CHANGED: u16 = 0x0D39;
 }
+
+/// The cast records (8 of 16h bytes).
+const CASTS: u16 = 0x7F86;
 
 /// Message texts in DGROUP.
 const FAILED: u16 = 0x7BFA;
@@ -139,6 +144,57 @@ impl Machine {
                 return Some(());
             }
         }
+    }
+
+    /// 29CF:0145. The actor in slot `slot`, record seg:`rec`, casts spell
+    /// `index` (not when silenced, spell flag 200h): a cast record is
+    /// taken (29CF:01C4, the first not in use; the original searches on
+    /// without end) with the caster's level + 1. A spell with a target
+    /// type above 0 is launched from the actor towards the player
+    /// (aimed, FFFEh at +14); others take effect on the caster at once,
+    /// with the reflected-spell flash on its actor. None where the
+    /// original faults or hangs.
+    pub fn actor_cast(&mut self, seg: u16, rec: u16, slot: u16, index: u8) -> Option<()> {
+        if self.mem.r16(seg, rec.wrapping_add(0x41A)) & 0x200 != 0 {
+            return Some(());
+        }
+        let mut cast = CASTS;
+        for _ in 0..0x10000 / 0x16 + 1 {
+            if self.mem.r16(DS, cast.wrapping_add(0xA)) & 1 == 0 {
+                break;
+            }
+            cast = cast.wrapping_add(0x16);
+        }
+        if self.mem.r16(DS, cast.wrapping_add(0xA)) & 1 != 0 {
+            return None;
+        }
+        self.mem.w16(DS, cast.wrapping_add(0xA), 1);
+        let level = self.mem.r8(seg, rec.wrapping_add(field::LEVEL)) as u16 + 1;
+        self.mem.w16(DS, cast.wrapping_add(8), level);
+        self.mem.w16(DS, svar::CASTER_LEVEL, level);
+        self.mem.w16(DS, cast.wrapping_add(4), rec);
+        self.mem.w16(DS, cast.wrapping_add(6), seg);
+        let (gs, spell) = self.spell_record(index);
+        self.mem.w16(DS, cast, spell);
+        self.mem.w16(DS, cast.wrapping_add(2), gs);
+        if self.mem.r8(gs, spell.wrapping_add(0x24)) as i8 > 0 {
+            let f = self.mem.r16(DS, cast.wrapping_add(0xA)) | 0x20;
+            self.mem.w16(DS, cast.wrapping_add(0xA), f);
+            self.mem.w16(DS, cast.wrapping_add(0x14), 0xFFFE);
+            let (px, py) = (self.mem.r16(DS, 0xC3D0), self.mem.r16(DS, 0xC3D4));
+            let h = crate::travel::travel_heading(self.mem.r16(DS, slot), self.mem.r16(DS, slot.wrapping_add(4)), px, py);
+            let saved = self.mem.r16(DS, slot.wrapping_add(0xA));
+            self.mem.w16(DS, slot.wrapping_add(0xA), h);
+            self.launch(cast, slot, py)?;
+            self.mem.w16(DS, slot.wrapping_add(0xA), saved);
+            return Some(());
+        }
+        self.mem.w16(DS, svar::TARGETS, rec);
+        self.mem.w16(DS, svar::TARGETS + 2, seg);
+        self.mem.w16(DS, svar::TARGET_COUNT, 1);
+        self.cast_apply(cast)?;
+        self.blood(slot, 0x19);
+        Some(())
     }
 
     /// 2CDD:000C. The spell's three effects on the target at tseg:toff,

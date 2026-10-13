@@ -9,9 +9,11 @@ from a seed (`setup`, mirrored in tests/actors.rs) and runs one frame of
 the actors. The door hooks are the game's: the lock check 2826:0AAB and
 the sound 23BA:002A (stubbed with a RETF, as sound is not ported, like
 0000:1B7F and FE58, which build the draw list), and so is the message
-box of a broken special item (1194:A36C) in a creature's blow. Spells
-(29CF:0145, 0675) are not ported: they are replaced by an INT 3, so a
-case reaching one is a "fault", as the port returns None there.
+box of a broken special item (1194:A36C) in a creature's blow. Casting
+runs for real, with gen_spell.py's stops (a projectile spawned by an
+effect, 29CF:0270, is an INT 3; a spell effect leaving DS at the
+creature segment or dispatching outside its handlers stops a case) and
+the timed-spell-flag table at 5C00:0000.
 
 Lines (fields separated by " | "):
   actors | mif px py seed var=value,... | digests
@@ -33,6 +35,9 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
 from emu import DGROUP, Fault, LOAD_SEG, STUB_SEG
+from gen_spell import guard_dispatch
+from unicorn import UC_HOOK_CODE
+from unicorn.x86_const import UC_X86_REG_DS
 
 EXE, GAME, OUT = sys.argv[1:4]
 SKIP = int(sys.argv[4]) if len(sys.argv) > 4 else 0
@@ -123,8 +128,7 @@ def setup(seed, px, py, corpse):
 a = DosArena(EXE, GAME)
 a.std_devices = True
 for seg, off, code in [(0, 0x1B7F, b'\xc3'), (0, 0xFE58, b'\xc3'), (0, 0xDA8E, b'\xc3'), (0, 0x8FC8, b'\xc3'),
-                       (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb'), (0x29CF, 0x0145, b'\xcc'),
-                       (0x29CF, 0x0675, b'\xcc')]:
+                       (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb'), (0x29CF, 0x0270, b'\xcc')]:
     a.patch(seg, off, code)
 a.init_heap()
 a.run_range(0, 0x6F3A, 0x6F87)  # open GLOBAL.BSA
@@ -138,6 +142,21 @@ a.w16(0xCCCE, 0x0C00 + FRAME)  # solid floors, as entering a level sets them (00
 a.w16(0xCD62, 0x0AAB)
 a.w16(0xCD64, LOAD_SEG + 0x2826)
 a.w16(0xCD46, 0x002A)
+# Casting: the timed-spell-flag table, and gen_spell.py's stops.
+a.w16(0x1020, 0)
+a.w16(0x1022, 0x5C00)
+guard_dispatch(a)
+
+
+def leak(mu, addr, size, _):
+    if mu.reg_read(UC_X86_REG_DS) != a.ds:
+        a.fault = 'ds'
+        mu.emu_stop()
+
+
+for seg_, off_ in [(0x2CDD, 0x03E5), (0x2CDD, 0x003F), (0x29CF, 0x09A3)]:
+    lin = (LOAD_SEG + seg_) * 16 + off_
+    a.mu.hook_add(UC_HOOK_CODE, leak, None, lin, lin)
 a.w16(0xCD48, LOAD_SEG + 0x23BA)
 BASE = a.snapshot()
 
@@ -147,12 +166,19 @@ d = len(bsa) - 18 * count
 NAMES = [bsa[d + 18 * i: d + 18 * i + 14].split(b'\0')[0].upper() for i in range(count)]
 
 
-def unrelocate(before):
-    """Words a blow sets to DGROUP's segment (the message pointer at 061C,
-    effect slot targets) are compared image-relative."""
-    for o in [0x061C] + [0x0660 + i * 0x3C + 0x2A for i in range(16)]:
+def unrelocate(before, c0):
+    """Words a blow or a spell sets to DGROUP's segment (the message
+    pointer at 061C, effect slot targets, cast casters and the target
+    list) or the spells' (cast +2, 3276h) are compared image-relative."""
+    for o in [0x061C] + [0x0660 + i * 0x3C + 0x2A for i in range(16)] + \
+            [0x0D5E + 4 * i for i in range(16)] + [0x7F86 + 0x16 * i + 6 for i in range(8)]:
         if a.r16(o) == a.ds and struct.unpack_from('<H', before, o)[0] != a.ds:
             a.w16(o, DGROUP)
+    for o in [0x7F86 + 0x16 * i + 2 for i in range(8)]:
+        if a.r16(o) == LOAD_SEG + 0x3276 and struct.unpack_from('<H', before, o)[0] != a.r16(o):
+            a.w16(o, 0x3276)
+    if a.r16(0x061C, CSEG) == a.ds and struct.unpack_from('<H', c0, 0x061C)[0] != a.ds:
+        a.w16(0x061C, DGROUP, CSEG)
 
 
 def has_info(name):
@@ -265,13 +291,23 @@ for _ in range(1500):
     a.w16(0xC3D4, py)
     a.w16(0xCB90, sy * 0x100 + sx * 2)
     before = a.seg_bytes(a.ds)
+    c0 = a.seg_bytes(CSEG)
     try:
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
-        unrelocate(before)
+        unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
         changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
+        if os.environ.get('DUMP') == f'{seed:x}':
+            for i in range(0x10000):
+                if after[i] != before[i]:
+                    print(f'{i:04x} {before[i]:02x} {after[i]:02x}', file=sys.stderr)
+            c1 = a.seg_bytes(CSEG)
+            for i in range(0x8000):
+                if c1[i] != c0[i]:
+                    print(f'c{i:04x} {c0[i]:02x} {c1[i]:02x}', file=sys.stderr)
+            sys.exit(0)
     except Fault:
         res = 'fault'
     except AssertionError:
@@ -326,10 +362,11 @@ for _ in range(300):
     a.w16(0xCB90, (py >> 7 << 8) + (px >> 7 << 1))
     door_case(x, y, cx, cy, lock)
     before = a.seg_bytes(a.ds)
+    c0 = a.seg_bytes(CSEG)
     try:
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
-        unrelocate(before)
+        unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
         changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'

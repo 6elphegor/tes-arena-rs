@@ -210,6 +210,9 @@ fn matches_original() {
     base.mem.w16(DS, 0xCCCE, 0x0C00 + FRAME);
     base.mem.w32(DS, 0xCD62, 0x2826_0AAB);
     base.mem.w32(DS, 0xCD46, 0x23BA_002A);
+    // The timed-spell-flag table (harness/gen_actors.py).
+    base.mem.w16(DS, 0x1020, 0);
+    base.mem.w16(DS, 0x1022, 0x5C00);
     let mut loaded: HashMap<String, (Machine, Files)> = HashMap::new();
     let vectors = include_str!("vectors/actors.txt");
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
@@ -265,6 +268,18 @@ fn matches_original() {
                 fnv((0..0x8000u16).map(|o| m.mem.r8(CSEG, o)))
             )
         });
+        if std::env::var("ACTORS_DUMP").is_ok_and(|v| v == p[3]) {
+            for o in 0..=0xFFFFu16 {
+                if m.mem.r8(DS, o) != before.mem.r8(DS, o) {
+                    eprintln!("{o:04x} {:02x} {:02x}", before.mem.r8(DS, o), m.mem.r8(DS, o));
+                }
+            }
+            for o in 0..0x8000u16 {
+                if m.mem.r8(CSEG, o) != before.mem.r8(CSEG, o) {
+                    eprintln!("c{o:04x} {:02x} {:02x}", before.mem.r8(CSEG, o), m.mem.r8(CSEG, o));
+                }
+            }
+        }
         match got {
             _ if f[2] == "hang" => {}
             Some(d) => assert_eq!(f[2], d, "{line}"),

@@ -33,7 +33,9 @@ No game code or data is included: everything is loaded from your own copy.
   handlers): damage and healing (through the magic shield and elemental
   resistance, 29CF:0B35), status effects, cures (2EBD:0004), timed spell
   flags, attribute, HP, SP and fatigue changes and transfers, instant
-  death, levitation. A projectile spawned by an effect is not ported.
+  death, levitation; and an actor's cast (29CF:0145), launched at the
+  player or taking effect on itself. A projectile spawned by an effect
+  is not ported.
 - `src/projectile.rs` – spells in flight and arrows (segment 29CF): the
   launch (29CF:02E2) with its sprite object, light and column list
   (0000:FDEA, E0CA, BFC0), the per-frame mover (29CF:0441) with its
@@ -89,8 +91,9 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation
-  states and the sprite seen, and blows at the player. Spells are not
-  ported (None), nor sound and the draw list.
+  states and the sprite seen, blows at the player, and casting (people
+  pick an affordable spell, creatures one of theirs). Sound and the draw
+  list are not ported.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).

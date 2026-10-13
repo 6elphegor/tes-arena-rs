@@ -28,9 +28,11 @@
 //! A creature or person whose attack animation reaches its blow hits at
 //! the player (`crate::attack`).
 //!
-//! Not ported: building the frame's draw list (0000:1B7F, FE58), sound,
-//! and spells (29CF:0145, 0675): an actor casting makes the update
-//! return None.
+//! Creatures and people who see the player cast now and then
+//! (`crate::spell::actor_cast`).
+//!
+//! Not ported: building the frame's draw list (0000:1B7F, FE58) and
+//! sound.
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -605,18 +607,20 @@ impl Machine {
                 self.set_act_flags(si, fl);
                 return Some(());
             }
-            if !self.actor_has_spell(si)? {
+            let Some((index, cost)) = self.actor_pick_spell(si)? else {
                 let fl = self.act_flags(si) & !1;
                 self.set_act_flags(si, fl);
                 return Some(());
-            }
+            };
             let fl = self.act_flags(si) | 1;
             self.set_act_flags(si, fl);
             if self.rng.next() % 0x16 != 0 {
                 return Some(());
             }
-            // 29CF:0145: the spell.
-            return None;
+            let (seg, rec) = (self.mem.r16(DS, crate::combat::var::CREATURE_SEG), self.act16(si, f::RECORD));
+            let sp = self.mem.r16(seg, rec.wrapping_add(0x66)).wrapping_sub(cost);
+            self.mem.w16(seg, rec.wrapping_add(0x66), sp);
+            return self.actor_cast(seg, rec, si, index);
         }
         if self.act_rec8(si, 0x366) == 0 || !self.actor_sees_player(si) {
             return Some(());
@@ -629,8 +633,11 @@ impl Machine {
         if self.rng.next() % 0x16 != 0 {
             return Some(());
         }
-        // 29CF:0145: the spell.
-        None
+        let n = self.act_rec8(si, 0x366) as u16;
+        let r = self.rng.range(0, n)?;
+        let index = self.act_rec8(si, 0x367u16.wrapping_add(r));
+        let (seg, rec) = (self.mem.r16(DS, crate::combat::var::CREATURE_SEG), self.act16(si, f::RECORD));
+        self.actor_cast(seg, rec, si, index)
     }
 
     /// 0000:1DB3 / 22F5: the actor's record hits at the player
@@ -657,17 +664,31 @@ impl Machine {
         true
     }
 
-    /// 0000:1FA2. A person with flag 0x20 at +5: whether it has spell
-    /// points for a spell (not ported: it picks one with 29CF:0675).
-    fn actor_has_spell(&mut self, si: u16) -> Option<bool> {
+    /// 0000:1FA2. A person with flag 0x20 at +5 and at least 200 / (level
+    /// + 1) SP picks one of the 16 spells listed at DGROUP 6259 at
+    /// random until it can pay for one (cost / (level + 1)); returns the
+    /// spell and that price. None where the original never finds one.
+    fn actor_pick_spell(&mut self, si: u16) -> Option<Option<(u8, u16)>> {
         if self.act_rec8(si, 5) & 0x20 == 0 {
-            return Some(false);
+            return Some(None);
         }
-        let per = 0xC8 / (self.act_rec8(si, 6) as u16 + 1);
-        if self.act_rec16(si, 0x66) < per {
-            return Some(false);
+        let per = self.act_rec8(si, 6) as u16 + 1;
+        if self.act_rec16(si, 0x66) < 0xC8 / per {
+            return Some(None);
         }
-        None
+        let mut tries = crate::random::CycleCheck::new(&self.rng);
+        loop {
+            let r = self.rng.range(0, 0x10)?;
+            let index = self.mem.r8(DS, 0x6259u16.wrapping_add(r));
+            let (gs, spell) = self.spell_record(index);
+            let cost = self.mem.r16(gs, spell.wrapping_add(0x32)) / per;
+            if self.act_rec16(si, 0x66) >= cost {
+                return Some(Some((index, cost)));
+            }
+            if tries.cycled(&self.rng) {
+                return None;
+            }
+        }
     }
 
     /// 0000:234B. Clears flag 0x800, then sets it if no wall stands
