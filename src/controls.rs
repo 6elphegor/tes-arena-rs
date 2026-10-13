@@ -131,11 +131,22 @@ const CENTRE: u16 = 0x077E;
 
 /// What the controls leave to code not ported here.
 pub trait ControlHooks {
-    /// 2826:077E: a left click in the centre of the view (doors, actors,
-    /// spells waiting for a target, walls).
-    fn view_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+    /// 2826:0B52: the map square (offset) of the floor under the cursor,
+    /// None when there is none. The original projects the cursor onto
+    /// the floor (0000:DB43); with a new renderer, its pick.
+    fn floor_pick(&mut self, _m: &mut Machine) -> Option<u16> {
+        None
+    }
+    /// 0000:43B1: a click on a wall may run its trigger (texts, riddles).
+    fn wall_trigger(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    /// 29CF:0000: the spell waiting for a target is cast.
+    fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    /// 1194:42EA, 59C8: the text at DGROUP `text` in a message box.
+    fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 2826:0C15: a right click in the centre: looking at the square
     /// `ax` (CB92 with its low byte halved).
     fn look(&mut self, _m: &mut Machine, _ax: u16) -> Option<()> {
@@ -153,6 +164,27 @@ pub trait ControlHooks {
     /// 2826:0BB2: the counters of a spell waiting for a target, drawn
     /// over the view.
     fn spell_counters(&mut self, _m: &mut Machine) {}
+}
+
+/// What a modern front end asks of the player in a frame, in place of
+/// the cursor regions and the arrow keys. Speeds are fractions of full
+/// speed, -256..=256, as the original's cursor position gives them, so
+/// the original's speeds, acceleration, and wilderness and race rules
+/// still apply.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Intent {
+    /// Forward (+) or back (-).
+    pub forward: i16,
+    /// Strafing right (+) or left (-).
+    pub strafe: i16,
+    /// Turning right (+) or left (-) at the original's turning speed.
+    pub turn: i16,
+    /// Turning by this many heading units as well (512 a full turn):
+    /// mouse look.
+    pub look: i16,
+    /// Jump; with `run`, a running jump.
+    pub jump: bool,
+    pub run: bool,
 }
 
 /// `ControlHooks` that do nothing.
@@ -194,6 +226,19 @@ impl Machine {
     /// a move fails (`movement::move_step`), a speed divides by zero, a
     /// handler is unknown, or the CyberMan is present.
     pub fn player_input(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
+        self.player_frame(files, hooks, None)
+    }
+
+    /// The player's input and movement for a frame from a modern front
+    /// end: `player_input` with `Intent` in place of the cursor regions
+    /// and the arrow keys (see `intent_step`). The front end resolves
+    /// clicks itself (picking what is under the cursor) and calls
+    /// `view_click`.
+    pub fn player_steer(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks, intent: &Intent) -> Option<()> {
+        self.player_frame(files, hooks, Some(intent))
+    }
+
+    fn player_frame(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks, intent: Option<&Intent>) -> Option<()> {
         self.mem.w16(DS, CURSOR, 0xFFFF);
         if self.mem.r16(DS, 0x061E) == 0xFFFE {
             self.mem.w16(DS, 0x061E, 0);
@@ -229,46 +274,100 @@ impl Machine {
                 self.walk(files, speed, heading)?;
                 return self.input_tail(files, hooks);
             }
-            self.mouse_clamp();
-            self.arrow_keys(files)?;
-            if self.mem.r8(DS, CYBERMAN) != 0 {
-                return None;
-            }
-            if self.pick_region(files, hooks)? {
-                // The cursor is on the interface bar: the handler is
-                // the centre now, so nothing moves.
-                break 'body;
-            }
-            let handler = self.mem.r16(DS, HANDLER);
-            if handler == CENTRE {
-                let v = self.mem.r16(DS, 0x05E0) | 0x40;
-                self.mem.w16(DS, 0x05E0, v);
-                let picked = self.mem.r16(DS, PICKED);
-                if self.mem.r8(DS, RELEASED_RIGHT) != 0 && (picked as i16) > 0 {
-                    hooks.look(self, picked & 0xFF00 | (picked as u8 >> 1) as u16)?;
-                }
-                if self.mem.r8(DS, RELEASED_LEFT) == 0 {
-                    self.mem.w16(DS, SPEED, 0);
-                } else if self.mem.r16(DS, 0x05E0) & 0x2000 == 0 {
-                    hooks.view_click(self, files)?;
-                }
-            } else if self.mem.r16(DS, ACCEL) != 0 || self.mem.r8(DS, BUTTONS) & 1 != 0 {
-                if self.mem.r16(DS, 0x05E0) & 0x2000 == 0 {
-                    self.run_handler(files, hooks, handler)?;
-                }
-            } else {
-                self.mem.w16(DS, SPEED, 0);
-            }
-            if self.key(key::J) {
-                self.jump();
-            } else if self.mem.r16(DS, 0x05E0) & 0x10 == 0 && self.mem.r8(DS, BUTTONS) == 3 {
-                self.jump();
+            match intent {
+                None => self.classic_step(files, hooks)?,
+                Some(it) => self.intent_step(files, it)?,
             }
         }
         if self.mem.r16(DS, REFRESH) != 0 {
             self.mem.w16(DS, REFRESH, 0);
         }
         self.input_tail(files, hooks)
+    }
+
+    /// 2826:00AD..0182. The classic controls: the arrow keys, then the
+    /// cursor's region (`pick_region`) and its handler while the left
+    /// button is down (or the speed has not run out); in the centre a
+    /// left click (`view_click`) or a right click (`look`); J or both
+    /// buttons jump.
+    fn classic_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
+        self.mouse_clamp();
+        self.arrow_keys(files)?;
+        if self.mem.r8(DS, CYBERMAN) != 0 {
+            return None;
+        }
+        if self.pick_region(files, hooks)? {
+            // The cursor is on the interface bar: the handler is
+            // the centre now, so nothing moves.
+            return Some(());
+        }
+        let handler = self.mem.r16(DS, HANDLER);
+        if handler == CENTRE {
+            let v = self.mem.r16(DS, 0x05E0) | 0x40;
+            self.mem.w16(DS, 0x05E0, v);
+            let picked = self.mem.r16(DS, PICKED);
+            if self.mem.r8(DS, RELEASED_RIGHT) != 0 && (picked as i16) > 0 {
+                hooks.look(self, picked & 0xFF00 | (picked as u8 >> 1) as u16)?;
+            }
+            if self.mem.r8(DS, RELEASED_LEFT) == 0 {
+                self.mem.w16(DS, SPEED, 0);
+            } else if self.mem.r16(DS, 0x05E0) & 0x2000 == 0 {
+                self.view_click(files, hooks)?;
+            }
+        } else if self.mem.r16(DS, ACCEL) != 0 || self.mem.r8(DS, BUTTONS) & 1 != 0 {
+            if self.mem.r16(DS, 0x05E0) & 0x2000 == 0 {
+                self.run_handler(files, hooks, handler)?;
+            }
+        } else {
+            self.mem.w16(DS, SPEED, 0);
+        }
+        if self.key(key::J) {
+            self.jump(self.key(key::LSHIFT) || self.key(key::RSHIFT));
+        } else if self.mem.r16(DS, 0x05E0) & 0x10 == 0 && self.mem.r8(DS, BUTTONS) == 3 {
+            self.jump(self.key(key::LSHIFT) || self.key(key::RSHIFT));
+        }
+        Some(())
+    }
+
+    /// The modern counterpart of `classic_step`: turning, then one walk
+    /// along the combined direction of `forward` and `strafe` at the
+    /// larger of their speeds (the original walks one region's direction
+    /// a frame) as if the left button were down, so the acceleration
+    /// builds; going back is at half speed. Nothing moving, the speed is
+    /// 0 at once (as with the keys and the cursor in the centre).
+    fn intent_step(&mut self, files: &mut Files, it: &Intent) -> Option<()> {
+        let f = self.mem.r16(DS, 0x05E0) & !0x2000;
+        self.mem.w16(DS, 0x05E0, f);
+        if it.look != 0 {
+            self.turn(it.look as u16);
+        }
+        if it.turn != 0 {
+            let d = self.turn_speed(it.turn.unsigned_abs().min(0x100));
+            self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
+        }
+        if it.forward != 0 || it.strafe != 0 {
+            let fraction = it.forward.unsigned_abs().max(it.strafe.unsigned_abs()).min(0x100);
+            let speed = self.walk_speed(fraction, it.forward < 0);
+            // The direction in heading units (512 a turn, + to the right).
+            let a = (it.strafe as f64).atan2(it.forward as f64);
+            let offset = (a * 256.0 / std::f64::consts::PI).round() as i32 as u16;
+            let h = self.mem.r16(DS, HEADING).wrapping_add(offset) & 0x1FF;
+            self.mem.w16(DS, SPEED, speed);
+            if it.strafe == 0 {
+                self.mem.w16(DS, 0x05DE, h);
+            }
+            let buttons = self.mem.r8(DS, BUTTONS);
+            self.mem.w8(DS, BUTTONS, buttons | 1);
+            let r = self.walk(files, speed, h);
+            self.mem.w8(DS, BUTTONS, buttons);
+            r?;
+        } else {
+            self.mem.w16(DS, SPEED, 0);
+        }
+        if it.jump {
+            self.jump(it.run);
+        }
+        Some(())
     }
 
     /// 2826:019D..01D5.
@@ -376,7 +475,7 @@ impl Machine {
     /// no wall, only if its floor is solid. Levitating, the jump instead
     /// ends the levitation (2826:0244). Holding Shift makes it a running
     /// jump.
-    fn jump(&mut self) {
+    fn jump(&mut self, run: bool) {
         if self.mem.r8(DS, JUMP) != 0 || self.mem.r8(DS, crate::movement::var::CLIMB) != 0 {
             return;
         }
@@ -397,7 +496,7 @@ impl Machine {
             }
         }
         self.mem.w8(DS, JUMP, 0x0A);
-        if !self.key(key::LSHIFT) && !self.key(key::RSHIFT) {
+        if !run {
             return;
         }
         if self.mem.r16(DS, SPEED) >= 0x1E {
@@ -577,7 +676,7 @@ impl Machine {
                 self.forward(files)
             }
             Handler::TurnLeft => self.turn_left(0x28, 0x2C),
-            Handler::Centre => hooks.view_click(self, files),
+            Handler::Centre => self.view_click(files, hooks),
             Handler::TurnRight => self.turn_right(0x40, 0x44),
             Handler::StrafeLeft => self.strafe_left(files),
             Handler::Back => self.back(files),

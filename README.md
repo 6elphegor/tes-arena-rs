@@ -91,6 +91,22 @@ No game code or data is included: everything is loaded from your own copy.
   physics frame (0000:F57C): falling and the floor height (F9C4: raised
   squares, water and pits, bobbing), with the input step and level
   transitions as `PhysicsHooks`.
+- `src/controls.rs` – the player's controls (2826:0002, the physics
+  frame's input hook). The original steers with the mouse: the view is a
+  3 x 3 grid of regions (forward, back, turn, strafe, centre), and the
+  cursor's distance from a region's outer edge sets the speed; the arrow
+  keys call the same handlers with the cursor at the edge. Also jumping,
+  the levitation bob, and cancelling a spell waiting for a target. The
+  front end reports the mouse and keys (`set_mouse`, `set_key`) and calls
+  `player_input`, or drives the same movement with modern controls
+  (`player_steer` with an `Intent`: forward, strafe, turn, mouse look,
+  jump). `controls::Classic` plugs the controls into the physics frame.
+- `src/click.rs` – a left click in the view (2826:077E): spells waiting
+  for a target (removing or raising walls, digging or filling pits,
+  Open and Lock on doors), doors (opened with a key, or picked by a
+  lockpicking roll), and the click left for the actors. What is under the
+  cursor comes from the renderer (the wall square, the door's span and
+  square, and the floor square through `ControlHooks::floor_pick`).
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation
