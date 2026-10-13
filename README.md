@@ -145,8 +145,12 @@ No game code or data is included: everything is loaded from your own copy.
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the state the start of the
   original's drawing sets (`view_begin`, 0000:C923: the player's square
-  CB90, which the encounters, the actors and the clicks read) with the
-  `EngineHooks::draw` hook in place of its walk over the squares, the
+  CB90, which the encounters, the actors and the clicks read), the doors
+  its walk over the squares stepped (`view_walk_doors`, 0000:C980: every
+  square within reach once, ring by ring; a door met from the sides
+  toward the player unless a full wall is there, each time stepping,
+  `door_drawn`, 0000:CD66: opening near the player, closing again away
+  from it), the `EngineHooks::draw` hook for the rest of the walk, the
   wall spells' squares, the frame body, a pending INF; `enter_area` sets
   a loaded level up (the state half of 0000:A4ED). `Engine::view` gives the renderer the
   player's position, heading, light, time of day and message;
@@ -208,7 +212,7 @@ member using wgpu, winit, glam and png.
   - solid walls (equal bytes), with the faces between walls culled;
   - raised platforms (the box side and cap tables, with heights from
     `move_wall_height`);
-  - doors and the other wall kinds;
+  - the other wall kinds (9, 0Ah, 0Dh) as walls;
   - floors (FLOOR words), and the *CEILING texture.
 - `flats.rs` decodes the flats the INF loader read into the flat banks:
   - raw .IMGs;
@@ -227,25 +231,34 @@ member using wgpu, winit, glam and png.
   - the creatures in the actor slots: sprite C0h + view, mirrored with
     flag 2, at the actor's frame.
 
+  `world::doors` draws the doors each frame, swung open by their state.
+  How the original drew a door ajar isn't ported: a panel on each side
+  turns about its left edge, by a quarter turn when fully open.
+
   The examples `flats` (every frame on one sheet), `formats` (what the
-  decoders miss, by level) and `actors` (the slots in use) check them.
+  decoders miss, by level), `actors` (the slots in use) and `doors` (the
+  doors nearest the start, their surroundings and locks) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
   with the palette.
 - `main.rs` turns the keys and the mouse into an `Intent` for
   `Engine::frame`, run at the game's pace. Its `draw` hook steps the
   changed squares within the view's reach. The original stepped only
-  the squares it drew. F (or `--fight`) rolls random encounters until
+  the squares it drew. The hook also leaves what is under the centre of
+  the view for a click: the first square that isn't empty along the
+  heading, and for a door its square and span, as the original's
+  drawing left them under the cursor. E or a left click clicks there
+  (`view_click`), which opens a door within reach. F (or `--fight`) rolls random encounters until
   creatures come, a debugging aid.
 
 ```
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--wait N] --shot out.png [FRAMES [TURN]]
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
 Not drawn yet: people (their graphics come from a list, 0000:1AF9),
-cities (their flats load elsewhere), doors as they open, chasms and
-water, the sky, and the interface. How a dungeon's placed creatures
+cities (their flats load elsewhere), the other door kinds moving, chasms
+and water, the sky, and the interface. How a dungeon's placed creatures
 (map flats naming creature files, such as rat.dfa) come to life is not
 found yet.
 

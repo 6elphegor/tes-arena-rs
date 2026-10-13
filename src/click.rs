@@ -315,6 +315,69 @@ impl Machine {
         }
     }
 
+    /// 0000:CD66..CE31. The renderer met the door (wall kind 0Bh) at map
+    /// offset `sq`: an opening door steps. Its high byte's low nibble is
+    /// the state: bits 1-3 how far open (0 shut .. 7), bit 0 closing.
+    /// Within two squares of the player it opens a step (and stops
+    /// closing); farther, a closing one closes a step and another opens a
+    /// step until fully open, where it starts closing. Returns the sound
+    /// the door hook (CD46) is called with, if it is set: the door's
+    /// moving sound (table C3C8 by the low byte's bits 6-7) as it opens
+    /// out of reach, its shutting sound (C3BC) as it shuts. For the
+    /// renderer it sets the kind drawn (CB37), CB38 (those bits), BA7F,
+    /// the open amount (CCC4) and, while it is open, C398 bit 1000h. The
+    /// original's walk over the squares (0000:C980) met each door within
+    /// its reach twice a frame.
+    pub fn door_drawn(&mut self, sq: u16) -> Option<u16> {
+        let walls = self.walls();
+        let (lo, hi) = (self.mem.r8(walls, sq), self.mem.r8(walls, sq.wrapping_add(1)));
+        self.mem.w8(DS, 0xCB37, 0xB);
+        self.mem.w8(DS, 0xBA7F, 1);
+        self.mem.w8(DS, 0xCB38, lo >> 6);
+        self.mem.w16(DS, 0xCCC4, 0);
+        let state = hi & 0xF;
+        if state == 0 {
+            return None;
+        }
+        let f = self.mem.r16(DS, MAP_FLAGS) | 0x1000;
+        self.mem.w16(DS, MAP_FLAGS, f);
+        let away = |p: u16, c: u16| ((p >> 7).wrapping_sub(c) as i16).unsigned_abs() > 2;
+        let near = !away(self.mem.r16(DS, X), (sq >> 1) & 0x7F) && !away(self.mem.r16(DS, Y), sq >> 8);
+        let mut sound = None;
+        let (step, mut closing) = if near {
+            (1i8, false)
+        } else if state & 1 != 0 {
+            (-1, true)
+        } else {
+            sound = self.door_sound(0xC3C8, lo);
+            (1, false)
+        };
+        let mut open = ((state >> 1) as i8).wrapping_add(step);
+        if open >= 7 {
+            open = 7;
+            if !near {
+                closing = true;
+            }
+        } else if open <= 0 {
+            open = 0;
+            closing = false;
+        }
+        self.mem.w16(DS, 0xCCC4, open as u16);
+        if open == 0 {
+            sound = self.door_sound(0xC3BC, lo);
+        }
+        self.mem.w8(walls, sq.wrapping_add(1), 0xB0 | (open as u8) << 1 | closing as u8);
+        sound
+    }
+
+    /// 0000:A8EF with a door's sound from `table` by bits 6-7 of its low
+    /// byte: the sound the door hook (CD46) is called with, unless its
+    /// segment is 0.
+    fn door_sound(&self, table: u16, lo: u8) -> Option<u16> {
+        let hook = crate::movement::var::SOUND_HOOK;
+        (self.mem.r16(DS, hook + 2) != 0).then(|| self.mem.r8(DS, table + (lo >> 6) as u16) as u16)
+    }
+
     /// 2826:0A4C. The click is left for the actors.
     fn actor_click(&mut self) {
         let f = self.mem.r16(DS, LEVEL_FLAGS) | 0x80;

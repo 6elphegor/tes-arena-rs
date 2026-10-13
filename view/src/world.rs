@@ -233,13 +233,11 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                     quad([[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]], uv, cap.saturating_sub(1), 1.0);
                     quad([[x0, lo, z1], [x1, lo, z1], [x1, lo, z0], [x0, lo, z0]], uv, cap.saturating_sub(1), 0.7);
                 }
-            } else if v != 0 && matches!(v >> 12, 9 | 0xA | 0xB | 0xD) {
-                // Doors and the other wall kinds, drawn as walls for now
-                // (an open door, bit 200h, as nothing).
-                if !(v >> 12 == 0xB && v & 0x200 != 0) {
-                    let t = (v & 0x3F) as u32;
-                    sides(0.0, ceiling, t.saturating_sub(1), &|_| false);
-                }
+            } else if v != 0 && matches!(v >> 12, 9 | 0xA | 0xD) {
+                // The other wall kinds, drawn as walls for now. Doors
+                // (0Bh) move: `doors`.
+                let t = (v & 0x3F) as u32;
+                sides(0.0, ceiling, t.saturating_sub(1), &|_| false);
             }
             if has_floor {
                 let f = m.mem.r16(floors, at(col as u16, row as u16));
@@ -255,6 +253,88 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
         }
     }
     out
+}
+
+/// The doors (wall kind 0Bh) as they stand this frame: shut, a panel on
+/// each side not against a full wall; opening (high byte bits 1-3, 0..7, as `Machine::
+/// door_drawn` steps them), each panel swung into the square about its
+/// left edge (as seen from outside) by 90 degrees fully open. How the
+/// original's renderer drew a door ajar (by CCC4) isn't ported; this is
+/// a stand-in.
+pub fn doors(m: &Machine) -> Vec<Vertex> {
+    let w = m.mem.r16(DS, 0xC357).min(128);
+    let d = m.mem.r16(DS, 0xC359).min(128);
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let ceiling = m.mem.r16(DS, arena::movement::var::CEILING) as f32;
+    let mut out = Vec::new();
+    for row in 0..d {
+        for col in 0..w {
+            let v = m.mem.r16(walls, (row << 8) | (col << 1));
+            if v >> 12 != 0xB {
+                continue;
+            }
+            let layer = ((v & 0x3F) as u32).saturating_sub(1);
+            let angle = ((v >> 9) & 7) as f32 / 7.0 * std::f32::consts::FRAC_PI_2;
+            let (x0, z0) = (col as f32 * SQUARE, row as f32 * SQUARE);
+            let (x1, z1) = (x0 + SQUARE, z0 + SQUARE);
+            // Each side: the neighbour it faces, its hinge, its far edge,
+            // the way into the square, and its light.
+            let sides = [
+                ((0, -1), (x1, z0), (x0, z0), (0.0, 1.0), 0.85),
+                ((0, 1), (x0, z1), (x1, z1), (0.0, -1.0), 0.85),
+                ((-1, 0), (x0, z0), (x0, z1), (1.0, 0.0), 1.0),
+                ((1, 0), (x1, z1), (x1, z0), (-1.0, 0.0), 1.0),
+            ];
+            for ((dc, dr), (hx, hz), (ex, ez), (nx, nz), light) in sides {
+                // None against a full wall.
+                let (c, r) = (col as i32 + dc, row as i32 + dr);
+                let n = if c < 0 || r < 0 || c >= w as i32 || r >= d as i32 { 0xFFFF } else { m.mem.r16(walls, (r << 8 | c << 1) as u16) };
+                if n == 0xFFFF || (n != 0 && n & 0x8000 == 0 && n as u8 == (n >> 8) as u8) {
+                    continue;
+                }
+                let (c, s) = (angle.cos(), angle.sin());
+                let (fx, fz) = (hx + (ex - hx) * c + nx * SQUARE * s, hz + (ez - hz) * c + nz * SQUARE * s);
+                let p = [[hx, 0.0, hz], [fx, 0.0, fz], [fx, ceiling, fz], [hx, ceiling, hz]];
+                let th = 64.0;
+                let uv = [[0.0, th], [64.0, th], [64.0, 0.0], [0.0, 0.0]];
+                for i in [0, 1, 2, 0, 2, 3] {
+                    out.push(Vertex { pos: p[i], uv: uv[i], layer, light, flags: 0 });
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The map square under the centre of the view, as the original's
+/// renderer leaves the square under the cursor (CB92) for a click: the
+/// first square that isn't empty along the player's heading, within
+/// `reach` squares; None past it or the map's edge.
+pub fn pick(m: &Machine, reach: u16) -> Option<u16> {
+    let w = m.mem.r16(DS, 0xC357).min(128) as i32;
+    let d = m.mem.r16(DS, 0xC359).min(128) as i32;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    use arena::movement::var::{HEADING, X, Y};
+    let (x, y) = (m.mem.r16(DS, X) as f32, m.mem.r16(DS, Y) as f32);
+    let a = m.mem.r16(DS, HEADING) as f32 / 512.0 * std::f32::consts::TAU;
+    let (dx, dy) = (a.sin(), a.cos());
+    let start = (x as i32 >> 7, y as i32 >> 7);
+    let mut t = 0.0;
+    while t < reach as f32 * SQUARE {
+        t += 4.0;
+        let (col, row) = ((x + dx * t) as i32 >> 7, (y + dy * t) as i32 >> 7);
+        if col < 0 || row < 0 || col >= w || row >= d {
+            return None;
+        }
+        if (col, row) == start {
+            continue;
+        }
+        let sq = (row << 8 | col << 1) as u16;
+        if m.mem.r16(walls, sq) != 0 {
+            return Some(sq);
+        }
+    }
+    None
 }
 
 /// The level's flats by number (from 0, FLAT_BASE being the level's

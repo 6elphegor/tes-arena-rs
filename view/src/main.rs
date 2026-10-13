@@ -1,14 +1,16 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
-//! Space jumps (Shift for a running jump). With --shot it renders one
+//! Space jumps (Shift for a running jump), E or a click (captured) clicks
+//! the centre of the view: opens a door. With --shot it renders one
 //! picture after turning by TURN (heading units, 512 a turn) and FRAMES
 //! frames (default 0) of walking forward, and exits; --wait stands still
-//! N frames before the walk. --fight brings a random encounter at the
+//! N frames before the walk, --click clicking first; --at puts the
+//! player in a square's centre, facing HEADING, a debugging aid. --fight brings a random encounter at the
 //! start (F does in the window).
 
 mod archive;
@@ -34,7 +36,21 @@ impl EngineHooks for Front {
     /// The original stepped the changed squares it drew: here those
     /// within the view's reach (C394 squares) step, seen or not.
     fn draw(&mut self, m: &mut arena::machine::Machine) {
+        use arena::click::var::{DOOR_AT, DOOR_COL, DOOR_ROW, DOOR_X0, DOOR_X1};
         use arena::mem::DS;
+        // What a click in the centre would meet (the original's renderer
+        // left the square and, for a door, its span under the cursor).
+        if let Some(sq) = world::pick(m, m.mem.r16(DS, 0xC394)) {
+            m.mem.w16(DS, arena::controls::var::PICKED, sq);
+            let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+            if m.mem.r16(walls, sq) >> 12 == 0xB {
+                m.mem.w16(DS, DOOR_X0, 0);
+                m.mem.w16(DS, DOOR_X1, 319);
+                m.mem.w16(DS, DOOR_COL, (sq & 0xFF) >> 1);
+                m.mem.w16(DS, DOOR_ROW, sq >> 8);
+                m.mem.w16(DS, DOOR_AT, sq);
+            }
+        }
         let reach = m.mem.r16(DS, 0xC394) as i32;
         let (col, row) = (m.mem.r16(DS, 0xCCA4) as i32, m.mem.r16(DS, 0xCCA6) as i32);
         for i in 0..0x20 {
@@ -86,7 +102,9 @@ impl Assets {
 
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
     fn sprites(&self, engine: &Engine, cam: Camera, ticks: usize) -> Vec<world::Vertex> {
-        world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE)
+        let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
+        v.extend(world::doors(&engine.m));
+        v
     }
 }
 
@@ -96,18 +114,31 @@ const ANIMATE: usize = 4;
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
     let fight = args.iter().any(|a| a == "--fight");
-    args.retain(|a| a != "--fight");
+    let click = args.iter().any(|a| a == "--click");
+    args.retain(|a| a != "--fight" && a != "--click");
     let mut wait = 0;
     if let Some(i) = args.iter().position(|a| a == "--wait") {
         wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
         args.drain(i..i + 2);
     }
+    let mut at = None;
+    if let Some(i) = args.iter().position(|a| a == "--at") {
+        let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
+        at = Some((v[0], v[1], v[2]));
+        args.drain(i..i + 4);
+    }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    if let Some((col, row, heading)) = at {
+        use arena::movement::var::{HEADING, X, Y};
+        engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
+        engine.m.mem.w16(arena::mem::DS, Y, row << 7 | 64);
+        engine.m.mem.w16(arena::mem::DS, HEADING, heading);
+    }
     if fight {
         world::summon(&mut engine);
     }
@@ -115,18 +146,18 @@ fn main() {
         let out = args.get(4).expect("--shot needs a file");
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, out, wait, frames, turn);
+        shot(&dir, engine, out, click, wait, frames, turn);
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &engine);
-    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, next: Instant::now() };
+    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, next: Instant::now() };
     event_loop.run_app(&mut app).expect("run");
 }
 
 /// Renders one frame offscreen to a PNG, after `frames` frames of
 /// walking forward.
-fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, wait: usize, frames: usize, turn: i16) {
+fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait: usize, frames: usize, turn: i16) {
     let mut hooks = Front;
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
@@ -134,6 +165,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, wait: usize, frame
     engine.tick(t);
     let intent = Intent { look: turn, ..Default::default() };
     engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
+    if click {
+        centre_click(&mut engine);
+    }
     for _ in 0..wait {
         let t = engine.frame_ticks();
         engine.tick(t);
@@ -193,6 +227,15 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, wait: usize, frame
     println!("{out}: at ({:#x}, {:#x}) heading {:#x}, {} triangles", v.x, v.y, v.heading, assets.mesh.len() / 3);
 }
 
+/// A left click in the centre of the view (`Machine::view_click`), on
+/// what the last frame's drawing left under it.
+fn centre_click(engine: &mut Engine) {
+    engine.m.set_mouse(160, 70, 0);
+    if engine.m.view_click(&mut engine.files, &mut Front).is_none() {
+        eprintln!("the click met something not ported");
+    }
+}
+
 struct Gpu {
     window: Arc<winit::window::Window>,
     surface: wgpu::Surface<'static>,
@@ -222,6 +265,8 @@ struct App {
     keys: Keys,
     look: f64,
     captured: bool,
+    /// A click waiting for the next frame.
+    click: bool,
     next: Instant,
 }
 
@@ -240,6 +285,9 @@ impl App {
             jump: k.jump,
             run: k.run,
         };
+        if std::mem::take(&mut self.click) {
+            centre_click(&mut self.engine);
+        }
         let t = self.engine.frame_ticks();
         self.engine.tick(t);
         match self.engine.frame(Input::Steer(&intent), &mut Front) {
@@ -308,6 +356,7 @@ impl winit::application::ApplicationHandler for App {
                     self.captured = ok;
                 }
             }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: winit::event::MouseButton::Left, .. } => self.click = true,
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
                 if let PhysicalKey::Code(code) = event.physical_key {
@@ -321,6 +370,7 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::ArrowRight => k.turn_right = down,
                         KeyCode::Space => k.jump = down,
                         KeyCode::KeyF if down => world::summon(&mut self.engine),
+                        KeyCode::KeyE if down => self.click = true,
                         KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
                         KeyCode::Escape if down => {
                             if let Some(g) = &self.gpu {

@@ -11,8 +11,8 @@
 //! The original drew the view between the physics and the changed
 //! squares. The start of its drawing set state the game reads (the
 //! player's square: `view_begin`); the walk over the squares stepped the
-//! changed squares it drew, which `EngineHooks::draw` leaves to the front
-//! end, called at that point. The front end draws the view from the
+//! doors (`view_walk_doors`) and the changed squares it drew, which
+//! `EngineHooks::draw` leaves to the front end, called at that point. The front end draws the view from the
 //! state after the frame (through `Machine` and the `View` helpers),
 //! advances the BIOS timer (`tick`: 18.2 ticks a second; the clock runs
 //! on it), and paces frames (`frame_ticks`).
@@ -47,6 +47,9 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     /// is changing (`Machine::temp_walls_begin_draw` then
     /// `temp_wall_drawn`).
     fn draw(&mut self, _m: &mut Machine) {}
+    /// The door hook (CD46, 0000:A8EF): a door's sound, as the walk
+    /// steps it (`Machine::view_walk_doors`), when the hook is set.
+    fn sound(&mut self, _m: &mut Machine, _sound: u16) {}
 }
 
 /// How a frame ended.
@@ -115,6 +118,9 @@ impl Engine {
             return Some(Frame::Left);
         }
         m.view_begin();
+        for s in m.view_walk_doors() {
+            hooks.sound(m, s);
+        }
         hooks.draw(m);
         m.temp_walls_frame();
         m.frame_body(files, hooks)?;
@@ -230,4 +236,76 @@ impl Machine {
         let f = self.mem.r16(DS, MAP_FLAGS) & !0x20;
         self.mem.w16(DS, MAP_FLAGS, f);
     }
+
+    /// 0000:C980, the walk over the squares in view, for the doors (the
+    /// rest it does is drawing, and the changed squares it steps are
+    /// `EngineHooks::draw`'s), with C398 bit 20h as the world loop sets
+    /// it (0000:A36F: when the player isn't below the floor, height C3D2
+    /// negative). Every square in the map within C394 squares of the
+    /// player's (CCA4, CCA6) is met once, ring by ring from the farthest
+    /// (`walk_order`). A door (kind 0Bh) is met twice, from its side
+    /// facing the player's row and then its column (0000:CB3F), each
+    /// unless the neighbour that side is a full wall (both bytes alike,
+    /// positive or kind 0Dh; 0000:CCC3), and steps each time it is met
+    /// (`door_drawn`). Not with level flag C39A bit 4, whose squares the
+    /// original handles otherwise (0000:CC76). Returns the sounds the
+    /// door hook was called with, in order. A reach of 0 isn't handled
+    /// (the original walks 65535 rings).
+    pub fn view_walk_doors(&mut self) -> Vec<u16> {
+        let mut sounds = Vec::new();
+        let reach = self.mem.r16(DS, 0xC394);
+        if (self.mem.r16(DS, HEIGHT) as i16) < 0 || self.mem.r16(DS, LEVEL_FLAGS) & 4 != 0 || reach == 0 {
+            return sounds;
+        }
+        let (w, d) = (self.mem.r16(DS, 0xC357), self.mem.r16(DS, 0xC359));
+        let (pc, pr) = (self.mem.r16(DS, 0xCCA4), self.mem.r16(DS, 0xCCA6));
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        let mut last = None;
+        for (dc, dr) in walk_order(reach) {
+            let (col, row) = ((dc as u16).wrapping_add(pc), (dr as u16).wrapping_add(pr));
+            if (col as i16) < 0 || (row as i16) < 0 || col >= w || row >= d || last == Some((col, row)) {
+                continue;
+            }
+            last = Some((col, row));
+            let sq = (row << 8).wrapping_add(col << 1);
+            let v = self.mem.r16(walls, sq);
+            if v >> 12 != 0xB {
+                continue;
+            }
+            let by_row = if row < pr { 0x100 } else { 0xFF00 };
+            let by_col = if col < pc { 2 } else { 0xFFFE };
+            for side in [by_row, by_col] {
+                let n = self.mem.r16(walls, sq.wrapping_add(side));
+                if n as u8 == (n >> 8) as u8 && ((n as i16) > 0 || n >> 12 == 0xD) {
+                    continue;
+                }
+                sounds.extend(self.door_drawn(sq));
+            }
+        }
+        sounds
+    }
+}
+
+/// The order 0000:C980 meets the squares in, as (column, row) from the
+/// player's: each ring from `reach` in to 1, then the player's square. A
+/// ring goes by k from 0 to r, a = k - r: (a, -r), (-a, -r), (-a, r),
+/// (a, r), then unless a = -r (r, a) mirrored likewise, (-r, a), (r, a),
+/// and unless a = 0, (r, -a), (-r, -a). The squares met twice running
+/// (a = 0) are skipped where they are met (CD14, D744).
+pub fn walk_order(reach: u16) -> Vec<(i16, i16)> {
+    let mut v = Vec::new();
+    for r in (1..=reach as i16).rev() {
+        for k in 0..=r {
+            let a = k - r;
+            v.extend([(a, -r), (-a, -r), (-a, r), (a, r)]);
+            if a != -r {
+                v.extend([(-r, a), (r, a)]);
+                if a != 0 {
+                    v.extend([(r, -a), (-r, -a)]);
+                }
+            }
+        }
+    }
+    v.push((0, 0));
+    v
 }
