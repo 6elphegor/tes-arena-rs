@@ -367,7 +367,7 @@ impl Machine {
     /// 0000:269E (2EBD:0084). Spell effects on the actor's record end:
     /// each is cleared and its two last bytes set to 0xFF (and DGROUP
     /// 0D39 gets bit 0x80); the record's low status flags clear.
-    fn actor_forget(&mut self, si: u16) {
+    pub(crate) fn actor_forget(&mut self, si: u16) {
         let seg = self.mem.r16(DS, CREATURE_SEG);
         let rec = self.act16(si, f::RECORD);
         let key = (seg as u32) << 16 | rec as u32;

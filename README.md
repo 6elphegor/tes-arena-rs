@@ -107,6 +107,15 @@ No game code or data is included: everything is loaded from your own copy.
   lockpicking roll), and the click left for the actors. What is under the
   cursor comes from the renderer (the wall square, the door's span and
   square, and the floor square through `ControlHooks::floor_pick`).
+- `src/weapon.rs` – the player's weapon each frame (0000:38CE): drawing
+  and sheathing it, and swinging it. A swing starts with a right-button
+  drag of 40h mickeys or more (the mouse's motion counters are input,
+  `Machine::mouse_motion`); its direction picks the swing; every fifth
+  frame it lands (`strike::swing_hits`), and with no actor in reach it
+  hits the square ahead (0000:3D43): breaking into a closed building in a
+  town (a crime that may bring the guards), or bashing a breakable flat
+  or a locked door by the blow's damage and strength. The bow's shot and
+  the drawing of the hands are hooks.
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation

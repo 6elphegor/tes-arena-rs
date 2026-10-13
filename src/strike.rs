@@ -158,7 +158,7 @@ impl Machine {
     /// 10 x the player's level, at least 50. The product is 8-bit times
     /// 8-bit but the subtraction is unsigned 16-bit, so from level 11 on
     /// the chance wraps to over 65000: always seen.
-    fn crime_seen(&mut self) -> bool {
+    pub(crate) fn crime_seen(&mut self) -> bool {
         let level = self.mem.r8(DS, PLAYER + field::LEVEL) as u16;
         let chance = 100u16.wrapping_sub(level * 10).max(50);
         self.percent() < chance
@@ -250,7 +250,7 @@ impl Machine {
 
     /// The player's side of 2AA1:04A5: weapon (1194:7510), else gauntlets
     /// (1194:7449 from SI = FFFF), else the racial bonus (1194:39ED).
-    fn player_gear(&mut self) -> Gear {
+    pub(crate) fn player_gear(&mut self) -> Gear {
         let w = self.equipped_weapon(DS, PLAYER);
         if w == 0xFFFF {
             let (found, g) = self.find_player_equipped(DS, 0xFFFF, 1, 0);

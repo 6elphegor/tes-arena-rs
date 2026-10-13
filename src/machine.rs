@@ -11,13 +11,16 @@ pub struct Machine {
     /// EMS: the 64 KB banks not mapped into the frame (see
     /// `Machine::ems_map`), created as zeros when first needed.
     pub ems: Vec<Vec<u8>>,
+    /// The mouse driver's motion counters (mickeys, x and y) since they
+    /// were last read (INT 33h function 0Bh; see `weapon`).
+    pub mouse_motion: (u16, u16),
 }
 
 impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new() }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0) }
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.

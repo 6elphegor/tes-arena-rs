@@ -34,6 +34,7 @@ pub mod progression;
 pub mod random;
 pub mod save;
 pub mod travel;
+pub mod weapon;
 pub mod wild;
 pub mod scale;
 pub mod shop;
