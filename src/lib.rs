@@ -8,6 +8,7 @@ pub mod character;
 pub mod city;
 pub mod clock;
 pub mod combat;
+pub mod controls;
 pub mod creature;
 pub mod dice;
 pub mod dungeon;
