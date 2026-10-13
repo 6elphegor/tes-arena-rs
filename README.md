@@ -87,7 +87,10 @@ No game code or data is included: everything is loaded from your own copy.
   F478, F60A, F697, FB3A): the 16 x 16 cell mask around a square,
   sliding along walls, triggers, climbing out of low areas, and level
   changes on stairs. Creatures that walk into a closed door open it
-  unless it is locked (the game's lock check for creatures).
+  unless it is locked (the game's lock check for creatures). The
+  physics frame (0000:F57C): falling and the floor height (F9C4: raised
+  squares, water and pits, bobbing), with the input step and level
+  transitions as `PhysicsHooks`.
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation

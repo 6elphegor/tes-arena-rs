@@ -72,6 +72,22 @@ pub mod var {
     pub const W_A850: u16 = 0xA850;
     /// Climb counter set when climbing out of a low area.
     pub const CLIMB: u16 = 0xE39F;
+    /// The physics frame's hooks (far pointers): input and movement, and
+    /// transitions on triggers.
+    pub const INPUT_HOOK: u16 = 0xC3B4;
+    pub const TRANSITION_HOOK: u16 = 0xC3AC;
+    /// The floor height the player settles to, and the fall speed.
+    pub const FLOOR: u16 = 0xE8BC;
+    pub const FALL: u16 = 0xE8BE;
+    /// The floor plane's segment and the EMS frame's (floor kinds are
+    /// frame-relative).
+    pub const FLOOR_SEG: u16 = 0xCCD0;
+    pub const FRAME_SEG: u16 = 0x9030;
+    /// Bobbing in water: the step (0..15), the offset (CB68) and tables.
+    pub const BOB_STEP: u16 = 0xE8B6;
+    pub const BOB: u16 = 0xCB68;
+    pub const BOB_TABLE: u16 = 0xE824;
+    pub const EYE_TABLE: u16 = 0xE844;
 }
 
 /// Sine and cosine (words, 512 entries) of a heading.
@@ -511,4 +527,196 @@ impl Machine {
         self.mem.w16(DS, MAP_FLAGS, f);
         Some(Test::Stop)
     }
+
+    /// 0000:F57C. The player's physics each frame: the climb countdown,
+    /// a pending view refresh (C398 bit 0x2000, the view is the
+    /// renderer's), then, when the input hook (C3B4) is set, the input
+    /// and movement step and the fall (`fall_step`). A trigger left in
+    /// CB6A goes to the transition hook (C3AC) when that is set (the
+    /// view window is saved and restored around it, 0000:A606/A5D1, for
+    /// the renderer); if the
+    /// level changed, the new level is loaded (unless 29CF's stairs
+    /// already did, E39E) and the player turns round. The original also
+    /// waits for the mouse buttons to be released there.
+    pub fn physics_frame(&mut self, files: &mut Files, hooks: &mut dyn PhysicsHooks) -> Option<()> {
+        let c = self.mem.r8(DS, CLIMB);
+        if c != 0 {
+            self.mem.w8(DS, CLIMB, c - 1);
+        }
+        let f = self.mem.r16(DS, MAP_FLAGS);
+        if f & 0x2000 != 0 {
+            self.mem.w16(DS, MAP_FLAGS, f & !0x2000);
+        }
+        if self.mem.r16(DS, INPUT_HOOK + 2) == 0 {
+            return Some(());
+        }
+        hooks.input(self, files)?;
+        self.fall_step();
+        let trigger = self.mem.r16(DS, TRIGGER);
+        if trigger == 0 || self.mem.r16(DS, TRANSITION_HOOK + 2) == 0 {
+            return Some(());
+        }
+        let level = self.mem.r8(DS, LEVEL);
+        hooks.transition(self, files, trigger)?;
+        self.mem.w16(DS, TRIGGER, 0);
+        if self.mem.r8(DS, LEVEL) == level {
+            return Some(());
+        }
+        if self.mem.r8(DS, CHANGED) == 0 {
+            self.level_change(files)?;
+        }
+        self.mem.w8(DS, CHANGED, 1);
+        self.mem.w16(DS, W_A850, 0xFFFE);
+        let h = self.mem.r16(DS, HEADING).wrapping_add(0x100) & 0x1FF;
+        self.mem.w16(DS, HEADING, h);
+        Some(())
+    }
+
+    /// 0000:F9C4. The player's height settles towards the floor under
+    /// them: the top of a raised square (3Ch above it, or the wall's top
+    /// + 3Ch when standing on it), the ground (3Ch), or for a floor
+    /// below FLOOR_SOLID's kind the depth of water or a pit (-80, or -25,
+    /// -10, -50 and -1 by the level's flags, bobbing on the way). Falling
+    /// moves down by E8BE, doubling every other frame, not while
+    /// levitating (C398 bit 0x200), climbing or with level flag 0x8000;
+    /// landing low pulls the player off the square's edges. The view
+    /// refreshes (0000:DA8E) are the renderer's.
+    pub fn fall_step(&mut self) {
+        let f = self.mem.r16(DS, LEVEL_FLAGS) & !0x10;
+        self.mem.w16(DS, LEVEL_FLAGS, f);
+        let f = self.mem.r16(DS, MAP_FLAGS) & !0x800;
+        self.mem.w16(DS, MAP_FLAGS, f);
+        self.mem.w16(DS, BOB, 0);
+        let (px, py) = (self.mem.r16(DS, X), self.mem.r16(DS, Y));
+        // 0000:F565
+        let sq = ((py >> 7) << 8).wrapping_add((px >> 7) << 1);
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        let wall = self.mem.r16(walls, sq);
+        let height = self.mem.r16(DS, HEIGHT);
+        let (target, wet) = 'floor: {
+            if height as i16 >= 0x3C && wall != 0 {
+                if (wall >> 8) as u8 != wall as u8 {
+                    self.stand_on(wall);
+                    break 'floor (self.mem.r16(DS, FLOOR), false);
+                }
+                break 'floor (0x3C, false);
+            }
+            let floors = self.mem.r16(DS, FLOOR_SEG);
+            let fl = self.mem.r16(floors, sq);
+            if fl < self.mem.r16(DS, FLOOR_SOLID) {
+                break 'floor (0x3C, false);
+            }
+            let level = self.mem.r16(DS, LEVEL_FLAGS);
+            if level & 1 != 0 && height <= 0x3E {
+                break 'floor (0x3C, false);
+            }
+            if fl.wrapping_sub(self.mem.r16(DS, FRAME_SEG)) == 0xC00 {
+                break 'floor (0xFFB0, false);
+            }
+            let mut bx = if level & 0x4000 != 0 { 0xFFF6 } else { 0xFFE7 };
+            if self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
+                bx = 0xFFCE;
+                if level & 0x200 != 0 {
+                    bx = if level & 0x4000 != 0 { 0xFFFF } else { 0xFFF6 };
+                }
+            }
+            (bx, true)
+        };
+        self.mem.w16(DS, FLOOR, target);
+        let height = self.mem.r16(DS, HEIGHT);
+        if (target as i16) < height as i16 {
+            if self.mem.r16(DS, MAP_FLAGS) & 0x200 != 0
+                || self.mem.r8(DS, CLIMB) != 0
+                || self.mem.r16(DS, LEVEL_FLAGS) & 0x8000 != 0
+            {
+                return;
+            }
+            let f = self.mem.r16(DS, MAP_FLAGS) | 0x800;
+            self.mem.w16(DS, MAP_FLAGS, f);
+            let ax = height.wrapping_sub(self.mem.r16(DS, FALL));
+            if (target as i16) < ax as i16 {
+                if self.mem.r16(DS, 0xCCBC) & 1 != 0 {
+                    let v = self.mem.r16(DS, FALL) << 1;
+                    self.mem.w16(DS, FALL, v);
+                }
+                if height == ax {
+                    return;
+                }
+                self.mem.w16(DS, HEIGHT, ax);
+                if (ax as i16) < 0x3C {
+                    for at in [X, Y] {
+                        let v = self.mem.r16(DS, at);
+                        let e = v & 0x7F;
+                        let e = if e < 0x32 {
+                            e + 0x10
+                        } else if e > 0x4E {
+                            e - 0x10
+                        } else {
+                            0x40
+                        };
+                        self.mem.w16(DS, at, (v & 0xFF80).wrapping_add(e));
+                    }
+                }
+                return;
+            }
+        }
+        // 0000:FADA: settled on the floor.
+        let target = self.mem.r16(DS, FLOOR);
+        if self.mem.r16(DS, HEIGHT) != target {
+            self.mem.w16(DS, HEIGHT, target);
+            self.mem.w16(DS, FALL, 4);
+        }
+        if !wet {
+            return;
+        }
+        let f = self.mem.r16(DS, LEVEL_FLAGS) | 0x10;
+        self.mem.w16(DS, LEVEL_FLAGS, f);
+        let bx = self.mem.r16(DS, BOB_STEP);
+        if self.mem.r16(DS, 0xCCBC) & 1 != 0 {
+            self.mem.w16(DS, BOB_STEP, bx.wrapping_add(1) & 0xF);
+        }
+        let at = bx.wrapping_mul(2);
+        let b = self.mem.r16(DS, BOB_TABLE.wrapping_add(at));
+        self.mem.w16(DS, BOB, b);
+        let e = self.mem.r16(DS, 0xC3D8).wrapping_add(self.mem.r16(DS, EYE_TABLE.wrapping_add(at)));
+        self.mem.w16(DS, 0xC3D8, e);
+    }
+
+    /// 0000:F73B. Standing on a raised square: its top (+3Ch) becomes the
+    /// floor (E8BC) if the player is not below it and, unless the level
+    /// has flag 200h, it is not above the ceiling.
+    fn stand_on(&mut self, wall: u16) {
+        let height = self.mem.r16(DS, HEIGHT);
+        if (height.wrapping_sub(0x3C) as i16) < 0 || (wall as i16) < 0 {
+            return;
+        }
+        let (top, bottom) = self.move_wall_height(wall);
+        if bottom as i16 > height as i16 {
+            return;
+        }
+        let ax = top.wrapping_add(0x3C);
+        if self.mem.r16(DS, LEVEL_FLAGS) & 0x200 == 0 && ax > self.mem.r16(DS, CEILING) {
+            return;
+        }
+        self.mem.w16(DS, FLOOR, ax);
+    }
 }
+
+/// The hooks the physics frame calls (far pointers the mode's code sets).
+pub trait PhysicsHooks {
+    /// Hook C3B4 (2826:0002 in 3D areas): the player's input and movement.
+    fn input(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    /// Hook C3AC (0000:4470): a trigger (CB6A) taking the player
+    /// elsewhere.
+    fn transition(&mut self, _m: &mut Machine, _files: &mut Files, _trigger: u16) -> Option<()> {
+        Some(())
+    }
+}
+
+/// `PhysicsHooks` that do nothing.
+pub struct NoPhysicsHooks;
+
+impl PhysicsHooks for NoPhysicsHooks {}
+

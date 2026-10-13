@@ -65,7 +65,7 @@ const LOOSE_DOS_HANDLE: u16 = 6;
 /// The game directory: loose files (matched case-insensitively, as DOS
 /// does) and the DOS file positions of open files. Cloning is cheap: file
 /// contents are shared.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Files {
     names: HashMap<Vec<u8>, PathBuf>,
     bsa: Option<(Rc<[u8]>, u32)>,
