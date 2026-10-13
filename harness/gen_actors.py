@@ -8,9 +8,10 @@ does, with EMS on), puts the player on a free square, fills the actors
 from a seed (`setup`, mirrored in tests/actors.rs) and runs one frame of
 the actors. The door hooks are the game's: the lock check 2826:0AAB and
 the sound 23BA:002A (stubbed with a RETF, as sound is not ported, like
-0000:1B7F and FE58, which build the draw list). Attacks (2AA1:00D8) and
-spells (29CF:0145, 0675) are not ported: they are replaced by an INT 3,
-so a case reaching one is a "fault", as the port returns None there.
+0000:1B7F and FE58, which build the draw list), and so is the message
+box of a broken special item (1194:A36C) in a creature's blow. Spells
+(29CF:0145, 0675) are not ported: they are replaced by an INT 3, so a
+case reaching one is a "fault", as the port returns None there.
 
 Lines (fields separated by " | "):
   actors | mif px py seed var=value,... | digests
@@ -31,7 +32,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
-from emu import Fault, LOAD_SEG, STUB_SEG
+from emu import DGROUP, Fault, LOAD_SEG, STUB_SEG
 
 EXE, GAME, OUT = sys.argv[1:4]
 SKIP = int(sys.argv[4]) if len(sys.argv) > 4 else 0
@@ -122,7 +123,7 @@ def setup(seed, px, py, corpse):
 a = DosArena(EXE, GAME)
 a.std_devices = True
 for seg, off, code in [(0, 0x1B7F, b'\xc3'), (0, 0xFE58, b'\xc3'), (0, 0xDA8E, b'\xc3'), (0, 0x8FC8, b'\xc3'),
-                       (0x23BA, 0x002A, b'\xcb'), (0x2AA1, 0x00D8, b'\xcc'), (0x29CF, 0x0145, b'\xcc'),
+                       (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb'), (0x29CF, 0x0145, b'\xcc'),
                        (0x29CF, 0x0675, b'\xcc')]:
     a.patch(seg, off, code)
 a.init_heap()
@@ -144,6 +145,14 @@ bsa = open(os.path.join(GAME, a.names['GLOBAL.BSA']), 'rb').read()
 count = struct.unpack_from('<H', bsa, 0)[0]
 d = len(bsa) - 18 * count
 NAMES = [bsa[d + 18 * i: d + 18 * i + 14].split(b'\0')[0].upper() for i in range(count)]
+
+
+def unrelocate(before):
+    """Words a blow sets to DGROUP's segment (the message pointer at 061C,
+    effect slot targets) are compared image-relative."""
+    for o in [0x061C] + [0x0660 + i * 0x3C + 0x2A for i in range(16)]:
+        if a.r16(o) == a.ds and struct.unpack_from('<H', before, o)[0] != a.ds:
+            a.w16(o, DGROUP)
 
 
 def has_info(name):
@@ -259,6 +268,7 @@ for _ in range(1500):
     try:
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
+        unrelocate(before)
         after = a.seg_bytes(a.ds)
         changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
@@ -319,6 +329,7 @@ for _ in range(300):
     try:
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
+        unrelocate(before)
         after = a.seg_bytes(a.ds)
         changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'

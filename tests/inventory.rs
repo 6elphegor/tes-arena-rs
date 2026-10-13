@@ -141,7 +141,7 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>) -> HashMap<&'stati
             use arena::combat::{Gear, Ptr};
             let (att, def) = (Ptr::new(reg("fs"), reg("si")), Ptr::new(reg("es"), reg("di")));
             let armor = m.defender_armor(def);
-            let gear = Gear { armor, weapon: None, gauntlets: None, weapon_bonus: 0, missile: false };
+            let gear = Gear { armor, weapon: None, gauntlets: None, weapon_bonus: 0, missile: false, missile_cx: 0 };
             put("ax", m.hit_chance(att, def, &gear));
         }
         _ => panic!("unknown routine {name}"),

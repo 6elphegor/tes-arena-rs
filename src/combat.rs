@@ -80,6 +80,10 @@ pub struct Gear {
     pub weapon_bonus: u16,
     /// 1194:78DE: a missile weapon is in hand.
     pub missile: bool,
+    /// The CX 1194:78DE leaves on a find: 3 minus the weapon type's
+    /// place in the missile table. An Archer's critical chance uses it
+    /// where the level was meant.
+    pub missile_cx: u16,
 }
 
 /// Item record fields (the shared layout).
@@ -170,7 +174,8 @@ impl Machine {
     ///
     /// Only classes with bit 0x40 can crit, at (multiplier × level)%:
     /// Thief 2, Assassin 3, Monk 3 at half level, Archer 3 but only with
-    /// a missile weapon; others 1. Except for Archers, a missile weapon
+    /// a missile weapon, and times `missile_cx` instead of the level
+    /// (the original skips restoring CX on that path); others 1. Except for Archers, a missile weapon
     /// rules out a critical.
     pub fn critical_multiplier(&mut self, att: Ptr, gear: &Gear) -> u16 {
         let mut level = self.rec_b(att, 6) as u16;
@@ -188,6 +193,7 @@ impl Machine {
                 return 1;
             }
             mult = 3;
+            level = gear.missile_cx;
         } else if idx > 10 && class == 0xCB {
             mult = 3;
         }

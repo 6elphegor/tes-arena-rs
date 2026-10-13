@@ -108,6 +108,7 @@ pub mod var {
     pub const CHANGED: u16 = 0x0D39;
     /// Set to 0x0F when an effect message was written to 1405.
     pub const MESSAGE: u16 = 0x1428;
+    pub const MESSAGE_TEXT: u16 = 0x1405;
     pub const SCRATCH_1296: u16 = 0x1296;
     /// Level + 1 of the spell's caster, it seems (resistance and absorb).
     pub const CASTER: u16 = 0x1292;
@@ -126,6 +127,15 @@ pub mod var {
     /// Per disease (from id 10), the range of each delta.
     pub const DISEASE_RANGES: u16 = 0x8BBC;
 }
+
+/// Effect message strings in segment 3276: "You are %s.", "%s is %s.",
+/// the effect names by kind and the creature type names; and the class
+/// names in DGROUP.
+const YOU_ARE: u16 = 0x481A;
+const IS: u16 = 0x4826;
+const MESSAGE_NAMES: u16 = 0x4830;
+const CREATURE_NAMES: u16 = 0x465D;
+const CLASS_NAMES: u16 = 0x2A62;
 
 /// 3276:78B0: per disease (from id 10), a pointer to the list of block
 /// fields it changes, ending in 0xFF.
@@ -228,8 +238,7 @@ impl Machine {
     /// with `b_left` remaining (or one of the `B_*` modes). The deltas
     /// start at whatever the slot held before.
     ///
-    /// The effect message (into DGROUP 1405) is not formatted; only its
-    /// flag at 1428 is set.
+    /// The effect message goes into DGROUP 1405 (`fx_message`).
     pub fn apply_effect(
         &mut self, seg: u16, off: u16, flag: u16, period: u16, duration: u16, b_period: u16, b_left: u16,
     ) -> Applied {
@@ -272,12 +281,59 @@ impl Machine {
             let v = self.mem.r16(seg, off.wrapping_add(from));
             self.mem.w16(DS, s + to, v);
         }
-        // 2EBD:0202: the message, unless the kind is 9.
-        if self.mem.r8(DS, s + slot::KIND) != 9 {
-            self.mem.w8(DS, var::MESSAGE, 0x0F);
-        }
+        self.fx_message(s);
         self.fx_or8(DS, var::CHANGED, 0x80);
         Applied::Slot(Some(s))
+    }
+
+    /// 2EBD:0202. The effect message into DGROUP 1405, unless the kind is
+    /// 9: "You are %s." for a target at offset 01A4 (in any segment),
+    /// else "%s is %s." with a person's class name or a creature's type
+    /// name. Diseases (kinds 10 and up) are named as kind 0, "Diseased".
+    fn fx_message(&mut self, s: u16) {
+        let kind = self.mem.r8(DS, s + slot::KIND) as u16;
+        if kind == 9 {
+            return;
+        }
+        let effect = self.skip_strings(DATA, MESSAGE_NAMES, if kind < 9 { kind } else { 0 });
+        let (seg, off) = self.fx_target(s);
+        let parts: Vec<(u16, u16)> = if off == crate::character::PLAYER {
+            vec![(DATA, YOU_ARE), (DATA, effect)]
+        } else {
+            let name = if self.fx_flags(seg, off) & FLAG_CREATURE != 0 {
+                let ty = self.mem.r8(seg, off.wrapping_add(RACE)) as u16;
+                (DATA, self.skip_strings(DATA, CREATURE_NAMES, ty))
+            } else {
+                let class = (self.mem.r8(seg, off.wrapping_add(CLASS)) & 0x1F) as u16;
+                (DS, self.skip_strings(DS, CLASS_NAMES, class))
+            };
+            vec![(DATA, IS), name, (DATA, effect)]
+        };
+        // sprintf(1405, format, ...): the formats hold only %s.
+        let mut di = var::MESSAGE_TEXT;
+        let (fseg, mut p) = parts[0];
+        let mut args = parts[1..].iter();
+        loop {
+            let c = self.mem.r8(fseg, p);
+            if c == 0 {
+                break;
+            }
+            if c == b'%' && self.mem.r8(fseg, p.wrapping_add(1)) == b's' {
+                let &(aseg, mut q) = args.next().expect("format arguments");
+                while self.mem.r8(aseg, q) != 0 {
+                    self.mem.w8(DS, di, self.mem.r8(aseg, q));
+                    di = di.wrapping_add(1);
+                    q = q.wrapping_add(1);
+                }
+                p = p.wrapping_add(2);
+                continue;
+            }
+            self.mem.w8(DS, di, c);
+            di = di.wrapping_add(1);
+            p = p.wrapping_add(1);
+        }
+        self.mem.w8(DS, di, 0);
+        self.mem.w8(DS, var::MESSAGE, 0x0F);
     }
 
     /// 2EBD:00B4. Ends a slot's effect on its target: clears the kind's

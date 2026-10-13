@@ -4,8 +4,8 @@ Handlers that are not ported are replaced by stubs that record their
 calls: the kill handler 2AA1:06A0 (returns a chosen carry flag) and the
 player-death handler 2686:02B4. Inventory queries are stubs returning
 chosen values (1194:7449 armour at the hit location, 1194:7C69
-enchantments 84/85/88), and UI calls return at once (the formatter
-0000:8D14, the broken-weapon message 2AA1:021B).
+enchantments 84/85/88), and the broken-weapon message 2AA1:021B
+returns at once.
 
 Each line: name | writes | regs | env | returned | hooks | memory diff
   writes: k:off:hexbytes, or K:off:size:value for segment values
@@ -55,8 +55,7 @@ def cs_ref(addr):
     return [addr & 0xff, addr >> 8]
 
 
-# UI: the formatter and the broken-weapon message.
-patch(0x0000, 0x8D14, [0xCB])
+# UI: the broken-weapon message.
 patch(0x2AA1, 0x021B, [0xCB])
 
 # Stubs keep their data right after their code (unicorn caches code, so

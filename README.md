@@ -18,6 +18,9 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/progression.rs` – levels from XP, level-up, XP awards (segment 2686).
 - `src/combat.rs` – to-hit, hit location, criticals, damage, weapon wear
   (segment 2AA1).
+- `src/attack.rs` – a blow at the player (2AA1:00D8): a creature's damage
+  range and special attacks or a person's weapon, wear on the armour hit
+  and broken items ("Your %s is broken."), the magic shield, and death.
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
 - `src/shop.rs` – shop stock, potions and magic items (1194:FAD9, B7FA,
   B848).
@@ -65,8 +68,8 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation
-  states and the sprite seen. Attacks and spells are not ported (None),
-  nor sound and the draw list.
+  states and the sprite seen, and blows at the player. Spells are not
+  ported (None), nor sound and the draw list.
 - `src/travel.rs` – fast travel: days and distance between two places,
   over the terrain map and the weather (1194:2E69), and the monthly
   weather roll (1194:2FB3).

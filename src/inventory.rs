@@ -312,12 +312,18 @@ impl Machine {
     /// 1194:78DE. Is the equipped weapon one of the three types at
     /// 3276:6CC0 (missile weapons, per combat)?
     pub fn has_missile_weapon(&mut self, seg: u16, rec: u16) -> bool {
+        self.missile_weapon(seg, rec).is_some()
+    }
+
+    /// `has_missile_weapon`, returning the CX left on a find: 3 minus the
+    /// type's place in the table.
+    pub fn missile_weapon(&mut self, seg: u16, rec: u16) -> Option<u16> {
         let w = self.equipped_weapon(seg, rec);
         if w == 0xFFFF {
-            return false;
+            return None;
         }
         let ty = self.mem.r8(seg, w);
-        (0..3).any(|i| self.mem.r8(DATA, MISSILE_TYPES + i) == ty)
+        (0..3).find(|&i| self.mem.r8(DATA, MISSILE_TYPES + i) == ty).map(|i| 3 - i)
     }
 
     /// 1194:39ED. Racial weapon damage bonus for record `rec` in `seg`:
@@ -449,10 +455,12 @@ impl Machine {
     /// Otherwise the slots above `index` move down one and the last is
     /// cleared; `index` above 39 makes the shift run on through memory.
     ///
-    /// For the player (seg = DGROUP) the original first removes the
-    /// item's enchantment through 1194:511A, which is not ported.
+    /// For the player (seg = DGROUP) the item's enchantment comes off
+    /// first (`unequip_enchantment`).
     pub fn remove_item(&mut self, seg: u16, si: u16, index: u16) {
-        assert_ne!(seg, DS, "removing a DGROUP item needs 1194:511A (not ported)");
+        if seg == DS {
+            self.unequip_enchantment(si);
+        }
         if self.item_category(seg, si) == category::STACK {
             let f = self.inv_flags(seg, si) | item::OCCUPIED;
             self.mem.w8(seg, si.wrapping_add(item::FLAGS), f);
@@ -473,6 +481,34 @@ impl Machine {
         for i in 0..SLOT_SIZE {
             self.mem.w8(seg, di.wrapping_add(i), 0);
         }
+    }
+
+    /// 1194:511A. Before an equipped item at DGROUP `si` leaves the
+    /// player: an enchantment that raised attribute +12 by +11 percent
+    /// gives it back (8-bit: a value over the attribute wraps, then
+    /// clamps at 255) and rebases drain snapshots; enchantment value C1h
+    /// clears flag 5CA bit 0x1000. The modifiers are always recomputed.
+    pub fn unequip_enchantment(&mut self, si: u16) {
+        use crate::scale::{to100, to256};
+        let p = crate::character::PLAYER;
+        let b = |m: &Self, f: u16| m.mem.r8(DS, si.wrapping_add(f));
+        if self.inv_flags(DS, si) & item::EQUIPPED != 0 {
+            if self.inv_flags(DS, si) & item::ENCHANTED != 0 && b(self, item::ENCHANT) != 0xFF && b(self, item::ENCHANT_ATTR) != 0xFF {
+                let attr = b(self, item::ENCHANT_ATTR) as u16;
+                let at = p + field::ATTRS + attr;
+                let r = to100(self.mem.r8(DS, at) as i16) as u16;
+                let ax = r & 0xFF00 | (r as u8).wrapping_sub(b(self, item::ENCHANT_VALUE)) as u16;
+                let ax = (to256(ax as i16) as u16).min(0xFF);
+                self.mem.w8(DS, at, ax as u8);
+                let v = (to256(b(self, item::ENCHANT_VALUE) as i16) as u16).min(0xFF);
+                self.rebase_drain_snapshots(v, attr);
+            }
+            if b(self, item::ENCHANT_VALUE) == 0xC1 {
+                let f = self.mem.r16(DS, 0x05CA) & !0x1000;
+                self.mem.w16(DS, 0x05CA, f);
+            }
+        }
+        self.attribute_modifiers(p);
     }
 
     /// 1194:7719. Player armour class at the 7 locations, into DGROUP

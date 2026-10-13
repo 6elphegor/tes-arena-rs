@@ -25,9 +25,12 @@
 //! creature mode on (see `crate::movement`), and so open doors without
 //! locks by walking into them.
 //!
+//! A creature or person whose attack animation reaches its blow hits at
+//! the player (`crate::attack`).
+//!
 //! Not ported: building the frame's draw list (0000:1B7F, FE58), sound,
-//! and attacks (2AA1:00D8) and spells (29CF:0145, 0675): an actor
-//! reaching one of these makes the update return None.
+//! and spells (29CF:0145, 0675): an actor casting makes the update
+//! return None.
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -542,8 +545,7 @@ impl Machine {
             if self.act8(si, f::FRAME) != 0xA {
                 return Some(());
             }
-            // 2AA1:00D8: the creature's blow.
-            return None;
+            return self.actor_blow(si);
         }
         let mut heading = ((self.rng.next() as i16 >> 13) as u16).wrapping_add(self.act16(si, f::HEADING)) & 0x1FF;
         let mut wander = true;
@@ -629,6 +631,15 @@ impl Machine {
         }
         // 29CF:0145: the spell.
         None
+    }
+
+    /// 0000:1DB3 / 22F5: the actor's record hits at the player
+    /// (2AA1:00D8).
+    fn actor_blow(&mut self, si: u16) -> Option<()> {
+        let rec = self.act16(si, f::RECORD);
+        self.mem.w16(DS, crate::combat::var::ATTACKER, rec);
+        self.mem.w16(DS, crate::combat::var::DEFENDER, crate::character::PLAYER);
+        self.attack_player(0)
     }
 
     /// 0000:1E1C..1E62: within 0xAA of the player, unless the player is
@@ -930,8 +941,11 @@ impl Machine {
             if d < 9 {
                 return Some(());
             }
-            // 2AA1:00D8: the blow.
-            return None;
+            self.actor_blow(si)?;
+            self.set_act8(si, f::FRAME, 8);
+            let fl = self.act_flags(si) & !0x10;
+            self.set_act_flags(si, fl);
+            return Some(());
         }
         if frame == 8 {
             return Some(());

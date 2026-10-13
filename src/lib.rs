@@ -2,6 +2,7 @@
 //! Addresses in comments are segment:offset in the unpacked image.
 
 pub mod actors;
+pub mod attack;
 pub mod bsa;
 pub mod character;
 pub mod city;

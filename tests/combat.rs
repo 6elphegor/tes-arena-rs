@@ -22,7 +22,7 @@ fn named(s: &str) -> HashMap<String, u32> {
 fn gear(s: &str) -> Gear {
     let v: Vec<u16> = s.split(':').map(|x| hex(x) as u16).collect();
     let opt = |x: u16| (x != 0xFFFF).then_some(x);
-    Gear { armor: v[0] as i16, weapon: opt(v[1]), gauntlets: opt(v[2]), weapon_bonus: v[3], missile: v[4] != 0 }
+    Gear { armor: v[0] as i16, weapon: opt(v[1]), gauntlets: opt(v[2]), weapon_bonus: v[3], missile: v[4] != 0, missile_cx: 0 }
 }
 
 /// Runs one routine; returns (ax, cf) where the routine defines them, or
@@ -39,7 +39,12 @@ fn run(m: &mut Machine, name: &str, r: &HashMap<String, u32>, g: &Gear) -> Optio
             let (hit, roll) = m.roll_to_hit(p("fs", "si"), p("es", "di"), reg("ax"), g)?;
             (Some(roll), Some(hit))
         }
-        "critical_multiplier" => (Some(m.critical_multiplier(p("ds", "si"), g)), None),
+        "critical_multiplier" => {
+            // The harness's 78DE stub leaves CX as the caller set it: the level.
+            let att = p("ds", "si");
+            let g = Gear { missile_cx: m.mem.r8(att.seg, att.off + 6) as u16, ..*g };
+            (Some(m.critical_multiplier(att, &g)), None)
+        }
         "weapon_damage" => (Some(m.weapon_damage(reg("ds"), reg("es"), reg("ax"), g)?), None),
         "weapon_wear" => (Some(m.weapon_wear(p("ds", "si"), reg("es"), reg("ax"))), None),
         "creature_damage_taken" => (Some(m.creature_damage_taken(reg("ax"))), None),
