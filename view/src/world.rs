@@ -75,6 +75,32 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     engine
 }
 
+/// A debugging aid: rolls random encounters (as the clock does hourly)
+/// until creatures come, at most 1000 times, with the area taken as kind
+/// 3 (as a dungeon's above 8 is) for the rolls.
+pub fn summon(engine: &mut Engine) {
+    // The player's square, as a frame sets it.
+    engine.m.view_begin();
+    let area = engine.m.mem.r8(DS, 0x05E6);
+    engine.m.mem.w8(DS, 0x05E6, 3);
+    summon_rolls(engine);
+    engine.m.mem.w8(DS, 0x05E6, area);
+}
+
+fn summon_rolls(engine: &mut Engine) {
+    let active = |m: &Machine| (0..8u16).any(|i| m.mem.r16(DS, 0x0C57 + i * 0x1C + 0xF) & 0x4000 == 0);
+    for _ in 0..1000 {
+        if active(&engine.m) {
+            return;
+        }
+        let Engine { m, files, .. } = engine;
+        if m.random_encounter(files, &mut arena::encounter::NoFightHooks).is_none() {
+            eprintln!("the encounter met code not ported");
+            return;
+        }
+    }
+}
+
 /// The 256 colours (RGB, 8 bits) of PAL.COL, past its 8-byte header.
 pub fn palette(dir: &Path) -> [[u8; 4]; 256] {
     let d = std::fs::read(dir.join("PAL.COL")).expect("PAL.COL");
@@ -248,53 +274,160 @@ pub fn flats(m: &Machine) -> Vec<Option<crate::flats::Flat>> {
         .collect()
 }
 
-/// The flats' frames as sprite layers: the first layer of each flat (by
-/// number), and every frame padded to the largest size.
-pub struct SpriteSheet {
-    pub w: usize,
-    pub h: usize,
-    pub layers: Vec<Vec<u8>>,
-    pub first: Vec<Option<u32>>,
+/// Where a frame is in the sprite atlas, and its size.
+#[derive(Clone, Copy, Debug)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
 }
 
-pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>]) -> SpriteSheet {
-    let w = flats.iter().flatten().map(|f| f.w).max().unwrap_or(1);
-    let h = flats.iter().flatten().map(|f| f.h).max().unwrap_or(1);
-    let mut layers = Vec::new();
-    let mut first = Vec::new();
-    for f in flats {
-        let Some(f) = f else {
-            first.push(None);
-            continue;
-        };
-        first.push(Some(layers.len() as u32));
+/// An image's frames in the atlas (from `first`, `count` of them).
+#[derive(Clone, Copy, Debug)]
+pub struct Frames {
+    pub first: usize,
+    pub count: usize,
+}
+
+/// Every flat image the renderer draws, packed in shelves into one
+/// atlas of palette indices `ATLAS` wide.
+pub struct SpriteSheet {
+    pub h: u32,
+    pub pixels: Vec<u8>,
+    pub rects: Vec<Rect>,
+    /// The level's flats, by number.
+    pub flats: Vec<Option<Frames>>,
+    /// The creatures' images, by type: views 1..5 (front to back) and 6.
+    pub creatures: Vec<[Option<Frames>; 6]>,
+}
+
+pub const ATLAS: u32 = 4096;
+
+struct Packer {
+    x: u32,
+    y: u32,
+    shelf: u32,
+    sheet: SpriteSheet,
+}
+
+impl Packer {
+    fn add(&mut self, f: &crate::flats::Flat) -> Frames {
+        let first = self.sheet.rects.len();
+        let (w, h) = (f.w as u32, f.h as u32);
         for frame in &f.frames {
-            let mut l = vec![0u8; w * h];
-            for y in 0..f.h {
-                l[y * w..y * w + f.w].copy_from_slice(&frame[y * f.w..(y + 1) * f.w]);
+            if self.x + w > ATLAS {
+                self.y += self.shelf;
+                self.x = 0;
+                self.shelf = 0;
             }
-            layers.push(l);
+            let r = Rect { x: self.x, y: self.y, w, h };
+            let need = ((r.y + h) * ATLAS) as usize;
+            if self.sheet.pixels.len() < need {
+                self.sheet.pixels.resize(need, 0);
+            }
+            for row in 0..f.h {
+                let at = ((r.y as usize + row) * ATLAS as usize) + r.x as usize;
+                self.sheet.pixels[at..at + f.w].copy_from_slice(&frame[row * f.w..(row + 1) * f.w]);
+            }
+            self.sheet.rects.push(r);
+            self.x += w;
+            self.shelf = self.shelf.max(h);
+        }
+        Frames { first, count: f.frames.len() }
+    }
+}
+
+/// The creatures' file name patterns (`rat@.cfa`, ... with `@` the view
+/// 1..6), from the table in the image, by type from 1.
+pub fn creature_names(m: &Machine) -> Vec<String> {
+    let needle = b"rat@.cfa\0";
+    let mut at = None;
+    for o in 0..0xFFF0u16 {
+        if (0..needle.len() as u16).all(|i| m.mem.r8(DS, o + i) == needle[i as usize]) {
+            at = Some(o);
+            break;
         }
     }
-    if layers.is_empty() {
-        layers.push(vec![0; w * h]);
+    let Some(mut o) = at else { return vec![] };
+    let mut names = Vec::new();
+    while names.len() < 24 {
+        let s: String = (0..13).map(|i| m.mem.r8(DS, o + i)).take_while(|&c| c != 0).map(|c| c as char).collect();
+        if !s.contains('@') {
+            break;
+        }
+        o += s.len() as u16 + 1;
+        names.push(s);
     }
-    SpriteSheet { w, h, layers, first }
+    names
 }
 
-/// Billboards for the flats standing in the map (MAP1 words 8xxx: flat
-/// low byte + FLAT_BASE), at their squares' centres, facing a camera
-/// turned to `heading`; animations at frame `tick`. A flat is a unit
-/// per pixel, raised by its record's Y.
-pub fn sprites(m: &Machine, flats: &[Option<crate::flats::Flat>], sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
+pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archive::Archive, names: &[String]) -> SpriteSheet {
+    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![] };
+    let mut p = Packer { x: 0, y: 0, shelf: 0, sheet };
+    for f in flats {
+        let frames = f.as_ref().map(|f| p.add(f));
+        p.sheet.flats.push(frames);
+    }
+    for name in names {
+        let mut views = [None; 6];
+        for (i, v) in views.iter_mut().enumerate() {
+            let file = name.replace('@', &(i + 1).to_string());
+            if let Some(f) = archive.read(&file).as_deref().and_then(crate::flats::cfa) {
+                *v = Some(p.add(&f));
+            }
+        }
+        p.sheet.creatures.push(views);
+    }
+    let mut sheet = p.sheet;
+    sheet.h = ((sheet.pixels.len() as u32).div_ceil(ATLAS)).max(1);
+    sheet.pixels.resize((sheet.h * ATLAS) as usize, 0);
+    sheet
+}
+
+/// A billboard: the frame `rect` standing at (x, y) from `lo` up, a unit
+/// per pixel, facing a camera whose right is (rx, rz).
+fn billboard(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, (rx, rz): (f32, f32), mirror: bool) {
+    let hw = rect.w as f32 / 2.0;
+    let hi = lo + rect.h as f32;
+    let p = [
+        [x - rx * hw, lo, y - rz * hw],
+        [x + rx * hw, lo, y + rz * hw],
+        [x + rx * hw, hi, y + rz * hw],
+        [x - rx * hw, hi, y - rz * hw],
+    ];
+    // Texel coordinates, kept just inside the frame.
+    const IN: f32 = 0.01;
+    let (mut u0, mut u1) = (rect.x as f32 + IN, (rect.x + rect.w) as f32 - IN);
+    if mirror {
+        std::mem::swap(&mut u0, &mut u1);
+    }
+    let (v0, v1) = (rect.y as f32 + IN, (rect.y + rect.h) as f32 - IN);
+    let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
+    for i in [0, 1, 2, 0, 2, 3] {
+        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE });
+    }
+}
+
+/// This frame's billboards, facing a camera turned to `heading`:
+/// - the flats standing in the map (MAP1 words 8xxx: flat low byte +
+///   FLAT_BASE) at their squares' centres, raised by the flat record's
+///   Y, animations at frame `tick`;
+/// - the creatures in the actor slots (not inactive, 4000h): sprite C0h
+///   + view (0..4, mirrored with flag 2) is the type's view file, C5h
+///   (dying) its sixth, any other a flat (the corpse); +D the frame.
+pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
     let w = m.mem.r16(DS, 0xC357).min(128);
     let d = m.mem.r16(DS, 0xC359).min(128);
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     let base = m.mem.r16(DS, arena::info::var::FLAT_BASE);
     let a = heading / 512.0 * std::f32::consts::TAU;
     // The camera's right, along which a billboard spreads.
-    let (rx, rz) = (a.cos(), -a.sin());
+    let right = (a.cos(), -a.sin());
     let mut out = Vec::new();
+    let frame_of = |f: Frames, k: usize| sheet.rects[f.first + k % f.count];
+    let flat = |n: usize| sheet.flats.get(n).copied().flatten();
+    let lift = |n: usize| m.mem.r8(DS, arena::info::var::FLATS + n as u16 * 5) as i8 as f32;
     for row in 0..d {
         for col in 0..w {
             let v = m.mem.r16(walls, (row << 8) | (col << 1));
@@ -302,25 +435,33 @@ pub fn sprites(m: &Machine, flats: &[Option<crate::flats::Flat>], sheet: &Sprite
                 continue;
             }
             let n = ((v & 0xFF) + base) as usize;
-            let (Some(Some(f)), Some(Some(layer))) = (flats.get(n), sheet.first.get(n)) else {
-                continue;
-            };
-            let lift = m.mem.r8(DS, arena::info::var::FLATS + n as u16 * 5) as i8 as f32;
-            let (cx, cz) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
-            let hw = f.w as f32 / 2.0;
-            let (lo, hi) = (lift, lift + f.h as f32);
-            let layer = layer + (tick % f.frames.len()) as u32;
-            let p = [
-                [cx - rx * hw, lo, cz - rz * hw],
-                [cx + rx * hw, lo, cz + rz * hw],
-                [cx + rx * hw, hi, cz + rz * hw],
-                [cx - rx * hw, hi, cz - rz * hw],
-            ];
-            let (u, t) = (f.w as f32, f.h as f32);
-            let uv = [[0.0, t], [u, t], [u, 0.0], [0.0, 0.0]];
-            for i in [0, 1, 2, 0, 2, 3] {
-                out.push(Vertex { pos: p[i], uv: uv[i], layer, light: 1.0, flags: SPRITE });
+            if let Some(f) = flat(n) {
+                let (x, y) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
+                billboard(&mut out, frame_of(f, tick), x, y, lift(n), right, false);
             }
+        }
+    }
+    let seg = m.mem.r16(DS, 0x1042);
+    for slot in 0..23u16 {
+        let si = 0x0AB3 + slot * 0x1C;
+        let flags = m.mem.r16(DS, si + 0xF);
+        let rec = m.mem.r16(DS, si + 0x12);
+        // (The first record is at offset 0.)
+        if flags & 0x4000 != 0 {
+            continue;
+        }
+        let (x, z, y) = (m.mem.r16(DS, si) as f32, m.mem.r16(DS, si + 2) as i16 as f32, m.mem.r16(DS, si + 4) as f32);
+        let sprite = m.mem.r8(DS, si + 0xC);
+        let frame = m.mem.r8(DS, si + 0xD) as usize;
+        let mirror = flags & 2 != 0;
+        let art = if (0xC0..=0xC5).contains(&sprite) {
+            let t = m.mem.r8(seg, rec + 4) as usize;
+            sheet.creatures.get(t.wrapping_sub(1)).and_then(|v| v[(sprite - 0xC0) as usize])
+        } else {
+            flat(sprite as usize)
+        };
+        if let Some(f) = art {
+            billboard(&mut out, frame_of(f, if frame == 0xFF { f.count - 1 } else { frame }), x, y, -z, right, mirror);
         }
     }
     out

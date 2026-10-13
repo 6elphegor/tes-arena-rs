@@ -211,25 +211,43 @@ member using wgpu, winit, glam and png.
   - doors and the other wall kinds;
   - floors (FLOOR words), and the *CEILING texture.
 - `flats.rs` decodes the flats the INF loader read into the flat banks:
-  raw .IMGs and .DFA animations (a run-length coded first frame, then
-  chunks of updates to it). `world::sprites` stands the map's flats (MAP1
-  words 8xxx) in their squares as billboards, a unit per pixel, raised by
-  the flat record's Y. The examples `flats` (every frame on one sheet)
-  and `formats` (what the decoders miss, by level) check the decoders.
+  - raw .IMGs;
+  - .DFA animations: a run-length coded first frame, then chunks of
+    updates to it;
+  - .CFAs: run-length coded rows of packed values, high bits first,
+    coloured through the header's table.
+
+  `archive.rs` reads files by name (loose, or from GLOBAL.BSA) for the
+  creatures' CFAs: the type's name pattern from the table in the image
+  (`rat@.cfa` ...), views 1 (front) to 5 (back), and 6.
+- `world::sprite_sheet` packs every frame into one atlas.
+  `world::sprites` makes billboards, a unit per pixel:
+  - the map's flats (MAP1 words 8xxx), in their squares, raised by the
+    flat record's Y;
+  - the creatures in the actor slots: sprite C0h + view, mirrored with
+    flag 2, at the actor's frame.
+
+  The examples `flats` (every frame on one sheet), `formats` (what the
+  decoders miss, by level) and `actors` (the slots in use) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
   with the palette.
 - `main.rs` turns the keys and the mouse into an `Intent` for
-  `Engine::frame`, run at the game's pace.
+  `Engine::frame`, run at the game's pace. Its `draw` hook steps the
+  changed squares within the view's reach. The original stepped only
+  the squares it drew. F (or `--fight`) rolls random encounters until
+  creatures come, a debugging aid.
 
 ```
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF --shot out.png [FRAMES [TURN]]
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
-Not drawn yet: creatures and people (CFA), cities (their flats load
-elsewhere), doors as they open, chasms and water, the sky, and the
-interface.
+Not drawn yet: people (their graphics come from a list, 0000:1AF9),
+cities (their flats load elsewhere), doors as they open, chasms and
+water, the sky, and the interface. How a dungeon's placed creatures
+(map flats naming creature files, such as rat.dfa) come to life is not
+found yet.
 
 ## Porting a routine
 

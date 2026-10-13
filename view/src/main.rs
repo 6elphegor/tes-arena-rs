@@ -1,14 +1,17 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
 //! Space jumps (Shift for a running jump). With --shot it renders one
 //! picture after turning by TURN (heading units, 512 a turn) and FRAMES
-//! frames (default 0) of walking forward, and exits.
+//! frames (default 0) of walking forward, and exits; --wait stands still
+//! N frames before the walk. --fight brings a random encounter at the
+//! start (F does in the window).
 
+mod archive;
 mod flats;
 mod render;
 mod world;
@@ -27,7 +30,26 @@ impl ControlHooks for Front {}
 impl arena::weapon::WeaponHooks for Front {}
 impl arena::clock::ClockHooks for Front {}
 impl arena::frame::FrameHooks for Front {}
-impl EngineHooks for Front {}
+impl EngineHooks for Front {
+    /// The original stepped the changed squares it drew: here those
+    /// within the view's reach (C394 squares) step, seen or not.
+    fn draw(&mut self, m: &mut arena::machine::Machine) {
+        use arena::mem::DS;
+        let reach = m.mem.r16(DS, 0xC394) as i32;
+        let (col, row) = (m.mem.r16(DS, 0xCCA4) as i32, m.mem.r16(DS, 0xCCA6) as i32);
+        for i in 0..0x20 {
+            let sq = m.mem.r16(DS, arena::click::var::TEMP_WALLS + 2 * i);
+            if sq == 0xFFFF {
+                continue;
+            }
+            let (c, r) = ((sq & 0xFF) as i32 >> 1, (sq >> 8) as i32);
+            if (c - col).abs() <= reach && (r - row).abs() <= reach {
+                m.temp_walls_begin_draw();
+                m.temp_wall_drawn(sq);
+            }
+        }
+    }
+}
 
 fn camera(engine: &Engine) -> Camera {
     let v = engine.view();
@@ -40,20 +62,19 @@ struct Assets {
     textures: Vec<[u8; 4096]>,
     shading: Vec<u8>,
     mesh: Vec<world::Vertex>,
-    flats: Vec<Option<flats::Flat>>,
     sheet: world::SpriteSheet,
 }
 
 impl Assets {
     fn new(dir: &std::path::Path, engine: &Engine) -> Self {
         let flats = world::flats(&engine.m);
-        let sheet = world::sprite_sheet(&flats);
+        let archive = archive::Archive::open(dir);
+        let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
         Assets {
             palette: world::palette(dir),
             textures: world::textures(&engine.m),
             shading: world::shading(&engine.m),
             mesh: world::mesh(&engine.m),
-            flats,
             sheet,
         }
     }
@@ -65,7 +86,7 @@ impl Assets {
 
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
     fn sprites(&self, engine: &Engine, cam: Camera, ticks: usize) -> Vec<world::Vertex> {
-        world::sprites(&engine.m, &self.flats, &self.sheet, cam.heading, ticks / ANIMATE)
+        world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE)
     }
 }
 
@@ -73,18 +94,28 @@ impl Assets {
 const ANIMATE: usize = 4;
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    let fight = args.iter().any(|a| a == "--fight");
+    args.retain(|a| a != "--fight");
+    let mut wait = 0;
+    if let Some(i) = args.iter().position(|a| a == "--wait") {
+        wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
+        args.drain(i..i + 2);
+    }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--shot OUT.png [FRAMES]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
-    let engine = world::load(&dir, &args[2]);
+    let mut engine = world::load(&dir, &args[2]);
+    if fight {
+        world::summon(&mut engine);
+    }
     if args.get(3).map(String::as_str) == Some("--shot") {
         let out = args.get(4).expect("--shot needs a file");
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, out, frames, turn);
+        shot(&dir, engine, out, wait, frames, turn);
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
@@ -95,13 +126,18 @@ fn main() {
 
 /// Renders one frame offscreen to a PNG, after `frames` frames of
 /// walking forward.
-fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, frames: usize, turn: i16) {
+fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, wait: usize, frames: usize, turn: i16) {
     let mut hooks = Front;
-    if turn != 0 {
+    // One frame turning (or not) before the walk: the actors pick their
+    // sprites in a frame.
+    let t = engine.frame_ticks();
+    engine.tick(t);
+    let intent = Intent { look: turn, ..Default::default() };
+    engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
+    for _ in 0..wait {
         let t = engine.frame_ticks();
         engine.tick(t);
-        let intent = Intent { look: turn, ..Default::default() };
-        engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
+        engine.frame(Input::Steer(&Intent::default()), &mut hooks).expect("frame");
     }
     for _ in 0..frames {
         let t = engine.frame_ticks();
@@ -127,7 +163,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, frames: usize, tur
         view_formats: &[],
     });
     let cam = camera(&engine);
-    let sprites = assets.sprites(&engine, cam, frames * 4);
+    let sprites = assets.sprites(&engine, cam, (wait + frames) * 4);
     r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, cam, &sprites);
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
@@ -284,6 +320,7 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::ArrowLeft => k.turn_left = down,
                         KeyCode::ArrowRight => k.turn_right = down,
                         KeyCode::Space => k.jump = down,
+                        KeyCode::KeyF if down => world::summon(&mut self.engine),
                         KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
                         KeyCode::Escape if down => {
                             if let Some(g) = &self.gpu {

@@ -4,6 +4,8 @@
 mod world;
 #[path = "../src/flats.rs"]
 mod flats;
+#[path = "../src/archive.rs"]
+mod archive;
 use arena::mem::DS;
 
 fn main() {

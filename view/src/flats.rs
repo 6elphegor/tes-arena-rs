@@ -4,7 +4,13 @@
 //! animation: frame count, two offsets, width, height and the size of the
 //! first frame, which is run-length coded; then for each further frame a
 //! chunk: its size (not counting this word), a count, and (offset,
-//! count, bytes) updates to the first frame).
+//! count, bytes) updates to the first frame), and .CFA (creatures, people
+//! and effects: width, height, the packed width of a row, two offsets,
+//! bits per pixel (byte 10) and the frame count (11); from 12 the frames'
+//! offsets (the first is the header's size; the file's size at 74); from
+//! 76 to the header's end the colour of each packed value. A frame is
+//! run-length coded as a DFA's first, to rows of packed values, high bits
+//! first).
 
 /// A flat: its frames, `w` x `h` palette indices each, row-major (0 is
 /// transparent).
@@ -26,8 +32,34 @@ pub fn decode(kind: u8, d: &[u8]) -> Option<Flat> {
     match kind {
         0 => img(d),
         1..0x80 => dfa(d),
-        _ => None,
+        _ => cfa(d),
     }
+}
+
+pub fn cfa(d: &[u8]) -> Option<Flat> {
+    let (w, h, packed) = (le16(d, 0), le16(d, 2), le16(d, 4));
+    let (bits, count, header) = (*d.get(10)? as usize, *d.get(11)? as usize, le16(d, 12));
+    if w == 0 || h == 0 || w > 320 || h > 200 || !(1..=8).contains(&bits) || count == 0 || count > 31 || header < 76 || packed * 8 < w * bits {
+        return None;
+    }
+    let colours = d.get(76..header)?;
+    let mut frames = Vec::with_capacity(count);
+    for k in 0..count {
+        let rows = unrle(d.get(le16(d, 12 + 2 * k)..)?, packed * h)?;
+        let mut f = vec![0u8; w * h];
+        for y in 0..h {
+            let row = &rows[y * packed..(y + 1) * packed];
+            for x in 0..w {
+                let mut v = 0usize;
+                for b in x * bits..(x + 1) * bits {
+                    v = v << 1 | (row[b / 8] >> (7 - b % 8) & 1) as usize;
+                }
+                f[y * w + x] = *colours.get(v).unwrap_or(&0);
+            }
+        }
+        frames.push(f);
+    }
+    Some(Flat { w, h, frames })
 }
 
 fn img(d: &[u8]) -> Option<Flat> {

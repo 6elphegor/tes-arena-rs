@@ -5,6 +5,8 @@
 mod world;
 #[path = "../src/flats.rs"]
 mod flats;
+#[path = "../src/archive.rs"]
+mod archive;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();

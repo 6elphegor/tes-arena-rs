@@ -13,7 +13,7 @@ struct Globals {
 @group(0) @binding(0) var<uniform> g: Globals;
 @group(0) @binding(1) var textures: texture_2d_array<u32>;
 @group(0) @binding(2) var shading: texture_2d<u32>;
-@group(0) @binding(3) var sprites: texture_2d_array<u32>;
+@group(0) @binding(3) var sprites: texture_2d<u32>;
 
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
@@ -46,10 +46,8 @@ fn vs_main(
 fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     var index: u32;
     if (i.flags & 1u) != 0u {
-        // A flat: no repeat, index 0 see-through.
-        let size = vec2<i32>(textureDimensions(sprites));
-        let t = clamp(vec2<i32>(floor(i.uv)), vec2<i32>(0, 0), size - 1);
-        index = textureLoad(sprites, t, i32(i.layer), 0).r;
+        // A flat: texels in the atlas, index 0 see-through.
+        index = textureLoad(sprites, vec2<i32>(floor(i.uv)), 0).r;
         if index == 0u {
             discard;
         }

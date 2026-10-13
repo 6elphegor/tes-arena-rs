@@ -87,10 +87,10 @@ impl Renderer {
             wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
         );
         let sheet = scene.sprites;
-        let sprite_layers = sheet.layers.len() as u32;
+        let atlas = wgpu::Extent3d { width: crate::world::ATLAS, height: sheet.h, depth_or_array_layers: 1 };
         let sprite_tex = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("sprites"),
-            size: wgpu::Extent3d { width: sheet.w as u32, height: sheet.h as u32, depth_or_array_layers: sprite_layers },
+            size: atlas,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -98,12 +98,11 @@ impl Renderer {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        let flat: Vec<u8> = sheet.layers.iter().flat_map(|l| l.iter().copied()).collect();
         queue.write_texture(
             wgpu::TexelCopyTextureInfo { texture: &sprite_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            &flat,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(sheet.w as u32), rows_per_image: Some(sheet.h as u32) },
-            wgpu::Extent3d { width: sheet.w as u32, height: sheet.h as u32, depth_or_array_layers: sprite_layers },
+            &sheet.pixels,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(crate::world::ATLAS), rows_per_image: Some(sheet.h) },
+            atlas,
         );
         let mut palette = [[0f32; 4]; 256];
         for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
@@ -149,7 +148,7 @@ impl Renderer {
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Uint,
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
+                        view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
                     count: None,
@@ -158,7 +157,7 @@ impl Renderer {
         });
         let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
         let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
-        let sprite_view = sprite_tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
+        let sprite_view = sprite_tex.create_view(&wgpu::TextureViewDescriptor::default());
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("world"),
             layout: &layout,
