@@ -126,7 +126,8 @@ No game code or data is included: everything is loaded from your own copy.
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the wall spells' squares,
-  the frame body, a pending INF. `Engine::view` gives the renderer the
+  the frame body, a pending INF; `enter_area` sets a loaded level up
+  (the state half of 0000:A4ED). `Engine::view` gives the renderer the
   player's position, heading, light, time of day and message;
   `examples/play.rs` runs it on a level with scripted modern controls.
 - `src/actors.rs` – the people and creatures of a level and their frame

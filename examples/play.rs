@@ -53,10 +53,6 @@ fn main() {
     }
     m.level_load(&mut files, 0xF000).expect("level");
     let info = m.mem.r16(DS, 0xCB84);
-    if info != 0 {
-        m.info_load(&mut files, info).expect("INF");
-        m.mem.w16(DS, 0xCB84, 0);
-    }
     // The world loop's hooks: the input step is set (the port's controls
     // run in its place), transitions too.
     m.mem.w32(DS, 0xC3B4, 0x2826_0002);
@@ -64,14 +60,6 @@ fn main() {
     // A creature segment for the actors' records.
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
-    // From the area's entry (0000:A4ED): the floor kinds below C00h
-    // past the EMS frame are solid, no squares are changing, and the
-    // player is on dry ground.
-    m.mem.w16(DS, 0xCCCE, buf.wrapping_add(0xC00));
-    for i in 0..0x20 {
-        m.mem.w16(DS, 0xC2C2 + 2 * i, 0xFFFF);
-    }
-    m.mem.w8(DS, 0xCB5B, 1);
     // A living player.
     m.mem.w16(DS, 0x01FD, 50);
     m.mem.w16(DS, 0x01FF, 50);
@@ -80,11 +68,11 @@ fn main() {
         m.mem.w8(DS, 0x01A4 + arena::character::field::ATTRS + i, 50);
         m.mem.w8(DS, 0x01A4 + arena::character::field::BASE_ATTRS + i, 50);
     }
-    m.mem.w16(DS, 0xC3D2, 0x3C);
     m.rng.seed = 1994;
     m.store_rng();
 
     let mut engine = Engine::new(m, files);
+    engine.enter_area(info).expect("entering the area");
     let mut hooks = Play;
     let mut turn = 0i16;
     let mut last = (0, 0);

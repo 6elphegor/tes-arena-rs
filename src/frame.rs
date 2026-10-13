@@ -499,6 +499,57 @@ impl Machine {
         };
         self.mem.w16(DS, crate::movement::var::BOB, ax);
     }
+
+    /// 0000:5D74. With EMS, the bank table (8FAA) frees every bank but
+    /// the level's: the first [9032] - [9034] are taken (FFFFh).
+    pub fn ems_reset(&mut self) {
+        if self.mem.r8(DS, 0x8FA6) == 0 {
+            return;
+        }
+        let n = self.mem.r16(DS, 0x9032);
+        let taken = n.wrapping_sub(self.mem.r16(DS, 0x9034));
+        for i in 0..n {
+            self.mem.w16(DS, 0x8FAA_u16.wrapping_add(2 * i), 0);
+        }
+        for i in 0..taken {
+            self.mem.w16(DS, 0x8FAA_u16.wrapping_add(2 * i), 0xFFFF);
+        }
+    }
+
+    /// 0000:E322. In rain or snow (weather BB09 82h), 100 drops (6 bytes
+    /// at E05E: x, y, and a drift of 2 either way) at random in the view
+    /// (A914..A918 across, A916..A91A - 14h down); otherwise the table
+    /// is cleared. None where the view is too small (a divide by zero).
+    pub fn weather_drops(&mut self) -> Option<()> {
+        if self.mem.r8(DS, 0xBB09) != 0x82 {
+            for i in 0..0x12C {
+                self.mem.w16(DS, 0xE05E + 2 * i, 0);
+            }
+            return Some(());
+        }
+        let r = |m: &Machine, a| m.mem.r16(DS, a);
+        let mut si = 0xE05Eu16;
+        for _ in 0..100 {
+            let cx = r(self, 0xA91A).wrapping_sub(r(self, 0xA916)).wrapping_sub(0x14);
+            let v = self.rng.next();
+            if cx == 0 {
+                return None;
+            }
+            let y = (v % cx).wrapping_add(r(self, 0xA916));
+            self.mem.w16(DS, si.wrapping_add(2), y);
+            let cx = r(self, 0xA918).wrapping_sub(r(self, 0xA914));
+            let v = self.rng.next();
+            if cx == 0 {
+                return None;
+            }
+            let x = (v % cx).wrapping_add(r(self, 0xA914));
+            self.mem.w16(DS, si, x);
+            let drift = if self.rng.next() & 0x20 != 0 { 0xFFFE } else { 2 };
+            self.mem.w16(DS, si.wrapping_add(4), drift);
+            si = si.wrapping_add(6);
+        }
+        Some(())
+    }
 }
 
 /// 2DA2:111C. The holiday on the day of `minutes` (day of the year from

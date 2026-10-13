@@ -118,6 +118,40 @@ impl Engine {
         Some(if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 { Frame::Left } else { Frame::Running })
     }
 
+    /// 0000:A26B..A297 and the state part of A4ED: entering a 3D area
+    /// whose level is loaded (`level_load`), with its INF named at DS:`inf`
+    /// (0 none). The timer restarts, the ceiling is 64h above the floor
+    /// (D80A, D80C), the player stands (3Ch) at the base walking speed,
+    /// the EMS banks are freed but the level's (5D74), floors from C00h
+    /// past the EMS frame are deep (CCCE), no squares are changing, the
+    /// player is on dry ground (CB5B), rain or snow gets its 100 drops
+    /// in the view (E322, weather 82h), and the INF loads. The rest of
+    /// A4ED sets up the renderer.
+    pub fn enter_area(&mut self, inf: u16) -> Option<()> {
+        let m = &mut self.m;
+        m.mem.w16(DS, crate::info::var::INFO_PTR, inf);
+        m.mem.w16(DS, crate::frame::var::TICKS, 0);
+        m.mem.w16(DS, 0xD80A, 0xFF9C);
+        m.mem.w16(DS, crate::movement::var::CEILING, 0x64);
+        let v = m.mem.r16(DS, 0xC390);
+        m.mem.w16(DS, crate::controls::var::WALK, v);
+        m.mem.w16(DS, HEIGHT, 0x3C);
+        m.ems_reset();
+        let v = m.mem.r16(DS, crate::movement::var::FRAME_SEG).wrapping_add(0xC00);
+        m.mem.w16(DS, crate::movement::var::FLOOR_SOLID, v);
+        for i in 0..0x20 {
+            m.mem.w16(DS, crate::click::var::TEMP_WALLS + 2 * i, 0xFFFF);
+        }
+        m.weather_drops()?;
+        m.mem.w8(DS, 0xCB5B, 1);
+        let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
+        if info != 0 {
+            m.info_load(&mut self.files, info)?;
+            m.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        }
+        Some(())
+    }
+
     /// What the renderer needs most often.
     pub fn view(&self) -> View {
         let r = |at| self.m.mem.r16(DS, at);
