@@ -127,6 +127,51 @@ impl Machine {
         Some(())
     }
 
+    /// 29CF:037F. An arrow (flat `flat`) is shot from `from`, an actor
+    /// slot, or with 0 the player, aimed by the cursor: the heading turns
+    /// by half the cursor's distance from the view's centre (C3D6). It
+    /// starts at the shooter's position and height (negated), lives 30
+    /// frames, and the original's step of C8h ahead is lost when the
+    /// sprite is set up at the shooter's position. None where the slot
+    /// search runs away.
+    pub fn fire_missile(&mut self, flat: u8, from: u16) -> Option<()> {
+        let si = self.free_projectile()?;
+        let w = |m: &mut Self, o: u16, v: u16| m.mem.w16(DS, si.wrapping_add(o), v);
+        self.mem.w8(DS, si + f::FLAT, flat);
+        w(self, f::CAST, ARROW);
+        w(self, f::DELAY, 0);
+        let fl = self.mem.r16(DS, si + f::FLAGS) & 0xE7FF;
+        w(self, f::FLAGS, fl);
+        w(self, f::F16, 0x400);
+        let r = |m: &Self, a: u16| m.mem.r16(DS, a);
+        let (x, z, y) = if from == 0 {
+            let d = (r(self, 0x8F92).wrapping_sub(r(self, 0xC3D6)) as i16 >> 1) as u16;
+            let h = d.wrapping_add(r(self, 0xC3DA)) & 0x1FF;
+            w(self, f::HEADING, h << 1);
+            (r(self, 0xC3D0), r(self, HEIGHT), r(self, 0xC3D4))
+        } else {
+            let h = r(self, from.wrapping_add(0xA)).wrapping_add(r(self, from.wrapping_add(0xA)));
+            w(self, f::HEADING, h);
+            (r(self, from), r(self, from.wrapping_add(2)), r(self, from.wrapping_add(4)))
+        };
+        let z = z.wrapping_neg();
+        w(self, f::X, x);
+        w(self, f::Z, z);
+        w(self, f::Y, y);
+        self.mem.w8(DS, si + f::FRAME, 0);
+        self.mem.w8(DS, si + f::LIFE, 0x1E);
+        let h = r(self, si + f::HEADING);
+        let step = |m: &Self, t: u16| (((0xC8i32 * m.mem.r16(DS, t.wrapping_add(h)) as i16 as i32) >> 16) as u16);
+        let nx = r(self, si).wrapping_add(step(self, SIN));
+        w(self, f::X, nx);
+        let ny = r(self, si + f::Y).wrapping_add(step(self, COS));
+        w(self, f::Y, ny);
+        self.sprite_object(si, x, z, y, flat, 0)?;
+        let n = r(self, COUNT).wrapping_add(1);
+        self.mem.w16(DS, COUNT, n);
+        Some(())
+    }
+
     /// 29CF:02E4..02F0: the first slot with +11 = 0, searching past the
     /// table if need be.
     fn free_projectile(&self) -> Option<u16> {

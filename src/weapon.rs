@@ -62,9 +62,10 @@ pub trait WeaponHooks {
     fn building_closed(&mut self, _m: &mut Machine, _kind: u8) -> Option<bool> {
         Some(false)
     }
-    /// 29CF:037F: the bow fires (AX = 1Bh).
-    fn fire_bow(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// 29CF:037F: the bow fires an arrow (flat 1Bh) from the player,
+    /// aimed by the cursor (`projectile::fire_missile`).
+    fn fire_bow(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
+        m.fire_missile(0x1B, 0)
     }
 }
 

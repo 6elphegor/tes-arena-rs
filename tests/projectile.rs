@@ -240,3 +240,74 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 1000);
 }
+
+/// Arrow shots (29CF:037F, harness/gen_missile.py): the same world, a
+/// shot in place of the launch, then the frames.
+#[test]
+fn missiles_match_original() {
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x1042, CSEG);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w16(DS, 0x91F0, 0);
+    base.mem.w16(DS, 0xC3D6, 0xA0);
+    base.mem.w16(DS, 0x1020, 0);
+    base.mem.w16(DS, 0x1022, 0x5C00);
+    let classes: Vec<u8> = (0..18).map(|i| base.mem.r8(DS, 0x2A50 + i)).collect();
+    let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    for line in include_str!("vectors/missile.txt").lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        assert_eq!(f[0], "missile", "{line}");
+        let p: Vec<&str> = f[1].split(' ').collect();
+        let (seed, k) = (hex(p[0]) as u32, hex(p[1]) as u16);
+        let (src, mx, flat) = (hex(p[2]) as u16, hex(p[3]) as u16, hex(p[4]) as u8);
+        let mut m = base.clone();
+        let mut s = setup(&mut m, seed, k, &classes);
+        strike(&mut m, &mut s, k * RSIZE);
+        let plan = flight(&mut m, &mut s);
+        m.mem.w16(DS, 0x8F92, mx);
+        m.load_rng();
+        let before = m.clone();
+        let run = |m: &mut Machine| -> Option<()> {
+            m.fire_missile(flat, src)?;
+            for _ in 0..plan.frames {
+                m.projectiles_update()?;
+            }
+            Some(())
+        };
+        let got = run(&mut m).map(|()| {
+            m.store_rng();
+            let changed = (0..=0xFFFFu16)
+                .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+                .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+            format!(
+                "{:x} {:x} {:x}",
+                fnv(changed),
+                fnv((0..0x8000u16).map(|o| m.mem.r8(CSEG, o))),
+                fnv((0..0x8000u16).map(|o| m.mem.r8(WSEG, o)))
+            )
+        });
+        if std::env::var("MISSILE_DUMP").is_ok_and(|v| v == p[0]) {
+            for o in 0..=0xFFFFu16 {
+                if m.mem.r8(DS, o) != before.mem.r8(DS, o) {
+                    eprintln!("{o:04x} {:02x} {:02x}", before.mem.r8(DS, o), m.mem.r8(DS, o));
+                }
+            }
+        }
+        match got {
+            _ if f[2] == "hang" => {}
+            _ if f[2] == "invalid" => {}
+            Some(d) => assert_eq!(f[2], d, "{line}"),
+            None => assert_eq!(f[2], "fault", "{line}"),
+        }
+        *counts.entry(match f[2] {
+            "fault" => "fault",
+            "hang" => "hang",
+            _ => "ran",
+        })
+        .or_default() += 1;
+    }
+    eprintln!("{counts:?}");
+    assert!(counts.get("ran").copied().unwrap_or(0) > 1000);
+}

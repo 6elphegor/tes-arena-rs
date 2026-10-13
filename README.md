@@ -114,8 +114,9 @@ No game code or data is included: everything is loaded from your own copy.
   frame it lands (`strike::swing_hits`), and with no actor in reach it
   hits the square ahead (0000:3D43): breaking into a closed building in a
   town (a crime that may bring the guards), or bashing a breakable flat
-  or a locked door by the blow's damage and strength. The bow's shot and
-  the drawing of the hands are hooks.
+  or a locked door by the blow's damage and strength. A bow shoots an
+  arrow aimed by the cursor (`projectile::fire_missile`, 29CF:037F);
+  drawing the hands is the renderer's.
 - `src/frame.rs` – the world loop's frame body (0000:481E): the detail
   and debug keys, the acceleration's decay, walking and turning speeds
   from speed and fatigue, the wilderness flats, levitation and the light
