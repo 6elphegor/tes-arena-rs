@@ -143,9 +143,12 @@ No game code or data is included: everything is loaded from your own copy.
   not ported.
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
-  step (`Input::Classic` or `Input::Steer`), the wall spells' squares,
-  the frame body, a pending INF; `enter_area` sets a loaded level up
-  (the state half of 0000:A4ED). `Engine::view` gives the renderer the
+  step (`Input::Classic` or `Input::Steer`), the state the start of the
+  original's drawing sets (`view_begin`, 0000:C923: the player's square
+  CB90, which the encounters, the actors and the clicks read) with the
+  `EngineHooks::draw` hook in place of its walk over the squares, the
+  wall spells' squares, the frame body, a pending INF; `enter_area` sets
+  a loaded level up (the state half of 0000:A4ED). `Engine::view` gives the renderer the
   player's position, heading, light, time of day and message;
   `examples/play.rs` runs it on a level with scripted modern controls.
 - `src/actors.rs` – the people and creatures of a level and their frame

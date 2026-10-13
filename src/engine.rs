@@ -8,10 +8,14 @@
 //! C3A8, `frame`), a level's INF waiting to load (CB84), and the frame
 //! counter (CCBC).
 //!
-//! The front end draws the view between the physics and the frame body,
-//! as the original did (it reads the state through `Machine` and the
-//! `View` helpers), advances the BIOS timer (`tick`: 18.2 ticks a second;
-//! the clock runs on it), and paces frames (`frame_ticks`).
+//! The original drew the view between the physics and the changed
+//! squares. The start of its drawing set state the game reads (the
+//! player's square: `view_begin`); the walk over the squares stepped the
+//! changed squares it drew, which `EngineHooks::draw` leaves to the front
+//! end, called at that point. The front end draws the view from the
+//! state after the frame (through `Machine` and the `View` helpers),
+//! advances the BIOS timer (`tick`: 18.2 ticks a second; the clock runs
+//! on it), and paces frames (`frame_ticks`).
 
 use crate::bsa::Files;
 use crate::controls::{ControlHooks, Intent};
@@ -38,6 +42,11 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     fn transition(&mut self, _m: &mut Machine, _files: &mut Files, _trigger: u16) -> Option<()> {
         Some(())
     }
+    /// 0000:C980, the walk over the squares in view (C394 squares out),
+    /// back to front: for the game's state, each square drawn steps if it
+    /// is changing (`Machine::temp_walls_begin_draw` then
+    /// `temp_wall_drawn`).
+    fn draw(&mut self, _m: &mut Machine) {}
 }
 
 /// How a frame ended.
@@ -105,6 +114,8 @@ impl Engine {
         if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 {
             return Some(Frame::Left);
         }
+        m.view_begin();
+        hooks.draw(m);
         m.temp_walls_frame();
         m.frame_body(files, hooks)?;
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
@@ -189,4 +200,34 @@ pub struct View {
     /// The message over the view (far pointer, segment then offset),
     /// while it shows.
     pub message: Option<(u16, u16)>,
+}
+
+impl Machine {
+    /// 0000:C923, but for the walk over the squares (C980): the state the
+    /// original sets as it starts drawing the view. The player's column
+    /// and row (A854, A856; the renderer's CCA4, CCA6) and square (CB90,
+    /// a wall plane offset), the wall word there (CB6C); the draw's
+    /// resets (CB92, CCCA FFFFh, CD14 F830h, CCB2, CCB4 0), and C398 bit
+    /// 20h (the frame sets it for the draw) clear.
+    pub fn view_begin(&mut self) {
+        self.mem.w16(DS, 0xCB92, 0xFFFF);
+        self.mem.w16(DS, 0xCCCA, 0xFFFF);
+        self.mem.w16(DS, 0xCD14, 0xF830);
+        self.mem.w16(DS, 0xCCB2, 0);
+        self.mem.w16(DS, 0xCCB4, 0);
+        let col = self.mem.r16(DS, 0xC3D0) >> 7;
+        let row = self.mem.r16(DS, 0xC3D4) >> 7;
+        self.mem.w16(DS, 0xA854, col);
+        self.mem.w16(DS, 0xCCA4, col);
+        self.mem.w16(DS, 0xA856, row);
+        self.mem.w16(DS, 0xCCA6, row);
+        // 0000:F565: the offset of (x, y) in the wall plane.
+        let sq = (row << 8).wrapping_add(col << 1);
+        self.mem.w16(DS, 0xCB90, sq);
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        let w = self.mem.r16(walls, sq);
+        self.mem.w16(DS, 0xCB6C, w);
+        let f = self.mem.r16(DS, MAP_FLAGS) & !0x20;
+        self.mem.w16(DS, MAP_FLAGS, f);
+    }
 }
