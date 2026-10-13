@@ -34,6 +34,12 @@ No game code or data is included: everything is loaded from your own copy.
   resistance, 29CF:0B35), status effects, cures (2EBD:0004), timed spell
   flags, attribute, HP, SP and fatigue changes and transfers, instant
   death, levitation. A projectile spawned by an effect is not ported.
+- `src/projectile.rs` – spells in flight and arrows (segment 29CF): the
+  launch (29CF:02E2) with its sprite object, light and column list
+  (0000:FDEA, E0CA, BFC0), the per-frame mover (29CF:0441) with its
+  hit tests against actors, the player and walls (0000:F4EB),
+  explosions, arrows striking, and the targets of a spell's impact
+  (29CF:09B8, 2CDD:08D9), which then takes effect (`spell.rs`).
 - `src/format.rs` – the game's sprintf for `%s` and `%d` formats (line
   feeds become CR LF).
 - `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).

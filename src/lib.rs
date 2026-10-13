@@ -24,6 +24,7 @@ pub mod loot;
 pub mod machine;
 pub mod mem;
 pub mod mif;
+pub mod projectile;
 pub mod movement;
 pub mod names;
 pub mod progression;

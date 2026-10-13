@@ -734,7 +734,8 @@ impl Machine {
         let di = di.wrapping_add(x.cx.wrapping_shl(2)).wrapping_add(8);
         self.mem.w16(seg, di.wrapping_add(2), strength);
         self.mem.w16(seg, di, timer);
-        let bit = 4u16.wrapping_shl((x.cx & 0xFF) as u32 & 0x1F);
+        // SHL AX, CL: the count is masked to 5 bits, so 16 and up clear it.
+        let bit = (4u32 << (x.cx & 0x1F)) as u16;
         self.sp_or_flags(&x, bit);
         Some(())
     }

@@ -127,6 +127,34 @@ def setup(seed):
     return w, cast
 
 
+# The handlers 2CDD:000C reaches through its tables. A table read that
+# lands elsewhere (a sub-kind past the tables) jumps into data; the port
+# returns None, and `guard_dispatch` stops such a case as a fault.
+HANDLERS = {0x004F, 0x0142, 0x01B3, 0x020C, 0x0278, 0x030F, 0x037D, 0x03C1, 0x03F1, 0x03F2, 0x0447, 0x0497,
+            0x04FA, 0x05CE, 0x0712, 0x0713, 0x0723, 0x075A, 0x078C, 0x0793, 0x07A3, 0x07DB, 0x0822, 0x0841,
+            0x0863, 0x00CB, 0x00CC, 0x0061, 0x00A5, 0x010C, 0x012F, 0x0154, 0x0180, 0x019B, 0x01BC, 0x01D6,
+            0x01F1, 0x0386, 0x03A3, 0x03C0, 0x021C, 0x022F, 0x024E, 0x0263, 0x0288, 0x02F0, 0x02FC, 0x0404,
+            0x04A6, 0x050F, 0x0548, 0x0571, 0x058F, 0x05F7, 0x0604}
+# Call sites `call word ptr [di + table]` and their displacements.
+DISPATCH = [(0x003F, 0x83E2), (0x005A, 0x8414), (0x014D, 0x841E), (0x01B7, 0x8424), (0x0216, 0x842A),
+            (0x0282, 0x8432), (0x0381, 0x8438), (0x03FE, 0x843E), (0x0504, 0x8442), (0x05DB, 0x844A)]
+
+
+def guard_dispatch(a):
+    from unicorn import UC_HOOK_CODE
+    from unicorn.x86_const import UC_X86_REG_DS, UC_X86_REG_DI
+
+    def check(mu, addr, size, table):
+        ds, di = mu.reg_read(UC_X86_REG_DS), mu.reg_read(UC_X86_REG_DI)
+        target = struct.unpack('<H', mu.mem_read(ds * 16 + ((di + table) & 0xFFFF), 2))[0]
+        if target not in HANDLERS:
+            a.fault = 'dispatch'
+            mu.emu_stop()
+    for off, table in DISPATCH:
+        lin = (LOAD_SEG + 0x2CDD) * 16 + off
+        a.mu.hook_add(UC_HOOK_CODE, check, table, lin, lin)
+
+
 RELOC = [0x061C] + [0x0D5E + 4 * i for i in range(16)] + [CASTS + 0x16 * i + 6 for i in range(8)] + \
     [SLOTS + i * 0x3C + 0x2A for i in range(16)]
 
@@ -150,6 +178,7 @@ def main():
     for seg, off in [(0x2CDD, 0x03E5), (0x2CDD, 0x003F), (0x29CF, 0x09A3)]:
         lin = (LOAD_SEG + seg) * 16 + off
         a.mu.hook_add(UC_HOOK_CODE, leak, None, lin, lin)
+    guard_dispatch(a)
     a.w16(0x1042, CSEG)
     a.w16(0xD806, WSEG)
     a.w16(0x9030, FRAME)
