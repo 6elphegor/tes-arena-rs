@@ -468,7 +468,7 @@ impl Machine {
     }
 
     /// 0000:26DC. A wall, or a floor at or above FLOOR_SOLID.
-    fn square_blocked(&self, sq: u16) -> bool {
+    pub(crate) fn square_blocked(&self, sq: u16) -> bool {
         if self.mem.r16(self.mem.r16(DS, MAP1_SEG), sq) != 0 {
             return true;
         }

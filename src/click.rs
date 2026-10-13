@@ -94,7 +94,7 @@ impl Machine {
 
     /// 2826:0A87. Whether an actor stands on map offset `sq` (the actors'
     /// squares at 1951); ACTOR_FOUND gets its slot.
-    fn actor_on(&mut self, sq: u16) -> bool {
+    pub(crate) fn actor_on(&mut self, sq: u16) -> bool {
         self.mem.w16(DS, ACTOR_FOUND, 0xFFFF);
         let squares = crate::actors::var::SQUARES;
         match (0..0x17).find(|&i| self.mem.r16(DS, squares + 2 * i) == sq) {

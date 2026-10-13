@@ -124,6 +124,10 @@ No game code or data is included: everything is loaded from your own copy.
   holiday's message, breath in deep water, the night's creatures in
   towns, the clock (a minute every 90 timer ticks) and the hurt flash.
   Drawing, sound, menus and message boxes are `FrameHooks`.
+- `src/encounter.rs` – fights starting (segment 25CA): the fight set up
+  for monsters or people (25CA:0000, the graphics and music as hooks),
+  and the creatures placed in the free creature slots around the player
+  (25CA:006A: a random free square near the player, facing the player).
 - `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
   without its drawing): actors and projectiles, physics with the input
   step (`Input::Classic` or `Input::Steer`), the wall spells' squares,

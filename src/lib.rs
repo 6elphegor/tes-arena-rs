@@ -14,6 +14,7 @@ pub mod creature;
 pub mod dice;
 pub mod dungeon;
 pub mod effects;
+pub mod encounter;
 pub mod engine;
 pub mod exe;
 pub mod format;
