@@ -64,6 +64,10 @@ fn matches_original() {
                 chunks = Some(c);
                 "ok".into()
             }),
+            "first_level" => m.dungeon_first_level_plan(HANDLE).map(|c| {
+                chunks = Some(c);
+                "ok".into()
+            }),
             "start_position" => {
                 m.dungeon_start_position();
                 Some("ok".into())
@@ -91,7 +95,7 @@ fn matches_original() {
                 .map(|(a, v)| (hex(a) as usize, hex(v) as u8))
                 .collect();
             assert_eq!(m.mem.diff(&before, LO..HI), want, "{name}: memory differs\n{line}");
-            if name == "level" {
+            if name == "level" || name == "first_level" {
                 assert_eq!(map_marks(&m), marks, "{name}: map differs\n{line}");
             } else {
                 assert_eq!(m.mem.diff(&before, MAPSEG as usize * 16..MAPSEG as usize * 16 + 0x10000), vec![]);
@@ -111,6 +115,7 @@ fn matches_original() {
         "setup",
         "enter",
         "level",
+        "first_level",
         "start_position",
         "quest_provinces",
         "quest_target",
