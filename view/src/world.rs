@@ -52,6 +52,13 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.mem.w8(DS, 0xF000 + i as u16, b);
         m.mem.w8(DS, 0xC37F + i as u16, b);
     }
+    // The spells (records the casting reads): a new game's, slot 65.
+    m.save_set_slot(65);
+    m.spells_load(&mut files).expect("spells");
+    let (sseg, _) = m.spell_record(0);
+    if m.mem.r16(sseg, 0x18) == 0 {
+        eprintln!("the spells did not load (SPELLSG.65)");
+    }
     m.level_load(&mut files, 0xF000).expect("level");
     let info = m.mem.r16(DS, 0xCB84);
     // The world loop's hooks are set: the port runs its own input step
