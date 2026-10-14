@@ -19,6 +19,7 @@
 //! data goes down, the province loaded and written back around it. The
 //! texts and the file I/O are `QuestHooks`.
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -89,6 +90,11 @@ pub trait QuestHooks {
     /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
     /// written to 19DE, before its message box.
     fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
+    /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
+    /// `seed`, written at DS:`di` (`Machine::npc_name`).
+    fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
+        m.npc_name(files, ax as u8, (ax >> 8) as u8, seed, DS, di)
+    }
 }
 
 /// `QuestHooks` that do nothing.
@@ -618,5 +624,180 @@ impl Machine {
             self.mem.w16(DS, 0x13E2, 25_000);
         }
         Some(())
+    }
+}
+
+/// The level's candidate squares for a quest's flats (x, y bytes; FFFFh
+/// used) and their count (a byte); the map's size; the floor plane's
+/// segment.
+const CANDIDATES: u16 = 0xC6E5;
+const CANDIDATE_COUNT: u16 = 0xC765;
+const MAP_WIDTH: u16 = 0xC357;
+const MAP_DEPTH: u16 = 0xC359;
+const FLOOR: u16 = 0xD806;
+/// The flats' kinds by a quest's +2Fh / +30h (bytes), and by +28h + 0Bh
+/// (the person's).
+const QUEST_FLATS: u16 = 0xC953;
+const PERSON_FLATS: u16 = 0xC934;
+/// The offsets (words) of the squares tried around a quest's person.
+const NEARBY: u16 = 0x6DF4;
+/// The person's name.
+const NAME: u16 = 0x6DD4;
+
+impl Machine {
+    /// 1194:9FAC (with CX 1, from the stairs' hook 0000:44D7 and the area
+    /// entry 0000:4790): a dungeon's last level reached (5E0 and 5CA lose
+    /// bit 400h first). Unless the player is wanted (5C8 bit 4000h), out
+    /// of a dungeon (5E6 not 3) or not on its last level (BB0A + 1 not
+    /// C355), the first quest under way, its goal not reached, of type 7
+    /// (+4 bits 12-15), in this province (+25h's top three bits) and place
+    /// (+14h), gets its flats (0F72 marks each quest looked at):
+    /// - stages 4 and 6: one of the level's candidates (`quest_candidate`,
+    ///   with the quest's seed +0) gets the flat of +30h; at stage 4
+    ///   another (the seed rotated four bits) that of +2Fh;
+    /// - stage 5: a candidate (kept at 1244) gets the flat of +30h, the
+    ///   first free square at the offsets from NEARBY around it the
+    ///   person (the kind at PERSON_FLATS + (+28h + 0Bh), with bit 15),
+    ///   and the person a name at NAME (set +25h's province, sex +28h,
+    ///   the seed +1Eh + +8, its low word plus +6 and +26h); returns the
+    ///   name and the person's kind (AX, BX with the carry).
+    ///
+    /// Returns Some(None) with the carry clear. None where the original
+    /// hangs or faults (no free candidate; none at all; no free square
+    /// nearby within 8000h tries) or the name's file is missing.
+    pub fn quest_level(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<Option<(u16, u16)>> {
+        for at in [0x05E0, 0x05CA] {
+            let v = self.mem.r16(DS, at) & 0xFBFF;
+            self.mem.w16(DS, at, v);
+        }
+        if self.mem.r16(DS, 0x05C8) & 0x4000 != 0
+            || self.mem.r8(DS, AREA) != 3
+            || (self.mem.r8(DS, 0xBB0A) as u16).wrapping_add(1) != self.mem.r16(DS, 0xC355)
+        {
+            return Some(None);
+        }
+        for i in 0..4u16 {
+            let si = QUESTS + i * 0x34;
+            self.mem.w16(DS, 0x0F72, si);
+            let f = self.quest_flags(si);
+            if self.quest_kind(si) != 1 || f & 0x20 != 0 || f >> 12 != 7 {
+                continue;
+            }
+            if self.mem.r8(DS, si + 0x25) >> 5 != self.mem.r8(DS, HERE_PROVINCE)
+                || self.mem.r8(DS, si + 0x14) != self.mem.r8(DS, HERE_PLACE) & 0x1F
+            {
+                continue;
+            }
+            match self.quest_stage(si) {
+                stage @ (4 | 6) => {
+                    let seed = self.mem.r32(DS, si);
+                    let at = self.quest_take_candidate(seed)?;
+                    self.quest_flat(at, self.mem.r8(DS, si + 0x30));
+                    if stage == 4 {
+                        let at = self.quest_take_candidate(seed.rotate_left(4))?;
+                        self.quest_flat(at, self.mem.r8(DS, si + 0x2F));
+                    }
+                    return Some(None);
+                }
+                5 => return self.quest_person(files, hooks, si).map(Some),
+                _ => {}
+            }
+        }
+        Some(None)
+    }
+
+    /// 1194:A0FC with its caller's next lines: a candidate picked
+    /// (`quest_candidate`), its square (y high, x low) returned and the
+    /// candidate used (FFFFh).
+    fn quest_take_candidate(&mut self, seed: u32) -> Option<u16> {
+        let e = self.quest_candidate(seed)?;
+        let at = self.mem.r16(DS, e);
+        self.mem.w16(DS, e, 0xFFFF);
+        Some(at)
+    }
+
+    /// 1194:A0FC. With the RNG seeded from `seed` (the game's seed put
+    /// back after), random candidates (0000:6EEA over the count) until
+    /// one is usable: x and y not 0, not FFFFh, inside the map, its
+    /// square empty on the floor plane. Returns its offset. None where
+    /// the original faults (no candidates) or loops forever.
+    fn quest_candidate(&mut self, seed: u32) -> Option<u16> {
+        let count = self.mem.r8(DS, CANDIDATE_COUNT) as u16;
+        // With no usable candidate at all the original rolls forever:
+        // known at once, instead of waiting for the RNG to cycle.
+        if !(0..count).any(|r| self.quest_usable(CANDIDATES + 2 * r)) {
+            return None;
+        }
+        let saved = self.rng.seed;
+        self.rng.seed = seed;
+        let mut tries = crate::random::CycleCheck::new(&self.rng);
+        let found = loop {
+            let r = self.rng.range(0, count)?;
+            let e = CANDIDATES.wrapping_add(r.wrapping_mul(2));
+            if self.quest_usable(e) {
+                break Some(e);
+            }
+            if tries.cycled(&self.rng) {
+                break None;
+            }
+        };
+        self.rng.seed = saved;
+        found
+    }
+
+    /// A0FC's test of the candidate at `e`: x and y not 0, not FFFFh,
+    /// inside the map, its square empty on the floor plane.
+    fn quest_usable(&self, e: u16) -> bool {
+        let (x, y) = (self.mem.r8(DS, e), self.mem.r8(DS, e.wrapping_add(1)));
+        if x == 0 || y == 0 || self.mem.r16(DS, e) == 0xFFFF {
+            return false;
+        }
+        if x as u16 >= self.mem.r16(DS, MAP_WIDTH) || y as u16 >= self.mem.r16(DS, MAP_DEPTH) {
+            return false;
+        }
+        let sq = (y as u16) << 8 | x.wrapping_mul(2) as u16;
+        let floor = self.mem.r16(DS, FLOOR);
+        self.mem.r16(floor, sq) == 0
+    }
+
+    /// 1194:A160. The square at `at` (y high, x low; kept at 6DF2) gets
+    /// the flat kind QUEST_FLATS[`which`] (82xxh on the floor plane);
+    /// 5CA bit 400h.
+    fn quest_flat(&mut self, at: u16, which: u8) {
+        self.mem.w16(DS, 0x6DF2, at);
+        let sq = at & 0xFF00 | (at as u8).wrapping_mul(2) as u16;
+        let kind = self.mem.r8(DS, QUEST_FLATS + which as u16);
+        let floor = self.mem.r16(DS, FLOOR);
+        self.mem.w16(floor, sq, 0x8200 | kind as u16);
+        let f = self.mem.r16(DS, 0x05CA) | 0x400;
+        self.mem.w16(DS, 0x05CA, f);
+    }
+
+    /// 1194:9FAC's stage 5 (A081..A0FB). See `quest_level`.
+    fn quest_person(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) -> Option<(u16, u16)> {
+        let at = self.quest_take_candidate(self.mem.r32(DS, si))?;
+        self.mem.w16(DS, STAGE, at);
+        let near = self.quest_nearby(at)?;
+        let idx = 0x0Bu8.wrapping_add(self.mem.r8(DS, si + 0x28)) as u16;
+        let person = self.mem.r8(DS, PERSON_FLATS + idx);
+        let floor = self.mem.r16(DS, FLOOR);
+        self.mem.w16(floor, near, 0x8000 | person as u16);
+        let at = self.mem.r16(DS, STAGE);
+        self.quest_flat(at, self.mem.r8(DS, si + 0x30));
+        let ax = (self.mem.r8(DS, si + 0x28) as u16) << 8 | (self.mem.r8(DS, si + 0x25) >> 5) as u16;
+        let seed = self.mem.r32(DS, si + 0x1E).wrapping_add(self.mem.r32(DS, si + 8));
+        let lo = (seed as u16).wrapping_add(self.mem.r16(DS, si + 6)).wrapping_add(self.mem.r16(DS, si + 0x26));
+        let seed = seed & 0xFFFF_0000 | lo as u32;
+        hooks.npc_name(self, files, ax, seed, NAME)?;
+        Some((NAME, self.mem.r8(DS, PERSON_FLATS + idx) as u16))
+    }
+
+    /// 1194:A180. The first square around `at` (y high, x low), at the
+    /// offsets (words) from NEARBY on, that is empty on the floor plane.
+    /// The list has no end: None past 8000h offsets.
+    fn quest_nearby(&self, at: u16) -> Option<u16> {
+        let sq = at & 0xFF00 | (at as u8).wrapping_mul(2) as u16;
+        let floor = self.mem.r16(DS, FLOOR);
+        (0..0x8000u16).map(|i| sq.wrapping_add(self.mem.r16(DS, NEARBY.wrapping_add(2 * i)))).find(|&bx| self.mem.r16(floor, bx) == 0)
     }
 }
