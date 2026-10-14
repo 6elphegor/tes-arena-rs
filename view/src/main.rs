@@ -14,7 +14,7 @@
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
-//! `walk:N` (frames), `wait:N`, `camp` (R), `key:N` (the key with scan
+//! `walk:N` (frames), `wait:N`, `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
 //! code N down for a frame: 60 is F2, the player's square on the message
 //! line). --picks answers the game's questions in order: a menu's entry
 //! by its number (talking to someone: 0 the greeting, 1 "Where is...", 2
@@ -615,7 +615,7 @@ fn main() {
         let out = args.get(4).expect("--shot needs a file");
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers);
+        shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)));
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
@@ -777,7 +777,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 /// walking forward, then `steps` (see `--do`), with the HUD: the message
 /// line, the last boxes, and the question left unanswered, if any.
 #[allow(clippy::too_many_arguments)]
-fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>) {
+fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
     let st = &mut Shot { assets: Assets::new(dir, &mut engine), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
     // One frame turning (or not) before the walk: the actors pick their
@@ -807,6 +807,25 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "save" | "load" => {
+                let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
+                let msg = if what == "save" {
+                    Ok(save_to(&mut engine, sdir, slot, st.assets.palette))
+                } else {
+                    load_from(&mut engine, sdir, slot)
+                };
+                let msg = match msg {
+                    Ok(m) => {
+                        if what == "load" {
+                            st.assets.level(&engine);
+                        }
+                        m
+                    }
+                    Err(m) => m,
+                };
+                println!("{msg}");
+                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg }]]];
             }
             "key" => {
                 // A key (its scan code) down for a frame.
@@ -944,6 +963,47 @@ impl arena::save_write::SaveHooks for SaveDir<'_> {
             }
         }
     }
+}
+
+/// The game saved to `slot` in `dir` (25FD:0113, `save_game`): NAMES.DAT,
+/// SAVEGAME.nn and SAVEENGN.nn. What happened, to show.
+fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 4]; 256]) -> String {
+    if let Err(e) = std::fs::create_dir_all(dir) {
+        return format!("{}: {e}", dir.display());
+    }
+    // The saved position (BA62: x, z, y), which saving the level makes the
+    // player's (25FD's caller sets it in the original; the save menu,
+    // 25FD:004F..00D0, isn't ported): the player's.
+    use arena::save_write::var::{POSITION, SAVED_POSITION};
+    for i in 0..3 {
+        let w = engine.m.mem.r16(arena::mem::DS, POSITION + 2 * i);
+        engine.m.mem.w16(arena::mem::DS, SAVED_POSITION + 2 * i, w);
+    }
+    engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
+    engine.m.save_game(&mut SaveDir { dir, palette });
+    format!("Saved to slot {slot} in {}.", dir.display())
+}
+
+/// The game of `slot` in `dir` loaded back: its state (SAVEENGN,
+/// `save_load_engine`) and its level (SAVEGAME, `save_load_level`: the
+/// level's state and planes; its screen skipped). The original's rebuild
+/// after loading (25FD:03F9 on: the area entered again, its INF, its
+/// sky) isn't ported: a game saved in this area comes back right; one
+/// saved elsewhere doesn't. The caller makes the level's assets again.
+fn load_from(engine: &mut Engine, dir: &std::path::Path, slot: u8) -> Result<String, String> {
+    use arena::mem::DS;
+    // Into a copy, kept only when both parts load.
+    let mut e = copy(engine);
+    e.files.add_dir(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
+    let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
+    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
+    let ok = e.m.save_load_engine(&mut e.files, slot).is_some() && e.m.save_load_level(&mut e.files).is_some();
+    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
+    if !ok {
+        return Err(format!("Slot {slot} couldn't be loaded from {}.", dir.display()));
+    }
+    *engine = e;
+    Ok(format!("Loaded slot {slot}."))
 }
 
 struct Gpu {
@@ -1135,46 +1195,27 @@ impl App {
 
     /// F5: the game saved to the slot in the save directory.
     fn save(&mut self) {
-        let Some(dir) = self.save_dir.clone() else {
-            self.say("No save directory (--save-dir).");
-            return;
+        let msg = match self.save_dir.clone() {
+            Some(dir) => save_to(&mut self.engine, &dir, self.slot, self.assets.palette),
+            None => "No save directory (--save-dir).".to_string(),
         };
-        if let Err(e) = std::fs::create_dir_all(&dir) {
-            self.say(&format!("{}: {e}", dir.display()));
-            return;
-        }
-        self.engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, self.slot);
-        self.engine.m.save_game(&mut SaveDir { dir: &dir, palette: self.assets.palette });
-        self.say(&format!("Saved to slot {} in {}.", self.slot, dir.display()));
+        self.say(&msg);
     }
 
-    /// F9: the slot's game loaded back: its state (SAVEENGN) and its level
-    /// (SAVEGAME: the level's state and planes), the level's assets made
-    /// again. The original's rebuild after loading (25FD:03F9 on: the
-    /// area entered again, its INF, its sky) isn't ported: a game saved in
-    /// this area comes back right; one saved elsewhere doesn't.
+    /// F9: the slot's game loaded back (`load_from`).
     fn load(&mut self) {
-        use arena::mem::DS;
         let Some(dir) = self.save_dir.clone() else {
             self.say("No save directory (--save-dir).");
             return;
         };
-        if self.engine.files.add_dir(&dir).is_err() {
-            self.say(&format!("{} can't be read.", dir.display()));
-            return;
+        match load_from(&mut self.engine, &dir, self.slot) {
+            Ok(msg) => {
+                self.assets.level(&self.engine);
+                self.remake_renderer();
+                self.say(&msg);
+            }
+            Err(msg) => self.say(&msg),
         }
-        let m = &mut self.engine.m;
-        let screen = m.mem.r8(DS, arena::save::var::NO_SCREEN);
-        m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
-        let ok = m.save_load_engine(&mut self.engine.files, self.slot).is_some() && m.save_load_level(&mut self.engine.files).is_some();
-        self.engine.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
-        if !ok {
-            self.say(&format!("Slot {} couldn't be loaded from {}.", self.slot, dir.display()));
-            return;
-        }
-        self.assets.level(&self.engine);
-        self.remake_renderer();
-        self.say(&format!("Loaded slot {}.", self.slot));
     }
 
     /// A box of the view's own.
