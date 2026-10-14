@@ -37,6 +37,10 @@ from gen_frame import counter
 TSEG = 0x6000
 
 
+# The inverse of the LCG's multiplier 6D002Dh mod 2**32.
+INV = 0x3F154FA5
+
+
 def setup(seed):
     """Writes. Mirrored in tests/fog.rs."""
     s = stream(seed)
@@ -66,6 +70,19 @@ def setup(seed):
     w.append((0x91F6, pk(word())))
     w.append((0x91F8, pk(word())))
     w.append((0x837A, pk(word())))
+    # Aimed cases, written over the rest: the roll's edges, the game's
+    # seed chosen through the LCG's inverse (its multiplier 6D002Dh is
+    # odd). In zone weather 7 the first roll fog under 3E80h (3E7Fh..3E81h);
+    # in 5 (rain, 81h) the second roll thunder up to 5DC0h (5DBFh..5DC1h).
+    k = byte() % 4
+    if k in (1, 2):
+        w.append((0x0A51, pb(0)))
+        w.append((0x0A5A, pb(7 if k == 1 else 5)))
+        r = (0x3E7F if k == 1 else 0x5DBF) + byte() % 3
+        seed = (r << 16 | word()) * INV & 0xFFFFFFFF
+        if k == 2:
+            seed = seed * INV & 0xFFFFFFFF
+        w.append((0x91F6, struct.pack('<I', seed)))
     return w
 
 

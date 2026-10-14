@@ -104,7 +104,24 @@ fn setup(m: &mut Machine, seed: u32) {
         let v = s.word();
         m.mem.w16(DS, at, v);
     }
+    // The roll's edges, aimed (see gen_fog.py): the seed through the
+    // LCG's inverse.
+    let k = s.byte() % 4;
+    if k == 1 || k == 2 {
+        m.mem.w8(DS, 0x0A51, 0);
+        m.mem.w8(DS, 0x0A5A, if k == 1 { 7 } else { 5 });
+        let r = if k == 1 { 0x3E7Fu32 } else { 0x5DBF } + (s.byte() % 3) as u32;
+        let low = s.word() as u32;
+        let mut seed = (r << 16 | low).wrapping_mul(INV);
+        if k == 2 {
+            seed = seed.wrapping_mul(INV);
+        }
+        m.mem.w32(DS, 0x91F6, seed);
+    }
 }
+
+/// The inverse of the LCG's multiplier 6D002Dh mod 2^32.
+const INV: u32 = 0x3F15_4FA5;
 
 #[test]
 fn matches_original() {
