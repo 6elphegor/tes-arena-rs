@@ -64,9 +64,6 @@ impl ShopHooks for Script {
         self.log.extend([9, si as u32, cx as u32]);
         take(&self.lists, &mut self.n[1], 0xFFFF)
     }
-    fn quests(&mut self, _m: &mut Machine) {
-        self.log.push(4);
-    }
 }
 
 impl TavernHooks for Script {
@@ -76,11 +73,17 @@ impl TavernHooks for Script {
     fn greeting(&mut self, _m: &mut Machine) {
         self.log.push(2);
     }
-    fn quest(&mut self, _m: &mut Machine) {
+    fn quest(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(3);
+        Some(())
     }
-    fn tavern_quest(&mut self, _m: &mut Machine) {
+    fn quests_talk(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        self.log.push(4);
+        Some(())
+    }
+    fn tavern_quest(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(5);
+        Some(())
     }
     fn room_load(&mut self, m: &mut Machine) -> bool {
         self.log.push(6);
@@ -263,6 +266,8 @@ fn changes(old: &[u8], new: &[u8]) -> Vec<u8> {
 #[test]
 fn matches_original() {
     let Some(img) = common::image() else { return };
+    // The stubbed quest hooks read no files: any directory will do.
+    let mut files = arena::bsa::Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).expect("files");
     let mut base = Machine::new(&img);
     base.mem.w16(DS, 0xD806, WSEG);
     let only = std::env::var("TAVERN_SEED").ok();
@@ -277,7 +282,7 @@ fn matches_original() {
         let mut sc = setup(&mut m, u32::from_str_radix(f[1], 16).unwrap());
         m.load_rng();
         let before = (seg_bytes(&m, DS), seg_bytes(&m, WSEG));
-        let got = m.tavern_shop(&mut sc).map(|()| {
+        let got = m.tavern_shop(&mut files, &mut sc).map(|()| {
             m.store_rng();
             let after = seg_bytes(&m, DS);
             if only.is_some() {

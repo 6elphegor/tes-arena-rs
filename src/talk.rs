@@ -146,8 +146,11 @@ pub trait TalkHooks: TextHooks {
     }
     /// 1194:D593: the quest's person speaks.
     fn quest_person(&mut self, _m: &mut Machine) {}
-    /// 1194:8F1E: the palace's ruler.
-    fn palace(&mut self, _m: &mut Machine) {}
+    /// 1194:8F1E (from DCE1): the palace's quests, ended, offered and
+    /// taken (`Machine::quests_talk`).
+    fn palace(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_talk(files, &mut crate::quest::NoQuestHooks)
+    }
     /// 1194:CD9A: a quest is offered. The carry: none
     /// (`quest::quest_offer`; none too where the original faults).
     fn quest_offer(&mut self, m: &mut Machine) -> bool {
@@ -163,12 +166,12 @@ pub trait TalkHooks: TextHooks {
     /// 869F). The temple (`shops::temple`) and the tavern
     /// (`tavern::tavern_shop`) run without their windows; the others aren't
     /// ported.
-    fn shop(&mut self, m: &mut Machine, _files: &mut Files, kind: u8) -> Option<()> {
+    fn shop(&mut self, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
         if kind == 5 {
             return m.temple(&mut crate::shops::NoShopHooks);
         }
         if kind == 4 {
-            return m.tavern_shop(&mut crate::tavern::NoTavernHooks);
+            return m.tavern_shop(files, &mut crate::tavern::NoTavernHooks);
         }
         Some(())
     }
@@ -366,7 +369,7 @@ impl Machine {
             if named {
                 hooks.quest_person(self);
             } else {
-                hooks.palace(self);
+                hooks.palace(self, files)?;
             }
             return Some(());
         }

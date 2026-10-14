@@ -44,6 +44,7 @@
 //! returns the carry clear and keeps BX (the chance the guards' roll
 //! reads).
 
+use crate::bsa::Files;
 use crate::effects::Applied;
 use crate::format::Arg;
 use crate::machine::Machine;
@@ -57,10 +58,18 @@ pub trait TavernHooks: ShopHooks {
     fn files(&mut self, _m: &mut Machine) {}
     /// 1194:C12A: the innkeeper's greeting (2DA2's %nt).
     fn greeting(&mut self, _m: &mut Machine) {}
-    /// 1194:CED7: the main quest's check.
-    fn quest(&mut self, _m: &mut Machine) {}
-    /// 1194:90B9: a quest's person in a tavern.
-    fn tavern_quest(&mut self, _m: &mut Machine) {}
+    /// 1194:CED7: the main quest's informant (`Machine::quest_informant`).
+    fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quest_informant(files, &mut crate::quest::NoQuestHooks).map(|_| ())
+    }
+    /// 1194:8F1E: the quests the talk ends or offers (`Machine::quests_talk`).
+    fn quests_talk(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_talk(files, &mut crate::quest::NoQuestHooks)
+    }
+    /// 1194:90B9: another queued quest's text taken (`Machine::quests_take`).
+    fn tavern_quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_take(files, &mut crate::quest::NoQuestHooks)
+    }
     /// 1194:C04C: the room's file read: 12BC set (1) with ROOM_HOURS
     /// (1019) and ROOM_END (12CA) when there is one, else 12BC 0 and the
     /// carry (returned).
@@ -152,12 +161,12 @@ mod text {
 impl Machine {
     /// 1194:B93C. See the module's notes. None where the original faults
     /// or hangs.
-    pub fn tavern_shop(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
+    pub fn tavern_shop(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         let saved = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, 0x137F, 4);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
             hooks.files(self);
-            self.tavern_enter(hooks)?;
+            self.tavern_enter(files, hooks)?;
             loop {
                 if self.mem.r8(DS, ROOM_RENTED) != 0 || self.mem.r8(DS, ROOM_FILED) != 0 {
                     let pick = hooks.menu(self, MENU_TITLE, KEYS_ROOM, ENTRIES_ROOM);
@@ -183,15 +192,15 @@ impl Machine {
     }
 
     /// 1194:C012: the state set up on entering.
-    fn tavern_enter(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
+    fn tavern_enter(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         self.mem.w32(DS, ROOM_END, 0);
         self.mem.w16(DS, ROOM_HOURS, 0);
         self.mem.w8(DS, ROOM_RENTED, 0);
         self.mem.w8(DS, 0x137F, 4);
         hooks.greeting(self);
-        hooks.quest(self);
-        hooks.quests(self);
-        hooks.tavern_quest(self);
+        hooks.quest(self, files)?;
+        hooks.quests_talk(self, files)?;
+        hooks.tavern_quest(self, files)?;
         let level = self.shop_roll_level()?;
         self.shop_price_factors(level)?;
         self.mem.w8(DS, HOLIDAY, 1);
