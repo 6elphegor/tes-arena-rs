@@ -14,7 +14,8 @@
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
-//! `walk:N` (frames), `wait:N`. --picks answers the menus (talking to
+//! `walk:N` (frames), `wait:N`, `at:COL:ROW:HEADING` (as --at, then a
+//! frame). --picks answers the menus (talking to
 //! someone: 0 the greeting, 1 "Where is...", 2 rumours), in order; after
 //! them a menu is left.
 //!
@@ -624,6 +625,17 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         shot_frame(dir, &mut engine, run, st, &walk).expect("area");
     }
     for step in steps.split(',').filter(|s| !s.is_empty()) {
+        if let Some(at) = step.strip_prefix("at:") {
+            // A square's centre and a heading, as --at, then a frame
+            // standing (the wilderness's window follows in its input step).
+            let v: Vec<u16> = at.split(':').map(|x| x.parse().expect("--do at:COL:ROW:HEADING")).collect();
+            use arena::movement::var::{HEADING, X, Y};
+            engine.m.mem.w16(arena::mem::DS, X, v[0] << 7 | 0x40);
+            engine.m.mem.w16(arena::mem::DS, Y, v[1] << 7 | 0x40);
+            engine.m.mem.w16(arena::mem::DS, HEADING, v[2]);
+            shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            continue;
+        }
         let (what, n) = step.split_once(':').map_or((step, 1), |(a, n)| (a, n.parse().expect("--do: a number")));
         match what {
             "click" => {
