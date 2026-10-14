@@ -59,6 +59,10 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.mem.w8(DS, 0x8FA6, 1);
     m.mem.w16(DS, 0x9032, 0x20);
     m.mem.w16(DS, 0x9034, 1);
+    // The bank loads unpack through (the wilderness's blocks, 217B:0189;
+    // the city's build): that last bank (21EE:004E: the pages less 1),
+    // not bank 0, where the textures are.
+    m.mem.w16(DS, 0x1030, 0x1F);
     let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
     m.mem.w16(DS, 0xBA54, off);
     m.mem.w16(DS, 0xBA56, seg);

@@ -4,8 +4,11 @@
 //! the view loads its level as the original's run does, and then makes
 //! its assets again.
 //!
-//! Cities and interiors are followed. The wilderness's set-up (217B:0084)
-//! and the dungeons' making (2294:0ED4, 0000:28BC) aren't wired here.
+//! Cities, interiors and the wilderness are followed: a city's gate
+//! writes the city as the wilderness's blocks 1..4 (217B:027A, in
+//! memory), the wilderness is set up around it (217B:0084) and its
+//! blocks follow the player (217B:0265). The dungeons' making (2294:0ED4,
+//! 0000:28BC) isn't wired here.
 
 use crate::world;
 use arena::bsa::Files;
@@ -71,10 +74,45 @@ impl AreaHooks for Areas<'_> {
         }
     }
 
+    /// 217B:0084, the weather's light tables from the game directory.
+    fn wild_setup(&mut self, m: &mut Machine) {
+        if m.wild_setup(&mut Wild(self.dir)).is_none() {
+            self.failed = true;
+        }
+    }
+
+    fn wild_done(&mut self, m: &mut Machine) {
+        m.wild_done();
+    }
+
+    /// 0000:45FC..4611: the chunks follow the player (217B:0184, which
+    /// loads the first blocks), then whether the quarter the player is in
+    /// has no people (217B:0058).
+    fn wild_empty(&mut self, m: &mut Machine) -> bool {
+        let Some(files) = self.files.as_deref_mut() else {
+            self.failed = true;
+            return true;
+        };
+        if m.wild_shift(files, &mut arena::wild::PortWild).is_none() {
+            self.failed = true;
+        }
+        !m.wild_quarter_ok()
+    }
+
     fn spawn(&mut self, m: &mut Machine, n: u16) {
         if m.spawn_actors(n, 0xA).is_none() {
             eprintln!("the townspeople met code not ported");
         }
+    }
+}
+
+/// The wilderness's hooks as the view runs them: the ports, the weather's
+/// light tables from the game directory.
+struct Wild<'a>(&'a Path);
+
+impl arena::wild::WildHooks for Wild<'_> {
+    fn weather(&mut self, m: &mut Machine) {
+        m.weather_set(&mut world::Lgt(self.0));
     }
 }
 
@@ -107,7 +145,7 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
         m.area_end(run, h);
         let next = m.area_next(h);
         match next {
-            Run::City | Run::Interior(_) | Run::Start => {
+            Run::City | Run::Interior(_) | Run::Start | Run::Wild => {
                 let name = m.area_begin(next, h);
                 m.world_begin(name, h);
                 // The view has no sound: the INF's sounds (the hook CD4A,
@@ -121,9 +159,13 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             }
         }
     };
+    // The world's entry reads the engine's files; the place hook's chunk
+    // shift (the wilderness's first blocks) reads a copy of them (cheap:
+    // their contents are shared).
+    let mut copy = files.clone();
     engine.files = files;
     let next = r?;
-    let h = &mut Areas { dir, files: None, failed: false };
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false };
     if engine.world_enter(h).is_none() || h.failed {
         eprintln!("entering the area met code not ported");
         return None;

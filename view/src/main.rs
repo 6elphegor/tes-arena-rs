@@ -63,6 +63,10 @@ impl ControlHooks for Front<'_> {
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.wall_trigger(files, self)
     }
+    /// The wilderness's chunks follow the player (217B:0265).
+    fn wild_recentre(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_shift(files, &mut arena::wild::PortWild)
+    }
 }
 impl arena::weapon::WeaponHooks for Front<'_> {
     /// A building broken into by the swing.
@@ -75,6 +79,12 @@ impl arena::weapon::WeaponHooks for Front<'_> {
 impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
         println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, text)).replace('\r', "\n"));
+    }
+    /// A city's gate out: the city written as the wilderness's blocks
+    /// 1..4 (217B:027A; the files are kept in memory).
+    fn leave_city(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_leave_city(files, &mut arena::wild::PortWild);
+        Some(())
     }
 }
 impl arena::clock::ClockHooks for Front<'_> {}
@@ -530,6 +540,13 @@ struct Shot {
     frames: usize,
 }
 
+/// Whether the wilderness's blocks were loaded again in a frame (217B:0265
+/// changed the window of four blocks it had, `window` before).
+fn wild_moved(engine: &Engine, window: u32) -> bool {
+    use arena::mem::DS;
+    engine.m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS) & 0x200 != 0 && engine.m.mem.r32(DS, arena::wild::var::WINDOW) != window
+}
+
 /// One frame with `intent`; a frame leaving the area goes on to the
 /// next (`areas::next`, None where it can't).
 fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
@@ -537,12 +554,16 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     engine.tick(t);
     st.frames += 1;
     let level = engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
+    let window = engine.m.mem.r32(arena::mem::DS, arena::wild::var::WINDOW);
     let assets = &mut st.assets;
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: st.frames * 4, clicked: std::mem::take(&mut st.clicked) };
     let frame = engine.frame(Input::Steer(intent), &mut hooks).expect("frame");
     print_message(engine, &mut st.message);
     if engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level {
         eprintln!("took the stairs to level {}", engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL));
+        st.assets.level(engine);
+    } else if wild_moved(engine, window) {
+        eprintln!("the wilderness moved: origin ({}, {})", engine.m.mem.r16(arena::mem::DS, arena::wild::var::ORIGIN_X), engine.m.mem.r16(arena::mem::DS, arena::wild::var::ORIGIN_Y));
         st.assets.level(engine);
     }
     if frame == arena::engine::Frame::Left {
@@ -727,12 +748,13 @@ impl App {
         self.engine.tick(t);
         let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
         let level = self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
+        let window = self.engine.m.mem.r32(arena::mem::DS, arena::wild::var::WINDOW);
         let assets = &mut self.assets;
         let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick, clicked: std::mem::take(&mut self.clicked) };
         let frame = self.engine.frame(Input::Steer(&intent), &mut hooks);
         print_message(&self.engine, &mut self.message);
-        // Stairs: the new level's assets.
-        if self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level {
+        // Stairs, or the wilderness's blocks loaded: the new level's assets.
+        if self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level || wild_moved(&self.engine, window) {
             self.assets.level(&self.engine);
             if let Some(g) = &mut self.gpu {
                 g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
