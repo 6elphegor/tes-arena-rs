@@ -55,3 +55,4 @@ pub mod strike;
 pub mod talk;
 pub mod transit;
 pub mod trigger;
+pub mod use_item;
