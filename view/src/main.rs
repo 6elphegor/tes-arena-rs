@@ -61,6 +61,12 @@
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
 //! the view loads it (`areas`).
+//!
+//! --new-game SPEC makes a character as the original's creation does and
+//! starts the game in the start dungeon (LEVEL.MIF may be left out:
+//! START.MIF): SPEC is `CLASS:PROVINCE:SEX:FACE:NAME`, CLASS 0..17 from
+//! the class list or `q` and ten answers 0..2 to the questions (see
+//! `newgame`).
 
 mod archive;
 mod areas;
@@ -68,6 +74,7 @@ mod dialog;
 mod flats;
 mod hud;
 mod interface;
+mod newgame;
 mod panels;
 mod render;
 mod world;
@@ -647,6 +654,15 @@ fn main() {
         steps = args[i + 1].clone();
         args.drain(i..i + 2);
     }
+    let mut new_game = None;
+    if let Some(i) = args.iter().position(|a| a == "--new-game") {
+        new_game = Some(args.get(i + 1).cloned().unwrap_or_default());
+        args.drain(i..(i + 2).min(args.len()));
+        // The start dungeon's level when none is given.
+        if args.get(2).is_none_or(|a| a.starts_with("--")) {
+            args.insert(2.min(args.len()), "START.MIF".into());
+        }
+    }
     let mut at = None;
     if let Some(i) = args.iter().position(|a| a == "--at") {
         let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
@@ -659,8 +675,14 @@ fn main() {
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    let run = match &new_game {
+        Some(spec) => {
+            newgame::start(&mut engine, spec);
+            arena::transit::Run::Start
+        }
+        None => areas::start(&mut engine, args[2].starts_with("CITY:")),
+    };
     interface::start(&mut engine.m);
-    let run = areas::start(&mut engine, args[2].starts_with("CITY:"));
     if let Some(h) = hour {
         // The clock at that hour of the first day (its calendar fields
         // agreeing, so no hour passes at once), and the sky's time.
