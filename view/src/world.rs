@@ -87,23 +87,8 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.mem.w8(DS, 0x01A4 + arena::character::field::ATTRS + i, 50);
         m.mem.w8(DS, 0x01A4 + arena::character::field::BASE_ATTRS + i, 50);
     }
-    // 0000:AAA2, the renderer's set-up: the light table (CCC2) the
-    // INF loader copies into each texture bank's shading rows (0000:B174):
-    // NORMAL.LGT's 13 rows as the image holds them at 3AAC:0240, then
-    // two of 16 zeros and the fill colour (C3C6: 70h, as 0000:095A sets
-    // it in clear weather).
     m.mem.w8(DS, 0xC3C6, 0x70);
-    let (light, _) = m.heap_alloc(0x100).expect("heap");
-    for i in 0..0xD00u16 {
-        let b = m.mem.r8(0x3AAC, 0x240 + i);
-        m.mem.w8(light, i, b);
-    }
-    for row in 0..2u16 {
-        for i in 0..0x100u16 {
-            m.mem.w8(light, 0xD00 + row * 0x100 + i, if i < 0x10 { 0 } else { 0x70 });
-        }
-    }
-    m.mem.w16(DS, 0xCCC2, light);
+    light_table(&mut m);
     m.rng.seed = 1994;
     m.store_rng();
     let mut engine = Engine::new(m, files);
@@ -112,6 +97,27 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // (0000:478F, `flat_lights`).
     engine.m.flat_lights();
     engine
+}
+
+/// 0000:AAA2, the renderer's set-up: the light table (CCC2) the INF
+/// loader copies into each texture bank's shading rows (0000:B174):
+/// NORMAL.LGT's 13 rows as the image holds them at 3AAC:0240, then two of
+/// 16 zeros and the fill colour (C3C6: 70h, as 0000:095A sets it in clear
+/// weather). Returns its segment.
+pub fn light_table(m: &mut Machine) -> u16 {
+    let fill = m.mem.r8(DS, 0xC3C6);
+    let (light, _) = m.heap_alloc(0x100).expect("heap");
+    for i in 0..0xD00u16 {
+        let b = m.mem.r8(0x3AAC, 0x240 + i);
+        m.mem.w8(light, i, b);
+    }
+    for row in 0..2u16 {
+        for i in 0..0x100u16 {
+            m.mem.w8(light, 0xD00 + row * 0x100 + i, if i < 0x10 { 0 } else { fill });
+        }
+    }
+    m.mem.w16(DS, 0xCCC2, light);
+    light
 }
 
 /// A city, from `PROVINCE:INDEX[:CLIMATE:WEATHER]`: province 0..7 (8 the

@@ -36,6 +36,8 @@ pub struct Sky {
     /// The row of the shading table everything is remapped through
     /// first (the light level's high byte; 0 by day).
     pub dark: u32,
+    /// Palette entry 71h, the lamps' glow, once the game set it.
+    pub lamp: Option<[u8; 3]>,
 }
 
 /// Where the player stands and looks (map units; heading 0..511 a turn,
@@ -303,6 +305,9 @@ impl Renderer {
         if sky.outdoors {
             for (i, c) in sky.colours.iter().enumerate() {
                 self.palette[1 + i] = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
+            }
+            if let Some(c) = sky.lamp {
+                self.palette[0x71] = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
             }
         }
     }

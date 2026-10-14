@@ -86,6 +86,45 @@ struct Assets {
     /// The sky's .COL as the game keeps it: its name's offset and its
     /// colours, the first eight again past the end.
     colours: Option<(u16, Vec<u8>)>,
+    /// What the day and night switch left: the row the textures are
+    /// remapped through (0 as loaded), palette entry 71h (the lamps'
+    /// glow; PAL.COL's until set) and the light table's segment.
+    dark: u32,
+    lamp: Option<[u8; 3]>,
+    table: u16,
+}
+
+/// The view's side of the day and night switch (`LightHooks`).
+struct Light<'a> {
+    dark: &'a mut u32,
+    lamp: &'a mut Option<[u8; 3]>,
+    table: &'a mut u16,
+}
+
+impl arena::light::LightHooks for Light<'_> {
+    /// The table freed and made again from NORMAL.LGT's rows.
+    fn light_table(&mut self, m: &mut arena::machine::Machine) {
+        if *self.table != 0 {
+            m.heap_free(*self.table);
+        }
+        *self.table = world::light_table(m);
+    }
+
+    fn relight(&mut self, _m: &mut arena::machine::Machine, level: u16) {
+        *self.dark = (level >> 8) as u32;
+    }
+
+    fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
+        *self.dark = 0;
+    }
+
+    /// Only entry 71h is written through here; its 6-bit colour made 8-bit.
+    fn palette(&mut self, m: &mut arena::machine::Machine, index: u8, at: u16) {
+        if index == 0x71 {
+            let c = |i: u16| m.mem.r8(arena::mem::DS, at + i) & 0x3F;
+            *self.lamp = Some([0, 1, 2].map(|i| c(i) << 2 | c(i) >> 4));
+        }
+    }
 }
 
 impl Assets {
@@ -106,6 +145,9 @@ impl Assets {
             }).collect(),
             archive,
             colours: None,
+            dark: 0,
+            lamp: None,
+            table: engine.m.mem.r16(arena::mem::DS, 0xCCC2),
         }
     }
 
@@ -114,9 +156,10 @@ impl Assets {
         Renderer::new(device, queue, format, &scene)
     }
 
-    /// The sky after a frame (2294:0428 and 0341 decide; the .COL loads
-    /// here): outdoors, palette entries 1..8 from the day's colours at the
-    /// window for the time of day.
+    /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
+    /// the .COL loads here): outdoors, palette entries 1..8 from the day's
+    /// colours at the window for the time of day, the textures darkened by
+    /// night and the lamps lit.
     fn sky(&mut self, m: &mut arena::machine::Machine) -> render::Sky {
         use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
         let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
@@ -124,7 +167,7 @@ impl Assets {
             return render::Sky::default();
         }
         m.sky_colours();
-        m.sky_step();
+        m.outdoor_light(&mut Light { dark: &mut self.dark, lamp: &mut self.lamp, table: &mut self.table });
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
             let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();
@@ -143,9 +186,7 @@ impl Assets {
                 *v = *c.get(w + 3 * i + k).unwrap_or(&0);
             }
         }
-        let level = m.sky_light();
-        let dark = if level == 0xFFFF { 0 } else { (level >> 8) as u32 };
-        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark }
+        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark: self.dark, lamp: self.lamp }
     }
 
     /// The lights after a frame (the drawing's set-up, 0000:A2EC..A303 and
