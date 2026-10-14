@@ -104,6 +104,30 @@ impl Talk {
             return 0xFFFF;
         }
         let menu = menu_at(m, si, bx, di);
+        self.ask(menu)
+    }
+
+    /// A list of `cx` strings one after another at DS:`si` (1194:5734:
+    /// the loot window's), under `title`: the next answer, or the
+    /// question left (FFFFh).
+    pub fn list(&mut self, m: &Machine, si: u16, cx: u16, title: &str) -> u16 {
+        if self.need.is_some() {
+            return 0xFFFF;
+        }
+        let mut at = si;
+        let mut entries = Vec::new();
+        for _ in 0..cx.min(64) {
+            let s = m.mem.cstr(DS, at);
+            at = at.wrapping_add(s.len() as u16 + 1);
+            entries.push(vec![Span { colour: 0x0F, text: String::from_utf8_lossy(s).into_owned() }]);
+        }
+        let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
+        let menu = Menu { title, entries, keys: Vec::new(), selected: 0 };
+        self.ask(menu)
+    }
+
+    /// `menu` asked: the next answer, or the question left (FFFFh).
+    fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {
             Some(Answer::Pick(p)) => {
                 let p = *p;

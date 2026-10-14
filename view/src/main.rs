@@ -42,6 +42,22 @@
 //! of DX, DY mickeys for a turn) and `cast:N` (spell N of the spellbook
 //! cast).
 //!
+//! I opens the inventory (`panels`: the original's equipment screen):
+//! a left click on an item puts it on or takes it off, a right click
+//! selects it, D (or the Drop button) drops it, U lists the items with an
+//! effect to use one (arrows, Enter), Up/Down scroll, Esc or Exit closes.
+//! C opens the spellbook: a click or Enter casts the spell; one with a
+//! target is then aimed by a click in the view. A corpse or chest clicked
+//! shows its loot in a list (the loot window): a pick takes the item.
+//! Uncaptured, a left click in the view clicks where it is (a corpse on
+//! the floor); another button captures the mouse. --do gains `inv`,
+//! `equip:N` and `select:N` (the list's line N), `drop`, `usable` (the
+//! use list up), `use:N`, `spells`, `book` (the spellbook printed),
+//! `spell:N` (its entry N cast), `close`, `clickat:X:Y` (a click at X, Y
+//! of the 320 x 200 screen), and as debugging aids `give:N` (N items
+//! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
+//! points), `class:N` and `corpse` (a creature killed a square ahead).
+//!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
 //! the view loads it (`areas`).
@@ -52,6 +68,7 @@ mod dialog;
 mod flats;
 mod hud;
 mod interface;
+mod panels;
 mod render;
 mod world;
 
@@ -76,6 +93,8 @@ struct Front<'a> {
     tick: usize,
     clicked: bool,
     talk: Option<&'a mut dialog::Talk>,
+    /// The window's width over its height (the click's line; 0: 1.6).
+    aspect: f32,
 }
 
 impl Front<'_> {
@@ -175,10 +194,30 @@ impl arena::talk::TalkHooks for Front<'_> {
         let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
         self.note(&s);
     }
+    /// The loot window (2433:0583) with its boxes and lists answered
+    /// through `dialog`.
+    fn loot(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
+        m.loot_window(files, &mut LootFront(self), ax, si, seg, bx)
+    }
     /// A dungeon's keeper in the wilderness: in (0000:08EC).
     fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         m.wild_dungeon_entry();
         Some(())
+    }
+}
+/// The loot window's boxes and lists (1194:59CC, 5734), through the
+/// front end's `dialog`.
+struct LootFront<'a, 'b>(&'a mut Front<'b>);
+
+impl arena::loot_window::LootHooks for LootFront<'_, '_> {
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        self.0.message_box(m, si);
+    }
+    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
+        match self.0.talk.as_deref_mut() {
+            Some(t) => t.list(m, si, cx, ""),
+            None => 0xFFFF,
+        }
     }
 }
 /// Resting (src/rest.rs): its menu and the hours typed through `dialog`,
@@ -228,7 +267,7 @@ impl EngineHooks for Front<'_> {
             let eye = (v.x as f32, v.y as f32, v.height as f32 + v.bob as f32);
             // On a hit the drawing calls the hook at CD3A (0000:C524), which
             // the 3D mode sets to 2294:047B (`clicked_flat`).
-            let hit = match world::hit(m, sheet, eye, v.heading as f32, self.tick) {
+            let hit = match world::hit(m, sheet, eye, v.heading as f32, self.tick, world::click_ray(m, self.aspect)) {
                 Some(world::Target::Slot(si)) => Some(si),
                 Some(world::Target::Flat { col, row, n }) => {
                     world::flat_drawn(m, col, row, n);
@@ -660,6 +699,7 @@ fn main() {
         captured: false,
         click: false,
         clicked: false,
+        click_point: None,
         camp: false,
         key: false,
         message: None,
@@ -679,6 +719,8 @@ fn main() {
         drag: (0.0, 0.0),
         save_dir,
         slot,
+        panel: None,
+        equip: None,
     };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -708,6 +750,8 @@ struct TurnIn {
     tick: usize,
     right: bool,
     drag: (i16, i16),
+    /// The window's width over its height (the click's line).
+    aspect: f32,
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -726,7 +770,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk) };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping met something not ported");
     }
@@ -781,6 +825,8 @@ struct Shot {
     boxes: Vec<Vec<Vec<hud::Span>>>,
     need: Option<dialog::Need>,
     status: Option<String>,
+    /// A panel up at the end (`inv`, `spells`).
+    panel: Option<panels::Panel>,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
@@ -796,6 +842,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         tick: st.frames * 4,
         right: std::mem::take(&mut st.right),
         drag: std::mem::take(&mut st.drag),
+        aspect: 1.6,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     let out = run_turn(engine, &mut st.assets, &input, &mut talk);
@@ -827,7 +874,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -857,6 +904,15 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             continue;
         }
+        if let Some(at) = step.strip_prefix("clickat:") {
+            // A click at (X, Y) of the 320 x 200 screen, found by the next
+            // frame's drawing.
+            let (x, y) = at.split_once(':').expect("--do clickat:X:Y");
+            let at = (x.parse().expect("--do clickat:X:Y"), y.parse().expect("--do clickat:X:Y"));
+            st.clicked = click_at(&mut engine, &mut st.boxes, at);
+            shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            continue;
+        }
         if let Some(d) = step.strip_prefix("swing:") {
             // The right button down with a drag (mickeys) for a turn.
             let (dx, dy) = d.split_once(':').expect("--do swing:DX:DY");
@@ -881,6 +937,54 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
             "compass" => interface::toggle_compass(&mut engine.m),
+            // The inventory (I) and the spellbook (C), up until `close`;
+            // their actions as the window's keys and clicks make them.
+            "inv" => st.panel = Some(panels::open_inventory(&mut engine.m)),
+            "spells" => st.panel = Some(panels::Panel::Spellbook(Default::default())),
+            "close" => st.panel = None,
+            "give" => panels::give(&mut engine.m, n as u16),
+            "learn" => panels::learn(&mut engine.m, n as u8),
+            "corpse" => println!("corpse: {}", panels::corpse(&mut engine)),
+            "sp" => {
+                // The spell points and their maximum, a debugging aid.
+                engine.m.mem.w16(arena::mem::DS, 0x020A, n as u16);
+                engine.m.mem.w16(arena::mem::DS, 0x020C, n as u16);
+            }
+            "class" => {
+                // The player's class (the low five bits of +5), a debugging
+                // aid as --at is.
+                let at = arena::character::PLAYER + arena::character::field::CLASS;
+                let b = engine.m.mem.r8(arena::mem::DS, at) & 0xE0 | (n as u8 & 0x1F);
+                engine.m.mem.w8(arena::mem::DS, at, b);
+            }
+            "equip" | "select" | "drop" | "use" | "spell" => {
+                let mut said = panels::Said::default();
+                match what {
+                    "equip" => panels::equip_line(&mut engine.m, n as usize, &mut said),
+                    "select" => panels::select_line(&mut engine.m, n as usize),
+                    "drop" => panels::drop_selected(&mut engine.m, &mut said),
+                    "use" => panels::use_pick(&mut engine.m, &mut engine.files, n as u16, &mut said),
+                    _ => {
+                        st.panel = None;
+                        panels::cast(&mut engine, n as usize, &mut said);
+                    }
+                }
+                if !said.boxes.is_empty() {
+                    st.boxes = said.boxes;
+                }
+            }
+            "usable" => {
+                if let Some(panels::Panel::Inventory(inv)) = st.panel.as_mut() {
+                    let names = panels::usable_names(&engine.m);
+                    println!("usable: {names:?}");
+                    inv.using = (!names.is_empty()).then_some((names, 0));
+                }
+            }
+            "book" => {
+                for (i, sp) in panels::spells(&engine.m).iter().enumerate() {
+                    println!("spell {i}: {} ({}), cost {}", sp.name, sp.index, sp.cost);
+                }
+            }
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
@@ -956,6 +1060,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         }
         let mut screen = hud::Screen::new(st.assets.palette);
         st.assets.interface.draw(&mut screen, &font, &engine.m);
+        if let Some(panel) = &st.panel {
+            let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
+            panels::draw(&mut screen, &font, equip.as_ref(), panel, &engine.m);
+        }
         hud::compose_over(&mut screen, &font, &hud);
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
@@ -993,7 +1101,14 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
 /// (C39A bit 80h), for the next frame's drawing to find. (A question it
 /// asks is left, as Esc leaves it.)
 fn centre_click(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>) -> bool {
-    engine.m.set_mouse(160, 70, 0);
+    click_at(engine, boxes, (164, 74))
+}
+
+/// A left click at (x, y) of the 320 x 200 screen in the view: the mouse
+/// put 4 up and left of it, as the click (CB60, 2826:0393) is the cursor
+/// + 4; else as `centre_click`.
+fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (i32, i32)) -> bool {
+    engine.m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
     let mut talk = dialog::Talk::default();
     let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
     if engine.m.view_click(&mut engine.files, &mut hooks).is_none() {
@@ -1130,6 +1245,9 @@ struct App {
     /// that the frame after it draws.
     click: bool,
     clicked: bool,
+    /// Where the waiting click is on the 320 x 200 screen (None: the
+    /// centre, as with the mouse captured).
+    click_point: Option<(i32, i32)>,
     /// Camping asked for (R), and a key pressed (it ends a rest).
     camp: bool,
     key: bool,
@@ -1159,6 +1277,10 @@ struct App {
     /// Where saves go (F5) and come from (F9), and the slot.
     save_dir: Option<PathBuf>,
     slot: u8,
+    /// A screen up over the game (I, C), which stops it; EQUIP.IMG once
+    /// loaded.
+    panel: Option<panels::Panel>,
+    equip: Option<Option<interface::Image>>,
 }
 
 impl App {
@@ -1169,7 +1291,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() {
+        if self.waiting() || self.panel.is_some() {
             return;
         }
         let k = &self.keys;
@@ -1194,13 +1316,17 @@ impl App {
             tick,
             right: self.keys.swing,
             drag: (drag.0.round() as i16, drag.1.round() as i16),
+            aspect: self.gpu.as_ref().map_or(1.6, |g| g.config.width as f32 / g.config.height.max(1) as f32),
         };
         let before = copy(&self.engine);
         self.turn(before, input, Vec::new());
         // A click now is found by the next frame's drawing.
         if !self.waiting() && std::mem::take(&mut self.click) {
             let mut boxes = Vec::new();
-            self.clicked = centre_click(&mut self.engine, &mut boxes);
+            self.clicked = match self.click_point.take() {
+                Some(at) => click_at(&mut self.engine, &mut boxes, at),
+                None => centre_click(&mut self.engine, &mut boxes),
+            };
             self.boxes.extend(boxes);
         }
     }
@@ -1308,6 +1434,149 @@ impl App {
             }
             Err(msg) => self.say(&msg),
         }
+    }
+
+    /// The cursor on the 320 x 200 screen.
+    fn screen_point(&self) -> (i32, i32) {
+        let Some(g) = &self.gpu else { return (0, 0) };
+        let (w, h) = (g.config.width as f64, g.config.height as f64);
+        ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32)
+    }
+
+    /// I and C: the inventory or the spellbook up, or down.
+    fn toggle_panel(&mut self, inventory: bool) {
+        let open = match &self.panel {
+            Some(panels::Panel::Inventory(_)) => inventory,
+            Some(panels::Panel::Spellbook(_)) => !inventory,
+            None => false,
+        };
+        if open {
+            self.panel = None;
+            return;
+        }
+        self.panel = Some(if inventory { panels::open_inventory(&mut self.engine.m) } else { panels::Panel::Spellbook(Default::default()) });
+        if self.captured {
+            self.release();
+        }
+    }
+
+    /// EQUIP.IMG, loaded the first time.
+    fn equip_image(&mut self) {
+        if self.equip.is_none() {
+            self.equip = Some(panels::load_image(&self.assets.archive, &self.engine.m, "EQUIP.IMG"));
+        }
+    }
+
+    /// A key with a panel up: see `panels`.
+    fn panel_key(&mut self, code: winit::keyboard::KeyCode) {
+        use winit::keyboard::KeyCode;
+        let mut said = panels::Said::default();
+        let shown = panels::book_layout(&self.font).4;
+        let m = &mut self.engine.m;
+        let mut cast = None;
+        match self.panel.as_mut() {
+            Some(panels::Panel::Inventory(inv)) => {
+                if let Some((names, sel)) = inv.using.as_mut() {
+                    let n = names.len().max(1);
+                    match code {
+                        KeyCode::ArrowUp => *sel = (*sel + n - 1) % n,
+                        KeyCode::ArrowDown => *sel = (*sel + 1) % n,
+                        KeyCode::Enter | KeyCode::NumpadEnter => {
+                            let pick = *sel as u16;
+                            inv.using = None;
+                            panels::use_pick(m, &mut self.engine.files, pick, &mut said);
+                        }
+                        KeyCode::Escape => inv.using = None,
+                        _ => {}
+                    }
+                } else {
+                    match code {
+                        KeyCode::Escape | KeyCode::KeyI => self.panel = None,
+                        KeyCode::ArrowUp => panels::scroll(m, -1),
+                        KeyCode::ArrowDown => panels::scroll(m, 1),
+                        KeyCode::KeyD => panels::drop_selected(m, &mut said),
+                        KeyCode::KeyU => {
+                            let names = panels::usable_names(m);
+                            if !names.is_empty() {
+                                inv.using = Some((names, 0));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Some(panels::Panel::Spellbook(book)) => {
+                let n = panels::spells(m).len().max(1);
+                match code {
+                    KeyCode::Escape | KeyCode::KeyC => self.panel = None,
+                    KeyCode::ArrowUp => book.selected = (book.selected + n - 1) % n,
+                    KeyCode::ArrowDown => book.selected = (book.selected + 1) % n,
+                    KeyCode::Enter | KeyCode::NumpadEnter => cast = Some(book.selected),
+                    _ => {}
+                }
+                if let Some(panels::Panel::Spellbook(book)) = self.panel.as_mut() {
+                    book.first = book.first.min(book.selected).max((book.selected + 1).saturating_sub(shown));
+                }
+            }
+            None => {}
+        }
+        if let Some(sel) = cast {
+            self.panel = None;
+            panels::cast(&mut self.engine, sel, &mut said);
+        }
+        self.boxes.extend(said.boxes);
+    }
+
+    /// A click with a panel up (`right`: the right button): an inventory
+    /// line's item put on or off, or selected; the use list's entry used;
+    /// the spellbook's entry cast.
+    fn panel_click(&mut self, right: bool) {
+        let Some(g) = &self.gpu else { return };
+        let (w, h) = (g.config.width as f64, g.config.height as f64);
+        let (x, y) = ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32);
+        let mut said = panels::Said::default();
+        let mut cast = None;
+        match self.panel.as_mut() {
+            Some(panels::Panel::Inventory(inv)) => {
+                if let Some((names, _)) = &inv.using {
+                    let menu = panels::use_menu(names, 0);
+                    let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
+                    let i = ((y - ey) / lh.max(1)) as usize;
+                    if x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < names.len() {
+                        inv.using = None;
+                        panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
+                    }
+                } else if let Some(b) = panels::button_at(x, y) {
+                    match b {
+                        panels::Button::Exit => self.panel = None,
+                        panels::Button::Spellbook => self.panel = Some(panels::Panel::Spellbook(Default::default())),
+                        panels::Button::Drop => panels::drop_selected(&mut self.engine.m, &mut said),
+                    }
+                } else if let Some(row) = panels::line_at(x, y) {
+                    if right {
+                        panels::select_line(&mut self.engine.m, row);
+                    } else {
+                        panels::equip_line(&mut self.engine.m, row, &mut said);
+                    }
+                }
+            }
+            Some(panels::Panel::Spellbook(book)) => {
+                let (bx, by, lh, bw, shown) = panels::book_layout(&self.font);
+                let i = ((y - by) / lh.max(1)) as usize;
+                if x >= bx - 3 && x < bx + bw + 3 && y >= by && i < shown {
+                    let sel = book.first + i;
+                    if sel < panels::spells(&self.engine.m).len() {
+                        cast = Some(sel);
+                    }
+                }
+            }
+            None => {}
+        }
+        if let Some(sel) = cast {
+            self.panel = None;
+            panels::cast(&mut self.engine, sel, &mut said);
+        }
+        self.boxes.extend(said.boxes);
     }
 
     /// A box of the view's own.
@@ -1465,8 +1734,15 @@ impl winit::application::ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if self.waiting() => self.dialog_click(),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
             // The right button held: dragging swings the weapon (0000:3C9F).
             WindowEvent::MouseInput { state, button: MouseButton::Right, .. } if self.captured => self.keys.swing = state == ElementState::Pressed,
+            // Uncaptured, a left click in the view clicks where it is (a
+            // corpse on the floor); another button captures the mouse.
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if !self.captured && self.screen_point().1 < 147 => {
+                self.click_point = Some(self.screen_point());
+                self.click = true;
+            }
             WindowEvent::MouseInput { state: ElementState::Pressed, .. } if !self.captured => {
                 if let Some(g) = &self.gpu {
                     let ok = g
@@ -1486,6 +1762,10 @@ impl winit::application::ApplicationHandler for App {
                         self.dialog_key(code, event.text.as_deref());
                         return;
                     }
+                    if down && self.panel.is_some() {
+                        self.panel_key(code);
+                        return;
+                    }
                     if down {
                         // Any key ends a rest (AFF9).
                         self.key = true;
@@ -1503,6 +1783,8 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::KeyP if down => world::summon_people(&mut self.engine),
                         KeyCode::KeyE if down => self.click = true,
                         KeyCode::KeyR if down => self.camp = true,
+                        KeyCode::KeyI if down => self.toggle_panel(true),
+                        KeyCode::KeyC if down => self.toggle_panel(false),
                         // The original's A (2542:0137) and F8 (01C5).
                         KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
                         KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
@@ -1522,6 +1804,11 @@ impl winit::application::ApplicationHandler for App {
                 let hud = self.hud();
                 self.screen.clear();
                 self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+                if self.panel.is_some() {
+                    self.equip_image();
+                    let equip = self.equip.as_ref().and_then(|e| e.as_ref());
+                    panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
+                }
                 hud::compose_over(&mut self.screen, &self.font, &hud);
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
