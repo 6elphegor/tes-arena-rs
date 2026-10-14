@@ -313,7 +313,8 @@ impl Machine {
 
     /// 0000:F8E1 (far F8DD). Moves the player by `speed` along heading
     /// `angle` (0..511): x and y get the high words of 2 * speed * sin and
-    /// * cos, then `move_resolve` settles where the player ends up.
+    /// of 2 * speed * cos, then `move_resolve` settles where the player
+    /// ends up.
     /// Returns the candidate taken (0 the full move .. 3 none). Stairs
     /// may change level on the way (`move_trigger`, with `hooks` for the
     /// stairs' hooks). None where a hook is set to a routine not ported,
