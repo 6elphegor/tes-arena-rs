@@ -51,6 +51,19 @@ pub trait LightHooks {
     fn palette(&mut self, _m: &mut Machine, _index: u8, _at: u16) {}
     /// 2294:0341's loads and palette writes (`sky_step` decides).
     fn sky(&mut self, _m: &mut Machine, _step: crate::sky::SkyStep) {}
+    /// 0000:7428 (742C near): the .LGT named at DS:`name` (NORMAL.LGT
+    /// 1A6Dh, FOG.LGT 1A78h) loaded to 3AAC:0240, the light table's
+    /// source.
+    fn lgt(&mut self, _m: &mut Machine, _name: u16) {}
+    /// 2294:0C36's I/O: the light table (CCC2) freed, FOG.LGT loaded to
+    /// 3AAC:0240 and the table made again (0000:AAA2).
+    fn fog_light_table(&mut self, _m: &mut Machine) {}
+    /// 0000:9A6E: the view filled with colour 9288h (the fog's, in place
+    /// of the sky).
+    fn fog_fill(&mut self, _m: &mut Machine) {}
+    /// 0000:7534 and 9B56: PAL.COL (named at 1304h) loaded to 929Eh and
+    /// the palette set from it.
+    fn weather_palette(&mut self, _m: &mut Machine) {}
 }
 
 /// `LightHooks` that do nothing.

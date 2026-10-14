@@ -1,0 +1,4500 @@
+fog | 0 | 125dd007 | 43d9746027cdc251
+fog | 1 | f3f19c7c | 3d4765b138580d39 1
+fog | 2 | 90127c5a | ce4e663dc19fee25
+fog | 0 | 13c86f58 | 8569e9caf9a363a7
+fog | 1 | 4d49d88d | af17ca76ec687916 1
+fog | 2 | 7cfd6f4b | 8bdf708187a53f8e
+fog | 0 | f6df9026 | 25e260d0e0cf2170
+fog | 1 | 66556fe9 | d8544c0809cfde4b 1
+fog | 2 | c44aaa4f | 1b3abc1239e1e32d
+fog | 0 | 2bc57603 | e286075194c49d18
+fog | 1 | 41969e59 | 7da144b97d054b25 0
+fog | 2 | 2d68e8b4 | 6d1c529f77d45de3
+fog | 0 | 93743470 | 95681d4bf42d5ef6
+fog | 1 | c0c165e6 | 33428bde90e59e65 0
+fog | 2 | e0ffc09b | 4d6d3acf843f262a
+fog | 0 | 21033b69 | 5bcb4fb6563cef7d
+fog | 1 | 89384eee | 9aa3dd487686d542 1
+fog | 2 | bc40d4ef | 7187a71821f83f0a
+fog | 0 | b1c6a77d | 322037514b5b809e
+fog | 1 | c6dd8f51 | 55e045d37c365c0c 1
+fog | 2 | 91989a01 | 4d6d3acf843f262a
+fog | 0 | 11794032 | 3bf91d56ce1eae8c
+fog | 1 | cb8811ae | 7da144b97d054b25 0
+fog | 2 | cdc7429d | dc31d6a628a8604c
+fog | 0 | 5ff574c | cb030b7e2465156b
+fog | 1 | 83e86fba | 25f1662ff1ad6da2 1
+fog | 2 | fda979d5 | e1fc794595ea00bc
+fog | 0 | 933b9bf8 | 6df5fd270abe7cc9
+fog | 1 | 1eabc1a8 | c7dc2b9be12d0e9a 1
+fog | 2 | e7483910 | 27995fd86f4701be
+fog | 0 | e2ad5a9c | eb78f7d92d2599bd
+fog | 1 | 90b34fa3 | c83324a672acd251 1
+fog | 2 | 381c5bea | 4d6d3acf843f262a
+fog | 0 | b019f200 | a989da0fee0c5f3f
+fog | 1 | 4c46b1dc | 1eac4aaf69500c23 0
+fog | 2 | efed54ee | 1fe030f253e2acd4
+fog | 0 | 46b32814 | 179df46008aa29c
+fog | 1 | 9a7ecee0 | f070dd2a4e20c6e1 0
+fog | 2 | cc4d88f2 | 7b13f0043efb627a
+fog | 0 | ae247f63 | daa61b136bde6d9f
+fog | 1 | 961bff0f | 190d175d622bb25f 1
+fog | 2 | 2b87dbe8 | 9387ed13490ce7c
+fog | 0 | 49d1bb45 | e0396a0515eccb91
+fog | 1 | 5e3d2095 | c56aa14e7ffa9f06 1
+fog | 2 | e59175d9 | 928fd07ccb1dca5b
+fog | 0 | 13f61fab | 6431389fd590878
+fog | 1 | 2bfbe19 | 7da144b97d054b25 0
+fog | 2 | 2024c740 | ac1ceb3a6eff24b6
+fog | 0 | 380b788b | d7bbc51b6d6d0601
+fog | 1 | 6b86170f | 232b43aa766df367 1
+fog | 2 | 5dd02108 | b37a1edd709d45c9
+fog | 0 | f1d6a941 | 97001cb97ca71214
+fog | 1 | 6ec2ad18 | 12425dbe66b3c700 0
+fog | 2 | 9cb14c59 | ead79b01d9352f2f
+fog | 0 | c9562320 | df1e3fc35ece2442
+fog | 1 | 722786a2 | 7da144b97d054b25 0
+fog | 2 | a0bb30d7 | b87b15799a4a8270
+fog | 0 | 76e4e92b | 1eca01a6d6081771
+fog | 1 | 3c82544f | 9aed83e85e67fb1a 1
+fog | 2 | 57d4d1f5 | 123d150686837d23
+fog | 0 | f88135a8 | 3ba8841f5ea6a0c4
+fog | 1 | 9bb4ca6c | 1b3c9eff8e5f4f39 1
+fog | 2 | 7c471e28 | 4550e699abb97ffe
+fog | 0 | cefffd60 | 4105fa2f5324d9b4
+fog | 1 | 982573b | 899ff49d5b8c8930 1
+fog | 2 | c9d5e59 | 7aec7019866f4d7d
+fog | 0 | e0e5ecdf | 3bd52b5581435043
+fog | 1 | 7c202cca | fca62ae14b5fec54 1
+fog | 2 | 30dc725 | a6be424076e7530e
+fog | 0 | ee4cfa99 | b33ab673a8d17628
+fog | 1 | ac27447c | 7da4e69e6a1c4be5 1
+fog | 2 | f066e29d | 40ea0a0a4eea43ec
+fog | 0 | f09280ea | e690198e8498cb21
+fog | 1 | 12ffdc74 | 62ed1a597d084a00 1
+fog | 2 | 130af8cd | 606704fea4ae0d07
+fog | 0 | b93d5eae | a49c48e5fcf0cd27
+fog | 1 | ee57864a | 7da144b97d054b25 0
+fog | 2 | f784c52a | 57c993eafba41fd1
+fog | 0 | 593ec9d8 | 2001e72f9c74786d
+fog | 1 | 9d117f4a | f993193e6ee0736e 0
+fog | 2 | ef92e69c | 4d6d3acf843f262a
+fog | 0 | 68d1b708 | 6f316926f986e435
+fog | 1 | a87ed356 | b0d5ea7a47fbc0bb 1
+fog | 2 | c62ccf22 | e3654f32224f9db1
+fog | 0 | 603b1147 | 2eebdc45963b2ea7
+fog | 1 | 31c8385b | f5df1fa7299eb021 1
+fog | 2 | 294060ed | 96d1a1caa2346dd1
+fog | 0 | 400bd3d3 | 51e69ea88a4b385c
+fog | 1 | 2b740317 | a797ebb6e89c4cd5 0
+fog | 2 | 60e050a0 | 9b771b5c4d4e663c
+fog | 0 | 9cb606c9 | b1467b686fb53a7e
+fog | 1 | db623c89 | 17701be70a0552c0 1
+fog | 2 | 99018d1f | 75b4a4f9e9809786
+fog | 0 | ca778919 | e749046100c53e50
+fog | 1 | f64dedef | 3700c1953cda820e 1
+fog | 2 | c089679e | a8dd6df4de4edc24
+fog | 0 | e9d88296 | f47affa01e51f137
+fog | 1 | b4e713cd | 7da144b97d054b25 0
+fog | 2 | cec359ca | 4d6d3acf843f262a
+fog | 0 | b793921e | c083535a1b366655
+fog | 1 | 9a61c0db | 2853676c3821adf2 1
+fog | 2 | 13d6c4ef | 4d6d3acf843f262a
+fog | 0 | fc586fec | 5cad45d5185109d5
+fog | 1 | eb988d8d | 3962d7684b045ae2 1
+fog | 2 | 5a3df2bc | c1b5b5a3165aedb1
+fog | 0 | e187143d | eb626a0724c0779d
+fog | 1 | 230ba6c1 | f2f852bdb422d740 0
+fog | 2 | 3a12df98 | 9a2974a8d917e540
+fog | 0 | 13fe22ed | fe8cd4cab5e98304
+fog | 1 | 61116e0b | 38f404ddad3f1c30 1
+fog | 2 | 7e297ba | 40ea0a0a4eea43ec
+fog | 0 | 47724581 | 1c69e779e6828d2e
+fog | 1 | a8db9f83 | ed9479a90d0e2752 1
+fog | 2 | 9008e95c | 8f9bd772f3bfdbb2
+fog | 0 | 643fbcb9 | 37ad89602d13fc04
+fog | 1 | 41f6cd4f | b779b72d42b1caac 0
+fog | 2 | 766361f4 | f37a9142a23c4595
+fog | 0 | 99273f7 | b2119adb6bdbfd25
+fog | 1 | 6d8711a1 | ee7baeb348fd4f54 1
+fog | 2 | 2eece6c8 | 40ea0a0a4eea43ec
+fog | 0 | db021231 | 37e1187bd0249536
+fog | 1 | caf0ce24 | 501514d94ccf5ee9 1
+fog | 2 | 44dae9c1 | eaed2d3d784dc2e7
+fog | 0 | 42f7eea0 | 4e1e4e7611902649
+fog | 1 | 3a4bb8ef | 7da144b97d054b25 0
+fog | 2 | 5c3fa55f | 40ea0a0a4eea43ec
+fog | 0 | a78899a4 | b65eb9f2291ab7d9
+fog | 1 | dca036a7 | 645f3b545a133c91 1
+fog | 2 | 4249fc59 | e3654f32224f9db1
+fog | 0 | 5619d5b6 | d43e01edd99c7dc9
+fog | 1 | 87a8816 | 32bb8e90f1c9aac9 1
+fog | 2 | b03062a3 | c5a58e97168cba22
+fog | 0 | ca28eec0 | 39a8d0a2879f29fc
+fog | 1 | 61f4e98a | b693ac659670e227 1
+fog | 2 | 3f436dec | 275dbfb53e0981a1
+fog | 0 | 3f035c81 | 6706dd2c1dc0d018
+fog | 1 | 7b21e66c | d12c848d17120ca2 0
+fog | 2 | 1d15430a | 12a3a36ed0be623f
+fog | 0 | 491e1ec3 | 56135acfd60db492
+fog | 1 | 8a029e32 | a8ce2c65de5a35b7 1
+fog | 2 | 40bb3249 | 40ea0a0a4eea43ec
+fog | 0 | 9fcd784f | 7b70c4b3295eb6ff
+fog | 1 | b9cd17df | 3eebd07fc30ebcee 1
+fog | 2 | e244606 | 61c7ab6508d4b68e
+fog | 0 | 35ea2f07 | 9be685b0115a1b6
+fog | 1 | b1e5e3e3 | 7da144b97d054b25 0
+fog | 2 | 598bbba4 | aa868c8bcc478f22
+fog | 0 | 544225ec | 4715176666a2bd92
+fog | 1 | e2f69ff3 | f29195f5ab3f6cb8 1
+fog | 2 | 645d11a0 | c990e5ddf65d6675
+fog | 0 | 2968e0dd | 2a0df73ef2ca8e9e
+fog | 1 | a78c1b00 | ac1bfbce4fecda8d 1
+fog | 2 | bc4e3146 | 1d03dbc655d1f2ba
+fog | 0 | 93f177ec | 75794444e530ee90
+fog | 1 | a1126c91 | 4b26304e15d9febe 0
+fog | 2 | 3899449e | 40ea0a0a4eea43ec
+fog | 0 | 73b8a336 | 69c44d0490c7a762
+fog | 1 | 26177d66 | 262f0a8a1efd51ca 1
+fog | 2 | 9c449286 | 40ea0a0a4eea43ec
+fog | 0 | ddde20c1 | b76c6de9cf88300c
+fog | 1 | d022563b | 12425dbe66b3c700 0
+fog | 2 | 90637164 | e115b00b6c31b446
+fog | 0 | 3b5bcd79 | aa2d43eb136fd6af
+fog | 1 | f0e52d70 | 12425dbe66b3c700 0
+fog | 2 | 62886257 | 40ea0a0a4eea43ec
+fog | 0 | 23ea11f1 | 543185cf86bc73cb
+fog | 1 | effebe95 | f44c449435178aa2 1
+fog | 2 | 4c500d96 | 98052fb8be534b6d
+fog | 0 | 7ea4567b | cb9fc46185941455
+fog | 1 | 95306e41 | 2cf8db9e8029098a 1
+fog | 2 | 89059cc | 40ea0a0a4eea43ec
+fog | 0 | e1fff4ef | 282ab1ab1c10a598
+fog | 1 | f522aae5 | c622cb0d7fc829f6 1
+fog | 2 | 2a16110a | 40ea0a0a4eea43ec
+fog | 0 | 6b062bbe | 4530e1f2a67847d
+fog | 1 | bc38460a | a46fe51fe4efd565 1
+fog | 2 | 3f4001e4 | b58cf523750d91f0
+fog | 0 | 9449084e | 5950011eb9d107de
+fog | 1 | 5c45b766 | 52da637aa93a7310 1
+fog | 2 | 4652b7f4 | 1d03dbc655d1f2ba
+fog | 0 | d0a26c74 | 4902f3448bd76bf
+fog | 1 | fe888e90 | 7da144b97d054b25 0
+fog | 2 | dfa9ff2d | d1f718743bfc4548
+fog | 0 | a96e60e7 | 2fc8e52a4c81226f
+fog | 1 | ff776f08 | 7da144b97d054b25 0
+fog | 2 | 55e99f49 | b9f8fe647c549527
+fog | 0 | 1db3018e | a4e0b18ec051b0b4
+fog | 1 | a0e136ba | 7da144b97d054b25 0
+fog | 2 | 40a4e638 | 320f8f1026b58078
+fog | 0 | db196cd0 | bd207b23a297f6d4
+fog | 1 | 956757af | 12425dbe66b3c700 0
+fog | 2 | 86e49376 | 4d6d3acf843f262a
+fog | 0 | 41211d29 | fdb510c2145e246
+fog | 1 | 75decf1 | 9f1bce0d52e8a25d 1
+fog | 2 | 1576c00d | 4d6d3acf843f262a
+fog | 0 | 7ee9701e | 50b038fc61ee3a6f
+fog | 1 | 7f11416f | 7da144b97d054b25 0
+fog | 2 | c97686df | 40ea0a0a4eea43ec
+fog | 0 | fcdbe1e9 | c79a550c65bbb9c4
+fog | 1 | 15aa93df | 78219ba88d1a484 1
+fog | 2 | 4239ada1 | b9945e20ba40c330
+fog | 0 | d7f4ef2c | 7ff06f8aeaa6f900
+fog | 1 | d7c66b56 | 5069e8e54f4e3790 1
+fog | 2 | ea7b5dfa | c781890c3f6f7a6
+fog | 0 | 8be38c17 | 6150726575b4e655
+fog | 1 | 17376967 | 12425dbe66b3c700 0
+fog | 2 | 7c617c4d | 1ab76280371b6c84
+fog | 0 | b9246711 | 492cffb1da15c7e6
+fog | 1 | 8ecbafc4 | a28bfbbd4ffd2146 1
+fog | 2 | 2802ee21 | d2f40450ecc95ccd
+fog | 0 | fc54fc4c | 944acac9af796199
+fog | 1 | 381a5c7f | 4d66739c976e7631 1
+fog | 2 | e386a09e | 87c7886e117cd429
+fog | 0 | 5a73a45 | ea46aa8c964cca71
+fog | 1 | 8c128480 | 7da144b97d054b25 0
+fog | 2 | 5b0d98db | 6d4a3dfa9485c2c3
+fog | 0 | 3aced485 | 32aa069b51e9c5e3
+fog | 1 | c6d27185 | 935a2f943dc3c0a1 1
+fog | 2 | f68b0e77 | bb65d6c610906f2e
+fog | 0 | a8d8bf54 | ed84f31784732734
+fog | 1 | 3c3b1717 | 79cc918420e750ce 1
+fog | 2 | 23ded1ec | d1825240751bc3d7
+fog | 0 | de03115d | 47e86c0d07712aed
+fog | 1 | 5b4f3671 | e55d14cdbb83cd42 1
+fog | 2 | 454c7bb5 | 4d6d3acf843f262a
+fog | 0 | ce60f393 | 41b3539efa9530c
+fog | 1 | 6010e6fb | 5a49d2b1c8d504c0 1
+fog | 2 | 44fc0b34 | 240fd0a1a13c4309
+fog | 0 | 4093e68f | ed0226ad31b3f4a8
+fog | 1 | 30f26523 | b779b72d42b1caac 0
+fog | 2 | 32ed97d3 | 9b771b5c4d4e663c
+fog | 0 | 5a82737e | e0f0bad80312c73a
+fog | 1 | 4e6be852 | 3df0a34ca05ec662 0
+fog | 2 | 529450d2 | abcbb62958b96388
+fog | 0 | e01d40ec | 149bfd2e30c49b77
+fog | 1 | 93dad9e7 | 70a2b8b41db21696 1
+fog | 2 | 418df3c1 | 40ea0a0a4eea43ec
+fog | 0 | 261fde0f | 8a15d725844f0f72
+fog | 1 | a346fd7f | 3f87bf2ef29a826f 0
+fog | 2 | 1aebea99 | a58e0c48418ca39e
+fog | 0 | d49562d3 | 23e837e00ea2f49
+fog | 1 | c3203b31 | 7da144b97d054b25 0
+fog | 2 | a3af8f32 | 64e4337bfa549261
+fog | 0 | e6a133ff | a5370f3b5bc9cd6a
+fog | 1 | ebdee1cb | 32667ac652d38df3 1
+fog | 2 | ec960b96 | 9803463d6a641f1
+fog | 0 | 3bf1720a | fd7dbca4f1e65787
+fog | 1 | d1ad236 | 3f4343ae462d89aa 1
+fog | 2 | 7a8b15f | 9b771b5c4d4e663c
+fog | 0 | 51ba0c0a | c95ea0bdcf2c2c34
+fog | 1 | dd5fd620 | 6b692782c84bdea2 1
+fog | 2 | e8413328 | e51dd2a2d9f56ce8
+fog | 0 | eac98376 | 448e26244939683
+fog | 1 | 6d476a0e | 3f87bf2ef29a826f 0
+fog | 2 | 46a6c011 | 4d6d3acf843f262a
+fog | 0 | ee62dda4 | bc76fcf6ddbbc021
+fog | 1 | faa1faca | f0b02185e10fb840 1
+fog | 2 | 5ccda53e | 40ea0a0a4eea43ec
+fog | 0 | 9d303c4a | a92483760a40b66e
+fog | 1 | 4d3f28bc | db71786128bf002e 1
+fog | 2 | 4771f194 | d53e4fa5f5264b16
+fog | 0 | a0432037 | 5611ce2da191be08
+fog | 1 | 9f286e25 | ceda8eceb533522e 1
+fog | 2 | 691c0748 | ad8ffab3e372c414
+fog | 0 | 12e32da6 | e274b1a02ef05637
+fog | 1 | 83339910 | 13270a9ada7340e4 1
+fog | 2 | 790ca0f6 | 3015c25bb806d4cc
+fog | 0 | 2eb7c5c6 | f83b379105ef2ea5
+fog | 1 | 18f7caf | d9215fb4d16a8dda 1
+fog | 2 | 5de7111d | 13c20b28e4cd0d3
+fog | 0 | 9dcb9c3b | 68631ac7c99fd51c
+fog | 1 | dae36617 | b311cca88371be1f 1
+fog | 2 | 699df27f | 395182bd482e439
+fog | 0 | 2202ce3 | ce805e438090ce5e
+fog | 1 | 6dd62d3b | bac35b33a603e139 1
+fog | 2 | cfe7e2c8 | ce6cb85ddd4d324c
+fog | 0 | dda176e0 | 7d7eada1bc251f5a
+fog | 1 | e17508c8 | 8b122196965ebdf 1
+fog | 2 | 51861348 | 58aeae3b10ea9da3
+fog | 0 | 6af4b643 | cc710412f9e299dc
+fog | 1 | c233332d | 9517c9d066c57e6b 1
+fog | 2 | 357a5c2d | 5e9a945469f4b375
+fog | 0 | 16f61041 | d789098ca9a05889
+fog | 1 | 35b8ab86 | a4cb711db3cb8201 1
+fog | 2 | ab152703 | 4faa76a812e0f6cf
+fog | 0 | 2d461311 | 5f55aaac6113b43d
+fog | 1 | 952ba887 | fdbea8f7f857e7a0 1
+fog | 2 | 8a8f39c1 | 44864136f8d8484b
+fog | 0 | cfce8dce | 2dbd0e14b5c3e1b0
+fog | 1 | 3e2f0f7a | d07529cc348723a5 1
+fog | 2 | b83f27c1 | 4d6d3acf843f262a
+fog | 0 | 86d99236 | 766320dad7256441
+fog | 1 | ab2d5105 | 4e27f06d46293a30 1
+fog | 2 | 10c87289 | 4d6d3acf843f262a
+fog | 0 | f6abab30 | 13babf1b7e2fe8d1
+fog | 1 | 77f77d7a | df1582d201092c95 1
+fog | 2 | 983e0360 | 204f25b64b80401d
+fog | 0 | 94712321 | fe76ebaf8c8dcaf7
+fog | 1 | 493c00c3 | 3f87bf2ef29a826f 0
+fog | 2 | e768d95b | 9e61329cd1809e48
+fog | 0 | 9dd0ed08 | f707e60e0f2fc593
+fog | 1 | b8d2b605 | 4e71672d2bbde4a3 1
+fog | 2 | ecd353f9 | 40ea0a0a4eea43ec
+fog | 0 | 1ea10b99 | b85040443fe6c45a
+fog | 1 | f30ef416 | 8d28fe95c99b94a3 1
+fog | 2 | c82766bd | 399c86b56fc76411
+fog | 0 | 4d29e78a | 6a1d150655e3337b
+fog | 1 | 33b6cef1 | 12425dbe66b3c700 0
+fog | 2 | c764dcce | 16b464d025c20cba
+fog | 0 | 7260540c | ed5bfba4431d4794
+fog | 1 | c9d286fb | cff9c8823c2d3628 0
+fog | 2 | 2f82ebe1 | 4d6d3acf843f262a
+fog | 0 | cf8d0ad | 3857ee6436422910
+fog | 1 | ec0a7970 | f494ea5d60206298 1
+fog | 2 | 5172e33f | 7fe95320336a991e
+fog | 0 | 7c41aded | 329062750a10505
+fog | 1 | 5b8e93f | e254dc1fc40452b8 1
+fog | 2 | 7df98393 | 87171c54b643766c
+fog | 0 | 4947d9e2 | a654c280fd672d7c
+fog | 1 | cb249eb5 | d43cf876fa414838 1
+fog | 2 | 60204cee | 1d03dbc655d1f2ba
+fog | 0 | ff3bec0e | 91fb4d21b926bba4
+fog | 1 | 4f5a40f0 | eed1cf6bced21bf6 1
+fog | 2 | 287fe4bd | 30777874b667f69d
+fog | 0 | 85bc2417 | 2c759c8bc99608d9
+fog | 1 | 42fc8a75 | dd4a010775b1ed7f 1
+fog | 2 | 9300de80 | 4d6d3acf843f262a
+fog | 0 | bc77e8d8 | deaad1c7efce382c
+fog | 1 | 92ebadb6 | 41c0d79b16c21be9 1
+fog | 2 | 77a62c23 | 5203808064d6961a
+fog | 0 | bbc543c2 | a3d36fc98eebc5f1
+fog | 1 | d8339104 | 12425dbe66b3c700 0
+fog | 2 | ac573c83 | 40ea0a0a4eea43ec
+fog | 0 | b18ae036 | f9f88cb059f11ac
+fog | 1 | 7f26dab4 | cacc0b86e7c36f0b 1
+fog | 2 | ce730774 | 1568efa8754e5fb
+fog | 0 | d3aa69e3 | ffc7a81e3636c9fa
+fog | 1 | 8059bb6b | 7da144b97d054b25 0
+fog | 2 | 342b0657 | ff072bb59b37bbd2
+fog | 0 | 7ae57b70 | a2e12ccc86375f77
+fog | 1 | b3264ec2 | 7da144b97d054b25 0
+fog | 2 | d8843d87 | a3987da5d3def2f0
+fog | 0 | bb39a3e8 | 4185be7dadae58a8
+fog | 1 | 9b697453 | 43d5993e9349aba8 1
+fog | 2 | 71f27f32 | e1d872495bc5b976
+fog | 0 | f473a9e5 | 1760ad8717d21702
+fog | 1 | 6e21f11f | b7cd1638d327ed34 1
+fog | 2 | c80e3c07 | 40ea0a0a4eea43ec
+fog | 0 | 27537fd6 | c580869338d89add
+fog | 1 | 5549dce0 | bc0090fb45ad4f12 1
+fog | 2 | 6b6e05f8 | c31a10b6e37ac11e
+fog | 0 | 60df2faf | b4bddfc8a492b2c2
+fog | 1 | 4ad229a3 | 97dd17d2fa310e4a 1
+fog | 2 | 96cb7ef0 | cf0d25b0fd807170
+fog | 0 | 38e7bae8 | a57a578f4bdfcf4e
+fog | 1 | 778e5c97 | 2b3f1a67f10d23c0 1
+fog | 2 | 62a78e47 | 698af7d07c49bc40
+fog | 0 | c4f4e436 | 49a4029740ae0d4e
+fog | 1 | 7c2fb3ff | 7da144b97d054b25 0
+fog | 2 | 817a661a | 1c7edc1eeb2450bd
+fog | 0 | b6583209 | cc25875063cb1e99
+fog | 1 | 46c0f7d | 9ca62c6fa62e9a0 1
+fog | 2 | f9169e5a | 4442d8b2dfb9b765
+fog | 0 | 9c7f7c29 | 8338178207e49178
+fog | 1 | 635464d8 | 2c1e260966fe3ab0 1
+fog | 2 | c61efd43 | f2d8d6668d45e9cb
+fog | 0 | 40b1245d | b00d8e5ada1d65b5
+fog | 1 | 8bc307bd | 4f287ed5fa8ad95 1
+fog | 2 | 88f3bacd | 8bbfa1d064cadb4e
+fog | 0 | 2649133f | 6570097b67445d33
+fog | 1 | fa9a18de | a00e11c434191d54 1
+fog | 2 | 4e9de8d8 | 1d03dbc655d1f2ba
+fog | 0 | f450609b | 5fb95fa077caf9ef
+fog | 1 | f1d4acc6 | 3f87bf2ef29a826f 0
+fog | 2 | 51e3e0be | b06b7b9886c0f657
+fog | 0 | c01908ac | a464773a0b24785b
+fog | 1 | 5cf9982e | ee54a94bc6416131 1
+fog | 2 | 4e854253 | bf2e0a4acb76ddbb
+fog | 0 | 36c4bffd | 7d06e3e9386afa2e
+fog | 1 | 1ca6fbed | 6835a4d593eef0ad 1
+fog | 2 | ca5b192a | 40ea0a0a4eea43ec
+fog | 0 | 3651c05d | 1fb94acc5e1b1178
+fog | 1 | bdde2cad | 7da144b97d054b25 0
+fog | 2 | 7551491e | 40ea0a0a4eea43ec
+fog | 0 | 9f8feb29 | 54983279a9c8c78d
+fog | 1 | e4e02d0a | 12425dbe66b3c700 0
+fog | 2 | 3e8374be | 92fe830ac7132ef
+fog | 0 | 34bba17b | c9e11abaf022c6a1
+fog | 1 | 11050e | 12425dbe66b3c700 0
+fog | 2 | a5b19c21 | c345fb22af2c60f7
+fog | 0 | 1c190906 | 1e308a51c8bbe740
+fog | 1 | 729f1802 | e625bc92ba55fdc0 0
+fog | 2 | d75198de | f0ae0466250c19e5
+fog | 0 | a8d8fbd2 | af676608c0b384b4
+fog | 1 | 3310ea8b | 8b9a9c228497d421 1
+fog | 2 | 125341e8 | cec9dc6ae90e9714
+fog | 0 | 926c24a | ebf3b7a2ffeb3d30
+fog | 1 | 66a69d04 | 69c1d84e3fc7cd67 0
+fog | 2 | 96518404 | 40ea0a0a4eea43ec
+fog | 0 | c8ea67c6 | 53b285d7c3d1137c
+fog | 1 | d1f11867 | 28d6af160df30dad 1
+fog | 2 | 3f3d2ea2 | 40ea0a0a4eea43ec
+fog | 0 | dde2df30 | be79d9a597968dc7
+fog | 1 | 5faf2ab | b59a3428a2337f8a 1
+fog | 2 | 23748521 | 4f66ffbdc6dc3998
+fog | 0 | 5eeeb742 | 8cbe763e6eade9cd
+fog | 1 | 9e6b481 | 7b93397381e8868d 1
+fog | 2 | be0aef8c | e8ededfe9d2dee38
+fog | 0 | 4fe6b0c0 | ae96af74fe0c1a09
+fog | 1 | f845a11d | c4bce53898f391fe 0
+fog | 2 | ad02c4a7 | 7cc854f988badc43
+fog | 0 | 8e7b5f9e | b4e68e1ecea8fed3
+fog | 1 | 61d7e79 | 12908753cc16ae3a 1
+fog | 2 | db729ce1 | 1d03dbc655d1f2ba
+fog | 0 | 6682468b | 3630e47c55c84d00
+fog | 1 | 4c03b770 | d1f718743bfc4548 1
+fog | 2 | 4f150e28 | 2f5d828e834a34d4
+fog | 0 | 727e5c4a | 5a26d3c6bc7a47f2
+fog | 1 | 9dc68de7 | e2cad64b4d906e0d 1
+fog | 2 | 1abe0052 | 5a49d2b1c8d504c0
+fog | 0 | ab363d38 | 6719f02d380893c3
+fog | 1 | 5fbcdc1b | ac0275421a2c6311 1
+fog | 2 | eee77a46 | 1d03dbc655d1f2ba
+fog | 0 | 5a03e672 | 3018c67b4eeac454
+fog | 1 | 37dda462 | ba381615065ec1a5 1
+fog | 2 | 2d043dad | fe08e0090fe45779
+fog | 0 | 65b4d9a4 | 904bb9290b7f3f1a
+fog | 1 | a26d7ab5 | 7da144b97d054b25 0
+fog | 2 | d005861 | 4d6d3acf843f262a
+fog | 0 | b2a99730 | 6fc79e64de2b6138
+fog | 1 | bb3b2f1b | 6a160e5b0b3419fd 1
+fog | 2 | 7c43437b | 4d6d3acf843f262a
+fog | 0 | d89cd5ee | be11da0cbf89c595
+fog | 1 | e38cddfe | a3c673ca6b9adb8b 1
+fog | 2 | 8e2b18d | 6c6d51b739fb3033
+fog | 0 | 7b3ac5f7 | dc64a79d65213e76
+fog | 1 | a6cef6c | 947bfdb305abfaea 1
+fog | 2 | ae9fb7b4 | 40ea0a0a4eea43ec
+fog | 0 | 9bbde62a | 491d0a9ff44a4924
+fog | 1 | a73f1f41 | 12425dbe66b3c700 0
+fog | 2 | a0aba73e | 9b771b5c4d4e663c
+fog | 0 | 5453ed03 | ba4d6f39b222e412
+fog | 1 | bfdac687 | aaccac343ed05e57 1
+fog | 2 | 7fa2f392 | 40ea0a0a4eea43ec
+fog | 0 | 214ea673 | 18604357fadc8c60
+fog | 1 | 1827a435 | 8b70696ef29cc5e3 0
+fog | 2 | 6a448336 | bdd2a3588dccf5fc
+fog | 0 | 5f49c25 | 7920d1a2e3b2bca8
+fog | 1 | 831fb353 | 72b9d16600a0aa6 0
+fog | 2 | a080f7e1 | 6fb764451e49e8ad
+fog | 0 | 7923c7c5 | df7ca48ed382aecc
+fog | 1 | 4550c264 | 77b64dfab8c53a87 1
+fog | 2 | 227b7d73 | 121146d80ad23a20
+fog | 0 | 605dbe65 | c499e270487ffc0e
+fog | 1 | ca785864 | 3f87bf2ef29a826f 0
+fog | 2 | 1fd115f4 | 4d6d3acf843f262a
+fog | 0 | 2bc4655e | 3e1eea18c0a6f9c3
+fog | 1 | 19314318 | 173c639e0dc78060 1
+fog | 2 | 6b5afbc8 | d47604bb9a008dbf
+fog | 0 | a021bd7b | f01afe1b2edbf89
+fog | 1 | 47c460ff | 7da144b97d054b25 0
+fog | 2 | 5baa7ef3 | 95470dda7fab6b17
+fog | 0 | e7c4b012 | 2721259f47a6a54d
+fog | 1 | e9818b63 | 29069b7b45d746cd 1
+fog | 2 | f8ef978b | 9b771b5c4d4e663c
+fog | 0 | d3a586e3 | b22ea554ca869751
+fog | 1 | 15f313e0 | 773d1f1646b5927d 0
+fog | 2 | 895b2c64 | 3c2e7ddf602e7308
+fog | 0 | fea26f8b | 4f18fe06e9f7f49e
+fog | 1 | 7220d494 | 7f5bd34e4c502eb9 1
+fog | 2 | 8b4ee669 | 1d03dbc655d1f2ba
+fog | 0 | d8736b0a | a22df8935a871651
+fog | 1 | e0d3acbd | 7da144b97d054b25 0
+fog | 2 | 799fb5c2 | 4d6d3acf843f262a
+fog | 0 | ba7b6ddf | 5fa22a06002ef1f1
+fog | 1 | 929755aa | 1b1de623fa9521eb 1
+fog | 2 | fe22584d | 12cc7f89ffb43435
+fog | 0 | 247fbdc9 | b1cf38ed60d90b8e
+fog | 1 | 32c81120 | a5a103545056095d 1
+fog | 2 | be0b366d | 320f8f1026b58078
+fog | 0 | 43da1f0a | d31b35169078b5f5
+fog | 1 | 8b7112a7 | 7da144b97d054b25 0
+fog | 2 | 38d72f08 | 61a6c58b0d953be2
+fog | 0 | 96ce5bb0 | a51d0ffbd5f8b4cd
+fog | 1 | 9db77c2 | 33b4cb5cef6d68c0 1
+fog | 2 | 2b64c9a4 | d49ccc24cd21e1a2
+fog | 0 | 287edf43 | 4ff5889c4ded8bd0
+fog | 1 | bce3a7d5 | 3f87bf2ef29a826f 0
+fog | 2 | 41c78640 | 8f759c63dcbdcaee
+fog | 0 | bf3d79e5 | a4e05a217467ed02
+fog | 1 | 81bd6edf | 7928c6c068938a82 1
+fog | 2 | 9c2fa295 | 4d6d3acf843f262a
+fog | 0 | f3931cc8 | 7493f1d4a68dc357
+fog | 1 | 30039156 | 7885bc77eb59963a 1
+fog | 2 | 80a6afe | 34baeb03318786b
+fog | 0 | 2e0353b6 | 4756f0912068fa4d
+fog | 1 | 7e4bac84 | 7da144b97d054b25 0
+fog | 2 | 8cd75bf3 | 1d03dbc655d1f2ba
+fog | 0 | 96d43580 | f205ab5e1a3eac16
+fog | 1 | db3e4182 | 7da144b97d054b25 0
+fog | 2 | 89fd4d4a | f89aeb725b2a487d
+fog | 0 | f6026beb | 5e5127add99fa1ad
+fog | 1 | 1f569771 | f3a69d5fce3af2ed 1
+fog | 2 | ff679522 | 1dca1521e89223e3
+fog | 0 | 19db3d89 | 2e0968989a2a5571
+fog | 1 | 7200d81d | 3f87bf2ef29a826f 0
+fog | 2 | a58963a0 | 1d03dbc655d1f2ba
+fog | 0 | 4fafbdd1 | afa9eb3a17200b54
+fog | 1 | 71251c1 | f070dd2a4e20c6e1 0
+fog | 2 | a9bf17e7 | 4d6d3acf843f262a
+fog | 0 | ed12b2b2 | a8582859aaaba0e9
+fog | 1 | 85de7ac4 | 6173bf3587fbf221 1
+fog | 2 | 329c8596 | d08a9f37407eba0f
+fog | 0 | b49132a4 | 1dfecfe1d5d20478
+fog | 1 | fe298aab | b9b83f81880565a6 1
+fog | 2 | d4aa34d | bdd2a3588dccf5fc
+fog | 0 | dab62fd4 | 9eb57254f4da58c1
+fog | 1 | 3700e9c7 | 3f87bf2ef29a826f 0
+fog | 2 | b6db7543 | f69f1126280d6e52
+fog | 0 | 5eb82624 | d2957f5a28abb04b
+fog | 1 | 4e906b48 | 738cc4ff6da8658a 0
+fog | 2 | 73276df2 | 97eb09ec3b0b319a
+fog | 0 | 9da51dd5 | a04d5263b84975f0
+fog | 1 | 4fae0aea | 60cb2be454c0088f 1
+fog | 2 | a8f1733a | 3a32479534910190
+fog | 0 | 3e32f42e | ff1c9856c7f5a1ff
+fog | 1 | e3be9743 | 7885bc77eb59963a 1
+fog | 2 | 3c56cecc | 1a0897cb2b6ffff8
+fog | 0 | 81c34a00 | 8e9d6dff67863cad
+fog | 1 | 80654bbb | d3e765b053116904 1
+fog | 2 | 6cac313b | 296ecd1dbc6b4b92
+fog | 0 | 98b2d1b4 | bbc5de5c3a7069b2
+fog | 1 | afe57868 | 86a79c4a06b7a824 1
+fog | 2 | 554987a7 | 4d6d3acf843f262a
+fog | 0 | 95aa6c78 | c5e4fe89e799c8be
+fog | 1 | 643d4d4c | 70f7a551eabcdc96 1
+fog | 2 | b6cda0ef | a8b8d6dbcc14d4df
+fog | 0 | d39d0d82 | 536dd93bcb4186fa
+fog | 1 | 4e5e8758 | f12591b29ad61821 1
+fog | 2 | bb8cfa0b | 4d6d3acf843f262a
+fog | 0 | 136f427c | 6085ee7290da73
+fog | 1 | 6e59237 | c146745f7f09fa9e 1
+fog | 2 | ee3475b8 | f4e8af4c2ee6bc72
+fog | 0 | 6f350884 | e3a642db90e23022
+fog | 1 | ffeb8833 | 7da144b97d054b25 0
+fog | 2 | 5aea91f6 | 47e62eb3f07830cd
+fog | 0 | 7fba6401 | 2465c91c287870d3
+fog | 1 | ab7d6bca | 9c208d13ac6e5afe 0
+fog | 2 | 22c460fc | 40ea0a0a4eea43ec
+fog | 0 | a2594b81 | 41781331528cf963
+fog | 1 | 4428db02 | 12425dbe66b3c700 0
+fog | 2 | 87886d89 | 40ea0a0a4eea43ec
+fog | 0 | e6b24024 | da3e3070f83503f4
+fog | 1 | ed7fb75b | 4b961cc45132d838 1
+fog | 2 | b7282d31 | 4d6d3acf843f262a
+fog | 0 | f0b93f66 | 21feb2a1eeed5a82
+fog | 1 | 79ca084f | c7cd14fa1c4ec3f6 1
+fog | 2 | a2bbaaa7 | 9cfdd0babd0f48a4
+fog | 0 | e8a7388c | bd2e211443a66d11
+fog | 1 | 5f50b5ea | 4c4940343d4dd2ab 1
+fog | 2 | 457330a2 | 40ea0a0a4eea43ec
+fog | 0 | 753f858f | 617323a7dc09078c
+fog | 1 | 3612d207 | 3f87bf2ef29a826f 0
+fog | 2 | ef713ac1 | 1d03dbc655d1f2ba
+fog | 0 | 3a62745d | b74d762187310be8
+fog | 1 | f253c47 | 89d27593ca02a406 1
+fog | 2 | 59af6148 | 4d6d3acf843f262a
+fog | 0 | 2ef56d21 | bab0b046d5c71351
+fog | 1 | 4293f486 | 27f8556bcf417ec8 1
+fog | 2 | 75df10ad | 1d03dbc655d1f2ba
+fog | 0 | 39eb694a | 86eff4cb0d1ce7e8
+fog | 1 | 37ef9343 | c614c99370b789c3 1
+fog | 2 | 940a9be2 | c9610afdab7c3be6
+fog | 0 | 370e00fe | c50396ab19092020
+fog | 1 | 8b5d54a0 | 12425dbe66b3c700 0
+fog | 2 | 21167ee | ac863e85a2ddb986
+fog | 0 | be75eb94 | ce42c94b18387257
+fog | 1 | d7516679 | a8c5efdbbf43a5d6 0
+fog | 2 | e1a9c442 | 62ed1a597d084a00
+fog | 0 | 194031cb | 9ec2dbb7fef1d7c2
+fog | 1 | 9ab61751 | 6117e41cbfd3b46d 0
+fog | 2 | dc3a6609 | 4525fb532a79f8cf
+fog | 0 | e3a4c3b9 | 3587ad1642bf700b
+fog | 1 | f07efeac | c1f165bbf0c7e454 0
+fog | 2 | 34acfd02 | 7f97d37a432a7a55
+fog | 0 | bfbf8522 | cade7789031e3595
+fog | 1 | de1ca9c0 | 41044470fbc8cf31 1
+fog | 2 | 9b9aee98 | 2b9aaa7040ae0afb
+fog | 0 | c528a1e7 | 623421ad9ca1bb78
+fog | 1 | b1e6874f | ea2df76dc713c75f 1
+fog | 2 | a1366c48 | 8c6d657f7458e031
+fog | 0 | 4234361e | e6d17191ff202a60
+fog | 1 | 8d59a28 | b026a409715dffbc 0
+fog | 2 | 259a81ba | 45192267be9fd5b4
+fog | 0 | e69eefbd | 2e30bd36e7c0250d
+fog | 1 | 4dd481a1 | 7da144b97d054b25 0
+fog | 2 | 357cda5f | 40ea0a0a4eea43ec
+fog | 0 | 635e22bd | 4ec0994e115aa738
+fog | 1 | 3f79980e | 9842ff99ec699f63 0
+fog | 2 | 26e77fe9 | 4d6d3acf843f262a
+fog | 0 | 55b2ba8c | 265dd5fa8b5b206a
+fog | 1 | eb31f8a4 | 8d315e89207d3c3f 1
+fog | 2 | 8dbce3aa | 4d6d3acf843f262a
+fog | 0 | ece8de47 | 89b57184265ae9dc
+fog | 1 | 35cd0632 | 7da144b97d054b25 0
+fog | 2 | 975a0826 | 4cb0f1fa86b669f1
+fog | 0 | 7297ca39 | 985a6889985bdea0
+fog | 1 | 2ff1a208 | 6c35d26bc52da0c2 1
+fog | 2 | 924303db | 707ed9c15a28363
+fog | 0 | ca879cef | 3231456dbe0d49b3
+fog | 1 | 8f2468aa | b423a3d92e4160f8 1
+fog | 2 | 2ea15588 | 6fb764451e49e8ad
+fog | 0 | d498e647 | bdeddf6d57824ff1
+fog | 1 | 1711dc7f | 76da283fcb0733a1 0
+fog | 2 | cda19ba1 | 4d6d3acf843f262a
+fog | 0 | ec427fc3 | 7344e74e4be50f48
+fog | 1 | 6ec960c7 | 93b34164bce2c3dc 1
+fog | 2 | 165c23e0 | 6d4a3dfa9485c2c3
+fog | 0 | fff0b78d | a13abcc29533151b
+fog | 1 | 2e119ad4 | 7da144b97d054b25 0
+fog | 2 | 4aef60b8 | 48c272658511ec18
+fog | 0 | 21a2ec90 | 8f38bcb8c02b9dac
+fog | 1 | 55d5c120 | e5b3c7fa8f70a277 0
+fog | 2 | 57041b8a | 4d6d3acf843f262a
+fog | 0 | d746413c | e5bb55c0b81a97e2
+fog | 1 | 38184370 | 3f87bf2ef29a826f 0
+fog | 2 | c7fbec1e | a83c811644e6bc14
+fog | 0 | f029ff4 | 24750af48e629182
+fog | 1 | 3ac95fac | 3f87bf2ef29a826f 0
+fog | 2 | a0b7842 | 40ea0a0a4eea43ec
+fog | 0 | 4e5a9334 | 55edf84ccf844e8f
+fog | 1 | 81794005 | 2b848a10e742ca99 1
+fog | 2 | e3f5cfb4 | 33b0a5abeb046758
+fog | 0 | 521d3d28 | 4bd39a11dc65a7d
+fog | 1 | 19ffce06 | 486ce44036ca623f 0
+fog | 2 | fcea485c | 87171c54b643766c
+fog | 0 | e0407877 | 88b30c5732684fb4
+fog | 1 | 7969f1a6 | e91028fc9c066cfb 0
+fog | 2 | 8df57be0 | efa79cd115dcda4
+fog | 0 | 8fab4244 | bba0ffbad5212377
+fog | 1 | 770597c3 | 4104190f889af6b4 1
+fog | 2 | fc2585d | 40ea0a0a4eea43ec
+fog | 0 | 13a99320 | 958e6da680b80865
+fog | 1 | 40a26b36 | 5ce28c32b5bdbb5f 1
+fog | 2 | cd4c1df9 | 1fa77252bda6ed9b
+fog | 0 | df03ddf0 | e5bc192da9149bba
+fog | 1 | 4cfcd434 | 8b74825261d2c0d9 1
+fog | 2 | a805ba2d | 4d6d3acf843f262a
+fog | 0 | 7152a000 | 49795f08f7baab9a
+fog | 1 | d746dab1 | d3e35ac69f17b981 1
+fog | 2 | 84ee969b | a79e7f3ee59ea42b
+fog | 0 | ee707188 | 4f8ae695d1cff6a1
+fog | 1 | d0d8323b | 12425dbe66b3c700 0
+fog | 2 | f538b415 | 99a3a12fc9601c42
+fog | 0 | 38507d74 | f4db88e5a4774080
+fog | 1 | 7f3f3758 | ac84bb44257d62a4 1
+fog | 2 | 41499002 | ca1c03bb6c21df1b
+fog | 0 | 670e8d79 | f8f699e1b67115e3
+fog | 1 | 1d2d5ca3 | a28a97c3da45b622 1
+fog | 2 | c1732349 | 4d6d3acf843f262a
+fog | 0 | 93c35d5b | ba014c8cd95c4ced
+fog | 1 | 8ce3436 | 5757394019be4731 1
+fog | 2 | dedf2b32 | 63cc221573d3c082
+fog | 0 | fb6ceb61 | 4aa5f3157b9773ca
+fog | 1 | 3363cd46 | 4712df60c11e72ef 0
+fog | 2 | 78f4b369 | 4d6d3acf843f262a
+fog | 0 | e26dd118 | dd457b68a7609099
+fog | 1 | 28c3fb73 | 3f87bf2ef29a826f 0
+fog | 2 | e56f9967 | 992e22c24291a31e
+fog | 0 | e25a233c | 31515e5df3087cb5
+fog | 1 | d29acf38 | 3f87bf2ef29a826f 0
+fog | 2 | 34f31818 | 2a7db1f565ad4475
+fog | 0 | 5217c9ce | 45a90e1a04a4907e
+fog | 1 | ed36719d | e382373758bb378d 1
+fog | 2 | 30254382 | d28dece296a5ce35
+fog | 0 | 39e6eeb9 | 4b5d59bb22015f1d
+fog | 1 | 5bd701ce | a790056bd68d8bd 0
+fog | 2 | 621db4f0 | bdf299134bdeb219
+fog | 0 | 3db9398b | 4d1a62c83ad34dce
+fog | 1 | 5017249d | 3f87bf2ef29a826f 0
+fog | 2 | 66bf921 | 5c4eae15c111c9be
+fog | 0 | ecf205b1 | 9a30fb8498b1c3f3
+fog | 1 | 8b9c87ae | 1f878e0c733180f 1
+fog | 2 | 27b68386 | 1d03dbc655d1f2ba
+fog | 0 | a66ecf86 | 98991e2bfa930413
+fog | 1 | a1ed25b9 | 1174c57ed5460344 1
+fog | 2 | da81517c | a31f9fac94943aa8
+fog | 0 | c05eca3d | d8a3515d3639d340
+fog | 1 | de2479e6 | f3ec317784a0377b 0
+fog | 2 | 8eff79af | d2e14168fc9c43c0
+fog | 0 | 5b7e1bf4 | ee4e77e0b5e9b5c0
+fog | 1 | aeb7cd27 | 7da144b97d054b25 0
+fog | 2 | bc6c685d | ac863e85a2ddb986
+fog | 0 | b76ff1bd | 6cc49dc386b028f3
+fog | 1 | 9974b364 | f98cec45159546e6 1
+fog | 2 | 50382bca | 1d03dbc655d1f2ba
+fog | 0 | 66852d18 | 3a0418deace53d21
+fog | 1 | 9e28bcf7 | 8378fe92d398badc 1
+fog | 2 | c3d5cdd3 | f4f01851652395c8
+fog | 0 | f23f2329 | 400501904e84e35d
+fog | 1 | 3f901dad | 5dbd5b488bf8652f 0
+fog | 2 | caa48eaa | 9b771b5c4d4e663c
+fog | 0 | b0db25f7 | 4e041bec139a4d7b
+fog | 1 | 8dc2a340 | 3f87bf2ef29a826f 0
+fog | 2 | 28302544 | 9b771b5c4d4e663c
+fog | 0 | 79cada4d | 84ad6745f0d1d6a3
+fog | 1 | 6c90a096 | 9e0fff5ffbcc3513 1
+fog | 2 | 9955dd4d | c9610afdab7c3be6
+fog | 0 | 885000e | aca22434baecea5f
+fog | 1 | f0482531 | 7da144b97d054b25 0
+fog | 2 | 1e5fcc3c | ac098aa606ed55f2
+fog | 0 | b84d679 | 33ddcd26dfc993c3
+fog | 1 | b3ad3a93 | 6c2c10d1bb8e0ba4 0
+fog | 2 | eb035327 | 4d6d3acf843f262a
+fog | 0 | 305b60da | 9ddb07c82021591a
+fog | 1 | ab301c92 | 1f0f4185e4fe6aff 0
+fog | 2 | ce0a0c23 | 2cf0704f32bfd49d
+fog | 0 | 48397cc9 | a22a95b1edb65317
+fog | 1 | 63d18efd | 33428bde90e59e65 0
+fog | 2 | 3ef29ea9 | 40ea0a0a4eea43ec
+fog | 0 | 1650eff1 | 280e793589b49e25
+fog | 1 | 2fbdcaae | 7da144b97d054b25 0
+fog | 2 | c71cca8c | 9b771b5c4d4e663c
+fog | 0 | 73136c33 | 4218d6a39c07068c
+fog | 1 | 3d57c657 | 73efbbd5e956c466 0
+fog | 2 | b19428ad | 9388f44b789a5
+fog | 0 | 771d9cb6 | 6b805a6496b6b0d9
+fog | 1 | 451875e3 | 610a49847f0c3f8 1
+fog | 2 | bbd92efa | 926e02cee5cc3063
+fog | 0 | 8121472d | 6dd530b032f177fc
+fog | 1 | 53db9383 | cd27485ce788b066 1
+fog | 2 | 7377e5e2 | 1d03dbc655d1f2ba
+fog | 0 | ab5eb1e4 | a924de24be789088
+fog | 1 | c607f5ab | 12b25b4adfbb2364 1
+fog | 2 | 2593b830 | c16bd6422d92ac49
+fog | 0 | 456d038d | eb88a04fa0608faf
+fog | 1 | 675bc238 | e5c2c5bc3ea79ee4 0
+fog | 2 | da4fd577 | ff7160a27bd3e736
+fog | 0 | c7db485c | 3633b476cbe42f1c
+fog | 1 | 493e3c48 | 911dce49efcd6acc 1
+fog | 2 | 5cac74a2 | a0b8b897a7e94dec
+fog | 0 | 10580457 | c8cd616ad3b4f0f3
+fog | 1 | c2c54f9e | fe7d9b84b49e1f2b 1
+fog | 2 | 67930ea5 | 5ff7a7dd1c7cb219
+fog | 0 | b4e1463a | 8cd9a78e06fa55e7
+fog | 1 | c5610816 | 824a6a16e33e4d3d 1
+fog | 2 | c8fb0cb3 | 6b5570515af601f1
+fog | 0 | 6089f10 | 4a99accba81be3c8
+fog | 1 | 9a9c9ab4 | 7da144b97d054b25 0
+fog | 2 | ce08409d | 1d03dbc655d1f2ba
+fog | 0 | 94977d23 | b07735f0d89e1608
+fog | 1 | df878842 | 7aaf3be1215ed610 1
+fog | 2 | 830a3778 | bfeb4cb766a86a8c
+fog | 0 | 3129e6e2 | 14ddbeeb5bcebd7f
+fog | 1 | d8a20c2f | 7da144b97d054b25 0
+fog | 2 | 232c110 | 4c12671b1bf66c7b
+fog | 0 | bd5db487 | 8ff57eb6ee627916
+fog | 1 | 440f5244 | fab00c581af6c493 1
+fog | 2 | 472ceafa | 1a91f91f748759fa
+fog | 0 | db76b01e | 90871f6bb50677b6
+fog | 1 | bd15fb1e | 3f4810d64d7307fa 1
+fog | 2 | 639676b5 | f22d2511ced0ddb0
+fog | 0 | baea0820 | af552e352c650634
+fog | 1 | 2cdefbd1 | 3f87bf2ef29a826f 0
+fog | 2 | d3c31a02 | 4d6d3acf843f262a
+fog | 0 | 71cb597 | d1c8c7c43e0248e2
+fog | 1 | 18e7b1d6 | 628346d7d6fe4662 1
+fog | 2 | 5a0f7c5a | 40ea0a0a4eea43ec
+fog | 0 | 13c6c17b | 3772809842dccebd
+fog | 1 | 312ae51c | 2ee0206b6985d2b1 1
+fog | 2 | 42a9269d | 8a60aba045c24219
+fog | 0 | ee609c | 1cfe8c44689d818b
+fog | 1 | aea3257f | c66027ab2d2580fe 1
+fog | 2 | f45d327b | 69b84c658f74faec
+fog | 0 | 6fd35b50 | 30ff8f46e47ae11e
+fog | 1 | 1ceb8054 | 2f1512f3b97e14a8 1
+fog | 2 | b522769e | 40ea0a0a4eea43ec
+fog | 0 | de14caa7 | 1888560f553854c2
+fog | 1 | dde2f24f | 3f87bf2ef29a826f 0
+fog | 2 | ed706938 | 51c061eb6aa6662d
+fog | 0 | 3b8c2056 | c48b08c9b61a0028
+fog | 1 | 6ed0d10d | b61cdc8edae7ce24 1
+fog | 2 | 7fab7af9 | 40ea0a0a4eea43ec
+fog | 0 | 7380c24d | 125fe374119d48a7
+fog | 1 | ff809f1e | 9edf1494f14e4492 1
+fog | 2 | fa44416a | f87199506381cd0e
+fog | 0 | 593a4c94 | a23576ddcd5813d4
+fog | 1 | 8f9ff76a | a4e664c76548454e 1
+fog | 2 | aa8f0b6f | b2ccada2dd3998d1
+fog | 0 | 4792011b | 6228e6a89a9765ca
+fog | 1 | f4bcc6ba | 4b26304e15d9febe 0
+fog | 2 | eb5e107b | a8cd09816193dd5b
+fog | 0 | b5be5627 | 173ea69cc6d48505
+fog | 1 | 75cd3fa4 | e2966f01278c977c 1
+fog | 2 | f4134c99 | 40ea0a0a4eea43ec
+fog | 0 | c98bd4d6 | 42545f7f12b7be55
+fog | 1 | 6da08ffc | 9d246940109c4aa6 1
+fog | 2 | 1422d20e | 1d03dbc655d1f2ba
+fog | 0 | 2877346e | 21fc850e688431d1
+fog | 1 | 1aa5b253 | 7da144b97d054b25 0
+fog | 2 | d25cdda | b67dcc6eefed8563
+fog | 0 | 340a968e | 9114d6c024454e12
+fog | 1 | 4907eb52 | a903347069d5f6b 1
+fog | 2 | 742c3565 | 4d6d3acf843f262a
+fog | 0 | 47946aa | 5dbcac035dfb8e04
+fog | 1 | 3fb1d32e | 6107c2f3dab07f8f 1
+fog | 2 | e0cfd2bf | c476499f5121731
+fog | 0 | c22f6914 | a7f406c5d24f9243
+fog | 1 | 1f2f6a5c | dc663971ac7a6d4 0
+fog | 2 | 91297ac | 40ea0a0a4eea43ec
+fog | 0 | d9e38e43 | 3e5d6eed0df7e469
+fog | 1 | 334576f9 | dc45a71d9543b631 1
+fog | 2 | 7ff3c8f3 | 9387ed13490ce7c
+fog | 0 | c74a2b6e | ea1a0f94a90fe569
+fog | 1 | 603e4d9f | 7da144b97d054b25 0
+fog | 2 | 4ea27df5 | 9b771b5c4d4e663c
+fog | 0 | 5a3b02ab | 7f9df0657e6f86f9
+fog | 1 | 3aa6a94d | 6bad4c6def648ee3 1
+fog | 2 | 7af433b5 | 4d6d3acf843f262a
+fog | 0 | cdb8d9af | 76c3404667a3ebf5
+fog | 1 | 4af9e0a3 | 6f4d96cb7ac2fd69 0
+fog | 2 | 42243c3c | eb1d413dba523c6
+fog | 0 | 978cf12d | a2b8425936feb7ee
+fog | 1 | fa1b5ed1 | 543f3844280a0842 1
+fog | 2 | d4ba766c | a4297c468383921
+fog | 0 | 4069a159 | 7eb3059b07bbc65a
+fog | 1 | c9d47bde | 80c25200e3239de6 0
+fog | 2 | 528075f7 | c89dcdd7413de3d1
+fog | 0 | 2b48566f | 2b34902cecd23489
+fog | 1 | 1181004f | dab2df050c7e0a7b 1
+fog | 2 | 71f35ce4 | dec0b7b0c9c31b58
+fog | 0 | 6d4fcba9 | f8770bbc9a7bc101
+fog | 1 | 676cbb32 | db1adee1544d262a 1
+fog | 2 | 2291cbd4 | d98505580e7a9148
+fog | 0 | 50ef7dfa | 56abddc78f449360
+fog | 1 | 2c775da9 | f2debcd8324ef72d 1
+fog | 2 | 5f40b841 | 77403425b50da77a
+fog | 0 | 8b2b8e22 | ec50f66865c6a0af
+fog | 1 | b89e6642 | 780ebeea34a0c2b1 0
+fog | 2 | d08b0b8 | ca3a45b036beb42d
+fog | 0 | 74f4c8de | d5bd091b08ada9fa
+fog | 1 | 416473 | 3c2fd8b432e1c6cd 1
+fog | 2 | f8d9bd9d | 4d6d3acf843f262a
+fog | 0 | f64aeeab | 2d5775f223af558a
+fog | 1 | dac2cdc3 | 21400c83f8a9243a 0
+fog | 2 | 87542f8a | 1e814d84bd3663c1
+fog | 0 | e4e2a12 | 51f81cf917fa057f
+fog | 1 | 42b5bb14 | e80df0a570292c83 1
+fog | 2 | c7f295c1 | bfb2b161ba26c54d
+fog | 0 | d91d55e4 | 28f6d9bc0c279b54
+fog | 1 | 9eb7d16a | 1605bc2433688100 1
+fog | 2 | fad7b9cd | 247c1ec343740d08
+fog | 0 | b031e57c | 238b12130924cf41
+fog | 1 | 21af403f | 3de035a32f657888 1
+fog | 2 | ff3931dc | 3ca9ee925c4899d8
+fog | 0 | 97e92c49 | fc7bbf8748dfa69d
+fog | 1 | 93b056 | 5223eda54c45f9c8 0
+fog | 2 | 83b1d1b2 | 40ea0a0a4eea43ec
+fog | 0 | d9a599b3 | dff220c27d780ee5
+fog | 1 | 10ecbf6a | 12425dbe66b3c700 0
+fog | 2 | 1f0570e3 | a754ffe6b18fc2e7
+fog | 0 | 7895d50b | 737431863bbd47d9
+fog | 1 | c2e24c46 | 5f597aa6c1c13224 0
+fog | 2 | 5bf855ab | 51972dc710996f93
+fog | 0 | 1e406499 | b8841ed6786cf44c
+fog | 1 | 2caed41a | 3af90e7263dcc0cb 1
+fog | 2 | b3a4fdac | 3782720870958c33
+fog | 0 | e3559249 | 15cd77d2d7803590
+fog | 1 | e26d77af | 32a01c671484dd56 1
+fog | 2 | 23a1c990 | c3ab326cc0196443
+fog | 0 | be936002 | 6d1dc0ecd1619174
+fog | 1 | d2954f15 | 7da144b97d054b25 0
+fog | 2 | 2c22afb | a0254e9744f4e6e9
+fog | 0 | 45be5b1f | 26a34fad96aaf205
+fog | 1 | ac2b73ba | 7da144b97d054b25 0
+fog | 2 | dfb2f313 | eb36272fe3567d83
+fog | 0 | c5201347 | 33f0e8ff7f1fd9cd
+fog | 1 | 7ba678dc | 37d4ac11bef84452 1
+fog | 2 | 6e63fadb | 9662be2cb2f21379
+fog | 0 | b3f8d042 | 20f7eb927db86b78
+fog | 1 | 76f70c6 | 52caced1776b0402 1
+fog | 2 | 2f14e1ef | 1d03dbc655d1f2ba
+fog | 0 | 53d92811 | 36fb64e41fa98a4c
+fog | 1 | 5d5ea26a | 2a7376d3d8fd9950 1
+fog | 2 | de6bdbba | 2113aa14be36722b
+fog | 0 | c455c283 | f0ca8dcb33e91e57
+fog | 1 | 90a6587b | 33fbb8178160ef0f 1
+fog | 2 | 6475b1b9 | 2ce381ba26617b51
+fog | 0 | b9c8b199 | c43c2292e946bf8b
+fog | 1 | 40c18be6 | 7da144b97d054b25 0
+fog | 2 | 73d516ba | cb9d6d130b2ed5d2
+fog | 0 | b6076379 | 20df751a23905bc9
+fog | 1 | 7319fee9 | 30c9acbf8f756c8a 1
+fog | 2 | a2a5b987 | b964566d03f0916a
+fog | 0 | 6adc9f2a | d37eab38f2c9009
+fog | 1 | 760898fb | c80a4878f6526015 0
+fog | 2 | e5100c1b | 9b771b5c4d4e663c
+fog | 0 | 882f067b | b40e28122da7fe5e
+fog | 1 | 74a48cd5 | 54acd017b5c6884 1
+fog | 2 | e778f118 | 7b1562750a9449d5
+fog | 0 | ae3e291c | d9fee56a2a3cbe8d
+fog | 1 | c4e9c02c | 12425dbe66b3c700 0
+fog | 2 | 375453a3 | 97484db244d0c5f
+fog | 0 | 4866ccb2 | 453cc305fbd33a67
+fog | 1 | d464cd17 | 3f87bf2ef29a826f 0
+fog | 2 | 18774706 | 4d6d3acf843f262a
+fog | 0 | 214486f4 | 59b89c48b35161c6
+fog | 1 | eb92353c | 703f61bf10499773 0
+fog | 2 | 60d33a99 | 756ccbea57ed0b33
+fog | 0 | 8115c7e3 | 988f929ffe7665d9
+fog | 1 | f6acb7b8 | 7da144b97d054b25 0
+fog | 2 | 66a958a0 | c2b617f888261828
+fog | 0 | a556b8af | 3ce5e1380e719e5b
+fog | 1 | bd6dbde0 | 2355b0e62bf9aadf 1
+fog | 2 | 2f224822 | 4d6d3acf843f262a
+fog | 0 | ead9b8be | b736476d66a8f549
+fog | 1 | a5709198 | 43e17b4f2e630f9e 0
+fog | 2 | 96035f7 | e507c56e8544c496
+fog | 0 | b222aec8 | b58f11d73e93bf52
+fog | 1 | ee35c2f5 | 10b4255bafcb30a3 1
+fog | 2 | ac4a592a | 698af7d07c49bc40
+fog | 0 | d7445de7 | 74caf4317721bba6
+fog | 1 | 430b8a4f | c4bce53898f391fe 0
+fog | 2 | e45a7591 | 40ea0a0a4eea43ec
+fog | 0 | eb6014b4 | 217bb7ec29988ca9
+fog | 1 | a5077141 | 8ab0699dddc521a9 1
+fog | 2 | bc719ae2 | 4d6d3acf843f262a
+fog | 0 | 341fbb2d | fc9b2634962703f4
+fog | 1 | d785dbf1 | e917439bbfbf2569 1
+fog | 2 | a8d03cdc | e522b8a10e48125
+fog | 0 | 6ace595 | 4dc2af3ea247f6ab
+fog | 1 | 5b72ff96 | 9b82cedb41a6363a 1
+fog | 2 | ed4a2b6e | 9b771b5c4d4e663c
+fog | 0 | 792f2b37 | 3a79d9e38f15f262
+fog | 1 | 68ab643b | 48c14bc2956afa4c 1
+fog | 2 | c632cbe3 | ea32da7d1d6a9578
+fog | 0 | 189922bc | e602227ef11c53f1
+fog | 1 | 520edc59 | 12425dbe66b3c700 0
+fog | 2 | 4c3ed6e0 | c1cb7e601ed3dd52
+fog | 0 | e05f6e07 | 88d32b3489248263
+fog | 1 | dbfc882e | 7da144b97d054b25 0
+fog | 2 | a426ecdc | 9b771b5c4d4e663c
+fog | 0 | f112946d | 52d91f47465d7f41
+fog | 1 | 4cecea20 | 7da144b97d054b25 0
+fog | 2 | a1b30a02 | 6ff38af214ae336f
+fog | 0 | 5832355f | abda663c63071c88
+fog | 1 | 8c98b8ab | 181f2e3323f3d8c2 1
+fog | 2 | fe828b79 | 4d6d3acf843f262a
+fog | 0 | 7d0e76ae | b05d1334c25493a7
+fog | 1 | e3317bee | 76564b8a90d459f8 1
+fog | 2 | 2a2e1d97 | 82cebaa7f79588e9
+fog | 0 | 82896c26 | d75c87c1a2f216b6
+fog | 1 | 4628a86e | b4da1264362ee0f7 1
+fog | 2 | fc2eb16a | 29e91b0e5e44cc56
+fog | 0 | 44a1e609 | 3db34904fd54fd11
+fog | 1 | 480ffc44 | 9a8f5208cf5c80 1
+fog | 2 | baccefb5 | 1d03dbc655d1f2ba
+fog | 0 | aa72675e | e334e4c2f5861de3
+fog | 1 | d1f66f36 | 5ef683d04612d348 0
+fog | 2 | 7209c975 | 54158a6f86e3ae62
+fog | 0 | 808381bd | 3e48e9968dff0c2
+fog | 1 | 5711547e | 5de0ea9308cf59d7 1
+fog | 2 | f2b81995 | 8674f149cbd976dc
+fog | 0 | dc9f2845 | 9583c8b93533fef0
+fog | 1 | 44769eaa | 8b0d729876ee6707 0
+fog | 2 | 85bb029e | 4d6d3acf843f262a
+fog | 0 | 6b2d4881 | c7e3290c8726b9c6
+fog | 1 | bb1bf821 | 995227637d6b8020 1
+fog | 2 | 9f7a24ea | 40ea0a0a4eea43ec
+fog | 0 | 1d5aea | 4ca70453aa8fd2e1
+fog | 1 | 7b88dae8 | 69c4f2828c56cbaa 1
+fog | 2 | 9307210b | 40ea0a0a4eea43ec
+fog | 0 | 66147ddb | 8b9075cce7676311
+fog | 1 | b101a0d5 | 5aa29645a5d6ae7f 1
+fog | 2 | 1cdb6668 | 40ea0a0a4eea43ec
+fog | 0 | b8bd3f3e | 5f30815664dfc83d
+fog | 1 | e8b7b413 | 900206215763ca1a 1
+fog | 2 | 37ff4e98 | fe701da570d6a94b
+fog | 0 | 5fddd5ee | b35453d86babe748
+fog | 1 | 54172501 | f1a4a5853106e403 1
+fog | 2 | b53bcda3 | dcd45ec679704442
+fog | 0 | 702acd77 | 80ced2635d9e772e
+fog | 1 | 36892b55 | 2d52531254134439 1
+fog | 2 | 4416c0da | 2304618e23d07959
+fog | 0 | 1e725a68 | 4a7e7baf1453b676
+fog | 1 | 8fcd7844 | 7da144b97d054b25 0
+fog | 2 | b5964bbd | df9bef2974696eae
+fog | 0 | bd2b311e | 72d6b7f5895adf2c
+fog | 1 | 4e122ab6 | ec4ba876f05233e9 1
+fog | 2 | e2396d25 | 744c0ae156caed25
+fog | 0 | 18a61529 | a5422590ac2a8ffb
+fog | 1 | 583ce8c5 | aab33bfc2af9a46a 1
+fog | 2 | 121b34c0 | 9b771b5c4d4e663c
+fog | 0 | e226805a | f764ef123c44c0dd
+fog | 1 | 482ef8ad | 98a5f6706817fe3f 0
+fog | 2 | 5f95bd68 | a2144a663f99f9f7
+fog | 0 | f0134482 | 9cfacf42a96df3ac
+fog | 1 | b891d3f0 | 3f87bf2ef29a826f 0
+fog | 2 | 7e98cbd4 | 9b771b5c4d4e663c
+fog | 0 | 71f99121 | 9065ffc3657c9f6
+fog | 1 | c6e43fe5 | 9fd1ec6995818588 1
+fog | 2 | dc07eaca | 429d01fdbde6aaed
+fog | 0 | 9033ec00 | d934f57c09e18a85
+fog | 1 | 842f574a | 7da144b97d054b25 0
+fog | 2 | fd2e74cd | 4d6d3acf843f262a
+fog | 0 | 2ff1bba6 | 2f9dc5a225e8392a
+fog | 1 | e21f050f | b5fc42ec8b4ecbea 1
+fog | 2 | ff89c7b2 | 31fa9c9d532af201
+fog | 0 | 307b1577 | 12f76695eb337181
+fog | 1 | 22aa40ff | 9d0fc1787413678d 1
+fog | 2 | ac6a16dd | c1b5b5a3165aedb1
+fog | 0 | 5ec87549 | 92f8dd12dc174162
+fog | 1 | 313a0d1a | e236573b59c52839 1
+fog | 2 | 6aa3123b | 3ccbeb96756cded3
+fog | 0 | e7796641 | add8adf4a1035b73
+fog | 1 | b94d999a | 3f87bf2ef29a826f 0
+fog | 2 | a9f72b70 | 4d6d3acf843f262a
+fog | 0 | 86c24d8b | f19d486383f91b6d
+fog | 1 | 31750c06 | e0b076cb095c7a51 1
+fog | 2 | 9a52c854 | 799eabfd0d3703c9
+fog | 0 | 501f7dc6 | ca6507fc26f6a0ed
+fog | 1 | 1527c01c | 9320928d8b61728d 1
+fog | 2 | 5453a45e | 40ea0a0a4eea43ec
+fog | 0 | 2191fb74 | 321c673d68939123
+fog | 1 | d132dff5 | 7da144b97d054b25 0
+fog | 2 | c63c6bd8 | 615facdc061cae69
+fog | 0 | 905a690f | 8f458f751e9ed71d
+fog | 1 | 4f1f33e3 | c01ff166385fbc3c 1
+fog | 2 | e76e3b22 | 44aae80ff0f0e9b4
+fog | 0 | b689cb5 | f862ff1697614cef
+fog | 1 | b8d867df | 7da144b97d054b25 0
+fog | 2 | 5f366da5 | 45f1c24f40f157c9
+fog | 0 | 34b85f6a | 6f3dfbaf0a994287
+fog | 1 | ab0a3b34 | 83640da6c7250b1b 0
+fog | 2 | 4c88f4bd | 9b771b5c4d4e663c
+fog | 0 | b94e81bb | 76004ce0da770c01
+fog | 1 | 683395f | fb96c3f9a9357b65 1
+fog | 2 | 1a68f9f4 | f7e16d9c71bc01d1
+fog | 0 | 51e8a06a | 27d60e6741b62cdc
+fog | 1 | 5fc5c201 | 65f5c01dde14ab83 1
+fog | 2 | dd5fcd88 | 1d03dbc655d1f2ba
+fog | 0 | 9e9dd7b5 | 5f41a30ac8328ada
+fog | 1 | 1d587735 | d8f02f9144dac564 0
+fog | 2 | 30054e9e | 9897eb34b7933c25
+fog | 0 | 7b7fa1c1 | 9d086f5dab8488d4
+fog | 1 | bed0785 | 6f42e0bb93e18c92 1
+fog | 2 | 58e2ed49 | 40ea0a0a4eea43ec
+fog | 0 | 3d106cd3 | 99cec806229cf690
+fog | 1 | fe08e408 | 8d2ee5ddec4c626d 1
+fog | 2 | ed469fbb | 7187a71821f83f0a
+fog | 0 | 17e31071 | 8f283f30eb6469cb
+fog | 1 | e7383f5c | e6ece8065b2de34d 1
+fog | 2 | a76b21d4 | 7031acffe7360279
+fog | 0 | 6cec873a | 640f8174447a94e4
+fog | 1 | 9afc0454 | fd84fab9e2f5aa4e 1
+fog | 2 | 251e745e | 4d6d3acf843f262a
+fog | 0 | 62f5de15 | 8ea260986c3dec95
+fog | 1 | e598b82d | 9f40bcf122d59a6d 0
+fog | 2 | 2474d83b | e41e95184ba03e25
+fog | 0 | 9405acd3 | 9f6f832c252bbf1
+fog | 1 | b7280473 | 152717c4cce200ba 0
+fog | 2 | 52288c69 | 9b771b5c4d4e663c
+fog | 0 | 99861f5b | 8b10ef860bf584c
+fog | 1 | 542ded59 | d8116ee334214b9d 1
+fog | 2 | 567ab5f4 | ba26ff576e7f528d
+fog | 0 | 3e4a9a46 | 62df0933e95d2426
+fog | 1 | 1cb80b20 | 81f5b7b75afca8e0 1
+fog | 2 | 7cf195cf | 2646b0f90cfd49fb
+fog | 0 | 4f7b940 | 35990a2caefae0c9
+fog | 1 | edb0bdd4 | 7da144b97d054b25 0
+fog | 2 | d96caf0 | f4cdfb93e964482
+fog | 0 | 9247a661 | 1193020b2d4e2e56
+fog | 1 | c291d412 | 42befd4dfe01151a 1
+fog | 2 | aedb7af8 | 5da1ca22a62e2d23
+fog | 0 | b8be7547 | 19a17389eb3e7b6e
+fog | 1 | 5be98438 | ae28e10bd094081b 1
+fog | 2 | 84c05863 | e8734d057257e480
+fog | 0 | d3721eaf | cab2517f5db72160
+fog | 1 | dda0ec59 | dba79a1584d51d7b 1
+fog | 2 | 5aa8a1cd | 40ea0a0a4eea43ec
+fog | 0 | 1722ba36 | 8ca9491822d5816b
+fog | 1 | ddfed92b | b1bfef91dc70c272 1
+fog | 2 | d3125e47 | 4d6d3acf843f262a
+fog | 0 | f7bf21d3 | 36bb9d046c94738e
+fog | 1 | b6eacca8 | a861884fcbd3228b 1
+fog | 2 | 4405a2ea | 1d03dbc655d1f2ba
+fog | 0 | b4cbfb6b | 88dd9403d0857a35
+fog | 1 | 737b066d | 3f87bf2ef29a826f 0
+fog | 2 | df272562 | 40ea0a0a4eea43ec
+fog | 0 | da6d1d9 | b5f0cb9fe93cac50
+fog | 1 | 4893dae8 | b19145e15692ac61 1
+fog | 2 | 8f4e9542 | a0b8b897a7e94dec
+fog | 0 | fd165433 | 82f9f7500fd798a1
+fog | 1 | 60c787a9 | dd51ff1cc5116d14 1
+fog | 2 | 6ab35b3b | 5bf710cdef5669de
+fog | 0 | 6b1b4abf | 529fc546849cca15
+fog | 1 | dd72bfff | 78c103ac3892b14b 1
+fog | 2 | 8d26bd0f | d8fdf347f2b472ce
+fog | 0 | df80405e | 60693d85fab04da
+fog | 1 | 1d6a4fb3 | e4b0eb8918c475fe 1
+fog | 2 | 9054818e | a465dcc70165b32f
+fog | 0 | 2ca6ec99 | 1c8e2e6e6007e466
+fog | 1 | c0c3f4b1 | fd28d94066f43188 1
+fog | 2 | 34ed8083 | 4d6d3acf843f262a
+fog | 0 | ad4ae99a | 6bfa1fbccd9adc29
+fog | 1 | 4e950f38 | d0071a0af90594aa 1
+fog | 2 | 8ec21584 | ca1c03bb6c21df1b
+fog | 0 | bb27880e | 5761872445d2a3f6
+fog | 1 | 128bf276 | 3df0a34ca05ec662 0
+fog | 2 | 57ccc3f3 | cc884ec6b6dd0498
+fog | 0 | dac6b60 | 14de0d03d7205eb6
+fog | 1 | a93c2137 | 6fdc6ae8949b3897 0
+fog | 2 | 8d9b7365 | 2c14aac0c1837873
+fog | 0 | 565ee29d | 66cb3eaef9de33b0
+fog | 1 | 6420c3aa | 76667fe6597cfea6 1
+fog | 2 | 4b80141d | 9b771b5c4d4e663c
+fog | 0 | fb0d658 | b4edae42d9cab87b
+fog | 1 | 35770e6c | c459ee621d453322 0
+fog | 2 | 8c4e1939 | 40ea0a0a4eea43ec
+fog | 0 | c4ea87e | ce410d5d2f62af99
+fog | 1 | 8b2cba8 | 76c11c0a6f98368f 1
+fog | 2 | 76a3bd6f | 40ea0a0a4eea43ec
+fog | 0 | 91813eb6 | af0edb948bdb0e8d
+fog | 1 | 31763691 | 7a8a8256a4146094 0
+fog | 2 | 9079c6d2 | 9b771b5c4d4e663c
+fog | 0 | be9edf09 | 1547e9e81eb68678
+fog | 1 | dd05363a | dd7883735cccf964 1
+fog | 2 | 863ce323 | e4bf9625e84de868
+fog | 0 | 3efc99a7 | 407736a56048f92d
+fog | 1 | 2afac129 | 7da144b97d054b25 0
+fog | 2 | 5ec8c7cd | 40ea0a0a4eea43ec
+fog | 0 | bff30bf9 | 385279473c254948
+fog | 1 | 311ab399 | 7da144b97d054b25 0
+fog | 2 | 2a1abd58 | 50f9260ff13f599f
+fog | 0 | 5d8b79a3 | c4b914298cfcb099
+fog | 1 | dfab3d9f | 7da144b97d054b25 0
+fog | 2 | 6c67137f | a93482b39a7ddb5a
+fog | 0 | 1d1feacd | bdd7f231f997f922
+fog | 1 | 7df92bbb | 19c32f4fbd87058f 1
+fog | 2 | e393d9e2 | 9b771b5c4d4e663c
+fog | 0 | c0132435 | 8cfc6957c2166606
+fog | 1 | e9f8c8ae | d6fa751eaf0069ee 1
+fog | 2 | 826a0f9e | b3f709ab1dad5b15
+fog | 0 | 821b9d34 | 1debfe5a0a6a6c64
+fog | 1 | f0a80a91 | 99a90299dfe648aa 1
+fog | 2 | 23cf3aed | 4d6d3acf843f262a
+fog | 0 | ad78bee6 | c41c228ccdd8a044
+fog | 1 | 5f6988e1 | 7da144b97d054b25 0
+fog | 2 | a19f5500 | 4d6d3acf843f262a
+fog | 0 | 4b47b68a | e4ffb87793ad86bb
+fog | 1 | fe7292fe | 4b26304e15d9febe 0
+fog | 2 | 6e1f9cd3 | 4d6d3acf843f262a
+fog | 0 | 65c8496a | e12e59d49f272791
+fog | 1 | 3cbe7e90 | 9b9062da49c86d7a 0
+fog | 2 | af5d5778 | 4d6d3acf843f262a
+fog | 0 | 8bdcf426 | 6b65f54f3c9688fd
+fog | 1 | b0e63ba2 | e75d88a362abf1a5 1
+fog | 2 | 473040b2 | 9b771b5c4d4e663c
+fog | 0 | ebba54c | b3c25dff5b6b2c6
+fog | 1 | 4f0b9050 | 4ed68a64eee72bb1 0
+fog | 2 | 72f2cc32 | 40ea0a0a4eea43ec
+fog | 0 | b9d2de8b | b8ab7c27e0957a5a
+fog | 1 | 2b63778a | 7da144b97d054b25 0
+fog | 2 | be4074d0 | 37223de3cd7bfd18
+fog | 0 | 732d7c56 | bedb0e3e85bcc739
+fog | 1 | af23e47d | 328b22951de6b639 1
+fog | 2 | 83425a6d | 4d6d3acf843f262a
+fog | 0 | bb16cef9 | 12d126ff1d5f2c71
+fog | 1 | c650123 | ecac4aa880fe92f7 1
+fog | 2 | d2ab2dfd | 3f1f0a837324e0cb
+fog | 0 | 385732c4 | 63903c0e12c1cced
+fog | 1 | 4b45e090 | 9914fd103dafcf89 1
+fog | 2 | 655bee4e | 4d6d3acf843f262a
+fog | 0 | 46213a48 | fa1120bb458b791
+fog | 1 | a50c836f | 4279f0012a600b52 1
+fog | 2 | 64fd2c16 | 89c15179bfe6f0de
+fog | 0 | 32584e9 | 2ab217886157c12b
+fog | 1 | ead63114 | 8edc3234391ac68d 1
+fog | 2 | d5dda857 | 9b771b5c4d4e663c
+fog | 0 | ab50b56e | fc055baad86652b5
+fog | 1 | 5054ae79 | 72b9d16600a0aa6 0
+fog | 2 | 235b77e5 | 32b6538cbd382e8b
+fog | 0 | c45d5686 | 402a533356f05995
+fog | 1 | b9800219 | e165eedb4b27a5b3 1
+fog | 2 | 4c77a2bf | 9b771b5c4d4e663c
+fog | 0 | d3b295ef | a707c5726147f76c
+fog | 1 | 36a43d90 | 3a32479534910190 1
+fog | 2 | a018f3f | 40ea0a0a4eea43ec
+fog | 0 | eff08401 | 8a64a87181fbce0
+fog | 1 | 5f3034ef | 73c1d5d9a6f535e2 1
+fog | 2 | 15c08c5c | 4d6d3acf843f262a
+fog | 0 | ffcf4ad5 | 93214e72253d3820
+fog | 1 | 2c3d0fdb | 25789efe30ca2e79 1
+fog | 2 | a3db506d | 8378fe92d398badc
+fog | 0 | 9bedc609 | 76ea6c0bf448c6b3
+fog | 1 | 86ed45ff | 73cb6756f17414db 1
+fog | 2 | 7c0d2e30 | f71813bb13c42685
+fog | 0 | fb6b7c2b | 4db00fd386645f5c
+fog | 1 | a15fc6a8 | ffdb894c8e718685 1
+fog | 2 | 390ea859 | fca0a8a9b491f5a9
+fog | 0 | 1507bc0b | 43d79965f5d90c58
+fog | 1 | 4ca2512b | 69c1d84e3fc7cd67 0
+fog | 2 | a7eeb2ae | 1d03dbc655d1f2ba
+fog | 0 | a9ce14fa | 3f23ce5178a4b52e
+fog | 1 | 97b4fa80 | 8c9fd8abf7eb1cb8 1
+fog | 2 | 60a626d1 | 3a32479534910190
+fog | 0 | 456b998e | 6805aadf6cb311c2
+fog | 1 | bda6706 | 840fb54140826bfd 0
+fog | 2 | 42e9d0a8 | 47644a174eb9cddd
+fog | 0 | 95fc7d6b | bd98b4a9761b3f12
+fog | 1 | 6db36645 | fc94ff8d8e41cdf8 1
+fog | 2 | afef3719 | b6aca495f1328d66
+fog | 0 | ebd17958 | bdae08c78a891b33
+fog | 1 | 8e139357 | 98688b97c68aab81 1
+fog | 2 | 83552908 | e7ebb1c3d9102d87
+fog | 0 | 21d00d41 | 8fc223c52d93bd64
+fog | 1 | ec6b1fdf | 7da144b97d054b25 0
+fog | 2 | f91d42ca | 40ea0a0a4eea43ec
+fog | 0 | b7c3af50 | 36173103f2a3e263
+fog | 1 | 130aca4d | 98b809b3f5e9719f 1
+fog | 2 | c04b8d74 | a2144a663f99f9f7
+fog | 0 | 7d864a2f | f0c7f128db502233
+fog | 1 | 33eddc17 | 4506508a6488db88 1
+fog | 2 | ad507c22 | 4d6d3acf843f262a
+fog | 0 | 1631016c | a7dd1f58bee1ce1
+fog | 1 | f75f9887 | 3f87bf2ef29a826f 0
+fog | 2 | 24a88b8b | 4f2587db9959292c
+fog | 0 | 5c8f39d6 | 18475ee4dd549c3
+fog | 1 | ce8351da | cc12262148f4c67 1
+fog | 2 | 5362c7d3 | 40ea0a0a4eea43ec
+fog | 0 | c5709e7 | cca56109d3c307f5
+fog | 1 | 41dfb894 | b9dfa95c4878f58f 1
+fog | 2 | b1c68fc5 | 40ea0a0a4eea43ec
+fog | 0 | 1bcf660a | b37a425d4af0e8b
+fog | 1 | 7548bdc | b69e753f9a15a82a 1
+fog | 2 | da80eb70 | 6dce72be09a3de66
+fog | 0 | 31e33179 | e2a9b087a50dfcec
+fog | 1 | 202f24a1 | a8c5efdbbf43a5d6 0
+fog | 2 | c882b33b | 40ea0a0a4eea43ec
+fog | 0 | 99ce3294 | e6e147723b1385ce
+fog | 1 | b2d80ade | 42381b1bb67a3c9b 1
+fog | 2 | bb20dc66 | 86b0fa1d4596750d
+fog | 0 | 42693bfb | 118362d421a2a54c
+fog | 1 | 8548b99e | 5c7e4f528e5fea67 1
+fog | 2 | 2900fd4e | 3897b6571d172a88
+fog | 0 | 56b2ca9d | ad10d27d89a3f382
+fog | 1 | fc8ae607 | fda66a2bc39bff3d 0
+fog | 2 | 9192bbda | 4d6d3acf843f262a
+fog | 0 | cce3581f | fec5b2558d38c6e5
+fog | 1 | 32b3fe5f | e32eeb57f21ccf24 1
+fog | 2 | db285389 | 40ea0a0a4eea43ec
+fog | 0 | 159cd698 | 67472e11c331d96e
+fog | 1 | 869bf691 | 3f4b4d44e778289b 1
+fog | 2 | f3a71921 | f71813bb13c42685
+fog | 0 | 4eefb772 | ae977ce0c5e0d6ca
+fog | 1 | f0b4b530 | aa4b5d0cf0759571 1
+fog | 2 | a19abe57 | 4d6d3acf843f262a
+fog | 0 | 811e649b | 1186e26a37273b24
+fog | 1 | 7d05d253 | 82f5e559c636815e 1
+fog | 2 | 8ad96901 | 870df166cc00bf0c
+fog | 0 | 1f264988 | 191998083477fd0f
+fog | 1 | 9b456840 | 225ca4c6425d3916 0
+fog | 2 | a9ed898d | 9b771b5c4d4e663c
+fog | 0 | 43f438ca | b7b478f1377ac1f0
+fog | 1 | ed32a0b4 | b29e1c7fe5e4f69d 1
+fog | 2 | dbf3ecc0 | 4d6d3acf843f262a
+fog | 0 | f9dc46c1 | 71f147bc10f282da
+fog | 1 | c8142246 | ca5ff3eeef908d29 1
+fog | 2 | 5235c8ce | 7f1f64e214ae5696
+fog | 0 | d9464577 | 391b74dc69114de0
+fog | 1 | a026ab80 | a4f68177af04d742 1
+fog | 2 | 9279d0aa | 64e4337bfa549261
+fog | 0 | c2fc1a71 | 89be91ff5c983a54
+fog | 1 | 7105d4e0 | 7b4968bcc61421d 0
+fog | 2 | 493f51d2 | 902b237bb6e21c91
+fog | 0 | 8575d891 | ef164675e0837877
+fog | 1 | bba4ba6e | 9a229d7a21fd8833 1
+fog | 2 | d54c9423 | 40ea0a0a4eea43ec
+fog | 0 | bad76ce5 | 2333d11932b5b141
+fog | 1 | 217c0130 | 3f87bf2ef29a826f 0
+fog | 2 | 352822df | f0ae0466250c19e5
+fog | 0 | ff40c8cf | df667bc1bad1a32e
+fog | 1 | 313a9d9d | 9f737855573f11a1 1
+fog | 2 | 17ee3746 | 40ea0a0a4eea43ec
+fog | 0 | 7c6ea412 | 85e1194b12202ea3
+fog | 1 | fb05dc8 | c3e2202fa761c6cc 1
+fog | 2 | 9df7a8f2 | 9b771b5c4d4e663c
+fog | 0 | 5d5cbba1 | c22ab888bd83f136
+fog | 1 | 58758d54 | 3f87bf2ef29a826f 0
+fog | 2 | 16e28883 | f05baa43e5acf5d7
+fog | 0 | a2a4589a | 9be3dea292ed10f0
+fog | 1 | c0ff9802 | d6232f453df5f83f 1
+fog | 2 | 97020008 | e9b2c42376515351
+fog | 0 | db32228d | 9b0c946df20b3a63
+fog | 1 | 6896860d | d4bf7800cf61178d 1
+fog | 2 | 9216029d | 48a858e1e55f3f7
+fog | 0 | 518d83b3 | c204f9b0616708d3
+fog | 1 | a61f941 | 3f87bf2ef29a826f 0
+fog | 2 | 1f3cc55f | 923ae2e4df9b64dd
+fog | 0 | 19ae0580 | b5c1bdb5d3a98b78
+fog | 1 | 59aaacdf | 4a42782fa07fa47 0
+fog | 2 | f04be548 | b97aae358443b8b
+fog | 0 | 55c9eeb5 | 9682140604cec38d
+fog | 1 | db2bbf04 | bc12856434bbaf97 1
+fog | 2 | 6fa02f9d | 4d6d3acf843f262a
+fog | 0 | 4c12dac | f41f20329f69b0aa
+fog | 1 | 4289da30 | 20152fad30011536 1
+fog | 2 | 48b0fb9c | 4d6d3acf843f262a
+fog | 0 | dde5fa05 | ea40ef924eb9a298
+fog | 1 | a7e050dc | 3cfde13291571eed 1
+fog | 2 | 5c627eb1 | 1d03dbc655d1f2ba
+fog | 0 | 46bbee4b | c30771ce9ae24374
+fog | 1 | 45e40b9a | 96d6d9c971234481 0
+fog | 2 | d23159c9 | 40ea0a0a4eea43ec
+fog | 0 | 527f08a0 | b7838c645bf129a0
+fog | 1 | 10dfb1f6 | 4a632179a504aa14 1
+fog | 2 | 18e2233b | 4d6d3acf843f262a
+fog | 0 | b615c395 | 6160556de22af654
+fog | 1 | 9669fde9 | 7da144b97d054b25 0
+fog | 2 | 9470d876 | 1cce4525b1e94dce
+fog | 0 | 3e4af9f | 6cc6b1073fe4c5d2
+fog | 1 | e32ace4e | 647dcbdf9e5fd81c 1
+fog | 2 | 20ffbe15 | a754ffe6b18fc2e7
+fog | 0 | f3355843 | 562303b83d8c6c2a
+fog | 1 | a606c906 | b4da1264362ee0f7 1
+fog | 2 | 6c4fb80d | 4f74338c75921b6d
+fog | 0 | 31b8ddd6 | ad94fdb4c53543e5
+fog | 1 | 9ad111c2 | b0899adfed0c5e98 0
+fog | 2 | d7a69d86 | 2662bc23b07d685f
+fog | 0 | 89d5d7ad | 6af41b317ba3a77f
+fog | 1 | 15713168 | 3f87bf2ef29a826f 0
+fog | 2 | 95c69a27 | 72dfee561b363664
+fog | 0 | ff749258 | b819947b059a5b0d
+fog | 1 | b43fb62e | d5697ad5d8f03f48 1
+fog | 2 | 763ddf | 4b90c56d052ff385
+fog | 0 | 351613c | ec3f04ff0c0b1fc3
+fog | 1 | 7f29f1b0 | d7928b906619638d 0
+fog | 2 | 79bd244b | 87170d1b131dc92f
+fog | 0 | 79e11baf | c6041d286a782bde
+fog | 1 | efabe930 | 6315dfa0e30eca5 1
+fog | 2 | 8faea70b | a06271fe70cef368
+fog | 0 | 46f82058 | 5b8780513b401f93
+fog | 1 | a0440326 | b701f0177ab29938 1
+fog | 2 | fd2473c6 | 9deefe1514080fe9
+fog | 0 | 271e4f5f | c5f58377d2d15dd8
+fog | 1 | 1aa231e7 | 12425dbe66b3c700 0
+fog | 2 | b732231a | 4d6d3acf843f262a
+fog | 0 | f2e3513d | edf7b2237ba25c5d
+fog | 1 | 4cc654db | 52a3f82614247d6b 1
+fog | 2 | bbac5d8c | 86b0fa1d4596750d
+fog | 0 | 1fc3062e | 37eb3f9c4f6719c1
+fog | 1 | 2003be83 | 84f2d708186a362e 0
+fog | 2 | 3298e3b3 | 82cebaa7f79588e9
+fog | 0 | ca5d8d16 | 5c800be5fbcfb3ed
+fog | 1 | eaf7bc07 | 2bddd8dc6de692cb 1
+fog | 2 | e1325a44 | 4d6d3acf843f262a
+fog | 0 | db0117c2 | 1d78dcab91e042d4
+fog | 1 | 68a447fc | bc2b28fe2f7dfd5b 1
+fog | 2 | 56308d62 | aa868c8bcc478f22
+fog | 0 | 6ebff5b | cd7e41962009731f
+fog | 1 | b2b41381 | 37cefbdd6b1279d5 1
+fog | 2 | ba134159 | 9b771b5c4d4e663c
+fog | 0 | 71ef20cd | 693a925b3c0e9d53
+fog | 1 | 6c0162e2 | 5ab2ed6364eca13b 1
+fog | 2 | 4b2bcf20 | a31f9fac94943aa8
+fog | 0 | 4f47240a | 84d02869831a9389
+fog | 1 | c45dfeb8 | 10a6d151d91be13e 1
+fog | 2 | b731ccfc | 4d6d3acf843f262a
+fog | 0 | 7d0b20b5 | c2c8a8dc6cec0d92
+fog | 1 | 6ab4abaf | 725a86e2a956b883 1
+fog | 2 | d249e2e9 | 3c2e7ddf602e7308
+fog | 0 | b7986194 | 3d5a1908acad4a5d
+fog | 1 | 81119b5c | 7da144b97d054b25 0
+fog | 2 | 4f7ffead | 4ef9bf4bc80305d3
+fog | 0 | 76ffc0dc | ff998d1e289e6e7e
+fog | 1 | af71e4af | 47e96433ffc6371d 1
+fog | 2 | 1bd17ffb | 62ed1a597d084a00
+fog | 0 | 9df0b6dd | d2053960f15c0e4b
+fog | 1 | 32145b56 | 779ec864eefa3420 1
+fog | 2 | efe70740 | 40ea0a0a4eea43ec
+fog | 0 | 9bef526e | 91af5d866a1cce7e
+fog | 1 | 30e5614e | 6f6cebc1fa102fa 0
+fog | 2 | d1306475 | ace909fc3f8522ec
+fog | 0 | 8c973f1a | 64c2fe7abdb2ddf7
+fog | 1 | 5af2b1a3 | ad5e9c2e3987636f 1
+fog | 2 | da32a7a3 | 2d4d8b3fa38d57ca
+fog | 0 | aa5c0c8 | 36e3d7f2d2598d31
+fog | 1 | 6472b722 | 43e17b4f2e630f9e 0
+fog | 2 | f970808b | 4d6d3acf843f262a
+fog | 0 | 7946347d | e7aeeb3684029eb4
+fog | 1 | 2866253c | 3f87bf2ef29a826f 0
+fog | 2 | 8e064159 | 2dbe5bb6957c95cc
+fog | 0 | 7cd624e2 | 86a1d69cede53cf2
+fog | 1 | d0dc2d18 | 714bf7d34f01507c 1
+fog | 2 | 1c070be7 | 4d6d3acf843f262a
+fog | 0 | ba4c6b4b | e7480b628cafb534
+fog | 1 | d18ef382 | 435ce17b4511d252 1
+fog | 2 | d91f83c4 | 9b771b5c4d4e663c
+fog | 0 | 4646acae | 3be7a5c36364336d
+fog | 1 | 5225bbfa | 88092039911bd18f 1
+fog | 2 | ebc6f269 | 465a4e16347c7974
+fog | 0 | 6b10bfb3 | fbe857028c6eeca7
+fog | 1 | 20c3d862 | 1dee4106a98226c 1
+fog | 2 | 7a5355e7 | 40ea0a0a4eea43ec
+fog | 0 | 9a860d7 | 913ef7e3c88c1cb
+fog | 1 | ac53b534 | f8a6d8d459475dad 1
+fog | 2 | a81406e0 | e55d14cdbb83cd42
+fog | 0 | c45e33cd | 1d2deaacaacdc0f0
+fog | 1 | 6d0f074d | 3f87bf2ef29a826f 0
+fog | 2 | 662e67f7 | 4f74338c75921b6d
+fog | 0 | bedee8c8 | fddbf02abce8b72a
+fog | 1 | 11168148 | 78cfbe1ba93e9433 0
+fog | 2 | 6b96ae59 | 40ea0a0a4eea43ec
+fog | 0 | 1872dbe6 | c21143790d1204b9
+fog | 1 | c826780 | b3f2b065a20823c0 1
+fog | 2 | fe2a389a | 4d6d3acf843f262a
+fog | 0 | 5a2c644a | 1322aa92e8693fdc
+fog | 1 | 4674653f | 572e547b663c89a3 1
+fog | 2 | eb1044f1 | 2a31502ec7525777
+fog | 0 | f46f83cc | dd8e7da78cf1046f
+fog | 1 | 1f335554 | 3f87bf2ef29a826f 0
+fog | 2 | 679f8fa5 | 40ea0a0a4eea43ec
+fog | 0 | 63744f2d | 4f01d1ee4a481a71
+fog | 1 | 65e0664 | 6fdc6ae8949b3897 0
+fog | 2 | 91fd4a48 | 5a49d2b1c8d504c0
+fog | 0 | 3d3279fa | 702759f9395391eb
+fog | 1 | 38c470d5 | 7d386a47a0a3cef0 1
+fog | 2 | 211e7fd7 | a4baf42d29000587
+fog | 0 | 5c308bee | ab1756a8d09476a4
+fog | 1 | 369d97fd | 695b3f26cf0b1094 1
+fog | 2 | d1b136a3 | a3c9d3ab7e4617b7
+fog | 0 | e4bfabd | 2be412fcb331ff05
+fog | 1 | a728f08f | b7ab911d4997000a 1
+fog | 2 | 49f3bf3c | dbb8d251bb6ae40d
+fog | 0 | db6ae63e | 964d7c8d6f7463a6
+fog | 1 | 5ef15de9 | 156777955b00cffe 1
+fog | 2 | 8c798e1d | 40b9a856b3335efd
+fog | 0 | c09fd68f | 7a2c34940a621503
+fog | 1 | da312800 | 6c4695a8a002a415 1
+fog | 2 | 3eca3a05 | 6d5f2e1d2ed936cc
+fog | 0 | 1a4e49fb | e2a2f9063cedf3b
+fog | 1 | c32d6f92 | 94f59c598f0ad14c 0
+fog | 2 | fe898afe | 102f72366df53261
+fog | 0 | c23ac805 | 344734a3b0da1187
+fog | 1 | fab78c73 | 152717c4cce200ba 0
+fog | 2 | 8ad32eba | 1d03dbc655d1f2ba
+fog | 0 | 44558f38 | 33fc80399be41e34
+fog | 1 | 54ced974 | 94ff68ac14009f6e 1
+fog | 2 | 6dcae65d | 788200e1bc0d5c66
+fog | 0 | 647da5e6 | 324445fc57cfc4a3
+fog | 1 | 4cc2d464 | df0f358f7191fdb1 1
+fog | 2 | d3aa1314 | 4d6d3acf843f262a
+fog | 0 | 4251cb5a | 579209d0982fbe8a
+fog | 1 | 8ff52510 | 898ad6cf2fe9dbae 1
+fog | 2 | f6ecc7b3 | fa5dd4eddd9529b8
+fog | 0 | c3a2ceef | 819c22782bdbabcc
+fog | 1 | be1e4134 | 12b975e0579ee3e8 0
+fog | 2 | d69adbf4 | 40ea0a0a4eea43ec
+fog | 0 | 80410ea9 | 509a28729cafa888
+fog | 1 | b5689d66 | f0175e1703d6d524 1
+fog | 2 | cac0bc3d | d47604bb9a008dbf
+fog | 0 | 390979f | 1febe9115f210ecc
+fog | 1 | 53c73915 | d9a6da0a7a728bb3 1
+fog | 2 | 485ec86e | 3f8d8462529bde13
+fog | 0 | e24f9ec8 | ecda7cee5222447d
+fog | 1 | 2f39d689 | 29069b7b45d746cd 1
+fog | 2 | c74f20e8 | d60da634b4d5bebd
+fog | 0 | 6c0f3e8 | 56486ddc0e076a4c
+fog | 1 | 99423358 | b362df21bb65c92b 1
+fog | 2 | 6bec651a | e19ffb8aa8bcf40e
+fog | 0 | e383ecf9 | 89d7d371a9998ea4
+fog | 1 | 17448d81 | b2687a3f186d40e0 1
+fog | 2 | 174423f1 | 9b771b5c4d4e663c
+fog | 0 | b4001e86 | 67aca523ccc2569e
+fog | 1 | eac2effb | a97876ca33c4e281 1
+fog | 2 | 575a1300 | 968843a015621af3
+fog | 0 | 8464b789 | 9c63315d76028290
+fog | 1 | 5b65255a | 7da144b97d054b25 0
+fog | 2 | fd0624a7 | 45cb71de112249db
+fog | 0 | 4361283 | 1b8db9cdde8440bd
+fog | 1 | 8302a827 | 55b619c9e6b64460 0
+fog | 2 | 916323fc | b2e2e11fd5fd05c3
+fog | 0 | 306379a4 | 81a9cbb5d6aed7f3
+fog | 1 | 934041f0 | 3a404935c751996f 0
+fog | 2 | f4b000ae | 4d6d3acf843f262a
+fog | 0 | f40c26a7 | 4adfea359e18add3
+fog | 1 | cf202c95 | 46c7ef876f1130f2 1
+fog | 2 | f90e21c6 | 40ea0a0a4eea43ec
+fog | 0 | fdbc7226 | aa8c63d1a8e46169
+fog | 1 | 7181733d | 12425dbe66b3c700 0
+fog | 2 | 87d62cc5 | 3f8d8462529bde13
+fog | 0 | 7e1b6ee4 | 93a18a6d7a54c77c
+fog | 1 | 37176b45 | 7da144b97d054b25 0
+fog | 2 | 857e97ba | 9b771b5c4d4e663c
+fog | 0 | 4f70d247 | fd5cd3d9d1fd4527
+fog | 1 | f91112ab | 2a0ba502230e04f9 1
+fog | 2 | 9f90b8b3 | 9b771b5c4d4e663c
+fog | 0 | 33950f34 | 2edbf05023d950e4
+fog | 1 | f47db694 | 7da144b97d054b25 0
+fog | 2 | 97a2eaa8 | 1568efa8754e5fb
+fog | 0 | afcc2841 | 3d195559943c85d3
+fog | 1 | 1ee6c445 | 8ebdccaf4ffb93fa 0
+fog | 2 | fa19415d | 9b21afc6a7176f25
+fog | 0 | 16964cec | 7c2c6a3749f251a5
+fog | 1 | a32b2166 | b1288093e6dd7c70 0
+fog | 2 | 5058d1f5 | 4d6d3acf843f262a
+fog | 0 | f36e026a | 632da9457b450a42
+fog | 1 | 97a7f46c | 5965078b70cd4618 1
+fog | 2 | 602f735f | ba73fde19db7a577
+fog | 0 | d7205bfb | 603d6011e4480ba3
+fog | 1 | 15581ff0 | ace26f1ca870bc1 1
+fog | 2 | cac09e8c | c2828e0ae9492249
+fog | 0 | 78102d02 | dcaf93808b626913
+fog | 1 | 47d1ffd5 | 35ddc50dc9019308 0
+fog | 2 | 8bf91574 | a79e7f3ee59ea42b
+fog | 0 | c207a656 | 44c41152ef2396da
+fog | 1 | 67d915da | 4449124483ee5bb 1
+fog | 2 | 895880a2 | dc205a653c620947
+fog | 0 | 6e50581c | 6f9535f951c50fa6
+fog | 1 | 7e48807c | 6e28311d028f06cc 1
+fog | 2 | d8a9ac53 | 1d03dbc655d1f2ba
+fog | 0 | 5246680e | 599062b5eb10c19
+fog | 1 | 47ea7ad | 9a6d9cbcbcaa1d1e 1
+fog | 2 | 17769784 | 40ea0a0a4eea43ec
+fog | 0 | 7cff8ca4 | f02ff708cb157e0e
+fog | 1 | cac1c29b | e81b7120db0367b6 1
+fog | 2 | 6c477f6f | 7a564d089641070e
+fog | 0 | f8e3f90a | d5405564682ef06e
+fog | 1 | 1eb41aba | 429d01fdbde6aaed 1
+fog | 2 | 4760a40d | 1d03dbc655d1f2ba
+fog | 0 | 105cfe35 | 140635a975a03161
+fog | 1 | eef74297 | cddf214cb9b33e8b 0
+fog | 2 | 919d47e1 | 40ea0a0a4eea43ec
+fog | 0 | bda18433 | 8441d1b6483f6b5e
+fog | 1 | 8cbc2a9a | 6250a1b49da2a762 1
+fog | 2 | 219af167 | d6944e42569a8275
+fog | 0 | 478d7813 | 8d8706f22b96107b
+fog | 1 | 9e8cc236 | 7aa23e655ff0e33c 1
+fog | 2 | 1e60ec30 | cb32621d174019f7
+fog | 0 | 6ad0b87c | 196ac6e5e468073b
+fog | 1 | 457ffb44 | b08457a37ed6b6de 1
+fog | 2 | 3ce4dec | a8886c38f0b9382c
+fog | 0 | 6a64daad | a790a10f07c37385
+fog | 1 | 79c4db27 | 5ba2eb0cb42a735a 1
+fog | 2 | d1e8e3f1 | c16bd6422d92ac49
+fog | 0 | d9f8f742 | 8a9d4972bf65168
+fog | 1 | 75aec782 | cd3f0894334c18bd 1
+fog | 2 | e4579845 | 4d6d3acf843f262a
+fog | 0 | ddacb8a6 | c7c1bf1575791240
+fog | 1 | 5d920631 | 7f3a0ef95879239c 1
+fog | 2 | e7d28eef | 25a21ccdb348f732
+fog | 0 | 6d65dd9f | 64f2f602d072dea8
+fog | 1 | f517ad2f | 799b2b6310b61d8c 0
+fog | 2 | a89b8401 | 719fb9d8b41e57b2
+fog | 0 | d39a27b5 | 4c10bff62472523d
+fog | 1 | a117abc | 3f87bf2ef29a826f 0
+fog | 2 | 51cf2615 | 722e9b9fd0e2a3e5
+fog | 0 | 7ea2b0d4 | afb579a7c5b84df9
+fog | 1 | 663ce22e | 7885bc77eb59963a 1
+fog | 2 | d0dbfa37 | 4d6d3acf843f262a
+fog | 0 | d4fefef3 | 58660d4a254bd75e
+fog | 1 | ceb03559 | 773d1f1646b5927d 0
+fog | 2 | 8e7d3836 | 1d03dbc655d1f2ba
+fog | 0 | 54d1b066 | f3ca13d13f365915
+fog | 1 | 803b2d80 | 80e89a612477f912 0
+fog | 2 | 8fd25a77 | d030a3e980455c6a
+fog | 0 | 582c09d5 | acbbe4669522bafd
+fog | 1 | d8be3a78 | 6bea72921072d509 1
+fog | 2 | 36aa8c6c | c2828e0ae9492249
+fog | 0 | ec94c9dd | 7343db9d26e0024e
+fog | 1 | 17e1075b | a09269bb8f67b0f4 1
+fog | 2 | c6bdcfc8 | cf9bc1f34fa40c35
+fog | 0 | 9962f806 | 300c0c83b4ddb0ae
+fog | 1 | 84a86172 | 7da144b97d054b25 0
+fog | 2 | 7084f6e6 | 28c06d1aa28c21f5
+fog | 0 | 18c9642a | 4de474d75f2e00ff
+fog | 1 | c9093e55 | dc7d4d53639441dc 0
+fog | 2 | 7b24598e | 4f0a254e2f8b3cdd
+fog | 0 | d6ef45db | 7316dd8beb54c854
+fog | 1 | f21827d9 | 7da144b97d054b25 0
+fog | 2 | 98111aad | e1cbc9b2d3b87dfd
+fog | 0 | 97592b40 | 8d9e8986a9465615
+fog | 1 | 3463d82b | 7da144b97d054b25 0
+fog | 2 | a0cd9cbf | e1cbc9b2d3b87dfd
+fog | 0 | 58df52f6 | a927510aa4ce5f6
+fog | 1 | baaf1d51 | 97e008c370bb4087 0
+fog | 2 | fcf9c3a7 | 6bcda49a2d2212af
+fog | 0 | 30403927 | 3f93f6b598441698
+fog | 1 | f0e56b55 | b6d4893623eea48c 1
+fog | 2 | dc29b219 | 40ea0a0a4eea43ec
+fog | 0 | 7b559584 | 252dd32edea85ee1
+fog | 1 | 88c461a | e8d04e859df33842 1
+fog | 2 | 3eed591f | b439e0b4799d721e
+fog | 0 | aae98790 | dac964f69a23a07f
+fog | 1 | fcddf92b | 3f87bf2ef29a826f 0
+fog | 2 | d8542e4d | 4d6d3acf843f262a
+fog | 0 | 9bac81aa | 44aba99bbfdd09b2
+fog | 1 | 4766f7c4 | b386b35eae551c2 1
+fog | 2 | 724d6960 | 2e66e4c69366a583
+fog | 0 | 8a328642 | 66fef78dd8d1b823
+fog | 1 | f9410b51 | e527f5aa9ff8a0b7 1
+fog | 2 | d9352e62 | 3fb029b86efda877
+fog | 0 | 8ef375cd | 5e259c28866cd584
+fog | 1 | 4d5910c | a717c857b91ae411 1
+fog | 2 | 22df59a1 | 3c2e7ddf602e7308
+fog | 0 | fb35e7a5 | 851873c9dfc32e09
+fog | 1 | a13129da | 7da144b97d054b25 0
+fog | 2 | 55e6e75f | 9b771b5c4d4e663c
+fog | 0 | 477c9cb3 | a0a7006f43b213ff
+fog | 1 | 73c89eee | 9f645ac5dab1855e 1
+fog | 2 | a7127a98 | 4d6d3acf843f262a
+fog | 0 | a8aa0865 | 5dab7c22e749566d
+fog | 1 | c856412f | 7d54b1f5c2b357c4 1
+fog | 2 | a576a2bc | fc66eee8ec619901
+fog | 0 | cd2ed290 | b7cd10b5b8caab82
+fog | 1 | 70b42b59 | 4e27f06d46293a30 1
+fog | 2 | e2048f4d | 40ea0a0a4eea43ec
+fog | 0 | 4b272da | 7a5218fceed599c9
+fog | 1 | 42587301 | 3f87bf2ef29a826f 0
+fog | 2 | f34a5d9 | db71786128bf002e
+fog | 0 | a993b8a1 | 540fc9b778d5d61d
+fog | 1 | 7b376492 | 1f967830e616b09e 1
+fog | 2 | 5823e8 | 9b771b5c4d4e663c
+fog | 0 | 29fbdfb1 | 69e78d3e54f863d3
+fog | 1 | 2259d679 | b95f4f437cb7145a 1
+fog | 2 | a473a46c | f99b2dffc55cb6d3
+fog | 0 | ff2dce91 | d3fbe9792cf7397f
+fog | 1 | f3bab035 | 6f79741218ecd9bb 0
+fog | 2 | 171bb955 | 4d6d3acf843f262a
+fog | 0 | ec7e1589 | 781d44d34483928d
+fog | 1 | 283e7c1d | 7da144b97d054b25 0
+fog | 2 | 55985666 | 74b6e04334f42b08
+fog | 0 | 2481866a | bc612c1184357995
+fog | 1 | 1bc26536 | 74d5d7b2dcc281c3 1
+fog | 2 | c2d1ca9a | eb1d50b3e2f72d23
+fog | 0 | 1d174ee1 | 3ce00e1d3eb8f4ae
+fog | 1 | ba06053d | 7da144b97d054b25 0
+fog | 2 | 7b1d33b7 | e507c56e8544c496
+fog | 0 | 5727ce29 | a0daeaba08943ff9
+fog | 1 | bf45787 | 9b9062da49c86d7a 0
+fog | 2 | 2d42193e | f980921bc3972b23
+fog | 0 | 4e6cc3d6 | 8e84d9f7d20f8eb3
+fog | 1 | 9816b33c | adf5135f262b5233 1
+fog | 2 | 2a0649a9 | 4d6d3acf843f262a
+fog | 0 | 49d52474 | e388e631967915c
+fog | 1 | cc461048 | 7da144b97d054b25 0
+fog | 2 | 9893257b | 9b21afc6a7176f25
+fog | 0 | 21abb627 | b3e0f01c62ed36ac
+fog | 1 | 5ace981a | 9b32d26989da9028 1
+fog | 2 | f140fc25 | 240af5c66f80da30
+fog | 0 | ec58a5f7 | c01bca66d69781f
+fog | 1 | 5279b2dc | 3f87bf2ef29a826f 0
+fog | 2 | 5c6ac212 | efa79cd115dcda4
+fog | 0 | 589a1476 | 778b88c7374d0ed1
+fog | 1 | a588ae8f | 480f2ce0cb22d0d6 1
+fog | 2 | 9a75825d | a8cd09816193dd5b
+fog | 0 | 617a2236 | 44f79bec2c7bfda6
+fog | 1 | dea8036a | 156c4429ca92c30 0
+fog | 2 | c9e131ea | 1d03dbc655d1f2ba
+fog | 0 | 8819afb5 | 548a221404634cbb
+fog | 1 | a6b4a2da | ce485b84a8e6c7e 1
+fog | 2 | 932d7f6e | a772528f4845f2f8
+fog | 0 | 4a1fce2a | 4f1e760746ec945d
+fog | 1 | f10979ee | 77ce1fd1b103942c 1
+fog | 2 | 14ad1f0a | d154ecd19b74553b
+fog | 0 | d6dd2bca | 4ad7527dbe807b
+fog | 1 | a4bdb817 | 73558fe5fccbff64 1
+fog | 2 | 1c1ed260 | 181f2e3323f3d8c2
+fog | 0 | 860974ad | 26fdbe05d87f24d9
+fog | 1 | cfc9521f | e295a6d967605b0 0
+fog | 2 | 72c79031 | 7f0e7707da443689
+fog | 0 | 21f9b7e5 | b9c7b97452a08219
+fog | 1 | bea04953 | bdb712282d372b2b 1
+fog | 2 | 12938544 | 4d6d3acf843f262a
+fog | 0 | c9b10cab | e3932dabffb62dcf
+fog | 1 | ecbc4387 | a5aca79a79958b88 1
+fog | 2 | 78a619d9 | 9b771b5c4d4e663c
+fog | 0 | 3b431578 | 5919fd03f6d8b9c4
+fog | 1 | faab4398 | 432f2f695150feab 1
+fog | 2 | 252b19d0 | 2350410a0ee6f397
+fog | 0 | 68def9f6 | 73c58534707c0cb0
+fog | 1 | bb38209c | 48b02fae41859aa9 1
+fog | 2 | f7fe7391 | 1d03dbc655d1f2ba
+fog | 0 | e533da2a | 4a76dad52de28621
+fog | 1 | 9e5b483c | 677a3dbada431cfe 1
+fog | 2 | d9d39d99 | ba26ff576e7f528d
+fog | 0 | 73979139 | 1a6cf3a7d21bf2bd
+fog | 1 | 4a8201d1 | 8fdb01ec7dba25c 1
+fog | 2 | 7228b41b | e3b31eb6d1624df2
+fog | 0 | a547d67b | e79f9c9d2e89383e
+fog | 1 | 7f681c1a | 7da144b97d054b25 0
+fog | 2 | 4d148129 | 95470dda7fab6b17
+fog | 0 | 32626bca | ee0e15d057f5431a
+fog | 1 | 5d84f299 | fa932e72c8df4a9b 0
+fog | 2 | 67f0ebf | 40ea0a0a4eea43ec
+fog | 0 | 8ed83c2c | 3564090a75585949
+fog | 1 | 2fcf587c | 9c8d6c8d8eb532f3 1
+fog | 2 | bad15a50 | 3e552872f68d7505
+fog | 0 | b2e05d09 | 9073c0e3898ccd10
+fog | 1 | 8afd99bf | 32a01c671484dd56 1
+fog | 2 | 32f8c388 | a79e7f3ee59ea42b
+fog | 0 | f73ce95c | d3a5cb264dfc398f
+fog | 1 | 66e8e856 | 1f311f737660def7 1
+fog | 2 | b92a9aa5 | 4d6d3acf843f262a
+fog | 0 | f12d6de2 | fdaa677bba2a037
+fog | 1 | 67eae2d4 | 640bed5c5dc19d89 1
+fog | 2 | 80f165e5 | 5c526394fcfcae62
+fog | 0 | a146b22 | e8ebb02d2dd36b01
+fog | 1 | c729b75b | 52242ec5db29eae3 1
+fog | 2 | 61a2b2b8 | e702ec6fa7935f80
+fog | 0 | ef1bdf7f | 9aeb4dd80f44f3a8
+fog | 1 | 8bcb9ee5 | 7da144b97d054b25 0
+fog | 2 | cbccb946 | 89e7d83f5ad25779
+fog | 0 | e3eaf2c1 | b61ff320c1bc1417
+fog | 1 | cfbaa62a | 9b9062da49c86d7a 0
+fog | 2 | d77f366 | 4f53cfc8838a0e52
+fog | 0 | 9ee33660 | 687c8efb9dfd0ce1
+fog | 1 | 107aec25 | 534f67f8e540405e 1
+fog | 2 | a8851a76 | 1783e3793472676
+fog | 0 | de6c1d8a | aaecbf20b84fe5c5
+fog | 1 | b79910e9 | 63e318af2f9d6b2d 1
+fog | 2 | 75425fdd | bf2e0a4acb76ddbb
+fog | 0 | 6b160a1e | 7458f482223cb6c0
+fog | 1 | c7696dc9 | 3f87bf2ef29a826f 0
+fog | 2 | b2d5e5f5 | 397f9ddbe63cdb14
+fog | 0 | 7e13a346 | aa3a138715f00b40
+fog | 1 | d45585c0 | 7d68e0153aa31c5e 1
+fog | 2 | 66e14b6e | 1d03dbc655d1f2ba
+fog | 0 | 161c983c | 1d13ad450e6311f0
+fog | 1 | 1d62bbd0 | 3a404935c751996f 0
+fog | 2 | 5acc9d59 | e7eaa0ed43e850cb
+fog | 0 | 16741712 | 597c64b6bfd0a8e8
+fog | 1 | 84195aac | acdde38bffeb490c 1
+fog | 2 | eafa10ca | 9ecf496410941245
+fog | 0 | 12a859da | ac4bb21f4484b07
+fog | 1 | cbd35f3 | 7d11f7ea0a1670f3 0
+fog | 2 | aa60aae7 | d9215fb4d16a8dda
+fog | 0 | 260256f7 | fc8b2017e6af41ee
+fog | 1 | 3225be8b | 9252305b1cc48c31 0
+fog | 2 | 6352f941 | d47604bb9a008dbf
+fog | 0 | a8fe29c6 | 2e05d57181593cff
+fog | 1 | 161c2798 | a8c5efdbbf43a5d6 0
+fog | 2 | 4f0c7cab | 4d6d3acf843f262a
+fog | 0 | 60b086c | 6fee5362e66eaf6a
+fog | 1 | 66c87ae5 | 10838ce5d1f6ff9b 1
+fog | 2 | ffe7c49a | 29c240966349693a
+fog | 0 | dfd75134 | b876ac2db0a2ebff
+fog | 1 | 39c5af8 | 34ed2478e485c2c9 0
+fog | 2 | 395ff656 | a93482b39a7ddb5a
+fog | 0 | f83fb189 | f9924e05ea5170df
+fog | 1 | aefe24f9 | 6f79741218ecd9bb 0
+fog | 2 | cf323a12 | 4d6d3acf843f262a
+fog | 0 | 2e6bdbba | 553e7f3fa0f15eeb
+fog | 1 | e463210 | 6b89d914b5638d22 1
+fog | 2 | ff834b90 | 9086df27e8d8e140
+fog | 0 | e69c1eb | 2a45dbc3ecdbb32
+fog | 1 | 9b2f6838 | 8629b024120ca305 1
+fog | 2 | c7bcb9a4 | 11fa07e6bc99fdb7
+fog | 0 | eb5c2fd | 73b199063fa77eb0
+fog | 1 | fd65c16c | 9dffa28171547c7b 1
+fog | 2 | 98e41b27 | 4d6d3acf843f262a
+fog | 0 | 4cfe44e1 | e7d05f2cd98573a4
+fog | 1 | a8aa6228 | 7da144b97d054b25 0
+fog | 2 | 9f873d00 | 1ca3fc2f403d5053
+fog | 0 | f87c96e2 | 6e452463d0417890
+fog | 1 | 60d6a51f | 5c7542fe03315740 1
+fog | 2 | 920b3413 | 7a564d089641070e
+fog | 0 | a44fd495 | 7006af87ef7262ef
+fog | 1 | 327b0847 | 7da144b97d054b25 0
+fog | 2 | 9dc4c199 | 9b771b5c4d4e663c
+fog | 0 | d8998564 | f51fce2dc4735c4c
+fog | 1 | 77ec0d03 | 7da144b97d054b25 0
+fog | 2 | 6ea73c78 | 8f01882ac01cf0a3
+fog | 0 | b975fa85 | e5bad384744bedbb
+fog | 1 | bafd1945 | 7da144b97d054b25 0
+fog | 2 | 16c37338 | d6e66fe6ed6d8c81
+fog | 0 | 2b386e84 | 109aaaa907d61c6f
+fog | 1 | 2f070b4d | 7da144b97d054b25 0
+fog | 2 | 89004ee7 | 64e4337bfa549261
+fog | 0 | 731716eb | c14988a85d0572f6
+fog | 1 | f05ee70f | ec70ba3b9d1615b5 0
+fog | 2 | fa80134b | 9b771b5c4d4e663c
+fog | 0 | e7df31cf | dcffdb727aeabe82
+fog | 1 | fb77457c | 52009dbf04571434 1
+fog | 2 | 8b013d4a | 4d6d3acf843f262a
+fog | 0 | 965b341e | 7e5d67547200231c
+fog | 1 | 20e1bb99 | 91be5c2f2fd45652 1
+fog | 2 | a15d5695 | 840e0fe5749a8459
+fog | 0 | 62978ac | 9f1ce864d5475225
+fog | 1 | 156b2eed | 7da144b97d054b25 0
+fog | 2 | 91effc37 | 1b3abc1239e1e32d
+fog | 0 | 2cda5e6c | d8b9075707ed4b7c
+fog | 1 | 4d5093bc | bfbf43032c519dd2 1
+fog | 2 | 4a994dc | 1d03dbc655d1f2ba
+fog | 0 | 3a3ccbb8 | 88c05fe4240d7a36
+fog | 1 | d524de4a | e13133e092f220cb 1
+fog | 2 | 3ebe18b7 | 45571cf0544e536b
+fog | 0 | 76db964a | 2eeb575596ee9764
+fog | 1 | ed30f07 | a901947b98cacb0f 1
+fog | 2 | 9bd832b8 | c7828df3192a0eed
+fog | 0 | 93692912 | 94154b904d59ac1e
+fog | 1 | ec485745 | 7da144b97d054b25 0
+fog | 2 | 95a0b164 | b57c567a227e2f12
+fog | 0 | 30004421 | 3a69174599f63977
+fog | 1 | 79d05f23 | 4ff5b33ee8fe45e2 1
+fog | 2 | f7626f79 | 9b771b5c4d4e663c
+fog | 0 | 2ece3a90 | 10aed64b7ab5f990
+fog | 1 | 53f29804 | 5d6fa10d4ad11af9 1
+fog | 2 | 6ce7f0a7 | e1fc794595ea00bc
+fog | 0 | 1bb232ca | f6c98b143a23e064
+fog | 1 | af1dc11d | 2e62c87cb7ac7622 1
+fog | 2 | c9287435 | ba7a5031ab50fda2
+fog | 0 | c5f8ae9c | f82f296ca2c20c26
+fog | 1 | 403ae101 | 2e2c6c1593707e9 1
+fog | 2 | 9ae135d5 | 3f8d8462529bde13
+fog | 0 | 551341b | 9f4550a5d1193efa
+fog | 1 | 973a1850 | d1169473a3af9cb5 1
+fog | 2 | a5e76ed1 | 4d6d3acf843f262a
+fog | 0 | 76742fcf | 4d806a8591e98a3b
+fog | 1 | d320437c | 22bf9b9cbe0b97f2 0
+fog | 2 | 777fd884 | 40ea0a0a4eea43ec
+fog | 0 | 7fa5334a | d43f2607f8ba289f
+fog | 1 | c8377dd8 | 7da144b97d054b25 0
+fog | 2 | cc52cd39 | 7187a71821f83f0a
+fog | 0 | 4b68204f | 4e4ab348bd90d85e
+fog | 1 | 21929034 | efa4b64bb0b135b2 0
+fog | 2 | d3778f17 | 9b771b5c4d4e663c
+fog | 0 | 4fb83019 | f541a23a874d2304
+fog | 1 | fed804e5 | 7435dc60a6b05b 1
+fog | 2 | 1b467483 | ab5fffa7be9b39f2
+fog | 0 | b794f324 | c733e9940b3f05b2
+fog | 1 | 39406e86 | b740369281dc0568 1
+fog | 2 | 33dcfc95 | 25a21ccdb348f732
+fog | 0 | ab62fd9a | 55d06d198bb04ebc
+fog | 1 | 367c9c01 | 56da795b88ba0567 1
+fog | 2 | 1bd45d5 | 40ea0a0a4eea43ec
+fog | 0 | 640d57b6 | f762d2d27651faa6
+fog | 1 | 8997a097 | 7802b9e794c635fc 0
+fog | 2 | 8c576e80 | 40ea0a0a4eea43ec
+fog | 0 | c25d15c6 | 29c00affd3c3ea1
+fog | 1 | 2e54ea3b | 8a4cf32afeae637 1
+fog | 2 | 94572d9e | 4a750847c2422bbd
+fog | 0 | c17db4e5 | b9c7680648e3c5d2
+fog | 1 | 35ca3d8d | 3d732d9241094da3 1
+fog | 2 | 84a829fb | 9803463d6a641f1
+fog | 0 | 45afa38a | e71ae454f59a01cb
+fog | 1 | 8d562633 | 3f87bf2ef29a826f 0
+fog | 2 | 624fc75 | f4cdfb93e964482
+fog | 0 | bab2b54 | be92f05d084551fc
+fog | 1 | 2046a6f | 7da144b97d054b25 0
+fog | 2 | 6b8c905f | 82f0ff55f86d86da
+fog | 0 | 50c46763 | 631e61313dc781aa
+fog | 1 | aa2aaebf | 1047e6a0e611fa02 1
+fog | 2 | 8b67bf33 | a09b44283af61212
+fog | 0 | 579f558d | 4b2b896253d8e674
+fog | 1 | 626598d0 | 47e5c1ed274e6cd2 1
+fog | 2 | 9b2558f | 40ea0a0a4eea43ec
+fog | 0 | 39c611 | 18cc2dfe8df5600e
+fog | 1 | 55d64c9d | c40c5f74e19efa24 1
+fog | 2 | f97d9a9c | 7a47528c7c34ae5e
+fog | 0 | 1227d99a | e9a0c7ff2329845f
+fog | 1 | bbf325d6 | b11284d8b1c8ed01 1
+fog | 2 | 6086977f | 40ea0a0a4eea43ec
+fog | 0 | 48f5e7fc | 22699e97d28c732e
+fog | 1 | 95538dba | 3f87bf2ef29a826f 0
+fog | 2 | 7d9efc3e | 4d6d3acf843f262a
+fog | 0 | 7bdce3a2 | 19b2ab9146271cf0
+fog | 1 | 42bb38c7 | 3c695c9707a209d6 1
+fog | 2 | 969bf633 | 1d03dbc655d1f2ba
+fog | 0 | 95f8b595 | c7d10ca6f15d69e7
+fog | 1 | d4185471 | e7ec782904650f05 1
+fog | 2 | bef810a5 | fbee4cecc314b8cb
+fog | 0 | d3c3f210 | dcd021bc6895a0fa
+fog | 1 | 3dd09b03 | 77327a97b66d0ad1 0
+fog | 2 | 8338aabc | c01ff166385fbc3c
+fog | 0 | 93f1f947 | 19c34c878da5d3f6
+fog | 1 | 82b4d775 | afe1b0d207d1b20a 1
+fog | 2 | f730b440 | 1d03dbc655d1f2ba
+fog | 0 | c914b5c9 | df74e9ece0057aff
+fog | 1 | b6844ab8 | 7da144b97d054b25 0
+fog | 2 | 2e27cbfe | 9b771b5c4d4e663c
+fog | 0 | 97ebd557 | b58b69d2d000fe74
+fog | 1 | e86e76c0 | c2add57064cc25a4 0
+fog | 2 | f2631190 | 40ea0a0a4eea43ec
+fog | 0 | c534a685 | af360954b0f7d219
+fog | 1 | 3e42a079 | 4ec49fbd992c440b 1
+fog | 2 | f2362e9 | fbef30a5970e49eb
+fog | 0 | 2ebbb125 | fa20cf3607febd3
+fog | 1 | 7863a5a3 | 3f87bf2ef29a826f 0
+fog | 2 | 10011c3f | a5a103545056095d
+fog | 0 | 60c4b035 | 6b8ae4286b02e5a3
+fog | 1 | 27d5cd35 | e001077c971a50d8 1
+fog | 2 | 6930a16b | 37b031e3a5300050
+fog | 0 | 442e81b7 | 2b8cab5441a4bb62
+fog | 1 | 6788eed6 | f95c4a12ac6be99a 0
+fog | 2 | 1a9ba227 | accc1ad68f8423c8
+fog | 0 | bc65a45 | baa64daefb7b899b
+fog | 1 | 32e564b7 | 55603721abcf449c 1
+fog | 2 | 6ad7fd81 | 4fc493c98bed00ab
+fog | 0 | 343b2076 | 6ce805a31f547044
+fog | 1 | b5867570 | 25aa08069fbc072d 0
+fog | 2 | 61d946d0 | 2f74d4d1d040bd1f
+fog | 0 | bfc6ff67 | 503cd41bc15db401
+fog | 1 | a182a853 | e11f198cb0fa9226 1
+fog | 2 | e9863f86 | d6944e42569a8275
+fog | 0 | 58f27727 | 271dabda7d9ae98f
+fog | 1 | 5ce6c6f4 | 2cfe3c077fca88ac 1
+fog | 2 | 11c40f3d | a754ffe6b18fc2e7
+fog | 0 | d36cc9d2 | a0da5ebb4a7db623
+fog | 1 | 5ccedf5a | 585de0d72d73de11 1
+fog | 2 | 33555101 | 4d6d3acf843f262a
+fog | 0 | 37c40af6 | 8c2110d98841adf6
+fog | 1 | 9ccb73cb | 5e4fd152f3570955 1
+fog | 2 | 431e5c8b | 1d03dbc655d1f2ba
+fog | 0 | 8fdd1c91 | e3be568986f012d7
+fog | 1 | 328e139f | d909adb9fa276339 1
+fog | 2 | bcd93f35 | 4d6d3acf843f262a
+fog | 0 | f016ac98 | e577b47932bc5594
+fog | 1 | 8e93a6c4 | 55a5a6d60903dc5 0
+fog | 2 | 5f271a3a | 9bb40480f521e0fa
+fog | 0 | eca2777c | 5505524166c9bcc6
+fog | 1 | 767282bd | 3a14014a6eec5cb 1
+fog | 2 | 3ae74816 | 6da9cb5113627ea1
+fog | 0 | a40affde | 7b1d1220ce0a1b10
+fog | 1 | 6c0ad7cb | 96a24a7af0d9689e 1
+fog | 2 | 2d57d6c7 | c37e3f6be9b8b565
+fog | 0 | 59b3180b | b0649950ccbdb108
+fog | 1 | 39aa336f | 3f87bf2ef29a826f 0
+fog | 2 | 41f4a2e9 | 4d6d3acf843f262a
+fog | 0 | 86ea119f | db2f0a1246300129
+fog | 1 | b07c8028 | fb68fc1f734a6b3f 1
+fog | 2 | b2e8c6ad | 1d03dbc655d1f2ba
+fog | 0 | 5d0999fe | 17f76cc5d5ea0a44
+fog | 1 | 507a2d53 | ccf3387bb973e7a9 1
+fog | 2 | f44d274f | 1d03dbc655d1f2ba
+fog | 0 | e9b9a94e | e84b642b0fc2e989
+fog | 1 | bdb9425c | 7da144b97d054b25 0
+fog | 2 | 2d649976 | a933850ce185aba9
+fog | 0 | 58b3f5d2 | ec5b130ab4fdb55c
+fog | 1 | fb6dc72f | 648df97b69109a47 1
+fog | 2 | 1c49eb68 | 40ea0a0a4eea43ec
+fog | 0 | b377bca9 | 8c8baafc5b5fee9
+fog | 1 | a73dffc1 | 8fee687e7a967f5e 0
+fog | 2 | 697a05b5 | a754ffe6b18fc2e7
+fog | 0 | 97f142cc | f605ede2fe748c2
+fog | 1 | 588520aa | 5e841cffe9438973 1
+fog | 2 | 950049df | 9b771b5c4d4e663c
+fog | 0 | 294b46de | b559bad591fee2d3
+fog | 1 | 8117238e | a1cb4fb1217df92f 1
+fog | 2 | ac51ea5a | 6bcda49a2d2212af
+fog | 0 | 86d36ed5 | 9a8768e48d5b36c2
+fog | 1 | 1efda308 | a62ce77c82df2dc8 1
+fog | 2 | 8efd1191 | e55d14cdbb83cd42
+fog | 0 | 3e77fd1b | 6028cc9c1be12f00
+fog | 1 | 9ced7fc6 | 7dd9145ef3e1fa4c 1
+fog | 2 | c1adba52 | 4d6d3acf843f262a
+fog | 0 | a5c73029 | 867a39235b5eb7fe
+fog | 1 | 82921066 | 7da144b97d054b25 0
+fog | 2 | a4fcf344 | 21115a9b9f006437
+fog | 0 | 176c4085 | 2480934eef567f52
+fog | 1 | a2b04383 | 8fa39fa142d9cd00 1
+fog | 2 | bea270ba | 820f06ab2f6a151e
+fog | 0 | ce3b0df6 | e34a572ab4a41561
+fog | 1 | 8eb00cea | 725f260c945ef79c 1
+fog | 2 | 630726c5 | 4d6d3acf843f262a
+fog | 0 | 20cf1723 | 26ed0361a22a5e99
+fog | 1 | e2242bd2 | a7fe8de4b0f6935f 1
+fog | 2 | 8542f0ac | 928fd07ccb1dca5b
+fog | 0 | 8603bcb1 | d972958e54e754ea
+fog | 1 | f625e5b | 2b49c7b8a8425b2e 1
+fog | 2 | 2c9fede | 45f1c24f40f157c9
+fog | 0 | 7e4b27b0 | c9bc562750f8144d
+fog | 1 | 2bef64a2 | 7da144b97d054b25 0
+fog | 2 | 3bc39d5e | a8bf6774b9a7a0b5
+fog | 0 | 4d5d92c9 | 6426b0bcaf70981f
+fog | 1 | dd34dd86 | 529070aa5f33c1b7 1
+fog | 2 | b1133c42 | 40ea0a0a4eea43ec
+fog | 0 | 1b59e64d | f155c2ebae83b28c
+fog | 1 | 66332156 | 1852cffecc05aa55 1
+fog | 2 | efab3bcb | d9215fb4d16a8dda
+fog | 0 | acb4b44f | 4121b3c7acdf95d0
+fog | 1 | 88c823b5 | cfabf52ba67da908 1
+fog | 2 | 9a8603e0 | 40ea0a0a4eea43ec
+fog | 0 | 91e9e956 | 3d51861ce32a5758
+fog | 1 | 69dbe0b | 72b9d16600a0aa6 0
+fog | 2 | 4022b7ca | 40ea0a0a4eea43ec
+fog | 0 | aa0710c5 | dab85fdf23414f2f
+fog | 1 | 13b3af87 | 12425dbe66b3c700 0
+fog | 2 | 312e41f1 | 4d6d3acf843f262a
+fog | 0 | ffd7d9e0 | 3b740589c7c834de
+fog | 1 | 7c2bb973 | 86319382a0952764 1
+fog | 2 | 8d819cef | ac863e85a2ddb986
+fog | 0 | baec8b90 | 6389fd43e001245
+fog | 1 | f243fbfc | 12425dbe66b3c700 0
+fog | 2 | 1a4a14e4 | 1e814d84bd3663c1
+fog | 0 | a44a610e | 1e5d3c710f211263
+fog | 1 | 588d5af2 | 7da144b97d054b25 0
+fog | 2 | b79bdd9c | 995227637d6b8020
+fog | 0 | f3a56221 | 2f626efc89474d51
+fog | 1 | f39b1339 | 7da144b97d054b25 0
+fog | 2 | 29120b45 | 4d6d3acf843f262a
+fog | 0 | 8e8b6b71 | a938f50069cb76f5
+fog | 1 | aa96ce31 | 8f91675b33a179ef 1
+fog | 2 | 87ed2ff2 | 2af9c715d8044417
+fog | 0 | e9a524d7 | 9467e29dd5bf839
+fog | 1 | 480bafb0 | 47a582bb1fe51d58 1
+fog | 2 | b28b8553 | ec04ae641e2e0661
+fog | 0 | e2d2d5e3 | 240cbf8a923fb880
+fog | 1 | ccffeaca | 7da144b97d054b25 0
+fog | 2 | 873225cd | 7d5f96d85c56e2d2
+fog | 0 | 51a93554 | f4302c0116d8cbf7
+fog | 1 | f2fe699e | 8d19db20543509b8 1
+fog | 2 | b57320c2 | 6aa78e6aa345230b
+fog | 0 | 70d6040f | da24b13dc2a760f2
+fog | 1 | 1a65a87e | 2a2e39b51d3f378c 1
+fog | 2 | 58ad2726 | 7a564d089641070e
+fog | 0 | 30c9979b | be52af8bcff3867b
+fog | 1 | 451776fa | 284bbfa0106f42a0 1
+fog | 2 | 49d811c0 | 40ea0a0a4eea43ec
+fog | 0 | c0fb85b | ce488e14b12d99ce
+fog | 1 | 51ee1b8c | 912f09aed7472dc1 0
+fog | 2 | d877153c | 75b4a4f9e9809786
+fog | 0 | 98486668 | f913c49c8b664153
+fog | 1 | e244ba8c | 7da144b97d054b25 0
+fog | 2 | 5db166a2 | 332b4a4a92e1e8bc
+fog | 0 | 28d12f67 | da3ad81387f34026
+fog | 1 | 31a81414 | 60ab271b98f1a772 1
+fog | 2 | 588027f6 | 1d03dbc655d1f2ba
+fog | 0 | ebcb91b5 | 988d57ea56ce862
+fog | 1 | 69165432 | fb2a9fa0c4c60a25 1
+fog | 2 | 9ed35a78 | 1d03dbc655d1f2ba
+fog | 0 | 340b169b | 996125831c1b8edd
+fog | 1 | 2b75af0b | 7da144b97d054b25 0
+fog | 2 | 5b4c398f | 4d6d3acf843f262a
+fog | 0 | 1577a22 | d2c9c290f0b537f0
+fog | 1 | f92677c0 | a58435f417035970 1
+fog | 2 | 97dad6e4 | 1dca1521e89223e3
+fog | 0 | 1963239b | 350b67454d5c6bcd
+fog | 1 | 16b90459 | e27778b8d357885b 1
+fog | 2 | 29d6bcb7 | 40ea0a0a4eea43ec
+fog | 0 | 3a60ed46 | 26eda524a8bda94b
+fog | 1 | 30660d2e | 7da144b97d054b25 0
+fog | 2 | f9a1c18c | 5a65ac127494f3ce
+fog | 0 | 63987d7d | 136046d0884d4833
+fog | 1 | 5fc88bfb | 841ff8efacf469e0 1
+fog | 2 | 78ea7b90 | 40ea0a0a4eea43ec
+fog | 0 | 817cdd9b | f89898ff8573081e
+fog | 1 | cb51b81d | 4550e699abb97ffe 1
+fog | 2 | 554efa62 | e2849a75c69eb05
+fog | 0 | 3ee99354 | 68fd86c40a6e9895
+fog | 1 | dee77d7 | 3b5597633af6da7f 1
+fog | 2 | bc2a6b6e | 40ea0a0a4eea43ec
+fog | 0 | f2d977f | e9cd36e2b491718f
+fog | 1 | 26c622dc | 6d5044a6280e7127 1
+fog | 2 | 18e165d1 | 20c2b830d7621562
+fog | 0 | 946f03aa | 6fdb9090cd1f8099
+fog | 1 | e15f777 | 72b9d16600a0aa6 0
+fog | 2 | 40a89f99 | 377a9b9b09c108ef
+fog | 0 | a7a00c1d | 2e9050415f5fa390
+fog | 1 | 74058e6b | beebbe8d591b3d47 1
+fog | 2 | 3932d713 | 40ea0a0a4eea43ec
+fog | 0 | c9570d8d | 6f256f0d5f641d8b
+fog | 1 | cca2f4c0 | 793b36a25716dad6 1
+fog | 2 | c4b8002f | e115b00b6c31b446
+fog | 0 | d3076ddf | 2814212faaba6853
+fog | 1 | 5436d736 | 7da144b97d054b25 0
+fog | 2 | 510598dc | 4d6d3acf843f262a
+fog | 0 | 394dd65b | 9bdc5c1c8deb92aa
+fog | 1 | 85f5ae71 | b527b395657c53bd 1
+fog | 2 | 4cfba49b | 92fe830ac7132ef
+fog | 0 | 2fd1b9a1 | 97f4dea5de134e5a
+fog | 1 | e639f341 | 2dc8e75a0368e916 0
+fog | 2 | f29f4c7a | a9e9f189b666c0d3
+fog | 0 | bf15c940 | c7363d7f9c9319a3
+fog | 1 | a69b6f6c | 5ef030e51dd24826 1
+fog | 2 | ee575b05 | ad7bc2f8e1de0772
+fog | 0 | 754838c3 | 15e4a5caf640572
+fog | 1 | 9dc8d0ca | 7da144b97d054b25 0
+fog | 2 | 6ef6362c | f28591edfa0e9f1f
+fog | 0 | 854c4bb6 | d1d25ed4a45db38
+fog | 1 | 8f4308da | a274eded4e2b6df4 1
+fog | 2 | db91ed92 | 3ad4fadef70a2844
+fog | 0 | 5b6b16c4 | ca90547e2831c01b
+fog | 1 | ecd12ad1 | 13aa2892baa70f5 0
+fog | 2 | 941a012d | bddf44a6cc9a3093
+fog | 0 | e4195a55 | 6ce688bb2d51817f
+fog | 1 | ae630b6e | 6765625873293b24 1
+fog | 2 | f3fc0601 | 4d6d3acf843f262a
+fog | 0 | 51048008 | 8fdf8de80e5fc8f4
+fog | 1 | 73fd77fc | b195f86b62e9fea8 1
+fog | 2 | 303641a9 | eaf86c2a88c67809
+fog | 0 | 14e5321a | f89ef866954434cf
+fog | 1 | 3a5a8a7f | 7da144b97d054b25 0
+fog | 2 | 652eff1b | 4200b3316fa3548a
+fog | 0 | d7374d8c | 7984e556554744ae
+fog | 1 | 38ae13e7 | 368fef1eee446c7c 0
+fog | 2 | cf1e0e26 | 95470dda7fab6b17
+fog | 0 | e9178b6 | ab531256b6c54e13
+fog | 1 | 9da02e98 | 94fb339fe56175bc 1
+fog | 2 | 50e5bd91 | a4d25a178ffd4066
+fog | 0 | 195985a | b6d23cf1a10eae3d
+fog | 1 | c148ce53 | 6a09df133c5b4f09 1
+fog | 2 | 1d8c67d6 | 2f5d828e834a34d4
+fog | 0 | a66956b8 | ffef23dd9e9d0b0d
+fog | 1 | 19306512 | d599e1eee367e608 1
+fog | 2 | 2a805af2 | 1d03dbc655d1f2ba
+fog | 0 | 2ba3c228 | 6de71fdec9a1f10f
+fog | 1 | ab0d94f5 | 2363f6262be7a409 1
+fog | 2 | 5bde8288 | 8d7cc762bd34d27
+fog | 0 | 23e13ecd | 50d9b4e01e969c76
+fog | 1 | 84d897f5 | 55b619c9e6b64460 0
+fog | 2 | 4e0c014 | 75e56405992dd4a2
+fog | 0 | 748d7024 | 817e04fd8da5538d
+fog | 1 | bc4604a8 | 7da144b97d054b25 0
+fog | 2 | 23665263 | 982b0643840e64e1
+fog | 0 | 54d7e887 | 821239667b7e519a
+fog | 1 | 6fa894ae | e23cd9a2ea6f22cf 0
+fog | 2 | 4abf4bef | 10f55cbced2803b3
+fog | 0 | f7a9a3d4 | bd9b8e7cf2c303eb
+fog | 1 | cf8fb2af | bdee4b7202b019ed 1
+fog | 2 | a2c86da6 | 682da95bd6b61968
+fog | 0 | 7ef46d8c | 125dcd8c7ff1f23e
+fog | 1 | 126742f1 | 12425dbe66b3c700 0
+fog | 2 | bf5c1a3a | 4d6d3acf843f262a
+fog | 0 | c11344b4 | 7b1060cca01dc5bf
+fog | 1 | 8b32fb9c | 20f461a6a1b6ea77 1
+fog | 2 | 46f26820 | 1d03dbc655d1f2ba
+fog | 0 | 10a0b1ef | 64a2917cf3ad0901
+fog | 1 | 4f3aa210 | e529f19d56132ce8 1
+fog | 2 | adfc139 | 92bc7ad4922e65e1
+fog | 0 | 4dc83ac3 | 1cec52209cff7b02
+fog | 1 | 139134e0 | 15bb013c113c9f4f 1
+fog | 2 | 6a24604b | 9b771b5c4d4e663c
+fog | 0 | 6fae3bbc | 4e7310c0a9ae596
+fog | 1 | ec836b72 | dada2cbdf6f8d45f 1
+fog | 2 | 452db441 | c94a640303f3cb60
+fog | 0 | ca93f0d4 | 83cd3940b9f63a17
+fog | 1 | 1bd9a067 | 31a4c9b30bf30d36 1
+fog | 2 | 4b0acb6e | 1d03dbc655d1f2ba
+fog | 0 | 3b24d526 | f2cbc05c857c6231
+fog | 1 | 85a7015f | d589a0bc5193fa3d 0
+fog | 2 | ddd7dd5 | d47604bb9a008dbf
+fog | 0 | 1966fa5b | e7e13e79d4fc762c
+fog | 1 | d8b3d753 | 42a630cbeeb9f3f 1
+fog | 2 | 84c28a22 | 4d6d3acf843f262a
+fog | 0 | 8370da65 | 5666320a3d098b22
+fog | 1 | 48206297 | 9d5166f29bdc50d0 1
+fog | 2 | 8e8e37b3 | 21dc4defbc0d9e7c
+fog | 0 | da727968 | dcbee3ab96892746
+fog | 1 | 328630f8 | 3ff6223c49d2090f 1
+fog | 2 | 4610bd08 | 1d03dbc655d1f2ba
+fog | 0 | c70f9641 | 313b2e6b32f9a43a
+fog | 1 | 1475026c | 11ae7e4b034a6eb1 1
+fog | 2 | 5bef6d0d | de55aee53bf2e100
+fog | 0 | 230bc1d2 | 41848a42c19f59ca
+fog | 1 | 1cc4b0af | 25aa08069fbc072d 0
+fog | 2 | be4cbedb | 9b771b5c4d4e663c
+fog | 0 | fe920f40 | 802322518229e70f
+fog | 1 | 1b8ff034 | a3fdf23205f17ec8 1
+fog | 2 | 98e1607c | 61c7ab6508d4b68e
+fog | 0 | f621334f | aecffcb506e02a1f
+fog | 1 | bfe8fd3b | 5a7a9d651c783c12 1
+fog | 2 | 1dc9f536 | b9e622fbdc8ddb78
+fog | 0 | ec7752ab | 81dc79950d5fcb95
+fog | 1 | f7db39df | c10c8b21bfe6650b 0
+fog | 2 | d6236e25 | 4d6d3acf843f262a
+fog | 0 | 56650e0f | a386faf86147eb69
+fog | 1 | 7f720dea | 258537fdab787b35 1
+fog | 2 | 86294929 | 8f9bd772f3bfdbb2
+fog | 0 | acef5d48 | ff30bc0111cc6b7f
+fog | 1 | 166a4b90 | 12425dbe66b3c700 0
+fog | 2 | 38bbaaf1 | 40ea0a0a4eea43ec
+fog | 0 | a446b739 | 45e0468cf635e383
+fog | 1 | 5b1d4515 | 7da144b97d054b25 0
+fog | 2 | 46b88fc1 | 4f74338c75921b6d
+fog | 0 | 777ccea1 | 9d4f57acc352dbff
+fog | 1 | 71ef23e6 | 46a4cb6bba8240ee 0
+fog | 2 | 3f55e894 | 4d6d3acf843f262a
+fog | 0 | 3f74ce3f | 4da6edb01cfd9828
+fog | 1 | 4f447405 | a3b552ae96392435 1
+fog | 2 | 9b1e0bb6 | 40ea0a0a4eea43ec
+fog | 0 | bf7e97fb | a9b573b365388ae6
+fog | 1 | 10fd9c0f | 2600b9294c4cf178 1
+fog | 2 | 4aacca5c | 831e5e11c500dafa
+fog | 0 | 3de72181 | 3124e41bdb62e357
+fog | 1 | 4e01ed7 | 466efd5b66040a41 1
+fog | 2 | 71ff0a41 | 40ea0a0a4eea43ec
+fog | 0 | 1456897d | 9bdda963fc9c57e9
+fog | 1 | 86b902bd | bd57053a44f45968 0
+fog | 2 | 9d526343 | 20c2b830d7621562
+fog | 0 | 2e301721 | d36213dfa514475b
+fog | 1 | 781cc429 | 9a8d14ddf248750 1
+fog | 2 | ee1eb4a2 | aa36398aa01bca16
+fog | 0 | d52b7ac9 | e1f8b90e212a1b8d
+fog | 1 | 347f1a10 | 4775d6373cccd1cb 0
+fog | 2 | 64de60d | 3f8d8462529bde13
+fog | 0 | 54227ca7 | 6a16dd00aae2d87c
+fog | 1 | 4f4f95 | 5203808064d6961a 1
+fog | 2 | c5a4690e | 5c68183f66e5318f
+fog | 0 | 4e3cde1d | a537b8825e45f998
+fog | 1 | 458f05e7 | 4ac339779a2b9fe2 0
+fog | 2 | 9f25d32e | 2a1ea955f29df8a0
+fog | 0 | 8e6fb13f | 82d9c6d6b60550c8
+fog | 1 | dbae65b0 | 790c5d54f9e84f4e 1
+fog | 2 | 2b1d9dde | 6be287ab6125e4f8
+fog | 0 | 5eeea938 | 91aba1cb75f545ad
+fog | 1 | b3dcd790 | 3f87bf2ef29a826f 0
+fog | 2 | 61f4e076 | 40ea0a0a4eea43ec
+fog | 0 | 1ff4364e | 2f183afbd80c4d07
+fog | 1 | 7ee4c0f4 | 7da144b97d054b25 0
+fog | 2 | b39c9690 | e33f960eb02fbff7
+fog | 0 | e861a24b | 3dc2ec4ede58fa24
+fog | 1 | 70d5c8f7 | 7887224d261e655 1
+fog | 2 | 97047b24 | 60ab9010e6fd8841
+fog | 0 | 3b6e7ea5 | 82c049db95826901
+fog | 1 | fd71f0b4 | 3f87bf2ef29a826f 0
+fog | 2 | d2c14cb0 | a3987da5d3def2f0
+fog | 0 | fce7aa07 | e8a040f7ab80decf
+fog | 1 | bca5888a | 3ceac40c64d1ccec 1
+fog | 2 | 2a955927 | 330190d9ba7d59c4
+fog | 0 | 9f55b6f7 | 275aece8c11e1f5b
+fog | 1 | ac8f0a25 | 7da144b97d054b25 0
+fog | 2 | e1dfd35 | 9b771b5c4d4e663c
+fog | 0 | de35819c | 73a07fe33be63bd0
+fog | 1 | 1a5a533b | 7da144b97d054b25 0
+fog | 2 | 3a58c726 | 2f74d4d1d040bd1f
+fog | 0 | a3cde370 | b79ca829eaf5025
+fog | 1 | 653f200c | 3f87bf2ef29a826f 0
+fog | 2 | f0b41503 | c9aed77dbbd258cd
+fog | 0 | f2e4e82f | f7dc60806bba3a57
+fog | 1 | 5e70bc4f | 72bc177fde2681f6 1
+fog | 2 | 77381cc6 | 40ea0a0a4eea43ec
+fog | 0 | 9a550a60 | b67319e8c7871293
+fog | 1 | 5897c37a | e55e947285ec0446 1
+fog | 2 | 4fc10b09 | 3c2e7ddf602e7308
+fog | 0 | bc975684 | 6a5b0f8e353ceee
+fog | 1 | 7f030671 | db7a23b2dbc9b22d 1
+fog | 2 | d3ea31e9 | 2af9c715d8044417
+fog | 0 | a9a139f3 | 68718b3b2b0a6a7a
+fog | 1 | ccf7c10c | 235a2140babc27a0 1
+fog | 2 | eaf5b3b5 | ce4e663dc19fee25
+fog | 0 | b9ab21cf | fd3033dfdfeaae96
+fog | 1 | d0125303 | 7da144b97d054b25 0
+fog | 2 | 3a894d29 | f8a6d8d459475dad
+fog | 0 | ad4bc402 | e940df3779eaeeab
+fog | 1 | aa814569 | c87268a9a80e2817 1
+fog | 2 | 1fb4d2db | 9a5b988adeebd73
+fog | 0 | 9a99dfe6 | b4c2a559e86f7732
+fog | 1 | f7e88463 | bc535e3bd377f13c 1
+fog | 2 | 15a2e93f | d4e88d74ea377e28
+fog | 0 | fdc83a8b | f3b21d9f8bab5083
+fog | 1 | 336572d7 | c2add57064cc25a4 0
+fog | 2 | 2c8ec9f2 | 82a028610c08b843
+fog | 0 | 3e6b286d | 6d3e4bd90438a410
+fog | 1 | 405c4041 | dc2d11c16220fbb2 1
+fog | 2 | ef7ed2f4 | 2a31502ec7525777
+fog | 0 | d41e3b13 | 203bdd7e3ac7249b
+fog | 1 | f3c0b5ab | b62432a18cc5b1f7 1
+fog | 2 | 5c23c143 | f5555f8067823326
+fog | 0 | 8bc9fffa | 6adb98c7cf9277c5
+fog | 1 | fe5b0f3b | 9163c8148c191374 1
+fog | 2 | 4646fe16 | a754ffe6b18fc2e7
+fog | 0 | 2817e0f8 | 32274d9d140168c0
+fog | 1 | 26253f65 | a1a1b529d640d12b 1
+fog | 2 | 327c703a | c52b07f7c1dc9294
+fog | 0 | 8699d3c4 | 42786cb202f5825
+fog | 1 | a45ddc7 | 158a0e9b48905f96 0
+fog | 2 | c19a68f8 | 7e9a96451d52c261
+fog | 0 | e4d95ded | 8143540e12c961c2
+fog | 1 | 20aad6e8 | b9eb41c291bed2c3 1
+fog | 2 | f3f6b700 | 68092919dea71fd6
+fog | 0 | b325ffd4 | 8c1b43c30e710c25
+fog | 1 | c8670ac9 | c3895a233e1a448 1
+fog | 2 | 7c5ab5e2 | 3cb8bcb5cb7b4689
+fog | 0 | 4e928f85 | f9ccae2282e8cdc3
+fog | 1 | a05438e9 | f3ec317784a0377b 0
+fog | 2 | de28be4c | 5da1ca22a62e2d23
+fog | 0 | 222b6690 | 54a1e5a7360b8d41
+fog | 1 | f0089a06 | 3f87bf2ef29a826f 0
+fog | 2 | ad12bac4 | 75b4a4f9e9809786
+fog | 0 | a73dfd8b | 21b213eceddb199b
+fog | 1 | 1a6d803b | 83640da6c7250b1b 0
+fog | 2 | 99b25f8d | 96d1a1caa2346dd1
+fog | 0 | 3530c1c5 | dff1bef5e192923a
+fog | 1 | 919a9a0e | a56d89e610d5c491 1
+fog | 2 | 7bab0940 | 9b771b5c4d4e663c
+fog | 0 | 933fa93a | f2f1338600d13e52
+fog | 1 | 75766152 | fe850627c7854f39 1
+fog | 2 | c1b96881 | 20f956181528bf5c
+fog | 0 | bad86dc2 | c45b85fa88387e18
+fog | 1 | 8bc1d5cb | a419b77a14c5f0c6 1
+fog | 2 | dddd7877 | b9f1146367de69a7
+fog | 0 | bc74d1d9 | d937be215fe7be31
+fog | 1 | 5663aa0c | 9fc3a7a3755ac76f 1
+fog | 2 | c7f772f8 | 3015c25bb806d4cc
+fog | 0 | dbd19645 | 914c39eb9073437b
+fog | 1 | c5b5eb71 | b48377d7c71db668 1
+fog | 2 | a2fdc100 | e115b00b6c31b446
+fog | 0 | 9f4df948 | 42ddd73bad07aa1b
+fog | 1 | 49e7c815 | 556b41f7ba26b0b5 1
+fog | 2 | 3891d83c | e6677304af24b0b4
+fog | 0 | 9c8f46b9 | 7893d8ed41875fa9
+fog | 1 | 91a13d7c | c3f9dc1cf61d63a6 1
+fog | 2 | 4820c370 | ad8ffab3e372c414
+fog | 0 | 738d2dbb | 5932a6e0d8f2b231
+fog | 1 | 18da1510 | dc3d92d1a239937b 0
+fog | 2 | 8524e39f | d882ba52df755ffb
+fog | 0 | 82130192 | 559d56d3716f00a5
+fog | 1 | 91f373bc | fd9c23d0e6025317 0
+fog | 2 | 1937b5bd | 4d6d3acf843f262a
+fog | 0 | 1993b730 | b35ba16ffd2a5a0
+fog | 1 | ca9793cf | 50a51bc1fe4a7d47 1
+fog | 2 | 9f48f394 | 86b0fa1d4596750d
+fog | 0 | 7fef4eed | 8e6f41fc344b5e92
+fog | 1 | 5d5f7d9f | c8c4e2381165a12 1
+fog | 2 | 50763234 | 5fff02bc61f975ce
+fog | 0 | 3acb05d | 29abab26240325dd
+fog | 1 | 878ba3d6 | 88b41df065ea2d16 1
+fog | 2 | 8b60abff | 29c27b3fd7e5d9c
+fog | 0 | 27d3b053 | a5f16c492f914ff3
+fog | 1 | ec6f5e39 | 223623ef7016b364 1
+fog | 2 | ceecea2b | 4d6d3acf843f262a
+fog | 0 | 85faa132 | 114de2d22e7cccfc
+fog | 1 | 351d1abd | a0ed9335f66040bc 1
+fog | 2 | 365b180d | 9b771b5c4d4e663c
+fog | 0 | 9dd52f73 | 778746563cf803f2
+fog | 1 | 9fb1cdf3 | c622cb0d7fc829f6 1
+fog | 2 | 5b3b6e65 | 40ea0a0a4eea43ec
+fog | 0 | 184ecc05 | 3f96afbf3cd652a4
+fog | 1 | 18574545 | eb498442a242324c 1
+fog | 2 | 7787ca99 | 465a4e16347c7974
+fog | 0 | 2ea8affc | d7169bfb7977d467
+fog | 1 | 8dc7124b | f578af6383ec5f1c 1
+fog | 2 | 97ba1332 | 8d16b896901c805d
+fog | 0 | f889356 | 5a6454148472d576
+fog | 1 | 1c379be8 | 57a3ae9c9b2303c1 1
+fog | 2 | ea659038 | 6f2186e5a66a5732
+fog | 0 | 65034128 | 74a5d7f71829b1fa
+fog | 1 | c8bf27de | 7da144b97d054b25 0
+fog | 2 | 52488579 | 36534060b90ef920
+fog | 0 | 8402872d | 6ae0c1afc693a7f0
+fog | 1 | 48ee3023 | f002fb24bcd7a95f 1
+fog | 2 | 59600feb | 7731e945b80f37b9
+fog | 0 | 9c3f570c | a0e7bff02b29978d
+fog | 1 | 9f388bc1 | 3f87bf2ef29a826f 0
+fog | 2 | dac6b422 | 4d6d3acf843f262a
+fog | 0 | 55e2cbb4 | 66a085a43e66b81d
+fog | 1 | 1798f452 | 6f7ca810d7bc7681 1
+fog | 2 | 9227b859 | 1a324678ecd4f1a6
+fog | 0 | 3df5efc | bbe3d833bef6caf0
+fog | 1 | 94498c14 | 59151bd76d659f2d 1
+fog | 2 | 45c4b2d5 | 5cfe63abd5e70e05
+fog | 0 | 718e6e3e | 7d1c9ac3dfb09bf
+fog | 1 | 3c599eb6 | 5a5b8b4e4f733a17 1
+fog | 2 | a36440d0 | 40ea0a0a4eea43ec
+fog | 0 | 27546d5e | 25b6d9433841a52d
+fog | 1 | ec25f0bd | c362128401455f5c 0
+fog | 2 | 871daf87 | e81b7120db0367b6
+fog | 0 | bd6d6478 | 1697d57a8d445bfe
+fog | 1 | 26690ea7 | ee97072d1311efd5 1
+fog | 2 | 476063f4 | 9b771b5c4d4e663c
+fog | 0 | 7af1976f | 6a2eb1a592eacc24
+fog | 1 | 348648e8 | 3b74d78cee1cdc24 1
+fog | 2 | cedf7932 | 4d6d3acf843f262a
+fog | 0 | a2156f92 | 8ed2813af5e71d80
+fog | 1 | a7014a91 | 44ee0c10fb950974 1
+fog | 2 | c0da16ae | 5b2c82f96c61422e
+fog | 0 | d28650fc | 4f60a0a12887ccb4
+fog | 1 | ac5b058c | 3b4b75740c2296c3 1
+fog | 2 | 59a29c03 | 4d6d3acf843f262a
+fog | 0 | 8a3acb3e | f27a85b9d922ca0f
+fog | 1 | ee50998f | f0af69e7256cec36 1
+fog | 2 | dbc5f95 | 40ea0a0a4eea43ec
+fog | 0 | 21942ed9 | eaf59b2b43bc4331
+fog | 1 | 13e06187 | 90c1f55d66bce845 1
+fog | 2 | 756067f5 | 98052fb8be534b6d
+fog | 0 | e49288b4 | 60cfb0056f42718b
+fog | 1 | eb453065 | ee8b0c1e85aa6486 1
+fog | 2 | e1f797d | 669275a0af92b145
+fog | 0 | 2d8b62e3 | b94736976b6209c0
+fog | 1 | b74b22c1 | 9a067a201722546 0
+fog | 2 | db6d4b63 | cd15a9295022eb5a
+fog | 0 | d2ce843e | fc5131c0a22cd63d
+fog | 1 | cf79f999 | d027daa35caef7d9 1
+fog | 2 | 6600770b | ac1cd1ef7c631e62
+fog | 0 | 26970eba | fbc74bd96c9c8052
+fog | 1 | 311f0a7a | 68ccbb3ee1a90678 1
+fog | 2 | 91845bf | fe96945cc0a0972e
+fog | 0 | b661e94c | 9628a9ad3670fcbf
+fog | 1 | 6687fd6 | 12425dbe66b3c700 0
+fog | 2 | bc040cbd | 46258705cf73b91d
+fog | 0 | d9d57139 | 14a00a664a07984a
+fog | 1 | 4ac10269 | 8af060555b1ebfe5 1
+fog | 2 | 5a418427 | 1adfcac3305e4f4e
+fog | 0 | 88b00466 | 7fca87f0eab17c3c
+fog | 1 | 2d6afbe | 12425dbe66b3c700 0
+fog | 2 | 2851a20b | 39cfb5c5ac61d5ec
+fog | 0 | 2f68a2ad | 9de6a9c893d97c15
+fog | 1 | a8721587 | 3e5732269643929f 1
+fog | 2 | e282842d | 4d6d3acf843f262a
+fog | 0 | 26b02e71 | 2bcc7d16c05ad657
+fog | 1 | b7dc5942 | b51ba0502890ca0f 1
+fog | 2 | 37a38748 | 74febbca4cb82e28
+fog | 0 | aa763c8c | 111fabc7090df574
+fog | 1 | 8ae85e87 | a4dc7cdb1a25ceb6 1
+fog | 2 | 1f154e3b | 4d6d3acf843f262a
+fog | 0 | a4d90d7 | 876bd9727952fc43
+fog | 1 | a8e4e80d | 54065dea179e4f41 1
+fog | 2 | d1eb649a | be692272ae4182d7
+fog | 0 | d61ae96f | ec7eb040bb49f9e8
+fog | 1 | 74ff9f60 | 4e27f06d46293a30 1
+fog | 2 | bf3f216d | 766bc1f40fac7a3
+fog | 0 | 65b2de98 | e90a5d2bbdea68ea
+fog | 1 | 70bbf736 | 7da144b97d054b25 0
+fog | 2 | 977802d2 | ab45017253e2b3
+fog | 0 | ef0160a7 | f67dc4019a47cb3b
+fog | 1 | 59cc3056 | 309447d55bf36585 1
+fog | 2 | 7ed4d90a | 8bdf708187a53f8e
+fog | 0 | 2ae4c5d6 | 51cce4a9fed4e342
+fog | 1 | 17cdc55a | 7da144b97d054b25 0
+fog | 2 | fe461da5 | f578af6383ec5f1c
+fog | 0 | f6f0a02a | 875a6d5dd6c91662
+fog | 1 | 687f336f | bbc6419feddb44ae 1
+fog | 2 | 8933684e | 1d03dbc655d1f2ba
+fog | 0 | 8dbbba4a | 6d4e9d03ad58f425
+fog | 1 | c85d2176 | c7e0ca39a569c807 1
+fog | 2 | 536c08f | 69b84c658f74faec
+fog | 0 | d3227527 | 345bedaae519e2be
+fog | 1 | 4eb31312 | fd28d94066f43188 1
+fog | 2 | a2d8ca43 | cce91c7df19c4822
+fog | 0 | c45ecd79 | 7ed1c9c4cf02d6e3
+fog | 1 | 9836f412 | 90becbab11ccbbb0 1
+fog | 2 | 5bf6bbed | a7ec931d32e70523
+fog | 0 | 211432cf | 115915772f4bb602
+fog | 1 | a4b21a91 | a8cd09816193dd5b 1
+fog | 2 | 68c5c9ba | 7fe97a4c7b8b6e89
+fog | 0 | dd8f2420 | 5cf909403297278
+fog | 1 | c3fd7a7e | d88d38bac92c6688 0
+fog | 2 | 9d985452 | 4d6d3acf843f262a
+fog | 0 | 5bfaee2 | 20ca0a9b48c8db36
+fog | 1 | f75fa8e6 | acd940c913ff31a5 0
+fog | 2 | 2f8fa37d | 1d03dbc655d1f2ba
+fog | 0 | c0537c6f | 86b40e2d4a4a05ad
+fog | 1 | 592ef09 | d88d38bac92c6688 0
+fog | 2 | 27c0d716 | 40ea0a0a4eea43ec
+fog | 0 | 8896a265 | eda2492ba6b03dc9
+fog | 1 | 3a88de3f | 4f129f4c290164b5 1
+fog | 2 | 4a534af5 | 415e6e42c7a4d0c3
+fog | 0 | 8f7f8fb8 | 8d50c987c5f91936
+fog | 1 | bee3a926 | 8b8a2c0b90eb63d5 1
+fog | 2 | 8f84d9cb | 40ea0a0a4eea43ec
+fog | 0 | 2cf7e2b0 | 458ee358bf10d92
+fog | 1 | ccb8027e | 12425dbe66b3c700 0
+fog | 2 | c8262ca | 9b771b5c4d4e663c
+fog | 0 | affa1756 | b3373d0b200e8074
+fog | 1 | 94bdb9f9 | 822581818e89417c 1
+fog | 2 | f73a0730 | 8b3d4912a583f895
+fog | 0 | 63139e58 | 10fae403cb3a5af2
+fog | 1 | 2b1d10db | 3f87bf2ef29a826f 0
+fog | 2 | 14fb5698 | 532ebf46b8a4a2ff
+fog | 0 | 3f1ff228 | 86db9fbd5c8fc188
+fog | 1 | ff55c4a6 | 4eeb6a7326ec944a 1
+fog | 2 | eca5a460 | 99362d3eac2b87b7
+fog | 0 | 5268147c | e3c2cb56abb7e07d
+fog | 1 | 5823979e | 656ceea6309dc5ea 1
+fog | 2 | f4bfe94 | 3d114c719c7dd47a
+fog | 0 | 6d68399d | 845fcecdfeacab6
+fog | 1 | 4f105fad | 3f87bf2ef29a826f 0
+fog | 2 | 8fcccaa | e7376bda8634a787
+fog | 0 | 97efcc86 | e0dcdbea7e375ed4
+fog | 1 | 9a9c66d2 | 7a8a8256a4146094 0
+fog | 2 | 12691295 | 40ea0a0a4eea43ec
+fog | 0 | ace84804 | 419ca4c2adbf1770
+fog | 1 | 396db333 | e0a0c79a1d96f3cb 1
+fog | 2 | 2d304a6c | f89aeb725b2a487d
+fog | 0 | 5adf153d | a24643c390eab0aa
+fog | 1 | 475c9ebc | 3dbc3154c289bb27 0
+fog | 2 | 8edf9efb | 40ea0a0a4eea43ec
+fog | 0 | 9a67a8f3 | f054516048cae63f
+fog | 1 | 44a7a0c9 | 6273c8694e714767 1
+fog | 2 | d1850010 | 425af9903230ef1
+fog | 0 | 6d8aca89 | 745c774c2891733d
+fog | 1 | ea17c446 | 2c5bc6b890e43044 1
+fog | 2 | 69e39e25 | 7f4596b1acaf0e66
+fog | 0 | 9cf36372 | 3b7c15bb03a4ab9f
+fog | 1 | 79100f69 | 578e25f91cf3dc61 1
+fog | 2 | e23c9a6e | d40dd347d3857f69
+fog | 0 | cbe0b3c | fe43f3c865101cbf
+fog | 1 | 76b2228e | a96d8a3b575cf697 1
+fog | 2 | d49370c | 4104190f889af6b4
+fog | 0 | 43e28a60 | d970c492c184a9a8
+fog | 1 | dface7c4 | a5162ca06ba97fce 1
+fog | 2 | 39ba79f0 | 6ec239e4ced89197
+fog | 0 | 68935d40 | f5d161d0baf1ff45
+fog | 1 | 1a2ff011 | e305632f5011936f 1
+fog | 2 | 17b0ba47 | e55d14cdbb83cd42
+fog | 0 | 643fb036 | 641133d038fab501
+fog | 1 | 879326e9 | e8c51441224648c 0
+fog | 2 | 8c8b5222 | 4d6d3acf843f262a
+fog | 0 | 53aef69e | e59f4676dfcdef6
+fog | 1 | 73d993c4 | 1f2844e9062f5ef5 1
+fog | 2 | e096538b | bdd2a3588dccf5fc
+fog | 0 | 7f8d8d9a | 228a8c675dd1cd41
+fog | 1 | ee41bae4 | d62191effdc10ef6 1
+fog | 2 | 48d05871 | 1d03dbc655d1f2ba
+fog | 0 | 99c1b2d9 | 75e0f14b352f91d3
+fog | 1 | 68a15d2c | 56f80f32148b3fc4 1
+fog | 2 | 81201aa1 | 6973d224f480e247
+fog | 0 | e7ceb0e7 | 38c0893ed516074a
+fog | 1 | 1a3472f5 | ec3f10de9f32c126 0
+fog | 2 | c430f549 | f8ca734c071efc98
+fog | 0 | 3652fac | 220c3edd78bcaf3f
+fog | 1 | f1f48a08 | ec12b09164790e81 1
+fog | 2 | 3f7ed728 | 40ea0a0a4eea43ec
+fog | 0 | 7b94b08a | dc3d0a6c4ba6229e
+fog | 1 | 5c527ba8 | 6fdc6ae8949b3897 0
+fog | 2 | 36c5fed2 | 2c14aac0c1837873
+fog | 0 | 30c1ad | b66091d32e5dec2
+fog | 1 | 4e108e84 | 7da144b97d054b25 0
+fog | 2 | d5af1fbc | 2a7db1f565ad4475
+fog | 0 | 42421a83 | 5487b4584631d91
+fog | 1 | 61b630bb | bbc1508f44c57bd1 1
+fog | 2 | 59d5a931 | 2248488d3011218
+fog | 0 | 4bf8c0aa | 5e43884464ccecca
+fog | 1 | 7feda5de | aee3913904774953 1
+fog | 2 | 116b970a | 9b771b5c4d4e663c
+fog | 0 | 274d6a2f | e689a4d8476375ce
+fog | 1 | f7bbb0c5 | d96c88e7066d34ea 1
+fog | 2 | 1f32321b | 104666c00033135a
+fog | 0 | 3fdcfa0c | 8b1c363ee591f7e7
+fog | 1 | fdc9baac | d584189988457a3f 1
+fog | 2 | c98ec8b6 | e468a241bf36d9be
+fog | 0 | 41808a7b | 3580016146db1e70
+fog | 1 | da3efafa | fe54ae25e9e4651 1
+fog | 2 | 68a0597d | d760c27d61c6d3f4
+fog | 0 | 7cb52b98 | fd201e460ae78b7a
+fog | 1 | 9dbc76f0 | e96e5d750d2f5844 1
+fog | 2 | a8365d6a | 9b771b5c4d4e663c
+fog | 0 | 48c0248d | 2d661e9eb2263feb
+fog | 1 | 957c59d8 | e3f116feed9d5eea 1
+fog | 2 | 536908c2 | 4d6d3acf843f262a
+fog | 0 | f4b6cd55 | b152504207d98e7c
+fog | 1 | 3d94263c | 7da144b97d054b25 0
+fog | 2 | 10fd52ea | 42a97956e341f49a
+fog | 0 | b39f5c4a | cc9382653f312dfe
+fog | 1 | 3e75f964 | 12425dbe66b3c700 0
+fog | 2 | 40c422b1 | 454f2ed26c70d239
+fog | 0 | 2a67ccd6 | cb6bd654f487a389
+fog | 1 | 16168315 | 91454242b5fda459 0
+fog | 2 | 26f03703 | 28eee9ddccced25f
+fog | 0 | c053582c | b5026608d587c042
+fog | 1 | dfbc5e3e | a754ffe6b18fc2e7 1
+fog | 2 | 4039295a | aa868c8bcc478f22
+fog | 0 | 236f4c56 | 7b65ac30bb2dcd63
+fog | 1 | b1bfd146 | 5cd85d1f3de9bb66 0
+fog | 2 | 24d5297d | 96d1a1caa2346dd1
+fog | 0 | fe66c466 | aa4ded336e271869
+fog | 1 | 96a66aff | 12425dbe66b3c700 0
+fog | 2 | 7c543ad3 | 1a391aad5c446a31
+fog | 0 | 96da3bdc | 62d1762a8c640a9a
+fog | 1 | 55794355 | 3f87bf2ef29a826f 0
+fog | 2 | fc83f6a2 | aa868c8bcc478f22
+fog | 0 | ab19e290 | 9444753466e4dcae
+fog | 1 | 26374991 | 6dd8393796f095e2 0
+fog | 2 | 1d8a5f79 | 4d6d3acf843f262a
+fog | 0 | 4b50eda2 | 69912d4d98f90cb1
+fog | 1 | 817c4db | a671bb36176e6054 1
+fog | 2 | 59799aa2 | 93347f3d299e735e
+fog | 0 | bec4962c | fadf4282accce19f
+fog | 1 | a300d7b5 | 8ebdccaf4ffb93fa 0
+fog | 2 | e0a61a25 | 40ea0a0a4eea43ec
+fog | 0 | 635b65fc | b5c556baf3e083c0
+fog | 1 | 9b08c03f | 5b53d1c72f010e26 1
+fog | 2 | 396d490 | 40ea0a0a4eea43ec
+fog | 0 | 293cf129 | 439717a43c62e189
+fog | 1 | 3587d46f | 225c16573042b728 1
+fog | 2 | c72db703 | 89c15179bfe6f0de
+fog | 0 | 430008f8 | 94bc46cafe81e664
+fog | 1 | 662c5373 | 491320825f0c4dfa 1
+fog | 2 | 9aeb8c4b | 262f0a8a1efd51ca
+fog | 0 | d17f5857 | ae22fc31acdf2171
+fog | 1 | 42ebfc07 | 7da144b97d054b25 0
+fog | 2 | 7a20d865 | d7d2b803c7cb106
+fog | 0 | c73ea62c | 2f7116387e8b2bfb
+fog | 1 | 970d15c3 | 3ac204b71a448cea 1
+fog | 2 | e461244e | 741750fc8fa5de6b
+fog | 0 | 7ae58aee | 3fa3e0840d7eb2ba
+fog | 1 | 82ff19d8 | e689f1be34d99d1a 1
+fog | 2 | 5810545f | 8de581b7c6fa8ff2
+fog | 0 | 175fe83a | 772be86562bca15e
+fog | 1 | f3fb6385 | 4516abcdf3986767 1
+fog | 2 | 42aaf565 | 40ea0a0a4eea43ec
+fog | 0 | 574a1882 | f27508ac8e485c28
+fog | 1 | 38dc04d | 47aec3c7c69b6955 1
+fog | 2 | f661cd54 | 9b771b5c4d4e663c
+fog | 0 | 86b55912 | e1165021094b3d37
+fog | 1 | a59a035a | d0b9e8bd807c7e21 1
+fog | 2 | cc14fcf | 5b3aeb8f1694d06a
+fog | 0 | 7f070d36 | aa33045f079b9bd1
+fog | 1 | 17f4d084 | d2baf18ebb8a0e69 1
+fog | 2 | 4ffb1486 | 40ea0a0a4eea43ec
+fog | 0 | 7007d193 | d6f384a05650464d
+fog | 1 | f8b23998 | 7da144b97d054b25 0
+fog | 2 | a03d5be7 | 7f4596b1acaf0e66
+fog | 0 | b3d7b20b | 71b116b74b95012e
+fog | 1 | 5c53da47 | 2055903635ce6b2c 1
+fog | 2 | 414cd644 | 40ea0a0a4eea43ec
+fog | 0 | 4f16aa00 | f639cf4f5f60da02
+fog | 1 | 713b97de | 495466bca256bd4e 1
+fog | 2 | ffd9d610 | a8cd09816193dd5b
+fog | 0 | e4525e26 | 68ae57e0c1830513
+fog | 1 | 5971328a | 4fb20d69930731e7 1
+fog | 2 | 52d1c5e1 | 1d03dbc655d1f2ba
+fog | 0 | b2291082 | be7a34f86451ad50
+fog | 1 | cb043e76 | 92f75b6517d3ad8c 1
+fog | 2 | d76fcb5a | c1b5b5a3165aedb1
+fog | 0 | ee6f2a28 | 4ec62914c680253b
+fog | 1 | 9373c692 | a752368318755fb2 1
+fog | 2 | 8b67449b | 4d6d3acf843f262a
+fog | 0 | 102673b1 | 193f725149901bfe
+fog | 1 | 50786214 | ed881457099c7d91 1
+fog | 2 | fa4087be | 80188c867d9fc2c
+fog | 0 | b5639535 | 55b70a6d509cdc87
+fog | 1 | 62df0521 | 2d8ce80b9df3937a 1
+fog | 2 | 9b44ea46 | 4d6d3acf843f262a
+fog | 0 | 823bf90 | fe156ac01df0170d
+fog | 1 | 8f9ccbe | a1fbac282b3dd111 1
+fog | 2 | 411d9545 | 5fff02bc61f975ce
+fog | 0 | aa0fec6f | fbf15306a093e9b0
+fog | 1 | a3f7ffac | 8b70696ef29cc5e3 0
+fog | 2 | 667c1aa | 4d6d3acf843f262a
+fog | 0 | 9408e885 | ac5e1915f2872c9
+fog | 1 | 6683a757 | 7e6ed7884820573d 1
+fog | 2 | 8dd46c2e | 40ea0a0a4eea43ec
+fog | 0 | 72139c60 | c04a4074929d62f5
+fog | 1 | d33a5228 | bed203f9b3a09f36 0
+fog | 2 | 39b7d219 | 40ea0a0a4eea43ec
+fog | 0 | ff86730d | 40746543afcb492e
+fog | 1 | c1ef1256 | 993d9f119b0a2def 1
+fog | 2 | 1bd44495 | 2dbe5bb6957c95cc
+fog | 0 | bac53bb6 | 6ff90eda0e77cdd7
+fog | 1 | 55e15e2f | 6ce7f7dc1a917743 1
+fog | 2 | b43f2a8d | 1adfcac3305e4f4e
+fog | 0 | 9bd45aeb | 6d292aea25948da6
+fog | 1 | ad771432 | bcf93a346b2ad93c 0
+fog | 2 | d30b1259 | fca0a8a9b491f5a9
+fog | 0 | 74dab9d1 | 635293f643536781
+fog | 1 | 8d601d42 | 12425dbe66b3c700 0
+fog | 2 | 50c46fce | 8378fe92d398badc
+fog | 0 | 4673fc1a | 4938035ceb776cb4
+fog | 1 | ef91c9c4 | 12425dbe66b3c700 0
+fog | 2 | f13ad440 | 5b8f1fa074a6e70f
+fog | 0 | 6011119e | 1f3e64055346a567
+fog | 1 | 8663faf5 | 7da144b97d054b25 0
+fog | 2 | c11e6d6d | 9b21afc6a7176f25
+fog | 0 | f85499c0 | 64f2fb583e896562
+fog | 1 | 7e71bfc7 | 3f87bf2ef29a826f 0
+fog | 2 | 3cada6f7 | 40ea0a0a4eea43ec
+fog | 0 | bb804d32 | 33159224562f514d
+fog | 1 | c078754e | 45a82096f504e38 1
+fog | 2 | b7d20016 | df9bef2974696eae
+fog | 0 | 9583cbe6 | d1b53d41bde2b23f
+fog | 1 | 7bfea695 | 2d77acf9cacbe1d0 0
+fog | 2 | b7fa3ad2 | d65458e0310fb4b3
+fog | 0 | ee1b1c5c | 5ae759e940bb468f
+fog | 1 | c04bc5d4 | 2a31502ec7525777 1
+fog | 2 | 5d0fcec3 | 5da1ca22a62e2d23
+fog | 0 | 761e33bb | ba0ec455270377c
+fog | 1 | 6e12e94f | 14b6272031a9ca88 1
+fog | 2 | 4e71854c | 9b771b5c4d4e663c
+fog | 0 | ac301045 | e04d94e617f99e68
+fog | 1 | d9562622 | 26728e786e55fdc2 1
+fog | 2 | e32e9a35 | 8a40060a6d071a2b
+fog | 0 | a6deea7c | c6554afca03c41ae
+fog | 1 | 88d74166 | 1abd4082f9ab165e 1
+fog | 2 | e36ba6ae | abcbb62958b96388
+fog | 0 | a48c1602 | e7618a3df621ccdf
+fog | 1 | 4e53d543 | b21f970f2d5682d 1
+fog | 2 | 97fb8622 | 4d6d3acf843f262a
+fog | 0 | 76613f78 | 70212371f54a5247
+fog | 1 | 2507b6fb | 7bbf779bfeb27371 1
+fog | 2 | 48076113 | 60c282e2742e833c
+fog | 0 | 86d72c56 | b552443a0150f6e7
+fog | 1 | d74c1642 | 3f5cd450f37efa30 1
+fog | 2 | 98919e1d | 4d6d3acf843f262a
+fog | 0 | 9c5bf3b7 | ba39389cb38dce97
+fog | 1 | a028d625 | 7271f2d87056f0a2 0
+fog | 2 | 59dcd7de | 9b771b5c4d4e663c
+fog | 0 | fb355d2a | 3d9e134a330cdcca
+fog | 1 | 6dbf9261 | a7bda382aec9330f 1
+fog | 2 | 4bf4fe1f | 615facdc061cae69
+fog | 0 | 2ff20cec | 2a3197ec83fe0f53
+fog | 1 | 7d20a5d5 | 3f87bf2ef29a826f 0
+fog | 2 | 2abdc402 | f66bc91ebfb73c11
+fog | 0 | c8c85fb5 | 7c7045f1b1dba497
+fog | 1 | f30e5f78 | 3f87bf2ef29a826f 0
+fog | 2 | 45740a22 | 40ea0a0a4eea43ec
+fog | 0 | f8ae38f2 | 5133a29c23b4759b
+fog | 1 | 7ae69cfe | 6b404a35102a5ea0 1
+fog | 2 | 80f7c0c2 | cac33f0745406983
+fog | 0 | ca859815 | e773f79e390bf3da
+fog | 1 | f0e52f91 | 30759e8f231606bc 1
+fog | 2 | 884a0daa | 66da8d2b00305703
+fog | 0 | 3c3f5561 | 1ec75ef0d666a5f3
+fog | 1 | 62f7c083 | 2442b5a907070c3c 0
+fog | 2 | dc88e98e | 4d6d3acf843f262a
+fog | 0 | 6471ac07 | 3e653cf85824a3a6
+fog | 1 | 6ccfc0de | 85bfdbd0666e2262 1
+fog | 2 | d555f49e | 29a7368e2a99044
+fog | 0 | 7dd34c4c | 75ef94c8e0050818
+fog | 1 | abf55b16 | 805f5b2a67753f0a 0
+fog | 2 | c4deda54 | 4d6d3acf843f262a
+fog | 0 | 14331429 | 544d5ec7c25f8245
+fog | 1 | 188ceb10 | daee412cd036fc8a 1
+fog | 2 | fb94c5a7 | 50ade916ec8cd906
+fog | 0 | 1c80b77f | 6581722e137daac
+fog | 1 | 6e6248ee | b032106d77e70f4 1
+fog | 2 | 7efb0946 | 4d6d3acf843f262a
+fog | 0 | 7a48b15b | 3d62c8efd6ab42c1
+fog | 1 | 5200f0e7 | 45d3ec47698bf3c6 0
+fog | 2 | 2c1a6022 | ed18b6b940dd5c29
+fog | 0 | 29c98410 | 6104464ccfbbc0a2
+fog | 1 | aa47fca7 | c0c9b84434d84ffe 1
+fog | 2 | e3827006 | 4d6d3acf843f262a
+fog | 0 | 908aa926 | 77430e9dd3466e99
+fog | 1 | 49785e44 | b3d6fe204a6b2caf 0
+fog | 2 | 2bc81f96 | e2149c239ccab7fb
+fog | 0 | 8c1cc81a | 642db7e20c546c48
+fog | 1 | 298a5d65 | 7da144b97d054b25 0
+fog | 2 | 27d64fec | 9b771b5c4d4e663c
+fog | 0 | 893fa4e9 | 6d787f044fc474a7
+fog | 1 | 39ca33c8 | ed8a25b74bfea841 1
+fog | 2 | 1224267a | 240fd0a1a13c4309
+fog | 0 | 1412dce8 | ef82b92b203d7e34
+fog | 1 | defef189 | b1f734c8d94eda25 1
+fog | 2 | e3cb66a5 | d030a3e980455c6a
+fog | 0 | adb10688 | a102d23e196cd5bd
+fog | 1 | 7cf20fed | bf3c44c27561f277 1
+fog | 2 | ed5f5332 | 37223de3cd7bfd18
+fog | 0 | 979c5079 | 3e33a317cfed61ee
+fog | 1 | d82cc715 | efaad1c5abbaf838 1
+fog | 2 | 7eb8a617 | 832c9dacaf299b07
+fog | 0 | d134c957 | 21e1f2d0cec8a3d3
+fog | 1 | 3d2b4eea | e9731fd317b4cbd7 0
+fog | 2 | b44ef9ea | 7dd52ef1f8fe0552
+fog | 0 | 3724feb4 | bf893ed74c4c7f88
+fog | 1 | d2bf8887 | 5b3aeb8f1694d06a 1
+fog | 2 | 9ef87e9c | 23cd00a2c3ecbb3f
+fog | 0 | a706ecf6 | 4e0257dfab885d41
+fog | 1 | 789c2de4 | 599dd4398ecb9378 1
+fog | 2 | 75e9c40d | ac1cd1ef7c631e62
+fog | 0 | 553a574d | 9ae7a41114ffe956
+fog | 1 | a2cd3ba4 | c8defbe51701cef 1
+fog | 2 | 2a8f31c7 | 30777874b667f69d
+fog | 0 | f47a2937 | 14ae966d59dded34
+fog | 1 | e84a0224 | 6757d279b5530d29 1
+fog | 2 | 37410889 | cec9dc6ae90e9714
+fog | 0 | 535c2da0 | 626b62ed6ff8077f
+fog | 1 | 4578798e | 7da144b97d054b25 0
+fog | 2 | 387d693c | 4d6d3acf843f262a
+fog | 0 | 6541d764 | 713f21854eb35ebe
+fog | 1 | aba66c6a | bd09be59658718f8 1
+fog | 2 | f2e3e973 | 3da82d997e5122dc
+fog | 0 | 92a2e8ac | 43465d90176da63b
+fog | 1 | ce250676 | bcb688449e479543 1
+fog | 2 | a814a9c | 53ffb15129b8f09d
+fog | 0 | 325f2826 | d8e24d92ae222106
+fog | 1 | eeee36aa | 7da144b97d054b25 0
+fog | 2 | 2b108ba0 | b71c4cea9a4b4bd9
+fog | 0 | d0f920e8 | aced774f4b0df3fe
+fog | 1 | d0366cd0 | b4a67730c9c3ccbc 1
+fog | 2 | 5d96e87b | 2a53509c21c48e6c
+fog | 0 | a2a0f43d | 929ae25f71557dee
+fog | 1 | bbd76b33 | 7da144b97d054b25 0
+fog | 2 | 4cafb36c | 9b771b5c4d4e663c
+fog | 0 | a5305024 | d6386ef2dc5dada1
+fog | 1 | 5772ad0 | 2f9231c7b7d87172 0
+fog | 2 | 1ef71a44 | 4d6d3acf843f262a
+fog | 0 | bd8b78fc | 61a79c12243ab845
+fog | 1 | 1da0f3d1 | ac556c5ec414417a 1
+fog | 2 | 3608bd34 | c1b5b5a3165aedb1
+fog | 0 | bfa53c6b | 91d75f958b79b40e
+fog | 1 | da2b71a9 | e6758295d7343721 0
+fog | 2 | e28280b5 | 9b771b5c4d4e663c
+fog | 0 | ebddd9c8 | 7d145113d0d7a57f
+fog | 1 | 8161aa8 | 7d5d8dad6719c75d 1
+fog | 2 | 22991ade | f89aeb725b2a487d
+fog | 0 | bb04d29e | ec57aa980210fb6c
+fog | 1 | c9beca32 | 12175d1ff2173d1d 1
+fog | 2 | 5ecbe2e6 | fe9cd23c3b4020d8
+fog | 0 | 35d49cbb | bc5595a78e539928
+fog | 1 | 2d733a9f | d71e14c9191b9f1f 1
+fog | 2 | 18eb7eb5 | 40ea0a0a4eea43ec
+fog | 0 | 81f0c127 | 1856e27983088c5
+fog | 1 | 90e16f6b | 2b734e6630f43bd2 0
+fog | 2 | f945c0d8 | 5a65ac127494f3ce
+fog | 0 | db7dc18a | 10f7094556d6e5f4
+fog | 1 | 981569b | 4c4fb85e54820631 1
+fog | 2 | 8e0fbfdf | 8887da87045e7b6b
+fog | 0 | 8503e67 | ac9197fda9dadf29
+fog | 1 | 3d1458d0 | f3ec317784a0377b 0
+fog | 2 | c9c6d166 | 40ea0a0a4eea43ec
+fog | 0 | e108a7a6 | b6ab3303c1d3b541
+fog | 1 | 2c3ce73f | 5a99dbf45987f6d7 0
+fog | 2 | 861c6cad | bf0e9ac5bfc0ce8d
+fog | 0 | 3e7c857f | 432c46f9b9da9ca2
+fog | 1 | d7d0d5c | 25789efe30ca2e79 1
+fog | 2 | 30ad1e16 | ba8ee8dc1a8dc240
+fog | 0 | 6cf8a1b4 | add823e81f37610b
+fog | 1 | 6c858e1a | 12425dbe66b3c700 0
+fog | 2 | 92b7ed7a | 4faa76a812e0f6cf
+fog | 0 | c29a20a6 | 8f788a71b16eea0e
+fog | 1 | 2c05119c | 12425dbe66b3c700 0
+fog | 2 | 34146d8 | b964566d03f0916a
+fog | 0 | 931dac7e | 64bcc88494f630c5
+fog | 1 | 4bac7e62 | 7da144b97d054b25 0
+fog | 2 | a4a7f68c | 9b771b5c4d4e663c
+fog | 0 | 5d1da27b | 2f1b8af045468045
+fog | 1 | bdc95cf2 | 6187e18ea63edca1 1
+fog | 2 | e93f9f41 | 40ea0a0a4eea43ec
+fog | 0 | fded053 | 1441ff1ea4810f51
+fog | 1 | 4cf8f601 | 66fe9213643bc307 1
+fog | 2 | c5e54b8f | 181f2e3323f3d8c2
+fog | 0 | a87b7e29 | 52720cddce33bb16
+fog | 1 | c60a9ece | a242731b3d50a98e 1
+fog | 2 | bba9dc4f | 40ea0a0a4eea43ec
+fog | 0 | ba7873c3 | 680f508d4bb6f591
+fog | 1 | c2de4d4a | 65a5407981ca834d 1
+fog | 2 | 93b2b6ff | fdf0b3924047c303
+fog | 0 | 39a0d8e6 | d4a3fcb140dd5f27
+fog | 1 | 6132e228 | 8cf296f73f7af58f 1
+fog | 2 | add634db | 23cd00a2c3ecbb3f
+fog | 0 | 729d1a5b | a4c0bfdd3b9dbd79
+fog | 1 | 5cfdb1d3 | 88b6f2d93a27b6bd 1
+fog | 2 | dcc7a354 | a8cd09816193dd5b
+fog | 0 | 961974f7 | 7c8950bf5bb5808f
+fog | 1 | c2f73a20 | 69737237137826e8 1
+fog | 2 | 87a7b62d | c069f6f78f16895a
+fog | 0 | 235466be | 784323dd271850d7
+fog | 1 | b0ab417f | 6f062f2585c4af5e 1
+fog | 2 | 84284f54 | ed52ec4d67f732
+fog | 0 | 2e169c23 | ee5af1e6c407cb72
+fog | 1 | 9bdac47f | 6426bd873c3af381 1
+fog | 2 | ee3a7f65 | e25a9898a626b46c
+fog | 0 | aaf519f0 | 72912399f4b75371
+fog | 1 | c0278592 | 62946cef46f88dc8 1
+fog | 2 | 8c9f7e9e | ca87d11e35ee6147
+fog | 0 | d07bf4cb | 507d68a7ddcc91e0
+fog | 1 | aefd4f00 | 93b581f32309df8e 0
+fog | 2 | 56d708d9 | da5c4ed0b78d8893
+fog | 0 | b492dcd3 | 1035d38753810537
+fog | 1 | b6ca697b | 7da144b97d054b25 0
+fog | 2 | a014da56 | 9b771b5c4d4e663c
+fog | 0 | 8087ef88 | fd0c7df280092b6a
+fog | 1 | 9981e3e6 | 84558e440cac61fc 1
+fog | 2 | 230a4514 | 663eced616b130cb
+fog | 0 | c9ceaf04 | 974bc9bd84d9ba4f
+fog | 1 | aba97ae5 | 58cd50b40d71a4 1
+fog | 2 | 9c66cb47 | 4d6d3acf843f262a
+fog | 0 | 90338f2a | 636205db0411d678
+fog | 1 | 54f53c2f | d7f36e9a7c47fa63 1
+fog | 2 | 53af5902 | b806f5ee4e1ff4ba
+fog | 0 | 3aedbd05 | a1b021d41ae233f4
+fog | 1 | fdef678b | e625bc92ba55fdc0 0
+fog | 2 | e8676d2e | d4e88d74ea377e28
+fog | 0 | afb88ec9 | 5431f452d9fe3a6e
+fog | 1 | e5e09a1d | 1330a15279b68000 1
+fog | 2 | c9d684da | 4d6d3acf843f262a
+fog | 0 | 9e0c5e39 | 4aedf7651cb5f3e3
+fog | 1 | 489832bf | afc414ad151bd96d 1
+fog | 2 | 993523ba | 8182a4059c34ae0
+fog | 0 | 3c8d28c0 | a0501a046744ea39
+fog | 1 | 4e3d76ff | 4b961cc45132d838 1
+fog | 2 | 5f8538f3 | a79e7f3ee59ea42b
+fog | 0 | 5f89977f | 6c7b8b202537a6e9
+fog | 1 | cf173d12 | 903796272c64f708 1
+fog | 2 | c13cc6bb | 2545972bd581c795
+fog | 0 | be75355f | d67344218d217bdf
+fog | 1 | 55f8346c | 4711bf4aff7934f 1
+fog | 2 | 7006c2d8 | 9b771b5c4d4e663c
+fog | 0 | fb620091 | b298e80744241f4f
+fog | 1 | 4e70401a | a6bf59f80ef09d58 1
+fog | 2 | dd823e31 | 9b771b5c4d4e663c
+fog | 0 | 346ae91e | 279e8d5059d75878
+fog | 1 | 235d9708 | c124de0c93679751 1
+fog | 2 | 508b4a87 | fbef30a5970e49eb
+fog | 0 | fdcc0d1c | b03511e1b619e93
+fog | 1 | 70d706c5 | ec3f10de9f32c126 0
+fog | 2 | b70f1a | 5ba3766e298aacdd
+fog | 0 | d6ab37eb | d67b864598bfef59
+fog | 1 | d1d82a95 | 12425dbe66b3c700 0
+fog | 2 | f39c68d9 | 6ca137f61d172de8
+fog | 0 | d9dc9c50 | 79371550dfed192b
+fog | 1 | cd7bf260 | 9387ed13490ce7c 1
+fog | 2 | a13e5ff4 | 40ea0a0a4eea43ec
+fog | 0 | 340882e8 | e3492d1998f333f7
+fog | 1 | c95419b6 | 5ba3766e298aacdd 1
+fog | 2 | 4ecb4eab | 40ea0a0a4eea43ec
+fog | 0 | 34125d9 | 74c18f31e78d2660
+fog | 1 | f769aa47 | 895612a5d6ea539c 1
+fog | 2 | 958a806d | 1d03dbc655d1f2ba
+fog | 0 | fafa0fef | 76514cd2aa3ddc26
+fog | 1 | f9e55d84 | 7da144b97d054b25 0
+fog | 2 | 2a2bce89 | 4d6d3acf843f262a
+fog | 0 | 6752c1a | 9aef22196be54259
+fog | 1 | c4072324 | 8c910f2cb94e9cfb 1
+fog | 2 | 527c8532 | a60738e4c5f92f4d
+fog | 0 | 91ff09b8 | c034a3e3fa4542ad
+fog | 1 | 7cb55a23 | f90874b9bf1e4853 1
+fog | 2 | b5041c4 | 4d6d3acf843f262a
+fog | 0 | d8abdf35 | 945a1cd004a1e0c2
+fog | 1 | cca1ebef | cb9edad34474e852 1
+fog | 2 | 55bd683d | 4d6d3acf843f262a
+fog | 0 | 8eac4ad9 | 832f70209e609cb4
+fog | 1 | 95200361 | 190e1bd8fbe4dd05 1
+fog | 2 | d9bfbaa | 40ea0a0a4eea43ec
+fog | 0 | 958ec3ee | 6dc53f5fd87d5f0c
+fog | 1 | 898e0e43 | a20cdd4185defa76 1
+fog | 2 | 34890363 | 40ea0a0a4eea43ec
+fog | 0 | 305a8bcc | a96ca73864526b0b
+fog | 1 | 49c7695 | abc7298f6b2b5425 1
+fog | 2 | d030b206 | 1a324678ecd4f1a6
+fog | 0 | 9e46b01c | c014c35e3f07b36e
+fog | 1 | cc00c773 | 7da144b97d054b25 0
+fog | 2 | e49a3efb | c0c08b61b37bae34
+fog | 0 | 29ae94ef | d0faf1dad378b90d
+fog | 1 | 9bd3f2b7 | eff1e17162f807c5 1
+fog | 2 | 114f624b | e565e3de8487d4e6
+fog | 0 | 30d68ac7 | d0b43cc450aadce8
+fog | 1 | bb0280da | a350094dfd290dd2 1
+fog | 2 | d7fbba9b | 1d03dbc655d1f2ba
+fog | 0 | 14a606f7 | d341a244df8298ae
+fog | 1 | 9d108959 | 5144a6cf1194ad51 0
+fog | 2 | 8153ab4 | 6acae82a1568f736
+fog | 0 | 2b645901 | 854b65066dee4725
+fog | 1 | ec175424 | 7da144b97d054b25 0
+fog | 2 | 1b6e6da1 | 8bdf708187a53f8e
+fog | 0 | a8670bdf | 5d53051dc3c90888
+fog | 1 | f27deca8 | 3f3e1d239839e812 1
+fog | 2 | f62f8c3c | 6b7cf42951c183d0
+fog | 0 | ddec1652 | 9419b84bbd0b0ac1
+fog | 1 | 33c80faa | a5788c9b61e4d7bf 0
+fog | 2 | a6aa0ce6 | 3327da72b1377b51
+fog | 0 | cf124fea | 1c6d3caf37489e2
+fog | 1 | 551cde3e | 3f87bf2ef29a826f 0
+fog | 2 | d98b1dc4 | e7376bda8634a787
+fog | 0 | 4e65d5ca | 5d43881210165f90
+fog | 1 | 6e4c6bf3 | 52e16018852407c 1
+fog | 2 | f7603639 | 1d03dbc655d1f2ba
+fog | 0 | fbf83807 | f7cb9a1ac93e409e
+fog | 1 | 3e7226a6 | d3921a5145ce1e0a 1
+fog | 2 | dc5ada99 | 40ea0a0a4eea43ec
+fog | 0 | 105068ef | 68aa86f58c5ff91b
+fog | 1 | aab78875 | 82b18acec35bd0a2 1
+fog | 2 | 1f2dab7d | f1a4a5853106e403
+fog | 0 | 6b3a4c9d | dadaaffd0c07702a
+fog | 1 | c5298c74 | 12425dbe66b3c700 0
+fog | 2 | 20713ea9 | a8e53790b8d9700d
+fog | 0 | 11cd3bb2 | 931d38823067e406
+fog | 1 | a91cd5a4 | 1763caea3745946d 1
+fog | 2 | 4496a9b4 | 4d6d3acf843f262a
+fog | 0 | c705214f | f2884f62dfefee8e
+fog | 1 | df30ace7 | 5b43abce3a277035 1
+fog | 2 | de9eb55c | 27995fd86f4701be
+fog | 0 | 3e9edf33 | 7df390428d76c66d
+fog | 1 | e28110dc | d12c848d17120ca2 0
+fog | 2 | fedc07a1 | 40ea0a0a4eea43ec
+fog | 0 | 1dcb81ab | 74b972f684bc0dec
+fog | 1 | ee8812db | cbfd6953ea5354a5 1
+fog | 2 | dbd940c3 | 4d6d3acf843f262a
+fog | 0 | e47db82c | d7defae6b17b7ba5
+fog | 1 | 61c336e1 | 7da144b97d054b25 0
+fog | 2 | 4d96ba94 | 4d6d3acf843f262a
+fog | 0 | 27f820d5 | e2dcfa78b9859299
+fog | 1 | 53037530 | bd09be59658718f8 1
+fog | 2 | 37d311e4 | 541aaa1e37935d7
+fog | 0 | 4a89239 | 9d9a6589d418abec
+fog | 1 | 57ce0d89 | cd56645601bdb2f6 1
+fog | 2 | a4778cd2 | 5b72515350fc69ff
+fog | 0 | 34d096f9 | fd7d762298dff052
+fog | 1 | 9db41e60 | 80cb41cbac980e78 1
+fog | 2 | 70191037 | 4d6d3acf843f262a
+fog | 0 | 863d4f0 | 98c82261cca049d8
+fog | 1 | a77fc9d9 | 710458138db82757 1
+fog | 2 | c5629806 | 40ea0a0a4eea43ec
+fog | 0 | 378b1796 | 6959e07884253e0a
+fog | 1 | 8da1e049 | 3d16a69bd2bacca6 1
+fog | 2 | 3d91d252 | 377a9b9b09c108ef
+fog | 0 | b4bd7b0d | 9177ebb8d71c497
+fog | 1 | df3ad549 | 3f87bf2ef29a826f 0
+fog | 2 | 17fb1bdd | 4764bd1c867e9e62
+fog | 0 | 2a6959e1 | c0b3e3ad6cb10d8d
+fog | 1 | acaa1ee3 | 3dde821d2fe57483 1
+fog | 2 | 5cc42b58 | 7f0e7707da443689
+fog | 0 | 42ba6872 | 345ebb70969b20ef
+fog | 1 | a4a0bab1 | 364a3ac230bc51b7 1
+fog | 2 | 6299e767 | 40ea0a0a4eea43ec
+fog | 0 | 38831982 | 116e0d53f9be90f2
+fog | 1 | ff15f4cd | 55207da7891476c8 1
+fog | 2 | 92ea11ae | 45f1c24f40f157c9
+fog | 0 | 30dd34e2 | ea2893550a3a50bb
+fog | 1 | 4e4e3229 | 8b74825261d2c0d9 1
+fog | 2 | e6d86117 | a60738e4c5f92f4d
+fog | 0 | 519309e9 | 33ac880426800d0f
+fog | 1 | f0f82652 | 95f54b300bc42ffd 1
+fog | 2 | a2f2f36d | 1d03dbc655d1f2ba
+fog | 0 | cfe8c6e9 | b0f824032b574ff3
+fog | 1 | b3e57e83 | 4db576475435cf40 1
+fog | 2 | 74a43dad | 40ea0a0a4eea43ec
+fog | 0 | feae039f | a30aee7cbe7fc836
+fog | 1 | d32c4e5 | d393c21bbbb006eb 1
+fog | 2 | 2ee03fed | 14d648412edd163f
+fog | 0 | cf310547 | 76d1c1e4d49ad2b7
+fog | 1 | 7a39a561 | 38e05ab85074feac 1
+fog | 2 | 4168cbea | 40ea0a0a4eea43ec
+fog | 0 | 9b6d97e3 | 5d6b7c8c98f3a6d7
+fog | 1 | 8b39c648 | 7da144b97d054b25 0
+fog | 2 | f4ccaf58 | 8fe6728d91c9290c
+fog | 0 | 6b75c912 | effac48d554d996b
+fog | 1 | 282b5603 | e81b7120db0367b6 1
+fog | 2 | 5fac0a82 | 9e0fff5ffbcc3513
+fog | 0 | a83e3a51 | 7529a9615ee3d4cc
+fog | 1 | 6c186fc0 | f868553b7ead1f64 1
+fog | 2 | 3f00be3b | cac33f0745406983
+fog | 0 | 75cdabdb | e92a3dc76c179060
+fog | 1 | 8644509d | 12425dbe66b3c700 0
+fog | 2 | 88f73106 | 465a4e16347c7974
+fog | 0 | ef0923e | 3d8f1e1b3740f93c
+fog | 1 | af2311a0 | a6d3474fb37178c6 1
+fog | 2 | 3989269 | 4d6d3acf843f262a
+fog | 0 | 3ec5598 | dca0c1cd7fbf9e1f
+fog | 1 | 3441d04a | 3f87bf2ef29a826f 0
+fog | 2 | 657430c0 | cae7a7dcb698e27
+fog | 0 | 6ff7e111 | 7ddbe3d348a7ae05
+fog | 1 | ffc8821e | f3cd6c20facd54 0
+fog | 2 | 483b6337 | 4d6d3acf843f262a
+fog | 0 | 56f9e440 | 77035a9ba1e0c02c
+fog | 1 | 989d683f | 1e74fb33c46f2633 1
+fog | 2 | 8c51e767 | a4156145192a98c7
+fog | 0 | 5dfa37b1 | d60f20d44b9c453b
+fog | 1 | 12e1f966 | e9ae7668e44601ae 1
+fog | 2 | d79b7661 | 68bed60281a69d4a
+fog | 0 | 6acd4b67 | e13917104ee3a387
+fog | 1 | f89e28d1 | 7da144b97d054b25 0
+fog | 2 | 39a54557 | 1d03dbc655d1f2ba
+fog | 0 | 7f78a4e6 | cf29630ad45c27d9
+fog | 1 | c6ebe47c | 3f87bf2ef29a826f 0
+fog | 2 | d037b772 | 4d6d3acf843f262a
+fog | 0 | 57c6013e | 3abfb569cc027e08
+fog | 1 | d4218ad6 | 7da144b97d054b25 0
+fog | 2 | 2e1b2686 | 1d03dbc655d1f2ba
+fog | 0 | ce39e454 | 3ef1d699afd391b
+fog | 1 | 24f4b45 | 7da144b97d054b25 0
+fog | 2 | 5fac2d01 | ee39004648c3481c
+fog | 0 | 64bffd54 | 4b976211015cd1be
+fog | 1 | 4e781a2 | 81fa843a2e77de1 0
+fog | 2 | 3250e7df | 9387ed13490ce7c
+fog | 0 | 4cc6bdcb | 672777ab749fae69
+fog | 1 | 157366be | 9ae487044977a406 1
+fog | 2 | 4f153911 | 40ea0a0a4eea43ec
+fog | 0 | eb393922 | d688319c023e9c83
+fog | 1 | 6e16fb7a | d7adf4a29016721b 1
+fog | 2 | 95d237ca | a0b8b897a7e94dec
+fog | 0 | 48e4be7c | 2a2353b29f35525b
+fog | 1 | 49bf7464 | 4d9980b2444e248a 1
+fog | 2 | b5240c96 | 40ea0a0a4eea43ec
+fog | 0 | 60c13b13 | b6ed1a9d12381fbf
+fog | 1 | f014d1e1 | a9130fc85974a678 1
+fog | 2 | e7f5fe7b | 4d6d3acf843f262a
+fog | 0 | 8183afe7 | d840c92f7ec709f5
+fog | 1 | 3c0e0ad1 | 314bb30825d20cc9 1
+fog | 2 | 32e093c | e8682fd43cf89f9f
+fog | 0 | dc836474 | c09e932028c3847e
+fog | 1 | a8b0d749 | 29069b7b45d746cd 1
+fog | 2 | ff9b4ab5 | 40ea0a0a4eea43ec
+fog | 0 | eaad12bc | 7c71e5cb7bafbc0a
+fog | 1 | 49e9922a | d4d4c63e5eac4c2f 1
+fog | 2 | 9342363a | 74e9399ec3f26d06
+fog | 0 | a6c39692 | 68942d94e2ca3fc
+fog | 1 | 4f76c171 | 4026328441455d3c 1
+fog | 2 | 5c0cebad | a7e17ac071133430
+fog | 0 | 759785a4 | 8d996b8493bcc0c8
+fog | 1 | 5f969a60 | f26f1d53927e019f 1
+fog | 2 | 4f0dfcca | 4d6d3acf843f262a
+fog | 0 | 8cfa2701 | c490815308bbe7e5
+fog | 1 | 450e42f9 | f645b5fe1181a557 0
+fog | 2 | f576af88 | 9387ed13490ce7c
+fog | 0 | b4a67439 | 642ea61f71991450
+fog | 1 | 71f9feb4 | 3f87bf2ef29a826f 0
+fog | 2 | 74af7b7f | 4d6d3acf843f262a
+fog | 0 | 8465679d | ecc1debbaa9d9b16
+fog | 1 | b8061b3c | 4a42782fa07fa47 0
+fog | 2 | b97fd7cf | 7c96cea1b2713ef4
+fog | 0 | 4d34781b | c8982bada260eb5c
+fog | 1 | 15bb1906 | b2ae217958306518 1
+fog | 2 | 99b2f680 | ea366b1079be6ff
+fog | 0 | e70c9fee | 269c63ad420ce0
+fog | 1 | bdb5420a | ac9a93d0fa79ecca 0
+fog | 2 | 3312ca62 | 13fed5103c1d0b3a
+fog | 0 | ea7eb5d3 | bf56b27b968a5651
+fog | 1 | 2941aae4 | 647985273104e360 1
+fog | 2 | 8d587c7e | 8629b024120ca305
+fog | 0 | e64b42fc | e571ee6cedda5147
+fog | 1 | d47db0da | 3f87bf2ef29a826f 0
+fog | 2 | 6368322d | 30777874b667f69d
+fog | 0 | 5cbe0cd5 | 796bd60a4b0b9957
+fog | 1 | 9f420e67 | 4de2b12b441c8d38 1
+fog | 2 | c25d6830 | 40ea0a0a4eea43ec
+fog | 0 | 297eed46 | 21c73aec3d0b7877
+fog | 1 | 79945e04 | d32a1ad5f4e68c9c 1
+fog | 2 | b6ebe977 | 29c27b3fd7e5d9c
+fog | 0 | f511e53 | 2bfdc0874d3f13c0
+fog | 1 | fffd3bbc | 31c6a46db30f1c05 1
+fog | 2 | 623c96e5 | cb32621d174019f7
+fog | 0 | f7f7b393 | a7b8160ce01e81ad
+fog | 1 | d188777 | 7da144b97d054b25 0
+fog | 2 | 1c73ffef | 7a564d089641070e
+fog | 0 | ec9c2f40 | eab88f4a9a3c037d
+fog | 1 | 7e9189c6 | d3512a0f4cd669b8 1
+fog | 2 | 47d13e4 | ec0d41e750b892a1
+fog | 0 | 51b4e2dc | c26d5e20b4480c5b
+fog | 1 | 5beb99c1 | 6a5e69306c9db998 1
+fog | 2 | 30ed1ae2 | df69b0ae206523c3
+fog | 0 | 83d6800f | 4b2d37a1d765276
+fog | 1 | 15630416 | 82681bdcf96f0e78 1
+fog | 2 | a2c07b7 | a374698651f7b956
+fog | 0 | 2fbdfd0 | a421ca8c1671e672
+fog | 1 | 827e44bb | 12425dbe66b3c700 0
+fog | 2 | c985146d | 113761ea710c94fc
+fog | 0 | fda4be16 | 84700997d9bfd085
+fog | 1 | 8006347f | 5c647fc7e9070796 1
+fog | 2 | c13d1c42 | 1d03dbc655d1f2ba
+fog | 0 | df0103d9 | 7fc944df54a26c85
+fog | 1 | 96d23232 | b9abd6f40dcc0b25 0
+fog | 2 | 9ac534c5 | 4d6d3acf843f262a
+fog | 0 | 537237a8 | 1a4f85486bdb0928
+fog | 1 | 8c3011a7 | fb0f171b31aa592a 1
+fog | 2 | 221a8f6e | ae398d136631a79f
+fog | 0 | c4b827fe | 8459bb007631d932
+fog | 1 | abb7d6ce | 9ed9f5ffd1491101 1
+fog | 2 | a8a46bcb | 9b771b5c4d4e663c
+fog | 0 | 6f9de607 | ee2aa2ced3fa46b0
+fog | 1 | 89348f63 | 7da144b97d054b25 0
+fog | 2 | 59ee0476 | bf0e9ac5bfc0ce8d
+fog | 0 | afa22623 | 535aa627ef67f544
+fog | 1 | 2e408b73 | 7da144b97d054b25 0
+fog | 2 | e50c17fa | dbd5ade6cffbd767
+fog | 0 | dfce615a | b8fa8b712984de6a
+fog | 1 | dcb6f9c6 | e01b30addc108521 1
+fog | 2 | fbcd6580 | 4d6d3acf843f262a
+fog | 0 | 132f5eed | ad3e6a17d31afa4e
+fog | 1 | dfe67f0f | 7da144b97d054b25 0
+fog | 2 | bc8b42d2 | e1d872495bc5b976
+fog | 0 | 886a4136 | 9ef03f57fa396ae8
+fog | 1 | cd88e819 | a0cb184b083ba576 1
+fog | 2 | 5468fa25 | 1b3abc1239e1e32d
+fog | 0 | 8cb2d64c | ae30d765fcd86dc6
+fog | 1 | e331360a | 8ebdccaf4ffb93fa 0
+fog | 2 | 75d189b0 | 8b3d4912a583f895
+fog | 0 | 35b3ce7e | eb2ceeeb4131d22a
+fog | 1 | 1358ab5d | 32df950815373f89 0
+fog | 2 | febeaf20 | 44864136f8d8484b
+fog | 0 | fada6e14 | b4f90077d90c5bac
+fog | 1 | 24d4e843 | c9bac6f05c8c645 1
+fog | 2 | 48044da | d773126644282a6
+fog | 0 | cba18233 | 25d19a090e60f7d3
+fog | 1 | 1bf3dc28 | d211f1efe4b36ae7 1
+fog | 2 | 4a9a8299 | 4d6d3acf843f262a
+fog | 0 | c0710131 | df204b3fd7a7ed6b
+fog | 1 | 89f83e72 | 12425dbe66b3c700 0
+fog | 2 | d6c89b7b | 99413d381e975cf
+fog | 0 | 331475bd | 26c4c32d72b5b4c2
+fog | 1 | 449c281e | db48eacd844c27d3 1
+fog | 2 | a6da57f9 | 1d03dbc655d1f2ba
+fog | 0 | 5b33d34d | 4a331547c2d6b7f3
+fog | 1 | cae425bb | e09d1d7c049829d4 1
+fog | 2 | 4669612c | 29c240966349693a
+fog | 0 | 5907a9af | 7aa2b647d291fdde
+fog | 1 | 64a7a1cb | c456aa6db75fd6c8 1
+fog | 2 | dcb47be9 | 40ea0a0a4eea43ec
+fog | 0 | 65a41cd3 | 8febf4195bda7755
+fog | 1 | 476cec8 | 308e60793d0fb95e 1
+fog | 2 | be956e43 | dd4a010775b1ed7f
+fog | 0 | 6ed52d4e | fffa2403b9e93809
+fog | 1 | bff29d08 | b2cf9b1f3c394a79 1
+fog | 2 | e7a922c9 | 4d6d3acf843f262a
+fog | 0 | 6c9a41cb | 717afc3236ca8558
+fog | 1 | 9c9d977b | 4b961cc45132d838 1
+fog | 2 | 41da22c3 | 330c4c7943cf360f
+fog | 0 | ab61b255 | 552a1bc726576413
+fog | 1 | 46aabd66 | 7da144b97d054b25 0
+fog | 2 | 4cfbda24 | e552f656b1d905f5
+fog | 0 | 442e3b8d | d3cc6d651167aa9d
+fog | 1 | c6061991 | d53fd57a6bcd9871 0
+fog | 2 | c6b44161 | eb1d413dba523c6
+fog | 0 | 20194f41 | be857fe55b47c953
+fog | 1 | 3f28fbcc | 3f87bf2ef29a826f 0
+fog | 2 | f80f4e4a | d5e66ac9b31bdbe4
+fog | 0 | b26c7a44 | 3058a5327a86de77
+fog | 1 | ca87bd7d | c7dfeb92ea05ffae 1
+fog | 2 | 7ae1e2c6 | d2f916ac8b41bbab
+fog | 0 | af335340 | 2b60964dd9d76f51
+fog | 1 | 3920db60 | 73efbbd5e956c466 0
+fog | 2 | 678d3cf4 | 3b8c4969c9dcd0ca
+fog | 0 | 2c2ce86f | 2edbbd0b5b75a029
+fog | 1 | 527ecb66 | 3f87bf2ef29a826f 0
+fog | 2 | a88fa2df | e57c5b99023a2480
+fog | 0 | 5b32b7c1 | b7181a246c7ab3
+fog | 1 | 7b6ec9c1 | 9ab0b071f3984224 1
+fog | 2 | a86c0318 | 40ea0a0a4eea43ec
+fog | 0 | ae4cfbaf | 3b5ff98d71b78abd
+fog | 1 | 8b16bd6 | b780f1fec8ec9c10 0
+fog | 2 | db7b6af | 40ea0a0a4eea43ec
+fog | 0 | a205ed94 | 38b9ff9f0bdb929a
+fog | 1 | 7b15e0d4 | 12425dbe66b3c700 0
+fog | 2 | 269e0d2d | 4d6d3acf843f262a
+fog | 0 | 6022e611 | 31c7295ed7e34f05
+fog | 1 | 3fc2d8b5 | 4c06e0f31978e2d0 1
+fog | 2 | d8db019b | 3c6a3d57be2b4e0e
+fog | 0 | e7ffb01 | 25a8d07a91dbb295
+fog | 1 | 42db9760 | 7da144b97d054b25 0
+fog | 2 | a6d4c5d2 | c87673ad5cc8aa4f
+fog | 0 | c17eb53a | c0385c3db47d70ef
+fog | 1 | 7ff52b | 7da144b97d054b25 0
+fog | 2 | 62468d7a | cb6a4ce78ae4053b
+fog | 0 | 896e52c0 | 1a3e2f5c5136510b
+fog | 1 | 1e432639 | 2f918633b9207630 1
+fog | 2 | dc7e287c | 5909e47a9be2048b
+fog | 0 | f5165bdf | 34ed0c68b767f96b
+fog | 1 | c3132eae | a2a0785a463e9c73 1
+fog | 2 | 7a04dbe7 | 1d03dbc655d1f2ba
+fog | 0 | 7dfba4da | 6d1fe0f192022cc8
+fog | 1 | 16c2865b | 6e47353c4a1759b8 1
+fog | 2 | 2b8255a3 | 99a3a12fc9601c42
+fog | 0 | 9d20d2d9 | 64cacb85028fd95d
+fog | 1 | 71e1a116 | 3d7a5f74612f25ba 1
+fog | 2 | 51276330 | 9b771b5c4d4e663c
+fog | 0 | 464808e9 | fbe7fde3234662c0
+fog | 1 | 9dcdec26 | 7da144b97d054b25 0
+fog | 2 | 23752f06 | a58e0c48418ca39e
+fog | 0 | 8e68c38 | e25f0a6dba9c445c
+fog | 1 | 7f9cb2bf | d4e0b147c30d20f7 1
+fog | 2 | 74d327e | 4d6d3acf843f262a
+fog | 0 | d0c23e7a | d40c4f8c2e15f76b
+fog | 1 | b18fab1f | 7da144b97d054b25 0
+fog | 2 | dfe0d408 | dd4a010775b1ed7f
+fog | 0 | c5245342 | a8ec06c869820e29
+fog | 1 | 80595ef4 | 7ef5cde3925d6441 1
+fog | 2 | 90b98ebc | 4d6d3acf843f262a
+fog | 0 | 45f177b3 | 157d75df63369e31
+fog | 1 | fcee0cc1 | c9154375bb0b36b2 1
+fog | 2 | d6d48c22 | 5da1ca22a62e2d23
+fog | 0 | 3e1be162 | 1d0b80defefa9d81
+fog | 1 | 8a28fd68 | fd3275b436d8c98a 1
+fog | 2 | d9305584 | 465a4e16347c7974
+fog | 0 | 353a20d4 | daedf226e00c72e8
+fog | 1 | 54ab0181 | aadd8f2dcb1881ba 1
+fog | 2 | 5ae36fe0 | 40ea0a0a4eea43ec
+fog | 0 | a7a22b08 | 571ef9f2fe4a5845
+fog | 1 | 1d87088f | e1e3f23d227bd49b 1
+fog | 2 | 5f97f27f | 1d03dbc655d1f2ba
+fog | 0 | 83a62553 | 9b12e12c506102c0
+fog | 1 | 34569055 | 3df0a34ca05ec662 0
+fog | 2 | bcc2358d | 9a9072e544b6c869
+fog | 0 | e3b573d7 | 9a74564859741040
+fog | 1 | 1b29f4b1 | 158a0e9b48905f96 0
+fog | 2 | dd472c11 | 9b771b5c4d4e663c
+fog | 0 | 4b1edc27 | 540a63fa97597d10
+fog | 1 | 23fadcf4 | 9565909e33c151dd 1
+fog | 2 | 6ef6d493 | 68092919dea71fd6
+fog | 0 | 626815e1 | 2cc8b28aa3e0817d
+fog | 1 | e2b013ad | e9731fd317b4cbd7 0
+fog | 2 | df15cef7 | ed52ec4d67f732
+fog | 0 | 69133e92 | 6ea801681707cb71
+fog | 1 | cc62080 | 346e19f2b9d84202 1
+fog | 2 | 11b0f0ee | 93d7f1984304f747
+fog | 0 | 8524df28 | 886fb25a8736f8d0
+fog | 1 | 87d1bfa8 | 508dac109f525cbc 1
+fog | 2 | 6f891fdb | fdf0b3924047c303
+fog | 0 | ae0b84b9 | e8abc4c2ea3261f8
+fog | 1 | f4eda63f | 4c4940343d4dd2ab 1
+fog | 2 | 218c7c38 | a31f9fac94943aa8
+fog | 0 | 32582fec | 87660d42e8c5b5ae
+fog | 1 | 30d45c46 | 98c1b194893b8d34 1
+fog | 2 | cbc44ac8 | 40ea0a0a4eea43ec
+fog | 0 | 3f66288e | 91e457fb159cbce8
+fog | 1 | 99f69b76 | b135134afdb9c89 1
+fog | 2 | 9757141d | 4d6d3acf843f262a
+fog | 0 | befa4422 | 78289c1e81fb7116
+fog | 1 | 5fdf8989 | 4b7038536dc809a5 1
+fog | 2 | c2f353ae | dd285c922faa7202
+fog | 0 | 396601f7 | 68330b1e204c0dd7
+fog | 1 | da08e835 | bf201d0631276f07 1
+fog | 2 | 54c35bf7 | 4d6d3acf843f262a
+fog | 0 | c36ae8c5 | 82d007b497dfd04e
+fog | 1 | ba2050b8 | ae2ed0f652ce40e 1
+fog | 2 | 16ab6e41 | 7d941d2e335ee9d4
+fog | 0 | 9fa1e753 | bd2ebe3ac95cf461
+fog | 1 | 6f3cc002 | 486ce44036ca623f 0
+fog | 2 | 60df3cb3 | 40ea0a0a4eea43ec
+fog | 0 | 2bdbd471 | 38846988851cd274
+fog | 1 | 15fbd4c3 | 4ac339779a2b9fe2 0
+fog | 2 | 17a5848e | 466efd5b66040a41
+fog | 0 | 24b43a20 | 1c20087b9f0b343
+fog | 1 | 4a95fd46 | dba79a1584d51d7b 1
+fog | 2 | b4a63c1 | 40ea0a0a4eea43ec
+fog | 0 | 736b4eb7 | f16f15e86553a0b1
+fog | 1 | 5a721a6e | 83640da6c7250b1b 0
+fog | 2 | d7b59a75 | 6aa78e6aa345230b
+fog | 0 | 11e9df28 | 79a5067305197365
+fog | 1 | e964288d | f7f8fa11800ce8e7 1
+fog | 2 | 9619c98a | d3393cfb83c69484
+fog | 0 | aaad295f | 424ea1c0d2f15acf
+fog | 1 | 3c59067b | f645b5fe1181a557 0
+fog | 2 | af4ce002 | 4d6d3acf843f262a
+fog | 0 | 69f175f1 | e2790092ddff0c80
+fog | 1 | 1a755b96 | 9922a446482d8d9d 0
+fog | 2 | df72065b | 4d6d3acf843f262a
+fog | 0 | af7d63ff | 7e389fa6b911dfb9
+fog | 1 | de0d6b25 | 7da144b97d054b25 0
+fog | 2 | 29c7760b | 40ea0a0a4eea43ec
+fog | 0 | f13950c5 | a7950030acefd9bd
+fog | 1 | 778bf5f8 | a75ceaa768ce7d0e 1
+fog | 2 | 9e5179e3 | b9945e20ba40c330
+fog | 0 | e5ffb5cc | d1b5bb747a72627
+fog | 1 | a71e41f4 | 601ad5d983ff6029 1
+fog | 2 | 112deaf9 | c0c08b61b37bae34
+fog | 0 | dbc577da | ef4a15b40261050c
+fog | 1 | e51f2039 | 142694378624d307 1
+fog | 2 | 6d0fde60 | 4d6d3acf843f262a
+fog | 0 | d9810713 | eed3bbb840a27280
+fog | 1 | cb0d7d58 | f88dae88d1a0abb9 1
+fog | 2 | 3f5c24f8 | fd88eac0032336fd
+fog | 0 | 845f3ddc | 7431ced451de5bca
+fog | 1 | fa4fbe0c | 58fdba528db3c9c4 1
+fog | 2 | f961edda | 40ea0a0a4eea43ec
+fog | 0 | 8fb479d5 | 5c9bc804c9bb5003
+fog | 1 | c3c40c54 | 723768cc14c91d5d 1
+fog | 2 | 3efbaa9f | 3cb8bcb5cb7b4689
+fog | 0 | d88e9312 | 5d245cc7ccaea50a
+fog | 1 | d0f50d2b | 25aa08069fbc072d 0
+fog | 2 | a8d9a3fc | d3b79cbe98e90940
+fog | 0 | ce619b2 | 77802083333af798
+fog | 1 | 89727374 | b95e980d50988ab 1
+fog | 2 | 651ad290 | 44aae80ff0f0e9b4
+fog | 0 | 92d08104 | bfcc017bd72aab0c
+fog | 1 | fe57309d | 7885bc77eb59963a 1
+fog | 2 | cd2449 | a7ec931d32e70523
+fog | 0 | bf018276 | b225072f2ba61c49
+fog | 1 | 21979847 | 8288065c4e765d55 0
+fog | 2 | 38ffbe0b | 9b771b5c4d4e663c
+fog | 0 | bf89cba | b044f33d2c77f154
+fog | 1 | 9f4b25a2 | 7da144b97d054b25 0
+fog | 2 | 692afabe | 1adfcac3305e4f4e
+fog | 0 | 4cf2d00c | 8b4bd1c9977f30a6
+fog | 1 | 51f33fc9 | 419cc377f08fce1a 1
+fog | 2 | 9f26b340 | 40ea0a0a4eea43ec
+fog | 0 | 561bba2a | 3898b4abf3fbc43d
+fog | 1 | 458872cd | 36f921ee8d821b3 0
+fog | 2 | bee2f453 | 4d6d3acf843f262a
+fog | 0 | da90e843 | afb7db39fdc68c1c
+fog | 1 | 56765fd2 | 7a8a8256a4146094 0
+fog | 2 | 4c46ba63 | ba7a5031ab50fda2
+fog | 0 | 5e531830 | d01b9417b6d582d8
+fog | 1 | 5fdf55ca | a52ce04850a5879e 1
+fog | 2 | abcbd366 | 6317c683c6e2f06b
+fog | 0 | ab1dcb7d | ad3db25d26767858
+fog | 1 | 1488e7b5 | 89c136683a0f3c0f 0
+fog | 2 | b8bd0278 | 40ea0a0a4eea43ec
+fog | 0 | d1569a26 | 3eb24476b488e929
+fog | 1 | b1c05a6c | 79d817be0dd0cbcb 1
+fog | 2 | 335bdb0f | 4d6d3acf843f262a
+fog | 0 | 276ec019 | 16de184fe6d1f67a
+fog | 1 | 8c084989 | 2101098bae2d849f 1
+fog | 2 | d904b460 | 4d6d3acf843f262a
+fog | 0 | fa8d1c03 | acf5166b33d28029
+fog | 1 | f696772d | 8cae5eaa0ce22d28 1
+fog | 2 | 3e8277d2 | 902b237bb6e21c91
+fog | 0 | f20465ec | 50f9c0b6186bbe73
+fog | 1 | 9837bd11 | 3d0a490fd0e74fcf 1
+fog | 2 | 6b0ccddd | 4d6d3acf843f262a
+fog | 0 | 4850f7b | 9dc799658c4d58cb
+fog | 1 | e1160c2b | 6a71a8acead32fca 1
+fog | 2 | fb2521b3 | cc809f0b04d9035a
+fog | 0 | 77123083 | 9905763079202bea
+fog | 1 | 4defe8d3 | dc1069c2fa0b3741 1
+fog | 2 | 93c655a8 | 1f877f71709be9df
+fog | 0 | 8227483d | b2bc8f1ae1f9a92b
+fog | 1 | 1576e985 | 8715551e353a8274 1
+fog | 2 | d2ce2f40 | 9b771b5c4d4e663c
+fog | 0 | 5da2419f | 6c35a5f9957aae1e
+fog | 1 | 3f295382 | 5407fb7770f8a8e8 1
+fog | 2 | ada02458 | 2f5d828e834a34d4
+fog | 0 | 84c81781 | 3cb75ca28b91e872
+fog | 1 | 673166b5 | 7da144b97d054b25 0
+fog | 2 | aea1a4c6 | 454adb9ea40fcca6
+fog | 0 | e9faf511 | 6cae85d79f69eddd
+fog | 1 | df1991f | d18f7b6392c06b7e 0
+fog | 2 | af09e347 | 4d6d3acf843f262a
+fog | 0 | 2b84e75e | f088dcb07db5deb9
+fog | 1 | 20fac70 | 7da144b97d054b25 0
+fog | 2 | 5884c8a6 | 87171c54b643766c
+fog | 0 | 4f2072d6 | 9960df9e7eeb8d6f
+fog | 1 | ffa7efcd | 6fb068264db538a5 1
+fog | 2 | f3a8028 | 99413d381e975cf
+fog | 0 | 43e5b603 | e3ca0b4548c91dbf
+fog | 1 | 60422d9e | 328dfcb2c4ff99b9 1
+fog | 2 | 7e27866c | 4d6d3acf843f262a
+fog | 0 | af41345a | 18d7102957b69706
+fog | 1 | 62ddcc6d | 3f87bf2ef29a826f 0
+fog | 2 | e6304498 | 40ea0a0a4eea43ec
+fog | 0 | cc8ac8b8 | b6f0395e9080f89d
+fog | 1 | 50ee75fb | ed2379e9f0c1f8ca 0
+fog | 2 | 98294580 | 204f25b64b80401d
+fog | 0 | 925389a0 | e18bc156c5f6685e
+fog | 1 | 55549a67 | 7da144b97d054b25 0
+fog | 2 | ccfdafdf | 563e89aa9fd12cf5
+fog | 0 | df039f2c | 9e5c7bf15c11127c
+fog | 1 | ef4b0dcc | 584ceddb7316bb0e 1
+fog | 2 | 8eb587c1 | 9b771b5c4d4e663c
+fog | 0 | 49ba8cc3 | 3cccd88cd3122fc4
+fog | 1 | 7483638b | 3f87bf2ef29a826f 0
+fog | 2 | 4df8a389 | e565e3de8487d4e6
+fog | 0 | 49f9bab | cf401198bcad59cd
+fog | 1 | b70149c2 | 8cdf753ca130e9ba 1
+fog | 2 | f9f35e51 | f578af6383ec5f1c
+fog | 0 | bc300f81 | 3c5b62f3fe034d15
+fog | 1 | b6226aaa | 7da144b97d054b25 0
+fog | 2 | 8288f017 | 75b4a4f9e9809786
+fog | 0 | 535bb376 | 5c8f8e074d5565af
+fog | 1 | 5595556 | c0c08b61b37bae34 1
+fog | 2 | ac9d60cf | 40ea0a0a4eea43ec
+fog | 0 | 3cdfa3da | ed6b6d60b95055e5
+fog | 1 | f19cd0f9 | 7da144b97d054b25 0
+fog | 2 | 7affb7b2 | f5f7db6f40984aa3
+fog | 0 | 46d49be8 | ff742aae5ed296f3
+fog | 1 | 564b4adc | eca2ce67e6005af1 1
+fog | 2 | ce53fefd | 3a32479534910190
+fog | 0 | 98caac85 | 5b180dba5edcb63c
+fog | 1 | 45e0d761 | 309447d55bf36585 1
+fog | 2 | a0a67aa2 | 9b771b5c4d4e663c
+fog | 0 | 59d131a5 | a6434c83476bd602
+fog | 1 | fce0a8b5 | 8fe42508de5330e2 1
+fog | 2 | 9444dbda | 1d03dbc655d1f2ba
+fog | 0 | 32dbc4ac | 8e57e9e3befdfd20
+fog | 1 | 92d146ab | 3b8f2a3cdf79ee12 1
+fog | 2 | 9a8f59e6 | 45e011922165769d
+fog | 0 | bde27b41 | 73038fb656698c0
+fog | 1 | f1112031 | f3d1a9cfeb92c914 1
+fog | 2 | ccda38f4 | 40ea0a0a4eea43ec
+fog | 0 | 10a792a3 | d48511a6262deb41
+fog | 1 | d1f41916 | 7da144b97d054b25 0
+fog | 2 | 6c60f40d | c35c6400b81dc500
+fog | 0 | 81feb0ad | df756eee270831a1
+fog | 1 | 95f98903 | 7da144b97d054b25 0
+fog | 2 | acfa2693 | 9387ed13490ce7c
+fog | 0 | e974ce41 | c18ec6617c8a2027
+fog | 1 | cdde0563 | 4d92fedc0a39af06 0
+fog | 2 | 7464a70c | 4d6d3acf843f262a
+fog | 0 | f0163fe0 | de716c3918778549
+fog | 1 | e95f0abf | 9ba8a080a040486c 1
+fog | 2 | 75573278 | 1d03dbc655d1f2ba
+fog | 0 | 983b588a | 19cf829c3b1b4d14
+fog | 1 | b9f3aee3 | b17c48644df666b9 1
+fog | 2 | da05d8e0 | 40ea0a0a4eea43ec
+fog | 0 | 31276351 | 3ae360c089db8d96
+fog | 1 | 99983b08 | 667108a7e7132c7b 1
+fog | 2 | 6f857d06 | 10292d2aa4021d27
+fog | 0 | 234b3b87 | 259c542cd60055b6
+fog | 1 | da2332f0 | 909e774e92e2ff9 1
+fog | 2 | 1af52c94 | a3973f17481ab82b
+fog | 0 | 8213cd2e | db0d956b367c1aa6
+fog | 1 | c9080604 | 772bf68176dfa59a 1
+fog | 2 | b9b0695c | 40ea0a0a4eea43ec
+fog | 0 | ba13b70b | 2bada8e633ef10f4
+fog | 1 | 6f4829e0 | 875d18819de13a14 0
+fog | 2 | dcb72b3f | 296ecd1dbc6b4b92
+fog | 0 | 6ef87e4e | 27b18993bb31e605
+fog | 1 | eabed053 | 744de7942d01cc8e 1
+fog | 2 | 1c940ff3 | f868553b7ead1f64
+fog | 0 | 302a8f66 | 696f63c27e03a8dd
+fog | 1 | 50f4145a | cfca9e4eaa405c4b 1
+fog | 2 | ec5f5fd7 | a7b078cc217dea2
+fog | 0 | 449fd585 | 6cd6da8f0ba67902
+fog | 1 | 20115aa1 | f62861f7af411925 1
+fog | 2 | 9689931d | 9b771b5c4d4e663c
+fog | 0 | 45495b8d | ab65db7888084238
+fog | 1 | 886901db | daca6b9f2d20526d 1
+fog | 2 | 8694ca05 | 91830afcb14478fb
+fog | 0 | f4978897 | 331aa26df5f9730c
+fog | 1 | ee7fa6fc | 5b33b96fcb8946cb 1
+fog | 2 | 1dd1b10 | 7dee75c4977d569c
+fog | 0 | 6241fee7 | 25f52291051e4f4c
+fog | 1 | acb8ef55 | 9243906aa99ba83e 1
+fog | 2 | a0302ddd | 40ea0a0a4eea43ec
+fog | 0 | 77f0274e | be64f4da458f288
+fog | 1 | 95edec15 | 213ac441803794fe 1
+fog | 2 | 5ca9df5f | 1d03dbc655d1f2ba
+fog | 0 | 254365b3 | 8aaa4fde11435277
+fog | 1 | 4116b05 | 12425dbe66b3c700 0
+fog | 2 | 46c45dcf | 4d6d3acf843f262a
+fog | 0 | a0e18ac9 | affb8e66e74f7b90
+fog | 1 | 9aba7c49 | 840fb54140826bfd 0
+fog | 2 | d498316a | 40ea0a0a4eea43ec
+fog | 0 | 9288f2bd | 52195a8618d9d10a
+fog | 1 | eed64f64 | 1056daa27d8b5ca0 1
+fog | 2 | 84182876 | 4e524d66013450fb
+fog | 0 | e0402aa | 1266d18a1a286755
+fog | 1 | 30ed0b3b | 7da144b97d054b25 0
+fog | 2 | 9ae72534 | 69b84c658f74faec
+fog | 0 | 3c963b67 | 42eee3a19a4b5b7a
+fog | 1 | 6b4088b2 | 5fbc717d3d6f9100 0
+fog | 2 | a0346b73 | 7987e6283cf1a558
+fog | 0 | 3a70a426 | 41d8ff543a86cd08
+fog | 1 | 7acc08e4 | da1f3e9dc106cc0f 1
+fog | 2 | b4f0ef3a | f868553b7ead1f64
+fog | 0 | e408df2a | 9723a8c3baa67a2
+fog | 1 | ba983aa9 | 83e7f1e2093ddc6a 1
+fog | 2 | 9b381615 | 4d6d3acf843f262a
+fog | 0 | 98c8b5b4 | c163e93a49c08334
+fog | 1 | 2bbf5bad | 7b4968bcc61421d 0
+fog | 2 | bbd2042f | 29c240966349693a
+fog | 0 | 980e03f4 | d1d9d27fb28890a7
+fog | 1 | d088ea7 | 2808f869eb93989d 1
+fog | 2 | 90408843 | deaa191832522497
+fog | 0 | 5d6cf561 | b8b766afa9643fe8
+fog | 1 | 1db53461 | 51a13f756278055b 1
+fog | 2 | c08a39a6 | 7c96cea1b2713ef4
+fog | 0 | 88f6869b | 544aaf0d9de8b659
+fog | 1 | a60d7c3b | ea366b1079be6ff 1
+fog | 2 | 8ea0d786 | 9b771b5c4d4e663c
+fog | 0 | 40961cc1 | 32ea2a353cf19c67
+fog | 1 | 5261c54a | f7b2fdf57f65b15f 1
+fog | 2 | 27d1cad6 | 23dfb4af1c05742a
+fog | 0 | 4dee3763 | ec22a5c80b7face3
+fog | 1 | b5aabd92 | 2545972bd581c795 1
+fog | 2 | 5a7e70bd | 70110e37e7c1c7af
+fog | 0 | d27bc857 | c60532096e2b8718
+fog | 1 | 9457047f | f4372290db172399 0
+fog | 2 | 2efb7a4c | 98e24100b9e632c6
+fog | 0 | 8a83e094 | 4c9aa90090c6d5c7
+fog | 1 | 3a127235 | 6eeec75f97a16410 1
+fog | 2 | 58084ee2 | 9b771b5c4d4e663c
+fog | 0 | 4fc8cce9 | 2a922c7874f14bcb
+fog | 1 | 32027e82 | a6571cd97b47d6b9 1
+fog | 2 | 7c4888fd | cadee8424b00b29a
+fog | 0 | 94feea29 | 15f17b3d857882d1
+fog | 1 | e627135d | 7da144b97d054b25 0
+fog | 2 | 757d1f96 | 9b771b5c4d4e663c
+fog | 0 | b0821edb | e584f3d654f7118f
+fog | 1 | 20fd340d | 40ebf72ab08cc45a 1
+fog | 2 | f040cf5a | e0cdf82d2b0a247b
+fog | 0 | cee6dd4e | c7f83af306b7ca7b
+fog | 1 | b9f4ab74 | 7d11f7ea0a1670f3 0
+fog | 2 | 11fce472 | 995227637d6b8020
+fog | 0 | a5a04258 | 6a47f363a1deb56e
+fog | 1 | cdb4b31f | 2b785601dafc65e6 1
+fog | 2 | 301f6098 | 1dca1521e89223e3
+fog | 0 | 838cb0a8 | b05b628b4fb34a38
+fog | 1 | 113d465d | 72a7c20b6166a4c3 1
+fog | 2 | b59dd0cf | 9e0fff5ffbcc3513
+fog | 0 | 821c65c3 | e6294fb878d01c8b
+fog | 1 | 7bb35875 | e8c51441224648c 0
+fog | 2 | 9d5a05ba | b3376e2d9e70e7d1
+fog | 0 | 9db39b2c | d63c383e26016454
+fog | 1 | a2fe40c | 4e73938e7338ccd5 0
+fog | 2 | 594351bf | 43d7cf4fd97945f
+fog | 0 | c55d11bd | 84543a86163940a8
+fog | 1 | f9e74be0 | e2ba86653f769567 1
+fog | 2 | 60b0d54e | 40ea0a0a4eea43ec
+fog | 0 | c7db95a7 | 488c0d78fce21299
+fog | 1 | f580ab06 | 994f0e952398cbe8 1
+fog | 2 | 1e9f6862 | 40ea0a0a4eea43ec
+fog | 0 | 9da0707d | a23ce5b2d607d267
+fog | 1 | d43b2673 | c092990757ac32fc 1
+fog | 2 | 675f9edc | 4d6d3acf843f262a
+fog | 0 | 98c78636 | 3a48fdf6be983644
+fog | 1 | ed3e70a0 | adbf72d39173799 0
+fog | 2 | 1a365269 | d6e66fe6ed6d8c81
+fog | 0 | 6b2f5eed | ad3e6a17d31afa4e
+fog | 1 | cda090cf | 1a5dd67777e6b3ab 1
+fog | 2 | e43e359f | e1be9e40d4338799
+fog | 0 | 5db0cea1 | 945260cc835ff253
+fog | 1 | 9b743f15 | 22cf02877a37afe2 1
+fog | 2 | 9d77f47f | bced67d9fdeb8024
+fog | 0 | ca6a7460 | 8c72e8bbb0b5bab7
+fog | 1 | cf69b58c | dfa3198f5160c4d 1
+fog | 2 | fcc579d5 | 1a0897cb2b6ffff8
+fog | 0 | d9a62051 | 3d40395ea173125a
+fog | 1 | 2d6fbba2 | df38350795569d6 0
+fog | 2 | e7a53428 | 1b93c5da78b9d260
+fog | 0 | ca8d1862 | 450678dffc9c891c
+fog | 1 | a2a6d44 | 7da144b97d054b25 0
+fog | 2 | aa5f6774 | dd4a010775b1ed7f
+fog | 0 | 6fc76a6e | f461c1c1ff784a77
+fog | 1 | d46fc4bd | 70ea4237bf5188bf 1
+fog | 2 | 846f2674 | c8f2f70ded1bc1c6
+fog | 0 | 427a7f33 | bd747ec42f78b162
+fog | 1 | b934739c | c10c8b21bfe6650b 0
+fog | 2 | b9d91fb4 | 40ea0a0a4eea43ec
+fog | 0 | fe2145be | 2d03f633500a706e
+fog | 1 | d561e117 | 12425dbe66b3c700 0
+fog | 2 | 4ae62cbf | 4d6d3acf843f262a
+fog | 0 | 575f2299 | b5a6a508262e0ea4
+fog | 1 | 8198f24c | 7cef1f143281b91e 1
+fog | 2 | ebb5b0f4 | 9b771b5c4d4e663c
+fog | 0 | fee6806f | 3ded74ed44fec42f
+fog | 1 | 3f5ad9e7 | 637ff53b48e6df6d 1
+fog | 2 | 2858413f | 63cc221573d3c082
+fog | 0 | 2b796229 | d6166678348ec274
+fog | 1 | 68057329 | 55a5a6d60903dc5 0
+fog | 2 | fa1cb051 | a60738e4c5f92f4d
+fog | 0 | a8aba101 | 8476994119fba8a2
+fog | 1 | f5763e9c | c9f396c62b1e9838 1
+fog | 2 | 7a57a35c | 5332009602e1eb79
+fog | 0 | 328baade | d1d6010b19c175f7
+fog | 1 | 9721cd06 | ec657cf2d634df7d 1
+fog | 2 | fe50600d | 2dbe5bb6957c95cc
+fog | 0 | 1c7d56db | 3e838d7aefd94ed7
+fog | 1 | 3617501 | 98a5f6706817fe3f 0
+fog | 2 | 16e60512 | 62ed1a597d084a00
+fog | 0 | 13160b71 | 9503a3a8d3c3c460
+fog | 1 | 67c61c5c | 12425dbe66b3c700 0
+fog | 2 | 77b35ba9 | 5dc64d02c8e92df0
+fog | 0 | 22e636 | f97c7253dc08fb98
+fog | 1 | 4b57fe40 | 7da144b97d054b25 0
+fog | 2 | 4b71e5ac | 6ff38af214ae336f
+fog | 0 | a07890db | 8f180d37f69d0629
+fog | 1 | 306beb35 | 695b3f26cf0b1094 1
+fog | 2 | 6b07efb | cc884ec6b6dd0498
+fog | 0 | d6968575 | b624fea6c5a64bdf
+fog | 1 | 56ce725e | 3f87bf2ef29a826f 0
+fog | 2 | ceaa5303 | aa36398aa01bca16
+fog | 0 | 14b1e48 | ef17407bb5d97a32
+fog | 1 | b94a98dd | 805b75c5d2610b35 1
+fog | 2 | 97b9a1e1 | 39cfb5c5ac61d5ec
+fog | 0 | d315b161 | 130d11807b992274
+fog | 1 | 491dbbc2 | 3f87bf2ef29a826f 0
+fog | 2 | c78f8bac | 22665aa07d6d2bf1
+fog | 0 | 25a46e23 | 5c26e10613991cc0
+fog | 1 | bc3f3d70 | b2bc896b79e29a66 1
+fog | 2 | 232fc891 | 9b771b5c4d4e663c
+fog | 0 | 11c30506 | 34dabcb8343b3e6c
+fog | 1 | c831d818 | a8c5efdbbf43a5d6 0
+fog | 2 | 81d99535 | a5baa30720f049fe
+fog | 0 | 67b9f15a | 5a9cf326662b49c1
+fog | 1 | 6679b9cf | 4b3c5a3680ff4307 1
+fog | 2 | fd4452a8 | 1d03dbc655d1f2ba
+fog | 0 | e727ebad | c6a0de4746284460
+fog | 1 | bf577a7f | 292312e0c4b8ac8e 1
+fog | 2 | a1b79aa0 | 1d03dbc655d1f2ba
+fog | 0 | 1e8533de | 69c134395bfe979f
+fog | 1 | a97e02f5 | 9bf359b0c576cc56 0
+fog | 2 | d286465d | b2e1f36dc60579bf
+fog | 0 | 474fc12 | b68405b6ad0c7cc0
+fog | 1 | 5f1596fe | 5a5aeb635a5af6a4 1
+fog | 2 | 4bb4a472 | 40ea0a0a4eea43ec
+fog | 0 | 2231ae33 | f97f30f614899140
+fog | 1 | cf937999 | 7da144b97d054b25 0
+fog | 2 | 62ee3129 | 807a74d610093c43
+fog | 0 | d65baf4d | 6b5fcb9c77e66775
+fog | 1 | f4bb4ada | 5deb7823dce21461 1
+fog | 2 | 915f7ae4 | 40ea0a0a4eea43ec
+fog | 0 | 15eb0412 | c8db25cdfd027356
+fog | 1 | 76f2cb1 | 7da144b97d054b25 0
+fog | 2 | d68962ff | 9b771b5c4d4e663c
+fog | 0 | 1acd2318 | 18c9c30fcce2efda
+fog | 1 | b7b44230 | 1f46eeac00545b15 1
+fog | 2 | da4300dd | a808ba767a016104
+fog | 0 | a754253b | b2c0e766d65f2ea
+fog | 1 | 2a359d70 | fb68fc1f734a6b3f 1
+fog | 2 | ad4e2da7 | 721d49070c1c4069
+fog | 0 | 8c96eb55 | 2fd1ba80a06786a5
+fog | 1 | 989f5aab | 68bed60281a69d4a 1
+fog | 2 | b251cd4 | 24736bca887f8773
+fog | 0 | b24e35c4 | d04cd0550a37f98
+fog | 1 | 7476332a | 7da144b97d054b25 0
+fog | 2 | 8a83af9e | bf7892feb51ce04a
+fog | 0 | efd4075a | ff9f93c96ddbe279
+fog | 1 | 2fbd34d6 | dd239b8b9b8dfef3 1
+fog | 2 | 18dc2851 | 4d6d3acf843f262a
+fog | 0 | 69a87f66 | ed1a2c2206562f27
+fog | 1 | d94f9b94 | 1f1f1d26ccc005a7 1
+fog | 2 | 5b46cf72 | 40ea0a0a4eea43ec
+fog | 0 | 3a00552b | 51c3fd29fab86c7d
+fog | 1 | 7d708196 | 900d06c77b6a8f14 1
+fog | 2 | 7ac8af7c | 1d03dbc655d1f2ba
+fog | 0 | 2dd77d11 | 384489c2900f37de
+fog | 1 | d9a05c6a | e55bc0bd149e1ae3 1
+fog | 2 | 920ba357 | 9b771b5c4d4e663c
+fog | 0 | a7f2a691 | 890d6ca1700582da
+fog | 1 | 1cb66b0f | 75b17e5e6dacd89 0
+fog | 2 | 7aba22fc | f1e221aae27b6853
+fog | 0 | 44f4af73 | 479c63a8929e5421
+fog | 1 | 6e62f10d | 594ebd54b8ee6f63 1
+fog | 2 | 359fc298 | 40ea0a0a4eea43ec
+fog | 0 | bf582c5c | 602e4f41799693f1
+fog | 1 | 29633b51 | 5fa872a49f2ba6c9 1
+fog | 2 | fb1262a5 | a0e26f9183fb54a0
+fog | 0 | f4736f6 | 7872b6628a763de2
+fog | 1 | bde159bd | 7da144b97d054b25 0
+fog | 2 | 54981bb8 | 2a53509c21c48e6c
+fog | 0 | dc724578 | 2a4c27a714ba761
+fog | 1 | f9f275b9 | d3f118a709500158 1
+fog | 2 | 30266090 | b6c6bb1a728da7f9
+fog | 0 | 4b612aef | 5d05d0232cf96520
+fog | 1 | 389f1c | 29bd58f3f47792fc 0
+fog | 2 | e18294d3 | 4d6d3acf843f262a
+fog | 0 | 68008a73 | bdf924b8bee9dae1
+fog | 1 | 61f6f5de | 12b975e0579ee3e8 0
+fog | 2 | 54c56c52 | 5050d66c615f89af
+fog | 0 | 4fad80ab | 97c2f0ccf0cbe381
+fog | 1 | 394b1ec7 | 7da144b97d054b25 0
+fog | 2 | 165acd0b | ac82a15452b918c7
+fog | 0 | c068b14c | 6d44929f58d3f027
+fog | 1 | da3a90af | 9b844b0d4019b33e 1
+fog | 2 | 9acd2663 | d9215fb4d16a8dda
+fog | 0 | 14b7db33 | a95b5f9ed5e9d2b6
+fog | 1 | ba1ab1de | 1a5e6013bd1ff92e 1
+fog | 2 | 236941b2 | 5bf710cdef5669de
+fog | 0 | c4293a02 | 12acb41f59100aaf
+fog | 1 | 41ef8a30 | 8c317787faaef79f 1
+fog | 2 | 796c324f | 870df166cc00bf0c
+fog | 0 | 49582662 | 78191b5325f139fd
+fog | 1 | bc1780e4 | d4dcdea3f01f3995 0
+fog | 2 | b0bda4fb | 4d6d3acf843f262a
+fog | 0 | fbb91204 | 8d8a54550f98068d
+fog | 1 | 301f48c2 | 5de107a484803c1b 1
+fog | 2 | 7740ce5c | 4d6d3acf843f262a
+fog | 0 | 38f40dc1 | cc495f65e22f88e3
+fog | 1 | a7cd882c | c4bce53898f391fe 0
+fog | 2 | ee9bfa75 | 40ea0a0a4eea43ec
+fog | 0 | 738ba50a | 1b8dfde43249deb0
+fog | 1 | 7e633087 | 25feb0b9269e84b6 1
+fog | 2 | eec7f599 | 2d2ad9f2230dcae4
+fog | 0 | 1443b0f1 | 52c4c7ac269b4691
+fog | 1 | 180c8f72 | 7da144b97d054b25 0
+fog | 2 | 1c86edd4 | a8dd6df4de4edc24
+fog | 0 | 11672d2a | 8a7381185d855cb1
+fog | 1 | 3ddbacb1 | 359999b494f0672d 1
+fog | 2 | fdf8737e | 1d03dbc655d1f2ba
+fog | 0 | 9e4c79f | 4cd6563a650836d8
+fog | 1 | 43d83fd | 2d40b064ba5029b 1
+fog | 2 | 43ce81c3 | ced6d169cfdbb332
+fog | 0 | 9f0c4dd8 | 63dd131cc0210c18
+fog | 1 | b7fd5741 | 3f87bf2ef29a826f 0
+fog | 2 | 99f7d906 | a5efce05cf7bf2ac
+fog | 0 | e2506db8 | 40df027066540e67
+fog | 1 | 1cc96277 | e4d669a0bfa74001 0
+fog | 2 | b388bf22 | 4f2587db9959292c
+fog | 0 | fb315d72 | cd1675c3ec119474
+fog | 1 | bc8b1177 | b335ded5d427d868 1
+fog | 2 | 715c165b | 40ea0a0a4eea43ec
+fog | 0 | d373106f | 3257b632b2dbefb9
+fog | 1 | ef078503 | 4d301cbea3bd23dd 1
+fog | 2 | 14f5ca9e | b2e70fe5e0fc12ec
+fog | 0 | cb9d0d1c | 145af1522d2f7837
+fog | 1 | 2250bdc9 | 7f55f55813405e64 1
+fog | 2 | 23359dda | 4d6d3acf843f262a
+fog | 0 | 4911d203 | b5adc7ae4ad76be8
+fog | 1 | 75db30e9 | 10d5b3ff108de4e7 1
+fog | 2 | b11ccfd | 40ea0a0a4eea43ec
+fog | 0 | 7c9b590f | 7a89e65637a7563f
+fog | 1 | 9bd3cdee | 5ef683d04612d348 0
+fog | 2 | c7b74bd4 | 283f5681fc440289
+fog | 0 | 4539fa7a | df620196be81d7f6
+fog | 1 | 56954c11 | 83acbe6ac4d40d21 0
+fog | 2 | df2f7693 | 9b771b5c4d4e663c
+fog | 0 | 19edf732 | c7aed2e26a153215
+fog | 1 | f3f957a | c96cf87186661115 1
+fog | 2 | 4c003a46 | 40ea0a0a4eea43ec
+fog | 0 | e914e2bb | 9f19a38af6afe075
+fog | 1 | 17779602 | e76998103f63b887 1
+fog | 2 | b1259285 | f578af6383ec5f1c
+fog | 0 | efacdd8d | 99f2e44ba0a39662
+fog | 1 | 89eca16 | 2101098bae2d849f 1
+fog | 2 | 23b197c8 | 9150ff15352a035
+fog | 0 | 3e5722da | 54b10077010132b9
+fog | 1 | 4e842ffd | 9db334d397c70c49 1
+fog | 2 | fc07f346 | 40ea0a0a4eea43ec
+fog | 0 | 551726af | 873ad22037dd908f
+fog | 1 | 2105132e | 7da144b97d054b25 0
+fog | 2 | 985cc58 | 40ea0a0a4eea43ec
+fog | 0 | ee52ace3 | f103fd74291f172f
+fog | 1 | 9b8903fa | 7da144b97d054b25 0
+fog | 2 | ec09ab98 | 1b3abc1239e1e32d
+fog | 0 | 5cb5ad4d | 2052b81b0e1be609
+fog | 1 | a0265e95 | 7da144b97d054b25 0
+fog | 2 | 7288954b | ac863e85a2ddb986
+fog | 0 | 115a4fec | 4ff0620b3e0b685a
+fog | 1 | 877db3a5 | 156c4429ca92c30 0
+fog | 2 | 449a5cb0 | a44b71115208e3d6
+fog | 0 | 5ed0fe35 | c02037c458ac632f
+fog | 1 | 34250dc2 | 1fa98ed1d7b2247a 1
+fog | 2 | 9156b14a | 5e6d58f38364028
+fog | 0 | b2bf29ea | 48db5e05b57351de
+fog | 1 | 8d8135ac | ab1b95fb26df8f4c 1
+fog | 2 | eda0567 | d47575f36d9e9854
+fog | 0 | 592d1e65 | cdae50cb3c581e0f
+fog | 1 | 61c6e26f | 3f87bf2ef29a826f 0
+fog | 2 | 40f0e15e | 958329d9e389b2ab
+fog | 0 | 76baea22 | 9c624e690c3bfbba
+fog | 1 | 41268020 | 7da144b97d054b25 0
+fog | 2 | e4fe222c | 4d6d3acf843f262a
+fog | 0 | 15927c21 | 628d8c6997cd8f9d
+fog | 1 | d48a6dfc | 40b351889322c5ba 1
+fog | 2 | a0b63eff | 4d6d3acf843f262a
+fog | 0 | 50ccd3ee | ad73cbaabb3d3a17
+fog | 1 | 74b0f4ed | e88bef1e2323d0c4 1
+fog | 2 | 9fd11f46 | f72f49a06d5e5154
+fog | 0 | 1717d123 | ead9e2a4f3e914f9
+fog | 1 | ba8109b | 9221cf6da2340ebf 1
+fog | 2 | 9dd9ac8a | 1097b7f4b26e89f8
+fog | 0 | fea7de99 | c92b5e8f6c31c715
+fog | 1 | 3a4ee87a | c81809ff49d246ef 1
+fog | 2 | e5421bab | 40ea0a0a4eea43ec
+fog | 0 | be7d5a27 | 8bd59fabff891be1
+fog | 1 | 3841dffe | 12425dbe66b3c700 0
+fog | 2 | 5a5f3b7c | a7b078cc217dea2
+fog | 0 | c9cf263e | 82bd06639ad123de
+fog | 1 | bc4f3fdd | b7a07926157d21a8 1
+fog | 2 | 52138efd | 1d03dbc655d1f2ba
+fog | 0 | cabb71e6 | 5566439e20b8159
+fog | 1 | 3b68ea0a | dc3d92d1a239937b 0
+fog | 2 | 9b40d43b | 2113aa14be36722b
+fog | 0 | 50946b60 | ebf68036e62c7cfc
+fog | 1 | ddd524b5 | 12425dbe66b3c700 0
+fog | 2 | 190654c5 | c40321245f1a3c55
+fog | 0 | 41c8f781 | 9dcf29b715ccc73e
+fog | 1 | 136c735 | 7da144b97d054b25 0
+fog | 2 | 29e0d9b9 | 40ea0a0a4eea43ec
+fog | 0 | a04c007d | ba793b1f4dae0b3d
+fog | 1 | 7b4e35c2 | 3f87bf2ef29a826f 0
+fog | 2 | 576a1a5b | 40ea0a0a4eea43ec
+fog | 0 | 5b640895 | 145b87c98065e30a
+fog | 1 | e3cc0cf2 | bd946e032ff8010f 1
+fog | 2 | 77c92786 | e7376bda8634a787
+fog | 0 | 4da1a108 | 1dd2bb1029e83b3
+fog | 1 | c5344817 | f3d1a9cfeb92c914 1
+fog | 2 | c41ce160 | 3842b6aa640894ca
+fog | 0 | c036292e | 5373d2dace99433
+fog | 1 | 430caad5 | 894fc347697542e2 1
+fog | 2 | 50ecbec1 | 9b771b5c4d4e663c
+fog | 0 | 9a917801 | c788d27f43db7ef9
+fog | 1 | 95c6e052 | 3f87bf2ef29a826f 0
+fog | 2 | 81734a6a | 40ea0a0a4eea43ec
+fog | 0 | 147c1215 | c9c99c2a15fa8844
+fog | 1 | 3592cab3 | fda66a2bc39bff3d 0
+fog | 2 | 33caea82 | 68bed60281a69d4a
+fog | 0 | bdd02704 | 1f69c7ebd97443f4
+fog | 1 | 9dc1c30d | 937779b0fffccfe2 1
+fog | 2 | 8ada060c | 4d6d3acf843f262a
+fog | 0 | 5c83b949 | 2aea44cd37cb851d
+fog | 1 | 8902ee03 | 3df0a34ca05ec662 0
+fog | 2 | 4f89cabc | 6ef7e39546e5342a
+fog | 0 | ae5500c6 | 9a4e044098e25f33
+fog | 1 | acbb0b18 | b8d868c47f0d20d7 1
+fog | 2 | 3412835c | b5d87162ac57ccb7
+fog | 0 | 1e5de74d | a2c5e18bf654869a
+fog | 1 | 2a2a7896 | 7da144b97d054b25 0
+fog | 2 | 60aea305 | 85137f8f6183d8ed
+fog | 0 | a514da69 | 6cdb1a72887d1b75
+fog | 1 | 5af880d5 | 6b5570515af601f1 1
+fog | 2 | 7d4b28ff | 1d03dbc655d1f2ba
+fog | 0 | ad625538 | a43b8b8c76f653b8
+fog | 1 | 109fbbb7 | f2f852bdb422d740 0
+fog | 2 | 910f56ac | 1a391aad5c446a31
+fog | 0 | e558f54 | 99c42b1ec5bea54
+fog | 1 | bcdbe294 | 14a81f5c26052fa3 1
+fog | 2 | 958ee099 | 9b771b5c4d4e663c
+fog | 0 | a1e090d4 | d8a40f06d88214ac
+fog | 1 | 90db60bc | 36a7b47ab8b7bb64 1
+fog | 2 | aea7b4f3 | 9e0fff5ffbcc3513
+fog | 0 | f8fafb12 | 663aed877dc7157f
+fog | 1 | ba695a68 | 46dd3ec9fbe985e2 1
+fog | 2 | bda1337e | aa36398aa01bca16
+fog | 0 | 9501679b | 67952de0ad74d38d
+fog | 1 | 569833c6 | dece668bfaaff909 1
+fog | 2 | 78ee5809 | 9b771b5c4d4e663c
+fog | 0 | d4cb9f0d | fe91301b3051610f
+fog | 1 | 9f69bd8a | 47f45b735687686f 1
+fog | 2 | f7822cd6 | 4d6d3acf843f262a
+fog | 0 | aa2d55c7 | 7d2bcf2733b04133
+fog | 1 | 3024f992 | 7da144b97d054b25 0
+fog | 2 | 298117cb | 37b031e3a5300050
+fog | 0 | af1a7f1b | 1ca5b33e33697c51
+fog | 1 | 3e202604 | 4ac46b476badac53 1
+fog | 2 | ec409d9f | c28684a779f83760
+fog | 0 | d6dc52f7 | 9f5864d55ff3f9f3
+fog | 1 | 57e824c | 77327a97b66d0ad1 0
+fog | 2 | fce66121 | 4d6d3acf843f262a
+fog | 0 | 2dfd99d9 | 4b152479749fba56
+fog | 1 | c20949c8 | 822349b0e0d832a8 1
+fog | 2 | af30a153 | 1d03dbc655d1f2ba
+fog | 0 | 2ff611e0 | 9e76c3327b293f7e
+fog | 1 | f1286f57 | 1afa24cc584a5709 1
+fog | 2 | fbbf40a3 | ae9939bfb95ca79f
+fog | 0 | 7f6d00f7 | d0d871c25b921c05
+fog | 1 | d541bc2c | 13fed5103c1d0b3a 1
+fog | 2 | 5a2e998b | 4d6d3acf843f262a
+fog | 0 | 350a676 | 1fbb6e9b11e8baf7
+fog | 1 | c16a5552 | 764b76a04515e540 1
+fog | 2 | 4bb5b0e7 | 26f26412b8a6680c
+fog | 0 | be238d3d | 93407f48c3a3f9b4
+fog | 1 | f2966a3f | 5b3aeb8f1694d06a 1
+fog | 2 | ff239b13 | bb96c527b99a14b3
+fog | 0 | 7c9b34e6 | 42f1140037e91288
+fog | 1 | 4ca7f85a | d5ecdad2249c4de8 1
+fog | 2 | 45c61216 | 4104190f889af6b4
+fog | 0 | 14d143ff | 52572164a8210228
+fog | 1 | 765d2cd0 | 5f2b43a3d3bc5b61 1
+fog | 2 | 6345c6fd | e8ededfe9d2dee38
+fog | 0 | b704ea9 | 5a5d35dd8c533e81
+fog | 1 | 8bf2b372 | 181f2e3323f3d8c2 1
+fog | 2 | 6800d77a | a4baf42d29000587
+fog | 0 | 8b6cff0b | e915135966501857
+fog | 1 | 25913812 | dd820eda37248de8 1
+fog | 2 | fa372d66 | ac307a983837ee21
+fog | 0 | e02fb278 | 745c3095ba3a458a
+fog | 1 | ef8a3fcc | b1abcb00e564b905 1
+fog | 2 | ce70614f | 4d6d3acf843f262a
+fog | 0 | ce7830e4 | aa8649f1142266cb
+fog | 1 | 8e495f2f | 5ba3766e298aacdd 1
+fog | 2 | bb66c3d0 | 40ea0a0a4eea43ec
+fog | 0 | ec947afb | c60bb58e2426c9e1
+fog | 1 | 652e2910 | d7928b906619638d 0
+fog | 2 | d9b9bce | 86169c9518353546
+fog | 0 | 660ca4 | 850a71062519fbf2
+fog | 1 | 79f144ab | 3e001a7e0fcd3845 1
+fog | 2 | 2e4ee981 | e01f83735ed6cb97
+fog | 0 | e7aa9d9f | c96c5d845371d940
+fog | 1 | 24ead66f | 9bf359b0c576cc56 0
+fog | 2 | 2ceb8a24 | aab87d4bbd68250
+fog | 0 | f9b79d15 | cbfc64deedc315a3
+fog | 1 | ca2abc76 | 63f64f0f2f94b806 1
+fog | 2 | b8fc97ff | 9b771b5c4d4e663c
+fog | 0 | 7d5eda4b | 280ca8a2829f00
+fog | 1 | ff7d7714 | 36869da7f9f86553 1
+fog | 2 | 4766741f | a5a103545056095d
+fog | 0 | adac20f2 | fd362d61909e4fa8
+fog | 1 | 29954eb2 | 12425dbe66b3c700 0
+fog | 2 | 17cc28b5 | 37b031e3a5300050
+fog | 0 | 735f3d25 | 3cf698dda0c6d5b4
+fog | 1 | 89f08011 | 6b5570515af601f1 1
+fog | 2 | 58c6abe3 | 40ea0a0a4eea43ec
+fog | 0 | 67b6a371 | af5ce442946f16ad
+fog | 1 | 599918bc | 6d24fdd4f0f046ee 1
+fog | 2 | b010ed95 | 4d6d3acf843f262a
+fog | 0 | 48a690bb | 452cb1443ff69e3a
+fog | 1 | ffb4c820 | 1b5ee76f0bf13e0c 0
+fog | 2 | c2faccdf | 2304618e23d07959
+fog | 0 | 5dc8bce5 | 13c1d710a34fc272
+fog | 1 | 4d4dc49f | 12425dbe66b3c700 0
+fog | 2 | fb21e36 | db71786128bf002e
+fog | 0 | ce70411d | 5490b2cd6f81e4f
+fog | 1 | af2a5158 | a14bbf5360311d3c 1
+fog | 2 | 33399197 | 78e83567c75de4db
+fog | 0 | e0b08935 | 23e21a3a060c7660
+fog | 1 | a06b6088 | a3c95bf7c724c5af 1
+fog | 2 | 19d84bcb | 9086df27e8d8e140
+fog | 0 | 93aa1ce7 | d93df2a6598d1510
+fog | 1 | 490a66ba | 62c5facbdfd7c779 0
+fog | 2 | e92f643b | 40ea0a0a4eea43ec
+fog | 0 | cc316376 | 7aeee19ff4335469
+fog | 1 | d827bdd0 | 7da144b97d054b25 0
+fog | 2 | 94f601cb | 1d03dbc655d1f2ba
+fog | 0 | 666d0f81 | 2a5b8626783d6df7
+fog | 1 | a2ba74c5 | 12425dbe66b3c700 0
+fog | 2 | 2898f118 | 7f97d37a432a7a55
+fog | 0 | 8e9c66d1 | d3eeaf626dfb1aa3
+fog | 1 | 6f7bd11a | d65bfe40b5198162 1
+fog | 2 | 39dbdf36 | 1a0c1051ba0c890a
+fog | 0 | 66dea398 | b36c706f8897eb4
+fog | 1 | 66b2e684 | dad18627f476f9ab 0
+fog | 2 | 3e8f04ad | 4d6d3acf843f262a
+fog | 0 | f37f11eb | 6a2fd4feec10d80d
+fog | 1 | 3f070432 | c392e0e9e5575bab 1
+fog | 2 | c363abb7 | 4d6d3acf843f262a
+fog | 0 | fdd5d9ba | 98750c5cdb6e90a3
+fog | 1 | ac4f6b1b | 582739349772ac19 0
+fog | 2 | c0edaa5e | 9b771b5c4d4e663c
+fog | 0 | 64b2dff9 | 6873ebd7926f0d78
+fog | 1 | 7756e743 | 551645f85b3c4ab6 0
+fog | 2 | d511a945 | 62494993895f087f
+fog | 0 | 3e3f7b7c | 7fe158c1f7086d92
+fog | 1 | f1f8a150 | 3f87bf2ef29a826f 0
+fog | 2 | bb14d519 | fc7f6c21beed8077
+fog | 0 | 98b987ef | d58c20812b8ff706
+fog | 1 | 5bec9441 | b3bce3351ec7bf0a 0
+fog | 2 | 39ce014e | 40ea0a0a4eea43ec
+fog | 0 | 5dc288e1 | 97a89ac5077bd938
+fog | 1 | 9fbefe3d | f190985ccd6dbf9a 1
+fog | 2 | c3f36578 | c37e3f6be9b8b565
+fog | 0 | b9ff9c8c | fd4b9ddd115f2576
+fog | 1 | c3811b5d | 786df8b89ed41aae 0
+fog | 2 | ce0f03e2 | 2c91bf10589b2c34
+fog | 0 | fdd6490c | e78296e368b573e5
+fog | 1 | 9d2db214 | 4b961cc45132d838 1
+fog | 2 | b7fd9918 | aeeba353c91b4e5c
+fog | 0 | 6d9e8dfc | 9daea4bcd9fda36f
+fog | 1 | 72d4af7 | 278537c3187e2849 1
+fog | 2 | afa59879 | a8cd09816193dd5b
+fog | 0 | 9fbdb219 | f78eeca2c1b68aeb
+fog | 1 | e442883b | 89c6c9d6a5a40ef1 1
+fog | 2 | 4dcc78d8 | c52b07f7c1dc9294
+fog | 0 | fac6015a | 1743a73a9a936af1
+fog | 1 | 5044de22 | bed203f9b3a09f36 0
+fog | 2 | 4b4d465a | 9b771b5c4d4e663c
+fog | 0 | 42e74b4b | f06831f9fe6a36ad
+fog | 1 | 24e28bed | f6ebc87cba25e0c6 1
+fog | 2 | 67e617d4 | 21115a9b9f006437
+fog | 0 | 7c2bad37 | 5bcc1b469f931be8
+fog | 1 | ed80fac3 | f4087584610cad85 1
+fog | 2 | b899a2fd | bbccd2fc405cf0b
+fog | 0 | 19371bbc | 77cb4ce3723ce53f
+fog | 1 | 3bc119c8 | 50af1c49d80556ce 1
+fog | 2 | 25cd8019 | b327c53e4328bce2
+fog | 0 | c6e3603e | fc17adb9bf075c58
+fog | 1 | 7360725 | 8dc925a96eac49eb 1
+fog | 2 | 3c512dab | 2817a6a92310b934
+fog | 0 | d138143d | 1d2e6a759f7d2868
+fog | 1 | 7f5eba83 | 12425dbe66b3c700 0
+fog | 2 | f4b5d63e | ab5fffa7be9b39f2
+fog | 0 | a4df200b | 3d8c1e51b5df3018
+fog | 1 | de5c8a8c | 3f87bf2ef29a826f 0
+fog | 2 | 45e06c59 | c93664545d3053f4
+fog | 0 | 8fac38e7 | 7e11a51f8b2960da
+fog | 1 | 41230c10 | 1ce9dc02e9799329 1
+fog | 2 | 171c1db6 | 51e9bbb62e2737f9
+fog | 0 | 9ef6cc93 | 3c3d9bd9feddc1db
+fog | 1 | ddf16c94 | 12425dbe66b3c700 0
+fog | 2 | dadf75fe | 11fa07e6bc99fdb7
+fog | 0 | bba8a8d9 | 17760df403a3cfdc
+fog | 1 | 902e9c1a | 3f87bf2ef29a826f 0
+fog | 2 | d84fe883 | 3327da72b1377b51
+fog | 0 | af6f82fa | e3e77f711c75301f
+fog | 1 | 463a2d30 | 7da144b97d054b25 0
+fog | 2 | 2799469a | 51c061eb6aa6662d
+fog | 0 | 95643c31 | 644a2ebfc607945
+fog | 1 | 8b228a0d | 9492a583135c7270 0
+fog | 2 | 3b50cab | 40ea0a0a4eea43ec
+fog | 0 | ecb99601 | 8e24f706a5afba1c
+fog | 1 | 2039e1c3 | 4e3849a8ebc32eca 1
+fog | 2 | b6bccb48 | be46200bbaa471d5
+fog | 0 | b4659e2b | c7d371458916802c
+fog | 1 | 4271ad85 | b696985505e8ad73 1
+fog | 2 | 9a13de8f | cb9d6d130b2ed5d2
+fog | 0 | fb9f9ca8 | 9cdb14051271c40f
+fog | 1 | 61631b77 | 24d85da93e559917 1
+fog | 2 | 982502e | a93482b39a7ddb5a
+fog | 0 | 92a1ab69 | 6208df5fcc6f5e25
+fog | 1 | da19a177 | e9a3ad2c992810ae 1
+fog | 2 | 95a1e1fd | ea366b1079be6ff
+fog | 0 | e1fe54f6 | fe8f367abcc8783a
+fog | 1 | 666296e8 | 66bef88d0137940b 0
+fog | 2 | da2c1e4e | 4d6d3acf843f262a
+fog | 0 | 70b7889a | 755e235190f932c3
+fog | 1 | 51b3a722 | 7da144b97d054b25 0
+fog | 2 | 228e85ea | 5f41f986473d597e
+fog | 0 | 38b8db18 | 109d0e443252128b
+fog | 1 | 647e5d23 | 3f87bf2ef29a826f 0
+fog | 2 | 14ce53e4 | 4d6d3acf843f262a
+fog | 0 | 421863cb | 3eb9d259c57e99e4
+fog | 1 | e1622ba9 | 7a7dee17df29792 1
+fog | 2 | 3df2affd | 40ea0a0a4eea43ec
+fog | 0 | 66d2bf21 | 4704ead22e02e2e1
+fog | 1 | 196cb999 | 3a7b7415de1d1458 1
+fog | 2 | 99addfc5 | 181f2e3323f3d8c2
+fog | 0 | 1292e93 | c1dc0b2cc2b56b5e
+fog | 1 | 29286e52 | 17546f5c9c5c1f46 1
+fog | 2 | c3e46800 | 40ea0a0a4eea43ec
+fog | 0 | a6515fcd | bf698e5a5e19fe10
+fog | 1 | f673f782 | 77dc8812a397353b 0
+fog | 2 | f068159c | 9b771b5c4d4e663c
+fog | 0 | 10ad78c0 | 5833f465da15bcbf
+fog | 1 | d04215e3 | af512845abd672f3 0
+fog | 2 | 32f37825 | 90bbba3aa5266963
+fog | 0 | 7b9dc4ad | 1fac657d1fb7b1b9
+fog | 1 | 3c0c642f | f935234c8a48ba52 1
+fog | 2 | de93338a | 26acbb1d23bf18b4
+fog | 0 | 8af725bd | 76695107819dc319
+fog | 1 | 571b619b | 7da144b97d054b25 0
+fog | 2 | a9ff599e | 5238ffafe83bf831
+fog | 0 | 5eac97e9 | 20c109e6e3c643c0
+fog | 1 | bbda728 | 12425dbe66b3c700 0
+fog | 2 | 9beb5862 | 99a3a12fc9601c42
+fog | 0 | cb81503a | 5bab41bd45b5854a
+fog | 1 | 5b8662bf | 586495b9da776e0f 1
+fog | 2 | 7c86cac8 | 92f551603bfd28ab
+fog | 0 | 82e834af | 88aa6a47e6c2179b
+fog | 1 | c9f8af60 | 67302ebd96e7362a 1
+fog | 2 | 4a52801e | 40ea0a0a4eea43ec
+fog | 0 | b00a0dae | 7c5144e3ca3555c8
+fog | 1 | f9f0248e | 12425dbe66b3c700 0
+fog | 2 | e59e2bf3 | 4d6d3acf843f262a
+fog | 0 | d816f004 | 851f6b52d3f0767b
+fog | 1 | 7d42b532 | e7791d1da4a446d3 1
+fog | 2 | f4b5ddcf | a4d25a178ffd4066
+fog | 0 | c5a4b533 | 60a00facb8365e13
+fog | 1 | 3aa5ce33 | fda66a2bc39bff3d 0
+fog | 2 | bda2a4bc | 308e60793d0fb95e
+fog | 0 | 8b93ea2 | 7205d116cfb6e01
+fog | 1 | 2d942698 | 76da283fcb0733a1 0
+fog | 2 | e0b56240 | 9a5b988adeebd73
+fog | 0 | a1b337ff | 50315ab5ae71accd
+fog | 1 | 5d69d308 | 7da144b97d054b25 0
+fog | 2 | 9dbb7d1 | 9b7aac1dddf778a5
+fog | 0 | 4f582994 | a74793ee48ba3cb6
+fog | 1 | 6583dec9 | 9dad1469452caa4b 1
+fog | 2 | 50fedbdc | 40ea0a0a4eea43ec
+fog | 0 | aca7ca5b | 3965c7dd1969fd92
+fog | 1 | c0c93049 | 2faa06493255b02a 1
+fog | 2 | 101233c9 | bbccd2fc405cf0b
+fog | 0 | 497a58ea | 5aadaf09ccb097ca
+fog | 1 | a862adad | adbf72d39173799 0
+fog | 2 | 2799a05d | 4d6d3acf843f262a
+fog | 0 | 32d10413 | 706b3a7789661d76
+fog | 1 | 16da0d06 | ffbfcf212880ba6b 0
+fog | 2 | 23e47ecf | 4d6d3acf843f262a
+fog | 0 | 258ccd1e | 698308cad9e7d9a1
+fog | 1 | 5e434475 | 5bf299f7ade3c1c8 1
+fog | 2 | 6ea5af05 | 7c51fd83c63ab3b3
+fog | 0 | ee22fdd5 | 97d002b9660ff363
+fog | 1 | 51825193 | bed203f9b3a09f36 0
+fog | 2 | 9586223c | 6474d004bd87d59e
+fog | 0 | ed7053da | d7d702b563330618
+fog | 1 | 7b6382fe | a6ff06b93a194607 1
+fog | 2 | 63ee25df | 9b771b5c4d4e663c
+fog | 0 | dd22a921 | 5f3fdaa6e48bbbe5
+fog | 1 | 9c2008f3 | b9379984be538973 1
+fog | 2 | a5ee36d2 | 27995fd86f4701be
+fog | 0 | e777798e | 21482e45459eaa01
+fog | 1 | e86e8b0f | a8dd6df4de4edc24 1
+fog | 2 | 21182927 | 1d03dbc655d1f2ba
+fog | 0 | 5ff87875 | 8827eed0104f4d69
+fog | 1 | ed814438 | 5c3f6c6d87d09abe 1
+fog | 2 | 3b20e497 | 7fc2fe4a9bb4199
+fog | 0 | 94662ab5 | aec8d881e843f0e2
+fog | 1 | 3d36b12 | 260cfedd1b6a6609 0
+fog | 2 | e0440f70 | 40ea0a0a4eea43ec
+fog | 0 | e978555e | ac476e476d1690dd
+fog | 1 | f6f0fc6b | c622cb0d7fc829f6 1
+fog | 2 | 2351fd47 | 4d6d3acf843f262a
+fog | 0 | 99ecb30 | dc7f1ce32b52f20b
+fog | 1 | a1383a08 | f6a515e128f1de77 1
+fog | 2 | 5fcdd2bb | ded98f6b57f5e49c
+fog | 0 | 6e92d571 | 1ccf68631282d5f9
+fog | 1 | afb1ce9f | a4d25a178ffd4066 1
+fog | 2 | 542dbea5 | d760c27d61c6d3f4
+fog | 0 | 6a9abe9d | 60832de67086f010
+fog | 1 | ac98a3ed | 3305458f2e5377 1
+fog | 2 | 273633c0 | a58e0c48418ca39e
+fog | 0 | a89309ea | 4a3c3ad34cd8fb60
+fog | 1 | 97b2ced3 | 286b934484d01c9e 1
+fog | 2 | be9e1c68 | 287780d659af4313
+fog | 0 | ac8ded9d | 3a8f0b01a08eac3
+fog | 1 | 6541871a | 8d883f55357ad01f 1
+fog | 2 | 634e7fe3 | 91475518be904dbb
+fog | 0 | 5934682d | 2d56d61b323a864c
+fog | 1 | 36936262 | 6f611ea9fd7cd504 1
+fog | 2 | 4184c5a | 9e02719ddc6289de
+fog | 0 | 885eb197 | c085050ccf1215b4
+fog | 1 | 9f655a60 | 6abfcedec466c2c7 0
+fog | 2 | a8a2032e | 982b0643840e64e1
+fog | 0 | d35d9b4d | ae88b8ae96883653
+fog | 1 | 204879a4 | 5aabf7ba827cba92 0
+fog | 2 | 56b9c033 | 4d6d3acf843f262a
+fog | 0 | 2a4c77c5 | 80b623f51a7ea61a
+fog | 1 | f83ed437 | 6c9b56584cc808c8 1
+fog | 2 | d9d7358c | 3897b6571d172a88
+fog | 0 | 6c541912 | 4680dc5acccc4f4e
+fog | 1 | 96cfdc0c | 70aef1463eab3efd 0
+fog | 2 | a81b9527 | 3384a253207e8eb3
+fog | 0 | d5a9a929 | 5098c0671b684978
+fog | 1 | 11d73988 | f2f852bdb422d740 0
+fog | 2 | 7b0af6eb | 1868a3411052af44
+fog | 0 | 537ec1d6 | 935b8eb9f82c59d4
+fog | 1 | 402dbd2c | ea131665dc87f9c9 1
+fog | 2 | 88992560 | 40ea0a0a4eea43ec
+fog | 0 | 22fb83cb | ee58ce092afb1ddb
+fog | 1 | 24dd722b | 47f45b735687686f 1
+fog | 2 | fd59e07b | 9b771b5c4d4e663c
+fog | 0 | f2e8e3a1 | c6e2402bd74cb3e0
+fog | 1 | 86fd2a32 | f85d6f948791a7fd 1
+fog | 2 | 1ea7c512 | 10f55cbced2803b3
+fog | 0 | 5e06f81f | a09d6cae80281814
+fog | 1 | 16c4607a | 74ceca7e7fac20ce 1
+fog | 2 | 64463a75 | abcbb62958b96388
+fog | 0 | 7c4878a | caf34bcb8ee1c6fc
+fog | 1 | c0e04136 | 450c2660ef14927c 1
+fog | 2 | eae7c236 | 33dec1fcd51c41e5
+fog | 0 | 26f7a9a1 | 2028c507951ab6b
+fog | 1 | e54bf6dc | 6abb6ac15d4c786a 1
+fog | 2 | 953cd53d | a627ce220e5bbf2c
+fog | 0 | 941b2bde | 60097cfaaf07399e
+fog | 1 | bbfbe62b | 7da144b97d054b25 0
+fog | 2 | 4edecd42 | 1f46d3556890b40e
+fog | 0 | d26cdfe8 | 95c9c3bdeef85033
+fog | 1 | bc8c5d26 | 7da144b97d054b25 0
+fog | 2 | 3344473d | 4d6d3acf843f262a
+fog | 0 | 87417786 | f567823e6c7e7d88
+fog | 1 | 84aaec1f | 8594423bfe6cffbe 1
+fog | 2 | 9339a269 | 6ec239e4ced89197
+fog | 0 | a79e3a07 | d69ae849bf192b35
+fog | 1 | e1ca8155 | b026a409715dffbc 0
+fog | 2 | 87892fc2 | 1d03dbc655d1f2ba
+fog | 0 | f450d4b1 | 92ac3dfa20d85649
+fog | 1 | d139da73 | cde9b223a874aa16 1
+fog | 2 | 9e63feb0 | 1d03dbc655d1f2ba
+fog | 0 | 3610f4f0 | 44b756912ea4a26f
+fog | 1 | f05a3a65 | dad18627f476f9ab 0
+fog | 2 | 146876f5 | 4d6d3acf843f262a
+fog | 0 | d95cba0c | ff9a041c4af8af11
+fog | 1 | 4e73eba9 | e77360a9961e4ccd 1
+fog | 2 | d142c5f8 | 60ab9010e6fd8841
+fog | 0 | 3c12cbd9 | 7b9324763ade7015
+fog | 1 | 9013d508 | ae34349d843c23e0 1
+fog | 2 | 2843bdc7 | 7731e945b80f37b9
+fog | 0 | ca407a11 | ea0a59db1261ff4a
+fog | 1 | 391da1b4 | f92a78539de594f0 1
+fog | 2 | e479f57b | 77403425b50da77a
+fog | 0 | cdb2b730 | c5837a1be0905f8c
+fog | 1 | b693f5a4 | 5914641c5dec7175 0
+fog | 2 | 27061a6a | 615facdc061cae69
+fog | 0 | fcfc7187 | be44a882d3374b61
+fog | 1 | 8c4d8977 | cdd79dfa5934593b 1
+fog | 2 | 886fabee | bf69091e97a1892e
+fog | 0 | 50913e8d | 2bd1f095e93bf378
+fog | 1 | 1d41558c | d9115504535f134 0
+fog | 2 | 7e867575 | 410399ee8d47bff6
+fog | 0 | 7b43e8a3 | e86b56f59dcc1fdc
+fog | 1 | c375c3eb | f73fbf530036f20b 1
+fog | 2 | f805a851 | 9183d623690c6f3b
+fog | 0 | a5cbca9c | 314334b45756640
+fog | 1 | ae140de7 | 7da144b97d054b25 0
+fog | 2 | f648cb35 | b327c53e4328bce2
+fog | 0 | 496e1467 | cd7d35d320767a49
+fog | 1 | b947aed8 | 152717c4cce200ba 0
+fog | 2 | 22c374b3 | 2f74d4d1d040bd1f
+fog | 0 | a65b2dd2 | cf75048b7811859a
+fog | 1 | b787cab6 | 7cd3e6552a52ce0b 1
+fog | 2 | ee28ff99 | 6eef2acf3e321d9f
+fog | 0 | b5da01ab | 676e04ce7b8018e1
+fog | 1 | d2c16006 | 9a8649f19181c361 1
+fog | 2 | bfd714a9 | 27995fd86f4701be
+fog | 0 | e8eba20d | f7e4ad9dc860620d
+fog | 1 | e19e5df3 | a7faddffa1d8c9a7 1
+fog | 2 | cd45dd9 | e565e3de8487d4e6
+fog | 0 | 44624746 | d3c97a7d72a4b9f5
+fog | 1 | 4dae8a89 | 1bf373c4d3c47c4d 1
+fog | 2 | 71e05866 | f161091ab1e15421
+fog | 0 | 2b802dac | 122e14c2250be61b
+fog | 1 | f7f70ab7 | f645b5fe1181a557 0
+fog | 2 | 4becb0d6 | b0eaeaa8b42a8da5
+fog | 0 | a4628abf | 678950e07ce721b3
+fog | 1 | 79f93e1b | 85e7f2ac3b45badd 0
+fog | 2 | cc955386 | 1d03dbc655d1f2ba
+fog | 0 | b202f8a6 | 54abbc5ae5f7567
+fog | 1 | a8ed5ffc | 32436867de5f36b5 1
+fog | 2 | 9ba4de41 | 9b771b5c4d4e663c
+fog | 0 | b434d5d7 | ed823db301278311
+fog | 1 | 7e7b2de9 | 7da144b97d054b25 0
+fog | 2 | de5c97d | 11fa07e6bc99fdb7
+fog | 0 | ee6f6693 | 5a43c04f48353dd3
+fog | 1 | 2efab06f | bbb99c9975d72c1 1
+fog | 2 | 5bdf07ed | db7a5b8db36790ee
+fog | 0 | 8a92af22 | e8902bed1d6f0549
+fog | 1 | f7299bed | c663ec8fb676fa31 1
+fog | 2 | d06a406f | c87673ad5cc8aa4f
+fog | 0 | 83392d6b | 4bad51daadf1a26b
+fog | 1 | 79289211 | ed31b67fa4310dc6 1
+fog | 2 | 5a475591 | f578af6383ec5f1c
+fog | 0 | a93a5502 | 75c3e2fc6c2001a2
+fog | 1 | d841063d | 5b53a6745f01ebb9 1
+fog | 2 | cc17e3fc | 9b771b5c4d4e663c
+fog | 0 | 2b9ea1d | 5f1db1c9682e488c
+fog | 1 | 1cf38445 | 4d7483da3a1f414a 1
+fog | 2 | 416f5594 | 4d6d3acf843f262a
+fog | 0 | ab78c43b | d43c2fd8b3e4a7e2
+fog | 1 | 2c3e9115 | d7c6fe37a82b5b21 1
+fog | 2 | 6daba97c | c1b5b5a3165aedb1
+fog | 0 | d9242147 | dc6d0829c507eafc
+fog | 1 | 393a838b | eb730341049a4e55 1
+fog | 2 | 5554584f | 6ffc2ee5543e8a27
+fog | 0 | 75dcbd8a | b85523e25886e674
+fog | 1 | 3ed72165 | 7da144b97d054b25 0
+fog | 2 | 715ac49d | 9517c9d066c57e6b
+fog | 0 | d203be89 | fb5e6daeab6622f0
+fog | 1 | 7e1042f4 | 9fe429b07f3b0b4 1
+fog | 2 | d9894a73 | 1d03dbc655d1f2ba
+fog | 0 | e3189cd0 | c57bbdc89c29cd4d
+fog | 1 | 47421b37 | 12425dbe66b3c700 0
+fog | 2 | 449c5d0c | 4d6d3acf843f262a
+fog | 0 | b27305e0 | 54c9152da222b483
+fog | 1 | 40bfd7fb | 408717fcdf8c4bc4 1
+fog | 2 | 214b8bfa | 2c14aac0c1837873
+fog | 0 | ecccc06d | a3d7b37ca886abe9
+fog | 1 | 761f36f | 3f87bf2ef29a826f 0
+fog | 2 | ff3ee5b4 | 79476fe9f4a5e792
+fog | 0 | ee001e0c | 37533196c6e6b7b8
+fog | 1 | 2b517d04 | a08be1b98b647e6c 1
+fog | 2 | ae2440f5 | 69fa42359fe80eb0
+fog | 0 | ea82e88f | c27006aa027a465e
+fog | 1 | 6ede619d | 7da144b97d054b25 0
+fog | 2 | 7450b4d8 | 3ccbeb96756cded3
+fog | 0 | f668d195 | 34b2aeffe475211a
+fog | 1 | 83ea00c5 | 51be5be77b3c8b43 1
+fog | 2 | c91a851a | 4db2471054204113
+fog | 0 | 596ec8aa | dc6ab9dd08c8dc26
+fog | 1 | b1ca76f4 | 1d2a13f362487991 1
+fog | 2 | 3349fbeb | ad0a8aae8e94a48a
+fog | 0 | 80a06527 | ca1464c4ac51f7b2
+fog | 1 | aa6bc2a8 | 9a7533be7255b3d1 1
+fog | 2 | 585c9f72 | ec0dc86ab4a4f6cd
+fog | 0 | f590a2e2 | b2c83f31ab8d4d81
+fog | 1 | 7c821529 | 78a184d112fcb31e 1
+fog | 2 | f7f1674e | b97aae358443b8b
+fog | 0 | 615ef543 | a069a42b6076889d
+fog | 1 | 1ddfd8b | 31ac49fa6cb1d21c 0
+fog | 2 | 4cd653dc | 4d6d3acf843f262a
+fog | 0 | 56d9f780 | 9f7936dec81f089c
+fog | 1 | 5950581 | 25f2499b71852147 1
+fog | 2 | e6640ccb | 40ea0a0a4eea43ec
+fog | 0 | cb14e7cc | eef95ef43d6fa587
+fog | 1 | 8a86e08c | 3f87bf2ef29a826f 0
+fog | 2 | 11937545 | 4d6d3acf843f262a
+fog | 0 | 3be7bac1 | 5b1cb1a0ef8cacd0
+fog | 1 | 109868b7 | a83bdeb9b1be4745 1
+fog | 2 | ccc16b2e | 454f2ed26c70d239
+fog | 0 | 3079ffa3 | bfc3fa800355c086
+fog | 1 | 732dc976 | 840fb54140826bfd 0
+fog | 2 | 2158b675 | 7dbd460e90062177
+fog | 0 | 5348ee91 | c35e138ad5d121d7
+fog | 1 | bd6c8bc4 | 8cf06f0b7ade589d 1
+fog | 2 | c1ae9389 | cac33f0745406983
+fog | 0 | 811cbfad | cad2aa0d4503871
+fog | 1 | cb449c3c | 3f87bf2ef29a826f 0
+fog | 2 | ca611388 | bf07897c437c7acc
+fog | 0 | 9bf3889e | b3a936ef646abffe
+fog | 1 | 9048a7b7 | 78cfbe1ba93e9433 0
+fog | 2 | 6c416e62 | dc31d6a628a8604c
+fog | 0 | e5567005 | 4c1be08ff26d304a
+fog | 1 | 9e377282 | e8c51441224648c 0
+fog | 2 | 88583a7c | 40ea0a0a4eea43ec
+fog | 0 | 5540354c | 83c27245c2b2da01
+fog | 1 | 75d64eb | a797ebb6e89c4cd5 0
+fog | 2 | e3ba3ec0 | 39cfb5c5ac61d5ec
+fog | 0 | c8553b09 | 3fff592efa456337
+fog | 1 | aae46f7f | e1fc794595ea00bc 1
+fog | 2 | c7845949 | 2f05f6934f376a76
+fog | 0 | c23cc65e | b9de0917ca34f752
+fog | 1 | dd2738d2 | 400ae1db366c8763 1
+fog | 2 | 19371235 | 982b0643840e64e1
+fog | 0 | f65ff1d7 | 3d3f913c10d13f29
+fog | 1 | 387f8712 | d9e0f8d1d74cd5a6 1
+fog | 2 | d27d0e02 | c93664545d3053f4
+fog | 0 | 63511029 | 84cc9f4f71648dc3
+fog | 1 | 553fe5f2 | fb00ad0772fa1732 0
+fog | 2 | 77490a78 | 82cebaa7f79588e9
+fog | 0 | ca5ebb7b | e576c8c9ff0a9b41
+fog | 1 | d15ba844 | 7da144b97d054b25 0
+fog | 2 | 1d0255fb | 6d1c529f77d45de3
+fog | 0 | 2f3221fe | 4f1d1b463990a71
+fog | 1 | c2c6fcee | 208579e71648f293 1
+fog | 2 | afd53f2a | 1ffa891db2a5e423
+fog | 0 | a00e6b55 | 1e8ad2c4e53b1f88
+fog | 1 | a90e414 | 5a99dbf45987f6d7 0
+fog | 2 | 7bb86023 | 536d39ca837dfe26
+fog | 0 | ef687fc | 1826d63bf073c466
+fog | 1 | f6d39e13 | 778537ea89e51442 1
+fog | 2 | 27387646 | 1d03dbc655d1f2ba
+fog | 0 | cd55e2f1 | 7d5652a7632fa407
+fog | 1 | 48628c0 | 3f87bf2ef29a826f 0
+fog | 2 | 80f0e7ff | 69b84c658f74faec
+fog | 0 | 326b4383 | 1906c2ac55a40b7
+fog | 1 | bf808048 | 902226cf4d7f9e71 1
+fog | 2 | 3550e2bf | 4d6d3acf843f262a
+fog | 0 | 4dc97458 | b4a9817d73fc6f72
+fog | 1 | 9f16b2d9 | 7a8a8256a4146094 0
+fog | 2 | 6a43413 | 91f221c416a9be9c
+fog | 0 | 33afc83a | 81ef254e0c81040e
+fog | 1 | f0e675f4 | e8c51441224648c 0
+fog | 2 | eef3f9a8 | 40ea0a0a4eea43ec
+fog | 0 | f34b7197 | 8603aedad1f50139
+fog | 1 | 36e8a1d6 | 2b734e6630f43bd2 0
+fog | 2 | 8c6e0366 | a88dd31b19dd89c1
+fog | 0 | 1184daaa | 41e13032be6e6914
+fog | 1 | 384dd213 | 47c657b14d74c890 1
+fog | 2 | ef62c58b | 4d6d3acf843f262a
+fog | 0 | d20888e1 | 712f4a2511f7b788
+fog | 1 | ffa1e242 | a804ddb5c06fc2a 1
+fog | 2 | bf83089e | 1d03dbc655d1f2ba
+fog | 0 | 765aaa3a | 5f93382438f3e0fa
+fog | 1 | 6f655e2e | d342b8484a9255b5 1
+fog | 2 | d18118c9 | 4d6d3acf843f262a
+fog | 0 | a5d78a2b | 860f2eaa3a7c3b37
+fog | 1 | d25ed908 | 7da144b97d054b25 0
+fog | 2 | 8af34a08 | 1d03dbc655d1f2ba
+fog | 0 | 2eb1ec | b45ff86fc3d33126
+fog | 1 | e67fd565 | 1b4c31f40bb80730 1
+fog | 2 | 41c6be1c | 4d6d3acf843f262a
+fog | 0 | 90de1d9 | 408ed35e88c55637
+fog | 1 | d9e209b2 | 8b74825261d2c0d9 1
+fog | 2 | 739afdd3 | 40ea0a0a4eea43ec
+fog | 0 | bdfc762f | b67b762e68fb68f3
+fog | 1 | 5d75db47 | b980a59db431bf6f 0
+fog | 2 | 6f2fa6c5 | 3f8d8462529bde13
+fog | 0 | 441dbc97 | 5b80b518088ca79b
+fog | 1 | 2296ee0c | 7da144b97d054b25 0
+fog | 2 | 660fd6e1 | 87951ce77b811e8f
+fog | 0 | e0d4f8bf | 648932e8ee40ed8c
+fog | 1 | 6576121b | 24edd6001148e5da 1
+fog | 2 | 1ad2753e | 4d6d3acf843f262a
+fog | 0 | 738179df | 701046037481e2a5
+fog | 1 | e7ec59d4 | 5fd69878dad52014 1
+fog | 2 | 91b69696 | f1b8ca2dbbe6941e
+fog | 0 | 869ac00d | d2e75e582911a207
+fog | 1 | 16b1d26c | 453217fe3a601c75 1
+fog | 2 | aaaeac1c | 98a5b04735015c2a
+fog | 0 | 4225b028 | 8fa9d5f81dc1b9fe
+fog | 1 | a06a1a09 | 7da144b97d054b25 0
+fog | 2 | 875177d2 | 62ed1a597d084a00
+fog | 0 | c6ef81e1 | 34c58902d18ff1ff
+fog | 1 | b449069f | ea65bd225dabb0a9 1
+fog | 2 | 3a272a75 | 40ea0a0a4eea43ec
+fog | 0 | aa30fdb4 | 27d0e6ccd00da630
+fog | 1 | 4972e5b0 | 69b058907489d938 1
+fog | 2 | fe032434 | 5de107a484803c1b
+fog | 0 | e408edd8 | d4f1d0252c2b97e0
+fog | 1 | 24016507 | 7da144b97d054b25 0
+fog | 2 | d72f35b | 9b771b5c4d4e663c
+fog | 0 | 41f49c9 | 594c57681e714d63
+fog | 1 | bd8044d0 | 141c2e352bb8a712 1
+fog | 2 | 885ed3e | d522df5ac6b9e69c
+fog | 0 | a66e2797 | c17cfb9c57a0f7a9
+fog | 1 | 8407959e | 949dda9d2eb9f64c 1
+fog | 2 | 34ff48d3 | 4d6d3acf843f262a
+fog | 0 | c37a88d0 | 7d72effd1d047f79
+fog | 1 | 5db2bc77 | 7da144b97d054b25 0
+fog | 2 | ba4e7414 | 82cebaa7f79588e9
+fog | 0 | af124286 | 492673126ca33d10
+fog | 1 | 198739fc | b5a4587abe263240 1
+fog | 2 | c46c4ea0 | 4d6d3acf843f262a
+fog | 0 | 82cd6858 | cf31d417948a6cb8
+fog | 1 | 4bf45456 | 366a524a9f25f348 1
+fog | 2 | d0858d04 | 84c6299dc2900b38
+fog | 0 | 30ade5b0 | 93cfca74f88fbe2e
+fog | 1 | c216481c | 6d2587ceca07c468 1
+fog | 2 | 93fbee40 | 8f181b8b5aaf78f9
+fog | 0 | f3491d32 | 2768758de495f96
+fog | 1 | d6b3fb0c | 9d59555bf0f7e6a0 1
+fog | 2 | 94d391fc | 3e0fb40fb172ac3c
+fog | 0 | b46ab8c2 | e39039f958f5b2
+fog | 1 | 1c106218 | 18d771dba5ef2dad 0
+fog | 2 | d5fc1261 | b06b7b9886c0f657
+fog | 0 | e2e7cee4 | 7399615b15de5836
+fog | 1 | b69100f0 | 8a7bbd84a242c619 1
+fog | 2 | 8df2cb29 | 454adb9ea40fcca6
+fog | 0 | af83e296 | b73b5b32a08732be
+fog | 1 | 96ee33d1 | 8df224a2ca393b4b 1
+fog | 2 | c33b1210 | 9b771b5c4d4e663c
+fog | 0 | 74f9ad5 | 76477dfbefb9b757
+fog | 1 | b5b05f71 | f644236545c301b1 1
+fog | 2 | cda75104 | 137584dd6ba2b831
+fog | 0 | 68311747 | 979a5ff10c1409da
+fog | 1 | b37cec68 | 6a765ea442f6a5a2 1
+fog | 2 | d4bf4230 | 31fa9c9d532af201
+fog | 0 | 9e8ccaa5 | b446a4285b15e580
+fog | 1 | e7464559 | 339914ecda9bf6f3 1
+fog | 2 | f53b8fdf | 1783e3793472676
+fog | 0 | 26d56b28 | 67d2e1ace0fd6d10
+fog | 1 | da11b7a9 | 773d1f1646b5927d 0
+fog | 2 | af0dabcc | fc62bb3c182c85ab
+fog | 0 | aa53807e | 746af7ea0a8b7747
+fog | 1 | 864541a0 | 7da144b97d054b25 0
+fog | 2 | 2891b30e | 1d03dbc655d1f2ba
+fog | 0 | 10cdcb30 | 7d287f5bf2647e7e
+fog | 1 | 92c40cc9 | 97e008c370bb4087 0
+fog | 2 | 70630f74 | 1a0897cb2b6ffff8
+fog | 0 | eb6f900a | 5a6f59095a332500
+fog | 1 | a5d40d3d | 23894b5e5f0016e 1
+fog | 2 | 7f087888 | 18b7d6038c51cbec
+fog | 0 | b77131b7 | e0d2700fa881753f
+fog | 1 | 6dbeba92 | 2c00a9fe1019c4f2 1
+fog | 2 | 58b9f29e | 4826f013141497d5
+fog | 0 | 9ee92188 | cd50d9d928a45988
+fog | 1 | f43fc278 | 28ff4a5a029b2df3 1
+fog | 2 | e317e72f | 9b771b5c4d4e663c
+fog | 0 | 8a28b97 | b172c825c68e2b7f
+fog | 1 | 7936b57 | ffbfcf212880ba6b 0
+fog | 2 | a54fa27b | 9b771b5c4d4e663c
+fog | 0 | fbc2de39 | a6e6b2156d28531a
+fog | 1 | c14bea7c | e9d616a993632ab3 0
+fog | 2 | a8ee07a2 | 9b771b5c4d4e663c
+fog | 0 | eca41fcb | 7f7cb5dbb7eb0d02
+fog | 1 | 94401f01 | fe0e3393b3984bef 1
+fog | 2 | e06acb60 | 2e66e4c69366a583
+fog | 0 | 747817bc | f2393f3a8be688fe
+fog | 1 | fb472313 | d6e66fe6ed6d8c81 1
+fog | 2 | e8cef0d2 | 82cebaa7f79588e9
