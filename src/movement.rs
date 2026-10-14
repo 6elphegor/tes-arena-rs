@@ -425,7 +425,7 @@ impl Machine {
             // dec, then the sign of the byte.
             let to = level.wrapping_sub(1);
             if to & 0x80 != 0 {
-                return if hooked(self, EXIT_HOOK) { None } else { Some(0) };
+                return self.move_exit(to);
             }
             to
         } else {
@@ -437,7 +437,7 @@ impl Machine {
             }
             let to = level.wrapping_add(1);
             if to >= self.mem.r8(DS, LEVELS) {
-                return if hooked(self, EXIT_HOOK) { None } else { Some(0) };
+                return self.move_exit(to);
             }
             to
         };
@@ -446,6 +446,27 @@ impl Machine {
         }
         self.mem.w8(DS, LEVEL, to);
         self.move_change_level(files)?;
+        Some(0)
+    }
+
+    /// 0000:F791..F7A3 and F842..F85B: past the first level or the
+    /// last, the way out (the hook CD4E) with the level at `to`
+    /// meanwhile. The ways out the areas set (0000:4537, 44BD) are
+    /// `Machine::area_exit`, recognised by their value: the port loads
+    /// the image at segment 0, where the original's are relocated and
+    /// pass the hook's test (0000:A8EF, the segment). None for another
+    /// hook set.
+    fn move_exit(&mut self, to: u8) -> Option<u16> {
+        let ported = matches!(self.mem.r32(DS, EXIT_HOOK), 0x4537 | 0x44BD);
+        if self.mem.r16(DS, EXIT_HOOK + 2) != 0 && !ported {
+            return None;
+        }
+        if ported {
+            let level = self.mem.r8(DS, LEVEL);
+            self.mem.w8(DS, LEVEL, to);
+            self.area_exit(&mut crate::transit::NoAreaHooks)?;
+            self.mem.w8(DS, LEVEL, level);
+        }
         Some(0)
     }
 

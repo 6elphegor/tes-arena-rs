@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
@@ -13,8 +13,15 @@
 //! player in a square's centre, facing HEADING, a debugging aid; --hour
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
+//! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
+//! `walk:N` (frames), `wait:N`.
+//!
+//! A frame that leaves the area (a building's door, an interior's way
+//! out) goes on to the next area as the game's outer loop picks it, and
+//! the view loads it (`areas`).
 
 mod archive;
+mod areas;
 mod flats;
 mod render;
 mod world;
@@ -433,6 +440,11 @@ fn main() {
         hour = Some(args[i + 1].parse::<u32>().expect("--hour H"));
         args.drain(i..i + 2);
     }
+    let mut steps = String::new();
+    if let Some(i) = args.iter().position(|a| a == "--do") {
+        steps = args[i + 1].clone();
+        args.drain(i..i + 2);
+    }
     let mut at = None;
     if let Some(i) = args.iter().position(|a| a == "--at") {
         let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
@@ -440,11 +452,12 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    let run = areas::start(&mut engine, args[2].starts_with("CITY:"));
     if let Some(h) = hour {
         // The clock at that hour of the first day (its calendar fields
         // agreeing, so no hour passes at once), and the sky's time.
@@ -471,45 +484,88 @@ fn main() {
         let out = args.get(4).expect("--shot needs a file");
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, out, click, wait, frames, turn);
+        shot(&dir, engine, run, out, click, wait, frames, turn, &steps);
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &mut engine);
-    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, clicked: false, message: None, next: Instant::now(), last: Some(arena::engine::Frame::Running) };
+    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, clicked: false, message: None, next: Instant::now(), last: Some(arena::engine::Frame::Running), dir, run };
     event_loop.run_app(&mut app).expect("run");
 }
 
-/// Renders one frame offscreen to a PNG, after `frames` frames of
-/// walking forward.
-fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait: usize, frames: usize, turn: i16) {
-    let mut assets = Assets::new(dir, &mut engine);
-    let mut message = None;
-    // One frame turning (or not) before the walk: the actors pick their
-    // sprites in a frame.
+/// What a scripted run keeps between frames: the area's assets (made
+/// afresh in each area, as the window does), a click left for the next
+/// frame's drawing, the message line printed last, the frames run.
+struct Shot {
+    assets: Assets,
+    clicked: bool,
+    message: Option<(u16, u16)>,
+    frames: usize,
+}
+
+/// One frame with `intent`; a frame leaving the area goes on to the
+/// next (`areas::next`, None where it can't).
+fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
     let t = engine.frame_ticks();
     engine.tick(t);
+    st.frames += 1;
+    let mut hooks = Front { sheet: Some(&st.assets.sheet), tick: st.frames * 4, clicked: std::mem::take(&mut st.clicked) };
+    let frame = engine.frame(Input::Steer(intent), &mut hooks).expect("frame");
+    print_message(engine, &mut st.message);
+    if frame == arena::engine::Frame::Left {
+        *run = areas::next(engine, dir, *run)?;
+        st.assets = Assets::new(dir, engine);
+    }
+    Some(())
+}
+
+/// Renders one frame offscreen to a PNG, after `frames` frames of
+/// walking forward, then `steps` (see `--do`).
+#[allow(clippy::too_many_arguments)]
+fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str) {
+    let run = &mut run;
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), clicked: false, message: None, frames: 0 };
+    // One frame turning (or not) before the walk: the actors pick their
+    // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
-    engine.frame(Input::Steer(&intent), &mut Front::default()).expect("frame");
+    shot_frame(dir, &mut engine, run, st, &intent).expect("area");
     // A click is acted on in the next frame (its drawing finds what is
     // under it), so one is waited at least.
-    let mut clicked = click && centre_click(&mut engine);
+    if click {
+        st.clicked = centre_click(&mut engine);
+    }
     let wait = if click { wait.max(1) } else { wait };
-    for (k, forward) in std::iter::repeat_n(0, wait).chain(std::iter::repeat_n(256, frames)).enumerate() {
-        let t = engine.frame_ticks();
-        engine.tick(t);
-        let intent = Intent { forward, ..Default::default() };
-        let mut hooks = Front { sheet: Some(&assets.sheet), tick: (k + 1) * 4, clicked: std::mem::take(&mut clicked) };
-        engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
-        print_message(&engine, &mut message);
+    for _ in 0..wait {
+        shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+    }
+    let walk = Intent { forward: 256, ..Default::default() };
+    for _ in 0..frames {
+        shot_frame(dir, &mut engine, run, st, &walk).expect("area");
+    }
+    for step in steps.split(',').filter(|s| !s.is_empty()) {
+        let (what, n) = step.split_once(':').map_or((step, 1), |(a, n)| (a, n.parse().expect("--do: a number")));
+        match what {
+            "click" => {
+                st.clicked = centre_click(&mut engine);
+                shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "turn" => shot_frame(dir, &mut engine, run, st, &Intent { look: n as i16, ..Default::default() }).expect("area"),
+            "walk" | "wait" => {
+                let intent = if what == "walk" { walk } else { Intent::default() };
+                for _ in 0..n {
+                    shot_frame(dir, &mut engine, run, st, &intent).expect("area");
+                }
+            }
+            _ => panic!("--do: {step}?"),
+        }
     }
     let (w, h) = (640u32, 400u32);
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
     let format = wgpu::TextureFormat::Rgba8Unorm;
-    let mut r = assets.renderer(&device, &queue, format);
-    let (sky, lights) = assets.light_frame(&mut engine.m);
+    let mut r = st.assets.renderer(&device, &queue, format);
+    let (sky, lights) = st.assets.light_frame(&mut engine.m);
     r.set_sky(sky);
     r.set_lights(lights);
     let target = device.create_texture(&wgpu::TextureDescriptor {
@@ -523,7 +579,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
         view_formats: &[],
     });
     let cam = camera(&engine);
-    let sprites = assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
+    let sprites = st.assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
     r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, cam, &sprites);
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
@@ -550,7 +606,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
     enc.set_depth(png::BitDepth::Eight);
     enc.write_header().expect("png").write_image_data(&data).expect("png");
     let v = engine.view();
-    println!("{out}: at ({:#x}, {:#x}) heading {:#x}, {} triangles", v.x, v.y, v.heading, assets.mesh.len() / 3);
+    println!("{out}: at ({:#x}, {:#x}) heading {:#x}, {} triangles", v.x, v.y, v.heading, st.assets.mesh.len() / 3);
 }
 
 /// A left click in the centre of the view (`Machine::view_click`), on
@@ -614,6 +670,9 @@ struct App {
     next: Instant,
     /// How the last frame ended (reported when it changes).
     last: Option<arena::engine::Frame>,
+    dir: PathBuf,
+    /// The area's run, for the next.
+    run: arena::transit::Run,
 }
 
 impl App {
@@ -645,15 +704,15 @@ impl App {
             match frame {
                 Some(arena::engine::Frame::Running) => {}
                 Some(arena::engine::Frame::Left) => {
-                    // The area is left; an interior's file is at D58 when
-                    // a building was entered (AREA 4).
-                    let m = &self.engine.m;
-                    let area = m.mem.r8(arena::mem::DS, arena::trigger::var::AREA);
-                    let file = m.mem.r16(arena::mem::DS, 0x0D58);
-                    if area == 4 && file != 0 {
-                        eprintln!("the area is left for {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, file)));
-                    } else {
-                        eprintln!("the area is left (area {area})");
+                    // On to the next area, whose assets are made afresh.
+                    if let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) {
+                        self.run = run;
+                        self.assets = Assets::new(&self.dir, &mut self.engine);
+                        if let Some(g) = &mut self.gpu {
+                            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+                        }
+                        self.last = Some(arena::engine::Frame::Running);
+                        return;
                     }
                 }
                 None => eprintln!("the frame ended: None"),

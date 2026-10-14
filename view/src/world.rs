@@ -52,9 +52,13 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let (block, _) = m.heap_alloc(0x1100).expect("heap");
     let buf = (block + 0xFF) & 0xFF00;
     m.mem.w16(DS, 0x9030, buf);
-    // EMS on: 32 banks swapped through the frame.
+    // EMS on: 32 banks swapped through the frame, the last kept back
+    // (21EE:0035): the INF loader caches GLOBAL.BSA's directory there
+    // (bank 1Fh), and in the 3D mode (C39A bit 400h) keeps it cached
+    // from area to area.
     m.mem.w8(DS, 0x8FA6, 1);
     m.mem.w16(DS, 0x9032, 0x20);
+    m.mem.w16(DS, 0x9034, 1);
     let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
     m.mem.w16(DS, 0xBA54, off);
     m.mem.w16(DS, 0xBA56, seg);
@@ -133,7 +137,7 @@ pub fn lgt(m: &mut Machine, dir: &Path, name: u16) {
 }
 
 /// The .LGT loads of the weather's set-up.
-struct Lgt<'a>(&'a Path);
+pub struct Lgt<'a>(pub &'a Path);
 
 impl arena::light::LightHooks for Lgt<'_> {
     fn lgt(&mut self, m: &mut Machine, name: u16) {
@@ -332,6 +336,11 @@ pub fn shading(m: &Machine) -> Vec<u8> {
 /// The ceiling's texture: the slot the *CEILING texture went to (its
 /// segment in the frame, CB64), in the first texture bank.
 fn ceiling_texture(m: &Machine) -> Option<u32> {
+    // None outdoors (C398 bit 4), whatever an interior's INF left at CB64
+    // (city INFs have no *CEILING).
+    if m.mem.r16(DS, 0xC398) & 4 != 0 {
+        return None;
+    }
     let seg = m.mem.r16(DS, arena::info::var::CEILING_SEG);
     let frame = m.mem.r16(DS, 0x9030);
     if seg == 0 || seg < frame {
