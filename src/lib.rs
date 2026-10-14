@@ -3,6 +3,7 @@
 
 pub mod actors;
 pub mod attack;
+pub mod automap;
 pub mod bsa;
 pub mod cast;
 pub mod character;
@@ -27,6 +28,7 @@ pub mod info;
 pub mod inventory;
 pub mod item;
 pub mod level;
+pub mod load;
 pub mod light;
 pub mod log;
 pub mod loot;

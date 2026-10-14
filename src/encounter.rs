@@ -565,7 +565,7 @@ impl Machine {
     /// (a person's graphics list, `person_outfit`, whose guard bits
     /// then go to all eight records; a monster's type name at 1044).
     /// Returns whether they are people (the fight's AL).
-    fn encounter_text(&mut self, n: u16) -> bool {
+    pub(crate) fn encounter_text(&mut self, n: u16) -> bool {
         if self.mem.r16(DS, FIGHTING) != 0 {
             return n & 0xFF != 0;
         }

@@ -100,7 +100,8 @@ pub trait AreaHooks {
     fn townsfolk_graphics(&mut self, _m: &mut Machine) {}
     /// 2294:11F2, around a city's run.
     fn city_screen(&mut self, _m: &mut Machine) {}
-    /// 292B:095E: the level's automap kept.
+    /// 292B:095E: a main quest dungeon's level's locks and triggers kept
+    /// in STATES.nn (`Machine::states_keep`, which needs the files).
     fn automap(&mut self, _m: &mut Machine) {}
     /// 26F7:0000, asked on the way out of a dungeon: whether to leave
     /// (the view saved and put back around it, 0000:A611/A606/A5D1, and
@@ -129,7 +130,8 @@ pub trait AreaHooks {
     }
     /// 0000:8FC4: the mouse's buttons waited for (AFF9 clear).
     fn mouse_wait(&mut self, _m: &mut Machine) {}
-    /// 0000:3503: the view's border.
+    /// 0000:3503: the automap loaded (`Machine::automap_load`, which
+    /// needs the files).
     fn border(&mut self, _m: &mut Machine) {}
     /// 25FD:034B and 0000:16F7 (5C8 bit 4: a saved game's level).
     fn restore_level(&mut self, _m: &mut Machine) {}
@@ -319,7 +321,7 @@ impl Machine {
     /// 0000:0B15 (`exit` 4537h) and 0B4F (`exit` 44BDh): the level
     /// hooks: after the INF, 0000:2957 in a dungeon (5E6 3), else 0B0B
     /// (the level's lights from its flats); the way out; CD52 0000:0628.
-    fn level_hooks(&mut self, exit: u16) {
+    pub(crate) fn level_hooks(&mut self, exit: u16) {
         let inf = if self.mem.r8(DS, AREA) == 3 { 0x2957 } else { 0x0B0B };
         self.mem.w32(DS, INF_HOOK, inf);
         self.mem.w32(DS, EXIT_HOOK, exit as u32);

@@ -28,8 +28,8 @@
 //! reads them), menus (arrows and Enter, an entry's letter or number, a
 //! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
 //! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
-//! (only a game saved in the same area comes back right: the original's
-//! rebuild after loading isn't ported). While the game waits for an
+//! as the game loads in play (src/load.rs), into whatever area it was
+//! saved in; --load loads it at the start. While the game waits for an
 //! answer no time passes.
 //!
 //! The player's interface is drawn from the game's own graphics as the
@@ -57,6 +57,8 @@
 //! of the 320 x 200 screen), and as debugging aids `give:N` (N items
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
 //! points), `class:N` and `corpse` (a creature killed a square ahead).
+//! M shows the automap (`automap`; `--do map`): the squares the game has
+//! marked seen, kept per area in AUTOMAP.nn (src/automap.rs).
 //!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
@@ -70,6 +72,7 @@
 
 mod archive;
 mod areas;
+mod automap;
 mod dialog;
 mod flats;
 mod hud;
@@ -623,7 +626,8 @@ fn main() {
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
-    args.retain(|a| a != "--fight" && a != "--click" && a != "--people");
+    let load_at_start = args.iter().any(|a| a == "--load");
+    args.retain(|a| a != "--fight" && a != "--click" && a != "--people" && a != "--load");
     let mut wait = 0;
     if let Some(i) = args.iter().position(|a| a == "--wait") {
         wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
@@ -675,7 +679,7 @@ fn main() {
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
-    let run = match &new_game {
+    let mut run = match &new_game {
         Some(spec) => {
             newgame::start(&mut engine, spec);
             arena::transit::Run::Start
@@ -683,6 +687,19 @@ fn main() {
         None => areas::start(&mut engine, args[2].starts_with("CITY:")),
     };
     interface::start(&mut engine.m);
+    if load_at_start {
+        let save = save_dir.as_deref().expect("--load needs --save-dir");
+        match areas::load_game(&mut engine, &dir, save, slot) {
+            Ok(r) => {
+                run = r;
+                eprintln!("loaded slot {slot}: {r:?} ({})", String::from_utf8_lossy(engine.m.mem.cstr(arena::mem::DS, arena::transit::var::LEVEL_NAME)));
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+    }
     if let Some(h) = hour {
         // The clock at that hour of the first day (its calendar fields
         // agreeing, so no hour passes at once), and the sky's time.
@@ -692,7 +709,9 @@ fn main() {
         engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
         engine.m.sky_time().expect("sky time");
     }
-    world::city_people(&mut engine);
+    if !load_at_start {
+        world::city_people(&mut engine);
+    }
     if let Some((col, row, heading)) = at {
         use arena::movement::var::{HEADING, X, Y};
         engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
@@ -748,6 +767,7 @@ fn main() {
         slot,
         panel: None,
         equip: None,
+        map: false,
     };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -809,7 +829,15 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
-    let level_changed = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level || wild_moved(engine, window);
+    let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
+    if stairs {
+        // 0000:368E, the stairs' level screen: the automap kept and the new
+        // level's loaded (here after the frame; nothing touches the map in
+        // between).
+        engine.m.automap_keep(&mut engine.files);
+        engine.m.automap_load(&mut engine.files);
+    }
+    let level_changed = stairs || wild_moved(engine, window);
     TurnOut { frame, level_changed }
 }
 
@@ -854,6 +882,8 @@ struct Shot {
     status: Option<String>,
     /// A panel up at the end (`inv`, `spells`).
     panel: Option<panels::Panel>,
+    /// The automap shown (`--do map`).
+    map: bool,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
@@ -901,7 +931,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1012,6 +1042,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     println!("spell {i}: {} ({}), cost {}", sp.name, sp.index, sp.cost);
                 }
             }
+            "map" => st.map = !st.map,
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
@@ -1019,18 +1050,16 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
                 let msg = if what == "save" {
-                    Ok(save_to(&mut engine, sdir, slot, st.assets.palette))
+                    save_to(&mut engine, sdir, slot, st.assets.palette)
                 } else {
-                    load_from(&mut engine, sdir, slot)
-                };
-                let msg = match msg {
-                    Ok(m) => {
-                        if what == "load" {
-                            st.assets.level(&engine);
+                    match load_from(&mut engine, dir, sdir, slot) {
+                        Ok((m, r)) => {
+                            *run = r;
+                            st.assets = Assets::new(dir, &mut engine);
+                            m
                         }
-                        m
+                        Err(m) => m,
                     }
-                    Err(m) => m,
                 };
                 println!("{msg}");
                 st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg }]]];
@@ -1092,6 +1121,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             panels::draw(&mut screen, &font, equip.as_ref(), panel, &engine.m);
         }
         hud::compose_over(&mut screen, &font, &hud);
+        if st.map {
+            automap::draw(&mut screen, &engine.m);
+        }
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1201,30 +1233,27 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
         engine.m.mem.w16(arena::mem::DS, SAVED_POSITION + 2 * i, w);
     }
     engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
+    // As 25FD:010B..0110: the automap written (23F1:0145), the working
+    // slot's files (CITYDATA, SPELLS, AUTOMAP, ...) copied to the slot's
+    // (25FD:0612) and kept on disk with the save; then the save itself.
+    engine.m.automap_write(&mut engine.files);
+    for name in engine.m.slot_files_out(&mut engine.files) {
+        let Some(data) = engine.files.written(&name) else { continue };
+        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        if let Err(e) = std::fs::write(&p, data) {
+            eprintln!("{}: {e}", p.display());
+        }
+    }
     engine.m.save_game(&mut SaveDir { dir, palette });
     format!("Saved to slot {slot} in {}.", dir.display())
 }
 
-/// The game of `slot` in `dir` loaded back: its state (SAVEENGN,
-/// `save_load_engine`) and its level (SAVEGAME, `save_load_level`: the
-/// level's state and planes; its screen skipped). The original's rebuild
-/// after loading (25FD:03F9 on: the area entered again, its INF, its
-/// sky) isn't ported: a game saved in this area comes back right; one
-/// saved elsewhere doesn't. The caller makes the level's assets again.
-fn load_from(engine: &mut Engine, dir: &std::path::Path, slot: u8) -> Result<String, String> {
-    use arena::mem::DS;
-    // Into a copy, kept only when both parts load.
-    let mut e = copy(engine);
-    e.files.add_dir(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
-    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
-    let ok = e.m.save_load_engine(&mut e.files, slot).is_some() && e.m.save_load_level(&mut e.files).is_some();
-    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
-    if !ok {
-        return Err(format!("Slot {slot} couldn't be loaded from {}.", dir.display()));
-    }
-    *engine = e;
-    Ok(format!("Loaded slot {slot}."))
+/// The game of `slot` in `dir` loaded back as the game loads in play
+/// (`areas::load_game`), in whatever area it was saved. Returns the
+/// message and the loaded area's run; the caller makes the assets again.
+fn load_from(engine: &mut Engine, game: &std::path::Path, dir: &std::path::Path, slot: u8) -> Result<(String, arena::transit::Run), String> {
+    let run = areas::load_game(engine, game, dir, slot)?;
+    Ok((format!("Loaded slot {slot}."), run))
 }
 
 struct Gpu {
@@ -1261,6 +1290,8 @@ struct Pending {
 }
 
 struct App {
+    /// The automap shown (M).
+    map: bool,
     assets: Assets,
     start: Instant,
     engine: Engine,
@@ -1453,9 +1484,10 @@ impl App {
             self.say("No save directory (--save-dir).");
             return;
         };
-        match load_from(&mut self.engine, &dir, self.slot) {
-            Ok(msg) => {
-                self.assets.level(&self.engine);
+        match load_from(&mut self.engine, &self.dir.clone(), &dir, self.slot) {
+            Ok((msg, run)) => {
+                self.run = run;
+                self.assets = Assets::new(&self.dir, &mut self.engine);
                 self.remake_renderer();
                 self.say(&msg);
             }
@@ -1812,6 +1844,7 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::KeyR if down => self.camp = true,
                         KeyCode::KeyI if down => self.toggle_panel(true),
                         KeyCode::KeyC if down => self.toggle_panel(false),
+                        KeyCode::KeyM if down => self.map = !self.map,
                         // The original's A (2542:0137) and F8 (01C5).
                         KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
                         KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
@@ -1838,6 +1871,9 @@ impl winit::application::ApplicationHandler for App {
                     panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
                 }
                 hud::compose_over(&mut self.screen, &self.font, &hud);
+                if self.map {
+                    automap::draw(&mut self.screen, &self.engine.m);
+                }
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);

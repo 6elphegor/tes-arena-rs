@@ -233,6 +233,11 @@ impl Machine {
     /// DGROUP 1294..12BB. None where the file is missing.
     pub fn save_load_engine(&mut self, files: &mut Files, slot: u8) -> Option<()> {
         self.save_set_slot(slot);
+        self.save_read_engine(files)
+    }
+
+    /// 25FD:035A..03F8: `save_load_engine` for the slot already set.
+    pub fn save_read_engine(&mut self, files: &mut Files) -> Option<()> {
         let path = self.save_path(SAVEENGN);
         self.file_open(files, path)?;
         let keep = self.mem.r16(DS, ENGINE_FLAGS) & 4;

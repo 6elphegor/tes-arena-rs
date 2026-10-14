@@ -432,7 +432,7 @@ impl Machine {
 
     /// 1194:8ED4. Type 2A: four words at 0x40 past the far pointer at
     /// DGROUP 1020, six special-attack bytes from DGROUP 2DCD, kind 6.
-    fn cr_type_2a(&mut self, seg: u16, rec: u16) {
+    pub(crate) fn cr_type_2a(&mut self, seg: u16, rec: u16) {
         let (off, s) = (self.mem.r16(DS, var::P_1020), self.mem.r16(DS, var::P_1020 + 2));
         let p = off.wrapping_add(0x40);
         for (f, v) in [(0x2C, 0xFFFF), (0x2E, 0x19), (0x30, 0xFFFF), (0x32, 0x32)] {
