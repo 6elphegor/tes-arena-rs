@@ -458,7 +458,7 @@ impl Machine {
     /// 1194:3829. A random item 10 * `base` + 0..9 not yet in the list at
     /// 0FD4 (9 entries, FF free), and the list's first free index (9 when
     /// full, which is past the list).
-    fn pick_quest_item(&mut self, base: u16) -> Option<(u16, u16)> {
+    pub(crate) fn pick_quest_item(&mut self, base: u16) -> Option<(u16, u16)> {
         let base = base.wrapping_mul(10);
         self.mem.w16(DS, svar::PICK_BASE, base);
         let mut tries = crate::random::CycleCheck::new(&self.rng);

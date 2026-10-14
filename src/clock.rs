@@ -48,12 +48,17 @@ pub mod var {
 
 /// The handlers the clock calls that are not ported here.
 pub trait ClockHooks {
-    /// 1194:99F8, daily: quest deadlines.
-    fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
+    /// 1194:99F8, daily: the deadlines of the records at 0DCA
+    /// (`quest::quests_daily`, its texts and files left out; override to
+    /// show them).
+    fn quests_daily(&mut self, m: &mut Machine) -> Option<()> {
+        m.quests_daily(&mut crate::quest::NoQuestHooks);
         Some(())
     }
-    /// 1194:98E8, hourly: quest progress.
-    fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
+    /// 1194:98E8, hourly: the quests' deadlines (`quest::quests_hourly`,
+    /// likewise).
+    fn quests_hourly(&mut self, m: &mut Machine) -> Option<()> {
+        m.quests_hourly(&mut crate::quest::NoQuestHooks);
         Some(())
     }
     /// 1194:887A: a random encounter check (`encounter::random_encounter`,
@@ -320,6 +325,12 @@ pub struct NoClockHooks;
 
 impl ClockHooks for NoClockHooks {
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+    fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
 }

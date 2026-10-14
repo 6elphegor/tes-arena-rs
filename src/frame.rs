@@ -105,6 +105,12 @@ impl ClockHooks for NoFrameHooks {
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+    fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
 }
 impl FrameHooks for NoFrameHooks {}
 

@@ -36,6 +36,7 @@ pub mod mem;
 pub mod mif;
 pub mod outfit;
 pub mod projectile;
+pub mod quest;
 pub mod movement;
 pub mod names;
 pub mod progression;

@@ -42,7 +42,8 @@ pub trait StairsHooks {
     fn automap_keep(&mut self, _m: &mut Machine) {}
     /// 292B:09AC: the new level's automap loaded.
     fn automap_load(&mut self, _m: &mut Machine) {}
-    /// 1194:9FAC with CX 1: a quest dungeon's last level reached.
+    /// 1194:9FAC with CX 1: a quest dungeon's last level reached
+    /// (`Machine::quest_level`, which needs the files for a person's name).
     fn quest_level(&mut self, _m: &mut Machine) {}
     /// 2433:0000 (4C91 FFh): the level's creatures and people placed.
     fn level_spawn(&mut self, _m: &mut Machine) {}
