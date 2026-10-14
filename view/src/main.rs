@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
@@ -14,9 +14,22 @@
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
-//! `walk:N` (frames), `wait:N`. --picks answers the menus (talking to
-//! someone: 0 the greeting, 1 "Where is...", 2 rumours), in order; after
-//! them a menu is left.
+//! `walk:N` (frames), `wait:N`, `camp` (R), `key:N` (the key with scan
+//! code N down for a frame: 60 is F2, the player's square on the message
+//! line). --picks answers the game's questions in order: a menu's entry
+//! by its number (talking to someone: 0 the greeting, 1 "Where is...", 2
+//! rumours; camping: 0 for a while, 1 until healed), `tTEXT` text typed
+//! (the hours to rest); after them a question is left, as Esc leaves it,
+//! and a shot shows it.
+//!
+//! In the window the game's texts are drawn in its own font (ARENAFNT.DAT):
+//! the message line at the top, message boxes (Enter, Space or a click
+//! reads them), menus (arrows and Enter, an entry's letter or number, a
+//! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
+//! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
+//! (only a game saved in the same area comes back right: the original's
+//! rebuild after loading isn't ported). While the game waits for an
+//! answer no time passes.
 //!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
@@ -24,7 +37,9 @@
 
 mod archive;
 mod areas;
+mod dialog;
 mod flats;
+mod hud;
 mod render;
 mod world;
 
@@ -37,16 +52,41 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// The front end's hooks: nothing asked of the player yet. With the
-/// sprites (`sheet`, animations at `tick`) the drawing makes the hit test
-/// for a click left for the actors (`clicked`); with the light state the
-/// stairs make the light table again.
+/// The front end's hooks. With the sprites (`sheet`, animations at
+/// `tick`) the drawing makes the hit test for a click left for the actors
+/// (`clicked`); with the light state the stairs make the light table
+/// again; with `talk` the game's questions are answered and its boxes
+/// kept (`dialog`), else its menus are left and its texts printed.
 #[derive(Default)]
 struct Front<'a> {
     sheet: Option<&'a world::SpriteSheet>,
     light: Option<&'a mut LightState>,
     tick: usize,
     clicked: bool,
+    talk: Option<&'a mut dialog::Talk>,
+}
+
+impl Front<'_> {
+    fn message_box(&mut self, m: &arena::machine::Machine, si: u16) {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.message_box(m, si),
+            None => println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n")),
+        }
+    }
+
+    fn menu(&mut self, m: &arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.menu(m, si, bx, di),
+            None => 0xFFFF,
+        }
+    }
+
+    fn note(&mut self, s: &str) {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.note(s),
+            None => println!("{s}"),
+        }
+    }
 }
 
 /// The stairs' hooks: the light table made again from NORMAL.LGT
@@ -76,11 +116,11 @@ impl arena::weapon::WeaponHooks for Front<'_> {
         m.wall_trigger(files, self)
     }
 }
-/// The triggers' messages are printed; entering an area isn't drawn yet
-/// (the frame ends: `Frame::Left`).
+/// The triggers' messages are the game's boxes; entering an area isn't
+/// drawn yet (the frame ends: `Frame::Left`).
 impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
-        println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, text)).replace('\r', "\n"));
+        Front::message_box(self, m, text);
     }
     /// A city's gate out: the city written as the wilderness's blocks
     /// 1..4 (217B:027A; the files are kept in memory).
@@ -95,30 +135,58 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.actor_click(files, self)
     }
+    /// 1194:4635: a frame of rest, while resting.
+    fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.rest_frame(files, self)
+    }
 }
-/// The game's texts (1194:A374, made by the port) in their windows: printed;
-/// the menus answered from `--picks`, then left.
+/// The game's texts (1194:A374, made by the port) in their windows: the
+/// boxes and menus of `dialog`.
 impl arena::text::TextHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
-        println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"));
+        Front::message_box(self, m, si);
     }
-    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, _bx: u16, _di: u16) -> u16 {
-        let pick = PICKS.with(|p| p.borrow_mut().pop_front()).unwrap_or(0xFFFF);
-        println!("[menu] {} -> {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"), pick as i16);
-        pick
+    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
+        Front::menu(self, m, si, bx, di)
+    }
+}
+/// Clicking on people and things: the way told is a note; the lists are
+/// left at once.
+impl arena::talk::TalkHooks for Front<'_> {
+    fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
+        let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
+        self.note(&s);
+    }
+}
+/// Resting (src/rest.rs): its menu and the hours typed through `dialog`,
+/// its texts boxes, the hours shown kept for the status line.
+impl arena::rest::RestHooks for Front<'_> {
+    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
+        Front::menu(self, m, si, bx, di)
+    }
+    fn type_hours(&mut self, m: &mut arena::machine::Machine) {
+        if let Some(t) = self.talk.as_deref_mut() {
+            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim().to_string();
+            t.typed(m, arena::rest::var::TYPED, 3, &prompt);
+        }
+    }
+    fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        Front::message_box(self, m, si);
+    }
+    fn hours_text(&mut self, m: &mut arena::machine::Machine) {
+        let s = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::rest::var::TEXT)).trim().to_string();
+        match self.talk.as_deref_mut() {
+            Some(t) => t.status = Some(s),
+            None => println!("{s}"),
+        }
+    }
+    fn dream(&mut self, _m: &mut arena::machine::Machine, text: u16) {
+        self.note(&format!("(a dream: text {text:#x})"));
     }
 }
 
-thread_local! {
-    /// The menus' answers (`--picks`), taken in order; then they are left.
-    static PICKS: std::cell::RefCell<std::collections::VecDeque<u16>> = Default::default();
-}
-/// Clicking on people and things: the lists are left at once.
-impl arena::talk::TalkHooks for Front<'_> {
-    fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
-        println!("[the way to {} at ({x}, {y})]", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
-    }
-}
+/// "How many hours do you wish to rest?" (DGROUP), which 1194:4800 shows.
+const REST_PROMPT: u16 = 0x4984;
 impl EngineHooks for Front<'_> {
     /// The original stepped the changed squares it drew: here those
     /// within the view's reach (C394 squares) step, seen or not.
@@ -488,9 +556,19 @@ fn main() {
         hour = Some(args[i + 1].parse::<u32>().expect("--hour H"));
         args.drain(i..i + 2);
     }
+    let mut answers = Default::default();
     if let Some(i) = args.iter().position(|a| a == "--picks") {
-        let picks = args[i + 1].split(',').map(|v| v.parse().expect("--picks N,..")).collect();
-        PICKS.with(|p| *p.borrow_mut() = picks);
+        answers = dialog::parse_answers(&args[i + 1]);
+        args.drain(i..i + 2);
+    }
+    let mut save_dir = None;
+    if let Some(i) = args.iter().position(|a| a == "--save-dir") {
+        save_dir = Some(PathBuf::from(&args[i + 1]));
+        args.drain(i..i + 2);
+    }
+    let mut slot = 0u8;
+    if let Some(i) = args.iter().position(|a| a == "--slot") {
+        slot = args[i + 1].parse().expect("--slot N");
         args.drain(i..i + 2);
     }
     let mut steps = String::new();
@@ -505,7 +583,7 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
@@ -537,24 +615,48 @@ fn main() {
         let out = args.get(4).expect("--shot needs a file");
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, run, out, click, wait, frames, turn, &steps);
+        shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers);
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &mut engine);
-    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, clicked: false, message: None, next: Instant::now(), last: Some(arena::engine::Frame::Running), dir, run };
+    let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
+    let screen = hud::Screen::new(assets.palette);
+    let mut app = App {
+        assets,
+        start: Instant::now(),
+        engine,
+        gpu: None,
+        keys: Default::default(),
+        look: 0.0,
+        captured: false,
+        click: false,
+        clicked: false,
+        camp: false,
+        key: false,
+        message: None,
+        next: Instant::now(),
+        last: Some(arena::engine::Frame::Running),
+        dir,
+        run,
+        script: answers,
+        pending: None,
+        boxes: Default::default(),
+        selected: 0,
+        typed: String::new(),
+        status: None,
+        font,
+        screen,
+        cursor: (0.0, 0.0),
+        save_dir,
+        slot,
+    };
     event_loop.run_app(&mut app).expect("run");
 }
 
-/// What a scripted run keeps between frames: the area's assets (made
-/// afresh in each area, as the window does), a click left for the next
-/// frame's drawing, the message line printed last, the frames run.
-struct Shot {
-    assets: Assets,
-    clicked: bool,
-    message: Option<(u16, u16)>,
-    frames: usize,
-}
+
+/// The game's font for its texts (`hud`).
+const FONT: &str = "ARENAFNT.DAT";
 
 /// Whether the wilderness's blocks were loaded again in a frame (217B:0265
 /// changed the window of four blocks it had, `window` before).
@@ -563,26 +665,108 @@ fn wild_moved(engine: &Engine, window: u32) -> bool {
     engine.m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS) & 0x200 != 0 && engine.m.mem.r32(DS, arena::wild::var::WINDOW) != window
 }
 
-/// One frame with `intent`; a frame leaving the area goes on to the
-/// next (`areas::next`, None where it can't).
-fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
+/// What a turn is given: the frame's intent, a click left for the actors
+/// (found by this frame's drawing), camping asked for before the frame,
+/// a key pressed (it ends a rest, AFF9), the animation tick.
+#[derive(Clone, Copy, Default)]
+struct TurnIn {
+    intent: Intent,
+    clicked: bool,
+    camp: bool,
+    key: bool,
+    tick: usize,
+}
+
+/// What a turn did besides the engine's state: how its frame ended, and
+/// whether the level's assets must be made again (stairs, the
+/// wilderness's blocks).
+struct TurnOut {
+    frame: Option<arena::engine::Frame>,
+    level_changed: bool,
+}
+
+/// One turn (`dialog`): camping if asked, then a frame, with `talk`
+/// answering the game's questions.
+fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut dialog::Talk) -> TurnOut {
+    use arena::mem::DS;
     let t = engine.frame_ticks();
     engine.tick(t);
+    let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
+    let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk) };
+    if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
+        eprintln!("camping met something not ported");
+    }
+    if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
+        engine.m.mem.w8(DS, arena::rest::var::KEY, input.key as u8);
+    }
+    let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
+    let level_changed = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level || wild_moved(engine, window);
+    TurnOut { frame, level_changed }
+}
+
+/// The engine copied, for a turn to run again (`dialog`).
+fn copy(engine: &Engine) -> Engine {
+    Engine { m: engine.m.clone(), files: engine.files.clone() }
+}
+
+/// The message line (061A, shown while 061E counts down) as the HUD's.
+fn message_line(engine: &Engine) -> Option<Vec<Vec<hud::Span>>> {
+    engine.view().message.map(|(seg, off)| hud::lines(engine.m.mem.cstr(seg, off), 0x0F))
+}
+
+/// The message line printed when a new one comes up.
+fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
+    let msg = engine.view().message;
+    if msg != *last {
+        if let Some((seg, off)) = msg {
+            println!("{}", String::from_utf8_lossy(engine.m.mem.cstr(seg, off)));
+        }
+        *last = msg;
+    }
+}
+
+/// What a scripted run keeps between turns: the area's assets (made
+/// afresh in each area, as the window does), a click left for the next
+/// frame's drawing, camping asked for, the answers still to give
+/// (`--picks`), the frames run, and what the HUD shows at the end: the
+/// boxes of the last turn that showed any, and a question left.
+struct Shot {
+    assets: Assets,
+    clicked: bool,
+    camp: bool,
+    answers: std::collections::VecDeque<dialog::Answer>,
+    message: Option<(u16, u16)>,
+    frames: usize,
+    boxes: Vec<Vec<Vec<hud::Span>>>,
+    need: Option<dialog::Need>,
+    status: Option<String>,
+}
+
+/// One turn with `intent`, its questions answered from `--picks` (then
+/// left, as Esc leaves them: the turn goes on); a frame leaving the area
+/// goes on to the next (`areas::next`, None where it can't).
+fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
     st.frames += 1;
-    let level = engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
-    let window = engine.m.mem.r32(arena::mem::DS, arena::wild::var::WINDOW);
-    let assets = &mut st.assets;
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: st.frames * 4, clicked: std::mem::take(&mut st.clicked) };
-    let frame = engine.frame(Input::Steer(intent), &mut hooks).expect("frame");
+    let input = TurnIn { intent: *intent, clicked: std::mem::take(&mut st.clicked), camp: std::mem::take(&mut st.camp), key: false, tick: st.frames * 4 };
+    let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
+    let out = run_turn(engine, &mut st.assets, &input, &mut talk);
+    st.answers = talk.answers;
+    if !talk.boxes.is_empty() {
+        st.boxes = if talk.need.is_some() { talk.since_answer } else { talk.boxes };
+    }
+    if let Some(need) = talk.need {
+        st.need = Some(need);
+    }
+    if talk.status.is_some() {
+        st.status = talk.status;
+    }
     print_message(engine, &mut st.message);
-    if engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level {
-        eprintln!("took the stairs to level {}", engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL));
-        st.assets.level(engine);
-    } else if wild_moved(engine, window) {
-        eprintln!("the wilderness moved: origin ({}, {})", engine.m.mem.r16(arena::mem::DS, arena::wild::var::ORIGIN_X), engine.m.mem.r16(arena::mem::DS, arena::wild::var::ORIGIN_Y));
+    if out.level_changed {
+        eprintln!("the level changed (stairs, or the wilderness's blocks)");
         st.assets.level(engine);
     }
-    if frame == arena::engine::Frame::Left {
+    if out.frame? == arena::engine::Frame::Left {
         *run = areas::next(engine, dir, *run)?;
         st.assets = Assets::new(dir, engine);
     }
@@ -590,11 +774,12 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 }
 
 /// Renders one frame offscreen to a PNG, after `frames` frames of
-/// walking forward, then `steps` (see `--do`).
+/// walking forward, then `steps` (see `--do`), with the HUD: the message
+/// line, the last boxes, and the question left unanswered, if any.
 #[allow(clippy::too_many_arguments)]
-fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str) {
+fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), clicked: false, message: None, frames: 0 };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -602,7 +787,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // A click is acted on in the next frame (its drawing finds what is
     // under it), so one is waited at least.
     if click {
-        st.clicked = centre_click(&mut engine);
+        st.clicked = centre_click(&mut engine, &mut st.boxes);
     }
     let wait = if click { wait.max(1) } else { wait };
     for _ in 0..wait {
@@ -616,8 +801,18 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         let (what, n) = step.split_once(':').map_or((step, 1), |(a, n)| (a, n.parse().expect("--do: a number")));
         match what {
             "click" => {
-                st.clicked = centre_click(&mut engine);
+                st.clicked = centre_click(&mut engine, &mut st.boxes);
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "camp" => {
+                st.camp = true;
+                shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "key" => {
+                // A key (its scan code) down for a frame.
+                engine.m.set_key(n as u8, true);
+                shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+                engine.m.set_key(n as u8, false);
             }
             "turn" => shot_frame(dir, &mut engine, run, st, &Intent { look: n as i16, ..Default::default() }).expect("area"),
             "walk" | "wait" => {
@@ -650,7 +845,22 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     });
     let cam = camera(&engine);
     let sprites = st.assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
-    r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, cam, &sprites);
+    let view = target.create_view(&Default::default());
+    r.draw(&device, &queue, &view, w, h, cam, &sprites);
+    if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
+        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, ..Default::default() };
+        if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
+            hud.status = st.status.clone();
+        }
+        match st.need.clone() {
+            Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
+            Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
+            None => {}
+        }
+        let mut screen = hud::Screen::new(st.assets.palette);
+        hud::compose(&mut screen, &font, &hud);
+        hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+    }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
         size: (w * h * 4) as u64,
@@ -680,25 +890,59 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
 }
 
 /// A left click in the centre of the view (`Machine::view_click`), on
-/// what the last frame's drawing left under it. Whether it is left for
-/// the actors (C39A bit 80h), for the next frame's drawing to find.
-fn centre_click(engine: &mut Engine) -> bool {
+/// what the last frame's drawing left under it; its boxes (a door locked,
+/// a shop closed) added to `boxes`. Whether it is left for the actors
+/// (C39A bit 80h), for the next frame's drawing to find. (A question it
+/// asks is left, as Esc leaves it.)
+fn centre_click(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>) -> bool {
     engine.m.set_mouse(160, 70, 0);
-    if engine.m.view_click(&mut engine.files, &mut Front::default()).is_none() {
+    let mut talk = dialog::Talk::default();
+    let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
+    if engine.m.view_click(&mut engine.files, &mut hooks).is_none() {
         eprintln!("the click met something not ported");
     }
+    boxes.extend(talk.boxes);
     engine.m.mem.r16(arena::mem::DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0
 }
 
-/// The game's message line (061A, shown while 061E counts down) printed
-/// when a new one comes up.
-fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
-    let msg = engine.view().message;
-    if msg != *last {
-        if let Some((seg, off)) = msg {
-            println!("{}", String::from_utf8_lossy(engine.m.mem.cstr(seg, off)));
+/// Saving writes the game's files into the save directory (by their
+/// names, the game's directory dropped); the VGA's palette is the view's.
+/// The screen saved with the level (0xFA00 bytes from A8FE, the original's
+/// screen) is left black: the view's picture isn't in the machine.
+struct SaveDir<'a> {
+    dir: &'a std::path::Path,
+    palette: [[u8; 4]; 256],
+}
+
+impl SaveDir<'_> {
+    fn path(&self, m: &arena::machine::Machine, path: u16) -> PathBuf {
+        let p = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, path)).into_owned();
+        let name = p.rsplit(['\\', '/']).next().unwrap_or(&p).to_string();
+        self.dir.join(name)
+    }
+}
+
+impl arena::save_write::SaveHooks for SaveDir<'_> {
+    fn delete(&mut self, m: &arena::machine::Machine, path: u16) {
+        let _ = std::fs::remove_file(self.path(m, path));
+    }
+    fn write(&mut self, m: &arena::machine::Machine, path: u16, data: &[u8]) {
+        let p = self.path(m, path);
+        let mut data = data.to_vec();
+        if p.file_name().is_some_and(|n| n.to_string_lossy().to_ascii_uppercase().starts_with("SAVEGAME")) {
+            let n = data.len().min(0xFA00);
+            data[..n].fill(0);
         }
-        *last = msg;
+        if let Err(e) = std::fs::write(&p, data) {
+            eprintln!("{}: {e}", p.display());
+        }
+    }
+    fn palette(&mut self, m: &mut arena::machine::Machine) {
+        for (i, c) in self.palette.iter().enumerate() {
+            for (k, v) in c.iter().take(3).enumerate() {
+                m.mem.w8(arena::mem::DS, arena::save_write::var::PALETTE + (i * 3 + k) as u16, v >> 2);
+            }
+        }
     }
 }
 
@@ -709,6 +953,7 @@ struct Gpu {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     renderer: Renderer,
+    overlay: hud::Overlay,
 }
 
 #[derive(Default)]
@@ -723,6 +968,15 @@ struct Keys {
     run: bool,
 }
 
+/// A turn stopped at a question: the engine as it was before it, what it
+/// was given, the answers given so far, and the question.
+struct Pending {
+    before: Engine,
+    input: TurnIn,
+    given: Vec<dialog::Answer>,
+    need: dialog::Need,
+}
+
 struct App {
     assets: Assets,
     start: Instant,
@@ -735,6 +989,9 @@ struct App {
     /// that the frame after it draws.
     click: bool,
     clicked: bool,
+    /// Camping asked for (R), and a key pressed (it ends a rest).
+    camp: bool,
+    key: bool,
     /// The message line last printed.
     message: Option<(u16, u16)>,
     next: Instant,
@@ -743,11 +1000,35 @@ struct App {
     dir: PathBuf,
     /// The area's run, for the next.
     run: arena::transit::Run,
+    /// Answers given before asking (`--picks`).
+    script: std::collections::VecDeque<dialog::Answer>,
+    /// A question waiting; boxes to read (the game waits for both); the
+    /// menu's entry highlighted; the hours typed so far; the rest's hours.
+    pending: Option<Pending>,
+    boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
+    selected: usize,
+    typed: String,
+    status: Option<String>,
+    font: hud::Font,
+    screen: hud::Screen,
+    /// The cursor in the window (pixels).
+    cursor: (f64, f64),
+    /// Where saves go (F5) and come from (F9), and the slot.
+    save_dir: Option<PathBuf>,
+    slot: u8,
 }
 
 impl App {
-    /// One engine frame with the keys and the mouse as an Intent.
+    /// Whether the game waits for the player (a box, a question).
+    fn waiting(&self) -> bool {
+        self.pending.is_some() || !self.boxes.is_empty()
+    }
+
+    /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
+        if self.waiting() {
+            return;
+        }
         let k = &self.keys;
         let axis = |p: bool, n: bool| (p as i16 - n as i16) * 256;
         let look = self.look.round() as i16;
@@ -760,26 +1041,57 @@ impl App {
             jump: k.jump,
             run: k.run,
         };
-        let t = self.engine.frame_ticks();
-        self.engine.tick(t);
         let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-        let level = self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
-        let window = self.engine.m.mem.r32(arena::mem::DS, arena::wild::var::WINDOW);
-        let assets = &mut self.assets;
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick, clicked: std::mem::take(&mut self.clicked) };
-        let frame = self.engine.frame(Input::Steer(&intent), &mut hooks);
-        print_message(&self.engine, &mut self.message);
-        // Stairs, or the wilderness's blocks loaded: the new level's assets.
-        if self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level || wild_moved(&self.engine, window) {
-            self.assets.level(&self.engine);
-            if let Some(g) = &mut self.gpu {
-                g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+        let input = TurnIn { intent, clicked: std::mem::take(&mut self.clicked), camp: std::mem::take(&mut self.camp), key: std::mem::take(&mut self.key), tick };
+        let before = copy(&self.engine);
+        self.turn(before, input, Vec::new());
+        // A click now is found by the next frame's drawing.
+        if !self.waiting() && std::mem::take(&mut self.click) {
+            let mut boxes = Vec::new();
+            self.clicked = centre_click(&mut self.engine, &mut boxes);
+            self.boxes.extend(boxes);
+        }
+    }
+
+    /// The turn `input` run from `before` with the answers `given` (and
+    /// the script's): stopped at a question, it waits for its answer;
+    /// otherwise it stands, and its frame's end is followed.
+    fn turn(&mut self, before: Engine, input: TurnIn, given: Vec<dialog::Answer>) {
+        let mut answers: std::collections::VecDeque<dialog::Answer> = given.iter().cloned().collect();
+        let scripted = self.script.len();
+        answers.extend(self.script.iter().cloned());
+        self.engine = copy(&before);
+        let mut talk = dialog::Talk { answers, ..Default::default() };
+        let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
+        // The script's answers used become given ones.
+        let used = (given.len() + scripted).saturating_sub(talk.answers.len());
+        let mut given = given;
+        while given.len() < used {
+            match self.script.pop_front() {
+                Some(a) => given.push(a),
+                None => break,
             }
         }
-        // A click now is found by the next frame's drawing.
-        if std::mem::take(&mut self.click) {
-            self.clicked = centre_click(&mut self.engine);
+        self.boxes.extend(talk.since_answer);
+        if talk.status.is_some() {
+            self.status = talk.status;
         }
+        if let Some(need) = talk.need {
+            self.engine = copy(&before);
+            self.selected = 0;
+            self.typed.clear();
+            self.pending = Some(Pending { before, input, given, need });
+            if self.captured {
+                self.release();
+            }
+            return;
+        }
+        print_message(&self.engine, &mut self.message);
+        if out.level_changed {
+            self.assets.level(&self.engine);
+            self.remake_renderer();
+        }
+        let frame = out.frame;
         if frame != self.last {
             match frame {
                 Some(arena::engine::Frame::Running) => {}
@@ -788,9 +1100,7 @@ impl App {
                     if let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) {
                         self.run = run;
                         self.assets = Assets::new(&self.dir, &mut self.engine);
-                        if let Some(g) = &mut self.gpu {
-                            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
-                        }
+                        self.remake_renderer();
                         self.last = Some(arena::engine::Frame::Running);
                         return;
                     }
@@ -798,6 +1108,175 @@ impl App {
                 None => eprintln!("the frame ended: None"),
             }
             self.last = frame;
+        }
+    }
+
+    /// The answer to the question waiting: its turn runs again.
+    fn answer(&mut self, a: dialog::Answer) {
+        let Some(p) = self.pending.take() else { return };
+        let mut given = p.given;
+        given.push(a);
+        self.turn(p.before, p.input, given);
+    }
+
+    fn remake_renderer(&mut self) {
+        if let Some(g) = &mut self.gpu {
+            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+        }
+    }
+
+    fn release(&mut self) {
+        if let Some(g) = &self.gpu {
+            let _ = g.window.set_cursor_grab(winit::window::CursorGrabMode::None);
+            g.window.set_cursor_visible(true);
+        }
+        self.captured = false;
+    }
+
+    /// F5: the game saved to the slot in the save directory.
+    fn save(&mut self) {
+        let Some(dir) = self.save_dir.clone() else {
+            self.say("No save directory (--save-dir).");
+            return;
+        };
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            self.say(&format!("{}: {e}", dir.display()));
+            return;
+        }
+        self.engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, self.slot);
+        self.engine.m.save_game(&mut SaveDir { dir: &dir, palette: self.assets.palette });
+        self.say(&format!("Saved to slot {} in {}.", self.slot, dir.display()));
+    }
+
+    /// F9: the slot's game loaded back: its state (SAVEENGN) and its level
+    /// (SAVEGAME: the level's state and planes), the level's assets made
+    /// again. The original's rebuild after loading (25FD:03F9 on: the
+    /// area entered again, its INF, its sky) isn't ported: a game saved in
+    /// this area comes back right; one saved elsewhere doesn't.
+    fn load(&mut self) {
+        use arena::mem::DS;
+        let Some(dir) = self.save_dir.clone() else {
+            self.say("No save directory (--save-dir).");
+            return;
+        };
+        if self.engine.files.add_dir(&dir).is_err() {
+            self.say(&format!("{} can't be read.", dir.display()));
+            return;
+        }
+        let m = &mut self.engine.m;
+        let screen = m.mem.r8(DS, arena::save::var::NO_SCREEN);
+        m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
+        let ok = m.save_load_engine(&mut self.engine.files, self.slot).is_some() && m.save_load_level(&mut self.engine.files).is_some();
+        self.engine.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
+        if !ok {
+            self.say(&format!("Slot {} couldn't be loaded from {}.", self.slot, dir.display()));
+            return;
+        }
+        self.assets.level(&self.engine);
+        self.remake_renderer();
+        self.say(&format!("Loaded slot {}.", self.slot));
+    }
+
+    /// A box of the view's own.
+    fn say(&mut self, s: &str) {
+        println!("{s}");
+        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string() }]]);
+    }
+
+    /// What the HUD shows now.
+    fn hud(&self) -> hud::Hud {
+        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), ..Default::default() };
+        if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
+            h.status = self.status.clone();
+        }
+        if self.boxes.is_empty() {
+            match self.pending.as_ref().map(|p| &p.need) {
+                Some(dialog::Need::Menu(m)) => {
+                    let mut m = m.clone();
+                    m.selected = self.selected.min(m.entries.len().saturating_sub(1));
+                    h.menu = Some(m);
+                }
+                Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
+                None => {}
+            }
+        }
+        h
+    }
+
+    /// A key while the game waits: a box read; a menu's entry moved to,
+    /// picked (Enter, its key letter, its number) or none (Esc); hours
+    /// typed.
+    fn dialog_key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) {
+        use winit::keyboard::KeyCode;
+        if !self.boxes.is_empty() {
+            if matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape) {
+                self.boxes.pop_front();
+            }
+            return;
+        }
+        let Some(p) = &self.pending else { return };
+        match &p.need {
+            dialog::Need::Menu(menu) => {
+                let n = menu.entries.len().max(1);
+                match code {
+                    KeyCode::ArrowUp => self.selected = (self.selected + n - 1) % n,
+                    KeyCode::ArrowDown => self.selected = (self.selected + 1) % n,
+                    KeyCode::Enter | KeyCode::NumpadEnter => {
+                        let s = self.selected as u16;
+                        self.answer(dialog::Answer::Pick(s));
+                    }
+                    KeyCode::Escape => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    _ => {
+                        let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
+                        let up = c.to_ascii_uppercase();
+                        let by_key = menu.keys.iter().position(|&k| k.to_ascii_uppercase() == up);
+                        let by_number = (c as char).to_digit(10).filter(|&d| d >= 1).map(|d| d as usize - 1).filter(|&i| i < menu.entries.len());
+                        if let Some(i) = by_key.or(by_number) {
+                            self.answer(dialog::Answer::Pick(i as u16));
+                        }
+                    }
+                }
+            }
+            dialog::Need::Text(_) => match code {
+                KeyCode::Enter | KeyCode::NumpadEnter => {
+                    let t = std::mem::take(&mut self.typed);
+                    self.answer(dialog::Answer::Text(t));
+                }
+                KeyCode::Escape => self.answer(dialog::Answer::Text(String::new())),
+                KeyCode::Backspace => {
+                    self.typed.pop();
+                }
+                _ => {
+                    if let Some(t) = text {
+                        for c in t.chars().filter(|c| c.is_ascii_graphic()) {
+                            if self.typed.len() < 3 {
+                                self.typed.push(c);
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    }
+
+    /// A click while the game waits: a box read, or a menu's entry picked.
+    fn dialog_click(&mut self) {
+        if !self.boxes.is_empty() {
+            self.boxes.pop_front();
+            return;
+        }
+        let Some(g) = &self.gpu else { return };
+        let (w, h) = (g.config.width as f64, g.config.height as f64);
+        let (x, y) = ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32);
+        let hud = self.hud();
+        if let Some(menu) = &hud.menu {
+            let (ex, ey, lh, ew) = hud::menu_layout(&self.font, menu);
+            if x >= ex - 3 && x < ex + ew + 3 && y >= ey {
+                let i = ((y - ey) / lh) as usize;
+                if i < menu.entries.len() {
+                    self.answer(dialog::Answer::Pick(i as u16));
+                }
+            }
         }
     }
 }
@@ -835,11 +1314,12 @@ impl winit::application::ApplicationHandler for App {
         };
         surface.configure(&device, &config);
         let renderer = self.assets.renderer(&device, &queue, format);
-        self.gpu = Some(Gpu { window, surface, device, queue, config, renderer });
+        let overlay = hud::Overlay::new(&device, format);
+        self.gpu = Some(Gpu { window, surface, device, queue, config, renderer, overlay });
     }
 
     fn window_event(&mut self, el: &winit::event_loop::ActiveEventLoop, _id: winit::window::WindowId, event: winit::event::WindowEvent) {
-        use winit::event::{ElementState, WindowEvent};
+        use winit::event::{ElementState, MouseButton, WindowEvent};
         use winit::keyboard::{KeyCode, PhysicalKey};
         match event {
             WindowEvent::CloseRequested => el.exit(),
@@ -850,6 +1330,8 @@ impl winit::application::ApplicationHandler for App {
                     g.surface.configure(&g.device, &g.config);
                 }
             }
+            WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if self.waiting() => self.dialog_click(),
             WindowEvent::MouseInput { state: ElementState::Pressed, .. } if !self.captured => {
                 if let Some(g) = &self.gpu {
                     let ok = g
@@ -861,10 +1343,18 @@ impl winit::application::ApplicationHandler for App {
                     self.captured = ok;
                 }
             }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: winit::event::MouseButton::Left, .. } => self.click = true,
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click = true,
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
                 if let PhysicalKey::Code(code) = event.physical_key {
+                    if down && self.waiting() {
+                        self.dialog_key(code, event.text.as_deref());
+                        return;
+                    }
+                    if down {
+                        // Any key ends a rest (AFF9).
+                        self.key = true;
+                    }
                     let k = &mut self.keys;
                     match code {
                         KeyCode::KeyW | KeyCode::ArrowUp => k.forward = down,
@@ -877,20 +1367,22 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::KeyF if down => world::summon(&mut self.engine),
                         KeyCode::KeyP if down => world::summon_people(&mut self.engine),
                         KeyCode::KeyE if down => self.click = true,
+                        KeyCode::KeyR if down => self.camp = true,
+                        // The game's debug keys (scan codes 3Ch, 3Dh).
+                        KeyCode::F2 => self.engine.m.set_key(0x3C, down),
+                        KeyCode::F3 => self.engine.m.set_key(0x3D, down),
+                        KeyCode::F5 if down => self.save(),
+                        KeyCode::F9 if down => self.load(),
                         KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
-                        KeyCode::Escape if down => {
-                            if let Some(g) = &self.gpu {
-                                let _ = g.window.set_cursor_grab(winit::window::CursorGrabMode::None);
-                                g.window.set_cursor_visible(true);
-                            }
-                            self.captured = false;
-                        }
+                        KeyCode::Escape if down => self.release(),
                         _ => {}
                     }
                 }
             }
             WindowEvent::RedrawRequested => {
                 let cam = camera(&self.engine);
+                let hud = self.hud();
+                hud::compose(&mut self.screen, &self.font, &hud);
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);
@@ -904,6 +1396,7 @@ impl winit::application::ApplicationHandler for App {
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
+                    g.overlay.draw(&g.device, &g.queue, &view, &self.screen);
                     frame.present();
                 }
             }
@@ -913,7 +1406,7 @@ impl winit::application::ApplicationHandler for App {
 
     fn device_event(&mut self, _el: &winit::event_loop::ActiveEventLoop, _id: winit::event::DeviceId, event: winit::event::DeviceEvent) {
         if let winit::event::DeviceEvent::MouseMotion { delta } = event {
-            if self.captured {
+            if self.captured && !self.waiting() {
                 // About a quarter turn for 400 pixels.
                 self.look += delta.0 * 128.0 / 400.0;
             }
@@ -922,7 +1415,8 @@ impl winit::application::ApplicationHandler for App {
 
     fn about_to_wait(&mut self, el: &winit::event_loop::ActiveEventLoop) {
         // The game runs at its own pace (18.2 timer ticks a second, a frame
-        // taking `frame_ticks`); drawing goes as fast as the display.
+        // taking `frame_ticks`); drawing goes as fast as the display. While
+        // the game waits for the player, no time passes.
         let now = Instant::now();
         if now >= self.next {
             self.step();
