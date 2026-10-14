@@ -90,6 +90,22 @@ pub trait QuestHooks {
     /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
     /// written to 19DE, before its message box.
     fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
+    /// 1194:3EC3 (and far 3EBF): the place `place`'s buildings listed
+    /// (its plan, `Machine::city_plan_for_record`, then each block's .MIF
+    /// header read for the counts at 1387/1389/138B and the lists at
+    /// 1AB5/1004/1008). Not ported (file I/O): None by default.
+    fn city_info(&mut self, _m: &mut Machine, _files: &mut Files, _place: u8) -> Option<()> {
+        None
+    }
+    /// 1194:2E69 (far): the days the journey set up at 193D..1944 takes,
+    /// left at 1927 (`Machine::travel_days`).
+    fn travel(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.travel_days(files).map(|_| ())
+    }
+    /// 0000:9D60: the PC's timer ticks (the BIOS's dword at 0:046C).
+    fn bios_ticks(&mut self, _m: &mut Machine) -> u32 {
+        0
+    }
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
