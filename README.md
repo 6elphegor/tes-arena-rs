@@ -121,8 +121,8 @@ No game code or data is included: everything is loaded from your own copy.
   and debug keys, the acceleration's decay, walking and turning speeds
   from speed and fatigue, the wilderness flats, levitation and the light
   radius, the weapon, the message and guards' countdowns, drowning, a
-  holiday's message, breath in deep water, the night's creatures in
-  towns, the clock (a minute every 90 timer ticks) and the hurt flash.
+  holiday's message, breath in deep water, townspeople coming back in
+  the daytime, the clock (a minute every 90 timer ticks) and the hurt flash.
   Drawing, sound, menus and message boxes are `FrameHooks`.
 - `src/cast.rs` – the player casting (segment 29CF): from the
   spellbook (29CF:071F: silence, the cost by level, the crime of casting

@@ -9,7 +9,7 @@
 //! weapon (class change 0000:3C4C, then `weapon_frame`), the message's
 //! countdown, the guards' countdown (0000:3EFA), the debug keys, the
 //! player held under water (2826:0D5F), a holiday's message (2DA2:111C),
-//! breath and drowning in deep water, the night's creatures in towns
+//! breath and drowning in deep water, townspeople in the daytime
 //! (0000:1793), and the clock: a minute every 90 timer ticks.
 //!
 //! Drawing (the status bars, compass, automap, keys, hand bobbing, hurt
@@ -68,8 +68,8 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn weapon_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    /// 0000:17F9: the night creatures' graphics are loaded.
-    fn night_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+    /// 0000:17F9: the townspeople's graphics are loaded.
+    fn townsfolk_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
     /// 2542:0100: the menu keys (Esc, the character sheet, the map...).
@@ -255,7 +255,7 @@ impl Machine {
             self.mem.w8(DS, 0x8725, v);
         }
         self.breath()?;
-        self.night_creatures(files, hooks)?;
+        self.townsfolk_return(files, hooks)?;
         self.town_entered(files, hooks);
         if self.mem.r8(DS, 0xACED) != 0 && self.mem.r8(DS, 0xACF4) != 0 {
             hooks.key_d327(self);
@@ -392,10 +392,11 @@ impl Machine {
         Some(())
     }
 
-    /// 0000:4A7A. At night (time of day 110h..2F0h) in a town with no
-    /// creatures about or overlay up, the night's creatures come: 15
-    /// (7 in the wild, where 217B:0058 allows) after their graphics load.
-    fn night_creatures(&mut self, files: &mut Files, hooks: &mut dyn FrameHooks) -> Option<()> {
+    /// 0000:4A7A. In the daytime (time of day 110h..2F0h: 100h is six in
+    /// the morning, 200h noon) outdoors with no fight on or overlay up,
+    /// the townspeople come back: 15 (7 in the wild, where 217B:0058
+    /// allows) after their graphics load.
+    fn townsfolk_return(&mut self, files: &mut Files, hooks: &mut dyn FrameHooks) -> Option<()> {
         let tod = self.mem.r16(DS, 0xCCFE);
         if self.mem.r16(DS, 0x0FF7) != 0
             || self.mem.r16(DS, 0x0FF9) != 0
@@ -412,7 +413,7 @@ impl Machine {
             }
             n = 7;
         }
-        hooks.night_graphics(self, files)?;
+        hooks.townsfolk_graphics(self, files)?;
         self.spawn_actors(n, 0xA)
     }
 
@@ -581,7 +582,7 @@ pub(crate) fn holiday(m: &Machine, minutes: u32) -> Option<u16> {
     }
 }
 
-/// 217B:0058. In the wild, whether the night's creatures may come: the
+/// 217B:0058. In the wild, whether people may come: the
 /// chunk the player is in (by quadrant, the four at 0604) is in the
 /// list at 392E (count 392D).
 fn wild_spawn_allowed(m: &Machine) -> bool {

@@ -70,7 +70,7 @@ impl FrameHooks for Hooks {
         count(m, 0xFFE4);
         Some(())
     }
-    fn night_graphics(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
+    fn townsfolk_graphics(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         count(m, 0xFFEE);
         Some(())
     }
