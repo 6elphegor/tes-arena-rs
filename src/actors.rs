@@ -286,8 +286,9 @@ impl Machine {
     }
 
     /// 217B:0058. Whether the wilderness quarter the player is in (by
-    /// x and y against 0x2000) is listed at 392E (count at 392D).
-    fn wild_quarter_ok(&self) -> bool {
+    /// x and y against 0x2000) is listed at 392E (count at 392D): the
+    /// blocks people may come to (the carry clear).
+    pub fn wild_quarter_ok(&self) -> bool {
         let mut bx = 0u16;
         if self.mem.r16(DS, PY) >= 0x2000 {
             bx = 2;

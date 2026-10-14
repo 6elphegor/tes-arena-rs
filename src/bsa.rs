@@ -70,13 +70,25 @@ pub struct Files {
     names: HashMap<Vec<u8>, PathBuf>,
     bsa: Option<(Rc<[u8]>, u32)>,
     loose: Option<(Rc<[u8]>, u32)>,
+    /// Files the game wrote (`Machine::file_write`), by upper-case name:
+    /// kept here, not on disk, and found before the directories' files.
+    written: HashMap<Vec<u8>, Rc<[u8]>>,
 }
 
 impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
-        let mut files = Self { names: HashMap::new(), bsa: None, loose: None };
+        let mut files = Self { names: HashMap::new(), bsa: None, loose: None, written: HashMap::new() };
         files.add_dir(dir)?;
         Ok(files)
+    }
+
+    /// A file the game wrote, by DOS name (its last component).
+    pub fn written(&self, name: &[u8]) -> Option<&[u8]> {
+        self.written.get(&Self::base(name).to_ascii_uppercase()).map(|d| &d[..])
+    }
+
+    fn base(name: &[u8]) -> &[u8] {
+        name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name)
     }
 
     /// Makes the files in `dir` available too (a save game's folder, for
@@ -93,8 +105,11 @@ impl Files {
     /// looked up by its last component: the game's directories all map
     /// to the directories given here.
     fn read_loose(&self, name: &[u8]) -> Option<Rc<[u8]>> {
-        let base = name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name);
-        std::fs::read(self.names.get(&base.to_ascii_uppercase())?).ok().map(Rc::from)
+        let base = Self::base(name).to_ascii_uppercase();
+        if let Some(d) = self.written.get(&base) {
+            return Some(d.clone());
+        }
+        std::fs::read(self.names.get(&base)?).ok().map(Rc::from)
     }
 
     /// DOS read: bytes from `pos`, fewer at the end of the file.
@@ -271,6 +286,16 @@ impl Machine {
         self.mem.w16(DS, OPEN_SIZE, size as u16);
         self.mem.w32(DS, REMAINING, size);
         self.mem.w32(DS, SIZE, size);
+    }
+
+    /// 0000:9DD2. A new file named at DS:`name` (DOS create, 3Ch) with the
+    /// `n` bytes at `seg`:`off` written, then closed; AX 1. The port
+    /// keeps written files in `Files` (later opens find them) and never
+    /// fails, where the original reports a failed create through 0000:74E5.
+    pub fn file_write(&mut self, files: &mut Files, name: u16, seg: u16, off: u16, n: u16) {
+        let data: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
+        let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
+        files.written.insert(base, Rc::from(data));
     }
 
     /// 0000:67C4. Opens the file named at DS:`name`: a loose file if one
