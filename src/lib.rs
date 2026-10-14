@@ -59,3 +59,4 @@ pub mod talk;
 pub mod text;
 pub mod transit;
 pub mod trigger;
+pub mod use_item;

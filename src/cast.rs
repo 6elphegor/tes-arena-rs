@@ -101,7 +101,7 @@ impl Machine {
     /// free one, 29CF:01C4) waits at PENDING if it needs a target
     /// (`target_prompt`): the weapon is put away (5E0 bit 10h saved and
     /// cleared, D49 FFh). Otherwise it takes effect on the player now.
-    fn player_cast(&mut self, files: &mut Files, index: u8) -> Option<()> {
+    pub(crate) fn player_cast(&mut self, files: &mut Files, index: u8) -> Option<()> {
         let _ = files;
         let cast = self.free_cast()?;
         self.mem.w16(DS, cast.wrapping_add(0xA), 1);
