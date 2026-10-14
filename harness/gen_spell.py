@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_CODE, UcError
 from unicorn.x86_const import UC_X86_REG_DS
 from emu import Arena, Fault, LOAD_SEG, DGROUP
+from emu import changes
 from gen_attack import fnv, stream
 
 CSEG, SSEG, TSEG, WSEG, FRAME = 0x7800, 0x6000, 0x5C00, 0x6800, 0x8800
@@ -212,7 +213,7 @@ def main():
             # Messages written with DS at the creature segment.
             if a.r16(0x061C, CSEG) == a.ds:
                 a.w16(0x061C, DGROUP, CSEG)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = (f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} '
                    f'{fnv(a.seg_bytes(TSEG)[:0x400]):x} {fnv(a.seg_bytes(WSEG)[:0x8000]):x}')
         except Fault:

@@ -34,6 +34,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import *
@@ -223,8 +225,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_08B9)
-    for n in range(int(os.environ.get('N', 4000))):
+    total = int(os.environ.get('N', 4000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         if os.environ.get('DEBUG') and os.environ['DEBUG'] != f'{seed:x}':
             continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
@@ -237,7 +242,7 @@ def main():
         try:
             a.call_far(0x2294, (0x08B9, 0x0A5D, 0x05A6)[op])
             after = a.seg_bytes(a.ds)
-            ch = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            ch = changes(before, after)
             res = f'{fnv(ch + a.seg_bytes(FRAME)[:0x1100] + st["log"]):x}'
             if os.environ.get('DEBUG') == f'{seed:x}':
                 print('ds', [(hex(i), hex(before[i]), hex(after[i])) for i in range(0x10000) if after[i] != before[i]])

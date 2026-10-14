@@ -26,6 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 
 CSEG = 0x6000
@@ -86,8 +88,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_0423)
-    for n in range(int(os.environ.get('N', 4000))):
+    total = int(os.environ.get('N', 4000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(CSEG, 0), zero)
         writes, rec = setup(seed)
@@ -98,7 +103,7 @@ def main():
         try:
             a.call_far(0x2686, 0x0423, ds=CSEG, si=rec)
             after, cafter = a.seg_bytes(a.ds), a.seg_bytes(CSEG)
-            ch = lambda x, y: b''.join(struct.pack('<HB', i, y[i]) for i in range(0x10000) if x[i] != y[i])
+            ch = lambda x, y: changes(x, y)
             res = f'{fnv(ch(before, after) + ch(cbefore, cafter)):x}'
             lst, at = [], 0x1044
             while after[at]:

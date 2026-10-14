@@ -26,6 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Fault, LOAD_SEG
+from emu import changes
+from emu import mine
 from dos import DosArena
 from gen_attack import fnv, stream
 from gen_frame import counter
@@ -79,8 +81,11 @@ def main():
     base_heap = bytes(a.mu.mem_read(0xA0000, 0x50000))
     zero = bytes(0x10000)
     rng = random.Random(0x1994_33C0)
-    for n in range(int(os.environ.get('N', 2000))):
+    total = int(os.environ.get('N', 2000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(0xA0000, base_heap)
         for seg in (WSEG, FSEG, CSEG):
@@ -93,7 +98,7 @@ def main():
             if a.r16(0xA90A) == a.ds:
                 a.w16(0xA90A, a.ds - LOAD_SEG)
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = (f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} '
                    f'{fnv(bytes(a.mu.mem_read(0xA0000, 0x50000))):x}')
         except Fault:

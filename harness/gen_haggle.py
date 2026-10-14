@@ -31,11 +31,7 @@ rng = random.Random(0x1994_8020)
 out = open(OUT, 'w', buffering=1)
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 class Script(Exception):

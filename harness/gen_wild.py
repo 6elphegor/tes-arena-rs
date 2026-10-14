@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
 from dos import DosArena
 
 EXE, GAME, OUT = sys.argv[1:4]
@@ -24,11 +25,7 @@ out = open(OUT, 'w', buffering=1)
 BUF = 0x7000
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 a = Arena(EXE)
@@ -48,7 +45,7 @@ for _ in range(300):
     try:
         a.call_far(0x217B, 0x0004)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         res = f'{fnv(a.seg_bytes(BUF)):x} {fnv(changed):x}'
     except Fault:
         res = 'fault'
@@ -74,7 +71,7 @@ for _ in range(200):
         if d.r16(0xA90A) == d.ds:
             d.w16(0xA90A, d.ds - LOAD_SEG)
         after = d.seg_bytes(d.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         parts = [fnv(d.mu.mem_read(d.lin(d.r16(v), 0), 0x8000)) for v in (0xCCD0, 0xD806, 0xD748)]
         parts += [fnv(d.seg_bytes(d.r16(0x9030))), fnv(changed)]
         res = ' '.join(f'{p:x}' for p in parts)

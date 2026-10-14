@@ -28,6 +28,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from unicorn.x86_const import UC_X86_REG_EFLAGS
 
@@ -129,8 +131,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_B6EB)
-    for n in range(int(os.environ.get('N', 4000))):
+    total = int(os.environ.get('N', 4000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(WSEG, 0), zero)
         a.mu.mem_write(a.lin(FSEG, 0), zero)
@@ -150,7 +155,7 @@ def main():
                 r = a.call_near(0, 0xB6EB, eax=x, ebx=y)
                 extra = f' {r["ax"]:x} {a.mu.reg_read(UC_X86_REG_EFLAGS) & 1}'
             after = a.seg_bytes(a.ds)
-            res = f'{fnv(b"".join(struct.pack("<HB", i, after[i]) for i in range(0x10000) if after[i] != before[i])):x}' + extra
+            res = f'{fnv(changes(before, after)):x}' + extra
         except Fault:
             res = 'fault'
         except AssertionError:

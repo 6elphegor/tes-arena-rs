@@ -30,6 +30,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from gen_frame import counter
 
@@ -98,8 +100,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_0390)
-    for n in range(int(os.environ.get('N', 4000))):
+    total = int(os.environ.get('N', 4000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(WSEG, 0), zero)
         a.mu.mem_write(a.lin(FSEG, 0), zero)
@@ -109,7 +114,7 @@ def main():
         try:
             a.call_near(0, 0x0390)
             after = a.seg_bytes(a.ds)
-            ch = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            ch = changes(before, after)
             res = f'{fnv(ch + a.seg_bytes(WSEG)[:0x1000]):x}'
         except Fault:
             res = 'fault'

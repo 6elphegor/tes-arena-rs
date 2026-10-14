@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import mine
 from gen_attack import stream
 
 
@@ -50,8 +51,11 @@ def main():
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     base_ds = a.seg_bytes(a.ds)
     rng = random.Random(0x1994_0390)
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         for off, data in setup(seed):
             a.mu.mem_write(a.lin(a.ds, off), data)

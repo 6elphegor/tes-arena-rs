@@ -30,6 +30,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
 from unicorn.x86_const import UC_X86_REG_EFLAGS
 from gen_attack import fnv, stream
 from gen_frame import counter
@@ -117,7 +118,7 @@ def main():
             else:
                 a.call_far(0x2294, 0x0BEF)
             after = a.seg_bytes(a.ds)
-            ch = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            ch = changes(before, after)
             res = f'{fnv(ch + a.seg_bytes(TSEG)[0xD00:0xF00]):x}{cf}'
         except Fault:
             res = 'fault'

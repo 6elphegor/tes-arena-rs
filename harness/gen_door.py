@@ -21,6 +21,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 
 WSEG = 0x6800
@@ -63,8 +65,11 @@ def main():
     a.mu.mem_write(a.lin(STUB, 0x10), b'\x1e\x68\x00\x70\x1f\xa3\x00\x00\xc6\x06\x02\x00\x01\x1f\xcb')
     base_ds = a.seg_bytes(a.ds)
     rng = random.Random(0x1994_CD66)
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(STUB, 0), bytes(4))
         writes, sq = setup(seed)
@@ -75,7 +80,7 @@ def main():
         try:
             a.run_range(0, 0xCD66, 0xCF20, es=WSEG, di=sq)
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed + struct.pack("<H", a.r16(sq, seg=WSEG))):x}'
             if a.mu.mem_read(a.lin(STUB, 2), 1)[0]:
                 sound = f'{a.r16(0, seg=STUB):x}'

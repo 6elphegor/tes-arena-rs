@@ -35,11 +35,7 @@ SRC_SEG = 0x5C00
 PLANES = (FLOOR_SEG, MAP1_SEG, MAP2_SEG, DECODE_SEG)
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def fill(i):

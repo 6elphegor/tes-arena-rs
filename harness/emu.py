@@ -8,6 +8,88 @@ DGROUP = 0x3BA0
 STUB_SEG = 0x0800  # far return lands here on a HLT
 
 
+def _fnv_py(b):
+    h = 0xcbf29ce484222325
+    for c in b:
+        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
+    return h
+
+
+_FNV_C = b"""
+#include <stdint.h>
+#include <stddef.h>
+uint64_t fnv(const uint8_t *p, size_t n) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (size_t i = 0; i < n; i++) h = (h ^ p[i]) * 0x100000001b3ull;
+    return h;
+}
+"""
+
+
+def _fnv_lib():
+    """The C FNV-1a, compiled once into the harness's __pycache__ (None
+    without a C compiler: the Python one is used)."""
+    import ctypes, hashlib, os, subprocess, tempfile
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), '__pycache__')
+    so = os.path.join(d, 'fnv_%s.so' % hashlib.sha1(_FNV_C).hexdigest()[:12])
+    if not os.path.exists(so):
+        try:
+            os.makedirs(d, exist_ok=True)
+            with tempfile.TemporaryDirectory() as t:
+                src = os.path.join(t, 'fnv.c')
+                open(src, 'wb').write(_FNV_C)
+                # Built beside its final name (the same file system), then
+                # renamed into place.
+                tmp = '%s.%d.tmp' % (so, os.getpid())
+                subprocess.run(['cc', '-O2', '-shared', '-fPIC', '-o', tmp, src], check=True, capture_output=True)
+                os.replace(tmp, so)
+        except (OSError, subprocess.CalledProcessError):
+            return None
+    lib = ctypes.CDLL(so)
+    lib.fnv.restype = ctypes.c_uint64
+    lib.fnv.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
+    return lib
+
+
+_FNV = _fnv_lib()
+
+
+def fnv(b):
+    """FNV-1a (64-bit) of the bytes `b` (or an iterable of byte values)."""
+    if _FNV is None:
+        return _fnv_py(b)
+    if not isinstance(b, (bytes, bytearray)):
+        b = bytes(b)
+    return _FNV.fnv(bytes(b), len(b))
+
+
+def mine(n, total):
+    """Whether case `n` of `total` is this process's: all of them, or with
+    SHARD=k/K in the environment the k-th of K contiguous blocks
+    (harness/par.py runs the K and joins their outputs in order). Every
+    case's seed is drawn either way, so the cases don't change."""
+    import os
+    shard = os.environ.get('SHARD')
+    if not shard:
+        return True
+    k, K = (int(x) for x in shard.split('/'))
+    return total * k // K <= n < total * (k + 1) // K
+
+
+def changes(old, new):
+    """The bytes that differ between two equal-length buffers, as
+    (offset word, new byte) records in order: b''.join(struct.pack('<HB',
+    i, new[i]) for each i where new[i] != old[i]), comparing 256-byte
+    blocks first so that only the blocks that changed are walked."""
+    out = []
+    for c in range(0, len(new), 256):
+        if old[c:c + 256] != new[c:c + 256]:
+            for i in range(c, min(c + 256, len(new))):
+                if old[i] != new[i]:
+                    out.append(struct.pack('<HB', i, new[i]))
+    return b''.join(out)
+
+
 class Fault(Exception):
     """The routine raised a CPU interrupt (0 = divide error) or INT n."""
 

@@ -18,6 +18,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
 from unicorn import UcError
 
 EXE, OUT = sys.argv[1:3]
@@ -26,11 +27,7 @@ out = open(OUT, 'w', buffering=1)
 OTHER = 0x7000
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 a = Arena(EXE)
@@ -70,7 +67,7 @@ for i in range(1500):
         from unicorn.x86_const import UC_X86_REG_SI
         si = a.mu.reg_read(UC_X86_REG_SI)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', k, after[k]) for k in range(0x10000) if after[k] != before[k])
+        changed = changes(before, after)
         # The name up to its NUL (at most 64 bytes): past it lie
         # relocated segment words that differ from the port's.
         name = (after + after)[si:si + 64].split(b'\0')[0]

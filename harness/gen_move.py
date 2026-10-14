@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import changes
 
 EXE, OUT = sys.argv[1:3]
 rng = random.Random(0x1994_F697)
@@ -22,11 +23,7 @@ out = open(OUT, 'w', buffering=1)
 WALLS, FLOOR = 0x7000, 0x7800
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def plane_words(seed):
@@ -114,7 +111,7 @@ for _ in range(1500):
     try:
         a.call_far(0, 0xF8DD, eax=speed, ebx=angle)
         d = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, d[i]) for i in range(0x10000) if d[i] != before[i])
+        changed = changes(before, d)
         res = f'{a.r16(0xC3D0):x} {a.r16(0xC3D4):x} {fnv(changed):x}'
     except (Fault, AssertionError):
         res = 'fault'

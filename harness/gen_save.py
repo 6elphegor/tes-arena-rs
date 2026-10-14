@@ -32,6 +32,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
 from emu import Fault, LOAD_SEG
+from emu import changes
 
 EXE, GAME, SAVE, SLOT, OUT = sys.argv[1:6]
 rng = random.Random(0x1994_25FD)
@@ -39,11 +40,7 @@ out = open(OUT, 'w', buffering=1)
 CREATURES, BUFFER, EXTRA = 0x7000, 0x7400, (0x8800, 0x0010)
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def lcg_bytes(n, seed):
@@ -77,7 +74,7 @@ for name in (0x5E92, 0x5E9E, 0x5EC6, 0x7D06):
         before = a.seg_bytes(a.ds)
         a.call_far(0x25FD, 0x0844, esi=name)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         out.write(f'path | {toggle:x} {name:x} | {fnv(changed):x} {a.mu.reg_read(__import__("unicorn").x86_const.UC_X86_REG_SI):x}\n')
 
 for slot in (int(SLOT), int(SLOT) + 1):
@@ -93,7 +90,7 @@ for slot in (int(SLOT), int(SLOT) + 1):
         if a.r16(0xA90A) == a.ds:
             a.w16(0xA90A, a.ds - LOAD_SEG)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         blocks = [a.mu.mem_read(a.lin(CREATURES, 0), 0x20F0), a.mu.mem_read(a.lin(BUFFER, 0xA000), 0x15E0),
                   a.mu.mem_read(a.lin(EXTRA[0], EXTRA[1]), 0x120)]
         res = ' '.join(f'{fnv(b):x}' for b in [changed] + blocks)
@@ -114,7 +111,7 @@ for name in names:
             if a.r16(0xA90A) == a.ds:
                 a.w16(0xA90A, a.ds - LOAD_SEG)
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             from unicorn.x86_const import UC_X86_REG_EFLAGS
             cf = a.mu.reg_read(UC_X86_REG_EFLAGS) & 1
             res = 'fault' if cf else f'{r:x} {fnv(changed):x} {fnv(a.seg_bytes(LOAD)):x}'
@@ -131,7 +128,7 @@ for slot in (int(SLOT), int(SLOT) + 1):
         if a.r16(0xA90A) == a.ds:
             a.w16(0xA90A, a.ds - LOAD_SEG)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         res = f'{fnv(changed):x} {fnv(a.mu.mem_read(a.lin(LOAD_SEG + 0x3276, 0), 0x3520)):x}'
     except (Fault, AssertionError):
         res = 'fault'
@@ -162,7 +159,7 @@ for slot in (int(SLOT), int(SLOT) + 1):
                 if a.r16(0xA90A) == a.ds:
                     a.w16(0xA90A, a.ds - LOAD_SEG)
                 after = a.seg_bytes(a.ds)
-                changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+                changed = changes(before, after)
                 parts = [fnv(changed)]
                 for var in (0xD806, 0xCCD0, 0xD748):
                     sg = a.r16(var)
@@ -183,7 +180,7 @@ for slot in (int(SLOT), 2, 64, 65):
             if a.r16(0xA90A) == a.ds:
                 a.w16(0xA90A, a.ds - LOAD_SEG)
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{r & 0xff:x} {fnv(changed):x}'
         except (Fault, AssertionError):
             res = 'fault'
