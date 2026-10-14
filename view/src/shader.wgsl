@@ -18,6 +18,8 @@ struct Globals {
     // no shading), y the limit row, z the row past it, w the row beyond a
     // light (C8E7, C8E9, C8EB).
     light: vec4<f32>,
+    // The view's window: the screen quads' row scale (x) and shift (y).
+    window: vec4<f32>,
     lights: array<vec4<f32>, 64>,
     palette: array<vec4<f32>, 256>,
 };
@@ -50,7 +52,7 @@ fn vs_main(
     o.clip = g.view_proj * vec4<f32>(pos, 1.0);
     if (flags & 16u) != 0u {
         // The sky's objects: already on the screen, behind everything.
-        o.clip = vec4<f32>(pos.xy, 0.999999, 1.0);
+        o.clip = vec4<f32>(pos.x, pos.y * g.window.x + g.window.y, 0.999999, 1.0);
     }
     o.uv = uv;
     o.layer = layer;

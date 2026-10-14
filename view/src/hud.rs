@@ -132,6 +132,33 @@ impl Screen {
         }
     }
 
+    /// Palette pixels (`w` x `h`, row-major) with their top left at
+    /// (x, y); colour 0 is see-through, rows below `bottom` are cut.
+    pub fn blit(&mut self, x: i32, y: i32, w: usize, h: usize, px: &[u8], bottom: i32) {
+        for r in 0..h as i32 {
+            let yy = y + r;
+            if yy < 0 || yy > bottom || yy >= H as i32 {
+                continue;
+            }
+            for c in 0..w as i32 {
+                let xx = x + c;
+                if !(0..W as i32).contains(&xx) {
+                    continue;
+                }
+                let v = *px.get((r * w as i32 + c) as usize).unwrap_or(&0);
+                if v != 0 {
+                    let p = self.palette[v as usize];
+                    self.px[yy as usize * W + xx as usize] = [p[0], p[1], p[2], 0xFF];
+                }
+            }
+        }
+    }
+
+    /// Text at (x, y) in colour `c`, without a shadow.
+    pub fn text_plain(&mut self, font: &Font, x: i32, y: i32, s: &str, c: u8) {
+        self.text_raw(font, x, y, s, c);
+    }
+
     /// A box: a dark fill with a one-pixel frame in colour `frame`.
     pub fn panel(&mut self, x: i32, y: i32, w: i32, h: i32, frame: u8) {
         self.fill(x, y, w, h, 0, 0xE0);
@@ -222,9 +249,9 @@ pub fn menu_layout(font: &Font, menu: &Menu) -> (i32, i32, i32, i32) {
     (x + 8, y + 5 + menu.title.len() as i32 * lh, lh, w - 16)
 }
 
-/// The layer drawn for `hud`.
-pub fn compose(screen: &mut Screen, font: &Font, hud: &Hud) {
-    screen.clear();
+/// `hud`'s texts drawn over what the layer has (the interface, drawn
+/// after the layer is cleared).
+pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
     let lh = font.h as i32 + 2;
     if let Some(lines) = &hud.message {
         let mut y = 4;
