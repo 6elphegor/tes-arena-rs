@@ -25,6 +25,16 @@
 //! (QUESTS, 9462) is made, otherwise as many errands (OTHERS, 9D64) as
 //! the town has taverns' entries left, four at most. The seed is put
 //! back after.
+//!
+//! `quests_talk` (8F1E) runs when the player talks to someone who may
+//! give or end a quest (from the talk, the shops and the palace): offers
+//! for the person (errands whose giver it is, 8F50; in a palace the
+//! first quest offered, 8F7B) and the quests under way it ends (8F99:
+//! a goal reached turns the quest back to its giver; at the giver, or
+//! for stages 0 and 3 at once, it is done, 9041: gold, experience, its
+//! item freed) are queued as texts (QUEUE, 9D2C), then one is taken
+//! (90B9): a failed quest scolded in a palace, a message, or the offer
+//! itself, answered (yes: under way and in the log; no: forgotten).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -58,6 +68,21 @@ pub mod var {
     pub const COUNT_TEMPLES: u16 = 0x138B;
     pub const COUNT_STORES: u16 = 0x1389;
     pub const PALACE: u16 = 0x138D;
+    /// The texts queued (byte text, word record, 4 bytes each; negative
+    /// texts are messages) and their count; the offer's text and record,
+    /// its goal's sort.
+    pub const QUEUE: u16 = 0x6CA2;
+    pub const QUEUED: u16 = 0x0AB0;
+    pub const OFFER_TEXT: u16 = 0x1252;
+    pub const OFFER: u16 = 0x1250;
+    pub const OFFER_GOAL: u16 = 0x1254;
+    /// The person talked to (its word, the low byte doubled), the
+    /// building's kind (1 a palace), the area's (4 a building), the talk's
+    /// (4 a tavern's keeper).
+    pub const TALKER: u16 = 0x0FD2;
+    pub const BUILDING: u16 = 0x0D48;
+    pub const AREA: u16 = 0x05E6;
+    pub const TALK: u16 = 0x137F;
     /// 2E69's inputs and result: the place's square, its kind; the
     /// province here; the days the journey takes.
     pub const TRAVEL_X: u16 = 0x193E;
@@ -811,5 +836,326 @@ impl Machine {
         let level = self.sq8(LEVEL).wrapping_add(1) as u32;
         self.mem.w32(DS, si + 0x18, r * level);
         Some(())
+    }
+
+    /// The person talked to, as the records name a giver or goal: FD2's
+    /// word with its low byte halved.
+    fn sq_talker(&self) -> u16 {
+        let w = self.sq16(TALKER);
+        w & 0xFF00 | (w as u8 >> 1) as u16
+    }
+
+    /// 1194:9D2C. Text `ax` (its low byte) for record `si` queued.
+    fn quest_queue(&mut self, ax: u16, si: u16) {
+        let bx = self.sq16(QUEUED).wrapping_mul(4);
+        self.mem.w16(DS, QUEUE.wrapping_add(bx), ax);
+        self.mem.w16(DS, QUEUE.wrapping_add(bx).wrapping_add(1), si);
+        let n = self.sq16(QUEUED).wrapping_add(1);
+        self.mem.w16(DS, QUEUED, n);
+    }
+
+    /// 1194:8F1E. A talk's quests (see the module's notes). None where
+    /// the original faults or never ends, or a hook fails.
+    pub fn quests_talk(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        self.mem.w16(DS, QUEUED, 0);
+        if self.sq16(0x05C8) & 0x4000 != 0 {
+            return Some(());
+        }
+        if self.sq8(TALK) == 4 {
+            // 8F50: the errands offered whose giver this is.
+            for i in 0..4 {
+                let si = OTHERS + i * ERRAND;
+                if self.quest_kind(si) == 2 && self.sq_talker() == self.sq16(si + 0x10) {
+                    self.mem.w16(DS, CURRENT, si);
+                    self.quest_queue(self.quest_stage(si) + 0x57, si);
+                }
+            }
+        } else if self.sq8(AREA) == 4 && self.sq8(BUILDING) == 1 {
+            // 8F7B: the first quest offered, in a palace.
+            if let Some(si) = (0..4).map(|i| QUESTS + i * QUEST).find(|&si| self.quest_kind(si) == 2) {
+                self.quest_queue(self.quest_stage(si) + 5, si);
+            }
+        }
+        self.quests_progress();
+        self.quests_take(files, hooks)
+    }
+
+    /// 1194:8F99. The quests under way (kind 1; the errands first) whose
+    /// place (+24h) is here and whose person (+10h once the goal is
+    /// reached, +14h's low word before; in a palace AAAAh) is the one
+    /// talked to: stage 1 not yet there marks the goal reached and turns
+    /// back to the giver's place (text 2Eh, 5Dh for an errand); stages 0
+    /// and 3, and the others with the goal reached, are done (9041). The
+    /// texts are queued as messages (low byte negated).
+    fn quests_progress(&mut self) {
+        for (base, size) in [(OTHERS, ERRAND), (QUESTS, QUEST)] {
+            for i in 0..4 {
+                let si = base + i * size;
+                if self.quest_kind(si) != 1 || self.sq8(LOCATION) != self.sq8(si + 0x24) {
+                    continue;
+                }
+                let who = if self.sq8(BUILDING) == 1 { 0xAAAA } else { self.sq_talker() };
+                let f = self.sq16(si + 4);
+                let person = if f & 0x20 != 0 { self.sq16(si + 0x10) } else { self.sq16(si + 0x14) };
+                if who != person {
+                    continue;
+                }
+                let stage = self.quest_stage(si);
+                let text = if stage == 1 && f & 0x20 == 0 {
+                    self.mem.w16(DS, si + 4, f | 0x20);
+                    let back = self.sq8(si + 0x25);
+                    self.mem.w8(DS, si + 0x24, back);
+                    if f & 0x100 != 0 { 0x5D } else { 0x2E }
+                } else if stage == 1 || stage == 3 || stage == 0 || f & 0x20 != 0 {
+                    self.quest_done(si, stage)
+                } else {
+                    continue;
+                };
+                self.quest_queue(text & 0xFF00 | (text as u8).wrapping_neg() as u16, si);
+            }
+        }
+    }
+
+    /// 1194:9041. Quest `si` (of stage `stage`) done: its goal marked,
+    /// its reward (+18h) to the gold (5C2), a quest (not an errand)
+    /// copied to F3E with 8A56 set; its item freed for stages 3..5; the
+    /// record freed (kind 0); experience (5AD) the level + 1 times 1F4h
+    /// (32h for an errand), at least C8h; 5CA bit 100h. Returns the
+    /// text, from 6D99 by the stage (+7 for an errand).
+    fn quest_done(&mut self, si: u16, stage: u16) -> u16 {
+        let f = self.sq16(si + 4) | 0x20;
+        self.mem.w16(DS, si + 4, f);
+        let gold = self.sq32(0x05C2).wrapping_add(self.sq32(si + 0x18));
+        self.mem.w32(DS, 0x05C2, gold);
+        if f & 0x100 == 0 {
+            for k in 0..QUEST {
+                let b = self.sq8(si.wrapping_add(k));
+                self.mem.w8(DS, 0x0F3E + k, b);
+            }
+            self.mem.w8(DS, 0x8A56, 1);
+        }
+        let (bx, cx) = if f & 0x100 != 0 { (stage + 7, 0x32u16) } else { (stage, 0x1F4) };
+        let text = self.sq8(0x6D99 + bx) as u16;
+        if (3..=5).contains(&stage) {
+            self.quest_item_free(si);
+        }
+        let k = self.sq16(si + 4) & 0xFF3F;
+        self.mem.w16(DS, si + 4, k);
+        let ax = (self.sq8(LEVEL) as u16 + 1).wrapping_mul(cx).max(0xC8);
+        let xp = self.sq32(0x05AD).wrapping_add(ax as u32);
+        self.mem.w32(DS, 0x05AD, xp);
+        let v = self.sq16(0x05CA) | 0x100;
+        self.mem.w16(DS, 0x05CA, v);
+        text
+    }
+
+    /// 1194:90B9. One of the queued texts taken (see the module's
+    /// notes), 8A56 kept meanwhile.
+    pub fn quests_take(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        let saved = self.sq8(0x8A56);
+        self.mem.w8(DS, 0x8A56, 0);
+        self.quests_take_in(files, hooks)?;
+        self.mem.w8(DS, 0x8A56, saved);
+        Some(())
+    }
+
+    fn quests_take_in(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        if self.sq8(BUILDING) == 1 {
+            if let Some(si) = self.quest_failed_at(0xFFFF, self.sq8(LOCATION)) {
+                // A palace's failed quest: its scolding, in its giver's
+                // words (the names' seed meanwhile).
+                self.mem.w16(DS, CURRENT, si);
+                let saved = self.rng.seed;
+                self.rng.seed = self.sq32(si + 0x1E);
+                self.quest_message(hooks, self.quest_stage(si) + 0x10, 0);
+                self.rng.seed = saved;
+                return Some(());
+            }
+        }
+        let q = self.sq16(QUEUED).wrapping_sub(1);
+        self.mem.w16(DS, QUEUED, q);
+        if (q as i16) < 0 {
+            if self.sq8(AREA) == 4 && self.sq8(BUILDING) == 1 {
+                self.quest_message(hooks, 0xD, 0);
+            }
+            return Some(());
+        }
+        // 9D40.
+        let bx = q.wrapping_mul(4);
+        let ax = self.sq8(QUEUE.wrapping_add(bx)) as u16;
+        let si = self.sq16(QUEUE.wrapping_add(bx).wrapping_add(1));
+        self.mem.w16(DS, CURRENT, si);
+        if (ax as u8 as i8) < 0 {
+            self.quest_message(hooks, (ax as u8).wrapping_neg() as u16, 0);
+            return Some(());
+        }
+        self.mem.w16(DS, OFFER_TEXT, ax);
+        self.mem.w16(DS, OFFER, si);
+        if self.sq8(TALK) != 4 && self.sq8(AREA) == 4 {
+            if self.sq8(BUILDING) != 1 {
+                return Some(());
+            }
+            if self.quest_ask(hooks, 0xE) != 0 {
+                self.quest_message(hooks, 0xF, 0);
+                return Some(());
+            }
+        } else {
+            self.quest_message(hooks, 0x56, 0);
+        }
+        self.quest_offer_made(files, hooks)
+    }
+
+    /// 1194:9CD8. Text `text` written (A374, mode 2; width 28h with 5C8
+    /// bit 20h) and offered with its yes and no (1194:020E, the keys at
+    /// 6D6E, the entries at 6D71). The pick.
+    fn quest_ask(&mut self, hooks: &mut dyn QuestHooks, text: u16) -> u16 {
+        use crate::quest::var::{TEXT, TEXT_COLOUR, TEXT_FLAG, TEXT_FLAG2};
+        self.mem.w16(DS, TEXT, text);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        let wide = self.sq16(0x05C8) & 0x20 != 0;
+        if wide {
+            self.mem.w8(DS, TEXT_FLAG, 0x28);
+        }
+        hooks.text(self);
+        self.mem.w8(DS, TEXT_COLOUR, 0x60);
+        let ax = self.sq16(0x102C);
+        hooks.font(self, 0, ax);
+        if wide {
+            let ax = self.sq16(0x1038);
+            hooks.font(self, 1, ax);
+        }
+        hooks.menu(self, 0x1044, 0x6D6E, 0x6D71)
+    }
+
+    /// 1194:9162..9321. The offer of record CURRENT: the way to its place
+    /// (8A52, 8A54) when not an errand; for a person to find (goal 7) its
+    /// name (the +32h-th of the strings at 6D27, its substitutions made,
+    /// at 6D49) given to a random dungeon of the province (26F7:0C0A,
+    /// mode 1), the journey there, and the deadline again: the days twice
+    /// unless the stage is 6, plus the level + 1. Bug kept: that stage is
+    /// read through SI as 26F7:0C0A leaves it, the name's buffer, so from
+    /// the name's fifth and sixth characters. The offer's text
+    /// (OFFER_TEXT) is then asked (A374 mode 1, the player put at the
+    /// place's square meanwhile, 9D51): no frees the record (text 5Bh, Fh
+    /// in a palace); yes gives a stage 3 quest its item (1194:3829, bit
+    /// 80h with +28h), takes the dungeon (mode 4, its index to +14h),
+    /// shows the acceptance (56Dh, 56Ch with a dungeon, 56Fh for an
+    /// errand), logs the quest (stage + 27h, + 4D6h for an errand) and
+    /// puts it under way.
+    fn quest_offer_made(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        use crate::quest::var::{ITEMS, TEXT, TEXT_FLAG, TEXT_FLAG2};
+        let si = self.sq16(CURRENT);
+        if self.sq16(si + 4) & 0x100 == 0 {
+            let here = self.sq8(PROVINCE);
+            let to = self.sq8(si + 0x24);
+            hooks.province_load(self, to >> 5);
+            let rec = PLACES + (to & 0x1F) as u16 * 0x19;
+            let (x, y) = (self.sq16(rec + 0x14), self.sq16(rec + 0x16));
+            self.mem.w16(DS, 0x8A52, x);
+            self.mem.w16(DS, 0x8A54, y);
+            hooks.province_load(self, here);
+        }
+        let goal = (self.sq16(si + 4) & 0xF000) >> 12;
+        self.mem.w16(DS, OFFER_GOAL, goal);
+        if goal == 7 {
+            let n = self.sq16(si + 0x32);
+            let name = self.skip_strings(DS, 0x6D27, n);
+            self.quest_strcpy(name, 0x6D49);
+            hooks.substitute(self, files, 0x6D49)?;
+            let province = self.sq8(PROVINCE) as u16;
+            let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x6D49)?;
+            let (bx, cx) = (self.sq16(0x129A), self.sq16(0x129C));
+            self.mem.w16(DS, 0x8A52, bx);
+            self.mem.w16(DS, 0x8A54, cx);
+            self.mem.w16(DS, 0x126C, ax);
+            self.mem.w16(DS, TRAVEL_X, bx);
+            self.mem.w16(DS, TRAVEL_Y, cx);
+            hooks.travel(self, files)?;
+            let mut days = self.sq16(TRAVEL_DAYS);
+            if self.quest_stage(0x6D49) != 6 {
+                days = days.wrapping_add(days);
+            }
+            let days = (self.sq8(LEVEL) as u16 + 1).wrapping_add(days);
+            let si = self.sq16(CURRENT);
+            let t = (days as u32).wrapping_mul(DAY).wrapping_add(self.sq32(si + 8));
+            self.mem.w32(DS, si + 0xC, t);
+        }
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        let text = self.sq16(OFFER_TEXT);
+        self.mem.w16(DS, TEXT, text);
+        let answer = self.sq_at_place(|m| {
+            m.mem.w8(DS, TEXT_FLAG, 0);
+            m.mem.w8(DS, TEXT_FLAG2, 0);
+            hooks.text_at(m, files, 1, 0x1044)
+        })?;
+        if answer != 0 {
+            let si = self.sq16(CURRENT);
+            let k = self.sq16(si + 4) & 0xFF3F;
+            self.mem.w16(DS, si + 4, k);
+            let text = if self.sq8(AREA) == 4 && self.sq8(BUILDING) == 1 { 0xF } else { 0x5B };
+            self.quest_message(hooks, text, 0);
+            return Some(());
+        }
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        let si = self.sq16(CURRENT);
+        if self.quest_stage(si) == 3 {
+            let (item, at) = self.pick_quest_item(self.sq8(PROVINCE) as u16)?;
+            let mut al = item as u8;
+            if self.sq8(si + 0x28) != 0 {
+                al |= 0x80;
+            }
+            self.mem.w8(DS, ITEMS.wrapping_add(at), al);
+            self.mem.w8(DS, si + 0x1C, al);
+            let d = self.sq8(0x0D39) | 0x80;
+            self.mem.w8(DS, 0x0D39, d);
+        }
+        self.mem.w16(DS, TEXT, 0x56D);
+        if self.sq16(OFFER_GOAL) == 7 {
+            let province = self.sq8(PROVINCE) as u16;
+            let index = self.sq16(0x126C);
+            let ax = self.quest_dungeon_entry(hooks, province, 4, index, 0x6D49)?;
+            let (bx, cx) = (self.sq16(0x129A), self.sq16(0x129C));
+            self.mem.w16(DS, 0x8A52, bx);
+            self.mem.w16(DS, 0x8A54, cx);
+            let si = self.sq16(CURRENT);
+            self.mem.w32(DS, si + 0x14, ax as u32);
+            self.mem.w16(DS, TEXT, 0x56C);
+        }
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        let si = self.sq16(CURRENT);
+        if self.sq16(si + 4) & 0x100 != 0 {
+            self.mem.w16(DS, TEXT, 0x56F);
+        }
+        hooks.text_shown(self);
+        let si = self.sq16(CURRENT);
+        let mut t = self.quest_stage(si) + 0x27;
+        if self.sq16(si + 4) & 0x100 != 0 {
+            t = t.wrapping_add(0x4D6);
+        }
+        self.mem.w16(DS, TEXT, t);
+        self.sq_at_place(|m| {
+            m.mem.w8(DS, TEXT_FLAG2, 0);
+            hooks.text_at(m, files, 2, 0x929E)?;
+            hooks.log_entry(m, 0x929E);
+            Some(())
+        })?;
+        let si = self.sq16(CURRENT);
+        let k = self.sq16(si + 4) & 0xFF3F | 0x40;
+        self.mem.w16(DS, si + 4, k);
+        Some(())
+    }
+
+    /// `f` run with the player put at the place's square (9D51: A48, A4A
+    /// in squares to C3D0, C3D4), then put back.
+    fn sq_at_place<T>(&mut self, f: impl FnOnce(&mut Machine) -> Option<T>) -> Option<T> {
+        let (x, y) = (self.sq16(0xC3D0), self.sq16(0xC3D4));
+        let (px, py) = (self.sq16(0x0A48) << 7, self.sq16(0x0A4A) << 7);
+        self.mem.w16(DS, 0xC3D0, px);
+        self.mem.w16(DS, 0xC3D4, py);
+        let r = f(self)?;
+        self.mem.w16(DS, 0xC3D4, y);
+        self.mem.w16(DS, 0xC3D0, x);
+        Some(r)
     }
 }

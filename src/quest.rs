@@ -106,6 +106,22 @@ pub trait QuestHooks {
     fn bios_ticks(&mut self, _m: &mut Machine) -> u32 {
         0
     }
+    /// 1194:A374 with AX `mode` (0 shown, 1 offered with its yes and no,
+    /// 2 written to DS:`di`): the text port (`Machine::text`, its menu
+    /// left). AX, a menu's pick (0 the first).
+    fn text_at(&mut self, m: &mut Machine, files: &mut Files, mode: u16, di: u16) -> Option<u16> {
+        m.text(files, &mut crate::text::NoTextHooks, mode, DS, di).map(|(ax, _)| ax)
+    }
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made (the
+    /// text port, `Machine::expand`).
+    fn substitute(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
+        m.expand(files, &mut crate::text::NoTextHooks, DS, di).map(|_| ())
+    }
+    /// 1194:020E: a menu, its title at DS:`si`, its keys at `bx`, its
+    /// entries' table at `di`. The pick (FFFFh: none).
+    fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
+        0xFFFF
+    }
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
@@ -253,7 +269,7 @@ impl Machine {
     /// 1194:9C96 (`flag` 0) / 9C9B (TEXT_FLAG already set, here `flag`):
     /// text `text` written (A374, mode 2) and shown in a message box,
     /// in colour 60h, or EEh with its second font when 5C8 bit 20h is set.
-    fn quest_message(&mut self, hooks: &mut dyn QuestHooks, text: u16, flag: u8) {
+    pub(crate) fn quest_message(&mut self, hooks: &mut dyn QuestHooks, text: u16, flag: u8) {
         self.mem.w8(DS, TEXT_FLAG, flag);
         self.mem.w16(DS, TEXT, text);
         self.mem.w8(DS, TEXT_FLAG2, 0);
@@ -406,7 +422,7 @@ impl Machine {
     }
 
     /// 0000:9CA0: the string at DS:`si` copied to DS:`di`, NUL included.
-    fn quest_strcpy(&mut self, mut si: u16, mut di: u16) {
+    pub(crate) fn quest_strcpy(&mut self, mut si: u16, mut di: u16) {
         loop {
             let b = self.mem.r8(DS, si);
             self.mem.w8(DS, di, b);
@@ -518,7 +534,7 @@ impl Machine {
     /// province (A46) loaded again. Returns AX, the entry's index. The
     /// entry written is the index's (modes 0, 1 and 4), the first fixed
     /// one (2) or the second (3 and more but 4).
-    fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
+    pub(crate) fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
         use crate::dungeon::{table::DUNGEON_ENTRIES, var::PICK_INDEX};
         let here = self.mem.r8(DS, HERE_PROVINCE);
         hooks.province_load(self, province as u8);
