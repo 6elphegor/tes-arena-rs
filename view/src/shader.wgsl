@@ -4,9 +4,12 @@
 
 struct Globals {
     view_proj: mat4x4<f32>,
+    // xyz: the eye; w: the rows a light behind the wall drawn loses
+    // (BB02).
     eye: vec4<f32>,
     // x: distance per shading row, y: rows (darkest kept), z: the row
-    // every index is remapped through first (night outdoors; 0 none).
+    // every index is remapped through first (night outdoors; 0 none), w:
+    // the fog's colour plus one (0 none), filling the view for the sky.
     shade: vec4<f32>,
     // x: outdoors (a sky), y: afternoon (the second dither), z, w: the
     // target's size.
@@ -69,7 +72,7 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     if g.shade.z > 0.0 {
         index = textureLoad(shading, vec2<i32>(i32(index), i32(g.shade.z)), 0).r;
     }
-    let row = light_row(vec2<i32>(floor(i.world.xz)));
+    let row = light_row(vec2<i32>(floor(i.world.xz)), (i.flags >> 1u) & 7u, vec2<i32>(round(i.world.xz)));
     let shaded = textureLoad(shading, vec2<i32>(i32(index), row), 0).r;
     return g.palette[shaded];
 }
@@ -88,6 +91,9 @@ fn fs_sky(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     if g.sky.x == 0.0 {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
+    if g.shade.w > 0.0 {
+        return g.palette[u32(g.shade.w) - 1u];
+    }
     let row = clamp(i32(pos.y / (g.sky.w * 0.5) * 20.0), 0, 19) + select(0, 20, g.sky.y != 0.0);
     let col = i32(pos.x * 320.0 / g.sky.z) % 40;
     let index = textureLoad(dither, vec2<i32>(col, row), 0).r;
@@ -99,9 +105,11 @@ fn fs_sky(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 // axis plus a quarter of the smaller; within half the radius row 0, then
 // one more every (radius / 2) / 13 units; beyond the radius, or at the
 // limit, the far row; the result at the limit or past it the dark row.
-// (The lights behind a wall, darker by 8 rows in the original, aren't
-// told apart here.)
-fn light_row(p: vec2<i32>) -> i32 {
+// On a wall face (`side` its side plus one, 0000:B7A9; `plane` the
+// fragment rounded, its plane's coordinate on its axis) a light behind
+// it is BB02 rows darker, the dark row at the limit or past it. (The
+// original's near and moving lists, kept apart there, are one here.)
+fn light_row(p: vec2<i32>, side: u32, plane: vec2<i32>) -> i32 {
     let n = i32(g.light.x);
     if n == 0 {
         return 0;
@@ -125,6 +133,23 @@ fn light_row(p: vec2<i32>) -> i32 {
                 row = (d - half) / step + 1;
                 if row >= limit {
                     row = far;
+                }
+            }
+        }
+        if side != 0u {
+            let lx = i32(l.x);
+            let ly = i32(l.y);
+            var behind = false;
+            switch side {
+                case 1u: { behind = ly >= plane.y; }
+                case 2u: { behind = lx < plane.x; }
+                case 3u: { behind = ly < plane.y; }
+                default: { behind = lx >= plane.x; }
+            }
+            if behind {
+                row = row + i32(g.eye.w);
+                if row >= limit {
+                    row = i32(g.light.z);
                 }
             }
         }

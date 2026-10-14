@@ -227,11 +227,11 @@ The core crate stays free of dependencies; the view crate is a workspace
 member using wgpu, winit, glam and png.
 
 - `world.rs` loads a level the way `examples/play.rs` does, or a city
-  (`CITY:PROVINCE:INDEX[:CLIMATE:WEATHER]`, 8:0 the Imperial City): its
+  (`CITY:PROVINCE:INDEX[:TERRAIN:WEATHER]`, 8:0 the Imperial City): its
   record and blocks built as `examples/city_map.rs` does, outdoors, with
-  the INF for its climate and weather (`outdoor_inf`, 0000:0896). The
-  weather and climate the game sets from the season and terrain
-  (0000:0F05) are not ported; they are given. It reads the
+  the climate, weather and fog set up from the terrain and the season's
+  weather as entering the area does (`weather_set`, 0000:0F05) and the
+  INF for them (`outdoor_inf`, 0000:0896). It reads the
   palette (PAL.COL), the textures from the EMS banks the INF loader filled
   (64 x 64, stored transposed, 15 to a bank) and the shading table (F000 in
   the first texture bank). It builds triangles from the map planes:

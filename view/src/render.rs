@@ -19,11 +19,14 @@ struct Globals {
 }
 
 /// The lights this frame (0000:B6EB's lists): none in full daylight,
-/// else up to 64 (x, y, radius) and the rows C8E7, C8E9, C8EB.
+/// else up to 64 (x, y, radius), the rows C8E7, C8E9, C8EB, and the rows
+/// a light behind the wall drawn loses (BB02, which the wall's drawing
+/// sets: 8, outdoors 2, 0000:AC1A).
 #[derive(Clone, Debug, Default)]
 pub struct Lights {
     pub lights: Vec<[u16; 3]>,
     pub rows: [u16; 3],
+    pub behind: u16,
 }
 
 /// The sky this frame: outdoors or not, the afternoon's dither or the
@@ -38,6 +41,8 @@ pub struct Sky {
     pub dark: u32,
     /// Palette entry 71h, the lamps' glow, once the game set it.
     pub lamp: Option<[u8; 3]>,
+    /// In fog (2294:0B01), the colour filling the view for the sky.
+    pub fog: Option<u8>,
 }
 
 /// Where the player stands and looks (map units; heading 0..511 a turn,
@@ -349,8 +354,8 @@ impl Renderer {
         let proj = Mat4::perspective_lh(60f32.to_radians(), width as f32 / height as f32, 4.0, 8192.0);
         let globals = Globals {
             view_proj: (proj * view).to_cols_array_2d(),
-            eye: [cam.x, cam.height, cam.y, 0.0],
-            shade: [96.0, 12.0, self.sky.dark as f32, 0.0],
+            eye: [cam.x, cam.height, cam.y, self.lights.behind as f32],
+            shade: [96.0, 12.0, self.sky.dark as f32, self.sky.fog.map_or(0.0, |c| c as f32 + 1.0)],
             sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, height as f32],
             light: {
                 let r = self.lights.rows;
