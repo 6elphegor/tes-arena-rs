@@ -267,7 +267,8 @@ impl Machine {
     /// flat drawn through the scratch record (FLAT_DRAWN, 0000:D18E) gets
     /// its +12h set to its x with the bytes swapped plus its y, and is
     /// copied (1Ch bytes) to RECORD, which becomes CLICKED; anything else
-    /// is nothing (0).
+    /// is nothing (0). The 3D mode sets it as the hook CD3A, which the
+    /// renderer's hit test calls on a hit (0000:C524..C52A).
     pub fn clicked_flat(&mut self) {
         let bx = self.g16(CLICKED);
         if bx == FLAT_DRAWN {

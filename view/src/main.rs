@@ -96,22 +96,26 @@ impl EngineHooks for Front<'_> {
         // The click left for the actors (`view_click`, before the frame,
         // whose input step clears C39A bit 80h) stands while it is drawn,
         // as in the original, where the click comes in the input step: the
-        // sprite under it becomes CB5E (0000:C4FA), made ready for 1194:DB6C
-        // (2294:047B).
+        // sprite under it becomes CB5E (0000:C4FA), made ready for 1194:DB6C.
         if let (true, Some(sheet)) = (std::mem::take(&mut self.clicked), self.sheet) {
             let f = m.mem.r16(DS, LEVEL_FLAGS) | 0x80;
             m.mem.w16(DS, LEVEL_FLAGS, f);
             let v = arena::engine::View::of(m);
             let eye = (v.x as f32, v.y as f32, v.height as f32 + v.bob as f32);
-            match world::hit(m, sheet, eye, v.heading as f32, self.tick) {
-                Some(world::Target::Slot(si)) => m.mem.w16(DS, arena::talk::var::CLICKED, si),
+            // On a hit the drawing calls the hook at CD3A (0000:C524), which
+            // the 3D mode sets to 2294:047B (`clicked_flat`).
+            let hit = match world::hit(m, sheet, eye, v.heading as f32, self.tick) {
+                Some(world::Target::Slot(si)) => Some(si),
                 Some(world::Target::Flat { col, row, n }) => {
                     world::flat_drawn(m, col, row, n);
-                    m.mem.w16(DS, arena::talk::var::CLICKED, arena::talk::var::FLAT_DRAWN);
+                    Some(arena::talk::var::FLAT_DRAWN)
                 }
-                None => {}
+                None => None,
+            };
+            if let Some(si) = hit {
+                m.mem.w16(DS, arena::talk::var::CLICKED, si);
+                m.clicked_flat();
             }
-            m.clicked_flat();
         }
         // What a click in the centre would meet (the original's renderer
         // left the square and, for a door, its span under the cursor).
