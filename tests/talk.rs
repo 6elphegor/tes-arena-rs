@@ -7,6 +7,7 @@ use arena::bsa::Files;
 use arena::machine::Machine;
 use arena::mem::{DATA, DS};
 use arena::talk::TalkHooks;
+use arena::text::TextHooks;
 use common::blow::Stream;
 
 const WSEG: u16 = 0x6000;
@@ -42,16 +43,22 @@ impl Script {
     }
 }
 
-impl TalkHooks for Script {
+/// The message boxes and menus (the texts are stubbed in the vectors:
+/// `TalkHooks::text`).
+impl TextHooks for Script {
     fn message_box(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([1, si]);
-    }
-    fn text(&mut self, m: &mut Machine, mode: u16) {
-        self.log.extend([2, m.mem.r16(DS, 0x137A), mode]);
     }
     fn menu(&mut self, _m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.log.extend([3, si, bx, di]);
         take(&self.menus, &mut self.n[0], 3)
+    }
+}
+
+impl TalkHooks for Script {
+    fn text(&mut self, m: &mut Machine, _files: &mut Files, mode: u16) -> Option<bool> {
+        self.log.extend([2, m.mem.r16(DS, 0x137A), mode]);
+        Some(true)
     }
     fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
         self.log.extend([4, si, cx]);
@@ -67,13 +74,13 @@ impl TalkHooks for Script {
     fn sound(&mut self, _m: &mut Machine, ax: u16, cx: u16) {
         self.log.extend([7, ax, cx]);
     }
-    fn expand(&mut self, m: &mut Machine, di: u16) -> u16 {
+    fn expand(&mut self, m: &mut Machine, di: u16) -> Option<u16> {
         self.log.extend([8, di]);
         let mut di = di;
         while m.mem.r8(DS, di) != 0 {
             di = di.wrapping_add(1);
         }
-        di
+        Some(di)
     }
     fn touch_cast(&mut self, _m: &mut Machine, _files: &mut Files, si: u16) -> Option<bool> {
         self.log.extend([9, si]);

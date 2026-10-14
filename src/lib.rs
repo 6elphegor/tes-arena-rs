@@ -50,5 +50,6 @@ pub mod skyobj;
 pub mod spell;
 pub mod strike;
 pub mod talk;
+pub mod text;
 pub mod transit;
 pub mod trigger;

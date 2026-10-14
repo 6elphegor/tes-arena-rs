@@ -32,6 +32,7 @@ use crate::controls::var::PICKED;
 use crate::format::Arg;
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
+use crate::text::TextHooks;
 
 /// DGROUP variables.
 pub mod var {
@@ -99,17 +100,16 @@ const WILD_FLAT: u16 = 0xC942;
 const ITEM_FLATS: u16 = 0xC934;
 const MARKS: u16 = 0x0622;
 
-/// What clicking leaves to the front end or to code not ported.
-pub trait TalkHooks {
-    /// 1194:59C8 (59CC): a message box with the text at DS:`si`.
-    fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
+/// What clicking leaves to the front end or to code not ported. The
+/// message boxes (1194:59C8/59CC) and menus (1194:020E) are the
+/// `TextHooks`' (the texts shown through them too).
+pub trait TalkHooks: TextHooks {
     /// 1194:A374 (A36C): text number TEXT, written to BUFFER (`mode` 2)
-    /// or shown (0).
-    fn text(&mut self, _m: &mut Machine, _mode: u16) {}
-    /// 1194:020E: a menu, its title at `si`, its keys at `bx`, its
-    /// entries' table at `di`. The pick (FFFFh: none).
-    fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
-        0xFFFF
+    /// or shown (0), when the front end does it itself (Some(true));
+    /// by default (Some(false)) the port's `Machine::text` runs. None
+    /// stops the click.
+    fn text(&mut self, _m: &mut Machine, _files: &mut Files, _mode: u16) -> Option<bool> {
+        Some(false)
     }
     /// 1194:5734: a list of `cx` strings at `si`. The pick (FFFFh: none).
     fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
@@ -126,14 +126,11 @@ pub trait TalkHooks {
     }
     /// 23BA:002A: sound `ax` at the square `cx`.
     fn sound(&mut self, _m: &mut Machine, _ax: u16, _cx: u16) {}
-    /// 2DA2:000A: the text at DS:`di` has its substitutions made; returns
-    /// DI after (at its NUL).
-    fn expand(&mut self, m: &mut Machine, di: u16) -> u16 {
-        let mut di = di;
-        while m.mem.r8(DS, di) != 0 {
-            di = di.wrapping_add(1);
-        }
-        di
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made; DI
+    /// after (at its NUL), when the front end does it itself; by default
+    /// (None) the port's `Machine::expand` runs.
+    fn expand(&mut self, _m: &mut Machine, _di: u16) -> Option<u16> {
+        None
     }
     /// 29CF:0000 with AL 0: a waiting touch spell lands on the actor at
     /// `si`. Whether one was waiting (the carry).
@@ -183,6 +180,7 @@ pub trait TalkHooks {
 /// `TalkHooks` that do nothing.
 pub struct NoTalkHooks;
 
+impl TextHooks for NoTalkHooks {}
 impl TalkHooks for NoTalkHooks {}
 
 /// How a dialogue goes on.
@@ -381,7 +379,7 @@ impl Machine {
             self.mem.w16(DS, TEXT, 0x596);
             self.mem.w8(DS, TEXT_FLAG2, 1);
             self.mem.w8(DS, TEXT_FLAG, 0);
-            hooks.text(self, 0);
+            self.talk_text(files, hooks, 0)?;
             return Some(());
         }
         if !self.people_kind() {
@@ -459,7 +457,7 @@ impl Machine {
             return self.talk_end(saved);
         }
         if self.g16(0x05CA) & 1 != 0 {
-            self.steal(hooks)?;
+            self.steal(files, hooks)?;
             self.picking_off();
             return self.talk_end(saved);
         }
@@ -477,10 +475,10 @@ impl Machine {
     /// 1194:DE83. The talk menu, until goodbye: a theft with picking
     /// armed, otherwise "Ask about?" (greeting, where is, rumours,
     /// goodbye).
-    fn talk(&mut self, _files: &mut Files, hooks: &mut dyn TalkHooks, saved: (u32, u16)) -> Option<()> {
+    fn talk(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, saved: (u32, u16)) -> Option<()> {
         loop {
             let ax = if self.g16(0x05CA) & 1 != 0 {
-                self.steal(hooks)?;
+                self.steal(files, hooks)?;
                 self.picking_off();
                 3
             } else {
@@ -503,9 +501,9 @@ impl Machine {
                 return self.talk_end(saved);
             }
             let flow = match ax {
-                0 => self.greeting(hooks),
-                1 => self.where_is(hooks)?,
-                _ => self.rumours(hooks)?,
+                0 => self.greeting(files, hooks)?,
+                1 => self.where_is(files, hooks)?,
+                _ => self.rumours(files, hooks)?,
             };
             if let Flow::End = flow {
                 return self.talk_end(saved);
@@ -513,36 +511,47 @@ impl Machine {
         }
     }
 
+    /// 1194:A374 (A36C) at the talk's calls: text TEXT shown (`mode` 0)
+    /// or written to BUFFER (2), by the front end if it does it
+    /// (`TalkHooks::text`), else by the port.
+    fn talk_text(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, mode: u16) -> Option<()> {
+        if !hooks.text(self, files, mode)? {
+            self.text(files, hooks, mode, DS, BUFFER)?;
+        }
+        Some(())
+    }
+
     /// 1194:E37D. Text `ax` said in a window (from BUFFER), and the quest
     /// record cleared.
-    fn say(&mut self, hooks: &mut dyn TalkHooks, ax: u16) -> Flow {
+    fn say(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, ax: u16) -> Option<Flow> {
         self.mem.w16(DS, TEXT, ax);
         self.mem.w8(DS, TEXT_FLAG, 0);
         self.mem.w8(DS, TEXT_FLAG2, 0);
-        hooks.text(self, 2);
+        self.talk_text(files, hooks, 2)?;
         self.mem.w8(DS, TEXT_COLOUR, 0x60);
         hooks.message_box(self, BUFFER);
         for i in 0..0x34 {
             self.mem.w8(DS, QUEST + i, 0);
         }
-        Flow::Menu
+        Some(Flow::Menu)
     }
 
     /// 1194:E4E3. Text `ax` said in a window.
-    fn say_box(&mut self, hooks: &mut dyn TalkHooks, ax: u16) {
+    fn say_box(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, ax: u16) -> Option<()> {
         self.mem.w16(DS, TEXT, ax);
         self.mem.w8(DS, TEXT_FLAG, 0);
         self.mem.w8(DS, TEXT_FLAG2, 0);
-        hooks.text(self, 2);
+        self.talk_text(files, hooks, 2)?;
         self.mem.w8(DS, TEXT_COLOUR, 0x60);
         hooks.message_box(self, BUFFER);
+        Some(())
     }
 
     /// 1194:DF01. The greeting: a townsperson's first (64h, marking it at
     /// +12h bit 8000h) or later (73h); a building's person by its kind
     /// (the table at 84E4: the text's offset, the gender), the first time
     /// on this square (map bit 100h, then set) or again.
-    fn greeting(&mut self, hooks: &mut dyn TalkHooks) -> Flow {
+    fn greeting(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<Flow> {
         let si = self.g16(CLICKED);
         let ax = if self.g8(si.wrapping_add(0xC)) >= 0xC0 {
             let f = self.g16(si.wrapping_add(0x12));
@@ -573,7 +582,7 @@ impl Machine {
             }
             ax + cx
         };
-        self.say(hooks, ax)
+        self.say(files, hooks, ax)
     }
 
     /// 1194:E7E6 / E7FD. In the wild, "I have no idea..." (84B0) or
@@ -599,7 +608,7 @@ impl Machine {
 
     /// 1194:DF7F. "Where is...": the places by kind (85D3; the wild's at
     /// 8635), with the quest's place tenth while a quest leads to one.
-    fn where_is(&mut self, hooks: &mut dyn TalkHooks) -> Option<Flow> {
+    fn where_is(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<Flow> {
         let base = if self.g16(LEVEL_FLAGS) & 0x200 != 0 { 0x8635 } else { 0x85D3 };
         let pick = if self.quest_place() {
             let mut di = BUFFER;
@@ -638,21 +647,21 @@ impl Machine {
                     return Some(Flow::Menu);
                 }
                 self.names_a(0);
-                self.choose_place(hooks, PLACES_A, self.g16(PLACES_A_COUNT))
+                self.choose_place(files, hooks, PLACES_A, self.g16(PLACES_A_COUNT))
             }
             1 => {
                 if self.in_wild(hooks, 0x84B0) {
                     return Some(Flow::Menu);
                 }
                 self.names_b(1);
-                self.choose_place(hooks, PLACES_B, self.g16(PLACES_B_COUNT))
+                self.choose_place(files, hooks, PLACES_B, self.g16(PLACES_B_COUNT))
             }
             2 => {
                 if self.in_wild(hooks, 0x84B0) {
                     return Some(Flow::Menu);
                 }
-                self.names_c(hooks);
-                self.choose_place(hooks, PLACES_C, self.g16(PLACES_C_COUNT))
+                self.names_c(files, hooks)?;
+                self.choose_place(files, hooks, PLACES_C, self.g16(PLACES_C_COUNT))
             }
             3..=5 => {
                 if self.in_wild(hooks, 0x849A) {
@@ -667,7 +676,7 @@ impl Machine {
                 };
                 self.mem.w16(DS, WAY, x);
                 self.mem.w16(DS, WAY + 2, y);
-                self.tell_way(hooks, pick)?;
+                self.tell_way(files, hooks, pick)?;
                 Some(Flow::Menu)
             }
             6..=8 => {
@@ -686,14 +695,14 @@ impl Machine {
                     self.names_b(pick as u8);
                     (list, cx) = (PLACES_B, self.g16(PLACES_B_COUNT));
                     if pick != 7 {
-                        self.names_c(hooks);
+                        self.names_c(files, hooks)?;
                         (list, cx) = (PLACES_C, self.g16(PLACES_C_COUNT));
                     }
                 }
                 if cx == 0 {
                     return Some(Flow::Menu);
                 }
-                self.nearest_place(hooks, list, cx)?;
+                self.nearest_place(files, hooks, list, cx)?;
                 Some(Flow::Menu)
             }
             // 1194:E197: reads that decide nothing.
@@ -835,10 +844,10 @@ impl Machine {
     /// 1194:E5FE. The names of the places in PLACES_C at A23E (LIST): two
     /// words (3276:3F71 and 403E) with their substitutions made (2DA2:000A,
     /// with the place's square at WAY and CLICKED FFFFh meanwhile).
-    fn names_c(&mut self, hooks: &mut dyn TalkHooks) {
+    fn names_c(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<()> {
         let n = self.g16(PLACES_C_COUNT);
         if n == 0 {
-            return;
+            return Some(());
         }
         let (seg, mut bx) = self.far(PLACES_C);
         let mut di = 0xA23Eu16;
@@ -855,15 +864,20 @@ impl Machine {
             self.mem.w8(DS, d.wrapping_sub(1), b' ');
             let si = self.skip_strings(DATA, 0x403E, dx >> 8);
             self.copy_string(DATA, si, d);
-            di = hooks.expand(self, start).wrapping_add(1);
+            di = match hooks.expand(self, start) {
+                Some(d) => d,
+                None => self.expand(files, hooks, DS, start)?,
+            }
+            .wrapping_add(1);
             self.mem.w16(DS, CLICKED, saved);
             bx = bx.wrapping_add(4);
         }
+        Some(())
     }
 
     /// 1194:E087. The places of `list` (`cx` of them, their names at LIST)
     /// sorted and shown; the way told to the one picked.
-    fn choose_place(&mut self, hooks: &mut dyn TalkHooks, list: u16, cx: u16) -> Option<Flow> {
+    fn choose_place(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, list: u16, cx: u16) -> Option<Flow> {
         let (seg, start) = self.far(list);
         let list_at = self.g16(LIST);
         let di = self.sort_names(list_at, cx);
@@ -876,7 +890,7 @@ impl Machine {
         let e = start.wrapping_add(idx << 2);
         self.mem.w16(DS, WAY, self.mem.r8(seg, e) as u16);
         self.mem.w16(DS, WAY + 2, self.mem.r8(seg, e.wrapping_add(1)) as u16);
-        self.tell_way(hooks, idx)?;
+        self.tell_way(files, hooks, idx)?;
         Some(Flow::Menu)
     }
 
@@ -884,7 +898,7 @@ impl Machine {
     /// player's square (the last of equals); the way told to it. (The
     /// original starts from 3E8h and BP; squares are bytes, so the first
     /// entry is always nearer.)
-    fn nearest_place(&mut self, hooks: &mut dyn TalkHooks, list: u16, cx: u16) -> Option<()> {
+    fn nearest_place(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, list: u16, cx: u16) -> Option<()> {
         let (seg, start) = self.far(list);
         let (px, py) = (self.g16(PX) >> 7, self.g16(PY) >> 7);
         let mut best = 0x3E8u16;
@@ -902,7 +916,7 @@ impl Machine {
         }
         self.mem.w16(DS, WAY, self.mem.r8(seg, bp) as u16);
         self.mem.w16(DS, WAY + 2, self.mem.r8(seg, bp.wrapping_add(1)) as u16);
-        self.tell_way(hooks, bp.wrapping_sub(start) >> 2)
+        self.tell_way(files, hooks, bp.wrapping_sub(start) >> 2)
     }
 
     /// 0000:0B9C. The `cx` strings at `si` sorted (0000:0BC6, an exchange
@@ -969,7 +983,7 @@ impl Machine {
     /// (85A9); 16 squares or more away, text 104h; else text 105h, then
     /// the way to the list's entry `cx` (23F1:00A3). The list is kept in
     /// the scratch buffer while the text is written.
-    fn tell_way(&mut self, hooks: &mut dyn TalkHooks, cx: u16) -> Option<()> {
+    fn tell_way(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, cx: u16) -> Option<()> {
         if self.g8(0x05E6) == 4 {
             self.mem.w8(DS, TEXT_COLOUR, 0x60);
             hooks.message_box(self, 0x85A9);
@@ -984,11 +998,11 @@ impl Machine {
         let d = self.squares_away(self.g16(WAY), self.g16(WAY + 2));
         let list = self.g16(LIST);
         if (d as i16) >= 0x10 {
-            self.say_box(hooks, 0x104);
+            self.say_box(files, hooks, 0x104);
             self.mem.w16(DS, LIST, list);
             return Some(());
         }
-        self.say_box(hooks, 0x105);
+        self.say_box(files, hooks, 0x105);
         self.mem.w16(DS, LIST, list);
         let (seg, off) = self.far(SCRATCH);
         for i in 0..0x384u16 {
@@ -1006,7 +1020,7 @@ impl Machine {
     /// person who knows any (+12h bit 8), work a roll of d100 within
     /// (level + 1) x 2 (at most 20) for a quest's offer; "Where" a
     /// quest's target is (+F bit 8) by its distance.
-    fn rumours(&mut self, hooks: &mut dyn TalkHooks) -> Option<Flow> {
+    fn rumours(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<Flow> {
         self.rng.seed = self.g16(0x0151) as u32;
         self.window_free();
         let ax = hooks.menu(self, 0x857B, 0x8589, 0x858C);
@@ -1019,7 +1033,7 @@ impl Machine {
                 1 => 0xA2,
                 _ => k + 0xA1,
             };
-            return Some(self.say(hooks, t));
+            return self.say(files, hooks, t);
         }
         if (ax as i16) < 0 {
             return Some(Flow::End);
@@ -1027,27 +1041,27 @@ impl Machine {
         if ax == 0 {
             let si = self.g16(CLICKED);
             if self.g16(si.wrapping_add(0x12)) & 8 == 0 {
-                return Some(self.say(hooks, 0x9F));
+                return self.say(files, hooks, 0x9F);
             }
             let roll = self.rng.next() % 100;
             let bx = ((self.g8(0x01AA) as u16 + 1) * 2).min(0x14);
             if roll > bx {
-                return Some(self.say(hooks, 0xB9));
+                return self.say(files, hooks, 0xB9);
             }
-            if self.quest_offered(hooks) {
+            if self.quest_offered(files, hooks)? {
                 return Some(Flow::Menu);
             }
-            return Some(self.say(hooks, 0x9F));
+            return self.say(files, hooks, 0x9F);
         }
         let si = self.g16(CLICKED);
         if self.g16(si.wrapping_add(0xF)) & 8 == 0 {
-            return Some(self.say(hooks, 0xA0));
+            return self.say(files, hooks, 0xA0);
         }
         if self.in_wild(hooks, 0x84B0) {
             return Some(Flow::Menu);
         }
         let Some(d) = self.nearest_target() else {
-            return Some(self.say(hooks, 0xA0));
+            return self.say(files, hooks, 0xA0);
         };
         let si = self.g16(TARGET);
         self.mem.w8(DATA, GENDER, self.g8(si.wrapping_add(0x1E)) & 1);
@@ -1059,15 +1073,15 @@ impl Machine {
         } else {
             0xBA
         };
-        Some(self.say(hooks, t))
+        self.say(files, hooks, t)
     }
 
     /// 1194:E4A3. A quest offered (1194:CD9A): its text CCh + FDD (8
     /// bits) shown, the way to its square (FDE, FDF) at WAY. Whether it
     /// was (CF clear).
-    fn quest_offered(&mut self, hooks: &mut dyn TalkHooks) -> bool {
+    fn quest_offered(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<bool> {
         if hooks.quest_offer(self) {
-            return false;
+            return Some(false);
         }
         self.mem.w16(DS, WAY, self.g8(0x0FDE) as u16);
         self.mem.w16(DS, WAY + 2, self.g8(0x0FDF) as u16);
@@ -1076,9 +1090,9 @@ impl Machine {
         self.mem.w8(DS, TEXT_COLOUR, 0x60);
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.mem.w8(DS, 0x0AB2, 0);
-        hooks.text(self, 0);
+        self.talk_text(files, hooks, 0)?;
         self.mem.w8(DS, 0x0AB2, 0xFF);
-        true
+        Some(true)
     }
 
     /// 1194:E729. The nearest of the four quest targets at DCA (29h
@@ -1117,7 +1131,7 @@ impl Machine {
     /// are not successful..."; done, a purse of 1..4 gold (text 563h +
     /// the roll) or, one time in 3.3, nothing (568h). None where the
     /// roll divides by zero.
-    fn steal(&mut self, hooks: &mut dyn TalkHooks) -> Option<()> {
+    fn steal(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<()> {
         self.mem.w8(DS, LOCK_TRIED, 4u8.wrapping_sub(self.g8(0x0A47)));
         let (ok, chance) = self.lockpick()?;
         if !ok {
@@ -1140,7 +1154,7 @@ impl Machine {
             self.mem.w8(DS, TEXT_FLAG2, 0xFF);
         }
         self.mem.w8(DS, TEXT_FLAG, 0);
-        hooks.text(self, 0);
+        self.talk_text(files, hooks, 0)?;
         Some(())
     }
 

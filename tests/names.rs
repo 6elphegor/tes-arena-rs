@@ -65,7 +65,7 @@ fn matches_original() {
         }
         let off = p[3] as u16;
         let before = m.clone();
-        let got = m.npc_name(&mut fs, p[0] as u8, p[1] as u8, p[2], OUT_SEG, off).map(|()| {
+        let got = m.npc_name(&mut fs, p[0] as u8, p[1] as u8, p[2], OUT_SEG, off).map(|_| {
             let name = (0..64u16).map(|i| m.mem.r8(OUT_SEG, off.wrapping_add(i)));
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
