@@ -1146,6 +1146,253 @@ impl Machine {
         Some(())
     }
 
+    /// 1194:CED7. The main quest's informant (0FDE the person, 0FE6 bit 2
+    /// the informant met, bit 4 told, bit 1 paid already): when it is the
+    /// person talked to (and the player isn't wanted, 5C8 bit 4000h),
+    /// with days left (0FED less the days since 0FE9) a deal is made: paid
+    /// for (bit 1: D019) or haggled over (8020 in mode 5, 6 once met,
+    /// `QuestHooks::informant_haggle`); a deal tells the next dungeon
+    /// (CFAF) and marks it told. With no days left the informant is gone
+    /// (bits 1, 2 and 3 cleared). AB2 is 0 meanwhile, FFh after. The
+    /// carry: set when it isn't the informant.
+    pub fn quest_informant(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
+        let f = self.sq8(0x0FE6);
+        if self.sq16(0x05C8) & 0x4000 != 0 || f & 4 != 0 || f & 2 == 0 || self.sq_talker() != self.sq16(0x0FDE) {
+            self.mem.w8(DS, 0x0AB2, 0xFF);
+            return Some(true);
+        }
+        self.mem.w8(DS, 0x0AB2, 0);
+        if (self.informant_days() as i16) <= 0 {
+            let f = self.sq8(0x0FE6) & !2 & !4 & !8;
+            self.mem.w8(DS, 0x0FE6, f);
+            self.mem.w8(DS, 0x0AB2, 0xFF);
+            return Some(false);
+        }
+        let no_deal = if self.sq8(0x0FE6) & 1 != 0 {
+            self.informant_paid(files, hooks)?
+        } else {
+            let per = crate::scale::to100(self.sq8(0x01D3) as i16) as u16;
+            let mode = if self.sq8(0x0FE6) & 8 != 0 { 6 } else { 5 };
+            let price = self.sq16(0x0FEE) as u32;
+            hooks.informant_haggle(self, files, price, per, mode)?
+        };
+        if !no_deal {
+            let f = self.sq8(0x0FE6) | 8 | 4;
+            self.mem.w8(DS, 0x0FE6, f);
+            self.informant_next(files, hooks)?;
+        }
+        let f = self.sq8(0x0FE6) | 8;
+        self.mem.w8(DS, 0x0FE6, f);
+        self.mem.w8(DS, 0x0AB2, 0xFF);
+        Some(false)
+    }
+
+    /// 1194:CFF7. The informant's days left: 0FED less the whole days
+    /// since 0FE9.
+    fn informant_days(&self) -> u16 {
+        let days = self.sq32(TIME).wrapping_sub(self.sq32(0x0FE9)) / DAY;
+        (self.sq8(0x0FED) as u16).wrapping_sub(days as u16)
+    }
+
+    /// 0000:5C86 with BX `page`: bank `page` mapped (`ems_map`); returns
+    /// the bank mapped before (AX `ax` with EMS off or no such bank).
+    fn sq_map_bank(&mut self, page: u16, ax: u16) -> u16 {
+        if self.sq8(0x8FA6) == 0 || page >= self.sq16(0x9032) {
+            return ax;
+        }
+        let old = self.sq16(0x8FA8);
+        self.ems_map(page);
+        old >> 2
+    }
+
+    /// 1194:D019. The informant paid for: the days left at 7880 (the
+    /// dialogue file's name, 7873), its bank (1032) mapped and the file
+    /// loaded into the EMS frame, the picture shown, the offer's line
+    /// (row 0, `informant_line`) answered: yes pays the price (0FEE) if
+    /// the gold is there (row 1 said, no carry) or tells it isn't
+    /// (198Ch); leaving (2) says nothing; no says row 3. The bank is put
+    /// back. Bug kept: with no days left the informant is forgotten
+    /// (0FE6 bits 1, 2) and the return address (CF92h) popped as the bank
+    /// to map, none being that high; it returns past CF58 as its RET
+    /// would. The carry.
+    fn informant_paid(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
+        let left = self.informant_days();
+        if (left as i16) <= 0 {
+            let f = self.sq8(0x0FE6) & !2 & !4;
+            self.mem.w8(DS, 0x0FE6, f);
+            self.sq_map_bank(0xCF92, 0);
+            return Some(true);
+        }
+        self.mem.w8(DS, 0x7880, left as u8);
+        let page = self.sq16(0x1032);
+        let old = self.sq_map_bank(page, left);
+        hooks.frame_load(self, files, 0x7873)?;
+        hooks.picture(self, 0x132F);
+        self.informant_line(files, hooks, 0)?;
+        self.mem.w8(DS, 0x13D3, 1);
+        let answer = hooks.dialog(self, 1);
+        let no_deal = match answer {
+            0 => {
+                let fee = self.sq16(0x0FEE) as u32;
+                let gold = self.sq32(0x05C2);
+                if gold < fee {
+                    hooks.notice(self, 0x198C);
+                    true
+                } else {
+                    self.mem.w32(DS, 0x05C2, gold - fee);
+                    self.informant_line(files, hooks, 1)?;
+                    self.mem.w8(DS, 0x13D3, 0);
+                    hooks.dialog(self, 0);
+                    false
+                }
+            }
+            2 => true,
+            _ => {
+                self.informant_line(files, hooks, 3)?;
+                self.mem.w8(DS, 0x13D3, 0);
+                hooks.dialog(self, 0);
+                true
+            }
+        };
+        self.sq_map_bank(old, 0);
+        Some(no_deal)
+    }
+
+    /// 1194:D105, then the line made ready (D0E3..D0F9): the informant's
+    /// line from the file in the EMS frame, the (step x 15 + `row` x 3
+    /// + a d3, unless row 1, rolled with the frame's bytes as the RNG's)-th
+    /// of its strings, copied to 929E, its
+    /// substitutions made, its line feeds and returns made spaces and
+    /// its lines wrapped at 3Ch (D2F3, 49FF), then split at 3 lines a
+    /// page (4E54).
+    fn informant_line(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, row: u16) -> Option<()> {
+        let frame = self.sq16(0x9030);
+        let step = self.sq8(0x0FDD) as u16;
+        let mut n = step * 15 + row * 3;
+        if row != 1 {
+            // Bug kept: DS is the frame here, so 0000:6EEA's RNG is the
+            // one at frame:91F0..91F8, made from the file's bytes, and
+            // stepped there. With its table on (91F0) not followed.
+            if self.mem.r16(frame, 0x91F0) != 0 {
+                return None;
+            }
+            let mut rng = crate::random::ArenaRandom::new(self.mem.r32(frame, 0x91F6));
+            let r = rng.range(0, 3)?;
+            self.mem.w32(frame, 0x91F6, rng.seed);
+            n = n.wrapping_add(r);
+        }
+        let si = self.skip_strings(frame, 0, n);
+        let mut k = 0u16;
+        loop {
+            let b = self.mem.r8(frame, si.wrapping_add(k));
+            self.mem.w8(DS, 0x929E_u16.wrapping_add(k), b);
+            if b == 0 {
+                break;
+            }
+            k = k.wrapping_add(1);
+            if k == 0 {
+                return None;
+            }
+        }
+        hooks.substitute(self, files, 0x929E)?;
+        let mut si = 0x929E_u16;
+        while self.sq8(si) != 0 {
+            if matches!(self.sq8(si), 0x0A | 0x0D) {
+                self.mem.w8(DS, si, 0x20);
+            }
+            si = si.wrapping_add(1);
+        }
+        self.mem.w8(DS, crate::quest::var::TEXT_FLAG, 0x3C);
+        self.sq_wrap(0x929E)?;
+        self.mem.w8(DS, crate::quest::var::TEXT_FLAG, 3);
+        self.sq_split(0x929E);
+        Some(())
+    }
+
+    /// 1194:49FF. The text at `si` wrapped at 137E characters (3Ch when
+    /// 0): from each line's end back to a space, made a line feed. None
+    /// where no space is found going back (the original reads on through
+    /// memory).
+    fn sq_wrap(&mut self, si: u16) -> Option<()> {
+        let mut ax = 0u16;
+        while self.sq8(si.wrapping_add(ax)) != 0 {
+            ax = ax.wrapping_add(1);
+        }
+        let mut si = si;
+        loop {
+            if self.sq8(crate::quest::var::TEXT_FLAG) == 0 {
+                self.mem.w8(DS, crate::quest::var::TEXT_FLAG, 0x3C);
+            }
+            let bx = self.sq8(crate::quest::var::TEXT_FLAG) as u16;
+            if ax <= bx {
+                return Some(());
+            }
+            si = si.wrapping_add(bx);
+            ax = ax.wrapping_sub(bx);
+            let mut steps = 0u32;
+            loop {
+                match self.sq8(si) {
+                    0 => return Some(()),
+                    0x20 => break,
+                    _ => {
+                        si = si.wrapping_sub(1);
+                        ax = ax.wrapping_add(1);
+                        steps += 1;
+                        if steps > 0x10000 {
+                            return None;
+                        }
+                    }
+                }
+            }
+            self.mem.w8(DS, si, 0x0A);
+            si = si.wrapping_add(1);
+        }
+    }
+
+    /// 1194:4E54. The text at `si` split at its line feeds (each made a
+    /// NUL; 137E lines a page), the lines counted (plus one) at FF5. ES is
+    /// taken to be DS.
+    fn sq_split(&mut self, si: u16) {
+        let mark = self.sq8(crate::quest::var::TEXT_FLAG);
+        let (mut si, mut cx, mut dl) = (si, 0u16, 0u8);
+        while self.sq8(si) != 0 {
+            if self.sq8(si) == 0x0A {
+                self.mem.w8(DS, si, 0);
+                cx = cx.wrapping_add(1);
+                dl = dl.wrapping_add(1);
+                if dl == mark {
+                    dl = 0;
+                }
+            }
+            si = si.wrapping_add(1);
+        }
+        self.mem.w16(DS, 0x0FF5, cx.wrapping_add(1));
+    }
+
+    /// 1194:CFAF. The informant tells: text 1F6h logged (CF93: written
+    /// to 1044, then 27E3), "%amn" made the next dungeon's name at 929E,
+    /// a random dungeon of its province (0FE3) given it (26F7:0C0A mode
+    /// 1), its index to 0FE2, 0FE6 bit 4, then taken (mode 4).
+    fn informant_next(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        use crate::quest::var::{TEXT, TEXT_FLAG, TEXT_FLAG2};
+        self.mem.w16(DS, TEXT, 0x1F6);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        hooks.text_at(self, files, 2, 0x1044)?;
+        hooks.log_entry(self, 0x1044);
+        self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%amn"));
+        self.mem.w8(DS, 0x92A2, 0);
+        hooks.substitute(self, files, 0x929E)?;
+        let province = self.sq8(0x0FE3) as u16;
+        let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x929E)?;
+        self.mem.w8(DS, 0x0FE2, ax as u8);
+        let f = self.sq8(0x0FE6) | 4;
+        self.mem.w8(DS, 0x0FE6, f);
+        let province = self.sq8(0x0FE3) as u16;
+        self.quest_dungeon_entry(hooks, province, 4, ax, 0x929E)?;
+        Some(())
+    }
+
     /// `f` run with the player put at the place's square (9D51: A48, A4A
     /// in squares to C3D0, C3D4), then put back.
     fn sq_at_place<T>(&mut self, f: impl FnOnce(&mut Machine) -> Option<T>) -> Option<T> {

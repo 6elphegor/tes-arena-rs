@@ -122,6 +122,28 @@ pub trait QuestHooks {
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
         0xFFFF
     }
+    /// 1194:8020 in modes 5 and 6 (not ported, see `haggle`): the main
+    /// quest's informant haggled with over `price` (0FEE), the player's
+    /// personality `per` (1194:5B07 of 1D3), quality 1Eh, mood 28h. The
+    /// carry: no deal. None by default.
+    fn informant_haggle(&mut self, _m: &mut Machine, _files: &mut Files, _price: u32, _per: u16, _mode: u8) -> Option<bool> {
+        None
+    }
+    /// 0000:7428 with ES:DI the EMS frame (9030):0: the file named at
+    /// DS:`name` loaded there (`Machine::file_load`).
+    fn frame_load(&mut self, m: &mut Machine, files: &mut Files, name: u16) -> Option<()> {
+        let frame = m.mem.r16(DS, 0x9030);
+        m.file_load(files, name, frame, 0).map(|_| ())
+    }
+    /// 1194:4B8E: the picture named at DS:`si` shown.
+    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:4E88: the text's window (its lines at 929E), of kind 13D3 (1
+    /// yes or no: AX 0 yes). Its AX.
+    fn dialog(&mut self, _m: &mut Machine, _kind: u8) -> u16 {
+        1
+    }
+    /// 1194:4D31: a message with the text at DS:`si`.
+    fn notice(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
