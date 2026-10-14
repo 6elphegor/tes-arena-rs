@@ -30,6 +30,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from gen_frame import counter
 
@@ -256,9 +258,12 @@ def main():
     zero = bytes(0x10000)
     rng = random.Random(0x1994_4009)
     n_each = int(os.environ.get('N', 1500))
-    for n in range(n_each * len(OPS)):
+    total = n_each * len(OPS)
+    for n in range(total):
         op = OPS[n % len(OPS)]
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         for seg in (WSEG, FSEG, CSEG):
             a.mu.mem_write(a.lin(seg, 0), zero)
@@ -280,7 +285,7 @@ def main():
             else:
                 a.call_far(0, {'stairs': 0x51B8, 'level': 0x44D7, 'infdone': 0x4531}[op])
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             if op == 'walk':
                 res = f'{a.r16(0xC3D0):x} {a.r16(0xC3D4):x} {fnv(changed):x}'
             else:
