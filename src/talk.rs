@@ -161,8 +161,12 @@ pub trait TalkHooks {
     }
     /// The far routine of the building kind `kind` (D48: 4 a tavern, 5 a
     /// temple, 7 an equipment store, 6 a mages' guild; the table at
-    /// 869F).
-    fn shop(&mut self, _m: &mut Machine, _files: &mut Files, _kind: u8) -> Option<()> {
+    /// 869F). The temple runs (`shops::temple`, without its windows); the
+    /// others aren't ported.
+    fn shop(&mut self, m: &mut Machine, _files: &mut Files, kind: u8) -> Option<()> {
+        if kind == 5 {
+            return m.temple(&mut crate::shops::NoShopHooks);
+        }
         Some(())
     }
     /// 2294:0DD0: a flat of kind WILD_FLAT (or the next) in the wild.
