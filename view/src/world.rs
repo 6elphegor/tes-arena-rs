@@ -88,10 +88,13 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.level_load(&mut files, 0xF000).expect("level");
     }
     let info = m.mem.r16(DS, 0xCB84);
-    // The world loop's hooks are set: the port runs its own input step
-    // and transitions in their place.
-    m.mem.w32(DS, 0xC3B4, 0x2826_0002);
-    m.mem.w32(DS, 0xC3AC, 0x0000_4470);
+    // The 3D world begun as the outer loop begins it for every area
+    // (0000:0AA9, `world_begin`: the 3D mode, 2294:0006, sets the world
+    // loop's hooks and the level's), the level being loaded already. The
+    // view has no sound: the INF's sounds (the hook CD4A) aren't loaded.
+    let name = arena::transit::var::LEVEL_NAME;
+    m.world_begin(name, &mut arena::transit::NoAreaHooks);
+    m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
     // A player to walk around with.
