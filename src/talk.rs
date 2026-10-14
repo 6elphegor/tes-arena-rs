@@ -40,6 +40,10 @@ pub mod var {
     pub const CLICKED: u16 = 0xCB5E;
     /// A clicked map flat, copied as an actor record (2294:047B).
     pub const RECORD: u16 = 0x3D96;
+    /// The scratch actor record a map flat is drawn through (0000:D18E):
+    /// x, z, y at +0, +2, +4, the flat at +0Ch, its frame +0Dh and frames
+    /// +0Eh.
+    pub const FLAT_DRAWN: u16 = 0xD7DE;
     /// The colour of the next text window.
     pub const TEXT_COLOUR: u16 = 0x9288;
     /// The text number for 1194:A374, and two of its flags.
@@ -255,6 +259,27 @@ impl Machine {
         let f = self.g16(0xA902);
         if f & 1 != 0 {
             self.mem.w16(DS, 0xA902, f & 0xFFFE);
+        }
+    }
+
+    /// 2294:047B. What the renderer's hit test left (CLICKED) made ready
+    /// for `actor_click`: an actor slot (0AB3h..0D36h) stays; the map
+    /// flat drawn through the scratch record (FLAT_DRAWN, 0000:D18E) gets
+    /// its +12h set to its x with the bytes swapped plus its y, and is
+    /// copied (1Ch bytes) to RECORD, which becomes CLICKED; anything else
+    /// is nothing (0).
+    pub fn clicked_flat(&mut self) {
+        let bx = self.g16(CLICKED);
+        if bx == FLAT_DRAWN {
+            let v = self.g16(bx).rotate_right(8).wrapping_add(self.g16(bx.wrapping_add(4)));
+            self.mem.w16(DS, bx.wrapping_add(0x12), v);
+            for i in 0..0x1Cu16 {
+                let b = self.g8(bx.wrapping_add(i));
+                self.mem.w8(DS, RECORD + i, b);
+            }
+            self.mem.w16(DS, CLICKED, RECORD);
+        } else if !(0x0AB3..0x0D37).contains(&bx) {
+            self.mem.w16(DS, CLICKED, 0);
         }
     }
 
