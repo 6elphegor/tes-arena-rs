@@ -93,7 +93,8 @@ pub trait QuestHooks {
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
-        m.npc_name(files, ax as u8, (ax >> 8) as u8, seed, DS, di)
+        // (DI after it, which some text codes need, isn't used here.)
+        m.npc_name(files, ax as u8, (ax >> 8) as u8, seed, DS, di).map(|_| ())
     }
 }
 
