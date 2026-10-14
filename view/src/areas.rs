@@ -7,8 +7,9 @@
 //! Cities, interiors and the wilderness are followed: a city's gate
 //! writes the city as the wilderness's blocks 1..4 (217B:027A, in
 //! memory), the wilderness is set up around it (217B:0084) and its
-//! blocks follow the player (217B:0265). The dungeons' making (2294:0ED4,
-//! 0000:28BC) isn't wired here.
+//! blocks follow the player (217B:0265). A dungeon is made from its
+//! location's seed (2294:0ED4, 0000:28BC), its levels as they are
+//! entered (0000:2957, the INF's hook).
 
 use crate::world;
 use arena::bsa::Files;
@@ -81,6 +82,34 @@ impl AreaHooks for Areas<'_> {
         }
     }
 
+    /// 2294:0ED4 then 0000:28BC (AX 1, BX `wild`, CX the level count):
+    /// the dungeon made from the seed the outer loop set (91F6), with
+    /// blank.mif for its planes.
+    fn build_dungeon(&mut self, m: &mut Machine, wild: bool) {
+        let Some(files) = self.files.as_deref_mut() else {
+            self.failed = true;
+            return;
+        };
+        m.load_rng();
+        let levels = m.dungeon_level_count();
+        if m.dungeon_create(files, 1, wild as u16, levels).is_none() {
+            self.failed = true;
+        }
+        m.store_rng();
+    }
+
+    /// 0000:2974, a made dungeon entered: its first level built and the
+    /// player at its start.
+    fn hook_2974(&mut self, m: &mut Machine) {
+        let Some(files) = self.files.as_deref_mut() else {
+            self.failed = true;
+            return;
+        };
+        if m.dungeon_first_level(files).is_none() {
+            self.failed = true;
+        }
+    }
+
     fn wild_done(&mut self, m: &mut Machine) {
         m.wild_done();
     }
@@ -129,13 +158,6 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
 /// and it is entered. Returns the new run, or None where the game ends
 /// there or the port can't follow (reported).
 pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
-    // The INF loader keeps GLOBAL.BSA's directory cached in EMS bank
-    // 1Fh in the 3D mode (C39A bit 400h, 0000:EF6E), but every plane a
-    // level load reads goes through that bank too (0000:EB0B), so the
-    // next area's INF would be looked up in plane bytes. Where the
-    // original drops the cache between areas isn't found yet; the view
-    // drops it here (0000:6ABA).
-    engine.m.mem.w16(DS, arena::bsa::var::DIR_CACHE, 0xFFFF);
     let mut files = std::mem::take(&mut engine.files);
     let r = {
         let h = &mut Areas { dir, files: Some(&mut files), failed: false };
@@ -145,7 +167,7 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
         m.area_end(run, h);
         let next = m.area_next(h);
         match next {
-            Run::City | Run::Interior(_) | Run::Start | Run::Wild => {
+            Run::City | Run::Interior(_) | Run::Start | Run::Wild | Run::Dungeon => {
                 let name = m.area_begin(next, h);
                 m.world_begin(name, h);
                 // The view has no sound: the INF's sounds (the hook CD4A,

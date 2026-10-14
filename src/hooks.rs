@@ -294,4 +294,15 @@ impl Machine {
         self.mem.w16(DS, crate::info::var::INFO_PTR, 0x4718);
         Some(())
     }
+
+    /// 0000:2974, a made dungeon entered (the place hook 0000:45B2 calls
+    /// it when entering, 5C8 bit 800h, with C39A bit 800h, which the
+    /// dungeon's set-up sets): its level built (0000:2957,
+    /// `dungeon_level_hook`) and the player put at its start
+    /// (0000:2978, `dungeon_start_position`: the start cell's stairs).
+    pub fn dungeon_first_level(&mut self, files: &mut Files) -> Option<()> {
+        self.dungeon_level_hook(files)?;
+        self.dungeon_start_position();
+        Some(())
+    }
 }

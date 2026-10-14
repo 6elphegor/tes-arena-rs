@@ -88,6 +88,12 @@ impl arena::trigger::TriggerHooks for Front<'_> {
         m.wild_leave_city(files, &mut arena::wild::PortWild);
         Some(())
     }
+    /// A dungeon's entrance in the wilderness: the wilderness left
+    /// (217B:04DC); the dungeon is made after (`areas::next`).
+    fn enter_dungeon(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_done();
+        Some(())
+    }
 }
 impl arena::clock::ClockHooks for Front<'_> {}
 impl arena::frame::FrameHooks for Front<'_> {
@@ -117,6 +123,11 @@ thread_local! {
 impl arena::talk::TalkHooks for Front<'_> {
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         println!("[the way to {} at ({x}, {y})]", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
+    }
+    /// A dungeon's keeper in the wilderness: in (0000:08EC).
+    fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_dungeon_entry();
+        Some(())
     }
 }
 impl EngineHooks for Front<'_> {
