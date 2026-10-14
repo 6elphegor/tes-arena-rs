@@ -36,9 +36,11 @@ struct Out {
 impl Machine {
     /// 1194:080B. Writes a name of set `kind` for sex `sex` (0 male) at
     /// seg:off, NUL-terminated, with the RNG seeded from `seed`; the
-    /// caller's seed is restored. None where the file is missing or a
-    /// chunk's count is 0 (the original divides by zero).
-    pub fn npc_name(&mut self, files: &mut Files, kind: u8, sex: u8, seed: u32, seg: u16, off: u16) -> Option<()> {
+    /// caller's seed is restored. Returns DI after, as the original
+    /// leaves it (mostly at the NUL; past it after race 2's suffix). None
+    /// where the file is missing or a chunk's count is 0 (the original
+    /// divides by zero).
+    pub fn npc_name(&mut self, files: &mut Files, kind: u8, sex: u8, seed: u32, seg: u16, off: u16) -> Option<u16> {
         let saved = self.rng.seed;
         self.mem.w8(DS, KIND, kind);
         self.mem.w8(DS, SEX, sex);
@@ -101,7 +103,7 @@ impl Machine {
         }
         self.file_close(files);
         self.rng.seed = saved;
-        Some(())
+        Some(o.di)
     }
 
     /// 1194:0940: race names. A male name takes the first two chunks and

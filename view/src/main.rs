@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
@@ -14,7 +14,9 @@
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
-//! `walk:N` (frames), `wait:N`.
+//! `walk:N` (frames), `wait:N`. --picks answers the menus (talking to
+//! someone: 0 the greeting, 1 "Where is...", 2 rumours), in order; after
+//! them a menu is left.
 //!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
@@ -84,16 +86,25 @@ impl arena::frame::FrameHooks for Front<'_> {
         m.actor_click(files, self)
     }
 }
-/// Clicking on people and things: the texts are printed, the menus and
-/// lists shown and left at once (no pick yet).
-impl arena::talk::TalkHooks for Front<'_> {
+/// The game's texts (1194:A374, made by the port) in their windows: printed;
+/// the menus answered from `--picks`, then left.
+impl arena::text::TextHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"));
     }
     fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, _bx: u16, _di: u16) -> u16 {
-        println!("[menu] {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"));
-        0xFFFF
+        let pick = PICKS.with(|p| p.borrow_mut().pop_front()).unwrap_or(0xFFFF);
+        println!("[menu] {} -> {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"), pick as i16);
+        pick
     }
+}
+
+thread_local! {
+    /// The menus' answers (`--picks`), taken in order; then they are left.
+    static PICKS: std::cell::RefCell<std::collections::VecDeque<u16>> = Default::default();
+}
+/// Clicking on people and things: the lists are left at once.
+impl arena::talk::TalkHooks for Front<'_> {
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         println!("[the way to {} at ({x}, {y})]", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
     }
@@ -467,6 +478,11 @@ fn main() {
         hour = Some(args[i + 1].parse::<u32>().expect("--hour H"));
         args.drain(i..i + 2);
     }
+    if let Some(i) = args.iter().position(|a| a == "--picks") {
+        let picks = args[i + 1].split(',').map(|v| v.parse().expect("--picks N,..")).collect();
+        PICKS.with(|p| *p.borrow_mut() = picks);
+        args.drain(i..i + 2);
+    }
     let mut steps = String::new();
     if let Some(i) = args.iter().position(|a| a == "--do") {
         steps = args[i + 1].clone();
@@ -479,7 +495,7 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);

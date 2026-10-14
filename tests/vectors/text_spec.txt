@@ -1,0 +1,125 @@
+# The state a text case draws, in order, from its byte stream (the LCG of
+# gen_attack.py `stream`), read by harness/gen_text.py and tests/text.rs.
+#
+#   SEG ADDR KIND [ARGS]
+#
+# SEG: ds (DGROUP), data (3276), c (CSEG, a scratch segment; the emulator
+# relocates it). KIND, and the draws it takes:
+#   b N        a byte, (byte) % N
+#   w N        a word (low byte, then high), % N
+#   d          a dword (four bytes, low first)
+#   bc V,..    a byte from the list, by (byte) % count
+#   wc V,..    a word from the list, by (byte) % count
+#   w2 A B     a word: low (byte) % A, high (byte) % B
+#   str N      N characters, each " abcdefghijklmnopqrstuvwxyz"[(byte) % 27],
+#              then a NUL
+#   bytes N    N bytes
+#   seg        CSEG's segment (no draw)
+#   text       the text number: (byte) < F0h: a key of POINTER1.DAT by
+#              (word) % keys (its low byte for the greetings' keys, 8000h
+#              set), else (word) % 700h
+#   aim N A:V,..  (byte) < N: each A (hex) written V, a byte (bV) or a
+#              word (wV); ADDR is not used
+# All values hex.
+
+ds 137A text
+ds 101C bc 0,0,0,ff
+ds 137E bc 0,0,0,10,20,3c
+ds 137F bc 0,ff
+ds 05C8 w 10000
+ds 6E54 bc 0,0,0,1
+ds 0D48 b 8
+ds 05CC d
+ds BB09 bc 0,1,2,81,82
+ds 05D2 wc 0,1,2,3,4,5,6,7,8,9,a,b
+ds 0DA8 bc 0,4,8
+ds 1030 bc 0,1,2,3,7,c
+ds 91F6 d
+ds CB5E wc ffff,ab3,acf,aeb,b07,c57,c73,0
+ds 0AC2 w 10000
+ds 0AC5 w 10000
+ds 0ADE w 10000
+ds 0AE1 w 10000
+ds 0AFA w 10000
+ds 0AFD w 10000
+ds 0B16 w 10000
+ds 0B19 w 10000
+ds 0C66 w 10000
+ds 0C69 w 10000
+ds 0C82 w 10000
+ds 0C85 w 10000
+ds 0A46 b 9
+ds 0A47 b 8
+ds 01A8 b 8
+ds 01AB b 2
+ds 01AD str c
+ds 0A22 str a
+ds 0F3E d
+ds 0F42 w 10000
+ds 0F44 b 10
+ds 0F46 d
+ds 0F4A d
+ds 0F52 b 20
+ds 0F53 b 20
+ds 0F54 w2 10 10
+ds 0F56 d
+ds 0F5A w 10000
+ds 0F5C d
+ds 0F60 wc 0,1,2,3,4,5,6,7
+ds 0F62 b 100
+ds 0F63 b 100
+ds 0F64 w 10000
+ds 0F65 b 10
+ds 0F66 b 3
+ds 0F68 d
+ds 0F6C b a
+ds 0F6D bc 18,19,1a,1b,1c,20,24,28
+ds 0F6E b 8
+ds 0F6F b 8
+ds 0F72 wc f3e,f3e,1445,9b00
+ds 8A56 bc 0,1,2
+ds 8A52 w 40
+ds 8A54 w 40
+ds 0FDE d
+ds 0FDD b 8
+ds 0FE3 b 9
+ds 0FE5 b 9
+ds 0FEE w 10000
+ds 1AA4 b 8
+ds 0F77 b 8
+ds 0A4C b 40
+ds 0AB2 bc 0,1,ff
+ds 05E6 bc 0,1,4
+ds C398 wc 0,4
+ds C39A wc 0,200,1000
+ds C3D0 w 10000
+ds C3D4 w 10000
+ds 0608 w 10000
+ds 060A w 10000
+ds 0610 w 10000
+ds 0612 w 10000
+ds 0151 w 10000
+ds 0FE0 w2 18 18
+ds 0A51 b 8
+ds 0A56 d
+ds 0A52 d
+ds 5E38 b 40
+ds 1042 seg
+c 040D w 10000
+c 0004 b 20
+c 0005 b 20
+ds 1387 w 8
+ds 1AB5 wc 100
+ds 1AB7 seg
+c 0100 bytes 40
+ds 138B w 8
+ds 1008 wc 200
+ds 100A seg
+c 0200 bytes 40
+data 7307 bc 0,0,0,0,1,2
+data 7387 b 4
+# A quarter of the cases aimed at the only template with a line break
+# before a space (key 8901h, the second match: greeting 1 with letter J by
+# day in region 3, clear, climate 4; its third variant), where the filter
+# drops the space the break became.
+ds 0000 aim 40 137A:w1,05D2:w3,BB09:b0,0D48:b1,0DA8:b4,6E54:b0
