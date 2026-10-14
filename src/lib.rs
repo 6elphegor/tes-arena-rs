@@ -39,6 +39,7 @@ pub mod projectile;
 pub mod quest;
 pub mod movement;
 pub mod names;
+pub mod piles;
 pub mod progression;
 pub mod random;
 pub mod rest;

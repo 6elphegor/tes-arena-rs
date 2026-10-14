@@ -45,8 +45,11 @@ pub trait StairsHooks {
     /// 1194:9FAC with CX 1: a quest dungeon's last level reached
     /// (`Machine::quest_level`, which needs the files for a person's name).
     fn quest_level(&mut self, _m: &mut Machine) {}
-    /// 2433:0000 (4C91 FFh): the level's creatures and people placed.
-    fn level_spawn(&mut self, _m: &mut Machine) {}
+    /// 2433:0000 (4C91 FFh): the level's piles of treasure made
+    /// (`Machine::piles`). None where the original faults or hangs.
+    fn level_piles(&mut self, m: &mut Machine) -> Option<()> {
+        m.piles()
+    }
     /// 0000:368E: 23F1:013C, then the view's border (0000:3503).
     fn level_screen(&mut self, _m: &mut Machine) {}
 }
@@ -114,11 +117,12 @@ impl Machine {
     /// 7A46 cleared, the creatures (slots 15..22 at 0C57) still about
     /// forgotten (0000:269E) and made inactive, the new level's automap
     /// (292B:09AC), the quest's item placed (2294:0E90), the quest's
-    /// level (1194:9FAC), its creatures (4C91 FFh, 2433:0000), the screen
+    /// level (1194:9FAC), its piles of treasure (4C91 FFh, 2433:0000), the
+    /// screen
     /// (0000:368E), a broken-into interior's people gone (0000:50B9), a
     /// quest's flat cleared (2294:119C), the floor's marks cleared
     /// (0000:47D7) and the player freed from a wall (0000:2631).
-    pub fn level_entered(&mut self, hooks: &mut dyn StairsHooks) {
+    pub fn level_entered(&mut self, hooks: &mut dyn StairsHooks) -> Option<()> {
         self.spells_clear();
         self.mem.w16(DS, 0x7A46, 0);
         for i in 0..8u16 {
@@ -134,12 +138,13 @@ impl Machine {
         self.quest_item_place();
         hooks.quest_level(self);
         self.mem.w8(DS, 0x4C91, 0xFF);
-        hooks.level_spawn(self);
+        hooks.level_piles(self)?;
         hooks.level_screen(self);
         self.clear_dungeon_flats();
         self.quest_flat_clear();
         self.floor_marks_clear();
         self.player_unstick();
+        Some(())
     }
 
     /// 2294:0E90. In a dungeon (5E6 3) on its last level, when the place
