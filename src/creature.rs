@@ -276,7 +276,7 @@ impl Machine {
 
     /// 1194:35FF. Portrait: race × 32 + roll(32), roll(31) for race 7,
     /// with the RNG state of the record's segment.
-    fn cr_portrait(&mut self, seg: u16, rec: u16) -> Option<()> {
+    pub(crate) fn cr_portrait(&mut self, seg: u16, rec: u16) -> Option<()> {
         let race = self.mem.r8(seg, rec.wrapping_add(RACE));
         let n = if race == 7 { 31 } else { 32 };
         let r = self.cr_range_in(seg, 0, n)?;

@@ -1,0 +1,711 @@
+//! A new game: the character created and the game's state started
+//! (1194:2498, from the main menu's "new game", 0000:1134).
+//!
+//! The steps, in the original's order:
+//! - the new game's state cleared (`newgame_reset`, 1194:24A6..2512);
+//! - the class: by ten questions (the quiz, 222C:0000: `quiz_pick`,
+//!   `quiz_find`, `quiz_answers`, `quiz_class`) or picked from the list
+//!   of eighteen (1194:2678, the table at 2AEE), then its starting weapon
+//!   and weapon class (`class_chosen`, 1194:26DC);
+//! - the name (1194:2711) and the sex (2791), as the player gives them;
+//! - the province on the map (27C2): the race is the province, the
+//!   portrait rolled (1194:35FF), and from that byte a starting location
+//!   (1194:3AE8; `province_chosen`);
+//! - the attributes (2A69): rolled (`creation_roll`, 1194:2AC7) as often
+//!   as the player asks, the bonus points spent on them
+//!   (`creation_select`, 1194:14C5; `creation_arrow`, 138E), then kept
+//!   (`creation_finish`, 2D28 and 2BAE);
+//! - the face (2BC5; `face_chosen`, 2C72);
+//! - the end (`creation_end`, 1194:257B..25B7).
+//!
+//! `new_game` runs them all from the player's choices (`Character`).
+//! Then, from the main menu (0000:1139..1171), the game is set up
+//! (`game_setup`, 21EE:016C: the first date, `game_date`, 0000:13FC; the
+//! weather, 1194:2FB3) and started (0000:0C66: `game_start`, the start
+//! dungeon chosen, then its run, `Machine::start_run`). The intro's
+//! texts (1194:D459) and the save slot's files (25FD:0219) are the front
+//! end's.
+//!
+//! The screens, the text typed, the menus, the map and the faces' screen
+//! are the front end's (`NewGameHooks`); the routines here start from
+//! what the player picked there.
+
+use crate::bsa::Files;
+use crate::character::PLAYER;
+use crate::machine::Machine;
+use crate::mem::{DATA, DS};
+
+/// DGROUP variables.
+pub mod var {
+    /// The quiz: the questions asked (their numbers, 1..40) and how many,
+    /// the three answers' kinds (0, 1 or 2), the counts of each kind
+    /// chosen, the byte the answers' parse cut off (put back after), the
+    /// question text (a far pointer) and the question shown's position.
+    pub const ASKED: u16 = 0x40CB;
+    pub const ASKED_COUNT: u16 = 0x40C7;
+    pub const KINDS: u16 = 0x40C4;
+    pub const COUNTS: u16 = 0x40C8;
+    pub const CUT: u16 = 0x40C3;
+    pub const QUESTIONS: u16 = 0x40E8;
+    pub const SHOWN: u16 = 0x40EC;
+    /// The answer picked (0..2).
+    pub const ANSWER: u16 = 0x129E;
+    /// The file of answer counts to classes, and the questions'.
+    pub const CLASSES_DAT: u16 = 0x40F8;
+    pub const QUESTION_TXT: u16 = 0x411E;
+    /// The attribute screen: the attribute picked (0..7), the arrows'
+    /// middle line, the points left and the points rolled; the mouse's y.
+    pub const PICKED: u16 = 0x1296;
+    pub const ARROWS: u16 = 0x1297;
+    pub const POINTS: u16 = 0x129C;
+    pub const POINTS_ROLLED: u16 = 0x9686;
+    pub const MOUSE_Y: u16 = 0x8F94;
+    /// The region clicked (the attribute: 1..8).
+    pub const REGION: u16 = 0xB7C6;
+    /// The face picked (0..9), and the faces in use (the player's first).
+    pub const FACE_PICKED: u16 = 0x129A;
+    pub const FACES: u16 = 0x0FD4;
+    /// The screen flags and the text colour.
+    pub const SCREEN: u16 = 0xB7C4;
+    pub const COLOUR: u16 = 0x9288;
+    /// Shown the attribute screen's note once.
+    pub const NOTED: u16 = 0x1299;
+}
+use var::*;
+
+/// The player's record's fields used here (from `PLAYER`).
+mod rec {
+    pub const RACE: u16 = 0x04;
+    pub const CLASS: u16 = 0x05;
+    pub const LEVEL: u16 = 0x06;
+    pub const SEX: u16 = 0x07;
+    pub const PORTRAIT: u16 = 0x08;
+    pub const ATTRS: u16 = 0x29;
+    pub const BASE_ATTRS: u16 = 0x31;
+    pub const HP_MOD: u16 = 0x4F;
+    pub const HP: u16 = 0x59;
+    pub const MAX_HP: u16 = 0x5B;
+    pub const FACE: u16 = 0x6B;
+    pub const ITEMS: u16 = 0x6E;
+}
+
+/// The attribute screen's arrows region (its record's y, in the region
+/// table at 3276:5312, record 9).
+const ARROWS_Y: u16 = 0x5312 + 0x372 + 2;
+
+/// What the front end does during creation.
+pub trait NewGameHooks {
+    /// 1194:59CC: a message box with the text at `seg`:`si`.
+    fn message_box(&mut self, _m: &mut Machine, _seg: u16, _si: u16) {}
+    /// 1194:0DC7: the stats screen drawn (also counting the items, 129D,
+    /// and naming the clothes' images by sex and class: 1194:16AA).
+    fn stats_screen(&mut self, _m: &mut Machine) {}
+    /// 1194:1695: the attribute screen's palette.
+    fn palette(&mut self, _m: &mut Machine) {}
+    /// 0000:5D70, at the end of creation.
+    fn creation_done(&mut self, _m: &mut Machine) {}
+    /// 2294:11F2, at the end of creation.
+    fn game_screen(&mut self, _m: &mut Machine) {}
+    /// 2294:01F1: the game's resources loaded (fonts, images; the far
+    /// pointers at 4391, 438D, 1002 and on).
+    fn resources(&mut self, _m: &mut Machine) {}
+    /// 0000:3C4C (SI 01A4): the hands' graphics for the weapon class.
+    fn hands(&mut self, _m: &mut Machine) {}
+    /// 29CF:0691: the spells loaded (`Machine::spells_load`).
+    fn spells(&mut self, _m: &mut Machine) {}
+    /// 21EE:0134: the level's flats loaded again (0000:FEF4, BFA5, BED4,
+    /// FECE), and the first flat's number (C38E) from D432.
+    fn level_flats(&mut self, _m: &mut Machine) {}
+}
+
+/// How the class is chosen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClassPick {
+    /// The ten questions' answers (0..2 each).
+    Quiz([u8; 10]),
+    /// The class list's entry (0..17, the table at 2AEE).
+    Listed(u8),
+}
+
+/// The player's choices in creation.
+#[derive(Clone, Debug)]
+pub struct Character {
+    pub class: ClassPick,
+    pub name: Vec<u8>,
+    pub sex: u8,
+    pub province: u8,
+    pub face: u8,
+    /// The attributes rolled again this many times.
+    pub rerolls: u16,
+    /// The attribute screen's clicks; none spends the points in turn.
+    pub clicks: Vec<Click>,
+}
+
+/// `NewGameHooks` that do nothing.
+pub struct NoNewGameHooks;
+
+impl NewGameHooks for NoNewGameHooks {}
+
+/// A click on the attribute screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Click {
+    /// An attribute's line (1..8, the region's number).
+    Attribute(u16),
+    /// The arrows, at the mouse's y.
+    Arrows(u16),
+}
+
+impl Machine {
+    fn ng8(&self, o: u16) -> u8 {
+        self.mem.r8(DS, o)
+    }
+
+    fn ng16(&self, o: u16) -> u16 {
+        self.mem.r16(DS, o)
+    }
+
+    /// 0000:77C8: `n` bytes of `al` from DGROUP:`di`, returning DI after.
+    fn ng_fill(&mut self, mut di: u16, n: u16, al: u8) -> u16 {
+        for _ in 0..n {
+            self.mem.w8(DS, di, al);
+            di = di.wrapping_add(1);
+        }
+        di
+    }
+
+    /// 1194:24A6..2512. The new game's state cleared: 12BA set, 5E0 bit
+    /// 200h clear, 5C8 bit 10h set, 1299 and 5CC cleared, the player's
+    /// record (41Eh bytes from 01A4) zeroed, then 0Bh bytes from F76 and
+    /// A4h from E6E. The next fill is given SI = 0DCA but fills from DI,
+    /// where the last one ended (F12h), D0h bytes: the quest records at
+    /// 0DCA are left and F12..FE1 zeroed. Then 1194:D327 (AB2 FFh, the
+    /// main quest's 13h bytes from FDD zeroed, FE4 FFh), the faces in use
+    /// (FD4, 0Ah bytes) FFh and the keys (652, 0Ch) C5h.
+    pub fn newgame_reset(&mut self) {
+        self.mem.w16(DS, 0x12BA, 1);
+        let v = self.ng16(0x05E0) & 0xFDFF;
+        self.mem.w16(DS, 0x05E0, v);
+        let v = self.ng16(0x05C8) | 0x10;
+        self.mem.w16(DS, 0x05C8, v);
+        self.mem.w8(DS, NOTED, 0);
+        self.mem.w32(DS, 0x05CC, 0);
+        self.ng_fill(PLAYER, 0x41E, 0);
+        self.ng_fill(0x0F76, 0xB, 0);
+        let di = self.ng_fill(0x0E6E, 0xA4, 0);
+        self.ng_fill(di, 0xD0, 0);
+        self.mem.w8(DS, 0x0AB2, 0xFF);
+        self.ng_fill(0x0FDD, 0x13, 0);
+        self.mem.w8(DS, 0x0FE4, 0xFF);
+        self.ng_fill(FACES, 0xA, 0xFF);
+        self.ng_fill(0x0652, 0xC, 0xC5);
+    }
+
+    /// 222C:057F. The next question: a number 1..40 (the RNG's next
+    /// word mod 40, plus 1) not among those asked (rolled again until
+    /// it isn't), added to the list. The first is taken as rolled. None
+    /// where the RNG cycles without finding one.
+    pub fn quiz_pick(&mut self) -> Option<u8> {
+        let n = self.ng8(ASKED_COUNT);
+        if n == 0 {
+            self.mem.w8(DS, ASKED_COUNT, 1);
+            let q = (self.rng.next() % 0x28) as u8 + 1;
+            self.mem.w8(DS, ASKED, q);
+            return Some(q);
+        }
+        let mut check = crate::random::CycleCheck::new(&self.rng);
+        loop {
+            let q = (self.rng.next() % 0x28) as u8 + 1;
+            let n = self.ng8(ASKED_COUNT) as u16;
+            if !(0..n).any(|i| self.ng8(ASKED.wrapping_add(i)) == q) {
+                self.mem.w8(DS, ASKED.wrapping_add(n), q);
+                self.mem.w8(DS, ASKED_COUNT, n as u8 + 1);
+                return Some(q);
+            }
+            if check.cycled(&self.rng) {
+                return None;
+            }
+        }
+    }
+
+    /// 222C:0525. Question `number` in the text at the far pointer
+    /// QUESTIONS: from the text's start (past bytes below 21h), each line
+    /// that starts with a digit is read as a number (0000:52BA); at the
+    /// match, the position past it and its dot (DI + 2, + 3 from 10 on).
+    /// Otherwise on past the next line feed (searched at most FDE8h
+    /// bytes). None where the original searches forever (no such
+    /// question: the search comes round again).
+    pub fn quiz_find(&mut self, number: u16) -> Option<u16> {
+        let (mut di, es) = (self.ng16(QUESTIONS), self.ng16(QUESTIONS + 2));
+        let skip_low = |m: &Self, di: &mut u16| -> Option<()> {
+            for _ in 0..0x10000u32 {
+                if m.mem.r8(es, *di) >= 0x21 {
+                    return Some(());
+                }
+                *di = di.wrapping_add(1);
+            }
+            None
+        };
+        skip_low(self, &mut di)?;
+        // Where the number is read, and where a line's search starts: a
+        // position seen again means the original goes round forever.
+        let mut seen = vec![false; 0x10000];
+        let mut searched = vec![false; 0x10000];
+        loop {
+            if std::mem::replace(&mut seen[di as usize], true) {
+                return None;
+            }
+            if self.info_atoi(es, di) == number {
+                let add = 2 + (number >= 10) as u16;
+                return Some(di.wrapping_add(add));
+            }
+            loop {
+                if std::mem::replace(&mut searched[di as usize], true) {
+                    return None;
+                }
+                for _ in 0..0xFDE8u32 {
+                    let b = self.mem.r8(es, di);
+                    di = di.wrapping_add(1);
+                    if b == 0x0A {
+                        break;
+                    }
+                }
+                skip_low(self, &mut di)?;
+                if self.mem.r8(es, di).is_ascii_digit() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// 222C:02D4..02DE with 05C9. The question at `es`:`di`: past its
+    /// colon, its three answers each marked "(Nk)": the kind after the
+    /// digit, `v` 0, `l` 2, any other 1, into KINDS; the "(Nk" blanked
+    /// (from the parenthesis on, four bytes). The byte five past the
+    /// last answer's digit is cut (to 0), kept at CUT. Returns DI after.
+    pub fn quiz_answers(&mut self, es: u16, mut di: u16) -> u16 {
+        let scan = |m: &Self, di: &mut u16, al: u8| {
+            for _ in 0..0xFDE8u32 {
+                let b = m.mem.r8(es, *di);
+                *di = di.wrapping_add(1);
+                if b == al {
+                    break;
+                }
+            }
+        };
+        scan(self, &mut di, b':');
+        for i in 0..3u16 {
+            scan(self, &mut di, b'(');
+            let kind = match self.mem.r8(es, di.wrapping_add(1)) {
+                b'v' => 0,
+                b'l' => 2,
+                _ => 1,
+            };
+            self.mem.w8(DS, KINDS + i, kind);
+            for k in [0xFFFFu16, 0, 1, 2] {
+                self.mem.w8(es, di.wrapping_add(k), b' ');
+            }
+        }
+        let cut = self.mem.r8(es, di.wrapping_add(5));
+        self.mem.w8(es, di.wrapping_add(5), 0);
+        self.mem.w8(DS, CUT, cut);
+        di
+    }
+
+    /// The answer picked (0..2) counted: one more of its kind (222C:010B).
+    pub fn quiz_count(&mut self, answer: u16) {
+        let kind = self.ng8(KINDS.wrapping_add(answer)) as u16;
+        let v = self.ng8(COUNTS.wrapping_add(kind)).wrapping_add(1);
+        self.mem.w8(DS, COUNTS.wrapping_add(kind), v);
+    }
+
+    /// 222C:005B. The class for the counts of the answers' kinds (40C8,
+    /// 40C9, 40CA): CLASSES.DAT loaded to the frame (9030:0, EMS off),
+    /// its 30h triples from offset 12h searched for the counts: the first
+    /// gives the class at 0, the n-th the class at n / 4. Not found, the
+    /// next 12h triples are searched on (from 0A2h): the class at 0Ch +
+    /// n / 3 (n 12h when not found either). None where the file can't be
+    /// loaded.
+    pub fn quiz_class(&mut self, files: &mut Files) -> Option<u8> {
+        let frame = self.ng16(0x9030);
+        self.file_load(files, CLASSES_DAT, frame, 0)?;
+        let key = [self.ng8(COUNTS), self.ng8(COUNTS + 1), self.ng8(COUNTS + 2)];
+        let search = |m: &Self, si: &mut u16, n: u16| -> (u16, bool) {
+            for bx in 0..n {
+                let t = [0, 1, 2].map(|k| m.mem.r8(frame, si.wrapping_add(k)));
+                if t == key {
+                    return (bx, true);
+                }
+                *si = si.wrapping_add(3);
+            }
+            (n, false)
+        };
+        let mut si = 0x12u16;
+        let at = match search(self, &mut si, 0x30) {
+            (0, true) => 0,
+            (bx, true) => bx / 4,
+            _ => {
+                let (bx, _) = search(self, &mut si, 0x12);
+                bx / 3 + 0xC
+            }
+        };
+        Some(self.mem.r8(frame, at))
+    }
+
+    /// 1194:2655..2677 then 26DC. The class `class` chosen (its byte to
+    /// the player's record), then its starting weapon: the weapon maker
+    /// (1194:E8B2) with level 0 and the type forced to 3 (from class 0Ch
+    /// on), 2 (from 6) or 1, copied (13h bytes from 13DA) to the first
+    /// item slot (0212); the weapon class (1194:731A) set. The class's
+    /// number (low 5 bits) decides, its other bits are kept.
+    pub fn class_chosen(&mut self, class: u8) -> Option<()> {
+        self.mem.w8(DS, PLAYER + rec::CLASS, class);
+        self.class_weapon(class & 0x1F)
+    }
+
+    /// 1194:26DC with AL `class`.
+    pub fn class_weapon(&mut self, class: u8) -> Option<()> {
+        let kind = if class >= 0xC {
+            3
+        } else if class >= 6 {
+            2
+        } else {
+            1
+        };
+        self.loot_weapon(0, kind)?;
+        for i in 0..0x13u16 {
+            let b = self.ng8(0x13DA + i);
+            self.mem.w8(DS, PLAYER + rec::ITEMS + i, b);
+        }
+        self.weapon_class(DS, PLAYER);
+        Some(())
+    }
+
+    /// 2791 and 2711's results: the sex (0 male, 1 female) and the name
+    /// (up to 12h characters, then a NUL), as the player gave them.
+    pub fn name_and_sex(&mut self, name: &[u8], sex: u8) {
+        let n = name.len().min(0x12);
+        for (i, &c) in name[..n].iter().enumerate() {
+            self.mem.w8(DS, PLAYER + 9 + i as u16, c);
+        }
+        self.mem.w8(DS, PLAYER + 9 + n as u16, 0);
+        self.mem.w8(DS, PLAYER + rec::SEX, sex);
+    }
+
+    /// 1194:28F6, 289B and 28E1: the province picked on the map (0..8)
+    /// is the race; the portrait rolled (1194:35FF); that byte is the
+    /// location the player comes from (its province and a place in it),
+    /// whose record is built (1194:3AE8, the Imperial City for province
+    /// 8, `city_build_location`).
+    pub fn province_chosen(&mut self, province: u8) -> Option<()> {
+        self.mem.w8(DS, PLAYER + rec::RACE, province);
+        self.cr_portrait(DS, PLAYER)?;
+        let mut id = self.ng8(PLAYER + rec::PORTRAIT) as u16;
+        if self.ng8(0x0A22 + 0x24) == 8 {
+            id = 0x100;
+        }
+        self.city_build_location(DS, 0x0A22, id, 0)
+    }
+
+    /// 1194:2AC7. The attributes rolled: 9686 the points to give (19h),
+    /// the gold (1194:2B87), the attributes, hit points and spell points
+    /// (2AFA..2B37, `create_player_stats`: the level 0 first and 1297
+    /// 34h), the bonus points (1194:2B9B: a die of 19h, into 129C), then
+    /// the stats screen; the first time (1299 clear) its palette and the
+    /// note on spending the points (3276:37C5), 1299 set. The screen
+    /// flag B7C4 bit 4 is set and the text colour FEh.
+    pub fn creation_roll(&mut self, hooks: &mut dyn NewGameHooks) -> Option<()> {
+        self.mem.w16(DS, POINTS_ROLLED, 0x19);
+        self.roll_starting_gold()?;
+        self.mem.w8(DS, COLOUR, 0xFE);
+        let v = self.ng8(SCREEN) | 4;
+        self.mem.w8(DS, SCREEN, v);
+        self.mem.w8(DS, PLAYER + rec::LEVEL, 0);
+        self.mem.w8(DS, ARROWS, 0x34);
+        self.create_player_stats()?;
+        let p = crate::dice::dice(&mut self.rng, 0x19)?;
+        self.mem.w8(DS, POINTS, p as u8);
+        hooks.stats_screen(self);
+        if self.ng8(NOTED) == 0 {
+            hooks.palette(self);
+            self.mem.w8(DS, NOTED, 1);
+            hooks.message_box(self, DATA, 0x37C5);
+        }
+        Some(())
+    }
+
+    /// 1194:14C5. An attribute's line clicked (REGION `region`, 1..8):
+    /// it is picked (1296: region - 1) and the arrows move to its line
+    /// (their region's y 30h + 8 × the pick, in the DATA segment's region
+    /// table; 1297 that + 8, its low byte).
+    pub fn creation_select(&mut self, region: u16) {
+        self.mem.w16(DS, REGION, region);
+        let bx = region.wrapping_sub(1);
+        self.mem.w8(DS, PICKED, bx as u8);
+        let y = 8u16.wrapping_mul(bx).wrapping_add(0x30);
+        self.mem.w16(DATA, ARROWS_Y, y);
+        self.mem.w8(DS, ARROWS, y.wrapping_add(8) as u8);
+    }
+
+    /// 1194:138E. The arrows clicked at the mouse's y `y`: at or above
+    /// their middle (1297) the picked attribute rises by one, if it is
+    /// below 100 and points are left (one is spent); below it, it falls by
+    /// one if above its rolled value (01D5..) and fewer points are left
+    /// than were rolled (9686, low byte; one comes back). After either,
+    /// the derived stats (1194:1408).
+    pub fn creation_arrow(&mut self, y: u16) {
+        self.mem.w16(DS, MOUSE_Y, y);
+        let i = self.ng8(PICKED) as u16;
+        let rolled = self.ng8(PLAYER + rec::BASE_ATTRS + i);
+        let si = PLAYER + rec::ATTRS + i;
+        let points = self.ng8(POINTS);
+        if self.ng16(MOUSE_Y) <= self.ng8(ARROWS) as u16 {
+            if self.ng8(si) >= 0x64 || points == 0 {
+                return;
+            }
+            self.mem.w8(DS, si, self.ng8(si) + 1);
+            self.mem.w8(DS, POINTS, points.wrapping_sub(1));
+        } else {
+            if self.ng8(si) <= rolled || points >= self.ng16(POINTS_ROLLED) as u8 {
+                return;
+            }
+            self.mem.w8(DS, si, self.ng8(si).wrapping_sub(1));
+            self.mem.w8(DS, POINTS, points.wrapping_add(1));
+        }
+        self.player_derived_stats();
+    }
+
+    /// A click on the attribute screen.
+    pub fn creation_click(&mut self, click: Click) {
+        match click {
+            Click::Attribute(r) => self.creation_select(r),
+            Click::Arrows(y) => self.creation_arrow(y),
+        }
+    }
+
+    /// 1194:2D28, then 2BAE. The attributes kept: the screen's flag bit 4
+    /// cleared; the hit points and their maximum the maximum plus the HP
+    /// modifier (recomputed while the points were spent); the attributes
+    /// to the 256 scale, and copied as the base ones. A class with bit 20h
+    /// (the spellcasters) starts with spells 3Dh and 3Eh (50B, 50C; 50A
+    /// 2).
+    pub fn creation_finish(&mut self) {
+        let v = self.ng8(SCREEN) & 0xFB;
+        self.mem.w8(DS, SCREEN, v);
+        let hp = self.ng16(PLAYER + rec::MAX_HP).wrapping_add(self.ng16(PLAYER + rec::HP_MOD));
+        self.mem.w16(DS, PLAYER + rec::HP, hp);
+        self.mem.w16(DS, PLAYER + rec::MAX_HP, hp);
+        let a = PLAYER + rec::ATTRS;
+        crate::scale::attrs_to256(&mut self.mem, a, a, 8);
+        for i in 0..8 {
+            let b = self.ng8(a + i);
+            self.mem.w8(DS, PLAYER + rec::BASE_ATTRS + i, b);
+        }
+        if self.ng8(PLAYER + rec::CLASS) & 0x20 != 0 {
+            self.mem.w8(DS, 0x050B, 0x3D);
+            self.mem.w8(DS, 0x050C, 0x3E);
+            self.mem.w8(DS, 0x050A, 2);
+        }
+    }
+
+    /// 1194:2C72..2C95. The face picked (129A, 0..9) is the player's
+    /// (+6Bh), and the first of the faces in use (FD4): the province × 10
+    /// plus it, in a byte, with bit 80h for a woman.
+    pub fn face_chosen(&mut self) {
+        let f = self.ng8(FACE_PICKED);
+        self.mem.w8(DS, PLAYER + rec::FACE, f);
+        let mut v = (self.ng8(PLAYER + rec::RACE) as u16).wrapping_mul(10) as u8;
+        v = v.wrapping_add(f);
+        if self.ng8(PLAYER + rec::SEX) != 0 {
+            v |= 0x80;
+        }
+        self.mem.w8(DS, FACES, v);
+    }
+
+    /// The questions asked and answered (222C:0000, its screens and the
+    /// scrolls' images left out): the seed kept at 12A8, the counts
+    /// cleared, QUESTION.TXT loaded into bank 4 (the frame with EMS off);
+    /// ten times a question picked (`quiz_pick`), found (`quiz_find`),
+    /// its answers parsed (`quiz_answers`), the byte cut put back
+    /// (222C:0241) and the answer counted (`quiz_count`); then the class
+    /// (`quiz_class`, through bank 5, the bank mapped before restored).
+    pub fn class_quiz(&mut self, files: &mut Files, answers: &[u8; 10]) -> Option<u8> {
+        self.store_rng();
+        let seed = self.mem.r32(DS, crate::random::SEED);
+        self.mem.w32(DS, 0x12A8, seed);
+        self.mem.w8(DS, ASKED_COUNT, 0);
+        self.mem.w16(DS, COUNTS, 0);
+        self.mem.w8(DS, COUNTS + 2, 0);
+        self.ems_map(4);
+        let frame = self.ng16(0x9030);
+        self.mem.w16(DS, QUESTIONS, 0);
+        self.mem.w16(DS, QUESTIONS + 2, frame);
+        self.file_load(files, QUESTION_TXT, frame, 0)?;
+        for &a in answers {
+            let q = self.quiz_pick()?;
+            self.ems_map(4);
+            let di = self.quiz_find(q as u16)?;
+            self.mem.w16(DS, SHOWN, di);
+            self.mem.w16(DS, SHOWN + 2, frame);
+            self.quiz_answers(frame, di);
+            let mut p = di;
+            for _ in 0..0xFDE8u32 {
+                let b = self.mem.r8(frame, p);
+                p = p.wrapping_add(1);
+                if b == 0 {
+                    break;
+                }
+            }
+            let cut = self.ng8(CUT);
+            self.mem.w8(frame, p.wrapping_sub(1), cut);
+            self.mem.w16(DS, ANSWER, a.min(2) as u16);
+            self.quiz_count(a.min(2) as u16);
+        }
+        let prev = self.ng16(0x8FA8) >> 2;
+        self.ems_map(5);
+        let class = self.quiz_class(files);
+        self.ems_map(prev);
+        class
+    }
+
+    /// Creation from the player's choices, in the original's order:
+    /// cleared, the class (by the quiz or the list), the name and sex,
+    /// the province, the attributes rolled (and rolled again), the points
+    /// spent (by the clicks, or one at a time over the attributes in turn
+    /// until none are left or none can rise), kept, the face, the end.
+    /// Returns the class. None where a step gives up.
+    pub fn new_game(&mut self, files: &mut Files, hooks: &mut dyn NewGameHooks, ch: &Character) -> Option<u8> {
+        self.newgame_reset();
+        let class = match ch.class {
+            ClassPick::Quiz(a) => self.class_quiz(files, &a)?,
+            ClassPick::Listed(i) => self.ng8(0x2AEE + (i % 18) as u16),
+        };
+        self.class_chosen(class)?;
+        self.name_and_sex(&ch.name, ch.sex);
+        self.province_chosen(ch.province)?;
+        for _ in 0..=ch.rerolls {
+            self.creation_roll(hooks)?;
+        }
+        if ch.clicks.is_empty() {
+            while self.ng8(POINTS) != 0 {
+                let before = self.ng8(POINTS);
+                for k in 1..=8 {
+                    if self.ng8(POINTS) == 0 {
+                        break;
+                    }
+                    self.creation_select(k);
+                    let y = self.ng8(ARROWS) as u16;
+                    self.creation_arrow(y);
+                }
+                if self.ng8(POINTS) == before {
+                    break;
+                }
+            }
+        } else {
+            for &c in &ch.clicks {
+                self.creation_click(c);
+            }
+        }
+        self.creation_finish();
+        self.mem.w8(DS, FACE_PICKED, ch.face);
+        self.face_chosen();
+        self.creation_end(hooks);
+        Some(class)
+    }
+
+    /// 0000:13FC. The game's first date: the time 548D0h (5CC), the
+    /// calendar's fields 5D0 0B7h, 5D2 8, 5D4 0, 5D6 0Ch, 5D8 0, A20 16h;
+    /// then the time of day for the sky (0000:16F7, `sky_time`).
+    pub fn game_date(&mut self) -> Option<()> {
+        self.mem.w32(DS, 0x05CC, 0x548D0);
+        for (at, v) in [(0x05D0, 0xB7), (0x05D2, 8), (0x05D4, 0), (0x05D6, 0xC), (0x05D8, 0)] {
+            self.mem.w16(DS, at, v);
+        }
+        self.mem.w8(DS, 0x0A20, 0x16);
+        self.sky_time()
+    }
+
+    /// 21EE:016C. The game set up, once (3B07 bit 0): A902 bit 10h, the
+    /// resources loaded; 280h bytes allocated (0000:51E2), their far
+    /// pointer at 1AB5, and the same segment with offsets 100h and 180h
+    /// at 1004 and 1008 (EAX keeps the segment the allocator returned in
+    /// its high word); 20F0h bytes allocated and cleared (0000:5338), the
+    /// segment at 1042 (the people's records); the table at 1B94 (65h
+    /// words, n × 28F5Ch >> 16); the first date (`game_date`); the hands'
+    /// graphics; the zones' weather (1194:2FB3, `weather_roll`); the
+    /// spells; 5C8 bit 2000h; the level's flats; CD00 FFFFh. None where an
+    /// allocation fails or the date's division overflows.
+    pub fn game_setup(&mut self, hooks: &mut dyn NewGameHooks) -> Option<()> {
+        if self.ng8(0x3B07) & 1 != 0 {
+            return Some(());
+        }
+        let v = self.ng8(0x3B07) | 1;
+        self.mem.w8(DS, 0x3B07, v);
+        let v = self.ng16(0xA902) | 0x10;
+        self.mem.w16(DS, 0xA902, v);
+        hooks.resources(self);
+        let (seg, off) = self.heap_alloc_bytes(0x280)?;
+        let hi = (seg as u32) << 16;
+        self.mem.w32(DS, 0x1AB5, hi | off as u32);
+        self.mem.w32(DS, 0x1004, hi | 0x100);
+        self.mem.w32(DS, 0x1008, hi | 0x180);
+        let (seg, off) = self.heap_alloc_bytes(0x20F0)?;
+        for i in 0..0x20F0u16 {
+            self.mem.w8(seg, off.wrapping_add(i), 0);
+        }
+        self.mem.w16(DS, 0x1042, seg);
+        for i in 0..0x65u32 {
+            self.mem.w16(DS, 0x1B94 + 2 * i as u16, (i.wrapping_mul(0x28F5C) >> 16) as u16);
+        }
+        self.game_date()?;
+        hooks.hands(self);
+        self.weather_roll()?;
+        hooks.spells(self);
+        let v = self.ng16(0x05C8) | 0x2000;
+        self.mem.w16(DS, 0x05C8, v);
+        hooks.level_flats(self);
+        self.mem.w16(DS, 0xCD00, 0xFFFF);
+        Some(())
+    }
+
+    /// 0000:0C66..0C94. The game started in the start dungeon: its level
+    /// hooks (0000:0B4F: the way out 44BDh), its file's name ("start.mif",
+    /// 4BD1) to 0A36 and the place's ("Imperial Dungeons", 4BDB) to 0A22,
+    /// indoors (C398 bits 8000h, 4 clear), the area the start dungeon (5E6
+    /// 2), BB0A 0, 5E4 bit 0. Its run follows (0997: `start_run`).
+    pub fn game_start(&mut self) {
+        self.start_level_hooks();
+        for (from, to) in [(0x4BD1u16, 0x0A36u16), (0x4BDB, 0x0A22)] {
+            let mut i = 0u16;
+            loop {
+                let b = self.ng8(from.wrapping_add(i));
+                self.mem.w8(DS, to.wrapping_add(i), b);
+                i = i.wrapping_add(1);
+                if b == 0 {
+                    break;
+                }
+            }
+        }
+        let v = self.ng16(0xC398) & 0x7FFB;
+        self.mem.w16(DS, 0xC398, v);
+        self.mem.w8(DS, 0x05E6, 2);
+        self.mem.w8(DS, 0xBB0A, 0);
+        let v = self.ng8(0x05E4) | 1;
+        self.mem.w8(DS, 0x05E4, v);
+    }
+
+    /// 1194:257B..25B7. Creation's end: 5C8 bit 10h clear, A902 bit 0
+    /// clear, 12BA cleared, 5B1 bit 4000h set, the time 2BCh (5AD); then
+    /// 0000:5D70 and 2294:11F2 (hooks).
+    pub fn creation_end(&mut self, hooks: &mut dyn NewGameHooks) {
+        let v = self.ng16(0x05C8) & 0xFFEF;
+        self.mem.w16(DS, 0x05C8, v);
+        let v = self.ng16(0xA902) & 0xFFFE;
+        self.mem.w16(DS, 0xA902, v);
+        self.mem.w16(DS, 0x12BA, 0);
+        let v = self.ng16(0x05B1) | 0x4000;
+        self.mem.w16(DS, 0x05B1, v);
+        self.mem.w32(DS, 0x05AD, 0x2BC);
+        hooks.creation_done(self);
+        hooks.game_screen(self);
+    }
+}

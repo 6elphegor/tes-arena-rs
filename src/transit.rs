@@ -326,6 +326,24 @@ impl Machine {
         self.mem.w32(DS, HOOK_CD52, 0x0628);
     }
 
+    /// 0000:0997, the start dungeon's run after its level hooks (0993
+    /// sets 0B15's first; a new game's start, 0000:0C66, 0B4F's):
+    /// NORMAL.LGT, the indoor state, no INF, 427D FFh, 430E 0. Returns the
+    /// level's name (0A36).
+    pub fn start_run(&mut self, hooks: &mut dyn AreaHooks) -> u16 {
+        hooks.normal_lgt(self);
+        self.indoor_state();
+        self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        self.mem.w8(DS, 0x427D, 0xFF);
+        self.mem.w8(DS, 0x430E, 0);
+        0x0A36
+    }
+
+    /// 0000:0B4F: the level hooks with the way out 44BDh.
+    pub(crate) fn start_level_hooks(&mut self) {
+        self.level_hooks(0x44BD);
+    }
+
     /// The state an indoor run sets (0000:0939.., 099A.., 09FD..): no fog,
     /// C8FC 0Dh, C8FD 2, 5C8 bit 800h (entering), indoors (C398 bits
     /// 8000h, 4 clear), not the wilderness, the fill colours 70h.
@@ -366,12 +384,7 @@ impl Machine {
             }
             Run::Start => {
                 self.level_hooks(0x4537);
-                hooks.normal_lgt(self);
-                self.indoor_state();
-                self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
-                self.mem.w8(DS, 0x427D, 0xFF);
-                self.mem.w8(DS, 0x430E, 0);
-                0x0A36
+                self.start_run(hooks)
             }
             Run::Dungeon => {
                 hooks.normal_lgt(self);
