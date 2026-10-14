@@ -317,14 +317,19 @@ pub fn travel_month(minutes: u32) -> u16 {
 /// 0000:E06A: the heading from (ax, bx) to (cx, dx), 0..511 for a full
 /// turn, from 64 * the smaller side / the larger.
 pub fn travel_heading(ax: u16, bx: u16, cx: u16, dx: u16) -> u16 {
+    // `sub` then `jge`: the comparison is signed, overflow included
+    // (8072h - 84h counts as below).
     let mut bp = 0u16;
+    let below = |a: u16, b: u16| (a as i16) < (b as i16);
+    let neg_x = below(cx, ax);
     let mut cx = cx.wrapping_sub(ax);
-    if (cx as i16) < 0 {
+    if neg_x {
         bp = 1;
         cx = cx.wrapping_neg();
     }
+    let neg_y = below(dx, bx);
     let mut dx = dx.wrapping_sub(bx);
-    if (dx as i16) < 0 {
+    if neg_y {
         bp |= 2;
         dx = dx.wrapping_neg();
     }
