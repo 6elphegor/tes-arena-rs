@@ -72,7 +72,7 @@ fn main() {
             m.mem.w16(DS, 0xC3DA, heading);
         }
         let level = m.mem.r8(DS, 0xBB0A);
-        if m.move_step(&mut files, 0x30, heading).is_none() {
+        if m.move_step(&mut files, &mut arena::hooks::NoStairsHooks, 0x30, heading).is_none() {
             println!("stopped: a hook or a failed level change");
             break;
         }

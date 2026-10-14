@@ -141,7 +141,7 @@ impl Machine {
         self.mem.w8(DS, LEVEL, level);
         self.level_skip(files, level as u16);
         self.level_chunks(files)?;
-        if self.mem.r8(DS, LEVEL_OVERRIDE) != 0xFF && self.mem.r16(DS, LEVEL_HOOK + 2) != 0 {
+        if self.mem.r8(DS, LEVEL_OVERRIDE) != 0xFF && self.hook_set(LEVEL_HOOK) {
             return None;
         }
         self.file_close(files);
@@ -231,9 +231,11 @@ impl Machine {
     /// named at LEVEL_FILE (the planes into the planes there are), as
     /// stairs do: the file is reopened, read from 0x43 (past a header of
     /// the usual 0x3D bytes), and the levels before skipped. A name
-    /// starting `#` (a generated dungeon) only calls the hook at CD32.
+    /// starting `#` (a generated dungeon) only calls the hook at CD32: an
+    /// area's level's lights (0000:0B0B, `flat_lights`) or a made
+    /// dungeon's level built (0000:2957, `dungeon_level_hook`).
     /// None where the file is missing, the chunk loop fails (see
-    /// `level_load`) or that hook is set.
+    /// `level_load`) or that hook is set to a routine not ported.
     pub fn level_change(&mut self, files: &mut Files) -> Option<()> {
         self.mem.w8(DS, TRIGGER_COUNT, 0);
         if self.mem.r8(DS, LEVEL_FILE) != b'#' {
@@ -244,8 +246,11 @@ impl Machine {
             self.level_chunks(files)?;
             self.file_close(files);
         }
-        if self.mem.r16(DS, CHANGE_HOOK + 2) != 0 {
-            return None;
+        match self.mem.r32(DS, CHANGE_HOOK) {
+            0 => {}
+            crate::hooks::value::LEVEL_LIGHTS => self.flat_lights(),
+            crate::hooks::value::DUNGEON_LEVEL => self.dungeon_level_hook(files)?,
+            _ => return None,
         }
         Some(())
     }

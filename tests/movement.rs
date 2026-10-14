@@ -84,7 +84,7 @@ fn matches_original() {
             let before = m.clone();
             // No files: the cases never reach a level change.
             let mut files = Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
-            let got = m.move_step(&mut files, hex(p[3]) as u16, hex(p[4]) as u16).map(|_| {
+            let got = m.move_step(&mut files, &mut arena::hooks::NoStairsHooks, hex(p[3]) as u16, hex(p[4]) as u16).map(|_| {
                 let changed = (0..=0xFFFFu16)
                     .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
                     .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);

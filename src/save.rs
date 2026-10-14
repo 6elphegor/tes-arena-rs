@@ -87,7 +87,7 @@ impl Machine {
         for (name, off) in [(SPELLBOOK, 0), (SPELLS, spell::SECOND)] {
             let path = self.save_path(name);
             if self.file_load(files, path, spell::SEG, off).is_none()
-                && self.mem.r16(DS, crate::bsa::var::ERROR_HOOK + 2) != 0
+                && self.hook_set(crate::bsa::var::ERROR_HOOK)
             {
                 return None;
             }

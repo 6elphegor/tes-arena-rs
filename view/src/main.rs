@@ -45,6 +45,7 @@ struct Front<'a> {
     clicked: bool,
 }
 
+impl arena::hooks::StairsHooks for Front<'_> {}
 impl ControlHooks for Front<'_> {
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).

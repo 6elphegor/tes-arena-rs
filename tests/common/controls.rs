@@ -197,6 +197,8 @@ pub fn base(img: &arena::exe::Image) -> Machine {
 /// (FFFFh none), as the patched 2826:0B52 does.
 pub struct Pick;
 
+impl arena::hooks::StairsHooks for Pick {}
+
 impl arena::controls::ControlHooks for Pick {
     fn floor_pick(&mut self, m: &mut Machine) -> Option<u16> {
         let v = m.mem.r16(DS, 0xFFF0);

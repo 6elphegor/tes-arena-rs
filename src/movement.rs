@@ -9,6 +9,7 @@
 //! away, or 13 in creature mode). The cell under the position decides.
 
 use crate::bsa::Files;
+use crate::hooks::{StairsHooks, value};
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -314,9 +315,10 @@ impl Machine {
     /// `angle` (0..511): x and y get the high words of 2 * speed * sin and
     /// * cos, then `move_resolve` settles where the player ends up.
     /// Returns the candidate taken (0 the full move .. 3 none). Stairs
-    /// may change level on the way (`move_trigger`). None where a hook is
-    /// set, or a level change fails (see `move_change_level`).
-    pub fn move_step(&mut self, files: &mut Files, speed: u16, angle: u16) -> Option<u16> {
+    /// may change level on the way (`move_trigger`, with `hooks` for the
+    /// stairs' hooks). None where a hook is set to a routine not ported,
+    /// or a level change fails (see `move_change_level`).
+    pub fn move_step(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, speed: u16, angle: u16) -> Option<u16> {
         let (ox, oy) = (self.mem.r16(DS, X), self.mem.r16(DS, Y));
         let a = speed.wrapping_add(speed) as i16 as i32;
         let b = angle.wrapping_add(angle);
@@ -326,7 +328,7 @@ impl Machine {
         let ny = oy.wrapping_add(((a * c) >> 16) as u16);
         self.mem.w16(DS, X, nx);
         self.mem.w16(DS, Y, ny);
-        let (x, y, k) = self.move_resolve(files, nx, ny, ox, oy)?;
+        let (x, y, k) = self.move_resolve(files, hooks, nx, ny, ox, oy)?;
         self.mem.w16(DS, X, x);
         self.mem.w16(DS, Y, y);
         Some(k)
@@ -335,14 +337,20 @@ impl Machine {
     /// 0000:F478. Tries (nx, ny), (nx, oy) and (ox, ny) in turn and takes
     /// the first the test allows; a test that says stop, or one that
     /// refuses while map flag 0x80 is set, ends at (ox, oy).
-    pub(crate) fn move_resolve(&mut self, files: &mut Files, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
+    ///
+    /// The walk's test (the hook CD6A, `Machine::walk_test`) reads the
+    /// position from AX and BX, which hold (nx, ny) only for the first
+    /// candidate: the next are tested with what the test before left
+    /// there (`move_test`).
+    pub(crate) fn move_resolve(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, nx: u16, ny: u16, ox: u16, oy: u16) -> Option<(u16, u16, u16)> {
         self.mem.w8(DS, CHANGED, 0);
         self.mem.w16(DS, TRIGGER, 0);
         for (i, w) in [nx, ny, nx, oy, ox, ny, ox, oy].into_iter().enumerate() {
             self.mem.w16(DS, CANDIDATES + i as u16 * 2, w);
         }
+        let mut regs = (nx, ny);
         for k in 0..3u16 {
-            match self.move_test(files, CANDIDATES + k * 4)? {
+            match self.move_test(files, hooks, CANDIDATES + k * 4, &mut regs)? {
                 Test::Take => {
                     let p = CANDIDATES + k * 4;
                     return Some((self.mem.r16(DS, p), self.mem.r16(DS, p + 2), k));
@@ -358,19 +366,38 @@ impl Machine {
         Some((ox, oy, 3))
     }
 
-    /// 0000:F60A. Tests the candidate at DS:`pos`.
-    fn move_test(&mut self, files: &mut Files, pos: u16) -> Option<Test> {
+    /// 0000:F60A. Tests the candidate at DS:`pos`. `regs` are AX and BX:
+    /// the player's test first asks the walk's test (the hook CD6A,
+    /// 0000:4009) about the position they hold; a refusal sets AL's bit 0
+    /// and leaves BX, so the next candidate asks about the same square.
+    /// Otherwise 0000:F697 leaves AX the cell's byte (AH 0) and BX its
+    /// index in the mask, which the rest keeps, but for the climb's
+    /// heading (`move_climb`) and the cursor's y after stairs
+    /// (`move_change_level`). (The ways out of a dungeon, the hook CD4E,
+    /// leave BX as their routines do: not modelled; the area ends.)
+    fn move_test(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, pos: u16, regs: &mut (u16, u16)) -> Option<Test> {
         let creature = self.mem.r8(DS, CREATURE_MODE) != 0;
-        if !creature && self.mem.r16(DS, TEST_HOOK + 2) != 0 {
-            return None;
+        if !creature {
+            match self.mem.r32(DS, TEST_HOOK) {
+                0 => {}
+                value::WALK_TEST => {
+                    if self.walk_test(regs.0, regs.1) {
+                        regs.0 |= 1;
+                        return Some(Test::Next);
+                    }
+                }
+                _ => return None,
+            }
         }
         let al = self.move_cell(pos)?;
+        let (x, y) = (self.mem.r16(DS, pos), self.mem.r16(DS, pos.wrapping_add(2)));
+        *regs = (al as u16, (((y & 0x7F) >> 3) << 4) + ((x & 0x7F) >> 3));
         let free = |al: u8| if al == 0 { Test::Take } else { Test::Next };
         if creature || al == 0 {
             return Some(free(al));
         }
         if al & 0x80 == 0 && self.mem.r16(DS, HEIGHT) as i16 >= LOW {
-            let t = self.move_trigger(files, al)?;
+            let t = self.move_trigger(files, hooks, al, regs)?;
             if t != 0 {
                 if self.move_heading_square() {
                     self.mem.w16(DS, TRIGGER, t);
@@ -400,9 +427,9 @@ impl Machine {
         }
         let heading = self.mem.r16(DS, HEADING);
         if ax >= bx {
-            self.move_climb(dxs, heading.wrapping_sub(0x80) & 0x1FF, pos)
+            self.move_climb(dxs, heading.wrapping_sub(0x80) & 0x1FF, pos, regs)
         } else {
-            self.move_climb(dys, heading, pos)
+            self.move_climb(dys, heading, pos, regs)
         }
     }
 
@@ -411,7 +438,11 @@ impl Machine {
     /// faces the stair square (0000:FDAA) and no level changed yet this
     /// move: up from the first level, or down from the last (or down
     /// with level flag 0x100), there is none.
-    fn move_trigger(&mut self, files: &mut Files, al: u8) -> Option<u16> {
+    ///
+    /// The stairs' hook (CD6E, `value::STAIRS`, `Machine::stairs_hook`) is
+    /// called before the level changes; past the first level or the last,
+    /// the way out instead (`move_exit`).
+    fn move_trigger(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, al: u8, regs: &mut (u16, u16)) -> Option<u16> {
         let stairs = [self.mem.r8(DS, STAIRS_UP), self.mem.r8(DS, STAIRS_DOWN)];
         let Some(i) = stairs.iter().position(|&s| s == al) else {
             return Some((0..16).find(|&i| self.mem.r8(DS, TRIGGERS + i) == al).map_or(0, |i| i + 1));
@@ -419,7 +450,14 @@ impl Machine {
         if !self.move_facing(al) || self.mem.r8(DS, CHANGED) != 0 {
             return Some(0);
         }
-        let hooked = |m: &Self, h: u16| m.mem.r16(DS, h + 2) != 0;
+        let stairs = |m: &mut Self, hooks: &mut dyn StairsHooks| -> Option<()> {
+            match m.mem.r32(DS, STAIRS_HOOK) {
+                0 => {}
+                value::STAIRS => m.stairs_hook(hooks),
+                _ => return None,
+            }
+            Some(())
+        };
         let level = self.mem.r8(DS, LEVEL);
         let to = if i == 0 {
             // dec, then the sign of the byte.
@@ -432,20 +470,18 @@ impl Machine {
             if self.mem.r16(DS, LEVEL_FLAGS) & 0x100 != 0 {
                 return Some(0);
             }
-            if hooked(self, STAIRS_HOOK) {
-                return None;
-            }
+            stairs(self, hooks)?;
             let to = level.wrapping_add(1);
             if to >= self.mem.r8(DS, LEVELS) {
                 return self.move_exit(to);
             }
             to
         };
-        if hooked(self, STAIRS_HOOK) {
-            return None;
+        if i == 0 {
+            stairs(self, hooks)?;
         }
         self.mem.w8(DS, LEVEL, to);
-        self.move_change_level(files)?;
+        self.move_change_level(files, hooks, regs)?;
         Some(0)
     }
 
@@ -458,7 +494,7 @@ impl Machine {
     /// hook set.
     fn move_exit(&mut self, to: u8) -> Option<u16> {
         let ported = matches!(self.mem.r32(DS, EXIT_HOOK), 0x4537 | 0x44BD);
-        if self.mem.r16(DS, EXIT_HOOK + 2) != 0 && !ported {
+        if self.hook_set(EXIT_HOOK) && !ported {
             return None;
         }
         if ported {
@@ -474,9 +510,14 @@ impl Machine {
     /// chunks are reloaded (`level_change`), the player turns round and
     /// the new level's INF, if one was loaded, is loaded. The view update
     /// (0000:DA8E) and the wait for the mouse buttons to be released
-    /// (8FC8) are skipped. None where the reload or the INF load fails,
-    /// or the hook at C3B8 is set.
-    fn move_change_level(&mut self, files: &mut Files) -> Option<()> {
+    /// (8FC8) are skipped; the wait leaves BX the cursor's y, kept within
+    /// its limits (8F94, 8F78..8F7A), which the next candidate's test
+    /// reads (`regs`). Then the hook C3B8: a dungeon's level entered
+    /// (`value::LEVEL_ENTERED`, `Machine::level_entered`; the view's
+    /// rectangle saved and put back around it, 0000:A606/A5D1, is the
+    /// renderer's). None where the reload or the INF load fails, or the
+    /// hook at C3B8 is set to a routine not ported.
+    fn move_change_level(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, regs: &mut (u16, u16)) -> Option<()> {
         self.level_change(files)?;
         self.mem.w8(DS, CHANGED, 1);
         self.mem.w16(DS, W_A850, 0xFFFE);
@@ -487,8 +528,14 @@ impl Machine {
             self.info_load(files, info)?;
             self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
         }
-        if self.mem.r16(DS, LEVEL_HOOK + 2) != 0 {
-            return None;
+        let y = self.mem.r16(DS, 0x8F94);
+        let y = if (y as i16) < 0 { 0 } else { y };
+        let y = y.max(self.mem.r16(DS, 0x8F78));
+        regs.1 = y.min(self.mem.r16(DS, 0x8F7A));
+        match self.mem.r32(DS, LEVEL_HOOK) {
+            0 => {}
+            value::LEVEL_ENTERED => self.level_entered(hooks),
+            _ => return None,
         }
         Some(())
     }
@@ -520,10 +567,14 @@ impl Machine {
     /// (`sign` set turns the heading round first; within 16 of north or
     /// south), the position is tested at height 0x3C, and if free (and
     /// level flag 0x4000 isn't set) the player rises by 6 (24 with map
-    /// flag 1), up to 0x3C.
-    fn move_climb(&mut self, sign: u16, heading: u16, pos: u16) -> Option<Test> {
+    /// flag 1), up to 0x3C. Along no axis BX is left the heading (`regs`);
+    /// otherwise the test at 0x3C leaves the cell's index there again.
+    /// (0000:DA8E, the view's update, would change it; it is the
+    /// renderer's, and the vectors' DA8E is a RET.)
+    fn move_climb(&mut self, sign: u16, heading: u16, pos: u16, regs: &mut (u16, u16)) -> Option<Test> {
         let h = if sign != 0 { heading.wrapping_sub(0x100) & 0x1FF } else { heading };
         if (0x10..0x1F0).contains(&h) {
+            regs.1 = h;
             return Some(Test::Next);
         }
         let height = self.mem.r16(DS, HEIGHT);
@@ -568,17 +619,20 @@ impl Machine {
         if f & 0x2000 != 0 {
             self.mem.w16(DS, MAP_FLAGS, f & !0x2000);
         }
-        if self.mem.r16(DS, INPUT_HOOK + 2) == 0 {
+        if !self.hook_set(INPUT_HOOK) {
             return Some(());
         }
         hooks.input(self, files)?;
         self.fall_step();
         let trigger = self.mem.r16(DS, TRIGGER);
-        if trigger == 0 || self.mem.r16(DS, TRANSITION_HOOK + 2) == 0 {
+        if trigger == 0 || !self.hook_set(TRANSITION_HOOK) {
             return Some(());
         }
         let level = self.mem.r8(DS, LEVEL);
-        hooks.transition(self, files, trigger)?;
+        // The 3D mode's transition (0000:4470) is a RETF.
+        if self.mem.r32(DS, TRANSITION_HOOK) != value::TRANSITION {
+            hooks.transition(self, files, trigger)?;
+        }
         self.mem.w16(DS, TRIGGER, 0);
         if self.mem.r8(DS, LEVEL) == level {
             return Some(());
