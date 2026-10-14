@@ -317,6 +317,10 @@ fn camera(engine: &Engine) -> Camera {
 /// What drawing a level needs, read once from the engine after loading.
 struct Assets {
     palette: [[u8; 4]; 256],
+    /// CHARSHT.COL: the colours the character sheet's screens (the
+    /// equipment screen, the spellbook) are shown in; 1194:1695 loads it
+    /// and sets the whole palette from it.
+    charsheet: [[u8; 4]; 256],
     textures: Vec<[u8; 4096]>,
     shading: Vec<u8>,
     mesh: Vec<world::Vertex>,
@@ -480,6 +484,7 @@ impl Assets {
         engine.m.area_sky(&mut sky);
         Assets {
             palette: world::palette(dir),
+            charsheet: world::palette_file(dir, "CHARSHT.COL"),
             textures: world::textures(&engine.m),
             shading: world::shading(&engine.m),
             mesh: world::mesh(&engine.m),
@@ -1058,7 +1063,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
             None => {}
         }
-        let mut screen = hud::Screen::new(st.assets.palette);
+        let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
@@ -1803,6 +1808,7 @@ impl winit::application::ApplicationHandler for App {
                 let cam = camera(&self.engine);
                 let hud = self.hud();
                 self.screen.clear();
+                self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
                 self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
                 if self.panel.is_some() {
                     self.equip_image();

@@ -122,6 +122,12 @@ impl Screen {
         self.px.fill([0; 4]);
     }
 
+    /// The colours from now on (the character sheet's screens have their
+    /// own, CHARSHT.COL).
+    pub fn set_palette(&mut self, palette: [[u8; 4]; 256]) {
+        self.palette = palette;
+    }
+
     /// A rectangle in palette colour `c`, `alpha` opaque.
     pub fn fill(&mut self, x: i32, y: i32, w: i32, h: i32, c: u8, alpha: u8) {
         let p = self.palette[c as usize];

@@ -293,7 +293,12 @@ fn summon_rolls(engine: &mut Engine) {
 
 /// The 256 colours (RGB, 8 bits) of PAL.COL, past its 8-byte header.
 pub fn palette(dir: &Path) -> [[u8; 4]; 256] {
-    let d = std::fs::read(dir.join("PAL.COL")).expect("PAL.COL");
+    palette_file(dir, "PAL.COL")
+}
+
+/// A .COL's 256 colours (RGB, 8 bits), past its 8-byte header.
+pub fn palette_file(dir: &Path, name: &str) -> [[u8; 4]; 256] {
+    let d = std::fs::read(dir.join(name)).unwrap_or_else(|_| panic!("{name}"));
     let mut p = [[0u8; 4]; 256];
     for (i, c) in p.iter_mut().enumerate() {
         *c = [d[8 + 3 * i], d[9 + 3 * i], d[10 + 3 * i], 255];
