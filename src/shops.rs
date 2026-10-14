@@ -159,7 +159,7 @@ impl Machine {
     /// the holiday's factor (byte `bx` of its entry) over four (the low
     /// dword), at least 1 when the factor isn't 0. Not a holiday: the
     /// entry the search stopped at (0, as the original's CX).
-    fn holiday_price(&self, eax: u32, bx: u16) -> u32 {
+    pub(crate) fn holiday_price(&self, eax: u32, bx: u16) -> u32 {
         let cx = self.holiday(self.mem.r32(DS, TIME)).unwrap_or(0);
         let f = self.mem.r8(DS, HOLIDAY_SHOPS.wrapping_add(cx.wrapping_mul(6)).wrapping_add(bx)) as u32;
         let p = eax.wrapping_mul(f) >> 2;
@@ -169,7 +169,7 @@ impl Machine {
     /// 1194:4E54: the text at `si` split at its line feeds: each becomes
     /// a NUL, and every LINE_MARK-th line ends at the NUL after it too;
     /// the lines counted at LINES.
-    fn split_lines(&mut self, si: u16) {
+    pub(crate) fn split_lines(&mut self, si: u16) {
         let mark = self.mem.r8(DS, LINE_MARK);
         let (mut si, mut cx, mut dl) = (si, 0u16, 0u8);
         while self.mem.r8(DS, si) != 0 {

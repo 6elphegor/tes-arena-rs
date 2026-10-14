@@ -704,6 +704,13 @@ impl Machine {
     /// left as it was). `forced` (13C8) fixes the trinket sub-kind unless
     /// it is 0xFF. The RNG seed is copied to 7238 first.
     pub fn shop_magic_item(&mut self, level: u8, forced: u8) -> Option<()> {
+        self.shop_magic_item_made(level, forced).map(|_| ())
+    }
+
+    /// `shop_magic_item`, saying whether an item was made: the original
+    /// returns the carry set, and SI 7033h, when it made none (kind 1
+    /// below level 7), else the carry clear and SI 13DAh.
+    pub fn shop_magic_item_made(&mut self, level: u8, forced: u8) -> Option<bool> {
         self.mem.w32(DS, 0x7238, self.rng.seed);
         self.shop_setb(LEVEL, level);
         self.shop_setb(SHOP_FLAG, forced);
@@ -723,7 +730,7 @@ impl Machine {
             self.shop_magic_item_record();
         }
         self.shop_setb(MAGIC_ACTIVE, 0);
-        Some(())
+        Some(made)
     }
 
     /// 1194:B7FA. A random potion into the item record at 13DA: one of 15

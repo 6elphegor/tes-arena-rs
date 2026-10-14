@@ -461,7 +461,7 @@ impl Machine {
     }
 
     /// 1194:485C. The text at DS:`si` is digits only, and not empty.
-    fn rest_digits(&self, mut si: u16) -> bool {
+    pub(crate) fn rest_digits(&self, mut si: u16) -> bool {
         let mut n = 0u16;
         loop {
             let c = self.r_g8(si);
