@@ -464,6 +464,25 @@ impl Machine {
         }
     }
 
+    /// 0000:08EC. A dungeon's entrance in the wilderness taken: the
+    /// wilderness left (`wild_done`), the dungeon is the wilderness's (5C8
+    /// bit 80h), the area left (C398 bit 80h), not the wilderness (C39A
+    /// bit 200h), the area to enter a dungeon (5E6 3). The wall triggers
+    /// 8 and 9 there (`Machine::wall_trigger`) run the same with
+    /// `wild_done` as their hook; clicking a dungeon's keeper in the
+    /// wilderness (`talk_to`, `TalkHooks::dungeon_entrance`) runs it after
+    /// clearing the view's window (0000:4EFD).
+    pub fn wild_dungeon_entry(&mut self) {
+        self.wild_done();
+        let v = self.mem.r16(DS, 0x05C8) | 0x80;
+        self.mem.w16(DS, 0x05C8, v);
+        let v = self.mem.r16(DS, 0xC398) | 0x80;
+        self.mem.w16(DS, 0xC398, v);
+        let v = self.mem.r16(DS, LEVEL_FLAGS) & 0xFDFF;
+        self.mem.w16(DS, LEVEL_FLAGS, v);
+        self.mem.w8(DS, crate::trigger::var::AREA, 3);
+    }
+
     /// 217B:027A. A city's gate taken out to the wilderness: the city
     /// becomes blocks 1..4 of its wilderness (the four quarters of the
     /// 128 x 128 map, at WINDOW_OFFSETS), written as wild001.rmd ..

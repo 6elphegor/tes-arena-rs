@@ -67,8 +67,9 @@ impl StairsHooks for Counted {
     fn quest_level(&mut self, m: &mut Machine) {
         count(m, 0xFFE2);
     }
-    fn level_spawn(&mut self, m: &mut Machine) {
+    fn level_piles(&mut self, m: &mut Machine) -> Option<()> {
         count(m, 0xFFE4);
+        Some(())
     }
     fn level_screen(&mut self, m: &mut Machine) {
         assert!(self.level);
@@ -389,7 +390,9 @@ fn matches_original() {
                 let before = m.clone();
                 match op {
                     "stairs" => m.stairs_hook(&mut Counted { level: false }),
-                    "level" => m.level_entered(&mut Counted { level: true }),
+                    "level" => {
+                        m.level_entered(&mut Counted { level: true });
+                    }
                     _ => m.inf_done_hook(),
                 }
                 let segs: String = [WSEG, FSEG, CSEG]

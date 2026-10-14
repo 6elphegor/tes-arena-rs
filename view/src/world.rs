@@ -63,6 +63,11 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // the city's build): that last bank (21EE:004E: the pages less 1),
     // not bank 0, where the textures are.
     m.mem.w16(DS, 0x1030, 0x1F);
+    // GLOBAL.BSA's directory cached in bank 16h (21EE:005E, 0000:6A52),
+    // for the whole game: the INF loader caches it in bank 1Fh only once
+    // it was dropped (0000:EC05, EF6E: an INF loaded outside the 3D
+    // mode), and that bank is the one the loads unpack through.
+    m.bsa_cache_dir(&mut files, 0x16);
     let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
     m.mem.w16(DS, 0xBA54, off);
     m.mem.w16(DS, 0xBA56, seg);
@@ -288,7 +293,12 @@ fn summon_rolls(engine: &mut Engine) {
 
 /// The 256 colours (RGB, 8 bits) of PAL.COL, past its 8-byte header.
 pub fn palette(dir: &Path) -> [[u8; 4]; 256] {
-    let d = std::fs::read(dir.join("PAL.COL")).expect("PAL.COL");
+    palette_file(dir, "PAL.COL")
+}
+
+/// A .COL's 256 colours (RGB, 8 bits), past its 8-byte header.
+pub fn palette_file(dir: &Path, name: &str) -> [[u8; 4]; 256] {
+    let d = std::fs::read(dir.join(name)).unwrap_or_else(|_| panic!("{name}"));
     let mut p = [[0u8; 4]; 256];
     for (i, c) in p.iter_mut().enumerate() {
         *c = [d[8 + 3 * i], d[9 + 3 * i], d[10 + 3 * i], 255];
@@ -887,13 +897,15 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
 
 /// The renderer's hit test (0000:C4BB..C533) for a click in the centre of
 /// the view, while one is left for the actors (C39A bit 80h or 1000h):
-/// the nearest billboard the view's centre line meets before a wall
-/// (only across with C39A bit 1000h, as the original then tests only the
-/// x), the eye at `eye` (x, y, height) facing `heading`. A map flat
+/// the nearest billboard the click's line meets before a wall (only
+/// across with C39A bit 1000h, as the original then tests only the x),
+/// the eye at `eye` (x, y, height) facing `heading`; the line turns
+/// `yaw` (radians, right positive) from it and rises `slope` a unit of
+/// distance (both 0 through the centre of the view; `click_ray`). A map flat
 /// counts only when its record (FLATS, 5 bytes) has +1 or bit 1 of +3, or
 /// with C39A bit 400h. The original keeps the last sprite drawn over the
 /// cursor, drawing far to near, which is the nearest.
-pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32, tick: usize) -> Option<Target> {
+pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32, tick: usize, (yaw, slope): (f32, f32)) -> Option<Target> {
     let level = m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS);
     if level & 0x1080 == 0 {
         return None;
@@ -919,19 +931,36 @@ pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32,
             if t <= 0.0 || t >= wall || best.is_some_and(|(b, _)| t >= b) {
                 continue;
             }
-            let (px, pz) = (eye.0 + fx * t, eye.1 + fz * t);
+            // Along the click's line, turned `yaw`: depth t is t / cos(yaw)
+            // along it, and the line is tan(yaw) x t to the right there.
+            let side = yaw.tan() * t;
+            let (px, pz) = (eye.0 + fx * t + rx * side, eye.1 + fz * t + rz * side);
             let width = (p1[0] - p0[0]) * rx + (p1[2] - p0[2]) * rz;
             let u = (px - p0[0]) * rx + (pz - p0[2]) * rz;
             if !(0.0..=width).contains(&u) {
                 continue;
             }
-            if level & 0x1000 == 0 && !(p0[1]..=p2[1]).contains(&eye.2) {
+            if level & 0x1000 == 0 && !(p0[1]..=p2[1]).contains(&(eye.2 + slope * t)) {
                 continue;
             }
             best = Some((t, target));
         }
     }
     best.map(|(_, t)| t)
+}
+
+/// The line through the click (CB60, CB62: the cursor + 4, 2826:0393)
+/// as (yaw, slope) for `hit`: the view is drawn at 100 / tan 30 degrees
+/// rows a unit of distance (see `render`), its columns at that scale over
+/// a target `aspect` wide; the centre column C3D6, the eye line row C3D8.
+pub fn click_ray(m: &Machine, aspect: f32) -> (f32, f32) {
+    let r = |at: u16| m.mem.r16(DS, at) as i16 as f32;
+    let rows = 100.0 / 30f32.to_radians().tan();
+    let aspect = if aspect > 0.0 { aspect } else { 1.6 };
+    let cols = rows * (320.0 / 200.0) / aspect;
+    let x = r(arena::click::var::ACTOR_CLICK) - r(0xC3D6);
+    let y = r(arena::click::var::ACTOR_CLICK + 2) - r(0xC3D8);
+    ((x / cols).atan(), -y / rows)
 }
 
 /// A map flat clicked: the scratch record the original draws it through

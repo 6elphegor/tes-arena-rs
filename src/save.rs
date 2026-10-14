@@ -105,16 +105,16 @@ impl Machine {
     /// the walls are allocated cleared and the others not. The screen and
     /// palette are not shown (0000:946A and 9B56 write to the VGA), and
     /// the world is not rebuilt (0000:AA4B on). None where the file is
-    /// missing, the heap reports an error, EMS is on or a hook is set.
+    /// missing, the heap reports an error or a hook is set. With EMS the
+    /// banks but the level's are freed first (0000:5D74, `ems_reset`).
     pub fn save_load_level(&mut self, files: &mut Files) -> Option<()> {
         use crate::level::var::MAP_FLAGS;
         use crate::mif::var::{BUFFER_SEG, FLOOR_SEG, MAP1_SEG, MAP2_SEG};
         let path = self.save_path(SAVEGAME);
         let handle = self.file_open_handle(files, path)?;
         self.mem.w16(DS, LEVEL_HANDLE, handle);
-        if self.mem.r8(DS, crate::level::var::EMS_ON) != 0 {
-            return None;
-        }
+        // 0000:A9AC: with EMS, every bank but the level's freed (5D74).
+        self.ems_reset();
         let ceiling = self.mem.r16(DS, MAP_FLAGS) & 4 != 0;
         for (var, free) in [(MAP1_SEG, true), (FLOOR_SEG, true), (MAP2_SEG, ceiling)] {
             if free {

@@ -69,9 +69,9 @@ pub trait LootHooks {
     }
     /// 1194:D986: the eighth piece: the quest's end begins.
     fn last_piece(&mut self, _m: &mut Machine) {}
-    /// 2433:0000: the piles of treasure made (not ported).
-    fn piles(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// 2433:0000: the piles of treasure made (`Machine::piles`).
+    fn piles(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
+        m.piles()
     }
 }
 
@@ -147,7 +147,7 @@ impl Machine {
     /// 0000:5C86 with BX `page`: bank `page` mapped (`ems_map`); returns
     /// the bank mapped before (AX `ax` unchanged with EMS off or no such
     /// bank).
-    fn map_bank(&mut self, page: u16, ax: u16) -> u16 {
+    pub(crate) fn map_bank(&mut self, page: u16, ax: u16) -> u16 {
         if self.mem.r8(DS, 0x8FA6) == 0 || page >= self.mem.r16(DS, 0x9032) {
             return ax;
         }
@@ -289,7 +289,7 @@ impl Machine {
     /// 2433:027D: a pile at seg:`si` with neither gold nor a name, whose
     /// item's price (dword at its +0Ah) is 0, gets 0Fh gold (after an
     /// INT 3, which DOS ignores).
-    fn pile_fix(&mut self, seg: u16, si: u16) {
+    pub(crate) fn pile_fix(&mut self, seg: u16, si: u16) {
         if self.mem.r16(seg, si.wrapping_add(5)) == 0xFFFF
             && self.mem.r8(seg, si.wrapping_add(7)) == 0xFF
             && self.mem.r32(seg, si.wrapping_add(0x13)) == 0

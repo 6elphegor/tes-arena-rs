@@ -34,8 +34,9 @@ impl arena::hooks::StairsHooks for Show {
     fn automap_load(&mut self, _m: &mut Machine) {
         println!("    the new level's automap (292B:09AC)");
     }
-    fn level_spawn(&mut self, _m: &mut Machine) {
-        println!("    the level's creatures (2433:0000)");
+    fn level_piles(&mut self, m: &mut Machine) -> Option<()> {
+        println!("    the level's piles of treasure (2433:0000)");
+        m.piles()
     }
 }
 impl arena::controls::ControlHooks for Show {}

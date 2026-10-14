@@ -31,6 +31,8 @@ out = open(sys.argv[2], 'w')
 LO, HI = 0x3276 * 16, 0x3BA0 * 16 + 0x10000  # image-relative
 MAPSEG = 0x5000
 MAP_LIN = (LOAD_SEG + MAPSEG) * 16
+FLOORSEG = 0x6000
+FLOOR_LIN = (LOAD_SEG + FLOORSEG) * 16
 HANDLE = 7
 
 
@@ -131,6 +133,7 @@ def case(name, writes, seg, off, far=False, stop=None, rets=None, climate=None, 
         base = region()
     a.mu.mem_write(LOAD_SEG * 16 + LO, base)
     a.mu.mem_write(MAP_LIN, bytes(0x10000))
+    a.mu.mem_write(FLOOR_LIN, bytes(0x10000))
     for w in writes:
         o, size, v = w[0], w[1], w[-1]
         if len(w) == 4:  # segment value
@@ -150,7 +153,7 @@ def case(name, writes, seg, off, far=False, stop=None, rets=None, climate=None, 
         else:
             result = 'ok'
         diff = ' '.join(f'{LO + i:x}:{y:x}' for i, (x, y) in enumerate(zip(before, after)) if x != y)
-        marks = map_marks() if name == 'level' else ''
+        marks = map_marks() if name in ('level', 'first_level') else ''
     ws = []
     for w in writes:
         o, size, v = w[0], w[1], w[-1]
@@ -159,7 +162,7 @@ def case(name, writes, seg, off, far=False, stop=None, rets=None, climate=None, 
     if climate is not None:
         rg += f' climate:{climate:x}'
     line = f'{name} | {" ".join(ws)} | {rg} | {result} | {diff} | {marks}'
-    if name == 'level' and r == 'ret':
+    if name in ('level', 'first_level') and r == 'ret':
         line += ' | ' + ' '.join(f'{bp:x}={blk:x}' for bp, blk in chunks)
     out.write(line + '\n')
 
@@ -296,3 +299,16 @@ for i in range(400):
     mode = rng.choice([0, 1, 1, 2, 3, 4, 4, rng.getrandbits(16)])
     case('pick_entry', w, 0x26F7, 0x0C0A, far=True, rets=('ax', 'bx', 'cx', 'si'),
          ax=rng.randint(0, 8), bx=mode, cx=rng.choice([rng.randint(0, 15), rng.getrandbits(16)]), si=NAME_BUF)
+
+
+# --- 0000:2974 a made dungeon entered: its level built (2957: 299F, the
+# flats' lights 081A, the INF named), the player at its start (2978) ---
+for _ in range(300):
+    levels = rng.choice([1, 2, 4, rng.randint(1, 10)])
+    level = rng.choice([rng.randint(0, levels - 1), rng.getrandbits(8)])
+    tiles = lambda: rng.choice([0x20, 0x40, 0x40, 0x60, 0x80, rng.randint(0x20, 0xFF)])
+    w = seed_writes() + stairs() + [
+        (0xC357, 2, tiles()), (0xC359, 2, tiles()), (0xC355, 2, levels), (0xBB0A, 1, level),
+        (0xD806, 2, 's', MAPSEG), (0xCCD0, 2, 's', FLOORSEG), (0x6596, 2, rng.getrandbits(16)),
+        (0x7A46, 2, rng.getrandbits(16)), (0xC765, 1, rng.getrandbits(8)), (0xC38E, 2, rng.choice([0, rng.randint(0, 0x40)]))]
+    case('first_level', w, 0, 0x2974)
