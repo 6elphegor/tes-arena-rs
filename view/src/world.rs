@@ -26,6 +26,9 @@ pub struct Vertex {
 
 /// Vertex flag: a flat, drawn from the sprite layers, index 0 clear.
 pub const SPRITE: u32 = 1;
+/// Vertex flag: placed on the screen (x, y in clip space), behind the
+/// world, not shaded by the lights: the sky's objects.
+pub const SCREEN: u32 = 4;
 
 /// Map squares are 128 units across.
 pub const SQUARE: f32 = 128.0;
@@ -89,6 +92,16 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     }
     m.mem.w8(DS, 0xC3C6, 0x70);
     light_table(&mut m);
+    // The view's clip (A914..A91A: the whole 320 x 200 screen, as C39C
+    // holds it) and from it the centre column and the horizon's row
+    // (0000:A5D1); the sky's objects are placed by them.
+    for (at, v) in [(0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
+        m.mem.w16(DS, at, v);
+    }
+    let centre = (m.mem.r16(DS, 0xA918) + m.mem.r16(DS, 0xA914)) / 2 + m.mem.r16(DS, 0xCB86);
+    m.mem.w16(DS, 0xC3D6, centre);
+    let horizon = (m.mem.r16(DS, 0xA91A) + m.mem.r16(DS, 0xA916)) / 2;
+    m.mem.w16(DS, 0xC3D8, horizon);
     m.rng.seed = 1994;
     m.store_rng();
     let mut engine = Engine::new(m, files);
@@ -511,6 +524,20 @@ pub struct SpriteSheet {
     /// The people's images by file name (upper case), with their CFA
     /// header's height and offsets (+2, +6, +8).
     pub people: std::collections::HashMap<String, (Frames, [i16; 3])>,
+    /// The sky's images by file name (upper case): every name 2294:08B9
+    /// can make, and the volcano's (292B:029A).
+    pub sky: std::collections::HashMap<String, Frames>,
+}
+
+/// The files the sky's objects can be: mount001..011.img, desert1..4,
+/// temp01..10, cloud01..17 and the volcano near and far.
+fn sky_files() -> Vec<String> {
+    let mut v: Vec<String> = (1..=11).map(|i| format!("MOUNT0{i:02}.IMG")).collect();
+    v.extend((1..=4).map(|i| format!("DESERT{i}.IMG")));
+    v.extend((1..=10).map(|i| format!("TEMP{i:02}.IMG")));
+    v.extend((1..=17).map(|i| format!("CLOUD{i:02}.IMG")));
+    v.extend(["VOLCANO2.DFA".to_string(), "VOLCANO3.IMG".to_string()]);
+    v
 }
 
 /// Whether a file is a person's image: a view (`01PLTWLK.CFA`: a woman's
@@ -583,7 +610,7 @@ pub fn creature_names(m: &Machine) -> Vec<String> {
 }
 
 pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archive::Archive, names: &[String]) -> SpriteSheet {
-    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![], people: Default::default() };
+    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![], people: Default::default(), sky: Default::default() };
     let mut p = Packer { x: 0, y: 0, shelf: 0, sheet };
     for f in flats {
         let frames = f.as_ref().map(|f| p.add(f));
@@ -607,6 +634,13 @@ pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archi
             let at = |o: usize| i16::from_le_bytes([d[o], d[o + 1]]);
             let frames = p.add(&f);
             p.sheet.people.insert(name.to_string(), (frames, [at(2), at(6), at(8)]));
+        }
+    }
+    for name in sky_files() {
+        let kind = if name.ends_with(".DFA") { 1 } else { 0 };
+        if let Some(f) = archive.read(&name).as_deref().and_then(|d| crate::flats::decode(kind, d)) {
+            let frames = p.add(&f);
+            p.sheet.sky.insert(name, frames);
         }
     }
     let mut sheet = p.sheet;
@@ -759,4 +793,30 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
         }
     }
     out
+}
+
+/// A sky object drawn as the original would draw `rect` with its top
+/// left at screen (`x`, `y`) of its 320 x 200 view, as a quad in clip
+/// space: columns from the centre (C3D6) at 160 a unit of tan (the
+/// original's scale, CCF4 A0h), turned to this view's by `focal` (the
+/// tangent of half the field across); rows from the horizon (C3D8, the
+/// row above it the last), 100 to the half view; rows past `bottom` cut.
+#[allow(clippy::too_many_arguments)]
+pub fn sky_quad(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, horizon: i16, bottom: i16, focal: f32) {
+    let rows = (bottom as i32 + 1 - y as i32).clamp(0, rect.h as i32);
+    if rows == 0 {
+        return;
+    }
+    let cx = |c: f32| (c - centre as f32) / 160.0 / focal;
+    let cy = |r: f32| (horizon as f32 + 1.0 - r) / 100.0;
+    let (x0, x1) = (cx(x as f32), cx(x as f32 + rect.w as f32));
+    let (y0, y1) = (cy(y as f32), cy(y as f32 + rows as f32));
+    let p = [[x0, y1, 0.0], [x1, y1, 0.0], [x1, y0, 0.0], [x0, y0, 0.0]];
+    const IN: f32 = 0.01;
+    let (u0, u1) = (rect.x as f32 + IN, (rect.x + rect.w) as f32 - IN);
+    let (v0, v1) = (rect.y as f32 + IN, (rect.y + rows as u32) as f32 - IN);
+    let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
+    for i in [0, 1, 2, 0, 2, 3] {
+        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE | SCREEN });
+    }
 }
