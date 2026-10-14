@@ -123,6 +123,44 @@ def setup(seed):
             w.append((FRAME, h + f, pk(word())))
         w.append((FRAME, h + 4, pk(1 + byte() % 0x80)))
         w.append((FRAME, h + 6, pk(1 + byte() % 0x80)))
+    # Aimed cases, written over the rest: a depth on the edge (heading 0,
+    # every point at x 0 and y 100..102, ahead 63h..65h); the near
+    # volcano's left or right edge on the clip's (seen at the centre A0h,
+    # 40h wide, so from 80h to C0h); the roll for lightning 7CFh..7D1h
+    # (the game's seed the LCG's inverse times the roll's).
+    k = byte() % 4
+    if k == 1:
+        op = 1 + byte() % 2
+        w.append((None, 0xC3DA, pk(0)))
+        for at in [0x42BC + 6 * i for i in range(6)] + [0x4398 + 6 * i for i in range(8)] + [0x7BCA, 0x43C2]:
+            w.append((None, at, pk(0)))
+            w.append((None, at + 2, pk(100 + byte() % 3)))
+    elif k == 2:
+        op = 1
+        w.append((None, 0xC398, pk(4)))
+        w.append((None, 0xFFDE, pb(0)))
+        w.append((None, 0xC3DA, pk(0)))
+        w.append((None, 0x7BD2, pb(2)))
+        w.append((None, 0x7BCA, pk(0)))
+        w.append((None, 0x7BCC, pk(0x200)))
+        w.append((None, 0x7BCE, pk(0x100)))
+        w.append((None, 0xCCF4, pk(0xA0)))
+        w.append((None, 0xC3D6, pk(0xA0)))
+        w.append((FRAME, 0x100, pk(1 + byte() % 8)))
+        w.append((FRAME, 0x106, pk(0x40)))
+        if byte() & 1:
+            w.append((None, 0xA918, pk(0x7F + byte() % 3)))
+        else:
+            w.append((None, 0xA914, pk(0xBF + byte() % 3)))
+    elif k == 3:
+        op = 2
+        w.append((None, 0xC398, pk(4)))
+        w.append((None, 0xBB09, pb(1)))
+        w.append((None, 0xCCFE, pk(0x50)))
+        w.append((None, 0x05C8, pk(1)))
+        w.append((None, 0x43C6, pk(0xFFFF)))
+        r = 0x7CF + byte() % 3
+        w.append((None, 0x91F6, struct.pack('<I', ((r << 16 | byte()) * 0x3F154FA5) & 0xFFFFFFFF)))
     return w, op, mask
 
 

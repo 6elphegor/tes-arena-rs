@@ -183,6 +183,55 @@ fn setup(m: &mut Machine, seed: u32) -> (u8, u8) {
             m.mem.w16(FRAME, h + f, v);
         }
     }
+    // The aimed cases: a depth on the edge, the near volcano on the
+    // clip's edges, the roll for lightning at 7D0h.
+    let mut op = op;
+    match s.byte() % 4 {
+        1 => {
+            op = 1 + s.byte() % 2;
+            m.mem.w16(DS, 0xC3DA, 0);
+            let points = (0..6).map(|i| 0x42BC + 6 * i).chain((0..8).map(|i| 0x4398 + 6 * i)).chain([0x7BCA, 0x43C2]);
+            for at in points {
+                m.mem.w16(DS, at, 0);
+                let y = 100 + (s.byte() % 3) as u16;
+                m.mem.w16(DS, at + 2, y);
+            }
+        }
+        2 => {
+            op = 1;
+            m.mem.w16(DS, 0xC398, 4);
+            m.mem.w8(DS, 0xFFDE, 0);
+            m.mem.w16(DS, 0xC3DA, 0);
+            m.mem.w8(DS, 0x7BD2, 2);
+            m.mem.w16(DS, 0x7BCA, 0);
+            m.mem.w16(DS, 0x7BCC, 0x200);
+            m.mem.w16(DS, 0x7BCE, 0x100);
+            m.mem.w16(DS, 0xCCF4, 0xA0);
+            m.mem.w16(DS, 0xC3D6, 0xA0);
+            let v = 1 + (s.byte() % 8) as u16;
+            m.mem.w16(FRAME, 0x100, v);
+            m.mem.w16(FRAME, 0x106, 0x40);
+            if s.byte() & 1 != 0 {
+                let v = 0x7F + (s.byte() % 3) as u16;
+                m.mem.w16(DS, 0xA918, v);
+            } else {
+                let v = 0xBF + (s.byte() % 3) as u16;
+                m.mem.w16(DS, 0xA914, v);
+            }
+        }
+        3 => {
+            op = 2;
+            m.mem.w16(DS, 0xC398, 4);
+            m.mem.w8(DS, 0xBB09, 1);
+            m.mem.w16(DS, 0xCCFE, 0x50);
+            m.mem.w16(DS, 0x05C8, 1);
+            m.mem.w16(DS, 0x43C6, 0xFFFF);
+            let r = 0x7CF + (s.byte() % 3) as u32;
+            let lo = s.byte() as u32;
+            m.mem.w32(DS, 0x91F6, (r << 16 | lo).wrapping_mul(0x3F15_4FA5));
+        }
+        _ => {}
+    }
     (op, mask)
 }
 
