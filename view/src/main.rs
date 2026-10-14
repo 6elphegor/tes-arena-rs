@@ -28,17 +28,24 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// The front end's hooks: nothing asked of the player yet.
-struct Front;
+/// The front end's hooks: nothing asked of the player yet. With the
+/// sprites (`sheet`, animations at `tick`) the drawing makes the hit test
+/// for a click left for the actors (`clicked`).
+#[derive(Default)]
+struct Front<'a> {
+    sheet: Option<&'a world::SpriteSheet>,
+    tick: usize,
+    clicked: bool,
+}
 
-impl ControlHooks for Front {
+impl ControlHooks for Front<'_> {
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.wall_trigger(files, self)
     }
 }
-impl arena::weapon::WeaponHooks for Front {
+impl arena::weapon::WeaponHooks for Front<'_> {
     /// A building broken into by the swing.
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.wall_trigger(files, self)
@@ -46,19 +53,59 @@ impl arena::weapon::WeaponHooks for Front {
 }
 /// The triggers' messages are printed; entering an area isn't drawn yet
 /// (the frame ends: `Frame::Left`).
-impl arena::trigger::TriggerHooks for Front {
+impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
         println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, text)).replace('\r', "\n"));
     }
 }
-impl arena::clock::ClockHooks for Front {}
-impl arena::frame::FrameHooks for Front {}
-impl EngineHooks for Front {
+impl arena::clock::ClockHooks for Front<'_> {}
+impl arena::frame::FrameHooks for Front<'_> {
+    /// 1194:DB6C with the view's own talk hooks.
+    fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.actor_click(files, self)
+    }
+}
+/// Clicking on people and things: the texts are printed, the menus and
+/// lists shown and left at once (no pick yet).
+impl arena::talk::TalkHooks for Front<'_> {
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"));
+    }
+    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, _bx: u16, _di: u16) -> u16 {
+        println!("[menu] {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n"));
+        0xFFFF
+    }
+    fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
+        println!("[the way to {} at ({x}, {y})]", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
+    }
+}
+impl EngineHooks for Front<'_> {
     /// The original stepped the changed squares it drew: here those
     /// within the view's reach (C394 squares) step, seen or not.
     fn draw(&mut self, m: &mut arena::machine::Machine) {
         use arena::click::var::{DOOR_AT, DOOR_COL, DOOR_ROW, DOOR_X0, DOOR_X1};
         use arena::mem::DS;
+        use arena::movement::var::LEVEL_FLAGS;
+        // The click left for the actors (`view_click`, before the frame,
+        // whose input step clears C39A bit 80h) stands while it is drawn,
+        // as in the original, where the click comes in the input step: the
+        // sprite under it becomes CB5E (0000:C4FA), made ready for 1194:DB6C
+        // (2294:047B).
+        if let (true, Some(sheet)) = (std::mem::take(&mut self.clicked), self.sheet) {
+            let f = m.mem.r16(DS, LEVEL_FLAGS) | 0x80;
+            m.mem.w16(DS, LEVEL_FLAGS, f);
+            let v = arena::engine::View::of(m);
+            let eye = (v.x as f32, v.y as f32, v.height as f32 + v.bob as f32);
+            match world::hit(m, sheet, eye, v.heading as f32, self.tick) {
+                Some(world::Target::Slot(si)) => m.mem.w16(DS, arena::talk::var::CLICKED, si),
+                Some(world::Target::Flat { col, row, n }) => {
+                    world::flat_drawn(m, col, row, n);
+                    m.mem.w16(DS, arena::talk::var::CLICKED, arena::talk::var::FLAT_DRAWN);
+                }
+                None => {}
+            }
+            m.clicked_flat();
+        }
         // What a click in the centre would meet (the original's renderer
         // left the square and, for a door, its span under the cursor).
         if let Some(sq) = world::pick(m, m.mem.r16(DS, 0xC394)) {
@@ -429,39 +476,37 @@ fn main() {
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &mut engine);
-    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, next: Instant::now(), last: Some(arena::engine::Frame::Running) };
+    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, clicked: false, message: None, next: Instant::now(), last: Some(arena::engine::Frame::Running) };
     event_loop.run_app(&mut app).expect("run");
 }
 
 /// Renders one frame offscreen to a PNG, after `frames` frames of
 /// walking forward.
 fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait: usize, frames: usize, turn: i16) {
-    let mut hooks = Front;
+    let mut assets = Assets::new(dir, &mut engine);
+    let mut message = None;
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let t = engine.frame_ticks();
     engine.tick(t);
     let intent = Intent { look: turn, ..Default::default() };
-    engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
-    if click {
-        centre_click(&mut engine);
-    }
-    for _ in 0..wait {
+    engine.frame(Input::Steer(&intent), &mut Front::default()).expect("frame");
+    // A click is acted on in the next frame (its drawing finds what is
+    // under it), so one is waited at least.
+    let mut clicked = click && centre_click(&mut engine);
+    let wait = if click { wait.max(1) } else { wait };
+    for (k, forward) in std::iter::repeat_n(0, wait).chain(std::iter::repeat_n(256, frames)).enumerate() {
         let t = engine.frame_ticks();
         engine.tick(t);
-        engine.frame(Input::Steer(&Intent::default()), &mut hooks).expect("frame");
-    }
-    for _ in 0..frames {
-        let t = engine.frame_ticks();
-        engine.tick(t);
-        let intent = Intent { forward: 256, ..Default::default() };
+        let intent = Intent { forward, ..Default::default() };
+        let mut hooks = Front { sheet: Some(&assets.sheet), tick: (k + 1) * 4, clicked: std::mem::take(&mut clicked) };
         engine.frame(Input::Steer(&intent), &mut hooks).expect("frame");
+        print_message(&engine, &mut message);
     }
     let (w, h) = (640u32, 400u32);
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
-    let mut assets = Assets::new(dir, &mut engine);
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = assets.renderer(&device, &queue, format);
     let (sky, lights) = assets.light_frame(&mut engine.m);
@@ -509,11 +554,25 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
 }
 
 /// A left click in the centre of the view (`Machine::view_click`), on
-/// what the last frame's drawing left under it.
-fn centre_click(engine: &mut Engine) {
+/// what the last frame's drawing left under it. Whether it is left for
+/// the actors (C39A bit 80h), for the next frame's drawing to find.
+fn centre_click(engine: &mut Engine) -> bool {
     engine.m.set_mouse(160, 70, 0);
-    if engine.m.view_click(&mut engine.files, &mut Front).is_none() {
+    if engine.m.view_click(&mut engine.files, &mut Front::default()).is_none() {
         eprintln!("the click met something not ported");
+    }
+    engine.m.mem.r16(arena::mem::DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0
+}
+
+/// The game's message line (061A, shown while 061E counts down) printed
+/// when a new one comes up.
+fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
+    let msg = engine.view().message;
+    if msg != *last {
+        if let Some((seg, off)) = msg {
+            println!("{}", String::from_utf8_lossy(engine.m.mem.cstr(seg, off)));
+        }
+        *last = msg;
     }
 }
 
@@ -546,8 +605,12 @@ struct App {
     keys: Keys,
     look: f64,
     captured: bool,
-    /// A click waiting for the next frame.
+    /// A click waiting for the next frame, and one left for the actors
+    /// that the frame after it draws.
     click: bool,
+    clicked: bool,
+    /// The message line last printed.
+    message: Option<(u16, u16)>,
     next: Instant,
     /// How the last frame ended (reported when it changes).
     last: Option<arena::engine::Frame>,
@@ -568,12 +631,16 @@ impl App {
             jump: k.jump,
             run: k.run,
         };
-        if std::mem::take(&mut self.click) {
-            centre_click(&mut self.engine);
-        }
         let t = self.engine.frame_ticks();
         self.engine.tick(t);
-        let frame = self.engine.frame(Input::Steer(&intent), &mut Front);
+        let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
+        let mut hooks = Front { sheet: Some(&self.assets.sheet), tick, clicked: std::mem::take(&mut self.clicked) };
+        let frame = self.engine.frame(Input::Steer(&intent), &mut hooks);
+        print_message(&self.engine, &mut self.message);
+        // A click now is found by the next frame's drawing.
+        if std::mem::take(&mut self.click) {
+            self.clicked = centre_click(&mut self.engine);
+        }
         if frame != self.last {
             match frame {
                 Some(arena::engine::Frame::Running) => {}

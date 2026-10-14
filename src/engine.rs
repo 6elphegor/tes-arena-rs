@@ -171,7 +171,14 @@ impl Engine {
 
     /// What the renderer needs most often.
     pub fn view(&self) -> View {
-        let r = |at| self.m.mem.r16(DS, at);
+        View::of(&self.m)
+    }
+}
+
+impl View {
+    /// The view of the machine's state (`Engine::view`).
+    pub fn of(m: &Machine) -> View {
+        let r = |at| m.mem.r16(DS, at);
         View {
             x: r(X),
             y: r(Y),

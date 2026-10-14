@@ -486,6 +486,16 @@ pub fn doors(m: &Machine) -> Vec<Vertex> {
 /// first square that isn't empty along the player's heading, within
 /// `reach` squares; None past it or the map's edge.
 pub fn pick(m: &Machine, reach: u16) -> Option<u16> {
+    pick_at(m, reach).map(|(sq, _)| sq)
+}
+
+/// `pick`, with how far along the line the square was met.
+pub fn pick_at(m: &Machine, reach: u16) -> Option<(u16, f32)> {
+    pick_where(m, reach, |_| true)
+}
+
+/// `pick_at`, meeting only the squares `meets` takes.
+fn pick_where(m: &Machine, reach: u16, meets: impl Fn(u16) -> bool) -> Option<(u16, f32)> {
     let w = m.mem.r16(DS, 0xC357).min(128) as i32;
     let d = m.mem.r16(DS, 0xC359).min(128) as i32;
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
@@ -505,8 +515,9 @@ pub fn pick(m: &Machine, reach: u16) -> Option<u16> {
             continue;
         }
         let sq = (row << 8 | col << 1) as u16;
-        if m.mem.r16(walls, sq) != 0 {
-            return Some(sq);
+        let v = m.mem.r16(walls, sq);
+        if v != 0 && meets(v) {
+            return Some((sq, t));
         }
     }
     None
@@ -742,6 +753,20 @@ fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shif
 ///   + view (0..4, mirrored with flag 2) is the type's view file, C5h
 ///   (dying) its sixth, any other a flat (the corpse); +D the frame.
 pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
+    sprites_tagged(m, sheet, heading, tick).0
+}
+
+/// What a billboard shows, for the hit test: an actor slot (its offset)
+/// or a flat standing in the map (its square, its number from 0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target {
+    Slot(u16),
+    Flat { col: u16, row: u16, n: u16 },
+}
+
+/// `sprites`, with each target's vertices (a range of the list).
+fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> (Vec<Vertex>, Vec<(Target, std::ops::Range<usize>)>) {
+    let mut tags = Vec::new();
     let w = m.mem.r16(DS, 0xC357).min(128);
     let d = m.mem.r16(DS, 0xC359).min(128);
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
@@ -762,14 +787,27 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
             let n = ((v & 0xFF) + base) as usize;
             if let Some(f) = flat(n) {
                 let (x, y) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
+                let start = out.len();
                 billboard(&mut out, frame_of(f, tick), x, y, lift(n), right, false);
+                tags.push((Target::Flat { col, row, n: n as u16 }, start..out.len()));
             }
         }
     }
     let seg = m.mem.r16(DS, 0x1042);
     let list = people_list(m);
     let towns = townsfolk(m);
+    // The slot being drawn and where its vertices start, tagged once the
+    // next one begins.
+    let mut open: Option<(u16, usize)> = None;
+    let mut close = |open: &mut Option<(u16, usize)>, end: usize| {
+        if let Some((si, start)) = open.take() {
+            if end > start {
+                tags.push((Target::Slot(si), start..end));
+            }
+        }
+    };
     for slot in 0..23u16 {
+        close(&mut open, out.len());
         let si = 0x0AB3 + slot * 0x1C;
         let flags = m.mem.r16(DS, si + 0xF);
         let rec = m.mem.r16(DS, si + 0x12);
@@ -777,6 +815,7 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
         if flags & 0x4000 != 0 {
             continue;
         }
+        open = Some((si, out.len()));
         let (x, z, y) = (m.mem.r16(DS, si) as f32, m.mem.r16(DS, si + 2) as i16 as f32, m.mem.r16(DS, si + 4) as f32);
         let sprite = m.mem.r8(DS, si + 0xC);
         let frame = m.mem.r8(DS, si + 0xD) as usize;
@@ -826,7 +865,86 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
             billboard(&mut out, frame_of(f, if frame == 0xFF { f.count - 1 } else { frame }), x, y, -z, right, mirror);
         }
     }
-    out
+    close(&mut open, out.len());
+    (out, tags)
+}
+
+/// The renderer's hit test (0000:C4BB..C533) for a click in the centre of
+/// the view, while one is left for the actors (C39A bit 80h or 1000h):
+/// the nearest billboard the view's centre line meets before a wall
+/// (only across with C39A bit 1000h, as the original then tests only the
+/// x), the eye at `eye` (x, y, height) facing `heading`. A map flat
+/// counts only when its record (FLATS, 5 bytes) has +1 or bit 1 of +3, or
+/// with C39A bit 400h. The original keeps the last sprite drawn over the
+/// cursor, drawing far to near, which is the nearest.
+pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32, tick: usize) -> Option<Target> {
+    let level = m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS);
+    if level & 0x1080 == 0 {
+        return None;
+    }
+    let (verts, tags) = sprites_tagged(m, sheet, heading, tick);
+    let a = heading / 512.0 * std::f32::consts::TAU;
+    let (fx, fz) = (a.sin(), a.cos());
+    let (rx, rz) = (a.cos(), -a.sin());
+    // The wall in the way: a square holding flats is passed through.
+    let wall = pick_where(m, m.mem.r16(DS, 0xC394), |v| v >> 12 != 8).map_or(f32::MAX, |(_, t)| t);
+    let mut best: Option<(f32, Target)> = None;
+    for (target, range) in tags {
+        if let Target::Flat { n, .. } = target {
+            let rec = arena::info::var::FLATS + n * 5;
+            if level & 0x400 == 0 && m.mem.r8(DS, rec + 1) == 0 && m.mem.r8(DS, rec + 3) & 1 == 0 {
+                continue;
+            }
+        }
+        for q in verts[range].chunks(6) {
+            // Corners: bottom left, bottom right, top right.
+            let (p0, p1, p2) = (q[0].pos, q[1].pos, q[2].pos);
+            let t = (p0[0] - eye.0) * fx + (p0[2] - eye.1) * fz;
+            if t <= 0.0 || t >= wall || best.is_some_and(|(b, _)| t >= b) {
+                continue;
+            }
+            let (px, pz) = (eye.0 + fx * t, eye.1 + fz * t);
+            let width = (p1[0] - p0[0]) * rx + (p1[2] - p0[2]) * rz;
+            let u = (px - p0[0]) * rx + (pz - p0[2]) * rz;
+            if !(0.0..=width).contains(&u) {
+                continue;
+            }
+            if level & 0x1000 == 0 && !(p0[1]..=p2[1]).contains(&eye.2) {
+                continue;
+            }
+            best = Some((t, target));
+        }
+    }
+    best.map(|(_, t)| t)
+}
+
+/// A map flat clicked: the scratch record the original draws it through
+/// (FLAT_DRAWN, 0000:D18E) filled as it fills it: the square's centre,
+/// z the flat's lift (+ the level's ceiling D80C negated with bit 20h of
+/// its +3; the floor's height the drawing adds, BP, is taken as 0), the
+/// flat's number, no flags, and an animated flat's frame (its frame count
+/// +0Eh, from CA97, the frame the frame counter CCBC gives) or FFh.
+pub fn flat_drawn(m: &mut Machine, col: u16, row: u16, n: u16) {
+    use arena::talk::var::FLAT_DRAWN as D;
+    let rec = arena::info::var::FLATS + n * 5;
+    let mut z = m.mem.r8(DS, rec) as i8 as i16 as u16;
+    if m.mem.r8(DS, rec + 3) & 0x20 != 0 {
+        z = z.wrapping_sub(m.mem.r16(DS, 0xD80C));
+    }
+    m.mem.w16(DS, D + 0xF, 0);
+    m.mem.w16(DS, D + 0x16, 0);
+    m.mem.w16(DS, D + 2, z);
+    m.mem.w8(DS, D + 0xD, 0xFF);
+    m.mem.w8(DS, D + 0xC, n as u8);
+    let frames = m.mem.r8(DS, 0xCA97 + n);
+    if frames != 0 {
+        m.mem.w8(DS, D + 0xE, frames);
+        let k = (frames & 0x7F).max(1);
+        let f = (m.mem.r16(DS, 0xCCBC) as u8) % k;
+        m.mem.w8(DS, D + 0xD, f);
+    }
+    m.mem.w16(DS, D, col << 7 | 0x40);
+    m.mem.w16(DS, D + 4, row << 7 | 0x40);
 }
 
 /// A sky object drawn as the original would draw `rect` with its top
