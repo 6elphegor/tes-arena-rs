@@ -316,7 +316,7 @@ impl Machine {
     /// dungeon of kind 4 except D48 8 and 0Bh counts), everyone becomes
     /// peaceful (1194:42B5) and the guards come in 15 frames (the hook at
     /// 67EA, 0000:3F0C).
-    fn call_guards(&mut self) {
+    pub(crate) fn call_guards(&mut self) {
         if self.mem.r16(DS, 0x0FFB) != 0 {
             return;
         }

@@ -47,3 +47,4 @@ pub mod shop;
 pub mod sky;
 pub mod spell;
 pub mod strike;
+pub mod trigger;
