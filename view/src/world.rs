@@ -120,6 +120,39 @@ fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
     m.outdoor_inf();
 }
 
+/// 0000:45FC..4631 for a city entered: in the daytime (CCFE 100h..300h)
+/// fifteen townspeople come around the player (`spawn_actors`, speed
+/// 0Ah); their graphics are the front end's (0000:17F9, `townsfolk`).
+/// The wilderness's seven are not done here.
+pub fn city_people(engine: &mut Engine) {
+    let m = &mut engine.m;
+    let t = m.mem.r16(DS, 0xCCFE);
+    if m.mem.r16(DS, 0xC398) & 4 == 0 || m.mem.r16(DS, 0xC39A) & 0x200 != 0 || !(0x100..=0x300).contains(&t) {
+        return;
+    }
+    if m.spawn_actors(0xF, 0xA).is_none() {
+        eprintln!("the townspeople met code not ported");
+    }
+}
+
+/// 0000:17F9: the townspeople's files, men's (actor +11h 34h) then
+/// women's (39h), with `@` the view: men by climate (DA8 / 4: mlgen0@w,
+/// @d, @t), women in the desert climate (4) fmgend0@, in snow (BB09 low
+/// bits 2) fmgenw0@, else fmgen0@.
+pub fn townsfolk(m: &Machine) -> [String; 2] {
+    let climate = m.mem.r16(DS, 0x0DA8);
+    let name = |at: u16| String::from_utf8_lossy(m.mem.cstr(DS, at)).into_owned();
+    let man = name(m.skip_strings(DS, 0x620A, climate >> 2));
+    let woman = if climate == 4 {
+        0x623D
+    } else if m.mem.r8(DS, 0xBB09) & 0x7F == 2 {
+        0x624A
+    } else {
+        0x6231
+    };
+    [man, name(woman)]
+}
+
 /// A debugging aid: rolls random encounters (as the clock does hourly)
 /// until creatures come, at most 1000 times, with the area taken as kind
 /// 3 (as a dungeon's above 8 is) for the rolls.
@@ -637,6 +670,7 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
     }
     let seg = m.mem.r16(DS, 0x1042);
     let list = people_list(m);
+    let towns = townsfolk(m);
     for slot in 0..23u16 {
         let si = 0x0AB3 + slot * 0x1C;
         let flags = m.mem.r16(DS, si + 0xF);
@@ -651,6 +685,19 @@ pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> V
         let mirror = flags & 2 != 0;
         // A person in a fight (0000:1C9A): the walk, or from frame 6 the
         // attack with the weapon over it.
+        // A townsperson (0000:1CAC): the file by +11h, the frame as it is.
+        if slot < 15 && (0xC0..0xC5).contains(&sprite) {
+            let file = match m.mem.r8(DS, si + 0x11) {
+                0x34 => &towns[0],
+                0x39 => &towns[1],
+                _ => continue,
+            };
+            let name = file.replace('@', &(sprite - 0xC0 + 1).to_string()).to_ascii_uppercase();
+            if let Some(&(f, _)) = sheet.people.get(&name) {
+                billboard(&mut out, frame_of(f, frame), x, y, -z, right, mirror);
+            }
+            continue;
+        }
         let person = slot >= 15 && m.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x1000 == 0;
         if person && (0xC0..0xC5).contains(&sprite) && !list.is_empty() {
             let view = (sprite - 0xC0 + 1).to_string();

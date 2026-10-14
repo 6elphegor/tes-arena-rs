@@ -251,7 +251,11 @@ member using wgpu, winit, glam and png.
   - people in a fight, from the list `person_outfit` built: the walk for
     frames 0..5, from frame 6 the attack with the weapon over it, placed
     by the files' headers as 0000:1B7F places it. Every person's file in
-    GLOBAL.BSA is packed into the atlas at load.
+    GLOBAL.BSA is packed into the atlas at load;
+  - townspeople (the first 15 slots): men's or women's files by +11h
+    (34h, 39h), named by climate and weather as 0000:17F9 names them.
+    `world::city_people` brings fifteen in the daytime as entering a
+    city does (0000:45FC; the entry itself is not ported).
 
   `world::doors` draws the doors each frame, swung open by their state.
   How the original drew a door ajar isn't ported: a panel on each side
@@ -285,7 +289,7 @@ cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
-Not drawn yet: the townspeople (MLGEN/FMGEN files by climate), the other door kinds moving, chasms
+Not drawn yet: the other door kinds moving, chasms
 and water, the outdoor light by time of day (the ground stays lit at
 night), the mountains, clouds, sun, moons and stars, and the interface. How a dungeon's placed creatures
 (map flats naming creature files, such as rat.dfa) come to life is not

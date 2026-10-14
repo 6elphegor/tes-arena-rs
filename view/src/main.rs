@@ -194,6 +194,7 @@ fn main() {
         engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
         engine.m.sky_time().expect("sky time");
     }
+    world::city_people(&mut engine);
     if let Some((col, row, heading)) = at {
         use arena::movement::var::{HEADING, X, Y};
         engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);

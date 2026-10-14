@@ -1,5 +1,6 @@
 //! Prints what the view reads of a level after loading it: the textures,
-//! flats, ceiling, light, time and the squares around the player.
+//! flats, ceiling, light, time, the squares around the player, and a
+//! city's townspeople.
 //!
 //! Usage: level GAME_DIR LEVEL.MIF
 #![allow(dead_code)]
@@ -13,7 +14,8 @@ use arena::mem::DS;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
-    let e = world::load(std::path::Path::new(&a[1]), &a[2]);
+    let mut e = world::load(std::path::Path::new(&a[1]), &a[2]);
+    world::city_people(&mut e);
     let m = &e.m;
     let v = e.view();
     let tex = world::textures(m);
@@ -36,6 +38,8 @@ fn main() {
     }
     let n8 = (0..m.mem.r16(DS, 0xC359).min(128)).flat_map(|r| (0..m.mem.r16(DS, 0xC357).min(128)).map(move |c| (r, c))).filter(|&(r, c)| m.mem.r16(walls, r << 8 | c << 1) >> 12 == 8).count();
     println!("flat squares {n8}");
+    let slots: Vec<u8> = (0..15u16).filter(|i| m.mem.r16(DS, 0x0AB3 + i * 0x1C + 0xF) & 0x4000 == 0).map(|i| m.mem.r8(DS, 0x0AB3 + i * 0x1C + 0x11)).collect();
+    println!("townspeople {slots:x?}, files {:?}", world::townsfolk(m));
     let name: String = (0..13).map(|i| m.mem.r8(DS, arena::info::var::NAME + i)).take_while(|&c| c != 0).map(|c| c as char).collect();
     let used: Vec<u16> = (0..0x40).filter(|&i| m.mem.r8(DS, arena::info::var::USED + i) != 0).collect();
     let (bo, bs) = (m.mem.r16(DS, 0xBA54), m.mem.r16(DS, 0xBA56));

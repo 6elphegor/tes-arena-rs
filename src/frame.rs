@@ -419,7 +419,7 @@ impl Machine {
     /// 0000:1793. `n` actors (if in a town) are put around the player
     /// (`actor_respawn`) at speed `speed`, walking (2008h), state 34h or
     /// at random 39h with flag 1000h; the actors' squares are refilled.
-    fn spawn_actors(&mut self, n: u16, speed: u16) -> Option<()> {
+    pub fn spawn_actors(&mut self, n: u16, speed: u16) -> Option<()> {
         let n = if self.mem.r16(DS, MAP_FLAGS) & 4 == 0 { 0 } else { n };
         if n == 0 {
             return Some(());
