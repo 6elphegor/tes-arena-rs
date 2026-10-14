@@ -14,7 +14,8 @@
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
-//! `walk:N` (frames), `wait:N`, `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
+//! `walk:N` (frames), `wait:N`, `at:COL:ROW:HEADING` (as --at, then a
+//! frame), `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
 //! code N down for a frame: 60 is F2, the player's square on the message
 //! line). --picks answers the game's questions in order: a menu's entry
 //! by its number (talking to someone: 0 the greeting, 1 "Where is...", 2
@@ -128,6 +129,12 @@ impl arena::trigger::TriggerHooks for Front<'_> {
         m.wild_leave_city(files, &mut arena::wild::PortWild);
         Some(())
     }
+    /// A dungeon's entrance in the wilderness: the wilderness left
+    /// (217B:04DC); the dungeon is made after (`areas::next`).
+    fn enter_dungeon(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_done();
+        Some(())
+    }
 }
 impl arena::clock::ClockHooks for Front<'_> {}
 impl arena::frame::FrameHooks for Front<'_> {
@@ -156,6 +163,11 @@ impl arena::talk::TalkHooks for Front<'_> {
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
         self.note(&s);
+    }
+    /// A dungeon's keeper in the wilderness: in (0000:08EC).
+    fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        m.wild_dungeon_entry();
+        Some(())
     }
 }
 /// Resting (src/rest.rs): its menu and the hours typed through `dialog`,
@@ -798,6 +810,17 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         shot_frame(dir, &mut engine, run, st, &walk).expect("area");
     }
     for step in steps.split(',').filter(|s| !s.is_empty()) {
+        if let Some(at) = step.strip_prefix("at:") {
+            // A square's centre and a heading, as --at, then a frame
+            // standing (the wilderness's window follows in its input step).
+            let v: Vec<u16> = at.split(':').map(|x| x.parse().expect("--do at:COL:ROW:HEADING")).collect();
+            use arena::movement::var::{HEADING, X, Y};
+            engine.m.mem.w16(arena::mem::DS, X, v[0] << 7 | 0x40);
+            engine.m.mem.w16(arena::mem::DS, Y, v[1] << 7 | 0x40);
+            engine.m.mem.w16(arena::mem::DS, HEADING, v[2]);
+            shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            continue;
+        }
         let (what, n) = step.split_once(':').map_or((step, 1), |(a, n)| (a, n.parse().expect("--do: a number")));
         match what {
             "click" => {

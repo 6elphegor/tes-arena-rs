@@ -63,6 +63,11 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // the city's build): that last bank (21EE:004E: the pages less 1),
     // not bank 0, where the textures are.
     m.mem.w16(DS, 0x1030, 0x1F);
+    // GLOBAL.BSA's directory cached in bank 16h (21EE:005E, 0000:6A52),
+    // for the whole game: the INF loader caches it in bank 1Fh only once
+    // it was dropped (0000:EC05, EF6E: an INF loaded outside the 3D
+    // mode), and that bank is the one the loads unpack through.
+    m.bsa_cache_dir(&mut files, 0x16);
     let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
     m.mem.w16(DS, 0xBA54, off);
     m.mem.w16(DS, 0xBA56, seg);

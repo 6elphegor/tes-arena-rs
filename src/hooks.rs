@@ -288,9 +288,38 @@ impl Machine {
     /// `dungeon_build_level`), its lights made (0000:081A with 7A46
     /// cleared, `flat_lights`) and its INF (4718) to be loaded.
     pub fn dungeon_level_hook(&mut self, files: &mut Files) -> Option<()> {
+        self.dungeon_level_with(|m, level| m.dungeon_build_level(files, level))
+    }
+
+    /// 0000:2974, a made dungeon entered (the place hook 0000:45B2 calls
+    /// it when entering, 5C8 bit 800h, with C39A bit 800h, which the
+    /// dungeon's set-up sets): its level built (0000:2957,
+    /// `dungeon_level_hook`) and the player put at its start
+    /// (0000:2978, `dungeon_start_position`: the start cell's stairs).
+    pub fn dungeon_first_level(&mut self, files: &mut Files) -> Option<()> {
+        self.dungeon_level_hook(files)?;
+        self.dungeon_start_position();
+        Some(())
+    }
+
+    /// `dungeon_first_level` without the file I/O, as `dungeon_level`
+    /// builds a level (random1.mif's file handle `handle`): returns the
+    /// chunks in load order.
+    pub fn dungeon_first_level_plan(&mut self, handle: u16) -> Option<Vec<crate::dungeon::Chunk>> {
+        let mut chunks = None;
+        self.dungeon_level_with(|m, level| {
+            chunks = Some(m.dungeon_level(level, handle)?);
+            Some(())
+        })?;
+        self.dungeon_start_position();
+        chunks
+    }
+
+    /// 0000:2957 with the level's build (0000:299F) `build`.
+    fn dungeon_level_with(&mut self, build: impl FnOnce(&mut Self, u8) -> Option<()>) -> Option<()> {
         self.mem.w8(DS, 0xC765, 0);
         let level = self.mem.r8(DS, crate::movement::var::LEVEL);
-        self.dungeon_build_level(files, level)?;
+        build(self, level)?;
         self.flat_lights();
         self.mem.w16(DS, crate::info::var::INFO_PTR, 0x4718);
         Some(())
