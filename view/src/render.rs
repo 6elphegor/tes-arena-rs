@@ -23,6 +23,9 @@ pub struct Sky {
     pub outdoors: bool,
     pub afternoon: bool,
     pub colours: [[u8; 3]; 8],
+    /// The row of the shading table everything is remapped through
+    /// first (the light level's high byte; 0 by day).
+    pub dark: u32,
 }
 
 /// Where the player stands and looks (map units; heading 0..511 a turn,
@@ -326,7 +329,7 @@ impl Renderer {
         let globals = Globals {
             view_proj: (proj * view).to_cols_array_2d(),
             eye: [cam.x, cam.height, cam.y, 0.0],
-            shade: [96.0, 12.0, 0.0, 0.0],
+            shade: [96.0, 12.0, self.sky.dark as f32, 0.0],
             sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, height as f32],
             palette: self.palette,
         };

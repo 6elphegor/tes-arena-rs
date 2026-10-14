@@ -20,6 +20,9 @@ fn main() {
     let v = e.view();
     let tex = world::textures(m);
     let fl = world::flats(m);
+    let sh = world::shading(m);
+    let same = |r: usize| (0..256).filter(|&i| sh[r * 256 + i] as usize == i).count();
+    println!("shading rows identity count: {:?}", (0..16).map(same).collect::<Vec<_>>());
     println!("textures {} (non-empty {}), flats {} (decoded {})", tex.len(), tex.iter().filter(|t| t.iter().any(|&b| b != 0)).count(), fl.len(), fl.iter().flatten().count());
     println!("ceiling {:#x} map {}x{} light {:#x} time {:#x} level flags C39A {:#x} C398 {:#x}", m.mem.r16(DS, arena::movement::var::CEILING), m.mem.r16(DS, 0xC357), m.mem.r16(DS, 0xC359), v.light, v.time_of_day, m.mem.r16(DS, 0xC39A), m.mem.r16(DS, 0xC398));
     let (col, row) = (v.x >> 7, v.y >> 7);

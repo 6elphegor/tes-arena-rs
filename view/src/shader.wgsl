@@ -5,7 +5,8 @@
 struct Globals {
     view_proj: mat4x4<f32>,
     eye: vec4<f32>,
-    // x: distance per shading row, y: rows (darkest kept), z: light radius.
+    // x: distance per shading row, y: rows (darkest kept), z: the row
+    // every index is remapped through first (night outdoors; 0 none).
     shade: vec4<f32>,
     // x: outdoors (a sky), y: afternoon (the second dither), z, w: the
     // target's size.
@@ -59,6 +60,9 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     } else {
         let t = vec2<i32>(floor(i.uv)) & vec2<i32>(63, 63);
         index = textureLoad(textures, t, i32(i.layer), 0).r;
+    }
+    if g.shade.z > 0.0 {
+        index = textureLoad(shading, vec2<i32>(i32(index), i32(g.shade.z)), 0).r;
     }
     let dist = distance(i.world.xz, g.eye.xz);
     var row = i32(dist / g.shade.x + (1.0 - i.light) * 4.0);

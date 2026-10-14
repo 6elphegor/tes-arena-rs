@@ -11,6 +11,10 @@
 //! entries are the palette's, anything else drawn in colours 1..8
 //! changes with them.
 //!
+//! At night the textures darken: the light level (0000:0390, `sky_light`)
+//! is a row of the light table they are remapped through, 10 at night,
+//! stepping to none over dawn and dusk.
+//!
 //! The file loads and the palette writes are the front end's: these
 //! routines keep the game's record of what is loaded and say what to do.
 
@@ -30,6 +34,10 @@ pub mod var {
     pub const DAYTIME: u16 = 0x42AD;
     pub const DITHER_MORNING: u16 = 0x428B;
     pub const DITHER_AFTERNOON: u16 = 0x4296;
+    /// The light level outdoors (a row of the light table, in the high
+    /// byte; FFFFh full day), and the dawn and dusk steps (16 words).
+    pub const LIGHT: u16 = 0x3C87;
+    pub const LIGHT_STEPS: u16 = 0x3D46;
     /// The time of day (0..3FFh) and the weather.
     pub const TIME: u16 = 0xCCFE;
     pub const WEATHER: u16 = 0xBB09;
@@ -62,6 +70,31 @@ impl Machine {
         }
         self.mem.w16(DS, COLOURS, name);
         Some(name)
+    }
+
+    /// 0000:0390's light level for the time of day, stored at LIGHT and
+    /// returned (indoors it is left as it is): FFFFh by day (110h..2F0h), at
+    /// dawn (100h..10Fh) and dusk (2F1h..300h) the step at LIGHT_STEPS for
+    /// the time from sunrise or to sunset (0A00h down to 0), 0A00h at
+    /// night. While it isn't FFFFh the textures are remapped through
+    /// that row of the light table (0000:02F2, 2294:032E), as the front
+    /// end does.
+    pub fn sky_light(&mut self) -> u16 {
+        if self.mem.r16(DS, crate::movement::var::MAP_FLAGS) & 4 == 0 {
+            return self.mem.r16(DS, LIGHT);
+        }
+        let t = self.mem.r16(DS, TIME);
+        let level = if !(0x100..=0x300).contains(&t) {
+            0xA00
+        } else if t < 0x110 {
+            self.mem.r16(DS, LIGHT_STEPS + 2 * (t - 0x100))
+        } else if t > 0x2F0 {
+            self.mem.r16(DS, LIGHT_STEPS + 2 * (0x300 - t))
+        } else {
+            0xFFFF
+        };
+        self.mem.w16(DS, LIGHT, level);
+        level
     }
 
     /// 2294:0341. The window for the time of day, and the dither for the

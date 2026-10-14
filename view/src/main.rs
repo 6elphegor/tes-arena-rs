@@ -143,7 +143,9 @@ impl Assets {
                 *v = *c.get(w + 3 * i + k).unwrap_or(&0);
             }
         }
-        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours }
+        let level = m.sky_light();
+        let dark = if level == 0xFFFF { 0 } else { (level >> 8) as u32 };
+        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark }
     }
 
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
