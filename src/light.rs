@@ -20,9 +20,43 @@
 //!
 //! Outdoors in full daylight (C398 bit 8000h) the drawing skips the
 //! lights: everything is bright.
+//!
+//! Outdoors each frame `outdoor_light` (0000:0390) follows the time of
+//! day: by night, and through dawn and dusk, the daylight bit is clear,
+//! the textures are darkened (a row of the light table, `sky_light`'s
+//! level), the level's lights are made and a city's street lamps lit
+//! (2294:028C); by day the lamps go out and the bit is set again
+//! (0000:033D), unless in fog.
 
 use crate::machine::Machine;
 use crate::mem::DS;
+
+/// What the day and night switch leaves to the front end.
+pub trait LightHooks {
+    /// 2294:0B8A's I/O: the light table (CCC2) freed, NORMAL.LGT loaded
+    /// to 3AAC:0240 and the table made again (0000:AAA2). The rest of
+    /// 0B8A is `light_table_reset`'s.
+    fn light_table(&mut self, _m: &mut Machine) {}
+    /// 0000:027A and 02F2: the sky's images (when listed) and the
+    /// textures remapped through row `level >> 8` of the light table.
+    /// 027A remakes the sky's objects first (2294:08B9) when there are
+    /// any.
+    fn relight(&mut self, _m: &mut Machine, _level: u16) {}
+    /// 0000:DFDB (with BA17): the textures as loaded, put back.
+    fn restore_textures(&mut self, _m: &mut Machine) {}
+    /// 2294:08B9: the sky's objects made again.
+    fn sky_objects(&mut self, _m: &mut Machine) {}
+    /// 0000:9B5B: palette entry `index` set to the colour at DS:`at`
+    /// (three 6-bit values).
+    fn palette(&mut self, _m: &mut Machine, _index: u8, _at: u16) {}
+    /// 2294:0341's loads and palette writes (`sky_step` decides).
+    fn sky(&mut self, _m: &mut Machine, _step: crate::sky::SkyStep) {}
+}
+
+/// `LightHooks` that do nothing.
+pub struct NoLightHooks;
+
+impl LightHooks for NoLightHooks {}
 
 /// DGROUP variables.
 pub mod var {
@@ -163,6 +197,195 @@ impl Machine {
             }
             si = si.wrapping_add(6);
         }
+    }
+
+    /// 0000:0390. Outdoors (C398 bit 4) the frame's light by the time of
+    /// day (indoors only the row limits are reset: 0Eh, 0Dh, 0Eh):
+    /// - first the sky's window (`sky_step`, 2294:0341);
+    /// - night (before 100h, after 300h): no daylight bit, the row limits
+    ///   reset, the night switch (`night_switch`); when the level isn't
+    ///   0A00h already it becomes so, the lamps' colour (entry 71h) is
+    ///   set, and the textures relit;
+    /// - dawn (100h..10Fh) and dusk (2F1h..300h): no daylight bit, the
+    ///   night switch, the level of the step (`sky_light`'s table); when
+    ///   it changes, the lamps' colour from the table at 3D66 and the
+    ///   textures relit, and the row limits follow the level's row r:
+    ///   LIMIT r + max(0, r / 2 - 1), DARK one less (not below 0), FAR
+    ///   DARK + 2;
+    /// - day: level FFFFh; once (5C8 bit 200h) the day switch
+    ///   (`day_switch`), the textures put back, then in fog (F81) the
+    ///   lamps' colour a grey, otherwise the daylight bit and no colour.
+    pub fn outdoor_light(&mut self, hooks: &mut dyn LightHooks) {
+        if self.mem.r16(DS, crate::movement::var::MAP_FLAGS) & 4 == 0 {
+            self.reset_rows();
+            return;
+        }
+        let step = self.sky_step();
+        hooks.sky(self, step);
+        let t = self.mem.r16(DS, crate::sky::var::TIME);
+        if !(0x100..=0x300).contains(&t) {
+            self.daylight(false);
+            self.reset_rows();
+            self.night_switch(hooks);
+            if self.mem.r16(DS, crate::sky::var::LIGHT) == 0xA00 {
+                return;
+            }
+            self.mem.w16(DS, crate::sky::var::LIGHT, 0xA00);
+            hooks.relight(self, 0xA00);
+            self.lamp_colour(hooks, [0x3F, 0x29, 0]);
+            return;
+        }
+        if t < 0x110 || t > 0x2F0 {
+            self.daylight(false);
+            self.night_switch(hooks);
+            let i = if t < 0x110 { t - 0x100 } else { 0x300 - t };
+            let level = self.mem.r16(DS, crate::sky::var::LIGHT_STEPS + 2 * i);
+            if level == self.mem.r16(DS, crate::sky::var::LIGHT) {
+                return;
+            }
+            self.mem.w16(DS, crate::sky::var::LIGHT, level);
+            hooks.palette(self, 0x71, 0x3D66 + 3 * i);
+            hooks.relight(self, level);
+            let r = level >> 8;
+            let limit = r + ((r >> 1) as i16 - 1).max(0) as u16;
+            self.mem.w16(DS, LIMIT, limit);
+            let dark = (limit as i16 - 1).max(0) as u16;
+            self.mem.w16(DS, DARK, dark);
+            self.mem.w16(DS, FAR, dark + 2);
+            return;
+        }
+        self.mem.w16(DS, crate::sky::var::LIGHT, 0xFFFF);
+        let f = self.mem.r16(DS, 0x05C8);
+        if f & 0x200 != 0 {
+            return;
+        }
+        self.mem.w16(DS, 0x05C8, f | 0x200);
+        self.day_switch(hooks);
+        self.mem.w16(DS, 0xCD00, 0xFFFF);
+        hooks.restore_textures(self);
+        self.mem.w16(DS, crate::sky::var::LIGHT, 0xFFFF);
+        if self.mem.r8(DS, 0x0F81) != 0 {
+            self.lamp_colour(hooks, [0x22, 0x22, 0x25]);
+            return;
+        }
+        self.daylight(true);
+        self.lamp_colour(hooks, [0, 0, 0]);
+    }
+
+    fn daylight(&mut self, on: bool) {
+        let f = self.mem.r16(DS, crate::movement::var::MAP_FLAGS) & 0x7FFF | if on { 0x8000 } else { 0 };
+        self.mem.w16(DS, crate::movement::var::MAP_FLAGS, f);
+    }
+
+    /// 0000:048B: the row limits 0Eh, 0Dh, 0Eh.
+    fn reset_rows(&mut self) {
+        self.mem.w16(DS, LIMIT, 0xE);
+        self.mem.w16(DS, DARK, 0xD);
+        self.mem.w16(DS, FAR, 0xE);
+    }
+
+    /// Palette entry 71h (the lamps' glow) set to `rgb` through the
+    /// buffer at 1044, as the original writes it.
+    fn lamp_colour(&mut self, hooks: &mut dyn LightHooks, rgb: [u8; 3]) {
+        for (i, c) in rgb.into_iter().enumerate() {
+            self.mem.w8(DS, 0x1044 + i as u16, c);
+        }
+        hooks.palette(self, 0x71, 0x1044);
+    }
+
+    /// 2294:0B8A. The light table set for clear weather: the row limits
+    /// reset, the fill colour 70h (C3C6, C3C7), the table loaded again
+    /// (`LightHooks::light_table`) and its rows from 0D00h filled with it,
+    /// fog off (F81, F82), the sky's window to be set again.
+    pub fn light_table_reset(&mut self, hooks: &mut dyn LightHooks) {
+        self.reset_rows();
+        self.mem.w8(DS, 0xC3C6, 0x70);
+        self.mem.w8(DS, 0xC3C7, 0x70);
+        self.mem.w16(DS, 0xCCC2, 0);
+        hooks.light_table(self);
+        let seg = self.mem.r16(DS, 0xCCC2);
+        for i in 0..0x200u16 {
+            self.mem.w8(seg, 0xD00 + i, 0x70);
+        }
+        self.mem.w8(DS, 0x0F81, 0);
+        self.mem.w8(DS, 0x0F82, 0);
+        self.mem.w16(DS, crate::sky::var::WINDOW, 0xFFFF);
+    }
+
+    /// 2294:028C. Once a night (5C8 bit 400h): the light table reset,
+    /// the day's mark (bit 200h) cleared, the level's lights made
+    /// (`flat_lights`); in a city its street lamps lit (map flats 1Eh
+    /// become 1Dh) and each lit lamp a light of radius 380h; the near
+    /// list to be made again.
+    pub fn night_switch(&mut self, hooks: &mut dyn LightHooks) {
+        let f = self.mem.r16(DS, 0x05C8);
+        if f & 0x400 != 0 {
+            return;
+        }
+        self.light_table_reset(hooks);
+        let mark = |m: &mut Machine| {
+            let f = m.mem.r16(DS, 0x05C8) | 0x400;
+            m.mem.w16(DS, 0x05C8, f & !0x200);
+        };
+        if self.mem.r16(DS, crate::movement::var::LEVEL_FLAGS) & 0x200 != 0 {
+            self.flat_lights();
+            mark(self);
+            return;
+        }
+        mark(self);
+        self.flat_lights();
+        let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+        let mut di = LEVEL.wrapping_add(self.mem.r16(DS, LEVEL_COUNT).wrapping_mul(6));
+        let (mut bx, mut row) = (0x40u16, 0u16);
+        for _ in 0..count(self.mem.r16(DS, 0xC359)) {
+            let (mut si, mut ax) = (row, 0x40u16);
+            for _ in 0..count(self.mem.r16(DS, 0xC357)) {
+                if self.mem.r8(walls, si.wrapping_add(1)) == 0x80 {
+                    if self.mem.r8(walls, si) == 0x1E {
+                        self.mem.w8(walls, si, 0x1D);
+                    }
+                    if self.mem.r8(walls, si) == 0x1D {
+                        self.mem.w16(DS, di, ax);
+                        self.mem.w16(DS, di.wrapping_add(2), bx);
+                        self.mem.w16(DS, di.wrapping_add(4), 0x380);
+                        di = di.wrapping_add(6);
+                        let n = self.mem.r16(DS, LEVEL_COUNT).wrapping_add(1);
+                        self.mem.w16(DS, LEVEL_COUNT, n);
+                    }
+                }
+                si = si.wrapping_add(2);
+                ax = ax.wrapping_add(0x80);
+            }
+            row = row.wrapping_add(0x100);
+            bx = bx.wrapping_add(0x80);
+        }
+        self.mem.w16(DS, NEAR_KEY, 0xFFFF);
+    }
+
+    /// 0000:033D. The day: night's mark (5C8 bit 400h) cleared, no level
+    /// lights, a city's lamps out (map flats 1Dh become 1Eh), and the
+    /// sky's objects made again (their image lists emptied).
+    pub fn day_switch(&mut self, hooks: &mut dyn LightHooks) {
+        let f = self.mem.r16(DS, 0x05C8) & !0x400;
+        self.mem.w16(DS, 0x05C8, f);
+        self.mem.w16(DS, LEVEL_COUNT, 0);
+        if self.mem.r16(DS, crate::movement::var::LEVEL_FLAGS) & 0x200 == 0 {
+            let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
+            let mut row = 0u16;
+            for _ in 0..count(self.mem.r16(DS, 0xC359)) {
+                let mut si = row;
+                for _ in 0..count(self.mem.r16(DS, 0xC357)) {
+                    if self.mem.r8(walls, si.wrapping_add(1)) == 0x80 && self.mem.r8(walls, si) == 0x1D {
+                        self.mem.w8(walls, si, 0x1E);
+                    }
+                    si = si.wrapping_add(2);
+                }
+                row = row.wrapping_add(0x100);
+            }
+        }
+        self.mem.w8(DS, 0x42B9, 0);
+        self.mem.w8(DS, 0x438C, 0);
+        hooks.sky_objects(self);
     }
 
     /// 0000:E106. The moving lights' slots (32 of 6 bytes at BB0C, free
