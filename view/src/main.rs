@@ -28,8 +28,8 @@
 //! reads them), menus (arrows and Enter, an entry's letter or number, a
 //! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
 //! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
-//! (only a game saved in the same area comes back right: the original's
-//! rebuild after loading isn't ported). While the game waits for an
+//! as the game loads in play (src/load.rs), into whatever area it was
+//! saved in; --load loads it at the start. While the game waits for an
 //! answer no time passes.
 //!
 //! The player's interface is drawn from the game's own graphics as the
@@ -572,7 +572,8 @@ fn main() {
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
-    args.retain(|a| a != "--fight" && a != "--click" && a != "--people");
+    let load_at_start = args.iter().any(|a| a == "--load");
+    args.retain(|a| a != "--fight" && a != "--click" && a != "--people" && a != "--load");
     let mut wait = 0;
     if let Some(i) = args.iter().position(|a| a == "--wait") {
         wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
@@ -616,7 +617,20 @@ fn main() {
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
     interface::start(&mut engine.m);
-    let run = areas::start(&mut engine, args[2].starts_with("CITY:"));
+    let mut run = areas::start(&mut engine, args[2].starts_with("CITY:"));
+    if load_at_start {
+        let save = save_dir.as_deref().expect("--load needs --save-dir");
+        match areas::load_game(&mut engine, &dir, save, slot) {
+            Ok(r) => {
+                run = r;
+                eprintln!("loaded slot {slot}: {r:?} ({})", String::from_utf8_lossy(engine.m.mem.cstr(arena::mem::DS, arena::transit::var::LEVEL_NAME)));
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+    }
     if let Some(h) = hour {
         // The clock at that hour of the first day (its calendar fields
         // agreeing, so no hour passes at once), and the sky's time.
@@ -626,7 +640,9 @@ fn main() {
         engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
         engine.m.sky_time().expect("sky time");
     }
-    world::city_people(&mut engine);
+    if !load_at_start {
+        world::city_people(&mut engine);
+    }
     if let Some((col, row, heading)) = at {
         use arena::movement::var::{HEADING, X, Y};
         engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
@@ -888,18 +904,16 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
                 let msg = if what == "save" {
-                    Ok(save_to(&mut engine, sdir, slot, st.assets.palette))
+                    save_to(&mut engine, sdir, slot, st.assets.palette)
                 } else {
-                    load_from(&mut engine, sdir, slot)
-                };
-                let msg = match msg {
-                    Ok(m) => {
-                        if what == "load" {
-                            st.assets.level(&engine);
+                    match load_from(&mut engine, dir, sdir, slot) {
+                        Ok((m, r)) => {
+                            *run = r;
+                            st.assets = Assets::new(dir, &mut engine);
+                            m
                         }
-                        m
+                        Err(m) => m,
                     }
-                    Err(m) => m,
                 };
                 println!("{msg}");
                 st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg }]]];
@@ -1060,29 +1074,24 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     }
     engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
     engine.m.save_game(&mut SaveDir { dir, palette });
+    // The working slot's files (CITYDATA, SPELLS, ...) to the slot's
+    // (25FD:0612), kept on disk with the save.
+    for name in engine.m.slot_files_out(&mut engine.files) {
+        let Some(data) = engine.files.written(&name) else { continue };
+        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        if let Err(e) = std::fs::write(&p, data) {
+            eprintln!("{}: {e}", p.display());
+        }
+    }
     format!("Saved to slot {slot} in {}.", dir.display())
 }
 
-/// The game of `slot` in `dir` loaded back: its state (SAVEENGN,
-/// `save_load_engine`) and its level (SAVEGAME, `save_load_level`: the
-/// level's state and planes; its screen skipped). The original's rebuild
-/// after loading (25FD:03F9 on: the area entered again, its INF, its
-/// sky) isn't ported: a game saved in this area comes back right; one
-/// saved elsewhere doesn't. The caller makes the level's assets again.
-fn load_from(engine: &mut Engine, dir: &std::path::Path, slot: u8) -> Result<String, String> {
-    use arena::mem::DS;
-    // Into a copy, kept only when both parts load.
-    let mut e = copy(engine);
-    e.files.add_dir(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
-    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
-    let ok = e.m.save_load_engine(&mut e.files, slot).is_some() && e.m.save_load_level(&mut e.files).is_some();
-    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
-    if !ok {
-        return Err(format!("Slot {slot} couldn't be loaded from {}.", dir.display()));
-    }
-    *engine = e;
-    Ok(format!("Loaded slot {slot}."))
+/// The game of `slot` in `dir` loaded back as the game loads in play
+/// (`areas::load_game`), in whatever area it was saved. Returns the
+/// message and the loaded area's run; the caller makes the assets again.
+fn load_from(engine: &mut Engine, game: &std::path::Path, dir: &std::path::Path, slot: u8) -> Result<(String, arena::transit::Run), String> {
+    let run = areas::load_game(engine, game, dir, slot)?;
+    Ok((format!("Loaded slot {slot}."), run))
 }
 
 struct Gpu {
@@ -1300,9 +1309,10 @@ impl App {
             self.say("No save directory (--save-dir).");
             return;
         };
-        match load_from(&mut self.engine, &dir, self.slot) {
-            Ok(msg) => {
-                self.assets.level(&self.engine);
+        match load_from(&mut self.engine, &self.dir.clone(), &dir, self.slot) {
+            Ok((msg, run)) => {
+                self.run = run;
+                self.assets = Assets::new(&self.dir, &mut self.engine);
                 self.remake_renderer();
                 self.say(&msg);
             }

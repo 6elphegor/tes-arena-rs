@@ -135,6 +135,68 @@ impl AreaHooks for Areas<'_> {
     }
 }
 
+/// A load's fights: the view draws people and creatures from its sprite
+/// sheet, made again after the load.
+impl arena::encounter::FightHooks for Areas<'_> {}
+
+impl arena::light::LightHooks for Areas<'_> {
+    /// 2294:0B8A's load: NORMAL.LGT, then the table made (0000:AAA2).
+    fn light_table(&mut self, m: &mut Machine) {
+        world::lgt(m, self.dir, arena::weather::NORMAL_LGT);
+        world::light_table(m);
+    }
+}
+
+impl arena::load::LoadHooks for Areas<'_> {
+    /// 0000:AAA2: the light table made (the load freed it).
+    fn renderer(&mut self, m: &mut Machine) {
+        world::light_table(m);
+    }
+}
+
+/// The run of the area the game is in, by 5E6 (an interior's level named
+/// at LEVEL_NAME).
+pub fn run_of(m: &Machine) -> Run {
+    match m.mem.r8(DS, arena::trigger::var::AREA) {
+        0 => Run::City,
+        1 => Run::Wild,
+        2 => Run::Start,
+        3 => Run::Dungeon,
+        _ => Run::Interior(arena::transit::var::LEVEL_NAME),
+    }
+}
+
+/// A saved game loaded in play from slot `slot` in `save` (the game's
+/// own load, `Machine::game_load`, with the view's hooks), into a copy of
+/// the engine kept only when it all loads. The old light table is freed
+/// first (the light table's reset clears CCC2 before its hook runs); the
+/// screenshot isn't read (the view has no screen buffer); the INF's
+/// sounds hook is cleared after, as the view has no sound. Returns the
+/// loaded area's run, or what went wrong.
+pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
+    let mut e = Engine { m: engine.m.clone(), files: engine.files.clone() };
+    e.files.add_dir(save).map_err(|err| format!("{}: {err}", save.display()))?;
+    let old = e.m.mem.r16(DS, 0xCCC2);
+    e.m.heap_free(old);
+    e.m.mem.w16(DS, 0xCCC2, 0);
+    let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
+    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
+    let mut copy = e.files.clone();
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false };
+    let r = e.m.game_load(&mut e.files, slot, h);
+    let failed = h.failed;
+    e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
+    match r {
+        Some(arena::load::Loaded::Done) if !failed => {}
+        Some(arena::load::Loaded::Missing) => return Err(format!("Slot {slot} is empty in {}.", save.display())),
+        _ => return Err(format!("Slot {slot} met code not ported while loading.")),
+    }
+    e.m.mem.w32(DS, 0xCD4A, 0);
+    let run = run_of(&e.m);
+    *engine = e;
+    Ok(run)
+}
+
 /// The wilderness's hooks as the view runs them: the ports, the weather's
 /// light tables from the game directory.
 struct Wild<'a>(&'a Path);
@@ -149,6 +211,10 @@ impl arena::wild::WildHooks for Wild<'_> {
 /// a city (5E6 0) or an interior (4).
 pub fn start(engine: &mut Engine, city: bool) -> Run {
     let area = if city { 0 } else { 4 };
+    // The working slot (1A80): the view plays from the game's own *.65
+    // files (CITYDATA.65, SPELLSG.65, ...), where the original first copies
+    // them to *.00. Saves copy them to the slot's names, loads back.
+    engine.m.mem.w8(DS, arena::load::var::WORKING_SLOT, 65);
     engine.m.mem.w8(DS, arena::trigger::var::AREA, area);
     engine.m.mem.w8(DS, arena::transit::var::ENTERED, area);
     if city { Run::City } else { Run::Interior(0xC37F) }
