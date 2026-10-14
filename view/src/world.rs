@@ -38,7 +38,11 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let mut files = Files::new(dir).expect("game directory");
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     m.heap_init(0xA000, 0xF000).expect("heap");
-    let (buf, _) = m.heap_alloc(0x1000).expect("heap");
+    // The EMS frame: the floor plane's words have its segment added
+    // (1194:04DD), so it must be page-aligned as the hardware's is, or
+    // their low bytes (a flat's number) shift.
+    let (block, _) = m.heap_alloc(0x1100).expect("heap");
+    let buf = (block + 0xFF) & 0xFF00;
     m.mem.w16(DS, 0x9030, buf);
     // EMS on: 32 banks swapped through the frame.
     m.mem.w8(DS, 0x8FA6, 1);
@@ -104,6 +108,9 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.store_rng();
     let mut engine = Engine::new(m, files);
     engine.enter_area(info).expect("entering the area");
+    // The level's lights from its flats, as entering a level makes them
+    // (0000:478F, `flat_lights`).
+    engine.m.flat_lights();
     engine
 }
 

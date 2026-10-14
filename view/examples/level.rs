@@ -20,6 +20,7 @@ fn main() {
     let v = e.view();
     let tex = world::textures(m);
     let fl = world::flats(m);
+    println!("level lights {} (C8F0 {:#x} {:#x})", m.mem.r16(DS, arena::light::var::LEVEL_COUNT), m.mem.r8(DS, 0xC8F0), m.mem.r8(DS, 0xC8F1));
     let sh = world::shading(m);
     let same = |r: usize| (0..256).filter(|&i| sh[r * 256 + i] as usize == i).count();
     println!("shading rows identity count: {:?}", (0..16).map(same).collect::<Vec<_>>());

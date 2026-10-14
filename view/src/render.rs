@@ -13,7 +13,17 @@ struct Globals {
     eye: [f32; 4],
     shade: [f32; 4],
     sky: [f32; 4],
+    light: [f32; 4],
+    lights: [[f32; 4]; 64],
     palette: [[f32; 4]; 256],
+}
+
+/// The lights this frame (0000:B6EB's lists): none in full daylight,
+/// else up to 64 (x, y, radius) and the rows C8E7, C8E9, C8EB.
+#[derive(Clone, Debug, Default)]
+pub struct Lights {
+    pub lights: Vec<[u16; 3]>,
+    pub rows: [u16; 3],
 }
 
 /// The sky this frame: outdoors or not, the afternoon's dither or the
@@ -44,6 +54,7 @@ pub struct Renderer {
     pipeline: wgpu::RenderPipeline,
     sky_pipeline: wgpu::RenderPipeline,
     sky: Sky,
+    lights: Lights,
     globals: wgpu::Buffer,
     bind: wgpu::BindGroup,
     vertices: wgpu::Buffer,
@@ -278,7 +289,12 @@ impl Renderer {
             contents: bytemuck::cast_slice(scene.mesh),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        Self { pipeline, sky_pipeline, sky: Sky::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
+        Self { pipeline, sky_pipeline, sky: Sky::default(), lights: Lights::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
+    }
+
+    /// The lights from now on.
+    pub fn set_lights(&mut self, lights: Lights) {
+        self.lights = lights;
     }
 
     /// The sky from now on: palette entries 1..8 become its colours.
@@ -331,6 +347,17 @@ impl Renderer {
             eye: [cam.x, cam.height, cam.y, 0.0],
             shade: [96.0, 12.0, self.sky.dark as f32, 0.0],
             sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, height as f32],
+            light: {
+                let r = self.lights.rows;
+                [self.lights.lights.len().min(64) as f32, r[0] as f32, r[1] as f32, r[2] as f32]
+            },
+            lights: {
+                let mut a = [[0f32; 4]; 64];
+                for (d, l) in a.iter_mut().zip(&self.lights.lights) {
+                    *d = [l[0] as f32, l[1] as f32, l[2] as f32, 0.0];
+                }
+                a
+            },
             palette: self.palette,
         };
         queue.write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));

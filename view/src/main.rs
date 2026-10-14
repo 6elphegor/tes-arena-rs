@@ -148,6 +148,31 @@ impl Assets {
         render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark }
     }
 
+    /// The lights after a frame (the drawing's set-up, 0000:A2EC..A303 and
+    /// E106): the player's light at the player, the near list made again
+    /// if the player moved to another place (`lights_near`), then the
+    /// near and the moving lights. None in full daylight (C398 bit 8000h).
+    fn lights(&self, m: &mut arena::machine::Machine) -> render::Lights {
+        use arena::light::var::*;
+        use arena::mem::DS;
+        if m.mem.r16(DS, 0xC398) & 0x8000 != 0 {
+            return render::Lights::default();
+        }
+        let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+        m.mem.w16(DS, NEAR, x);
+        m.mem.w16(DS, NEAR + 2, y);
+        m.lights_near();
+        m.moving_lights();
+        let at = |m: &arena::machine::Machine, list: u16, i: u16| {
+            let e = list + 6 * i;
+            [m.mem.r16(DS, e), m.mem.r16(DS, e + 2), m.mem.r16(DS, e + 4)]
+        };
+        let mut lights: Vec<[u16; 3]> = (0..m.mem.r16(DS, NEAR_COUNT).min(64)).map(|i| at(m, NEAR, i)).collect();
+        lights.extend((0..m.mem.r16(DS, MOVING_COUNT).min(32)).map(|i| at(m, MOVING, i)));
+        lights.truncate(64);
+        render::Lights { lights, rows: [m.mem.r16(DS, LIMIT), m.mem.r16(DS, DARK), m.mem.r16(DS, FAR)] }
+    }
+
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
     fn sprites(&self, engine: &Engine, cam: Camera, ticks: usize) -> Vec<world::Vertex> {
         let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
@@ -254,6 +279,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = assets.renderer(&device, &queue, format);
     r.set_sky(assets.sky(&mut engine.m));
+    r.set_lights(assets.lights(&mut engine.m));
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("shot"),
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -463,6 +489,7 @@ impl winit::application::ApplicationHandler for App {
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
                     let sprites = self.assets.sprites(&self.engine, cam, ticks);
                     g.renderer.set_sky(self.assets.sky(&mut self.engine.m));
+                    g.renderer.set_lights(self.assets.lights(&mut self.engine.m));
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     frame.present();
                 }

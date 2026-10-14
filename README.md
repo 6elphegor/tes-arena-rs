@@ -141,6 +141,14 @@ No game code or data is included: everything is loaded from your own copy.
   area and night, an entry by the player's level; monsters, or people
   with their equipment, 24FA:0313). The quests' encounters (86F2) are
   not ported.
+- `src/light.rs` – light (segment 0000): a point is shaded by the
+  lights, not by distance (`light_row`, 0000:B6EB: the brightest row any
+  light gives it, full within half its radius, 13 steps to its edge);
+  the lights are the player's, the level's near the player
+  (`lights_near`, 0000:E12E), made from the flats whose record gives a
+  light (`flat_lights`, 0000:0810, run on entering a level), and the
+  moving ones (`moving_lights`, 0000:E106). In full daylight (C398 bit
+  8000h) nothing is shaded.
 - `src/sky.rs` – the sky's colours (2294:0428, 0341): outdoors the .COL
   for the weather (DAYTIME.COL or DREARY.COL, a run of colours through
   the day) and the window of eight of them palette entries 1..8 take for
@@ -269,7 +277,13 @@ member using wgpu, winit, glam and png.
   player) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
-  with the palette. Outdoors the sky is drawn first: palette entries
+  with the palette, the row of the shading table each point takes
+  computed in the shader as `light_row` does, from the lights the front
+  end hands it each frame (the original's per-light flag for a light
+  behind the wall drawn isn't reproduced). The shading table is the
+  light table (NORMAL.LGT as the image holds it) the INF loader copies,
+  which needs the renderer's set-up (0000:AAA2) the view does on
+  loading. Outdoors the sky is drawn first: palette entries
   1..8 (set each frame from the .COL at `sky_step`'s window) through the
   dither images, their 20 rows from the top of the view to the horizon
   (how the original scales them is a guess).

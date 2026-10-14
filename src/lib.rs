@@ -26,6 +26,7 @@ pub mod info;
 pub mod inventory;
 pub mod item;
 pub mod level;
+pub mod light;
 pub mod log;
 pub mod loot;
 pub mod machine;

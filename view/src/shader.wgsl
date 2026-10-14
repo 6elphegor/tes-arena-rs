@@ -11,6 +11,11 @@ struct Globals {
     // x: outdoors (a sky), y: afternoon (the second dither), z, w: the
     // target's size.
     sky: vec4<f32>,
+    // The lights (x, y, radius; 0000:B6EB): x the count (0: full daylight,
+    // no shading), y the limit row, z the row past it, w the row beyond a
+    // light (C8E7, C8E9, C8EB).
+    light: vec4<f32>,
+    lights: array<vec4<f32>, 64>,
     palette: array<vec4<f32>, 256>,
 };
 
@@ -64,9 +69,7 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     if g.shade.z > 0.0 {
         index = textureLoad(shading, vec2<i32>(i32(index), i32(g.shade.z)), 0).r;
     }
-    let dist = distance(i.world.xz, g.eye.xz);
-    var row = i32(dist / g.shade.x + (1.0 - i.light) * 4.0);
-    row = clamp(row, 0, i32(g.shade.y));
+    let row = light_row(vec2<i32>(floor(i.world.xz)));
     let shaded = textureLoad(shading, vec2<i32>(i32(index), row), 0).r;
     return g.palette[shaded];
 }
@@ -89,4 +92,46 @@ fn fs_sky(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let col = i32(pos.x * 320.0 / g.sky.z) % 40;
     let index = textureLoad(dither, vec2<i32>(col, row), 0).r;
     return g.palette[index];
+}
+
+// 0000:B6EB (src/light.rs `light_row`): the brightest row any light gives
+// the point, in the game's integer arithmetic: the distance is the larger
+// axis plus a quarter of the smaller; within half the radius row 0, then
+// one more every (radius / 2) / 13 units; beyond the radius, or at the
+// limit, the far row; the result at the limit or past it the dark row.
+// (The lights behind a wall, darker by 8 rows in the original, aren't
+// told apart here.)
+fn light_row(p: vec2<i32>) -> i32 {
+    let n = i32(g.light.x);
+    if n == 0 {
+        return 0;
+    }
+    let limit = i32(g.light.y);
+    let far = i32(g.light.w);
+    var darkest = 14;
+    for (var k = 0; k < n; k++) {
+        let l = g.lights[k];
+        let a = abs(p.x - i32(l.x));
+        let b = abs(p.y - i32(l.y));
+        let d = (min(a, b) >> 2u) + max(a, b);
+        let r = i32(l.z);
+        var row = far;
+        if d <= r {
+            let half = r >> 1u;
+            if d < half {
+                row = 0;
+            } else {
+                let step = max(half / 13, 1);
+                row = (d - half) / step + 1;
+                if row >= limit {
+                    row = far;
+                }
+            }
+        }
+        darkest = min(darkest, row);
+    }
+    if darkest >= limit {
+        darkest = i32(g.light.z);
+    }
+    return clamp(darkest, 0, 15);
 }
