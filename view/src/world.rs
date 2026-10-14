@@ -27,6 +27,11 @@ pub struct Vertex {
 /// Vertex flag: a flat, drawn from the sprite layers, index 0 clear.
 pub const SPRITE: u32 = 1;
 
+/// Vertex flags: a wall face's side as the original numbers it (CCF8),
+/// plus one, shifted by WALL_SHIFT: 0 its normal -y (north), 1 +x, 2 +y,
+/// 3 -x. Floors, caps and flats have none.
+pub const WALL_SHIFT: u32 = 1;
+
 /// Map squares are 128 units across.
 pub const SQUARE: f32 = 128.0;
 
@@ -63,6 +68,9 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     if m.mem.r16(sseg, 0x18) == 0 {
         eprintln!("the spells did not load (SPELLSG.65)");
     }
+    // The light table's source as the game starts with it.
+    lgt(&mut m, dir, arena::weather::NORMAL_LGT);
+    m.mem.w8(DS, 0xC3C6, 0x70);
     if let Some(city) = level.strip_prefix("CITY:") {
         city_load(&mut m, &mut files, dir, city);
         // The city's build left the buffer pointer at the frame (1194:0292);
@@ -87,7 +95,6 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.mem.w8(DS, 0x01A4 + arena::character::field::ATTRS + i, 50);
         m.mem.w8(DS, 0x01A4 + arena::character::field::BASE_ATTRS + i, 50);
     }
-    m.mem.w8(DS, 0xC3C6, 0x70);
     light_table(&mut m);
     m.rng.seed = 1994;
     m.store_rng();
@@ -97,6 +104,28 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // (0000:478F, `flat_lights`).
     engine.m.flat_lights();
     engine
+}
+
+/// 0000:7428 for a .LGT: the file named at DS:`name` (loose in the game
+/// directory) to 3AAC:0240, where the light table is made from.
+pub fn lgt(m: &mut Machine, dir: &Path, name: u16) {
+    let file = String::from_utf8_lossy(m.mem.cstr(DS, name)).to_ascii_uppercase();
+    let Ok(d) = std::fs::read(dir.join(&file)) else {
+        eprintln!("{file} not found");
+        return;
+    };
+    for (i, &b) in d.iter().take(0xD00).enumerate() {
+        m.mem.w8(0x3AAC, 0x240 + i as u16, b);
+    }
+}
+
+/// The .LGT loads of the weather's set-up.
+struct Lgt<'a>(&'a Path);
+
+impl arena::light::LightHooks for Lgt<'_> {
+    fn lgt(&mut self, m: &mut Machine, name: u16) {
+        lgt(m, self.0, name);
+    }
 }
 
 /// 0000:AAA2, the renderer's set-up: the light table (CCC2) the INF
@@ -120,20 +149,22 @@ pub fn light_table(m: &mut Machine) -> u16 {
     light
 }
 
-/// A city, from `PROVINCE:INDEX[:CLIMATE:WEATHER]`: province 0..7 (8 the
+/// A city, from `PROVINCE:INDEX[:TERRAIN:WEATHER]`: province 0..7 (8 the
 /// Imperial City), the location in it (0..7 city-states, 8..15 towns,
-/// 16..31 villages), the climate (DA8: 0, 4 or 8) and the weather (BB09:
-/// 0 clear, 1 rain, 2 snow; 81h, 82h at night). The location's record is
-/// built from CITYDATA.65 (1194:3B84) and its city from its blocks
-/// (1194:0292); it is outdoors (C398 bit 4), and its INF is the one for
-/// the climate and weather (0000:0896). The entry's other set-up (the
-/// weather and climate from the season and terrain, 0000:0F05) is not
-/// ported.
+/// 16..31 villages), the terrain class (A50; 1 by default: the climate
+/// DA8 is 0 for 1 and 4, 4, the desert, for 3 and 5, else 8) and the
+/// weather as the season's roll gives it (0 clear, 1 and 6 overcast with
+/// fog, 2 rain, 3 snow, both with fog one day in four, 4 snow with fog, 5
+/// rain with fog, 7 snow, fog on a roll), set up as entering the area
+/// does (0000:0F05, `weather_set`; the zone is taken as 0). The
+/// location's record is built from CITYDATA.65 (1194:3B84) and its city
+/// from its blocks (1194:0292); it is outdoors (C398 bit 4), and its INF
+/// is the one for the climate and weather (0000:0896).
 fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
     const RECORD: u16 = 0x0A22;
     const PROVINCE_DATA: u16 = 0x1429;
     const PROVINCE_BYTES: usize = 0x4CC;
-    let v: Vec<u16> = spec.split(':').map(|x| x.parse().expect("CITY:PROVINCE:INDEX[:CLIMATE:WEATHER]")).collect();
+    let v: Vec<u16> = spec.split(':').map(|x| x.parse().expect("CITY:PROVINCE:INDEX[:TERRAIN:WEATHER]")).collect();
     let (province, index) = (v[0].min(8), v.get(1).copied().unwrap_or(0));
     let data = std::fs::read(dir.join("CITYDATA.65")).expect("CITYDATA.65");
     let p = province as usize;
@@ -143,8 +174,10 @@ fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
     let id = if province == 8 { 0x100 } else { province * 32 + index };
     m.city_build_location(DS, RECORD, id, 0).expect("location record");
     m.mif_build_city(files).expect("city");
-    m.mem.w16(DS, 0x0DA8, v.get(2).copied().unwrap_or(0));
-    m.mem.w8(DS, 0xBB09, v.get(3).copied().unwrap_or(0) as u8);
+    m.mem.w8(DS, arena::weather::var::TERRAIN, v.get(2).copied().unwrap_or(1) as u8);
+    m.mem.w8(DS, arena::weather::var::ZONE, 0);
+    m.mem.w8(DS, arena::weather::var::ZONE_WEATHER, v.get(3).copied().unwrap_or(0) as u8);
+    m.weather_set(&mut Lgt(dir));
     let f = m.mem.r16(DS, 0xC398) | 4;
     m.mem.w16(DS, 0xC398, f);
     m.outdoor_inf();
@@ -314,11 +347,12 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
     // A solid, full-height wall (for hiding the faces between them).
     let solid = |v: u16| -> bool { v == 0xFFFF || (v != 0 && v & 0x8000 == 0 && (v >> 8) as u8 == v as u8) };
     let mut out = Vec::new();
-    let mut quad = |p: [[f32; 3]; 4], uv: [[f32; 2]; 4], layer: u32, light: f32| {
+    let mut quad = |p: [[f32; 3]; 4], uv: [[f32; 2]; 4], layer: u32, light: f32, flags: u32| {
         for i in [0, 1, 2, 0, 2, 3] {
-            out.push(Vertex { pos: p[i], uv: uv[i], layer, light, flags: 0 });
+            out.push(Vertex { pos: p[i], uv: uv[i], layer, light, flags });
         }
     };
+    let side = |s: u32| (s + 1) << WALL_SHIFT;
     for row in 0..d as i32 {
         for col in 0..w as i32 {
             let x0 = col as f32 * SQUARE;
@@ -330,16 +364,16 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                 let th = 64.0 * (hi - lo) / ceiling.max(1.0);
                 let uv = [[0.0, th], [64.0, th], [64.0, 0.0], [0.0, 0.0]];
                 if !cull(wall(col, row - 1)) {
-                    quad([[x1, lo, z0], [x0, lo, z0], [x0, hi, z0], [x1, hi, z0]], uv, layer, 0.85);
+                    quad([[x1, lo, z0], [x0, lo, z0], [x0, hi, z0], [x1, hi, z0]], uv, layer, 0.85, side(0));
                 }
                 if !cull(wall(col, row + 1)) {
-                    quad([[x0, lo, z1], [x1, lo, z1], [x1, hi, z1], [x0, hi, z1]], uv, layer, 0.85);
+                    quad([[x0, lo, z1], [x1, lo, z1], [x1, hi, z1], [x0, hi, z1]], uv, layer, 0.85, side(2));
                 }
                 if !cull(wall(col - 1, row)) {
-                    quad([[x0, lo, z0], [x0, lo, z1], [x0, hi, z1], [x0, hi, z0]], uv, layer, 1.0);
+                    quad([[x0, lo, z0], [x0, lo, z1], [x0, hi, z1], [x0, hi, z0]], uv, layer, 1.0, side(3));
                 }
                 if !cull(wall(col + 1, row)) {
-                    quad([[x1, lo, z1], [x1, lo, z0], [x1, hi, z0], [x1, hi, z1]], uv, layer, 1.0);
+                    quad([[x1, lo, z1], [x1, lo, z0], [x1, hi, z0], [x1, hi, z1]], uv, layer, 1.0, side(1));
                 }
             };
             let mut has_floor = true;
@@ -358,8 +392,8 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                     let (lo, hi) = (bottom as i16 as f32, top as i16 as f32);
                     sides(lo, hi, side.saturating_sub(1), &solid);
                     let uv = [[0.0, 0.0], [64.0, 0.0], [64.0, 64.0], [0.0, 64.0]];
-                    quad([[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]], uv, cap.saturating_sub(1), 1.0);
-                    quad([[x0, lo, z1], [x1, lo, z1], [x1, lo, z0], [x0, lo, z0]], uv, cap.saturating_sub(1), 0.7);
+                    quad([[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]], uv, cap.saturating_sub(1), 1.0, 0);
+                    quad([[x0, lo, z1], [x1, lo, z1], [x1, lo, z0], [x0, lo, z0]], uv, cap.saturating_sub(1), 0.7, 0);
                 }
             } else if v != 0 && matches!(v >> 12, 9 | 0xA | 0xD) {
                 // The other wall kinds, drawn as walls for now. Doors
@@ -372,10 +406,10 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                 let kind = f.wrapping_sub(frame) >> 8;
                 let uv = [[0.0, 0.0], [64.0, 0.0], [64.0, 64.0], [0.0, 64.0]];
                 if kind < 0xC {
-                    quad([[x0, 0.0, z1], [x1, 0.0, z1], [x1, 0.0, z0], [x0, 0.0, z0]], uv, kind as u32, 0.9);
+                    quad([[x0, 0.0, z1], [x1, 0.0, z1], [x1, 0.0, z0], [x0, 0.0, z0]], uv, kind as u32, 0.9, 0);
                 }
                 if let Some(t) = ceiling_tex {
-                    quad([[x0, ceiling, z0], [x1, ceiling, z0], [x1, ceiling, z1], [x0, ceiling, z1]], uv, t, 0.8);
+                    quad([[x0, ceiling, z0], [x1, ceiling, z0], [x1, ceiling, z1], [x0, ceiling, z1]], uv, t, 0.8, 0);
                 }
             }
         }

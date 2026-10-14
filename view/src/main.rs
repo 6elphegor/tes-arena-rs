@@ -86,43 +86,64 @@ struct Assets {
     /// The sky's .COL as the game keeps it: its name's offset and its
     /// colours, the first eight again past the end.
     colours: Option<(u16, Vec<u8>)>,
-    /// What the day and night switch left: the row the textures are
-    /// remapped through (0 as loaded), palette entry 71h (the lamps'
-    /// glow; PAL.COL's until set) and the light table's segment.
+    /// What the day and night switch and the fog left.
+    light: LightState,
+}
+
+/// The view's side of the day and night switch and the fog
+/// (`LightHooks`): the row the textures are remapped through (0 as
+/// loaded), palette entry 71h (the lamps' glow; PAL.COL's until set), the
+/// light table's segment, and this frame's fog colour (filling the view
+/// for the sky).
+struct LightState {
+    dir: PathBuf,
     dark: u32,
     lamp: Option<[u8; 3]>,
     table: u16,
+    fog: Option<u8>,
 }
 
-/// The view's side of the day and night switch (`LightHooks`).
-struct Light<'a> {
-    dark: &'a mut u32,
-    lamp: &'a mut Option<[u8; 3]>,
-    table: &'a mut u16,
-}
-
-impl arena::light::LightHooks for Light<'_> {
-    /// The table freed and made again from NORMAL.LGT's rows.
-    fn light_table(&mut self, m: &mut arena::machine::Machine) {
-        if *self.table != 0 {
-            m.heap_free(*self.table);
+impl LightState {
+    /// The table freed and made again from the .LGT named at `name`.
+    fn table(&mut self, m: &mut arena::machine::Machine, name: u16) {
+        world::lgt(m, &self.dir, name);
+        if self.table != 0 {
+            m.heap_free(self.table);
         }
-        *self.table = world::light_table(m);
+        self.table = world::light_table(m);
+    }
+}
+
+impl arena::light::LightHooks for LightState {
+    fn light_table(&mut self, m: &mut arena::machine::Machine) {
+        self.table(m, arena::weather::NORMAL_LGT);
+    }
+
+    fn fog_light_table(&mut self, m: &mut arena::machine::Machine) {
+        self.table(m, arena::weather::FOG_LGT);
+    }
+
+    fn lgt(&mut self, m: &mut arena::machine::Machine, name: u16) {
+        world::lgt(m, &self.dir, name);
+    }
+
+    fn fog_fill(&mut self, m: &mut arena::machine::Machine) {
+        self.fog = Some(m.mem.r8(arena::mem::DS, arena::weather::var::FILL_COLOUR));
     }
 
     fn relight(&mut self, _m: &mut arena::machine::Machine, level: u16) {
-        *self.dark = (level >> 8) as u32;
+        self.dark = (level >> 8) as u32;
     }
 
     fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
-        *self.dark = 0;
+        self.dark = 0;
     }
 
     /// Only entry 71h is written through here; its 6-bit colour made 8-bit.
     fn palette(&mut self, m: &mut arena::machine::Machine, index: u8, at: u16) {
         if index == 0x71 {
             let c = |i: u16| m.mem.r8(arena::mem::DS, at + i) & 0x3F;
-            *self.lamp = Some([0, 1, 2].map(|i| c(i) << 2 | c(i) >> 4));
+            self.lamp = Some([0, 1, 2].map(|i| c(i) << 2 | c(i) >> 4));
         }
     }
 }
@@ -145,9 +166,7 @@ impl Assets {
             }).collect(),
             archive,
             colours: None,
-            dark: 0,
-            lamp: None,
-            table: engine.m.mem.r16(arena::mem::DS, 0xCCC2),
+            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None },
         }
     }
 
@@ -167,7 +186,7 @@ impl Assets {
             return render::Sky::default();
         }
         m.sky_colours();
-        m.outdoor_light(&mut Light { dark: &mut self.dark, lamp: &mut self.lamp, table: &mut self.table });
+        m.outdoor_light(&mut self.light);
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
             let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();
@@ -186,24 +205,42 @@ impl Assets {
                 *v = *c.get(w + 3 * i + k).unwrap_or(&0);
             }
         }
-        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark: self.dark, lamp: self.lamp }
+        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours, dark: self.light.dark, lamp: self.light.lamp, fog: None }
+    }
+
+    /// The sky and the lights after a frame, in the original's order: the
+    /// frame's day and night switch (`sky`), the drawing's lights
+    /// (`lights`), then the sky's hook, whose fog step may fill the view
+    /// in place of the sky.
+    fn light_frame(&mut self, m: &mut arena::machine::Machine) -> (render::Sky, render::Lights) {
+        let mut sky = self.sky(m);
+        let lights = self.lights(m);
+        sky.fog = self.light.fog;
+        (sky, lights)
     }
 
     /// The lights after a frame (the drawing's set-up, 0000:A2EC..A303 and
     /// E106): the player's light at the player, the near list made again
     /// if the player moved to another place (`lights_near`), then the
-    /// near and the moving lights. None in full daylight (C398 bit 8000h).
-    fn lights(&self, m: &mut arena::machine::Machine) -> render::Lights {
+    /// near and the moving lights; outdoors the sky's hook's fog step
+    /// (2294:0B01, from 0000:D513), which in fog leaves only the player's
+    /// light. None in full daylight (C398 bit 8000h).
+    fn lights(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
         use arena::light::var::*;
         use arena::mem::DS;
-        if m.mem.r16(DS, 0xC398) & 0x8000 != 0 {
-            return render::Lights::default();
-        }
         let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
         m.mem.w16(DS, NEAR, x);
         m.mem.w16(DS, NEAR + 2, y);
         m.lights_near();
         m.moving_lights();
+        self.light.fog = None;
+        if m.mem.r16(DS, 0xC398) & 4 != 0 && m.fog_step(&mut self.light) && self.light.fog.is_none() {
+            // The fog's first frame: no fill, the background colour.
+            self.light.fog = Some(m.mem.r8(DS, arena::weather::var::BACKGROUND));
+        }
+        if m.mem.r16(DS, 0xC398) & 0x8000 != 0 {
+            return render::Lights::default();
+        }
         let at = |m: &arena::machine::Machine, list: u16, i: u16| {
             let e = list + 6 * i;
             [m.mem.r16(DS, e), m.mem.r16(DS, e + 2), m.mem.r16(DS, e + 4)]
@@ -211,7 +248,7 @@ impl Assets {
         let mut lights: Vec<[u16; 3]> = (0..m.mem.r16(DS, NEAR_COUNT).min(64)).map(|i| at(m, NEAR, i)).collect();
         lights.extend((0..m.mem.r16(DS, MOVING_COUNT).min(32)).map(|i| at(m, MOVING, i)));
         lights.truncate(64);
-        render::Lights { lights, rows: [m.mem.r16(DS, LIMIT), m.mem.r16(DS, DARK), m.mem.r16(DS, FAR)] }
+        render::Lights { lights, rows: [m.mem.r16(DS, LIMIT), m.mem.r16(DS, DARK), m.mem.r16(DS, FAR)], behind: if m.mem.r16(DS, 0xC398) & 4 != 0 { 2 } else { 8 } }
     }
 
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
@@ -319,8 +356,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
     let mut assets = Assets::new(dir, &engine);
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = assets.renderer(&device, &queue, format);
-    r.set_sky(assets.sky(&mut engine.m));
-    r.set_lights(assets.lights(&mut engine.m));
+    let (sky, lights) = assets.light_frame(&mut engine.m);
+    r.set_sky(sky);
+    r.set_lights(lights);
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("shot"),
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -529,8 +567,9 @@ impl winit::application::ApplicationHandler for App {
                     let view = frame.texture.create_view(&Default::default());
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
                     let sprites = self.assets.sprites(&self.engine, cam, ticks);
-                    g.renderer.set_sky(self.assets.sky(&mut self.engine.m));
-                    g.renderer.set_lights(self.assets.lights(&mut self.engine.m));
+                    let (sky, lights) = self.assets.light_frame(&mut self.engine.m);
+                    g.renderer.set_sky(sky);
+                    g.renderer.set_lights(lights);
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     frame.present();
                 }
