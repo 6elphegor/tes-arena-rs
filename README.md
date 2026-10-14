@@ -297,10 +297,17 @@ member using wgpu, winit, glam and png.
   (`view_click`), which opens a door within reach. P (or `--people`)
   rolls until people come. F (or `--fight`) rolls random encounters until
   creatures come, a debugging aid.
+- The game's texts are drawn over the view in its own font (ARENAFNT.DAT):
+  the message line, message boxes, menus and the hours typed. Talking to
+  someone and camping (R) ask their questions in menus answered with the
+  keys or the mouse; the game waits meanwhile. F5 saves to `--slot N` in
+  `--save-dir DIR`, F9 loads it back (only within the same area: the
+  original's rebuild after loading isn't ported). `--picks` and `--do`
+  script answers and steps for shots (see view/src/main.rs).
 
 ```
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] --shot out.png [FRAMES [TURN]]
 ```
 
 Not drawn yet: the other door kinds moving, chasms
