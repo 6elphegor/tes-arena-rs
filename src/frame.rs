@@ -88,6 +88,13 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn town_welcome(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:D327 (keys ACED and ACF4).
     fn key_d327(&mut self, _m: &mut Machine) {}
+    /// 1194:4635: a frame of rest, while resting (`rest::rest_frame`,
+    /// with the front end's `RestHooks`: its texts and menus, and its
+    /// `ClockHooks` for the hours passing). Nothing by default: a front
+    /// end that lets the player camp (`Machine::camp`) calls it.
+    fn rest(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
 }
 
 /// `FrameHooks` that do nothing.
@@ -160,6 +167,8 @@ impl Machine {
         let f = self.mem.r16(DS, 0x05CA) & !0x4000;
         self.mem.w16(DS, 0x05CA, f);
         self.area_change();
+        // 1194:4635: a frame of rest (0000:48C9).
+        hooks.rest(self, files)?;
         // Levitation (spell flag 80h) and light (100h, the timed flag's
         // strength from the table at [1020]).
         let spells = self.mem.r16(DS, 0x05BE);

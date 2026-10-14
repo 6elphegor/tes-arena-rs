@@ -39,6 +39,7 @@ pub mod movement;
 pub mod names;
 pub mod progression;
 pub mod random;
+pub mod rest;
 pub mod save;
 pub mod travel;
 pub mod weather;

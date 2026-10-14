@@ -65,6 +65,12 @@ impl Machine {
                                 put(self, d, false);
                             }
                         }
+                        // 0000:7028
+                        (b'u', Some(&Arg::Int(v))) => {
+                            for d in self.utoa(v) {
+                                put(self, d, false);
+                            }
+                        }
                         (s, a) => unimplemented!("sprintf %{} with {a:?}", s as char),
                     }
                 }

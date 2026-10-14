@@ -447,7 +447,7 @@ impl Machine {
 
     /// 0000:52BA. The decimal number at `seg`:`off`, with an optional
     /// sign, ending at the first other character (16 bits kept).
-    fn info_atoi(&self, seg: u16, mut off: u16) -> u16 {
+    pub(crate) fn info_atoi(&self, seg: u16, mut off: u16) -> u16 {
         let mut neg = false;
         match self.mem.r8(seg, off) {
             b'-' => {
