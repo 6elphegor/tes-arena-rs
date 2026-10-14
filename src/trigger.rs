@@ -357,7 +357,8 @@ impl Machine {
     /// 0000:414E. An Open spell waiting (DC4) opens the building: 7D0h
     /// always, otherwise a d100 at most its power plus (the player's
     /// level byte 1AA less the kind) x 5; the spell is used either way.
-    fn open_spell(&mut self, kind: u8) -> bool {
+    /// Chests' locks too (`talk`).
+    pub(crate) fn open_spell(&mut self, kind: u8) -> bool {
         let power = self.mem.r16(DS, OPEN_SPELL);
         if power == 0 {
             return false;

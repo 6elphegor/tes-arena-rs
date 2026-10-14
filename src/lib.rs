@@ -49,4 +49,5 @@ pub mod sky;
 pub mod skyobj;
 pub mod spell;
 pub mod strike;
+pub mod talk;
 pub mod trigger;

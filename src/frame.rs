@@ -60,9 +60,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn guards_arrive(&mut self, m: &mut Machine, files: &mut Files, hook: u32) -> Option<()> {
         m.guards_hook(files, &mut crate::encounter::NoFightHooks, hook)
     }
-    /// 1194:DB6C: a click left for the actors (talk, loot, steal).
-    fn actor_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// 1194:DB6C: a click left for the actors (talk, loot, steal;
+    /// `talk::actor_click`). Its windows and menus are `TalkHooks`: by
+    /// default none (every menu escaped); override to give the player's.
+    fn actor_click(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.actor_click(files, &mut crate::talk::NoTalkHooks)
     }
     /// 0000:3C4C's loading of the hands' graphic for weapon class [1012].
     fn weapon_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
