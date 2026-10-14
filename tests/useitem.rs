@@ -171,7 +171,84 @@ fn setup(m: &mut Machine, seed: u32, op: u8) -> (u16, u8) {
     if op == 3 && extra & 1 != 0 {
         m.mem.w16(DS, 0x0212 + 0x13 * slot + 1, day_of(minutes));
     }
+    // Aimed cases, written over the rest.
+    let (aim, a1, a2) = (s.byte() % 4, s.byte(), s.byte());
+    let si = 0x0212 + 0x13 * slot;
+    let other = 0x0212 + 0x13 * if slot == 0 { 1 } else { 0 };
+    let item = |m: &mut Machine, at: u16, ty: u8, flags: u8| {
+        m.mem.w8(DS, at, ty);
+        m.mem.w8(DS, at + 0xE, flags);
+    };
+    let enchant = |m: &mut Machine, attr: u8, p: u16| {
+        m.mem.w8(DS, si + 0xF, 0);
+        m.mem.w8(DS, si + 0x11, 0);
+        m.mem.w8(DS, si + 0x12, attr);
+        m.mem.w8(DS, 0x01CD + attr as u16, attr_for(p));
+    };
+    match (op, aim) {
+        (0, 1) => {
+            item(m, si, a1 % 0x12, 0x41 | ((a1 >> 6) & 1) << 2);
+            enchant(m, a2 % 8, 0x59 + ((a2 >> 3) % 3) as u16);
+        }
+        (0, 2) => {
+            let t = a1 % 5;
+            let gain = m.mem.r8(DS, 0x4AFE + t as u16) as i32;
+            let p = if gain == 0xFF { (a2 % 0x64) as i32 } else { (0x63 + ((a2 >> 3) % 3) as i32 - gain).max(0) };
+            item(m, si, t, 0x41 | 0x08 | 0x10);
+            enchant(m, a2 % 8, p as u16);
+        }
+        (0, 3) => {
+            item(m, si, a1 % 0x12, 0x41 | 0x04);
+            m.mem.w8(DS, si + 3, 2);
+            item(m, other, 0x8D + a2 % 3, 0xC0 | 0x04);
+            m.mem.w8(DS, 0x129D, 40);
+        }
+        (1, 1) => {
+            let t = a1 % 4;
+            m.mem.w16(DS, 0x1270, 0);
+            item(m, si, t, 0x41 | 0x08 | (a2 % 4) << 4);
+            item(m, other, t, 0xC1 | 0x08 | ((a2 >> 2) % 4) << 4);
+        }
+        (2, 1) => {
+            let t = a1 % 4;
+            item(m, si, t, 0x41 | 0x08 | (1 + a2 % 3) << 4);
+            m.mem.w8(DS, 0x7F81 + t as u16, 0);
+        }
+        (2, 2) | (2, 3) => {
+            let cost = 15 * (a2 % 50) as u16 + (a1 % 15) as u16;
+            let ty = if aim == 3 { 0x80 + a1 % 0x0D } else { a1 % 0x12 };
+            let share = if aim == 3 { cost >> 1 } else { cost / 15 };
+            item(m, si, ty, 0x40 | ((a1 >> 7) & 1) << 2);
+            m.mem.w8(DS, si + 0x11, a1);
+            m.mem.w16(DS, si + 6, share.wrapping_add(((a2 >> 6) % 3) as u16).wrapping_sub(1));
+            let base = if a1 & 0x80 != 0 { 0x2A80 } else { 0 };
+            m.mem.w16(DATA, base + (a1 & 0x7F) as u16 * 0x55 + 0x32, cost);
+        }
+        (3, 1) => m.mem.w16(DS, si + 6, (a1 % 0x70) as u16),
+        (5, 1) | (5, 2) => {
+            let (c, lines) = (a1 % 41, a2 % 12);
+            let ax = c as i32 + lines as i32 - 7;
+            let delta = [-1, 0, 1, 5, 6, 7][((a1 >> 5) % 6) as usize];
+            m.mem.w8(DS, 0x129A, 0);
+            m.mem.w8(DS, 0x1299, 0);
+            m.mem.w8(DS, 0x050A, c);
+            m.mem.w16(DS, 0x126C, lines as u16);
+            m.mem.w8(DS, 0x1297, (ax + delta) as u8);
+        }
+        (5, 3) => {
+            m.mem.w16(DS, 0xC39A, 0);
+            m.mem.w16(DS, 0xC398, 0);
+            m.mem.w8(DS, 0x05E6, 4);
+            m.mem.w8(DS, 0x0D48, [8, 0x0B, 1, 3, 2, 5][(a1 % 6) as usize]);
+        }
+        _ => {}
+    }
     (slot, extra)
+}
+
+/// The smallest attribute byte that is `p` percent (1194:5B07).
+fn attr_for(p: u16) -> u8 {
+    (0..=255u8).find(|&v| arena::scale::to100(v as i16) as u16 == p).unwrap_or(0)
 }
 
 #[test]

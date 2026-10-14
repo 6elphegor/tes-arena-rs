@@ -53,9 +53,20 @@ def day_of(minutes):
     return (minutes % 0x7E900) // 0x5A0
 
 
-def setup(seed, op):
-    """(DGROUP writes, DATA writes, slot, extra). Mirrored in
-    tests/useitem.rs."""
+def to100(v):
+    """1194:5B07 for v >= 0."""
+    q, r = divmod(v * 100, 256)
+    return q + 1 if r >= 128 else q
+
+
+def attr_for(p):
+    """The smallest attribute byte that is `p` percent."""
+    return next((v for v in range(256) if to100(v) == p), 0)
+
+
+def setup(seed, op, gains):
+    """(DGROUP writes, DATA writes, slot, extra). `gains` is DGROUP 4AFE..
+    as loaded. Mirrored in tests/useitem.rs."""
     s = stream(seed)
     byte = lambda: next(s)
     word = lambda: byte() | byte() << 8
@@ -128,6 +139,62 @@ def setup(seed, op):
     extra = byte()
     if op == 3 and extra & 1:
         w.append((0x0212 + 0x13 * slot + 1, pk(day_of(minutes))))
+    # Aimed cases, written over the rest, at the edges the random ones
+    # rarely reach.
+    aim, a1, a2 = byte() % 4, byte(), byte()
+    si = 0x0212 + 0x13 * slot
+    other = 0x0212 + 0x13 * (1 if slot == 0 else 0)
+    item = lambda at, ty, flags: [(at, pb(ty)), (at + 0xE, pb(flags))]
+    if op == 0 and aim == 1:
+        # Putting on an enchantment, the sum at 63h..65h percent.
+        attr = a2 % 8
+        w += item(si, a1 % 0x12, 0x41 | ((a1 >> 6) & 1) << 2)
+        w += [(si + 0xF, pb(0)), (si + 0x11, pb(0)), (si + 0x12, pb(attr))]
+        w.append((0x01CD + attr, pb(attr_for(0x59 + (a2 >> 3) % 3))))
+    elif op == 0 and aim == 2:
+        # A kind-1 accessory: its type's gain (type 4's is FFh, wrapping).
+        t, attr = a1 % 5, a2 % 8
+        gain = gains[t]
+        p = a2 % 0x64 if gain == 0xFF else max(0, 0x63 + (a2 >> 3) % 3 - gain)
+        w += item(si, t, 0x41 | 0x08 | 0x10)
+        w += [(si + 0xF, pb(0)), (si + 0x11, pb(0)), (si + 0x12, pb(attr))]
+        w.append((0x01CD + attr, pb(attr_for(p))))
+    elif op == 0 and aim == 3:
+        # A two-handed weapon put on with a special one worn.
+        w += item(si, a1 % 0x12, 0x41 | 0x04) + [(si + 3, pb(2))]
+        w += item(other, 0x8D + a2 % 3, 0xC0 | 0x04)
+        w.append((0x129D, pb(40)))
+    elif op == 1 and aim == 1:
+        # An accessory clashing (or not) with one worn of its type.
+        t = a1 % 4
+        w.append((0x1270, pk(0)))
+        w += item(si, t, 0x41 | 0x08 | (a2 % 4) << 4)
+        w += item(other, t, 0xC1 | 0x08 | ((a2 >> 2) % 4) << 4)
+    elif op == 2 and aim == 1:
+        # An accessory of kind 1..3 whose divisor is 0.
+        t = a1 % 4
+        w += item(si, t, 0x41 | 0x08 | (1 + a2 % 3) << 4)
+        w.append((0x7F81 + t, pb(0)))
+    elif op == 2 and aim in (2, 3):
+        # The condition at the cost's share, less 1, equal or more 1.
+        cost = 15 * (a2 % 50) + a1 % 15
+        ty = (0x80 + a1 % 0x0D) if aim == 3 else a1 % 0x12
+        share = cost >> 1 if aim == 3 else cost // 15
+        w += item(si, ty, 0x40 | ((a1 >> 7) & 1) << 2)
+        w += [(si + 0x11, pb(a1)), (si + 6, pk(share + (a2 >> 6) % 3 - 1))]
+        d.append(((0x2A80 if a1 & 0x80 else 0) + (a1 & 0x7F) * 0x55 + 0x32, pk(cost)))
+    elif op == 3 and aim == 1:
+        # The gold charm's condition about the roll (10..100).
+        w.append((si + 6, pk(a1 % 0x70)))
+    elif op == 5 and aim in (1, 2):
+        # The first line about the list's limits.
+        c, lines = a1 % 41, a2 % 12
+        ax = c + lines - 7
+        delta = (-1, 0, 1, 5, 6, 7)[(a1 >> 5) % 6]
+        w += [(0x129A, pb(0)), (0x1299, pb(0)), (0x050A, pb(c)), (0x126C, pk(lines)), (0x1297, pb(ax + delta))]
+    elif op == 5 and aim == 3:
+        # Indoors in a building, by its kind.
+        w += [(0xC39A, pk(0)), (0xC398, pk(0)), (0x05E6, pb(4)), (0x0D48, pb((8, 0x0B, 1, 3, 2, 5)[a1 % 6]))]
     return w, d, slot, extra
 
 
@@ -172,6 +239,7 @@ def main():
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     base_ds = a.seg_bytes(a.ds)
     base_data = a.seg_bytes(LOAD_SEG + DATA)
+    gains = base_ds[0x4AFE:0x4B10]
     zero = bytes(0x10000)
     rng = random.Random(0x1994_07C3)
     total = int(os.environ.get('N', 3000))
@@ -183,7 +251,7 @@ def main():
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(LOAD_SEG + DATA, 0), base_data)
         a.mu.mem_write(a.lin(FRAME, 0), zero)
-        w, d, slot, extra = setup(seed, op)
+        w, d, slot, extra = setup(seed, op, gains)
         for off, data in w:
             a.mu.mem_write(a.lin(a.ds, off), data)
         for off, data in d:
