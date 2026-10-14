@@ -150,9 +150,10 @@ pub trait TalkHooks {
     fn quest_person(&mut self, _m: &mut Machine) {}
     /// 1194:8F1E: the palace's ruler.
     fn palace(&mut self, _m: &mut Machine) {}
-    /// 1194:CD9A: a quest is offered. The carry: none.
-    fn quest_offer(&mut self, _m: &mut Machine) -> bool {
-        true
+    /// 1194:CD9A: a quest is offered. The carry: none
+    /// (`quest::quest_offer`; none too where the original faults).
+    fn quest_offer(&mut self, m: &mut Machine) -> bool {
+        m.quest_offer().unwrap_or(true)
     }
     /// 2294:0F33: a chest holding the quest's item (at `si`). The carry:
     /// it was (`quest::quest_chest`).

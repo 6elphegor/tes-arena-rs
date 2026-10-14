@@ -801,3 +801,121 @@ impl Machine {
         (0..0x8000u16).map(|i| sq.wrapping_add(self.mem.r16(DS, NEARBY.wrapping_add(2 * i)))).find(|&bx| self.mem.r16(floor, bx) == 0)
     }
 }
+
+/// The main quest's provinces by step (bytes).
+const STEP_PROVINCES: u16 = 0x7883;
+
+impl Machine {
+    /// 1194:CD9A. The main quest's next step offered. No (the carry) when
+    /// the player holds a piece (`quest_piece_held`) or FLAGS bit 2 is set
+    /// (the original then also works out the days left, 1194:CFF7, and
+    /// refuses whichever their sign). Otherwise FLAGS loses bits 3 and 0,
+    /// and a step is rolled (`quest_roll_step`); no when none comes or the
+    /// step's province (the table at 7883) is this one (1194:CE01, whose
+    /// call to CEC8 only computes registers). Then the step's dword at
+    /// 0FDE is a random one from the table at the far pointer 1AB5
+    /// (count at 1387, CE61), its provinces are picked (CE1B,
+    /// `dungeon_pick_quest_provinces`), its target set (CE40,
+    /// `dungeon_set_quest_target`), the time noted at 0FE9 and 2..7 days
+    /// given at 0FED (CF41). Returns the carry. None where the original
+    /// faults (an empty table) or loops forever.
+    pub fn quest_offer(&mut self) -> Option<bool> {
+        use main_quest::*;
+        if self.quest_piece_held() {
+            return Some(true);
+        }
+        let f = self.mem.r8(DS, FLAGS);
+        if f & 4 != 0 {
+            return Some(true);
+        }
+        self.mem.w8(DS, FLAGS, f & 0xF7 & 0xFE);
+        if !self.quest_roll_step()? {
+            return Some(true);
+        }
+        let step = self.mem.r8(DS, STEP) as u16;
+        if self.mem.r8(DS, STEP_PROVINCES.wrapping_add(step)) == self.mem.r8(DS, HERE_PROVINCE) {
+            return Some(true);
+        }
+        let count = self.mem.r16(DS, 0x1387);
+        let r = self.rng.range(0, count)?;
+        let (off, seg) = (self.mem.r16(DS, 0x1AB5), self.mem.r16(DS, 0x1AB7));
+        let v = self.mem.r32(seg, off.wrapping_add(r.wrapping_shl(2)));
+        self.mem.w32(DS, 0x0FDE, v);
+        self.dungeon_pick_quest_provinces()?;
+        self.dungeon_set_quest_target();
+        let t = self.mem.r32(DS, TIME);
+        self.mem.w32(DS, 0x0FE9, t);
+        let days = self.rng.range(2, 8)?;
+        self.mem.w8(DS, 0x0FED, days as u8);
+        Some(false)
+    }
+
+    /// 1194:CDEA. Whether one of the player's first n item slots (from
+    /// 0212, n the occupied slots' count, 1194:7472) holds a piece (its
+    /// type with bit 80h). With none occupied the `loop` runs 65536 times,
+    /// stepping 13h bytes through all of DGROUP.
+    fn quest_piece_held(&self) -> bool {
+        let (n, _) = self.count_items(DS, crate::inventory::PLAYER_SLOTS);
+        let count = if n == 0 { 0x10000u32 } else { n as u32 };
+        let mut si = crate::inventory::PLAYER_SLOTS;
+        for _ in 0..count {
+            if self.mem.r8(DS, si) & 0x80 != 0 {
+                return true;
+            }
+            si = si.wrapping_add(0x13);
+        }
+        false
+    }
+
+    /// 1194:CE7F. Up to 32h rolls of a step 0..15 not yet done (DONE's
+    /// bit clear) whose piece the player may have (`quest_piece_ok`); one
+    /// that is becomes STEP and is marked done. Rolls that meet a done
+    /// step count down too, and once all 32h are spent that way DONE is
+    /// cleared and one more roll is made (an offered piece that is refused
+    /// counts down instead, and ends the rolls at 0). Returns whether a
+    /// step was found.
+    fn quest_roll_step(&mut self) -> Option<bool> {
+        use main_quest::*;
+        let mut cx: u16 = 0x32;
+        loop {
+            let r = self.rng.range(0, 16)?;
+            let done = self.mem.r16(DS, DONE);
+            if done >> r & 1 == 0 {
+                let piece = self.mem.r8(DS, PIECES + r) as u16;
+                if self.quest_piece_ok(piece)? {
+                    self.mem.w8(DS, STEP, r as u8);
+                    let d = self.mem.r16(DS, DONE) | 1 << r;
+                    self.mem.w16(DS, DONE, d);
+                    return Some(true);
+                }
+                cx -= 1;
+                if cx == 0 {
+                    return Some(false);
+                }
+                continue;
+            }
+            cx -= 1;
+            if cx == 0 {
+                self.mem.w16(DS, DONE, 0);
+                cx = 1;
+            }
+        }
+    }
+
+    /// 1194:7C83. Whether the player may have piece `piece`: from 89h
+    /// yes; below, a trial item at ITEM (its type the piece, armour (to
+    /// 83h) or weapon kind in bits 2-3 of 13E8, health 1) that the
+    /// player's class (1A9's low five bits) may use (1194:7772).
+    fn quest_piece_ok(&mut self, piece: u16) -> Option<bool> {
+        if piece >= 0x89 {
+            return Some(true);
+        }
+        self.mem.w8(DS, ITEM, piece as u8);
+        let kind = if piece as u8 <= 0x83 { 0 } else { 1 };
+        let f = self.mem.r8(DS, ITEM + 0x0E) & 0xF3 | kind << 2;
+        self.mem.w8(DS, ITEM + 0x0E, f);
+        self.mem.w16(DS, ITEM + 6, 1);
+        let class = (self.mem.r8(DS, 0x01A9) & 0x1F) as u16;
+        self.class_can_use(DS, ITEM, class)
+    }
+}
