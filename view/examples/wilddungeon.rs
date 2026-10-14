@@ -133,6 +133,47 @@ fn main() {
     println!("the gate at ({}, {})", gate.0, gate.1);
     run = areas::next(&mut e, dir, run).expect("the wilderness");
     place(&e, run);
+    if std::env::var("TRACE").is_ok() {
+        let m = &e.m;
+        let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+        let (pc, pr) = (m.mem.r16(DS, X) >> 7, m.mem.r16(DS, Y) >> 7);
+        println!("    window {:02x?}, the player's square ({pc}, {pr}):", (0..4).map(|i| m.mem.r8(DS, arena::wild::var::WINDOW + i)).collect::<Vec<_>>());
+        for r in pr - 2..=pr + 2 {
+            let row: Vec<String> = (pc - 2..=pc + 2).map(|c| format!("{:04x}", m.mem.r16(walls, r << 8 | c << 1))).collect();
+            println!("    row {r}: {}", row.join(" "));
+        }
+        // For harness/check_move.py: DGROUP and the wall and floor
+        // planes as they are now, and the port's single move (0000:F8DD,
+        // speed 40h) each way from here.
+        if let Ok(d) = std::env::var("DUMP") {
+            let seg_bytes = |s: u16| (0..=0xFFFFu16).map(|o| m.mem.r8(s, o)).collect::<Vec<u8>>();
+            std::fs::write(format!("{d}/ds.bin"), seg_bytes(DS)).unwrap();
+            for (name, var) in [("walls", arena::mif::var::MAP1_SEG), ("floor", arena::mif::var::FLOOR_SEG)] {
+                let s = m.mem.r16(DS, var);
+                std::fs::write(format!("{d}/{name}_{s:04x}.bin"), seg_bytes(s)).unwrap();
+            }
+            for h in [0u16, 0x80, 0x100, 0x180] {
+                let mut t = e.m.clone();
+                let r = t.move_step(&mut e.files.clone(), &mut Front, 0x40, h);
+                println!("    port move heading {h:#x}: {r:?} to ({:#x}, {:#x})", t.mem.r16(DS, X), t.mem.r16(DS, Y));
+            }
+        }
+        // Each way from where the player arrived, a few frames' walk.
+        for h in [0u16, 0x80, 0x100, 0x180] {
+            let mut t = Engine { m: e.m.clone(), files: e.files.clone() };
+            t.m.mem.w16(DS, HEADING, h);
+            let walk = Intent { forward: 256, ..Default::default() };
+            for _ in 0..8 {
+                let k = t.frame_ticks();
+                t.tick(k);
+                if t.frame(Input::Steer(&walk), &mut Front).is_none() {
+                    println!("    heading {h:#x}: code not ported");
+                    break;
+                }
+            }
+            println!("    heading {h:#x}: to ({:#x}, {:#x}), height {:#x}", t.m.mem.r16(DS, X), t.m.mem.r16(DS, Y), t.m.mem.r16(DS, 0xC3D2));
+        }
+    }
 
     // The window moved a block at a time, out in a spiral, until a
     // keeper is in it.
