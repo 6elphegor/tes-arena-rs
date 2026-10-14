@@ -71,7 +71,11 @@ def setup(seed):
     w.append((0xA91A, pk(word())))
     w.append((0x91F6, bytes(byte() for _ in range(4))))
     w.append((0x91F0, pk(0)))
-    if byte() < 0xC0:
+    k = byte()
+    if k < 0x40:
+        # A purse about a drink's price, for the price-equals-gold edge.
+        gold = byte() % 40
+    elif k < 0xC0:
         gold = word() % 0x800
     else:
         gold = byte() | byte() << 8 | byte() << 16
@@ -145,7 +149,11 @@ def setup(seed):
     haggles = []
     for _ in range(3):
         cf = byte() < 0x40
-        if byte() < 0xC0:
+        k = byte()
+        if k < 0x30:
+            # The price agreed exactly the player's gold.
+            eax = gold
+        elif k < 0xC0:
             eax = word() % 0x400
         else:
             eax = byte() | byte() << 8 | byte() << 16

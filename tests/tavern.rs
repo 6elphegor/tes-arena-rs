@@ -129,7 +129,10 @@ fn setup(m: &mut Machine, seed: u32) -> Script {
         m.mem.w8(DS, 0x91F6 + i, v);
     }
     m.mem.w16(DS, 0x91F0, 0);
-    let gold = if s.byte() < 0xC0 {
+    let k = s.byte();
+    let gold = if k < 0x40 {
+        (s.byte() % 40) as u32
+    } else if k < 0xC0 {
         (s.word() % 0x800) as u32
     } else {
         let a = s.byte() as u32;
@@ -227,7 +230,10 @@ fn setup(m: &mut Machine, seed: u32) -> Script {
     let haggles = (0..3)
         .map(|_| {
             let cf = s.byte() < 0x40;
-            let eax = if s.byte() < 0xC0 {
+            let k = s.byte();
+            let eax = if k < 0x30 {
+                gold
+            } else if k < 0xC0 {
                 (s.word() % 0x400) as u32
             } else {
                 let a = s.byte() as u32;
