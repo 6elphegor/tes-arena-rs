@@ -67,7 +67,7 @@ impl TalkHooks for Script {
     fn way(&mut self, _m: &mut Machine, si: u16, x: u16, y: u16) {
         self.log.extend([5, si, x, y]);
     }
-    fn loot(&mut self, _m: &mut Machine, _files: &mut Files, ax: u16) -> Option<()> {
+    fn loot(&mut self, _m: &mut Machine, _files: &mut Files, ax: u16, _si: u16, _seg: u16, _bx: u16) -> Option<()> {
         self.log.extend([6, ax]);
         Some(())
     }

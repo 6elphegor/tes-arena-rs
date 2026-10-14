@@ -120,9 +120,10 @@ pub trait TalkHooks: TextHooks {
     fn way(&mut self, _m: &mut Machine, _si: u16, _x: u16, _y: u16) {}
     /// 1194:7B16: the loot window: AH 0 a creature's loot (AL its type),
     /// 1 a person's (AL its level), 3 an item (AL its number), 0Fh the
-    /// level's item flat AL.
-    fn loot(&mut self, _m: &mut Machine, _files: &mut Files, _ax: u16) -> Option<()> {
-        Some(())
+    /// level's item flat AL; the record at `seg`:`si`, the square `bx`
+    /// (`loot_window`, without its windows).
+    fn loot(&mut self, m: &mut Machine, files: &mut Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
+        m.loot_window(files, &mut crate::loot_window::NoLootHooks, ax, si, seg, bx)
     }
     /// 23BA:002A: sound `ax` at the square `cx`.
     fn sound(&mut self, _m: &mut Machine, _ax: u16, _cx: u16) {}
@@ -157,8 +158,12 @@ pub trait TalkHooks: TextHooks {
     }
     /// The far routine of the building kind `kind` (D48: 4 a tavern, 5 a
     /// temple, 7 an equipment store, 6 a mages' guild; the table at
-    /// 869F).
-    fn shop(&mut self, _m: &mut Machine, _files: &mut Files, _kind: u8) -> Option<()> {
+    /// 869F). The temple runs (`shops::temple`, without its windows); the
+    /// others aren't ported.
+    fn shop(&mut self, m: &mut Machine, _files: &mut Files, kind: u8) -> Option<()> {
+        if kind == 5 {
+            return m.temple(&mut crate::shops::NoShopHooks);
+        }
         Some(())
     }
     /// 2294:0DD0: a flat of kind WILD_FLAT (or the next) in the wild.
@@ -189,6 +194,12 @@ enum Flow {
     Menu,
     /// It ends (E3C3).
     End,
+}
+
+/// BX after 0000:1242 (the distance): the larger of |dx| and |dy|.
+fn reach_bx(dx: u16, dy: u16) -> u16 {
+    let abs = |v: u16| if (v as i16) < 0 { v.wrapping_neg() } else { v };
+    abs(dx).max(abs(dy))
 }
 
 /// The map offset of (x, y) as most of this code makes it: the column
@@ -1213,7 +1224,7 @@ impl Machine {
                 return Some(true);
             }
             self.mem.w16(DS, di.wrapping_sub(0x389A), 0xFFFF);
-            hooks.loot(self, files, 0x300 | al as u16)?;
+            hooks.loot(self, files, 0x300 | al as u16, si, DS, reach_bx(dx, dy))?;
             return Some(true);
         }
         let rec = self.g16(si.wrapping_add(0x12));
@@ -1223,7 +1234,7 @@ impl Machine {
         } else {
             0x100 | self.mem.r8(seg, rec.wrapping_add(5)) as u16
         };
-        hooks.loot(self, files, ax)?;
+        hooks.loot(self, files, ax, rec, seg, reach_bx(dx, dy))?;
         Some(true)
     }
 
@@ -1241,7 +1252,7 @@ impl Machine {
         let sq = square_at(x, y);
         if al != self.g8(ITEM_FLATS + 1) {
             let ax = 0x0F00 | (self.flat_of(si) & 0xFF);
-            hooks.loot(self, files, ax)?;
+            hooks.loot(self, files, ax, si, DS, sq)?;
             return Some(true);
         }
         let key = (((y >> 7) as u8 as u16) << 8) | ((x >> 7) & 0xFF);
@@ -1251,12 +1262,14 @@ impl Machine {
         };
         self.mem.w16(DS, rec, 0xFFFF);
         let map = self.g16(MAP);
-        if (self.mem.r16(map, sq) as i16) < 0 {
+        let fs = if (self.mem.r16(map, sq) as i16) < 0 {
             self.mem.w16(map, sq, 0);
+            map
         } else {
             self.mem.w8(self.g16(FLOOR), sq, 0);
-        }
-        hooks.loot(self, files, 0x300 | (bx & 0xFF))?;
+            self.g16(FLOOR)
+        };
+        hooks.loot(self, files, 0x300 | (bx & 0xFF), si, fs, sq)?;
         Some(true)
     }
 
