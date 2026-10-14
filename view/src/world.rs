@@ -59,7 +59,15 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     if m.mem.r16(sseg, 0x18) == 0 {
         eprintln!("the spells did not load (SPELLSG.65)");
     }
-    m.level_load(&mut files, 0xF000).expect("level");
+    if let Some(city) = level.strip_prefix("CITY:") {
+        city_load(&mut m, &mut files, dir, city);
+        // The city's build left the buffer pointer at the frame (1194:0292);
+        // entering the area gives the INF a buffer again (0000:A4C5).
+        m.mem.w16(DS, 0xBA54, off);
+        m.mem.w16(DS, 0xBA56, seg);
+    } else {
+        m.level_load(&mut files, 0xF000).expect("level");
+    }
     let info = m.mem.r16(DS, 0xCB84);
     // The world loop's hooks are set: the port runs its own input step
     // and transitions in their place.
@@ -80,6 +88,36 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let mut engine = Engine::new(m, files);
     engine.enter_area(info).expect("entering the area");
     engine
+}
+
+/// A city, from `PROVINCE:INDEX[:CLIMATE:WEATHER]`: province 0..7 (8 the
+/// Imperial City), the location in it (0..7 city-states, 8..15 towns,
+/// 16..31 villages), the climate (DA8: 0, 4 or 8) and the weather (BB09:
+/// 0 clear, 1 rain, 2 snow; 81h, 82h at night). The location's record is
+/// built from CITYDATA.65 (1194:3B84) and its city from its blocks
+/// (1194:0292); it is outdoors (C398 bit 4), and its INF is the one for
+/// the climate and weather (0000:0896). The entry's other set-up (the
+/// weather and climate from the season and terrain, 0000:0F05) is not
+/// ported.
+fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
+    const RECORD: u16 = 0x0A22;
+    const PROVINCE_DATA: u16 = 0x1429;
+    const PROVINCE_BYTES: usize = 0x4CC;
+    let v: Vec<u16> = spec.split(':').map(|x| x.parse().expect("CITY:PROVINCE:INDEX[:CLIMATE:WEATHER]")).collect();
+    let (province, index) = (v[0].min(8), v.get(1).copied().unwrap_or(0));
+    let data = std::fs::read(dir.join("CITYDATA.65")).expect("CITYDATA.65");
+    let p = province as usize;
+    for (i, &b) in data[p * PROVINCE_BYTES..(p + 1) * PROVINCE_BYTES].iter().enumerate() {
+        m.mem.w8(DS, PROVINCE_DATA + i as u16, b);
+    }
+    let id = if province == 8 { 0x100 } else { province * 32 + index };
+    m.city_build_location(DS, RECORD, id, 0).expect("location record");
+    m.mif_build_city(files).expect("city");
+    m.mem.w16(DS, 0x0DA8, v.get(2).copied().unwrap_or(0));
+    m.mem.w8(DS, 0xBB09, v.get(3).copied().unwrap_or(0) as u8);
+    let f = m.mem.r16(DS, 0xC398) | 4;
+    m.mem.w16(DS, 0xC398, f);
+    m.outdoor_inf();
 }
 
 /// A debugging aid: rolls random encounters (as the clock does hourly)

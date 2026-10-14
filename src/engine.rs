@@ -237,6 +237,35 @@ impl Machine {
         self.mem.w16(DS, MAP_FLAGS, f);
     }
 
+    /// 0000:0896. Outdoors (C398 bit 4), the INF to load (CB84): in the
+    /// wilderness (C39A bit 200h) the one for the climate (DA8: 0, 4 or
+    /// 8) and weather (BB09, low 7 bits), from the table at 3CF8 (eight
+    /// bytes a name, three weathers a climate); in a city the one at
+    /// 3C98 by the weather plus the climate (four a climate), weather 1
+    /// with BB09 bit 7 taken as 3. Returns whether the townspeople's
+    /// graphics then load (a city: 0000:17F9, the front end's).
+    pub fn outdoor_inf(&mut self) -> bool {
+        if self.mem.r16(DS, MAP_FLAGS) & 4 == 0 {
+            return false;
+        }
+        let climate = self.mem.r16(DS, 0x0DA8);
+        let weather = self.mem.r8(DS, 0xBB09);
+        if self.mem.r16(DS, LEVEL_FLAGS) & 0x200 != 0 {
+            // mul cl: AL = 3 x (DA8 >> 2) low byte, AH the high.
+            let ax = 3u16.wrapping_mul((climate >> 2) & 0xFF);
+            let i = ax.wrapping_add((weather & 0x7F) as u16);
+            self.mem.w16(DS, crate::info::var::INFO_PTR, (i << 3).wrapping_add(0x3CF8));
+            return false;
+        }
+        let mut al = (weather & 0x7F) as u16;
+        if weather & 0x80 != 0 && al == 1 {
+            al = 3;
+        }
+        let i = al.wrapping_add(climate);
+        self.mem.w16(DS, crate::info::var::INFO_PTR, (i << 3).wrapping_add(0x3C98));
+        true
+    }
+
     /// 0000:C980, the walk over the squares in view, for the doors (the
     /// rest it does is drawing, and the changed squares it steps are
     /// `EngineHooks::draw`'s), with C398 bit 20h as the world loop sets

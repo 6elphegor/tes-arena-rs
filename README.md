@@ -161,6 +161,8 @@ No game code or data is included: everything is loaded from your own copy.
   a loaded level up (the state half of 0000:A4ED). `Engine::view` gives the renderer the
   player's position, heading, light, time of day and message;
   `examples/play.rs` runs it on a level with scripted modern controls.
+  `outdoor_inf` (0000:0896) picks an outdoor area's INF by climate and
+  weather (and says whether a city's townspeople load).
 - `src/actors.rs` – the people and creatures of a level and their frame
   (0000:1854): idle walking, facing and chasing the player, side steps
   when blocked, line of sight, respawning near the player, animation
@@ -211,7 +213,12 @@ port's engine runs the game, and the renderer draws what is in its memory.
 The core crate stays free of dependencies; the view crate is a workspace
 member using wgpu, winit, glam and png.
 
-- `world.rs` loads a level the way `examples/play.rs` does. It reads the
+- `world.rs` loads a level the way `examples/play.rs` does, or a city
+  (`CITY:PROVINCE:INDEX[:CLIMATE:WEATHER]`, 8:0 the Imperial City): its
+  record and blocks built as `examples/city_map.rs` does, outdoors, with
+  the INF for its climate and weather (`outdoor_inf`, 0000:0896). The
+  weather and climate the game sets from the season and terrain
+  (0000:0F05) are not ported; they are given. It reads the
   palette (PAL.COL), the textures from the EMS banks the INF loader filled
   (64 x 64, stored transposed, 15 to a bank) and the shading table (F000 in
   the first texture bank). It builds triangles from the map planes:
@@ -247,8 +254,10 @@ member using wgpu, winit, glam and png.
 
   The examples `flats` (every frame on one sheet), `formats` (what the
   decoders miss, by level), `actors` (the slots in use) and `doors` (the
-  doors nearest the start, their surroundings and locks) and `people` (a
-  person's attack frames with the weapon over them) check them.
+  doors nearest the start, their surroundings and locks), `people` (a
+  person's attack frames with the weapon over them) and `level` (what a
+  level or city loads: textures, flats, INF, the squares about the
+  player) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
   with the palette.
@@ -268,8 +277,7 @@ cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
-Not drawn yet: the townspeople (MLGEN/FMGEN files by climate, with the
-cities), cities (their flats load elsewhere), the other door kinds moving, chasms
+Not drawn yet: the townspeople (MLGEN/FMGEN files by climate), the other door kinds moving, chasms
 and water, the sky, and the interface. How a dungeon's placed creatures
 (map flats naming creature files, such as rat.dfa) come to life is not
 found yet.
