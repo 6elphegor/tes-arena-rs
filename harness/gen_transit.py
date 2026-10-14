@@ -19,7 +19,8 @@ Four kinds of case, by the seed's first byte:
 
 Stubbed callees count their calls in DGROUP (see STUBS); some keep
 registers: 1194:D459 AX, SI, DI at FFB0..FFB4, 1194:3AE8 AX at FFB6,
-0000:28BC BX, AX at FFB8, FFBA, 0000:0AA9 SI at FFBC, 0000:1793 AX at
+0000:28BC BX, AX at FFB8, FFBA, 0000:0AA9 SI at FFBC (and CD32, CD4E at
+FFC4, FFC6), 0000:1793 AX at
 FF92. 26F7:0000 and 217B:0058 return the carry from FFDE bits 0 and 1;
 25CA:01E6 returns FFC0.
 
@@ -106,7 +107,11 @@ STUBS = [
     (0, 0x4EFD, counter(0xFF76, True)),
     (0, 0x946A, counter(0xFF78, False)),
 ]
-WORLD = (0, 0x0AA9, counter(0xFFF4, False, [(0xFFBC, 'si')]))
+# 0000:0AA9: the level hooks the run set (cleared after it) kept: mov
+# ax, [CD32]; mov [FFC4], ax; mov ax, [CD4E]; mov [FFC6], ax; then SI
+# and the count.
+WORLD = (0, 0x0AA9, bytes([0xA1, 0x32, 0xCD, 0xA3, 0xC4, 0xFF, 0xA1, 0x4E, 0xCD, 0xA3, 0xC6, 0xFF])
+         + counter(0xFFF4, False, [(0xFFBC, 'si')]))
 STOPS = [(0, 0x0A83, stop(0)), (0, 0x090A, stop(1)), (0, 0x09FA, stop(3)), (0, 0x0936, stop(4)),
          (0, 0x0993, stop(2)), (0, 0xFFF0, stop(6, False))]
 RUNS = [0x0936, 0x0993, 0x09FA, 0x0A83, 0x090A]

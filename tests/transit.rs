@@ -263,6 +263,10 @@ fn case(m: &mut Machine, kind: u8, sub: u8) -> Option<()> {
                 n => n,
             };
             m.area_begin(run, h);
+            for (from, to) in [(0xCD32, 0xFFC4), (0xCD4E, 0xFFC6)] {
+                let v = m.mem.r16(DS, from);
+                m.mem.w16(DS, to, v);
+            }
             m.mem.w16(DS, 0xFFBC, si);
             count(m, 0xFFF4);
             m.area_end(run, h);

@@ -146,6 +146,14 @@ pub trait AreaHooks {
     /// After the world loop (0000:0AD7..0B07): 23F1:013C, the palette
     /// faded to black (5E3E), 4EFD and 946A.
     fn world_screen(&mut self, _m: &mut Machine) {}
+    /// 0000:A5A0: the renderer's buffers freed (CD78, CD84, CD80, CD88,
+    /// the buffer at BA56), 0000:DE9B and AB2A.
+    fn world_free(&mut self, _m: &mut Machine) {}
+    /// 0000:468B, the hook CD42 once the INF is loaded: the flats' flags,
+    /// outdoors the light (0000:0390) and the city's people, indoors the
+    /// level's lights from its flats (0000:478F, `Machine::flat_lights`)
+    /// and the interior's people (2433:0000).
+    fn entered(&mut self, _m: &mut Machine) {}
 }
 
 /// `AreaHooks` that do nothing.
@@ -503,9 +511,11 @@ impl Machine {
             self.mem.w32(DS, at, v);
         }
         self.and16(MAP_FLAGS, 0xFF7F);
-        for (i, v) in [5u8, 0xFF, 0xFF, 0xFF, 6, 0xE, 0xF, 0xFF, 0, 1, 0xFF, 0xE, 0xF, 0xFF].into_iter().enumerate() {
-            // C3BC..C3BF, C3C0..C3C5 (C3C5 set after), C3C8..C3CB.
-            let at = [0xC3BC, 0xC3BD, 0xC3BE, 0xC3BF, 0xC3C0, 0xC3C1, 0xC3C2, 0xC3C3, 0xC3C4, 0xC3C5, 0xC3C8, 0xC3C9, 0xC3CA, 0xC3CB][i];
+        let bytes: [(u16, u8); 14] = [
+            (0xC3BC, 5), (0xC3BD, 0xFF), (0xC3BE, 0xFF), (0xC3BF, 0xFF), (0xC3C8, 0xFF), (0xC3C9, 0xE), (0xC3CA, 0xF),
+            (0xC3CB, 0xFF), (0xC3C0, 6), (0xC3C1, 0xE), (0xC3C2, 0xF), (0xC3C3, 0xFF), (0xC3C4, 0), (0xC3C5, 1),
+        ];
+        for (at, v) in bytes {
             self.mem.w8(DS, at, v);
         }
         let v = self.mem.r16(DS, 0x0D37);
@@ -639,5 +649,89 @@ impl Machine {
         }
         hooks.spawn(self, n);
         hooks.townsfolk_graphics(self);
+    }
+}
+
+impl Machine {
+    /// 0000:A45D..A47F, the world loop's end: the planes freed (0000:C8FE:
+    /// the floor, walls and ceiling, their segments cleared), the actors'
+    /// flags past the flats' (from CA97 + C38E, to 9Eh bytes, its length
+    /// kept at D432 and its start at CCC0) cleared, then the renderer's
+    /// buffers freed (0000:A5A0, `AreaHooks::world_free`).
+    pub fn world_leave(&mut self, hooks: &mut dyn AreaHooks) {
+        for at in [crate::mif::var::FLOOR_SEG, crate::mif::var::MAP1_SEG, crate::mif::var::MAP2_SEG] {
+            let seg = self.mem.r16(DS, at);
+            self.heap_free(seg);
+            self.mem.w16(DS, at, 0);
+        }
+        let n = self.mem.r16(DS, 0xC38E);
+        self.mem.w16(DS, 0xD432, n);
+        let at = n.wrapping_add(0xCA97);
+        self.mem.w16(DS, 0xCCC0, at);
+        // rep stosb with CX 9Eh - n (65536 - .. past 9Eh).
+        let cx = 0x9Eu16.wrapping_sub(n);
+        for i in 0..cx {
+            self.mem.w8(DS, at.wrapping_add(i), 0);
+        }
+        hooks.world_free(self);
+    }
+}
+
+impl crate::engine::Engine {
+    /// 0000:A26F..A2A0 without the drawing: entering the 3D world whose
+    /// level is named at LEVEL_NAME, after `world_begin`. The timer, the
+    /// ceiling 64h, the walking speed, standing (`enter_area`'s); the EMS
+    /// banks but the level's freed, the deep floors, no changing squares,
+    /// the rain's drops, no moving lights (0000:E122), on dry ground
+    /// (0000:A4ED); the entry hook (C3B0: 0000:4632, `area_entry`); the
+    /// level loaded unless its name starts with `#` (a city built, a
+    /// dungeon made) or the hook CD5E is set; the place hook (CD2A:
+    /// 0000:45B2, `area_place`); the INF loaded (0000:EC03); the entered
+    /// hook (CD42: 0000:468B, `AreaHooks::entered`).
+    ///
+    /// The hooks are recognised by their value: the port loads the image
+    /// at segment 0, so the original's hooks into segment 0000 read as
+    /// unset to the original's test of the segment (0000:A8EF).
+    pub fn world_enter(&mut self, hooks: &mut dyn AreaHooks) -> Option<()> {
+        let m = &mut self.m;
+        m.mem.w16(DS, crate::frame::var::TICKS, 0);
+        m.mem.w16(DS, 0xD80A, 0xFF9C);
+        m.mem.w16(DS, crate::movement::var::CEILING, 0x64);
+        let v = m.mem.r16(DS, 0xC390);
+        m.mem.w16(DS, crate::controls::var::WALK, v);
+        m.mem.w16(DS, crate::movement::var::HEIGHT, 0x3C);
+        m.ems_reset();
+        let v = m.mem.r16(DS, crate::movement::var::FRAME_SEG).wrapping_add(0xC00);
+        m.mem.w16(DS, crate::movement::var::FLOOR_SOLID, v);
+        for i in 0..0x20 {
+            m.mem.w16(DS, crate::click::var::TEMP_WALLS + 2 * i, 0xFFFF);
+        }
+        m.weather_drops()?;
+        for i in 0..0x60 {
+            m.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
+        }
+        m.mem.w8(DS, 0xCB5B, 1);
+        if m.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
+            m.area_entry(hooks);
+        }
+        if m.mem.r16(DS, 0xCD60) != 0 {
+            return None;
+        }
+        if m.mem.r8(DS, LEVEL_NAME) != b'#' {
+            m.level_load(&mut self.files, LEVEL_NAME)?;
+        }
+        let m = &mut self.m;
+        if m.mem.r32(DS, PLACE_HOOK) == 0x45B2 {
+            m.area_place(hooks);
+        }
+        let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
+        if info != 0 {
+            m.info_load(&mut self.files, info)?;
+            self.m.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        }
+        if self.m.mem.r32(DS, ENTERED_HOOK) == 0x468B {
+            hooks.entered(&mut self.m);
+        }
+        Some(())
     }
 }
