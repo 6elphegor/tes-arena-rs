@@ -72,6 +72,23 @@ pub trait QuestHooks {
     /// 26F7:0CF1: province `province`'s data written back to CITYDATA
     /// (AX the province).
     fn province_save(&mut self, _m: &mut Machine, _province: u16) {}
+    /// 1194:A374 with AX 0 (A36C): text number TEXT shown.
+    fn text_shown(&mut self, _m: &mut Machine) {}
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made.
+    fn expand(&mut self, _m: &mut Machine, _di: u16) {}
+    /// 26F7:0C0A's write of the dungeon entry at DS:`si` (19h bytes) to
+    /// CITYDATA, in its province (PICK_PROVINCE).
+    fn entry_save(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 27E3:000A: the text at DS:`si` added to the logbook: the entry made
+    /// (`Machine::log_entry`), then the file's appends (not ported).
+    fn log_entry(&mut self, m: &mut Machine, si: u16) {
+        m.log_entry(si);
+    }
+    /// 1194:1034 when the main quest ends (0FDD 8Eh).
+    fn finale(&mut self, _m: &mut Machine) {}
+    /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
+    /// written to 19DE, before its message box.
+    fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
 }
 
 /// `QuestHooks` that do nothing.
@@ -284,5 +301,322 @@ impl Machine {
         self.mem.w8(DS, at, c);
         let ax = self.mem.r16(DS, STAGE);
         hooks.province_save(self, ax);
+    }
+}
+
+/// The main quest's block (0FDD..0FEF, 13h bytes): its step, the dungeon
+/// holding the current piece (place, province), the next dungeon (place,
+/// province), flags, the steps done (a word, bits), the chest's square.
+pub mod main_quest {
+    pub const STEP: u16 = 0x0FDD;
+    pub const PLACE: u16 = 0x0FE2;
+    pub const PROVINCE: u16 = 0x0FE3;
+    pub const NEXT_PLACE: u16 = 0x0FE4;
+    pub const NEXT_PROVINCE: u16 = 0x0FE5;
+    pub const FLAGS: u16 = 0x0FE6;
+    pub const DONE: u16 = 0x0FE7;
+    pub const CHEST: u16 = 0x0FEE;
+    pub const BYTES: u16 = 0x13;
+    /// The pieces by step (16 bytes, 80h set); the step whose piece is
+    /// 8Eh ends the quest.
+    pub const PIECES: u16 = 0x78C3;
+    pub const LAST_PIECE: u8 = 0x8E;
+}
+
+/// The item buffer the main quest's piece is made in (13h bytes).
+const ITEM: u16 = 0x13DA;
+/// The player's record (its item slots from +6Eh).
+const PLAYER: u16 = 0x01A4;
+/// The place: the area's kind (3 a dungeon), its province, the place in
+/// it (low 5 bits).
+const AREA: u16 = 0x05E6;
+const HERE_PROVINCE: u16 = 0x0A46;
+const HERE_PLACE: u16 = 0x0A4C;
+
+impl Machine {
+    /// 292B:06C7. The map square (row high, column doubled low) of the
+    /// record at `si` (x at +0, y at +4).
+    pub fn record_square(&self, si: u16) -> u16 {
+        let x = self.mem.r16(DS, si);
+        let y = self.mem.r16(DS, si.wrapping_add(4));
+        (y >> 7) << 8 | ((x >> 7) as u8).wrapping_mul(2) as u16
+    }
+
+    /// 1194:9F04. A quest item lying in the level is picked up: the
+    /// quest under way at stage 5 whose place (+14h's low byte) is this
+    /// place (A4C's low five bits) is marked (+4 bit 5) and given a new
+    /// quest item (`pick_quest_item` of the province's ten, 1194:3829),
+    /// with bit 80h when +28h is set, put in the first free slot of the
+    /// list at ITEMS (the tenth byte, 0FDD, when it is full) and at +1Ch;
+    /// 0D39 bit 80h. The text at 6E0A is copied to 1044, has its
+    /// substitutions made and is shown. Returns the carry: set (the item
+    /// stays) when no quest wants it. None where the original loops
+    /// forever (every item taken).
+    pub fn quest_item_taken(&mut self, hooks: &mut dyn QuestHooks) -> Option<bool> {
+        let here = self.mem.r8(DS, HERE_PLACE) & 0x1F;
+        let Some(si) = (0..4u16)
+            .map(|i| QUESTS + i * 0x34)
+            .find(|&si| self.quest_stage(si) == 5 && self.quest_kind(si) == 1 && self.mem.r8(DS, si + 0x14) == here)
+        else {
+            return Some(true);
+        };
+        let f = self.quest_flags(si) | 0x20;
+        self.mem.w16(DS, si + 4, f);
+        let province = self.mem.r8(DS, HERE_PROVINCE) as u16;
+        let (item, slot) = self.pick_quest_item(province)?;
+        let mut al = item as u8;
+        if self.mem.r8(DS, si + 0x28) != 0 {
+            al |= 0x80;
+        }
+        self.mem.w8(DS, ITEMS.wrapping_add(slot), al);
+        let c = self.mem.r8(DS, 0x0D39) | 0x80;
+        self.mem.w8(DS, 0x0D39, c);
+        self.mem.w8(DS, si + 0x1C, al);
+        let f = self.quest_flags(si) | 0x20;
+        self.mem.w16(DS, si + 4, f);
+        let ax = self.mem.r16(DS, 0x102C);
+        hooks.font(self, 0, ax);
+        self.quest_strcpy(0x6E0A, 0x1044);
+        hooks.expand(self, 0x1044);
+        hooks.message_box(self, 0x1044);
+        Some(false)
+    }
+
+    /// 0000:9CA0: the string at DS:`si` copied to DS:`di`, NUL included.
+    fn quest_strcpy(&mut self, mut si: u16, mut di: u16) {
+        loop {
+            let b = self.mem.r8(DS, si);
+            self.mem.w8(DS, di, b);
+            if b == 0 {
+                break;
+            }
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+        }
+    }
+
+    /// 2294:0F33. A chest opened in a dungeon (AREA 3) at the main
+    /// quest's chest square (`main_quest::CHEST`; the chest's record at
+    /// `si`): in the dungeon of the current piece the chest goes
+    /// (`quest_chest_clear`), the next dungeon is revealed
+    /// (`quest_next_dungeon`) and this one is done (PROVINCE FFh); in the
+    /// next dungeon, at the last step (the step of piece 8Eh) the chest
+    /// goes, text 1FAh is shown and the quest ends (the step 8Eh for
+    /// 1194:1034, then 0; NEXT_PROVINCE FFh, FLAGS bit 2 clear);
+    /// otherwise with the inventory full its text is shown and nothing
+    /// else, or the chest goes and the piece is the player's
+    /// (`quest_piece`), NEXT_PROVINCE FFh. Returns the carry: set where
+    /// the chest was the quest's. None where an item's making fails.
+    pub fn quest_chest(&mut self, hooks: &mut dyn QuestHooks, si: u16) -> Option<bool> {
+        use main_quest::*;
+        if self.mem.r8(DS, AREA) != 3 || self.record_square(si) != self.mem.r16(DS, CHEST) {
+            return Some(false);
+        }
+        let ax = self.mem.r16(DS, 0x102C);
+        hooks.font(self, 0, ax);
+        let province = self.mem.r8(DS, HERE_PROVINCE);
+        let here = self.mem.r8(DS, HERE_PLACE) & 0x1F;
+        if province == self.mem.r8(DS, PROVINCE) && here == self.mem.r8(DS, PLACE) {
+            self.quest_chest_clear(si);
+            self.quest_next_dungeon(hooks)?;
+            self.mem.w8(DS, PROVINCE, 0xFF);
+            return Some(true);
+        }
+        if province != self.mem.r8(DS, NEXT_PROVINCE) || here != self.mem.r8(DS, NEXT_PLACE) {
+            return Some(false);
+        }
+        if self.mem.r8(DS, STEP) == self.quest_step_of(LAST_PIECE) as u8 {
+            self.quest_chest_clear(si);
+            self.mem.w16(DS, TEXT, 0x1FA);
+            self.mem.w8(DS, TEXT_FLAG, 0);
+            hooks.text_shown(self);
+            self.mem.w8(DS, STEP, LAST_PIECE);
+            hooks.finale(self);
+            self.mem.w8(DS, NEXT_PROVINCE, 0xFF);
+            let f = self.mem.r8(DS, FLAGS) & 0xFB;
+            self.mem.w8(DS, FLAGS, f);
+            self.mem.w8(DS, STEP, 0);
+            return Some(true);
+        }
+        if self.free_slot(DS, PLAYER).is_err() {
+            let ax = self.mem.r16(DS, 0x1026);
+            hooks.inventory_full(self, ax);
+            hooks.message_box(self, 0x19DE);
+            return Some(true);
+        }
+        self.quest_chest_clear(si);
+        self.quest_piece(hooks)?;
+        self.mem.w8(DS, NEXT_PROVINCE, 0xFF);
+        Some(true)
+    }
+
+    /// 2294:10A5. The chest at `si` taken off the floor plane (the
+    /// segment at D806).
+    fn quest_chest_clear(&mut self, si: u16) {
+        let sq = self.record_square(si);
+        let floor = self.mem.r16(DS, 0xD806);
+        self.mem.w16(floor, sq, 0);
+    }
+
+    /// 1194:D316. The step whose piece (PIECES) is `piece`: 0..15, or 16
+    /// when none is.
+    pub fn quest_step_of(&self, piece: u8) -> u16 {
+        (0..16u16).find(|&i| self.mem.r8(DS, main_quest::PIECES + i) == piece).unwrap_or(16)
+    }
+
+    /// 1194:D140. Text 1F4h is shown; "%adn" made at 929E has its
+    /// substitutions made (the next dungeon's name); a random dungeon
+    /// entry of the next dungeon's province takes or gives that name
+    /// (26F7:0C0A, mode 1: `quest_dungeon_entry`) and its index becomes
+    /// NEXT_PLACE, then it is taken again (mode 4); text 1F7h goes to the
+    /// log (`quest_log_text`).
+    fn quest_next_dungeon(&mut self, hooks: &mut dyn QuestHooks) -> Option<()> {
+        use main_quest::*;
+        self.mem.w16(DS, TEXT, 0x1F4);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        hooks.text_shown(self);
+        self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%adn"));
+        self.mem.w8(DS, 0x92A2, 0);
+        hooks.expand(self, 0x929E);
+        let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
+        let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x929E)?;
+        self.mem.w8(DS, NEXT_PLACE, ax as u8);
+        let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
+        self.quest_dungeon_entry(hooks, province, 4, ax, 0x929E)?;
+        self.mem.w16(DS, TEXT, 0x1F7);
+        self.quest_log_text(hooks);
+        Some(())
+    }
+
+    /// 26F7:0C0A with its I/O as hooks: province `province` loaded, the
+    /// entry picked (`dungeon_pick_entry`), the save's digits written to
+    /// 1367, the entry written back (`QuestHooks::entry_save`), the place's
+    /// province (A46) loaded again. Returns AX, the entry's index. The
+    /// entry written is the index's (modes 0, 1 and 4), the first fixed
+    /// one (2) or the second (3 and more but 4).
+    fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
+        use crate::dungeon::{table::DUNGEON_ENTRIES, var::PICK_INDEX};
+        let here = self.mem.r8(DS, HERE_PROVINCE);
+        hooks.province_load(self, province as u8);
+        self.dungeon_pick_entry(province, mode, index, name)?;
+        let entry = match mode {
+            2 => DUNGEON_ENTRIES,
+            3 | 5.. => DUNGEON_ENTRIES + 0x19,
+            _ => DUNGEON_ENTRIES.wrapping_add(self.mem.r16(DS, PICK_INDEX).wrapping_mul(0x19)),
+        };
+        let slot = self.mem.r8(DS, 0x1A6C);
+        let digits = (((slot % 10) as u16) << 8 | (slot / 10) as u16).wrapping_add(0x3030);
+        self.mem.w16(DS, 0x1367, digits);
+        hooks.entry_save(self, entry);
+        hooks.province_load(self, here);
+        Some(self.mem.r16(DS, PICK_INDEX))
+    }
+
+    /// 1194:CF93. Text TEXT written to 1044 (A374, mode 2) and logged
+    /// (27E3:000A).
+    fn quest_log_text(&mut self, hooks: &mut dyn QuestHooks) {
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        hooks.text(self);
+        hooks.log_entry(self, 0x1044);
+    }
+
+    /// 1194:D198. Unless at the last step (the step of piece 8Eh), text
+    /// 1F5h is shown, the step's piece is made at ITEM (`quest_artifact`)
+    /// and, with a free slot, given to the player (copied, then the
+    /// items sorted); then the main quest's block is cleared but for DONE.
+    fn quest_piece(&mut self, hooks: &mut dyn QuestHooks) -> Option<()> {
+        use main_quest::*;
+        if self.mem.r8(DS, STEP) == self.quest_step_of(LAST_PIECE) as u8 {
+            return Some(());
+        }
+        self.mem.w16(DS, TEXT, 0x1F5);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        hooks.text_shown(self);
+        let step = self.mem.r8(DS, STEP) as u16;
+        self.quest_artifact(step)?;
+        if let Ok((slot, _)) = self.free_slot(DS, PLAYER) {
+            self.memmove(DS, ITEM, DS, slot, 0x13);
+            self.sort_inventory();
+        }
+        let done = self.mem.r16(DS, DONE);
+        for i in 0..BYTES {
+            self.mem.w8(DS, STEP + i, 0);
+        }
+        self.mem.w16(DS, DONE, done);
+        Some(())
+    }
+
+    /// 1194:D1F1. The piece of step `step` made at ITEM: its kind k
+    /// (PIECES' byte without bit 80h) goes to 13C8, and k | 80h picks the
+    /// maker: up to 83h armour (1194:E889) and up to 88h a weapon (E8B2),
+    /// each of item level k | 80h with the type from the table at 36DD,
+    /// and the byte at 36ED + k to 13EA; up to 8Bh a magic item (B848,
+    /// level 14h, the forced kind from 36DD; 8Ch kind 3), 13EA FFh, the
+    /// item's bits 4-5 (13E8) clear, for kinds 0Ah..0Ch 20h and the byte
+    /// at 7870 to 13DE; beyond, a blank item (13DB 40h, or FFFFh with 13E0
+    /// 2710h for kind 0Dh; 13E8 bits 6 and 3). Then all: 13E8 bit 0, 13EC
+    /// FFh, 13EB from 78B3 + k, 13DA k | 80h, the dword 13E4 100000 and,
+    /// but for kind 0Dh, 13E0 and 13E2 25000.
+    fn quest_artifact(&mut self, step: u16) -> Option<()> {
+        let k = self.mem.r8(DS, main_quest::PIECES.wrapping_add(step)) & 0x7F;
+        self.mem.w8(DS, 0x13C8, k);
+        let ty = self.mem.r8(DS, 0x36DD + k as u16);
+        let ax = (k | 0x80) as u16;
+        let magic = |m: &mut Self, forced: u8| -> Option<()> {
+            let kind = m.mem.r8(DS, 0x13C8);
+            m.shop_magic_item(0x14, forced)?;
+            m.mem.w8(DS, 0x13C8, kind);
+            let f = m.mem.r8(DS, 0x13E8) & 0xCF;
+            m.mem.w8(DS, 0x13E8, f);
+            m.mem.w8(DS, 0x13EA, 0xFF);
+            if (0x0A..=0x0C).contains(&kind) {
+                let f = m.mem.r8(DS, 0x13E8) & 0xCF | 0x20;
+                m.mem.w8(DS, 0x13E8, f);
+                let b = m.mem.r8(DS, 0x7870 + (kind - 0x0A) as u16);
+                m.mem.w8(DS, 0x13DE, b);
+            }
+            Some(())
+        };
+        if ax <= 0x88 {
+            if ax <= 0x83 {
+                self.loot_armor(ax as u8, ty);
+            } else {
+                self.loot_weapon(ax as u8, ty)?;
+            }
+            let kind = self.mem.r8(DS, 0x13C8);
+            let b = self.mem.r8(DS, 0x36ED + kind as u16);
+            self.mem.w8(DS, 0x13EA, b);
+        } else if ax <= 0x8B {
+            magic(self, ty)?;
+        } else if ax == 0x8C {
+            magic(self, 3)?;
+        } else {
+            for i in 0..0x13 {
+                self.mem.w8(DS, ITEM + i, 0);
+            }
+            let f = self.mem.r8(DS, 0x13E8) | 0x40 | 8;
+            self.mem.w8(DS, 0x13E8, f);
+            self.mem.w16(DS, 0x13DB, 0x40);
+            if self.mem.r8(DS, 0x13C8) == 0x0D {
+                self.mem.w16(DS, 0x13DB, 0xFFFF);
+                self.mem.w16(DS, 0x13E0, 0x2710);
+            }
+        }
+        let f = self.mem.r8(DS, 0x13E8) | 1;
+        self.mem.w8(DS, 0x13E8, f);
+        self.mem.w8(DS, 0x13EC, 0xFF);
+        let kind = self.mem.r8(DS, 0x13C8);
+        let b = self.mem.r8(DS, 0x78B3 + kind as u16);
+        self.mem.w8(DS, 0x13EB, b);
+        self.mem.w8(DS, ITEM, kind | 0x80);
+        self.mem.w32(DS, 0x13E4, 100_000);
+        if kind != 0x0D {
+            self.mem.w16(DS, 0x13E0, 25_000);
+            self.mem.w16(DS, 0x13E2, 25_000);
+        }
+        Some(())
     }
 }

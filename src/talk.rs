@@ -141,9 +141,10 @@ pub trait TalkHooks {
         m.resolve_cast(files, Touch::Actor(si))
     }
     /// 1194:9F04: the level's quest item at `si` is taken. The carry: it
-    /// stays.
-    fn quest_item(&mut self, _m: &mut Machine, _si: u16) -> bool {
-        true
+    /// stays (`quest::quest_item_taken`; it stays too where the original
+    /// would loop forever).
+    fn quest_item(&mut self, m: &mut Machine, _si: u16) -> bool {
+        m.quest_item_taken(&mut crate::quest::NoQuestHooks).unwrap_or(true)
     }
     /// 1194:D593: the quest's person speaks.
     fn quest_person(&mut self, _m: &mut Machine) {}
@@ -154,9 +155,9 @@ pub trait TalkHooks {
         true
     }
     /// 2294:0F33: a chest holding the quest's item (at `si`). The carry:
-    /// it was.
-    fn quest_chest(&mut self, _m: &mut Machine, _si: u16) -> bool {
-        false
+    /// it was (`quest::quest_chest`).
+    fn quest_chest(&mut self, m: &mut Machine, si: u16) -> bool {
+        m.quest_chest(&mut crate::quest::NoQuestHooks, si).unwrap_or(false)
     }
     /// The far routine of the building kind `kind` (D48: 4 a tavern, 5 a
     /// temple, 7 an equipment store, 6 a mages' guild; the table at
