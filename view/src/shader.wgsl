@@ -48,6 +48,10 @@ fn vs_main(
 ) -> VsOut {
     var o: VsOut;
     o.clip = g.view_proj * vec4<f32>(pos, 1.0);
+    if (flags & 16u) != 0u {
+        // The sky's objects: already on the screen, behind everything.
+        o.clip = vec4<f32>(pos.xy, 0.999999, 1.0);
+    }
     o.uv = uv;
     o.layer = layer;
     o.world = pos;
@@ -72,7 +76,10 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     if g.shade.z > 0.0 {
         index = textureLoad(shading, vec2<i32>(i32(index), i32(g.shade.z)), 0).r;
     }
-    let row = light_row(vec2<i32>(floor(i.world.xz)), (i.flags >> 1u) & 7u, vec2<i32>(round(i.world.xz)));
+    var row = 0;
+    if (i.flags & 16u) == 0u {
+        row = light_row(vec2<i32>(floor(i.world.xz)), (i.flags >> 1u) & 7u, vec2<i32>(round(i.world.xz)));
+    }
     let shaded = textureLoad(shading, vec2<i32>(i32(index), row), 0).r;
     return g.palette[shaded];
 }

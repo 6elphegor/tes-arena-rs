@@ -22,7 +22,9 @@ mod world;
 use arena::controls::{ControlHooks, Intent};
 use arena::engine::{Engine, EngineHooks, Input};
 use render::{Camera, Renderer, Scene};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -98,7 +100,7 @@ struct Assets {
     shading: Vec<u8>,
     mesh: Vec<world::Vertex>,
     sheet: world::SpriteSheet,
-    archive: archive::Archive,
+    archive: Rc<archive::Archive>,
     /// DITHER.IMG then DITHER2.IMG.
     dither: Vec<u8>,
     /// The sky's .COL as the game keeps it: its name's offset and its
@@ -119,6 +121,69 @@ struct LightState {
     lamp: Option<[u8; 3]>,
     table: u16,
     fog: Option<u8>,
+    /// The sky's images loaded (`SkyLoad`).
+    sky: SkyLoad,
+}
+
+/// The sky's images loaded as 0000:7428 loads them with DI FFFDh: the
+/// file's size allocated in EMS (0000:5C26, which maps the bank), the
+/// file read there. Their names are kept, by their offset in the EMS
+/// frame, for the atlas.
+struct SkyLoad {
+    archive: Rc<archive::Archive>,
+    images: HashMap<u16, String>,
+}
+
+impl arena::skyobj::SkyHooks for SkyLoad {
+    fn load(&mut self, m: &mut arena::machine::Machine, name: u16) -> Option<(u16, u16)> {
+        let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).to_ascii_uppercase();
+        let data = self.archive.read(&file)?;
+        if data.is_empty() || data.len() > 0xFFFF {
+            return None;
+        }
+        let (off, _) = m.ems_alloc(data.len() as u16)?;
+        let frame = m.mem.r16(arena::mem::DS, 0x9030);
+        for (i, &b) in data.iter().enumerate() {
+            m.mem.w8(frame, off.wrapping_add(i as u16), b);
+        }
+        self.images.insert(off, file);
+        Some((frame, off))
+    }
+}
+
+/// The sky's objects drawn this frame (2294:0A5D's draws), as quads.
+/// `fog` is this frame's fog step's answer (`LightState::fog`), already
+/// run with the drawing's lights.
+struct SkyDraw<'a> {
+    sheet: &'a world::SpriteSheet,
+    images: &'a HashMap<u16, String>,
+    focal: f32,
+    fog: bool,
+    out: Vec<world::Vertex>,
+}
+
+impl SkyDraw<'_> {
+    fn quad(&mut self, m: &arena::machine::Machine, name: Option<&String>, frame: usize, x: u16, y: u16) {
+        use arena::mem::DS;
+        let Some(f) = name.and_then(|n| self.sheet.sky.get(n)) else { return };
+        let rect = self.sheet.rects[f.first + frame % f.count];
+        let r = |at| m.mem.r16(DS, at) as i16;
+        world::sky_quad(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xA91A), self.focal);
+    }
+}
+
+impl arena::skyobj::SkyHooks for SkyDraw<'_> {
+    fn fog(&mut self, _m: &mut arena::machine::Machine) -> bool {
+        self.fog
+    }
+    fn draw_image(&mut self, m: &mut arena::machine::Machine, seg: u16, off: u16) {
+        let name = if seg == m.mem.r16(arena::mem::DS, 0x9030) { self.images.get(&off) } else { None };
+        let name = name.cloned().or_else(|| (m.mem.r8(arena::mem::DS, 0x7BD2) == 3).then(|| "VOLCANO3.IMG".to_string()));
+        self.quad(m, name.as_ref(), 0, m.mem.r16(seg, off), m.mem.r16(seg, off + 2));
+    }
+    fn draw_dfa(&mut self, m: &mut arena::machine::Machine, _seg: u16, _off: u16, frame: u16, x: u16, y: u16) {
+        self.quad(m, Some(&"VOLCANO2.DFA".to_string()), frame as usize, x, y);
+    }
 }
 
 impl LightState {
@@ -149,12 +214,27 @@ impl arena::light::LightHooks for LightState {
         self.fog = Some(m.mem.r8(arena::mem::DS, arena::weather::var::FILL_COLOUR));
     }
 
-    fn relight(&mut self, _m: &mut arena::machine::Machine, level: u16) {
+    /// 0000:027A: the sky's objects made again, when there are any (their
+    /// images are then remapped with the textures: the shader's `dark`).
+    fn relight(&mut self, m: &mut arena::machine::Machine, level: u16) {
+        use arena::skyobj::var::{CLOUD_COUNT, OBJECT_COUNT};
+        if m.mem.r8(arena::mem::DS, OBJECT_COUNT) | m.mem.r8(arena::mem::DS, CLOUD_COUNT) != 0 {
+            m.mem.w8(arena::mem::DS, OBJECT_COUNT, 0);
+            m.mem.w8(arena::mem::DS, CLOUD_COUNT, 0);
+            arena::light::LightHooks::sky_objects(self, m);
+        }
         self.dark = (level >> 8) as u32;
     }
 
     fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
         self.dark = 0;
+    }
+
+    /// 2294:08B9, the sky's objects made again (by day, and before
+    /// relighting by night).
+    fn sky_objects(&mut self, m: &mut arena::machine::Machine) {
+        self.sky.images.clear();
+        m.sky_objects(&mut self.sky);
     }
 
     /// Only entry 71h is written through here; its 6-bit colour made 8-bit.
@@ -167,10 +247,13 @@ impl arena::light::LightHooks for LightState {
 }
 
 impl Assets {
-    fn new(dir: &std::path::Path, engine: &Engine) -> Self {
+    /// Also enters the area's sky (0000:464A: its objects made).
+    fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
         let flats = world::flats(&engine.m);
-        let archive = archive::Archive::open(dir);
+        let archive = Rc::new(archive::Archive::open(dir));
         let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
+        let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
+        engine.m.area_sky(&mut sky);
         Assets {
             palette: world::palette(dir),
             textures: world::textures(&engine.m),
@@ -184,7 +267,7 @@ impl Assets {
             }).collect(),
             archive,
             colours: None,
-            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None },
+            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
         }
     }
 
@@ -269,10 +352,17 @@ impl Assets {
         render::Lights { lights, rows: [m.mem.r16(DS, LIMIT), m.mem.r16(DS, DARK), m.mem.r16(DS, FAR)], behind: if m.mem.r16(DS, 0xC398) & 4 != 0 { 2 } else { 8 } }
     }
 
-    /// This frame's billboards, animations stepping every `ANIMATE` ticks.
-    fn sprites(&self, engine: &Engine, cam: Camera, ticks: usize) -> Vec<world::Vertex> {
+    /// This frame's billboards, animations stepping every `ANIMATE` ticks,
+    /// and the sky's objects (2294:0A5D) for a view `aspect` wide. After
+    /// `light_frame`, whose fog step the sky's hook runs first.
+    fn sprites(&self, engine: &mut Engine, cam: Camera, ticks: usize, aspect: f32) -> Vec<world::Vertex> {
         let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
         v.extend(world::doors(&engine.m));
+        let focal = (30f32).to_radians().tan() * aspect;
+        let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new() };
+        if engine.m.sky_draw(&mut draw).is_some() {
+            v.extend(draw.out);
+        }
         v
     }
 }
@@ -338,7 +428,7 @@ fn main() {
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
-    let assets = Assets::new(&dir, &engine);
+    let assets = Assets::new(&dir, &mut engine);
     let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, next: Instant::now(), last: Some(arena::engine::Frame::Running) };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -371,7 +461,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
-    let mut assets = Assets::new(dir, &engine);
+    let mut assets = Assets::new(dir, &mut engine);
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = assets.renderer(&device, &queue, format);
     let (sky, lights) = assets.light_frame(&mut engine.m);
@@ -388,7 +478,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
         view_formats: &[],
     });
     let cam = camera(&engine);
-    let sprites = assets.sprites(&engine, cam, (wait + frames) * 4);
+    let sprites = assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
     r.draw(&device, &queue, &target.create_view(&Default::default()), w, h, cam, &sprites);
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
@@ -602,8 +692,9 @@ impl winit::application::ApplicationHandler for App {
                     };
                     let view = frame.texture.create_view(&Default::default());
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-                    let sprites = self.assets.sprites(&self.engine, cam, ticks);
                     let (sky, lights) = self.assets.light_frame(&mut self.engine.m);
+                    let aspect = g.config.width as f32 / g.config.height.max(1) as f32;
+                    let sprites = self.assets.sprites(&mut self.engine, cam, ticks, aspect);
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
