@@ -3,6 +3,7 @@
 
 pub mod actors;
 pub mod attack;
+pub mod automap;
 pub mod bsa;
 pub mod cast;
 pub mod character;

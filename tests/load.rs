@@ -53,9 +53,6 @@ impl AreaHooks for Count {
     fn location(&mut self, m: &mut Machine, _id: u16) {
         count(m, 0xFFEE);
     }
-    fn border(&mut self, m: &mut Machine) {
-        count(m, 0xFFF4);
-    }
 }
 impl LoadHooks for Count {
     fn sky_graphics(&mut self, m: &mut Machine, _files: &mut Files) {
@@ -76,6 +73,9 @@ impl LoadHooks for Count {
     }
     fn interior_text(&mut self, m: &mut Machine) {
         count(m, 0xFFF2);
+    }
+    fn automap_area(&mut self, m: &mut Machine, _files: &mut Files) {
+        count(m, 0xFFF4);
     }
 }
 

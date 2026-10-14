@@ -104,6 +104,23 @@ impl Files {
         v
     }
 
+    /// The names of the files written (upper case, sorted).
+    pub fn written_names(&self) -> Vec<Vec<u8>> {
+        let mut v: Vec<Vec<u8>> = self.written.keys().cloned().collect();
+        v.sort();
+        v
+    }
+
+    /// A file's bytes by DOS name (written first, then the directories').
+    pub fn data(&self, name: &[u8]) -> Option<Rc<[u8]>> {
+        self.read_loose(name)
+    }
+
+    /// A file written (by DOS name) with `data`, replacing any.
+    pub fn store(&mut self, name: &[u8], data: Vec<u8>) {
+        self.written.insert(Self::base(name).to_ascii_uppercase(), Rc::from(data));
+    }
+
     /// The file named `from` copied to `to` (by DOS name) as a written
     /// file. False where `from` doesn't exist.
     pub fn copy(&mut self, from: &[u8], to: &[u8]) -> bool {

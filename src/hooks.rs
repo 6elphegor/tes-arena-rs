@@ -38,16 +38,19 @@ pub trait StairsHooks {
     /// 2294:0B8A's I/O (`light::LightHooks::light_table`): the light
     /// table freed, NORMAL.LGT loaded and the table made again.
     fn light_table(&mut self, _m: &mut Machine) {}
-    /// 292B:095E: the level's automap kept, before the level changes.
+    /// 292B:095E: a main quest dungeon's level's locks and triggers kept
+    /// in STATES.nn (`Machine::states_keep`), before the level changes.
     fn automap_keep(&mut self, _m: &mut Machine) {}
-    /// 292B:09AC: the new level's automap loaded.
+    /// 292B:09AC: the new level's locks and triggers loaded from
+    /// STATES.nn (`Machine::states_load`).
     fn automap_load(&mut self, _m: &mut Machine) {}
     /// 1194:9FAC with CX 1: a quest dungeon's last level reached
     /// (`Machine::quest_level`, which needs the files for a person's name).
     fn quest_level(&mut self, _m: &mut Machine) {}
     /// 2433:0000 (4C91 FFh): the level's creatures and people placed.
     fn level_spawn(&mut self, _m: &mut Machine) {}
-    /// 0000:368E: 23F1:013C, then the view's border (0000:3503).
+    /// 0000:368E: the automap kept (23F1:013C, `Machine::automap_keep`),
+    /// then loaded (0000:3503, `Machine::automap_load`).
     fn level_screen(&mut self, _m: &mut Machine) {}
 }
 

@@ -42,12 +42,16 @@
 //! of DX, DY mickeys for a turn) and `cast:N` (spell N of the spellbook
 //! cast).
 //!
+//! M shows the automap (`automap`; `--do map`): the squares the game has
+//! marked seen, kept per area in AUTOMAP.nn (src/automap.rs).
+//!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
 //! the view loads it (`areas`).
 
 mod archive;
 mod areas;
+mod automap;
 mod dialog;
 mod flats;
 mod hud;
@@ -695,6 +699,7 @@ fn main() {
         drag: (0.0, 0.0),
         save_dir,
         slot,
+        map: false,
     };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -754,7 +759,15 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
-    let level_changed = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level || wild_moved(engine, window);
+    let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
+    if stairs {
+        // 0000:368E, the stairs' level screen: the automap kept and the new
+        // level's loaded (here after the frame; nothing touches the map in
+        // between).
+        engine.m.automap_keep(&mut engine.files);
+        engine.m.automap_load(&mut engine.files);
+    }
+    let level_changed = stairs || wild_moved(engine, window);
     TurnOut { frame, level_changed }
 }
 
@@ -797,6 +810,8 @@ struct Shot {
     boxes: Vec<Vec<Vec<hud::Span>>>,
     need: Option<dialog::Need>,
     status: Option<String>,
+    /// The automap shown (`--do map`).
+    map: bool,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
@@ -843,7 +858,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, map: false };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -897,6 +912,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
             "compass" => interface::toggle_compass(&mut engine.m),
+            "map" => st.map = !st.map,
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
@@ -971,6 +987,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         let mut screen = hud::Screen::new(st.assets.palette);
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         hud::compose_over(&mut screen, &font, &hud);
+        if st.map {
+            automap::draw(&mut screen, &engine.m);
+        }
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1073,9 +1092,10 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
         engine.m.mem.w16(arena::mem::DS, SAVED_POSITION + 2 * i, w);
     }
     engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
-    engine.m.save_game(&mut SaveDir { dir, palette });
-    // The working slot's files (CITYDATA, SPELLS, ...) to the slot's
-    // (25FD:0612), kept on disk with the save.
+    // As 25FD:010B..0110: the automap written (23F1:0145), the working
+    // slot's files (CITYDATA, SPELLS, AUTOMAP, ...) copied to the slot's
+    // (25FD:0612) and kept on disk with the save; then the save itself.
+    engine.m.automap_write(&mut engine.files);
     for name in engine.m.slot_files_out(&mut engine.files) {
         let Some(data) = engine.files.written(&name) else { continue };
         let p = dir.join(String::from_utf8_lossy(&name).into_owned());
@@ -1083,6 +1103,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
             eprintln!("{}: {e}", p.display());
         }
     }
+    engine.m.save_game(&mut SaveDir { dir, palette });
     format!("Saved to slot {slot} in {}.", dir.display())
 }
 
@@ -1128,6 +1149,8 @@ struct Pending {
 }
 
 struct App {
+    /// The automap shown (M).
+    map: bool,
     assets: Assets,
     start: Instant,
     engine: Engine,
@@ -1513,6 +1536,7 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::KeyP if down => world::summon_people(&mut self.engine),
                         KeyCode::KeyE if down => self.click = true,
                         KeyCode::KeyR if down => self.camp = true,
+                        KeyCode::KeyM if down => self.map = !self.map,
                         // The original's A (2542:0137) and F8 (01C5).
                         KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
                         KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
@@ -1533,6 +1557,9 @@ impl winit::application::ApplicationHandler for App {
                 self.screen.clear();
                 self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
                 hud::compose_over(&mut self.screen, &self.font, &hud);
+                if self.map {
+                    automap::draw(&mut self.screen, &self.engine.m);
+                }
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);

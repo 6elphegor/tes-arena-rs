@@ -77,8 +77,10 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     /// (the slot is empty).
     fn message(&mut self, _m: &mut Machine, _si: u16) {}
     /// 23F1:0178 (in 013C, which then clears 6636): the current area's
-    /// automap written back.
-    fn automap_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// automap written back (`Machine::automap_write`, by default).
+    fn automap_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        m.automap_write(files);
+    }
     /// 25FD:0803: "Loading..." shown.
     fn loading(&mut self, _m: &mut Machine) {}
     /// 25FD:06A1: the slot's files (*.nn) copied to the working ones. The
@@ -102,8 +104,16 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     fn copy_file(&mut self, m: &mut Machine, files: &mut Files, from: u16, to: u16) {
         m.file_copy(files, from, to);
     }
-    /// 292B:09AC: the level's automap (STATES.nn) loaded.
-    fn level_automap(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// 292B:09AC: a main quest dungeon's level's locks and triggers
+    /// (STATES.nn) loaded (`Machine::states_load`, by default).
+    fn level_automap(&mut self, m: &mut Machine, files: &mut Files) {
+        m.states_load(files);
+    }
+    /// 0000:3503: the area's automap loaded (`Machine::automap_load`, by
+    /// default).
+    fn automap_area(&mut self, m: &mut Machine, files: &mut Files) {
+        m.automap_load(files);
+    }
     /// 25FD:051F: in an interior, 2F9F:001F with the text at DS:[FF0].
     fn interior_text(&mut self, _m: &mut Machine) {}
     /// 2294:0006, the 3D mode in play: true where the hook did it (the
@@ -249,6 +259,18 @@ impl Machine {
         made
     }
 
+    /// 1194:3AC5. The working slot set: 1A80 and 1A6C `slot`, its digits
+    /// in STATES.nn (7D0D), 8B06 and the patterns at 5CAF, 5CB6 and 5CBD
+    /// ("log.", "re*.", "in*.").
+    pub fn working_slot_set(&mut self, slot: u8) {
+        self.mem.w8(DS, WORKING_SLOT, slot);
+        self.mem.w8(DS, SLOT, slot);
+        let d = Self::slot_digits(slot);
+        for at in [0x7D0D, 0x8B06, 0x5CB3, 0x5CBA, 0x5CC1] {
+            self.mem.w16(DS, at, d);
+        }
+    }
+
     /// 25FD:022A: the working slot's digits in "*.00" (WORKING_FILES +2).
     pub fn working_files_digits(&mut self) {
         let slot = self.mem.r8(DS, WORKING_SLOT);
@@ -364,7 +386,7 @@ impl Machine {
             hooks.interior_text(self);
         }
         self.mem.w8(DS, 0x6636, 0);
-        hooks.border(self);
+        hooks.automap_area(self, files);
         self.load_and16(0x05E0, 0xFDFF);
         self.mem.w8(DS, 0x1404, 0x0A);
         let b = (self.mem.r16(DS, 0x05E0) & 0x80 != 0) as u8;

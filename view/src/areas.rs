@@ -128,6 +128,21 @@ impl AreaHooks for Areas<'_> {
         !m.wild_quarter_ok()
     }
 
+    /// 0000:3503, entering the world: the area's automap loaded.
+    fn border(&mut self, m: &mut Machine) {
+        if let Some(files) = self.files.as_deref_mut() {
+            m.automap_load(files);
+        }
+    }
+
+    /// After the world loop: the area's automap written back (23F1:013C);
+    /// the screens' fades aren't the view's.
+    fn world_screen(&mut self, m: &mut Machine) {
+        if let Some(files) = self.files.as_deref_mut() {
+            m.automap_keep(files);
+        }
+    }
+
     fn spawn(&mut self, m: &mut Machine, n: u16) {
         if m.spawn_actors(n, 0xA).is_none() {
             eprintln!("the townspeople met code not ported");
@@ -211,12 +226,14 @@ impl arena::wild::WildHooks for Wild<'_> {
 /// a city (5E6 0) or an interior (4).
 pub fn start(engine: &mut Engine, city: bool) -> Run {
     let area = if city { 0 } else { 4 };
-    // The working slot (1A80): the view plays from the game's own *.65
-    // files (CITYDATA.65, SPELLSG.65, ...), where the original first copies
-    // them to *.00. Saves copy them to the slot's names, loads back.
-    engine.m.mem.w8(DS, arena::load::var::WORKING_SLOT, 65);
+    // The working slot (1194:3AC5): the view plays from the game's own
+    // *.65 files (CITYDATA.65, SPELLSG.65, ...), where the original first
+    // copies them to *.00. Saves copy them to the slot's names, loads back.
+    engine.m.working_slot_set(65);
     engine.m.mem.w8(DS, arena::trigger::var::AREA, area);
     engine.m.mem.w8(DS, arena::transit::var::ENTERED, area);
+    // The area's automap (0000:3503), as entering the world loads it.
+    engine.m.automap_load(&mut engine.files);
     if city { Run::City } else { Run::Interior(0xC37F) }
 }
 
