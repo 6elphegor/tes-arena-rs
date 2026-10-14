@@ -186,7 +186,7 @@ impl Machine {
             // 2826:089D: Open on a locked door.
             let sq = self.mem.r16(DS, PICKED);
             if sq == 0xFFFF {
-                self.actor_click();
+                self.leave_click();
                 return Some(());
             }
             if self.is_door(sq) {
@@ -379,7 +379,7 @@ impl Machine {
     }
 
     /// 2826:0A4C. The click is left for the actors.
-    fn actor_click(&mut self) {
+    fn leave_click(&mut self) {
         let f = self.mem.r16(DS, LEVEL_FLAGS) | 0x80;
         self.mem.w16(DS, LEVEL_FLAGS, f);
         let x = self.mem.r16(DS, MOUSE_X).wrapping_add(4);
@@ -398,12 +398,12 @@ impl Machine {
         hooks.wall_trigger(self, files)?;
         self.mem.w16(DS, SPEED, 0);
         if self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
-            self.actor_click();
+            self.leave_click();
             return Some(());
         }
         let x = self.mem.r16(DS, MOUSE_X).wrapping_add(4) as i16;
         if (self.mem.r16(DS, DOOR_X0) as i16) > x || (self.mem.r16(DS, DOOR_X1) as i16) < x {
-            self.actor_click();
+            self.leave_click();
             return Some(());
         }
         let (col, row) = (self.mem.r16(DS, DOOR_COL), self.mem.r16(DS, DOOR_ROW));
@@ -417,7 +417,7 @@ impl Machine {
             || !near(self.mem.r16(DS, X), col)
             || !near(self.mem.r16(DS, Y), row)
         {
-            self.actor_click();
+            self.leave_click();
             return Some(());
         }
         match self.door_lock(col, row)? {
@@ -511,7 +511,7 @@ impl Machine {
 
     /// 2294:0E35. "This lock ..." by how hard it is to pick (a magic
     /// lock, level 20 and up, says so), unless a failure is showing.
-    fn locked_message(&mut self, level: u8) -> Option<()> {
+    pub(crate) fn locked_message(&mut self, level: u8) -> Option<()> {
         self.mem.w8(DS, LOCK_TRIED, level);
         if self.mem.r16(DS, MESSAGE_TIME) != 0 && self.mem.r16(DS, MESSAGE) == FAILURE {
             return Some(());
