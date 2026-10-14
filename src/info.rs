@@ -146,7 +146,8 @@ impl Machine {
     /// several flats the INFs name, such as rat.dfa, are not in the data.
     /// A missing INF leaves the buffer's old text, which is parsed. None
     /// where the flats don't fit in their banks (the original stops at
-    /// an INT 3), a hook is set (end CD2E, sounds CD4A), a scan runs on
+    /// an INT 3), a hook is set to a routine not ported (end CD2E, but
+    /// the 3D mode's 0000:4531, `inf_done_hook`; sounds CD4A), a scan runs on
     /// without end (the original hangs), or a *TOP line has no number
     /// (its value is then whatever AX held).
     pub fn info_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
@@ -197,7 +198,7 @@ impl Machine {
         // A failed load (no such file, 64 KiB or more, nothing read) is
         // ignored: the text left in the buffer is parsed, up to the last
         // size stored at OPEN_SIZE.
-        if self.mem.r16(DS, crate::bsa::var::OPEN_HOOK + 2) != 0 {
+        if self.hook_set(crate::bsa::var::OPEN_HOOK) {
             return None;
         }
         if self.file_load(files, name, seg, off).is_none() && self.mem.r32(DS, crate::bsa::var::ERROR_HOOK) != 0 {
@@ -209,8 +210,10 @@ impl Machine {
         self.mem.w8(DS, TEXTURE, 1);
         self.mem.w8(DS, BANK, first as u8);
         self.info_parse(files, seg, off)?;
-        if self.mem.r16(DS, DONE_HOOK + 2) != 0 {
-            return None;
+        match self.mem.r32(DS, DONE_HOOK) {
+            0 => {}
+            crate::hooks::value::INF_DONE => self.inf_done_hook(),
+            _ => return None,
         }
         self.mem.w16(DS, INFO_PTR, 0);
         if self.mem.r16(DS, FLAGS) & 0x400 == 0 {
@@ -880,7 +883,7 @@ impl Machine {
             tick()?;
             let c = self.mem.r8(es, *di);
             if *di >= end || c == b'@' {
-                if self.mem.r16(DS, SOUND_HOOK + 2) != 0 {
+                if self.hook_set(SOUND_HOOK) {
                     return None;
                 }
                 return Some(*di >= end);

@@ -375,7 +375,7 @@ impl Machine {
     /// segment is 0.
     fn door_sound(&self, table: u16, lo: u8) -> Option<u16> {
         let hook = crate::movement::var::SOUND_HOOK;
-        (self.mem.r16(DS, hook + 2) != 0).then(|| self.mem.r8(DS, table + (lo >> 6) as u16) as u16)
+        self.hook_set(hook).then(|| self.mem.r8(DS, table + (lo >> 6) as u16) as u16)
     }
 
     /// 2826:0A4C. The click is left for the actors.

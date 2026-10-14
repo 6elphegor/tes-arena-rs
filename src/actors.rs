@@ -908,7 +908,8 @@ impl Machine {
         let dy = ((a * self.mem.r16(DS, COS + b) as i16 as i32) >> 16) as u16;
         let (ox, oy) = (self.act16(si, f::X), self.act16(si, f::Y));
         self.mem.w8(DS, CREATURE_MODE, 1);
-        let r = self.move_resolve(files, dx.wrapping_add(ox), dy.wrapping_add(oy), ox, oy);
+        // (In creature mode the stairs and their hooks are never reached.)
+        let r = self.move_resolve(files, &mut crate::hooks::NoStairsHooks, dx.wrapping_add(ox), dy.wrapping_add(oy), ox, oy);
         self.mem.w8(DS, CREATURE_MODE, 0);
         let (x, y, _) = r?;
         let ok = self.actor_may_stand(si, x, y);

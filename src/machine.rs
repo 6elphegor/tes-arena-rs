@@ -32,4 +32,17 @@ impl Machine {
     pub fn store_rng(&mut self) {
         self.rng.store(&mut self.mem);
     }
+
+    /// Whether the hook (far pointer) at DS:`at` is set. The original
+    /// tests the segment word (0000:A8EF and its inline copies), which is
+    /// never 0 for a routine of its own: the image is relocated when it is
+    /// loaded, and the hooks into its segment 0000 are written with a
+    /// relocated segment (2294:0006, `mov word [C3AA], 0000` with a
+    /// relocation). The port keeps the image at segment 0, so those hooks
+    /// have segment 0 here. A hook is cleared with the whole pointer
+    /// (0000:0971 `mov dword [CD32], 0` and the like), so the port tests
+    /// the whole pointer.
+    pub fn hook_set(&self, at: u16) -> bool {
+        self.mem.r32(crate::mem::DS, at) != 0
+    }
 }
