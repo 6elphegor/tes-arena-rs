@@ -29,8 +29,26 @@ use std::time::{Duration, Instant};
 /// The front end's hooks: nothing asked of the player yet.
 struct Front;
 
-impl ControlHooks for Front {}
-impl arena::weapon::WeaponHooks for Front {}
+impl ControlHooks for Front {
+    /// A click on a building's door, a city's gate or an interior's way
+    /// out (0000:43B1).
+    fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.wall_trigger(files, self)
+    }
+}
+impl arena::weapon::WeaponHooks for Front {
+    /// A building broken into by the swing.
+    fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.wall_trigger(files, self)
+    }
+}
+/// The triggers' messages are printed; entering an area isn't drawn yet
+/// (the frame ends: `Frame::Left`).
+impl arena::trigger::TriggerHooks for Front {
+    fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, text)).replace('\r', "\n"));
+    }
+}
 impl arena::clock::ClockHooks for Front {}
 impl arena::frame::FrameHooks for Front {}
 impl EngineHooks for Front {
@@ -321,7 +339,7 @@ fn main() {
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &engine);
-    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, next: Instant::now() };
+    let mut app = App { assets, start: Instant::now(), engine, gpu: None, keys: Default::default(), look: 0.0, captured: false, click: false, next: Instant::now(), last: Some(arena::engine::Frame::Running) };
     event_loop.run_app(&mut app).expect("run");
 }
 
@@ -441,6 +459,8 @@ struct App {
     /// A click waiting for the next frame.
     click: bool,
     next: Instant,
+    /// How the last frame ended (reported when it changes).
+    last: Option<arena::engine::Frame>,
 }
 
 impl App {
@@ -463,9 +483,25 @@ impl App {
         }
         let t = self.engine.frame_ticks();
         self.engine.tick(t);
-        match self.engine.frame(Input::Steer(&intent), &mut Front) {
-            Some(arena::engine::Frame::Running) => {}
-            other => eprintln!("the frame ended: {other:?}"),
+        let frame = self.engine.frame(Input::Steer(&intent), &mut Front);
+        if frame != self.last {
+            match frame {
+                Some(arena::engine::Frame::Running) => {}
+                Some(arena::engine::Frame::Left) => {
+                    // The area is left; an interior's file is at D58 when
+                    // a building was entered (AREA 4).
+                    let m = &self.engine.m;
+                    let area = m.mem.r8(arena::mem::DS, arena::trigger::var::AREA);
+                    let file = m.mem.r16(arena::mem::DS, 0x0D58);
+                    if area == 4 && file != 0 {
+                        eprintln!("the area is left for {}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, file)));
+                    } else {
+                        eprintln!("the area is left (area {area})");
+                    }
+                }
+                None => eprintln!("the frame ended: None"),
+            }
+            self.last = frame;
         }
     }
 }

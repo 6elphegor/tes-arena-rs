@@ -73,7 +73,7 @@ impl Machine {
     }
 
     /// 292B:0456 / 0469. "Failure..." or "Success..." for 15 frames.
-    fn outcome(&mut self, ok: bool) {
+    pub(crate) fn outcome(&mut self, ok: bool) {
         self.mem.w16(DS, MESSAGE_TIME, 0xF);
         self.mem.w16(DS, MESSAGE, if ok { SUCCESS } else { FAILURE });
         self.mem.w16(DS, MESSAGE + 2, DS);
@@ -511,7 +511,7 @@ impl Machine {
 
     /// 2294:0E35. "This lock ..." by how hard it is to pick (a magic
     /// lock, level 20 and up, says so), unless a failure is showing.
-    fn locked_message(&mut self, level: u8) -> Option<()> {
+    pub(crate) fn locked_message(&mut self, level: u8) -> Option<()> {
         self.mem.w8(DS, LOCK_TRIED, level);
         if self.mem.r16(DS, MESSAGE_TIME) != 0 && self.mem.r16(DS, MESSAGE) == FAILURE {
             return Some(());
