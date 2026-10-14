@@ -41,6 +41,7 @@ pub mod progression;
 pub mod random;
 pub mod rest;
 pub mod save;
+pub mod save_write;
 pub mod travel;
 pub mod weather;
 pub mod weapon;
