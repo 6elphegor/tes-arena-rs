@@ -32,6 +32,16 @@
 //! rebuild after loading isn't ported). While the game waits for an
 //! answer no time passes.
 //!
+//! The player's interface is drawn from the game's own graphics as the
+//! original places it (`interface`): the world in the 320 x 147 above the
+//! bar, the bar with the portrait, the condition, the name and the three
+//! bars, the compass (F8 hides it), the weapon in hand and the casting
+//! hands. Q readies or puts away the weapon (the original's A); holding
+//! the right button (captured) and dragging swings it. --do gains
+//! `ready`, `compass`, `swing:DX:DY` (the right button down with a drag
+//! of DX, DY mickeys for a turn) and `cast:N` (spell N of the spellbook
+//! cast).
+//!
 //! A frame that leaves the area (a building's door, an interior's way
 //! out) goes on to the next area as the game's outer loop picks it, and
 //! the view loads it (`areas`).
@@ -41,6 +51,7 @@ mod areas;
 mod dialog;
 mod flats;
 mod hud;
+mod interface;
 mod render;
 mod world;
 
@@ -279,6 +290,8 @@ struct Assets {
     colours: Option<(u16, Vec<u8>)>,
     /// What the day and night switch and the fog left.
     light: LightState,
+    /// The player's interface (`interface`).
+    interface: interface::Interface,
 }
 
 /// The view's side of the day and night switch and the fog
@@ -423,6 +436,7 @@ impl Assets {
         let flats = world::flats(&engine.m);
         let archive = Rc::new(archive::Archive::open(dir));
         let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
+        interface::enter(&mut engine.m);
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         engine.m.area_sky(&mut sky);
         Assets {
@@ -436,6 +450,7 @@ impl Assets {
                 d.resize(800, 0);
                 d
             }).collect(),
+            interface: interface::Interface::new(archive.clone()),
             archive,
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
@@ -600,6 +615,7 @@ fn main() {
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    interface::start(&mut engine.m);
     let run = areas::start(&mut engine, args[2].starts_with("CITY:"));
     if let Some(h) = hour {
         // The clock at that hour of the first day (its calendar fields
@@ -660,6 +676,7 @@ fn main() {
         font,
         screen,
         cursor: (0.0, 0.0),
+        drag: (0.0, 0.0),
         save_dir,
         slot,
     };
@@ -679,7 +696,9 @@ fn wild_moved(engine: &Engine, window: u32) -> bool {
 
 /// What a turn is given: the frame's intent, a click left for the actors
 /// (found by this frame's drawing), camping asked for before the frame,
-/// a key pressed (it ends a rest, AFF9), the animation tick.
+/// a key pressed (it ends a rest, AFF9), the animation tick, the right
+/// button held (AFF9 bit 2) and the mouse's motion since the last turn
+/// (mickeys, `Machine::mouse_motion`): a drag with it swings the weapon.
 #[derive(Clone, Copy, Default)]
 struct TurnIn {
     intent: Intent,
@@ -687,6 +706,8 @@ struct TurnIn {
     camp: bool,
     key: bool,
     tick: usize,
+    right: bool,
+    drag: (i16, i16),
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -712,6 +733,10 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
         engine.m.mem.w8(DS, arena::rest::var::KEY, input.key as u8);
     }
+    let buttons = engine.m.mem.r8(DS, arena::controls::var::BUTTONS) & !2 | (input.right as u8) << 1;
+    engine.m.mem.w8(DS, arena::controls::var::BUTTONS, buttons);
+    let (mx, my) = engine.m.mouse_motion;
+    engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
     let level_changed = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level || wild_moved(engine, window);
     TurnOut { frame, level_changed }
@@ -745,6 +770,9 @@ fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
 /// boxes of the last turn that showed any, and a question left.
 struct Shot {
     assets: Assets,
+    /// The right button and a drag for the next turn (`swing`).
+    right: bool,
+    drag: (i16, i16),
     clicked: bool,
     camp: bool,
     answers: std::collections::VecDeque<dialog::Answer>,
@@ -760,7 +788,15 @@ struct Shot {
 /// goes on to the next (`areas::next`, None where it can't).
 fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
     st.frames += 1;
-    let input = TurnIn { intent: *intent, clicked: std::mem::take(&mut st.clicked), camp: std::mem::take(&mut st.camp), key: false, tick: st.frames * 4 };
+    let input = TurnIn {
+        intent: *intent,
+        clicked: std::mem::take(&mut st.clicked),
+        camp: std::mem::take(&mut st.camp),
+        key: false,
+        tick: st.frames * 4,
+        right: std::mem::take(&mut st.right),
+        drag: std::mem::take(&mut st.drag),
+    };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     let out = run_turn(engine, &mut st.assets, &input, &mut talk);
     st.answers = talk.answers;
@@ -791,7 +827,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -821,12 +857,30 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             continue;
         }
+        if let Some(d) = step.strip_prefix("swing:") {
+            // The right button down with a drag (mickeys) for a turn.
+            let (dx, dy) = d.split_once(':').expect("--do swing:DX:DY");
+            st.right = true;
+            st.drag = (dx.parse().expect("--do swing:DX:DY"), dy.parse().expect("--do swing:DX:DY"));
+            shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            continue;
+        }
         let (what, n) = step.split_once(':').map_or((step, 1), |(a, n)| (a, n.parse().expect("--do: a number")));
         match what {
             "click" => {
                 st.clicked = centre_click(&mut engine, &mut st.boxes);
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
+            "ready" => interface::ready(&mut engine.m),
+            "cast" => {
+                // Spell N of the spellbook cast (29CF:071F), as the
+                // spellbook's pick would.
+                if engine.m.cast_spell(&mut engine.files, &mut arena::cast::NoCastHooks, n as u8).is_none() {
+                    eprintln!("the cast met something not ported");
+                }
+                shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "compass" => interface::toggle_compass(&mut engine.m),
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
@@ -875,6 +929,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let (sky, lights) = st.assets.light_frame(&mut engine.m);
     r.set_sky(sky);
     r.set_lights(lights);
+    r.set_window(interface::window(&engine.m));
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("shot"),
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -900,7 +955,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             None => {}
         }
         let mut screen = hud::Screen::new(st.assets.palette);
-        hud::compose(&mut screen, &font, &hud);
+        st.assets.interface.draw(&mut screen, &font, &engine.m);
+        hud::compose_over(&mut screen, &font, &hud);
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1049,6 +1105,8 @@ struct Keys {
     turn_right: bool,
     jump: bool,
     run: bool,
+    /// The right button held (captured): the mouse's motion swings.
+    swing: bool,
 }
 
 /// A turn stopped at a question: the engine as it was before it, what it
@@ -1096,6 +1154,8 @@ struct App {
     screen: hud::Screen,
     /// The cursor in the window (pixels).
     cursor: (f64, f64),
+    /// The mouse's motion with the right button held, since the last turn.
+    drag: (f64, f64),
     /// Where saves go (F5) and come from (F9), and the slot.
     save_dir: Option<PathBuf>,
     slot: u8,
@@ -1125,7 +1185,16 @@ impl App {
             run: k.run,
         };
         let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-        let input = TurnIn { intent, clicked: std::mem::take(&mut self.clicked), camp: std::mem::take(&mut self.camp), key: std::mem::take(&mut self.key), tick };
+        let drag = std::mem::take(&mut self.drag);
+        let input = TurnIn {
+            intent,
+            clicked: std::mem::take(&mut self.clicked),
+            camp: std::mem::take(&mut self.camp),
+            key: std::mem::take(&mut self.key),
+            tick,
+            right: self.keys.swing,
+            drag: (drag.0.round() as i16, drag.1.round() as i16),
+        };
         let before = copy(&self.engine);
         self.turn(before, input, Vec::new());
         // A click now is found by the next frame's drawing.
@@ -1396,6 +1465,8 @@ impl winit::application::ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if self.waiting() => self.dialog_click(),
+            // The right button held: dragging swings the weapon (0000:3C9F).
+            WindowEvent::MouseInput { state, button: MouseButton::Right, .. } if self.captured => self.keys.swing = state == ElementState::Pressed,
             WindowEvent::MouseInput { state: ElementState::Pressed, .. } if !self.captured => {
                 if let Some(g) = &self.gpu {
                     let ok = g
@@ -1432,6 +1503,9 @@ impl winit::application::ApplicationHandler for App {
                         KeyCode::KeyP if down => world::summon_people(&mut self.engine),
                         KeyCode::KeyE if down => self.click = true,
                         KeyCode::KeyR if down => self.camp = true,
+                        // The original's A (2542:0137) and F8 (01C5).
+                        KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
+                        KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
                         // The game's debug keys (scan codes 3Ch, 3Dh).
                         KeyCode::F2 => self.engine.m.set_key(0x3C, down),
                         KeyCode::F3 => self.engine.m.set_key(0x3D, down),
@@ -1446,7 +1520,9 @@ impl winit::application::ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let cam = camera(&self.engine);
                 let hud = self.hud();
-                hud::compose(&mut self.screen, &self.font, &hud);
+                self.screen.clear();
+                self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+                hud::compose_over(&mut self.screen, &self.font, &hud);
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);
@@ -1459,6 +1535,7 @@ impl winit::application::ApplicationHandler for App {
                     let sprites = self.assets.sprites(&mut self.engine, cam, ticks, aspect);
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
+                    g.renderer.set_window(interface::window(&self.engine.m));
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     g.overlay.draw(&g.device, &g.queue, &view, &self.screen);
                     frame.present();
@@ -1471,8 +1548,14 @@ impl winit::application::ApplicationHandler for App {
     fn device_event(&mut self, _el: &winit::event_loop::ActiveEventLoop, _id: winit::event::DeviceId, event: winit::event::DeviceEvent) {
         if let winit::event::DeviceEvent::MouseMotion { delta } = event {
             if self.captured && !self.waiting() {
-                // About a quarter turn for 400 pixels.
-                self.look += delta.0 * 128.0 / 400.0;
+                if self.keys.swing {
+                    // A mickey a pixel.
+                    self.drag.0 += delta.0;
+                    self.drag.1 += delta.1;
+                } else {
+                    // About a quarter turn for 400 pixels.
+                    self.look += delta.0 * 128.0 / 400.0;
+                }
             }
         }
     }

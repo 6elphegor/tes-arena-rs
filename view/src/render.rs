@@ -14,8 +14,27 @@ struct Globals {
     shade: [f32; 4],
     sky: [f32; 4],
     light: [f32; 4],
+    // The view's window: the screen quads' row scale and shift (x, y).
+    window: [f32; 4],
     lights: [[f32; 4]; 64],
     palette: [[f32; 4]; 256],
+}
+
+/// Where the world is drawn: the top `rows` of the target (a fraction:
+/// the original's view is 147 rows of 200, the interface below it), its
+/// eye line `horizon` of the way down that view (the original's C3D8 + 1
+/// rows of its A91A + 1), and the sky objects' screen quads, made for
+/// 100 rows a half view, scaled to it.
+#[derive(Clone, Copy, Debug)]
+pub struct Window {
+    pub rows: f32,
+    pub horizon: f32,
+}
+
+impl Default for Window {
+    fn default() -> Self {
+        Window { rows: 1.0, horizon: 0.5 }
+    }
 }
 
 /// The lights this frame (0000:B6EB's lists): none in full daylight,
@@ -69,6 +88,7 @@ pub struct Renderer {
     sprites: Option<(wgpu::Buffer, u64)>,
     palette: [[f32; 4]; 256],
     depth: Option<(wgpu::TextureView, u32, u32)>,
+    window: Window,
 }
 
 pub struct Scene<'a> {
@@ -296,7 +316,12 @@ impl Renderer {
             contents: bytemuck::cast_slice(scene.mesh),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        Self { pipeline, sky_pipeline, sky: Sky::default(), lights: Lights::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
+        Self { pipeline, sky_pipeline, sky: Sky::default(), lights: Lights::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None, window: Window::default() }
+    }
+
+    /// Where the world is drawn from now on.
+    pub fn set_window(&mut self, window: Window) {
+        self.window = window;
     }
 
     /// The lights from now on.
@@ -351,16 +376,27 @@ impl Renderer {
         let eye = Vec3::new(cam.x, cam.height, cam.y);
         let forward = Vec3::new(a.sin(), 0.0, a.cos());
         let view = Mat4::look_at_lh(eye, eye + forward, Vec3::Y);
-        let proj = Mat4::perspective_lh(60f32.to_radians(), width as f32 / height as f32, 4.0, 8192.0);
+        // The world in the window's rows, at the same scale a row as over
+        // the whole target, its eye line moved down to the window's.
+        let rows = self.window.rows.clamp(0.05, 1.0);
+        let view_h = ((height as f32 * rows).round() as u32).clamp(1, height);
+        let fov = 2.0 * ((30f32).to_radians().tan() * view_h as f32 / height as f32).atan();
+        let shift = 1.0 - 2.0 * self.window.horizon;
+        let proj = Mat4::from_translation(Vec3::new(0.0, shift, 0.0)) * Mat4::perspective_lh(fov, width as f32 / view_h as f32, 4.0, 8192.0);
+        // The screen quads: rows from the eye line at 100 a half of the
+        // original's 200, over this window's half.
+        let quad_scale = height as f32 / view_h as f32;
         let globals = Globals {
             view_proj: (proj * view).to_cols_array_2d(),
             eye: [cam.x, cam.height, cam.y, self.lights.behind as f32],
             shade: [96.0, 12.0, self.sky.dark as f32, self.sky.fog.map_or(0.0, |c| c as f32 + 1.0)],
-            sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, height as f32],
+            // The dither spans the view's top to its eye line.
+            sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, 2.0 * view_h as f32 * self.window.horizon],
             light: {
                 let r = self.lights.rows;
                 [self.lights.lights.len().min(64) as f32, r[0] as f32, r[1] as f32, r[2] as f32]
             },
+            window: [quad_scale, shift, 0.0, 0.0],
             lights: {
                 let mut a = [[0f32; 4]; 64];
                 for (d, l) in a.iter_mut().zip(&self.lights.lights) {
@@ -389,6 +425,7 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+            pass.set_viewport(0.0, 0.0, width as f32, view_h as f32, 0.0, 1.0);
             pass.set_bind_group(0, &self.bind, &[]);
             pass.set_pipeline(&self.sky_pipeline);
             pass.draw(0..3, 0..1);
