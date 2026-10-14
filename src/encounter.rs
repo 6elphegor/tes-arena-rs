@@ -781,7 +781,7 @@ impl Machine {
     /// 0000:50B9. In a dungeon (kind 4) once 191D is set, flats (type 8)
     /// that are C943, or one of the eight at C987, are cleared from the
     /// map.
-    fn clear_dungeon_flats(&mut self) {
+    pub(crate) fn clear_dungeon_flats(&mut self) {
         if self.mem.r8(DS, 0x05E6) != 4 || self.mem.r8(DS, 0x191D) == 0 {
             return;
         }

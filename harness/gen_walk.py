@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import mine
 from gen_attack import fnv, stream
 
 WSEG = 0x6800
@@ -76,8 +77,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_C980)
-    for n in range(int(os.environ.get('N', 1500))):
+    total = int(os.environ.get('N', 1500))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         a.mu.mem_write(a.lin(WSEG, 0), zero)
         for seg, off, data in setup(seed):

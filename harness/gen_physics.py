@@ -25,6 +25,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG
+from emu import changes
 from gen_attack import fnv, stream
 
 WSEG, FSEG, FRAME = 0x6800, 0x7000, 0x8800
@@ -102,7 +103,7 @@ def main():
             for _ in range(frames):
                 a.call_near(0, 0xF57C)
             after = a.seg_bytes(a.ds)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x}'
         except Fault:
             res = 'fault'

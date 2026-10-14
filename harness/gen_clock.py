@@ -26,6 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
 from gen_attack import fnv, stream
 
 CSEG, TSEG = 0x7800, 0x5C00
@@ -159,7 +160,7 @@ def main():
             a._setup([0, STUB_SEG], {'eax': minutes})
             a._run(0, 0x142D, STUB_SEG, 0)
             after = unrelocated(a.seg_bytes(a.ds))
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} {fnv(a.seg_bytes(TSEG)[:0x400]):x}'
         except Fault:
             res = 'fault'

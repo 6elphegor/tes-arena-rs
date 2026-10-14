@@ -28,6 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
 from gen_attack import setup, fnv, CSEG, RSIZE
 from gen_strike import strike, WSEG, FRAME, ACTORS, SIZE
 from gen_spell import guard_dispatch
@@ -213,7 +214,7 @@ def main():
             after = unrelocated(a.seg_bytes(a.ds))
             if a.r16(0x061C, CSEG) == a.ds:
                 a.w16(0x061C, DGROUP, CSEG)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} {fnv(a.seg_bytes(WSEG)[:0x8000]):x}'
         except Fault:
             res = 'fault'

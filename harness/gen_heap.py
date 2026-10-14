@@ -32,11 +32,7 @@ out = open(OUT, 'w', buffering=1)
 START, TOP = 0x7000, 0x9000
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 a = Arena(EXE)

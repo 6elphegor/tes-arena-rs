@@ -31,6 +31,8 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from unicorn.x86_const import UC_X86_REG_AX, UC_X86_REG_CX, UC_X86_REG_DX
 from emu import Arena, Fault, LOAD_SEG
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from gen_bash import TRIGGER, CLOSED, WSEG, unrelocated
 
@@ -110,8 +112,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_38CE)
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         for seg in (HSEG, BUFSEG, WSEG):
             a.mu.mem_write(a.lin(seg, 0), zero)
@@ -124,7 +129,7 @@ def main():
                 a.motion = m
                 a.call_near(0, 0x38CE)
             after = unrelocated(a.seg_bytes(a.ds))
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x}'
         except Fault:
             res = 'fault'

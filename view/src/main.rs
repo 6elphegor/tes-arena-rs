@@ -39,14 +39,26 @@ use std::time::{Duration, Instant};
 
 /// The front end's hooks: nothing asked of the player yet. With the
 /// sprites (`sheet`, animations at `tick`) the drawing makes the hit test
-/// for a click left for the actors (`clicked`).
+/// for a click left for the actors (`clicked`); with the light state the
+/// stairs make the light table again.
 #[derive(Default)]
 struct Front<'a> {
     sheet: Option<&'a world::SpriteSheet>,
+    light: Option<&'a mut LightState>,
     tick: usize,
     clicked: bool,
 }
 
+/// The stairs' hooks: the light table made again from NORMAL.LGT
+/// (2294:0B8A); the automap, the quest's level, the level's creatures
+/// and the screen aren't the view's yet.
+impl arena::hooks::StairsHooks for Front<'_> {
+    fn light_table(&mut self, m: &mut arena::machine::Machine) {
+        if let Some(l) = self.light.as_deref_mut() {
+            l.table(m, arena::weather::NORMAL_LGT);
+        }
+    }
+}
 impl ControlHooks for Front<'_> {
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
@@ -340,6 +352,17 @@ impl Assets {
         }
     }
 
+    /// The level's own assets made again after a level change (stairs):
+    /// the textures, the shading rows, the walls and the flats. The sky
+    /// and the light state stay the area's.
+    fn level(&mut self, engine: &Engine) {
+        let flats = world::flats(&engine.m);
+        self.sheet = world::sprite_sheet(&flats, &self.archive, &world::creature_names(&engine.m));
+        self.textures = world::textures(&engine.m);
+        self.shading = world::shading(&engine.m);
+        self.mesh = world::mesh(&engine.m);
+    }
+
     fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
         let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither };
         Renderer::new(device, queue, format, &scene)
@@ -529,9 +552,15 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     let t = engine.frame_ticks();
     engine.tick(t);
     st.frames += 1;
-    let mut hooks = Front { sheet: Some(&st.assets.sheet), tick: st.frames * 4, clicked: std::mem::take(&mut st.clicked) };
+    let level = engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
+    let assets = &mut st.assets;
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: st.frames * 4, clicked: std::mem::take(&mut st.clicked) };
     let frame = engine.frame(Input::Steer(intent), &mut hooks).expect("frame");
     print_message(engine, &mut st.message);
+    if engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level {
+        eprintln!("took the stairs to level {}", engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL));
+        st.assets.level(engine);
+    }
     if frame == arena::engine::Frame::Left {
         *run = areas::next(engine, dir, *run)?;
         st.assets = Assets::new(dir, engine);
@@ -713,9 +742,18 @@ impl App {
         let t = self.engine.frame_ticks();
         self.engine.tick(t);
         let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-        let mut hooks = Front { sheet: Some(&self.assets.sheet), tick, clicked: std::mem::take(&mut self.clicked) };
+        let level = self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL);
+        let assets = &mut self.assets;
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick, clicked: std::mem::take(&mut self.clicked) };
         let frame = self.engine.frame(Input::Steer(&intent), &mut hooks);
         print_message(&self.engine, &mut self.message);
+        // Stairs: the new level's assets.
+        if self.engine.m.mem.r8(arena::mem::DS, arena::movement::var::LEVEL) != level {
+            self.assets.level(&self.engine);
+            if let Some(g) = &mut self.gpu {
+                g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+            }
+        }
         // A click now is found by the next frame's drawing.
         if std::mem::take(&mut self.click) {
             self.clicked = centre_click(&mut self.engine);

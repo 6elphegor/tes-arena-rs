@@ -22,6 +22,7 @@ pub mod format;
 pub mod frame;
 pub mod haggle;
 pub mod heap;
+pub mod hooks;
 pub mod info;
 pub mod inventory;
 pub mod item;

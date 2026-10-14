@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
 from emu import Fault, LOAD_SEG
+from emu import changes
 
 EXE, GAME, OUT = sys.argv[1:4]
 rng = random.Random(0x1994_080B)
@@ -31,11 +32,7 @@ out = open(OUT, 'w', buffering=1)
 OUT_SEG = 0x7000
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 a = DosArena(EXE, GAME)
@@ -56,7 +53,7 @@ for kind, sex in cases:
         if a.r16(0xA90A) == a.ds:
             a.w16(0xA90A, a.ds - LOAD_SEG)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         name = bytes(a.mu.mem_read(a.lin(OUT_SEG, 0), 0x10000))
         name = (name + name)[off:off + 64]
         res = f'{fnv(name):x} {fnv(changed):x}'
@@ -89,7 +86,7 @@ for _ in range(300):
         if a.r16(0xA90A) == a.ds:
             a.w16(0xA90A, a.ds - LOAD_SEG)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         record = bytes(a.mu.mem_read(a.lin(RC, rec), 0x41E))
         state = bytes(a.mu.mem_read(a.lin(RC, 0x91EE), 0xE))
         res = f'{fnv(record):x} {fnv(state):x} {fnv(changed):x}'

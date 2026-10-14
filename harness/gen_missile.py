@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
 from gen_attack import setup, fnv, CSEG, RSIZE
 from gen_strike import strike, WSEG, FRAME, ACTORS, SIZE
 from gen_spell import guard_dispatch
@@ -71,7 +72,10 @@ def main():
                   lambda mu, acc, addr, size, v, _: wrap.append(1) if size > 1 else None, None, edge, edge)
 
     rng = __import__('random').Random(0x1994_037F)
-    for n in range(int(os.environ.get('N', 3000))):
+    # Not sharded (harness/par.py): a case starts from the state the one
+    # before it left, so the cases must run in order.
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
         k = rng.randrange(8)
         src = 0 if rng.random() < 0.6 else ACTORS + rng.randrange(23) * SIZE
@@ -107,7 +111,7 @@ def main():
             after = unrelocated(a.seg_bytes(a.ds))
             if a.r16(0x061C, CSEG) == a.ds:
                 a.w16(0x061C, DGROUP, CSEG)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} {fnv(a.seg_bytes(WSEG)[:0x8000]):x}'
         except Fault:
             res = 'fault'

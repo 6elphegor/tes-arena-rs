@@ -38,6 +38,7 @@ fn main() {
     }
     println!("people's list: {:?}", (0..64u16).map(|i| e.m.mem.r8(DS, 0x1044 + i)).map(|c| if c == 0 { ',' } else { c as char }).collect::<String>());
     struct Front;
+    impl arena::hooks::StairsHooks for Front {}
     impl arena::controls::ControlHooks for Front {}
     impl arena::weapon::WeaponHooks for Front {}
     impl arena::clock::ClockHooks for Front {}

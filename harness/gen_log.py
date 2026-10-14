@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena
+from emu import changes
 
 EXE, OUT = sys.argv[1:3]
 rng = random.Random(0x1994_1508)
@@ -23,11 +24,7 @@ out = open(OUT, 'w', buffering=1)
 YEAR, DAY = 360 * 1440, 1440
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 a = Arena(EXE)
@@ -36,7 +33,7 @@ BASE = bytes(a.mu.mem_read(0, 0x110000))
 
 def changed(before):
     after = a.seg_bytes(a.ds)
-    return fnv(b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i]))
+    return fnv(changes(before, after))
 
 
 minutes = [0, 1, DAY - 1, DAY, 30 * DAY - 1, 30 * DAY, 11 * 30 * DAY, YEAR - 1, YEAR, 0xFFFFFFFF]

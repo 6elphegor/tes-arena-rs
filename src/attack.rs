@@ -211,15 +211,6 @@ impl Machine {
         let f = self.mem.r16(DS, 0xC398) | 0x80;
         self.mem.w16(DS, 0xC398, f);
         self.clear_effects_on(DS, PLAYER);
-        for i in 0..12u16 {
-            self.mem.w8(DS, 0x7DBC + i * 0x1C + 0x11, 0);
-        }
-        self.mem.w16(DS, 0x7DB8, 0);
-        self.mem.w16(DS, 0x0D5A, 0);
-        for i in 0..8u16 {
-            let at = 0x7F86 + i * 0x16 + 0xA;
-            let v = self.mem.r16(DS, at) & !1;
-            self.mem.w16(DS, at, v);
-        }
+        self.spells_clear();
     }
 }

@@ -126,7 +126,7 @@ fn matches_original() {
                 put(&mut m, 0xC37F, format!("{}\0", p[0]).as_bytes());
                 let before = m.clone();
                 let level = m.mem.r8(DS, 0xBB0A);
-                let got = m.move_step(&mut fs, hex(p[4]) as u16, heading);
+                let got = m.move_step(&mut fs, &mut arena::hooks::NoStairsHooks, hex(p[4]) as u16, heading);
                 changes += (m.mem.r8(DS, 0xBB0A) != level) as usize;
                 got.map(|_| {
                     let planes = [0xCCD0u16, 0xD806, 0xD748].map(|v| {

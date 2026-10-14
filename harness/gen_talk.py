@@ -43,6 +43,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ
 from unicorn.x86_const import *
 from emu import Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
+from emu import mine
 from dos import DosArena
 from gen_attack import fnv, stream
 
@@ -331,8 +333,11 @@ def main():
             mu.hook_add(UC_HOOK_CODE, lambda mu, addr, size, d: cover.add(addr), None, l0 + lo, l0 + hi)
     snap = a.snapshot()
     rng = random.Random(0x1994_DB6C)
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         if os.environ.get('SEED') and seed != int(os.environ['SEED'], 16):
             continue
         a.restore(snap)
@@ -389,7 +394,7 @@ def main():
             # The guards' hook (0000:3F0C), its segment relocated.
             if struct.unpack_from('<H', after, 0x67EC)[0] == LOAD_SEG:
                 struct.pack_into('<H', after, 0x67EC, 0)
-            ch = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            ch = changes(before, after)
             sseg, soff = a.r16(0xBA56), a.r16(0xBA54)
             scratch = bytearray(mu.mem_read(a.lin(sseg, soff), SCRATCH))
             if copies and copies[-1][1:] == (sseg, soff):

@@ -19,6 +19,7 @@ use std::path::PathBuf;
 /// The front end's side: nothing drawn, nothing asked.
 struct Play;
 
+impl arena::hooks::StairsHooks for Play {}
 impl ControlHooks for Play {}
 impl WeaponHooks for Play {}
 impl ClockHooks for Play {}

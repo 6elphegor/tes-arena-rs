@@ -36,6 +36,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_IP, UC_X86_REG_SP, UC_X86_REG_SS, UC_X86_REG_DS, UC_X86_REG_ES, UC_X86_REG_FS, UC_X86_REG_GS, UC_X86_REG_SI
 
@@ -224,8 +226,11 @@ def main():
     r_ = make(EXE, STUBS + [WORLD])
     w_ = make(EXE, STUBS)
     rng = random.Random(0x1994_0CAD)
-    for n in range(int(os.environ.get('N', 4000))):
+    total = int(os.environ.get('N', 4000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         w, kind, sub = setup(seed)
         a = (n_, r_, w_, r_)[kind]
         a.mu.mem_write(a.lin(a.ds, 0), a.base)
@@ -252,7 +257,7 @@ def main():
                 a.call_far(0, 0x4632)
             if res is None:
                 after = relocated(a, a.seg_bytes(a.ds), FAR)
-                ch = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+                ch = changes(before, after)
                 res = f'{fnv(ch):x}'
         except Fault:
             res = 'fault'

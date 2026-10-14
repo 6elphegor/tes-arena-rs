@@ -26,15 +26,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
 
 CSEG, PLAYER, RSIZE = 0x7800, 0x01A4, 0x500
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def stream(seed):
@@ -197,7 +194,7 @@ def main():
             a._setup([0, STUB_SEG], {})
             a._run(0x2AA1, 0x00D8, STUB_SEG, 0)
             after = unrelocated(a.seg_bytes(a.ds))
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
         except Fault:
             res = 'fault'

@@ -35,6 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
 from emu import DGROUP, Fault, LOAD_SEG, STUB_SEG
+from emu import changes
 from gen_spell import guard_dispatch
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_DS
@@ -51,11 +52,7 @@ VARS = [(0xC3D2, 2), (0x05BE, 2), (0x653E, 2), (0x05E0, 2), (0x7A54, 2), (0xCCBA
         (0x1013, 1), (0x05B1, 2), (0x0604, 4), (0x392D, 1), (0x392E, 4), (0x7A44, 2), (0x91F6, 4)]
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def stream(seed):
@@ -297,7 +294,7 @@ for _ in range(1500):
         a._run(0, 0x1854, STUB_SEG, 0)
         unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
         if os.environ.get('DUMP') == f'{seed:x}':
             for i in range(0x10000):
@@ -368,7 +365,7 @@ for _ in range(300):
         a._run(0, 0x1854, STUB_SEG, 0)
         unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         res = f'{fnv(changed):x} {fnv(a.seg_bytes(a.r16(0xD806))[:0x8000]):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x}'
     except Fault:
         res = 'fault'

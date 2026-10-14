@@ -26,6 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import Arena, Fault
+from emu import changes
+from emu import mine
 from gen_attack import fnv, stream
 import gen_input as gi
 
@@ -125,8 +127,11 @@ def main():
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_077E)
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
+        if not mine(n, total):
+            continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
         for seg in (gi.WSEG, gi.FSEG, gi.CURSEG, SSEG):
             a.mu.mem_write(a.lin(seg, 0), zero)
@@ -136,7 +141,7 @@ def main():
         try:
             a.call_near(0x2826, 0x077E)
             after = gi.unrelocated(a, a.seg_bytes(a.ds))
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(gi.WSEG)[:0x8000]):x} {fnv(a.seg_bytes(gi.FSEG)[:0x8000]):x}'
         except Fault:
             res = 'fault'

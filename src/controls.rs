@@ -129,8 +129,9 @@ impl Handler {
 
 const CENTRE: u16 = 0x077E;
 
-/// What the controls leave to code not ported here.
-pub trait ControlHooks {
+/// What the controls leave to code not ported here (and, through the
+/// walk, the stairs' hooks).
+pub trait ControlHooks: crate::hooks::StairsHooks {
     /// 2826:0B52: the map square (offset) of the floor under the cursor,
     /// None when there is none. The original projects the cursor onto
     /// the floor (0000:DB43); with a new renderer, its pick.
@@ -191,6 +192,8 @@ pub struct Intent {
 
 /// `ControlHooks` that do nothing.
 pub struct NoControlHooks;
+
+impl crate::hooks::StairsHooks for NoControlHooks {}
 
 impl ControlHooks for NoControlHooks {
     fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
@@ -264,7 +267,7 @@ impl Machine {
         let f = self.mem.r16(DS, MAP_FLAGS) & !0x200;
         self.mem.w16(DS, MAP_FLAGS, f);
         'body: {
-            if self.jump_step(files)? {
+            if self.jump_step(files, hooks)? {
                 break 'body;
             }
             let f = self.mem.r16(DS, LEVEL_FLAGS) & !0x80;
@@ -277,12 +280,12 @@ impl Machine {
             if f & 0x800 != 0 || self.mem.r8(DS, JUMP) != 0 {
                 // 2826:0468: falling or jumping keeps the last speed.
                 let (speed, heading) = (self.mem.r16(DS, SPEED), self.mem.r16(DS, HEADING));
-                self.walk(files, speed, heading)?;
+                self.walk(files, hooks, speed, heading)?;
                 return self.input_tail(files, hooks);
             }
             match intent {
                 None => self.classic_step(files, hooks)?,
-                Some(it) => self.intent_step(files, it)?,
+                Some(it) => self.intent_step(files, hooks, it)?,
             }
         }
         if self.mem.r16(DS, REFRESH) != 0 {
@@ -298,7 +301,7 @@ impl Machine {
     /// buttons jump.
     fn classic_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         self.mouse_clamp();
-        self.arrow_keys(files)?;
+        self.arrow_keys(files, hooks)?;
         if self.mem.r8(DS, CYBERMAN) != 0 {
             return None;
         }
@@ -341,7 +344,7 @@ impl Machine {
     /// a frame) as if the left button were down, so the acceleration
     /// builds; going back is at half speed. Nothing moving, the speed is
     /// 0 at once (as with the keys and the cursor in the centre).
-    fn intent_step(&mut self, files: &mut Files, it: &Intent) -> Option<()> {
+    fn intent_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks, it: &Intent) -> Option<()> {
         // Moving or turning holds 5E0 bit 2000h as the arrow keys do, so
         // the frame body doesn't brake the acceleration.
         let held = it.forward != 0 || it.strafe != 0 || it.turn != 0;
@@ -367,7 +370,7 @@ impl Machine {
             }
             let buttons = self.mem.r8(DS, BUTTONS);
             self.mem.w8(DS, BUTTONS, buttons | 1);
-            let r = self.walk(files, speed, h);
+            let r = self.walk(files, hooks, speed, h);
             self.mem.w8(DS, BUTTONS, buttons);
             r?;
         } else {
@@ -447,7 +450,7 @@ impl Machine {
     /// jump's speed scaled by agility (the player's byte 1CD). The
     /// counter runs down each frame, every other frame with feather fall
     /// (5CA bit 1000h) or as a race C9h. True while jumping.
-    fn jump_step(&mut self, files: &mut Files) -> Option<bool> {
+    fn jump_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<bool> {
         let f = self.mem.r16(DS, LEVEL_FLAGS) & 0x7FFF;
         self.mem.w16(DS, LEVEL_FLAGS, f);
         let f = self.mem.r16(DS, MAP_FLAGS) & !0x100;
@@ -469,7 +472,7 @@ impl Machine {
         self.mem.w16(DS, REFRESH, 0);
         let heading = self.mem.r16(DS, HEADING);
         let speed = (self.mem.r16(DS, SPEED) as u8 as u16 * self.mem.r8(DS, 0x01CD) as u16) >> 7;
-        self.walk(files, speed, heading)?;
+        self.walk(files, hooks, speed, heading)?;
         let f = self.mem.r16(DS, MAP_FLAGS) | 0x100;
         self.mem.w16(DS, MAP_FLAGS, f);
         let slow = self.mem.r16(DS, 0x05CA) & 0x1000 != 0 || self.mem.r8(DS, 0x01A9) == 0xC9;
@@ -535,7 +538,7 @@ impl Machine {
     /// runs its region's handler with the cursor at the region's edge
     /// (full speed) and the left button held. Up and Down set the last
     /// handler (LAST_HANDLER).
-    fn arrow_keys(&mut self, files: &mut Files) -> Option<()> {
+    fn arrow_keys(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let f = self.mem.r16(DS, 0x05E0) & !0x2000;
         self.mem.w16(DS, 0x05E0, f);
         let buttons = self.mem.r8(DS, BUTTONS);
@@ -549,25 +552,25 @@ impl Machine {
         };
         if self.key(key::UP) {
             held(self);
-            self.with_cursor(MOUSE_Y, 0, |m| m.forward(files))?;
+            self.with_cursor(MOUSE_Y, 0, |m| m.forward(files, hooks))?;
             self.mem.w16(DS, LAST_HANDLER, 0x055A);
         } else if self.key(key::DOWN) {
             held(self);
-            self.with_cursor(MOUSE_Y, 0x90, |m| m.back(files))?;
+            self.with_cursor(MOUSE_Y, 0x90, |m| m.back(files, hooks))?;
             self.mem.w16(DS, LAST_HANDLER, 0x05A9);
         }
         let ctrl = self.key(key::CTRL);
         if self.key(key::LEFT) {
             held(self);
             if ctrl {
-                self.with_cursor(MOUSE_X, 0, |m| m.strafe_left(files))?;
+                self.with_cursor(MOUSE_X, 0, |m| m.strafe_left(files, hooks))?;
             } else {
                 self.with_cursor(MOUSE_X, 0, |m| m.turn_left(0x28, 0x2C))?;
             }
         } else if self.key(key::RIGHT) {
             held(self);
             if ctrl {
-                self.with_cursor(MOUSE_X, 0x13C, |m| m.strafe_right(files))?;
+                self.with_cursor(MOUSE_X, 0x13C, |m| m.strafe_right(files, hooks))?;
             } else {
                 self.with_cursor(MOUSE_X, 0x13C, |m| m.turn_right(0x40, 0x44))?;
             }
@@ -677,19 +680,19 @@ impl Machine {
         match Handler::from_offset(at)? {
             Handler::ForwardLeft => {
                 self.turn_left(4, 8)?;
-                self.forward(files)
+                self.forward(files, hooks)
             }
-            Handler::Forward => self.forward(files),
+            Handler::Forward => self.forward(files, hooks),
             Handler::ForwardRight => {
                 self.turn_right(0x1C, 0x20)?;
-                self.forward(files)
+                self.forward(files, hooks)
             }
             Handler::TurnLeft => self.turn_left(0x28, 0x2C),
             Handler::Centre => self.view_click(files, hooks),
             Handler::TurnRight => self.turn_right(0x40, 0x44),
-            Handler::StrafeLeft => self.strafe_left(files),
-            Handler::Back => self.back(files),
-            Handler::StrafeRight => self.strafe_right(files),
+            Handler::StrafeLeft => self.strafe_left(files, hooks),
+            Handler::Back => self.back(files, hooks),
+            Handler::StrafeRight => self.strafe_right(files, hooks),
         }
     }
 
@@ -732,45 +735,45 @@ impl Machine {
     }
 
     /// 2826:055A. Forward: faster towards the top of region 1.
-    fn forward(&mut self, files: &mut Files) -> Option<()> {
+    fn forward(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let (y0, y1) = (self.region(1, 6), self.region(1, 0xA));
         let ax = y1.wrapping_sub(self.mem.r16(DS, MOUSE_Y));
         let speed = self.walk_speed(Self::fraction(ax, y1.wrapping_sub(y0))?, false);
         self.mem.w16(DS, SPEED, speed);
         let h = self.mem.r16(DS, HEADING);
         self.mem.w16(DS, 0x05DE, h);
-        self.walk(files, speed, h)
+        self.walk(files, hooks, speed, h)
     }
 
     /// 2826:05A9. Back: faster towards the bottom of region 7.
-    fn back(&mut self, files: &mut Files) -> Option<()> {
+    fn back(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let (y0, y1) = (self.region(7, 6), self.region(7, 0xA));
         let ax = self.mem.r16(DS, MOUSE_Y).wrapping_sub(y0);
         let speed = self.walk_speed(Self::fraction(ax, y1.wrapping_sub(y0))?, true);
         self.mem.w16(DS, SPEED, speed);
         let h = self.mem.r16(DS, HEADING).wrapping_add(0x100) & 0x1FF;
         self.mem.w16(DS, 0x05DE, h);
-        self.walk(files, speed, h)
+        self.walk(files, hooks, speed, h)
     }
 
     /// 2826:05FE. Strafing left: faster towards the left of region 6.
-    fn strafe_left(&mut self, files: &mut Files) -> Option<()> {
+    fn strafe_left(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let (x0, x1) = (self.region(6, 4), self.region(6, 8));
         let ax = x1.wrapping_sub(self.mem.r16(DS, MOUSE_X));
         let speed = self.walk_speed(Self::fraction(ax, x1.wrapping_sub(x0))?, false);
         self.mem.w16(DS, SPEED, speed);
         let h = self.mem.r16(DS, HEADING).wrapping_sub(0x80) & 0x1FF;
-        self.walk(files, speed, h)
+        self.walk(files, hooks, speed, h)
     }
 
     /// 2826:0651. Strafing right: faster towards the right of region 8.
-    fn strafe_right(&mut self, files: &mut Files) -> Option<()> {
+    fn strafe_right(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let (x0, x1) = (self.region(8, 4), self.region(8, 8));
         let ax = self.mem.r16(DS, MOUSE_X).wrapping_sub(x0);
         let speed = self.walk_speed(Self::fraction(ax, x1.wrapping_sub(x0))?, false);
         self.mem.w16(DS, SPEED, speed);
         let h = self.mem.r16(DS, HEADING).wrapping_add(0x80) & 0x1FF;
-        self.walk(files, speed, h)
+        self.walk(files, hooks, speed, h)
     }
 
     /// 2826:06A0 (and 06B1 from 0750). Turning left, only with the left
@@ -816,7 +819,7 @@ impl Machine {
     /// grows by 20h while the left button is down and falls by 40h
     /// otherwise; the step is speed x ACCEL / 256 (the product's low
     /// word). See `movement::move_step`.
-    pub fn walk(&mut self, files: &mut Files, speed: u16, heading: u16) -> Option<()> {
+    pub fn walk(&mut self, files: &mut Files, hooks: &mut dyn crate::hooks::StairsHooks, speed: u16, heading: u16) -> Option<()> {
         if self.mem.r16(DS, 0x05B1) & 0x40 != 0 {
             return Some(());
         }
@@ -830,7 +833,7 @@ impl Machine {
             }
         }
         let step = speed.wrapping_mul(self.mem.r16(DS, ACCEL)) >> 8;
-        self.move_step(files, step, heading)?;
+        self.move_step(files, hooks, step, heading)?;
         Some(())
     }
 }

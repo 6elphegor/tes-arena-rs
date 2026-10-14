@@ -316,7 +316,7 @@ impl Machine {
         self.mem.w8(0, CS_IN_BSA, 0);
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
-        if self.mem.r16(DS, OPEN_HOOK + 2) != 0 {
+        if self.hook_set(OPEN_HOOK) {
             return None;
         }
         let raw = self.mem.cstr(DS, name).to_vec();

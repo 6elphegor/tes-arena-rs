@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS
 from emu import Fault, LOAD_SEG, STUB_SEG, DGROUP
+from emu import changes
 from dos import DosArena
 from gen_attack import setup, fnv, CSEG, RSIZE
 from gen_strike import strike, WSEG, FRAME, ACTORS, SIZE
@@ -129,7 +130,10 @@ def main():
     low = []
     a.mu.hook_add(UC_HOOK_MEM_READ, lambda mu, acc, addr, size, v, _: low.append(addr), None, 0, 0x3FFF)
     rng = __import__('random').Random(0x1994_071F)
-    for n in range(int(os.environ.get('N', 3000))):
+    # Not sharded (harness/par.py): a case starts from the state the one
+    # before it left, so the cases must run in order.
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
         k = rng.randrange(8)
         idx = rng.randrange(8)
@@ -185,7 +189,7 @@ def main():
             after = cast_unrelocated(a, unrelocated(a.seg_bytes(a.ds)), bool(saved))
             if a.r16(0x061C, CSEG) == a.ds:
                 a.w16(0x061C, DGROUP, CSEG)
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+            changed = changes(before, after)
             res = f'{fnv(changed):x} {fnv(a.seg_bytes(CSEG)[:0x8000]):x} {fnv(a.seg_bytes(WSEG)[:0x8000]):x}'
         except LowMemory:
             res = 'lowmem'

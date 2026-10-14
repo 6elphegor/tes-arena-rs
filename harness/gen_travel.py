@@ -20,17 +20,14 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
 from emu import Fault, LOAD_SEG
+from emu import changes
 
 EXE, GAME, OUT = sys.argv[1:4]
 rng = random.Random(0x1994_2E69)
 out = open(OUT, 'w', buffering=1)
 
 
-def fnv(b):
-    h = 0xcbf29ce484222325
-    for c in b:
-        h = ((h ^ c) * 0x100000001b3) & 0xffffffffffffffff
-    return h
+from emu import fnv  # noqa: E402 (C FNV-1a, emu.py)
 
 
 def locations(slot):
@@ -75,7 +72,7 @@ for _ in range(300):
         if a.r16(0xA90A) == a.ds:
             a.w16(0xA90A, a.ds - LOAD_SEG)
         after = a.seg_bytes(a.ds)
-        changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+        changed = changes(before, after)
         res = f'{days:x} {fnv(changed):x}'
     except (Fault, AssertionError):
         res = 'fault'
@@ -91,6 +88,6 @@ for _ in range(300):
     before = a.seg_bytes(a.ds)
     a.call_far(0x1194, 0x2FB3)
     after = a.seg_bytes(a.ds)
-    changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
+    changed = changes(before, after)
     out.write(f'weather | {minutes:x} {seed:x} | {fnv(changed):x}\n')
 out.close()
