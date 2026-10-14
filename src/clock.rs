@@ -151,7 +151,7 @@ impl Machine {
 
     /// 0000:16F7. The time of day for the sky. None where the original's
     /// division overflows (more than 65535 days).
-    fn sky_time(&mut self) -> Option<()> {
+    pub fn sky_time(&mut self) -> Option<()> {
         let t = if self.mem.r8(DS, var::FIXED_TIME) != 0 { 0x2D0 } else { self.mem.r32(DS, var::MINUTES) };
         let days = u16::try_from(t / 1440).ok()?;
         self.mem.w16(DS, var::SKY_DAY, days & 0x1F);

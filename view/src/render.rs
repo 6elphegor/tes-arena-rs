@@ -12,7 +12,17 @@ struct Globals {
     view_proj: [[f32; 4]; 4],
     eye: [f32; 4],
     shade: [f32; 4],
+    sky: [f32; 4],
     palette: [[f32; 4]; 256],
+}
+
+/// The sky this frame: outdoors or not, the afternoon's dither or the
+/// morning's, and palette entries 1..8 (the window of the day's colours).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Sky {
+    pub outdoors: bool,
+    pub afternoon: bool,
+    pub colours: [[u8; 3]; 8],
 }
 
 /// Where the player stands and looks (map units; heading 0..511 a turn,
@@ -29,6 +39,8 @@ pub const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub struct Renderer {
     pipeline: wgpu::RenderPipeline,
+    sky_pipeline: wgpu::RenderPipeline,
+    sky: Sky,
     globals: wgpu::Buffer,
     bind: wgpu::BindGroup,
     vertices: wgpu::Buffer,
@@ -44,6 +56,8 @@ pub struct Scene<'a> {
     pub shading: &'a [u8],
     pub mesh: &'a [Vertex],
     pub sprites: &'a crate::world::SpriteSheet,
+    /// DITHER.IMG then DITHER2.IMG (800 bytes each; zeros if missing).
+    pub dither: &'a [u8],
 }
 
 impl Renderer {
@@ -104,6 +118,24 @@ impl Renderer {
             wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(crate::world::ATLAS), rows_per_image: Some(sheet.h) },
             atlas,
         );
+        let dither = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("dither"),
+            size: wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let mut d = scene.dither.to_vec();
+        d.resize(1600, 0);
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &dither, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            &d,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(40), rows_per_image: Some(40) },
+            wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
+        );
         let mut palette = [[0f32; 4]; 256];
         for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
             *p = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
@@ -153,11 +185,22 @@ impl Renderer {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
             ],
         });
         let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
         let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
         let sprite_view = sprite_tex.create_view(&wgpu::TextureViewDescriptor::default());
+        let dither_view = dither.create_view(&wgpu::TextureViewDescriptor::default());
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("world"),
             layout: &layout,
@@ -166,6 +209,7 @@ impl Renderer {
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex_view) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&shade_view) },
                 wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&sprite_view) },
+                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&dither_view) },
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -204,12 +248,44 @@ impl Renderer {
             multiview: None,
             cache: None,
         });
+        let sky_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("sky"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_sky"), compilation_options: Default::default(), buffers: &[] },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_sky"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+            }),
+            primitive: Default::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
         let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh"),
             contents: bytemuck::cast_slice(scene.mesh),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        Self { pipeline, globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
+        Self { pipeline, sky_pipeline, sky: Sky::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None }
+    }
+
+    /// The sky from now on: palette entries 1..8 become its colours.
+    pub fn set_sky(&mut self, sky: Sky) {
+        self.sky = sky;
+        if sky.outdoors {
+            for (i, c) in sky.colours.iter().enumerate() {
+                self.palette[1 + i] = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
+            }
+        }
     }
 
     /// Draws the world seen from `cam` into `target` (`width` x `height`),
@@ -251,6 +327,7 @@ impl Renderer {
             view_proj: (proj * view).to_cols_array_2d(),
             eye: [cam.x, cam.height, cam.y, 0.0],
             shade: [96.0, 12.0, 0.0, 0.0],
+            sky: [self.sky.outdoors as u32 as f32, self.sky.afternoon as u32 as f32, width as f32, height as f32],
             palette: self.palette,
         };
         queue.write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
@@ -272,8 +349,10 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.bind, &[]);
+            pass.set_pipeline(&self.sky_pipeline);
+            pass.draw(0..3, 0..1);
+            pass.set_pipeline(&self.pipeline);
             pass.set_vertex_buffer(0, self.vertices.slice(..));
             pass.draw(0..self.count, 0..1);
             if !sprites.is_empty() {

@@ -43,5 +43,6 @@ pub mod weapon;
 pub mod wild;
 pub mod scale;
 pub mod shop;
+pub mod sky;
 pub mod spell;
 pub mod strike;

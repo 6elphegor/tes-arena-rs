@@ -141,6 +141,11 @@ No game code or data is included: everything is loaded from your own copy.
   area and night, an entry by the player's level; monsters, or people
   with their equipment, 24FA:0313). The quests' encounters (86F2) are
   not ported.
+- `src/sky.rs` – the sky's colours (2294:0428, 0341): outdoors the .COL
+  for the weather (DAYTIME.COL or DREARY.COL, a run of colours through
+  the day) and the window of eight of them palette entries 1..8 take for
+  the time of day, and the dither image for the half of the day. The
+  loads and palette writes are the front end's.
 - `src/outfit.rs` – what people in a fight are drawn as (2686:0423): the
   list of graphics files at 1044 the fight loads, from the first
   person's record. Their look comes from the armour mostly worn, or from
@@ -260,7 +265,10 @@ member using wgpu, winit, glam and png.
   player) check them.
 - `render.rs` and `shader.wgsl` keep the textures as palette indices,
   shade them by distance through the original's table, then colour them
-  with the palette.
+  with the palette. Outdoors the sky is drawn first: palette entries
+  1..8 (set each frame from the .COL at `sky_step`'s window) through the
+  dither images, their 20 rows from the top of the view to the horizon
+  (how the original scales them is a guess).
 - `main.rs` turns the keys and the mouse into an `Intent` for
   `Engine::frame`, run at the game's pace. Its `draw` hook steps the
   changed squares within the view's reach. The original stepped only
@@ -274,11 +282,12 @@ member using wgpu, winit, glam and png.
 
 ```
 cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
+cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] --shot out.png [FRAMES [TURN]]
 ```
 
 Not drawn yet: the townspeople (MLGEN/FMGEN files by climate), the other door kinds moving, chasms
-and water, the sky, and the interface. How a dungeon's placed creatures
+and water, the outdoor light by time of day (the ground stays lit at
+night), the mountains, clouds, sun, moons and stars, and the interface. How a dungeon's placed creatures
 (map flats naming creature files, such as rat.dfa) come to life is not
 found yet.
 

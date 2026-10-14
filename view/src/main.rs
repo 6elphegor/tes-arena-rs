@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
 //! the mouse turns (click the window to capture it, Esc to release),
@@ -10,7 +10,8 @@
 //! picture after turning by TURN (heading units, 512 a turn) and FRAMES
 //! frames (default 0) of walking forward, and exits; --wait stands still
 //! N frames before the walk, --click clicking first; --at puts the
-//! player in a square's centre, facing HEADING, a debugging aid. --fight brings a random encounter at the
+//! player in a square's centre, facing HEADING, a debugging aid; --hour
+//! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (P) rolls until people come.
 
 mod archive;
@@ -79,6 +80,12 @@ struct Assets {
     shading: Vec<u8>,
     mesh: Vec<world::Vertex>,
     sheet: world::SpriteSheet,
+    archive: archive::Archive,
+    /// DITHER.IMG then DITHER2.IMG.
+    dither: Vec<u8>,
+    /// The sky's .COL as the game keeps it: its name's offset and its
+    /// colours, the first eight again past the end.
+    colours: Option<(u16, Vec<u8>)>,
 }
 
 impl Assets {
@@ -92,12 +99,51 @@ impl Assets {
             shading: world::shading(&engine.m),
             mesh: world::mesh(&engine.m),
             sheet,
+            dither: ["DITHER.IMG", "DITHER2.IMG"].iter().flat_map(|n| {
+                let mut d = archive.read(n).unwrap_or_default();
+                d.resize(800, 0);
+                d
+            }).collect(),
+            archive,
+            colours: None,
         }
     }
 
     fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
-        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet };
+        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither };
         Renderer::new(device, queue, format, &scene)
+    }
+
+    /// The sky after a frame (2294:0428 and 0341 decide; the .COL loads
+    /// here): outdoors, palette entries 1..8 from the day's colours at the
+    /// window for the time of day.
+    fn sky(&mut self, m: &mut arena::machine::Machine) -> render::Sky {
+        use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
+        let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
+        if !outdoors {
+            return render::Sky::default();
+        }
+        m.sky_colours();
+        m.sky_step();
+        let name = m.mem.r16(arena::mem::DS, COLOURS);
+        if self.colours.as_ref().map(|c| c.0) != Some(name) {
+            let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();
+            // An 8-byte header, then the colours.
+            let mut c = self.archive.read(&file).map(|d| d.get(8..).unwrap_or_default().to_vec()).unwrap_or_default();
+            c.resize(0x300, 0);
+            let first: Vec<u8> = c[..0x18].to_vec();
+            c.extend(first);
+            self.colours = Some((name, c));
+        }
+        let c = &self.colours.as_ref().unwrap().1;
+        let w = m.mem.r16(arena::mem::DS, WINDOW) as usize;
+        let mut colours = [[0u8; 3]; 8];
+        for (i, col) in colours.iter_mut().enumerate() {
+            for (k, v) in col.iter_mut().enumerate() {
+                *v = *c.get(w + 3 * i + k).unwrap_or(&0);
+            }
+        }
+        render::Sky { outdoors, afternoon: m.mem.r16(arena::mem::DS, DITHER) == DITHER_AFTERNOON, colours }
     }
 
     /// This frame's billboards, animations stepping every `ANIMATE` ticks.
@@ -122,6 +168,11 @@ fn main() {
         wait = args.get(i + 1).and_then(|v| v.parse().ok()).expect("--wait N");
         args.drain(i..i + 2);
     }
+    let mut hour = None;
+    if let Some(i) = args.iter().position(|a| a == "--hour") {
+        hour = Some(args[i + 1].parse::<u32>().expect("--hour H"));
+        args.drain(i..i + 2);
+    }
     let mut at = None;
     if let Some(i) = args.iter().position(|a| a == "--at") {
         let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
@@ -129,11 +180,20 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    if let Some(h) = hour {
+        // The clock at that hour of the first day (its calendar fields
+        // agreeing, so no hour passes at once), and the sky's time.
+        use arena::clock::var::{HOUR, MINUTE, MINUTES};
+        engine.m.mem.w32(arena::mem::DS, MINUTES, h % 24 * 60);
+        engine.m.mem.w16(arena::mem::DS, HOUR, (h % 24) as u16);
+        engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
+        engine.m.sky_time().expect("sky time");
+    }
     if let Some((col, row, heading)) = at {
         use arena::movement::var::{HEADING, X, Y};
         engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
@@ -187,9 +247,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, out: &str, click: bool, wait:
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
-    let assets = Assets::new(dir, &engine);
+    let mut assets = Assets::new(dir, &engine);
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = assets.renderer(&device, &queue, format);
+    r.set_sky(assets.sky(&mut engine.m));
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("shot"),
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -398,6 +459,7 @@ impl winit::application::ApplicationHandler for App {
                     let view = frame.texture.create_view(&Default::default());
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
                     let sprites = self.assets.sprites(&self.engine, cam, ticks);
+                    g.renderer.set_sky(self.assets.sky(&mut self.engine.m));
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     frame.present();
                 }

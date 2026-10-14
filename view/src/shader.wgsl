@@ -7,6 +7,9 @@ struct Globals {
     eye: vec4<f32>,
     // x: distance per shading row, y: rows (darkest kept), z: light radius.
     shade: vec4<f32>,
+    // x: outdoors (a sky), y: afternoon (the second dither), z, w: the
+    // target's size.
+    sky: vec4<f32>,
     palette: array<vec4<f32>, 256>,
 };
 
@@ -14,6 +17,8 @@ struct Globals {
 @group(0) @binding(1) var textures: texture_2d_array<u32>;
 @group(0) @binding(2) var shading: texture_2d<u32>;
 @group(0) @binding(3) var sprites: texture_2d<u32>;
+// DITHER.IMG (rows 0..19) and DITHER2.IMG (20..39): 40 x 20 indices 1..8.
+@group(0) @binding(4) var dither: texture_2d<u32>;
 
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
@@ -60,4 +65,24 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     row = clamp(row, 0, i32(g.shade.y));
     let shaded = textureLoad(shading, vec2<i32>(i32(index), row), 0).r;
     return g.palette[shaded];
+}
+
+// The sky: palette entries 1..8 through the dither, its 20 rows from the
+// top of the view to the horizon (the middle), 40 columns repeating
+// across a view 320 wide; below the horizon its last row. Black indoors.
+@vertex
+fn vs_sky(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
+    let p = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
+    return vec4<f32>(p * 2.0 - 1.0, 1.0, 1.0);
+}
+
+@fragment
+fn fs_sky(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    if g.sky.x == 0.0 {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    let row = clamp(i32(pos.y / (g.sky.w * 0.5) * 20.0), 0, 19) + select(0, 20, g.sky.y != 0.0);
+    let col = i32(pos.x * 320.0 / g.sky.z) % 40;
+    let index = textureLoad(dither, vec2<i32>(col, row), 0).r;
+    return g.palette[index];
 }
