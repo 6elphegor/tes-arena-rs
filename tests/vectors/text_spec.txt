@@ -18,6 +18,8 @@
 #   text       the text number: (byte) < F0h: a key of POINTER1.DAT by
 #              (word) % keys (its low byte for the greetings' keys, 8000h
 #              set), else (word) % 700h
+#   aim N A:V,..  (byte) < N: each A (hex) written V, a byte (bV) or a
+#              word (wV); ADDR is not used
 # All values hex.
 
 ds 137A text
@@ -74,7 +76,7 @@ ds 0F6C b a
 ds 0F6D bc 18,19,1a,1b,1c,20,24,28
 ds 0F6E b 8
 ds 0F6F b 8
-ds 0F72 wc f3e
+ds 0F72 wc f3e,f3e,1445,9b00
 ds 8A56 bc 0,1,2
 ds 8A52 w 40
 ds 8A54 w 40
@@ -116,3 +118,8 @@ ds 100A seg
 c 0200 bytes 40
 data 7307 bc 0,0,0,0,1,2
 data 7387 b 4
+# A quarter of the cases aimed at the only template with a line break
+# before a space (key 8901h, the second match: greeting 1 with letter J by
+# day in region 3, clear, climate 4; its third variant), where the filter
+# drops the space the break became.
+ds 0000 aim 40 137A:w1,05D2:w3,BB09:b0,0D48:b1,0DA8:b4,6E54:b0

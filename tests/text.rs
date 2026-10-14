@@ -2,7 +2,7 @@
 //! and its substitutions 2DA2:000A) against vectors from the original code
 //! (harness/gen_text.py). Needs the game directory (POINTER1.DAT,
 //! TEMPLATE.DAT, NAMECHNK.DAT). Cases whose text reaches a substitution
-//! not ported are counted, not compared.
+//! not ported are counted, not compared (and their number checked).
 mod common;
 
 use arena::bsa::Files;
@@ -100,6 +100,20 @@ fn setup(m: &mut Machine, seed: u32, keys: &[u16]) -> u16 {
                 };
                 t.to_le_bytes().to_vec()
             }
+            "aim" => {
+                if s.byte() < hex(f[3]) as u8 {
+                    for item in f[4].split(',') {
+                        let (addr, val) = item.split_once(':').unwrap();
+                        let (addr, n) = (hex(addr) as u16, hex(&val[1..]));
+                        if val.starts_with('b') {
+                            m.mem.w8(seg, addr, n as u8);
+                        } else {
+                            m.mem.w16(seg, addr, n as u16);
+                        }
+                    }
+                }
+                continue;
+            }
             x => panic!("{x}"),
         };
         for (i, b) in v.into_iter().enumerate() {
@@ -153,10 +167,14 @@ fn matches_original() {
                 assert_eq!(f[2], g, "{line}");
                 n += 1;
             }
-            None if f[2] == "hang" || f[2] == "fault" => stuck += 1,
+            None if f[2] == "stuck" => stuck += 1,
             None => skipped += 1,
         }
     }
-    eprintln!("text: {n} compared, {skipped} not ported, {stuck} hang or fault in both");
-    assert!(n > 1000, "{n} compared");
+    eprintln!("text: {n} compared, {skipped} not ported, {stuck} stuck in both");
+    assert!(n > 2000, "{n} compared");
+    // A None where the original goes on is only right for the code not
+    // ported: these counts are the vectors' (a change that makes the port
+    // give up more often shows here).
+    assert_eq!((skipped, stuck), (57, 379), "not ported, stuck in both");
 }

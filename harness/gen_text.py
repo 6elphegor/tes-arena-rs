@@ -12,7 +12,10 @@ tests/vectors/text_spec.txt, from its seed's byte stream; the output (mode
 
   text | seed | result
 
-Results: "fault" / "hang", or FNV-1a digests of the changed DGROUP bytes,
+Results: "stuck" (the original faults or doesn't return: which of the two,
+after it has jumped into garbage, depends on the emulator's state from
+earlier cases, not on memory or registers, so they are one result), or
+FNV-1a digests of the changed DGROUP bytes,
 the changed 3276 bytes, the output's first 200h bytes and the frame.
 """
 import os
@@ -22,8 +25,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
-from emu import Fault, LOAD_SEG
-from gen_attack import fnv, stream
+from emu import Fault, LOAD_SEG, changes, fnv, mine
+from gen_attack import stream
 from gen_frame import counter
 from unicorn import UcError
 
@@ -93,6 +96,13 @@ def setup(seed):
             else:
                 t = word() % 0x700
             v = struct.pack('<H', t)
+        elif kind == 'aim':
+            if byte() < int(args[0], 16):
+                for item in args[1].split(','):
+                    addr, val = item.split(':')
+                    n = int(val[1:], 16)
+                    w.append((seg, int(addr, 16), bytes([n]) if val[0] == 'b' else struct.pack('<H', n)))
+            continue
         else:
             raise ValueError(kind)
         w.append((seg, at, v))
@@ -111,8 +121,11 @@ def call_far(a, seg, off, budget=100_000_000, **regs):
     for r, v in ((UC_X86_REG_DS, a.ds), (UC_X86_REG_ES, regs['es']), (UC_X86_REG_SS, ss), (UC_X86_REG_SP, sp),
                  (UC_X86_REG_EAX, regs['eax']), (UC_X86_REG_EDI, regs['edi']), (UC_X86_REG_CS, LOAD_SEG + seg), (UC_X86_REG_IP, off)):
         mu.reg_write(r, v)
-    # A case that faulted may leave the direction flag set; every case
-    # starts as a call from the game would (DF clear).
+    # Every case starts from the same registers: one that faulted may leave
+    # the direction flag set, and garbage paths read leftover ones.
+    from unicorn.x86_const import UC_X86_REG_EBX, UC_X86_REG_ECX, UC_X86_REG_EDX, UC_X86_REG_ESI, UC_X86_REG_EBP
+    for r in (UC_X86_REG_EBX, UC_X86_REG_ECX, UC_X86_REG_EDX, UC_X86_REG_ESI, UC_X86_REG_EBP):
+        mu.reg_write(r, 0)
     for r, v in ((UC_X86_REG_EFLAGS, 0x0002), (UC_X86_REG_FS, a.ds), (UC_X86_REG_GS, a.ds)):
         mu.reg_write(r, v)
     a.fault = None
@@ -134,9 +147,10 @@ def main():
     rng = random.Random(0x1994_A374)
     rds = LOAD_SEG + DATA
     dump = os.environ.get('DUMP')
-    for n in range(int(os.environ.get('N', 3000))):
+    total = int(os.environ.get('N', 3000))
+    for n in range(total):
         seed = rng.getrandbits(32)
-        if dump and seed != int(dump, 16):
+        if not mine(n, total) or dump and seed != int(dump, 16):
             continue
         a.restore(BASE)
         mode, writes = setup(seed)
@@ -165,10 +179,8 @@ def main():
                 a.w16(0xA90A, a.ds - LOAD_SEG)
             after = a.seg_bytes(a.ds)
             after_data = a.seg_bytes(rds)
-            # Relocated segments written back (the C segment's far
-            # pointers) are compared unrelocated.
-            changed = b''.join(struct.pack('<HB', i, after[i]) for i in range(0x10000) if after[i] != before[i])
-            dchanged = b''.join(struct.pack('<HB', i, after_data[i]) for i in range(0x10000) if after_data[i] != before_data[i])
+            changed = changes(before, after)
+            dchanged = changes(before_data, after_data)
             text = bytes(a.mu.mem_read(a.lin(OUT_SEG, 0), 0x200))
             frame = a.seg_bytes(FRAME)
             res = f'{fnv(changed):x} {fnv(dchanged):x} {fnv(text):x} {fnv(frame):x}'
@@ -176,12 +188,12 @@ def main():
                 open(OUT + '.ds', 'w').write(''.join(f'{i:04x} {before[i]:02x} {after[i]:02x}\n' for i in range(0x10000) if after[i] != before[i]))
                 open(OUT + '.frame', 'wb').write(frame)
         except (Fault, UcError) as e:
-            res = 'fault'
+            res = 'stuck'
             if dump:
                 from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_IP
                 print('fault', e, hex(a.mu.reg_read(UC_X86_REG_CS) - LOAD_SEG), hex(a.mu.reg_read(UC_X86_REG_IP)))
         except AssertionError:
-            res = 'hang'
+            res = 'stuck'
         out.write(f'text | {seed:x} | {res}\n')
     out.close()
 
