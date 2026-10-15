@@ -1357,8 +1357,9 @@ impl Machine {
     }
 
     /// 2DA2:094F, %nt: a place's name: in the wild (or a dungeon with
-    /// 5C8 bit 4000h) one made from the square's seed, else the quest's
-    /// or a random one of the province's; then its region's suffix.
+    /// 5C8 bit 4000h) one made from the square's seed, in a building the
+    /// place listed for it (1194:3EB1), else the quest's or a random one
+    /// of the province's; then its region's suffix.
     fn text_place(&mut self, c: &Ctx) -> Option<Res> {
         let mut si = c.rest;
         let (dx, ax) = 'p: {
@@ -1369,7 +1370,15 @@ impl Machine {
                 if !wild {
                     if self.t8(0x05E6) == 4 {
                         if self.t16(0x05C8) & 0x4000 == 0 {
-                            return None;
+                            // 09BD: in a building, the place whose key is
+                            // the word at FD2 with its low byte halved
+                            // (`shr al, 1`), among the 1387 at [1AB5]
+                            // (1194:3EB1; none: offset 0, as the original
+                            // reads it), its second word.
+                            let key = self.t16(0x0FD2) & 0xFF00 | (self.t8(0x0FD2) >> 1) as u16;
+                            let (off, seg) = (self.t16(0x1AB5), self.t16(0x1AB7));
+                            let si = self.place_lookup(seg, off, key, self.t16(0x1387));
+                            break 'p (self.mem.r16(seg, si.wrapping_add(2)), self.t8(0x0A4C));
                         }
                         cx = self.t16(0x0610);
                         dx = self.t16(0x0612);

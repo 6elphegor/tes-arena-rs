@@ -177,5 +177,5 @@ fn matches_original() {
     // A None where the original goes on is only right for the code not
     // ported: these counts are the vectors' (a change that makes the port
     // give up more often shows here).
-    assert_eq!((skipped, stuck), (35, 676), "not ported, stuck in both");
+    assert_eq!((skipped, stuck), (22, 514), "not ported, stuck in both");
 }

@@ -53,6 +53,13 @@ fn place(engine: &Engine, run: &arena::transit::Run) -> String {
     )
 }
 
+/// What a save and a load must keep: the level's name, the position and
+/// the heading (the run's label may differ: an interior's name pointer).
+fn kept(engine: &Engine) -> (Vec<u8>, u16, u16, u16, u16) {
+    let r = |at| engine.m.mem.r16(DS, at);
+    (engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME).to_vec(), r(X), r(Y), r(HEIGHT), r(HEADING))
+}
+
 /// The odd states looked for after each turn.
 fn odd(engine: &Engine) -> Option<String> {
     let r = |at| engine.m.mem.r16(DS, at);
@@ -77,6 +84,7 @@ enum Act {
     Camp,
     Fight,
     SaveLoad,
+    Jump,
 }
 
 pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u64, frames: usize, setup: &str, saves: Option<(&Path, u8)>) {
@@ -177,7 +185,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 78..=89 => Act::Click,
                 90..=95 => Act::Swing,
                 96 => Act::Camp,
-                97..=98 => Act::Fight,
+                97 => Act::Fight,
+                98 => Act::Jump,
                 _ => Act::SaveLoad,
             };
         }
@@ -190,7 +199,15 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::Camp => "camp",
             Act::Fight => "fight",
             Act::SaveLoad => "save/load",
+            Act::Jump => "jump",
         };
+        // A test aid, as --do hp is: the player healed when below a third,
+        // so a run goes on past its fights.
+        let (hp, max) = (engine.m.mem.r16(DS, 0x01FD), engine.m.mem.r16(DS, 0x01FF));
+        if hp < max / 3 {
+            engine.m.mem.w16(DS, 0x01FD, max);
+            *counts.entry("healed").or_default() += 1;
+        }
         *counts.entry(name).or_default() += 1;
         let mut intent = Intent::default();
         match act {
@@ -221,11 +238,28 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     crate::world::summon(&mut engine);
                 }
             }
+            Act::Jump => {
+                // To a random free square of the map (its walls' word 0), a
+                // test aid spreading a run over the map, as --at is.
+                if left == 0 {
+                    let walls = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+                    let (w, d) = (engine.m.mem.r16(DS, 0xC357).min(128) as u64, engine.m.mem.r16(DS, 0xC359).min(128) as u64);
+                    for _ in 0..200 {
+                        let (c, r) = (dice.below(w.max(1)) as u16, dice.below(d.max(1)) as u16);
+                        if engine.m.mem.r16(walls, r << 8 | c << 1) == 0 {
+                            engine.m.mem.w16(DS, X, c << 7 | 0x40);
+                            engine.m.mem.w16(DS, Y, r << 7 | 0x40);
+                            break;
+                        }
+                    }
+                }
+            }
             Act::SaveLoad => {
                 if let (0, Some((sdir, slot))) = (left, saves) {
                     let pre = place(&engine, run);
                     let msg = crate::save_to(&mut engine, sdir, slot, st.assets.palette);
                     let before = place(&engine, run);
+                    let was = kept(&engine);
                     if std::env::var_os("PT_VERBOSE").is_some() {
                         println!("save frame {n}: fighting {} resting {} pre {pre}", engine.m.mem.r8(DS, arena::encounter::var::FIGHTING), engine.m.mem.r8(DS, arena::rest::var::RESTING));
                     }
@@ -234,7 +268,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             *run = r;
                             st.assets = Assets::new(dir, &mut engine);
                             let after = place(&engine, run);
-                            if before != after {
+                            if was != kept(&engine) {
                                 println!("SAVELOAD frame {n}: {msg}; before {before}; after {after}");
                                 issues.set(issues.get() + 1);
                             }
