@@ -134,8 +134,8 @@ impl QuestHooks for QuestFront<'_, '_> {
         let _ = m.text(&mut self.1, &mut *self.0, 0, DS, 0x1044);
     }
     /// 2DA2:000A: the text at DS:`di` has its substitutions made.
-    fn expand(&mut self, m: &mut Machine, di: u16) {
-        let _ = m.expand(&mut self.1, &mut *self.0, DS, di);
+    fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) {
+        let _ = m.expand(files, &mut *self.0, DS, di);
     }
     fn substitute(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
         m.expand(files, &mut *self.0, DS, di).map(|_| ())

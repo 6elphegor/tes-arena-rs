@@ -91,10 +91,10 @@ impl QuestHooks for Log {
     fn text(&mut self, m: &mut Machine) {
         self.0.extend([1, m.mem.r16(DS, 0x137A), m.mem.r8(DS, 0x137E) as u16]);
     }
-    fn province_load(&mut self, _m: &mut Machine, province: u8) {
+    fn province_load(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, province: u8) {
         self.0.extend([2, province as u16]);
     }
-    fn province_save(&mut self, _m: &mut Machine, province: u16) {
+    fn province_save(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, province: u16) {
         self.0.extend([3, province]);
     }
 }
@@ -113,7 +113,7 @@ fn matches_original() {
         let before = m.clone();
         let mut log = Log::default();
         if op == 0 {
-            m.quests_hourly(&mut log);
+            m.quests_hourly(&mut arena::bsa::Files::default(), &mut log);
         } else {
             m.quests_daily(&mut log);
         }

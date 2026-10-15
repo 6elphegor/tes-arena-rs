@@ -68,18 +68,27 @@ pub trait QuestHooks {
     /// 1194:59CC: the message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:2E18: province `province`'s data loaded to PROVINCE_DATA
-    /// (`Machine::city_load_province`, which needs the files).
-    fn province_load(&mut self, _m: &mut Machine, _province: u8) {}
+    /// (`Machine::city_load_province`; a missing CITYDATA loads nothing).
+    fn province_load(&mut self, m: &mut Machine, files: &mut Files, province: u8) {
+        let _ = m.city_load_province(files, province);
+    }
     /// 26F7:0CF1: province `province`'s data written back to CITYDATA
-    /// (AX the province).
-    fn province_save(&mut self, _m: &mut Machine, _province: u16) {}
+    /// (AX the province; `Machine::city_save_province`).
+    fn province_save(&mut self, m: &mut Machine, files: &mut Files, province: u16) {
+        let _ = m.city_save_province(files, province);
+    }
     /// 1194:A374 with AX 0 (A36C): text number TEXT shown.
     fn text_shown(&mut self, _m: &mut Machine) {}
-    /// 2DA2:000A: the text at DS:`di` has its substitutions made.
-    fn expand(&mut self, _m: &mut Machine, _di: u16) {}
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made (the
+    /// text port, `Machine::expand`; what it can't make is left).
+    fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) {
+        let _ = m.expand(files, &mut crate::text::NoTextHooks, DS, di);
+    }
     /// 26F7:0C0A's write of the dungeon entry at DS:`si` (19h bytes) to
-    /// CITYDATA, in its province (PICK_PROVINCE).
-    fn entry_save(&mut self, _m: &mut Machine, _si: u16) {}
+    /// CITYDATA, in its province (PICK_PROVINCE; `Machine::city_save_entry`).
+    fn entry_save(&mut self, m: &mut Machine, files: &mut Files, si: u16) {
+        let _ = m.city_save_entry(files, si);
+    }
     /// 27E3:000A: the text at DS:`si` added to the logbook: the entry made
     /// (`Machine::log_entry`), then the file's appends (not ported).
     fn log_entry(&mut self, m: &mut Machine, si: u16) {
@@ -206,19 +215,19 @@ impl Machine {
     ///   from the deadline it fails without a text.
     ///
     /// The texts are shown with flag 32h. 8A56 is cleared meanwhile.
-    pub fn quests_hourly(&mut self, hooks: &mut dyn QuestHooks) {
+    pub fn quests_hourly(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) {
         let saved = self.mem.r8(DS, 0x8A56);
         self.mem.w8(DS, 0x8A56, 0);
         let mut si = QUESTS;
         for _ in 0..4 {
             self.mem.w16(DS, CURRENT, si);
-            self.quest_check(hooks, si);
+            self.quest_check(files, hooks, si);
             si = si.wrapping_add(0x34);
         }
         self.mem.w8(DS, 0x8A56, saved);
     }
 
-    fn quest_check(&mut self, hooks: &mut dyn QuestHooks, si: u16) {
+    fn quest_check(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) {
         if self.quest_kind(si) != 1 {
             return;
         }
@@ -268,7 +277,7 @@ impl Machine {
         if let Some(t) = text {
             self.quest_message(hooks, t, 0x32);
         }
-        self.quest_fail(hooks, si);
+        self.quest_fail(files, hooks, si);
     }
 
     /// 1194:99F8, every day: each of the records at OTHERS whose deadline
@@ -349,7 +358,7 @@ impl Machine {
     /// hundred days on. Then the place's count (+18h of its record at
     /// PLACES) in its province goes down, the province loaded before
     /// and written back after; STAGE becomes the province.
-    pub fn quest_fail(&mut self, hooks: &mut dyn QuestHooks, si: u16) {
+    pub fn quest_fail(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) {
         if matches!(self.quest_stage(si), 3..=5) {
             self.quest_item_free(si);
         }
@@ -373,12 +382,12 @@ impl Machine {
         self.mem.w32(DS, di + 2, t);
         let province = (place as u16) >> 5;
         self.mem.w16(DS, STAGE, province);
-        hooks.province_load(self, province as u8);
+        hooks.province_load(self, files, province as u8);
         let at = PLACES.wrapping_add((place as u16 & 0x1F) * 0x19).wrapping_add(0x18);
         let c = self.mem.r8(DS, at).wrapping_sub(1);
         self.mem.w8(DS, at, c);
         let ax = self.mem.r16(DS, STAGE);
-        hooks.province_save(self, ax);
+        hooks.province_save(self, files, ax);
     }
 }
 
@@ -430,7 +439,7 @@ impl Machine {
     /// substitutions made and is shown. Returns the carry: set (the item
     /// stays) when no quest wants it. None where the original loops
     /// forever (every item taken).
-    pub fn quest_item_taken(&mut self, hooks: &mut dyn QuestHooks) -> Option<bool> {
+    pub fn quest_item_taken(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
         let here = self.mem.r8(DS, HERE_PLACE) & 0x1F;
         let Some(si) = (0..4u16)
             .map(|i| QUESTS + i * 0x34)
@@ -455,7 +464,7 @@ impl Machine {
         let ax = self.mem.r16(DS, 0x102C);
         hooks.font(self, 0, ax);
         self.quest_strcpy(0x6E0A, 0x1044);
-        hooks.expand(self, 0x1044);
+        hooks.expand(self, files, 0x1044);
         hooks.message_box(self, 0x1044);
         Some(false)
     }
@@ -485,7 +494,7 @@ impl Machine {
     /// else, or the chest goes and the piece is the player's
     /// (`quest_piece`), NEXT_PROVINCE FFh. Returns the carry: set where
     /// the chest was the quest's. None where an item's making fails.
-    pub fn quest_chest(&mut self, hooks: &mut dyn QuestHooks, si: u16) -> Option<bool> {
+    pub fn quest_chest(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) -> Option<bool> {
         use main_quest::*;
         if self.mem.r8(DS, AREA) != 3 || self.record_square(si) != self.mem.r16(DS, CHEST) {
             return Some(false);
@@ -496,7 +505,7 @@ impl Machine {
         let here = self.mem.r8(DS, HERE_PLACE) & 0x1F;
         if province == self.mem.r8(DS, PROVINCE) && here == self.mem.r8(DS, PLACE) {
             self.quest_chest_clear(si);
-            self.quest_next_dungeon(hooks)?;
+            self.quest_next_dungeon(files, hooks)?;
             self.mem.w8(DS, PROVINCE, 0xFF);
             return Some(true);
         }
@@ -548,7 +557,7 @@ impl Machine {
     /// (26F7:0C0A, mode 1: `quest_dungeon_entry`) and its index becomes
     /// NEXT_PLACE, then it is taken again (mode 4); text 1F7h goes to the
     /// log (`quest_log_text`).
-    fn quest_next_dungeon(&mut self, hooks: &mut dyn QuestHooks) -> Option<()> {
+    fn quest_next_dungeon(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         use main_quest::*;
         self.mem.w16(DS, TEXT, 0x1F4);
         self.mem.w8(DS, TEXT_FLAG2, 0);
@@ -556,12 +565,12 @@ impl Machine {
         hooks.text_shown(self);
         self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%adn"));
         self.mem.w8(DS, 0x92A2, 0);
-        hooks.expand(self, 0x929E);
+        hooks.expand(self, files, 0x929E);
         let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
-        let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x929E)?;
+        let ax = self.quest_dungeon_entry(files, hooks, province, 1, 0, 0x929E)?;
         self.mem.w8(DS, NEXT_PLACE, ax as u8);
         let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
-        self.quest_dungeon_entry(hooks, province, 4, ax, 0x929E)?;
+        self.quest_dungeon_entry(files, hooks, province, 4, ax, 0x929E)?;
         self.mem.w16(DS, TEXT, 0x1F7);
         self.quest_log_text(hooks);
         Some(())
@@ -573,10 +582,10 @@ impl Machine {
     /// province (A46) loaded again. Returns AX, the entry's index. The
     /// entry written is the index's (modes 0, 1 and 4), the first fixed
     /// one (2) or the second (3 and more but 4).
-    pub(crate) fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
+    pub fn quest_dungeon_entry(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
         use crate::dungeon::{table::DUNGEON_ENTRIES, var::PICK_INDEX};
         let here = self.mem.r8(DS, HERE_PROVINCE);
-        hooks.province_load(self, province as u8);
+        hooks.province_load(self, files, province as u8);
         self.dungeon_pick_entry(province, mode, index, name)?;
         let entry = match mode {
             2 => DUNGEON_ENTRIES,
@@ -586,8 +595,8 @@ impl Machine {
         let slot = self.mem.r8(DS, 0x1A6C);
         let digits = (((slot % 10) as u16) << 8 | (slot / 10) as u16).wrapping_add(0x3030);
         self.mem.w16(DS, 0x1367, digits);
-        hooks.entry_save(self, entry);
-        hooks.province_load(self, here);
+        hooks.entry_save(self, files, entry);
+        hooks.province_load(self, files, here);
         Some(self.mem.r16(DS, PICK_INDEX))
     }
 

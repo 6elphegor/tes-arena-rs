@@ -79,14 +79,23 @@ impl AreaHooks for Areas<'_> {
         m.mem.w16(DS, 0xBA56, seg);
     }
 
-    /// 0000:468B's part the view needs: indoors, the level's lights
-    /// from its flats (0000:478F; outdoors the night makes them);
-    /// outdoors, a town's buildings listed and its quests made
-    /// (`Machine::city_entered`, 0000:46B2).
+    /// 0000:468B: indoors, the level entered (`Machine::area_entered_inside`:
+    /// its lights, the main quest's piece and a side quest's item or
+    /// person placed, its piles of treasure; the automap's STATES and
+    /// the palace's screen aren't the view's yet); outdoors, a town's
+    /// buildings listed and its quests made (`Machine::city_entered`,
+    /// 0000:46B2).
     fn entered(&mut self, m: &mut Machine) {
         if m.mem.r16(DS, 0xC398) & 4 == 0 {
-            m.flat_lights();
-            m.mem.w16(DS, 0x7A46, 0);
+            let Some(files) = self.files.as_deref_mut() else {
+                m.flat_lights();
+                m.mem.w16(DS, 0x7A46, 0);
+                return;
+            };
+            if m.area_entered_inside(files, &mut arena::hooks::NoStairsHooks).is_none() {
+                eprintln!("entering the interior met something the original hangs or faults on (0000:4767)");
+                self.failed = true;
+            }
         } else if let Some(files) = self.files.as_deref_mut() {
             if m.city_entered(files, &mut arena::quest::NoQuestHooks).is_none() {
                 eprintln!("the town's quests met something not ported");

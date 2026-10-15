@@ -535,7 +535,7 @@ impl Machine {
         regs.1 = y.min(self.mem.r16(DS, 0x8F7A));
         match self.mem.r32(DS, LEVEL_HOOK) {
             0 => {}
-            value::LEVEL_ENTERED => self.level_entered(hooks)?,
+            value::LEVEL_ENTERED => self.level_entered(files, hooks)?,
             _ => return None,
         }
         Some(())

@@ -323,7 +323,7 @@ impl Machine {
     /// province here set as 2E69's inputs, 2E69 run
     /// (`QuestHooks::travel`); its result at TRAVEL_DAYS.
     fn sq_days_to(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, place: u8) -> Option<u16> {
-        hooks.province_load(self, place >> 5);
+        hooks.province_load(self, files, place >> 5);
         let rec = PLACES + (place & 0xF) as u16 * 0x19;
         let x = self.sq16(rec + 0x14);
         self.mem.w16(DS, TRAVEL_X, x);
@@ -1087,12 +1087,12 @@ impl Machine {
         if self.sq16(si + 4) & 0x100 == 0 {
             let here = self.sq8(PROVINCE);
             let to = self.sq8(si + 0x24);
-            hooks.province_load(self, to >> 5);
+            hooks.province_load(self, files, to >> 5);
             let rec = PLACES + (to & 0x1F) as u16 * 0x19;
             let (x, y) = (self.sq16(rec + 0x14), self.sq16(rec + 0x16));
             self.mem.w16(DS, 0x8A52, x);
             self.mem.w16(DS, 0x8A54, y);
-            hooks.province_load(self, here);
+            hooks.province_load(self, files, here);
         }
         let goal = (self.sq16(si + 4) & 0xF000) >> 12;
         self.mem.w16(DS, OFFER_GOAL, goal);
@@ -1102,7 +1102,7 @@ impl Machine {
             self.quest_strcpy(name, 0x6D49);
             hooks.substitute(self, files, 0x6D49)?;
             let province = self.sq8(PROVINCE) as u16;
-            let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x6D49)?;
+            let ax = self.quest_dungeon_entry(files, hooks, province, 1, 0, 0x6D49)?;
             let (bx, cx) = (self.sq16(0x129A), self.sq16(0x129C));
             self.mem.w16(DS, 0x8A52, bx);
             self.mem.w16(DS, 0x8A54, cx);
@@ -1152,7 +1152,7 @@ impl Machine {
         if self.sq16(OFFER_GOAL) == 7 {
             let province = self.sq8(PROVINCE) as u16;
             let index = self.sq16(0x126C);
-            let ax = self.quest_dungeon_entry(hooks, province, 4, index, 0x6D49)?;
+            let ax = self.quest_dungeon_entry(files, hooks, province, 4, index, 0x6D49)?;
             let (bx, cx) = (self.sq16(0x129A), self.sq16(0x129C));
             self.mem.w16(DS, 0x8A52, bx);
             self.mem.w16(DS, 0x8A54, cx);
@@ -1422,12 +1422,12 @@ impl Machine {
         self.mem.w8(DS, 0x92A2, 0);
         hooks.substitute(self, files, 0x929E)?;
         let province = self.sq8(0x0FE3) as u16;
-        let ax = self.quest_dungeon_entry(hooks, province, 1, 0, 0x929E)?;
+        let ax = self.quest_dungeon_entry(files, hooks, province, 1, 0, 0x929E)?;
         self.mem.w8(DS, 0x0FE2, ax as u8);
         let f = self.sq8(0x0FE6) | 4;
         self.mem.w8(DS, 0x0FE6, f);
         let province = self.sq8(0x0FE3) as u16;
-        self.quest_dungeon_entry(hooks, province, 4, ax, 0x929E)?;
+        self.quest_dungeon_entry(files, hooks, province, 4, ax, 0x929E)?;
         Some(())
     }
 
@@ -1552,7 +1552,7 @@ impl Machine {
                 done_here(self, hooks);
                 return Some(());
             }
-            self.quest_dungeon_entry(hooks, province(self), 2, 0, 0)?;
+            self.quest_dungeon_entry(files, hooks, province(self), 2, 0, 0)?;
             self.mem.w8(DS, 0x0F7B, 1);
             self.mem.w8(DS, 0x0F7F, 0);
             self.quest_say(files, hooks, self.quest_texts() + 4)?;
@@ -1596,7 +1596,7 @@ impl Machine {
         self.mem.w8(DS, 0x0F79, 1);
         self.mem.w8(DS, 0x0F78, 1);
         self.quest_say(files, hooks, self.quest_texts() + 1)?;
-        self.quest_dungeon_entry(hooks, province(self), 3, 0, 0)?;
+        self.quest_dungeon_entry(files, hooks, province(self), 3, 0, 0)?;
         Some(())
     }
 

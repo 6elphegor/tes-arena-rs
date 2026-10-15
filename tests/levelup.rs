@@ -56,7 +56,7 @@ impl ClockHooks for Stubs {
     fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
-    fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
+    fn quests_hourly(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         Some(())
     }
     fn exhaustion_box(&mut self, m: &mut Machine, _si: u16) {

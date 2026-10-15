@@ -37,10 +37,10 @@ impl QuestHooks for Log {
         }
         Some(())
     }
-    fn province_load(&mut self, _m: &mut Machine, province: u8) {
+    fn province_load(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, province: u8) {
         self.log.extend([4, province as u16]);
     }
-    fn entry_save(&mut self, m: &mut Machine, si: u16) {
+    fn entry_save(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) {
         self.log.extend([5, si, 0x19, m.mem.r16(DS, 0x129E)]);
     }
     fn log_entry(&mut self, _m: &mut Machine, si: u16) {

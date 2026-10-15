@@ -45,8 +45,11 @@ pub trait StairsHooks {
     /// STATES.nn (`Machine::states_load`).
     fn automap_load(&mut self, _m: &mut Machine) {}
     /// 1194:9FAC with CX 1: a quest dungeon's last level reached
-    /// (`Machine::quest_level`, which needs the files for a person's name).
-    fn quest_level(&mut self, _m: &mut Machine) {}
+    /// (`Machine::quest_level`: a side quest's item, or its person and
+    /// their name, placed). None where the original hangs or faults.
+    fn quest_level(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quest_level(files, &mut crate::quest::NoQuestHooks).map(|_| ())
+    }
     /// 2433:0000 (4C91 FFh): the level's piles of treasure made
     /// (`Machine::piles`). None where the original faults or hangs.
     fn level_piles(&mut self, m: &mut Machine) -> Option<()> {
@@ -125,7 +128,7 @@ impl Machine {
     /// (0000:368E), a broken-into interior's people gone (0000:50B9), a
     /// quest's flat cleared (2294:119C), the floor's marks cleared
     /// (0000:47D7) and the player freed from a wall (0000:2631).
-    pub fn level_entered(&mut self, hooks: &mut dyn StairsHooks) -> Option<()> {
+    pub fn level_entered(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks) -> Option<()> {
         self.spells_clear();
         self.mem.w16(DS, 0x7A46, 0);
         for i in 0..8u16 {
@@ -139,7 +142,7 @@ impl Machine {
         }
         hooks.automap_load(self);
         self.quest_item_place();
-        hooks.quest_level(self);
+        hooks.quest_level(self, files)?;
         self.mem.w8(DS, 0x4C91, 0xFF);
         hooks.level_piles(self)?;
         hooks.level_screen(self);
@@ -148,6 +151,98 @@ impl Machine {
         self.floor_marks_clear();
         self.player_unstick();
         Some(())
+    }
+
+    /// 0000:4767..47D6, the hook CD42's (0000:468B) part indoors (C398
+    /// bit 4 clear), unless a game was just loaded (5CA bit 4000h): in a
+    /// building (5E6 4) a noble's house furnished (D48 8, 0000:5160) or a
+    /// house's flats marked (D48 1, 513A); the level's locks and
+    /// triggers (292B:09AC), its lights (0000:081A, 7A46 cleared), its
+    /// listed flats marked (25CA:0200), the main quest's item placed
+    /// (2294:0E90), a side quest's level (1194:9FAC with CX 1), its piles
+    /// of treasure (4C91 FFh, 2433:0000), a quest's flat cleared
+    /// (2294:119C) and the floor's marks (0000:47D7); in the Imperial
+    /// City's palace (A47 3, A4C's low 5 bits 0, A46 4) the screen
+    /// (0000:368E). None where a callee's original hangs or faults.
+    pub fn area_entered_inside(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks) -> Option<()> {
+        if self.mem.r16(DS, 0x05CA) & 0x4000 != 0 {
+            return Some(());
+        }
+        if self.mem.r8(DS, 0x05E6) == 4 {
+            if self.mem.r8(DS, 0x0D48) == 8 {
+                self.noble_house_furnish()?;
+            }
+            if self.mem.r8(DS, 0x0D48) == 1 {
+                self.house_flats_mark();
+            }
+        }
+        hooks.automap_load(self);
+        self.flat_lights();
+        self.mem.w16(DS, 0x7A46, 0);
+        self.inf_done_hook();
+        self.quest_item_place();
+        hooks.quest_level(self, files)?;
+        self.mem.w8(DS, 0x4C91, 0xFF);
+        hooks.level_piles(self)?;
+        self.quest_flat_clear();
+        self.floor_marks_clear();
+        if self.mem.r8(DS, 0x0A47) == 3 && self.mem.r8(DS, 0x0A4C) & 0x1F == 0 && self.mem.r8(DS, 0x0A46) == 4 {
+            hooks.level_screen(self);
+        }
+        Some(())
+    }
+
+    /// 0000:5160. A noble's house furnished: with the location's key
+    /// (0000:386F, `automap_key`) as the RNG's seed (the seed put back
+    /// after), a d1Eh picks an entry of the table at 8732 (two bytes: the
+    /// count, and the kind's index + 1 into the flats at C954); then for
+    /// each of the count (`loop`: 0 runs 65536 times) a random square of
+    /// the C765 listed at C6E5 (FFFFh ones rolled again) gets the flat
+    /// 82xxh, its column byte doubled in 8 bits. None where the roll
+    /// divides by zero (no squares listed) or can only find FFFFh ones.
+    fn noble_house_furnish(&mut self) -> Option<()> {
+        let saved = self.rng.seed;
+        self.rng.seed = self.automap_key();
+        let r = self.rng.range(0, 0x1E)?;
+        let at = 0x8732u16.wrapping_add(r.wrapping_mul(2));
+        let count = self.mem.r8(DS, at) as u32;
+        let kind = self.mem.r8(DS, at.wrapping_add(1)).wrapping_sub(1);
+        let flat = self.mem.r8(DS, 0xC954u16.wrapping_add(kind as u16));
+        self.rng.seed = saved;
+        let n = if count == 0 { 0x10000 } else { count };
+        let seg = walls(self);
+        for _ in 0..n {
+            let mut cycle = crate::random::CycleCheck::new(&self.rng);
+            let w = loop {
+                let r = self.rng.range(0, self.mem.r8(DS, 0xC765) as u16)?;
+                let w = self.mem.r16(DS, 0xC6E5u16.wrapping_add(r.wrapping_mul(2)));
+                if w != 0xFFFF {
+                    break w;
+                }
+                if cycle.cycled(&self.rng) {
+                    return None;
+                }
+            };
+            let bx = w & 0xFF00 | (w as u8).wrapping_add(w as u8) as u16;
+            self.mem.w16(seg, bx, 0x8200 | flat as u16);
+        }
+        Some(())
+    }
+
+    /// 0000:513A. A house's flats marked: unless A52's low two bits are
+    /// set, each flat in the map (type 8) numbered 0 becomes 1 (its low
+    /// byte incremented), over the plane's 4000h words.
+    fn house_flats_mark(&mut self) {
+        if self.mem.r8(DS, 0x0A52) & 3 != 0 {
+            return;
+        }
+        let seg = walls(self);
+        for i in 0..0x4000u16 {
+            let w = self.mem.r16(seg, i * 2);
+            if w >> 12 == 8 && w as u8 == 0 {
+                self.mem.w8(seg, i * 2, 1);
+            }
+        }
     }
 
     /// 2294:0E90. In a dungeon (5E6 3) on its last level, when the place
