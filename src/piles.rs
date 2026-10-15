@@ -445,7 +445,7 @@ impl Machine {
     fn pile_add(&mut self) {
         let frame = self.mem.r16(DS, FRAME_SEG);
         let n = self.mem.r8(DS, PILE_COUNT);
-        let di = TABLE.wrapping_add((0x1C * n as u16) & 0xFFFF);
+        let di = TABLE.wrapping_add(0x1C * n as u16);
         self.pile_fix(DS, PILE);
         for i in 0..0x1Cu16 {
             let b = self.mem.r8(DS, PILE + i);

@@ -264,7 +264,7 @@ impl Machine {
                     return Some(());
                 };
                 let level = self.mem.r8(DS, rec + 2) as u16;
-                self.mem.w16(DS, BASH_TOUGHNESS, (level * 5) & 0xFFFF);
+                self.mem.w16(DS, BASH_TOUGHNESS, level * 5);
                 self.mem.w16(DS, BASH_LOCK, rec);
                 self.mem.w16(DS, BASH_AT, ahead | 0x8000);
             }

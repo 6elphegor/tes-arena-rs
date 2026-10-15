@@ -248,7 +248,7 @@ impl Machine {
             self.lamp_colour(hooks, [0x3F, 0x29, 0]);
             return;
         }
-        if t < 0x110 || t > 0x2F0 {
+        if !(0x110..=0x2F0).contains(&t) {
             self.daylight(false);
             self.night_switch(hooks);
             let i = if t < 0x110 { t - 0x100 } else { 0x300 - t };

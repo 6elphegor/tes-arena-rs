@@ -133,7 +133,7 @@ fn setup(m: &mut Machine, seed: u32) -> (Script, Vec<(String, Vec<u8>)>) {
         if (i as u8) < n {
             let cat = s.byte() % 4;
             let ty = if s.byte() < 8 {
-                0x80 | s.byte() % 8
+                0x80 | (s.byte() % 8)
             } else {
                 match cat {
                     1 => s.byte() % 18,

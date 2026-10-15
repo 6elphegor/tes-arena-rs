@@ -299,6 +299,9 @@ impl Machine {
     /// button is down (or the speed has not run out); in the centre a
     /// left click (`view_click`) or a right click (`look`); J or both
     /// buttons jump.
+    // The jump's two tests are the original's two branches (2826), kept
+    // apart as it has them.
+    #[allow(clippy::if_same_then_else)]
     fn classic_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         self.mouse_clamp();
         self.arrow_keys(files, hooks)?;

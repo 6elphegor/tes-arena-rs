@@ -240,7 +240,7 @@ impl Machine {
     /// (a byte add: past 255 it is the base), not above the base; then
     /// the player's modifiers (1194:361D).
     fn rest_attributes(&mut self) {
-        let dl = (self.r_g8(0x01D2) / 10) as u8;
+        let dl = self.r_g8(0x01D2) / 10;
         for i in 0..8u16 {
             let base = self.r_g8(0x01D5 + i);
             let cur = self.r_g8(0x01CD + i);

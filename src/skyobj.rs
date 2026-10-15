@@ -418,8 +418,8 @@ impl Machine {
     /// shows (BOLT_FRAME 0..2 and an image), the sky above the horizon
     /// flashes (FLASH's colour for the frame, `fill`), and the bolt, where
     /// it is seen, is drawn there standing on the horizon (its x left so;
-    /// its y put back, by the original into DGROUP at the image's offset
-    /// + 8, not into the image: kept); after three frames, thunder (sound
+    /// its y put back, by the original into DGROUP at the image's offset + 8,
+    /// not into the image: kept); after three frames, thunder (sound
     /// 1Ch at the player's square, CB90). Otherwise one time in 32 or so
     /// (a roll up to 7D0h) a bolt starts: one of the six images, a heading
     /// on the circle.

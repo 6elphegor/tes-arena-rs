@@ -55,7 +55,7 @@ fn flight(m: &mut Machine, s: &mut Stream) -> Plan {
         if i >= 15 {
             m.mem.w16(DS, si + 0x12, (i - 15) * RSIZE);
         }
-        let sq = if s.byte() < 0xE0 { (y >> 7) << 8 | ((x >> 7) * 2 & 0xFF) } else { 0xFFFF };
+        let sq = if s.byte() < 0xE0 { (y >> 7) << 8 | (((x >> 7) * 2) & 0xFF) } else { 0xFFFF };
         m.mem.w16(DS, 0x1951 + 2 * i, sq);
     }
     m.mem.w16(DS, 0xCB90, ((py >> 7) << 8).wrapping_add((px >> 7) * 2));

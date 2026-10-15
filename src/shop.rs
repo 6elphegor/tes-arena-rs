@@ -392,6 +392,9 @@ impl Machine {
     /// 1194:F37B. Sorts `n` templates at LIST_SEG:`list` by price,
     /// cheapest first, swapping through the template at 13F3 (which is
     /// left holding the last swapped entry).
+    // The outer count is fixed on entry (the original's CX), while DL
+    // shrinks inside: `for` over the first value keeps that.
+    #[allow(clippy::mut_range_bound)]
     pub fn shop_sort(&mut self, list: u16, n: u8) {
         if n <= 1 {
             return;

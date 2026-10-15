@@ -51,6 +51,8 @@ impl ArenaRandom {
     }
 
     /// 0000:6EA8 (far entries 6EA0 and 6EA4).
+    // Named for the game's routine; the RNG isn't an iterator.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> u16 {
         let Some(mut t) = self.table.take() else {
             return self.step();
