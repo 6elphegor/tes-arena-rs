@@ -106,10 +106,13 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
-    // A player to walk around with.
+    // A player to walk around with: health 50 of 50, fatigue full
+    // ((strength + endurance) x 64, 2901:00A8's maximum) — with less, the
+    // first exhaustion's hour of rest (2901:0014) can't make up the hour's
+    // loss, and the player collapses again and again.
     m.mem.w16(DS, 0x01FD, 50);
     m.mem.w16(DS, 0x01FF, 50);
-    m.mem.w16(DS, 0x0201, 200);
+    m.mem.w16(DS, 0x0201, (50 + 50) * 64);
     for i in 0..8 {
         m.mem.w8(DS, 0x01A4 + arena::character::field::ATTRS + i, 50);
         m.mem.w8(DS, 0x01A4 + arena::character::field::BASE_ATTRS + i, 50);

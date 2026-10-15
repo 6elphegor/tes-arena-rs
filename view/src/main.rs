@@ -108,6 +108,7 @@ mod hud;
 mod interface;
 mod newgame;
 mod panels;
+mod playtest;
 mod render;
 mod shopui;
 mod spellmaker;
@@ -795,6 +796,15 @@ fn main() {
             args.insert(2.min(args.len()), "START.MIF".into());
         }
     }
+    // --playtest SEED FRAMES [SETUP]: a headless playtest (`playtest`).
+    let mut playtest = None;
+    if let Some(i) = args.iter().position(|a| a == "--playtest") {
+        let seed: u64 = args[i + 1].parse().expect("--playtest SEED FRAMES [SETUP]");
+        let frames: usize = args[i + 2].parse().expect("--playtest SEED FRAMES [SETUP]");
+        let setup = args.get(i + 3).filter(|a| !a.starts_with("--")).cloned();
+        args.drain(i..i + 3 + setup.is_some() as usize);
+        playtest = Some((seed, frames, setup.unwrap_or_default()));
+    }
     let mut at = None;
     if let Some(i) = args.iter().position(|a| a == "--at") {
         let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
@@ -865,6 +875,10 @@ fn main() {
     }
     if people {
         world::summon_people(&mut engine);
+    }
+    if let Some((seed, frames, setup)) = playtest {
+        playtest::run(&dir, engine, run, seed, frames, &setup, save_dir.as_deref().map(|d| (d, slot)));
+        return;
     }
     if args.get(3).map(String::as_str) == Some("--shot") {
         let out = args.get(4).expect("--shot needs a file");
@@ -1488,6 +1502,9 @@ fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (
 struct SaveDir<'a> {
     dir: &'a std::path::Path,
     palette: [[u8; 4]; 256],
+    /// The files written (their DOS names, their bytes), for the game's
+    /// `Files` to have them too (`save_to`).
+    written: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 impl SaveDir<'_> {
@@ -1509,8 +1526,11 @@ impl arena::save_write::SaveHooks for SaveDir<'_> {
             let n = data.len().min(0xFA00);
             data[..n].fill(0);
         }
-        if let Err(e) = std::fs::write(&p, data) {
+        if let Err(e) = std::fs::write(&p, &data) {
             eprintln!("{}: {e}", p.display());
+        }
+        if let Some(n) = p.file_name() {
+            self.written.push((n.to_string_lossy().as_bytes().to_vec(), data));
         }
     }
     fn palette(&mut self, m: &mut arena::machine::Machine) {
@@ -1548,7 +1568,15 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
             eprintln!("{}: {e}", p.display());
         }
     }
-    engine.m.save_game(&mut SaveDir { dir, palette });
+    let mut out = SaveDir { dir, palette, written: Vec::new() };
+    engine.m.save_game(&mut out);
+    // The game's files have them too: a load reads the files written in
+    // play before the directories' (`Files`), and the slot's copies made
+    // above (25FD:0612 copies every "*.65", SAVEGAME's and SAVEENGN's of an
+    // earlier load included) would otherwise hide the save just made.
+    for (name, data) in out.written {
+        engine.files.put(&name, &data);
+    }
     format!("Saved to slot {slot} in {}.", dir.display())
 }
 
