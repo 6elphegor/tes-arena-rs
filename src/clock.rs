@@ -71,13 +71,27 @@ pub trait ClockHooks {
     fn encounter_minute(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
-    /// 2901:0014..: the player's fatigue went below 0 (in combat they
-    /// die; elsewhere they collapse and rest an hour, or die).
-    fn exhausted(&mut self, _m: &mut Machine) -> Option<()> {
-        Some(())
+    /// 2901:0014..: the player's fatigue went below 0. Whether the port
+    /// runs it (`Machine::exhaustion`: in a fight they die, in water they
+    /// drown, elsewhere they collapse and rest an hour); false where the
+    /// harness stubs it.
+    fn exhausted(&mut self, _m: &mut Machine) -> Option<bool> {
+        Some(true)
     }
-    /// 1194:1034: the level-up screen, after `levels` levels were gained.
-    fn level_up_screen(&mut self, _m: &mut Machine, _levels: u16) {}
+    /// 1194:59C8 from the exhaustion: its text at DS:`si` (7B6A dead in a
+    /// fight, 7B2F drowned, 7AE0 collapsed).
+    fn exhaustion_box(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 0000:4EFD's fill (9A72): the view filled with colour 0 (9288,
+    /// which the port sets).
+    fn view_cleared(&mut self, _m: &mut Machine) {}
+    /// 2686:0319..0331: the level-up screen (1194:1034,
+    /// `Machine::level_up_screen`), after `levels` levels were gained,
+    /// with the text segment B038 set from 103A around it (0000:9AF8) and
+    /// from 1036 after. By default its points are spent in turn
+    /// (`levelup::NoLevelUpHooks`); front ends show it.
+    fn level_up_screen(&mut self, m: &mut Machine, levels: u16) -> Option<()> {
+        crate::levelup::level_up_around(m, levels, &mut crate::levelup::NoLevelUpHooks)
+    }
 }
 
 impl Machine {
@@ -222,18 +236,18 @@ impl Machine {
         let busy = self.mem.r8(DS, 0x05E6) == 4 && self.mem.r8(DS, 0x137F) != 0xFF;
         if !busy && self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x1013) == 0 && self.mem.r16(DS, 0x05CA) & 0x100 != 0 {
             if let Some(n) = self.level_up()? {
-                hooks.level_up_screen(self, n);
+                hooks.level_up_screen(self, n)?;
             }
         }
         if self.mem.r16(DS, 0x05C8) & 0x20 != 0 {
             return Some(());
         }
-        self.fatigue_minute(hooks)?;
+        self.fatigue_minute(files, hooks)?;
         let flags = self.mem.r16(DS, var::LEVEL_FLAGS);
         if flags & 0x10 != 0 && flags & 0x4000 == 0 {
             let n = if self.mem.r8(DS, PLAYER + field::RACE) == 7 { 0xC } else { 0x1E };
             for _ in 0..n {
-                self.fatigue_minute(hooks)?;
+                self.fatigue_minute(files, hooks)?;
                 if self.mem.r16(DS, 0x05B1) & 0x100 != 0 {
                     return Some(());
                 }
@@ -251,15 +265,15 @@ impl Machine {
 
     /// 2901:0002. Fatigue drops by 11 a minute (not while 1013 is set);
     /// below 0 the player is exhausted.
-    fn fatigue_minute(&mut self, hooks: &mut dyn ClockHooks) -> Option<()> {
+    pub fn fatigue_minute(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
         if self.mem.r8(DS, 0x1013) != 0 {
             return Some(());
         }
         let at = PLAYER + field::FATIGUE;
         let v = self.mem.r16(DS, at).wrapping_sub(0xB);
         self.mem.w16(DS, at, v);
-        if (v as i16) < 0 {
-            hooks.exhausted(self)?;
+        if (v as i16) < 0 && hooks.exhausted(self)? {
+            self.exhaustion(files, hooks)?;
         }
         Some(())
     }
@@ -324,6 +338,12 @@ impl Machine {
 pub struct NoClockHooks;
 
 impl ClockHooks for NoClockHooks {
+    fn exhausted(&mut self, _m: &mut Machine) -> Option<bool> {
+        Some(false)
+    }
+    fn level_up_screen(&mut self, _m: &mut Machine, _levels: u16) -> Option<()> {
+        Some(())
+    }
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }

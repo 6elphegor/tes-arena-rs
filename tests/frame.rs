@@ -46,7 +46,13 @@ impl WeaponHooks for Hooks {
 
 impl ClockHooks for Hooks {
     // The generator stubs the encounters and the quests (gen_clock.py's
-    // stubs).
+    // stubs), the level-up screen and the exhaustion.
+    fn exhausted(&mut self, _m: &mut Machine) -> Option<bool> {
+        Some(false)
+    }
+    fn level_up_screen(&mut self, _m: &mut Machine, _levels: u16) -> Option<()> {
+        Some(())
+    }
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
