@@ -85,10 +85,12 @@ pub trait TavernHooks: ShopHooks {
     /// 1194:4B8E: the picture named at DS:`si` shown.
     fn picture(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:C14E: the room's price (1391) haggled over with the
-    /// innkeeper (1194:8020): the price agreed, or the carry when the
-    /// player walks away.
-    fn haggle(&mut self, m: &mut Machine) -> (u32, bool) {
-        (m.mem.r32(DS, PRICE), true)
+    /// innkeeper (`Machine::tavern_room_haggle`, 1194:8020 in mode 3):
+    /// the price agreed, or the carry when the player walks away. By
+    /// default the player walks away (`haggle::Leave`); a front end
+    /// answers for them. None where the original faults or hangs.
+    fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
+        m.tavern_room_haggle(files, &mut crate::haggle::Leave)
     }
     /// 1194:E3F7: the rumours told by the front end instead: whether it
     /// did. By default the port (`Machine::tavern_rumours`) runs, its
@@ -160,6 +162,8 @@ const COLOUR: u16 = 0x9288;
 const DRINK_NAMES: u16 = 0x2112;
 const DRINK_PRICES: u16 = 0x21E8;
 const ROOM_NAMES: u16 = 0x2892;
+/// The innkeeper's name (1194:C14E).
+const INNKEEPER: u16 = 0x7311;
 const ROOM_PRICES: u16 = 0x28C3;
 const NAME: u16 = 0x110C;
 const DRUNK_FACTORS: u16 = 0x7349;
@@ -238,7 +242,7 @@ impl Machine {
         match self.mem.r16(DS, table.wrapping_add(pick.wrapping_add(pick))) {
             0xBB83 => self.tavern_drinks(hooks).map(|_| false),
             0xBC8B => {
-                self.tavern_room(hooks)?;
+                self.tavern_room(files, hooks)?;
                 hooks.room_file(self);
                 Some(false)
             }
@@ -475,7 +479,7 @@ impl Machine {
 
     /// 1194:BD51. A room rented; see the module's notes. The room's file
     /// written (1194:BA91) when it is.
-    fn tavern_room(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
+    fn tavern_room(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         self.mem.w32(DS, TYPED, 0);
         let pick = hooks.list(self, ROOM_NAMES, 5, text::ROOMS);
         self.mem.w8(DS, PICK, pick as u8);
@@ -521,7 +525,7 @@ impl Machine {
             hooks.message_box(self, text::FREE_ROOM);
         } else {
             self.mem.w32(DS, PRICE, eax);
-            let (agreed, walked) = hooks.haggle(self);
+            let (agreed, walked) = hooks.haggle(self, files)?;
             if walked {
                 return self.room_cancelled();
             }
@@ -538,6 +542,44 @@ impl Machine {
         self.mem.w32(DS, ROOM_END, end);
         hooks.room_file(self);
         Some(())
+    }
+
+    /// 1194:C14E. The room's price (PRICE) haggled over with the
+    /// innkeeper, 1194:8020 in mode 3 (TAVERN.DAT's lines):
+    /// - his place's record (`place_lookup` on 0FD2's key, as the drinks
+    ///   find it) gives the seed (its dword) his name is made from, set
+    ///   [A46], male, at INNKEEPER (1194:080B);
+    /// - the room's kind (13C8) picks the item named in the lines (%i,
+    ///   1376) from the list at ROOM_NAMES (1194:5585);
+    /// - a second name, at 1A4C, the lines' %n, is made with AL and BX as
+    ///   the first left them: AL 0 but on one of race 1's paths
+    ///   (`npc_name_al`), BX the name file's handle (98E0) under the
+    ///   seed's high word;
+    /// - the player's personality from 1D3 (1194:5B07), the shop's
+    ///   quality and mood (13CA, 13CB).
+    ///
+    /// The price agreed, or true when the player walked away. DL, which
+    /// the haggle keeps at 6598 (for %c, which TAVERN.DAT has none of), is
+    /// what the names left in DX: not modelled, taken as 0. None where a
+    /// name can't be made or the haggle stops.
+    pub fn tavern_room_haggle(&mut self, files: &mut Files, io: &mut impl crate::haggle::HaggleIo) -> Option<(u32, bool)> {
+        let ax = self.mem.r16(DS, 0x0FD2);
+        let key = (ax & 0xFF00) | ((ax as u8) >> 1) as u16;
+        let (seg, si) = (self.mem.r16(DS, 0x1AB7), self.mem.r16(DS, 0x1AB5));
+        let si = self.place_lookup(seg, si, key, self.mem.r16(DS, 0x1387));
+        let ebx = self.mem.r32(seg, si);
+        let kind = self.mem.r8(DS, 0x0A46);
+        let (_, al) = self.npc_name_al(files, kind, 0, ebx, DS, INNKEEPER)?;
+        let item = self.skip_strings(DS, ROOM_NAMES, self.mem.r8(DS, 0x13C8) as u16);
+        self.mem.w16(DS, crate::haggle::var::ITEM, item);
+        let seed = (ebx & 0xFFFF_0000) | self.mem.r16(DS, crate::names::var::HANDLE) as u32;
+        self.npc_name(files, al, 0, seed, DS, 0x1A4C)?;
+        let per = crate::scale::to100(self.mem.r8(DS, PLAYER + 0x2F) as i16) as u16;
+        let (price, quality, mood) = (self.mem.r32(DS, PRICE), self.mem.r8(DS, 0x13CA), self.mem.r8(DS, 0x13CB));
+        Some(match self.haggle(files, io, price, per, quality, mood, 0, 3, 0x1A4C)? {
+            crate::haggle::Haggle::Deal(p) => (p, false),
+            crate::haggle::Haggle::NoDeal => (price, true),
+        })
     }
 
     /// 1194:BE78: no room (its hours and the file's mark cleared).

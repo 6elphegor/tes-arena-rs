@@ -31,6 +31,10 @@ const SUFFIX: u16 = 0x398D;
 struct Out {
     seg: u16,
     di: u16,
+    /// AL as the routine's last step leaves it: 0 after a string copied
+    /// (0000:9CA0 stops on the NUL), the new position's low byte after a
+    /// chunk skipped (0000:6D52, DOS seek).
+    al: u8,
 }
 
 impl Machine {
@@ -41,6 +45,15 @@ impl Machine {
     /// where the file is missing or a chunk's count is 0 (the original
     /// divides by zero).
     pub fn npc_name(&mut self, files: &mut Files, kind: u8, sex: u8, seed: u32, seg: u16, off: u16) -> Option<u16> {
+        self.npc_name_al(files, kind, sex, seed, seg, off).map(|(di, _)| di)
+    }
+
+    /// `npc_name`, with AL as 1194:080B returns it (AH is left 3Eh by the
+    /// file's close, DOS 3Eh, which changes no other register): 0, but
+    /// for race 1 (`names_set_1`) when its last step skips a chunk, then
+    /// the file position's low byte. BX is left the file's handle
+    /// (HANDLE, its high word the caller's).
+    pub fn npc_name_al(&mut self, files: &mut Files, kind: u8, sex: u8, seed: u32, seg: u16, off: u16) -> Option<(u16, u8)> {
         let saved = self.rng.seed;
         self.mem.w8(DS, KIND, kind);
         self.mem.w8(DS, SEX, sex);
@@ -48,7 +61,7 @@ impl Machine {
         self.mem.w8(seg, off, 0);
         let handle = self.file_open_handle(files, FILE_NAME)?;
         self.mem.w16(DS, HANDLE, handle);
-        let mut o = Out { seg, di: off };
+        let mut o = Out { seg, di: off, al: 0 };
         match kind {
             0..=7 => {
                 if kind > 0 {
@@ -103,7 +116,7 @@ impl Machine {
         }
         self.file_close(files);
         self.rng.seed = saved;
-        Some(o.di)
+        Some((o.di, o.al))
     }
 
     /// 1194:0940: race names. A male name takes the first two chunks and
@@ -135,7 +148,7 @@ impl Machine {
         }
         let mut n = 0u16;
         if self.rng.range(0, 100)? > 0x4B {
-            self.names_skip(files);
+            o.al = self.names_skip(files) as u8;
         } else {
             n += 1;
         }
@@ -165,10 +178,10 @@ impl Machine {
 
     /// 1194:08DE: skips a chunk (its length counts the length word; under
     /// 2 seeks on by nearly 64 KiB).
-    fn names_skip(&mut self, files: &mut Files) {
+    fn names_skip(&mut self, files: &mut Files) -> u32 {
         self.file_read(files, DS, CHUNK, 2);
         let len = self.mem.r16(DS, CHUNK).wrapping_sub(2);
-        self.file_seek(files, 1, len as u32);
+        self.file_seek(files, 1, len as u32)
     }
 
     fn names_skip_n(&mut self, files: &mut Files, n: u32) {
@@ -201,6 +214,7 @@ impl Machine {
         }
         self.names_copy(si, o);
         o.di = o.di.wrapping_sub(1);
+        o.al = 0;
         Some(())
     }
 

@@ -17,7 +17,11 @@
 //! `walk:N` (frames), `wait:N`, `at:COL:ROW:HEADING` (as --at, then a
 //! frame), `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
 //! code N down for a frame: 60 is F2, the player's square on the message
-//! line). --picks answers the game's questions in order: a menu's entry
+//! line), `shop:KIND` (a debugging aid: the shop of building kind KIND
+//! entered, as talking to its keeper enters it: 4 a tavern, 5 a temple, 6
+//! an equipment store) and `quest` (a debugging aid: the talk pointed at
+//! the giver of the first errand offered, then `shop:4`, the tavern's
+//! talk offering it). --picks answers the game's questions in order: a menu's entry
 //! by its number (talking to someone: 0 the greeting, 1 "Where is...", 2
 //! rumours; camping: 0 for a while, 1 until healed), `tTEXT` text typed
 //! (the hours to rest); after them a question is left, as Esc leaves it,
@@ -108,6 +112,7 @@ mod hud;
 mod interface;
 mod newgame;
 mod panels;
+mod questui;
 mod render;
 mod shopui;
 mod spellmaker;
@@ -302,6 +307,14 @@ impl arena::talk::TalkHooks for Front<'_> {
     /// through `dialog`.
     fn loot(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
         m.loot_window(files, &mut LootFront(self), ax, si, seg, bx)
+    }
+    /// 1194:D593: the quest's person speaks (`questui::QuestFront`).
+    fn quest_person(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.quest_person_talk(files, &mut questui::QuestFront(self, files.clone()))
+    }
+    /// 1194:8F1E (from DCE1): the palace's quests.
+    fn palace(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.quests_talk(files, &mut questui::QuestFront(self, files.clone()))
     }
     /// A shop entered: its questions through `dialog` (`shopui`).
     fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
@@ -963,6 +976,9 @@ struct TurnIn {
     intent: Intent,
     clicked: bool,
     camp: bool,
+    /// A shop of this building kind entered before the frame (`--do
+    /// shop:KIND`).
+    shop: Option<u8>,
     key: bool,
     tick: usize,
     right: bool,
@@ -990,6 +1006,11 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping met something not ported");
+    }
+    if let Some(kind) = input.shop {
+        if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
+            eprintln!("the shop met something not ported");
+        }
     }
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
         engine.m.mem.w8(DS, arena::rest::var::KEY, input.key as u8);
@@ -1059,6 +1080,8 @@ struct Shot {
     drag: (i16, i16),
     clicked: bool,
     camp: bool,
+    /// A shop to enter in the next turn (`shop:KIND`).
+    shop: Option<u8>,
     answers: std::collections::VecDeque<dialog::Answer>,
     message: Option<(u16, u16)>,
     frames: usize,
@@ -1092,6 +1115,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         intent: *intent,
         clicked: std::mem::take(&mut st.clicked),
         camp: std::mem::take(&mut st.camp),
+        shop: st.shop.take(),
         key: false,
         tick: st.frames * 4,
         right: std::mem::take(&mut st.right),
@@ -1156,7 +1180,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let assets = Assets::new(dir, &mut engine);
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
+    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1352,6 +1376,39 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "shop" => {
+                st.shop = Some(n as u8);
+                shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            }
+            "quest" => {
+                // The talk pointed at the first offered errand's giver (as
+                // view/examples/town_quests.rs does), then the tavern.
+                use arena::mem::DS;
+                use arena::sidequest::var::{TALK, TALKER};
+                let offered = |m: &arena::machine::Machine| (0..4u16).map(|i| arena::quest::var::OTHERS + i * 0x29).find(|&si| m.quest_kind(si) == 2);
+                if offered(&engine.m).is_none() {
+                    // A town the view starts in hasn't had its quests made
+                    // (that is the area's entry, 0000:46B2): made here.
+                    engine.m.mem.w16(DS, arena::sidequest::var::PLACE_SEEN, 0xFFFF);
+                    if engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
+                        eprintln!("the town's quests met something not ported");
+                    }
+                }
+                let m = &mut engine.m;
+                let giver = offered(m);
+                match giver {
+                    Some(si) => {
+                        let g = m.mem.r16(DS, si + 0x10);
+                        m.mem.w8(DS, TALK, 4);
+                        m.mem.w16(DS, TALKER, g & 0xFF00 | ((g as u8 as u16) << 1) & 0xFF);
+                        st.shop = Some(4);
+                        shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+                        let state = ["free", "under way", "offered", "failed"][engine.m.quest_kind(si) as usize & 3];
+                        println!("quest: errand {} {state}", (si - arena::quest::var::OTHERS) / 0x29);
+                    }
+                    None => println!("no errand offered"),
+                }
             }
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
@@ -1785,6 +1842,7 @@ impl App {
             intent,
             clicked: std::mem::take(&mut self.clicked),
             camp: std::mem::take(&mut self.camp),
+            shop: None,
             key: std::mem::take(&mut self.key),
             tick,
             right: self.keys.swing,

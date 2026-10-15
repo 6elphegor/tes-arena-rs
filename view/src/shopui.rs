@@ -10,16 +10,19 @@
 //! - The store's lists of weapons and armour are the original's lines
 //!   (1194:F142 and F204, `Machine::store_lines`): name, hands (or the
 //!   armour's kind), weight and price, laid out by their columns.
-//! - The store's haggling runs the haggle port (1194:8020, modes 1 and 4):
-//!   each round accept, make an offer (typed) or leave; the shopkeeper's
-//!   lines aren't ported, so only the price asked first is shown. The
-//!   tavern's room (mode 3, not ported) is paid as asked, or left.
+//! - The store's and the guild's haggling and the tavern's room run the
+//!   haggle port (1194:8020, modes 1, 4, 2 and 3; the room's set-up
+//!   1194:C14E, `tavern_room_haggle`), the shopkeeper's lines titling
+//!   each question (`questui::HaggleTalk`).
+//! - The shops' quests (the tavern's informant and quests, the quests
+//!   on entering) go through `questui::QuestFront`.
 
 use crate::Front;
 use crate::dialog::Talk;
+use crate::questui::{HaggleTalk, QuestFront};
 use crate::hud::{self, Menu, Span};
 use arena::bsa::Files;
-use arena::haggle::{Haggle, HaggleIo};
+use arena::haggle::Haggle;
 use arena::machine::Machine;
 use arena::mem::DS;
 
@@ -157,6 +160,10 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             None => 0xFFFF,
         }
     }
+    /// 1194:8F1E on entering: the quests ended or offered.
+    fn quests(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_talk(files, &mut QuestFront(&mut *self.front, files.clone()))
+    }
     fn expand(&mut self, m: &mut Machine, di: u16) -> u16 {
         if let Some(end) = m.expand(&mut self.files, &mut arena::text::NoTextHooks, DS, di) {
             return end;
@@ -166,37 +173,6 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             di = di.wrapping_add(1);
         }
         di
-    }
-}
-
-/// The haggle's moves asked through `Talk`; with no answer yet, leaving.
-struct HaggleTalk<'a> {
-    talk: Option<&'a mut Talk>,
-    asked: u32,
-}
-
-impl HaggleIo for HaggleTalk<'_> {
-    fn menu(&mut self) -> Option<u16> {
-        let Some(t) = self.talk.as_deref_mut() else { return Some(2) };
-        let title = vec![line(&format!("The price asked: {} gp", self.asked))];
-        let menu = Menu {
-            title,
-            entries: vec![line("Accept"), line("Make an offer"), line("Leave")],
-            keys: b"AML".to_vec(),
-            selected: 0,
-        };
-        Some(match t.ask_menu(menu) {
-            0 => 0,
-            1 => 1,
-            _ => 2,
-        })
-    }
-    fn text(&mut self) -> Option<Vec<u8>> {
-        let Some(t) = self.talk.as_deref_mut() else { return Some(Vec::new()) };
-        Some(t.typed_text("Your offer?").unwrap_or_default().into_bytes())
-    }
-    fn key(&mut self) -> Option<()> {
-        Some(())
     }
 }
 
@@ -213,7 +189,7 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
     }
     fn haggle(&mut self, m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         let (quality, mood) = (m.mem.r8(DS, 0x13CA), m.mem.r8(DS, 0x13CB));
-        let mut io = HaggleTalk { talk: self.front.talk.as_deref_mut(), asked: eax };
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut());
         match m.haggle(&mut self.files, &mut io, eax, per, quality, mood, 0, mode, name) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (eax, true),
@@ -318,23 +294,16 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             None => 0xFFFF,
         }
     }
-    /// 1194:8020 in mode 1 (buying), the seller named at 1A4C. The
-    /// original maps EMS bank [1032] before loading the dialogue into the
-    /// frame (1194:8665, the bank before kept at A88E) and maps it back on
-    /// every way out (8:82D1..83D3); the haggle port loads into the frame
-    /// as it is, which in the guild holds the stock (bank 18h), so the
-    /// swap is made around it here.
+    /// 1194:8020 in mode 2 (the guild's calls, 1194:B3A5 and B562, pass DH
+    /// 2: MUGUILD.DAT's lines), the seller named at 1A4C. The port maps
+    /// the dialogue's EMS bank and puts the stock's back (8665), so the
+    /// stock in bank 18h is kept.
     fn haggle(&mut self, m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
-        use arena::level::var::EMS_MAPPED;
-        let old = m.mem.r16(DS, EMS_MAPPED) >> 2;
-        m.ems_map(m.mem.r16(DS, 0x1032));
-        let mut io = HaggleTalk { talk: self.front.talk.as_deref_mut(), asked: price };
-        let r = match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 1, 0x1A4C) {
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut());
+        match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 2, 0x1A4C) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (price, true),
-        };
-        m.ems_map(old);
-        r
+        }
     }
     fn spell_screen(&mut self, m: &mut Machine) {
         let name = String::from_utf8_lossy(m.mem.cstr(DS, 0x57E6)).into_owned();
@@ -409,11 +378,20 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     fn picture(&mut self, _m: &mut Machine, si: u16) {
         self.picture = si;
     }
-    /// The room's price (1391) paid as asked, or the tavern left (the
-    /// haggle's mode 3 isn't ported).
-    fn haggle(&mut self, m: &mut Machine) -> (u32, bool) {
-        let price = m.mem.r32(DS, 0x1391);
-        let pick = self.ask(vec![line(&format!("The room costs {price} gold."))], &["Pay", "Leave"]);
-        (price, pick != 0)
+    /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
+    fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
+        m.tavern_room_haggle(files, &mut HaggleTalk::new(self.front.talk.as_deref_mut()))
+    }
+    /// 1194:CED7: the main quest's informant.
+    fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quest_informant(files, &mut QuestFront(&mut *self.front, files.clone())).map(|_| ())
+    }
+    /// 1194:8F1E: the quests the talk ends or offers.
+    fn quests_talk(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_talk(files, &mut QuestFront(&mut *self.front, files.clone()))
+    }
+    /// 1194:90B9: another queued quest's text taken.
+    fn tavern_quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_take(files, &mut QuestFront(&mut *self.front, files.clone()))
     }
 }
