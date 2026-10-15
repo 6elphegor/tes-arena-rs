@@ -5,7 +5,7 @@ through the fatigue's minute 2901:0002, `Machine::fatigue_minute`).
 Usage: gen_levelup.py ACD_unpacked.EXE OUT
 
 Op 0, the screen, far-called with CX the levels gained. Stubbed: the
-notice 1194:5E33 counts at FFE2, keeping the screen 1194:158F at FFE4,
+notice's sound 23BA:012B counts at FFE2, keeping the screen 1194:158F at FFE4,
 the message box 1194:59CC (59C8 calls it) at FFE8; the drawing (0000:541E, A611, 9A98,
 9426, A6B5, 1194:55B2, 2462) returns; the points' spending 1194:122C
 spends nothing its first time (FFE0 counts the calls), then puts all of
@@ -71,6 +71,11 @@ def setup_screen(s):
     k = byte()
     if k < 0x10:
         base = b'\xff' * 8
+    elif k < 0x20:
+        i = byte() % 8
+        base = bytes(0xFD if j == i else 0xFF for j in range(8))
+    elif k < 0x28:
+        base = b'\xff' * 4 + bytes(byte() for _ in range(4)) if byte() & 1 else bytes(byte() for _ in range(4)) + b'\xff' * 4
     elif k < 0x60:
         base = bytes(0xE0 + byte() % 0x20 for _ in range(8))
     else:
@@ -146,7 +151,7 @@ def install_stubs(a):
     clash = bytes([0xFF, 0x06, 0xE6, 0xFF, 0xEB, (0x1BC9 - (0x1B78 + 6)) & 0xFF])
     for seg, off, code in [
         # The screen's own.
-        (0x1194, 0x5E33, counter(0xFFE2, True)), (0x1194, 0x158F, counter(0xFFE4, False)),
+        (0x23BA, 0x012B, counter(0xFFE2, True)), (0x1194, 0x158F, counter(0xFFE4, False)),
         (0x1194, 0x59CC, counter(0xFFE8, False)), (0x1194, 0x122C, SPEND),
         (0, 0x541E, RETF), (0, 0xA611, RETF), (0, 0x9A98, RETF), (0, 0x9426, RETF), (0, 0xA6B5, RETF),
         (0x1194, 0x55B2, RETF), (0x1194, 0x2462, RET),

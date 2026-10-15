@@ -66,9 +66,9 @@ const ITEMS: u16 = 0x0212;
 
 /// What the level-up screen leaves to the front end.
 pub trait LevelUpHooks {
-    /// 1194:5E33: the level's notice (a sound, its text in a box), unless
-    /// the main quest is over.
-    fn notice(&mut self, _m: &mut Machine) {}
+    /// 23BA:012B: the sound named at DS:`si` played (the notice's
+    /// FANFARE1.VOC).
+    fn sound(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:158F: the screen kept (CHARSHET.$$$), unless 5E0 bit 200h.
     fn keep_screen(&mut self, _m: &mut Machine) {}
     /// The screen drawn: 0000:541E, A611, the view filled (9A98), 9426,
@@ -81,8 +81,8 @@ pub trait LevelUpHooks {
     fn spend(&mut self, m: &mut Machine) {
         spend_in_turn(m);
     }
-    /// 1194:59CC: a message box with the text at DS:`si` (3E17: points
-    /// are left to spend).
+    /// 1194:59CC: a message box with the text at DS:`si` (4F25 the
+    /// level's notice, 3E17 points left to spend).
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
     /// 0000:541E, A6B5: the game's screen back.
     fn restore(&mut self, _m: &mut Machine) {}
@@ -150,7 +150,7 @@ impl Machine {
         let finale = self.l8(0x0FDD) == 0x8E;
         self.mem.w16(DS, FINALE, finale as u16);
         if !finale {
-            hooks.notice(self);
+            self.level_notice(hooks);
         }
         if self.mem.r32(DS, BASE) == 0xFFFF_FFFF && self.mem.r32(DS, BASE + 4) == 0xFFFF_FFFF {
             let max = self.l16(PLAYER + field::MAX_HP);
@@ -229,6 +229,19 @@ impl Machine {
         self.mem.w16(DS, 0x0201, fatigue);
         self.mem.w16(DS, 0x020A, sp);
         Some(())
+    }
+
+    /// 1194:5E33. The level's notice: its sound, then (1194:42EE) the
+    /// text segments B036 (102C) and B038 (1036) and colour 60h set, and
+    /// "You have gained a level of experience!" (4F25) in a box.
+    fn level_notice(&mut self, hooks: &mut dyn LevelUpHooks) {
+        hooks.sound(self, 0x4F18);
+        let v = self.l16(0x102C);
+        self.mem.w16(DS, TEXT_B036, v);
+        let v = self.l16(0x1036);
+        self.mem.w16(DS, TEXT_B038, v);
+        self.mem.w8(DS, COLOUR, 0x60);
+        hooks.message_box(self, 0x4F25);
     }
 
     /// 1194:7FD3. The worn items taken off, listed at WORN: as many slots

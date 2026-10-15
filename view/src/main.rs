@@ -56,7 +56,10 @@
 //! `spell:N` (its entry N cast), `close`, `clickat:X:Y` (a click at X, Y
 //! of the 320 x 200 screen), and as debugging aids `give:N` (N items
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
-//! points), `class:N` and `corpse` (a creature killed a square ahead).
+//! points), `class:N`, `corpse` (a creature killed a square ahead),
+//! `fatigue:N` (the player's fatigue; at 0 the next minute exhausts
+//! them) and `xp:N` (N experience gained: the next minute checks the
+//! level, and a level gained brings the level-up screen).
 //! M shows the automap (`automap`; `--do map`): the squares the game has
 //! marked seen, kept per area in AUTOMAP.nn (src/automap.rs).
 //!
@@ -176,7 +179,21 @@ impl arena::trigger::TriggerHooks for Front<'_> {
         Some(())
     }
 }
-impl arena::clock::ClockHooks for Front<'_> {}
+/// Exhaustion's boxes, and the level-up screen with its notice and
+/// refusal in boxes (its points spent in turn: no attribute screen yet).
+impl arena::clock::ClockHooks for Front<'_> {
+    fn exhaustion_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        Front::message_box(self, m, si);
+    }
+    fn level_up_screen(&mut self, m: &mut arena::machine::Machine, levels: u16) -> Option<()> {
+        arena::levelup::level_up_around(m, levels, self)
+    }
+}
+impl arena::levelup::LevelUpHooks for Front<'_> {
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        Front::message_box(self, m, si);
+    }
+}
 impl arena::frame::FrameHooks for Front<'_> {
     /// 1194:DB6C with the view's own talk hooks.
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -884,12 +901,18 @@ struct Shot {
     panel: Option<panels::Panel>,
     /// The automap shown (`--do map`).
     map: bool,
+    /// The game is over (the player died, or the main quest ended):
+    /// later steps do nothing.
+    over: bool,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
 /// left, as Esc leaves them: the turn goes on); a frame leaving the area
 /// goes on to the next (`areas::next`, None where it can't).
 fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
+    if st.over {
+        return Some(());
+    }
     st.frames += 1;
     let input = TurnIn {
         intent: *intent,
@@ -919,7 +942,14 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         st.assets.level(engine);
     }
     if out.frame? == arena::engine::Frame::Left {
-        *run = areas::next(engine, dir, *run)?;
+        let next = areas::next(engine, dir, *run);
+        if next.is_none() && engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
+            // The ending's text is on the message line.
+            st.over = true;
+            print_message(engine, &mut st.message);
+            return Some(());
+        }
+        *run = next?;
         st.assets = Assets::new(dir, engine);
     }
     Some(())
@@ -931,7 +961,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false };
+    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1002,6 +1032,14 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "give" => panels::give(&mut engine.m, n as u16),
             "learn" => panels::learn(&mut engine.m, n as u8),
             "corpse" => println!("corpse: {}", panels::corpse(&mut engine)),
+            "fatigue" => engine.m.mem.w16(arena::mem::DS, 0x0201, n as u16),
+            "xp" => {
+                let at = arena::character::PLAYER + 0x409;
+                let v = engine.m.mem.r32(arena::mem::DS, at).wrapping_add(n as u32);
+                engine.m.mem.w32(arena::mem::DS, at, v);
+                let f = engine.m.mem.r16(arena::mem::DS, 0x05CA) | 0x100;
+                engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+            }
             "sp" => {
                 // The spell points and their maximum, a debugging aid.
                 engine.m.mem.w16(arena::mem::DS, 0x020A, n as u16);

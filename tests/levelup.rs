@@ -25,7 +25,7 @@ fn inc(m: &mut Machine, at: u16) {
 struct Stubs;
 
 impl LevelUpHooks for Stubs {
-    fn notice(&mut self, m: &mut Machine) {
+    fn sound(&mut self, m: &mut Machine, _si: u16) {
         inc(m, 0xFFE2);
     }
     fn keep_screen(&mut self, m: &mut Machine) {
@@ -76,15 +76,30 @@ fn setup_screen(m: &mut Machine, s: &mut Stream) -> u16 {
         m.mem.w8(DS, 0x01CD + i, b);
     }
     let k = s.byte();
-    for i in 0..8 {
-        let b = if k < 0x10 {
-            0xFF
-        } else if k < 0x60 {
-            0xE0 + s.byte() % 0x20
+    let base: Vec<u8> = if k < 0x10 {
+        vec![0xFF; 8]
+    } else if k < 0x20 {
+        // One point of room: seven at 100%, one at 99%.
+        let i = s.byte() % 8;
+        (0..8).map(|j| if j == i { 0xFD } else { 0xFF }).collect()
+    } else if k < 0x28 {
+        // Half of them FFh (1194:11C6 tests both dwords).
+        if s.byte() & 1 != 0 {
+            let mut v = vec![0xFF; 4];
+            v.extend((0..4).map(|_| s.byte()));
+            v
         } else {
-            s.byte()
-        };
-        m.mem.w8(DS, 0x01D5 + i, b);
+            let mut v: Vec<u8> = (0..4).map(|_| s.byte()).collect();
+            v.extend([0xFF; 4]);
+            v
+        }
+    } else if k < 0x60 {
+        (0..8).map(|_| 0xE0 + s.byte() % 0x20).collect()
+    } else {
+        (0..8).map(|_| s.byte()).collect()
+    };
+    for (i, &b) in base.iter().enumerate() {
+        m.mem.w8(DS, 0x01D5 + i as u16, b);
     }
     let v = s.byte();
     m.mem.w8(DS, 0x01A9, v);
