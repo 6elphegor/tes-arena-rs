@@ -592,7 +592,7 @@ impl Machine {
         // AX after the close is the read's result (0 if nothing was read).
         let n = if seg != 0 { self.file_read(files, seg, off, size as u16) } else { 0 };
         self.file_close(files);
-        (n != 0).then_some((seg, off))
+        (n != 0).then_some((seg, off)).or_else(|| crate::giveup::error("0000:7428: an empty file, or no room to read it"))
     }
 
     /// 0000:6742.
