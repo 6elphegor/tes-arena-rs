@@ -102,8 +102,11 @@ pub trait QuestHooks {
     fn travel(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.travel_days(files).map(|_| ())
     }
-    /// 2294:04C0: the town's music started (after its quests are made).
-    fn music(&mut self, _m: &mut Machine) {}
+    /// 2294:04C0: the town's music started (after its quests are made;
+    /// `music::town_music`, by default).
+    fn music(&mut self, m: &mut Machine) {
+        m.town_music();
+    }
     /// 0000:9D60: the PC's timer ticks (the BIOS's dword at 0:046C,
     /// `Machine::bios_ticks`).
     fn bios_ticks(&mut self, m: &mut Machine) -> u32 {

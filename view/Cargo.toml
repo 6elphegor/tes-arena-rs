@@ -14,3 +14,4 @@ glam = "0.29"
 png = "0.17"
 # The sound driver opens libpulse-simple at run time (view/src/audio.rs).
 libloading = "0.8"
+nuked-opl3 = "=0.1.0"

@@ -44,6 +44,7 @@ pub mod outfit;
 pub mod projectile;
 pub mod quest;
 pub mod movement;
+pub mod music;
 pub mod names;
 pub mod piles;
 pub mod progression;
