@@ -67,9 +67,19 @@
 //! START.MIF): SPEC is `CLASS:PROVINCE:SEX:FACE:NAME`, CLASS 0..17 from
 //! the class list or `q` and ten answers 0..2 to the questions (see
 //! `newgame`).
+//!
+//! --create [SCRIPT] makes the character in the window, on the original's
+//! creation screens (`create`): how the class is chosen, the questions or
+//! the list, the name, the gender, the province on the map, what the
+//! player is told, the attributes, the face, the vision's text; then the
+//! game starts in the start dungeon. SCRIPT gives keys and clicks first,
+//! comma-separated: a character, `enter`, `esc`, `back`, `up`, `down`,
+//! `type:TEXT`, `click:X:Y` (on the 320 x 200 screen); with --shot the
+//! screen they reach is the picture (the game's, once creation is over).
 
 mod archive;
 mod areas;
+mod create;
 mod dialog;
 mod flats;
 mod hud;
@@ -663,6 +673,17 @@ fn main() {
             args.insert(2.min(args.len()), "START.MIF".into());
         }
     }
+    // --create [SCRIPT]: creation in the window, its keys and clicks
+    // (`create::parse_script`) given first.
+    let mut create_script = None;
+    if let Some(i) = args.iter().position(|a| a == "--create") {
+        let script = args.get(i + 1).filter(|a| !a.starts_with("--")).cloned();
+        args.drain(i..i + 1 + script.is_some() as usize);
+        create_script = Some(script.unwrap_or_default());
+        if args.get(2).is_none_or(|a| a.starts_with("--")) {
+            args.insert(2.min(args.len()), "START.MIF".into());
+        }
+    }
     let mut at = None;
     if let Some(i) = args.iter().position(|a| a == "--at") {
         let v: Vec<u16> = args[i + 1..i + 4].iter().map(|v| v.parse().expect("--at COL ROW HEADING")).collect();
@@ -670,17 +691,31 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--new-game SPEC | --create [SCRIPT]] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
-    let run = match &new_game {
-        Some(spec) => {
+    let mut creation = None;
+    let run = match (&new_game, &create_script) {
+        (Some(spec), _) => {
             newgame::start(&mut engine, spec);
             arena::transit::Run::Start
         }
-        None => areas::start(&mut engine, args[2].starts_with("CITY:")),
+        (None, Some(script)) => {
+            let archive = Rc::new(archive::Archive::open(&dir));
+            let mut c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
+            for inp in create::parse_script(script) {
+                c.input(&mut engine, inp);
+            }
+            if c.done() {
+                newgame::play(&mut engine);
+            } else {
+                creation = Some(c);
+            }
+            arena::transit::Run::Start
+        }
+        (None, None) => areas::start(&mut engine, args[2].starts_with("CITY:")),
     };
     interface::start(&mut engine.m);
     if let Some(h) = hour {
@@ -707,6 +742,14 @@ fn main() {
     }
     if args.get(3).map(String::as_str) == Some("--shot") {
         let out = args.get(4).expect("--shot needs a file");
+        // Creation not over: its screen as the script left it.
+        if let Some(c) = &creation {
+            let mut screen = hud::Screen::new(world::palette(&dir));
+            c.draw(&mut screen, &engine.m);
+            create::Creation::save_png(&screen, out);
+            println!("{out}: creation");
+            return;
+        }
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
         shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)));
@@ -748,6 +791,7 @@ fn main() {
         slot,
         panel: None,
         equip: None,
+        creation,
     };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -1308,9 +1352,25 @@ struct App {
     /// loaded.
     panel: Option<panels::Panel>,
     equip: Option<Option<interface::Image>>,
+    /// Character creation under way (`--create`): its screens instead of
+    /// the game, which starts when it ends.
+    creation: Option<create::Creation>,
 }
 
 impl App {
+    /// A key or click for creation; at its end the game started, in the
+    /// start dungeon, its assets made again.
+    fn creation_input(&mut self, inp: create::Input) {
+        let Some(c) = &mut self.creation else { return };
+        c.input(&mut self.engine, inp);
+        if c.done() {
+            self.creation = None;
+            newgame::play(&mut self.engine);
+            self.assets = Assets::new(&self.dir, &mut self.engine);
+            self.remake_renderer();
+        }
+    }
+
     /// Whether the game waits for the player (a box, a question).
     fn waiting(&self) -> bool {
         self.pending.is_some() || !self.boxes.is_empty()
@@ -1318,7 +1378,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() {
             return;
         }
         let k = &self.keys;
@@ -1760,6 +1820,28 @@ impl winit::application::ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
+            WindowEvent::MouseInput { state, button, .. } if self.creation.is_some() => {
+                if state == ElementState::Pressed && button == MouseButton::Left {
+                    let (x, y) = self.screen_point();
+                    self.creation_input(create::Input::Click(x, y));
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } if self.creation.is_some() => {
+                if event.state != ElementState::Pressed {
+                    return;
+                }
+                let inp = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter) => Some(create::Input::Enter),
+                    PhysicalKey::Code(KeyCode::Escape) => Some(create::Input::Esc),
+                    PhysicalKey::Code(KeyCode::Backspace) => Some(create::Input::Back),
+                    PhysicalKey::Code(KeyCode::ArrowUp) => Some(create::Input::Up),
+                    PhysicalKey::Code(KeyCode::ArrowDown) => Some(create::Input::Down),
+                    _ => event.text.as_deref().and_then(|t| t.bytes().next()).filter(|c| (0x20..0x7F).contains(c)).map(create::Input::Char),
+                };
+                if let Some(inp) = inp {
+                    self.creation_input(inp);
+                }
+            }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if self.waiting() => self.dialog_click(),
             WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
             // The right button held: dragging swings the weapon (0000:3C9F).
@@ -1830,14 +1912,18 @@ impl winit::application::ApplicationHandler for App {
                 let cam = camera(&self.engine);
                 let hud = self.hud();
                 self.screen.clear();
-                self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
-                self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
-                if self.panel.is_some() {
-                    self.equip_image();
-                    let equip = self.equip.as_ref().and_then(|e| e.as_ref());
-                    panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
+                if let Some(c) = &self.creation {
+                    c.draw(&mut self.screen, &self.engine.m);
+                } else {
+                    self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
+                    self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+                    if self.panel.is_some() {
+                        self.equip_image();
+                        let equip = self.equip.as_ref().and_then(|e| e.as_ref());
+                        panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
+                    }
+                    hud::compose_over(&mut self.screen, &self.font, &hud);
                 }
-                hud::compose_over(&mut self.screen, &self.font, &hud);
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);
