@@ -55,6 +55,7 @@ pub mod shops;
 pub mod sky;
 pub mod skyobj;
 pub mod spell;
+pub mod store;
 pub mod strike;
 pub mod talk;
 pub mod tavern;
