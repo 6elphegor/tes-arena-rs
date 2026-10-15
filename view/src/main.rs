@@ -316,11 +316,17 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
     }
 }
 /// The automap's notes: the text typed through the dialog (into 1044,
-/// at most the place's room), the rest drawn by the screen's own pass.
+/// at most the place's room), edited in place on the map (`Talk::text_at`,
+/// `automap::draw_field`), the rest drawn by the screen's own pass.
 impl arena::mapnotes::NoteHooks for Front<'_> {
-    fn type_text(&mut self, m: &mut arena::machine::Machine, _x: u16, _y: u16, _cursor: u16, max: u16) {
+    fn type_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, _cursor: u16, max: u16) {
         if let Some(t) = self.talk.as_deref_mut() {
+            let asked = t.need.is_some();
             t.typed(m, arena::mapnotes::var::TEXT, max as usize, "Your note:");
+            if !asked && t.need.is_some() {
+                let text = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::mapnotes::var::TEXT)).into_owned();
+                t.text_at = Some((x as i16 as i32, y as i16 as i32, text));
+            }
         }
     }
 }
@@ -2227,6 +2233,9 @@ struct Pending {
     /// The spellmaker's screen behind the question, when the turn stopped
     /// inside it (`Talk::maker`).
     maker: Option<(dialog::Snapshot, Option<u16>)>,
+    /// The text asked for edited in place at this screen point
+    /// (`Talk::text_at`).
+    at: Option<(i32, i32)>,
 }
 
 struct App {
@@ -2504,7 +2513,11 @@ impl App {
                 self.creation_engine = Some(e);
             }
             let maker = talk.maker.take();
-            self.pending = Some(Pending { before, input, given, need, maker });
+            let at = talk.text_at.take().map(|(x, y, text)| {
+                self.typed = text;
+                (x, y)
+            });
+            self.pending = Some(Pending { before, input, given, need, maker, at });
             if self.captured {
                 self.release();
             }
@@ -2585,6 +2598,9 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
+                if let Some((x, y)) = self.pending.as_ref().and_then(|p| p.at) {
+                    automap::draw_field(&mut self.screen, x, y, &self.typed);
+                }
             }
         }
         if prof::on() {
@@ -2980,6 +2996,7 @@ impl App {
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
                     h.menu = Some(m);
                 }
+                Some(dialog::Need::Text(_)) if self.pending.as_ref().is_some_and(|p| p.at.is_some()) => {}
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).

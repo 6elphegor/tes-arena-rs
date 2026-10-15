@@ -1071,9 +1071,15 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
         Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
         _ => panic!("a click on the map asks for the note's text"),
     }
+    // Typed in place where clicked (0000:9EE9), not in a box.
+    assert_eq!(a.pending.as_ref().and_then(|p| p.at), Some((100, 100)), "the note edited where clicked");
     for (k, c) in [(KeyCode::KeyH, "H"), (KeyCode::KeyI, "i")] {
         d.key(&mut a, k, Some(c));
     }
+    a.compose();
+    let field = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..6).flat_map(|r| (0..12).map(move |c| (100 + r) * hud::W + 100 + c)).map(|i| px[i]).collect() };
+    assert_ne!(field(&a.screen.px), field(&bare), "the text typed drawn on the map");
+    shot(&mut a, "automap_note_typed");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(a.pending.is_none(), "Enter answers");
     assert!(a.map, "the automap stays up");
@@ -1095,6 +1101,7 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     // Clicked again: the note's text asked for again, now edited.
     d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
     assert!(a.pending.is_some(), "a click on the note edits it");
+    assert_eq!(a.typed, "Hi", "the note's text to edit");
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::KeyX, Some("X"));

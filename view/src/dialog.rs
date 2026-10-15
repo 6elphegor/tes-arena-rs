@@ -85,6 +85,9 @@ pub struct Talk {
     /// click was asked, and the form open then (DATA:form). Kept when the
     /// turn stops inside the spellmaker.
     pub maker: Option<(Snapshot, Option<u16>)>,
+    /// The text asked for edited in place (0000:9EE9 with the automap's
+    /// notes): the field's screen point and the text there at the start.
+    pub text_at: Option<(i32, i32, String)>,
 }
 
 /// The game's text at DS:`at`, as lines.
