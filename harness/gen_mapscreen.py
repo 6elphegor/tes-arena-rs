@@ -67,7 +67,7 @@ def setup(seed):
     word = lambda: byte() | byte() << 8
     pk = lambda v: struct.pack('<H', v & 0xFFFF)
     letters = lambda n: bytes(0x41 + byte() % 26 if i == 0 else 0x61 + byte() % 26 for i in range(n))
-    op = byte() % 6
+    op = byte() % 7
     w = []
     w.append((0xC39A, pk(word())))
     w.append((0xC398, pk(word())))
@@ -103,6 +103,8 @@ def setup(seed):
     w.append((0xAFF9, bytes([0 if byte() < 0x80 else 1])))
     w.append((0x1032, pk(byte())))
     w.append((0x6636, bytes([byte()])))
+    f = byte()
+    w.append((0x1A81, bytes([0 if f < 0x80 else byte()])))
     # The typed name's buffer, not empty past where the search clears it.
     w.append((0x9C62, bytes((i * 37 + 11) & 0xFF | 1 for i in range(0x200))))
     for i in range(32):
@@ -281,8 +283,11 @@ def main():
                 a.call_near(0x26F7, 0x0483)
             elif op == 4:
                 a.call_far(0x26F7, 0x0625)
-            else:
+            elif op == 5:
                 a.call_far(0x26F7, 0x03A4)
+            else:
+                a.call_far(0x2542, 0x038F)
+                extra = f' {reg("eflags") & 1}'
             if a.fault is not None:
                 raise Fault(a.fault)
             after = a.seg_bytes(a.ds)

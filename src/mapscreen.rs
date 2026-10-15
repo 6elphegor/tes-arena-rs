@@ -63,6 +63,19 @@ impl Machine {
         self.mem.r16(DS, o)
     }
 
+    /// 2542:038F..03BE with 03CF. Whether the journey may start from
+    /// here: outside (C398 bit 4) or where 1A81 allows it; else "You
+    /// cannot travel from here." (5D0D). The colour 60h set either way
+    /// (03AE, 03CF; the fonts' loads 0000:9AE6, 9AF8 are the front end's).
+    pub fn map_from_here(&mut self, hooks: &mut dyn TravelHooks) -> bool {
+        if self.ms16(crate::movement::var::MAP_FLAGS) & 4 != 0 || self.ms8(0x1A81) != 0 {
+            return true;
+        }
+        self.mem.w8(DS, 0x9288, 0x60);
+        hooks.message_box(self, DS, 0x5D0D);
+        false
+    }
+
     /// 2542:03DC..03FF. The map button: refused from a boat (in water,
     /// C39A bit 10h, with bit 4000h: "You cannot travel from a boat...",
     /// 5D56) or with monsters near (FFB: 5D2A), the text shown; true when

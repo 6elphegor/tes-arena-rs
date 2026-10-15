@@ -295,7 +295,7 @@ impl arena::newgame::NewGameHooks for Hooks<'_> {
 
 /// An image with a 12-byte header and its palette after the data
 /// (6-bit; flag 100h), as the .MNU screens are.
-fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
+pub(crate) fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
     let d = archive.read(name)?;
     let (img, used) = crate::interface::image(&d)?;
     let p = d.get(used..used + 0x300)?;

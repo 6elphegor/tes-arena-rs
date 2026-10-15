@@ -1,5 +1,5 @@
 //! Differential tests of the travel map's screen (src/mapscreen.rs:
-//! 2542:03DC, 26F7:0000's start and end, 0483, 0625, 03A4) against
+//! 2542:038F, 03DC, 26F7:0000's start and end, 0483, 0625, 03A4) against
 //! vectors from the original code (harness/gen_mapscreen.py).
 mod common;
 
@@ -100,7 +100,7 @@ fn setup(m: &mut Machine, seed: u32) -> (u8, Answers) {
     let letters = |s: &mut Stream, n: u8| -> Vec<u8> {
         (0..n).map(|i| if i == 0 { 0x41 + s.byte() % 26 } else { 0x61 + s.byte() % 26 }).collect()
     };
-    let op = s.byte() % 6;
+    let op = s.byte() % 7;
     let w16 = |m: &mut Machine, at: u16, v: u16| m.mem.w16(DS, at, v);
     let w8 = |m: &mut Machine, at: u16, v: u8| m.mem.w8(DS, at, v);
     let ws = |m: &mut Machine, at: u16, v: &[u8]| {
@@ -178,6 +178,8 @@ fn setup(m: &mut Machine, seed: u32) -> (u8, Answers) {
     w16(m, 0x1032, v);
     let v = s.byte();
     w8(m, 0x6636, v);
+    let v = if s.byte() < 0x80 { 0 } else { s.byte() };
+    w8(m, 0x1A81, v);
     for i in 0..0x200u16 {
         w8(m, 0x9C62 + i, (i.wrapping_mul(37).wrapping_add(11) as u8) | 1);
     }
@@ -270,7 +272,12 @@ fn matches_original() {
             }
             3 => m.travel_journey(&mut fs, &mut hooks),
             4 => m.travel_click(&mut fs, &mut hooks),
-            _ => m.travel_search(&mut fs, &mut hooks),
+            5 => m.travel_search(&mut fs, &mut hooks),
+            _ => {
+                let c = !m.map_from_here(&mut hooks);
+                extra = format!(" {}", c as u8);
+                Some(())
+            }
         };
         if std::env::var("DUMP").ok().as_deref() == Some(f[1]) {
             for o in (0..=0xFFFFu16).filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o)) {

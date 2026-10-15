@@ -134,6 +134,7 @@ mod questui;
 mod render;
 mod shopui;
 mod spellmaker;
+mod travel;
 mod world;
 
 use arena::controls::{ControlHooks, Intent};
@@ -295,6 +296,13 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
+    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box.
+    fn town_welcome(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if m.file_load(files, 0x130C, arena::mem::DS, 0x1044).is_some() {
+            self.message_box(m, 0x1044);
+        }
+    }
     /// 1194:DB6C with the view's own talk hooks.
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.actor_click(files, self)
@@ -1185,6 +1193,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         save_dir,
         slot,
         panel: None,
+        travel: None,
         equip: None,
         map: false,
         creation,
@@ -1374,6 +1383,10 @@ struct Shot {
     /// screen) and the engine it acts on: fed by `ui:` steps, the shot's
     /// picture.
     ui: Option<(create::Creation, Engine)>,
+    /// The travel map up (`travel`, `tclick:X:Y`, `tkey:K`), and where
+    /// the cursor last was.
+    travel: Option<travel::Travel>,
+    cursor: (i32, i32),
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
@@ -1457,7 +1470,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100) };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1486,6 +1499,42 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             engine.m.mem.w16(arena::mem::DS, HEADING, v[2]);
             engine.world_loop_start();
             shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+            continue;
+        }
+        if step == "travel" || step.starts_with("tclick:") || step.starts_with("tkey:") {
+            // The travel map: opened as the map button opens it (Shift+M),
+            // a click on it at (X, Y), a key (esc, enter, s, t, a letter).
+            let archive = st.assets.archive.clone();
+            if step == "travel" {
+                match travel::Travel::open(&mut engine, &archive) {
+                    Ok(t) => st.travel = Some(t),
+                    Err(b) => st.boxes = vec![b],
+                }
+            } else if let Some(at) = step.strip_prefix("tclick:") {
+                let (x, y) = at.split_once(':').expect("--do tclick:X:Y");
+                let (x, y) = (x.parse().expect("--do tclick:X:Y"), y.parse().expect("--do tclick:X:Y"));
+                st.cursor = (x, y);
+                if let Some(t) = &mut st.travel {
+                    t.click(&mut engine, &archive, x, y, false);
+                }
+            } else if let Some(k) = step.strip_prefix("tkey:") {
+                use winit::keyboard::KeyCode;
+                let (code, text) = match k {
+                    "esc" => (KeyCode::Escape, None),
+                    "enter" => (KeyCode::Enter, None),
+                    "s" => (KeyCode::KeyS, Some("s")),
+                    "t" => (KeyCode::KeyT, Some("t")),
+                    _ => (KeyCode::KeyA, Some(k)),
+                };
+                if let Some(t) = &mut st.travel {
+                    t.key(&mut engine, code, text);
+                }
+            }
+            let mut boxes = Vec::new();
+            travel::after(&mut st.travel, &mut engine, &mut boxes);
+            if !boxes.is_empty() {
+                st.boxes = boxes;
+            }
             continue;
         }
         if let Some(at) = step.strip_prefix("clickat:") {
@@ -1748,6 +1797,19 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
             _ => panic!("--do: {step}?"),
         }
+    }
+    if let Some(t) = &st.travel {
+        // The travel map up is the picture, its last box over it.
+        let mut screen = hud::Screen::new(st.assets.palette);
+        if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
+            hud::init_style(&st.assets.archive, &engine.m);
+            t.draw(&mut screen, &font, &mut engine.m, st.cursor.0, st.cursor.1);
+            let hud = hud::Hud { boxed: st.boxes.last().cloned(), ..Default::default() };
+            hud::compose_over(&mut screen, &font, &hud);
+        }
+        create::Creation::save_png(&screen, out);
+        println!("{out}: the travel map");
+        return;
     }
     if let Some((c, e)) = &st.ui {
         // The screen up is the picture.
@@ -2080,6 +2142,8 @@ struct App {
     /// A screen up over the game (I, C), which stops it; EQUIP.IMG once
     /// loaded.
     panel: Option<panels::Panel>,
+    /// The travel map up (`travel`).
+    travel: Option<travel::Travel>,
     equip: Option<Option<interface::Image>>,
     /// Character creation under way (`--create`): its screens instead of
     /// the game, which starts when it ends. Also the main menu after a
@@ -2194,7 +2258,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() {
             return;
         }
         let k = &self.keys;
@@ -2355,6 +2419,10 @@ impl App {
             // (a list, the name) over it.
             spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
             hud::compose_over(&mut self.screen, &self.font, &hud);
+        } else if let Some(t) = &self.travel {
+            let (x, y) = self.screen_point();
+            t.draw(&mut self.screen, &self.font, &mut self.engine.m, x, y);
+            hud::compose_over(&mut self.screen, &self.font, &hud);
         } else {
             self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
@@ -2420,6 +2488,36 @@ impl App {
     fn screen_point(&self) -> (i32, i32) {
         let (w, h) = (self.size.0.max(1.0), self.size.1.max(1.0));
         ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32)
+    }
+
+    /// The map button (Shift+M, its right click): the travel map, or the
+    /// box refusing it.
+    fn open_travel(&mut self) {
+        match travel::Travel::open(&mut self.engine, &self.assets.archive) {
+            Ok(t) => {
+                self.travel = Some(t);
+                if self.captured {
+                    self.release();
+                }
+            }
+            Err(b) => self.boxes.push_back(b),
+        }
+        self.travel_after();
+    }
+
+    /// An input to the travel map, then its boxes shown and its end
+    /// followed (`travel::after`).
+    fn travel_input(&mut self, f: impl FnOnce(&mut travel::Travel, &mut Engine, &archive::Archive)) {
+        if let Some(t) = &mut self.travel {
+            f(t, &mut self.engine, &self.assets.archive);
+        }
+        self.travel_after();
+    }
+
+    fn travel_after(&mut self) {
+        let mut boxes = Vec::new();
+        travel::after(&mut self.travel, &mut self.engine, &mut boxes);
+        self.boxes.extend(boxes);
     }
 
     /// I and C: the inventory or the spellbook up, or down.
@@ -2760,6 +2858,17 @@ impl App {
             }
             In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
             In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
+            // The travel map up: its clicks and keys (`travel`).
+            In::Button { down: true, button } if self.travel.is_some() => {
+                let (x, y) = self.screen_point();
+                self.travel_input(|t, e, a| t.click(e, a, x, y, button == MouseButton::Right));
+            }
+            In::Key { code, down: true, text } if self.travel.is_some() && !self.waiting() => {
+                self.travel_input(|t, e, _| t.key(e, code, text.as_deref()));
+            }
+            // Uncaptured, the bar's map button right-clicked: the travel
+            // map (2542:0380 with no left release).
+            In::Button { down: true, button: MouseButton::Right } if !self.captured && travel::on_map_button(self.screen_point()) => self.open_travel(),
             // The right button held: dragging swings the weapon (0000:3C9F).
             In::Button { down, button: MouseButton::Right } if self.captured => self.keys.swing = down,
             // Uncaptured, a left click in the view clicks where it is (a
@@ -2801,6 +2910,8 @@ impl App {
                     KeyCode::KeyR if down => self.camp = true,
                     KeyCode::KeyI if down => self.toggle_panel(true),
                     KeyCode::KeyC if down => self.toggle_panel(false),
+                    // Shift+M: the travel map (2542:0193); M the automap.
+                    KeyCode::KeyM if down && k.run => self.open_travel(),
                     KeyCode::KeyM if down => self.map = !self.map,
                     // The original's A (2542:0137) and F8 (01C5).
                     KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
