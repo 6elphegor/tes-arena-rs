@@ -97,12 +97,17 @@ impl Files {
     /// sorted (DOS gives directory order).
     pub fn with_ext(&self, ext: &[u8]) -> Vec<Vec<u8>> {
         let ext = ext.to_ascii_uppercase();
+        self.with_ext_where(|e| e == &ext[..])
+    }
+
+    /// As `with_ext`, the extensions (upper case) that `fits` takes.
+    pub fn with_ext_where(&self, fits: impl Fn(&[u8]) -> bool) -> Vec<Vec<u8>> {
         let mut v: Vec<Vec<u8>> = self
             .names
             .keys()
             .chain(self.written.keys())
             .filter(|n| !self.deleted.contains(*n))
-            .filter(|n| n.rsplit(|&c| c == b'.').next() == Some(&ext[..]) && n.contains(&b'.'))
+            .filter(|n| n.contains(&b'.') && n.rsplit(|&c| c == b'.').next().is_some_and(&fits))
             .cloned()
             .collect();
         v.sort();

@@ -324,7 +324,11 @@ impl Machine {
         };
         let (prefix, rest) = (&pattern[..star], &pattern[star + 1..]);
         let ext = rest.strip_prefix(b".").unwrap_or(rest);
-        for name in files.with_ext(ext) {
+        // DOS's '?' takes any character or none (1194:D55F's "eq*.??").
+        let fits = |e: &[u8]| {
+            e.len() <= ext.len() && ext.iter().enumerate().all(|(i, &c)| e.get(i).map_or(c == b'?', |&d| c == b'?' || c == d))
+        };
+        for name in files.with_ext_where(fits) {
             if !name.starts_with(prefix) {
                 continue;
             }
