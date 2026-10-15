@@ -115,17 +115,21 @@ mod archive;
 mod areas;
 mod audio;
 mod automap;
+mod bench;
 mod create;
 mod dialog;
 mod doll;
 mod flats;
 mod flc;
 mod hud;
+#[cfg(test)]
+mod inputtest;
 mod interface;
 mod music;
 mod newgame;
 mod panels;
 mod playtest;
+mod prof;
 mod questui;
 mod render;
 mod sheets;
@@ -724,31 +728,35 @@ impl arena::light::LightHooks for LightState {
 impl Assets {
     /// Also enters the area's sky (0000:464A: its objects made).
     fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
-        let flats = world::flats(&engine.m);
-        let archive = Rc::new(archive::Archive::open(dir));
-        let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
+        prof::time("assets.new", || Self::make(dir, engine))
+    }
+
+    fn make(dir: &std::path::Path, engine: &mut Engine) -> Self {
+        let flats = prof::time("assets.flats", || world::flats(&engine.m));
+        let archive = prof::time("assets.archive", || Rc::new(archive::Archive::open(dir)));
+        let sheet = prof::time("assets.sheet", || world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m)));
         interface::enter(&mut engine.m);
         // Outdoors, the sky's images (the sun, the moons, the lightning's
         // bolts, the stars) into the sky's bank, as entering the area does
         // (0000:A4E9 calls 0000:E5C9).
-        if engine.m.sky_images(&mut engine.files).is_none() {
+        if prof::time("assets.sky_images", || engine.m.sky_images(&mut engine.files)).is_none() {
             eprintln!("the sky's images did not load");
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
-        engine.m.area_sky(&mut sky);
+        prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
         Assets {
             palette: world::palette(dir),
             charsheet: world::palette_file(dir, "CHARSHT.COL"),
-            textures: world::textures(&engine.m),
+            textures: prof::time("assets.textures", || world::textures(&engine.m)),
             shading: world::shading(&engine.m),
-            mesh: world::mesh(&engine.m),
+            mesh: prof::time("assets.mesh", || world::mesh(&engine.m)),
             sheet,
             dither: ["DITHER.IMG", "DITHER2.IMG"].iter().flat_map(|n| {
                 let mut d = archive.read(n).unwrap_or_default();
                 d.resize(800, 0);
                 d
             }).collect(),
-            interface: interface::Interface::new(archive.clone()),
+            interface: prof::time("assets.interface", || interface::Interface::new(archive.clone())),
             archive,
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
@@ -762,6 +770,14 @@ impl Assets {
     /// the textures, the shading rows, the walls and the flats. The sky
     /// and the light state stay the area's.
     fn level(&mut self, engine: &Engine) {
+        let t = Instant::now();
+        self.level_make(engine);
+        if prof::on() {
+            prof::add("assets.level", t.elapsed());
+        }
+    }
+
+    fn level_make(&mut self, engine: &Engine) {
         let flats = world::flats(&engine.m);
         self.sheet = world::sprite_sheet(&flats, &self.archive, &world::creature_names(&engine.m));
         self.textures = world::textures(&engine.m);
@@ -769,9 +785,18 @@ impl Assets {
         self.mesh = world::mesh(&engine.m);
     }
 
+    fn scene(&self) -> Scene<'_> {
+        Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither }
+    }
+
     fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
-        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither };
-        Renderer::new(device, queue, format, &scene)
+        Renderer::new(device, queue, format, &self.scene())
+    }
+
+    /// `r` made over for these assets (its pipelines and, where it can,
+    /// its sprite atlas kept: `Renderer::reload`).
+    fn reload_renderer(&self, r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
+        prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
     /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
@@ -980,6 +1005,15 @@ fn main() {
             args.insert(2.min(args.len()), "START.MIF".into());
         }
     }
+    // --bench TURNS [SETUP]: the window's turns and redraws timed,
+    // headless (`bench`).
+    let mut bench = None;
+    if let Some(i) = args.iter().position(|a| a == "--bench") {
+        let turns: usize = args[i + 1].parse().expect("--bench TURNS [SETUP]");
+        let setup = args.get(i + 2).filter(|a| !a.starts_with("--")).cloned();
+        args.drain(i..i + 2 + setup.is_some() as usize);
+        bench = Some((turns, setup.unwrap_or_default()));
+    }
     // --playtest SEED FRAMES [SETUP]: a headless playtest (`playtest`).
     let mut playtest = None;
     if let Some(i) = args.iter().position(|a| a == "--playtest") {
@@ -1000,7 +1034,8 @@ fn main() {
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
-    let mut engine = world::load(&dir, &args[2]);
+    let started = Instant::now();
+    let mut engine = prof::time("start.load", || world::load(&dir, &args[2]));
     // The music driver loads at the program's start (2F9F:01C7, 035B),
     // before the first area picks a song.
     if SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed) || (!MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed)) {
@@ -1042,13 +1077,7 @@ fn main() {
         }
     }
     if let Some(h) = hour {
-        // The clock at that hour of the first day (its calendar fields
-        // agreeing, so no hour passes at once), and the sky's time.
-        use arena::clock::var::{HOUR, MINUTE, MINUTES};
-        engine.m.mem.w32(arena::mem::DS, MINUTES, h % 24 * 60);
-        engine.m.mem.w16(arena::mem::DS, HOUR, (h % 24) as u16);
-        engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
-        engine.m.sky_time().expect("sky time");
+        set_hour(&mut engine, h);
     }
     if !load_at_start {
         world::city_people(&mut engine);
@@ -1085,15 +1114,43 @@ fn main() {
         shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)), &maker_script);
         return;
     }
+    let play = !MUTE.load(std::sync::atomic::Ordering::Relaxed);
+    let mut app = make_app(dir, engine, run, creation, answers, save_dir, slot, play);
+    if let Some((turns, setup)) = bench {
+        bench::run(&mut app, turns, &setup, started);
+        return;
+    }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
+    event_loop.run_app(&mut app).expect("run");
+}
+
+
+/// The clock at hour `h` of the first day (its calendar fields agreeing,
+/// so no hour passes at once), and the sky's time (`--hour`).
+fn set_hour(engine: &mut Engine, h: u32) {
+    use arena::clock::var::{HOUR, MINUTE, MINUTES};
+    engine.m.mem.w32(arena::mem::DS, MINUTES, h % 24 * 60);
+    engine.m.mem.w16(arena::mem::DS, HOUR, (h % 24) as u16);
+    engine.m.mem.w16(arena::mem::DS, MINUTE, 0);
+    engine.m.sky_time().expect("sky time");
+}
+
+/// The window's application over `engine` (its area's `run`, creation's
+/// screens if under way, the answers given first, the save directory and
+/// slot), with no window yet (`resumed` makes it). `play`: sound and
+/// music played (else none, as with --mute).
+#[allow(clippy::too_many_arguments)]
+fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation: Option<create::Creation>, answers: std::collections::VecDeque<dialog::Answer>, save_dir: Option<PathBuf>, slot: u8, play: bool) -> App {
     let assets = Assets::new(&dir, &mut engine);
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
     hud::init_style(&assets.archive, &engine.m);
     let screen = hud::Screen::new(assets.palette);
-    let audio = audio::Audio::new(assets.archive.clone(), !MUTE.load(std::sync::atomic::Ordering::Relaxed), SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let play_music = !MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed);
+    let audio = audio::Audio::new(assets.archive.clone(), play, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
+    let play_music = play && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed);
     let music = music::Music::new(assets.archive.clone(), play_music, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let mut app = App {
+    App {
+        remade: 0,
+        spare: None,
         audio,
         music,
         creation_song: None,
@@ -1124,6 +1181,7 @@ fn main() {
         font,
         screen,
         cursor: (0.0, 0.0),
+        size: (960.0, 600.0),
         drag: (0.0, 0.0),
         save_dir,
         slot,
@@ -1133,10 +1191,8 @@ fn main() {
         creation,
         creation_engine: None,
         movie_at: Instant::now(),
-    };
-    event_loop.run_app(&mut app).expect("run");
+    }
 }
-
 
 /// The game's font for its texts (`hud`).
 const FONT: &str = "ARENAFNT.DAT";
@@ -1201,7 +1257,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.m.mem.w8(DS, arena::controls::var::BUTTONS, buttons);
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
-    let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
+    let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     if stairs {
         // 0000:368E, the stairs' level screen: the automap kept and the new
@@ -1211,7 +1267,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         engine.m.automap_load(&mut engine.files);
     }
     let level_changed = stairs || wild_moved(engine, window);
-    assets.view_frame(engine, input.aspect);
+    prof::time("view_frame", || assets.view_frame(engine, input.aspect));
     TurnOut { frame, level_changed }
 }
 
@@ -1248,7 +1304,16 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
 
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
-    Engine { m: engine.m.clone(), files: engine.files.clone() }
+    prof::time("turn.copy", || Engine { m: engine.m.clone(), files: engine.files.clone() })
+}
+
+/// `src` copied into `dst`, reusing `dst`'s allocations (`copy` makes
+/// new ones: a megabyte and more of fresh pages to fault in).
+fn copy_into(dst: &mut Engine, src: &Engine) {
+    prof::time("turn.copy", || {
+        dst.m.clone_from(&src.m);
+        dst.files.clone_from(&src.files);
+    });
 }
 
 /// The window the game centres its boxes in (A914, A916, A918, A91A).
@@ -1994,6 +2059,12 @@ struct Pending {
 }
 
 struct App {
+    /// How often the renderer was made again (`remake_renderer`; a
+    /// headless bench keeps its own).
+    remade: u32,
+    /// The last standing turn's copy of the engine, the next turn's to
+    /// fill (its allocations reused).
+    spare: Option<Engine>,
     /// The sound driver (`audio`).
     audio: audio::Audio,
     /// The music driver (`music`), and the song the creation's screens
@@ -2041,8 +2112,9 @@ struct App {
     status: Option<String>,
     font: hud::Font,
     screen: hud::Screen,
-    /// The cursor in the window (pixels).
+    /// The cursor in the window, and the window's size (pixels).
     cursor: (f64, f64),
+    size: (f64, f64),
     /// The mouse's motion with the right button held, since the last turn.
     drag: (f64, f64),
     /// Where saves go (F5) and come from (F9), and the slot.
@@ -2191,10 +2263,18 @@ impl App {
             tick,
             right: self.keys.swing,
             drag: (drag.0.round() as i16, drag.1.round() as i16),
-            aspect: self.gpu.as_ref().map_or(1.6, |g| g.config.width as f32 / g.config.height.max(1) as f32),
+            aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
         };
-        let before = copy(&self.engine);
-        self.turn(before, input, Vec::new());
+        // The engine before the turn, for a question to run it again: into
+        // the last standing turn's copy, its allocations reused.
+        let before = match self.spare.take() {
+            Some(mut e) => {
+                copy_into(&mut e, &self.engine);
+                e
+            }
+            None => copy(&self.engine),
+        };
+        self.turn(before, input, Vec::new(), true);
         // A click now is found by the next frame's drawing.
         if !self.waiting() && std::mem::take(&mut self.click) {
             let mut boxes = Vec::new();
@@ -2208,12 +2288,15 @@ impl App {
 
     /// The turn `input` run from `before` with the answers `given` (and
     /// the script's): stopped at a question, it waits for its answer;
-    /// otherwise it stands, and its frame's end is followed.
-    fn turn(&mut self, before: Engine, input: TurnIn, given: Vec<dialog::Answer>) {
+    /// otherwise it stands, and its frame's end is followed. `fresh`: the
+    /// engine is `before` already (a new turn), not to be copied back.
+    fn turn(&mut self, before: Engine, input: TurnIn, given: Vec<dialog::Answer>, fresh: bool) {
         let mut answers: std::collections::VecDeque<dialog::Answer> = given.iter().cloned().collect();
         let scripted = self.script.len();
         answers.extend(self.script.iter().cloned());
-        self.engine = copy(&before);
+        if !fresh {
+            copy_into(&mut self.engine, &before);
+        }
         let mut talk = dialog::Talk { answers, ..Default::default() };
         self.audio.before(&mut self.engine.m);
         self.music.before(&mut self.engine.m);
@@ -2244,7 +2327,7 @@ impl App {
             self.status = talk.status;
         }
         if let Some(need) = talk.need {
-            self.engine = copy(&before);
+            copy_into(&mut self.engine, &before);
             self.selected = 0;
             self.typed.clear();
             if let dialog::Need::Spend(snap) = &need {
@@ -2260,6 +2343,8 @@ impl App {
             }
             return;
         }
+        // The turn stands: its copy is the next turn's to fill.
+        self.spare = Some(before);
         print_message(&self.engine, &mut self.message);
         if out.level_changed {
             self.assets.level(&self.engine);
@@ -2294,12 +2379,49 @@ impl App {
         let Some(p) = self.pending.take() else { return };
         let mut given = p.given;
         given.push(a);
-        self.turn(p.before, p.input, given);
+        self.turn(p.before, p.input, given, false);
+    }
+
+    /// The 320 x 200 layer of a redraw (the HUD, a screen up, an
+    /// animation), and the camera the world is drawn from.
+    fn compose(&mut self) -> Camera {
+        let cam = camera(&self.engine);
+        let hud = prof::time("redraw.hud", || self.hud());
+        let t = std::time::Instant::now();
+        self.screen.clear();
+        if let Some(mv) = self.movies.front() {
+            mv.draw(&mut self.screen, &self.font);
+        } else if let Some(c) = &self.creation {
+            c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
+        } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
+            // Inside the guild's spellmaker: its screen, the question asked
+            // (a list, the name) over it.
+            spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+        } else {
+            self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
+            self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+            if self.panel.is_some() {
+                self.equip_image();
+                let equip = self.equip.as_ref().and_then(|e| e.as_ref());
+                let doll = doll::images(&self.assets.archive, &self.engine.m);
+                panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
+            }
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+            if self.map {
+                automap::draw(&mut self.screen, &self.engine.m);
+            }
+        }
+        if prof::on() {
+            prof::add("redraw.screen", t.elapsed());
+        }
+        cam
     }
 
     fn remake_renderer(&mut self) {
+        self.remade += 1;
         if let Some(g) = &mut self.gpu {
-            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+            self.assets.reload_renderer(&mut g.renderer, &g.device, &g.queue);
         }
     }
 
@@ -2339,8 +2461,7 @@ impl App {
 
     /// The cursor on the 320 x 200 screen.
     fn screen_point(&self) -> (i32, i32) {
-        let Some(g) = &self.gpu else { return (0, 0) };
-        let (w, h) = (g.config.width as f64, g.config.height as f64);
+        let (w, h) = (self.size.0.max(1.0), self.size.1.max(1.0));
         ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32)
     }
 
@@ -2446,9 +2567,7 @@ impl App {
     /// line's item put on or off, or selected; the use list's entry used;
     /// the spellbook's entry cast.
     fn panel_click(&mut self, right: bool) {
-        let Some(g) = &self.gpu else { return };
-        let (w, h) = (g.config.width as f64, g.config.height as f64);
-        let (x, y) = ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32);
+        let (x, y) = self.screen_point();
         let mut said = panels::Said::default();
         let mut cast = None;
         match self.panel.as_mut() {
@@ -2508,9 +2627,9 @@ impl App {
     }
 
     /// A click on the interface bar (`sheets::bar_click`).
-    fn bar(&mut self, x: i32, y: i32, right: bool) {
+    fn bar(&mut self, x: i32, y: i32, right: bool) -> bool {
         sheets::pics(&self.assets.archive, &self.engine.m);
-        let Some(a) = sheets::bar_click(&mut self.engine.m, x, y, right) else { return };
+        let Some(a) = sheets::bar_click(&mut self.engine.m, x, y, right) else { return false };
         match a {
             sheets::BarAction::None | sheets::BarAction::WorldMap => {}
             sheets::BarAction::Automap => self.map = true,
@@ -2530,6 +2649,26 @@ impl App {
             sheets::BarAction::Camp => self.camp = true,
             sheets::BarAction::Sheet => self.panel = Some(panels::Panel::Sheet),
         }
+        true
+    }
+
+    /// The automap screen (M, the map's button), on the player.
+    fn open_automap(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.engine.m.automap_view_open();
+        self.map = true;
+    }
+
+    /// The character sheet (K, the portrait).
+    fn open_sheet(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.panel = Some(panels::Panel::Sheet);
+    }
+
+    /// The logbook (L, the scroll).
+    fn open_log(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files)));
     }
 
     /// A box of the view's own.
@@ -2635,9 +2774,7 @@ impl App {
             self.boxes.pop_front();
             return;
         }
-        let Some(g) = &self.gpu else { return };
-        let (w, h) = (g.config.width as f64, g.config.height as f64);
-        let (x, y) = ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32);
+        let (x, y) = self.screen_point();
         // The spellmaker waits for a click on its screen or form.
         if matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)) {
             self.answer(dialog::Answer::Click(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16));
@@ -2646,6 +2783,237 @@ impl App {
         let hud = self.hud();
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
             self.answer(dialog::Answer::Pick(i as u16));
+        }
+    }
+}
+
+/// An input the window gives, apart from winit's event loop and the GPU,
+/// so that a test can give them too (`App::input`).
+#[derive(Clone, Debug)]
+enum In {
+    /// A key down or up, with the text it types.
+    Key { code: winit::keyboard::KeyCode, down: bool, text: Option<String> },
+    /// The cursor moved to (x, y) in the window (pixels).
+    Cursor(f64, f64),
+    /// A mouse button down or up.
+    Button { button: winit::event::MouseButton, down: bool },
+    /// The mouse's raw motion (mickeys), for looking and dragging.
+    Motion(f64, f64),
+    /// The mouse's wheel turned (lines; up positive).
+    Wheel(f64),
+    /// The window's new size (pixels).
+    Resized(f64, f64),
+}
+
+impl App {
+    /// One input: an animation's next lines; creation's screens; a box or
+    /// a question answered; a panel's keys and clicks; else the game's
+    /// keys, the mouse captured, a click in the view.
+    fn input(&mut self, ev: In) {
+        use winit::event::MouseButton;
+        use winit::keyboard::KeyCode;
+        match ev {
+            In::Resized(w, h) => self.size = (w, h),
+            In::Cursor(x, y) => self.cursor = (x, y),
+            // The wheel moves a menu's or a list's entry, as Up and Down do
+            // (a list scrolls to keep it shown).
+            In::Wheel(dy) => {
+                if self.boxes.is_empty() {
+                    if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
+                        let n = m.entries.len().max(1);
+                        self.selected = if dy > 0.0 { (self.selected + n - 1) % n } else if dy < 0.0 { (self.selected + 1) % n } else { self.selected };
+                    }
+                }
+            }
+            In::Motion(dx, dy) => {
+                if self.captured && !self.waiting() {
+                    if self.keys.swing {
+                        // A mickey a pixel.
+                        self.drag.0 += dx;
+                        self.drag.1 += dy;
+                    } else {
+                        // About a quarter turn for 400 pixels.
+                        self.look += dx * 128.0 / 400.0;
+                    }
+                }
+            }
+            // An animation up: a key or a click its next lines, or its end.
+            In::Button { down: true, .. } | In::Key { down: true, .. } if !self.movies.is_empty() => {
+                if let Some(mv) = self.movies.front_mut() {
+                    if mv.lines.is_empty() {
+                        mv.over = true;
+                    } else {
+                        mv.key();
+                    }
+                    if mv.over {
+                        self.movies.pop_front();
+                        self.movies_over();
+                    }
+                }
+            }
+            In::Button { button, down } if self.creation.is_some() => {
+                if down && button == MouseButton::Left {
+                    let (x, y) = self.screen_point();
+                    self.creation_input(create::Input::Click(x, y));
+                }
+            }
+            In::Key { code, down, text } if self.creation.is_some() => {
+                if !down {
+                    return;
+                }
+                let inp = match code {
+                    KeyCode::Enter | KeyCode::NumpadEnter => Some(create::Input::Enter),
+                    KeyCode::Escape => Some(create::Input::Esc),
+                    KeyCode::Backspace => Some(create::Input::Back),
+                    KeyCode::ArrowUp => Some(create::Input::Up),
+                    KeyCode::ArrowDown => Some(create::Input::Down),
+                    _ => text.as_deref().and_then(|t| t.bytes().next()).filter(|c| (0x20..0x7F).contains(c)).map(create::Input::Char),
+                };
+                if let Some(inp) = inp {
+                    self.creation_input(inp);
+                }
+            }
+            In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
+            In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
+            // The automap screen up: its buttons and its exit (0000:2E30).
+            In::Button { down: true, .. } if self.map => {
+                let (x, y) = self.screen_point();
+                if automap::exit_at(x, y) {
+                    self.map = false;
+                } else if let Some(b) = automap::button_at(x, y) {
+                    self.engine.m.automap_view_button(b);
+                    self.engine.m.automap_origin();
+                }
+            }
+            In::Button { .. } if self.map => {}
+            // Uncaptured, a click on the interface bar (rows 147 on) is its
+            // button's (2542:06CE); off the buttons it captures the mouse.
+            In::Button { down: true, button } if !self.captured && self.screen_point().1 >= 147 => {
+                let (x, y) = self.screen_point();
+                if !self.bar(x, y, button == MouseButton::Right) {
+                    self.capture();
+                }
+            }
+            // The right button held: dragging swings the weapon (0000:3C9F).
+            In::Button { down, button: MouseButton::Right } if self.captured => self.keys.swing = down,
+            // Uncaptured, a left click in the view clicks where it is (a
+            // corpse on the floor); another button captures the mouse.
+            In::Button { down: true, button: MouseButton::Left } if !self.captured && self.screen_point().1 < 147 => {
+                self.click_point = Some(self.screen_point());
+                self.click = true;
+            }
+            In::Button { down: true, .. } if !self.captured => self.capture(),
+            In::Button { down: true, button: MouseButton::Left } => self.click = true,
+            In::Button { .. } => {}
+            In::Key { code, down, text } => {
+                if down && self.waiting() {
+                    self.dialog_key(code, text.as_deref());
+                    return;
+                }
+                if down && self.panel.is_some() {
+                    self.panel_key(code);
+                    return;
+                }
+                if self.map {
+                    // The automap screen: Esc or M leaves; the arrows and
+                    // Home are its buttons (a convenience of the view's).
+                    let b = match code {
+                        _ if !down => return,
+                        KeyCode::Escape | KeyCode::KeyM => {
+                            self.map = false;
+                            return;
+                        }
+                        KeyCode::ArrowUp => 0,
+                        KeyCode::ArrowDown => 1,
+                        KeyCode::ArrowRight => 2,
+                        KeyCode::ArrowLeft => 3,
+                        KeyCode::Home => 4,
+                        _ => return,
+                    };
+                    self.engine.m.automap_view_button(b);
+                    self.engine.m.automap_origin();
+                    return;
+                }
+                // Any key pressed during a rest ends it (AFF9); not the key
+                // that asked for the camp (R), which the original's input
+                // step takes before the rest begins.
+                if down && self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
+                    self.key = true;
+                }
+                let k = &mut self.keys;
+                match code {
+                    KeyCode::KeyW | KeyCode::ArrowUp => k.forward = down,
+                    KeyCode::KeyS | KeyCode::ArrowDown => k.back = down,
+                    KeyCode::KeyA => k.left = down,
+                    KeyCode::KeyD => k.right = down,
+                    KeyCode::ArrowLeft => k.turn_left = down,
+                    KeyCode::ArrowRight => k.turn_right = down,
+                    KeyCode::Space => k.jump = down,
+                    KeyCode::KeyF if down => world::summon(&mut self.engine),
+                    KeyCode::KeyP if down => world::summon_people(&mut self.engine),
+                    KeyCode::KeyE if down => self.click = true,
+                    KeyCode::KeyR if down => self.camp = true,
+                    KeyCode::KeyI if down => self.toggle_panel(true),
+                    KeyCode::KeyC if down => self.toggle_panel(false),
+                    KeyCode::KeyM if down => self.open_automap(),
+                    // The view's keys for the bar's portrait and scroll.
+                    KeyCode::KeyK if down => self.open_sheet(),
+                    KeyCode::KeyL if down => self.open_log(),
+                    // The original's A (2542:0137) and F8 (01C5).
+                    KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
+                    KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
+                    // The game's debug keys (scan codes 3Ch, 3Dh).
+                    KeyCode::F2 => self.engine.m.set_key(0x3C, down),
+                    KeyCode::F3 => self.engine.m.set_key(0x3D, down),
+                    KeyCode::F5 if down => self.save(),
+                    KeyCode::F9 if down => self.load(),
+                    KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
+                    KeyCode::Escape if down => self.release(),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// The mouse captured: locked (or confined) and hidden in the window;
+    /// with no window (a test), taken as captured.
+    fn capture(&mut self) {
+        match &self.gpu {
+            Some(g) => {
+                let ok = g
+                    .window
+                    .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                    .or_else(|_| g.window.set_cursor_grab(winit::window::CursorGrabMode::Confined))
+                    .is_ok();
+                g.window.set_cursor_visible(!ok);
+                self.captured = ok;
+            }
+            None => self.captured = true,
+        }
+    }
+
+    /// The time at `now`: the animations and creation's screens advanced,
+    /// and a game turn when its time has come (18.2 timer ticks a second,
+    /// a frame taking `frame_ticks`). While the game waits for the player,
+    /// no time passes.
+    fn tick(&mut self, now: Instant) {
+        if let Some(mv) = self.movies.front_mut() {
+            mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            if mv.over {
+                self.movies.pop_front();
+                self.movies_over();
+            }
+        }
+        if let Some(c) = &mut self.creation {
+            c.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            self.creation_outcome();
+        }
+        self.creation_music();
+        self.movie_at = now;
+        if now >= self.next {
+            self.step();
+            let ticks = self.engine.frame_ticks() as f64;
+            self.next = now + Duration::from_secs_f64(ticks / 18.2);
         }
     }
 }
@@ -2682,14 +3050,17 @@ impl winit::application::ApplicationHandler for App {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
+        // The window's size in pixels, as the cursor's positions are
+        // given (a HiDPI screen may make it larger than asked for).
+        self.size = (config.width as f64, config.height as f64);
         let renderer = self.assets.renderer(&device, &queue, format);
         let overlay = hud::Overlay::new(&device, format);
         self.gpu = Some(Gpu { window, surface, device, queue, config, renderer, overlay });
     }
 
     fn window_event(&mut self, el: &winit::event_loop::ActiveEventLoop, _id: winit::window::WindowId, event: winit::event::WindowEvent) {
-        use winit::event::{ElementState, MouseButton, WindowEvent};
-        use winit::keyboard::{KeyCode, PhysicalKey};
+        use winit::event::{ElementState, WindowEvent};
+        use winit::keyboard::PhysicalKey;
         match event {
             WindowEvent::CloseRequested => el.exit(),
             WindowEvent::Resized(size) => {
@@ -2698,187 +3069,24 @@ impl winit::application::ApplicationHandler for App {
                     g.config.height = size.height.max(1);
                     g.surface.configure(&g.device, &g.config);
                 }
+                self.input(In::Resized(size.width.max(1) as f64, size.height.max(1) as f64));
             }
-            WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
-            // An animation up: a key or a click its next lines, or its end.
-            WindowEvent::MouseInput { state: ElementState::Pressed, .. } | WindowEvent::KeyboardInput { event: winit::event::KeyEvent { state: ElementState::Pressed, .. }, .. }
-                if !self.movies.is_empty() =>
-            {
-                if let Some(mv) = self.movies.front_mut() {
-                    if mv.lines.is_empty() {
-                        mv.over = true;
-                    } else {
-                        mv.key();
-                    }
-                    if mv.over {
-                        self.movies.pop_front();
-                        self.movies_over();
-                    }
-                }
-            }
-            WindowEvent::MouseInput { state, button, .. } if self.creation.is_some() => {
-                if state == ElementState::Pressed && button == MouseButton::Left {
-                    let (x, y) = self.screen_point();
-                    self.creation_input(create::Input::Click(x, y));
-                }
-            }
-            WindowEvent::KeyboardInput { event, .. } if self.creation.is_some() => {
-                if event.state != ElementState::Pressed {
-                    return;
-                }
-                let inp = match event.physical_key {
-                    PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter) => Some(create::Input::Enter),
-                    PhysicalKey::Code(KeyCode::Escape) => Some(create::Input::Esc),
-                    PhysicalKey::Code(KeyCode::Backspace) => Some(create::Input::Back),
-                    PhysicalKey::Code(KeyCode::ArrowUp) => Some(create::Input::Up),
-                    PhysicalKey::Code(KeyCode::ArrowDown) => Some(create::Input::Down),
-                    _ => event.text.as_deref().and_then(|t| t.bytes().next()).filter(|c| (0x20..0x7F).contains(c)).map(create::Input::Char),
+            WindowEvent::CursorMoved { position, .. } => self.input(In::Cursor(position.x, position.y)),
+            WindowEvent::MouseWheel { delta, .. } => {
+                let dy = match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    winit::event::MouseScrollDelta::PixelDelta(p) => p.y / 20.0,
                 };
-                if let Some(inp) = inp {
-                    self.creation_input(inp);
-                }
+                self.input(In::Wheel(dy));
             }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if self.waiting() => self.dialog_click(),
-            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
-            // The automap screen up: its buttons and its exit (0000:2E30).
-            WindowEvent::MouseInput { state: ElementState::Pressed, .. } if self.map => {
-                let (x, y) = self.screen_point();
-                if automap::exit_at(x, y) {
-                    self.map = false;
-                } else if let Some(b) = automap::button_at(x, y) {
-                    self.engine.m.automap_view_button(b);
-                    self.engine.m.automap_origin();
-                }
-            }
-            // On the interface bar (rows 147 on): its buttons (2542:06CE).
-            WindowEvent::MouseInput { state: ElementState::Pressed, button, .. } if !self.captured && self.screen_point().1 >= 147 => {
-                let (x, y) = self.screen_point();
-                self.bar(x, y, button == MouseButton::Right);
-            }
-            // The right button held: dragging swings the weapon (0000:3C9F).
-            WindowEvent::MouseInput { state, button: MouseButton::Right, .. } if self.captured => self.keys.swing = state == ElementState::Pressed,
-            // Uncaptured, a left click in the view clicks where it is (a
-            // corpse on the floor); another button captures the mouse.
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } if !self.captured && self.screen_point().1 < 147 => {
-                self.click_point = Some(self.screen_point());
-                self.click = true;
-            }
-            WindowEvent::MouseInput { state: ElementState::Pressed, .. } if !self.captured => {
-                if let Some(g) = &self.gpu {
-                    let ok = g
-                        .window
-                        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-                        .or_else(|_| g.window.set_cursor_grab(winit::window::CursorGrabMode::Confined))
-                        .is_ok();
-                    g.window.set_cursor_visible(!ok);
-                    self.captured = ok;
-                }
-            }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click = true,
+            WindowEvent::MouseInput { state, button, .. } => self.input(In::Button { button, down: state == ElementState::Pressed }),
             WindowEvent::KeyboardInput { event, .. } => {
-                let down = event.state == ElementState::Pressed;
                 if let PhysicalKey::Code(code) = event.physical_key {
-                    if down && self.waiting() {
-                        self.dialog_key(code, event.text.as_deref());
-                        return;
-                    }
-                    if down && self.panel.is_some() {
-                        self.panel_key(code);
-                        return;
-                    }
-                    if down && self.map {
-                        // The automap screen: Esc or M leaves; the arrows
-                        // and Home are its buttons (a convenience).
-                        let b = match code {
-                            KeyCode::Escape | KeyCode::KeyM => {
-                                self.map = false;
-                                return;
-                            }
-                            KeyCode::ArrowUp => 0,
-                            KeyCode::ArrowDown => 1,
-                            KeyCode::ArrowRight => 2,
-                            KeyCode::ArrowLeft => 3,
-                            KeyCode::Home => 4,
-                            _ => return,
-                        };
-                        self.engine.m.automap_view_button(b);
-                        self.engine.m.automap_origin();
-                        return;
-                    }
-                    if down {
-                        // Any key ends a rest (AFF9).
-                        self.key = true;
-                    }
-                    let k = &mut self.keys;
-                    match code {
-                        KeyCode::KeyW | KeyCode::ArrowUp => k.forward = down,
-                        KeyCode::KeyS | KeyCode::ArrowDown => k.back = down,
-                        KeyCode::KeyA => k.left = down,
-                        KeyCode::KeyD => k.right = down,
-                        KeyCode::ArrowLeft => k.turn_left = down,
-                        KeyCode::ArrowRight => k.turn_right = down,
-                        KeyCode::Space => k.jump = down,
-                        KeyCode::KeyF if down => world::summon(&mut self.engine),
-                        KeyCode::KeyP if down => world::summon_people(&mut self.engine),
-                        KeyCode::KeyE if down => self.click = true,
-                        KeyCode::KeyR if down => self.camp = true,
-                        KeyCode::KeyI if down => self.toggle_panel(true),
-                        KeyCode::KeyC if down => self.toggle_panel(false),
-                        KeyCode::KeyM if down => {
-                            sheets::pics(&self.assets.archive, &self.engine.m);
-                            self.engine.m.automap_view_open();
-                            self.map = true;
-                        }
-                        // The view's keys for the bar's portrait and scroll.
-                        KeyCode::KeyK if down => {
-                            sheets::pics(&self.assets.archive, &self.engine.m);
-                            self.panel = Some(panels::Panel::Sheet);
-                        }
-                        KeyCode::KeyL if down => {
-                            sheets::pics(&self.assets.archive, &self.engine.m);
-                            self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files)));
-                        }
-                        // The original's A (2542:0137) and F8 (01C5).
-                        KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
-                        KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
-                        // The game's debug keys (scan codes 3Ch, 3Dh).
-                        KeyCode::F2 => self.engine.m.set_key(0x3C, down),
-                        KeyCode::F3 => self.engine.m.set_key(0x3D, down),
-                        KeyCode::F5 if down => self.save(),
-                        KeyCode::F9 if down => self.load(),
-                        KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
-                        KeyCode::Escape if down => self.release(),
-                        _ => {}
-                    }
+                    self.input(In::Key { code, down: event.state == ElementState::Pressed, text: event.text.as_deref().map(str::to_string) });
                 }
             }
             WindowEvent::RedrawRequested => {
-                let cam = camera(&self.engine);
-                let hud = self.hud();
-                self.screen.clear();
-                if let Some(mv) = self.movies.front() {
-                    mv.draw(&mut self.screen, &self.font);
-                } else if let Some(c) = &self.creation {
-                    c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
-                } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
-                    // Inside the guild's spellmaker: its screen, the
-                    // question asked (a list, the name) over it.
-                    spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
-                    hud::compose_over(&mut self.screen, &self.font, &hud);
-                } else {
-                    self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
-                    self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
-                    if self.panel.is_some() {
-                        self.equip_image();
-                        let equip = self.equip.as_ref().and_then(|e| e.as_ref());
-                        let doll = doll::images(&self.assets.archive, &self.engine.m);
-                        panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
-                    }
-                    hud::compose_over(&mut self.screen, &self.font, &hud);
-                    if self.map {
-                        automap::draw(&mut self.screen, &self.engine.m);
-                    }
-                }
+                let cam = self.compose();
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);
@@ -2903,42 +3111,12 @@ impl winit::application::ApplicationHandler for App {
 
     fn device_event(&mut self, _el: &winit::event_loop::ActiveEventLoop, _id: winit::event::DeviceId, event: winit::event::DeviceEvent) {
         if let winit::event::DeviceEvent::MouseMotion { delta } = event {
-            if self.captured && !self.waiting() {
-                if self.keys.swing {
-                    // A mickey a pixel.
-                    self.drag.0 += delta.0;
-                    self.drag.1 += delta.1;
-                } else {
-                    // About a quarter turn for 400 pixels.
-                    self.look += delta.0 * 128.0 / 400.0;
-                }
-            }
+            self.input(In::Motion(delta.0, delta.1));
         }
     }
 
     fn about_to_wait(&mut self, el: &winit::event_loop::ActiveEventLoop) {
-        // The game runs at its own pace (18.2 timer ticks a second, a frame
-        // taking `frame_ticks`); drawing goes as fast as the display. While
-        // the game waits for the player, no time passes.
-        let now = Instant::now();
-        if let Some(mv) = self.movies.front_mut() {
-            mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
-            if mv.over {
-                self.movies.pop_front();
-                self.movies_over();
-            }
-        }
-        if let Some(c) = &mut self.creation {
-            c.advance(now.duration_since(self.movie_at).as_millis() as u32);
-            self.creation_outcome();
-        }
-        self.creation_music();
-        self.movie_at = now;
-        if now >= self.next {
-            self.step();
-            let ticks = self.engine.frame_ticks() as f64;
-            self.next = now + Duration::from_secs_f64(ticks / 18.2);
-        }
+        self.tick(Instant::now());
         if let Some(g) = &self.gpu {
             g.window.request_redraw();
         }

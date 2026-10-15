@@ -342,13 +342,8 @@ pub fn bar_click(m: &mut Machine, x: i32, y: i32, right: bool) -> Option<BarActi
     let i = BAR.iter().position(|&(x0, y0, x1, y1)| x >= x0 && x <= x1 && y >= y0 && y <= y1)?;
     Some(match i {
         0 => {
-            // 0486: not in water (C39A bit 4000h), the weapon readied or put
-            // away (5E0 bit 10h) and the hands' frame 1Eh.
-            if m.mem.r16(DS, 0xC39A) & 0x4000 == 0 {
-                let f = m.mem.r16(DS, 0x05E0) ^ 0x10;
-                m.mem.w16(DS, 0x05E0, f);
-                m.mem.w16(DS, 0x1947, 0x1E);
-            }
+            // 0486: as the menu keys' 'A' (2542:0137).
+            crate::interface::ready(m);
             BarAction::None
         }
         1 if right => BarAction::WorldMap,

@@ -8,7 +8,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub struct Archive {
-    dir: PathBuf,
+    /// The game directory's files by upper-case name, as it was listed
+    /// when the archive was opened (the first of a name in the listing's
+    /// order, where two differ only in case).
+    loose: HashMap<String, PathBuf>,
     bsa: Vec<u8>,
     members: HashMap<String, (usize, usize)>,
 }
@@ -30,7 +33,13 @@ impl Archive {
                 }
             }
         }
-        Archive { dir: dir.to_path_buf(), bsa, members }
+        let mut loose = HashMap::new();
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for e in entries.flatten() {
+                loose.entry(e.file_name().to_string_lossy().to_ascii_uppercase()).or_insert_with(|| e.path());
+            }
+        }
+        Archive { loose, bsa, members }
     }
 
     /// The members' names (upper case).
@@ -40,12 +49,8 @@ impl Archive {
 
     pub fn read(&self, name: &str) -> Option<Vec<u8>> {
         let upper = name.to_ascii_uppercase();
-        if let Ok(entries) = std::fs::read_dir(&self.dir) {
-            for e in entries.flatten() {
-                if e.file_name().to_string_lossy().to_ascii_uppercase() == upper {
-                    return std::fs::read(e.path()).ok();
-                }
-            }
+        if let Some(path) = self.loose.get(&upper) {
+            return std::fs::read(path).ok();
         }
         let &(at, size) = self.members.get(&upper)?;
         self.bsa.get(at..at + size).map(<[u8]>::to_vec)
