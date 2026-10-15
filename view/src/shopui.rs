@@ -245,8 +245,18 @@ fn frame_lines(m: &Machine, at: u16, n: usize) -> Vec<String> {
     for _ in 0..n {
         let raw = m.mem.cstr(frame, at).to_vec();
         at = at.wrapping_add(raw.len() as u16 + 1);
-        let mut row = String::new();
-        let mut first = None;
+        out.push(lay_out(&raw));
+    }
+    out
+}
+
+/// A list line's fields (`\n` between them, each from a column: `\t` and
+/// three digits, its x on the 320-wide screen) as one row, padded to
+/// their columns at about five pixels a character.
+fn lay_out(raw: &[u8]) -> String {
+    let mut row = String::new();
+    let mut first = None;
+    {
         for field in raw.split(|&b| b == b'\n') {
             let (col, text) = match field {
                 [b'\t', a, b, c, rest @ ..] if [a, b, c].iter().all(|d| d.is_ascii_digit()) => {
@@ -265,11 +275,10 @@ fn frame_lines(m: &Machine, at: u16, n: usize) -> Vec<String> {
                     row.push(' ');
                 }
             }
-            row.push_str(&String::from_utf8_lossy(text));
+            row.push_str(&String::from_utf8_lossy(text).replace('\r', ""));
         }
-        out.push(row);
     }
-    out
+    row
 }
 
 /// The mages' guild: its menus, lists, haggling and boxes as the store's;
@@ -301,7 +310,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
         for _ in 0..cx {
             let raw = m.mem.cstr(seg, at).to_vec();
             at = at.wrapping_add(raw.len() as u16 + 1);
-            entries.push(hud::lines(&raw, 0x0F).into_iter().flatten().collect::<Vec<_>>());
+            entries.push(line(&lay_out(&raw)));
         }
         let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0 };
         match self.talk() {
@@ -309,13 +318,23 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             None => 0xFFFF,
         }
     }
-    /// 1194:8020 in mode 1 (buying), the seller named at 1A4C.
+    /// 1194:8020 in mode 1 (buying), the seller named at 1A4C. The
+    /// original maps EMS bank [1032] before loading the dialogue into the
+    /// frame (1194:8665, the bank before kept at A88E) and maps it back on
+    /// every way out (8:82D1..83D3); the haggle port loads into the frame
+    /// as it is, which in the guild holds the stock (bank 18h), so the
+    /// swap is made around it here.
     fn haggle(&mut self, m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
+        use arena::level::var::EMS_MAPPED;
+        let old = m.mem.r16(DS, EMS_MAPPED) >> 2;
+        m.ems_map(m.mem.r16(DS, 0x1032));
         let mut io = HaggleTalk { talk: self.front.talk.as_deref_mut(), asked: price };
-        match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 1, 0x1A4C) {
+        let r = match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 1, 0x1A4C) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (price, true),
-        }
+        };
+        m.ems_map(old);
+        r
     }
     fn spell_screen(&mut self, m: &mut Machine) {
         let name = String::from_utf8_lossy(m.mem.cstr(DS, 0x57E6)).into_owned();
