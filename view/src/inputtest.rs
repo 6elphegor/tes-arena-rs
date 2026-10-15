@@ -1070,3 +1070,138 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     assert!(loaded.iter().any(|n| n.2 == "X") && !loaded.iter().any(|n| n.2 == "Y"), "the save's note loaded back: {loaded:?}");
     let _ = std::fs::remove_dir_all(&saves);
 }
+
+/// The squares of trigger walls whose trigger's index (in TRIGGERS)
+/// `pick` accepts, each with the open squares beside it.
+fn trigger_walls(m: &arena::machine::Machine, pick: impl Fn(u16) -> bool) -> Vec<(u16, Vec<(u16, u16)>)> {
+    use arena::mem::DS;
+    use arena::movement::var::TRIGGERS;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let (rows, cols) = (m.mem.r16(DS, 0xC359), m.mem.r16(DS, 0xC357));
+    let mut out = Vec::new();
+    for r in 0..rows {
+        for c in 0..cols {
+            let sq = r << 8 | c << 1;
+            let w = m.mem.r16(walls, sq);
+            if (w as i16) >= 0 && (w >> 8) as u8 != w as u8 {
+                continue;
+            }
+            let Some(i) = (0..0x10u16).find(|&i| m.mem.r8(DS, TRIGGERS + i) == w as u8 & 0x3F) else { continue };
+            if !pick(i) {
+                continue;
+            }
+            let open = [(0i32, -1i32), (1, 0), (0, 1), (-1, 0)]
+                .iter()
+                .map(|&(dc, dr)| (c as i32 + dc, r as i32 + dr))
+                .filter(|&(c, r)| c >= 0 && r >= 0 && (c as u16) < cols && (r as u16) < rows)
+                .filter(|&(c, r)| m.mem.r16(walls, (r as u16) << 8 | (c as u16) << 1) == 0)
+                .map(|(c, r)| (c as u16, r as u16))
+                .collect();
+            out.push((sq, open));
+        }
+    }
+    out
+}
+
+/// The boxes read (Enter) and a menu left (Esc).
+fn clear(d: &mut Driver, a: &mut App) {
+    for _ in 0..20 {
+        if !a.boxes.is_empty() {
+            d.key(a, KeyCode::Enter, None);
+        } else if menu(a).is_some() {
+            d.key(a, KeyCode::Escape, None);
+        } else {
+            return;
+        }
+    }
+}
+
+/// Stands beside each wall of `walls` in turn, facing each way, and
+/// clicks the view's centre (164, 74) until `done`: a wall's trigger
+/// used by the window's own click.
+fn click_a_wall(d: &mut Driver, a: &mut App, walls: &[(u16, Vec<(u16, u16)>)], done: impl Fn(&App) -> bool) -> bool {
+    use arena::movement::var::{HEADING, X, Y};
+    for (_, open) in walls {
+        for &(c, r) in open {
+            for heading in [0u16, 0x80, 0x100, 0x180] {
+                a.engine.m.mem.w16(arena::mem::DS, X, c << 7 | 64);
+                a.engine.m.mem.w16(arena::mem::DS, Y, r << 7 | 64);
+                a.engine.m.mem.w16(arena::mem::DS, HEADING, heading);
+                a.engine.world_loop_start();
+                d.frame(a);
+                d.click(a, 164, 74, MouseButton::Left);
+                d.frames(a, 2);
+                if done(a) {
+                    return true;
+                }
+                clear(d, a);
+            }
+        }
+    }
+    false
+}
+
+/// The user's save (ARENA_SAVE, slot 1: in Daggerfall's mages' guild,
+/// the main quest at stage 9) walked out of the guild, travelled to the
+/// Imperial City through the travel map's clicks, the town's welcome
+/// read, and the palace's door clicked: the artifact's audience, text
+/// 5DDh (0000:425F), shown whole in its box -- the last template, read
+/// on past TEMPLATE.DAT's end into what the welcome's box kept.
+#[test]
+fn the_palace_at_stage_9_shows_the_artifacts_audience() {
+    use arena::mem::DS;
+    use arena::movement::var::MAP_FLAGS;
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let mut a = app(&dir, &Start { hour: None, load: Some((save, 1)), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    clear(&mut d, &mut a);
+    assert_eq!(a.engine.m.mem.r8(DS, 0x0F77), 9, "the save's stage");
+    let outdoors = |a: &App| a.engine.m.mem.r16(DS, MAP_FLAGS) & 4 != 0;
+    let exits = trigger_walls(&a.engine.m, |_| true);
+    assert!(click_a_wall(&mut d, &mut a, &exits, outdoors), "out of the guild");
+    d.frames(&mut a, 2);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // Shift+M; Esc to the world map; the Imperial Province (its region
+    // at DATA:6D90 + 8 x 62h: 103, 72, 131 x 84); the Imperial City at
+    // (180, 65); the journey's box read; Travel.
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    d.key(&mut a, KeyCode::KeyM, Some("M"));
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+    assert!(a.travel.is_some(), "the travel map");
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 160, 100, MouseButton::Left);
+    d.click(&mut a, 180, 65, MouseButton::Left);
+    let journey = a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>().join("\n");
+    assert!(journey.contains("Imperial City"), "the journey: {journey}");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    d.click(&mut a, 62, 180, MouseButton::Left);
+    assert!(a.travel.is_none(), "travelled");
+    let mut welcome = String::new();
+    for _ in 0..20 {
+        d.frame(&mut a);
+        if let Some(b) = a.boxes.front() {
+            welcome = text(b);
+            break;
+        }
+    }
+    assert!(welcome.contains("You have arrived in the Imperial City"), "the welcome: {welcome:?}");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // The palace's door: the city's triggers 11..13 (0000:4192).
+    let doors = trigger_walls(&a.engine.m, |i| (11..=13).contains(&i));
+    assert!(!doors.is_empty(), "the palace's door");
+    let audience = |a: &App| a.boxes.iter().any(|b| text(b).contains("Palace Gates"));
+    assert!(click_a_wall(&mut d, &mut a, &doors, audience), "the audience");
+    let t = a.boxes.iter().map(|x| text(x)).find(|t| t.contains("Palace Gates")).unwrap();
+    assert!(t.starts_with("As you approach the Palace Gates") && t.trim_end().ends_with("complete..."), "the audience: {t:?}");
+}

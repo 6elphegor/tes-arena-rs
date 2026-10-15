@@ -27,10 +27,10 @@ impl StairsHooks for Counted {
         count(m, 0xFFE2);
         count(m, 0xFFE4);
     }
-    fn automap_keep(&mut self, m: &mut Machine) {
+    fn automap_keep(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         count(m, 0xFFE6);
     }
-    fn automap_load(&mut self, m: &mut Machine) {
+    fn automap_load(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         count(m, 0xFFE0);
     }
     fn quest_level(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
@@ -41,7 +41,7 @@ impl StairsHooks for Counted {
         count(m, 0xFFE4);
         Some(())
     }
-    fn level_screen(&mut self, m: &mut Machine) {
+    fn level_screen(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         assert!(self.level);
         count(m, 0xFFE6);
     }

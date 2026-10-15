@@ -40,10 +40,10 @@ pub trait StairsHooks {
     fn light_table(&mut self, _m: &mut Machine) {}
     /// 292B:095E: a main quest dungeon's level's locks and triggers kept
     /// in STATES.nn (`Machine::states_keep`), before the level changes.
-    fn automap_keep(&mut self, _m: &mut Machine) {}
+    fn automap_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 292B:09AC: the new level's locks and triggers loaded from
     /// STATES.nn (`Machine::states_load`).
-    fn automap_load(&mut self, _m: &mut Machine) {}
+    fn automap_load(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:9FAC with CX 1: a quest dungeon's last level reached
     /// (`Machine::quest_level`: a side quest's item, or its person and
     /// their name, placed). None where the original hangs or faults.
@@ -57,7 +57,7 @@ pub trait StairsHooks {
     }
     /// 0000:368E: the automap kept (23F1:013C, `Machine::automap_keep`),
     /// then loaded (0000:3503, `Machine::automap_load`).
-    fn level_screen(&mut self, _m: &mut Machine) {}
+    fn level_screen(&mut self, _m: &mut Machine, _files: &mut Files) {}
 }
 
 /// `StairsHooks` that do nothing.
@@ -96,9 +96,9 @@ impl Machine {
     /// 0000:51B8, the stairs' hook (CD6E): the light table set for clear
     /// weather (2294:0B8A, `light_table_reset`), the level's automap kept
     /// (292B:095E) and 3C82 cleared.
-    pub fn stairs_hook(&mut self, hooks: &mut dyn StairsHooks) {
+    pub fn stairs_hook(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks) {
         self.light_table_reset(&mut StairsLight(&mut *hooks));
-        hooks.automap_keep(self);
+        hooks.automap_keep(self, files);
         self.mem.w8(DS, 0x3C82, 0);
     }
 
@@ -140,12 +140,12 @@ impl Machine {
                 self.mem.w16(DS, si + 0xF, f);
             }
         }
-        hooks.automap_load(self);
+        hooks.automap_load(self, files);
         self.quest_item_place();
         hooks.quest_level(self, files)?;
         self.mem.w8(DS, 0x4C91, 0xFF);
         hooks.level_piles(self)?;
-        hooks.level_screen(self);
+        hooks.level_screen(self, files);
         self.clear_dungeon_flats();
         self.quest_flat_clear();
         self.floor_marks_clear();
@@ -176,7 +176,7 @@ impl Machine {
                 self.house_flats_mark();
             }
         }
-        hooks.automap_load(self);
+        hooks.automap_load(self, files);
         self.flat_lights();
         self.mem.w16(DS, 0x7A46, 0);
         self.inf_done_hook();
@@ -187,7 +187,7 @@ impl Machine {
         self.quest_flat_clear();
         self.floor_marks_clear();
         if self.mem.r8(DS, 0x0A47) == 3 && self.mem.r8(DS, 0x0A4C) & 0x1F == 0 && self.mem.r8(DS, 0x0A46) == 4 {
-            hooks.level_screen(self);
+            hooks.level_screen(self, files);
         }
         Some(())
     }

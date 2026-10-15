@@ -210,13 +210,23 @@ impl arena::quest::QuestHooks for Audience<'_, '_> {
 }
 
 /// The stairs' hooks: the light table made again from NORMAL.LGT
-/// (2294:0B8A); the automap, the quest's level, the level's creatures
-/// and the screen aren't the view's yet.
+/// (2294:0B8A); a main quest dungeon's levels' locks and triggers kept
+/// in STATES.nn, and the automap's keep and load (0000:368E), as
+/// `areas::Kept`.
 impl arena::hooks::StairsHooks for Front<'_> {
     fn light_table(&mut self, m: &mut arena::machine::Machine) {
         if let Some(l) = self.light.as_deref_mut() {
             l.table(m, arena::weather::NORMAL_LGT);
         }
+    }
+    fn automap_keep(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        arena::hooks::StairsHooks::automap_keep(&mut areas::Kept, m, files);
+    }
+    fn automap_load(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        arena::hooks::StairsHooks::automap_load(&mut areas::Kept, m, files);
+    }
+    fn level_screen(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        arena::hooks::StairsHooks::level_screen(&mut areas::Kept, m, files);
     }
 }
 impl ControlHooks for Front<'_> {
@@ -245,6 +255,11 @@ impl arena::trigger::TriggerHooks for Front<'_> {
     /// 0000:41A4..4247: the audience, its screens as animations.
     fn palace_audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.emperor_audience(files, &mut Audience(self))
+    }
+    /// 0000:425F: at stage 9 the artifact's audience, text 5DDh (137A)
+    /// shown in its box (1194:A36C, AX 0).
+    fn artifact_audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.text(files, self, 0, arena::mem::DS, 0).map(|_| ())
     }
     /// A city's gate out: the city written as the wilderness's blocks
     /// 1..4 (217B:027A; the files are kept in memory).
@@ -307,9 +322,16 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
 }
 impl arena::frame::FrameHooks for Front<'_> {
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
-    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box.
+    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box,
+    /// what the box covers kept at the frame's start (0000:4B18) as the
+    /// original keeps it; the view's screen isn't the game's 256 colours,
+    /// so the kept pixels are black.
     fn town_welcome(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         if m.file_load(files, 0x130C, arena::mem::DS, 0x1044).is_some() {
+            if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
+                let frame = m.mem.r16(arena::mem::DS, 0x9030);
+                m.box_background(frame, 0, rect, None);
+            }
             self.message_box(m, 0x1044);
         }
     }
@@ -1290,13 +1312,6 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
-    if stairs {
-        // 0000:368E, the stairs' level screen: the automap kept and the new
-        // level's loaded (here after the frame; nothing touches the map in
-        // between).
-        engine.m.automap_keep(&mut engine.files);
-        engine.m.automap_load(&mut engine.files);
-    }
     let level_changed = stairs || wild_moved(engine, window);
     prof::time("view_frame", || assets.view_frame(engine, input.aspect));
     TurnOut { frame, level_changed }
@@ -1523,6 +1538,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let mut maker: Option<spellmaker::Maker> = None;
     let run = &mut run;
     let assets = Assets::new(dir, &mut engine);
+    // The texts' style from the start, as the window has it: the boxes
+    // the turns show are sized in it (the welcome's keeps what it covers,
+    // `hud::centred_box`).
+    hud::init_style(&assets.archive, &engine.m);
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
