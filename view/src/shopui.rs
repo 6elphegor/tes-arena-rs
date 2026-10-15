@@ -96,6 +96,7 @@ impl ShopFront<'_, '_> {
             keys: entries.iter().map(|e| e.as_bytes()[0]).collect(),
             selected: 0,
             list: false,
+            kind: 0,
         };
         match self.talk() {
             Some(t) => t.ask_menu(menu),
@@ -147,16 +148,20 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             }
         }
     }
-    fn list(&mut self, m: &mut Machine, si: u16, cx: u16, _di: u16) -> u16 {
+    fn list(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
+        // Kinds 6 and 10 draw the text at DI as their title (1194:5734
+        // keeps it at A872 for 0000:5364); the others don't read it.
+        let title = if di != 0 && matches!(m.list_kind, 6 | 0xA) { String::from_utf8_lossy(m.mem.cstr(DS, di)).into_owned() } else { String::new() };
         if let Some(entries) = self.lines.take() {
-            let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true };
+            let title = if title.is_empty() { Vec::new() } else { crate::hud::lines(title.as_bytes(), 0x0F) };
+            let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
             return match self.talk() {
                 Some(t) => t.ask_menu(menu),
                 None => 0xFFFF,
             };
         }
         match self.talk() {
-            Some(t) => t.list(m, si, cx, ""),
+            Some(t) => t.list(m, si, cx, &title),
             None => 0xFFFF,
         }
     }
@@ -262,7 +267,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             at = at.wrapping_add(raw.len() as u16 + 1);
             entries.push(row(&raw));
         }
-        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true };
+        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
         match self.talk() {
             Some(t) => t.ask_menu(menu),
             None => 0xFFFF,

@@ -244,6 +244,24 @@ fn talk_menu_by_letter_as_by_script() {
 }
 
 #[test]
+fn where_is_shows_its_list_and_tells_the_way_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    let m = menu(&a).expect("a menu").clone();
+    let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
+    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    // "Where is": 1194:5734 with AX 9 (POPUP11.IMG, the record at 5105).
+    let l = menu(&a).expect("the places' list").clone();
+    assert!(l.list && l.kind == 9, "a list of kind 9: {} {}", l.list, l.kind);
+    assert!(!l.entries.is_empty());
+    d.key(&mut a, KeyCode::Enter, None);
+    let (mut b, _) = talk_start(&dir, "1,0");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "a place picked by Enter and by --picks 1,0");
+}
+
+#[test]
 fn esc_leaves_the_talk_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
@@ -357,7 +375,8 @@ fn camping_with_typed_hours_as_by_script() {
     // "For a while" (entry 0), then the hours typed.
     d.key(&mut a, KeyCode::Enter, None);
     match a.pending.as_ref().map(|p| &p.need) {
-        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        // The prompt's trailing spaces kept: the field's room in its box.
+        Some(dialog::Need::Text(prompt)) => assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}"),
         other => panic!("the hours asked for, not {:?}", other.map(|_| "something else")),
     }
     d.key(&mut a, KeyCode::Digit2, Some("2"));
@@ -669,10 +688,19 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     let mut t = Some(travel::Travel::open(&mut b.engine, &archive).ok().expect("it opens"));
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
-    // Travel: the journey made, the screen ended, the area left.
+    // Travel: the journey made, its horse running a frame a day
+    // (1194:30F1), then the screen ended, the area left.
     d.click(&mut a, 62, 180, MouseButton::Left);
+    assert!(a.travel.as_ref().is_some_and(|t| t.journeying()), "the journey's frames play");
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
     assert!(a.travel.is_none(), "the screen ends after the journey");
     t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
+    t.as_mut().unwrap().skip_journey();
     travel::after(&mut t, &mut b.engine, &mut Vec::new());
     assert!(t.is_none());
     same(&a, &b, "Travel clicked, and Travel::click");
@@ -1043,9 +1071,15 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
         Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
         _ => panic!("a click on the map asks for the note's text"),
     }
+    // Typed in place where clicked (0000:9EE9), not in a box.
+    assert_eq!(a.pending.as_ref().and_then(|p| p.at), Some((100, 100)), "the note edited where clicked");
     for (k, c) in [(KeyCode::KeyH, "H"), (KeyCode::KeyI, "i")] {
         d.key(&mut a, k, Some(c));
     }
+    a.compose();
+    let field = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..6).flat_map(|r| (0..12).map(move |c| (100 + r) * hud::W + 100 + c)).map(|i| px[i]).collect() };
+    assert_ne!(field(&a.screen.px), field(&bare), "the text typed drawn on the map");
+    shot(&mut a, "automap_note_typed");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(a.pending.is_none(), "Enter answers");
     assert!(a.map, "the automap stays up");
@@ -1067,6 +1101,7 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     // Clicked again: the note's text asked for again, now edited.
     d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
     assert!(a.pending.is_some(), "a click on the note edits it");
+    assert_eq!(a.typed, "Hi", "the note's text to edit");
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::KeyX, Some("X"));
@@ -1207,6 +1242,13 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.click(&mut a, 62, 180, MouseButton::Left);
+    // The horse runs a frame a day (1194:30F1), then the screen ends.
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.frame(&mut a);
+    }
     assert!(a.travel.is_none(), "travelled");
     let mut welcome = String::new();
     for _ in 0..20 {

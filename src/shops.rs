@@ -379,6 +379,8 @@ impl Machine {
             self.mem.w8(DS, COUNT, count + 1);
         }
         let count = self.mem.r8(DS, COUNT);
+        // AX Ah (1194:C4F6): the list's kind (1194:5734).
+        self.list_kind = 0xA;
         let pick = hooks.list(self, 0x110C, count as u16, 0x1044);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {

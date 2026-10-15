@@ -316,6 +316,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
         keys: Vec::new(),
         selected: sel,
         list: false,
+        kind: 0,
     }
 }
 

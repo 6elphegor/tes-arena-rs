@@ -342,6 +342,8 @@ impl Machine {
     /// 1194:BB83. A drink bought; see the module's notes.
     fn tavern_drinks(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
         self.drinks_list()?;
+        // AX Bh (1194:BB9E): the list's kind (1194:5734).
+        self.list_kind = 0xB;
         let pick = hooks.list(self, DRINKS_TEXT + 1, 10, 0);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
@@ -503,6 +505,8 @@ impl Machine {
     /// written (1194:BA91) when it is.
     fn tavern_room(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         self.mem.w32(DS, TYPED, 0);
+        // AX Ah (1194:BD66): the list's kind (1194:5734).
+        self.list_kind = 0xA;
         let pick = hooks.list(self, ROOM_NAMES, 5, text::ROOMS);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
