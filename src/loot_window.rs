@@ -212,7 +212,7 @@ impl Machine {
     fn of_100_to_256(ax: u16) -> Option<u16> {
         let p = (ax as i16 as i32) * 256;
         let (q, r) = (p / 100, p % 100);
-        let q = i16::try_from(q).ok()? as u16;
+        let q = i16::try_from(q).ok().or_else(|| crate::giveup::original("1194:5B34: the divide by 100 overflows"))? as u16;
         if r.unsigned_abs() >= 0x32 {
             return Some(if (ax as i16) < 0 { q.wrapping_sub(1) } else { q.wrapping_add(1) });
         }
@@ -264,7 +264,7 @@ impl Machine {
             hooks.message_box(self, 0x4B33);
             return Some(true);
         }
-        let q = (ax.wrapping_sub(bx) << 8).checked_div(bx >> 1)?;
+        let q = (ax.wrapping_sub(bx) << 8).checked_div(bx >> 1).or_else(|| crate::giveup::original("1194:4D99: the weight limit's divide by zero"))?;
         let load = Self::of_100_to_256(q)?;
         self.mem.w8(DS, LOAD, load as u8);
         Some(false)

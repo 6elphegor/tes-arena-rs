@@ -239,9 +239,9 @@ impl Machine {
     /// 0 (divide error).
     fn dun_cell(&mut self, w: u16, h: u16) -> Option<u8> {
         let r = self.rng.next();
-        let row = (r.checked_rem(h)? as u8) << 3;
+        let row = (r.checked_rem(h).or_else(|| crate::giveup::original("0000:2939: a chunk grid of no height: the divide by zero"))? as u8) << 3;
         let r = self.rng.next();
-        let col = r.checked_rem(w)? as u8;
+        let col = r.checked_rem(w).or_else(|| crate::giveup::original("0000:2939: a chunk grid of no width: the divide by zero"))? as u8;
         Some(row.wrapping_add(col.wrapping_add(col)))
     }
 

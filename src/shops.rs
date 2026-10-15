@@ -516,10 +516,10 @@ impl Machine {
             };
             if bless {
                 self.mem.w16(DS, GIVEN, ax);
-                let q = ax.checked_div(self.mem.r16(DS, LEAST))?;
+                let q = ax.checked_div(self.mem.r16(DS, LEAST)).or_else(|| crate::giveup::original("1194:C58B: a least donation of 0: the divide by zero"))?;
                 let p = (q as i16 as i32) * 256;
                 let r = p % 100;
-                let mut v = i16::try_from(p / 100).ok()? as u16;
+                let mut v = i16::try_from(p / 100).ok().or_else(|| crate::giveup::original("1194:C58B: the blessing's divide by 100 overflows"))? as u16;
                 if r.unsigned_abs() >= 0x32 {
                     v = if (q as i16) < 0 { v.wrapping_sub(1) } else { v.wrapping_add(1) };
                 }

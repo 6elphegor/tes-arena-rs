@@ -166,7 +166,7 @@ impl Machine {
             cast = cast.wrapping_add(0x16);
         }
         if self.mem.r16(DS, cast.wrapping_add(0xA)) & 1 != 0 {
-            return None;
+            return crate::giveup::original("29CF:01C4: no free cast record: the original searches on through memory");
         }
         self.mem.w16(DS, cast.wrapping_add(0xA), 1);
         let level = self.mem.r8(seg, rec.wrapping_add(field::LEVEL)) as u16 + 1;
@@ -823,7 +823,7 @@ impl Machine {
         let (b, _) = self.range_0bb4(&x)?;
         let v = b.wrapping_add(a) as i16 as i32 as u32;
         let q = (v << 8) / 100;
-        let q = u16::try_from(q).ok()?;
+        let q = u16::try_from(q).ok().or_else(|| crate::giveup::original("2CDD:050F: the fatigue's divide by 100 overflows"))?;
         let fat = x.dx.wrapping_add(field::FATIGUE);
         let ax = (q << 6).wrapping_add(self.mem.r16(x.fs, fat));
         let cap = (self.mem.r8(x.fs, x.dx.wrapping_add(0x29)) as u16 + self.mem.r8(x.fs, x.dx.wrapping_add(0x2E)) as u16) << 6;
