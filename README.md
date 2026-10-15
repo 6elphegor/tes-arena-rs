@@ -257,15 +257,17 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2256 reachable routines (189,658 bytes); 1524 ported in whole or
-part (125,590 bytes), counting far thunks to ported code and the routines
-read by hand as trivial or inlined (`tools/triage.tsv`); 69 left to the
-front end as hooks and 69 that the view re-implements; 499 presentation,
-I/O, driver or hardware routines not ported (the renderer's internals, the
-menu library, input waits, the sound and CyberMan drivers, decode
-artefacts); 95 game-state routines (4,068 bytes) not named by the port that
-look ported inline in a caller, with none left open. Code reached only
-through the 46 unresolved indirect calls isn't counted.
+writing: 2455 reachable routines (198,014 bytes); 1788 ported in whole or
+part (140,111 bytes), counting far thunks to ported code, the handlers
+the port dispatches on by their offsets, and the routines read by hand as
+trivial or inlined (`tools/triage.tsv`); 72 left to the front end as hooks
+and 75 that the view re-implements; 520 presentation, I/O, driver or
+hardware routines not ported (the renderer's internals, the menu library,
+input waits, the sound and CyberMan drivers, decode artefacts); no
+game-state routine left open. Every indirect call site is followed or
+explained: the ones no table or pointer heuristic resolves were traced by
+hand (`INDIRECT` in the tool), 15 with no target in the image (window
+callbacks, code generated at run time, a chained interrupt, a return).
 
 ## Known gaps and approximations
 
@@ -281,6 +283,10 @@ At the time of writing:
   - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
     check (242A:000E) and loading from the title screen (5C8 bit 4) are not
     ported; the view saves to and loads from a fixed slot.
+  - A monster's flat coming alive near the player (25CA:0271,
+    `flat_creature`) is ported and tested, but the view doesn't call it
+    yet: the original runs it from its drawing (0000:CF96, a flat with
+    bit 2 drawn).
   - The Emperor's audience (stage 8) hasn't been reached in a walkthrough;
     the test save is past it.
   - Text 5DDh (the last text in TEMPLATE.DAT, with nothing after it) has

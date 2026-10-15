@@ -2074,7 +2074,7 @@ fn centre_click(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>) -> bo
 }
 
 /// A left click at (x, y) of the 320 x 200 screen in the view: the mouse
-/// put 4 up and left of it, as the click (CB60, 2826:0393) is the cursor
+/// put 4 up and left of it, as the click (CB60, 2826:0A52) is the cursor
 /// + 4; else as `centre_click`.
 fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (i32, i32)) -> bool {
     engine.m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);

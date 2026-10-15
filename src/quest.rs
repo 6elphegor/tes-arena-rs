@@ -727,7 +727,7 @@ const NAME: u16 = 0x6DD4;
 
 impl Machine {
     /// 1194:9FAC (with CX 1, from the stairs' hook 0000:44D7 and the area
-    /// entry 0000:4790): a dungeon's last level reached (5E0 and 5CA lose
+    /// entry 0000:47A2): a dungeon's last level reached (5E0 and 5CA lose
     /// bit 400h first). Unless the player is wanted (5C8 bit 4000h), out
     /// of a dungeon (5E6 not 3) or not on its last level (BB0A + 1 not
     /// C355), the first quest under way, its goal not reached, of type 7
