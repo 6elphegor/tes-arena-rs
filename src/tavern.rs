@@ -380,6 +380,15 @@ impl Machine {
     /// never counted as taken, 1194:BFFF) rolled from the place's seed,
     /// each a line "%u gp\n%s" from 1045 on.
     fn drinks_list(&mut self) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.drinks_list_seeded();
+        self.seed_back(saved, r)
+    }
+
+    fn drinks_list_seeded(&mut self) -> Option<()> {
         for i in 0..10u16 {
             self.mem.w8(DS, TAKEN + i, 0);
         }

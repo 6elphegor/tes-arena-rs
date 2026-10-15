@@ -99,6 +99,15 @@ impl Machine {
     /// to 4 at the centre. None where the original divides by zero or EMS
     /// is on.
     pub fn wild_generate(&mut self) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.wild_generate_seeded();
+        self.seed_back(saved, r)
+    }
+
+    fn wild_generate_seeded(&mut self) -> Option<()> {
         self.mem.w16(DS, WINDOW, 0xFFFF);
         let saved = self.rng.seed;
         let seed = self.mem.r32(DS, LOCATION);
@@ -279,6 +288,15 @@ impl Machine {
     /// (0000:0F05, `WildHooks::weather`). None where a block list is
     /// empty (a division by 0).
     pub fn wild_setup(&mut self, hooks: &mut dyn WildHooks) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.wild_setup_seeded(hooks);
+        self.seed_back(saved, r)
+    }
+
+    fn wild_setup_seeded(&mut self, hooks: &mut dyn WildHooks) -> Option<()> {
         self.mem.w16(DS, WINDOW, 0xFFFF);
         let saved = self.rng.seed;
         let back = self.mem.r16(DS, LEVEL_FLAGS) & BACK != 0;

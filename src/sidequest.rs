@@ -151,6 +151,15 @@ impl Machine {
     /// the one they were made for (see the module's notes). None where
     /// the original faults or never ends, or a hook fails.
     pub fn quests_place(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.quests_place_seeded(files, hooks);
+        self.seed_back(saved, r)
+    }
+
+    fn quests_place_seeded(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         let saved = self.rng.seed;
         self.quests_place_in(files, hooks)?;
         self.rng.seed = saved;

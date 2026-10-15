@@ -336,10 +336,10 @@ impl Machine {
             }
             let saved = self.rng.seed;
             self.rng.seed = eax;
-            let level = self.shop_roll_level()?;
-            self.shop_price_factors(level)?;
-            self.stock_make()?;
+            // The game's seed back even where the port gives up.
+            let r = self.shop_roll_level().and_then(|level| self.shop_price_factors(level)).and_then(|()| self.stock_make());
             self.rng.seed = saved;
+            r?;
         }
         self.mem.w8(DS, 0x12CB, 0);
         Some(())

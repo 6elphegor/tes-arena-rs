@@ -397,6 +397,15 @@ impl Machine {
     /// The first part of 299F: clears the map, sets the group and rolls
     /// each chunk's level of random1.mif.
     fn dun_plan(&mut self, level: u8) -> Option<Vec<Chunk>> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.dun_plan_seeded(level);
+        self.seed_back(saved, r)
+    }
+
+    fn dun_plan_seeded(&mut self, level: u8) -> Option<Vec<Chunk>> {
         let rows = self.mem.r16(DS, HEIGHT) >> 5;
         if rows == 0 || self.mem.r16(DS, WIDTH) >> 5 == 0 {
             return None;

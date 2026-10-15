@@ -508,6 +508,15 @@ impl Machine {
     /// factors, clears the key list, and generates the stock; then the
     /// RNG seed is put back.
     pub fn shop_open(&mut self) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.shop_open_seeded();
+        self.seed_back(saved, r)
+    }
+
+    fn shop_open_seeded(&mut self) -> Option<()> {
         let saved = self.rng.seed;
         self.rng.seed = match self.mem.r32(DS, SHOP_SEED) {
             0 => 1,
