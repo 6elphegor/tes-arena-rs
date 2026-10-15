@@ -115,6 +115,7 @@ mod archive;
 mod areas;
 mod audio;
 mod automap;
+mod bench;
 mod create;
 mod dialog;
 mod doll;
@@ -126,6 +127,7 @@ mod music;
 mod newgame;
 mod panels;
 mod playtest;
+mod prof;
 mod questui;
 mod render;
 mod shopui;
@@ -723,31 +725,35 @@ impl arena::light::LightHooks for LightState {
 impl Assets {
     /// Also enters the area's sky (0000:464A: its objects made).
     fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
-        let flats = world::flats(&engine.m);
-        let archive = Rc::new(archive::Archive::open(dir));
-        let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
+        prof::time("assets.new", || Self::make(dir, engine))
+    }
+
+    fn make(dir: &std::path::Path, engine: &mut Engine) -> Self {
+        let flats = prof::time("assets.flats", || world::flats(&engine.m));
+        let archive = prof::time("assets.archive", || Rc::new(archive::Archive::open(dir)));
+        let sheet = prof::time("assets.sheet", || world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m)));
         interface::enter(&mut engine.m);
         // Outdoors, the sky's images (the sun, the moons, the lightning's
         // bolts, the stars) into the sky's bank, as entering the area does
         // (0000:A4E9 calls 0000:E5C9).
-        if engine.m.sky_images(&mut engine.files).is_none() {
+        if prof::time("assets.sky_images", || engine.m.sky_images(&mut engine.files)).is_none() {
             eprintln!("the sky's images did not load");
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
-        engine.m.area_sky(&mut sky);
+        prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
         Assets {
             palette: world::palette(dir),
             charsheet: world::palette_file(dir, "CHARSHT.COL"),
-            textures: world::textures(&engine.m),
+            textures: prof::time("assets.textures", || world::textures(&engine.m)),
             shading: world::shading(&engine.m),
-            mesh: world::mesh(&engine.m),
+            mesh: prof::time("assets.mesh", || world::mesh(&engine.m)),
             sheet,
             dither: ["DITHER.IMG", "DITHER2.IMG"].iter().flat_map(|n| {
                 let mut d = archive.read(n).unwrap_or_default();
                 d.resize(800, 0);
                 d
             }).collect(),
-            interface: interface::Interface::new(archive.clone()),
+            interface: prof::time("assets.interface", || interface::Interface::new(archive.clone())),
             archive,
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
@@ -761,6 +767,14 @@ impl Assets {
     /// the textures, the shading rows, the walls and the flats. The sky
     /// and the light state stay the area's.
     fn level(&mut self, engine: &Engine) {
+        let t = Instant::now();
+        self.level_make(engine);
+        if prof::on() {
+            prof::add("assets.level", t.elapsed());
+        }
+    }
+
+    fn level_make(&mut self, engine: &Engine) {
         let flats = world::flats(&engine.m);
         self.sheet = world::sprite_sheet(&flats, &self.archive, &world::creature_names(&engine.m));
         self.textures = world::textures(&engine.m);
@@ -768,9 +782,18 @@ impl Assets {
         self.mesh = world::mesh(&engine.m);
     }
 
+    fn scene(&self) -> Scene<'_> {
+        Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither }
+    }
+
     fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
-        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither };
-        Renderer::new(device, queue, format, &scene)
+        Renderer::new(device, queue, format, &self.scene())
+    }
+
+    /// `r` made over for these assets (its pipelines and, where it can,
+    /// its sprite atlas kept: `Renderer::reload`).
+    fn reload_renderer(&self, r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
+        prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
     /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
@@ -979,6 +1002,15 @@ fn main() {
             args.insert(2.min(args.len()), "START.MIF".into());
         }
     }
+    // --bench TURNS [SETUP]: the window's turns and redraws timed,
+    // headless (`bench`).
+    let mut bench = None;
+    if let Some(i) = args.iter().position(|a| a == "--bench") {
+        let turns: usize = args[i + 1].parse().expect("--bench TURNS [SETUP]");
+        let setup = args.get(i + 2).filter(|a| !a.starts_with("--")).cloned();
+        args.drain(i..i + 2 + setup.is_some() as usize);
+        bench = Some((turns, setup.unwrap_or_default()));
+    }
     // --playtest SEED FRAMES [SETUP]: a headless playtest (`playtest`).
     let mut playtest = None;
     if let Some(i) = args.iter().position(|a| a == "--playtest") {
@@ -999,7 +1031,8 @@ fn main() {
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
-    let mut engine = world::load(&dir, &args[2]);
+    let started = Instant::now();
+    let mut engine = prof::time("start.load", || world::load(&dir, &args[2]));
     // The music driver loads at the program's start (2F9F:01C7, 035B),
     // before the first area picks a song.
     if SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed) || (!MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed)) {
@@ -1084,7 +1117,6 @@ fn main() {
         shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)), &maker_script);
         return;
     }
-    let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &mut engine);
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
     hud::init_style(&assets.archive, &engine.m);
@@ -1093,6 +1125,8 @@ fn main() {
     let play_music = !MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed);
     let music = music::Music::new(assets.archive.clone(), play_music, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let mut app = App {
+        remade: 0,
+        spare: None,
         audio,
         music,
         creation_song: None,
@@ -1133,6 +1167,11 @@ fn main() {
         creation_engine: None,
         movie_at: Instant::now(),
     };
+    if let Some((turns, setup)) = bench {
+        bench::run(&mut app, turns, &setup, started);
+        return;
+    }
+    let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     event_loop.run_app(&mut app).expect("run");
 }
 
@@ -1200,7 +1239,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.m.mem.w8(DS, arena::controls::var::BUTTONS, buttons);
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
-    let frame = engine.frame(Input::Steer(&input.intent), &mut hooks);
+    let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     if stairs {
         // 0000:368E, the stairs' level screen: the automap kept and the new
@@ -1210,7 +1249,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         engine.m.automap_load(&mut engine.files);
     }
     let level_changed = stairs || wild_moved(engine, window);
-    assets.view_frame(engine, input.aspect);
+    prof::time("view_frame", || assets.view_frame(engine, input.aspect));
     TurnOut { frame, level_changed }
 }
 
@@ -1247,7 +1286,16 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
 
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
-    Engine { m: engine.m.clone(), files: engine.files.clone() }
+    prof::time("turn.copy", || Engine { m: engine.m.clone(), files: engine.files.clone() })
+}
+
+/// `src` copied into `dst`, reusing `dst`'s allocations (`copy` makes
+/// new ones: a megabyte and more of fresh pages to fault in).
+fn copy_into(dst: &mut Engine, src: &Engine) {
+    prof::time("turn.copy", || {
+        dst.m.clone_from(&src.m);
+        dst.files.clone_from(&src.files);
+    });
 }
 
 /// The window the game centres its boxes in (A914, A916, A918, A91A).
@@ -1951,6 +1999,12 @@ struct Pending {
 }
 
 struct App {
+    /// How often the renderer was made again (`remake_renderer`; a
+    /// headless bench keeps its own).
+    remade: u32,
+    /// The last standing turn's copy of the engine, the next turn's to
+    /// fill (its allocations reused).
+    spare: Option<Engine>,
     /// The sound driver (`audio`).
     audio: audio::Audio,
     /// The music driver (`music`), and the song the creation's screens
@@ -2150,8 +2204,16 @@ impl App {
             drag: (drag.0.round() as i16, drag.1.round() as i16),
             aspect: self.gpu.as_ref().map_or(1.6, |g| g.config.width as f32 / g.config.height.max(1) as f32),
         };
-        let before = copy(&self.engine);
-        self.turn(before, input, Vec::new());
+        // The engine before the turn, for a question to run it again: into
+        // the last standing turn's copy, its allocations reused.
+        let before = match self.spare.take() {
+            Some(mut e) => {
+                copy_into(&mut e, &self.engine);
+                e
+            }
+            None => copy(&self.engine),
+        };
+        self.turn(before, input, Vec::new(), true);
         // A click now is found by the next frame's drawing.
         if !self.waiting() && std::mem::take(&mut self.click) {
             let mut boxes = Vec::new();
@@ -2165,12 +2227,15 @@ impl App {
 
     /// The turn `input` run from `before` with the answers `given` (and
     /// the script's): stopped at a question, it waits for its answer;
-    /// otherwise it stands, and its frame's end is followed.
-    fn turn(&mut self, before: Engine, input: TurnIn, given: Vec<dialog::Answer>) {
+    /// otherwise it stands, and its frame's end is followed. `fresh`: the
+    /// engine is `before` already (a new turn), not to be copied back.
+    fn turn(&mut self, before: Engine, input: TurnIn, given: Vec<dialog::Answer>, fresh: bool) {
         let mut answers: std::collections::VecDeque<dialog::Answer> = given.iter().cloned().collect();
         let scripted = self.script.len();
         answers.extend(self.script.iter().cloned());
-        self.engine = copy(&before);
+        if !fresh {
+            copy_into(&mut self.engine, &before);
+        }
         let mut talk = dialog::Talk { answers, ..Default::default() };
         self.audio.before(&mut self.engine.m);
         self.music.before(&mut self.engine.m);
@@ -2201,7 +2266,7 @@ impl App {
             self.status = talk.status;
         }
         if let Some(need) = talk.need {
-            self.engine = copy(&before);
+            copy_into(&mut self.engine, &before);
             self.selected = 0;
             self.typed.clear();
             if let dialog::Need::Spend(snap) = &need {
@@ -2217,6 +2282,8 @@ impl App {
             }
             return;
         }
+        // The turn stands: its copy is the next turn's to fill.
+        self.spare = Some(before);
         print_message(&self.engine, &mut self.message);
         if out.level_changed {
             self.assets.level(&self.engine);
@@ -2251,12 +2318,49 @@ impl App {
         let Some(p) = self.pending.take() else { return };
         let mut given = p.given;
         given.push(a);
-        self.turn(p.before, p.input, given);
+        self.turn(p.before, p.input, given, false);
+    }
+
+    /// The 320 x 200 layer of a redraw (the HUD, a screen up, an
+    /// animation), and the camera the world is drawn from.
+    fn compose(&mut self) -> Camera {
+        let cam = camera(&self.engine);
+        let hud = prof::time("redraw.hud", || self.hud());
+        let t = std::time::Instant::now();
+        self.screen.clear();
+        if let Some(mv) = self.movies.front() {
+            mv.draw(&mut self.screen, &self.font);
+        } else if let Some(c) = &self.creation {
+            c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
+        } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
+            // Inside the guild's spellmaker: its screen, the question asked
+            // (a list, the name) over it.
+            spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+        } else {
+            self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
+            self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+            if self.panel.is_some() {
+                self.equip_image();
+                let equip = self.equip.as_ref().and_then(|e| e.as_ref());
+                let doll = doll::images(&self.assets.archive, &self.engine.m);
+                panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
+            }
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+            if self.map {
+                automap::draw(&mut self.screen, &self.engine.m);
+            }
+        }
+        if prof::on() {
+            prof::add("redraw.screen", t.elapsed());
+        }
+        cam
     }
 
     fn remake_renderer(&mut self) {
+        self.remade += 1;
         if let Some(g) = &mut self.gpu {
-            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+            self.assets.reload_renderer(&mut g.renderer, &g.device, &g.queue);
         }
     }
 
@@ -2711,32 +2815,7 @@ impl winit::application::ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                let cam = camera(&self.engine);
-                let hud = self.hud();
-                self.screen.clear();
-                if let Some(mv) = self.movies.front() {
-                    mv.draw(&mut self.screen, &self.font);
-                } else if let Some(c) = &self.creation {
-                    c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
-                } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
-                    // Inside the guild's spellmaker: its screen, the
-                    // question asked (a list, the name) over it.
-                    spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
-                    hud::compose_over(&mut self.screen, &self.font, &hud);
-                } else {
-                    self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
-                    self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
-                    if self.panel.is_some() {
-                        self.equip_image();
-                        let equip = self.equip.as_ref().and_then(|e| e.as_ref());
-                        let doll = doll::images(&self.assets.archive, &self.engine.m);
-                        panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
-                    }
-                    hud::compose_over(&mut self.screen, &self.font, &hud);
-                    if self.map {
-                        automap::draw(&mut self.screen, &self.engine.m);
-                    }
-                }
+                let cam = self.compose();
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {
                         g.surface.configure(&g.device, &g.config);

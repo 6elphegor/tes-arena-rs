@@ -150,8 +150,8 @@ fn matches_original() {
         let mut m = base.clone();
         let (bank, ems) = setup(&mut m, u32::from_str_radix(f[1], 16).unwrap());
         if ems {
-            m.ems.resize(7, vec![0; 0x10000]);
-            m.ems[6] = bank;
+            m.ems.resize(7, std::sync::Arc::new(vec![0; 0x10000]));
+            m.ems[6] = std::sync::Arc::new(bank);
         } else {
             m.mem.w8(DS, 0x8FA6, 0);
             for (i, &b) in bank.iter().enumerate() {
