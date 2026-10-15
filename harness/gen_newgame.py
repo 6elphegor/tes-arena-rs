@@ -202,7 +202,7 @@ def main():
     zero = bytes(0x10000)
     qtext = (question + bytes(0x10000))[:0x10000]
     rng = random.Random(0x1994_2498)
-    total = int(os.environ.get('N', 3000))
+    total = int(os.environ.get('N', 3900))
     for n in range(total):
         op = n % OPS
         seed = rng.getrandbits(32)

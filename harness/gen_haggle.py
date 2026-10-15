@@ -94,7 +94,7 @@ a.run_range(0, 0x6F3A, 0x6F87)  # open GLOBAL.BSA
 a.w16(0x9030, 0x7000)
 BASE = a.snapshot()
 
-for case in range(int(os.environ.get('N', 2500))):
+for case in range(int(os.environ.get('N', 3000))):
     a.restore(BASE)
     mode = rng.choice([1, 2, 3, 4, 5, 6])
     price = rng.choice([rng.randint(1, 500), rng.randint(1, 5000), rng.randint(1, 70000), 1, 2, 64001, 65000, 65001,

@@ -171,12 +171,12 @@ fn matches_original() {
                 n += 1;
             }
             None => {
-                assert!(f[2] == "hang" || f[2] == "fault", "{line}: the port gave None");
+                assert_eq!(f[2], "stuck", "{line}: the port gave None");
                 stuck += 1;
             }
         }
     }
-    eprintln!("temple: {n} compared, {stuck} hang or fault in both");
+    eprintln!("temple: {n} compared, {stuck} stuck in both");
     if only.is_none() {
         assert!(n > 2500, "{n} compared");
     }

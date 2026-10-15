@@ -159,12 +159,18 @@ from a copy of a save.
   harness/gen_x.py ARGS OUT` runs six processes and joins their output in
   order (`emu.mine`), byte-identical to one process. `emu.changes` and
   `emu.fnv` (a small C function compiled on first use) keep generation
-  fast.
+  fast. A few generators carry each case's state into the next
+  (gen_cast.py, gen_missile.py) and must run in order on one process.
+- `tools/regen_check.py` regenerates every vector file into a scratch
+  directory (sharding where it can) and says, per generator, whether it
+  reproduces the committed file byte for byte. Generators without a
+  `Usage:` line take `ACD_unpacked.EXE OUT`.
 
 Running them:
 
     ARENA_EXE=/path/to/ACD.EXE ARENA_SAVE=/path/to/save cargo test --release
     python harness/gen_rules.py re/ACD_unpacked.EXE tests/vectors/rules.txt
+    ARENA_SAVE=/path/to/save python tools/regen_check.py [NAME...]
 
 `re/ACD_unpacked.EXE` is the unpacked image (`tools/` holds the unpacker and
 `tools/rebuild_mz.py`). Generators need `pip install unicorn capstone`.

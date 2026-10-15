@@ -131,7 +131,7 @@ def main():
     rng = __import__('random').Random(0x1994_071F)
     # Not sharded (harness/par.py): a case starts from the state the one
     # before it left, so the cases must run in order.
-    total = int(os.environ.get('N', 3000))
+    total = int(os.environ.get('N', 2000))
     for n in range(total):
         seed = rng.getrandbits(32)
         k = rng.randrange(8)

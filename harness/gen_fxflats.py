@@ -63,7 +63,7 @@ def main():
     base = a.snapshot()
     rng = random.Random(0x1994_0134)
     out = open(OUT, 'w', buffering=1)
-    total = int(os.environ.get('N', 300))
+    total = int(os.environ.get('N', 800))
     for n in range(total):
         seed = rng.getrandbits(32)
         if not mine(n, total):

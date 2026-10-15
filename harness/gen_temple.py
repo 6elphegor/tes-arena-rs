@@ -26,12 +26,13 @@ images, fonts and the greeting (1194:5496, 54B3, 4B60, 4B8E, 4BFF,
 
   temple | seed | result
 
-Results: "fault" / "hang", or the FNV-1a digests of the changed DGROUP
-bytes and of the log. "Cure all" jumps into code that isn't (see
+Results: "stuck", or the FNV-1a digests of the changed DGROUP bytes
+and of the log. "Cure all" jumps into code that isn't (see
 src/shops.rs); there the emulator ends with a fault or a hang depending
 on its translation cache (the first such case in a process faults), so
-those two differ between runs split differently; the port gives None for
-either.
+which one a case gets depends on how the run was split. Both are written
+"stuck", so the file is the same however it is sharded; the port gives
+None for either.
 """
 import os
 import random
@@ -207,9 +208,9 @@ def main():
             res = ' '.join(f'{d:x}' for d in digests)
         except (Fault, UcError):
             # UcError: a call through a table entry that isn't code.
-            res = 'fault'
+            res = 'stuck'
         except AssertionError:
-            res = 'hang'
+            res = 'stuck'
         out.write(f'temple | {seed:x} | {res}\n')
     out.close()
     if cover:

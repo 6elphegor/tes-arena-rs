@@ -333,7 +333,7 @@ def main():
             mu.hook_add(UC_HOOK_CODE, lambda mu, addr, size, d: cover.add(addr), None, l0 + lo, l0 + hi)
     snap = a.snapshot()
     rng = random.Random(0x1994_DB6C)
-    total = int(os.environ.get('N', 3000))
+    total = int(os.environ.get('N', 4000))
     for n in range(total):
         seed = rng.getrandbits(32)
         if not mine(n, total):
