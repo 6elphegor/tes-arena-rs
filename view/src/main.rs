@@ -67,7 +67,8 @@
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
 //! points), `gold:N`, `hp:N` (the health), `day:N` (the clock, 5CC, N days
 //! on), `mday:N` (the day of the month, CCA8: the moons' places and
-//! phases), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
+//! phases), `material:N` (every worn piece of armour enchanted, of
+//! material N: the doll's colours), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
 //! creature killed a square ahead), `fatigue:N` (the player's fatigue; at
 //! 0 the next minute exhausts them) and `xp:N` (N experience gained: the
 //! next minute checks the level, and a level gained brings the level-up
@@ -1471,6 +1472,19 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 let at = arena::inventory::PLAYER_SLOTS + n as u16 * 0x13 + 6;
                 let v = engine.m.mem.r16(arena::mem::DS, at) / 2;
                 engine.m.mem.w16(arena::mem::DS, at, v);
+            }
+            "material" => {
+                // Every worn piece of armour enchanted (+E bit 0) and of
+                // material N (+10), a debugging aid for the doll's colours.
+                use arena::inventory::{PLAYER_SLOTS, SLOT_SIZE};
+                for i in 0..40u16 {
+                    let si = PLAYER_SLOTS + i * SLOT_SIZE;
+                    let f = engine.m.mem.r8(arena::mem::DS, si + 0xE);
+                    if f & 0xC0 == 0xC0 && f & 0xC == 0 {
+                        engine.m.mem.w8(arena::mem::DS, si + 0xE, f | 1);
+                        engine.m.mem.w8(arena::mem::DS, si + 0x10, n as u8);
+                    }
+                }
             }
             "mday" => {
                 // The day of the month (CCA8, 0..1Fh), a debugging aid for
