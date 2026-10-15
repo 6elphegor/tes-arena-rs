@@ -281,8 +281,11 @@ At the time of writing:
   - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
     check (242A:000E) and loading from the title screen (5C8 bit 4) are not
     ported; the view saves to and loads from a fixed slot.
-  - The Emperor's audience (stage 8) hasn't been reached in a walkthrough;
-    the test save is past it.
+  - The staff walkthrough (`mainquest GAME_DIR STAFF:CITY:3:3 9`) runs
+    from a new game through the eight pieces, the Emperor's audience, the
+    palace's piece and the staff made whole (1194:D986), and is back in
+    the Imperial City; it travels, places the player and changes levels
+    rather than walking.
   - Text 5DDh (the last text in TEMPLATE.DAT, with nothing after it) has
     failed after a long session while it reads right from a fresh start;
     being investigated.
