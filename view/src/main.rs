@@ -1050,6 +1050,8 @@ struct Shot {
     frames: usize,
     boxes: Vec<Vec<Vec<hud::Span>>>,
     need: Option<dialog::Need>,
+    /// The spellmaker's screen when the turn stopped inside it.
+    maker_screen: Option<(dialog::Snapshot, Option<u16>)>,
     status: Option<String>,
     /// A panel up at the end (`inv`, `spells`).
     panel: Option<panels::Panel>,
@@ -1092,6 +1094,10 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
         st.boxes = if talk.need.is_some() { talk.since_answer } else { talk.boxes };
+    }
+    // Kept as the question is (`need`): set by the turn that asked.
+    if talk.need.is_some() {
+        st.maker_screen = talk.maker.take();
     }
     if let Some(need) = talk.need {
         if let (dialog::Need::Spend(snap), None) = (&need, &st.ui) {
@@ -1136,7 +1142,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let assets = Assets::new(dir, &mut engine);
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false, ui: None };
+    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1406,11 +1412,17 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         match st.need.clone() {
             Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
             Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
-            Some(dialog::Need::Spend(_)) | None => {}
+            Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker) | None => {}
         }
         let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
         if let Some(mk) = &maker {
             spellmaker::draw(&mut screen, &font, &st.assets.archive, &engine.files, mk);
+            hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+        } else if let Some((snap, form)) = &st.maker_screen {
+            // The turn stopped inside the guild's spellmaker: its screen,
+            // with the question asked over it.
+            spellmaker::draw_state(&mut screen, &font, &st.assets.archive, &engine.files, &snap.0, *form);
+            hud::compose_over(&mut screen, &font, &hud);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else {
         st.assets.interface.draw(&mut screen, &font, &engine.m);
@@ -1591,6 +1603,9 @@ struct Pending {
     input: TurnIn,
     given: Vec<dialog::Answer>,
     need: dialog::Need,
+    /// The spellmaker's screen behind the question, when the turn stopped
+    /// inside it (`Talk::maker`).
+    maker: Option<(dialog::Snapshot, Option<u16>)>,
 }
 
 struct App {
@@ -1817,7 +1832,8 @@ impl App {
                 self.creation = Some(c);
                 self.creation_engine = Some(e);
             }
-            self.pending = Some(Pending { before, input, given, need });
+            let maker = talk.maker.take();
+            self.pending = Some(Pending { before, input, given, need, maker });
             if self.captured {
                 self.release();
             }
@@ -2063,8 +2079,9 @@ impl App {
                     h.menu = Some(m);
                 }
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
-                // A level's points: the attribute screen (`creation`).
-                Some(dialog::Need::Spend(_)) | None => {}
+                // A level's points: the attribute screen (`creation`); the
+                // spellmaker's screen is drawn behind (`maker_screen`).
+                Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker) | None => {}
             }
         }
         h
@@ -2106,6 +2123,17 @@ impl App {
             }
             // The attribute screen takes the keys (`creation_input`).
             dialog::Need::Spend(_) => {}
+            // On the spellmaker, Esc clicks as leaving does: its "exit",
+            // or the form's done box.
+            dialog::Need::Spellmaker => {
+                if code == KeyCode::Escape {
+                    if let Some((snap, form)) = &p.maker {
+                        let mut m = (*snap.0).clone();
+                        let (x, y) = arena::spellmaker::SpellmakerHooks::click(&mut arena::spellmaker::NoSpellmakerHooks, &mut m, *form);
+                        self.answer(dialog::Answer::Click(x, y));
+                    }
+                }
+            }
             dialog::Need::Text(_) => match code {
                 KeyCode::Enter | KeyCode::NumpadEnter => {
                     let t = std::mem::take(&mut self.typed);
@@ -2137,6 +2165,11 @@ impl App {
         let Some(g) = &self.gpu else { return };
         let (w, h) = (g.config.width as f64, g.config.height as f64);
         let (x, y) = ((self.cursor.0 / w * hud::W as f64) as i32, (self.cursor.1 / h * hud::H as f64) as i32);
+        // The spellmaker waits for a click on its screen or form.
+        if matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)) {
+            self.answer(dialog::Answer::Click(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16));
+            return;
+        }
         let hud = self.hud();
         if let Some(menu) = &hud.menu {
             let (ex, ey, lh, ew) = hud::menu_layout(&self.font, menu);
@@ -2312,6 +2345,11 @@ impl winit::application::ApplicationHandler for App {
                     mv.draw(&mut self.screen, &self.font);
                 } else if let Some(c) = &self.creation {
                     c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
+                } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
+                    // Inside the guild's spellmaker: its screen, the
+                    // question asked (a list, the name) over it.
+                    spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
+                    hud::compose_over(&mut self.screen, &self.font, &hud);
                 } else {
                     self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
                     self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
