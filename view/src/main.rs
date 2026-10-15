@@ -84,6 +84,7 @@
 
 mod archive;
 mod areas;
+mod audio;
 mod automap;
 mod create;
 mod dialog;
@@ -142,6 +143,29 @@ impl Front<'_> {
             None => println!("{s}"),
         }
     }
+
+    /// An animation played (with a text's number, as a vision).
+    fn movie(&mut self, name: &'static str, text: Option<u16>, colour: u8) {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.movies.push((name, text, colour)),
+            None => println!("(the animation {name})"),
+        }
+    }
+}
+
+/// The Emperor's audience's screens (`QuestHooks::audience`, 0000:41B6):
+/// MORPH.FLC (2294:0895), then JAGAR.FLC with text 5A7h in 39h
+/// (1194:D459).
+struct Audience<'a, 'b>(&'a mut Front<'b>);
+
+impl arena::quest::QuestHooks for Audience<'_, '_> {
+    fn audience(&mut self, _m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, part: u8) -> Option<()> {
+        if part == 0 {
+            self.0.movie("MORPH.FLC", None, 0);
+            self.0.movie("JAGAR.FLC", Some(0x5A7), 0x39);
+        }
+        Some(())
+    }
 }
 
 /// The stairs' hooks: the light table made again from NORMAL.LGT
@@ -176,6 +200,10 @@ impl arena::weapon::WeaponHooks for Front<'_> {
 impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
         Front::message_box(self, m, text);
+    }
+    /// 0000:41A4..4247: the audience, its screens as animations.
+    fn palace_audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.emperor_audience(files, &mut Audience(self))
     }
     /// A city's gate out: the city written as the wilderness's blocks
     /// 1..4 (217B:027A; the files are kept in memory).
@@ -265,6 +293,23 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
             None => 0xFFFF,
         }
     }
+    /// 1194:D986: the eighth piece, the quest's end: WALK.FLC and
+    /// AFLC2.FLC, NUJAGDTH.FLC with text 57Ch in 64h, STAFF.FLC and
+    /// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h. (What comes
+    /// after, 0000:9426 on, isn't ported.)
+    fn last_piece(&mut self, _m: &mut arena::machine::Machine) {
+        for (name, text, colour) in [
+            ("WALK.FLC", None, 0),
+            ("AFLC2.FLC", None, 0),
+            ("NUJAGDTH.FLC", Some(0x57C), 0x64),
+            ("STAFF.FLC", None, 0),
+            ("KING.FLC", None, 0),
+            ("NUKING.FLC", Some(0x57D), 0x99),
+            ("NUKING.FLC", Some(0x57F), 0x99),
+        ] {
+            self.0.movie(name, text, colour);
+        }
+    }
 }
 /// Resting (src/rest.rs): its menu and the hours typed through `dialog`,
 /// its texts boxes, the hours shown kept for the status line.
@@ -288,8 +333,10 @@ impl arena::rest::RestHooks for Front<'_> {
             None => println!("{s}"),
         }
     }
+    /// 1194:D3D4: the dream on CHAOSVSN.FLC, its text in 33h (the
+    /// colour of the first level's dream; the others' are taken alike).
     fn dream(&mut self, _m: &mut arena::machine::Machine, text: u16) {
-        self.note(&format!("(a dream: text {text:#x})"));
+        self.movie("CHAOSVSN.FLC", Some(text), 0x33);
     }
 }
 
@@ -657,8 +704,16 @@ impl Assets {
 /// Timer ticks an animation frame lasts.
 const ANIMATE: usize = 4;
 
+/// `--mute` (no sound played) and `--sound-log` (each sound printed),
+/// for the window and the shots alike.
+static MUTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SOUND_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
+    MUTE.store(args.iter().any(|a| a == "--mute"), std::sync::atomic::Ordering::Relaxed);
+    SOUND_LOG.store(args.iter().any(|a| a == "--sound-log"), std::sync::atomic::Ordering::Relaxed);
+    args.retain(|a| a != "--mute" && a != "--sound-log");
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
@@ -804,7 +859,10 @@ fn main() {
     let assets = Assets::new(&dir, &mut engine);
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
     let screen = hud::Screen::new(assets.palette);
+    let audio = audio::Audio::new(assets.archive.clone(), !MUTE.load(std::sync::atomic::Ordering::Relaxed), SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let mut app = App {
+        audio,
+        movies: Default::default(),
         assets,
         start: Instant::now(),
         engine,
@@ -913,6 +971,18 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     TurnOut { frame, level_changed }
 }
 
+/// The animations a turn played (`dialog::Talk::movies`), made: a text's
+/// lines through the text port (1194:D459), the files from the game's.
+fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>) -> Vec<flc::Movie> {
+    played
+        .into_iter()
+        .filter_map(|(name, text, colour)| {
+            let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
+            flc::Movie::new(archive, name, lines)
+        })
+        .collect()
+}
+
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
     Engine { m: engine.m.clone(), files: engine.files.clone() }
@@ -940,6 +1010,9 @@ fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
 /// (`--picks`), the frames run, and what the HUD shows at the end: the
 /// boxes of the last turn that showed any, and a question left.
 struct Shot {
+    audio: audio::Audio,
+    /// The animations the turns played (`--do`); the first is drawn.
+    movies: Vec<flc::Movie>,
     assets: Assets,
     /// The right button and a drag for the next turn (`swing`).
     right: bool,
@@ -984,7 +1057,12 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         aspect: 1.6,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
+    st.audio.before(&mut engine.m);
     let out = run_turn(engine, &mut st.assets, &input, &mut talk);
+    st.audio.after(&mut engine.m);
+    let played = std::mem::take(&mut talk.movies);
+    let archive = st.assets.archive.clone();
+    st.movies.extend(movies_of(engine, &archive, played));
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
         st.boxes = if talk.need.is_some() { talk.since_answer } else { talk.boxes };
@@ -1028,7 +1106,10 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false, ui: None };
+    let assets = Assets::new(dir, &mut engine);
+    // Shots play nothing; with --sound-log they print what would play.
+    let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
+    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false, ui: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1090,6 +1171,19 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                 }
             }
+            continue;
+        }
+        if let Some(spec) = step.strip_prefix("movie:") {
+            // A debugging aid: an animation queued as the game's hooks
+            // queue them (NAME, or NAME:TEXT with the text's number in
+            // hex, in colour 33h).
+            let (name, text) = match spec.split_once(':') {
+                Some((n, t)) => (n, Some(u16::from_str_radix(t, 16).expect("--do movie:NAME:TEXT"))),
+                None => (spec, None),
+            };
+            let name: &'static str = Box::leak(name.to_ascii_uppercase().into_boxed_str());
+            let archive = st.assets.archive.clone();
+            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, 0x33)]));
             continue;
         }
         if let Some(d) = step.strip_prefix("swing:") {
@@ -1262,6 +1356,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if st.map {
             automap::draw(&mut screen, &engine.m);
         }
+        // An animation the turns played: its first frame and lines.
+        if let Some(mv) = st.movies.first() {
+            println!("animations played: {}", st.movies.len());
+            mv.draw(&mut screen, &font);
+        }
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1428,6 +1527,11 @@ struct Pending {
 }
 
 struct App {
+    /// The sound driver (`audio`).
+    audio: audio::Audio,
+    /// Animations the game played, shown over it in turn (a key the next
+    /// lines or the end); the game waits meanwhile.
+    movies: std::collections::VecDeque<flc::Movie>,
     /// The automap shown (M).
     map: bool,
     assets: Assets,
@@ -1564,7 +1668,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() {
             return;
         }
         let k = &self.keys;
@@ -1613,7 +1717,16 @@ impl App {
         answers.extend(self.script.iter().cloned());
         self.engine = copy(&before);
         let mut talk = dialog::Talk { answers, ..Default::default() };
+        self.audio.before(&mut self.engine.m);
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
+        // A turn stopped at a question is run again once answered: its
+        // sounds are the rerun's.
+        if talk.need.is_none() {
+            self.audio.after(&mut self.engine.m);
+            let played = std::mem::take(&mut talk.movies);
+            let archive = self.assets.archive.clone();
+            self.movies.extend(movies_of(&mut self.engine, &archive, played));
+        }
         // The script's answers used become given ones.
         let used = (given.len() + scripted).saturating_sub(talk.answers.len());
         let mut given = given;
@@ -2020,6 +2133,21 @@ impl winit::application::ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
+            // An animation up: a key or a click its next lines, or its end.
+            WindowEvent::MouseInput { state: ElementState::Pressed, .. } | WindowEvent::KeyboardInput { event: winit::event::KeyEvent { state: ElementState::Pressed, .. }, .. }
+                if !self.movies.is_empty() =>
+            {
+                if let Some(mv) = self.movies.front_mut() {
+                    if mv.lines.is_empty() {
+                        mv.over = true;
+                    } else {
+                        mv.key();
+                    }
+                    if mv.over {
+                        self.movies.pop_front();
+                    }
+                }
+            }
             WindowEvent::MouseInput { state, button, .. } if self.creation.is_some() => {
                 if state == ElementState::Pressed && button == MouseButton::Left {
                     let (x, y) = self.screen_point();
@@ -2113,7 +2241,9 @@ impl winit::application::ApplicationHandler for App {
                 let cam = camera(&self.engine);
                 let hud = self.hud();
                 self.screen.clear();
-                if let Some(c) = &self.creation {
+                if let Some(mv) = self.movies.front() {
+                    mv.draw(&mut self.screen, &self.font);
+                } else if let Some(c) = &self.creation {
                     c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
                 } else {
                     self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
@@ -2170,11 +2300,17 @@ impl winit::application::ApplicationHandler for App {
         // taking `frame_ticks`); drawing goes as fast as the display. While
         // the game waits for the player, no time passes.
         let now = Instant::now();
+        if let Some(mv) = self.movies.front_mut() {
+            mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            if mv.over {
+                self.movies.pop_front();
+            }
+        }
         if let Some(c) = &mut self.creation {
             c.advance(now.duration_since(self.movie_at).as_millis() as u32);
-            self.movie_at = now;
             self.creation_outcome();
         }
+        self.movie_at = now;
         if now >= self.next {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;

@@ -184,6 +184,12 @@ enum Stage {
     Intro,
     Vision,
     Ending,
+    /// The opening story after the menu's Start (0000:1323): SCROLL.FLC
+    /// (the movie), then INTRO01..09.IMG (`pic` 1..9, its picture and
+    /// the colours the movie left) for 350 screen refreshes each (5 s at
+    /// 70 Hz, 0000:13BF); a key ends it all (ACB6). Then `next`, the
+    /// class's first question, made at the Start.
+    Story { pic: u8, ms: u32, img: Option<Box<(Image, [[u8; 4]; 256])>>, next: Box<Stage> },
     Title,
     MainMenu,
     Done,
@@ -418,11 +424,45 @@ impl Creation {
             mv.advance(ms);
         }
         self.movie_over();
+        self.story(ms);
+    }
+
+    /// The opening story's pictures: each for 5 s, in the colours the
+    /// movie left, then the next stage.
+    fn story(&mut self, ms: u32) {
+        let Stage::Story { pic, ms: shown, img, .. } = &mut self.stage else { return };
+        if *pic == 0 {
+            return;
+        }
+        *shown += ms;
+        if *shown < 5000 {
+            return;
+        }
+        *shown = 0;
+        *pic += 1;
+        if *pic > 9 {
+            if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
+                self.stage = *next;
+            }
+            return;
+        }
+        let pal = img.as_ref().map(|b| b.1).unwrap_or([[0; 4]; 256]);
+        *img = intro_pic(&self.archive, *pic, pal).map(Box::new);
     }
 
     /// The next screen when the movie is over.
     fn movie_over(&mut self) {
         if !self.movie.as_ref().is_some_and(|m| m.over) {
+            return;
+        }
+        if let Stage::Story { pic: 0, .. } = self.stage {
+            // The movie over: its colours stay for the pictures.
+            let pal = self.movie.as_ref().map(|m| m.flc.palette).unwrap_or([[0; 4]; 256]);
+            self.movie = None;
+            if let Stage::Story { pic, img, .. } = &mut self.stage {
+                *pic = 1;
+                *img = intro_pic(&self.archive, 1, pal).map(Box::new);
+            }
             return;
         }
         let next = match self.stage {
@@ -489,6 +529,16 @@ impl Creation {
             }
             return;
         }
+        if let Stage::Story { .. } = self.stage {
+            // A key ends the whole story (0000:1314, 137F: ACB6).
+            if !matches!(inp, Input::Up | Input::Down) {
+                self.movie = None;
+                if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
+                    self.stage = *next;
+                }
+            }
+            return;
+        }
         if matches!(self.stage, Stage::Intro | Stage::Vision | Stage::Ending) {
             // A key the next lines (or, the intro, its end).
             if let Some(mv) = &mut self.movie {
@@ -521,10 +571,14 @@ impl Creation {
                         Stage::MainMenu
                     }
                     Some(1) => {
-                        // 1194:24A6: creation starts from a cleared state.
+                        // 0000:1131: the opening story (0000:1323), then
+                        // creation (1194:2498), which starts from a cleared
+                        // state (1194:24A6).
                         engine.m.newgame_reset();
                         self.colour = COLOUR_A;
-                        Stage::Method(self.method(&mut engine.m))
+                        let next = Box::new(Stage::Method(self.method(&mut engine.m)));
+                        self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
+                        Stage::Story { pic: 0, ms: 0, img: None, next }
                     }
                     Some(_) => {
                         self.outcome = Some(Outcome::Exit);
@@ -639,7 +693,7 @@ impl Creation {
                 Some(_) => self.roll(engine),
             },
             Stage::Face => self.face_input(engine, inp),
-            s @ (Stage::Intro | Stage::Vision | Stage::Ending) => s,
+            s @ (Stage::Intro | Stage::Vision | Stage::Ending | Stage::Story { .. }) => s,
             Stage::Done => Stage::Done,
         };
     }
@@ -956,16 +1010,17 @@ impl Creation {
             (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
             (None, Stage::Map | Stage::ProvinceYes(..)) => Back::Map,
             (None, Stage::Stats | Stage::Choose(_) | Stage::Face) => Back::Stats,
-            (None, Stage::Vision | Stage::Done | Stage::Intro | Stage::Ending | Stage::Title | Stage::MainMenu) => Back::Black,
+            (None, Stage::Vision | Stage::Done | Stage::Intro | Stage::Ending | Stage::Title | Stage::MainMenu | Stage::Story { .. }) => Back::Black,
         };
         if let (Some(mv), None) = (&self.movie, self.boxes.front()) {
             return mv.draw(screen, &self.fonts.arena);
         }
         if self.boxes.is_empty() {
-            let pic = match self.stage {
-                Stage::Title => &self.title,
-                Stage::MainMenu => &self.menu_pic,
-                _ => &None,
+            let pic = match &self.stage {
+                Stage::Title => self.title.as_ref(),
+                Stage::MainMenu => self.menu_pic.as_ref(),
+                Stage::Story { img, .. } => img.as_deref(),
+                _ => None,
             };
             if let Some((i, pal)) = pic {
                 screen.set_palette(*pal);
@@ -1195,6 +1250,13 @@ fn boxed(tw: i32, th: i32) -> Rect {
     Rect { x: (W as i32 - w) / 2, y: (H as i32 - h) / 2, w, h }
 }
 
+/// INTROnn.IMG (`n` 1..9; the digit at 4DD7 counted up, 0000:137B),
+/// shown in the colours `pal`.
+fn intro_pic(archive: &Archive, n: u8, pal: [[u8; 4]; 256]) -> Option<(Image, [[u8; 4]; 256])> {
+    let d = archive.read(&format!("INTRO0{n}.IMG"))?;
+    crate::interface::image(&d).map(|(i, _)| (i, pal))
+}
+
 /// An image (12-byte header; LZSS or the type-8 coding) with its 6-bit
 /// palette after the data (flag 100h), as TITLE.IMG and MENU.IMG are.
 fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
@@ -1215,7 +1277,7 @@ fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> Option<(Ima
 
 /// Text number `n` made (1194:A374 into a buffer, as 1194:D459 makes the
 /// vision's) as lines in colour `colour`.
-fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
+pub(crate) fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
     let m = &mut engine.m;
     let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
         return Vec::new();
