@@ -436,7 +436,7 @@ impl arena::rest::RestHooks for Front<'_> {
     }
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim().to_string();
+            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim_start().to_string();
             t.typed(m, arena::rest::var::TYPED, 3, &prompt);
         }
     }

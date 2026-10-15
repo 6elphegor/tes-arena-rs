@@ -375,7 +375,8 @@ fn camping_with_typed_hours_as_by_script() {
     // "For a while" (entry 0), then the hours typed.
     d.key(&mut a, KeyCode::Enter, None);
     match a.pending.as_ref().map(|p| &p.need) {
-        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        // The prompt's trailing spaces kept: the field's room in its box.
+        Some(dialog::Need::Text(prompt)) => assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}"),
         other => panic!("the hours asked for, not {:?}", other.map(|_| "something else")),
     }
     d.key(&mut a, KeyCode::Digit2, Some("2"));
