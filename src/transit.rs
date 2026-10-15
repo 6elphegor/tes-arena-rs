@@ -160,8 +160,9 @@ pub trait AreaHooks {
     /// After the world loop (0000:0AD7..0B07): 23F1:013C, the palette
     /// faded to black (5E3E), 4EFD and 946A.
     fn world_screen(&mut self, _m: &mut Machine) {}
-    /// 0000:A5A0: the renderer's buffers freed (CD78, CD84, CD80, CD88,
-    /// the buffer at BA56), 0000:DE9B and AB2A.
+    /// 0000:A5A0: the renderer's buffers freed (CD78, CD84, CD80, CD88;
+    /// the buffer at BA56 is freed by `Machine::world_leave`), 0000:DE9B
+    /// and AB2A.
     fn world_free(&mut self, _m: &mut Machine) {}
     /// 0000:468B, the hook CD42 once the INF is loaded: the flats' flags,
     /// outdoors the light (0000:0390) and the city's people, indoors the
@@ -712,8 +713,9 @@ impl Machine {
     /// 0000:A45D..A47F, the world loop's end: the planes freed (0000:C8FE:
     /// the floor, walls and ceiling, their segments cleared), the actors'
     /// flags past the flats' (from CA97 + C38E, to 9Eh bytes, its length
-    /// kept at D432 and its start at CCC0) cleared, then the renderer's
-    /// buffers freed (0000:A5A0, `AreaHooks::world_free`).
+    /// kept at D432 and its start at CCC0) cleared, then the buffers
+    /// freed (0000:A5A0): the buffer block (BA56, as the entry allocated
+    /// it) here, the renderer's by `AreaHooks::world_free`.
     pub fn world_leave(&mut self, hooks: &mut dyn AreaHooks) {
         for at in [crate::mif::var::FLOOR_SEG, crate::mif::var::MAP1_SEG, crate::mif::var::MAP2_SEG] {
             let seg = self.mem.r16(DS, at);
@@ -729,6 +731,9 @@ impl Machine {
         for i in 0..cx {
             self.mem.w8(DS, at.wrapping_add(i), 0);
         }
+        // A5C0: the buffer block the entry allocated (A516) freed.
+        let seg = self.mem.r16(DS, crate::level::var::BUFFER_BLOCK + 2);
+        self.heap_free(seg);
         hooks.world_free(self);
     }
 }
@@ -739,7 +744,8 @@ impl crate::engine::Engine {
     /// ceiling 64h, the walking speed, standing (`enter_area`'s); the EMS
     /// banks but the level's freed, the deep floors, no changing squares,
     /// the rain's drops, no moving lights (0000:E122), on dry ground
-    /// (0000:A4ED); the entry hook (C3B0: 0000:4632, `area_entry`); the
+    /// (0000:A4ED), the buffer block (A516, `buffer_block_alloc`); the
+    /// entry hook (C3B0: 0000:4632, `area_entry`); the
     /// level loaded unless its name starts with `#` (a city built, a
     /// dungeon made) or the hook CD5E is set; the place hook (CD2A:
     /// 0000:45B2, `area_place`); the INF loaded (0000:EC03); the entered
@@ -767,6 +773,7 @@ impl crate::engine::Engine {
             m.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         m.mem.w8(DS, 0xCB5B, 1);
+        m.buffer_block_alloc()?;
         if m.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
             m.area_entry(hooks);
         }
