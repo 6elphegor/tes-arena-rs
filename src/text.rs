@@ -26,10 +26,8 @@
 //! too. The routines read the game's state: the person clicked (CB5E),
 //! the province, city and race (A46, A47, 1A8), the quest (0F3E), the
 //! player's name (1AD), names made from seeds (1194:080B), and further
-//! texts (A374 again). Those that depend on routines not ported (the
-//! province's loading 1194:2E18, the places 1194:3EB1, 1194:CFF7,
-//! 25CA:0323, 1194:0A44) or on registers the original leaves over (%qf's
-//! EBX) give None, as do %en outside a building of kind 6 (its routine
+//! texts (A374 again). %qf, which seeds a name with EBX the original
+//! leaves over, gives None, as do %en outside a building of kind 6 (its routine
 //! returns into the text: it leaves DS pushed) and the loops where the
 //! original never ends (a key not in the index, a copy over its own
 //! source, codes coming back without end).
@@ -861,10 +859,26 @@ impl Machine {
                 self.text_number(c, v)
             }
             // %cn: the city's name (A22) in a city or building, else the
-            // province's; %cn2 (a place by the location's seed) not ported.
+            // province's; %cn2: the city nearest the location (1194:0A44),
+            // its province loaded (2E14), its square to 8A52/8A54. (The
+            // RNG's seed is set from the location's and put back, nothing
+            // rolling between.)
             0x02F1 => {
                 if self.mem.r8(c.bp, c.rest) == b'2' {
-                    return None;
+                    c.dx = c.rest.wrapping_add(1);
+                    let al = self.text_nearest_city(c.di) as u8;
+                    let (province, ah) = (al / 0x20, (al % 0x20) as u16);
+                    self.city_load_province(files, province)?;
+                    let si = if ah >= 0x10 {
+                        0x15D5 + (ah & 0xF) * 0x19
+                    } else if ah >= 8 {
+                        0x150D + (ah & 7) * 0x19
+                    } else {
+                        0x1445 + (ah & 7) * 0x19
+                    };
+                    self.mem.w16(DS, 0x8A52, self.t16(si + 0x14));
+                    self.mem.w16(DS, 0x8A54, self.t16(si + 0x16));
+                    return Some(Res::Str(DS, si));
                 }
                 let city = self.t16(0xC39A) & 0x200 == 0 && (self.t8(0x05E6) == 4 || self.t16(0xC398) & 4 != 0);
                 if city {
@@ -901,6 +915,14 @@ impl Machine {
                 let h = crate::travel::travel_heading(self.t16(0x8A52), self.t16(0x8A54), self.t16(0xC3D0) >> 7, self.t16(0xC3D4) >> 7);
                 let cx = (h.wrapping_add(0x20) >> 6) % 8;
                 Res::Str(DATA, self.skip_strings(DATA, 0x7566, cx))
+            }
+            // %dit: the informant's days left (1194:CFF7: 0FED less the whole
+            // days since 0FE9) in decimal (0000:7052).
+            0x04A9 => {
+                let days = self.mem.r32(DS, 0x05CC).wrapping_sub(self.mem.r32(DS, 0x0FE9)) / 0x5A0;
+                let ax = (self.t8(0x0FED) as u16).wrapping_sub(days as u16);
+                self.text_utoa(ax, DS, 0x9B66);
+                Res::Str(DS, 0x9B66)
             }
             // %dnl: the quest person's first name (2DA2:0866).
             0x04C5 => {
@@ -1053,6 +1075,17 @@ impl Machine {
                 let cx = (self.mem.r8(DATA, SEX) as u16).min(2);
                 Res::Str(DATA, self.skip_strings(DATA, si, cx))
             }
+            // %hc, %qc, %tc: a city by its number (the player's home, 1AC;
+            // the quest's +25h; its +24h): 1194:07F0.
+            0x070D => self.text_city(files, self.t8(0x01AC))?,
+            0x0C0C => {
+                let q = self.text_quest();
+                self.text_city(files, self.t8(q.wrapping_add(0x25)))?
+            }
+            0x0D7A => {
+                let q = self.text_quest();
+                self.text_city(files, self.t8(q.wrapping_add(0x24)))?
+            }
             // %hod: the holiday (texts A9h..).
             0x071E => {
                 let (mut cx, _, hit) = self.text_holiday(self.mem.r32(DS, 0x05CC), c.rest);
@@ -1079,6 +1112,12 @@ impl Machine {
             0x0786 => {
                 let q = self.text_quest();
                 Res::Str(DATA, self.skip_strings(DATA, 0x4A3B, self.t8(q.wrapping_add(6)) as u16))
+            }
+            // %mt: the quest's monster kind (25CA:0323: its +30h among the
+            // creatures' names at 3276:465D; DS stays 3276).
+            0x07E2 => {
+                let q = self.text_quest();
+                Res::Str(DATA, self.skip_strings(DATA, 0x465D, self.t8(q.wrapping_add(0x30)) as u16))
             }
             // %mn: the quest monster's name (set 9 + its +30h).
             0x079F => {
@@ -1230,6 +1269,11 @@ impl Machine {
                 self.mem.w8(DATA, SEX, self.t8(0x01AB));
                 Res::Str(DS, 0x01AD)
             }
+            // %qf (2DA2:0BAF) isn't here: it names a person through 1194:0807
+            // with EBX as the seed and never sets it. BX is 8A56 (0 or 1)
+            // by then (2DA2:1083), but EBX's high word is whatever code last
+            // wrote it, often before the text was asked for, so it falls
+            // to the `_` arm (None).
             // %qmn: the quest's monster kind (5E38 among C954).
             0x0C20 => {
                 let al = self.t8(0x5E38);
@@ -1276,7 +1320,9 @@ impl Machine {
                 let r = self.rng.next() & 7;
                 Res::Str(DS, self.skip_strings(DS, 0x2F06, r))
             }
-            // %st: the city's... by its seed (A56).
+            // %st: the city's... by its seed (A56). The seed pushed is popped
+            // with DS at 3276 by then: it lands at 3276:91F6, and the rolled
+            // seed stays (until the substitutions' end puts theirs back).
             0x0CED => {
                 let saved = self.rng.seed;
                 let eax = self.mem.r32(DS, 0x0A56);
@@ -1284,7 +1330,7 @@ impl Machine {
                 self.rng.seed = (eax & 0xFFFF_FF00) | al as u32;
                 let cx = self.rng.next() & 1;
                 let res = Res::Str(DATA, self.skip_strings(DATA, 0x73AC, cx));
-                self.rng.seed = saved;
+                self.mem.w32(DATA, 0x91F6, saved);
                 res
             }
             // %sn: a name of set 15h from CB5E.
@@ -1356,6 +1402,41 @@ impl Machine {
         self.npc_name(files, al, 0, ebx, c.es, c.di)
     }
 
+    /// 1194:07F0: city `al` (its province `al >> 5` loaded, 1194:2E18;
+    /// its number `al & 1Fh` among the 19h-byte records from 1445).
+    fn text_city(&mut self, files: &mut Files, al: u8) -> Option<Res> {
+        self.city_load_province(files, al >> 5)?;
+        Some(Res::Str(DS, 0x1445 + (al & 0x1F) as u16 * 0x19))
+    }
+
+    /// 1194:0A44. The city of the location's kind (A47: 0 the city-states
+    /// from 1445, 1 the towns from 150D, else the villages from 15D5)
+    /// nearest the location's square (A48, A4A; the larger axis plus a
+    /// quarter of the smaller, 0 not counted), as province * 20h + its
+    /// number; none nearer than 2710h leaves `di` (the caller's DI).
+    fn text_nearest_city(&self, mut di: u16) -> u16 {
+        let (mut bp, mut si, cx) = match self.t8(0x0A47) {
+            0 => (0u16, 0x1445u16, 8),
+            1 => (8, 0x150D, 8),
+            _ => (0x10, 0x15D5, 0x10),
+        };
+        let abs = |v: u16| if (v as i16) < 0 { v.wrapping_neg() } else { v };
+        let mut dx = 0x2710u16;
+        for _ in 0..cx {
+            let a = abs(self.t16(0x0A48).wrapping_sub(self.t16(si.wrapping_add(0x14))));
+            let b = abs(self.t16(0x0A4A).wrapping_sub(self.t16(si.wrapping_add(0x16))));
+            let (lo, hi) = if a > b { (b, a) } else { (a, b) };
+            let d = (lo >> 2).wrapping_add(hi);
+            if d != 0 && dx > d {
+                dx = d;
+                di = bp;
+            }
+            si = si.wrapping_add(0x19);
+            bp = bp.wrapping_add(1);
+        }
+        di.wrapping_add((self.t8(0x0A46) as u16) << 5)
+    }
+
     /// 2DA2:094F, %nt: a place's name: in the wild (or a dungeon with
     /// 5C8 bit 4000h) one made from the square's seed, else the quest's
     /// or a random one of the province's; then its region's suffix.
@@ -1369,7 +1450,14 @@ impl Machine {
                 if !wild {
                     if self.t8(0x05E6) == 4 {
                         if self.t16(0x05C8) & 0x4000 == 0 {
-                            return None;
+                            // In a building: its entry among the places at
+                            // [1AB5] (3EB1, the key FD2 with its low byte
+                            // halved); none found reads offset 0.
+                            let key = self.t16(0x0FD2);
+                            let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+                            let (off, seg) = (self.t16(0x1AB5), self.t16(0x1AB7));
+                            let si = self.place_lookup(seg, off, key, self.t16(0x1387));
+                            break 'p (self.mem.r16(seg, si.wrapping_add(2)), self.t8(0x0A4C));
                         }
                         cx = self.t16(0x0610);
                         dx = self.t16(0x0612);
@@ -1415,13 +1503,36 @@ impl Machine {
     }
 
     /// 2DA2:0D8C, %tem: a temple's name: in the wild (or a dungeon with
-    /// 5C8 bit 4000h) one made from the square's seed; in a city by
-    /// 1194:3EB1 (not ported).
+    /// 5C8 bit 4000h) one made from the square's seed; elsewhere the
+    /// place's entry among the temples at [1004] (3EB1, the key FD2 with
+    /// its low byte halved), or when there is none a random one: the
+    /// seed the person's (CB5E, 15 bits), the time's (5CC >> 4) when that
+    /// is 0, 8A57 when set (then cleared to FFFFFFFFh); the entry's +2
+    /// and +3 pick the name's words.
     fn text_temple(&mut self, c: &Ctx) -> Option<Res> {
         let (mut cx, mut dx) = (self.t16(0xC3D0), self.t16(0xC3D4));
         if self.t16(0xC39A) & 0x200 == 0 {
             if self.t8(0x05E6) != 4 || self.t16(0x05C8) & 0x4000 == 0 {
-                return None;
+                let key = self.t16(0x0FD2);
+                let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+                let (off, seg) = (self.t16(0x1004), self.t16(0x1006));
+                let n = self.t16(0x1389);
+                let mut si = self.place_lookup(seg, off, key, n);
+                if si == 0 {
+                    let mut eax = (self.t16(0xCB5E) & 0x7FFF) as u32;
+                    if eax == 0 {
+                        eax = self.mem.r32(DS, 0x05CC) >> 4;
+                    }
+                    if self.mem.r32(DS, 0x8A57) != 0xFFFF_FFFF {
+                        eax = self.mem.r32(DS, 0x8A57);
+                        self.mem.w32(DS, 0x8A57, 0xFFFF_FFFF);
+                    }
+                    self.rng.seed = eax;
+                    let r = self.rng.range(0, n)?;
+                    si = off.wrapping_add((r & 0xFF) * 4);
+                }
+                let dx = self.mem.r16(seg, si.wrapping_add(2));
+                return self.text_temple_name(c, dx & 0xFF, dx >> 8);
             }
             cx = self.t16(0x0610);
             dx = self.t16(0x0612);
@@ -1490,8 +1601,10 @@ impl Machine {
                 let si = self.skip_strings(DATA, si, dh);
                 Res::Buf(self.text_cat(DATA, si, c.es, di)?)
             }
+            // (DS is 3276 by now: the word read is 3276:0F76, not the
+            // quest record's.)
             6 => {
-                if (self.t16(0x0F72 + 4) & 0xE00) >> 9 == 0 {
+                if (self.mem.r16(DATA, 0x0F76) & 0xE00) >> 9 == 0 {
                     Res::Str(DATA, 0x72F0)
                 } else {
                     Res::Str(DATA, self.skip_strings(DATA, 0x730F, 6))

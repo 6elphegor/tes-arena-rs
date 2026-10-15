@@ -118,6 +118,90 @@ ds 100A seg
 c 0200 bytes 40
 data 7307 bc 0,0,0,0,1,2
 data 7387 b 4
+# The province a city code loads (1194:2E18) comes from CITYDATA.nn by
+# the save slot at 1A6C: 64 or 65, both in the game's folder. The player's
+# home (%hc, 1AC), the informant's days (%dit: 0FE9, 0FED), the location's
+# square (%cn2: A48, A4A), the temples' list (%tem: [1004], its count
+# 1389), the place's key (FD2) and %tem's seed (8A57).
+ds 1A6C bc 40,41
+ds 01AC b 100
+ds 0FE9 d
+ds 0FED b 100
+ds 0A48 w 140
+ds 0A4A w 140
+ds 1389 w 8
+ds 1004 wc 300
+ds 1006 seg
+c 0300 bytes 40
+ds 0FD2 w 10000
+ds 8A57 d
+# The province's city records' squares (+14h, +16h: the 8 city-states
+# from 1445, 8 towns from 150D, 16 villages from 15D5), which %cn2's
+# nearest city (1194:0A44) measures before any province is loaded.
+ds 1459 w 140
+ds 145B w 140
+ds 1472 w 140
+ds 1474 w 140
+ds 148B w 140
+ds 148D w 140
+ds 14A4 w 140
+ds 14A6 w 140
+ds 14BD w 140
+ds 14BF w 140
+ds 14D6 w 140
+ds 14D8 w 140
+ds 14EF w 140
+ds 14F1 w 140
+ds 1508 w 140
+ds 150A w 140
+ds 1521 w 140
+ds 1523 w 140
+ds 153A w 140
+ds 153C w 140
+ds 1553 w 140
+ds 1555 w 140
+ds 156C w 140
+ds 156E w 140
+ds 1585 w 140
+ds 1587 w 140
+ds 159E w 140
+ds 15A0 w 140
+ds 15B7 w 140
+ds 15B9 w 140
+ds 15D0 w 140
+ds 15D2 w 140
+ds 15E9 w 140
+ds 15EB w 140
+ds 1602 w 140
+ds 1604 w 140
+ds 161B w 140
+ds 161D w 140
+ds 1634 w 140
+ds 1636 w 140
+ds 164D w 140
+ds 164F w 140
+ds 1666 w 140
+ds 1668 w 140
+ds 167F w 140
+ds 1681 w 140
+ds 1698 w 140
+ds 169A w 140
+ds 16B1 w 140
+ds 16B3 w 140
+ds 16CA w 140
+ds 16CC w 140
+ds 16E3 w 140
+ds 16E5 w 140
+ds 16FC w 140
+ds 16FE w 140
+ds 1715 w 140
+ds 1717 w 140
+ds 172E w 140
+ds 1730 w 140
+ds 1747 w 140
+ds 1749 w 140
+ds 1760 w 140
+ds 1762 w 140
 # A quarter of the cases aimed at the only template with a line break
 # before a space (key 8901h, the second match: greeting 1 with letter J by
 # day in region 3, clear, climate 4; its third variant), where the filter
@@ -129,3 +213,26 @@ ds 0000 aim 40 137A:w1,05D2:w3,BB09:b0,0D48:b1,0DA8:b4,6E54:b0
 # 101h, so that %en finds it.
 ds 0000 aim 40 137A:w4,0D48:b6,0FD2:w102
 c 0000 aim 80 0200:w101
+# A quarter of the cases with no temple seed (8A57 FFFFFFFFh), and half of
+# the temples' lists with an entry for key 101h (FD2 102h, as aimed above).
+ds 0000 aim 40 8A57:wffff,8A59:wffff
+c 0000 aim 80 0300:w101
+# Cases aimed at the texts with %hc (6Eh, 7Fh) and %dit (ECh), which the
+# drawn text numbers hardly reach.
+ds 0000 aim 20 137A:w6e
+ds 0000 aim 20 137A:w7f
+ds 0000 aim 20 137A:wec
+# The location on the first city of each kind's list (a distance of 0,
+# which 0A44 doesn't count), or far from all (A48 9000h: none nearer than
+# 2710h, DI kept); a place found among [1AB5]'s (%nt in a building, FD2
+# 102h for key 101h); no person and no seed for %tem's random temple (the
+# time's seed).
+ds 0000 aim 30 0A48:w20,0A4A:w30,1459:w20,145B:w30,1521:w20,1523:w30,15E9:w20,15EB:w30
+ds 0000 aim 20 0A48:w9000
+ds 0000 aim 40 0FD2:w102
+c 0000 aim 80 0100:w101
+ds 0000 aim 40 CB5E:w0,8A57:wffff,8A59:wffff
+# Cases aimed at texts with %cn2 (A5h, B9h, C7h: templates 165, 185, 199).
+ds 0000 aim 18 137A:wa5
+ds 0000 aim 18 137A:wb9
+ds 0000 aim 18 137A:wc7

@@ -152,6 +152,19 @@ fn matches_original() {
         let before = m.clone();
         let got = m.text(&mut fs, &mut Count, mode, OUT_SEG, 0).map(|_| {
             m.store_rng();
+            // TEXT_DUMP=seed TEXT_DUMP_TO=path: that case's changed DGROUP
+            // and 3276 bytes written out, to set beside gen_text.py's DUMP.
+            if let (Ok(d), Ok(to)) = (std::env::var("TEXT_DUMP"), std::env::var("TEXT_DUMP_TO")) {
+                if hex(f[1]) == hex(&d) {
+                    for (seg, ext) in [(DS, "ds"), (DATA, "data")] {
+                        let s: String = (0..=0xFFFFu16)
+                            .filter(|&o| m.mem.r8(seg, o) != before.mem.r8(seg, o))
+                            .map(|o| format!("{o:04x} {:02x} {:02x}\n", before.mem.r8(seg, o), m.mem.r8(seg, o)))
+                            .collect();
+                        std::fs::write(format!("{to}.{ext}"), s).unwrap();
+                    }
+                }
+            }
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
                 .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
@@ -173,9 +186,9 @@ fn matches_original() {
         }
     }
     eprintln!("text: {n} compared, {skipped} not ported, {stuck} stuck in both");
-    assert!(n > 2000, "{n} compared");
+    assert!(n > 3500, "{n} compared");
     // A None where the original goes on is only right for the code not
     // ported: these counts are the vectors' (a change that makes the port
     // give up more often shows here).
-    assert_eq!((skipped, stuck), (35, 676), "not ported, stuck in both");
+    assert_eq!((skipped, stuck), (2, 480), "not ported, stuck in both");
 }
