@@ -18,8 +18,7 @@
 //! The slot's files copied (25FD:0612, 056F) are `load.rs`'s, through
 //! `Files`; the automap kept and loaded (23F1:0145, 0000:3503) is
 //! `automap.rs`'s; the save's end (25FD:01CB on) is `save_finish` below.
-//! Not ported: the menu and the name typed (25FD:004F..00D0) and the
-//! CITYDATA check (242A:000E), left to the front end.
+//! The CITYDATA check after it (242A:000E) is `Machine::citydata_check`.
 
 use crate::machine::Machine;
 use crate::mem::DS;

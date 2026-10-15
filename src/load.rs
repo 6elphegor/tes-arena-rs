@@ -88,8 +88,15 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     fn slot_files(&mut self, m: &mut Machine, files: &mut Files) {
         m.slot_files_in(files);
     }
-    /// 242A:000E: CITYDATA.
-    fn citydata(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// 242A:000E: CITYDATA checked (`Machine::citydata_check`, by
+    /// default; its warnings through `message`, after the check).
+    fn citydata(&mut self, m: &mut Machine, files: &mut Files) {
+        let mut shown = Vec::new();
+        let _ = m.citydata_check(files, &mut |_, si| shown.push(si));
+        for si in shown {
+            self.message(m, si);
+        }
+    }
     /// 0000:A5D1: the view's screen set up.
     fn screen(&mut self, _m: &mut Machine) {}
     /// 0000:DA8E: the view updated.
