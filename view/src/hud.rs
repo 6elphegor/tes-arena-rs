@@ -787,8 +787,8 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
 /// Approximate: the callers place the field themselves (the rest's at
 /// FCh,44h, the search's x 55h at y 64h), the view puts it after the
 /// last line's words, a space on (5C30's at its line's start); the
-/// text's colour (9288) is taken as the boxes' 0Fh; the cursor's
-/// 8-frame blink is not drawn (it stays on).
+/// text's colour (9288) is taken as the boxes' 0Fh. The cursor blinks
+/// (`cursor_on`).
 pub fn typed_prompt(screen: &mut Screen, prompt: &str, typed: &str) {
     if let Some(st) = STYLE.get() {
         draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, typed);
@@ -816,7 +816,26 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
     let fx = x + tx + if words > 0 { words + font.width(" ") as i32 } else { 0 };
     let fy = y + ty + last as i32 * lh;
     screen.text_raw(font, fx, fy, typed, 0x0F);
-    screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
+    if cursor_on() {
+        screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
+    }
+}
+
+/// The typed field's cursor blink: 0000:A0D9 XORs the cursor on every
+/// eighth pass of the field's key wait (A84C & 7, the wait going once a
+/// frame through 946A), so it is on for eight frames and off for eight
+/// (the cursor keys' zeroing of the count, A005 and A026, doesn't arise:
+/// the view's cursor stays at the end). The window counts its frames
+/// here (`blink_frame`); a shot, never counting, shows it on.
+static BLINK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+pub fn blink_frame() {
+    BLINK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the typed field's cursor is drawn this frame.
+pub fn cursor_on() -> bool {
+    BLINK.load(std::sync::atomic::Ordering::Relaxed) & 8 == 0
 }
 
 /// A list's line as 2F26:2DF6 draws it: each part but the last (ended by

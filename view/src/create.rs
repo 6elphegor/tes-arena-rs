@@ -41,9 +41,8 @@
 //!
 //! Approximate: the boxes and menus are PARCH.CIF's nine tiles around the
 //! text, centred (the original's sizes and the keys' highlights aren't
-//! traced); the paper doll right of the attributes and the derived
-//! numbers (1194:0F08) aren't drawn; the scroll doesn't roll; the fades
-//! and the music are left out.
+//! traced); the scroll doesn't roll; the fades and the music are left
+//! out.
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -70,7 +69,6 @@ const SEX: u16 = PLAYER + 7;
 /// plural) and the provinces'.
 const LIST_ORDER: u16 = 0x2AEE;
 const CLASS_NAMES: u16 = 0x2A62;
-const RACE_NAMES: u16 = 0x2B94;
 const RACES: u16 = 0x2B49;
 const PROVINCES: u16 = 0x2F06;
 /// The region tables (3276), records of 62h bytes: x, y, width, height.
@@ -1114,40 +1112,23 @@ impl Creation {
     fn draw_stats(&self, screen: &mut Screen, m: &Machine) {
         let f = &self.fonts.arena;
         let c = COLOUR_B;
+        // The page as 0DC7 draws it (from 2B58 and 122F's redraw 12AE):
+        // the doll (16AA: the body and what is worn, 1194:23E5), then
+        // CHARSTAT.IMG over it.
+        for i in crate::doll::images(&self.archive, m) {
+            screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+        }
         if let Some(i) = &self.pics.charstat {
             screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
         }
         let s = |screen: &mut Screen, x: i32, y: i32, t: &str| screen.text_plain(f, x, y, t, c);
-        let cstr = |seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
-        s(screen, 0xB, 7, &cstr(DS, NAME));
-        let (rs, ro) = Self::nth(m, RACE_NAMES, m.mem.r8(DS, RACE));
-        s(screen, 0xB, 0x10, &cstr(rs, ro));
-        let (cs, co) = m.class_name(DS, PLAYER);
-        s(screen, 0xB, 0x19, &cstr(cs, co));
         // While creating (5C8 bit 10h) the attributes as they are, else on
         // the 100 scale (1194:5B07). On the faces' screen the original
         // doesn't draw them again: they stay as they were before they were
         // kept on the 256 scale (2D28), which the 100 scale gives back.
+        // The texts are 0DE1's, the derived numbers (0F08) among them.
         let creating = (m.mem.r16(DS, 0x05C8) & 0x10 != 0 && !matches!(self.stage, Stage::Face)) || self.level_up.is_some();
-        let scale = |v: u16| {
-            let p = v as u32 * 100;
-            (p / 256 + (p % 256 >= 0x80) as u32) as u16
-        };
-        for i in 0..8u16 {
-            let v = m.mem.r8(DS, PLAYER + 0x29 + i) as u16;
-            s(screen, 0x1A, 0x34 + 8 * i as i32, &(if creating { v } else { scale(v) }).to_string());
-        }
-        let w = |o: u16| m.mem.r16(DS, PLAYER + o);
-        let max_hp = w(0x5B);
-        let hp = if creating { max_hp } else { w(0x59) };
-        s(screen, 0x2D, 0x7F, &format!("{hp}/{max_hp}"));
-        let a = |o: u16| m.mem.r8(DS, PLAYER + o) as u16;
-        let fat_max = if creating { a(0x29) + a(0x2E) } else { scale(a(0x29) + a(0x2E)) };
-        s(screen, 0x2D, 0x87, &format!("{}/{fat_max}", scale(w(0x5D) >> 6)));
-        s(screen, 0x56, 0x3C, &format!("{}/{}", w(0x66), w(0x68)));
-        s(screen, 0x2D, 0x90, &m.mem.r32(DS, 0x05C2).to_string());
-        s(screen, 0x2D, 0x9E, &m.mem.r32(DS, PLAYER + 0x409).to_string());
-        s(screen, 0x2D, 0xA7, &(m.mem.r8(DS, PLAYER + 6) as u16 + 1).to_string());
+        crate::sheets::sheet_texts(screen, f, m, creating);
         if matches!(self.stage, Stage::Stats | Stage::Choose(_)) {
             if let Some(i) = &self.pics.bonus {
                 screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
