@@ -1277,7 +1277,7 @@ fn intro_pic(archive: &Archive, n: u8, pal: [[u8; 4]; 256]) -> Option<(Image, [[
 
 /// An image (12-byte header; LZSS or the type-8 coding) with its 6-bit
 /// palette after the data (flag 100h), as TITLE.IMG and MENU.IMG are.
-fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
+pub(crate) fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
     let d = archive.read(name)?;
     let size = u16::from_le_bytes([*d.get(10)?, *d.get(11)?]) as usize;
     let img = crate::interface::image(&d).map(|(i, _)| i).or_else(|| crate::panels::image_type8(m, &d))?;
@@ -1309,4 +1309,24 @@ pub(crate) fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Sp
     };
     engine.m.heap_free(seg);
     hud::lines(&text, colour)
+}
+
+/// The ending's text over the house (1194:DA64..DA75: text `n`, 579h,
+/// made with 101C FFh into 929E), its lines split at the line feeds as
+/// DA9E does, in colour `colour` (5Ch).
+pub(crate) fn house_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
+    let m = &mut engine.m;
+    let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
+        return Vec::new();
+    };
+    m.mem.w16(DS, 0x137A, n);
+    m.mem.w8(DS, 0x137E, 0);
+    m.mem.w8(DS, 0x101C, 0xFF);
+    let text = match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, seg, off) {
+        Some(_) => engine.m.mem.cstr(seg, off).to_vec(),
+        None => Vec::new(),
+    };
+    engine.m.mem.w8(DS, 0x101C, 0);
+    engine.m.heap_free(seg);
+    text.split(|&b| b == 0x0A).flat_map(|l| hud::lines(l, colour)).collect()
 }

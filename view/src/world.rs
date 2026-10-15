@@ -108,7 +108,14 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // loop's hooks and the level's), the level being loaded already. The
     // view has no sound: the INF's sounds (the hook CD4A) aren't loaded.
     let name = arena::transit::var::LEVEL_NAME;
+    // The original begins the world before it loads the level, and
+    // world_begin empties the level's trigger squares (C866), which the
+    // level's TRIG chunk has filled here already: they are kept.
+    let triggers: Vec<u8> = (0..0x101u16).map(|i| m.mem.r8(DS, arena::level::var::TRIGGERS + i)).collect();
     m.world_begin(name, &mut arena::transit::NoAreaHooks);
+    for (i, b) in triggers.into_iter().enumerate() {
+        m.mem.w8(DS, arena::level::var::TRIGGERS + i as u16, b);
+    }
     m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);

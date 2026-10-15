@@ -106,7 +106,8 @@
 //! plays none, and then no music driver is loaded, as with the original's
 //! "No Music"; --sound-log prints the songs asked for. The animations the game plays (the dream, the Emperor's
 //! audience, the quest's end) show over it, a key their next lines or
-//! their end; `--do movie:NAME[:TEXT]` queues one (a debugging aid).
+//! their end; `--do movie:NAME[:TEXT[:COLOUR]]` queues one (a debugging
+//! aid; NAME may be a still .IMG, shown as the ending's house is).
 
 mod archive;
 mod areas;
@@ -353,8 +354,9 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
     }
     /// 1194:D986: the eighth piece, the quest's end: WALK.FLC and
     /// AFLC2.FLC, NUJAGDTH.FLC with text 57Ch in 64h, STAFF.FLC and
-    /// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h. (What comes
-    /// after, 0000:9426 on, isn't ported.)
+    /// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h, then the house
+    /// (1194:DA38..DAC2: HOUSE.IMG in its own colours, text 579h in 5Ch).
+    /// (What comes after, 1194:DAC4 on, isn't ported.)
     fn last_piece(&mut self, _m: &mut arena::machine::Machine) {
         for (name, text, colour) in [
             ("WALK.FLC", None, 0),
@@ -364,6 +366,7 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
             ("KING.FLC", None, 0),
             ("NUKING.FLC", Some(0x57D), 0x99),
             ("NUKING.FLC", Some(0x57F), 0x99),
+            ("HOUSE.IMG", Some(0x579), 0x5C),
         ] {
             self.0.movie(name, text, colour);
         }
@@ -951,6 +954,7 @@ fn main() {
         engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
         engine.m.mem.w16(arena::mem::DS, Y, row << 7 | 64);
         engine.m.mem.w16(arena::mem::DS, HEADING, heading);
+        engine.world_loop_start();
     }
     if fight {
         world::summon(&mut engine);
@@ -1114,6 +1118,21 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
             // Its song (the routines that show them take one).
             if let Some(song) = music::movie_song(name) {
                 engine.m.music_song(song);
+            }
+            if name.ends_with(".IMG") {
+                // A still with its text all at once (the ending's house).
+                let (img, pal) = create::image_with_palette(&engine.m, archive, name)?;
+                let mut px = vec![0u8; 320 * 200];
+                for row in 0..img.h {
+                    for col in 0..img.w {
+                        let (x, y) = (img.x as usize + col, img.y as usize + row);
+                        if x < 320 && y < 200 {
+                            px[y * 320 + x] = img.px[row * img.w + col];
+                        }
+                    }
+                }
+                let lines = text.map(|t| create::house_text(engine, t, colour)).unwrap_or_default();
+                return Some(flc::Movie::still(flc::Flc::still(px, pal), lines));
             }
             let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
             flc::Movie::new(archive, name, lines)
@@ -1289,6 +1308,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             engine.m.mem.w16(arena::mem::DS, X, v[0] << 7 | 0x40);
             engine.m.mem.w16(arena::mem::DS, Y, v[1] << 7 | 0x40);
             engine.m.mem.w16(arena::mem::DS, HEADING, v[2]);
+            engine.world_loop_start();
             shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             continue;
         }
@@ -1327,16 +1347,16 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             continue;
         }
         if let Some(spec) = step.strip_prefix("movie:") {
-            // A debugging aid: an animation queued as the game's hooks
-            // queue them (NAME, or NAME:TEXT with the text's number in
-            // hex, in colour 33h).
-            let (name, text) = match spec.split_once(':') {
-                Some((n, t)) => (n, Some(u16::from_str_radix(t, 16).expect("--do movie:NAME:TEXT"))),
-                None => (spec, None),
-            };
+            // A debugging aid: an animation (or a still .IMG) queued as the
+            // game's hooks queue them (NAME, or NAME:TEXT with the text's
+            // number in hex, in colour 33h or NAME:TEXT:COLOUR's, hex).
+            let mut parts = spec.split(':');
+            let name = parts.next().unwrap_or_default();
+            let text = parts.next().map(|t| u16::from_str_radix(t, 16).expect("--do movie:NAME:TEXT"));
+            let colour = parts.next().map_or(0x33, |c| u8::from_str_radix(c, 16).expect("--do movie:NAME:TEXT:COLOUR"));
             let name: &'static str = Box::leak(name.to_ascii_uppercase().into_boxed_str());
             let archive = st.assets.archive.clone();
-            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, 0x33)]));
+            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, colour)]));
             continue;
         }
         if let Some(d) = step.strip_prefix("swing:") {
@@ -1573,7 +1593,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let view = target.create_view(&Default::default());
     r.draw(&device, &queue, &view, w, h, cam, &sprites);
     if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
-        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, ..Default::default() };
+        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, level: hud::level_text(&engine.m), ..Default::default() };
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
@@ -1655,8 +1675,22 @@ fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (
     engine.m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
     let mut talk = dialog::Talk::default();
     let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
+    // The original takes the click in the input step, during the physics,
+    // when the position is the player's (BA62, 0000:A3AA), not the eye's
+    // the frame leaves in C3D0 (A919): the click from there, and the eye
+    // put back unless the click moved the player.
+    use arena::mem::DS;
+    let words = |m: &arena::machine::Machine, at: u16| [m.mem.r16(DS, at), m.mem.r16(DS, at + 2), m.mem.r16(DS, at + 4)];
+    let put = |m: &mut arena::machine::Machine, at: u16, w: [u16; 3]| (0..3).for_each(|i| m.mem.w16(DS, at + 2 * i as u16, w[i]));
+    let (eye, real) = (words(&engine.m, 0xC3D0), words(&engine.m, 0xBA62));
+    put(&mut engine.m, 0xC3D0, real);
     if engine.m.view_click(&mut engine.files, &mut hooks).is_none() {
         eprintln!("the click met something not ported");
+    }
+    let now = words(&engine.m, 0xC3D0);
+    put(&mut engine.m, 0xBA62, now);
+    if now == real {
+        put(&mut engine.m, 0xC3D0, eye);
     }
     boxes.extend(talk.boxes);
     engine.m.mem.r16(arena::mem::DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0
@@ -2286,7 +2320,7 @@ impl App {
 
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
-        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), ..Default::default() };
+        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), level: hud::level_text(&self.engine.m), ..Default::default() };
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             h.status = self.status.clone();
         }

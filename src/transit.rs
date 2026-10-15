@@ -324,7 +324,7 @@ impl Machine {
     /// 0000:0B15 (`exit` 4537h) and 0B4F (`exit` 44BDh): the level
     /// hooks: after the INF, 0000:2957 in a dungeon (5E6 3), else 0B0B
     /// (the level's lights from its flats); the way out; CD52 0000:0628.
-    pub(crate) fn level_hooks(&mut self, exit: u16) {
+    pub fn level_hooks(&mut self, exit: u16) {
         let inf = if self.mem.r8(DS, AREA) == 3 { 0x2957 } else { 0x0B0B };
         self.mem.w32(DS, INF_HOOK, inf);
         self.mem.w32(DS, EXIT_HOOK, exit as u32);
@@ -750,6 +750,7 @@ impl crate::engine::Engine {
         if self.m.mem.r32(DS, ENTERED_HOOK) == 0x468B {
             hooks.entered(&mut self.m);
         }
+        self.world_loop_start();
         Some(())
     }
 }

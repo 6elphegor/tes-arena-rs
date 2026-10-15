@@ -54,6 +54,14 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A36C: the message box of text number [137A].
     fn message_box_number(&mut self, _m: &mut Machine) {}
+    /// 0000:05B5: the level's text shown (`level_text`: at DS:[3D42] in
+    /// the EMS frame) drawn: its lines (to a CR, a `%` code the player's
+    /// name at 01AD, a line ending in `:` the riddle's last), each centred
+    /// (x A0h) from the view's bottom (C3A2) less its height (3D40), 0Ah
+    /// apart, in the font at 102C and colour F0h.
+    fn level_text_draw(&mut self, _m: &mut Machine) {}
+    /// 292B:05A2: the riddle's answer asked (typed under the text).
+    fn riddle(&mut self, _m: &mut Machine) {}
     /// The routine at GUARDS_HOOK (0000:3F0C or 3F3B): the guards arrive
     /// (`encounter::guards_hook`, with the fight's graphics, music and
     /// text left out; override to draw them).
@@ -151,6 +159,39 @@ impl Machine {
         self.mem.w16(DS, 0x061C, DS);
     }
 
+    /// 0000:0550, each frame: the level's text shown (`level_text`) while
+    /// its time (3C82) lasts, which runs down once the player has left its
+    /// square (0DBC). The font from 102C (0000:9AEA: B036), colour F0h
+    /// (9288), the level's bank mapped (C8FE), the lines drawn
+    /// (`FrameHooks::level_text_draw`). With the riddle waiting (7C5E) the
+    /// text: its answer asked (`riddle`), the time over if the text is no
+    /// more (3D42 0), and the riddle cleared.
+    pub fn level_text_frame(&mut self, hooks: &mut dyn FrameHooks) {
+        use crate::squares::var::{SHOWN, SHOWN_SQUARE, SHOWN_TIME};
+        let t = self.mem.r8(DS, SHOWN_TIME);
+        if t == 0 {
+            return;
+        }
+        if self.mem.r16(DS, SHOWN_SQUARE) != self.mem.r16(DS, 0xCB90) {
+            self.mem.w8(DS, SHOWN_TIME, t.wrapping_sub(1));
+        }
+        let v = self.mem.r16(DS, 0x102C);
+        self.mem.w16(DS, 0xB036, v);
+        self.mem.w8(DS, 0x9288, 0xF0);
+        let bank = self.mem.r8(DS, 0xC8FE) as u16;
+        self.ems_map(bank);
+        let si = self.mem.r16(DS, SHOWN);
+        hooks.level_text_draw(self);
+        if self.mem.r16(DS, 0x7C5E) != si {
+            return;
+        }
+        hooks.riddle(self);
+        if self.mem.r16(DS, SHOWN) == 0 {
+            self.mem.w8(DS, SHOWN_TIME, 0);
+        }
+        self.mem.w16(DS, 0x7C5E, 0);
+    }
+
     /// 0000:481E up to the detail wait (4CE7). None where a ported part
     /// fails.
     pub fn frame_body(&mut self, files: &mut Files, hooks: &mut dyn FrameHooks) -> Option<()> {
@@ -220,6 +261,7 @@ impl Machine {
         }
         self.weapon_change(files, hooks)?;
         self.weapon_frame(files, hooks)?;
+        self.level_text_frame(hooks);
         // 0000:0511: the message's countdown (and its drawing's colour
         // and font, 9288 and B036).
         let t = self.mem.r16(DS, 0x061E);

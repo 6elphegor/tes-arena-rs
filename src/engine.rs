@@ -54,6 +54,108 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     fn sound(&mut self, m: &mut Machine, sound: u16, at: u16) {
         let _ = m.sound_at(sound, at);
     }
+    /// A step of the frame taken over: true where the hooks did it (a
+    /// test's stand-in), false to let the engine run it.
+    fn step(&mut self, _m: &mut Machine, _step: Step) -> bool {
+        false
+    }
+    /// 0000:DFDB: the textures put back from the copy at SI (BA17 as
+    /// loaded); the renderer's.
+    fn textures(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 0000:D4B4: the drawing's set-up (the floor's half, 140h, then the
+    /// ceiling's, FEC0h, unless outdoors or C398 bit 40h), which in fog
+    /// runs the fog's step (2294:0B01); the renderer's.
+    fn draw_setup(&mut self, _m: &mut Machine, _half: u16) {}
+    /// The hook CD1A, 2294:0A5D: the sky's objects drawn (`sky_draw`,
+    /// with the renderer's SkyHooks).
+    fn sky(&mut self, _m: &mut Machine) {}
+    /// 0000:E26B, E1A2: the snow's or the rain's drops moved (the drops
+    /// are the renderer's).
+    fn snow(&mut self, _m: &mut Machine) {}
+    fn rain(&mut self, _m: &mut Machine) {}
+    /// 0000:A7B4: the frame's picture put on the screen (shaken by CB68).
+    fn present(&mut self, _m: &mut Machine) {}
+}
+
+/// The world loop's stage (BA4B), which it marks as it goes.
+const STAGE: u16 = 0xBA4B;
+
+/// The steps of a frame that `EngineHooks::step` may take over (a test
+/// stands in for them; by default the engine runs them).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// The hooks C3A4 (the actors, 0000:47FD), CD16, CD66, CD1A (the sky,
+    /// 2294:0A5D) and C3A8 (the frame body, 0000:481E).
+    Actors,
+    HookCD16,
+    HookCD66,
+    Sky,
+    FrameBody,
+    /// 0000:FCF6, the walk's bob and its footstep.
+    WalkBob,
+    /// 0000:E12E, the level's lights near the eye.
+    LightsNear,
+    /// 0000:DFDB with SI: the textures put back.
+    Textures(u16),
+    /// 0000:5C8A with BX: the level's bank mapped (C8F0).
+    MapBank(u16),
+    /// 0000:E106, the moving lights packed.
+    MovingLights,
+    /// 0000:D4B4 with its argument: the drawing's set-up.
+    DrawSetup(u16),
+    /// 0000:C923, the view drawn (`view_begin`, the walk's doors,
+    /// `EngineHooks::draw`, the trigger squares).
+    View,
+    /// 0000:B4F5 and B358: the draw lists, drawing only.
+    DrawLists,
+    DrawFlats,
+    /// 0000:E26B, E1A2: the snow's or the rain's drops moved.
+    Snow,
+    Rain,
+    /// 0000:F57C, the physics.
+    Physics,
+    /// 0000:D476, the changed squares.
+    TempWalls,
+    /// 0000:EC03, a level's INF waiting (CB84).
+    InfoLoad,
+    /// 0000:A7B4, the picture put on the screen.
+    Present,
+}
+
+/// `n` words copied in DGROUP from `from` to `to`.
+fn copy_words(m: &mut Machine, from: u16, to: u16, n: u16) {
+    for i in 0..n {
+        let w = m.mem.r16(DS, from + 2 * i);
+        m.mem.w16(DS, to + 2 * i, w);
+    }
+}
+
+/// 0000:A606: the clip (A914..A91B) put back from BA58.
+fn clip_back(m: &mut Machine) {
+    for i in 0..8u16 {
+        let b = m.mem.r8(DS, 0xBA58 + i);
+        m.mem.w8(DS, 0xA914 + i, b);
+    }
+}
+
+/// A hook of the world loop called through 0000:A8EF: nothing when unset,
+/// the ported routine its value names, None for another.
+fn world_hook(m: &mut Machine, files: &mut Files, hooks: &mut dyn EngineHooks, step: Step, at: u16) -> Option<()> {
+    if !m.hook_set(at) || hooks.step(m, step) {
+        return Some(());
+    }
+    match (at, m.mem.r32(DS, at)) {
+        (0xC3A4, 0x47FD) => {
+            m.actors_update(files)?;
+            m.projectiles_update()
+        }
+        (0xC3A8, 0x481E) => m.frame_body(files, hooks),
+        (0xCD1A, 0x2294_0A5D) => {
+            hooks.sky(m);
+            Some(())
+        }
+        _ => None,
+    }
 }
 
 /// How a frame ended.
@@ -110,51 +212,177 @@ impl Engine {
         base + self.m.mem.r8(DS, crate::frame::var::DETAIL) as u16
     }
 
-    /// One frame of the world. None where ported code meets something it
-    /// cannot do (an unported hook, a fault or hang of the original).
+    /// One frame of the world, the world loop's body 0000:A2AC..A453 in
+    /// its order. None where ported code meets something it cannot do (an
+    /// unported hook, a fault or hang of the original).
+    ///
+    /// The player's position (C3D0..C3D5) is the eye's for most of the
+    /// frame: the real one is kept at BA62 and put back only around the
+    /// physics (A3AA..A3BE); after them the eye moves 1Eh back along the
+    /// heading (A919) until the next physics. The waits for the timer
+    /// (A428..A444) are the front end's (`frame_ticks`, `tick`); the extra
+    /// tick of a level without C39A bit 400h shows in BA60.
     pub fn frame(&mut self, input: Input, hooks: &mut dyn EngineHooks) -> Option<Frame> {
         let (m, files) = (&mut self.m, &mut self.files);
-        let t = m.mem.r16(DS, crate::frame::var::TICKS);
+        let r = |m: &Machine, at: u16| m.mem.r16(DS, at);
+        m.mem.w8(DS, STAGE, 0);
+        let t = r(m, crate::frame::var::TICKS);
         m.mem.w16(DS, 0xBA60, t);
-        m.actors_update(files)?;
-        m.projectiles_update()?;
-        // 0000:A2CE, A2D7: the view's window for the frame, then the
-        // walk's bob and its footstep.
+        // A2BD: the hook C3A4, the actors and the projectiles.
+        world_hook(m, files, hooks, Step::Actors, 0xC3A4)?;
+        m.mem.w8(DS, STAGE, 1);
         m.view_window();
-        if let Some((s, at)) = m.walk_bob() {
-            hooks.sound(m, s, at);
-        }
-        m.physics_frame(files, &mut Physics { input: &input, hooks })?;
-        if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 {
-            return Some(Frame::Left);
-        }
-        m.view_begin();
-        for (s, at) in m.view_walk_doors() {
-            hooks.sound(m, s, at);
-        }
-        hooks.draw(m);
-        // 0000:A36F..A37B, C9E8: the trigger squares at the end of the
-        // walk, while the eye isn't below the floor.
-        if (m.mem.r16(DS, HEIGHT) as i16) >= 0 {
-            if let Some((s, at)) = m.trigger_squares()? {
+        if !hooks.step(m, Step::WalkBob) {
+            if let Some((s, at)) = m.walk_bob() {
                 hooks.sound(m, s, at);
             }
         }
-        m.temp_walls_frame();
-        m.frame_body(files, hooks)?;
-        let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
-        if info != 0 {
+        world_hook(m, files, hooks, Step::HookCD16, 0xCD16)?;
+        // A2EC: the player's light at the eye.
+        let (x, y) = (r(m, X), r(m, Y));
+        m.mem.w16(DS, 0xC3DE, x);
+        m.mem.w16(DS, 0xC3E0, y);
+        m.mem.w8(DS, STAGE, 2);
+        if !hooks.step(m, Step::LightsNear) {
+            m.lights_near();
+        }
+        // B4E8: the draw lists emptied.
+        m.mem.w16(DS, 0xBAC8, 0);
+        m.mem.w16(DS, 0xCD7A, 0);
+        // A483: the textures put back (0000:DFDB), from the copy at BA17
+        // outdoors or on dry ground, else from BA24's.
+        let si = if r(m, MAP_FLAGS) & 4 != 0 || m.mem.r8(DS, 0xCB5B) == 1 { 0xBA17 } else { 0xBA24 };
+        if !hooks.step(m, Step::Textures(si)) {
+            hooks.textures(m, si);
+        }
+        let bank = m.mem.r8(DS, 0xC8F0) as u16;
+        if !hooks.step(m, Step::MapBank(bank)) {
+            m.ems_map(bank);
+        }
+        if !hooks.step(m, Step::MovingLights) {
+            m.moving_lights();
+        }
+        m.mem.w8(DS, STAGE, 3);
+        // A322: the drawing's set-up (0000:D4B4, the floor's half).
+        if !hooks.step(m, Step::DrawSetup(0x140)) {
+            hooks.draw_setup(m, 0x140);
+        }
+        world_hook(m, files, hooks, Step::HookCD66, 0xCD66)?;
+        if m.mem.r8(DS, 0xCB5C) != 0 {
+            world_hook(m, files, hooks, Step::Sky, 0xCD1A)?;
+        } else {
+            m.mem.w8(DS, STAGE, 4);
+            if r(m, MAP_FLAGS) & 0x44 == 0 && !hooks.step(m, Step::DrawSetup(0xFEC0)) {
+                hooks.draw_setup(m, 0xFEC0);
+            }
+        }
+        m.mem.w8(DS, STAGE, 6);
+        // A367..A393: the view drawn (0000:C923), twice as far when the
+        // eye is below the floor; else C398 bit 20h set for the draw.
+        let reach = r(m, 0xC394);
+        m.mem.w16(DS, 0xC394, reach << 1);
+        if (r(m, HEIGHT) as i16) >= 0 {
+            // shl then shr: bit 15 is lost for the draw.
+            m.mem.w16(DS, 0xC394, (reach << 1) >> 1);
+            let f = r(m, MAP_FLAGS) | 0x20;
+            m.mem.w16(DS, MAP_FLAGS, f);
+        }
+        m.mem.w8(DS, STAGE, 7);
+        if !hooks.step(m, Step::View) {
+            m.view_begin();
+            for (s, at) in m.view_walk_doors() {
+                hooks.sound(m, s, at);
+            }
+            hooks.draw(m);
+            // 0000:C9E8: the trigger squares at the end of the walk, while
+            // the eye isn't below the floor.
+            if (r(m, HEIGHT) as i16) >= 0 {
+                if let Some((s, at)) = m.trigger_squares()? {
+                    hooks.sound(m, s, at);
+                }
+            }
+        }
+        hooks.step(m, Step::DrawLists);
+        m.mem.w8(DS, STAGE, 8);
+        hooks.step(m, Step::DrawFlats);
+        m.mem.w16(DS, 0xC394, reach);
+        m.mem.w8(DS, STAGE, 9);
+        // A8FB: outdoors, the snow (BB09 82h) or the rain (81h) moves.
+        if r(m, MAP_FLAGS) & 4 != 0 {
+            match m.mem.r8(DS, 0xBB09) {
+                0x82 => {
+                    if !hooks.step(m, Step::Snow) {
+                        hooks.snow(m);
+                    }
+                }
+                0x81 => {
+                    if !hooks.step(m, Step::Rain) {
+                        hooks.rain(m);
+                    }
+                }
+                _ => {}
+            }
+        }
+        m.mem.w8(DS, STAGE, 0x0A);
+        // A3AA..A3BE: the physics from the real position.
+        copy_words(m, 0xBA62, X, 3);
+        if !hooks.step(m, Step::Physics) {
+            m.physics_frame(files, &mut Physics { input: &input, hooks })?;
+        }
+        copy_words(m, X, 0xBA62, 3);
+        if r(m, MAP_FLAGS) & 0x80 != 0 {
+            return Some(Frame::Left);
+        }
+        m.mem.w8(DS, STAGE, 0x0B);
+        // A919: the eye 1Eh behind the player (the sine table at B03C, the
+        // cosine's at B13C; the high word of each product).
+        let b = (r(m, HEADING).wrapping_add(0x100) & 0x1FF).wrapping_mul(2);
+        let s = r(m, 0xB03C_u16.wrapping_add(b)) as i16 as i32;
+        let c = r(m, 0xB13C_u16.wrapping_add(b)) as i16 as i32;
+        let x = r(m, X).wrapping_add(((0x1E * s) >> 16) as u16);
+        let y = r(m, Y).wrapping_add(((0x1E * c) >> 16) as u16);
+        m.mem.w16(DS, X, x);
+        m.mem.w16(DS, Y, y);
+        clip_back(m);
+        if !hooks.step(m, Step::TempWalls) {
+            m.temp_walls_frame();
+        }
+        m.mem.w8(DS, STAGE, 0x0C);
+        world_hook(m, files, hooks, Step::FrameBody, 0xC3A8)?;
+        m.mem.w8(DS, STAGE, 0x0D);
+        m.view_window();
+        let info = r(m, crate::info::var::INFO_PTR);
+        if info != 0 && !hooks.step(m, Step::InfoLoad) {
             m.info_load(files, info)?;
-            m.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        }
+        if !hooks.step(m, Step::Present) {
+            hooks.present(m);
         }
         m.mem.w16(DS, 0xCB5E, 0);
-        let c = m.mem.r16(DS, 0xCCBC).wrapping_add(1);
+        clip_back(m);
+        m.mem.w8(DS, STAGE, 0x0E);
+        // A431..A444: the second tick waited (the front end's), counted.
+        if r(m, LEVEL_FLAGS) & 0x400 == 0 {
+            let t = r(m, 0xBA60).wrapping_add(1);
+            m.mem.w16(DS, 0xBA60, t);
+        }
+        let c = r(m, 0xCCBC).wrapping_add(1);
         m.mem.w16(DS, 0xCCBC, c);
-        // 0000:A44A: the objects' lists emptied for the next frame (its
-        // sprites file themselves again); without it the node pool fills
-        // up and filing a projectile (0000:BFC0) runs away.
+        // 0000:A44A: the objects' lists emptied for the next frame (C019;
+        // its sprites file themselves again); without it the node pool
+        // fills up and filing a projectile (0000:BFC0) runs away.
         m.object_lists_clear();
-        Some(if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 { Frame::Left } else { Frame::Running })
+        Some(if r(m, MAP_FLAGS) & 0x80 != 0 { Frame::Left } else { Frame::Running })
+    }
+
+    /// The end of the world's entry and the loop's start: the view's
+    /// window (0000:A5D1, which both ways in call, A250 and A28D) and the
+    /// clip put back (A606 at A2A0), then the player's position kept
+    /// (A2A3: BA62), which each frame's physics start from.
+    pub fn world_loop_start(&mut self) {
+        self.m.view_window();
+        clip_back(&mut self.m);
+        copy_words(&mut self.m, X, 0xBA62, 3);
     }
 
     /// 0000:A26B..A297 and the state part of A4ED: entering a 3D area
@@ -188,6 +416,7 @@ impl Engine {
             m.info_load(&mut self.files, info)?;
             m.mem.w16(DS, crate::info::var::INFO_PTR, 0);
         }
+        self.world_loop_start();
         Some(())
     }
 

@@ -83,6 +83,7 @@ fn main() {
         e2.m.mem.w16(DS, X, (c as u16) << 7 | 0x40);
         e2.m.mem.w16(DS, Y, (r as u16) << 7 | 0x40);
         e2.m.mem.w16(DS, HEADING, heading);
+        e2.world_loop_start();
         if std::env::var("NO_WALK_TEST").is_ok() {
             e2.m.mem.w32(DS, 0xCD6A, 0);
         }
