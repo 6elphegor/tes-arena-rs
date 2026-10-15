@@ -190,6 +190,42 @@ impl Machine {
         Some(())
     }
 
+    /// 29CF:0270. A spell's ball of light (flat 16h) sent from the player
+    /// along its heading (C3DA, doubled, the cursor not counted), with a
+    /// light of radius (`ax` << 8) + 64h, `ax` the effect's first word
+    /// (2CDD:075A's call for an effect on its caster, +27 bit 80h). Its
+    /// flags are 200h, its cast word 1, its height the player's negated
+    /// and halved (`sar`); it lives 30 frames and isn't stepped ahead as
+    /// an arrow is. Sound 7 at its square. None where the slot search
+    /// runs away.
+    pub fn light_missile(&mut self, ax: u16) -> Option<()> {
+        let radius = (ax << 8).wrapping_add(0x64);
+        let si = self.free_projectile()?;
+        let w = |m: &mut Self, o: u16, v: u16| m.mem.w16(DS, si.wrapping_add(o), v);
+        let r = |m: &Self, a: u16| m.mem.r16(DS, a);
+        w(self, f::FLAGS, 0x200);
+        w(self, f::Z, 0);
+        self.mem.w8(DS, si + f::FLAT, 0x16);
+        w(self, f::CAST, 1);
+        w(self, f::F16, 0);
+        let h = r(self, 0xC3DA);
+        w(self, f::HEADING, h.wrapping_add(h));
+        let (x, y) = (r(self, 0xC3D0), r(self, 0xC3D4));
+        let z = (r(self, 0xC3D2).wrapping_neg() as i16 >> 1) as u16;
+        w(self, f::X, x);
+        let zz = r(self, si + f::Z).wrapping_add(z);
+        w(self, f::Z, zz);
+        w(self, f::Y, y);
+        self.mem.w8(DS, si + f::FRAME, 0);
+        self.mem.w8(DS, si + f::LIFE, 0x1E);
+        self.sprite_object(si, x, z, y, 0x16, radius)?;
+        let at = self.projectile_square(si);
+        self.sound_at(7, at)?;
+        let n = r(self, COUNT).wrapping_add(1);
+        self.mem.w16(DS, COUNT, n);
+        Some(())
+    }
+
     /// 29CF:02E4..02F0: the first slot with +11 = 0, searching past the
     /// table if need be.
     fn free_projectile(&self) -> Option<u16> {

@@ -2104,6 +2104,16 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     for (name, data) in out.written {
         engine.files.put(&name, &data);
     }
+    // The save's end (25FD:01CB..020C): the wilderness's blocks copied to
+    // the slot's names (kept on disk too), the slot back to the working
+    // slot, an interior's automap loaded.
+    for name in engine.m.save_finish(&mut engine.files) {
+        let Some(data) = engine.files.written(&name) else { continue };
+        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        if let Err(e) = std::fs::write(&p, data) {
+            eprintln!("{}: {e}", p.display());
+        }
+    }
     format!("Saved to slot {slot} in {}.", dir.display())
 }
 

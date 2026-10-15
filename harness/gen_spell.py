@@ -164,7 +164,6 @@ def main():
     EXE, OUT = sys.argv[1:3]
     out = open(OUT, 'w', buffering=1)
     a = Arena(EXE)
-    a.mu.mem_write(a.lin(LOAD_SEG + 0x29CF, 0x0270), b'\xcc')
 
     # 2CDD:03C1 (instant death) leaves DS at the target's segment, and
     # what follows reads DGROUP's tables through it, running into data:

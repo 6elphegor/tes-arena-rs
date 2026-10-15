@@ -78,8 +78,7 @@ def main():
     a = DosArena(EXE, GAME)
     a.run_range(0, 0x6F3A, 0x6F87)  # open GLOBAL.BSA, as the game does
     for seg, off, code in [(0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb'),
-                           (0, 0x9CA0, b'\xcb'), (0x2DA2, 0x000A, b'\xcb'), (0x1194, 0x59C8, b'\xcb'),
-                           (0x29CF, 0x0270, b'\xcc')]:
+                           (0, 0x9CA0, b'\xcb'), (0x2DA2, 0x000A, b'\xcb'), (0x1194, 0x59C8, b'\xcb')]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     # The spell effects' DS leak stops a case, as in gen_spell.py.
     from unicorn import UC_HOOK_CODE, UcError
