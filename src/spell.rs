@@ -292,7 +292,7 @@ impl Machine {
             0x0822 => self.sp_timed_pair(x, 0x400, 0x28, false),
             0x0841 => self.sp_timed_pair(x, 0x800, 0x2C, true),
             0x0863 => self.sp_timed_pair(x, 0x1000, 0x30, true),
-            _ => None,
+            _ => crate::giveup::not_ported("the table at 83E2: a spell kind not in the table"),
         }
     }
 
@@ -304,7 +304,7 @@ impl Machine {
     fn sp_sub_leaky(&mut self, h: u16, x: Fx) -> Option<()> {
         let (_, at_target) = self.sp_sub(h, x)?;
         if at_target && x.fs != DS {
-            return None;
+            return crate::giveup::not_ported("29CF:0941: DS left at the target's segment: not followed");
         }
         Some(())
     }
@@ -409,7 +409,7 @@ impl Machine {
                 Some((self.sp_transfer(Fx { bp, ..x })?, true))
             }
             0x0604 => Some((self.sp_transfer(x)?, true)),
-            _ => None,
+            _ => crate::giveup::not_ported("2EBD:0102: a spell routine not in the table"),
         }
     }
 
@@ -453,7 +453,7 @@ impl Machine {
     fn h08c3(&self, x: &Fx) -> Option<u16> {
         let d = self.sw(x, 0xC);
         if d == 0 {
-            return None;
+            return crate::giveup::original("2CDD:08C3: a divide by zero");
         }
         let e = self.sw(x, 0x1E);
         Some((self.mem.r16(DS, svar::CASTER_LEVEL) / d).wrapping_mul(e).wrapping_add(e))
@@ -746,7 +746,7 @@ impl Machine {
         if x.fs != DS {
             // DS is left at the target's segment: the message and every
             // table read after it go through the wrong segment.
-            return None;
+            return crate::giveup::not_ported("2CDD:03C1: DS left at the target's segment: not followed");
         }
         self.msg(SUCCEEDED);
         Some(())
@@ -778,7 +778,7 @@ impl Machine {
         let strength = self.h08b7(&x)?.wrapping_add(self.sw(&x, 0));
         let d = self.sw(&x, 0xC);
         if d == 0 {
-            return None;
+            return crate::giveup::original("2CDD:0447: a divide by zero");
         }
         let lvl = self.mem.r8(DS, PLAYER + field::LEVEL) as u16 + 1;
         let timer = (lvl / d).wrapping_mul(self.sw(&x, 0x1E));

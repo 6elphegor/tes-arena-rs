@@ -571,7 +571,7 @@ impl Machine {
                 0xC58B => self.temple_bless(hooks)?,
                 0xC36E => self.temple_cure(hooks)?,
                 0xC2C7 => self.temple_heal(hooks),
-                _ => return None,
+                _ => return crate::giveup::not_ported("1194:C65F: a temple choice not in the table"),
             }
         }
         self.mem.w8(DS, SHOP, 0xFF);

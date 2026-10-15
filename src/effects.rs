@@ -979,7 +979,7 @@ impl Machine {
         if self.mem.r16(seg, r(0x41A)) & spell_flag::ABSORB != 0 && self.fx_resist_roll(seg, off, 0x28) {
             let div = self.mem.r16(DS, var::CASTER);
             if div == 0 {
-                return None;
+                return crate::giveup::original("2CDD:0A38: no caster: the original divides by zero");
             }
             max_sp(self, cost / div);
             return Some(true);
