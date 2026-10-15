@@ -1301,11 +1301,11 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
-        eprintln!("camping met something not ported");
+        eprintln!("camping gave up: {}", arena::giveup::describe());
     }
     if let Some(kind) = input.shop {
         if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
-            eprintln!("the shop met something not ported");
+            eprintln!("the shop gave up: {}", arena::giveup::describe());
         }
     }
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
@@ -1683,7 +1683,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 // Spell N of the spellbook cast (29CF:071F), as the
                 // spellbook's pick would.
                 if engine.m.cast_spell(&mut engine.files, &mut arena::cast::NoCastHooks, n as u8).is_none() {
-                    eprintln!("the cast met something not ported");
+                    eprintln!("the cast gave up: {}", arena::giveup::describe());
                 }
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
@@ -1707,7 +1707,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     engine.m.mem.w32(arena::mem::DS, 0x05C2, g);
                 }
                 if engine.m.spellmaker(&mut engine.files, &mut mk, 0x01A4).is_none() {
-                    eprintln!("the spellmaker met something not ported");
+                    eprintln!("the spellmaker gave up: {}", arena::giveup::describe());
                 }
                 for t in &mk.messages {
                     println!("{t}");
@@ -1873,7 +1873,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     // (that is the area's entry, 0000:46B2): made here.
                     engine.m.mem.w16(DS, arena::sidequest::var::PLACE_SEEN, 0xFFFF);
                     if engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
-                        eprintln!("the town's quests met something not ported");
+                        eprintln!("the town's quests gave up: {}", arena::giveup::describe());
                     }
                 }
                 let m = &mut engine.m;
@@ -2064,7 +2064,7 @@ fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (
     let (eye, real) = (words(&engine.m, 0xC3D0), words(&engine.m, 0xBA62));
     put(&mut engine.m, 0xC3D0, real);
     if engine.m.view_click(&mut engine.files, &mut hooks).is_none() {
-        eprintln!("the click met something not ported");
+        eprintln!("the click gave up: {}", arena::giveup::describe());
     }
     let now = words(&engine.m, 0xC3D0);
     put(&mut engine.m, 0xBA62, now);
@@ -2526,7 +2526,7 @@ impl App {
                         return;
                     }
                 }
-                None => eprintln!("the frame ended: None"),
+                None => eprintln!("the frame ended: None ({})", arena::giveup::describe()),
             }
             self.last = frame;
         }

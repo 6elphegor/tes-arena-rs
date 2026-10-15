@@ -295,7 +295,7 @@ impl Travel {
             m.mem.w8(DS, BUTTONS, if right { 2 } else { 1 });
             let mut h = Self::hooks(&mut self.boxes, &engine.files);
             if m.travel_click(&mut engine.files, &mut h).is_none() {
-                eprintln!("the click met code not ported");
+                eprintln!("the click gave up: {}", arena::giveup::describe());
             }
             m.mem.w8(DS, BUTTONS, b);
         }
@@ -317,7 +317,7 @@ impl Travel {
         let ok = engine.m.travel_go(&mut engine.files, &mut h);
         let failed = h.failed;
         if ok.is_none() || failed {
-            eprintln!("the journey met code not ported");
+            eprintln!("the journey gave up: {}", arena::giveup::describe());
         }
         if engine.m.mem.r16(DS, 0x12A2) != 0 {
             self.end(engine);
@@ -342,7 +342,7 @@ impl Travel {
         h.typed = typed.into_bytes();
         h.pick = pick;
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
-            eprintln!("the search met code not ported");
+            eprintln!("the search gave up: {}", arena::giveup::describe());
         }
     }
 
