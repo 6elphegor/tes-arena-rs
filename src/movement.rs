@@ -138,8 +138,8 @@ const LOW: i16 = 0x3C;
 struct Exit<'a>(&'a mut dyn StairsHooks);
 
 impl crate::transit::AreaHooks for Exit<'_> {
-    fn ask_leave(&mut self, m: &mut Machine) -> bool {
-        self.0.ask_leave(m)
+    fn ask_leave(&mut self, m: &mut Machine, files: &mut Files) -> bool {
+        self.0.ask_leave(m, files)
     }
     /// 292B:095E, as the stairs keep a level's states.
     fn automap(&mut self, m: &mut Machine, files: &mut Files) {

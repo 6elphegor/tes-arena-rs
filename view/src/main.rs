@@ -258,10 +258,14 @@ impl arena::hooks::StairsHooks for Front<'_> {
     fn level_screen(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         arena::hooks::StairsHooks::level_screen(&mut areas::Kept, m, files);
     }
-    /// 26F7:0000, the stairs out of a dungeon: its question isn't drawn
-    /// yet; taken as yes, so the dungeon can be left.
-    fn ask_leave(&mut self, _m: &mut arena::machine::Machine) -> bool {
-        true
+    /// 26F7:0000, the stairs out of a dungeon: the travel map shown
+    /// (`dialog::Talk::travel`, the turn run again with the screen's
+    /// end); its carry leaves. Without the dialog, stays.
+    fn ask_leave(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> bool {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.travel(m, files),
+            None => false,
+        }
     }
 }
 impl ControlHooks for Front<'_> {
@@ -1376,10 +1380,32 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
+    if frame == Some(arena::engine::Frame::Running) {
+        creature_flats(engine, &mut hooks);
+    }
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     let level_changed = stairs || wild_moved(engine, window);
     prof::time("view_frame", || assets.view_frame(engine, input.aspect));
     TurnOut { frame, level_changed }
+}
+
+/// The drawing's creatures' flats (0000:CF96): each one reached goes to
+/// the hook CD56 (25CA:0271, `Machine::flat_creature`) with its square's
+/// centre, its number and its word, as the original's drawing calls it.
+fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
+    use arena::mem::DS;
+    if engine.m.mem.r32(DS, 0xCD56) != 0x25CA_0271 {
+        return;
+    }
+    let seg = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    for (col, row, di) in world::creature_flats_seen(&engine.m) {
+        let flat = engine.m.mem.r8(seg, di);
+        let (x, y) = (col << 7 | 0x40, row << 7 | 0x40);
+        if engine.m.flat_creature(&mut engine.files, &mut FightFront(hooks), x, y, flat, seg, di).is_none() {
+            eprintln!("a creature's flat gave up: {}", arena::giveup::describe());
+            return;
+        }
+    }
 }
 
 /// The animations a turn played (`dialog::Talk::movies`), made: a text's
@@ -1504,6 +1530,8 @@ struct Shot {
     need: Option<dialog::Need>,
     /// The spellmaker's screen when the turn stopped inside it.
     maker_screen: Option<(dialog::Snapshot, Option<u16>)>,
+    /// The shop's screen behind the question asked (`Talk::backdrop`).
+    backdrop: Option<shopui::Backdrop>,
     status: Option<String>,
     /// A panel up at the end (`inv`, `spells`).
     panel: Option<panels::Panel>,
@@ -1561,6 +1589,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     // Kept as the question is (`need`): set by the turn that asked.
     if talk.need.is_some() {
         st.maker_screen = talk.maker.take();
+        st.backdrop = talk.backdrop.take();
     }
     if let Some(need) = talk.need {
         if let (dialog::Need::Spend(snap), None) = (&need, &st.ui) {
@@ -1610,7 +1639,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, backdrop: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1674,7 +1703,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 t.skip_journey();
             }
             let mut boxes = Vec::new();
-            travel::after(&mut st.travel, &mut engine, &mut boxes);
+            travel::after(&mut st.travel, &mut engine, &mut boxes, true);
             if !boxes.is_empty() {
                 st.boxes = boxes;
             }
@@ -2045,7 +2074,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         match st.need.clone() {
             Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
             Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
-            Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker) | None => {}
+            Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
         }
         let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
         if let Some(mk) = &maker {
@@ -2055,6 +2084,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // The turn stopped inside the guild's spellmaker: its screen,
             // with the question asked over it.
             spellmaker::draw_state(&mut screen, &font, &st.assets.archive, &engine.files, &snap.0, *form);
+            hud::compose_over(&mut screen, &font, &hud);
+            hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+        } else if let Some(b) = st.backdrop.as_ref().filter(|_| st.need.is_some()) {
+            b.draw(&mut screen, &st.assets.archive, &engine.m);
             hud::compose_over(&mut screen, &font, &hud);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else {
@@ -2291,6 +2324,8 @@ struct Pending {
     /// The text asked for edited in place at this screen point
     /// (`Talk::text_at`).
     at: Option<(i32, i32)>,
+    /// The shop's screen behind the question (`Talk::backdrop`).
+    backdrop: Option<shopui::Backdrop>,
 }
 
 struct App {
@@ -2566,6 +2601,12 @@ impl App {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
             self.typed.clear();
+            if let dialog::Need::Travel(w) = &need {
+                // The travel map from the game as the way out showed it.
+                self.engine.m.clone_from(&w.0 .0);
+                self.engine.files.clone_from(&w.0 .1);
+                self.travel = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
+            }
             if let dialog::Need::Spend(snap) = &need {
                 let mut e = Engine::new((*snap.0).clone(), self.engine.files.clone());
                 let c = create::Creation::level_up(&mut e.m, self.assets.archive.clone(), &self.dir, self.assets.palette);
@@ -2577,7 +2618,8 @@ impl App {
                 self.typed = text;
                 (x, y)
             });
-            self.pending = Some(Pending { before, input, given, need, maker, at });
+            let backdrop = talk.backdrop.take();
+            self.pending = Some(Pending { before, input, given, need, maker, at, backdrop });
             if self.captured {
                 self.release();
             }
@@ -2645,6 +2687,11 @@ impl App {
             // Inside the guild's spellmaker: its screen, the question asked
             // (a list, the name) over it.
             spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+        } else if let Some(b) = self.pending.as_ref().and_then(|p| p.backdrop.as_ref()) {
+            // Inside a shop: its screen and banner, the question over it.
+            self.screen.set_palette(self.assets.palette);
+            b.draw(&mut self.screen, &self.assets.archive, &self.engine.m);
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else if let Some(t) = &self.travel {
             let (x, y) = self.screen_point();
@@ -2844,8 +2891,15 @@ impl App {
 
     fn travel_after(&mut self) {
         let mut boxes = Vec::new();
-        travel::after(&mut self.travel, &mut self.engine, &mut boxes);
+        // Shown on the way out of a dungeon (a turn's question): its end
+        // is the answer, the turn run again with the game as it ended.
+        let forced = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_)));
+        let carry = travel::after(&mut self.travel, &mut self.engine, &mut boxes, !forced);
         self.boxes.extend(boxes);
+        if let (true, Some(carry)) = (forced, carry) {
+            let world = dialog::World(Box::new((self.engine.m.clone(), self.engine.files.clone())));
+            self.answer(dialog::Answer::Travel(world, carry));
+        }
     }
 
     /// I and C: the inventory or the spellbook up, or down.
@@ -3115,7 +3169,7 @@ impl App {
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).
-                Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker) | None => {}
+                Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
             }
         }
         h
@@ -3157,6 +3211,8 @@ impl App {
             }
             // The attribute screen takes the keys (`creation_input`).
             dialog::Need::Spend(_) => {}
+            // The travel map takes the keys (`travel`).
+            dialog::Need::Travel(_) => {}
             // On the spellmaker, Esc clicks as leaving does: its "exit",
             // or the form's done box.
             dialog::Need::Spellmaker => {
@@ -3335,14 +3391,16 @@ impl App {
                     self.creation_input(inp);
                 }
             }
-            In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
-            In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
-            // The travel map up: its clicks and keys (`travel`).
-            In::Button { down: true, button } if self.travel.is_some() => {
+            // The travel map up (a box over it read first): its clicks and
+            // keys (`travel`); it may be a turn's question (the way out of
+            // a dungeon).
+            In::Button { down: true, button } if self.travel.is_some() && self.boxes.is_empty() => {
                 let (x, y) = self.screen_point();
                 self.travel_input(|t, e, a| t.click(e, a, x, y, button == MouseButton::Right));
             }
-            In::Key { code, down: true, text } if self.travel.is_some() && !self.waiting() => {
+            In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
+            In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
+            In::Key { code, down: true, text } if self.travel.is_some() && self.boxes.is_empty() => {
                 self.travel_input(|t, e, _| t.key(e, code, text.as_deref()));
             }
             // The automap screen up: its buttons and its exit (0000:2E30).

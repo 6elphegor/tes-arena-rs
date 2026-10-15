@@ -705,7 +705,7 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     assert!(a.travel.is_none(), "the screen ends after the journey");
     t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
     t.as_mut().unwrap().skip_journey();
-    travel::after(&mut t, &mut b.engine, &mut Vec::new());
+    travel::after(&mut t, &mut b.engine, &mut Vec::new(), true);
     assert!(t.is_none());
     same(&a, &b, "Travel clicked, and Travel::click");
     // The next turns arrive: the town's welcome reads the arrival.
@@ -1499,6 +1499,173 @@ fn the_options_screens_new_goes_to_the_main_menu() {
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x20, 0x80, MouseButton::Left);
     assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
+}
+
+/// A creature's flat (bit 2 of its map word's high byte) ahead of the
+/// player and near: the drawing reaches it (0000:CF96), the hook CD56
+/// (25CA:0271) brings its creature; behind the player it isn't reached.
+#[test]
+fn a_creatures_flat_seen_near_comes_alive() {
+    use arena::mem::DS;
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    let m = &mut a.engine.m;
+    m.mem.w32(DS, 0xCD56, 0x25CA_0271);
+    // A flat of the first creature kind (C954), named if the level has none.
+    if m.mem.r8(DS, 0xC954) == 0 {
+        m.mem.w8(DS, 0xC954, 0x10);
+    }
+    let flat = m.mem.r8(DS, 0xC954);
+    use arena::movement::var::{HEADING, X, Y};
+    let (x, y) = (m.mem.r16(DS, X), m.mem.r16(DS, Y));
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    // A square two away along an axis (empty or a flat's), with the one
+    // between empty.
+    let (col, row) = ((x >> 7) as i32, (y >> 7) as i32);
+    let empty = |m: &arena::machine::Machine, c: i32, r: i32| c >= 0 && r >= 0 && m.mem.r16(walls, (r << 8 | c << 1) as u16) == 0;
+    let (dc, dr, heading) = [(0, 1, 0u16), (1, 0, 128), (0, -1, 256), (-1, 0, 384)]
+        .into_iter()
+        .find(|&(dc, dr, _)| {
+            let (c, r) = (col + 2 * dc, row + 2 * dr);
+            empty(m, col + dc, row + dr) && c >= 0 && r >= 0 && matches!(m.mem.r16(walls, (r << 8 | c << 1) as u16) >> 12, 0 | 8)
+        })
+        .unwrap_or_else(|| {
+            let around: Vec<String> = (-2..=2).map(|r| (-2..=2).map(|c| format!("{:04x}", m.mem.r16(walls, ((row + r) << 8 | (col + c) << 1) as u16))).collect::<Vec<_>>().join(" ")).collect();
+            panic!("an open line from the start: {around:?}")
+        });
+    let di = ((row + 2 * dr) << 8 | (col + 2 * dc) << 1) as u16;
+    m.mem.w16(walls, di, 0x8200 | flat as u16);
+    // Facing away first: not reached, nothing comes.
+    m.mem.w16(DS, HEADING, (heading + 256) & 0x1FF);
+    assert!(world::creature_flats_seen(m).is_empty(), "behind the player, not reached");
+    d.frame(&mut a);
+    assert_eq!(a.engine.m.mem.r16(DS, 0x05C8) & 0x1000, 0, "nothing came from behind");
+    a.engine.m.mem.w16(DS, HEADING, heading);
+    assert_eq!(world::creature_flats_seen(&a.engine.m), vec![((col + 2 * dc) as u16, (row + 2 * dr) as u16, di)]);
+    d.frame(&mut a);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    let m = &a.engine.m;
+    assert_ne!(m.mem.r16(DS, 0x05C8) & 0x1000, 0, "the flat came alive (5C8 bit 1000h)");
+    assert_eq!(m.mem.r8(DS, 0x126C), 1, "its kind, the first");
+    assert_eq!(m.mem.r16(DS, arena::encounter::var::FLAT_AT), di, "its word kept");
+    assert_ne!(m.mem.r16(DS, arena::encounter::var::FIGHTING), 0, "its creature came");
+}
+
+/// The stairs out of a dungeon's first level (the way out 0000:4537):
+/// the travel map shown (26F7:0000, a turn's question); left by Esc it
+/// stays, a journey made from it leaves.
+#[test]
+fn the_stairs_out_show_the_travel_map() {
+    use arena::mem::DS;
+    use arena::movement::var::{HEADING, LEVEL, MAP_FLAGS, STAIRS_UP, X, Y};
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // Stairs up planted beside the player, faced, on the first level, the
+    // way out a dungeon's (not entered by a trigger nor the wilderness's).
+    let m = &mut a.engine.m;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let (col, row) = ((m.mem.r16(DS, X) >> 7) as i32, (m.mem.r16(DS, Y) >> 7) as i32);
+    let (dc, dr, heading) = [(0, 1, 0u16), (1, 0, 128), (0, -1, 256), (-1, 0, 384)]
+        .into_iter()
+        .find(|&(dc, dr, _)| m.mem.r16(walls, ((row + dr) << 8 | (col + dc) << 1) as u16) == 0)
+        .expect("an open square beside the start");
+    let s = m.mem.r8(DS, STAIRS_UP) as u16;
+    m.mem.w16(walls, ((row + dr) << 8 | (col + dc) << 1) as u16, s << 8 | s);
+    m.mem.w16(DS, HEADING, heading);
+    m.mem.w8(DS, LEVEL, 0);
+    m.mem.w32(DS, arena::transit::var::EXIT_HOOK, 0x4537);
+    if m.mem.r8(DS, 0x05E6) == 4 {
+        m.mem.w8(DS, 0x05E6, 2);
+    }
+    let f = m.mem.r16(DS, 0x05C8) & !0x4080;
+    m.mem.w16(DS, 0x05C8, f);
+    let here = |a: &App| String::from_utf8_lossy(a.engine.m.mem.cstr(DS, 0x0A22)).into_owned();
+    let before = here(&a);
+    let walk = |a: &mut App, d: &mut Driver| {
+        a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+        for _ in 0..40 {
+            d.frame(a);
+            if a.travel.is_some() {
+                break;
+            }
+        }
+        a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+    };
+    walk(&mut a, &mut d);
+    assert!(a.travel.is_some(), "the stairs show the travel map");
+    // Esc: the world map; Esc again: the screen ends, no journey made.
+    // The move's candidates (0000:F76F for each) each meet the stairs, so
+    // the frame asks again until all are answered, as the original's.
+    let mut asked = 0;
+    while a.travel.is_some() && asked < 8 {
+        asked += 1;
+        assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_))), "a turn's question");
+        d.key(&mut a, KeyCode::Escape, None);
+        assert!(a.travel.is_some(), "the world map");
+        d.key(&mut a, KeyCode::Escape, None);
+    }
+    assert!(a.travel.is_none() && a.pending.is_none(), "the screen ended, the turn answered after {asked}");
+    assert_eq!(a.engine.m.mem.r16(DS, MAP_FLAGS) & 0x80, 0, "stayed: the area not left");
+    d.frames(&mut a, 2);
+    assert!(a.travel.is_none(), "not asked again standing");
+    // Again, and a journey made: the dungeon left for the place.
+    walk(&mut a, &mut d);
+    assert!(a.travel.is_some(), "asked again on the stairs");
+    d.click(&mut a, 135, 58, MouseButton::Left);
+    assert!(!a.boxes.is_empty(), "the journey's box");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    d.click(&mut a, 62, 180, MouseButton::Left);
+    for _ in 0..20 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
+    assert!(a.travel.is_none() && a.pending.is_none(), "the screen ended after the journey");
+    for _ in 0..20 {
+        while !a.boxes.is_empty() {
+            d.key(&mut a, KeyCode::Enter, None);
+        }
+        d.frame(&mut a);
+    }
+    assert_ne!(here(&a), before, "the dungeon left for the place travelled to");
+}
+
+/// A shop's screen behind its questions (1194:4B60, 4BFF): the tavern's
+/// name made from "%nt " on the banner; gone once the shop is left.
+#[test]
+fn a_shops_banner_is_drawn_behind_its_menu() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "TAVERN1.MIF", ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    shop_turn(&mut a, 4);
+    let b = a.pending.as_ref().and_then(|p| p.backdrop.clone()).expect("the shop's screen behind its menu");
+    let title = String::from_utf8_lossy(&b.title).into_owned();
+    assert!(!title.is_empty() && !title.contains('%'), "the tavern's name made: {title:?}");
+    a.compose();
+    let banner = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..14).flat_map(|r| (100..220).map(move |c| r * hud::W + c)).map(|i| px[i]).collect() };
+    let up = banner(&a.screen.px);
+    shot(&mut a, "shop_banner");
+    while a.pending.is_some() || !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Escape, None);
+    }
+    a.compose();
+    assert_ne!(banner(&a.screen.px), up, "the banner gone with the shop");
 }
 
 /// The player given a name (01AD), as every game's player has: the
