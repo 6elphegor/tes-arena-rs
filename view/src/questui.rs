@@ -53,6 +53,7 @@ impl<'a> HaggleTalk<'a> {
             entries: entries.iter().map(|e| line(e)).collect(),
             keys: entries.iter().map(|e| e.as_bytes()[0]).collect(),
             selected: 0,
+            list: false,
         };
         t.ask_menu(menu)
     }
@@ -168,7 +169,7 @@ impl QuestHooks for QuestFront<'_, '_> {
             t.lines_box(lines);
             return 0;
         }
-        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0 };
+        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false };
         if t.ask_menu(menu) == 0 { 0 } else { 1 }
     }
     fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
