@@ -19,13 +19,16 @@ pub struct Machine {
     /// front end to take (`sound`).
     pub sound_busy: bool,
     pub sounds: Vec<crate::sound::Played>,
+    /// The level's sound files by slot, as its INF's @SOUND section named
+    /// them (the files the driver's loader, 23BA:0217, puts in the slots).
+    pub sound_names: Vec<Vec<u8>>,
 }
 
 impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), sound_busy: false, sounds: Vec::new() }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), sound_busy: false, sounds: Vec::new(), sound_names: Vec::new() }
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.
