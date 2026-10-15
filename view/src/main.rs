@@ -39,8 +39,10 @@
 //! hands. Q readies or puts away the weapon (the original's A); holding
 //! the right button (captured) and dragging swings it. --do gains
 //! `ready`, `compass`, `swing:DX:DY` (the right button down with a drag
-//! of DX, DY mickeys for a turn) and `cast:N` (spell N of the spellbook
-//! cast).
+//! of DX, DY mickeys for a turn: a swing starts only from a drag of 40h
+//! (64) or more, 0000:3C9F, so `swing:0:60` does nothing) and `cast:N`
+//! (spell N of the spellbook cast). E.g. `--sound-log --do
+//! ready,wait:2,swing:0:100,wait:3` logs the swing's swish.voc.
 //!
 //! I opens the inventory (`panels`: the original's equipment screen):
 //! a left click on an item puts it on or takes it off, a right click
