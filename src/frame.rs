@@ -647,14 +647,14 @@ impl Machine {
             let cx = r(self, 0xA91A).wrapping_sub(r(self, 0xA916)).wrapping_sub(0x14);
             let v = self.rng.next();
             if cx == 0 {
-                return None;
+                return crate::giveup::original("0000:E322: the view has no width: the original divides by zero");
             }
             let y = (v % cx).wrapping_add(r(self, 0xA916));
             self.mem.w16(DS, si.wrapping_add(2), y);
             let cx = r(self, 0xA918).wrapping_sub(r(self, 0xA914));
             let v = self.rng.next();
             if cx == 0 {
-                return None;
+                return crate::giveup::original("0000:E322: the view has no width: the original divides by zero");
             }
             let x = (v % cx).wrapping_add(r(self, 0xA914));
             self.mem.w16(DS, si, x);

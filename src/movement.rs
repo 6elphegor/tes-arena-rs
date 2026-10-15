@@ -167,10 +167,10 @@ impl Machine {
                         return Some(al);
                     }
                 }
-                _ => return None,
+                _ => return crate::giveup::not_ported("2826:0AAB: a move hook not ported"),
             }
             if !matches!(self.mem.r32(DS, SOUND_HOOK), 0 | SOUND) {
-                return None;
+                return crate::giveup::not_ported("2826:0AAB: the sound hook set to a routine not ported");
             }
             let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
             let w = self.mem.r16(walls, sq) | 0x200;
@@ -387,7 +387,7 @@ impl Machine {
                         return Some(Test::Next);
                     }
                 }
-                _ => return None,
+                _ => return crate::giveup::not_ported("0000:F60A: a walk-test hook not ported"),
             }
         }
         let al = self.move_cell(pos)?;
@@ -455,7 +455,7 @@ impl Machine {
             match m.mem.r32(DS, STAIRS_HOOK) {
                 0 => {}
                 value::STAIRS => m.stairs_hook(files, hooks),
-                _ => return None,
+                _ => return crate::giveup::not_ported("0000:F76F: the stairs hook set to a routine not ported"),
             }
             Some(())
         };
@@ -496,7 +496,7 @@ impl Machine {
     fn move_exit(&mut self, to: u8) -> Option<u16> {
         let ported = matches!(self.mem.r32(DS, EXIT_HOOK), 0x4537 | 0x44BD);
         if self.hook_set(EXIT_HOOK) && !ported {
-            return None;
+            return crate::giveup::not_ported("0000:F791: the exit hook set to a routine not ported");
         }
         if ported {
             let level = self.mem.r8(DS, LEVEL);
@@ -536,7 +536,7 @@ impl Machine {
         match self.mem.r32(DS, LEVEL_HOOK) {
             0 => {}
             value::LEVEL_ENTERED => self.level_entered(files, hooks)?,
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:F7B5: the level hook set to a routine not ported"),
         }
         Some(())
     }

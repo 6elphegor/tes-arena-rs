@@ -640,7 +640,7 @@ impl Machine {
                 hooks.leave_interior(self);
                 Some(())
             }
-            _ => None,
+            _ => crate::giveup::not_ported("0000:4537: an exit hook not ported"),
         }
     }
 
@@ -762,7 +762,7 @@ impl crate::engine::Engine {
             m.area_entry(hooks);
         }
         if m.mem.r16(DS, 0xCD60) != 0 {
-            return None;
+            return crate::giveup::not_ported("0000:A26F: the level-load hook CD5E set: not ported");
         }
         if m.mem.r8(DS, LEVEL_NAME) != b'#' {
             m.level_load(&mut self.files, LEVEL_NAME)?;

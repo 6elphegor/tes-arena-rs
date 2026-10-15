@@ -142,7 +142,7 @@ impl Machine {
         self.level_skip(files, level as u16);
         self.level_chunks(files)?;
         if self.mem.r8(DS, LEVEL_OVERRIDE) != 0xFF && self.hook_set(LEVEL_HOOK) {
-            return None;
+            return crate::giveup::not_ported("0000:E87C: the level hook set to a routine not ported");
         }
         self.file_close(files);
         if self.mem.r16(DS, FLAGS) & 0x200 == 0 {
@@ -252,7 +252,7 @@ impl Machine {
             0 => {}
             crate::hooks::value::LEVEL_LIGHTS => self.flat_lights(),
             crate::hooks::value::DUNGEON_LEVEL => self.dungeon_level_hook(files)?,
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:EBB5: the level-change hook set to a routine not ported"),
         }
         Some(())
     }
@@ -281,7 +281,7 @@ impl Machine {
                     // div bl: a quotient above 0xFF is a divide error.
                     let q = n / 3;
                     if q > 0xFF {
-                        return None;
+                        return crate::giveup::original("0000:E930: the chunk's divide overflows");
                     }
                     self.mem.w8(DS, LOCK_COUNT, q as u8);
                 }

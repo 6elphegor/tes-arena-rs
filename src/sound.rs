@@ -144,7 +144,7 @@ impl Machine {
         let product = (cx as u8 as u16) * self.mem.r8(DS, VOLUME) as u16;
         let q = product / 100;
         if q > 0xFF {
-            return None;
+            return crate::giveup::original("23BA:00E8: the volume's divide overflows");
         }
         Some(q as u8)
     }

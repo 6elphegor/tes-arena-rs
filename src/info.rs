@@ -197,16 +197,16 @@ impl Machine {
         self.ems_map(first);
         let (off, seg) = (self.mem.r16(DS, BUFFER), self.mem.r16(DS, BUFFER + 2));
         if off >= 0xFFFD {
-            return None;
+            return crate::giveup::not_ported("0000:EC03: a buffer to allocate: not followed");
         }
         // A failed load (no such file, 64 KiB or more, nothing read) is
         // ignored: the text left in the buffer is parsed, up to the last
         // size stored at OPEN_SIZE.
         if self.hook_set(crate::bsa::var::OPEN_HOOK) {
-            return None;
+            return crate::giveup::not_ported("0000:EC03: the open hook set to a routine not ported");
         }
         if self.file_load(files, name, seg, off).is_none() && self.mem.r32(DS, crate::bsa::var::ERROR_HOOK) != 0 {
-            return None;
+            return crate::giveup::error("0000:EC03: an INF missing, the error hook set");
         }
         let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
         self.mem.w16(DS, END, size);
@@ -217,7 +217,7 @@ impl Machine {
         match self.mem.r32(DS, DONE_HOOK) {
             0 => {}
             crate::hooks::value::INF_DONE => self.inf_done_hook(),
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:EC03: the INF's end hook set to a routine not ported"),
         }
         self.mem.w16(DS, INFO_PTR, 0);
         if self.mem.r16(DS, FLAGS) & 0x400 == 0 {
@@ -592,7 +592,7 @@ impl Machine {
                 let (v, _) = self.info_number(es, &mut di)?;
                 self.mem.w16(DS, TOP, v);
             }
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:EF7A: an INF keyword not ported"),
         }
         Some(())
     }
@@ -932,7 +932,7 @@ impl Machine {
                 // front end (`Machine::sound_names`).
                 self.sound_names = self.sound_list();
                 if self.hook_set(SOUND_HOOK) {
-                    return None;
+                    return crate::giveup::not_ported("23BA:0217: the sounds hook set to a routine not ported");
                 }
                 return Some(*di >= end);
             }

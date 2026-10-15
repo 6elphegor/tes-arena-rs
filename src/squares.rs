@@ -96,7 +96,7 @@ impl Machine {
                 self.mem.w8(DS, LAST_TEXT, a);
                 if self.hook_set(TEXT_HOOK) {
                     if self.mem.r32(DS, TEXT_HOOK) != 0x0628 {
-                        return None;
+                        return crate::giveup::not_ported("0000:D39B: the level's text hook set to a routine not ported");
                     }
                     let bx = self.mem.r16(DS, ROW);
                     self.level_text(bx, TEXT_HOOK)?;
@@ -214,7 +214,7 @@ impl Machine {
                     s = s.wrapping_add(1);
                     steps += 1;
                     if steps > SCAN {
-                        return None;
+                        return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                     }
                 }
                 s = s.wrapping_add(1);
@@ -238,7 +238,7 @@ impl Machine {
                         p = p.wrapping_add(1);
                         steps += 1;
                         if steps > SCAN {
-                            return None;
+                            return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                         }
                     }
                     self.mem.w16(DS, TEXT_AT, p.wrapping_add(1));
@@ -253,7 +253,7 @@ impl Machine {
                     p = p.wrapping_add(1);
                     steps += 1;
                     if steps > SCAN {
-                        return None;
+                        return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                     }
                 }
                 let (v2, p2, b2) = atoi(self, seg, p, b1);
@@ -263,7 +263,7 @@ impl Machine {
                     p = p.wrapping_add(1);
                     steps += 1;
                     if steps > SCAN {
-                        return None;
+                        return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                     }
                 }
                 self.mem.w16(DS, RIDDLE_AT, p);
@@ -288,7 +288,7 @@ impl Machine {
                         di = di.wrapping_add(1);
                         steps += 1;
                         if steps > SCAN {
-                            return None;
+                            return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                         }
                         continue;
                     }
@@ -298,7 +298,7 @@ impl Machine {
                         di = di.wrapping_add(1);
                         steps += 1;
                         if steps > SCAN {
-                            return None;
+                            return crate::giveup::original("0000:06BE: the scan never ends: the original reads on for ever");
                         }
                     }
                     di = di.wrapping_add(1);

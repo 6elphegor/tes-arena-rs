@@ -466,7 +466,7 @@ impl Machine {
         if !found {
             files.loose = None;
             if self.mem.r32(DS, ERROR_HOOK) != 0 {
-                return None;
+                return crate::giveup::error("0000:67C8: a file missing, the error hook set");
             }
         }
         Some(found)
@@ -488,7 +488,7 @@ impl Machine {
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
         if self.hook_set(OPEN_HOOK) {
-            return None;
+            return crate::giveup::not_ported("0000:67C4: the open hook set to a routine not ported");
         }
         let raw = self.mem.cstr(DS, name).to_vec();
         if let Some(bytes) = files.read_loose(&raw) {
@@ -585,7 +585,7 @@ impl Machine {
         let size = self.file_seek(files, 2, 0);
         if size > 0xFFFF {
             self.file_close(files);
-            return None;
+            return crate::giveup::error("0000:7428: a file of 64 KiB or more");
         }
         self.mem.w16(DS, OPEN_SIZE, size as u16);
         self.file_seek(files, 0, 0);

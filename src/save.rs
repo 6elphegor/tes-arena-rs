@@ -89,7 +89,7 @@ impl Machine {
             if self.file_load(files, path, spell::SEG, off).is_none()
                 && self.hook_set(crate::bsa::var::ERROR_HOOK)
             {
-                return None;
+                return crate::giveup::error("29CF:0691: the spells file missing, the error hook set");
             }
         }
         Some(())
@@ -131,7 +131,7 @@ impl Machine {
         }
         self.file_read(files, DS, LEVEL_STATE, LEVEL_STATE_BYTES);
         if self.mem.r16(DS, LOAD_HOOK_1 + 2) != 0 {
-            return None;
+            return crate::giveup::not_ported("0000:A9AC: a load hook set to a routine not ported");
         }
         for i in 0..3 {
             let w = self.mem.r16(DS, crate::level::var::PLAYER_X + i * 2);
@@ -158,7 +158,7 @@ impl Machine {
         }
         self.file_close(files);
         if self.mem.r16(DS, LOAD_HOOK_2 + 2) != 0 {
-            return None;
+            return crate::giveup::not_ported("0000:A72E: a load hook set to a routine not ported");
         }
         self.mem.w16(DS, crate::level::var::W_C8ED, 0xFFFF);
         self.mem.w8(DS, 0xCB5B, 0xFF);
