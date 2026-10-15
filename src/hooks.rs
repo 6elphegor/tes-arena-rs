@@ -59,8 +59,9 @@ pub trait StairsHooks {
     /// then loaded (0000:3503, `Machine::automap_load`).
     fn level_screen(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 26F7:0000, asked on the stairs out of a dungeon's first level
-    /// (the way out 0000:4537): whether to leave. The default stays.
-    fn ask_leave(&mut self, _m: &mut Machine) -> bool {
+    /// (the way out 0000:4537): the travel map shown (1A81 set: from
+    /// anywhere), its carry whether to leave. The default stays.
+    fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
     }
 }

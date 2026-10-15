@@ -219,7 +219,7 @@ fn person(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<b
 struct LeaveYes;
 
 impl arena::transit::AreaHooks for LeaveYes {
-    fn ask_leave(&mut self, _m: &mut Machine) -> bool {
+    fn ask_leave(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
         true
     }
 }

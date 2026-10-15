@@ -283,10 +283,6 @@ At the time of writing:
   - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
     check (242A:000E) and loading from the title screen (5C8 bit 4) are not
     ported; the view saves to and loads from a fixed slot.
-  - A monster's flat coming alive near the player (25CA:0271,
-    `flat_creature`) is ported and tested, but the view doesn't call it
-    yet: the original runs it from its drawing (0000:CF96, a flat with
-    bit 2 drawn).
   - The Emperor's audience (stage 8) hasn't been reached in a walkthrough;
     the test save is past it.
   - Text 5DDh (the last text in TEMPLATE.DAT, with nothing after it) has
@@ -296,6 +292,9 @@ At the time of writing:
   gives up after 65536 tries; collapsing from exhaustion inside the hour it
   costs gives up after 200 nested collapses.
 - **View:**
+  - The squares the drawing reaches, for a monster's flat to come alive
+    (0000:CF96, `world::creature_flats_seen`), are those in the view's
+    columns with no wall on the line to them, not the ray caster's own.
   - Lights behind a wall follow the original's rule but are unconfirmed on
     screen, and its two exceptions (CB37 = 0Dh, CCF8 = FFFFh) aren't
     modelled; a spell's burst is nudged in front of the wall it hits.

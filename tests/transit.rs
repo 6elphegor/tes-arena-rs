@@ -65,7 +65,7 @@ impl AreaHooks for Hooks {
     fn automap(&mut self, m: &mut Machine) {
         count(m, 0xFFFA);
     }
-    fn ask_leave(&mut self, m: &mut Machine) -> bool {
+    fn ask_leave(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
         count(m, 0xFFFC);
         count(m, 0xFFFE);
         count(m, 0xFFA0);

@@ -246,6 +246,19 @@ impl Travel {
                 return Err(boxes.pop().unwrap_or_default());
             }
         }
+        Ok(Travel::begin(engine, archive, boxes))
+    }
+
+    /// The screen shown on the way out of a dungeon (0000:4570, 1A81
+    /// set): no refusals, its end's carry the answer (`after`'s, with
+    /// the area left by the caller).
+    pub fn forced(engine: &mut Engine, archive: &crate::archive::Archive) -> Travel {
+        Travel::begin(engine, archive, Vec::new())
+    }
+
+    /// 26F7:0000's start, on the current province's map.
+    fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
+        let m = &mut engine.m;
         let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
@@ -270,7 +283,7 @@ impl Travel {
         };
         let p = m.mem.r8(DS, 0x0A46);
         t.show_province(engine, archive, p);
-        Ok(t)
+        t
     }
 
     /// The boxes shown since last asked.
@@ -592,12 +605,17 @@ fn list_at(names: &[String], x: i32, y: i32) -> Option<usize> {
 }
 
 /// After an input to the travel map (or a frame): its boxes to `boxes`;
-/// ended and the journey's frames played, it goes (with the carry, the area left: `Machine::map_button_done`, 2542:0411).
-pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<Lines>) {
-    let Some(t) = travel else { return };
+/// ended and the journey's frames played, it goes, its carry returned:
+/// opened by the map `button`, the area left on the carry
+/// (`Machine::map_button_done`, 2542:0411); else (`Travel::forced`) the
+/// caller's.
+pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<Lines>, button: bool) -> Option<bool> {
+    let t = travel.as_mut()?;
     boxes.extend(t.take_boxes());
-    if let Some(carry) = t.done.filter(|_| !t.journeying()) {
+    let carry = t.done.filter(|_| !t.journeying())?;
+    if button {
         engine.m.map_button_done(carry);
-        *travel = None;
     }
+    *travel = None;
+    Some(carry)
 }
