@@ -543,6 +543,10 @@ fn trip(engine: &mut Engine, dir: &std::path::Path, run: Run, p: u8, i: u8, n: &
     let carry = m.travel_map_end(&mut h, start);
     m.map_button_done(carry);
     println!("   travelled: here {} {:#x} (kind {}), 5E6 {}, the carry {carry}", m.mem.r8(DS, HERE_PROVINCE), m.mem.r8(DS, HERE_ID), m.mem.r8(DS, HERE_KIND), m.mem.r8(DS, 0x05E6));
+    // The PC's clock goes on while the map is used (20 seconds of it): a
+    // town's quests are seeded by it (1194:9358), and at 0 the seed stays
+    // 0, so a town first in its province rolls for ever (0ABF).
+    engine.tick(364);
     let r = areas::next(engine, dir, run);
     let m = &engine.m;
     println!("   entered {r:?}: level {} of {}, the piece's square (FEE) {:04x}: {}", m.mem.r8(DS, arena::movement::var::LEVEL), m.mem.r8(DS, arena::movement::var::LEVELS), m.mem.r16(DS, 0x0FEE), state(m));

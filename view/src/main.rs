@@ -1912,8 +1912,12 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 }
             }
             "map" => {
-                sheets::pics(&st.assets.archive, &engine.m);
-                automap::open(&mut engine, &st.assets.archive);
+                if st.map {
+                    automap::close(&mut engine.m);
+                } else {
+                    sheets::pics(&st.assets.archive, &engine.m);
+                    automap::open(&mut engine, &st.assets.archive);
+                }
                 st.map = !st.map;
             }
             // The automap screen's button N (0 up, 1 down, 2 right, 3 left,
@@ -1946,7 +1950,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 sheets::pics(&st.assets.archive, &engine.m);
                 let (x, y) = sheets::bar_centre(n as usize);
                 match sheets::bar_click(&mut engine.m, &mut engine.files, x, y, false) {
-                    Some(sheets::BarAction::Automap) => {
+                    Some(sheets::BarAction::Automap) if !st.map => {
                         automap::open(&mut engine, &st.assets.archive);
                         st.map = true;
                     }
@@ -3446,6 +3450,7 @@ impl App {
             In::Button { down: true, .. } if self.map => {
                 let (x, y) = self.screen_point();
                 if automap::exit_at(x, y) {
+                    automap::close(&mut self.engine.m);
                     self.map = false;
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
@@ -3489,6 +3494,7 @@ impl App {
                     let b = match code {
                         _ if !down => return,
                         KeyCode::Escape | KeyCode::KeyM => {
+                            automap::close(&mut self.engine.m);
                             self.map = false;
                             return;
                         }

@@ -363,7 +363,7 @@ impl Machine {
                     match section {
                         b'A' => self.info_flats(files, es, &mut di)?,
                         b'U' => {
-                            if self.info_sounds(es, &mut di)? {
+                            if self.info_sounds(files, es, &mut di)? {
                                 return Some(());
                             }
                         }
@@ -919,7 +919,7 @@ impl Machine {
     /// 0000:EDB1. The @SOUND section: names into the list at LIST, and
     /// SOUNDS[number] = their index; then the sound hook. True at the end
     /// of the text.
-    fn info_sounds(&mut self, es: u16, di: &mut u16) -> Option<bool> {
+    fn info_sounds(&mut self, files: &mut Files, es: u16, di: &mut u16) -> Option<bool> {
         self.mem.w8(DS, COUNT, 0);
         self.mem.w16(DS, LIST, 0);
         let mut si = LIST;
@@ -928,15 +928,15 @@ impl Machine {
             tick()?;
             let c = self.mem.r8(es, *di);
             if *di >= end || c == b'@' {
-                // The files 23BA:0217 (at SOUND_HOOK) would load into the
-                // sound slots, in order: the sound driver's, kept for the
-                // front end (`Machine::sound_names`). With no sound (8F64
-                // 0) it returns at once.
+                // The hook (called where its segment is set): 23BA:0217
+                // loads the files into the sound slots. Their names are
+                // kept for the front end (`Machine::sound_names`).
                 self.sound_names = self.sound_list();
-                let hook = self.mem.r32(DS, SOUND_HOOK);
-                let quiet = hook == 0x23BA_0217 && self.mem.r16(DS, crate::sound::var::ENABLED) == 0;
-                if hook != 0 && !quiet {
-                    return crate::giveup::not_ported("23BA:0217: the sounds hook set to a routine not ported");
+                if self.mem.r16(DS, SOUND_HOOK + 2) != 0 {
+                    if self.mem.r32(DS, SOUND_HOOK) != 0x23BA_0217 {
+                        return crate::giveup::not_ported("0000:EE02: the sounds hook set to a routine not ported");
+                    }
+                    self.sound_load(files, LIST)?;
                 }
                 return Some(*di >= end);
             }

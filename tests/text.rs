@@ -1,8 +1,9 @@
 //! Differential tests of the game's text (src/text.rs `text`, 1194:A374,
 //! and its substitutions 2DA2:000A) against vectors from the original code
 //! (harness/gen_text.py). Needs the game directory (POINTER1.DAT,
-//! TEMPLATE.DAT, NAMECHNK.DAT). Cases whose text reaches a substitution
-//! not ported are counted, not compared (and their number checked).
+//! TEMPLATE.DAT, NAMECHNK.DAT). Cases where the original goes on past
+//! its own fault (a None from the port, noted `giveup::original`) are
+//! counted, not compared (and their number checked); any other None fails.
 mod common;
 
 use arena::bsa::Files;
@@ -140,7 +141,7 @@ fn matches_original() {
     base.mem.w8(DS, 0x8FA6, 1);
     base.mem.w16(DS, 0x9032, 0x20);
     base.mem.w16(DS, 0x8FA8, 0);
-    let (mut n, mut skipped, mut stuck) = (0, 0, 0);
+    let (mut n, mut survived, mut stuck) = (0, 0, 0);
     for line in include_str!("vectors/text.txt").lines() {
         let f: Vec<&str> = line.split(" | ").collect();
         assert_eq!(f[0], "text", "{line}");
@@ -149,6 +150,7 @@ fn matches_original() {
         let mode = setup(&mut m, hex(f[1]), &keys);
         m.mem.w16(DS, 0x91F0, 0);
         m.load_rng();
+        arena::giveup::take();
         let before = m.clone();
         let got = m.text(&mut fs, &mut Count, mode, OUT_SEG, 0).map(|_| {
             m.store_rng();
@@ -182,15 +184,20 @@ fn matches_original() {
                 n += 1;
             }
             None if f[2] == "stuck" => stuck += 1,
-            None => skipped += 1,
+            // The original goes on where the port can't follow it: only
+            // as the original's own fault (%en's return into 2DA2, which
+            // two cases survive by reading on from FFFD:0001).
+            None => match arena::giveup::take() {
+                Some(g) if g.kind == arena::giveup::Kind::Original => survived += 1,
+                g => panic!("{line}: gave up: {g:?}"),
+            },
         }
     }
-    eprintln!("text: {n} compared, {skipped} not ported, {stuck} stuck in both");
+    eprintln!("text: {n} compared, {survived} survived the original's own fault, {stuck} stuck in both");
     assert!(n > 3500, "{n} compared");
-    // A None where the original goes on is only right for the code not
-    // ported: these counts are the vectors' (a change that makes the port
-    // give up more often shows here).
-    assert_eq!((skipped, stuck), (2, 480), "not ported, stuck in both");
+    // These counts are the vectors' (a change that makes the port give up
+    // more often shows here).
+    assert_eq!((survived, stuck), (2, 480), "survived, stuck in both");
 }
 
 /// A substitution the port gives up on (%qf, which seeds a name with EBX
@@ -217,7 +224,9 @@ fn a_substitution_given_up_leaves_the_nesting() {
         m.mem.w8(OUT_SEG, i as u16, b);
     }
     let seed = m.rng.seed;
+    arena::giveup::take();
     assert_eq!(m.expand(&mut files, &mut Count, OUT_SEG, 0), None);
+    assert_eq!(arena::giveup::take().map(|g| g.kind), Some(arena::giveup::Kind::Original), "%qf: the original's EBX");
     assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0, "the nesting back");
     assert_eq!(m.mem.r16(DS, 0x8FA8), 0x11 << 2, "the bank mapped before back");
     assert_eq!(m.rng.seed, seed, "the seed back");

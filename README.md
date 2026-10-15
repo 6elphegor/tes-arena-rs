@@ -299,9 +299,13 @@ At the time of writing:
   person. Its input paths are tested headlessly (`inputtest`) and
   everything else through scripted shots, playtests and the walkthrough.
 - **Engine:**
-  - `%qf` still returns `None` (it seeds a name with an EBX the original
-    never sets; no template uses it), and 2 of the text vectors' cases
-    still reach unported code.
+  - Two text codes give `None` as the original's own fault, the only
+    text paths left: `%qf` seeds a name with an EBX high word left over
+    from earlier code (no text uses it), and `%en` outside an equipment
+    store returns into 2DA2 at the text's offset (townspeople's lines use
+    it in the street). Two of the text vectors' cases survive that return
+    by reading on from FFFD:0001, the BIOS ROM's last bytes; they are
+    counted, not compared.
   - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
     check (242A:000E) and loading from the title screen (5C8 bit 4) are not
     ported; the view saves to and loads from a fixed slot.

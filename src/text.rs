@@ -27,8 +27,9 @@
 //! the province, city and race (A46, A47, 1A8), the quest (0F3E), the
 //! player's name (1AD), names made from seeds (1194:080B), and further
 //! texts (A374 again). %qf, which seeds a name with EBX the original
-//! leaves over, gives None, as do %en outside a building of kind 6 (its routine
-//! returns into the text: it leaves DS pushed) and the loops where the
+//! leaves over, gives None, as do %en outside a building of kind 6 (it
+//! leaves DS pushed, and its RET goes on in 2DA2 at the text's offset)
+//! and the loops where the
 //! original never ends (a key not in the index, a copy over its own
 //! source, codes coming back without end).
 
@@ -1051,10 +1052,18 @@ impl Machine {
             // second word (3276:403E), a space between. (No entry found:
             // the entry is read at offset 0.)
             // Otherwise the original leaves DS pushed (it pops it only on
-            // that path) and its RET returns into the text.
+            // that path): 066C's POP DX takes DS, and its near RET the DX
+            // pushed, the text's offset past the code, so it goes on at
+            // 2DA2:<that offset>, wherever the text lies in the frame (a
+            // townsperson's lines, 0271 and on, use %en in the street).
+            // Mostly that is the middle of some routine and the original
+            // dies; at 2DA2:1773 (the two cases the vectors see go on) it
+            // returns into the dispatch (0077) with DX 1 and BP FFFD, and
+            // the rest of the text is read from FFFD:0001, the BIOS ROM's
+            // last bytes on a PC: nothing a port can follow.
             0x05DC => {
                 if self.t8(0x0D48) != 6 {
-                    return self.original_fault("%en outside an equipment store (2DA2:05DC returns into the text)");
+                    return self.original_fault("2DA2:05DC: %en outside an equipment store returns to 2DA2 at the text's offset");
                 }
                 let key = self.t16(0x0FD2);
                 let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
@@ -1314,11 +1323,13 @@ impl Machine {
                 self.mem.w8(DATA, SEX, self.t8(0x01AB));
                 Res::Str(DS, 0x01AD)
             }
-            // %qf (2DA2:0BAF) isn't here: it names a person through 1194:0807
-            // with EBX as the seed and never sets it. BX is 8A56 (0 or 1)
-            // by then (2DA2:1083), but EBX's high word is whatever code last
-            // wrote it, often before the text was asked for, so it falls
-            // to the `_` arm (None).
+            // %qf names a person through 1194:0807 with EBX as the seed and
+            // never sets it. BX is 8A56 (0 or 1) by then (2DA2:1083), but
+            // EBX's high word is whatever code last wrote it (a %fn earlier
+            // in the same text clears it, 066E; otherwise often code from
+            // before the text was asked for), so the name isn't the text's
+            // to give. No text in TEMPLATE.DAT or GLOBAL.BSA uses it.
+            0x0BAF => return crate::giveup::original("2DA2:0BAF: %qf seeds a name with EBX's high word left over from earlier code"),
             // %qmn: the quest's monster kind (5E38 among C954).
             0x0C20 => {
                 let al = self.t8(0x5E38);

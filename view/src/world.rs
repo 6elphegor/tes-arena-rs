@@ -51,6 +51,14 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let mut files = Files::new(dir).expect("game directory");
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     m.heap_init(0xA000, 0xF000).expect("heap");
+    // The sound driver's buffer (EB89), FFDCh bytes as the program's
+    // start allocates them (2294:CEDB): the level's sound files are read
+    // through it on their way to EMS (23BA:0217, `sound_load`). The
+    // original's heap is all of conventional memory; the view's, A000h..
+    // F000h, has no 64 KB to spare, so it sits above it.
+    let (dseg, doff) = (0xF000u16, 0u16);
+    m.mem.w16(DS, arena::sound::var::BUFFER, doff);
+    m.mem.w16(DS, arena::sound::var::BUFFER + 2, dseg);
     // The EMS frame: the floor plane's words have its segment added
     // (1194:04DD), so it must be page-aligned as the hardware's is, or
     // their low bytes (a flat's number) shift.
@@ -110,8 +118,7 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let info = m.mem.r16(DS, 0xCB84);
     // The 3D world begun as the outer loop begins it for every area
     // (0000:0AA9, `world_begin`: the 3D mode, 2294:0006, sets the world
-    // loop's hooks and the level's), the level being loaded already. The
-    // view has no sound: the INF's sounds (the hook CD4A) aren't loaded.
+    // loop's hooks and the level's), the level being loaded already.
     let name = arena::transit::var::LEVEL_NAME;
     // The original begins the world before it loads the level, and
     // world_begin empties the level's trigger squares (C866), which the
@@ -121,7 +128,6 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     for (i, b) in triggers.into_iter().enumerate() {
         m.mem.w8(DS, arena::level::var::TRIGGERS + i as u16, b);
     }
-    m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
     // The towns' lists of taverns, temples and stores, as the game's
@@ -159,7 +165,7 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.rng.seed = 1994;
     m.store_rng();
     let mut engine = Engine::new(m, files);
-    engine.enter_area(info).expect("entering the area");
+    engine.enter_area(info).unwrap_or_else(|| panic!("entering the area: {}", arena::giveup::describe()));
     // The level's lights from its flats, as entering a level makes them
     // (0000:478F, `flat_lights`).
     engine.m.flat_lights();

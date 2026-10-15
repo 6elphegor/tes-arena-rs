@@ -265,14 +265,8 @@ impl Machine {
             self.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         self.mem.w8(DS, 0xCB5B, 1);
-        // A4C5: the buffer block (BA54, where the INF is read) from the
-        // heap's top. Where none fits EAX's high half is left as it was.
-        let size = self.mem.r16(DS, crate::level::var::BUFFER_SIZE);
-        let seg = self.heap_alloc_high(size)?;
-        if seg == 0 {
-            return None;
-        }
-        self.mem.w32(DS, crate::level::var::BUFFER_BLOCK, (seg as u32) << 16);
+        // A4C5.
+        self.buffer_block_alloc()?;
         hooks.view_update(self);
         self.clip_back();
         if self.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
@@ -313,6 +307,20 @@ impl Machine {
             let w = self.mem.r16(DS, crate::level::var::PLAYER_X + 2 * i);
             self.mem.w16(DS, 0xBA62 + 2 * i, w);
         }
+        Some(())
+    }
+
+    /// 0000:A4C5 (A516 in A4ED): the buffer block (BA54, where the INF is
+    /// read) of BUFFER_SIZE bytes from the heap's top (0000:9CD6), its
+    /// segment the far pointer's high word. None where none fits: 9CD6
+    /// returns AX 0 and EAX's high half is left as it was.
+    pub fn buffer_block_alloc(&mut self) -> Option<()> {
+        let size = self.mem.r16(DS, crate::level::var::BUFFER_SIZE);
+        let seg = self.heap_alloc_high(size)?;
+        if seg == 0 {
+            return crate::giveup::not_ported("0000:9CD6: no room for the buffer block: EAX's high half not known");
+        }
+        self.mem.w32(DS, crate::level::var::BUFFER_BLOCK, (seg as u32) << 16);
         Some(())
     }
 

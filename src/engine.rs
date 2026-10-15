@@ -392,7 +392,8 @@ impl Engine {
     /// the EMS banks are freed but the level's (5D74), floors from C00h
     /// past the EMS frame are deep (CCCE), no squares are changing, the
     /// player is on dry ground (CB5B), rain or snow gets its 100 drops
-    /// in the view (E322, weather 82h), and the INF loads. The rest of
+    /// in the view (E322, weather 82h), the buffer block is allocated
+    /// (A516, `buffer_block_alloc`), and the INF loads. The rest of
     /// A4ED sets up the renderer.
     pub fn enter_area(&mut self, inf: u16) -> Option<()> {
         let m = &mut self.m;
@@ -411,6 +412,7 @@ impl Engine {
         }
         m.weather_drops()?;
         m.mem.w8(DS, 0xCB5B, 1);
+        m.buffer_block_alloc()?;
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             m.info_load(&mut self.files, info)?;
