@@ -124,6 +124,16 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
+    // The towns' lists of taverns, temples and stores, as the game's
+    // setup allocates them (21EE:016C: 280h bytes, the temples' at offset
+    // 100h and the stores' at 180h of its segment). Left at 0:0, the
+    // first entry of a list sits at offset 0, which the lookup (1194:3EB1)
+    // returns as "none": the first temple's name came out random.
+    let (seg, off) = m.heap_alloc_bytes(0x280).expect("heap");
+    let hi = (seg as u32) << 16;
+    m.mem.w32(DS, 0x1AB5, hi | off as u32);
+    m.mem.w32(DS, 0x1004, hi | 0x100);
+    m.mem.w32(DS, 0x1008, hi | 0x180);
     // A player to walk around with: health 50 of 50, fatigue full
     // ((strength + endurance) x 64, 2901:00A8's maximum) — with less, the
     // first exhaustion's hour of rest (2901:0014) can't make up the hour's

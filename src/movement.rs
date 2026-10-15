@@ -133,6 +133,15 @@ const SQUARE: u16 = 0xCB90;
 /// Low down means under this height.
 const LOW: i16 = 0x3C;
 
+/// The way out's hooks from the stairs': the question to leave theirs.
+struct Exit<'a>(&'a mut dyn StairsHooks);
+
+impl crate::transit::AreaHooks for Exit<'_> {
+    fn ask_leave(&mut self, m: &mut Machine) -> bool {
+        self.0.ask_leave(m)
+    }
+}
+
 impl Machine {
     /// 0000:F697. The mask value of the cell under the position at
     /// DS:`pos` (x, then y): 0 free, otherwise what blocks it. Walls are
@@ -464,7 +473,7 @@ impl Machine {
             // dec, then the sign of the byte.
             let to = level.wrapping_sub(1);
             if to & 0x80 != 0 {
-                return self.move_exit(files, to);
+                return self.move_exit(files, hooks, to);
             }
             to
         } else {
@@ -474,7 +483,7 @@ impl Machine {
             stairs(self, files, hooks)?;
             let to = level.wrapping_add(1);
             if to >= self.mem.r8(DS, LEVELS) {
-                return self.move_exit(files, to);
+                return self.move_exit(files, hooks, to);
             }
             to
         };
@@ -491,9 +500,10 @@ impl Machine {
     /// meanwhile. The ways out the areas set (0000:4537, 44BD) are
     /// `Machine::area_exit`, recognised by their value: the port loads
     /// the image at segment 0, where the original's are relocated and
-    /// pass the hook's test (0000:A8EF, the segment). None for another
-    /// hook set.
-    fn move_exit(&mut self, files: &mut Files, to: u8) -> Option<u16> {
+    /// pass the hook's test (0000:A8EF, the segment). Their question
+    /// (26F7:0000) is the stairs' hooks' `ask_leave`; the rest of their
+    /// I/O isn't drawn. None for another hook set.
+    fn move_exit(&mut self, files: &mut Files, hooks: &mut dyn StairsHooks, to: u8) -> Option<u16> {
         let ported = matches!(self.mem.r32(DS, EXIT_HOOK), 0x4537 | 0x44BD);
         if self.hook_set(EXIT_HOOK) && !ported {
             return None;
@@ -501,7 +511,7 @@ impl Machine {
         if ported {
             let level = self.mem.r8(DS, LEVEL);
             self.mem.w8(DS, LEVEL, to);
-            self.area_exit(files, &mut crate::transit::NoAreaHooks)?;
+            self.area_exit(files, &mut Exit(hooks))?;
             self.mem.w8(DS, LEVEL, level);
         }
         Some(0)

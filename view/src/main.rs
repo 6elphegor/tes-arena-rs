@@ -232,6 +232,11 @@ impl arena::hooks::StairsHooks for Front<'_> {
     fn level_screen(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         arena::hooks::StairsHooks::level_screen(&mut areas::Kept, m, files);
     }
+    /// 26F7:0000, the stairs out of a dungeon: its question isn't drawn
+    /// yet; taken as yes, so the dungeon can be left.
+    fn ask_leave(&mut self, _m: &mut arena::machine::Machine) -> bool {
+        true
+    }
 }
 impl ControlHooks for Front<'_> {
     /// A click on a building's door, a city's gate or an interior's way

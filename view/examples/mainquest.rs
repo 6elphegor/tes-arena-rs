@@ -51,6 +51,8 @@ mod flats;
 mod archive;
 #[path = "../src/areas.rs"]
 mod areas;
+#[path = "mainquest/staff.rs"]
+mod staff;
 use arena::bsa::Files;
 use arena::engine::Engine;
 use arena::machine::Machine;
@@ -159,6 +161,10 @@ fn main() {
     let dir = std::path::PathBuf::from(&a[1]);
     let spec = a.get(2).cloned().unwrap_or_else(|| "CITY:3:3".into());
     let level: u8 = a.get(3).map_or(9, |s| s.parse().expect("LEVEL"));
+    if let Some(save) = spec.strip_prefix("STAFF:") {
+        staff::walk(&dir, save, level);
+        return;
+    }
     let (mut engine, mut run) = match spec.strip_prefix("SAVE:") {
         Some(save) => match from_save(&dir, save) {
             Some(e) => e,
@@ -425,7 +431,7 @@ fn from_save(dir: &std::path::Path, save: &str) -> Option<(Engine, Run)> {
     run = trip(&mut engine, dir, run, p, i, "1")?;
     for _ in 0..24 {
         let t = engine.m.mem.r16(DS, 0xCCFE);
-        if (0x100..=0x300).contains(&t) {
+        if (0x100..0x2C0).contains(&t) {
             break;
         }
         engine.m.advance_minutes(&mut engine.files, 60, &mut arena::clock::NoClockHooks)?;
@@ -532,7 +538,7 @@ fn trip(engine: &mut Engine, dir: &std::path::Path, run: Run, p: u8, i: u8, n: &
     m.mem.w8(DS, 0xAFF9, 1);
     m.travel_click(&mut engine.files, &mut h)?;
     m.mem.w8(DS, 0xAFF9, 0);
-    println!("   picked {:#x} ({}), chosen {}", m.mem.r16(DS, PICK), String::from_utf8_lossy(m.mem.cstr(DS, DEST_NAME)), m.mem.r8(DS, CHOSEN));
+    println!("   picked {:#x} ({}), chosen {}, shown {}, nearest {:#x} at {}", m.mem.r16(DS, PICK), String::from_utf8_lossy(m.mem.cstr(DS, DEST_NAME)), m.mem.r8(DS, CHOSEN), m.mem.r8(DS, SHOWN), m.mem.r16(DS, NEAREST), m.mem.r16(DS, NEAREST_DIST));
     m.travel_go(&mut engine.files, &mut h)?;
     let carry = m.travel_map_end(&mut h, start);
     m.map_button_done(carry);
