@@ -56,10 +56,12 @@
 //! `spell:N` (its entry N cast), `close`, `clickat:X:Y` (a click at X, Y
 //! of the 320 x 200 screen), and as debugging aids `give:N` (N items
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
-//! points), `class:N`, `corpse` (a creature killed a square ahead),
-//! `fatigue:N` (the player's fatigue; at 0 the next minute exhausts
-//! them) and `xp:N` (N experience gained: the next minute checks the
-//! level, and a level gained brings the level-up screen).
+//! points), `gold:N`, `hp:N` (the health), `day:N` (the clock, 5CC, N days
+//! on), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
+//! creature killed a square ahead), `fatigue:N` (the player's fatigue; at
+//! 0 the next minute exhausts them) and `xp:N` (N experience gained: the
+//! next minute checks the level, and a level gained brings the level-up
+//! screen).
 //! M shows the automap (`automap`; `--do map`): the squares the game has
 //! marked seen, kept per area in AUTOMAP.nn (src/automap.rs).
 //!
@@ -94,6 +96,7 @@ mod interface;
 mod newgame;
 mod panels;
 mod render;
+mod shopui;
 mod world;
 
 use arena::controls::{ControlHooks, Intent};
@@ -244,6 +247,10 @@ impl arena::talk::TalkHooks for Front<'_> {
     /// through `dialog`.
     fn loot(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
         m.loot_window(files, &mut LootFront(self), ax, si, seg, bx)
+    }
+    /// A shop entered: its questions through `dialog` (`shopui`).
+    fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
+        shopui::shop(self, m, files, kind)
     }
     /// A dungeon's keeper in the wilderness: in (0000:08EC).
     fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
@@ -1131,6 +1138,26 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 engine.m.mem.w32(arena::mem::DS, at, v);
                 let f = engine.m.mem.r16(arena::mem::DS, 0x05CA) | 0x100;
                 engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+            }
+            "wear" => {
+                // Item N's condition (+6) halved, a debugging aid.
+                let at = arena::inventory::PLAYER_SLOTS + n as u16 * 0x13 + 6;
+                let v = engine.m.mem.r16(arena::mem::DS, at) / 2;
+                engine.m.mem.w16(arena::mem::DS, at, v);
+            }
+            "day" => {
+                // The clock N days on, a debugging aid (the calendar's
+                // other fields are left).
+                let t = engine.m.mem.r32(arena::mem::DS, 0x05CC).wrapping_add(n as u32 * 1440);
+                engine.m.mem.w32(arena::mem::DS, 0x05CC, t);
+            }
+            "hp" => {
+                // The player's health, a debugging aid.
+                engine.m.mem.w16(arena::mem::DS, 0x01FD, n as u16);
+            }
+            "gold" => {
+                // The player's gold, a debugging aid.
+                engine.m.mem.w32(arena::mem::DS, 0x05C2, n as u32);
             }
             "sp" => {
                 // The spell points and their maximum, a debugging aid.

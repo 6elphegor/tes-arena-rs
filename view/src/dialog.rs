@@ -143,11 +143,60 @@ impl Talk {
         for _ in 0..cx.min(64) {
             let s = m.mem.cstr(DS, at);
             at = at.wrapping_add(s.len() as u16 + 1);
-            entries.push(vec![Span { colour: 0x0F, text: String::from_utf8_lossy(s).into_owned() }]);
+            // An entry of several lines (the tavern's "price\nname") on one.
+            let mut entry: Vec<Span> = Vec::new();
+            for l in hud::lines(s, 0x0F) {
+                if !entry.is_empty() && !l.is_empty() {
+                    entry.push(Span { colour: 0x0F, text: "  ".into() });
+                }
+                entry.extend(l);
+            }
+            entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
         let menu = Menu { title, entries, keys: Vec::new(), selected: 0 };
         self.ask(menu)
+    }
+
+    /// A menu made by the front end (the shops' yes or no, the haggle's
+    /// moves): the next answer, or the question left (FFFFh).
+    pub fn ask_menu(&mut self, menu: Menu) -> u16 {
+        if self.need.is_some() {
+            return 0xFFFF;
+        }
+        self.ask(menu)
+    }
+
+    /// Lines shown in a box, as a message box's.
+    pub fn lines_box(&mut self, lines: Vec<Vec<Span>>) {
+        if self.need.is_some() {
+            return;
+        }
+        for l in &lines {
+            println!("{}", hud::plain(l));
+        }
+        self.boxes.push(lines.clone());
+        self.since_answer.push(lines);
+    }
+
+    /// Text typed under `prompt`: the next answer, or None (the question
+    /// left: nothing typed).
+    pub fn typed_text(&mut self, prompt: &str) -> Option<String> {
+        if self.need.is_some() {
+            return None;
+        }
+        match self.answers.front() {
+            Some(Answer::Text(t)) => {
+                let t = t.clone();
+                self.answers.pop_front();
+                self.since_answer.clear();
+                Some(t)
+            }
+            _ => {
+                self.need = Some(Need::Text(prompt.to_string()));
+                None
+            }
+        }
     }
 
     /// `menu` asked: the next answer, or the question left (FFFFh).
