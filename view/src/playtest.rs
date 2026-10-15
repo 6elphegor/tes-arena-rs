@@ -14,6 +14,23 @@
 //! its height out of range). The run stops at the first None or panic,
 //! the state then being the port's guess. The last line sums it up:
 //! `PLAYTEST seed .. frames .. result ..`.
+//!
+//! The targeted acts also travel (the map opened, a random place or
+//! region clicked, Travel), open the bar's screens (automap, sheet,
+//! logbook, status, camp) and write automap notes. Every turn checks
+//! the heap's chain, the EMS bank mapped, the text nesting (6E54,
+//! 3276:7307) back at rest, the dice's seed moving, and DGROUP's file
+//! names intact.
+//!
+//! Two Nones are the original's own faults, not the port's:
+//! - `%en` (2DA2:05DC) outside an equipment store (D48 not 6) pushes DS
+//!   and pops it only on the store's path, so its `pop dx; ret` (066C)
+//!   returns to the text's offset. Townspeople's answers reach it
+//!   (#0271 "work for the owner of %en", #0289, #0303, ...): seed 105
+//!   at CITY:1:2 hour 10 stops at frame 8793 on #0271.
+//! - A note clicked on the automap can overflow a divide in the hit test
+//!   (0000:31FE / 32FE); the view prints "the note met a fault of the
+//!   original's" and goes on.
 
 use crate::{Assets, Shot, shot_frame};
 use arena::controls::Intent;
