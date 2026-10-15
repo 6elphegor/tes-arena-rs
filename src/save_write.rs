@@ -99,6 +99,40 @@ impl Machine {
         self.save_engine(hooks);
     }
 
+    /// 25FD:01CB..020C, after the save: the wilderness's four blocks
+    /// (wild00N.rmd, the name at 5EBA) copied to the slot's (wild00N.nn
+    /// at 5EC6, its digits `save_set_slot`'s; 25FD:056F, `file_copy`),
+    /// the slot set back to the working slot (1A80 to SLOT: later reads,
+    /// CITYDATA's among them, name the working files again), and in an
+    /// interior (5E6 = 4) its automap loaded (0000:3503). 242A:000E (a
+    /// check of CITYDATA) is the caller's. Returns the slot's file names
+    /// made, for a front end to keep with the save.
+    pub fn save_finish(&mut self, files: &mut crate::bsa::Files) -> Vec<Vec<u8>> {
+        const FROM: u16 = 0x5EBA;
+        const TO: u16 = 0x5EC6;
+        let mut made = Vec::new();
+        self.mem.w8(DS, TO + 6, b'1');
+        self.mem.w8(DS, FROM + 6, b'1');
+        for _ in 0..4 {
+            let from = self.save_path(FROM);
+            let to = self.save_path(TO);
+            if files.data(self.mem.cstr(DS, from)).is_some() {
+                made.push(self.mem.cstr(DS, TO).to_ascii_uppercase());
+            }
+            self.file_copy(files, from, to);
+            for at in [FROM + 6, TO + 6] {
+                let c = self.mem.r8(DS, at).wrapping_add(1);
+                self.mem.w8(DS, at, c);
+            }
+        }
+        let w = self.mem.r8(DS, 0x1A80);
+        self.mem.w8(DS, SLOT, w);
+        if self.mem.r8(DS, crate::trigger::var::AREA) == 4 {
+            self.automap_load(files);
+        }
+        made
+    }
+
     /// 25FD:0114..0121 (0000:9DD6): NAMES.DAT written with the slots'
     /// names.
     pub fn save_names(&mut self, hooks: &mut dyn SaveHooks) {
