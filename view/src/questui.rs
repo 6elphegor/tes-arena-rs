@@ -122,7 +122,8 @@ impl QuestHooks for QuestFront<'_, '_> {
     /// 1194:A374 with AX 2: text number TEXT written to the buffer at 1044.
     fn text(&mut self, m: &mut Machine) {
         if m.text(&mut self.1, &mut *self.0, 2, DS, 0x1044).is_none() {
-            // A substitution the text port doesn't make (as some of %cn's):
+            // A substitution the text port doesn't make (%qf, where the
+            // original's leftover EBX seeds a name; no template uses it):
             // nothing written, and its box (`message_box`) left out.
             m.mem.w8(DS, 0x1044, 0);
         }

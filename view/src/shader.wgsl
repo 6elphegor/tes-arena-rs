@@ -52,7 +52,10 @@ fn vs_main(
     o.clip = g.view_proj * vec4<f32>(pos, 1.0);
     if (flags & 16u) != 0u {
         // The sky's objects: already on the screen, behind everything.
-        o.clip = vec4<f32>(pos.x, pos.y * g.window.x + g.window.y, 0.999999, 1.0);
+        // The sky's bodies (flag 32) behind its objects, which the
+        // original draws after them (0000:E41A, then the hook CD1A).
+        let z = select(0.999999, 0.9999995, (flags & 32u) != 0u);
+        o.clip = vec4<f32>(pos.x, pos.y * g.window.x + g.window.y, z, 1.0);
     }
     o.uv = uv;
     o.layer = layer;
@@ -75,7 +78,17 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
         let t = vec2<i32>(floor(i.uv)) & vec2<i32>(63, 63);
         index = textureLoad(textures, t, i32(i.layer), 0).r;
     }
-    if g.shade.z > 0.0 {
+    if (i.flags & 64u) != 0u {
+        // A star: drawn only where the sky under it is dark, each of the
+        // .COL's colours below 10h (2294:03A1, 03D7) as the loader keeps
+        // them, shifted to six bits (0000:7534): below 40h here.
+        let under = sky_at(i.clip.xy);
+        if any(under.rgb * 255.0 > vec3<f32>(63.5)) {
+            discard;
+        }
+    }
+    // The sky's bodies (flag 32) aren't remapped by the night's row.
+    if g.shade.z > 0.0 && (i.flags & 32u) == 0u {
         index = textureLoad(shading, vec2<i32>(i32(index), i32(g.shade.z)), 0).r;
     }
     var row = 0;
@@ -100,6 +113,12 @@ fn fs_sky(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     if g.sky.x == 0.0 {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
+    return sky_at(pos.xy);
+}
+
+// The sky's colour at a pixel of the target: the fog's (or the flash's),
+// else the dither's.
+fn sky_at(pos: vec2<f32>) -> vec4<f32> {
     if g.shade.w > 0.0 {
         return g.palette[u32(g.shade.w) - 1u];
     }

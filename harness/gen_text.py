@@ -147,7 +147,7 @@ def main():
     rng = random.Random(0x1994_A374)
     rds = LOAD_SEG + DATA
     dump = os.environ.get('DUMP')
-    total = int(os.environ.get('N', 3000))
+    total = int(os.environ.get('N', 4500))
     for n in range(total):
         seed = rng.getrandbits(32)
         if not mine(n, total) or dump and seed != int(dump, 16):
@@ -165,6 +165,10 @@ def main():
             from unicorn import UC_HOOK_CODE
             from unicorn.x86_const import UC_X86_REG_BX, UC_X86_REG_DI, UC_X86_REG_ES
             def tr(mu, addr, size, u):
+                from unicorn.x86_const import UC_X86_REG_DS
+                for at in (0x0344, 0x0350, 0x03BD):
+                    if addr == a.lin(LOAD_SEG + 0x2DA2, at):
+                        print('at', hex(at), 'ds', hex(mu.reg_read(UC_X86_REG_DS) - LOAD_SEG))
                 if addr == a.lin(LOAD_SEG + 0x2DA2, 0x0074):
                     bx = mu.reg_read(UC_X86_REG_BX)
                     h = struct.unpack('<H', mu.mem_read(a.lin(LOAD_SEG + DATA, bx), 2))[0]
@@ -189,6 +193,7 @@ def main():
             if dump:
                 open(OUT + '.ds', 'w').write(''.join(f'{i:04x} {before[i]:02x} {after[i]:02x}\n' for i in range(0x10000) if after[i] != before[i]))
                 open(OUT + '.frame', 'wb').write(frame)
+                open(OUT + '.data', 'w').write(''.join(f'{i:04x} {before_data[i]:02x} {after_data[i]:02x}\n' for i in range(0x10000) if after_data[i] != before_data[i]))
         except (Fault, UcError) as e:
             res = 'stuck'
             if dump:
