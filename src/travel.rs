@@ -98,18 +98,25 @@ impl Machine {
         for i in 0..LINE_BYTES {
             self.mem.w8(classes, i, 0);
         }
-        let zones = self.heap_alloc_high(LINE_BYTES)?;
+        let Some(zones) = self.heap_alloc_high(LINE_BYTES) else {
+            self.heap_free(classes);
+            return None;
+        };
         self.mem.w16(DS, ZONES, zones);
         for i in 0..LINE_BYTES {
             self.mem.w8(zones, i, 0);
         }
         self.mem.w16(DS, END_X, hx);
         self.mem.w16(DS, END_Y, hy);
-        self.travel_line(files, dx, dy)?;
-        let count = self.mem.r16(DS, COUNT);
-        self.travel_sum(classes, zones, count)?;
+        // The blocks are freed even where the port gives up (a file
+        // missing, the original's faults), so the heap doesn't lose them.
+        let r = self.travel_line(files, dx, dy).and_then(|()| {
+            let count = self.mem.r16(DS, COUNT);
+            self.travel_sum(classes, zones, count)
+        });
         self.heap_free(classes);
         self.heap_free(zones);
+        r?;
         let days = self.mem.r16(DS, DAYS) as i16;
         let days = days.clamp(1, 2000) as u16;
         self.mem.w16(DS, DAYS, days);

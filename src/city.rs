@@ -216,6 +216,15 @@ impl Machine {
     /// or hangs. The RNG seed is saved and restored around the whole
     /// routine, as in the original.
     pub fn generate_city(&mut self) -> Option<Vec<Block>> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.generate_city_seeded();
+        self.seed_back(saved, r)
+    }
+
+    fn generate_city_seeded(&mut self) -> Option<Vec<Block>> {
         let seg = self.mem.r16(DS, 0x9030);
         self.mem.w32(DS, 0xBA54, (seg as u32) << 16);
         let f = self.mem.r16(DS, 0xC398) | 0x8000;

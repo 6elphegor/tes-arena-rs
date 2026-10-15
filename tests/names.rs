@@ -77,3 +77,17 @@ fn matches_original() {
     }
     eprintln!("{n} names");
 }
+
+/// Where a name can't be made (here the names file missing) the game's
+/// seed is put back as 1194:080B's end puts it, not left at the name's.
+#[test]
+fn a_name_given_up_puts_the_seed_back() {
+    let Some(img) = common::image() else { return };
+    let empty = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-names");
+    std::fs::create_dir_all(&empty).unwrap();
+    let mut files = arena::bsa::Files::new(&empty).unwrap();
+    let mut m = arena::machine::Machine::new(&img);
+    m.rng.seed = 0x1234_5678;
+    assert_eq!(m.npc_name_al(&mut files, 3, 0, 0xDEAD_BEEF, arena::mem::DS, 0x1A4C), None);
+    assert_eq!(m.rng.seed, 0x1234_5678, "the game's seed back");
+}

@@ -143,3 +143,27 @@ fn matches_original() {
     }
     eprintln!("{n} haggles");
 }
+
+/// Every way out of 1194:8020 maps the bank kept at A88E back; where the
+/// port gives up (a player with no answer) it does too, so the
+/// dialogue's bank doesn't stand in for the shop's.
+#[test]
+fn a_haggle_given_up_maps_the_bank_back() {
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut m = Machine::new(&img);
+    assert!(m.bsa_open(&mut files));
+    m.mem.w16(DS, 0x9030, 0x7000);
+    m.mem.w8(DS, 0x8FA6, 1);
+    m.mem.w16(DS, 0x9032, 0x20);
+    m.mem.w16(DS, 0x8FA8, 3 * 4);
+    for b in 0..0x20u16 {
+        m.mem.w16(DS, 0x9036 + 4 * b, b * 2);
+        m.mem.w16(DS, 0x9038 + 4 * b, 0x0600);
+    }
+    m.mem.w16(DS, 0x1032, 5);
+    let mut io = Script { menus: Vec::new(), offers: Vec::new(), used: [0; 3] };
+    assert_eq!(m.haggle(&mut files, &mut io, 100, 50, 0x80, 0x80, 0, 1, 0x1A4C), None);
+    assert_eq!(m.mem.r16(DS, 0x8FA8), 3 * 4, "the bank mapped before back");
+}

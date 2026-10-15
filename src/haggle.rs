@@ -195,11 +195,11 @@ impl Machine {
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         self.file_load(files, DIALOGUE[mode as usize - 1], buf, 0);
         let r = self.haggle_rounds(files, io, per, quality, mood, mode);
-        // Every way out maps OLD_BANK back (82CF, 8330, 8382, 83C2, 83D1).
-        if r.is_some() {
-            let old = self.mem.r16(DS, OLD_BANK);
-            self.map_bank(old, 0);
-        }
+        // Every way out maps OLD_BANK back (82CF, 8330, 8382, 83C2, 83D1);
+        // so does the port where it gives up (a front end with no answer):
+        // left mapped, the dialogue's bank would stand in for the shop's.
+        let old = self.mem.r16(DS, OLD_BANK);
+        self.map_bank(old, 0);
         r
     }
 

@@ -466,7 +466,8 @@ impl Machine {
         let wild = self.g16(LEVEL_FLAGS) & 0x200 != 0;
         if bl == self.g8(KEEPER_FLAT) {
             if wild {
-                hooks.dungeon_entrance(self, files)?;
+                let r = hooks.dungeon_entrance(self, files);
+                self.talk_given_up(saved, r)?;
             }
             return self.talk_end(saved);
         }
@@ -491,7 +492,8 @@ impl Machine {
             return self.talk_end(saved);
         }
         if self.g16(0x05CA) & 1 != 0 {
-            self.steal(files, hooks)?;
+            let r = self.steal(files, hooks);
+            self.talk_given_up(saved, r)?;
             self.picking_off();
             return self.talk_end(saved);
         }
@@ -506,10 +508,26 @@ impl Machine {
         Some(())
     }
 
+    /// Where the port gives up inside a dialogue (a hook with no answer, a
+    /// routine not ported), the dialogue's end is done all the same, so
+    /// the game's seed doesn't stay the dialogue's. The original has no
+    /// such exit.
+    fn talk_given_up<T>(&mut self, saved: (u32, u16), r: Option<T>) -> Option<T> {
+        if r.is_none() {
+            self.talk_end(saved);
+        }
+        r
+    }
+
     /// 1194:DE83. The talk menu, until goodbye: a theft with picking
     /// armed, otherwise "Ask about?" (greeting, where is, rumours,
     /// goodbye).
     fn talk(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, saved: (u32, u16)) -> Option<()> {
+        let r = self.talk_loop(files, hooks, saved);
+        self.talk_given_up(saved, r)
+    }
+
+    fn talk_loop(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, saved: (u32, u16)) -> Option<()> {
         loop {
             let ax = if self.g16(0x05CA) & 1 != 0 {
                 self.steal(files, hooks)?;

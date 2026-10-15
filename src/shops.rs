@@ -537,6 +537,21 @@ impl Machine {
     /// or none), its pick's service run each time. On leaving SHOP FFh,
     /// D39 bit 80h set and HOLIDAY FFh. None where a service is.
     pub fn temple(&mut self, files: &mut crate::bsa::Files, hooks: &mut dyn ShopHooks) -> Option<()> {
+        // Where the port gives up (a hook with no answer, a routine not
+        // ported), the end's state is left all the same: no shop (SHOP
+        // FFh), no holiday, the clip as it was. The original has no such
+        // exit.
+        let a91a = self.mem.r16(DS, 0xA91A);
+        let r = self.temple_body(files, hooks);
+        if r.is_none() {
+            self.mem.w8(DS, SHOP, 0xFF);
+            self.mem.w16(DS, 0xA91A, a91a);
+            self.mem.w8(DS, HOLIDAY, 0xFF);
+        }
+        r
+    }
+
+    fn temple_body(&mut self, files: &mut crate::bsa::Files, hooks: &mut dyn ShopHooks) -> Option<()> {
         let a91a = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 5);
         // 1194:C65F.

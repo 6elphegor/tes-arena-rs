@@ -250,10 +250,12 @@ impl Machine {
         let seed = self.heap_alloc_high(0x10)?;
         self.mem.w16(DS, 0x4198, seed);
         let level = self.mem.r16(DS, GUARD_LEVEL);
-        self.npc_seed(seed, 0, 0x10, level)?;
-        self.expand_npc_named(files, seed, 0, seg, rec)?;
+        // The seed's block is freed even where the port gives up (a name
+        // file missing), so the heap doesn't lose it.
+        let r = self.npc_seed(seed, 0, 0x10, level).and_then(|()| self.expand_npc_named(files, seed, 0, seg, rec));
         let s = self.mem.r16(DS, 0x4198);
         self.heap_free(s);
+        r?;
         let rank = self.mem.r16(DS, GUARD_RANK);
         let table = 0x3AE3u16
             .wrapping_add((self.mem.r8(DS, 0x0A47) as u16).wrapping_mul(0x18))
@@ -601,10 +603,11 @@ impl Machine {
         let class = self.mem.r8(DS, 0x2A50u16.wrapping_add(ty.wrapping_sub(0x18))) as u16;
         let seed = self.heap_alloc_high(0x10)?;
         self.mem.w16(DS, 0x4198, seed);
-        self.npc_seed(seed, 0, class, level)?;
-        self.expand_npc_named(files, seed, 0, seg, rec)?;
+        // The seed's block is freed even where the port gives up.
+        let r = self.npc_seed(seed, 0, class, level).and_then(|()| self.expand_npc_named(files, seed, 0, seg, rec));
         let s = self.mem.r16(DS, 0x4198);
         self.heap_free(s);
+        r?;
         self.npc_level_boost(seg, rec);
         if self.mem.r16(DS, 0x05CA) & 0x40 != 0 {
             self.mem.w8(seg, rec.wrapping_add(7), 0);

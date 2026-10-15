@@ -261,3 +261,33 @@ fn matches_original() {
         assert!(n > 2500, "{n} compared");
     }
 }
+
+/// Where the spellmaker gives up (here a click on a region whose handler
+/// isn't one it knows), the name's backing block and the cursors' file are
+/// freed, as its end frees them, so the heap doesn't lose them.
+#[test]
+fn a_spellmaker_given_up_frees_its_blocks() {
+    struct Unknown;
+    impl SpellmakerHooks for Unknown {
+        fn click(&mut self, _m: &mut Machine, _form: Option<u16>) -> (u16, u16) {
+            (5, 5)
+        }
+    }
+    let Some(img) = common::image() else { return };
+    let empty = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-spellmaker");
+    std::fs::create_dir_all(&empty).unwrap();
+    let mut files = Files::new(&empty).unwrap();
+    let mut m = Machine::new(&img);
+    m.heap_init(0xB000, 0xF000).unwrap();
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w16(DS, 0xA8FE, 0);
+    m.mem.w16(DS, 0xA900, SCREEN);
+    // The first region: (0, 0)-(10, 10), handler 1234h (no such routine).
+    for (i, v) in [0u16, 0, 10, 10, 0x1234].into_iter().enumerate() {
+        m.mem.w16(DS, 0x5711 + 2 * i as u16, v);
+    }
+    let mut fresh = m.clone();
+    let block = fresh.heap_alloc_bytes(0xFFF0).map(|(s, _)| s);
+    assert_eq!(m.spellmaker(&mut files, &mut Unknown, 0x2000), None);
+    assert_eq!(m.heap_alloc_bytes(0xFFF0).map(|(s, _)| s), block, "the heap as it was");
+}

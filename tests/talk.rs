@@ -29,6 +29,8 @@ struct Script {
     texts: Vec<(u16, u16)>,
     n: [usize; 4],
     log: Vec<u16>,
+    /// The text hook gives up (a front end with nothing to show).
+    give_up_text: bool,
 }
 
 fn take<T: Copy>(q: &[T], n: &mut usize, default: T) -> T {
@@ -58,6 +60,13 @@ impl TextHooks for Script {
 impl TalkHooks for Script {
     fn text(&mut self, m: &mut Machine, _files: &mut Files, mode: u16) -> Option<bool> {
         self.log.extend([2, m.mem.r16(DS, 0x137A), mode]);
+        if self.give_up_text {
+            // Rolled on (as the text routine does for its variant) before
+            // giving up.
+            m.rng.next();
+            m.rng.next();
+            return None;
+        }
         Some(true)
     }
     fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
@@ -460,4 +469,52 @@ fn matches_original() {
         *counts.entry(f[2].split(' ').count().to_string()).or_default() += 1;
     }
     eprintln!("{counts:?}");
+}
+
+/// A dialogue the port gives up in (here its greeting's text) ends as
+/// 1194:E3C3 ends one: the game's seed as it was before the talk, the same
+/// as after a goodbye, not the seed the dialogue rolled with.
+#[test]
+fn a_talk_given_up_puts_the_seed_back() {
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.heap_init(0xA000, 0xF000).unwrap();
+    for (o, v) in [(0xD806u16, WSEG), (0xCCD0, FSEG), (0x1042, CSEG), (0x91F0, 0), (0xCB8E, SCRATCH)] {
+        base.mem.w16(DS, o, v);
+    }
+    let (seg, off) = base.heap_alloc_bytes(SCRATCH).unwrap();
+    base.mem.w16(DS, 0xBA54, off);
+    base.mem.w16(DS, 0xBA56, seg);
+    let dir = std::path::PathBuf::from(std::env::var("ARENA_EXE").map_or_else(
+        |_| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into(),
+        |p| std::path::Path::new(&p).parent().unwrap().to_string_lossy().into_owned(),
+    ));
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut tried = 0;
+    for line in include_str!("vectors/talk.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let run = |give_up: bool, files: &mut Files| {
+            let mut m = base.clone();
+            let mut sc = setup(&mut m, seed);
+            // The greeting, then goodbye.
+            sc.menus = vec![0, 3];
+            sc.give_up_text = give_up;
+            m.load_rng();
+            let r = m.actor_click(files, &mut sc);
+            let talked = sc.log.windows(2).any(|w| w == [3, 0x8523]);
+            (r, m.rng.seed, talked)
+        };
+        let (a, seed_a, talked) = run(false, &mut files);
+        if a.is_none() || !talked {
+            continue;
+        }
+        let (b, seed_b, _) = run(true, &mut files);
+        assert_eq!(b, None, "{line}");
+        assert_eq!(seed_b, seed_a, "the seed as after a goodbye\n{line}");
+        tried += 1;
+        if tried == 20 {
+            break;
+        }
+    }
+    assert!(tried > 0, "no case reached the talk's menu");
 }
