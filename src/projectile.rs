@@ -356,6 +356,16 @@ impl Machine {
         (o != 0xFFFF).then(|| self.mem.r16(DS, o))
     }
 
+    /// 0000:C019. The objects' lists emptied: the 80h column heads 0 and
+    /// the 80h nodes free (+4 = 0). The world loop does it after each frame
+    /// (0000:A44A, after the frame count), a load in its rebuild (C015).
+    pub fn object_lists_clear(&mut self) {
+        for i in 0..0x80u16 {
+            self.mem.w16(DS, COLUMNS + 2 * i, 0);
+            self.mem.w16(DS, NODES + 6 * i + 4, 0);
+        }
+    }
+
     /// 0000:C005. The first node from NODES with +4 = 0.
     fn node_alloc(&self) -> Option<u16> {
         let mut si = NODES;

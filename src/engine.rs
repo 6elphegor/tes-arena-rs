@@ -137,6 +137,10 @@ impl Engine {
         m.mem.w16(DS, 0xCB5E, 0);
         let c = m.mem.r16(DS, 0xCCBC).wrapping_add(1);
         m.mem.w16(DS, 0xCCBC, c);
+        // 0000:A44A: the objects' lists emptied for the next frame (its
+        // sprites file themselves again); without it the node pool fills
+        // up and filing a projectile (0000:BFC0) runs away.
+        m.object_lists_clear();
         Some(if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 { Frame::Left } else { Frame::Running })
     }
 
