@@ -11,23 +11,26 @@ descent from the program entry, the world and outer loops, and every far
 pointer constant the relocation table fixes up (far calls, far pointers
 written as immediates or stored in tables), following near and far calls;
 indirect calls through tables are resolved where the table reads as a run
-of code offsets. The port's claims are the SEG:OFF addresses in its
+of code offsets (bounded by a `cmp` before the call, or each entry
+starting like a routine), and calls through a DGROUP pointer [N] by its
+value in the image and the immediates the code stores to it.
+The port's claims are the SEG:OFF addresses in its
 sources: in a `...Hooks` trait's docs a hook (left to the front end),
 elsewhere in `src/` ported, in `view/src/` the front end's own version.
 A routine counts as ported when a ported address falls on its entry or
 inside its instructions.
 
 Limits, honestly: indirect calls the heuristic could not resolve are
-not followed (370 sites; 30 table sites resolved), so
+not followed (46 sites; 50 table sites resolved), so
 code reached only through pointers set at run time (hooks, handler
 tables built in code, overlay-style dispatch) can be missing from
 "reachable"; routine sizes count decoded instruction bytes only (data
 inside code is not counted); a routine "ported" may be ported in part
 (its doc names what is left as hooks); addresses claimed in the port
-that fall in no routine the graph found: 31
-({'ported': 21, 'hook': 2, 'view': 8}), a measure of what the graph misses; and routines the
+that fall in no routine the graph found: 27
+({'hook': 3, 'ported': 18, 'view': 6}), a measure of what the graph misses; and routines the
 port names as entries that the graph alone did not reach, added as roots:
-364 routines came in with them.
+326 routines came in with them.
 
 "Likely ported inline" marks an uncovered routine whose distinctive
 constants (immediates and addresses of 100h and more) show as hex literals
@@ -43,39 +46,39 @@ drawing): the renderer's internals mostly land there.
 
 | | routines | bytes |
 |---|---:|---:|
-| reachable | 2208 | 187874 |
-| ported (in whole or part) | 1268 | 113011 |
-| hooks (front end's) | 57 | 4849 |
-| the view's own version | 43 | 5123 |
-| not covered: game state or undetermined | 538 | 28459 |
-| &nbsp;&nbsp;of which likely ported inline in a caller | 111 | 8365 |
-| &nbsp;&nbsp;of which open | 427 | 20094 |
-| not covered: presentation / I/O / hardware | 302 | 36432 |
+| reachable | 2245 | 189692 |
+| ported (in whole or part) | 1327 | 117615 |
+| hooks (front end's) | 63 | 4749 |
+| the view's own version | 45 | 5424 |
+| not covered: game state or undetermined | 513 | 26058 |
+| &nbsp;&nbsp;of which likely ported inline in a caller | 119 | 8711 |
+| &nbsp;&nbsp;of which open | 394 | 17347 |
+| not covered: presentation / I/O / hardware | 297 | 35846 |
 
 By segment:
 
 | segment | routines | bytes | covered | covered bytes |
 |---|---:|---:|---:|---:|
-| 0000 | 718 | 63183 | 377 | 35612 |
+| 0000 | 724 | 63619 | 405 | 36905 |
 | 0FFD | 63 | 2085 | 0 | 0 |
-| 1194 | 820 | 62628 | 583 | 51228 |
+| 1194 | 835 | 62890 | 607 | 52335 |
 | 217B | 18 | 1834 | 14 | 1573 |
-| 21EE | 7 | 847 | 3 | 493 |
-| 222C | 24 | 1592 | 8 | 697 |
-| 2294 | 41 | 4229 | 39 | 4021 |
-| 23BA | 8 | 573 | 5 | 448 |
+| 21EE | 9 | 951 | 3 | 493 |
+| 222C | 24 | 1592 | 10 | 902 |
+| 2294 | 42 | 4526 | 40 | 4318 |
+| 23BA | 9 | 813 | 6 | 688 |
 | 23F1 | 11 | 901 | 7 | 387 |
 | 242A | 4 | 125 | 1 | 31 |
-| 2433 | 40 | 3057 | 34 | 2820 |
+| 2433 | 49 | 3177 | 34 | 2820 |
 | 24FA | 18 | 1246 | 15 | 1124 |
 | 2542 | 26 | 1834 | 5 | 309 |
 | 25CA | 9 | 638 | 8 | 576 |
 | 25FD | 23 | 2226 | 20 | 1766 |
 | 2686 | 29 | 1805 | 22 | 1213 |
-| 26F7 | 25 | 3428 | 4 | 644 |
-| 27CE | 3 | 164 | 1 | 76 |
+| 26F7 | 26 | 3428 | 15 | 2105 |
+| 27CE | 6 | 327 | 1 | 76 |
 | 27E3 | 12 | 1062 | 3 | 180 |
-| 2826 | 34 | 3795 | 32 | 3765 |
+| 2826 | 33 | 3991 | 31 | 3961 |
 | 2901 | 6 | 672 | 6 | 672 |
 | 292B | 22 | 2134 | 17 | 1605 |
 | 29CF | 38 | 3487 | 33 | 3328 |
@@ -88,7 +91,7 @@ By segment:
 | 2F75 | 5 | 663 | 0 | 0 |
 | 2F9F | 6 | 1278 | 3 | 941 |
 | 3065 | 9 | 1740 | 9 | 1740 |
-| 3159 | 37 | 4288 | 0 | 0 |
+| 3159 | 37 | 4288 | 1 | 6 |
 
 ## The frontier: uncovered game-state routines the port reaches
 
@@ -98,56 +101,53 @@ the uncovered code reachable from them.
 
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | what it is | evidence |
 |---|---:|---:|---|---|---|
-| 3159:06A0 | 120 | 2955 / 44 | 1194:5734, 2542:06F8 (dialog.rs, guild.rs, loot_window.rs) | window library: a window's handler called through es:[di+33] [UI] | vars B80A B7C4 |
-| 0000:CBFF | 100 | 2833 / 7 | 0000:CB20, 0000:D0A1 (engine.rs) | an object's corners for the renderer's lists (A872..A888) [renderer] | vars A876 A87C A882 A888 |
+| 0000:8755 | 125 | 4415 / 86 | 0000:85AE (levelup.rs) | a polygon clipped against one plane (Sutherland-Hodgman over AF74/AF78/AF7A, outcodes AF76/AF77) [renderer] | vars AF74 AF78 AF7A AF77 |
+| 3159:06A0 | 120 | 2893 / 42 | 1194:5734, 2542:06F8 (dialog.rs, guild.rs, loot_window.rs) | window library: a window's handler called through es:[di+33] [UI] | vars B80A B7C4 |
+| 0000:CBFF | 100 | 2785 / 6 | 0000:CB20, 0000:D0A1 (engine.rs) | an object's corners for the renderer's lists (A872..A888) [renderer] | vars A876 A87C A882 A888 |
 | 1194:2A69 | 52 | 1540 / 30 | 1194:24A6 (create.rs, newgame.rs) | creation's attribute screen loop around the ported rolls/checks (2AC7, 2CD0, 2D28) [UI] | vars 0D49 |
 | 0000:965A | 4 | 1426 / 10 | 1194:4800, 1194:59CC, 1194:5C34, 2542:04B1 (guild.rs, levelup.rs, loot_window.rs) | message box drawn (from 1194:59CC) [UI] |  |
 | 0FFD:0C49 | 178 | 1299 / 28 | 2F9F:01BF, 2F9F:0364 (music.rs) | sound/music driver interface (segment 0FFD) [driver] |  |
 | 1194:6001 | 99 | 1150 / 18 | 1194:4E88 (haggle.rs, quest.rs, questui.rs) | waiting for a key or click (8F92/8F94 mouse, AFF9 key) [input] | vars 8F92 8F94 AFF9 |
-| 1194:5CD9 | 27 | 821 / 7 | 1194:0D8E, 1194:124A, 1194:1687, 1194:1738 (create.rs, doll.rs, newgame.rs) | EMS bank [1030] mapped (the port has ems_map) [infrastructure] | vars 1030 |
-| 0000:56C8 | 4 | 794 / 6 | 0000:1246, 1194:161A, 1194:27C2, 1194:51D1 (create.rs, dialog.rs, doll.rs) | an image drawn, clipped [drawing] |  |
 | 1194:5FC0 | 65 | 630 / 12 | 1194:4D31, 1194:4E88, 1194:85DE, 1194:AA8C (guild.rs, haggle.rs, quest.rs) | waiting for input [input] | vars 9030 |
 | 2F26:0445 | 107 | 622 / 8 | 0000:2CFE (text.rs) | key handling [input] | vars 8F37 8F36 8BEC 126C |
 | 0000:77EC | 4 | 550 / 9 | 1194:4D31, 1194:4E88, 1194:51D1, 1194:5651 (controls.rs, dialog.rs, guild.rs) | waiting for input [input] |  |
-| 0000:36B6 | 143 | 539 / 6 | 0000:2CFE (text.rs) | a text box drawn [UI] | vars A888 A88E A878 A87A |
 | 0FFD:0821 | 101 | 511 / 18 | 2F9F:001F, 2F9F:01BF, 2F9F:04A0 (load.rs, music.rs) | sound/music driver interface [driver] |  |
 | 1194:5E21 | 18 | 497 / 7 | 1194:122F, 1194:124A, 1194:16BD, 1194:17D8 (create.rs, guild.rs, haggle.rs) | waiting for input [input] | vars AFF9 |
-| 0000:CD30 | 4 | 465 / 7 | 0000:CC63, 0000:CD6C (engine.rs) | renderer |  |
 | 1194:157E | 13 | 447 / 9 | 1194:2AFA (character.rs) | the character sheet's values shown (12E6/12F5 draw, DE1) [UI] |  |
+| 0000:CD30 | 4 | 417 / 6 | 0000:CC63, 0000:CD6C (engine.rs) | renderer |  |
+| 0000:36B6 | 143 | 386 / 5 | 0000:2CFE (text.rs) | a text box drawn [UI] | vars A888 A88E A878 A87A |
 | 0FFD:0AF7 | 223 | 342 / 5 | 2F9F:01BF, 2F9F:0364 (music.rs) | sound/music driver interface [driver] |  |
-| 0000:5E3E | 18 | 299 / 3 | 0000:0AD7, 0000:1246, 0000:2CFE, 0000:A6B5 (create.rs, flc.rs, guild.rs) |  |  |
 | 0000:9370 | 4 | 275 / 4 | 1194:6410, 3159:0AE2 (spellmaker.rs) |  |  |
 | 0000:5368 | 19 | 275 / 3 | 0000:0511, 0000:0605, 0000:2FFD, 0000:5364 (frame.rs, rest.rs) |  |  |
 | 25FD:05A5 | 109 | 271 / 6 | 25FD:056F (bsa.rs, load.rs) | a save slot's four files checked (list at 5F5A) [file I/O] | vars A836 A838 902E |
 | 1194:12E6 | 15 | 229 / 4 | 1194:124A, 1194:138E, 1194:1528, 1194:157E (newgame.rs) | a value drawn at (5Ch, 71h) [UI] | vars 129C |
 | 0000:C032 | 43 | 189 / 4 | 0000:C9FF (click.rs) |  |  |
 | 0000:9E06 | 4 | 189 / 2 | 1194:0DE1, 1194:0E19, 1194:0E86, 1194:0FD8 (controls.rs, create.rs, haggle.rs) |  |  |
-| 0000:A561 | 63 | 187 / 2 | 0000:A49C, 0000:A4ED, 0000:A6B5 (areas.rs, guild.rs, level.rs) |  | vars CD86 CD82 CD7E CB8C |
+| 0000:A561 | 63 | 187 / 2 | 0000:A49C, 0000:A4ED, 0000:A6B5 (areas.rs, guild.rs, level.rs) | the renderer's buffers allocated (CD86, CD82, CD7E, CD76/CD7A) and its set-up (AAA2) [renderer] | vars CD86 CD82 CD7E CB8C |
 | 2F26:04E2 | 15 | 185 / 5 | 0000:2CFE, 2542:000A, 2542:0100, 2542:04B1 (frame.rs, interface.rs, main.rs) |  |  |
 | 0000:1393 | 40 | 165 / 3 | 0000:1246, 0000:1323 (create.rs, flc.rs, music.rs) |  | vars 902E |
-| 0000:B5A5 | 164 | 164 / 1 | 0000:B4F5 (engine.rs) |  |  |
+| 0000:B5A5 | 164 | 164 / 1 | 0000:B4F5 (engine.rs) | a quad's corners flagged inside a rectangle (+12h bits F000h) [renderer] |  |
 | 23BA:014A | 57 | 161 / 7 | 222C:00EA (newgame.rs) |  | vars 46F0 8F64 EB91 |
-| 0000:5A66 | 4 | 157 / 2 | 0000:4BD6, 26F7:0325, 292B:0201 (frame.rs, skyobj.rs) |  |  |
 | 222C:016E | 23 | 154 / 7 | 222C:0000 (create.rs, newgame.rs) |  | vars 102C 1030 |
 | 0000:6C0C | 4 | 149 / 3 | 1194:08DE, 1194:0901, 1194:4943, 25FD:05A5 (names.rs) |  |  |
-| 292B:0530 | 79 | 131 / 3 | 0000:4BD6 (frame.rs) |  | vars 9030 |
+| 292B:0530 | 79 | 131 / 3 | 0000:4BD6 (frame.rs) | eight images of the list at 7BAA drawn (FD5 flags) [drawing] | vars 9030 |
 | 1194:BC8B | 14 | 128 / 4 | 1194:B93C (tavern.rs) |  |  |
 | 1194:0282 | 16 | 127 / 3 | 1194:020E (create.rs, dialog.rs, quest.rs) |  |  |
-| 0000:4D2F | 77 | 125 / 2 | 0000:481E (automap.rs, engine.rs, frame.rs) |  | vars 43D4 |
-| 0000:8755 | 125 | 125 / 1 | 0000:85AE (levelup.rs) |  | vars AF74 AF78 AF7A AF77 |
-| 0000:8950 | 124 | 124 / 1 | 0000:85AE (levelup.rs) |  |  |
+| 0000:4D2F | 77 | 125 / 2 | 0000:481E (automap.rs, engine.rs, frame.rs) | the keys held (652, 12 of them) drawn as icons [drawing] | vars 43D4 |
+| 0000:8950 | 124 | 124 / 1 | 0000:85AE, 0000:8839 (levelup.rs) | a point's outcode against the view's planes [renderer] |  |
+| 23BA:0183 | 33 | 119 / 4 | 222C:0185 (newgame.rs) |  | vars 46F0 EB91 |
 | 0FFD:0C1D | 38 | 118 / 3 | 0FFD:0AF7, 0FFD:0C49, 2F9F:01BF, 2F9F:0364 (music.rs) |  |  |
+| 0000:5656 | 36 | 113 / 3 | 0000:552E, 0000:5652, 0000:C2CE, 0000:C3A6 (celestial.rs, main.rs, skyobj.rs) |  |  |
 | 0000:933C | 4 | 112 / 4 | 1194:4800, 1194:59CC, 1194:5C34, 3159:0F2A (guild.rs, levelup.rs, loot_window.rs) |  |  |
 | 1194:149D | 40 | 104 / 4 | 1194:138E, 1194:1528 (newgame.rs) |  | vars 1032 9030 |
 | 0000:5B3C | 4 | 103 / 5 | 29CF:0A28 (interface.rs, weapon.rs) |  |  |
 | 2F9F:000D | 17 | 103 / 4 | 2294:04F5 (frame.rs, music.rs) |  | vars EB00 EB93 |
-| 0000:6D76 | 102 | 102 / 1 | 0000:8D6E (format.rs) |  |  |
+| 0000:6D76 | 102 | 102 / 1 | 0000:8D6E (format.rs) | the formatter's fraction digits (three, after a '.') [text formatting] |  |
 | 0000:5B65 | 49 | 99 / 4 | 0000:3B8E, 0000:5B3C, 0000:5B5C, 0000:C539 (interface.rs, weapon.rs) |  |  |
-| 242A:0031 | 48 | 94 / 3 | 242A:000E (load.rs, save_write.rs) |  | vars 9288 |
+| 242A:0031 | 48 | 94 / 3 | 242A:000E (load.rs, save_write.rs) | CITYDATA's province records checked; a bad one shows the text at 4A1E [I/O check] | vars 9288 |
 | 27E3:000E | 12 | 93 / 3 | 27E3:000A (quest.rs) |  |  |
 | 0000:942A | 59 | 91 / 3 | 0000:10C9, 0000:618F, 0000:9426 (create.rs, flc.rs, load.rs) |  | vars A902 A8FE 928A 928E |
-| 1194:E539 | 50 | 91 / 2 | 1194:E50D, 2826:0C15 (controls.rs, talk.rs) |  |  |
-| 0000:3796 | 87 | 87 / 1 | 0000:2CFE (text.rs) |  | vars 126C 126E C357 C359 |
+| 0000:3796 | 87 | 87 / 1 | 0000:2CFE (text.rs) | the automap's centre (126C/126E) kept inside the map (C357/C359) [UI: automap screen 0000:2CFE] | vars 126C 126E C357 C359 |
 | 0FFD:0E0C | 6 | 86 / 3 | 2F9F:001F (load.rs, music.rs) |  |  |
 | 0FFD:0DE8 | 6 | 86 / 3 | 2F9F:001F, 2F9F:0438 (load.rs, music.rs, transit.rs) |  |  |
 | 0FFD:0DCA | 6 | 86 / 3 | 2F9F:0438 (load.rs, music.rs, transit.rs) |  |  |
@@ -158,6 +158,9 @@ the uncovered code reachable from them.
 | 0FFD:0D9A | 6 | 86 / 3 | 2F9F:01BF (music.rs) |  |  |
 | 0FFD:0D94 | 6 | 86 / 3 | 2F9F:0438 (load.rs, music.rs, transit.rs) |  |  |
 | 0FFD:0D8E | 6 | 86 / 3 | 2F9F:001F (load.rs, music.rs) |  |  |
+| 0FFD:0D88 | 6 | 86 / 3 | 2F9F:01BF (music.rs) |  |  |
+| 0FFD:0D70 | 6 | 86 / 3 | 23BA:002A (attack.rs, audio.rs, engine.rs) |  |  |
+| 0FFD:0D5E | 6 | 86 / 3 | 23BA:000C, 23BA:012B, 23BA:014A, 23BA:01A4 (audio.rs, encounter.rs, levelup.rs) |  |  |
 
 ## Game state still to port
 
@@ -179,6 +182,7 @@ docs:
 | 2CDD:0658 | 57 | 2CDD:0604 (spell.rs) | a value at +66 changed and clamped to the maximum at +68, which the cap overwrites [game state; ported inline: spell.rs 2CDD:0604] |
 | 2CDD:0691 | 59 | 2CDD:0604 (spell.rs) | the same for another pair [game state; ported inline: spell.rs 2CDD:0604] |
 | 2CDD:06CC | 58 | 2CDD:0604 (spell.rs) | the same for another pair [game state; ported inline: spell.rs 2CDD:0604] |
+| 1194:E539 | 50 | 1194:E50D, 2826:0C15 (controls.rs, talk.rs) | a place's name: the name list 3276:3CB6 then a suffix [game text; ported inline: talk.rs names_a] |
 
 Not yet looked at: the open frontier past the hand-checked ones (no
 I/O or drawing signs, not marked inline, a ported caller), largest
@@ -186,37 +190,27 @@ first; candidates, not findings:
 
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | evidence |
 |---|---:|---:|---|---|
-| 0000:5E3E | 18 | 299 / 3 | 0000:0AD7, 0000:1246, 0000:2CFE (create.rs, flc.rs, guild.rs) |  |
 | 0000:9370 | 4 | 275 / 4 | 1194:6410, 3159:0AE2 (spellmaker.rs) |  |
 | 0000:5368 | 19 | 275 / 3 | 0000:0511, 0000:0605, 0000:2FFD (frame.rs, rest.rs) |  |
 | 0000:C032 | 43 | 189 / 4 | 0000:C9FF (click.rs) |  |
 | 0000:9E06 | 4 | 189 / 2 | 1194:0DE1, 1194:0E19, 1194:0E86 (controls.rs, create.rs, haggle.rs) |  |
-| 0000:A561 | 63 | 187 / 2 | 0000:A49C, 0000:A4ED, 0000:A6B5 (areas.rs, guild.rs, level.rs) | vars CD86 CD82 CD7E CB8C |
 | 2F26:04E2 | 15 | 185 / 5 | 0000:2CFE, 2542:000A, 2542:0100 (frame.rs, interface.rs, main.rs) |  |
 | 0000:1393 | 40 | 165 / 3 | 0000:1246, 0000:1323 (create.rs, flc.rs, music.rs) | vars 902E |
-| 0000:B5A5 | 164 | 164 / 1 | 0000:B4F5 (engine.rs) |  |
 | 23BA:014A | 57 | 161 / 7 | 222C:00EA (newgame.rs) | vars 46F0 8F64 EB91 |
-| 0000:5A66 | 4 | 157 / 2 | 0000:4BD6, 26F7:0325, 292B:0201 (frame.rs, skyobj.rs) |  |
 | 222C:016E | 23 | 154 / 7 | 222C:0000 (create.rs, newgame.rs) | vars 102C 1030 |
 | 0000:6C0C | 4 | 149 / 3 | 1194:08DE, 1194:0901, 1194:4943 (names.rs) |  |
-| 292B:0530 | 79 | 131 / 3 | 0000:4BD6 (frame.rs) | vars 9030 |
 | 1194:BC8B | 14 | 128 / 4 | 1194:B93C (tavern.rs) |  |
 | 1194:0282 | 16 | 127 / 3 | 1194:020E (create.rs, dialog.rs, quest.rs) |  |
-| 0000:4D2F | 77 | 125 / 2 | 0000:481E (automap.rs, engine.rs, frame.rs) | vars 43D4 |
-| 0000:8755 | 125 | 125 / 1 | 0000:85AE (levelup.rs) | vars AF74 AF78 AF7A AF77 |
-| 0000:8950 | 124 | 124 / 1 | 0000:85AE (levelup.rs) |  |
+| 23BA:0183 | 33 | 119 / 4 | 222C:0185 (newgame.rs) | vars 46F0 EB91 |
 | 0FFD:0C1D | 38 | 118 / 3 | 0FFD:0AF7, 0FFD:0C49, 2F9F:01BF (music.rs) |  |
+| 0000:5656 | 36 | 113 / 3 | 0000:552E, 0000:5652, 0000:C2CE (celestial.rs, main.rs, skyobj.rs) |  |
 | 0000:933C | 4 | 112 / 4 | 1194:4800, 1194:59CC, 1194:5C34 (guild.rs, levelup.rs, loot_window.rs) |  |
 | 1194:149D | 40 | 104 / 4 | 1194:138E, 1194:1528 (newgame.rs) | vars 1032 9030 |
 | 0000:5B3C | 4 | 103 / 5 | 29CF:0A28 (interface.rs, weapon.rs) |  |
 | 2F9F:000D | 17 | 103 / 4 | 2294:04F5 (frame.rs, music.rs) | vars EB00 EB93 |
-| 0000:6D76 | 102 | 102 / 1 | 0000:8D6E (format.rs) |  |
 | 0000:5B65 | 49 | 99 / 4 | 0000:3B8E, 0000:5B3C, 0000:5B5C (interface.rs, weapon.rs) |  |
-| 242A:0031 | 48 | 94 / 3 | 242A:000E (load.rs, save_write.rs) | vars 9288 |
 | 27E3:000E | 12 | 93 / 3 | 27E3:000A (quest.rs) |  |
 | 0000:942A | 59 | 91 / 3 | 0000:10C9, 0000:618F, 0000:9426 (create.rs, flc.rs, load.rs) | vars A902 A8FE 928A 928E |
-| 1194:E539 | 50 | 91 / 2 | 1194:E50D, 2826:0C15 (controls.rs, talk.rs) |  |
-| 0000:3796 | 87 | 87 / 1 | 0000:2CFE (text.rs) | vars 126C 126E C357 C359 |
 | 0FFD:0E0C | 6 | 86 / 3 | 2F9F:001F (load.rs, music.rs) |  |
 | 0FFD:0DE8 | 6 | 86 / 3 | 2F9F:001F, 2F9F:0438 (load.rs, music.rs, transit.rs) |  |
 | 0FFD:0DCA | 6 | 86 / 3 | 2F9F:0438 (load.rs, music.rs, transit.rs) |  |
@@ -226,6 +220,96 @@ first; candidates, not findings:
 | 0FFD:0DA0 | 6 | 86 / 3 | 2F9F:01BF (music.rs) |  |
 | 0FFD:0D9A | 6 | 86 / 3 | 2F9F:01BF (music.rs) |  |
 | 0FFD:0D94 | 6 | 86 / 3 | 2F9F:0438 (load.rs, music.rs, transit.rs) |  |
+| 0FFD:0D8E | 6 | 86 / 3 | 2F9F:001F (load.rs, music.rs) |  |
+| 0FFD:0D88 | 6 | 86 / 3 | 2F9F:01BF (music.rs) |  |
+| 0FFD:0D70 | 6 | 86 / 3 | 23BA:002A (attack.rs, audio.rs, engine.rs) |  |
+| 0FFD:0D5E | 6 | 86 / 3 | 23BA:000C, 23BA:012B, 23BA:014A (audio.rs, encounter.rs, levelup.rs) |  |
+| 0FFD:0D58 | 6 | 86 / 3 | 23BA:002A, 23BA:012B, 23BA:014A (attack.rs, audio.rs, encounter.rs) |  |
+| 0FFD:0D52 | 6 | 86 / 3 | 2294:076C, 23BA:000C, 23BA:002A (attack.rs, audio.rs, encounter.rs) |  |
+| 0FFD:0D4C | 6 | 86 / 3 | 23BA:0183, 23BA:01C7, 23BA:0217 (areas.rs, encounter.rs, info.rs) |  |
+| 0FFD:0D46 | 6 | 86 / 3 | 23BA:002A, 23BA:012B, 23BA:014A (attack.rs, audio.rs, encounter.rs) |  |
+| 0FFD:0C43 | 6 | 86 / 3 | 2F9F:01BF, 2F9F:0364 (music.rs) |  |
+| 0000:66F2 | 4 | 75 / 2 | 1194:4BFF, 26F7:0625 (store.rs, travelmap.rs) |  |
+
+## Named in passing
+
+Uncovered routines whose offset appears bare (no segment) in a comment
+of a port file that names their segment. Such a mention is as often a
+routine ported inline as one deliberately left out ("stubbed: ...") or a
+variable that happens to share the number, so they are not counted as
+ported; 72 to check, largest first:
+
+| routine | bytes | files |
+|---|---:|---|
+| 0000:0000 | 212 | automap.rs, bsa.rs, celestial.rs, heap.rs, hooks.rs, light.rs, machine.rs, movement.rs, random.rs, save.rs, transit.rs |
+| 1194:20BF | 200 | doll.rs |
+| 0000:1A5C | 157 | encounter.rs |
+| 0000:8A60 | 146 | text.rs |
+| 1194:1C5E | 146 | text.rs |
+| 0000:91F2 | 129 | random.rs |
+| 1194:124A | 116 | cityinfo.rs |
+| 0000:4F1B | 87 | interface.rs |
+| 0000:5458 | 83 | spellmaker.rs |
+| 1194:2D60 | 79 | doll.rs |
+| 1194:5FC0 | 65 | store.rs |
+| 1194:545C | 58 | store.rs |
+| 1194:2A69 | 52 | create.rs, newgame.rs |
+| 1194:5F8C | 52 | store.rs |
+| 1194:2791 | 49 | newgame.rs |
+| 1194:12BE | 40 | guild.rs, tavern.rs |
+| 0000:9A72 | 37 | clock.rs, levelup.rs |
+| 1194:98A9 | 36 | sidequest.rs |
+| 1194:D2F3 | 35 | sidequest.rs |
+| 23BA:01A4 | 35 | attack.rs, projectile.rs, strike.rs, talk.rs |
+| 1194:54B3 | 31 | store.rs |
+| 1194:8F7B | 30 | sidequest.rs |
+| 1194:CE61 | 30 | quest.rs |
+| 1194:98CD | 27 | sidequest.rs |
+| 1194:EB56 | 27 | shop.rs |
+| 1194:51B8 | 25 | transit.rs |
+| 1194:9EAB | 25 | sidequest.rs |
+| 1194:2BAE | 23 | newgame.rs |
+| 1194:B7AD | 23 | guild.rs |
+| 1194:CF41 | 23 | quest.rs |
+| 1194:E7FD | 23 | talk.rs |
+| 0000:3F3B | 21 | encounter.rs, frame.rs |
+| 0000:6EEE | 20 | random.rs |
+| 1194:9895 | 20 | sidequest.rs |
+| 1194:B7C4 | 20 | guild.rs, newgame.rs |
+| 1194:9D51 | 19 | sidequest.rs |
+| 292B:0469 | 19 | click.rs, spell.rs, talk.rs |
+| 1194:5E21 | 18 | store.rs |
+| 0000:75F6 | 17 | format.rs |
+| 1194:2451 | 17 | doll.rs |
+| 1194:9D40 | 17 | sidequest.rs |
+| 2F9F:000D | 17 | music.rs |
+| 0000:9D64 | 16 | sidequest.rs |
+| 1194:9815 | 16 | sidequest.rs |
+| 1194:9683 | 15 | sidequest.rs |
+| 1194:CEC8 | 15 | quest.rs |
+| 1194:9E7F | 14 | sidequest.rs |
+| 0000:AB2A | 13 | transit.rs |
+| 1194:0FFB | 12 | encounter.rs, frame.rs, levelup.rs, sidequest.rs, weapon.rs |
+| 1194:8575 | 12 | haggle.rs |
+| 1194:85D6 | 8 | haggle.rs |
+| 1194:94D2 | 7 | sidequest.rs |
+| 1194:0000 | 6 | hooks.rs, transit.rs |
+| 0000:9B56 | 5 | save.rs |
+| 0000:6C32 | 4 | heap.rs |
+| 0000:6EA4 | 4 | random.rs |
+| 0000:7138 | 4 | guild.rs |
+| 0000:77EC | 4 | controls.rs, guild.rs, store.rs |
+| 0000:9466 | 4 | guild.rs, rest.rs, store.rs, transit.rs |
+| 0000:F8DD | 4 | movement.rs |
+| 1194:4D95 | 4 | loot_window.rs |
+| 1194:55D5 | 4 | quest.rs |
+| 1194:5EB1 | 4 | inventory.rs |
+| 1194:5ECD | 4 | loot_window.rs |
+| 1194:7384 | 4 | loot_window.rs |
+| 1194:776E | 4 | inventory.rs |
+| 1194:C6A3 | 4 | shops.rs |
+| 0000:C3AA | 3 | machine.rs |
+| 1194:48E6 | 3 | spellmaker.rs |
 
 ## All uncovered routines
 
@@ -234,7 +318,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 
 | routine | bytes | class | callers | what it is | evidence |
 |---|---:|---|---|---|---|
-| 0000:0000 | 212 | DOS I/O, BIOS |  |  | vars 015D 0159 015F |
+| 0000:0000 | 212 | DOS I/O, BIOS | 0000:3EFA, 0000:51F2, 0000:5C26 (+12) |  | vars 015D 0159 015F |
 | 0000:0118 | 57 | under a hook | 0000:0000 |  |  |
 | 0000:016B | 32 | DOS I/O | 0000:0000 |  |  |
 | 0000:01A8 | 18 | DOS I/O | 0000:01FD |  |  |
@@ -275,27 +359,21 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:3745 | 30 | under a hook | 0000:31FE, 0000:33BF |  | vars A880 A882 |
 | 0000:3763 | 26 | under a hook | 0000:31FE, 0000:32FE |  | vars A880 A882 |
 | 0000:377D | 25 | game | 0000:2CFE |  | vars 126C A880 126E A882 |
-| 0000:3796 | 87 | game | 0000:2CFE |  | vars 126C 126E C357 C359 |
+| 0000:3796 | 87 | game | 0000:2CFE | the automap's centre (126C/126E) kept inside the map (C357/C359) [UI: automap screen 0000:2CFE] | vars 126C 126E C357 C359 |
 | 0000:3825 | 66 | under a hook | 0000:303C |  | vars A865 A866 |
+| 0000:3F3B | 21 | game | 0000:3EFA |  | files halt.voc |
 | 0000:3FC5 | 17 | game | 0000:3F7E |  | vars C942 |
 | 0000:3FD6 | 17 | game | 0000:3F7E |  | vars C942 |
 | 0000:418C | 6 | game | 0000:4118 |  |  |
-| 0000:42B4 | 15 | game |  |  | vars 0FF0 0D48 |
-| 0000:42C3 | 15 | game |  |  | vars 0FF0 0D48 |
-| 0000:4303 | 31 | game |  |  | vars 191F 137A 137E 0FF0 |
-| 0000:4322 | 31 | game |  |  | vars 191F 137A 137E 0FF0 |
-| 0000:4341 | 31 | game |  |  | vars 191F 137A 137E 0FF0 |
-| 0000:4360 | 20 | game |  |  | vars 191F 0FF0 0D48 |
-| 0000:4374 | 20 | game |  |  | vars 191F 0FF0 0D48 |
-| 0000:4388 | 6 | game |  |  |  |
-| 0000:439F | 1 | game |  |  |  |
-| 0000:4D2F | 77 | game | 0000:481E |  | vars 43D4 |
+| 0000:4D2F | 77 | game | 0000:481E | the keys held (652, 12 of them) drawn as icons [drawing] | vars 43D4 |
 | 0000:4DD5 | 1 | game | 0000:1644 |  |  |
 | 0000:4F1B | 87 | under a hook | 0000:4DD6 |  | vars C3D8 1B8C 1B8E 1B90 |
 | 0000:4F72 | 159 | likely inline | 0000:4ACD | the walls plane copied 80h x 80h into a buffer (A900) for a map image [presentation?] | vars C3D0 C3D4 A900 D806 |
 | 0000:5011 | 88 | likely inline | 0000:4BD6 |  | vars 9288 3C82 102C C3A2 |
 | 0000:5069 | 4 | game | 1194:2E69 |  |  |
 | 0000:5104 | 54 | likely inline | 0000:481E | rain/snow drops drawn over the view (F81 bit 2, not full daylight) [drawing] | vars A91A 0F81 C398 C3A2 |
+| 0000:513A | 38 | likely inline | 0000:468B |  | vars 0A52 D806 |
+| 0000:5160 | 87 | likely inline | 0000:468B |  | vars 91F6 C765 D806 |
 | 0000:51D3 | 11 | game | 1194:4943, 2F9F:01BF, 3065:0D2D |  |  |
 | 0000:52B6 | 4 | game | 1194:066A, 1194:46BF, 1194:6D87 (+7) |  |  |
 | 0000:52F6 | 65 | game | 0000:52F2 |  |  |
@@ -306,12 +384,10 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:5422 | 46 | likely inline | 0000:10C9, 0000:4DD6, 0000:541E (+1) |  | vars A902 8F8C 8F8E 8F90 |
 | 0000:5458 | 83 | under a hook | 0000:5454, 0000:77F0 |  | vars A902 8F7C 8F7E 8F8E |
 | 0000:54AB | 122 | drawing? | 0000:5458 |  | vars 8F8E 8F90 8F92 8F96 |
-| 0000:5526 | 4 | game | 1194:30F1, 1194:5B58, 222C:03B1 |  |  |
-| 0000:552E | 267 | game | 0000:5526 |  | vars A918 A91A A916 A914 |
+| 0000:552E | 267 | under a hook | 0000:5526 |  | vars A918 A91A A916 A914 |
 | 0000:5656 | 36 | game | 0000:552E, 0000:5652, 0000:C2CE (+4) |  |  |
 | 0000:567A | 46 | drawing? | 0000:5656 |  |  |
 | 0000:56A8 | 31 | drawing? | 0000:5656 |  |  |
-| 0000:56C8 | 4 | game | 0000:1246, 1194:161A, 1194:27C2 (+7) | an image drawn, clipped [drawing] |  |
 | 0000:56CC | 338 | likely inline | 0000:10C9, 0000:56C8 | an image drawn, clipped (A836..A83C) [drawing] | vars A83A A83C A836 A838 |
 | 0000:5998 | 4 | game | 1194:149D, 1194:14C5, 1194:5B58 (+1) |  |  |
 | 0000:599C | 4 | game | 1194:21C2, 1194:223A, 1194:2C96 (+6) |  |  |
@@ -319,13 +395,12 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:59B5 | 31 | game | 0000:5422 |  |  |
 | 0000:59D8 | 141 | under a hook | 0000:582C, 0000:618F |  | vars A916 A91A A914 A918 |
 | 0000:5A66 | 4 | game | 0000:4BD6, 26F7:0325, 292B:0201 |  |  |
-| 0000:5A6A | 153 | likely inline | 0000:36B6, 0000:552E, 0000:582C (+3) |  | vars A916 A91A A914 A918 |
 | 0000:5B04 | 4 | game | 1194:1354, 1194:1647, 1194:20BF (+2) |  |  |
 | 0000:5B08 | 48 | game | 0000:4D2F, 0000:4D7C, 0000:5458 (+3) |  |  |
 | 0000:5B3C | 4 | game | 29CF:0A28 |  |  |
 | 0000:5B5C | 9 | under a hook | 0000:582C |  |  |
 | 0000:5B65 | 49 | game | 0000:3B8E, 0000:5B3C, 0000:5B5C (+1) |  |  |
-| 0000:5C22 | 4 | game |  |  |  |
+| 0000:5C22 | 4 | game | 23BA:0217 |  |  |
 | 0000:5CCE | 128 | DOS I/O | 0000:5CCA |  | vars 9032 8FA6 9030 |
 | 0000:5D4E | 4 | under a hook | 21EE:01ED |  |  |
 | 0000:5D52 | 30 | under a hook | 0000:01FD, 0000:5D4E |  | vars 8FA6 9038 902A |
@@ -333,7 +408,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:5DA0 | 111 | under a hook | 0000:5CCE |  | vars 9032 902C 902A 8FA8 |
 | 0000:5E0F | 29 | under a hook | 0000:5DA0 |  |  |
 | 0000:5E2C | 17 | under a hook | 0000:5DA0 |  |  |
-| 0000:5E3E | 18 | game | 0000:0AD7, 0000:1246, 0000:2CFE (+5) |  |  |
 | 0000:5E50 | 276 | game | 0000:56CC, 0000:5E3E |  |  |
 | 0000:5F64 | 54 | BIOS | 0000:9B04 |  | vars 9136 929A 929E |
 | 0000:6010 | 19 | DOS I/O | 0000:600C |  |  |
@@ -345,7 +419,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:6257 | 608 | drawing? | 0000:618F |  | vars A8FE |
 | 0000:64F0 | 86 | under a hook | 0000:654A |  | vars A836 A838 |
 | 0000:654A | 383 | under a hook | 0000:6546 |  | vars A902 0151 9146 914A |
-| 0000:66F2 | 4 | under a hook | 1194:4BFF, 26F7:0625 |  |  |
+| 0000:66F2 | 4 | game | 1194:4BFF, 26F7:0625 |  |  |
 | 0000:66F6 | 71 | game | 0000:343C, 0000:5368, 0000:66F2 (+2) |  |  |
 | 0000:6746 | 27 | DOS I/O | 0000:31FE, 0000:32FE, 0000:33BF (+8) |  |  |
 | 0000:6762 | 4 | game | 1194:080B, 25FD:056F, 3159:0494 |  |  |
@@ -368,7 +442,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:6C32 | 4 | game | 0000:1246, 1194:0488, 1194:2E69 (+24) |  |  |
 | 0000:6D36 | 28 | DOS I/O | 0000:31FE, 0000:32FE, 0000:33BF (+4) |  |  |
 | 0000:6D56 | 23 | DOS I/O | 0000:2A54, 0000:2A73, 0000:603C (+10) |  |  |
-| 0000:6D76 | 102 | game | 0000:8D6E |  |  |
+| 0000:6D76 | 102 | game | 0000:8D6E | the formatter's fraction digits (three, after a '.') [text formatting] |  |
 | 0000:6DE0 | 16 | DOS I/O | 0000:31FE, 0000:3546, 0000:6DDC (+2) |  |  |
 | 0000:6DF0 | 4 | game | 25FD:05A5 |  |  |
 | 0000:6DF4 | 9 | DOS I/O | 0000:6DF0 |  |  |
@@ -376,7 +450,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:6E06 | 5 | DOS I/O | 0000:6E02 |  |  |
 | 0000:6E38 | 4 | game | 1194:51D1, 1194:5496, 1194:D45D (+3) |  |  |
 | 0000:6EA4 | 4 | game | 1194:0316, 1194:03A2, 1194:04BE (+17) |  |  |
-| 0000:6EEE | 20 | game | 0000:402F, 0000:6EEA |  |  |
+| 0000:6EEE | 20 | game | 0000:402F, 0000:5160, 0000:6EEA |  |  |
 | 0000:6F02 | 4 | under a hook | 21EE:0000 |  |  |
 | 0000:6F06 | 52 | BIOS | 0000:6F02 |  | vars A900 9289 A902 |
 | 0000:6F8C | 4 | under a hook | 1194:066A, 21EE:0000, 21EE:01ED |  |  |
@@ -409,8 +483,9 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:77F0 | 45 | BIOS | 0000:77EC |  | vars 8F92 8F94 B03A |
 | 0000:78A0 | 8 | game | 0000:C0F1 |  |  |
 | 0000:7C51 | 2397 | under a hook | 0000:FF26 |  | vars AFB7 AFBB AFBF AFB9 |
-| 0000:8755 | 125 | game | 0000:85AE |  | vars AF74 AF78 AF7A AF77 |
-| 0000:8950 | 124 | game | 0000:85AE |  |  |
+| 0000:8755 | 125 | game | 0000:85AE | a polygon clipped against one plane (Sutherland-Hodgman over AF74/AF78/AF7A, outcodes AF76/AF77) [renderer] | vars AF74 AF78 AF7A AF77 |
+| 0000:8839 | 138 | game | 0000:8755 |  | vars AF76 AF77 |
+| 0000:8950 | 124 | game | 0000:85AE, 0000:8839 | a point's outcode against the view's planes [renderer] |  |
 | 0000:89CE | 146 | game | 0000:8AF2 |  | vars AFD0 AFD4 AFD8 AFC2 |
 | 0000:8A60 | 146 | game | 0000:8AF2 |  | vars AFD2 AFD4 AFE0 AFC6 |
 | 0000:8AF2 | 143 | game |  |  | vars AFD4 AFCC AFEE A900 |
@@ -432,9 +507,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:9340 | 48 | game | 0000:933C |  |  |
 | 0000:9370 | 4 | game | 1194:6410, 3159:0AE2 |  |  |
 | 0000:9374 | 15 | game | 0000:9370 |  |  |
-| 0000:9388 | 48 | game | 0000:E51B, 0000:E557 |  |  |
-| 0000:93BC | 48 | game | 0000:93B8, 0000:AC13, 0000:C2CE (+8) |  |  |
-| 0000:93F0 | 49 | game | 0000:E51B |  |  |
 | 0000:942A | 59 | game | 0000:10C9, 0000:618F, 0000:9426 |  | vars A902 A8FE 928A 928E |
 | 0000:9466 | 4 | game | 0000:1246, 1194:020E, 1194:0D8E (+59) |  |  |
 | 0000:94B1 | 61 | drawing | 0000:946A, 0000:94F2 |  |  |
@@ -445,7 +517,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:965E | 201 | likely inline | 0000:4ACD, 0000:965A | message box drawn [UI] | vars A84C A84A A83A A848 |
 | 0000:9727 | 113 | game | 0000:9798 |  | vars A856 A840 A83E |
 | 0000:9798 | 264 | game | 0000:965E |  | vars A84C A83A A83C A848 |
-| 0000:98A0 | 360 | game | 0000:965E, 0000:9A0C |  | vars A84C A858 A850 B036 |
+| 0000:98A0 | 360 | game | 0000:965E, 0000:9A0C | a text's lines laid out (colour codes 0Ch, tabs 09h) [text drawing] | vars A84C A858 A850 B036 |
 | 0000:9A08 | 4 | game | 3159:0F2A |  |  |
 | 0000:9A0C | 40 | game | 0000:9A08 |  | vars A83A A83C A846 A84C |
 | 0000:9A34 | 57 | game | 0000:9727 |  | vars A854 A856 A900 B038 |
@@ -468,13 +540,12 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:9C5E | 4 | under a hook | 21EE:0314 |  |  |
 | 0000:9C62 | 41 | under a hook | 0000:9C5E |  |  |
 | 0000:9C8C | 20 | game | 2F9F:001F |  |  |
-| 0000:9CAC | 4 | game | 1194:17D8, 1194:2711, 1194:49DF (+10) |  |  |
+| 0000:9CAC | 4 | game | 1194:17D8, 1194:2711, 1194:49DF (+11) |  |  |
 | 0000:9CC6 | 11 | game |  |  |  |
 | 0000:9D64 | 16 | game | 0000:6FC2, 0000:9D60 |  | vars 046C 046E |
 | 0000:9D74 | 4 | game | 3159:0F2A |  |  |
 | 0000:9D78 | 11 | game | 0000:9D74 |  |  |
-| 0000:9D84 | 4 | game | 1194:2020, 1194:6410, 26F7:071F (+3) |  |  |
-| 0000:9D88 | 58 | game | 0000:9D84 |  | vars A900 |
+| 0000:9D88 | 58 | under a hook | 0000:9D84 |  | vars A900 |
 | 0000:9E06 | 4 | game | 1194:0DE1, 1194:0E19, 1194:0E86 (+18) |  |  |
 | 0000:9E0A | 185 | game | 0000:32FE, 0000:5368, 0000:603C (+6) |  | vars ADB6 B034 ADB8 A900 |
 | 0000:9EE9 | 453 | drawing? | 0000:31FE, 0000:9EE5 |  | vars A83E A840 A83A A842 |
@@ -486,14 +557,13 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:A1B9 | 61 | under a hook | 0000:9EE9 |  | vars B034 |
 | 0000:A1F6 | 59 | under a hook | 0000:A0D9 |  |  |
 | 0000:A483 | 25 | likely inline | 0000:A232, 0000:A240, 0000:A26F |  | files lavaani.rci, waterani.rci; vars C398 CB5B |
-| 0000:A561 | 63 | game | 0000:A49C, 0000:A4ED, 0000:A6B5 |  | vars CD86 CD82 CD7E CB8C |
+| 0000:A561 | 63 | game | 0000:A49C, 0000:A4ED, 0000:A6B5 | the renderer's buffers allocated (CD86, CD82, CD7E, CD76/CD7A) and its set-up (AAA2) [renderer] | vars CD86 CD82 CD7E CB8C |
 | 0000:A5CD | 4 | under a hook | 2542:03BF |  |  |
 | 0000:A602 | 4 | under a hook | 2542:03BF |  |  |
 | 0000:A653 | 18 | likely inline | 0000:A665, 0000:A72E |  | vars CCD0 |
 | 0000:A69E | 23 | game | 0000:2CFE, 0000:A611, 1194:5496 (+3) |  | files screensv.$$2; vars A8FE |
 | 0000:A7A0 | 20 | game | 0000:2CFE, 0000:A6B5, 1194:54B3 (+1) |  | files screensv.$$2; vars A8FE |
 | 0000:A8FB | 30 | likely inline | 0000:A232, 0000:A240, 0000:A26F |  | vars BB09 C398 |
-| 0000:A919 | 37 | likely inline | 0000:A232, 0000:A240, 0000:A26F |  | vars C3DA C3D0 C3D4 |
 | 0000:A93E | 4 | game | 29CF:0270, 29CF:02E4, 29CF:037F (+2) |  |  |
 | 0000:A942 | 4 | game | 29CF:0441, 29CF:04E1 |  |  |
 | 0000:A946 | 4 | game | 29CF:0589 |  |  |
@@ -515,7 +585,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:B358 | 400 | drawing? | 0000:A232, 0000:A240, 0000:A26F (+1) |  | vars BA4B BB06 C8F0 BAC8 |
 | 0000:B4E8 | 13 | likely inline | 0000:A232, 0000:A240, 0000:A26F (+1) |  | vars BAC8 CD7A |
 | 0000:B51B | 138 | likely inline | 0000:B4F5 |  | vars CD7A A914 A918 |
-| 0000:B5A5 | 164 | game | 0000:B4F5 |  |  |
+| 0000:B5A5 | 164 | game | 0000:B4F5 | a quad's corners flagged inside a rectangle (+12h bits F000h) [renderer] |  |
 | 0000:B649 | 98 | under a hook | 0000:AC13 |  | vars CB59 A85E CB5A CCF8 |
 | 0000:B7A9 | 51 | game | 0000:B6AB |  | vars BA7E CCF8 CB37 BAF6 |
 | 0000:B7DC | 67 | under a hook | 0000:AE59 |  | vars A916 A91A CD90 |
@@ -539,7 +609,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:CD44 | 2 | game |  |  |  |
 | 0000:CD50 | 134 | game |  |  | vars BA7F D7AC D7B2 D7B8 |
 | 0000:CD54 | 130 | game |  |  | vars BA7F D7AC D7B2 D7B8 |
-| 0000:CD6C | 326 | game |  |  | vars CCC4 C398 D7AC D7B2 |
+| 0000:CD6C | 326 | game |  | a door's wall drawn (C398 bit 1000h set for the hit test near the player) [renderer] | vars CCC4 C398 D7AC D7B2 |
 | 0000:CF96 | 36 | game | 0000:CD30 |  | vars A84A A84E |
 | 0000:CFBA | 231 | likely inline | 0000:C9FF, 0000:CF96 | map flats placed for the drawing (D806, C38E) [renderer] | vars D806 C38E A84A A84E |
 | 0000:D0A1 | 237 | likely inline | 0000:C9FF | the drawing's walk over floor squares (deep floors CCCE) [renderer] | vars CCCE 9031 C398 C39A |
@@ -549,7 +619,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:DB78 | 209 | drawing? | 0000:DA8E |  | vars D80C C3D2 CD7E A836 |
 | 0000:DC67 | 286 | likely inline | 0000:D4B4 | renderer | vars CD86 D834 D838 A836 |
 | 0000:DD85 | 37 | game | 0000:DC67 |  | vars CCEC A836 C3DC BC8C |
-| 0000:DDAA | 117 | game | 0000:DD85 |  | vars A836 C8E7 CCD2 |
+| 0000:DDAA | 117 | game | 0000:DD85 | a sprite's shading row from the lights near it (A836) [renderer] | vars A836 C8E7 CCD2 |
 | 0000:DE1F | 124 | game | 0000:A561 |  | vars CD8C CD8A CD90 CD8E |
 | 0000:DEA8 | 135 | drawing? | 0000:D4B4 |  | vars D813 C3D8 C8F2 A91A |
 | 0000:DF2F | 115 | likely inline | 0000:D4B4 |  | vars A916 A914 CD8C C3D8 |
@@ -558,14 +628,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:E084 | 69 | game | 0000:E06A | the heading's slope, the body of 0000:E06A [game math; ported inline: travel.rs travel_heading] |  |
 | 0000:E1A2 | 201 | game | 0000:A8FB |  | vars E05C A914 E05A A91A |
 | 0000:E37F | 155 | under a hook | 0000:C2CE, 0000:C3A6, 0000:C3AE (+2) |  | vars A914 A900 A918 A91A |
-| 0000:E41A | 83 | likely inline | 0000:D4B4 | the sun and moons placed and drawn (clear weather, time 100h..300h) [sky drawing] | vars CCFE BB09 C8F3 C3D6 |
-| 0000:E46D | 101 | game | 0000:E41A |  | files moon01.dfa, moon02.dfa; vars CB36 CCA8 CCAA E042 |
-| 0000:E4D2 | 73 | game | 0000:E41A, 0000:E46D |  | vars A91A A91C A916 C3D8 |
-| 0000:E51B | 60 | game | 0000:E41A, 0000:E557, 0000:E6E9 |  | vars CCFE CB66 E052 C3DA |
-| 0000:E557 | 114 | game | 0000:E46D |  | vars E052 CCA8 E042 C3D6 |
-| 0000:E6CB | 30 | game | 0000:E46D |  | vars BA54 9030 |
-| 0000:E6E9 | 117 | game | 0000:E41A |  | vars A91A C3D8 C3D6 |
-| 0000:E75E | 28 | game | 0000:E6E9 |  | vars A914 A918 A916 C3D8 |
 | 0000:F21B | 18 | game | 0000:ED0D, 0000:EE19, 0000:F22D (+2) |  |  |
 | 0000:F259 | 145 | game | 0000:CD50 |  | vars 5BFF A86C C39A |
 | 0000:F8DD | 4 | game | 2826:0D20, 2F26:01BB |  |  |
@@ -621,8 +683,8 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0FFD:0CF0 | 1 | game | 0FFD:0C49 |  |  |
 | 0FFD:0CFB | 51 | game | 0FFD:0821 |  |  |
 | 0FFD:0D46 | 6 | game | 23BA:002A, 23BA:012B, 23BA:014A (+1) |  |  |
-| 0FFD:0D4C | 6 | game | 23BA:0183, 23BA:01C7 |  |  |
-| 0FFD:0D52 | 6 | game | 23BA:000C, 23BA:002A, 23BA:012B (+2) |  |  |
+| 0FFD:0D4C | 6 | game | 23BA:0183, 23BA:01C7, 23BA:0217 |  |  |
+| 0FFD:0D52 | 6 | game | 2294:076C, 23BA:000C, 23BA:002A (+3) |  |  |
 | 0FFD:0D58 | 6 | game | 23BA:002A, 23BA:012B, 23BA:014A (+1) |  |  |
 | 0FFD:0D5E | 6 | game | 23BA:000C, 23BA:012B, 23BA:014A (+1) |  |  |
 | 0FFD:0D70 | 6 | game | 23BA:002A |  |  |
@@ -638,7 +700,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0FFD:0DD6 | 6 | game | 2F9F:000D |  |  |
 | 0FFD:0DE8 | 6 | game | 2F9F:001F, 2F9F:0438 |  |  |
 | 0FFD:0E0C | 6 | game | 2F9F:001F |  |  |
-| 1194:0000 | 6 | game | 1194:9462, 1194:9D64 |  |  |
+| 1194:0000 | 6 | game | 1194:6105, 1194:8020, 1194:9462 (+1) |  |  |
 | 1194:000A | 30 | DOS I/O | 1194:0067, 1194:00A4, 1194:0142 (+1) |  | vars 019A |
 | 1194:0028 | 41 | DOS I/O | 1194:0051 |  |  |
 | 1194:0051 | 22 | under a hook | 1194:0067 |  |  |
@@ -653,7 +715,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:07B1 | 29 | under a hook | 1194:066A |  |  |
 | 1194:07CE | 17 | under a hook | 1194:066A |  |  |
 | 1194:07DF | 17 | under a hook | 1194:066A |  | vars 37EA |
-| 1194:07F0 | 23 | game |  |  |  |
 | 1194:09CB | 48 | game | 1194:080B |  | vars 98DE |
 | 1194:0A48 | 115 | likely inline | 1194:0A44 |  | vars 0A47 0A48 0A4A 0A46 |
 | 1194:0ABB | 4 | game | 1194:9511 |  |  |
@@ -683,7 +744,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:16E0 | 88 | under a hook | 1194:16BD |  | vars 126C 1299 1270 1272 |
 | 1194:1738 | 160 | under a hook | 1194:16E0 |  | files backmsg.$$$, equip.img; vars 9030 A900 1032 |
 | 1194:17D8 | 324 | likely inline | 1194:18F6 | the inventory screen's list drawn [UI] | vars 9288 102C 1026 1296 |
-| 1194:1988 | 194 | game | 1194:1C5E |  | vars 12B2 12B0 9288 102E |
+| 1194:1988 | 194 | game | 1194:1C5E | the character sheet's status texts [UI] | vars 12B2 12B0 9288 102E |
 | 1194:1A4A | 74 | game |  |  | vars 129A 1297 129D 126C |
 | 1194:1A94 | 50 | game |  |  | vars 1297 129A |
 | 1194:1AC6 | 109 | game |  |  | vars 1296 1299 129A AFF9 |
@@ -709,23 +770,16 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:2C96 | 42 | under a hook | 1194:2BC5 |  | vars 9030 |
 | 1194:2CC0 | 16 | game |  |  | vars B7C4 1298 |
 | 1194:2D60 | 79 | under a hook | 1194:158F, 1194:2D5C |  | vars 9030 |
-| 1194:2F4D | 28 | game | 1194:2E69, 1194:2F69 |  | vars 1927 |
-| 1194:2F69 | 43 | game | 26F7:07CD |  | files horse.dfa; vars 1927 902E 40A0 |
-| 1194:2F94 | 31 | game | 1194:2E69 |  | vars 3FF9 |
-| 1194:30F1 | 89 | game | 1194:2F69 |  | vars 40A0 1927 902E |
 | 1194:314A | 20 | likely inline | 1194:3332 |  |  |
 | 1194:315E | 37 | game | 1194:3332 |  |  |
 | 1194:3280 | 16 | game | 1194:31CA |  | vars 9030 |
 | 1194:3323 | 15 | likely inline | 1194:3332 |  |  |
 | 1194:3A50 | 1 | game | 0000:481E |  |  |
 | 1194:3A51 | 117 | under a hook | 0000:102E |  | files screensv.$$2, tempsave.$$$; vars 1A80 1A6C 7D0D |
-| 1194:3E9A | 4 | game | 26F7:03C4 |  |  |
 | 1194:423B | 18 | game | 1194:3B84 |  |  |
 | 1194:4317 | 33 | likely inline | 1194:424E |  | vars 1026 1036 |
 | 1194:4338 | 13 | likely inline | 1194:424E |  | vars 1014 1016 |
-| 1194:452F | 64 | likely inline | 1194:4430, 1194:456F |  | vars 1016 1026 9288 |
 | 1194:48C9 | 18 | game | 1194:4892 |  |  |
-| 1194:48DB | 4 | game | 26F7:07CD |  |  |
 | 1194:48DF | 7 | game |  |  |  |
 | 1194:48E6 | 3 | likely inline | 1194:6A6C |  |  |
 | 1194:48E9 | 12 | likely inline | 1194:17D8, 1194:25B9, 1194:27C2 (+4) |  |  |
@@ -735,7 +789,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:49DF | 28 | game | 1194:29DE, 1194:49DB, 1194:7CF8 |  |  |
 | 1194:49FB | 4 | game | 26F7:08F7 |  |  |
 | 1194:4BCC | 51 | under a hook | 1194:4BC8 |  | vars 9288 |
-| 1194:4D74 | 29 | drawing? | 1194:27C2, 222C:020A, 26F7:0000 (+3) |  | vars 9030 B7E6 |
 | 1194:4D91 | 4 | game | 1194:D55F, 21EE:01ED, 25FD:0002 (+2) |  |  |
 | 1194:4D95 | 4 | game | 2433:08E2, 2433:0981 |  |  |
 | 1194:4E17 | 4 | under a hook | 2542:04B1 |  |  |
@@ -771,7 +824,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:5D75 | 24 | game | 1194:5CF4 |  |  |
 | 1194:5D8D | 50 | game | 1194:5CF4 |  | vars 8F92 8F94 AFF9 |
 | 1194:5DE2 | 59 | game | 1194:5CF4 |  | vars B7C4 8F92 8F94 AFF9 |
-| 1194:5E1D | 4 | game | 26F7:03A4, 26F7:0483, 26F7:07CD (+1) |  |  |
 | 1194:5E21 | 18 | game | 1194:122F, 1194:124A, 1194:16BD (+17) | waiting for input [input] | vars AFF9 |
 | 1194:5E63 | 20 | game | 1194:B1EA |  | vars A8FE |
 | 1194:5E77 | 46 | game | 1194:B1EA |  | files pal.col; vars A8FE |
@@ -803,35 +855,36 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:7E44 | 107 | game | 1194:7CBA |  | vars 12B4 137A 137E 103A |
 | 1194:7EAF | 127 | game | 1194:7D79 |  | vars 12B2 |
 | 1194:7F2E | 165 | game | 1194:7D79, 1194:7DE1 |  |  |
-| 1194:84F1 | 132 | likely inline | 1194:83FD |  | vars 65AB 6598 65A3 65A5 |
 | 1194:8575 | 12 | game | 1194:8084 |  | vars 0FE6 |
 | 1194:8581 | 11 | game | 1194:8084 |  |  |
 | 1194:85CF | 7 | game | 1194:8084 |  |  |
 | 1194:85D6 | 8 | game | 1194:8084, 1194:82BB |  |  |
+| 1194:864D | 4 | likely inline | 1194:8020 |  | files artfact1.dat |
+| 1194:8651 | 4 | likely inline | 1194:8020 |  | files artfact2.dat |
+| 1194:8655 | 4 | likely inline | 1194:8020 |  | files equip.dat |
+| 1194:8659 | 4 | likely inline | 1194:8020 |  | files muguild.dat |
+| 1194:865D | 4 | likely inline | 1194:8020 |  | files tavern.dat |
+| 1194:8661 | 4 | likely inline | 1194:8020 |  | files selling.dat |
 | 1194:8960 | 67 | likely inline | 1194:887A | the date from the clock 5CC (day of the year, 7E900h minutes a year) [game state; ported inline: text.rs, shops.rs, use_item.rs] | vars 05CC |
 | 1194:89A3 | 4 | game |  |  |  |
 | 1194:8B6F | 30 | likely inline | 1194:8B12 |  | vars 1042 |
 | 1194:8BD8 | 23 | game | 1194:8B8D |  | vars 1042 05C8 |
-| 1194:8F50 | 43 | likely inline | 1194:8F1E |  | vars 0FD2 0F72 |
 | 1194:8F7B | 30 | game | 1194:8F1E |  |  |
 | 1194:943B | 39 | game | 1194:941F |  |  |
 | 1194:94D2 | 7 | game | 1194:94B7, 1194:96FE, 1194:98CD |  |  |
 | 1194:9683 | 15 | game | 1194:94B7, 1194:98CD |  |  |
 | 1194:9815 | 16 | game | 1194:97F1 |  |  |
-| 1194:9825 | 36 | game | 1194:97F1 |  | vars 01AA |
 | 1194:9895 | 20 | likely inline | 1194:9849 |  |  |
 | 1194:98A9 | 36 | game | 1194:9849 |  | vars 01AA |
 | 1194:98CD | 27 | game | 1194:9462 |  |  |
 | 1194:9BB6 | 14 | likely inline | 1194:9162, 1194:9C30 |  |  |
 | 1194:9BC4 | 18 | likely inline | 1194:9760 |  |  |
-| 1194:9C9B | 61 | likely inline | 1194:98E8, 1194:9C96 |  | vars 9288 137A 101C 102C |
 | 1194:9D40 | 17 | likely inline | 1194:90B9 |  | vars 0AB0 |
 | 1194:9D51 | 19 | likely inline | 1194:9162 |  | vars 0A48 C3D0 0A4A C3D4 |
 | 1194:9E7F | 14 | game | 1194:9DCF, 1194:9EAB |  |  |
 | 1194:9EAB | 25 | game | 1194:9D64 |  |  |
-| 1194:9EDD | 39 | game | 1194:9EC4 |  |  |
 | 1194:9F5C | 46 | game | 1194:9F04 |  | vars 0A4C |
-| 1194:A206 | 265 | game | 1194:16E0, 1194:1DC8, 1194:1F56 |  | vars 126C |
+| 1194:A206 | 265 | game | 1194:16E0, 1194:1DC8, 1194:1F56 | the logbook's quest lines listed (records at 0DCA, 0E6E) [UI] | vars 126C |
 | 1194:A30F | 72 | game | 1194:A206 |  |  |
 | 1194:A357 | 21 | game | 1194:A206 |  |  |
 | 1194:A586 | 41 | likely inline | 1194:A374 |  | vars 9030 6E50 6E52 |
@@ -839,6 +892,9 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:AA73 | 25 | game | 1194:AA07 |  |  |
 | 1194:AF1A | 18 | likely inline | 1194:AE8F |  | vars 9030 |
 | 1194:AF2C | 15 | likely inline | 1194:AE8F, 1194:B848 |  |  |
+| 1194:B7AD | 23 | game | 1194:AE8F, 1194:AFD9, 1194:B566 (+1) |  | vars 7035 7034 7036 |
+| 1194:B7C4 | 20 | game | 1194:AE8F, 1194:AFD9, 1194:B566 (+1) |  | vars 7034 7036 |
+| 1194:B7D8 | 34 | game | 1194:AE8F, 1194:AFD9, 1194:B566 (+1) |  | vars 7037 7034 |
 | 1194:BA44 | 77 | likely inline | 1194:BA91, 1194:C04C |  | vars 05C8 1387 1AB5 |
 | 1194:BC8B | 14 | game | 1194:B93C |  |  |
 | 1194:BD4C | 5 | game | 1194:B93C |  |  |
@@ -851,8 +907,8 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:C4E8 | 23 | likely inline | 1194:C36E |  | vars 12BE 13C8 |
 | 1194:C537 | 22 | likely inline | 1194:C36E |  |  |
 | 1194:C54D | 37 | likely inline | 1194:C36E |  |  |
-| 1194:CBD3 | 142 | drawing? | 1194:C83B |  | vars 785D 785F 7867 137A |
-| 1194:CC77 | 29 | likely inline | 1194:C83B |  | vars 137E 13D3 7867 |
+| 1194:C6A3 | 4 | game | 1194:C36E |  |  |
+| 1194:C6A7 | 4 | game | 1194:C36E |  |  |
 | 1194:CE61 | 30 | likely inline | 1194:CD9A |  | vars 1387 1AB5 0FDE |
 | 1194:CEC8 | 15 | game | 1194:CE01 |  |  |
 | 1194:CF41 | 23 | likely inline | 1194:CD9A |  | vars 05CC 0FE9 0FED |
@@ -860,9 +916,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:D2EC | 7 | likely inline | 1194:CE7F, 1194:D1F1 |  |  |
 | 1194:D2F3 | 35 | game | 1194:D019, 1194:D0DD |  | vars 137E |
 | 1194:D540 | 31 | under a hook | 1194:D45D |  |  |
-| 1194:D8DE | 62 | game | 1194:D863 |  | vars 137E |
-| 1194:E539 | 50 | game | 1194:E50D, 2826:0C15 |  |  |
-| 1194:E56B | 41 | game | 1194:E539 |  | vars 0A46 0A4C |
 | 1194:E5BE | 64 | likely inline | 1194:E594, 2826:0C15 |  |  |
 | 1194:E626 | 90 | likely inline | 1194:E5FE, 2826:0C15 |  | vars CB5E |
 | 1194:E7FD | 23 | likely inline | 1194:DF7F |  | vars C39A 9288 |
@@ -879,7 +932,9 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 217B:05C2 | 95 | under a hook | 217B:0682 |  | vars C91A C91B C943 A840 |
 | 217B:0621 | 97 | under a hook | 217B:05C2 |  | vars C3D0 0608 A838 C3D4 |
 | 217B:0708 | 40 | drawing | 217B:0189 |  | vars A900 9288 |
-| 21EE:01ED | 157 | DOS I/O | 0000:102E, 0000:10C9 |  | vars 43C0 CD04 1040 |
+| 21EE:01ED | 157 | DOS I/O | 0000:102E, 0000:10C9, 21EE:028A |  | vars 43C0 CD04 1040 |
+| 21EE:028A | 64 | likely inline | 0000:51F2, 0000:5C26 |  | vars 41C6 9288 |
+| 21EE:02CA | 40 | drawing | 21EE:028A |  | vars 1036 102C 9288 A900 |
 | 21EE:0314 | 143 | DOS I/O | 0000:102E |  | vars A836 |
 | 21EE:03A3 | 39 | DOS I/O | 0000:102E |  |  |
 | 21EE:03CA | 15 | DOS I/O | 0000:102E, 21EE:01ED |  |  |
@@ -887,7 +942,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 222C:00D2 | 24 | game | 222C:005B |  |  |
 | 222C:0149 | 37 | game | 222C:00EA |  | vars 929E 92A0 |
 | 222C:016E | 23 | game | 222C:0000 |  | vars 102C 1030 |
-| 222C:0185 | 133 | likely inline | 222C:0000 | the class quiz's scroll screen (question.txt, scroll01.dfa) [UI] | files burst5.voc, question.txt, scroll01.dfa; vars 9030 40E8 40F4 40F6 |
 | 222C:025A | 102 | game |  |  | vars 40F2 9030 1298 129A |
 | 222C:02C0 | 20 | game |  |  | vars 40F0 |
 | 222C:034C | 101 | game | 222C:025A |  | vars 1296 1294 A900 40F2 |
@@ -895,7 +949,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 222C:045D | 95 | game | 222C:0640 |  | vars 1298 129C 129A 1296 |
 | 222C:04BC | 27 | game | 222C:040B, 222C:045D |  | vars 40F2 |
 | 222C:04E5 | 64 | game | 222C:040B, 222C:045D |  | vars A900 9288 40F2 40F0 |
-| 222C:05C9 | 72 | likely inline | 222C:02D4 |  | vars 40C3 |
 | 222C:0611 | 47 | game |  |  | vars AFF9 |
 | 222C:0640 | 47 | game |  |  | vars AFF9 |
 | 222C:066F | 20 | game |  |  | vars B7C6 129E |
@@ -908,12 +961,21 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 23F1:01E1 | 56 | under a hook | 23F1:02D1 |  |  |
 | 23F1:0219 | 184 | under a hook | 0000:2F9E |  |  |
 | 23F1:02D1 | 125 | under a hook | 0000:2F9E |  |  |
-| 242A:0031 | 48 | game | 242A:000E |  | vars 9288 |
+| 242A:0031 | 48 | game | 242A:000E | CITYDATA's province records checked; a bad one shows the text at 4A1E [I/O check] | vars 9288 |
 | 242A:0061 | 28 | game | 242A:0031 |  |  |
 | 242A:007D | 18 | game | 242A:0031 |  |  |
 | 2433:012F | 11 | likely inline | 2433:0000 |  |  |
 | 2433:013A | 24 | drawing | 2433:0000 |  | vars 0FF2 9030 |
-| 2433:0577 | 12 | game | 2433:029F |  |  |
+| 2433:03D5 | 12 | game | 2433:0000, 2433:0358, 2433:036C (+2) |  |  |
+| 2433:03E1 | 12 | game | 2433:0000, 2433:0358, 2433:036C (+2) |  |  |
+| 2433:03ED | 24 | game | 2433:0000, 2433:0358, 2433:036C (+2) |  | vars 0A47 |
+| 2433:0405 | 12 | likely inline | 2433:0000, 2433:0358, 2433:036C (+2) |  | vars BB0A |
+| 2433:0411 | 11 | likely inline | 2433:0000, 2433:0358, 2433:036C (+2) |  | vars BB0A |
+| 2433:0546 | 15 | likely inline | 2433:0000, 2433:0358 |  | vars 0A47 4BFB |
+| 2433:0555 | 12 | game | 2433:0000, 2433:0358 |  | vars 4BFB |
+| 2433:0561 | 18 | game | 2433:0000, 2433:0358, 2433:0573 |  | vars BB0A 4BFB |
+| 2433:0573 | 4 | likely inline | 2433:0000, 2433:0358 |  |  |
+| 2433:0577 | 12 | game | 2433:029F, 2433:0561 |  |  |
 | 2433:083D | 70 | game | 1194:16E0, 1194:1DC8, 1194:1F56 |  | vars 12CE 0F77 0F7F |
 | 2433:0A39 | 104 | drawing | 2542:00BE |  | vars C39A 0FF2 9030 |
 | 2433:0BE4 | 16 | likely inline | 2433:0AFF |  |  |
@@ -957,22 +1019,15 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 26F7:0268 | 189 | under a hook | 26F7:0176 |  | files city.img, dungeon.img, stafdung.cif; vars 1294 47E1 8F9A 9030 |
 | 26F7:0325 | 127 | under a hook | 26F7:0268 |  | vars 9030 A8BE A8C0 1030 |
 | 26F7:03A4 | 32 | game |  |  | vars 6C28 |
-| 26F7:03C4 | 191 | game | 26F7:03A4, 26F7:0625 |  | vars A8AE 6C41 193D 0A47 |
-| 26F7:0483 | 359 | game | 26F7:03A4, 26F7:0625 |  | vars 1943 05CC 1032 6C41 |
-| 26F7:05EA | 59 | game | 26F7:03C4 |  | vars 1943 47E1 12A8 193E |
-| 26F7:0625 | 250 | drawing? |  |  | vars A8AE A8BA 9288 47E1 |
-| 26F7:071F | 138 | under a hook | 26F7:0625 |  | vars A8AE 0A4C 0A46 47E1 |
-| 26F7:07A9 | 36 | game | 26F7:0000, 26F7:07CD |  | vars 193D 193E 1940 1942 |
-| 26F7:07CD | 298 | game |  |  | files tamriel.mnu; vars 47E1 05B1 6C28 05C8 |
-| 26F7:08F7 | 420 | game | 26F7:07CD |  | files entercty.$$$; vars 6ACD 1927 6ACF 137A |
+| 26F7:0483 | 359 | likely inline | 26F7:03A4, 26F7:0625 |  | vars 1943 05CC 1032 6C41 |
+| 26F7:071F | 138 | likely inline | 26F7:0625 |  | vars A8AE 0A4C 0A46 47E1 |
 | 26F7:0AA7 | 21 | game | 26F7:08F7 |  | vars 0A46 6ACF 137A |
 | 26F7:0ABC | 95 | game | 26F7:03A4 |  | vars 9C62 A8AE |
 | 26F7:0B1B | 19 | game | 26F7:0ABC |  |  |
 | 26F7:0B2E | 45 | game | 26F7:0ABC |  | vars A8AE |
-| 26F7:0B5B | 31 | game | 26F7:03C4 |  |  |
-| 26F7:0B7A | 79 | under a hook | 26F7:0625 |  | vars 1294 47E1 A8B6 8F92 |
-| 26F7:0BC9 | 65 | under a hook | 26F7:0B7A |  | vars A8B6 1294 A8BA A8BC |
-| 26F7:0D50 | 32 | game | 26F7:07CD |  | vars 1927 01A9 01AA |
+| 27CE:0058 | 47 | likely inline | 27CE:000C |  |  |
+| 27CE:0087 | 49 | likely inline | 27CE:000C |  |  |
+| 27CE:00B8 | 67 | likely inline | 27CE:000C |  |  |
 | 27CE:00FB | 47 | likely inline | 27CE:000C |  |  |
 | 27CE:012A | 41 | likely inline | 27CE:000C |  |  |
 | 27E3:000E | 12 | game | 27E3:000A |  |  |
@@ -987,10 +1042,10 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2826:0D12 | 14 | under a hook | 2826:0C15 |  |  |
 | 2826:0DA1 | 16 | game | 2826:0D85 |  |  |
 | 292B:000E | 26 | drawing? | 0000:4BD6 |  | vars 7DB8 BC8C |
-| 292B:0362 | 244 | under a hook | 26F7:0000 |  | files dungeon.txt; vars 902E 8F92 8F94 9288 |
+| 292B:0362 | 244 | likely inline | 26F7:0000 |  | files dungeon.txt; vars 902E 8F92 8F94 9288 |
 | 292B:0469 | 19 | likely inline | 0000:40FD, 2826:077E, 2826:0AAB (+6) |  | vars 061E 061A |
 | 292B:048F | 161 | drawing? | 0000:4DD6 |  | files faces00.cif, facesf00.cif; vars 05CA BA54 9030 |
-| 292B:0530 | 79 | game | 0000:4BD6 |  | vars 9030 |
+| 292B:0530 | 79 | game | 0000:4BD6 | eight images of the list at 7BAA drawn (FD5 flags) [drawing] | vars 9030 |
 | 29CF:060B | 69 | under a hook | 2542:056A |  | vars 8036 |
 | 29CF:0654 | 33 | game | 29CF:060B, 29CF:0650 |  |  |
 | 29CF:0675 | 4 | game | 0000:1FA2 |  |  |
@@ -999,7 +1054,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2AA1:0556 | 53 | game | 2AA1:04A5 | a bare-handed hit's damage from the gauntlets (1194:7449) and the table at 8270h [game state; ported inline: combat.rs FIST_DAMAGE, 2AA1:04A5] |  |
 | 2AA1:078E | 22 | game | 2AA1:06F6 |  |  |
 | 2B39:0004 | 6068 | drawing? | 0000:5104 |  | vars A900 A91A |
-| 2B39:17B8 | 653 | game | 0000:5104 |  | files fog.txt; vars 83AC 837A 833E 8358 |
+| 2B39:17B8 | 653 | game | 0000:5104 | a 3D object's file loaded and its points projected [renderer] | files fog.txt; vars 83AC 837A 833E 8358 |
 | 2CDD:02D5 | 27 | game | 2CDD:029B |  |  |
 | 2CDD:0635 | 35 | game | 2CDD:0604 |  |  |
 | 2CDD:0658 | 57 | likely inline | 2CDD:0604 | a value at +66 changed and clamped to the maximum at +68, which the cap overwrites [game state; ported inline: spell.rs 2CDD:0604] |  |
@@ -1013,12 +1068,12 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2DA2:092B | 36 | game | 1194:BA44 |  | vars 0610 0612 060A 0608 |
 | 2EBD:0518 | 14 | game | 2EBD:044B, 2EBD:04D6 |  |  |
 | 2F26:000E | 24 | under a hook | 21EE:0000 |  | vars 8BEC |
-| 2F26:0026 | 24 | game | 2F26:00F2 |  | vars C3DA 127C |
-| 2F26:003E | 49 | game | 2F26:00F2 |  | vars AFF9 C3DA CCBA 05DE |
+| 2F26:0026 | 24 | game | 2F26:00F2 | the CyberMan's turn (C3DA) [input hardware] | vars C3DA 127C |
+| 2F26:003E | 49 | game | 2F26:00F2 | the CyberMan's move (CCBA, 5DE) [input hardware] | vars AFF9 C3DA CCBA 05DE |
 | 2F26:006F | 30 | game | 2F26:00F2 |  | vars C3DA |
 | 2F26:008D | 28 | game | 2F26:00F2, 2F26:02A1, 2F26:0347 (+3) |  |  |
 | 2F26:00A9 | 73 | drawing | 2F26:00F2 |  | vars 8F37 A900 8F36 8F94 |
-| 2F26:00F2 | 201 | likely inline | 2826:00AD | keyboard/mouse reading (key buffer 8BEC) [input] | vars C39A 01A8 8BEC 8F36 |
+| 2F26:00F2 | 201 | likely inline | 2826:0002, 2826:0042 | keyboard/mouse reading (key buffer 8BEC) [input] | vars C39A 01A8 8BEC 8F36 |
 | 2F26:01BB | 14 | game | 2F26:003E, 2F26:006F |  | vars 05B1 |
 | 2F26:01C9 | 75 | game | 2F26:0214 |  | vars 8F30 8F31 8F32 8F33 |
 | 2F26:0214 | 141 | likely inline | 0000:38CE | key state [input] | vars 05E0 1012 8BEC 8F36 |
@@ -1027,17 +1082,16 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2F26:03ED | 16 | game | 2542:0100, 2F26:04E2, 3159:0834 |  | vars 8BEC |
 | 2F26:03FD | 72 | game | 3159:06A0 |  | vars 8F38 8BEC |
 | 2F26:0445 | 107 | game | 0000:2CFE | key handling [input] | vars 8F37 8F36 8BEC 126C |
-| 2F26:04B0 | 50 | likely inline | 2826:00AD | key handling [input] | vars 8BEC CCBA 7A46 |
+| 2F26:04B0 | 50 | likely inline | 2826:0002, 2826:0042 | key handling [input] | vars 8BEC CCBA 7A46 |
 | 2F26:04E2 | 15 | game | 0000:2CFE, 2542:000A, 2542:0100 (+2) |  |  |
 | 2F75:000A | 210 | under a hook | 2294:0700 |  | files vision.ems; vars 9030 8F4E A900 A8FE |
-| 2F75:00DC | 114 | under a hook | 2294:0700 |  | vars 8F5A 9030 EB8B EB89 |
+| 2F75:00DC | 114 | under a hook | 2294:0700, 2294:076C |  | vars 8F5A 9030 EB8B EB89 |
 | 2F75:014E | 203 | under a hook | 2294:0700 |  | files vision.ems; vars 9030 8F4E 8F41 EB8B |
 | 2F75:0219 | 38 | under a hook | 1194:D45D |  |  |
 | 2F75:023F | 98 | under a hook | 2F75:000A, 2F75:00DC |  | vars 8F5C 8F48 9030 |
 | 2F9F:000D | 17 | game | 2294:04F5 |  | vars EB00 EB93 |
 | 2F9F:0364 | 212 | under a hook | 1194:066A |  | vars EB95 EB91 8F64 8F62 |
 | 2F9F:04A0 | 108 | under a hook | 0000:102E, 21EE:01ED |  | vars 8F5E 8F60 8F62 8F64 |
-| 3159:0006 | 6 | likely inline | 1194:1AC6, 1194:1CF0, 1194:28F6 (+4) |  | vars B7C4 |
 | 3159:000C | 231 | drawing? | 1194:27C2, 222C:020A, 26F7:0000 (+1) |  | vars B7C4 |
 | 3159:00F3 | 126 | under a hook | 3159:000C |  | vars AFF9 B7C6 B7C4 B7D4 |
 | 3159:0171 | 41 | under a hook | 3159:000C, 3159:00F3 |  | vars B7CE B7D4 B7C6 |

@@ -103,6 +103,26 @@ NOTES = {
     '2CDD:0658': 'a value at +66 changed and clamped to the maximum at +68, which the cap overwrites [game state; ported inline: spell.rs 2CDD:0604]',
     '2CDD:0691': 'the same for another pair [game state; ported inline: spell.rs 2CDD:0604]',
     '2CDD:06CC': 'the same for another pair [game state; ported inline: spell.rs 2CDD:0604]',
+    # Classified by hand in the triage after the first audit.
+    '0000:85AE': "the 3D polygon set-up: points projected (AF7F..AF85), outcodes, then the clipper [renderer]",
+    '0000:8755': "a polygon clipped against one plane (Sutherland-Hodgman over AF74/AF78/AF7A, outcodes AF76/AF77) [renderer]",
+    '0000:8950': "a point's outcode against the view's planes [renderer]",
+    '0000:4D2F': "the keys held (652, 12 of them) drawn as icons [drawing]",
+    '0000:A561': "the renderer's buffers allocated (CD86, CD82, CD7E, CD76/CD7A) and its set-up (AAA2) [renderer]",
+    '0000:3796': "the automap's centre (126C/126E) kept inside the map (C357/C359) [UI: automap screen 0000:2CFE]",
+    '0000:B5A5': "a quad's corners flagged inside a rectangle (+12h bits F000h) [renderer]",
+    '292B:0530': "eight images of the list at 7BAA drawn (FD5 flags) [drawing]",
+    '242A:0031': "CITYDATA's province records checked; a bad one shows the text at 4A1E [I/O check]",
+    '0000:6D76': "the formatter's fraction digits (three, after a '.') [text formatting]",
+    '1194:E539': "a place's name: the name list 3276:3CB6 then a suffix [game text; ported inline: talk.rs names_a]",
+    '2B39:17B8': "a 3D object's file loaded and its points projected [renderer]",
+    '2F26:0026': "the CyberMan's turn (C3DA) [input hardware]",
+    '2F26:003E': "the CyberMan's move (CCBA, 5DE) [input hardware]",
+    '0000:98A0': "a text's lines laid out (colour codes 0Ch, tabs 09h) [text drawing]",
+    '1194:A206': "the logbook's quest lines listed (records at 0DCA, 0E6E) [UI]",
+    '0000:CD6C': "a door's wall drawn (C398 bit 1000h set for the hit test near the player) [renderer]",
+    '0000:DDAA': "a sprite's shading row from the lights near it (A836) [renderer]",
+    '1194:1988': "the character sheet's status texts [UI]",
 }
 DATA = 0x3276
 
