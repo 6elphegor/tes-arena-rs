@@ -1,5 +1,6 @@
-//! Haggling over a price (1194:8020), for buying (modes 1 and 2) and
-//! selling (mode 4).
+//! Haggling over a price (1194:8020), for buying (modes 1 and 2),
+//! selling (mode 4) and the main quest's informant (modes 5 and 6, his
+//! price for the way: 0FEE).
 //!
 //! The shopkeeper starts at the asking price and has a limit: for a
 //! purchase the lowest price they will take, for a sale the most they
@@ -16,10 +17,22 @@
 //! the current price as the result (1194:84F1). The player's answers come
 //! from a `HaggleIo`.
 //!
+//! With the informant (modes 5, 6) the price is paid at once from the
+//! player's gold (05C2), before the confirmation, which always agrees;
+//! too little gold is no deal. His price follows the haggle (0FEE), and
+//! 0FE6 bit 0 says a price was named (83E4). His lines are line
+//! step * 15 + kind * 3 (+ a d3 but for the confirmation) of the
+//! dialogue file, the step the main quest's (0FDD), put through the
+//! text's substitutions (2DA2:000A) rather than the %mm scan.
+//!
+//! Every counter-offer's menu (8575) sets 0FE6 bit 0, and every message
+//! (862E) the text colour 9288 to 3Ch, in all modes.
+//!
 //! Bugs kept: selling never reaches its acceptance roll (`and ax,ax`
 //! clears carry before a carry test); accepting the first price returns
 //! DGROUP 65B8 as left by an earlier haggle; an asking price equal to the
-//! limit divides by zero.
+//! limit divides by zero; the informant is paid before the player
+//! confirms, and a refusal then keeps the gold.
 
 use crate::bsa::Files;
 use crate::dice::roll;
@@ -54,6 +67,15 @@ pub mod var {
     pub const TYPED: u16 = 0x6599;
     pub const TYPED_VALUE: u16 = 0x1044;
     pub const AGREED: u16 = 0x1391;
+    /// The player's gold, the informant's flags and price, the main
+    /// quest's step (his lines), the text colour.
+    pub const GOLD: u16 = 0x05C2;
+    pub const QUEST_FLAGS: u16 = 0x0FE6;
+    pub const QUEST_PRICE: u16 = 0x0FEE;
+    pub const QUEST_STEP: u16 = 0x0FDD;
+    pub const COLOUR: u16 = 0x9288;
+    /// The line read (and, for the informant, substituted).
+    pub const LINE: u16 = 0x929E;
 }
 use var::*;
 
@@ -68,6 +90,28 @@ pub trait HaggleIo {
     fn menu(&mut self) -> Option<u16>;
     fn text(&mut self) -> Option<Vec<u8>>;
     fn key(&mut self) -> Option<()>;
+    /// 2DA2:000A: the informant's line at DS:`di` has its codes
+    /// substituted (the text port, `Machine::expand`).
+    fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
+        m.expand(files, &mut crate::text::NoTextHooks, DS, di).map(|_| ())
+    }
+}
+
+/// A player who walks away: the menus left (2), no offer typed, keys
+/// pressed. For where no one answers (a front end's hooks answer for
+/// the player).
+pub struct Leave;
+
+impl HaggleIo for Leave {
+    fn menu(&mut self) -> Option<u16> {
+        Some(2)
+    }
+    fn text(&mut self) -> Option<Vec<u8>> {
+        Some(Vec::new())
+    }
+    fn key(&mut self) -> Option<()> {
+        Some(())
+    }
 }
 
 /// The result: a deal at a price (EAX with carry clear), or none (carry
@@ -81,11 +125,11 @@ pub enum Haggle {
 impl Machine {
     /// 1194:8020. Haggles over `price` with the player's personality
     /// `per` (0..100, as 1194:5B07 gives it), the shop's `quality` and
-    /// `mood` bytes, `mode` 1, 2 (buying) or 4 (selling); `di` and `dl`
-    /// are kept for the dialogue. The dialogue file for the mode is
-    /// loaded into the buffer segment, as the original does. None for
-    /// other modes (not ported), where the original faults, or where the
-    /// player stops answering.
+    /// `mood` bytes, `mode` 1, 2 (buying), 4 (selling), 5 or 6 (the
+    /// informant); `di` and `dl` are kept for the dialogue. The dialogue
+    /// file for the mode is loaded into the buffer segment, as the
+    /// original does. None for mode 3 (not ported), where the original
+    /// faults, or where the player stops answering.
     #[allow(clippy::too_many_arguments)]
     pub fn haggle(
         &mut self,
@@ -99,7 +143,7 @@ impl Machine {
         mode: u8,
         di: u16,
     ) -> Option<Haggle> {
-        if !matches!(mode, 1 | 2 | 4) {
+        if !matches!(mode, 1 | 2 | 4 | 5 | 6) {
             return None;
         }
         self.mem.w8(DS, HALVED, 0);
@@ -130,9 +174,9 @@ impl Machine {
         self.mem.w16(DS, MOOD, ((mood as i16 - 0x80) >> 1) as u16);
 
         // The opening menu: 0 accept, 2 leave, else haggle.
-        match self.haggle_menu(io, 0)? {
-            0 => return self.haggle_accept_current(io),
-            2 => return Some(Haggle::NoDeal),
+        match self.haggle_menu(files, io, 0)? {
+            0 => return self.haggle_accept_current(files, io),
+            2 => return self.haggle_leave(files, io),
             _ => {}
         }
         loop {
@@ -176,7 +220,7 @@ impl Machine {
             // cases returning directly.
             let counter = if mode == 4 {
                 if ax <= price {
-                    return self.haggle_deal(io, ax);
+                    return self.haggle_deal(files, io, ax);
                 }
                 if ax > self.mem.r16(DS, FIRST_OFFER_2) || ax > limit {
                     false
@@ -196,7 +240,7 @@ impl Machine {
                 self.mem.w16(DS, OFFER_SEEN, ax);
                 if ax >= price {
                     self.mem.w16(DS, PRICE, ax);
-                    return self.haggle_accept_current(io);
+                    return self.haggle_accept_current(files, io);
                 }
                 if ax < limit {
                     false
@@ -211,11 +255,11 @@ impl Machine {
                     if (a as i16) <= 0 {
                         true
                     } else if a >= 0x100 {
-                        return self.haggle_deal(io, ax);
+                        return self.haggle_deal(files, io, ax);
                     } else {
                         let r = roll(&mut self.rng, 0x100)?;
                         if r <= a {
-                            return self.haggle_deal(io, ax);
+                            return self.haggle_deal(files, io, ax);
                         }
                         true
                     }
@@ -226,10 +270,10 @@ impl Machine {
                 let left = self.mem.r8(DS, ROUNDS_LEFT).wrapping_sub(1);
                 self.mem.w8(DS, ROUNDS_LEFT, left);
                 if left == 0 {
-                    self.haggle_message(io, 3)?;
-                    return Some(Haggle::NoDeal);
+                    self.haggle_message(files, io, 3)?;
+                    return self.haggle_leave(files, io);
                 }
-                self.haggle_message(io, 2)?;
+                self.haggle_message(files, io, 2)?;
                 continue;
             }
             // 822F: the counter-offer.
@@ -242,14 +286,14 @@ impl Machine {
             let next = if mode == 4 {
                 let a = bx.wrapping_sub(1);
                 if a > offer {
-                    return self.haggle_deal(io, a);
+                    return self.haggle_deal(files, io, a);
                 }
                 let a = if a == offer { a } else { a.wrapping_add(1) };
                 a.min(self.mem.r16(DS, FIRST_OFFER_2))
             } else {
                 let a = if bx > self.mem.r16(DS, LIMIT) { bx } else { mood_term.wrapping_add(bx) };
                 if a <= offer {
-                    return self.haggle_deal(io, bx);
+                    return self.haggle_deal(files, io, bx);
                 }
                 bx.max(self.mem.r16(DS, FIRST_OFFER))
             };
@@ -257,62 +301,125 @@ impl Machine {
             let left = self.mem.r8(DS, ROUNDS_LEFT).wrapping_sub(1);
             self.mem.w8(DS, ROUNDS_LEFT, left);
             if left == 0 {
-                self.haggle_message(io, 3)?;
-                return Some(Haggle::NoDeal);
+                self.haggle_message(files, io, 3)?;
+                return self.haggle_leave(files, io);
             }
-            match self.haggle_menu(io, 4)? {
-                0 => return self.haggle_accept_current(io),
-                2 => return Some(Haggle::NoDeal),
+            if matches!(mode, 5 | 6) {
+                self.mem.w16(DS, QUEST_PRICE, next);
+            }
+            // 8575: the counter-offer's menu marks a price named.
+            let f = self.mem.r8(DS, QUEST_FLAGS) | 1;
+            self.mem.w8(DS, QUEST_FLAGS, f);
+            match self.haggle_menu(files, io, 4)? {
+                0 => return self.haggle_accept_current(files, io),
+                2 => return self.haggle_leave(files, io),
                 _ => {}
             }
         }
     }
 
-    /// 1194:8349 for modes 1, 2, 4: the current price is accepted; the
-    /// first round's deal returns RESULT as it stands.
-    fn haggle_accept_current(&mut self, io: &mut impl HaggleIo) -> Option<Haggle> {
+    /// 1194:8349: the current price is accepted; the first round's deal
+    /// returns RESULT as it stands. The informant (modes 5, 6) is paid
+    /// first: with too little gold (a message, 4D31) the price is AGREED,
+    /// the round counted as 1 and no deal made (83E4 marks the price).
+    fn haggle_accept_current(&mut self, files: &mut Files, io: &mut impl HaggleIo) -> Option<Haggle> {
         let price = self.mem.r16(DS, PRICE);
+        if matches!(self.mem.r8(DS, MODE), 5 | 6) && !self.haggle_pay(price) {
+            self.mem.w32(DS, AGREED, price as u32);
+            self.mem.w8(DS, ROUND, 1);
+            self.haggle_named();
+            return Some(Haggle::NoDeal);
+        }
         if self.mem.r8(DS, ROUND) == 0 {
             self.mem.w32(DS, AGREED, price as u32);
         }
-        if self.haggle_confirm(io)? {
+        if self.haggle_confirm(files, io)? {
             Some(Haggle::Deal(self.mem.r32(DS, RESULT)))
         } else {
             Some(Haggle::NoDeal)
         }
     }
 
-    /// 1194:82E2: a deal at `ax`, if the player confirms.
-    fn haggle_deal(&mut self, io: &mut impl HaggleIo, ax: u16) -> Option<Haggle> {
+    /// 1194:82E2: a deal at `ax`, if the player confirms. The informant
+    /// takes his price (0FEE) and is paid first, as above.
+    fn haggle_deal(&mut self, files: &mut Files, io: &mut impl HaggleIo, ax: u16) -> Option<Haggle> {
         self.mem.w32(DS, AGREED, ax as u32);
         self.mem.w32(DS, RESULT, ax as u32);
         self.mem.w16(DS, PRICE, ax);
-        if self.haggle_confirm(io)? {
+        if matches!(self.mem.r8(DS, MODE), 5 | 6) {
+            self.mem.w16(DS, QUEST_PRICE, ax);
+            if !self.haggle_pay(ax) {
+                self.mem.w8(DS, ROUND, 1);
+                self.haggle_named();
+                return Some(Haggle::NoDeal);
+            }
+        }
+        if self.haggle_confirm(files, io)? {
             Some(Haggle::Deal(ax as u32))
         } else {
             Some(Haggle::NoDeal)
         }
     }
 
+    /// The gold (a dword) paid if there is enough.
+    fn haggle_pay(&mut self, price: u16) -> bool {
+        let gold = self.mem.r32(DS, GOLD);
+        if gold < price as u32 {
+            return false;
+        }
+        self.mem.w32(DS, GOLD, gold - price as u32);
+        true
+    }
+
+    /// 1194:83E4: once a round was made, 0FE6 bit 0 set and the price
+    /// kept at 0FEE; else bit 0 cleared.
+    fn haggle_named(&mut self) {
+        let f = self.mem.r8(DS, QUEST_FLAGS);
+        if self.mem.r8(DS, ROUND) != 0 {
+            self.mem.w8(DS, QUEST_FLAGS, f | 1);
+            let p = self.mem.r16(DS, PRICE);
+            self.mem.w16(DS, QUEST_PRICE, p);
+        } else {
+            self.mem.w8(DS, QUEST_FLAGS, f & 0xFE);
+        }
+    }
+
+    /// 1194:82BB: no deal; the informant (modes 5, 6) has his price
+    /// marked (83E4) and a last word (85D6).
+    fn haggle_leave(&mut self, files: &mut Files, io: &mut impl HaggleIo) -> Option<Haggle> {
+        if matches!(self.mem.r8(DS, MODE), 5 | 6) {
+            self.haggle_named();
+            self.haggle_message(files, io, 3)?;
+        }
+        Some(Haggle::NoDeal)
+    }
+
     /// 1194:858C: a message, then a menu choice. At a price of 1, a
     /// choice of 1 counts as 2 (leave).
-    fn haggle_menu(&mut self, io: &mut impl HaggleIo, kind: u8) -> Option<u16> {
+    fn haggle_menu(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<u16> {
         let one = self.mem.r16(DS, PRICE) == 1;
-        self.haggle_say(kind)?;
+        self.haggle_say(files, io, kind)?;
         let c = io.menu()?;
         Some(if one && c == 1 { 2 } else { c })
     }
 
-    /// 1194:85DE: the confirmation; true for a choice of 0.
-    fn haggle_confirm(&mut self, io: &mut impl HaggleIo) -> Option<bool> {
-        self.haggle_say(1)?;
+    /// 1194:85DE: the confirmation; true for a choice of 0. The
+    /// informant's (modes 5, 6) asks for a key (13D3 left 0) and always
+    /// agrees.
+    fn haggle_confirm(&mut self, files: &mut Files, io: &mut impl HaggleIo) -> Option<bool> {
+        self.haggle_say(files, io, 1)?;
+        if matches!(self.mem.r8(DS, MODE), 5 | 6) {
+            io.key()?;
+            return Some(true);
+        }
         Some(io.menu()? == 0)
     }
 
-    /// 1194:862E: a message (kind 2 a refusal, 3 the last one) and a
-    /// keypress.
-    fn haggle_message(&mut self, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
-        self.haggle_say(kind)?;
+    /// 1194:862E: a message (kind 2 a refusal, 3 the last one) in colour
+    /// 3Ch and a keypress.
+    fn haggle_message(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
+        self.mem.w8(DS, COLOUR, 0x3C);
+        self.haggle_say(files, io, kind)?;
         io.key()
     }
 
@@ -322,7 +429,10 @@ impl Machine {
     /// the buffer segment, where tier is quality / 20 rounded up, less 1
     /// (all in 8 bits: a quality of 0 wraps). Each "%mm" in the line puts
     /// the current price (doubled back if halved) in RESULT.
-    fn haggle_say(&mut self, kind: u8) -> Option<()> {
+    fn haggle_say(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
+        if matches!(self.mem.r8(DS, MODE), 5 | 6) {
+            return self.haggle_say_informant(files, io, kind);
+        }
         let q = self.mem.r8(DS, QUALITY);
         let tier = (q / 20 + (q % 20 != 0) as u8).wrapping_sub(1);
         let base = kind.wrapping_mul(15) as u16 + tier.wrapping_mul(3) as u16;
@@ -356,5 +466,30 @@ impl Machine {
             }
         }
         Some(())
+    }
+
+    /// 1194:83FD..8467 and 84AA for the informant (modes 5, 6): line
+    /// step * 15 (8 bits) + kind * 3 (8 bits) of the dialogue file, plus
+    /// a d3 but for the confirmation (kind 1), copied to LINE and its
+    /// codes substituted (2DA2:000A, `HaggleIo::expand`).
+    fn haggle_say_informant(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
+        let step = (self.mem.r8(DS, QUEST_STEP) as u16 * 15) & 0xFF;
+        let mut line = step.wrapping_add((kind as u16 * 3) & 0xFF);
+        if kind != 1 {
+            line = line.wrapping_add(self.rng.range(0, 3)?);
+        }
+        let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        let mut si = self.skip_strings(buf, 0, line);
+        let mut di = LINE;
+        loop {
+            let c = self.mem.r8(buf, si);
+            self.mem.w8(DS, di, c);
+            if c == 0 {
+                break;
+            }
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+        }
+        io.expand(self, files, LINE)
     }
 }

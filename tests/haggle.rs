@@ -44,6 +44,12 @@ impl HaggleIo for Script {
         self.used[2] += 1;
         Some(())
     }
+    /// The generator's stub of 2DA2:000A: counts its calls in FFE0.
+    fn expand(&mut self, m: &mut Machine, _files: &mut Files, _di: u16) -> Option<()> {
+        let v = m.mem.r16(DS, 0xFFE0).wrapping_add(1);
+        m.mem.w16(DS, 0xFFE0, v);
+        Some(())
+    }
 }
 
 #[test]
@@ -70,6 +76,9 @@ fn matches_original() {
         let mut fs = files.clone();
         m.mem.w32(DS, 0x91F6, p[6]);
         m.mem.w16(DS, 0x91F0, 0);
+        m.mem.w32(DS, 0x05C2, p[7]);
+        m.mem.w8(DS, 0x0FE6, p[8] as u8);
+        m.mem.w8(DS, 0x0FDD, p[9] as u8);
         m.load_rng();
         let got = m.haggle(&mut fs, &mut io, p[0], p[1] as u16, p[2] as u8, p[3] as u8, p[5] as u8, p[4] as u8, 0x1A4C);
         let got = match got {
@@ -80,7 +89,19 @@ fn matches_original() {
             None => panic!("port gave None\n{line}"),
             Some(r) => {
                 m.store_rng();
-                let state: Vec<u8> = [(0x1044u16, 4u16), (0x1391, 4), (0x13CA, 2), (0x6598, 0x10), (0x65AA, 0x12), (0x91F6, 4)]
+                let state: Vec<u8> = [
+                    (0x1044u16, 4u16),
+                    (0x1391, 4),
+                    (0x13CA, 2),
+                    (0x6598, 0x10),
+                    (0x65AA, 0x12),
+                    (0x91F6, 4),
+                    (0x05C2, 4),
+                    (0x0FE6, 1),
+                    (0x0FEE, 2),
+                    (0x9288, 1),
+                    (0xFFE0, 2),
+                ]
                     .iter()
                     .flat_map(|&(o, l)| (0..l).map(move |i| (o + i, ())))
                     .map(|(o, _)| m.mem.r8(DS, o))
