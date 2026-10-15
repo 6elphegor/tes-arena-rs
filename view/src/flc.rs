@@ -294,6 +294,17 @@ pub struct Movie {
     elapsed: u32,
     /// Over: a key past the text, or (no text) a key or the end.
     pub over: bool,
+    /// A still picture with its text all at once from row 32h, over the
+    /// whole picture (the ending's house, 1194:DA38..DAC2); a key ends it.
+    pub full: bool,
+}
+
+impl Flc {
+    /// A picture of one frame, 320 x 200 indices in `palette`, that never
+    /// steps.
+    pub fn still(px: Vec<u8>, palette: [[u8; 4]; 256]) -> Flc {
+        Flc { data: Vec::new(), frames: 1, speed: u32::MAX, first: 0, second: 0, at: 0, shown: 1, looped: false, px, palette }
+    }
 }
 
 /// The vision's lines a page (2294:07B8: at most 3).
@@ -303,7 +314,12 @@ impl Movie {
     /// `name` played; with `lines`, as a vision with that text.
     pub fn new(archive: &Archive, name: &str, lines: Vec<Vec<Span>>) -> Option<Movie> {
         let flc = Flc::open(archive, name)?;
-        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false })
+        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false })
+    }
+
+    /// A still picture shown with all its text (`full`).
+    pub fn still(flc: Flc, lines: Vec<Vec<Span>>) -> Movie {
+        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true }
     }
 
     /// Time passing (milliseconds): frames stepped at the file's speed. An
@@ -321,7 +337,7 @@ impl Movie {
 
     /// A key or click: the next three lines, or the end.
     pub fn key(&mut self) {
-        if self.top + VISION_LINES < self.lines.len() {
+        if !self.full && self.top + VISION_LINES < self.lines.len() {
             self.top += VISION_LINES;
         } else {
             self.over = true;
@@ -330,6 +346,21 @@ impl Movie {
 
     /// The frame, and the text's lines now in `font`.
     pub fn draw(&self, screen: &mut Screen, font: &Font) {
+        if self.full {
+            // 1194:DA91..DAC2: every line centred at x A0h from row 32h,
+            // ten apart, over the whole picture.
+            self.flc.draw(screen, H);
+            for (i, l) in self.lines.iter().enumerate() {
+                let w = font.width(&hud::plain(l)) as i32;
+                let mut x = 0xA0 - w / 2;
+                let y = 0x32 + 10 * i as i32;
+                for s in l {
+                    screen.text_plain(font, x, y, &s.text, s.colour);
+                    x += font.width(&s.text) as i32;
+                }
+            }
+            return;
+        }
         if self.lines.is_empty() {
             self.flc.draw(screen, H);
             return;

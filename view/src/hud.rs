@@ -233,6 +233,54 @@ pub struct Hud {
     pub typing: Option<(String, String)>,
     /// A status line at the bottom (the rest's hours).
     pub status: Option<String>,
+    /// The level's text shown (`level_text`): each line with its row.
+    pub level: Vec<(i32, Vec<Span>)>,
+}
+
+/// The level's text while it is shown (0000:0550, through 05B5): the text
+/// at [3D42] in the EMS frame with the level's bank (C8FE) mapped, while
+/// its time (3C82) lasts. Its lines end at a CR; a line beginning with `:`
+/// ends it (the riddle's answers follow); `%` and the three bytes after it
+/// become the name at 01AD, read in the frame's segment as the original
+/// reads it (DS is still the frame there). The first line's row is the
+/// view's bottom (C3A2) less the text's height (3D40), each next 0Ah
+/// lower, in colour F0h, centred at x A0h.
+pub fn level_text(m: &arena::machine::Machine) -> Vec<(i32, Vec<Span>)> {
+    use arena::mem::DS;
+    use arena::squares::var::{SHOWN, SHOWN_HEIGHT, SHOWN_TIME};
+    if m.mem.r8(DS, SHOWN_TIME) == 0 {
+        return Vec::new();
+    }
+    let mut c = m.clone();
+    let bank = c.mem.r8(DS, 0xC8FE) as u16;
+    c.ems_map(bank);
+    let seg = c.mem.r16(DS, 0x9030);
+    let mut si = c.mem.r16(DS, SHOWN);
+    let mut y = c.mem.r16(DS, 0xC3A2).wrapping_sub(c.mem.r16(DS, SHOWN_HEIGHT)) as i16 as i32;
+    let mut out = Vec::new();
+    let mut line = Vec::new();
+    for _ in 0..0x1000 {
+        let ch = c.mem.r8(seg, si);
+        si = si.wrapping_add(1);
+        match ch {
+            b':' if matches!(c.mem.r8(seg, si.wrapping_sub(2)), 0 | 0x0D) => return out,
+            b'%' => {
+                si = si.wrapping_add(3);
+                line.extend_from_slice(c.mem.cstr(seg, 0x01AD));
+            }
+            0 => {
+                out.extend(lines(&line, 0xF0).into_iter().map(|l| (y, l)));
+                return out;
+            }
+            0x0D => {
+                out.extend(lines(&line, 0xF0).into_iter().map(|l| (y, l)));
+                line.clear();
+                y += 0x0A;
+            }
+            _ => line.push(ch),
+        }
+    }
+    out
 }
 
 #[derive(Clone, Debug, Default)]
@@ -266,6 +314,10 @@ pub fn menu_layout(font: &Font, menu: &Menu) -> (i32, i32, i32, i32) {
 /// after the layer is cleared).
 pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
     let lh = font.h as i32 + 2;
+    for (y, l) in &hud.level {
+        let w = font.width(&plain(l)) as i32;
+        screen.spans(font, 0xA0 - w / 2, *y, l);
+    }
     if let Some(lines) = &hud.message {
         let mut y = 4;
         for l in lines {
