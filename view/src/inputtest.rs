@@ -304,6 +304,7 @@ fn shop_turn(app: &mut App, kind: u8) {
         right: false,
         drag: (0, 0),
         aspect: 1.6,
+        note: None,
     };
     app.turn(before, input, Vec::new(), true);
 }
@@ -924,4 +925,90 @@ fn each_bar_button_as_the_original_wires_it() {
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 8);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the sheet");
+}
+
+/// The notes the automap screen draws (0000:32FE), on a copy.
+fn notes_drawn(app: &App) -> Vec<(u16, u16, String)> {
+    struct Collect(Vec<(u16, u16, String)>);
+    impl arena::mapnotes::NoteHooks for Collect {
+        fn draw_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, si: u16) {
+            self.0.push((x, y, String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).into_owned()));
+        }
+    }
+    let (mut m, mut fs) = (app.engine.m.clone(), app.engine.files.clone());
+    let mut c = Collect(Vec::new());
+    m.notes_draw(&mut fs, &mut c);
+    c.0
+}
+
+/// A click on the automap's map asks for a note's text (0000:31FE); typed
+/// and Enter, the note is in the level's AUTOMAP record and drawn; a click
+/// on it again edits it; it outlives a save and a load.
+#[test]
+fn a_note_added_on_the_automap_by_a_click_and_keys() {
+    let Some(dir) = game_dir() else { return };
+    let saves = std::env::temp_dir().join(format!("arena-inputtest-notes-{}", std::process::id()));
+    std::fs::create_dir_all(&saves).unwrap();
+    let mut a = app(&dir, &Start { save_dir: Some(saves.clone()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let before = notes_drawn(&a);
+    d.key(&mut a, KeyCode::KeyM, None);
+    assert!(a.map);
+    a.compose();
+    let bare = a.screen.px.clone();
+    d.click(&mut a, 100, 100, MouseButton::Left);
+    match a.pending.as_ref().map(|p| &p.need) {
+        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        _ => panic!("a click on the map asks for the note's text"),
+    }
+    for (k, c) in [(KeyCode::KeyH, "H"), (KeyCode::KeyI, "i")] {
+        d.key(&mut a, k, Some(c));
+    }
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.pending.is_none(), "Enter answers");
+    assert!(a.map, "the automap stays up");
+    let after = notes_drawn(&a);
+    eprintln!("notes: {after:?}");
+    assert_eq!(after.len(), before.len() + 1, "one note more");
+    let note = after.iter().find(|n| n.2 == "Hi").expect("the note drawn").clone();
+    // Its square under (100, 100), as 0000:3745 places it (3 pixels a
+    // square, drawn from 3763's point).
+    assert!((note.0 as i32 - 100).abs() <= 3 && (note.1 as i32 - 100).abs() <= 3, "drawn where clicked: {note:?}");
+    // The screen draws it (FONT_S, colour 18h): the pixels at its point
+    // change.
+    a.compose();
+    let near = |px: &[[u8; 4]]| -> Vec<[u8; 4]> {
+        (0..6).flat_map(|r| (0..10).map(move |c| (note.1 as usize + r) * hud::W + note.0 as usize + c)).map(|i| px[i]).collect()
+    };
+    assert_ne!(near(&a.screen.px), near(&bare), "the note drawn on the screen");
+    // Clicked again: the note's text asked for again, now edited.
+    d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
+    assert!(a.pending.is_some(), "a click on the note edits it");
+    d.key(&mut a, KeyCode::Backspace, None);
+    d.key(&mut a, KeyCode::Backspace, None);
+    d.key(&mut a, KeyCode::KeyX, Some("X"));
+    d.key(&mut a, KeyCode::Enter, None);
+    let edited = notes_drawn(&a);
+    assert_eq!(edited.len(), after.len(), "edited, not added");
+    assert!(edited.iter().any(|n| n.2 == "X") && !edited.iter().any(|n| n.2 == "Hi"), "{edited:?}");
+    // Saved, the map left, loaded: still there.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.key(&mut a, KeyCode::F5, None);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // Changed after the save (Y), then loaded: X again.
+    let x = edited.iter().find(|n| n.2 == "X").unwrap().clone();
+    d.key(&mut a, KeyCode::KeyM, None);
+    d.click(&mut a, x.0 as i32 + 1, x.1 as i32 + 1, MouseButton::Left);
+    d.key(&mut a, KeyCode::Backspace, None);
+    d.key(&mut a, KeyCode::KeyY, Some("Y"));
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(notes_drawn(&a).iter().any(|n| n.2 == "Y"), "changed after the save");
+    d.key(&mut a, KeyCode::Escape, None);
+    d.key(&mut a, KeyCode::F9, None);
+    let loaded = notes_drawn(&a);
+    assert!(loaded.iter().any(|n| n.2 == "X") && !loaded.iter().any(|n| n.2 == "Y"), "the save's note loaded back: {loaded:?}");
+    let _ = std::fs::remove_dir_all(&saves);
 }

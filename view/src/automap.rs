@@ -259,3 +259,49 @@ pub fn draw(screen: &mut hud::Screen, m: &Machine) {
         }
     }
 }
+
+thread_local! {
+    /// The heap block FONT_S.DAT was put in for the engine (freed when the
+    /// screen opens again).
+    static FONT_BLOCK: std::cell::Cell<Option<u16>> = const { std::cell::Cell::new(None) };
+}
+
+/// The automap screen's font made the current one, as the screen does
+/// (0000:2D66 loads FONT_S.DAT whole into a segment, 7508; its redraw
+/// selects it, 3035 calling 9AEA, which sets the far pointer B034's
+/// segment): the file put in a heap block of the engine's, so the notes'
+/// hit test (0000:66F6's widths) measures as the original's does.
+pub fn select_font(m: &mut Machine, archive: &crate::archive::Archive) {
+    let Some(d) = archive.read("FONT_S.DAT") else { return };
+    if let Some(old) = FONT_BLOCK.with(|c| c.take()) {
+        m.heap_free(old);
+    }
+    let paras = (d.len().div_ceil(16)).min(0xFFFF) as u16;
+    let Some((seg, _)) = m.heap_alloc(paras) else { return };
+    for (i, &b) in d.iter().enumerate().take(0xFFFF) {
+        m.mem.w8(seg, i as u16, b);
+    }
+    m.mem.w16(DS, arena::mapnotes::var::FONT, 0);
+    m.mem.w16(DS, arena::mapnotes::var::FONT + 2, seg);
+    FONT_BLOCK.with(|c| c.set(Some(seg)));
+}
+
+/// The notes over the automap screen (0000:32FE, `notes_draw`, run on a
+/// copy: it reads the file and moves its state), each text at its point
+/// in colour 18h, in FONT_S.
+pub fn draw_notes(screen: &mut hud::Screen, engine: &arena::engine::Engine) {
+    struct Collect(Vec<(u16, u16, String)>);
+    impl arena::mapnotes::NoteHooks for Collect {
+        fn draw_text(&mut self, m: &mut Machine, x: u16, y: u16, si: u16) {
+            self.0.push((x, y, String::from_utf8_lossy(m.mem.cstr(DS, si)).into_owned()));
+        }
+    }
+    let Some(pics) = crate::sheets::loaded() else { return };
+    let Some(f) = pics.small.as_ref().or(pics.teeny.as_ref()) else { return };
+    let (mut m, mut fs) = (engine.m.clone(), engine.files.clone());
+    let mut c = Collect(Vec::new());
+    m.notes_draw(&mut fs, &mut c);
+    for (x, y, t) in c.0 {
+        screen.text_plain(f, x as i16 as i32, y as i16 as i32, &t, 0x18);
+    }
+}

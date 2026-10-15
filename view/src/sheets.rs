@@ -41,6 +41,8 @@ pub struct Pics {
     pub arena: Option<Font>,
     pub teeny: Option<Font>,
     pub font_a: Option<Font>,
+    /// FONT_S.DAT, the automap's (its notes).
+    pub small: Option<Font>,
 }
 
 thread_local! {
@@ -77,6 +79,7 @@ pub fn pics(archive: &Archive, m: &Machine) -> Rc<Pics> {
                     arena: Font::load(archive, "ARENAFNT.DAT"),
                     teeny: Font::load(archive, "TEENYFNT.DAT"),
                     font_a: Font::load(archive, "FONT_A.DAT"),
+                    small: Font::load(archive, "FONT_S.DAT"),
                 })
             })
             .clone()
