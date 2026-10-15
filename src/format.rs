@@ -49,8 +49,18 @@ impl Machine {
                 b'%' => {
                     let spec = self.mem.r8(fseg, p);
                     p = p.wrapping_add(1);
+                    // 0000:8D97: `%%` writes a percent sign and takes no
+                    // argument; a conversion the formatter doesn't know
+                    // (8E39..8E6B: neither d, i, u, x, X, f, c, s nor l)
+                    // writes nothing and takes none either.
+                    if spec == b'%' {
+                        put(self, b'%', false);
+                        continue;
+                    }
+                    if !matches!(spec, b'd' | b'i' | b'u' | b'x' | b'X' | b'f' | b'c' | b's' | b'l') {
+                        continue;
+                    }
                     match (spec, args.next()) {
-                        (b'%', _) => put(self, b'%', false),
                         (b's', Some(&Arg::Str(aseg, mut q))) => loop {
                             let c = self.mem.r8(aseg, q);
                             if c == 0 {
@@ -110,6 +120,8 @@ impl Machine {
                                 q = q.wrapping_add(1);
                             }
                         }
+                        // 0000:8DEF: `%c`, the word's low byte.
+                        (b'c', Some(&Arg::Int(v))) => put(self, v as u8, false),
                         (s, a) => unimplemented!("sprintf %{} with {a:?}", s as char),
                     }
                 }

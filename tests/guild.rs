@@ -130,8 +130,9 @@ impl GuildHooks for Script {
         self.log.extend([17, b as u32, x as u32, y as u32]);
         (b, x, y)
     }
-    fn spellmaker(&mut self, _m: &mut Machine) {
+    fn spellmaker(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(18);
+        Some(())
     }
 }
 

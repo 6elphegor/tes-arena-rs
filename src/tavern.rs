@@ -92,8 +92,29 @@ pub trait TavernHooks: ShopHooks {
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
         m.tavern_room_haggle(files, &mut crate::haggle::Leave)
     }
-    /// 1194:E3F7: the rumours.
-    fn rumours(&mut self, _m: &mut Machine) {}
+    /// 1194:E3F7: the rumours told by the front end instead: whether it
+    /// did. By default the port (`Machine::tavern_rumours`) runs, its
+    /// menu and boxes through these hooks.
+    fn rumours(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
+        Some(false)
+    }
+    /// 1194:A374 (mode `mode`, into 1044) done by the front end instead:
+    /// whether it was. By default the text port runs.
+    fn text(&mut self, _m: &mut Machine, _files: &mut Files, _mode: u16) -> Option<bool> {
+        Some(false)
+    }
+}
+
+/// The text's own boxes and menus through the tavern's hooks.
+struct TavernText<'a>(&'a mut dyn TavernHooks);
+
+impl crate::text::TextHooks for TavernText<'_> {
+    fn message_box(&mut self, m: &mut Machine, si: u16) {
+        self.0.message_box(m, si);
+    }
+    fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
+        self.0.menu(m, si, bx, di)
+    }
 }
 
 /// `TavernHooks` that do nothing: every menu left at once.
@@ -227,11 +248,75 @@ impl Machine {
             }
             0xBC99 => self.tavern_sneak(hooks),
             0xBD4C => {
-                hooks.rumours(self);
+                if !hooks.rumours(self, files)? {
+                    self.tavern_rumours(files, hooks)?;
+                }
                 Some(false)
             }
             _ => None,
         }
+    }
+
+    /// 1194:E3F7. The rumours: the menu "Rumor Type" (general, work; the
+    /// seed taken from 151 first). General: by the parity of the clock's
+    /// low word plus the player's x (C3D0), over 8 (the low byte's bits
+    /// even), the quest being told (F3E +4 bits 6-7) says where it stands
+    /// (A1h + its kind, +4 bits 9-11) and the record is cleared (34h
+    /// bytes), or nothing is heard (B9h); odd, a plain "nothing" (9Fh,
+    /// colour C0h first). Work: the first of the four quests from E6E in
+    /// state 2 (+4 bits 6-7) is told of (C5h + its kind), else C4h. Each
+    /// text through 1194:E4E3 (`tavern_say`). None where the text fails.
+    pub fn tavern_rumours(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
+        self.mem.w32(DS, 0x91F6, self.mem.r16(DS, 0x0151) as u32);
+        self.load_rng();
+        let ax = hooks.menu(self, 0x857B, 0x8589, 0x858C);
+        let clock = self.mem.r32(DS, 0x05CC);
+        let bx = ((clock as u16).wrapping_add(self.mem.r16(DS, 0xC3D0)) >> 3) as u8;
+        if (ax as i16) < 0 {
+            return Some(());
+        }
+        if ax == 0 {
+            if bx.count_ones() % 2 != 0 {
+                self.mem.w8(DS, 0x9288, 0xC0);
+                return self.tavern_say(files, hooks, 0x9F);
+            }
+            let q = self.mem.r16(DS, 0x0F3E + 4);
+            if (q & 0xC0) >> 6 == 0 {
+                return self.tavern_say(files, hooks, 0xB9);
+            }
+            self.mem.w8(DS, 0x9288, 0x60);
+            self.tavern_say(files, hooks, ((q & 0xE00) >> 9).wrapping_add(0xA1))?;
+            for i in 0..0x34u16 {
+                self.mem.w8(DS, 0x0F3E + i, 0);
+            }
+            return Some(());
+        }
+        let mut si = 0x0E6Eu16;
+        for _ in 0..4 {
+            let w = self.mem.r16(DS, si.wrapping_add(4));
+            if (w & 0xC0) >> 6 == 2 {
+                return self.tavern_say(files, hooks, ((w & 0xE00) >> 9).wrapping_add(0xC5));
+            }
+            si = si.wrapping_add(0x34);
+        }
+        self.tavern_say(files, hooks, 0xC4)
+    }
+
+    /// 1194:E4E3. Text `ax` said in a box: the font (B038) from 1036, the
+    /// text (1194:A374, mode 2, no wrap width, substituted) into 1044,
+    /// then the box in colour 60h.
+    fn tavern_say(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks, ax: u16) -> Option<()> {
+        self.mem.w16(DS, 0x137A, ax);
+        let f = self.mem.r16(DS, 0x1036);
+        self.mem.w16(DS, 0xB038, f);
+        self.mem.w8(DS, 0x137E, 0);
+        self.mem.w8(DS, 0x101C, 0);
+        if !hooks.text(self, files, 2)? {
+            self.text(files, &mut TavernText(hooks), 2, DS, 0x1044)?;
+        }
+        self.mem.w8(DS, 0x9288, 0x60);
+        hooks.message_box(self, 0x1044);
+        Some(())
     }
 
     /// The price of the drink at `i` in the drinks listed (a holiday's,
