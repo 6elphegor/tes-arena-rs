@@ -1440,6 +1440,8 @@ struct Shot {
     /// the cursor last was.
     travel: Option<travel::Travel>,
     cursor: (i32, i32),
+    /// A click on the automap screen's map for the next turn (a note).
+    note: Option<(u16, u16)>,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
@@ -1460,7 +1462,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         right: std::mem::take(&mut st.right),
         drag: std::mem::take(&mut st.drag),
         aspect: 1.6,
-        note: None,
+        note: st.note.take(),
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     st.audio.before(&mut engine.m);
@@ -1524,7 +1526,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100) };
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };

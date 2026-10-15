@@ -62,26 +62,73 @@ fn kept(engine: &Engine) -> (Vec<u8>, u16, u16, u16, u16) {
     (engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME).to_vec(), r(X), r(Y), r(HEIGHT), r(HEADING))
 }
 
-/// The odd states looked for after each turn.
-fn odd(engine: &Engine) -> Option<String> {
-    let r = |at| engine.m.mem.r16(DS, at);
-    let (w, d) = (r(0xC357), r(0xC359));
-    let (col, row) = (r(X) >> 7, r(Y) >> 7);
-    if w != 0 && d != 0 && (col >= w || row >= d) {
-        return Some(format!("off the map: square ({col}, {row}) of {w} x {d}"));
-    }
-    let h = r(HEIGHT) as i16;
-    if !(-200..=2000).contains(&h) {
-        return Some(format!("height {h}"));
-    }
-    // DGROUP's constant file names stay as the image has them: the text
-    // system's POINTER1.DAT (197F) and TEMPLATE.DAT (6E57).
-    for (at, name) in [(0x197Fu16, &b"pointer1.dat"[..]), (0x6E57, b"template.dat")] {
-        if engine.m.mem.cstr(DS, at) != name {
-            return Some(format!("DGROUP {at:04X} overwritten: {:?}", String::from_utf8_lossy(engine.m.mem.cstr(DS, at))));
+/// The odd states looked for after each turn, and round 3's invariants:
+/// the heap's chain whole (`heap_check`), the EMS bank mapped one there
+/// is (EMS_MAPPED a page times 4, below EMS_PAGES), the text system's
+/// nesting back where it rests between turns (LEVEL, SUB_LEVEL: a text
+/// given up mid-way once left them raised and the next ran over DGROUP),
+/// and the game's dice moving (the seed not the same for 2000 turns).
+struct Watch {
+    text_level: u8,
+    sub_level: u8,
+    seed: u32,
+    same: usize,
+}
+
+impl Watch {
+    fn new(engine: &Engine) -> Watch {
+        Watch {
+            text_level: engine.m.mem.r8(DS, arena::text::var::LEVEL),
+            sub_level: engine.m.mem.r8(arena::mem::DATA, arena::text::var::SUB_LEVEL),
+            seed: engine.m.rng.seed,
+            same: 0,
         }
     }
-    None
+
+    fn check(&mut self, engine: &Engine) -> Option<String> {
+        let m = &engine.m;
+        let r = |at| m.mem.r16(DS, at);
+        let (w, d) = (r(0xC357), r(0xC359));
+        let (col, row) = (r(X) >> 7, r(Y) >> 7);
+        if w != 0 && d != 0 && (col >= w || row >= d) {
+            return Some(format!("off the map: square ({col}, {row}) of {w} x {d}"));
+        }
+        let h = r(HEIGHT) as i16;
+        if !(-200..=2000).contains(&h) {
+            return Some(format!("height {h}"));
+        }
+        // DGROUP's constant file names stay as the image has them: the text
+        // system's POINTER1.DAT (197F) and TEMPLATE.DAT (6E57).
+        for (at, name) in [(0x197Fu16, &b"pointer1.dat"[..]), (0x6E57, b"template.dat")] {
+            if m.mem.cstr(DS, at) != name {
+                return Some(format!("DGROUP {at:04X} overwritten: {:?}", String::from_utf8_lossy(m.mem.cstr(DS, at))));
+            }
+        }
+        if !m.heap_check() {
+            return Some("the heap's chain broken (heap_check)".into());
+        }
+        use arena::level::var::{EMS_MAPPED, EMS_ON, EMS_PAGES};
+        if m.mem.r8(DS, EMS_ON) != 0 {
+            let mapped = r(EMS_MAPPED);
+            if mapped & 3 != 0 || mapped >> 2 >= r(EMS_PAGES) {
+                return Some(format!("EMS mapped {mapped:#x} of {} pages", r(EMS_PAGES)));
+            }
+        }
+        let (tl, sl) = (m.mem.r8(DS, arena::text::var::LEVEL), m.mem.r8(arena::mem::DATA, arena::text::var::SUB_LEVEL));
+        if (tl, sl) != (self.text_level, self.sub_level) {
+            return Some(format!("text nesting left at {tl}, substitutions at {sl} (rest {}, {})", self.text_level, self.sub_level));
+        }
+        if m.rng.seed == self.seed {
+            self.same += 1;
+            if self.same >= 2000 {
+                return Some(format!("the dice stuck: seed {:#x} for {} turns", self.seed, self.same));
+            }
+        } else {
+            self.seed = m.rng.seed;
+            self.same = 0;
+        }
+        None
+    }
 }
 
 /// What a turn of the policy does.
@@ -114,6 +161,16 @@ enum Act {
     /// The healing aid off, a fight summoned at 1 health: death, then the
     /// last save loaded back.
     Die,
+    /// Round 3: the travel map opened (as Shift+M does), now and then the
+    /// world map and another province, a place clicked and Travel: a
+    /// journey when the click named one, the screen left otherwise.
+    Travel,
+    /// A button of the bar clicked (the automap, the status box, the
+    /// logbook, the sheet, camping...), the automap's buttons pressed.
+    Screens,
+    /// The automap opened and a note begun where a click falls, its text
+    /// typed from the answers.
+    Note,
 }
 
 /// The squares of the walls plane whose word `pred` takes, each with an
@@ -178,6 +235,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         ui: None,
         travel: None,
         cursor: (160, 100),
+        note: None,
     };
     let mut dice = Dice(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     // Round 2's targeted acts (PT_TOURS=N: N% of the acts, 30 when not a
@@ -194,6 +252,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     };
     let issues = std::cell::Cell::new(0usize);
     let mut last_odd = None;
+    let mut watch: Option<Watch> = None;
     // One turn, caught: Some(true) on, Some(false) stopped (reported).
     let mut turn = |engine: &mut Engine, st: &mut Shot, run: &mut arena::transit::Run, intent: Intent, what: &str, n: usize| -> bool {
         let t = Instant::now();
@@ -219,7 +278,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 return false;
             }
         }
-        if let Some(o) = odd(engine) {
+        let w = watch.get_or_insert_with(|| Watch::new(engine));
+        if let Some(o) = w.check(engine) {
             if last_odd.as_ref() != Some(&o) {
                 println!("ODD frame {n} ({what}): {o}; {}", place(engine, run));
                 issues.set(issues.get() + 1);
@@ -290,7 +350,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if left == 0 {
             left = 5 + dice.below(40) as usize;
             act = if tours && dice.below(100) < tours_pc {
-                match dice.below(18) {
+                match dice.below(22) {
                     0..=3 => Act::Door,
                     4..=5 => Act::Stairs,
                     6..=8 => Act::Talk,
@@ -299,6 +359,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     11..=12 => Act::Cast,
                     13 => Act::Xp,
                     14..=15 => Act::Items,
+                    18..=19 => Act::Travel,
+                    20 => Act::Screens,
+                    21 => Act::Note,
                     _ => Act::Die,
                 }
             } else {
@@ -314,7 +377,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 _ => Act::SaveLoad,
                 }
             };
-            if let Act::Door | Act::Stairs | Act::Talk | Act::Shop(_) | Act::Quest | Act::Cast | Act::Xp | Act::Items | Act::Die = act {
+            if let Act::Door | Act::Stairs | Act::Talk | Act::Shop(_) | Act::Quest | Act::Cast | Act::Xp | Act::Items | Act::Die | Act::Travel | Act::Screens | Act::Note = act {
                 left = 12;
             }
         }
@@ -337,6 +400,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::Xp => "xp",
             Act::Items => "items",
             Act::Die => "die",
+            Act::Travel => "travel",
+            Act::Screens => "screens",
+            Act::Note => "note",
         };
         // A test aid, as --do hp is: the player healed when below a third,
         // so a run goes on past its fights.
@@ -555,6 +621,84 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     no_heal = 400;
                     engine.m.mem.w16(DS, 0x01FD, 1);
                     crate::world::summon(&mut engine);
+                }
+            }
+            Act::Travel => {
+                if left == 11 {
+                    use winit::keyboard::KeyCode;
+                    let archive = st.assets.archive.clone();
+                    let here = engine.m.mem.cstr(DS, 0x0A22).to_vec();
+                    match crate::travel::Travel::open(&mut engine, &archive) {
+                        Ok(mut t) => {
+                            *counts.entry("travel opened").or_default() += 1;
+                            if dice.below(3) == 0 {
+                                // The world map, and a province's region.
+                                t.key(&mut engine, KeyCode::Escape, None);
+                                let (x, y) = (dice.below(320) as i32, dice.below(200) as i32);
+                                t.click(&mut engine, &archive, x, y, false);
+                            }
+                            let (x, y) = (10 + dice.below(300) as i32, 5 + dice.below(155) as i32);
+                            t.click(&mut engine, &archive, x, y, false);
+                            t.click(&mut engine, &archive, 62, 180, false);
+                            let mut open = Some(t);
+                            let mut boxes = Vec::new();
+                            crate::travel::after(&mut open, &mut engine, &mut boxes);
+                            // No journey: the screen left as Esc leaves it.
+                            for _ in 0..4 {
+                                if let Some(t) = open.as_mut() {
+                                    t.key(&mut engine, KeyCode::Escape, None);
+                                }
+                                crate::travel::after(&mut open, &mut engine, &mut boxes);
+                            }
+                            if open.is_some() {
+                                println!("ODD frame {n} (travel): the travel map didn't end; {}", place(&engine, run));
+                                issues.set(issues.get() + 1);
+                            }
+                            if !boxes.is_empty() {
+                                st.boxes = boxes;
+                            }
+                            if engine.m.mem.cstr(DS, 0x0A22) != here {
+                                *counts.entry("journeys").or_default() += 1;
+                            }
+                        }
+                        Err(_) => *counts.entry("travel refused").or_default() += 1,
+                    }
+                }
+            }
+            Act::Screens => {
+                if left == 11 {
+                    let archive = st.assets.archive.clone();
+                    crate::sheets::pics(&archive, &engine.m);
+                    let (x, y) = crate::sheets::bar_centre(dice.below(9) as usize);
+                    match crate::sheets::bar_click(&mut engine.m, x, y, dice.below(4) == 0) {
+                        Some(crate::sheets::BarAction::Automap) => {
+                            crate::automap::open(&mut engine, &archive);
+                            for _ in 0..1 + dice.below(4) {
+                                engine.m.automap_view_button(dice.below(5) as u16);
+                                engine.m.automap_origin();
+                            }
+                            *counts.entry("automap").or_default() += 1;
+                        }
+                        Some(crate::sheets::BarAction::Status(lines)) => {
+                            st.boxes = vec![lines];
+                            *counts.entry("status").or_default() += 1;
+                        }
+                        Some(crate::sheets::BarAction::Log) => {
+                            let _ = crate::sheets::open_log(&engine.m, &engine.files);
+                            *counts.entry("logbook").or_default() += 1;
+                        }
+                        Some(crate::sheets::BarAction::Camp) => st.camp = true,
+                        _ => {}
+                    }
+                }
+            }
+            Act::Note => {
+                if left == 11 && crate::automap::notes_here(&engine.m) {
+                    let archive = st.assets.archive.clone();
+                    crate::sheets::pics(&archive, &engine.m);
+                    crate::automap::open(&mut engine, &archive);
+                    st.note = Some((dice.below(320) as u16, dice.below(150) as u16));
+                    *counts.entry("notes").or_default() += 1;
                 }
             }
             Act::SaveLoad => {
