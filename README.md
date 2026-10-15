@@ -73,7 +73,8 @@ Options:
 | `--do STEPS` | scripted steps before the shot (below) |
 | `--picks A,B,..` | answers to the game's questions in order: a menu's entry by number, `tTEXT` typed text, `cX:Y` a click; after them a question is left as Esc leaves it |
 | `--spellmaker SCRIPT` | with `--do spellmaker`: the spellmaker's clicks (`name`, `effects`, `target`, `element`, `new`, `buy`, `exit`, `up:I`, `down:I`, `done`, `show`, `pick:N`, `type:TEXT`) |
-| `--playtest SEED FRAMES [SETUP]` | a headless playtest: a seeded random policy plays FRAMES turns and reports every turn that fails |
+| `--playtest SEED FRAMES [SETUP]` | a headless playtest: a seeded random policy plays FRAMES turns and reports every turn that fails (`PT_TOURS=N`: N% of the turns given to targeted acts — doors, stairs, shops, errands, spells, items, dying and reloading; `PT_TRACE=1` names each turn on stderr) |
+| `--bench TURNS [SETUP]` | the window's turns and redraws run headless and timed; `ARENA_PROFILE=1` adds named timers |
 | `--mute`, `--no-music`, `--sound-log` | no sound at all; no music (no music driver loaded, as "No Music"); print each sound and song instead of or as well as playing it |
 
 `--do` steps (comma-separated): `click`, `turn:N`, `walk:N`, `wait:N`,
@@ -81,20 +82,28 @@ Options:
 `ready`, `compass`, `swing:DX:DY` (a right-button drag; a swing needs 40h
 mickeys or more), `cast:N`, `storm:N` (frames until the lightning flashes),
 `inv`, `equip:N`, `select:N`, `drop`, `usable`, `use:N`, `spells`, `book`,
-`spell:N`, `close`, `clickat:X:Y`, `map`, `shop:KIND`, `quest`,
-`movie:NAME[:TEXT]`, `spellmaker`, `ui:TOKEN`; and debugging aids `give:N`,
-`learn:N`, `sp:N`, `gold:N`, `hp:N`, `day:N`, `wear:N`, `class:N`,
-`corpse`, `fatigue:N`, `xp:N`. `view/src/main.rs`'s module docs describe
-each.
+`spell:N`, `close`, `clickat:X:Y`, `map`, `mapbtn:N` (the automap's
+buttons), `sheet`, `page` (the sheet's equipment page), `log`, `nextpage`,
+`bar:N` (the interface bar's button N), `travel`, `tclick:X:Y`, `tkey:K`
+(the travel map), `shop:KIND`, `quest`, `mq` (the main quest's state
+printed), `movie:NAME[:TEXT[:COLOUR]]`, `spellmaker`, `ui:TOKEN` (and
+`ui:ms:N`); and debugging aids `give:N`, `learn:N`, `sp:N`, `gold:N`,
+`hp:N`, `day:N`, `mday:N`, `material:N`, `wear:N`, `class:N`, `corpse`,
+`fatigue:N`, `xp:N`. `view/src/main.rs` describes each where it parses
+it.
 
 Keys in the window: W/S or Up/Down walk, A/D strafe, Left/Right turn, the
 mouse turns (click to capture, Esc releases); Space jumps (Shift: a running
 jump); E or a captured click clicks the view's centre; Q readies the weapon
-and a right-button drag swings it; I the inventory, C the spellbook, M the
-automap, R camps, F5 saves, F9 loads, F2/F3 the game's keys, F8 the
-compass, F a random encounter, P people. Menus take arrows and Enter, an
-entry's letter or number, or a click; Esc leaves them. While the game waits
-for an answer no game time passes.
+and a right-button drag swings it; I the inventory (a click equips, a right
+click selects, D drops, U uses), C the spellbook, K the character sheet (N
+its equipment page), L the logbook, M the automap (arrows and Home move it,
+a click places or edits a note), Shift+M the travel map, R camps, F5 saves,
+F9 loads, F2/F3 the game's keys, F8 the compass, F a random encounter, P
+people. The interface bar's nine buttons work as the original's (the map
+button's right click is the travel map). Menus take arrows and Enter, an
+entry's letter or number, a click, or the mouse wheel; Esc leaves them.
+While the game waits for an answer no game time passes.
 
 Sound plays through PulseAudio, opened at run time (nothing plays without
 it). Music plays on an emulated OPL3 with the game's own timbres
@@ -102,7 +111,9 @@ it). Music plays on an emulated OPL3 with the game's own timbres
 
 The `examples/` of both crates are smaller tools (maps of cities, dungeons
 and the wilderness, the character sheet of a save, quests made in a town,
-and so on); each one's header says how to run it.
+and so on); each one's header says how to run it. `view/examples/mainquest.rs`
+walks the main quest through the game's own routines, from a new game and
+from a copy of a save.
 
 ## How the port is verified
 
@@ -140,6 +151,22 @@ The tests that need the game read `ARENA_EXE` (or `../ESarena/ACD.EXE`) and
 **skip silently** when it is missing; those that need a save read
 `ARENA_SAVE`. In a git worktree `../ESarena` doesn't exist, so set both.
 
+Beyond the vectors:
+
+- `view/src/inputtest.rs` drives the window's input (`App::input`, `App::tick`)
+  without a window and compares each action with the scripted path
+  (`cargo test --release` in `view/`, with `ARENA_EXE` set).
+- `--playtest` and `view/examples/mainquest.rs` play long sessions and the
+  quest chain; they found the integration bugs the per-routine vectors
+  can't (two ports meeting, the view's use of them).
+- A port that gives up (`None`) between changing global state and
+  restoring it must leave what the original's exit leaves (a bank mapped
+  back, a seed, a nesting counter, a heap block freed): the original never
+  takes that exit, so no vector shows it. Each such guard has a test that
+  forces the `None`.
+- `tools/coverage.py` builds the original's call graph and compares it with
+  the addresses the port's docs name (`docs/COVERAGE.md`).
+
 Porting a routine: disassemble it, port it with explicit 16-bit arithmetic
 (`wrapping_*`, exact widths) and the original's bugs, keep state in memory
 at the original's addresses where it isn't understood, write a generator and
@@ -168,25 +195,30 @@ image-relative segment:offset in the unpacked ACD.EXE.
 - **Core:** `exe` (unpacking), `mem` (flat real-mode memory, the image at
   linear 0), `heap` (the game's heap), `random` (0000:6E10..6EEA), `dice`,
   `scale`, `format` (sprintf 0000:8D14), `hooks` (the segment-0000 hooks the
-  3D mode installs).
+  3D mode installs, the indoor entry 0000:4767).
 - **Files:** `bsa` (GLOBAL.BSA and loose files, 0000:67C4..6F87; files the
   game writes are kept in memory), `mif` (.MIF levels, the LZHUF
   decompressor, city blocks), `level` (0000:E87C), `info` (the .INF loader
   0000:EC03), `save`, `load` (25FD), `save_write` (25FD:0113),
-  `automap` (0000:3491, 3503, 386F; 23F1:013C).
+  `automap` (0000:3491, 3503, 386F; 23F1:013C), `mapdraw` (the automap's
+  squares, 0000:2F10), `mapnotes` (its notes, 0000:31FE..347F).
 - **Characters and items:** `character`, `progression` (2686),
   `newgame` (creation, 1194:24A6..2D28, 222C; set-up 21EE:016C), `levelup`
   (1194:1034, exhaustion 2901:0014), `item`, `inventory`, `use_item`
   (24FA:07CD, 29CF:07C3, 1194:1AFB/7605/18F6), `loot`, `shop`, `outfit`,
-  `names` (1194:080B), `effects` (2EBD), `rest` (1194:424E, 2901:016C).
+  `names` (1194:080B), `effects` (2EBD), `rest` (1194:424E, 2901:016C),
+  `status` (the bar's buttons and the status box, 2542, 2686:005E).
 - **The world:** `engine` (the world loop 0000:A240), `frame` (0000:481E),
   `movement` (0000:F478..FD00), `controls` (2826:0002), `steps`
   (0000:FCF6), `squares` (0000:D3A0, 0628, 06BE), `click` (2826:077E),
   `trigger` (0000:43B1), `transit` (the outer loop 0000:0CAD, area runs,
   2294:025B), `city` (1194:0292), `cityinfo` (1194:3EBF), `dungeon`, `wild`
-  (217B), `travel` (1194:2E69), `clock` (0000:142D), `weather` (0000:0F05,
+  (217B), `travel` (1194:2E69), `travelmap` (26F7: a destination and the
+  journey), `mapscreen` (the travel map's screen, 2542:03DC, 26F7:0000),
+  `clock` (0000:142D), `weather` (0000:0F05,
   2294:0B01), `light` (0000:B6EB, 0390), `sky` (2294:0341), `skyobj`
-  (2294:08B9, 0A5D, 0000:E5C9).
+  (2294:08B9, 0A5D, 0000:E5C9), `celestial` (the stars, sun and moons,
+  0000:E41A).
 - **People and fights:** `actors` (0000:1854), `creature`, `encounter`
   (25CA, 1194:887A, 86F2, D91C), `combat`, `attack` (2AA1:00D8), `strike`
   (0000:3B6D), `weapon` (0000:38CE), `cast` (29CF:071F), `spell`
@@ -213,28 +245,62 @@ original's screens and questions.
 - `hud` (texts in the game's font), `dialog` (answers to the game's
   questions, by replaying a turn), `interface` (the bar, portrait, bars,
   compass, weapon, casting hands), `panels` (inventory, spellbook, loot),
-  `doll` (the paper doll), `automap`, `shopui`, `questui`, `spellmaker`.
+  `doll` (the paper doll), `sheets` (the character sheet, the logbook, the
+  bar's buttons), `automap`, `travel` (the travel and world maps), `shopui`,
+  `questui`, `spellmaker`.
 - `flc` (the game's FLC animations), `audio` (VOC sounds through
   PulseAudio), `music` (XMIDI on an emulated OPL3).
+- `inputtest` (the window's input tested headless), `bench` and `prof`
+  (timing).
+
+## How much is ported
+
+`docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
+reachable routines against the addresses the port names. At the time of
+writing: 2254 reachable routines (189,693 bytes); 1382 ported in whole or
+part (122,085 bytes); 64 left to the front end as hooks and 69 that the
+view re-implements; 272 presentation, I/O or hardware routines not ported
+(the renderer's internals, the menu library, input waits, the sound driver
+interface); 467 game-state or undetermined routines not covered, of which
+117 look ported inline in a caller and 350 (13,917 bytes) are open. Code
+reached only through the 46 unresolved indirect calls isn't counted.
 
 ## Known gaps and approximations
 
 At the time of writing:
 
-- **Engine:** `Engine::frame` runs the player's physics before the drawing
-  step, where the original draws first. Some `%` text codes still return
-  `None` (`%hc`, `%qc`, `%tc`, `%mt`, `%dit`, `%qf`, parts of `%cn` and
-  `%tem`). The save menu and typing a save's name, the CITYDATA check
-  (242A:000E) and loading from the title screen (5C8 bit 4) are not ported.
+- **Not tested by hand:** the live window has never been driven by a
+  person. Its input paths are tested headlessly (`inputtest`) and
+  everything else through scripted shots, playtests and the walkthrough.
+- **Engine:**
+  - `%qf` still returns `None` (it seeds a name with an EBX the original
+    never sets; no template uses it), and 2 of the text vectors' cases
+    still reach unported code.
+  - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
+    check (242A:000E) and loading from the title screen (5C8 bit 4) are not
+    ported; the view saves to and loads from a fixed slot.
+  - The Emperor's audience (stage 8) hasn't been reached in a walkthrough;
+    the test save is past it.
+  - Text 5DDh (the last text in TEMPLATE.DAT, with nothing after it) has
+    failed after a long session while it reads right from a fresh start;
+    being investigated.
 - **Bounds where the original never ends:** a respawn with no free square
   gives up after 65536 tries; collapsing from exhaustion inside the hour it
   costs gives up after 200 nested collapses.
-- **View:** the lightning bolt, the moons and the stars are not drawn (the
-  flash is); lights behind walls follow the original's rule but are
-  unconfirmed on screen; the paper doll isn't recoloured by material; the
-  level's texts aren't drawn; some store list lines show a price of 0;
-  explosions are nudged in front of the wall they hit. Many interactive
-  paths were checked only with scripted shots.
+- **View:**
+  - Lights behind a wall follow the original's rule but are unconfirmed on
+    screen, and its two exceptions (CB37 = 0Dh, CCF8 = FFFFh) aren't
+    modelled; a spell's burst is nudged in front of the wall it hits.
+  - The sun and the helmet's head recolour are ported but not yet seen on
+    screen.
+  - The travel animation and the chosen place's blink (MAPBLINK.CIF) are
+    not drawn; the travel map's texts take the province picture's palette.
+  - List kinds 3, 9 and 10 ("Where is", the spellmaker's, the temple's)
+    use a stand-in panel; the selection is a frame rather than the
+    original's recolour; the typed-text prompt isn't traced; automap notes
+    are typed in a dialog, not inline (0000:9EE9).
+  - Fonts are fixed per element rather than following the game's selected
+    font (B036).
 - **Sound:** the FM voice driver (voice allocation, volume curves, vibrato,
   the Pro's two chips) is approximate and has not been listened to; there
   is no SoundFont fallback, and the music volume setting isn't applied.
