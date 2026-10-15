@@ -143,8 +143,11 @@ fn matches_original() {
         base.mem.w16(DS, o, v);
     }
     base.heap_init(0xA000, 0xF000).unwrap();
-    let dir = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena"));
-    let Ok(mut files) = Files::new(&dir) else { return };
+    let dir = common::game_dir();
+    let Ok(mut files) = Files::new(&dir) else {
+        eprintln!("skipping: {} not found", dir.display());
+        return;
+    };
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in include_str!("vectors/encounter.txt").lines().take(std::env::var("ENCOUNTER_N").map_or(usize::MAX, |v| v.parse().unwrap())) {
         let f: Vec<&str> = line.split(" | ").collect();

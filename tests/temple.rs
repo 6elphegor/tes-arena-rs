@@ -64,8 +64,9 @@ impl ShopHooks for Script {
     fn quest_check(&mut self, _m: &mut Machine) {
         self.log.push(6);
     }
-    fn quests(&mut self, _m: &mut Machine) {
+    fn quests(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(7);
+        Some(())
     }
 }
 
@@ -150,7 +151,7 @@ fn matches_original() {
         let mut m = base.clone();
         let mut sc = setup(&mut m, u32::from_str_radix(f[1], 16).unwrap(), &holidays);
         let before: Vec<u8> = (0..=0xFFFFu16).map(|o| m.mem.r8(DS, o)).collect();
-        let got = m.temple(&mut sc).map(|()| {
+        let got = m.temple(&mut arena::bsa::Files::default(), &mut sc).map(|()| {
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before[o as usize])
                 .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);

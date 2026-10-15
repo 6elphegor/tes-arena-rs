@@ -24,10 +24,10 @@ struct Stubs {
 }
 
 impl QuestHooks for Stubs {
-    fn city_info(&mut self, m: &mut Machine, _files: &mut Files, place: u8) -> Option<()> {
+    fn city_info(&mut self, m: &mut Machine, _files: &mut Files, ax: u16) -> Option<()> {
         let v = m.mem.r16(DS, 0xFFE0).wrapping_add(1);
         m.mem.w16(DS, 0xFFE0, v);
-        let b = m.mem.r8(DS, 0xFFE6).wrapping_add(place);
+        let b = m.mem.r8(DS, 0xFFE6).wrapping_add(ax as u8);
         m.mem.w8(DS, 0xFFE6, b);
         Some(())
     }

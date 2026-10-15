@@ -8,7 +8,7 @@
 //! (bits 6-7: 0 free, 1 under way, 2 offered, 3 failed), its stage
 //! (bits 9-11: here the sort of quest it is, 0..6), bit 8 (an errand)
 //! and the sort of building its goal is (bits 12-15: 0 a tavern's list,
-//! 1 a temple's, 3 an equipment store's, 2 the palace, 6 none, 7 a
+//! 1 an equipment store's, 3 a temple's, 2 the palace, 6 none, 7 a
 //! person); +0 the place's seed it was made with, +6 the amount (people,
 //! days, what is asked), +8 the time it began (a day's noon), +0Ch its
 //! deadline, +10h who gives it, +14h its goal (a list's entry dword, the
@@ -59,14 +59,15 @@ pub mod var {
     /// The player's level (byte).
     pub const LEVEL: u16 = 0x01AA;
     /// The place's lists of buildings (far pointers to dwords; their
-    /// counts): taverns', temples', equipment stores'; and 138D, the
-    /// palace's word.
+    /// counts): taverns', equipment stores', temples'; and 138D, the
+    /// palace's word. (1008 is the stores': the store finds itself
+    /// there, 1194:F48E; a goal of sort 1 is named a store.)
     pub const LIST_TAVERNS: u16 = 0x1AB5;
-    pub const LIST_TEMPLES: u16 = 0x1008;
-    pub const LIST_STORES: u16 = 0x1004;
+    pub const LIST_STORES: u16 = 0x1008;
+    pub const LIST_TEMPLES: u16 = 0x1004;
     pub const COUNT_TAVERNS: u16 = 0x1387;
-    pub const COUNT_TEMPLES: u16 = 0x138B;
-    pub const COUNT_STORES: u16 = 0x1389;
+    pub const COUNT_STORES: u16 = 0x138B;
+    pub const COUNT_TEMPLES: u16 = 0x1389;
     pub const PALACE: u16 = 0x138D;
     /// The texts queued (byte text, word record, 4 bytes each; negative
     /// texts are messages) and their count; the offer's text and record,
@@ -115,7 +116,7 @@ mod table {
     /// (level, value) pairs; values by a d14.
     pub const RANKS: u16 = 0x6D0B;
     pub const ITEMS: u16 = 0x6D0C;
-    /// The temples' kinds no quest goes to (7 bytes).
+    /// The equipment stores' kinds no quest goes to (7 bytes).
     pub const EXCLUDED: u16 = 0x6D67;
     /// d20 thresholds (3, or 5 for a size of 7) and what they give.
     pub const ODDS: u16 = 0x6DA4;
@@ -160,8 +161,9 @@ impl Machine {
         if self.sq16(PLACE) == self.sq16(PLACE_SEEN) {
             return Some(());
         }
-        let here = self.sq8(LOCATION);
-        hooks.city_info(self, files, here)?;
+        // 9369: AL the place, AH left from 935E's load of PLACE.
+        let ax = self.sq16(PLACE) & 0xFF00 | self.sq8(LOCATION) as u16;
+        hooks.city_info(self, files, ax)?;
         self.quests_clear();
         let place = self.sq16(PLACE);
         self.mem.w16(DS, PLACE_SEEN, place);
@@ -506,20 +508,20 @@ impl Machine {
 
     /// 1194:9511. The goal in another place of the province (0ABF, to
     /// +24h): its buildings listed (3EC3, `QuestHooks::city_info`) into a
-    /// block of 280h bytes from the heap (taverns' at 0, stores' at 100h,
-    /// temples' at 180h), the lists here kept and put back after. A d100
+    /// block of 280h bytes from the heap (taverns' at 0, temples' at 100h,
+    /// stores' at 180h), the lists here kept and put back after. A d100
     /// against five times the level + 1 (in 8 bits) sets +29h (1 at or
     /// under it); a d25 over the pairs at GOALS gives the goal's sort
     /// (+4 bits 12-15): for a tavern, store or temple a random entry of
-    /// its list (a temple's not of a kind in EXCLUDED, unless all are),
+    /// its list (a store's not of a kind in EXCLUDED, unless all are),
     /// +14h its dword with its index in the low word; for the palace (2)
     /// or none (6) +0's high word and 1. The block is freed. None where
     /// the heap has no room (see below).
     fn quest_goal(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) -> Option<()> {
         let place = self.sq_other_place()?;
         self.mem.w8(DS, si + 0x24, place as u8);
-        let words = [COUNT_TEMPLES, COUNT_TAVERNS, COUNT_STORES, PALACE, 0x138F].map(|o| (o, self.sq16(o)));
-        let dwords = [LIST_TEMPLES, LIST_TAVERNS, LIST_STORES].map(|o| (o, self.sq32(o)));
+        let words = [COUNT_STORES, COUNT_TAVERNS, COUNT_TEMPLES, PALACE, 0x138F].map(|o| (o, self.sq16(o)));
+        let dwords = [LIST_STORES, LIST_TAVERNS, LIST_TEMPLES].map(|o| (o, self.sq32(o)));
         // With no room the original's EAX keeps a high word left from
         // earlier code: not followed (None).
         let seg = self.heap_alloc_high(0x280)?;
@@ -528,10 +530,12 @@ impl Machine {
         }
         let block = (seg as u32) << 16;
         self.mem.w32(DS, LIST_TAVERNS, block);
-        self.mem.w32(DS, LIST_STORES, block | 0x100);
-        self.mem.w32(DS, LIST_TEMPLES, block | 0x180);
+        self.mem.w32(DS, LIST_TEMPLES, block | 0x100);
+        self.mem.w32(DS, LIST_STORES, block | 0x180);
+        // 9558: AL the place, AH from EAX, the block's far pointer plus
+        // 180h (the block's offset is 0).
         let to = self.sq8(si + 0x24);
-        hooks.city_info(self, files, to)?;
+        hooks.city_info(self, files, 0x0100 | to as u16)?;
         let d = self.sq_d100();
         let limit = (self.sq8(LEVEL).wrapping_add(1) as u16) * 5;
         let near = ((d as i16) <= (limit as i16)) as u8;
@@ -545,8 +549,8 @@ impl Machine {
         self.mem.w8(DS, si + 0x29, near);
         let list = match goal {
             0 => Some((self.sq16(COUNT_TAVERNS), self.sq32(LIST_TAVERNS))),
-            3 => Some((self.sq16(COUNT_STORES), self.sq32(LIST_STORES))),
-            1 => Some((self.sq16(COUNT_TEMPLES), self.sq32(LIST_TEMPLES))),
+            3 => Some((self.sq16(COUNT_TEMPLES), self.sq32(LIST_TEMPLES))),
+            1 => Some((self.sq16(COUNT_STORES), self.sq32(LIST_STORES))),
             2 | 6 => None,
             // The table gives no other sort; the original would draw from
             // whatever GS:DI held.
@@ -563,7 +567,7 @@ impl Machine {
                     let kind = m.mem.r8(seg, off.wrapping_add(i.wrapping_mul(4)).wrapping_add(2));
                     (0..7).any(|k| m.sq8(EXCLUDED + k) == kind)
                 };
-                // A temple's list: whether any entry may be drawn (`loop`
+                // A store's list: whether any entry may be drawn (`loop`
                 // over the count, 65536 for 0).
                 let check = goal == 1 && {
                     let n = if count == 0 { 0x10000 } else { count as u32 };
@@ -802,8 +806,8 @@ impl Machine {
             let goal = self.sq_roll(4)?;
             self.sq_goal_set(si, goal);
             let (count, far) = match goal {
-                3 => (self.sq16(COUNT_STORES), self.sq32(LIST_STORES)),
-                1 => (self.sq16(COUNT_TEMPLES), self.sq32(LIST_TEMPLES)),
+                3 => (self.sq16(COUNT_TEMPLES), self.sq32(LIST_TEMPLES)),
+                1 => (self.sq16(COUNT_STORES), self.sq32(LIST_STORES)),
                 0 => (self.sq16(COUNT_TAVERNS), self.sq32(LIST_TAVERNS)),
                 _ => {
                     let v = self.sq16(PALACE) as u32;

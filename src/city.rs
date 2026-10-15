@@ -89,7 +89,7 @@ impl Machine {
     /// 1194:04BE. Puts block `ty` (stored as ty + 2) on a random empty
     /// cell. A cell is empty when its byte, read signed, is below 1.
     /// None where the original faults (no cells) or spins forever (no
-    /// empty cell).
+    /// empty cell, or none the RNG gives in 2^20 rolls).
     pub fn city_place_block(&mut self, ty: u8) -> Option<()> {
         self.city_place_in(WORK_CELLS, ty)
     }
@@ -104,13 +104,17 @@ impl Machine {
         if !(0..cells).any(|i| (self.mem.r8(DS, PLAN.wrapping_add(i)) as i8) < 1) {
             return None;
         }
-        loop {
+        // An empty cell the RNG never lands on keeps the original rolling
+        // forever; past 2^20 rolls (beyond the emulator's budget for the
+        // vectors) the port gives up.
+        for _ in 0..1u32 << 20 {
             let i = self.city_next() % cells;
             if (self.mem.r8(DS, PLAN.wrapping_add(i)) as i8) < 1 {
                 self.mem.w8(DS, PLAN.wrapping_add(i), ty.wrapping_add(2));
                 return Some(());
             }
         }
+        None
     }
 
     /// 1194:0316..036A. Places the six fixed blocks (types 0-5), then
@@ -425,6 +429,13 @@ impl Machine {
     /// are set up only when DGROUP 0A46 (the current record's province)
     /// is not 8. None where the original faults.
     pub fn city_build_location(&mut self, seg: u16, rec: u16, id: u16, climate: u8) -> Option<()> {
+        self.city_build_location_with(seg, rec, id, &mut |_| Some(climate))
+    }
+
+    /// `city_build_location` with the climate made by `climate` where the
+    /// original makes it (1194:3D91, after the quadrant, before the map
+    /// row), as `Machine::city_location` does from the terrain map.
+    pub(crate) fn city_build_location_with(&mut self, seg: u16, rec: u16, id: u16, climate: &mut dyn FnMut(&mut Self) -> Option<u8>) -> Option<()> {
         use record::*;
         let w8 = |m: &mut Self, f: u16, v: u8| m.mem.w8(seg, rec.wrapping_add(f), v);
         let w16 = |m: &mut Self, f: u16, v: u16| m.mem.w16(seg, rec.wrapping_add(f), v);
@@ -488,6 +499,7 @@ impl Machine {
         let (x, y, prov) = (r16(self, X), r16(self, Y), r8(self, PROVINCE));
         let q = self.city_quadrant(x, y, prov);
         w8(self, QUADRANT, q);
+        let climate = climate(self)?;
         w8(self, CLIMATE, climate);
         let (_, row) = self.city_map_y(x, y)?;
         w16(self, MAP_Y, row);

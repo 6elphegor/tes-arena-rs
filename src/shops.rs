@@ -63,8 +63,11 @@ pub trait ShopHooks {
     /// 1194:D961: the quest's person, when the quest's place is this
     /// (1194:D593).
     fn quest_check(&mut self, _m: &mut Machine) {}
-    /// 1194:8F1E: the quests' progress on entering.
-    fn quests(&mut self, _m: &mut Machine) {}
+    /// 1194:8F1E: the quests the talk ends or offers on entering
+    /// (`Machine::quests_talk`).
+    fn quests(&mut self, m: &mut Machine, files: &mut crate::bsa::Files) -> Option<()> {
+        m.quests_talk(files, &mut crate::quest::NoQuestHooks)
+    }
 }
 
 /// `ShopHooks` that do nothing (every menu left at once).
@@ -528,7 +531,7 @@ impl Machine {
     /// discount (HOLIDAY 1, else FFh); then its menu until it is left (3
     /// or none), its pick's service run each time. On leaving SHOP FFh,
     /// D39 bit 80h set and HOLIDAY FFh. None where a service is.
-    pub fn temple(&mut self, hooks: &mut dyn ShopHooks) -> Option<()> {
+    pub fn temple(&mut self, files: &mut crate::bsa::Files, hooks: &mut dyn ShopHooks) -> Option<()> {
         let a91a = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 5);
         // 1194:C65F.
@@ -536,7 +539,7 @@ impl Machine {
         self.mem.w16(DS, 0x92A2, 0);
         hooks.expand(self, 0x929E);
         hooks.quest_check(self);
-        hooks.quests(self);
+        hooks.quests(self, files)?;
         let h = if self.shop_holiday() { 1 } else { 0xFF };
         self.mem.w8(DS, HOLIDAY, h);
         loop {

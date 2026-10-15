@@ -15,3 +15,12 @@ pub fn image() -> Option<exe::Image> {
         }
     }
 }
+
+/// The game's directory: ARENA_EXE's, or ESarena/ next to this crate.
+#[allow(dead_code)]
+pub fn game_dir() -> std::path::PathBuf {
+    std::env::var("ARENA_EXE")
+        .ok()
+        .and_then(|p| std::path::Path::new(&p).parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into())
+}

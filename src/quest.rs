@@ -90,21 +90,24 @@ pub trait QuestHooks {
     /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
     /// written to 19DE, before its message box.
     fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
-    /// 1194:3EC3 (and far 3EBF): the place `place`'s buildings listed
-    /// (its plan, `Machine::city_plan_for_record`, then each block's .MIF
-    /// header read for the counts at 1387/1389/138B and the lists at
-    /// 1AB5/1004/1008). Not ported (file I/O): None by default.
-    fn city_info(&mut self, _m: &mut Machine, _files: &mut Files, _place: u8) -> Option<()> {
-        None
+    /// 1194:3EC3 (and far 3EBF) with AX `ax`: the buildings of place AL
+    /// listed (`Machine::city_info`: the counts at 1387/1389/138B, the
+    /// lists at 1AB5/1004/1008). AH matters only for another place (100h
+    /// the Imperial City).
+    fn city_info(&mut self, m: &mut Machine, files: &mut Files, ax: u16) -> Option<()> {
+        m.city_info(files, ax)
     }
     /// 1194:2E69 (far): the days the journey set up at 193D..1944 takes,
     /// left at 1927 (`Machine::travel_days`).
     fn travel(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.travel_days(files).map(|_| ())
     }
-    /// 0000:9D60: the PC's timer ticks (the BIOS's dword at 0:046C).
-    fn bios_ticks(&mut self, _m: &mut Machine) -> u32 {
-        0
+    /// 2294:04C0: the town's music started (after its quests are made).
+    fn music(&mut self, _m: &mut Machine) {}
+    /// 0000:9D60: the PC's timer ticks (the BIOS's dword at 0:046C,
+    /// `Machine::bios_ticks`).
+    fn bios_ticks(&mut self, m: &mut Machine) -> u32 {
+        m.bios_ticks
     }
     /// 1194:A374 with AX `mode` (0 shown, 1 offered with its yes and no,
     /// 2 written to DS:`di`): the text port (`Machine::text`, its menu
@@ -122,12 +125,16 @@ pub trait QuestHooks {
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
         0xFFFF
     }
-    /// 1194:8020 in modes 5 and 6 (not ported, see `haggle`): the main
-    /// quest's informant haggled with over `price` (0FEE), the player's
+    /// 1194:8020 in modes 5 and 6 (`Machine::haggle`): the main quest's
+    /// informant haggled with over `price` (0FEE), the player's
     /// personality `per` (1194:5B07 of 1D3), quality 1Eh, mood 28h. The
-    /// carry: no deal. None by default.
-    fn informant_haggle(&mut self, _m: &mut Machine, _files: &mut Files, _price: u32, _per: u16, _mode: u8) -> Option<bool> {
-        None
+    /// carry: no deal. DL and DI at the call (1194:CF8B) are what earlier
+    /// code left; they only name things in modes 1, 2 and 4's lines but
+    /// are kept at 6598 and 65AB: taken as 0. By default the player walks
+    /// away (`haggle::Leave`); a front end answers for the player.
+    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
+        let r = m.haggle(files, &mut crate::haggle::Leave, price, per, 0x1E, 0x28, 0, mode, 0)?;
+        Some(r == crate::haggle::Haggle::NoDeal)
     }
     /// 0000:7428 with ES:DI the EMS frame (9030):0: the file named at
     /// DS:`name` loaded there (`Machine::file_load`).

@@ -171,7 +171,7 @@ pub trait TalkHooks: TextHooks {
     /// isn't ported.
     fn shop(&mut self, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
         if kind == 5 {
-            return m.temple(&mut crate::shops::NoShopHooks);
+            return m.temple(files, &mut crate::shops::NoShopHooks);
         }
         if kind == 4 {
             return m.tavern_shop(files, &mut crate::tavern::NoTavernHooks);
