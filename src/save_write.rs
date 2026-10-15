@@ -15,10 +15,11 @@
 //!   (0x20F0 bytes at 1042), 0x15E0 bytes of EMS bank 6 at offset A000 of
 //!   the frame, and 0x120 bytes at the far pointer 1020.
 //!
-//! The save's other parts are not ported: the menu and the name typed
-//! (25FD:004F..00D0), the files copied from the slot's temporary ones
-//! (25FD:0612, 056F; DOS's find first / next), the automap and the
-//! area's files (23F1:0145, 0000:3503), and CITYDATA (242A:000E).
+//! The slot's files copied (25FD:0612, 056F) are `load.rs`'s, through
+//! `Files`; the automap kept and loaded (23F1:0145, 0000:3503) is
+//! `automap.rs`'s; the save's end (25FD:01CB on) is `save_finish` below.
+//! Not ported: the menu and the name typed (25FD:004F..00D0) and the
+//! CITYDATA check (242A:000E), left to the front end.
 
 use crate::machine::Machine;
 use crate::mem::DS;
