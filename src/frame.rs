@@ -101,8 +101,10 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn quest_carry(&mut self, _m: &mut Machine) -> bool {
         false
     }
-    /// 0000:4ACD..4B35's drawing: the town's welcome, and the wait for a
-    /// key (1194:5532).
+    /// 0000:4B02..4B2B: the town's welcome (ENTERCTY.$$$ loaded to
+    /// 1044), its box, and the wait for a key (1194:5532). The box saves
+    /// what it covers into the frame (ES:DI [9030]:0, CX 7), bank [1030]
+    /// mapped: `Machine::box_background` with the front end's screen.
     fn town_welcome(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:D327 (keys ACED and ACF4).
     fn key_d327(&mut self, _m: &mut Machine) {}
@@ -545,10 +547,36 @@ impl Machine {
         self.mem.w16(DS, 0xB038, v);
         let v = self.mem.r16(DS, 0x102C);
         self.mem.w16(DS, 0xB036, v);
+        // 4AFB: the welcome's box keeps what it covers in the load bank,
+        // at the frame's start, over what the last load unpacked there.
+        let bank = self.mem.r16(DS, 0x1030);
+        self.ems_map(bank);
         hooks.town_welcome(self, files);
         let v = self.mem.r8(DS, 0x0D39) | 0x80;
         self.mem.w8(DS, 0x0D39, v);
         self.mem.w8(DS, 0x1404, 5);
+    }
+
+    /// 0000:965E's flag 1 (with 8F2A, 7706): a box's background kept at
+    /// `seg`:`off` before the box is drawn: its x (bit 15 set: the box's
+    /// buffer was given, not allocated), y, width and height, then its
+    /// rows from the draw page ([A900], 320 wide), here `screen` (the
+    /// front end's, a byte a pixel; none: black). The last template text
+    /// (5DDh) reads on past TEMPLATE.DAT's end into what the town's
+    /// welcome left here (1194:A44A).
+    pub fn box_background(&mut self, seg: u16, off: u16, (x, y, w, h): (u16, u16, u16, u16), screen: Option<&[u8]>) {
+        for (i, v) in [x | 0x8000, y, w, h].into_iter().enumerate() {
+            self.mem.w16(seg, off.wrapping_add(2 * i as u16), v);
+        }
+        let mut at = off.wrapping_add(8);
+        for r in 0..h as usize {
+            let row = (y as usize + r) * 320 + x as usize;
+            for c in 0..w as usize {
+                let v = screen.and_then(|s| s.get(row + c)).copied().unwrap_or(0);
+                self.mem.w8(seg, at, v);
+                at = at.wrapping_add(1);
+            }
+        }
     }
 
     /// 0000:4BD6. Out of the water the bob stops; the hurt flash steps

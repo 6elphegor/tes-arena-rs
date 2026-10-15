@@ -231,8 +231,7 @@ impl arena::trigger::TriggerHooks for Palace {
         };
         // 5DDh is TEMPLATE.DAT's last text, which no `#` ends: its read
         // (1194:A374) runs on past the end of the file into what the text
-        // bank holds. The original stops there on a fresh state, as does
-        // the port; after this walk the port reads on without end.
+        // bank holds: the town's welcome box's background (`Welcome`).
         if m.text(files, &mut arena::text::NoTextHooks, 2, seg, off).is_none() {
             println!("    its text met something not ported");
             return Some(());
@@ -242,12 +241,75 @@ impl arena::trigger::TriggerHooks for Palace {
     }
 }
 
+/// The world's frames after arriving in a town, until its welcome
+/// (0000:4ACD, the fourth frame on): ENTERCTY.$$$ printed, and what its
+/// box covers kept in the load bank's frame as the original keeps it
+/// (`Machine::box_background`), black here. The box as 965A sizes it
+/// (98A0, 9798) in ARENAFNT.DAT with MARBLE.CIF's 3 x 3 tiles, centred
+/// in the clip.
+struct Welcome {
+    widths: Vec<u8>,
+    height: u16,
+    shown: bool,
+}
+
+impl arena::hooks::StairsHooks for Welcome {}
+impl arena::controls::ControlHooks for Welcome {}
+impl arena::weapon::WeaponHooks for Welcome {}
+impl arena::clock::ClockHooks for Welcome {}
+impl arena::engine::EngineHooks for Welcome {}
+impl arena::frame::FrameHooks for Welcome {
+    fn town_welcome(&mut self, m: &mut Machine, files: &mut Files) {
+        if m.file_load(files, 0x130C, DS, 0x1044).is_none() {
+            return;
+        }
+        self.shown = true;
+        let text = m.mem.cstr(DS, 0x1044).to_vec();
+        println!("   [welcome] {}", String::from_utf8_lossy(&text).replace('\r', " / "));
+        let glyph = |c: u8| match c {
+            0x21..=0x7E => self.widths[(c - 0x21) as usize] as u16,
+            _ => self.widths[0] as u16 + 1,
+        };
+        let lines: Vec<&[u8]> = text.split(|&c| c == b'\r').collect();
+        let tw = lines.iter().map(|l| l.iter().map(|&c| glyph(c)).sum::<u16>()).max().unwrap_or(0);
+        let (w, h) = (tw + 10, lines.len() as u16 * (self.height + 1) + 10);
+        let (w, h) = (w + (3 - w % 3) % 3, h + (3 - h % 3) % 3);
+        let r = |at| m.mem.r16(DS, at);
+        let x = (r(0xA918).wrapping_add(r(0xA914)) >> 1).wrapping_sub(w >> 1);
+        let y = (r(0xA91A).wrapping_add(r(0xA916)) >> 1).wrapping_sub(h >> 1);
+        let frame = r(0x9030);
+        m.box_background(frame, 0, (x, y, w, h), None);
+    }
+}
+
+fn welcome(engine: &mut Engine, dir: &std::path::Path) {
+    let font = archive::Archive::open(dir).read("ARENAFNT.DAT").unwrap_or_default();
+    if font.len() < 95 {
+        println!("   no ARENAFNT.DAT");
+        return;
+    }
+    let mut h = Welcome { widths: font[1..95].to_vec(), height: font[0] as u16, shown: false };
+    for _ in 0..8 {
+        let t = engine.frame_ticks();
+        engine.tick(t);
+        if engine.frame(arena::engine::Input::Steer(&Default::default()), &mut h).is_none() {
+            println!("   a frame met code not ported");
+            return;
+        }
+        if h.shown {
+            return;
+        }
+    }
+    println!("   no welcome");
+}
+
 /// Step 8: the Imperial City (province 8) travelled to and its palace's door
 /// used (0000:43B1: a wall whose trigger is the city table's 11..13,
 /// 0000:4192): by the main quest's stage (F77) the audience (8), the
 /// artifact's (9) or "no time".
 fn palace(engine: &mut Engine, dir: &std::path::Path, run: Run) {
     let Some(_) = trip(engine, dir, run, 8, 0, "8") else { return };
+    welcome(engine, dir);
     let m = &mut engine.m;
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     let (rows, cols) = (m.mem.r16(DS, 0xC359), m.mem.r16(DS, 0xC357));

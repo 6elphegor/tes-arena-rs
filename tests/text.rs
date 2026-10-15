@@ -259,3 +259,58 @@ fn an_oath_given_up_leaves_no_expand() {
     assert_eq!(m.mem.r8(DS, NO_EXPAND), 0, "substitutions not left off");
     assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0, "the nesting back");
 }
+
+/// TEMPLATE.DAT's last text (5DDh, the palace's artifact audience at
+/// 0000:4248) has no `#` after it: its byte-a-call read (1194:A44A) goes
+/// past the file's end, where the reads leave the text bank as it was,
+/// and stops at the first 0 or `#` there. In the original that bank
+/// ([1030], the loads' bank) then holds what the town's welcome box
+/// covered (0000:4B18..4B21, `box_background`), not what the level's
+/// load unpacked through it: after a long walk the port read on into a
+/// plane's compressed bytes (a `%|$`, a substitution with no code: None,
+/// as the original's 1194:A36C fails from that state too).
+#[test]
+fn the_last_template_reads_on_into_the_welcome_box() {
+    use arena::text::var::BANK;
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut m = Machine::new(&img);
+    m.heap_init(HEAP.0, HEAP.1).unwrap();
+    assert!(m.bsa_open(&mut files));
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w8(DS, 0x8FA6, 1);
+    m.mem.w16(DS, 0x9032, 0x20);
+    m.mem.w16(DS, BANK, 0x1F);
+    m.ems_map(0x1F);
+    let run = |m: &mut Machine, files: &mut Files| {
+        // The walk's seed is long gone; this one picks the second variant.
+        m.rng.seed = 0x9E37_79B9;
+        m.mem.w16(DS, 0x137A, 0x5DD);
+        m.mem.w16(DS, 0x101C, 0);
+        m.mem.w16(DS, 0x137E, 0);
+        m.text(files, &mut Count, 2, OUT_SEG, 0).map(|_| String::from_utf8_lossy(m.mem.cstr(OUT_SEG, 0)).into_owned())
+    };
+    // The file ends "complete...&" CR LF CR LF ";last template _ (1501)"
+    // CR LF: two variants (the `&`), the second running on into the bank.
+    // The bank as a level's load leaves it: compressed bytes (the walk's
+    // were IMPERIAL.MIF's) with another `&` and a `%` before a 0: a third
+    // variant, and a `%` in the second that the substitutions can't read.
+    for i in 0..0x400u16 {
+        m.mem.w8(FRAME, i, 0x8E);
+    }
+    for (i, &b) in b"\x8E%|$&\x8E\x88\x00".iter().enumerate() {
+        m.mem.w8(FRAME, 0x151 + i as u16, b);
+    }
+    assert_eq!(run(&mut m, &mut files), None, "read on into the plane's bytes");
+    // The welcome's box keeps the dark view under it there.
+    m.mem.w8(FRAME, 8 + 0xD5 * 0x45, 0x8E);
+    m.box_background(FRAME, 0, (0x2B, 0x47, 0xD5, 0x45), None);
+    assert_eq!(m.mem.r16(FRAME, 0), 0x802B);
+    assert_eq!((m.mem.r16(FRAME, 2), m.mem.r16(FRAME, 4), m.mem.r16(FRAME, 6)), (0x47, 0xD5, 0x45));
+    assert_eq!(m.mem.r8(FRAME, 8 + 0xD5 * 0x45), 0x8E, "the box's rows only");
+    assert_eq!(m.mem.r8(FRAME, 0x151), 0);
+    let t = run(&mut m, &mut files).expect("the text");
+    assert!(t.starts_with("As you approach the Palace Gates"), "{t:?}");
+    assert!(t.trim_end().ends_with("complete..."), "{t:?}");
+}

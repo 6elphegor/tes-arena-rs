@@ -307,9 +307,16 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
 }
 impl arena::frame::FrameHooks for Front<'_> {
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
-    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box.
+    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box,
+    /// what the box covers kept at the frame's start (0000:4B18) as the
+    /// original keeps it; the view's screen isn't the game's 256 colours,
+    /// so the kept pixels are black.
     fn town_welcome(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         if m.file_load(files, 0x130C, arena::mem::DS, 0x1044).is_some() {
+            if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
+                let frame = m.mem.r16(arena::mem::DS, 0x9030);
+                m.box_background(frame, 0, rect, None);
+            }
             self.message_box(m, 0x1044);
         }
     }
