@@ -209,6 +209,18 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             engine.m.mem.w16(DS, 0x01FD, max);
             *counts.entry("healed").or_default() += 1;
         }
+        // And rested when fatigue (201h) is below a quarter of its most,
+        // (strength + endurance) x 64: once exhausted, an hour's rest
+        // (2901:0014, 016C) makes up 420 for a heal mod of 0 where the hour
+        // takes 660, so the player collapses again and again, the
+        // original until its stack runs into its data, the port until its
+        // bound of 200 (None). A player rests before that.
+        let attr = |i: u16| engine.m.mem.r8(DS, arena::character::PLAYER + arena::character::field::ATTRS + i) as u16;
+        let most = (attr(0) + attr(5)) * 64;
+        if engine.m.mem.r16(DS, 0x0201) < most / 4 {
+            engine.m.mem.w16(DS, 0x0201, most);
+            *counts.entry("rested").or_default() += 1;
+        }
         *counts.entry(name).or_default() += 1;
         // The game's questions answered at random (talk menus, shops,
         // haggles, rests): menu entries 0..5, now and then a number typed.
