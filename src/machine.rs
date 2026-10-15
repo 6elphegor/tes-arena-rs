@@ -14,13 +14,18 @@ pub struct Machine {
     /// The mouse driver's motion counters (mickeys, x and y) since they
     /// were last read (INT 33h function 0Bh; see `weapon`).
     pub mouse_motion: (u16, u16),
+    /// The sound driver: playing a sound (its status 2: a new one is
+    /// dropped), as the front end says; and the sounds played, for the
+    /// front end to take (`sound`).
+    pub sound_busy: bool,
+    pub sounds: Vec<crate::sound::Sound>,
 }
 
 impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0) }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), sound_busy: false, sounds: Vec::new() }
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.
