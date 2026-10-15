@@ -266,6 +266,13 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
     if city && engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
         eprintln!("the town's quests met something not ported");
     }
+    // A level begun as an interior: its level hooks (0000:0B15, as an
+    // interior's run sets them: the way out, the INF's hook, CD52 the
+    // level's text, 0000:0628).
+    if !city {
+        let exit = if engine.m.mem.r16(DS, 0x05C8) & 0x80 == 0 { 0x4537 } else { 0x44BD };
+        engine.m.level_hooks(exit);
+    }
     if city { Run::City } else { Run::Interior(0xC37F) }
 }
 

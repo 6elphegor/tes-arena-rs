@@ -86,7 +86,7 @@ fn setup(m: &mut Machine, seed: u32) {
         let goal = if s.byte() < 0x20 { 0x20 } else { 0 };
         m.mem.w16(DS, at + 4, w | goal | kind << 6 | stage << 9 | ty << 12);
         let p = if s.byte() < 0xD0 { province } else { s.byte() % 8 };
-        let v = p << 5 | s.byte() % 32;
+        let v = (p << 5) | (s.byte() % 32);
         m.mem.w8(DS, at + 0x25, v);
         let v = if s.byte() < 0xD0 { place & 0x1F } else { s.byte() };
         m.mem.w8(DS, at + 0x14, v);

@@ -33,7 +33,7 @@ fn setup(m: &mut Machine, seed: u32) -> u8 {
     }
     let v = s.byte();
     m.mem.w8(DS, 0x0FDD, v);
-    let mut record = |m: &mut Machine, s: &mut Stream, at: u16, size: u16| {
+    let record = |m: &mut Machine, s: &mut Stream, at: u16, size: u16| {
         for i in 0..size {
             let b = s.byte();
             m.mem.w8(DS, at + i, b);

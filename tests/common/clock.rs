@@ -1,5 +1,6 @@
 //! The game clock's test set-up (harness/gen_clock.py `setup`), shared by
 //! the clock's test and those running the clock inside other routines.
+#![allow(dead_code)]
 
 use arena::machine::Machine;
 use arena::mem::DS;

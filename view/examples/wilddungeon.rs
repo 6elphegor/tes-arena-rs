@@ -93,6 +93,12 @@ fn stand(m: &mut Machine, (c, r, h): (u16, u16, u16)) {
     m.mem.w16(DS, X, c << 7 | 0x40);
     m.mem.w16(DS, Y, r << 7 | 0x40);
     m.mem.w16(DS, HEADING, h);
+    // The real position too (BA62), which each frame's physics start
+    // from (0000:A3AA).
+    for i in 0..3u16 {
+        let w = m.mem.r16(DS, X + 2 * i);
+        m.mem.w16(DS, 0xBA62 + 2 * i, w);
+    }
 }
 
 fn place(e: &Engine, run: Run) {

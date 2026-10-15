@@ -240,6 +240,8 @@ impl Machine {
     /// start at whatever the slot held before.
     ///
     /// The effect message goes into DGROUP 1405 (`fx_message`).
+    // The original's register arguments, one each.
+    #[allow(clippy::too_many_arguments)]
     pub fn apply_effect(
         &mut self, seg: u16, off: u16, flag: u16, period: u16, duration: u16, b_period: u16, b_left: u16,
     ) -> Applied {
@@ -944,8 +946,8 @@ impl Machine {
 
     /// 2CDD:0A38. Whether the record at seg:off stops a spell costing
     /// `cost` (spell +32): Sorcerers (class byte 23h) absorb it on a random
-    /// byte under (INT + WIL) / 2 (at most C0h), regaining cost / (level +
-    /// 1) SP; then resist magic (flag 1000h), absorb (400h, regaining
+    /// byte under (INT + WIL) / 2 (at most C0h), regaining cost / (level + 1)
+    /// SP; then resist magic (flag 1000h), absorb (400h, regaining
     /// cost / [1292] SP) and reflect (800h, queueing the projectile at
     /// [A886] back). Absorb and reflect are only tried if one of 1C00h is
     /// set. None where the original faults ([1292] = 0).

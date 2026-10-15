@@ -1,365 +1,263 @@
 # arena-port
 
-A routine-by-routine Rust port of The Elder Scrolls: Arena (ACD.EXE, CD v1.07).
-No game code or data is included: everything is loaded from your own copy.
+A routine-by-routine Rust port of The Elder Scrolls: Arena (ACD.EXE, CD
+version 1.07), checked instruction for instruction against the original
+running under an emulator, and a new wgpu front end (`view/`) that plays it.
 
-## Layout
+The port keeps the original's behaviour exactly, bugs included: each ported
+routine is compared with the original on thousands of generated cases, and
+where the original faults or never returns, the port returns `None` rather
+than guessing.
 
-- `src/exe.rs` – unpacks ACD.EXE (PKLITE 1.12, extra compression, large
-  relocation table) and checks it is the expected build.
-- `src/mem.rs` – flat real-mode memory with the image at linear 0, so
-  segments overlap as they really do (3276:92A0 is DGROUP 3BA0:0000).
-- `src/machine.rs` – memory plus RNG; ported routines are methods on it.
-- `src/random.rs` – random number generator (0000:6E10, 6EA8, 6EEA).
-- `src/dice.rs`, `src/scale.rs` – dice rolls and percent/256-scale conversions.
-- `src/character.rs` – character creation stats, attribute modifiers, hit
-  and spell points (segment 1194). `character::field` is the one place
-  character/creature record offsets are named.
-- `src/progression.rs` – levels from XP, level-up, XP awards (segment 2686).
-- `src/combat.rs` – to-hit, hit location, criticals, damage, weapon wear
-  (segment 2AA1).
-- `src/attack.rs` – a blow at the player (2AA1:00D8): a creature's damage
-  range and special attacks or a person's weapon, wear on the armour hit
-  and broken items ("Your %s is broken."), the magic shield, and death.
-- `src/strike.rs` – a landing swing (0000:39D8): every actor in reach in
-  front of the player is struck; people die at once (0000:3AED: gold,
-  and maybe the guards); the player's strike on a creature-slot actor
-  (0000:3B6D, 2AA1:0000): blood, criticals, damage and weapon
-  enchantments; and the kill handler all damage goes through (2AA1:06A0):
-  death, corpses moved off doors, experience, quest targets that die or
-  give up. `GameHooks` gives the effects engine these handlers.
-- `src/spell.rs` – a cast applied to its targets (29CF:0941): their
-  defences, then the spell's three effects (2CDD:000C and some 25
-  handlers): damage and healing (through the magic shield and elemental
-  resistance, 29CF:0B35), status effects, cures (2EBD:0004), timed spell
-  flags, attribute, HP, SP and fatigue changes and transfers, instant
-  death, levitation; and an actor's cast (29CF:0145), launched at the
-  player or taking effect on itself. A projectile spawned by an effect
-  is not ported.
-- `src/projectile.rs` – spells in flight and arrows (segment 29CF): the
-  launch (29CF:02E2) with its sprite object, light and column list
-  (0000:FDEA, E0CA, BFC0), the per-frame mover (29CF:0441) with its
-  hit tests against actors, the player and walls (0000:F4EB),
-  explosions, arrows striking, and the targets of a spell's impact
-  (29CF:09B8, 2CDD:08D9), which then takes effect (`spell.rs`).
-- `src/format.rs` – the game's sprintf for `%s` and `%d` formats (line
-  feeds become CR LF).
-- `src/loot.rs` – item and treasure generation (1194:E8xx-F3xx, 24FA).
-- `src/shop.rs` – shop stock, potions and magic items (1194:FAD9, B7FA,
-  B848).
-- `src/haggle.rs` – haggling when buying or selling (1194:8020); the
-  player's answers come from a `HaggleIo`. Temple and guild services
-  (modes 5, 6) are not ported.
-- `src/item.rs` – the 19-byte item slot layout shared by loot, inventory
-  and combat.
-- `src/inventory.rs` – inventory slots, equipment lookups (armour per
-  location, weapon, shields, missile), class usability, add/remove/sort.
-- `src/city.rs` – city block plans and block file names from a city's
-  seed, location records and templates (1194:0292, 3B84). Loading the
-  MIFs is in `src/mif.rs`.
-- `src/bsa.rs`, `src/mif.rs` – GLOBAL.BSA access (including the XOR
-  decryption of .INF/.TXT entries and the directory cached in EMS), the
-  MIF decompressor (LZHUF), city block loading, the wall pass and whole
-  cities (1194:0292).
-- `src/level.rs` – the .MIF level loader (0000:E87C) used for city
-  templates, interiors and dungeons: header, level selection, planes,
-  locks, triggers, lights, text and info chunks; reloading a level on
-  stairs (0000:EBB5); EMS (0000:5C8A), modelled as 64 KB banks swapped
-  through the frame.
-- `src/info.rs` – the level .INF loader (0000:EC03): which textures the
-  map uses, texture files read into EMS banks, wall and floor roles
-  (stairs, chasms, triggers, box sides and caps, ceiling), flat
-  records, sounds and texts, and the flat files read whole into EMS
-  (0000:BED8, through the EMS allocator 0000:5C26).
-- `src/heap.rs` – the game's heap: startup setup, first-fit and last-fit
-  allocation, free with merging. Loaders and the decompressor allocate
-  from it as the original does; set it up with `heap_init` first.
-- `src/dungeon.rs` – dungeon records and seeds, level count, layout,
-  stairs, whole levels built from random1.mif, main-quest dungeon
-  selection.
-- `src/creature.rs` – NPC and monster generation, corpse loot,
-  monster spawning.
-- `src/save.rs` – saved games: slot file names, paths, the engine save
-  (SAVEENGN.nn, decrypted), the level save (SAVEGAME.nn: screenshot,
-  palette, state and planes) and spell files. Tests with a save need
-  `ARENA_SAVE` set to its folder.
-- `src/movement.rs` – the movement step and collision (0000:F8DD,
-  F478, F60A, F697, FB3A): the 16 x 16 cell mask around a square,
-  sliding along walls, triggers, climbing out of low areas, and level
-  changes on stairs. Creatures that walk into a closed door open it
-  unless it is locked (the game's lock check for creatures). The
-  physics frame (0000:F57C): falling and the floor height (F9C4: raised
-  squares, water and pits, bobbing), with the input step and level
-  transitions as `PhysicsHooks`.
-- `src/controls.rs` – the player's controls (2826:0002, the physics
-  frame's input hook). The original steers with the mouse: the view is a
-  3 x 3 grid of regions (forward, back, turn, strafe, centre), and the
-  cursor's distance from a region's outer edge sets the speed; the arrow
-  keys call the same handlers with the cursor at the edge. Also jumping,
-  the levitation bob, and cancelling a spell waiting for a target. The
-  front end reports the mouse and keys (`set_mouse`, `set_key`) and calls
-  `player_input`, or drives the same movement with modern controls
-  (`player_steer` with an `Intent`: forward, strafe, turn, mouse look,
-  jump). `controls::Classic` plugs the controls into the physics frame.
-- `src/click.rs` – a left click in the view (2826:077E): spells waiting
-  for a target (removing or raising walls, digging or filling pits,
-  Open and Lock on doors), doors (opened with a key, or picked by a
-  lockpicking roll), and the click left for the actors. What is under the
-  cursor comes from the renderer (the wall square, the door's span and
-  square, and the floor square through `ControlHooks::floor_pick`).
-- `src/weapon.rs` – the player's weapon each frame (0000:38CE): drawing
-  and sheathing it, and swinging it. A swing starts with a right-button
-  drag of 40h mickeys or more (the mouse's motion counters are input,
-  `Machine::mouse_motion`); its direction picks the swing; every fifth
-  frame it lands (`strike::swing_hits`), and with no actor in reach it
-  hits the square ahead (0000:3D43): breaking into a closed building in a
-  town (a crime that may bring the guards), or bashing a breakable flat
-  or a locked door by the blow's damage and strength. A bow shoots an
-  arrow aimed by the cursor (`projectile::fire_missile`, 29CF:037F);
-  drawing the hands is the renderer's.
-- `src/frame.rs` – the world loop's frame body (0000:481E): the detail
-  and debug keys, the acceleration's decay, walking and turning speeds
-  from speed and fatigue, the wilderness flats, levitation and the light
-  radius, the weapon, the message and guards' countdowns, drowning, a
-  holiday's message, breath in deep water, townspeople coming back in
-  the daytime, the clock (a minute every 90 timer ticks) and the hurt flash.
-  Drawing, sound, menus and message boxes are `FrameHooks`.
-- `src/cast.rs` – the player casting (segment 29CF): from the
-  spellbook (29CF:071F: silence, the cost by level, the crime of casting
-  at someone in town), a spell takes effect on the player or waits for a
-  target with its prompt; a click resolves it (29CF:0000): a touch on an
-  actor or the player, an aimed spell launched along the cursor's
-  direction (`projectile::launch_player`, which loads the casting hands'
-  graphic), or an area around the player.
-- `src/encounter.rs` – fights starting (segment 25CA): the fight set up
-  for monsters or people (25CA:0000, the graphics and music as hooks),
-  and the creatures placed in the free creature slots around the player
-  (25CA:006A: a random free square near the player, facing the player);
-  the guards arriving (1194:33C0: one to three named guards of the
-  province's race, rank and level, in armour with a weapon and shield);
-  random encounters (1194:887A: the area's chance, a row of the table by
-  area and night, an entry by the player's level; monsters, or people
-  with their equipment, 24FA:0313). The quests' encounters (86F2) are
-  not ported.
-- `src/light.rs` – light (segment 0000): a point is shaded by the
-  lights, not by distance (`light_row`, 0000:B6EB: the brightest row any
-  light gives it, full within half its radius, 13 steps to its edge);
-  the lights are the player's, the level's near the player
-  (`lights_near`, 0000:E12E), made from the flats whose record gives a
-  light (`flat_lights`, 0000:0810, run on entering a level), and the
-  moving ones (`moving_lights`, 0000:E106). In full daylight (C398 bit
-  8000h) nothing is shaded.
-- `src/sky.rs` – the sky's colours (2294:0428, 0341): outdoors the .COL
-  for the weather (DAYTIME.COL or DREARY.COL, a run of colours through
-  the day) and the window of eight of them palette entries 1..8 take for
-  the time of day, and the dither image for the half of the day. The
-  loads and palette writes are the front end's.
-- `src/outfit.rs` – what people in a fight are drawn as (2686:0423): the
-  list of graphics files at 1044 the fight loads, from the first
-  person's record. Their look comes from the armour mostly worn, or from
-  their class (mage, monk, barbarian, unarmoured). The list holds the
-  walk, the attack (a bow, a monk's kick, a mage's sword or staff), the
-  weapon drawn over it, and the shield; a woman's files start with 1.
-- `src/engine.rs` – one frame of the 3D world (the world loop 0000:A240
-  without its drawing): actors and projectiles, physics with the input
-  step (`Input::Classic` or `Input::Steer`), the state the start of the
-  original's drawing sets (`view_begin`, 0000:C923: the player's square
-  CB90, which the encounters, the actors and the clicks read), the doors
-  its walk over the squares stepped (`view_walk_doors`, 0000:C980: every
-  square within reach once, ring by ring; a door met from the sides
-  toward the player unless a full wall is there, each time stepping,
-  `door_drawn`, 0000:CD66: opening near the player, closing again away
-  from it), the `EngineHooks::draw` hook for the rest of the walk, the
-  wall spells' squares, the frame body, a pending INF; `enter_area` sets
-  a loaded level up (the state half of 0000:A4ED). `Engine::view` gives the renderer the
-  player's position, heading, light, time of day and message;
-  `examples/play.rs` runs it on a level with scripted modern controls.
-  `outdoor_inf` (0000:0896) picks an outdoor area's INF by climate and
-  weather (and says whether a city's townspeople load).
-- `src/actors.rs` – the people and creatures of a level and their frame
-  (0000:1854): idle walking, facing and chasing the player, side steps
-  when blocked, line of sight, respawning near the player, animation
-  states and the sprite seen, blows at the player, and casting (people
-  pick an affordable spell, creatures one of theirs). Sound and the draw
-  list are not ported.
-- `src/clock.rs` – the game clock (0000:142D): minutes pass one at a
-  time, the calendar is recomputed and each changed field's handler runs:
-  the minute tick (auras, timed spell flags, effects, the drain check,
-  countdowns, level-up, fatigue, encounter checks), the day (weather,
-  Knights' repairs), the hour; and the sky's time of day. Quests,
-  encounters, the level-up screen and exhaustion go through `ClockHooks`.
-- `src/travel.rs` – fast travel: days and distance between two places,
-  over the terrain map and the weather (1194:2E69), and the monthly
-  weather roll (1194:2FB3).
-- `src/wild.rs` – the wilderness grid around a location (217B:0004).
-- `src/log.rs` – the calendar (dates from the minute counter) and
-  logbook entries; appending them to LOG.nn is not ported.
-- `src/names.rs` – random NPC names from NAMECHNK.DAT (1194:080B);
-  `expand_npc_named` builds a whole NPC with its name.
-- `examples/city_map.rs`, `examples/dungeon_map.rs` – build a city or a
-  dungeon from your game files with the ported code and write its map as
-  a PPM image: `cargo run --release --example city_map -- ../ESarena 8 0
-  imperial.ppm`. `examples/character_sheet.rs` loads a saved game and
-  prints the character, date, logbook, inventory and spells; `examples/save_view.rs`
-  writes a save's stored screenshot and the map of the level it is in;
-  `examples/wild_map.rs` draws a location's wilderness grid and four of
-  its blocks as terrain; `examples/travel.rs` plans a journey;
-  `examples/walk.rs` lets a walker wander a level with the movement code
-  and draws its path.
-- `harness/dos.py` – a minimal emulated DOS file layer (int 21h) so file
-  routines can run unmodified against the user's own game files,
-  `init_heap` to set up the game's heap, and `enable_ems` for EMS bank
-  switching (int 67h 4E02).
-- `harness/emu.py` – runs original routines under unicorn (far, near or a
-  code range); CPU faults are reported as `Fault`.
-- `harness/xref.py` – static helpers: data xrefs, pointer tables,
-  disassembly, call sites.
-- `harness/gen_*.py` – produce test vectors from the original code.
-- `tests/` – differential tests against those vectors, plus loader tests.
-- `tools/` – the original C/Python unpacking scripts; `re/` holds the rebuilt
-  `ACD_unpacked.EXE` for disassembly (git-ignored).
+## Your own game files
 
-## The renderer (view/)
+Nothing derived from the game is in this repository: no code, no data, no
+text, no saved games.
 
-`arena-view` is a new wgpu renderer, not a port of the original's: the
-port's engine runs the game, and the renderer draws what is in its memory.
-The core crate stays free of dependencies; the view crate is a workspace
-member using wgpu, winit, glam and png.
+- The crate reads your own `ACD.EXE` at run time and unpacks it in memory
+  (`src/exe.rs`: PKLITE 1.12 with extra compression).
+- The view reads your game directory (GLOBAL.BSA, the loose files) at run
+  time. Images, fonts, sounds, songs and texts are decoded there, never
+  stored.
+- `re/` (the unpacked image used for disassembly) is git-ignored, and so are
+  the agent worktrees under `.claude/`.
+- Test vectors hold only digests and the seeds that rebuild each case; texts
+  the tests need are read from your files at run time.
+- Never commit a saved game. Tests that need one read it from `ARENA_SAVE`.
 
-- `world.rs` loads a level the way `examples/play.rs` does, or a city
-  (`CITY:PROVINCE:INDEX[:TERRAIN:WEATHER]`, 8:0 the Imperial City): its
-  record and blocks built as `examples/city_map.rs` does, outdoors, with
-  the climate, weather and fog set up from the terrain and the season's
-  weather as entering the area does (`weather_set`, 0000:0F05) and the
-  INF for them (`outdoor_inf`, 0000:0896). It reads the
-  palette (PAL.COL), the textures from the EMS banks the INF loader filled
-  (64 x 64, stored transposed, 15 to a bank) and the shading table (F000 in
-  the first texture bank). It builds triangles from the map planes:
-  - solid walls (equal bytes), with the faces between walls culled;
-  - raised platforms (the box side and cap tables, with heights from
-    `move_wall_height`);
-  - the other wall kinds (9, 0Ah, 0Dh) as walls;
-  - floors (FLOOR words), and the *CEILING texture.
-- `flats.rs` decodes the flats the INF loader read into the flat banks:
-  - raw .IMGs;
-  - .DFA animations: a run-length coded first frame, then chunks of
-    updates to it;
-  - .CFAs: run-length coded rows of packed values, high bits first,
-    coloured through the header's table.
+By default the game is expected in `../ESarena` next to this directory.
 
-  `archive.rs` reads files by name (loose, or from GLOBAL.BSA) for the
-  creatures' CFAs: the type's name pattern from the table in the image
-  (`rat@.cfa` ...), views 1 (front) to 5 (back), and 6.
-- `world::sprite_sheet` packs every frame into one atlas.
-  `world::sprites` makes billboards, a unit per pixel:
-  - the map's flats (MAP1 words 8xxx), in their squares, raised by the
-    flat record's Y;
-  - the creatures in the actor slots: sprite C0h + view, mirrored with
-    flag 2, at the actor's frame;
-  - people in a fight, from the list `person_outfit` built: the walk for
-    frames 0..5, from frame 6 the attack with the weapon over it, placed
-    by the files' headers as 0000:1B7F places it. Every person's file in
-    GLOBAL.BSA is packed into the atlas at load;
-  - townspeople (the first 15 slots): men's or women's files by +11h
-    (34h, 39h), named by climate and weather as 0000:17F9 names them.
-    `world::city_people` brings fifteen in the daytime as entering a
-    city does (0000:45FC; the entry itself is not ported).
+## Building and running
 
-  `world::doors` draws the doors each frame, swung open by their state.
-  How the original drew a door ajar isn't ported: a panel on each side
-  turns about its left edge, by a quarter turn when fully open.
+    cargo build --release                  # the port, its examples
+    cargo build --release -p arena-view    # the front end
+    cargo test --release                   # the differential tests
 
-  The examples `flats` (every frame on one sheet), `formats` (what the
-  decoders miss, by level), `actors` (the slots in use) and `doors` (the
-  doors nearest the start, their surroundings and locks), `people` (a
-  person's attack frames with the weapon over them) and `level` (what a
-  level or city loads: textures, flats, INF, the squares about the
-  player) check them.
-- `render.rs` and `shader.wgsl` keep the textures as palette indices,
-  shade them by distance through the original's table, then colour them
-  with the palette, the row of the shading table each point takes
-  computed in the shader as `light_row` does, from the lights the front
-  end hands it each frame (the original's per-light flag for a light
-  behind the wall drawn isn't reproduced). The shading table is the
-  light table (NORMAL.LGT as the image holds it) the INF loader copies,
-  which needs the renderer's set-up (0000:AAA2) the view does on
-  loading. Outdoors the sky is drawn first: palette entries
-  1..8 (set each frame from the .COL at `sky_step`'s window) through the
-  dither images, their 20 rows from the top of the view to the horizon
-  (how the original scales them is a guess).
-- `main.rs` turns the keys and the mouse into an `Intent` for
-  `Engine::frame`, run at the game's pace. Its `draw` hook steps the
-  changed squares within the view's reach. The original stepped only
-  the squares it drew. The hook also leaves what is under the centre of
-  the view for a click: the first square that isn't empty along the
-  heading, and for a door its square and span, as the original's
-  drawing left them under the cursor. E or a left click clicks there
-  (`view_click`), which opens a door within reach. P (or `--people`)
-  rolls until people come. F (or `--fight`) rolls random encounters until
-  creatures come, a debugging aid.
-- The game's texts are drawn over the view in its own font (ARENAFNT.DAT):
-  the message line, message boxes, menus and the hours typed. Talking to
-  someone and camping (R) ask their questions in menus answered with the
-  keys or the mouse; the game waits meanwhile. F5 saves to `--slot N` in
-  `--save-dir DIR`, F9 loads it back (only within the same area: the
-  original's rebuild after loading isn't ported). `--picks` and `--do`
-  script answers and steps for shots (see view/src/main.rs).
+`cargo build --examples` does not rebuild the `arena-view` binary; build it
+with `cargo build --release` in `view/` (or `-p arena-view`).
 
-```
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF
-cargo run --release -p arena-view -- GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] --shot out.png [FRAMES [TURN]]
-```
+### The view
 
-Not drawn yet: the other door kinds moving, chasms
-and water, the outdoor light by time of day (the ground stays lit at
-night), the mountains, clouds, sun, moons and stars, and the interface. How a dungeon's placed creatures
-(map flats naming creature files, such as rat.dfa) come to life is not
-found yet.
+    target/release/arena-view GAME_DIR [LEVEL] [options]
 
-## Porting a routine
+What to start with:
 
-1. Disassemble it from `re/ACD_unpacked.EXE` (rebuild with
-   `tools/rebuild_mz.py` if missing).
-2. Port it, keeping 16-bit semantics explicit (`wrapping_*`, exact widths)
-   and keeping the original's bugs. State goes in a typed struct if
-   understood, otherwise in `Memory` at the original segment:offset. Where
-   the original faults or hangs, return `None`.
-3. Add cases to a `harness/gen_*.py` and regenerate its vectors. Each case
-   records the writes made before the call, the returned registers and
-   every changed byte; the Rust test replays it and must match exactly.
+- `--create [SCRIPT]` — the program as the original starts: intro, title,
+  main menu, then character creation on the original's screens (class by
+  questions or from the list, name, gender, province on the map, what you
+  are told, attributes and bonus points, face, the vision), then the start
+  dungeon. SCRIPT feeds keys and clicks first (comma-separated: a
+  character, `enter`, `esc`, `back`, `up`, `down`, `type:TEXT`,
+  `click:X:Y`). The menu's Start plays the opening story; a key ends it and
+  is spent, so give one (e.g. `esc`) after `S`.
+- `--new-game CLASS:PROVINCE:SEX:FACE:NAME` — a character made without the
+  screens (CLASS 0..17 from the class list, or `q` and ten answers 0..2),
+  then the start dungeon. LEVEL may be left out (START.MIF).
+- `LEVEL` — a `.MIF`, or a city: `CITY:PROVINCE:INDEX[:TERRAIN:WEATHER[:DAY]]`
+  (province 0..7, 8 the Imperial City; index 0..7 city-states, 8..15
+  towns, 16..31 villages; the weather is the season's roll, 5 rain with
+  fog).
+- `--load --save-dir DIR --slot N` — a saved game loaded at the start, into
+  whatever area it was saved in. Your save folder is only read; saves the
+  view makes (F5) go to `--save-dir`.
 
-Pitfalls:
+Options:
 
-- capstone mislabels sign extensions in 16-bit code: opcode 99 prints as
-  `cdq` but is `cwd`, and 98 prints as `cwde` but is `cbw`.
-- unicorn caches translated code, so patching code bytes after it has run
-  has no effect. Stub calls with fixed code that reads its result from
-  data (see `harness/gen_combat.py`).
-- The image's RNG seed is 0, a fixed point of the LCG. Seed the machine
-  before running anything that rerolls.
-- Private helpers on `Machine` share one namespace across modules; give
-  them module-specific names.
-- DGROUP holds relocated segment words, which differ between the
-  emulator (loaded at 1000h) and the port (image-relative). Keep test
-  pointers in memory the case writes, and convert stored segment values
-  back to image-relative before diffing.
-- capstone reports near branch targets past offset 0xFFFF unwrapped;
-  `xref.py` wraps them (a `call 0x1533c` in segment 0 is 0000:533C).
-- unicorn stops silently on a faulting `div` and on an exhausted
-  instruction budget; check where it stopped before trusting a result.
-- Reroll loops that can only end on a different RNG value hang when the
-  seed sits on a short cycle; use `random::CycleCheck` and return None.
-- Vector runs that decompress under unicorn are slow (an hour for
-  `gen_level.py`): write output line-buffered and make long generators
-  resumable.
-- In an agent worktree the game is not at `../ESarena`; set `ARENA_EXE`
-  or the game-dependent tests skip silently.
+| Option | |
+|---|---|
+| `--hour H` | the clock set to that hour of the first day |
+| `--at COL ROW HEADING` | the player put in a square's centre (512 heading units a turn) |
+| `--fight`, `--people` | a random encounter at the start; roll until people come |
+| `--shot OUT.png [FRAMES [TURN]]` | render one picture headless and exit, after turning by TURN and FRAMES frames of walking |
+| `--wait N`, `--click` | stand still N frames before the walk; click the view's centre first |
+| `--do STEPS` | scripted steps before the shot (below) |
+| `--picks A,B,..` | answers to the game's questions in order: a menu's entry by number, `tTEXT` typed text, `cX:Y` a click; after them a question is left as Esc leaves it |
+| `--spellmaker SCRIPT` | with `--do spellmaker`: the spellmaker's clicks (`name`, `effects`, `target`, `element`, `new`, `buy`, `exit`, `up:I`, `down:I`, `done`, `show`, `pick:N`, `type:TEXT`) |
+| `--playtest SEED FRAMES [SETUP]` | a headless playtest: a seeded random policy plays FRAMES turns and reports every turn that fails |
+| `--mute`, `--no-music`, `--sound-log` | no sound at all; no music (no music driver loaded, as "No Music"); print each sound and song instead of or as well as playing it |
 
-## Running tests
+`--do` steps (comma-separated): `click`, `turn:N`, `walk:N`, `wait:N`,
+`at:COL:ROW:HEADING`, `camp`, `save`, `load`, `key:N` (a key by scan code),
+`ready`, `compass`, `swing:DX:DY` (a right-button drag; a swing needs 40h
+mickeys or more), `cast:N`, `storm:N` (frames until the lightning flashes),
+`inv`, `equip:N`, `select:N`, `drop`, `usable`, `use:N`, `spells`, `book`,
+`spell:N`, `close`, `clickat:X:Y`, `map`, `shop:KIND`, `quest`,
+`movie:NAME[:TEXT]`, `spellmaker`, `ui:TOKEN`; and debugging aids `give:N`,
+`learn:N`, `sp:N`, `gold:N`, `hp:N`, `day:N`, `wear:N`, `class:N`,
+`corpse`, `fatigue:N`, `xp:N`. `view/src/main.rs`'s module docs describe
+each.
 
-    cargo test
+Keys in the window: W/S or Up/Down walk, A/D strafe, Left/Right turn, the
+mouse turns (click to capture, Esc releases); Space jumps (Shift: a running
+jump); E or a captured click clicks the view's centre; Q readies the weapon
+and a right-button drag swings it; I the inventory, C the spellbook, M the
+automap, R camps, F5 saves, F9 loads, F2/F3 the game's keys, F8 the
+compass, F a random encounter, P people. Menus take arrows and Enter, an
+entry's letter or number, or a click; Esc leaves them. While the game waits
+for an answer no game time passes.
 
-Loader tests read `../ESarena/ACD.EXE`, or the path in `ARENA_EXE`, and skip
-if it is absent. Regenerating vectors needs `pip install unicorn capstone`:
+Sound plays through PulseAudio, opened at run time (nothing plays without
+it). Music plays on an emulated OPL3 with the game's own timbres
+(SAMPLE.AD), as its Sound Blaster FM driver did.
 
+The `examples/` of both crates are smaller tools (maps of cities, dungeons
+and the wilderness, the character sheet of a save, quests made in a town,
+and so on); each one's header says how to run it.
+
+## How the port is verified
+
+- `harness/emu.py` loads the unpacked image under unicorn (16-bit x86) at
+  segment 1000h with a stub DOS. Every call starts from a defined register
+  state, and a fault in the original is reported as a fault.
+- Each `harness/gen_*.py` draws cases from a seeded stream: the memory a
+  routine reads is filled, the original runs, and one line is written per
+  case to `tests/vectors/*.txt`, with digests (FNV-1a) of every byte the
+  routine changed, its registers, and what its stubbed callees were asked.
+  "hang" and "fault" are recorded too.
+- Each `tests/*.rs` rebuilds the same cases from the same seeds and replays
+  them through the port: every digest must match. A port that returns `None`
+  must do so exactly where the original hangs or faults.
+- Each port is mutation-checked: small changes to the port (a boundary, a
+  constant, a dropped write) must make its test fail. Cases are aimed at
+  the edges random cases miss; random rolls can be forced to a value by
+  running the RNG backwards (its multiplier 6D002Dh is invertible mod 2^32).
+- The vectors are regenerated only when a port or its generator changes.
+  Generators whose cases are independent shard: `python harness/par.py 6
+  harness/gen_x.py ARGS OUT` runs six processes and joins their output in
+  order (`emu.mine`), byte-identical to one process. `emu.changes` and
+  `emu.fnv` (a small C function compiled on first use) keep generation
+  fast.
+
+Running them:
+
+    ARENA_EXE=/path/to/ACD.EXE ARENA_SAVE=/path/to/save cargo test --release
     python harness/gen_rules.py re/ACD_unpacked.EXE tests/vectors/rules.txt
+
+`re/ACD_unpacked.EXE` is the unpacked image (`tools/` holds the unpacker and
+`tools/rebuild_mz.py`). Generators need `pip install unicorn capstone`.
+
+The tests that need the game read `ARENA_EXE` (or `../ESarena/ACD.EXE`) and
+**skip silently** when it is missing; those that need a save read
+`ARENA_SAVE`. In a git worktree `../ESarena` doesn't exist, so set both.
+
+Porting a routine: disassemble it, port it with explicit 16-bit arithmetic
+(`wrapping_*`, exact widths) and the original's bugs, keep state in memory
+at the original's addresses where it isn't understood, write a generator and
+a test, mutation-check it, then commit with a message saying what was
+found. Some pitfalls the history taught:
+
+- capstone prints 99h as `cdq` and 98h as `cwde`; in 16-bit code they are
+  `cwd` and `cbw`.
+- unicorn caches translated code: stub a callee with fixed code that reads
+  its answer from data, don't patch code between cases.
+- The image's RNG seed (and its table mode) make every roll the same; seed
+  the machine before anything that rolls.
+- DGROUP holds relocated segment words, which differ between the emulator
+  and the port; convert them back before comparing.
+- The port keeps the image at segment 0, so a hook into segment 0000 has a
+  zero segment word; `Machine::hook_set` tests the whole far pointer.
+- Loops the original only leaves when memory gives it what it looks for
+  need a cheap bound (a cycle check), not a huge step limit.
+
+## What is ported (`src/`)
+
+Ported routines are methods on `Machine` (`machine.rs`: memory, the RNG, the
+EMS banks, the mouse, sound and music drivers' state). Addresses are
+image-relative segment:offset in the unpacked ACD.EXE.
+
+- **Core:** `exe` (unpacking), `mem` (flat real-mode memory, the image at
+  linear 0), `heap` (the game's heap), `random` (0000:6E10..6EEA), `dice`,
+  `scale`, `format` (sprintf 0000:8D14), `hooks` (the segment-0000 hooks the
+  3D mode installs).
+- **Files:** `bsa` (GLOBAL.BSA and loose files, 0000:67C4..6F87; files the
+  game writes are kept in memory), `mif` (.MIF levels, the LZHUF
+  decompressor, city blocks), `level` (0000:E87C), `info` (the .INF loader
+  0000:EC03), `save`, `load` (25FD), `save_write` (25FD:0113),
+  `automap` (0000:3491, 3503, 386F; 23F1:013C).
+- **Characters and items:** `character`, `progression` (2686),
+  `newgame` (creation, 1194:24A6..2D28, 222C; set-up 21EE:016C), `levelup`
+  (1194:1034, exhaustion 2901:0014), `item`, `inventory`, `use_item`
+  (24FA:07CD, 29CF:07C3, 1194:1AFB/7605/18F6), `loot`, `shop`, `outfit`,
+  `names` (1194:080B), `effects` (2EBD), `rest` (1194:424E, 2901:016C).
+- **The world:** `engine` (the world loop 0000:A240), `frame` (0000:481E),
+  `movement` (0000:F478..FD00), `controls` (2826:0002), `steps`
+  (0000:FCF6), `squares` (0000:D3A0, 0628, 06BE), `click` (2826:077E),
+  `trigger` (0000:43B1), `transit` (the outer loop 0000:0CAD, area runs,
+  2294:025B), `city` (1194:0292), `cityinfo` (1194:3EBF), `dungeon`, `wild`
+  (217B), `travel` (1194:2E69), `clock` (0000:142D), `weather` (0000:0F05,
+  2294:0B01), `light` (0000:B6EB, 0390), `sky` (2294:0341), `skyobj`
+  (2294:08B9, 0A5D, 0000:E5C9).
+- **People and fights:** `actors` (0000:1854), `creature`, `encounter`
+  (25CA, 1194:887A, 86F2, D91C), `combat`, `attack` (2AA1:00D8), `strike`
+  (0000:3B6D), `weapon` (0000:38CE), `cast` (29CF:071F), `spell`
+  (29CF:0941), `projectile` (29CF), `talk` (1194:DB6C), `text` (1194:A374,
+  the `%` codes 2DA2:000A).
+- **Shops and quests:** `shops` (the table at 869F; the temple 1194:C258),
+  `tavern` (B93C), `store` (F48E, repairs C6AC), `guild` (A73E),
+  `spellmaker` (1194:6064), `haggle` (1194:8020), `loot_window`
+  (2433:0583), `piles` (2433:0000), `quest` (98E8..9CD7, 8F1E, CED7, D593),
+  `sidequest` (1194:9358), `log`.
+- **Sound:** `sound` (23BA:002A, 00E8), `music` (2294:04C0, 04F5, 10B6).
+
+## The front end (`view/`)
+
+A new renderer, not a port of the original's drawing: the engine runs the
+game and the view draws what is in its memory, through hooks for the
+original's screens and questions.
+
+- `world` (the level as triangles and billboards, the hit test), `render`
+  and `shader.wgsl` (wgpu; the original's focal length, light rows and
+  shading table), `flats` and `archive` (the game's images and files).
+- `areas` (following the game from area to area), `newgame`, `create`
+  (character creation's screens), `playtest`.
+- `hud` (texts in the game's font), `dialog` (answers to the game's
+  questions, by replaying a turn), `interface` (the bar, portrait, bars,
+  compass, weapon, casting hands), `panels` (inventory, spellbook, loot),
+  `doll` (the paper doll), `automap`, `shopui`, `questui`, `spellmaker`.
+- `flc` (the game's FLC animations), `audio` (VOC sounds through
+  PulseAudio), `music` (XMIDI on an emulated OPL3).
+
+## Known gaps and approximations
+
+At the time of writing:
+
+- **Engine:** `Engine::frame` runs the player's physics before the drawing
+  step, where the original draws first. Some `%` text codes still return
+  `None` (`%hc`, `%qc`, `%tc`, `%mt`, `%dit`, `%qf`, parts of `%cn` and
+  `%tem`). The save menu and typing a save's name, the CITYDATA check
+  (242A:000E) and loading from the title screen (5C8 bit 4) are not ported.
+- **Bounds where the original never ends:** a respawn with no free square
+  gives up after 65536 tries; collapsing from exhaustion inside the hour it
+  costs gives up after 200 nested collapses.
+- **View:** the lightning bolt, the moons and the stars are not drawn (the
+  flash is); lights behind walls follow the original's rule but are
+  unconfirmed on screen; the paper doll isn't recoloured by material; the
+  level's texts aren't drawn; some store list lines show a price of 0;
+  explosions are nudged in front of the wall they hit. Many interactive
+  paths were checked only with scripted shots.
+- **Sound:** the FM voice driver (voice allocation, volume curves, vibrato,
+  the Pro's two chips) is approximate and has not been listened to; there
+  is no SoundFont fallback, and the music volume setting isn't applied.
+- **Vectors:** `gen_level.py`'s last 169 of 852 cases were not regenerated
+  after the harness's register fix (resume with `gen_level.py EXE GAME_DIR
+  OUT 683`).
+
+## Third-party code
+
+The `arena` crate has no dependencies. The view uses:
+
+| Crate | Licence |
+|---|---|
+| wgpu | MIT OR Apache-2.0 |
+| winit | Apache-2.0 |
+| pollster | Apache-2.0 / MIT |
+| bytemuck | Zlib OR Apache-2.0 OR MIT |
+| glam | MIT OR Apache-2.0 |
+| png | MIT OR Apache-2.0 |
+| libloading | ISC |
+| nuked-opl3 | LGPL-2.1-or-later |
+
+`nuked-opl3` (a Rust port of Nuked-OPL3) is linked statically into the
+`arena-view` binary. That matters only if you distribute the binary: the
+LGPL then asks that users can relink it against a modified version of the
+library (for example by providing the object files or the source).

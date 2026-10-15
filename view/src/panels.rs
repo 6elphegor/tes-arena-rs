@@ -150,6 +150,10 @@ pub fn learn(m: &mut Machine, index: u8) {
 pub enum Panel {
     Inventory(Inventory),
     Spellbook(Spellbook),
+    /// The character sheet's stats page (`sheets`).
+    Sheet,
+    /// The logbook (`sheets`).
+    Log(crate::sheets::LogBook),
 }
 
 /// The inventory: the use list when it is up (the names, the line
@@ -157,6 +161,9 @@ pub enum Panel {
 #[derive(Clone, Debug, Default)]
 pub struct Inventory {
     pub using: Option<(Vec<String>, usize)>,
+    /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
+    /// back to the sheet.
+    pub from_sheet: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -308,6 +315,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
         entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone() }]).collect(),
         keys: Vec::new(),
         selected: sel,
+        list: false,
     }
 }
 
@@ -371,6 +379,8 @@ pub fn book_layout(font: &Font) -> (i32, i32, i32, i32, usize) {
 /// The panel drawn over the layer (`pics`: EQUIP.IMG).
 pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Image], panel: &Panel, m: &Machine) {
     match panel {
+        Panel::Sheet => crate::sheets::draw_sheet(screen, m, doll),
+        Panel::Log(log) => crate::sheets::draw_log(screen, log),
         Panel::Inventory(inv) => {
             screen.fill(0, 0, crate::hud::W as i32, crate::hud::H as i32, 0, 0xFF);
             // The page with the body and what is worn on it (`doll`), the

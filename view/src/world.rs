@@ -29,6 +29,11 @@ pub const SPRITE: u32 = 1;
 /// Vertex flag: placed on the screen (x, y in clip space), behind the
 /// world, not shaded by the lights: the sky's objects.
 pub const SCREEN: u32 = 16;
+/// Vertex flags for the sky's bodies (0000:E41A): BODY, behind the sky's
+/// objects and not remapped by the night; DARK_SKY, a star, drawn only
+/// where the sky under it is dark.
+pub const BODY: u32 = 32;
+pub const DARK_SKY: u32 = 64;
 
 /// Vertex flags: a wall face's side as the original numbers it (CCF8),
 /// plus one, shifted by WALL_SHIFT: 0 its normal -y (north), 1 +x, 2 +y,
@@ -108,7 +113,14 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // loop's hooks and the level's), the level being loaded already. The
     // view has no sound: the INF's sounds (the hook CD4A) aren't loaded.
     let name = arena::transit::var::LEVEL_NAME;
+    // The original begins the world before it loads the level, and
+    // world_begin empties the level's trigger squares (C866), which the
+    // level's TRIG chunk has filled here already: they are kept.
+    let triggers: Vec<u8> = (0..0x101u16).map(|i| m.mem.r8(DS, arena::level::var::TRIGGERS + i)).collect();
     m.world_begin(name, &mut arena::transit::NoAreaHooks);
+    for (i, b) in triggers.into_iter().enumerate() {
+        m.mem.w8(DS, arena::level::var::TRIGGERS + i as u16, b);
+    }
     m.mem.w32(DS, 0xCD4A, 0);
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);
@@ -623,8 +635,16 @@ fn sky_files() -> Vec<String> {
     v.extend(["VOLCANO2.DFA".to_string(), "VOLCANO3.IMG".to_string()]);
     // The lightning's bolts (0000:E5C9 loads them into the sky's bank).
     v.extend((1..=6).map(|i| format!("LGLIT0{i}.CFA")));
+    // The sky's bodies (0000:E5C9 too): the sun, the moons' phases, the
+    // stars.
+    v.extend(["SUN.IMG".to_string(), "MOON01.DFA".to_string(), "MOON02.DFA".to_string()]);
+    v.extend((1..=8).map(|i| format!("STAR{i}.IMG")));
     v
 }
+
+/// The atlas entry of the stars' single pixels: colours 40h..4Fh, one
+/// texel each (a cluster's pixel, 2294:03A1).
+pub const STAR_PIXELS: &str = "#STAR PIXELS";
 
 /// Whether a file is a person's image: a view (`01PLTWLK.CFA`: a woman's
 /// with 1 first, the view 1..5, then the look and the action, or a
@@ -641,12 +661,13 @@ struct Packer {
     x: u32,
     y: u32,
     shelf: u32,
-    sheet: SpriteSheet,
+    pixels: Vec<u8>,
+    rects: Vec<Rect>,
 }
 
 impl Packer {
     fn add(&mut self, f: &crate::flats::Flat) -> Frames {
-        let first = self.sheet.rects.len();
+        let first = self.rects.len();
         let (w, h) = (f.w as u32, f.h as u32);
         for frame in &f.frames {
             if self.x + w > ATLAS {
@@ -656,14 +677,14 @@ impl Packer {
             }
             let r = Rect { x: self.x, y: self.y, w, h };
             let need = ((r.y + h) * ATLAS) as usize;
-            if self.sheet.pixels.len() < need {
-                self.sheet.pixels.resize(need, 0);
+            if self.pixels.len() < need {
+                self.pixels.resize(need, 0);
             }
             for row in 0..f.h {
                 let at = ((r.y as usize + row) * ATLAS as usize) + r.x as usize;
-                self.sheet.pixels[at..at + f.w].copy_from_slice(&frame[row * f.w..(row + 1) * f.w]);
+                self.pixels[at..at + f.w].copy_from_slice(&frame[row * f.w..(row + 1) * f.w]);
             }
-            self.sheet.rects.push(r);
+            self.rects.push(r);
             self.x += w;
             self.shelf = self.shelf.max(h);
         }
@@ -695,34 +716,68 @@ pub fn creature_names(m: &Machine) -> Vec<String> {
     names
 }
 
-pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archive::Archive, names: &[String]) -> SpriteSheet {
-    let sheet = SpriteSheet { h: 0, pixels: vec![], rects: vec![], flats: vec![], creatures: vec![], people: Default::default(), sky: Default::default() };
-    let mut p = Packer { x: 0, y: 0, shelf: 0, sheet };
-    for f in flats {
-        let frames = f.as_ref().map(|f| p.add(f));
-        p.sheet.flats.push(frames);
-    }
-    for name in names {
-        let mut views = [None; 6];
-        for (i, v) in views.iter_mut().enumerate() {
-            let file = name.replace('@', &(i + 1).to_string());
-            if let Some(f) = archive.read(&file).as_deref().and_then(crate::flats::cfa) {
-                *v = Some(p.add(&f));
-            }
+/// One file read and decoded (`kind` as `flats::decode` takes it), with
+/// the header words at +2, +6 and +8 (a person's: the weapon's placement
+/// over it).
+fn decode_file(archive: &crate::archive::Archive, name: &str, kind: u8) -> Option<(crate::flats::Flat, [i16; 3])> {
+    let d = archive.read(name)?;
+    let f = crate::flats::decode(kind, &d)?;
+    let at = |o: usize| d.get(o..o + 2).map_or(0, |b| i16::from_le_bytes([b[0], b[1]]));
+    Some((f, [at(2), at(6), at(8)]))
+}
+
+/// A file decoded for the sheet (`decode_file`), shared by the sheets.
+type Decoded = Option<std::rc::Rc<(crate::flats::Flat, [i16; 3])>>;
+/// A file's name and what `decode_file` made of it.
+type Made = (String, Option<(crate::flats::Flat, [i16; 3])>);
+
+thread_local! {
+    /// The files decoded so far, by name. The game's files don't change
+    /// during a run, and every area's sheet holds the same creatures,
+    /// people and sky, so only the first sheet decodes them.
+    static DECODED: std::cell::RefCell<std::collections::HashMap<String, Decoded>> = Default::default();
+}
+
+/// `files` decoded, in their order: from `DECODED`, the rest decoded on
+/// threads at once (decoding a file reads nothing but the file).
+fn decoded(archive: &crate::archive::Archive, files: &[(String, u8)]) -> Vec<Decoded> {
+    let missing: Vec<&(String, u8)> = DECODED.with(|c| {
+        let c = c.borrow();
+        let mut seen = std::collections::HashSet::new();
+        files.iter().filter(|(n, _)| !c.contains_key(n) && seen.insert(n.as_str())).collect()
+    });
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).clamp(1, 16);
+    let chunk = missing.len().div_ceil(threads).max(1);
+    let made: Vec<Made> = std::thread::scope(|s| {
+        let parts: Vec<_> = missing
+            .chunks(chunk)
+            .map(|part| s.spawn(move || part.iter().map(|(name, kind)| (name.clone(), decode_file(archive, name, *kind))).collect::<Vec<_>>()))
+            .collect();
+        parts.into_iter().flat_map(|h| h.join().expect("decoding the sheet's files")).collect()
+    });
+    DECODED.with(|c| {
+        let mut c = c.borrow_mut();
+        for (name, d) in made {
+            c.insert(name, d.map(std::rc::Rc::new));
         }
-        p.sheet.creatures.push(views);
-    }
+        files.iter().map(|(n, _)| c.get(n).cloned().flatten()).collect()
+    })
+}
+
+pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archive::Archive, names: &[String]) -> SpriteSheet {
+    let mut p = Packer { x: 0, y: 0, shelf: 0, pixels: Vec::new(), rects: Vec::new() };
+    let flats = flats.iter().map(|f| f.as_ref().map(|f| p.add(f))).collect();
+    // The files after the level's flats, decoded first and packed in this
+    // order: the creatures' views, the people, the sky's.
     let mut people: Vec<&str> = archive.names().filter(|n| is_person_file(n)).collect();
     people.sort_unstable();
-    for name in people {
-        let Some(d) = archive.read(name) else { continue };
-        if let Some(f) = crate::flats::cfa(&d) {
-            let at = |o: usize| i16::from_le_bytes([d[o], d[o + 1]]);
-            let frames = p.add(&f);
-            p.sheet.people.insert(name.to_string(), (frames, [at(2), at(6), at(8)]));
-        }
+    let sky = sky_files();
+    let mut files: Vec<(String, u8)> = Vec::new();
+    for name in names {
+        files.extend((1..=6).map(|i| (name.replace('@', &i.to_string()), 0x80)));
     }
-    for name in sky_files() {
+    files.extend(people.iter().map(|n| (n.to_string(), 0x80)));
+    for name in &sky {
         let kind = if name.ends_with(".DFA") {
             1
         } else if name.ends_with(".CFA") {
@@ -730,15 +785,41 @@ pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archi
         } else {
             0
         };
-        if let Some(f) = archive.read(&name).as_deref().and_then(|d| crate::flats::decode(kind, d)) {
-            let frames = p.add(&f);
-            p.sheet.sky.insert(name, frames);
+        files.push((name.clone(), kind));
+    }
+    let made = decoded(archive, &files);
+    let mut made = made.iter();
+    let mut creatures = Vec::new();
+    for _ in names {
+        let mut views = [None; 6];
+        for v in views.iter_mut() {
+            if let Some(d) = made.next().expect("a view") {
+                *v = Some(p.add(&d.0));
+            }
+        }
+        creatures.push(views);
+    }
+    let mut people_frames = std::collections::HashMap::new();
+    for name in people {
+        if let Some(d) = made.next().expect("a person") {
+            let frames = p.add(&d.0);
+            people_frames.insert(name.to_string(), (frames, d.1));
         }
     }
-    let mut sheet = p.sheet;
-    sheet.h = ((sheet.pixels.len() as u32).div_ceil(ATLAS)).max(1);
-    sheet.pixels.resize((sheet.h * ATLAS) as usize, 0);
-    sheet
+    let mut sky_frames = std::collections::HashMap::new();
+    for name in sky {
+        if let Some(d) = made.next().expect("a sky's") {
+            let frames = p.add(&d.0);
+            sky_frames.insert(name, frames);
+        }
+    }
+    let strip = crate::flats::Flat { w: 16, h: 1, frames: vec![(0x40..0x50).collect()] };
+    let frames = p.add(&strip);
+    sky_frames.insert(STAR_PIXELS.to_string(), frames);
+    let h = ((p.pixels.len() as u32).div_ceil(ATLAS)).max(1);
+    let mut pixels = p.pixels;
+    pixels.resize((h * ATLAS) as usize, 0);
+    SpriteSheet { h, pixels, rects: p.rects, flats, creatures, people: people_frames, sky: sky_frames }
 }
 
 /// The graphics list of the people in a fight (2686:0423, at 1044,
@@ -797,8 +878,8 @@ fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shif
 /// - the flats standing in the map (MAP1 words 8xxx: flat low byte +
 ///   FLAT_BASE) at their squares' centres, raised by the flat record's
 ///   Y, animations at frame `tick`;
-/// - the creatures in the actor slots (not inactive, 4000h): sprite C0h
-///   + view (0..4, mirrored with flag 2) is the type's view file, C5h
+/// - the creatures in the actor slots (not inactive, 4000h): sprite C0h +
+///   view (0..4, mirrored with flag 2) is the type's view file, C5h
 ///   (dying) its sixth, any other a flat (the corpse); +D the frame.
 pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
     sprites_tagged(m, sheet, heading, tick).0
@@ -1096,6 +1177,12 @@ pub fn flat_drawn(m: &mut Machine, col: u16, row: u16, n: u16) {
 /// row above it the last), 100 to the half view; rows past `bottom` cut.
 #[allow(clippy::too_many_arguments)]
 pub fn sky_quad(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, horizon: i16, bottom: i16, focal: f32) {
+    sky_quad_flags(out, rect, x, y, centre, horizon, bottom, focal, 0);
+}
+
+/// `sky_quad` with more vertex flags (BODY, DARK_SKY).
+#[allow(clippy::too_many_arguments)]
+pub fn sky_quad_flags(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, horizon: i16, bottom: i16, focal: f32, flags: u32) {
     let rows = (bottom as i32 + 1 - y as i32).clamp(0, rect.h as i32);
     if rows == 0 {
         return;
@@ -1110,6 +1197,6 @@ pub fn sky_quad(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, 
     let (v0, v1) = (rect.y as f32 + IN, (rect.y + rows as u32) as f32 - IN);
     let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
     for i in [0, 1, 2, 0, 2, 3] {
-        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE | SCREEN });
+        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE | SCREEN | flags });
     }
 }

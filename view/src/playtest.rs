@@ -176,6 +176,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         map: false,
         over: false,
         ui: None,
+        travel: None,
+        cursor: (160, 100),
     };
     let mut dice = Dice(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     // Round 2's targeted acts (PT_TOURS=N: N% of the acts, 30 when not a

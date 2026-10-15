@@ -335,7 +335,7 @@ fn atoi(m: &Machine, seg: u16, mut s: u16, mut bx: u16) -> (u16, u16, u16) {
     loop {
         let c = m.mem.r8(seg, s);
         s = s.wrapping_add(1);
-        if c == 0 || !(b'0'..=b'9').contains(&c) {
+        if c == 0 || !c.is_ascii_digit() {
             break;
         }
         let d2 = dx.wrapping_add(dx);

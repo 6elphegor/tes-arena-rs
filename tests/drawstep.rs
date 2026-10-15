@@ -27,7 +27,7 @@ fn setup(m: &mut Machine, seed: u32) {
         flags |= 0x100;
     }
     rec[0xF..0x11].copy_from_slice(&flags.to_le_bytes());
-    let count = s.byte() % 0x10 | if s.byte() & 1 != 0 { 0x80 } else { 0 };
+    let count = (s.byte() % 0x10) | if s.byte() & 1 != 0 { 0x80 } else { 0 };
     rec[0xE] = count;
     rec[0xD] = if s.byte() < 0xC0 { ((count & 0x7F) as i32 - 1 + (s.byte() % 3) as i32) as u8 } else { s.byte() };
     let k = s.byte() % 4;

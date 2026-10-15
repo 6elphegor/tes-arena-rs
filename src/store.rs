@@ -1119,7 +1119,7 @@ impl Machine {
 
     /// 1194:C83B. The job on the item at `si`, priced `eax`: offered
     /// (text 590h) and, refused, asked again from the three reasons
-    /// (REASONS: 1194:CB40, CBD3, CC77) until agreed or left. The minute
+    /// (REASONS: 1194:CB40, 1194:CBD3, 1194:CC77) until agreed or left. The minute
     /// it will be ready (1194:CAF6, paid), or None (left, or not enough
     /// gold).
     fn repair_offer(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, si: u16, eax: u32) -> Option<Option<u32>> {
@@ -1458,28 +1458,5 @@ impl Machine {
             let b = self.mem.r8(DS, at.wrapping_add(1 + i));
             self.mem.w8(DS, di.wrapping_add(i), b);
         }
-    }
-
-    /// The store's weapons (`weapons`) or armour for a front end's list:
-    /// each record's name as Buy names it (1194:F768, through TEMPLATE and
-    /// NAME) and its price as Buy asks it (on the shop's holiday, 1194:
-    /// 4A6B). The original's lines (1194:F142, F204: the name, the hands,
-    /// the weight and the price, in the EMS frame) aren't ported.
-    pub fn store_list(&mut self, weapons: bool) -> Vec<(String, u32)> {
-        let (list, count, service) = if weapons { (WEAPON_LIST, WEAPONS, 2) } else { (ARMOR_LIST, ARMOR, 3) };
-        let n = self.mem.r8(DS, count) as u16;
-        let frame = self.mem.r16(DS, FRAME);
-        let mut out = Vec::new();
-        for i in 0..n {
-            self.memmove(frame, list.wrapping_add(i * 13), DS, TEMPLATE, 13);
-            let price = self.mem.r32(DS, TEMPLATE + t::PRICE);
-            let price = if self.mem.r8(DS, HOLIDAY) == 1 { self.holiday_price(price, service) } else { price };
-            let name = match self.store_template_name() {
-                Some(()) => String::from_utf8_lossy(self.mem.cstr(DS, NAME)).into_owned(),
-                None => String::from("?"),
-            };
-            out.push((name, price));
-        }
-        out
     }
 }

@@ -480,7 +480,7 @@ impl Machine {
         self.mem.w8(DS, INPUT_KIND, kind);
     }
 
-    /// 1194:83FD, 84F1 and 84C3 for modes 1 to 4: message `kind` (0 the
+    /// 1194:83FD, 1194:84F1 and 1194:84C3 for modes 1 to 4: message `kind` (0 the
     /// opening, 1 the confirmation, 2 and 3 refusals, 4 a counter-offer)
     /// is line kind * 15 + tier * 3 + range(0, 3) of the dialogue file in
     /// the buffer segment, where tier is quality / 20 rounded up, less 1

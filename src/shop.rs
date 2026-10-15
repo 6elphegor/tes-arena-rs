@@ -392,6 +392,9 @@ impl Machine {
     /// 1194:F37B. Sorts `n` templates at LIST_SEG:`list` by price,
     /// cheapest first, swapping through the template at 13F3 (which is
     /// left holding the last swapped entry).
+    // The outer count is fixed on entry (the original's CX), while DL
+    // shrinks inside: `for` over the first value keeps that.
+    #[allow(clippy::mut_range_bound)]
     pub fn shop_sort(&mut self, list: u16, n: u8) {
         if n <= 1 {
             return;
@@ -555,7 +558,7 @@ impl Machine {
     }
 
     /// 1194:B566. Trinket (kind 0): a sub-kind by d100 against 1DEB (or
-    /// forced by 13C8), then one of three variants (B718/B74B/B77E) each
+    /// forced by 13C8), then one of three variants (1194:B718/1194:B74B/1194:B77E) each
     /// with its own type table, then the price (B5B5).
     pub(crate) fn shop_magic_kind0(&mut self) -> Option<()> {
         self.shop_add_key16(10);

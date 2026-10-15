@@ -4,13 +4,14 @@ use crate::exe::Image;
 use crate::mem::Memory;
 use crate::random::ArenaRandom;
 
-#[derive(Clone)]
 pub struct Machine {
     pub mem: Memory,
     pub rng: ArenaRandom,
     /// EMS: the 64 KB banks not mapped into the frame (see
-    /// `Machine::ems_map`), created as zeros when first needed.
-    pub ems: Vec<Vec<u8>>,
+    /// `Machine::ems_map`), created as zeros when first needed. Shared
+    /// between copies of the machine until one writes a bank
+    /// (`Arc::make_mut`), so a copy costs the memory, not every bank.
+    pub ems: Vec<std::sync::Arc<Vec<u8>>>,
     /// The mouse driver's motion counters (mickeys, x and y) since they
     /// were last read (INT 33h function 0Bh; see `weapon`).
     pub mouse_motion: (u16, u16),
@@ -32,6 +33,41 @@ pub struct Machine {
     /// (AIL's sequence status: 0 stopped, 1 playing, 2 done).
     pub songs: Vec<crate::music::Song>,
     pub music_status: u8,
+}
+
+impl Clone for Machine {
+    fn clone(&self) -> Self {
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status } = self;
+        Machine {
+            mem: mem.clone(),
+            rng: rng.clone(),
+            ems: ems.clone(),
+            mouse_motion: *mouse_motion,
+            bios_ticks: *bios_ticks,
+            sound_busy: *sound_busy,
+            sounds: sounds.clone(),
+            sound_names: sound_names.clone(),
+            songs: songs.clone(),
+            music_status: *music_status,
+        }
+    }
+
+    /// Copied into this machine's own allocations (the memory and the EMS
+    /// banks reused): what a front end copying the machine every turn
+    /// wants, a fresh copy's megabytes being faulted in page by page.
+    fn clone_from(&mut self, source: &Self) {
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status } = source;
+        self.mem.clone_from(mem);
+        self.rng.clone_from(rng);
+        self.ems.clone_from(ems);
+        self.mouse_motion = *mouse_motion;
+        self.bios_ticks = *bios_ticks;
+        self.sound_busy = *sound_busy;
+        self.sounds.clone_from(sounds);
+        self.sound_names.clone_from(sound_names);
+        self.songs.clone_from(songs);
+        self.music_status = *music_status;
+    }
 }
 
 impl Machine {

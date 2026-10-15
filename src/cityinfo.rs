@@ -311,7 +311,7 @@ impl Machine {
     /// (y * 140h + x, 16 bits) of TERRAIN.IMG read, the image's 12-byte
     /// header included, made a terrain (`terrain_of`); for 6 the nearest
     /// other terrain (3DF2).
-    fn city_climate(&mut self, files: &mut Files, x: u16, y: u16, province: u8) -> Option<u8> {
+    pub fn city_climate(&mut self, files: &mut Files, x: u16, y: u16, province: u8) -> Option<u8> {
         self.city_load_province(files, province)?;
         let (gx, gy) = self.city_local_to_global(x, y)?;
         self.mem.w16(DS, WORLD, gx);

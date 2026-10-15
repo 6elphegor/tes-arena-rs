@@ -240,7 +240,7 @@ impl Machine {
     /// (a byte add: past 255 it is the base), not above the base; then
     /// the player's modifiers (1194:361D).
     fn rest_attributes(&mut self) {
-        let dl = (self.r_g8(0x01D2) / 10) as u8;
+        let dl = self.r_g8(0x01D2) / 10;
         for i in 0..8u16 {
             let base = self.r_g8(0x01D5 + i);
             let cur = self.r_g8(0x01CD + i);
@@ -318,7 +318,7 @@ impl Machine {
         self.r_g8(0x05E6) == 4 && self.r_g8(0x0D48) == 4
     }
 
-    /// 1194:4659 (`passed` false) / 452F (true): the hours (HOURS, `%u`)
+    /// 1194:4659 (`passed` false) / 1194:452F (true): the hours (HOURS, `%u`)
     /// formatted with the text `si` into TEXT and drawn. 452F picks the
     /// text itself, "hours passed".
     fn rest_hours_text(&mut self, hooks: &mut dyn RestHooks, si: u16) {

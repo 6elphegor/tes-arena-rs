@@ -187,11 +187,13 @@ impl Machine {
         let frame = self.mem.r16(DS, BUFFER_SEG);
         let (old, page) = ((old >> 2) as usize, page as usize);
         if self.ems.len() <= old.max(page) {
-            self.ems.resize(old.max(page) + 1, vec![0; 0x10000]);
+            self.ems.resize(old.max(page) + 1, std::sync::Arc::new(vec![0; 0x10000]));
         }
-        for o in 0..=0xFFFFu16 {
-            self.ems[old][o as usize] = self.mem.r8(frame, o);
-            self.mem.w8(frame, o, self.ems[page][o as usize]);
+        // The frame's bytes to the old bank, the new bank's to the frame
+        // (the same bank twice: kept, the frame unchanged).
+        std::sync::Arc::make_mut(&mut self.ems[old]).copy_from_slice(self.mem.segment(frame));
+        if page != old {
+            self.mem.segment_mut(frame).copy_from_slice(&self.ems[page]);
         }
     }
 
@@ -222,9 +224,9 @@ impl Machine {
     pub fn ems_bank(&self, page: u16) -> Vec<u8> {
         if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
             let frame = self.mem.r16(DS, BUFFER_SEG);
-            return (0..=0xFFFFu16).map(|o| self.mem.r8(frame, o)).collect();
+            return self.mem.segment(frame).to_vec();
         }
-        self.ems.get(page as usize).cloned().unwrap_or_else(|| vec![0; 0x10000])
+        self.ems.get(page as usize).map(|b| b.to_vec()).unwrap_or_else(|| vec![0; 0x10000])
     }
 
     /// 0000:EBB5. Reloads the chunks of level LEVEL from the level file
