@@ -464,7 +464,7 @@ impl Machine {
             // dec, then the sign of the byte.
             let to = level.wrapping_sub(1);
             if to & 0x80 != 0 {
-                return self.move_exit(to);
+                return self.move_exit(files, to);
             }
             to
         } else {
@@ -474,7 +474,7 @@ impl Machine {
             stairs(self, files, hooks)?;
             let to = level.wrapping_add(1);
             if to >= self.mem.r8(DS, LEVELS) {
-                return self.move_exit(to);
+                return self.move_exit(files, to);
             }
             to
         };
@@ -493,7 +493,7 @@ impl Machine {
     /// the image at segment 0, where the original's are relocated and
     /// pass the hook's test (0000:A8EF, the segment). None for another
     /// hook set.
-    fn move_exit(&mut self, to: u8) -> Option<u16> {
+    fn move_exit(&mut self, files: &mut Files, to: u8) -> Option<u16> {
         let ported = matches!(self.mem.r32(DS, EXIT_HOOK), 0x4537 | 0x44BD);
         if self.hook_set(EXIT_HOOK) && !ported {
             return None;
@@ -501,7 +501,7 @@ impl Machine {
         if ported {
             let level = self.mem.r8(DS, LEVEL);
             self.mem.w8(DS, LEVEL, to);
-            self.area_exit(&mut crate::transit::NoAreaHooks)?;
+            self.area_exit(files, &mut crate::transit::NoAreaHooks)?;
             self.mem.w8(DS, LEVEL, level);
         }
         Some(0)

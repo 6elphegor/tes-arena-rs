@@ -65,9 +65,10 @@ pub trait LootHooks {
     fn sound(&mut self, m: &mut Machine, si: u16) {
         m.sound_file(si);
     }
-    /// 1194:D363: whether the staff's text was shown already (the carry).
-    fn piece_told(&mut self, _m: &mut Machine) -> bool {
-        false
+    /// 1194:D363: the piece completed (`Machine::complete_staff_piece`);
+    /// the carry, true where none was ready (then no text).
+    fn piece_told(&mut self, m: &mut Machine) -> bool {
+        !m.complete_staff_piece()
     }
     /// 1194:D986: the eighth piece: the quest's end begins.
     fn last_piece(&mut self, _m: &mut Machine) {}
@@ -156,6 +157,24 @@ impl Machine {
         let old = self.mem.r16(DS, 0x8FA8);
         self.ems_map(page);
         old >> 2
+    }
+
+    /// 2433:0199, leaving an interior or a dungeon: with piles in use
+    /// (FF2), bank 6 mapped (the bank before saved at 4D77; AX `ax` with
+    /// EMS off), the piles' table cleared (15E0h bytes at the frame's
+    /// A000h), none in use, the bank put back.
+    pub fn piles_forget(&mut self, ax: u16) {
+        if self.mem.r8(DS, PILE_COUNT) == 0 {
+            return;
+        }
+        let old = self.map_bank(BANK_PILES, ax);
+        self.mem.w16(DS, BANK, old);
+        let frame = self.mem.r16(DS, FRAME_SEG);
+        for i in 0..0x15E0 {
+            self.mem.w8(frame, TABLE + i, 0);
+        }
+        self.mem.w8(DS, PILE_COUNT, 0);
+        self.map_bank(old, old & 0xFF00);
     }
 
     /// 0000:9CA0: the string at seg:si copied to es:di with its NUL; DI

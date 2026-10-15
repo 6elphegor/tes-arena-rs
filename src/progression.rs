@@ -32,6 +32,8 @@ const STAFF_ACTIVE: u16 = 0x0F76;
 const STAFF_PIECES: u16 = 0x0F77;
 const STAFF_F7A: u16 = 0x0F7A;
 const STAFF_READY: u16 = 0x0F7C;
+const STAFF_ASKED: u16 = 0x0F79;
+const STAFF_F7E: u16 = 0x0F7E;
 
 impl Machine {
     fn set_pending_level_check(&mut self) {
@@ -227,6 +229,27 @@ impl Machine {
         let xp = 1000u16.wrapping_mul(level).min(65000);
         self.award_xp(xp as u32);
         true
+    }
+
+    /// 1194:D55F, leaving an interior for the outside (0000:44BD): with a
+    /// staff piece sought (0F76), 0F7E set, and with the person's quest
+    /// taken (0F79) the piece ready (0F7C, which `complete_staff_piece`
+    /// asks for); then the stores' and guilds' stock files deleted
+    /// ("eq*.??", 5CC4; "gl*.??", 5CCB; 1194:4D91).
+    pub fn staff_leave(&mut self, files: &mut crate::bsa::Files) {
+        self.staff_leave_with(&mut |m, si| m.delete_matching(files, si));
+    }
+
+    /// `staff_leave` with the deletes (SI the pattern) left to `delete`.
+    pub fn staff_leave_with(&mut self, delete: &mut dyn FnMut(&mut Machine, u16)) {
+        if self.mem.r8(DS, STAFF_ACTIVE) != 0 {
+            self.mem.w8(DS, STAFF_F7E, 1);
+            if self.mem.r8(DS, STAFF_ASKED) != 0 {
+                self.mem.w8(DS, STAFF_READY, 1);
+            }
+        }
+        delete(self, 0x5CC4);
+        delete(self, 0x5CCB);
     }
 
     /// 1194:3893..38B0. Hit points for a character created at a level

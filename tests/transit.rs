@@ -78,7 +78,7 @@ impl AreaHooks for Hooks {
         count(m, 0xFFA6);
         count(m, 0xFF78);
     }
-    fn leave_interior(&mut self, m: &mut Machine) {
+    fn leave_interior(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         count(m, 0xFFAE);
         count(m, 0xFFAC);
     }
@@ -276,7 +276,7 @@ fn case(m: &mut Machine, kind: u8, sub: u8) -> Option<()> {
             count(m, 0xFF70);
             m.world_end(h);
         }
-        _ if sub < 2 => m.area_exit(h)?,
+        _ if sub < 2 => m.area_exit(&mut arena::bsa::Files::default(), h)?,
         _ if sub < 4 => m.area_place(h),
         _ => m.area_entry(h),
     }
