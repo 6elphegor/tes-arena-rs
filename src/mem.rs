@@ -13,9 +13,20 @@ pub const DATA: u16 = 0x3276;
 
 const SIZE: usize = 0x10_FFF0;
 
-#[derive(Clone)]
 pub struct Memory {
     bytes: Vec<u8>,
+}
+
+impl Clone for Memory {
+    fn clone(&self) -> Self {
+        Self { bytes: self.bytes.clone() }
+    }
+
+    /// Copied into this memory's own allocation: no fresh megabyte to
+    /// fault in (a front end copying the machine every turn).
+    fn clone_from(&mut self, source: &Self) {
+        self.bytes.clone_from(&source.bytes);
+    }
 }
 
 fn lin(seg: u16, off: u16) -> usize {
@@ -54,6 +65,17 @@ impl Memory {
     pub fn w32(&mut self, seg: u16, off: u16, v: u32) {
         self.w16(seg, off, v as u16);
         self.w16(seg, off.wrapping_add(2), (v >> 16) as u16);
+    }
+
+    /// The 64 KiB of segment `seg` (offsets 0..=FFFFh, as `r8` reads
+    /// them).
+    pub fn segment(&self, seg: u16) -> &[u8] {
+        &self.bytes[lin(seg, 0)..=lin(seg, 0xFFFF)]
+    }
+
+    /// The 64 KiB of segment `seg`, to write.
+    pub fn segment_mut(&mut self, seg: u16) -> &mut [u8] {
+        &mut self.bytes[lin(seg, 0)..=lin(seg, 0xFFFF)]
     }
 
     /// NUL-terminated string at seg:off, without the terminator.
