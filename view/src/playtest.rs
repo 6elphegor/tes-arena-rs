@@ -92,8 +92,10 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     let run = &mut run;
     let assets = Assets::new(dir, &mut engine);
     let audio = crate::audio::Audio::new(assets.archive.clone(), false, false);
+    let music = crate::music::Music::new(assets.archive.clone(), false, false);
     let st = &mut Shot {
         audio,
+        music,
         movies: Vec::new(),
         assets,
         right: false,
