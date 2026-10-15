@@ -322,7 +322,7 @@ fn setup(m: &mut Machine, seed: u32, days: &[u16]) -> Script {
         for _ in 0..count {
             let mut r = [0u8; 0x0B];
             r[0] = if s.byte() < 0xF8 { s.byte() % 3 } else { 3 };
-            r[1] = s.byte() % 4;
+            r[1] = s.byte() % 6;
             r[2] = s.byte() % 3;
             r[3] = s.byte() % 8;
             r[4] = s.byte() % 0x20;
@@ -341,7 +341,7 @@ fn setup(m: &mut Machine, seed: u32, days: &[u16]) -> Script {
     for i in 0..0x100u16 {
         let mut r = [0u8; 0x0B];
         r[0] = s.byte() % 3;
-        r[1] = s.byte() % 4;
+        r[1] = s.byte() % 6;
         r[2] = s.byte() % 3;
         r[3] = s.byte() % 8;
         r[4] = s.byte() % 0x20;
@@ -352,6 +352,22 @@ fn setup(m: &mut Machine, seed: u32, days: &[u16]) -> Script {
         for (k, &b) in r.iter().enumerate() {
             m.mem.w8(SRC, i * 0x0B + k as u16, b);
         }
+    }
+    // Aimed at edges (see harness/gen_guild.py).
+    if s.byte() < 0x20 {
+        m.mem.w32(DS, 0x0A4C, 0xFFFF_FC18);
+    }
+    if s.byte() < 0x30 {
+        m.mem.w8(DS, 0x13F4, 1);
+        let v = 0xC350 + (s.byte() % 3) as u32 - 1;
+        m.mem.w32(DS, 0x13FA, v);
+    }
+    if s.byte() < 0x40 && n_items > 0 {
+        let i = (s.byte() as usize % n_items) as u16;
+        let v = 9 + (s.byte() % 3) as u32;
+        m.mem.w32(DS, 0x0212 + i * 0x13 + 0x0A, v);
+        let f = items[i as usize * 0x13 + 0x0E] | 2;
+        m.mem.w8(DS, 0x0212 + i * 0x13 + 0x0E, f);
     }
     // Bank 18h, not mapped: its word at 9030.
     if m.ems.len() <= 0x18 {

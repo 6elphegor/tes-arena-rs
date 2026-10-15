@@ -192,7 +192,7 @@ def setup(seed, holidays):
         for i in range(count):
             r = bytearray(0x0B)
             r[0] = byte() % 3 if byte() < 0xF8 else 3
-            r[1] = byte() % 4
+            r[1] = byte() % 6
             r[2] = byte() % 3
             r[3] = byte() % 8
             r[4] = byte() % 0x20
@@ -209,7 +209,7 @@ def setup(seed, holidays):
     for _ in range(0x100):
         r = bytearray(0x0B)
         r[0] = byte() % 3
-        r[1] = byte() % 4
+        r[1] = byte() % 6
         r[2] = byte() % 3
         r[3] = byte() % 8
         r[4] = byte() % 0x20
@@ -218,6 +218,18 @@ def setup(seed, holidays):
         r[10] = byte()
         src += r
     src = bytes(src)
+    # Aimed at edges: the place's seed + 1000 at 0 (made 1), the price a
+    # potion's health takes at 50000, an item's value about 10 (a tenth
+    # of it, or 1).
+    if byte() < 0x20:
+        w.append((0x0A4C, pd(0xFFFFFC18)))
+    if byte() < 0x30:
+        w.append((0x13F4, bytes([1])))
+        w.append((0x13FA, pd(0xC350 + byte() % 3 - 1)))
+    if byte() < 0x40 and n_items:
+        i = byte() % n_items
+        w.append((0x0212 + i * 0x13 + 0x0A, pd(9 + byte() % 3)))
+        w.append((0x0212 + i * 0x13 + 0x0E, bytes([items[i * 0x13 + 0x0E] | 2])))
     return w, dw, src, (menus, lists, yes, counts, haggles, clicks, file)
 
 
