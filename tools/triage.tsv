@@ -288,3 +288,10 @@
 2CDD:094D	inline	a step of 2CDD:08D9 (spell.rs)
 2EBD:0518	inline	an effect's kill (effects.rs, 2AA1:06A0)
 2F9F:000D	driver	the music driver's call
+0000:0118	I/O	C startup: the PSP command tail split into argv
+0000:9C56	inline	far memcmp (repe cmpsb at 9C5A), slice comparison in its callers' ports
+0000:9C5A	inline	memcmp primitive (repe cmpsb), see 9C56
+1194:3A51	I/O	startup: the environment scanned for the launch key at 472C, the slot read after it or @ by default, then 3AC5 (load.rs)
+27E3:000E	I/O	file open wrapper around 27E3:01AB
+27E3:01AB	I/O	file at 78D6 opened (600C) and its size checked against 2000, closed otherwise
+2F9F:04A0	driver	music shutdown: its buffers freed (6C26) and the driver stopped (0FFD:0821)
