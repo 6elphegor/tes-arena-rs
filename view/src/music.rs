@@ -335,13 +335,14 @@ enum Cmd {
     Stop,
     /// A song's file, at the music volume.
     Play(Vec<u8>, u8),
-    /// The music volume changed.
+    /// The music volume changed (the options screen's arrows: 0FFD:0DE8
+    /// at once).
     Volume(u8),
 }
 
-/// The music volume (0..127, the start's 100), which the game gives the
-/// driver with each song (2F9F:01A3).
-const MUSIC_VOLUME: u16 = 0x0D3A;
+/// The music volume (D3A, 0..64h), which the game gives the driver with
+/// each song (2F9F:01A3) and the options screen as it changes.
+use arena::options::var::MUSIC as MUSIC_VOLUME;
 
 /// The music driver: the songs asked for, played on a thread of its own
 /// (its own PulseAudio stream), or only logged.
