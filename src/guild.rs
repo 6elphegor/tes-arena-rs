@@ -109,8 +109,13 @@ pub trait GuildHooks: ShopHooks {
     fn click(&mut self, _m: &mut Machine) -> (u8, u16, u16) {
         (1, 0x130, 0xC0)
     }
-    /// The spellmaker (0000:A611, 1194:6064, 0000:A6B5).
-    fn spellmaker(&mut self, _m: &mut Machine) {}
+    /// The spellmaker (0000:A611, 1194:6064 with SI the player, 0000:A6B5;
+    /// the far calls keep and give back the world around the screen, the
+    /// front end's). By default 6064 runs (`Machine::spellmaker`) without
+    /// its screen: the first click leaves.
+    fn spellmaker(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.spellmaker(files, &mut crate::spellmaker::NoSpellmakerHooks, 0x01A4)
+    }
 }
 
 /// `GuildHooks` that do nothing: every menu left at once, nothing typed
@@ -278,7 +283,7 @@ impl Machine {
                 // 1194:A80D: A902 bit 0 cleared around the spellmaker.
                 let f = self.mem.r16(DS, 0xA902) & !1;
                 self.mem.w16(DS, 0xA902, f);
-                hooks.spellmaker(self);
+                hooks.spellmaker(self, files)?;
                 let f = self.mem.r16(DS, 0xA902) & !1;
                 self.mem.w16(DS, 0xA902, f);
                 Some(false)
