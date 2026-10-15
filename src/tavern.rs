@@ -187,6 +187,19 @@ impl Machine {
     /// 1194:B93C. See the module's notes. None where the original faults
     /// or hangs.
     pub fn tavern_shop(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
+        // Where the port gives up, the end's state is left all the same:
+        // no tavern (137F FFh), the clip as it was. The original has no
+        // such exit.
+        let saved = self.mem.r16(DS, 0xA91A);
+        let r = self.tavern_shop_body(files, hooks);
+        if r.is_none() {
+            self.mem.w8(DS, 0x137F, 0xFF);
+            self.mem.w16(DS, 0xA91A, saved);
+        }
+        r
+    }
+
+    fn tavern_shop_body(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         let saved = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, 0x137F, 4);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {

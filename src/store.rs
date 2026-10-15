@@ -228,6 +228,28 @@ impl Machine {
     /// 1194:F48E. See the module's notes. None where the original faults
     /// or hangs, or a routine isn't ported.
     pub fn equipment_store(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<()> {
+        // Where the port gives up (a hook with no answer, a routine not
+        // ported), the end's state is left all the same: no shop, no
+        // holiday, the clip as it was, and the bank mapped before the
+        // store's (kept at BANK) mapped back, so the store's bank (18h)
+        // doesn't stand in for it. Its stock file isn't written. The
+        // original has no such exit.
+        let saved = self.mem.r16(DS, 0xA91A);
+        let entered = self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0;
+        let r = self.equipment_store_body(files, hooks);
+        if r.is_none() {
+            self.mem.w8(DS, SHOP, 0xFF);
+            self.mem.w8(DS, HOLIDAY, 0xFF);
+            self.mem.w16(DS, 0xA91A, saved);
+            if entered {
+                let bank = self.mem.r16(DS, BANK);
+                self.map_bank(bank, 0);
+            }
+        }
+        r
+    }
+
+    fn equipment_store_body(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<()> {
         let saved = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 6);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
