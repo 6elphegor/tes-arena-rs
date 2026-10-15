@@ -244,8 +244,8 @@ fn setup(m: &mut Machine, seed: u32) -> ((u16, u16, u16, u16), Script) {
     }
     let lists = (0..12).map(|_| if s.byte() < 0x30 { 0xFFFF } else { s.byte() as u16 % 12 }).collect();
     let cfs = (0..4).map(|_| s.byte() & 1 != 0).collect();
-    m.ems.resize(7, vec![0; 0x10000]);
-    m.ems[6] = bank6;
+    m.ems.resize(7, std::sync::Arc::new(vec![0; 0x10000]));
+    m.ems[6] = std::sync::Arc::new(bank6);
     (((ah as u16) << 8 | al as u16, si, seg, bx), Script { lists, cfs, ..Default::default() })
 }
 

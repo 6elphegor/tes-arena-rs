@@ -82,6 +82,9 @@ pub struct Renderer {
     sky: Sky,
     lights: Lights,
     globals: wgpu::Buffer,
+    layout: wgpu::BindGroupLayout,
+    /// The sprite atlas on the GPU (`reload` keeps it).
+    atlas: Option<Atlas>,
     bind: wgpu::BindGroup,
     vertices: wgpu::Buffer,
     count: u32,
@@ -101,92 +104,162 @@ pub struct Scene<'a> {
     pub dither: &'a [u8],
 }
 
+/// The sprite atlas's texture: `rows` high (the sheet's and some to spare,
+/// so a later sheet a little taller fits).
+struct Atlas {
+    texture: wgpu::Texture,
+    rows: u32,
+}
+
+/// What `load` makes of a scene.
+struct Loaded {
+    bind: wgpu::BindGroup,
+    vertices: wgpu::Buffer,
+    count: u32,
+    palette: [[f32; 4]; 256],
+    atlas: Atlas,
+}
+
+/// The rows an atlas texture gets past a sheet's: room for a taller
+/// level's flats before a new texture is made.
+const ATLAS_SPARE: u32 = 512;
+
+/// `rows` of the atlas, from `row` on, sent to `texture`.
+fn atlas_rows(queue: &wgpu::Queue, texture: &wgpu::Texture, row: u32, rows: u32, pixels: &[u8]) {
+    if rows == 0 {
+        return;
+    }
+    let size = wgpu::Extent3d { width: crate::world::ATLAS, height: rows, depth_or_array_layers: 1 };
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: row, z: 0 }, aspect: wgpu::TextureAspect::All },
+        &pixels[..(rows * crate::world::ATLAS) as usize],
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(crate::world::ATLAS), rows_per_image: Some(rows) },
+        size,
+    );
+}
+
+/// A scene's textures, buffers and bind group; the atlas texture `old`
+/// kept when the sheet fits in it.
+fn load(device: &wgpu::Device, queue: &wgpu::Queue, layout: &wgpu::BindGroupLayout, globals: &wgpu::Buffer, scene: &Scene, old: Option<Atlas>) -> Loaded {
+    let layers = scene.textures.len() as u32;
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("textures"),
+        size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Uint,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let flat: Vec<u8> = scene.textures.iter().flat_map(|t| t.iter().copied()).collect();
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &flat,
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(64), rows_per_image: Some(64) },
+        wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
+    );
+    let shade = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("shading"),
+        size: wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Uint,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &shade, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &scene.shading[..0x1000],
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(256), rows_per_image: Some(16) },
+        wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
+    );
+    // The atlas: the old texture kept when the sheet's rows fit in it,
+    // else a new one; the sheet's rows sent.
+    let sheet = scene.sprites;
+    let atlas = match old {
+        Some(a) if sheet.h <= a.rows => a,
+        _ => {
+            let most = device.limits().max_texture_dimension_2d;
+            let rows = (sheet.h + ATLAS_SPARE).min(most).max(sheet.h);
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("sprites"),
+                size: wgpu::Extent3d { width: crate::world::ATLAS, height: rows, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Uint,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            Atlas { texture, rows }
+        }
+    };
+    atlas_rows(queue, &atlas.texture, 0, sheet.h, &sheet.pixels);
+    let dither = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("dither"),
+        size: wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Uint,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let mut d = scene.dither.to_vec();
+    d.resize(1600, 0);
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &dither, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &d,
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(40), rows_per_image: Some(40) },
+        wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
+    );
+    let mut palette = [[0f32; 4]; 256];
+    for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
+        *p = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
+    }
+    let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
+    let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
+    let sprite_view = atlas.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let dither_view = dither.create_view(&wgpu::TextureViewDescriptor::default());
+    let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("world"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: globals.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex_view) },
+            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&shade_view) },
+            wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&sprite_view) },
+            wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&dither_view) },
+        ],
+    });
+    let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("mesh"),
+        contents: bytemuck::cast_slice(scene.mesh),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
+    Loaded { bind, vertices, count: scene.mesh.len() as u32, palette, atlas }
+}
+
 impl Renderer {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, scene: &Scene) -> Self {
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("world"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
-        let layers = scene.textures.len() as u32;
-        let tex = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("textures"),
-            size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Uint,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let flat: Vec<u8> = scene.textures.iter().flat_map(|t| t.iter().copied()).collect();
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            &flat,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(64), rows_per_image: Some(64) },
-            wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: layers },
-        );
-        let shade = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("shading"),
-            size: wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Uint,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &shade, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            &scene.shading[..0x1000],
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(256), rows_per_image: Some(16) },
-            wgpu::Extent3d { width: 256, height: 16, depth_or_array_layers: 1 },
-        );
-        let sheet = scene.sprites;
-        let atlas = wgpu::Extent3d { width: crate::world::ATLAS, height: sheet.h, depth_or_array_layers: 1 };
-        let sprite_tex = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("sprites"),
-            size: atlas,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Uint,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &sprite_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            &sheet.pixels,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(crate::world::ATLAS), rows_per_image: Some(sheet.h) },
-            atlas,
-        );
-        let dither = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("dither"),
-            size: wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Uint,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let mut d = scene.dither.to_vec();
-        d.resize(1600, 0);
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &dither, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            &d,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(40), rows_per_image: Some(40) },
-            wgpu::Extent3d { width: 40, height: 40, depth_or_array_layers: 1 },
-        );
-        let mut palette = [[0f32; 4]; 256];
-        for (p, c) in palette.iter_mut().zip(scene.palette.iter()) {
-            *p = [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0];
-        }
         let globals = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("globals"),
             size: std::mem::size_of::<Globals>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let texture = |binding: u32, view_dimension: wgpu::TextureViewDimension| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Uint, view_dimension, multisampled: false },
+            count: None,
+        };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("world"),
             entries: &[
@@ -196,61 +269,10 @@ impl Renderer {
                     ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Uint,
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Uint,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Uint,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Uint,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-            ],
-        });
-        let tex_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
-        let shade_view = shade.create_view(&wgpu::TextureViewDescriptor::default());
-        let sprite_view = sprite_tex.create_view(&wgpu::TextureViewDescriptor::default());
-        let dither_view = dither.create_view(&wgpu::TextureViewDescriptor::default());
-        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("world"),
-            layout: &layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: globals.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&shade_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&sprite_view) },
-                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&dither_view) },
+                texture(1, wgpu::TextureViewDimension::D2Array),
+                texture(2, wgpu::TextureViewDimension::D2),
+                texture(3, wgpu::TextureViewDimension::D2),
+                texture(4, wgpu::TextureViewDimension::D2),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -311,12 +333,38 @@ impl Renderer {
             multiview: None,
             cache: None,
         });
-        let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("mesh"),
-            contents: bytemuck::cast_slice(scene.mesh),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        Self { pipeline, sky_pipeline, sky: Sky::default(), lights: Lights::default(), globals, bind, vertices, count: scene.mesh.len() as u32, sprites: None, palette, depth: None, window: Window::default() }
+        let l = load(device, queue, &layout, &globals, scene, None);
+        Self {
+            pipeline,
+            sky_pipeline,
+            sky: Sky::default(),
+            lights: Lights::default(),
+            globals,
+            layout,
+            bind: l.bind,
+            vertices: l.vertices,
+            count: l.count,
+            sprites: None,
+            palette: l.palette,
+            depth: None,
+            window: Window::default(),
+            atlas: Some(l.atlas),
+        }
+    }
+
+    /// The scene's resources made again in this renderer (an area's, a
+    /// level's after stairs): as `new` makes them, but its pipelines kept,
+    /// and its atlas texture too while the scene's sheet fits in it.
+    pub fn reload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, scene: &Scene) {
+        let l = load(device, queue, &self.layout, &self.globals, scene, self.atlas.take());
+        self.bind = l.bind;
+        self.vertices = l.vertices;
+        self.count = l.count;
+        self.palette = l.palette;
+        self.atlas = Some(l.atlas);
+        self.sky = Sky::default();
+        self.lights = Lights::default();
+        self.window = Window::default();
     }
 
     /// Where the world is drawn from now on.
