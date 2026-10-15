@@ -112,10 +112,15 @@ pub trait StoreHooks: ShopHooks {
     fn haggle(&mut self, _m: &mut Machine, _mode: u8, eax: u32, _per: u16, _name: u16) -> (u32, bool) {
         (eax, true)
     }
-    /// 1194:F142: the weapons' lines for the list (at frame:FA0).
-    fn weapon_lines(&mut self, _m: &mut Machine) {}
+    /// 1194:F142: the weapons' lines for the list (at frame:FA0;
+    /// `Machine::store_lines`).
+    fn weapon_lines(&mut self, m: &mut Machine) -> Option<()> {
+        m.store_lines(true)
+    }
     /// 1194:F204: the armour's lines for the list (at frame:2710).
-    fn armor_lines(&mut self, _m: &mut Machine) {}
+    fn armor_lines(&mut self, m: &mut Machine) -> Option<()> {
+        m.store_lines(false)
+    }
     /// 1194:C6AC in a generator that stubs it: Some(the carry) takes the
     /// repairs' place; None (the default) runs them (`store_repair`).
     fn repair_instead(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
@@ -441,9 +446,9 @@ impl Machine {
         let (list, count, service) = if weapons { (WEAPON_LIST, WEAPONS, 2) } else { (ARMOR_LIST, ARMOR, 3) };
         self.mem.w8(DS, BUYING_WEAPON, weapons as u8);
         if weapons {
-            hooks.weapon_lines(self);
+            hooks.weapon_lines(self)?;
         } else {
-            hooks.armor_lines(self);
+            hooks.armor_lines(self)?;
         }
         let n = self.mem.r8(DS, count) as u16;
         let lines = if weapons { 0x0FA0 } else { 0x2710 };
@@ -1315,6 +1320,144 @@ impl Machine {
         self.split_lines(SAID);
         self.mem.w8(DS, DIALOG, 1);
         hooks.dialog_at(self, 1, SAID, 0)
+    }
+
+    /// 1194:F142 (`weapons`) and F204. The list's lines, one per record,
+    /// written one after another (NUL-terminated) into the EMS frame from
+    /// FA0 (weapons, from the records at 0, 12C6 of them) or 2710 (armour,
+    /// from 7D0, 12CF), the read and write offsets kept at 12C7 and 12CB
+    /// (12C9, 12CD). Each record is copied to the template (13F3, cleared
+    /// first, 1194:E970) and named at 1395: a magic one (+1: 1 for a
+    /// weapon, any for armour) by 27CE:000C (1194:F126, its +2, +4, +5,
+    /// +6), a plain weapon from the list at 2204, plain armour from its
+    /// kind's list (2688) by its type (+5). A weapon's line (the format at
+    /// 86BD): the name, its hands (the table at 229E, kept at A874), its
+    /// weight (1194:EBBE: the word at 22B0 by type, a whole number of
+    /// pounds from 100h up written by 0000:7024 with its bytes swapped,
+    /// else the quarter (".25", ".5", ".75" for 40h, 80h, C0h, 1194:F2FC;
+    /// another value is searched for on through DGROUP, its index then a
+    /// string past those three) at 10A8) and its price; armour's (86DD):
+    /// the name, its kind's name
+    /// (the list at 2491, at 10A8), its weight (the high byte of the word
+    /// by type in the kind's table: 252B, 2515, 24FF; at A874) and its
+    /// price. The price on the shop's holiday (13C9) is 1194:4A6B's with
+    /// service 2 (weapons) or 3. None where the original loops for ever (a
+    /// weight under 100h found nowhere in DGROUP) or runs wild: no records
+    /// at all (CX 0 runs the loop 65536 times through the frame), or a
+    /// name that fails (`item_name_format`).
+    pub fn store_lines(&mut self, weapons: bool) -> Option<()> {
+        let (count, src, src0, dst, dst0) =
+            if weapons { (WEAPONS, 0x12C7, WEAPON_LIST, 0x12CB, 0x0FA0) } else { (ARMOR, 0x12C9, ARMOR_LIST, 0x12CD, 0x2710) };
+        let n = self.mem.r8(DS, count) as u16;
+        self.mem.w16(DS, src, src0);
+        self.mem.w16(DS, dst, dst0);
+        if n == 0 {
+            return None;
+        }
+        let frame = self.mem.r16(DS, FRAME);
+        for _ in 0..n {
+            for i in 0..13u16 {
+                self.mem.w8(DS, TEMPLATE + i, 0);
+            }
+            let si = self.mem.r16(DS, src);
+            self.memmove(frame, si, DS, TEMPLATE, 13);
+            self.mem.w16(DS, src, si.wrapping_add(13));
+            let tb = |m: &Self, f: u16| m.mem.r8(DS, TEMPLATE + f);
+            let magic = if weapons { tb(self, 1) == 1 } else { tb(self, 1) != 0 };
+            if magic {
+                // CX is the byte zero-extended: weapons and armour take it
+                // whole as the suffix, an accessory (kind 2) its CH, 0.
+                let (dl, cl) = (tb(self, 2), tb(self, 6));
+                let suffix = if dl == 2 { 0 } else { cl };
+                self.item_name_format(DS, dl, tb(self, 4), 0, tb(self, 5) as u16, cl, suffix)?;
+            } else {
+                let list = if weapons {
+                    0x2204
+                } else {
+                    self.mem.r16(DS, 0x2688u16.wrapping_add((tb(self, 3) as u16).wrapping_mul(2)))
+                };
+                let si = self.skip_strings(DS, list, tb(self, 5) as u16);
+                self.store_strcpy(si, NAME);
+            }
+            let ty = tb(self, 5) as u16;
+            let (fmt, args_weight_str) = if weapons {
+                let w = self.mem.r16(DS, 0x22B0u16.wrapping_add(ty.wrapping_mul(2)));
+                if w >= 0x100 {
+                    self.mem.w32(DS, DIGITS, 0);
+                    self.store_utoa(w.swap_bytes(), DIGITS);
+                } else {
+                    // 1194:F2FC: the words from 2413 searched for it (40h,
+                    // 80h, C0h first, then on through DGROUP), its index
+                    // the quarter's among ".25", ".5", ".75" and beyond.
+                    let mut si = 0x2413u16;
+                    let mut i = 0u16;
+                    let mut found = false;
+                    for _ in 0..0x10000u32 {
+                        if self.mem.r16(DS, si) == w {
+                            found = true;
+                            break;
+                        }
+                        si = si.wrapping_add(2);
+                        i = i.wrapping_add(1);
+                    }
+                    if !found {
+                        return None;
+                    }
+                    let si = self.skip_strings(DS, 0x2419, i);
+                    self.store_strcpy(si, DIGITS);
+                }
+                let hands = self.mem.r8(DS, 0x229Eu16.wrapping_add(ty)) as u16;
+                self.mem.w16(DS, 0xA874, hands);
+                (0x86BDu16, true)
+            } else {
+                let si = self.skip_strings(DS, 0x2491, ty);
+                self.store_strcpy(si, DIGITS);
+                let table = match tb(self, 3) {
+                    0 => 0x252Bu16,
+                    1 => 0x2515,
+                    _ => 0x24FF,
+                };
+                let w = self.mem.r16(DS, table.wrapping_add(ty.wrapping_mul(2)));
+                self.mem.w16(DS, 0xA874, w >> 8);
+                (0x86DDu16, false)
+            };
+            let mut price = self.mem.r32(DS, TEMPLATE + 7);
+            if self.mem.r8(DS, HOLIDAY) == 1 {
+                price = self.holiday_price(price, if weapons { 2 } else { 3 });
+            }
+            let at = self.mem.r16(DS, dst);
+            let a874 = self.mem.r16(DS, 0xA874) as u32;
+            let args: [Arg; 4] = if args_weight_str {
+                [Arg::Str(DS, NAME), Arg::Int(a874 as u16), Arg::Str(DS, DIGITS), Arg::Long(price)]
+            } else {
+                [Arg::Str(DS, NAME), Arg::Str(DS, DIGITS), Arg::Int(a874 as u16), Arg::Long(price)]
+            };
+            let end = self.sprintf((frame, at), (DS, fmt), &args);
+            let di = if end.wrapping_sub(at) < 0x4E20 { end.wrapping_add(1) } else { at.wrapping_add(0x4E20) };
+            self.mem.w8(frame, di.wrapping_sub(1), 0);
+            self.mem.w16(DS, dst, di);
+        }
+        Some(())
+    }
+
+    /// 0000:7024. `v` in decimal at DS:`di` (no NUL), its digits made
+    /// backwards from DGROUP A933 down first (they stay there).
+    fn store_utoa(&mut self, v: u16, di: u16) {
+        let mut at = 0xA933u16;
+        let mut v = v;
+        loop {
+            self.mem.w8(DS, at, (v % 10) as u8 + b'0');
+            v /= 10;
+            at = at.wrapping_sub(1);
+            if v == 0 {
+                break;
+            }
+        }
+        let n = 0xA933u16.wrapping_sub(at);
+        for i in 0..n {
+            let b = self.mem.r8(DS, at.wrapping_add(1 + i));
+            self.mem.w8(DS, di.wrapping_add(i), b);
+        }
     }
 
     /// The store's weapons (`weapons`) or armour for a front end's list:
