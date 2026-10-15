@@ -32,6 +32,12 @@ pub mod var {
     /// The guards' rank and level.
     pub const GUARD_RANK: u16 = 0x1294;
     pub const GUARD_LEVEL: u16 = 0x1298;
+    /// A creature's flat seen (`flat_creature`): its number, its place,
+    /// and its map word (a far pointer).
+    pub const FLAT_NUMBER: u16 = 0x5E38;
+    pub const FLAT_X: u16 = 0x5E3E;
+    pub const FLAT_Y: u16 = 0x5E40;
+    pub const FLAT_AT: u16 = 0x5E39;
 }
 use var::*;
 
@@ -94,9 +100,11 @@ impl Machine {
     /// speed: FS was left there), walking (34h). The slot
     /// keeps DBE at +16 and the height FF3 for flyers (record +40Dh bit
     /// 1000h, which also sets the slot's bit 8000h). The first eight get
-    /// their square in the actors' squares (at 15 + FIGHTING). Stops when
-    /// no slot is free. None for a quest's creature (5C8 bit 1000h, not
-    /// ported), or where no square is found.
+    /// their square in the actors' squares (at 15 + FIGHTING). A flat's
+    /// creature (5C8 bit 1000h, `flat_creature`) stands where the flat
+    /// was instead, and may take the square's item (25CA:0233). Stops when
+    /// no slot is free. None where no square is found or a square's text
+    /// scan never ends.
     pub fn place_creatures(&mut self, count: u16) -> Option<()> {
         let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
         let n = if count == 0 { 0x10000u32 } else { count as u32 };
@@ -122,8 +130,15 @@ impl Machine {
             if fighting < 8 {
                 self.mem.w16(DS, SQUARES.wrapping_add(2 * (fighting + 0xF)), sq);
             }
+            let (mut x, mut y) = (x, y);
             if self.mem.r16(DS, 0x05C8) & 0x1000 != 0 {
-                return None;
+                // 25CA:00C3..00D9: the flat's word cleared, its number at
+                // 5E2, the creature where the flat was.
+                let (off, fseg) = (self.mem.r16(DS, FLAT_AT), self.mem.r16(DS, FLAT_AT + 2));
+                self.mem.w16(fseg, off, 0);
+                let v = self.mem.r8(DS, FLAT_NUMBER);
+                self.mem.w8(DS, 0x05E2, v);
+                (x, y) = (self.mem.r16(DS, FLAT_X), self.mem.r16(DS, FLAT_Y));
             }
             self.mem.w16(DS, di, x);
             self.mem.w16(DS, di + 4, y);
@@ -153,6 +168,7 @@ impl Machine {
             self.mem.w16(DS, di + 0xF, bp);
             self.mem.w8(DS, di + 0x11, 0x34);
             self.mem.w8(DS, di + 0xC, 0);
+            self.flat_creature_item(di, rec)?;
             self.mem.w16(DS, FIGHTING, fighting.wrapping_add(1));
         }
         self.clear_dungeon_flats();
@@ -510,6 +526,80 @@ impl Machine {
         self.mem.w16(DS, GUARD_RANK, 0);
         self.mem.w16(DS, 0x12AC, 0);
         self.encounter_bring(files, hooks, ty, 0x1296)
+    }
+
+    /// 25CA:0271, the hook CD56: the drawing reached a flat marked as a
+    /// creature's (bit 2 of its high byte, 25CA:0200) at (`x`, `y`), its
+    /// map word at `seg`:`di` and `flat` its number. The word's low byte
+    /// is kept (FLAT_NUMBER) unless a flat's creature is fighting (FF9 with
+    /// 5C8 bit 1000h); 5CA bit 400h adds 200h; the place is kept. Within
+    /// 320h of the player (the larger distance plus a quarter of the
+    /// smaller), 126E `di`; outside 5E6 2 and 4, 5CA bit 40h; and when
+    /// `flat` is one of the 40h at C954 the flat comes alive: 126C its
+    /// place + 1, 5C8 bit 1000h, the word kept (FLAT_AT) and one creature
+    /// of that kind at the player's level comes (`quest_encounter`).
+    pub fn flat_creature(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, x: u16, y: u16, flat: u8, seg: u16, di: u16) -> Option<()> {
+        if self.mem.r16(DS, FIGHTING) == 0 || self.mem.r16(DS, 0x05C8) & 0x1000 == 0 {
+            let v = self.mem.r8(seg, di);
+            self.mem.w8(DS, FLAT_NUMBER, v);
+        }
+        if self.mem.r16(DS, 0x05CA) & 0x400 != 0 {
+            let v = self.mem.r16(DS, 0x05CA) | 0x200;
+            self.mem.w16(DS, 0x05CA, v);
+        }
+        self.mem.w16(DS, FLAT_X, x);
+        self.mem.w16(DS, FLAT_Y, y);
+        let abs = |v: u16| if (v as i16) < 0 { v.wrapping_neg() } else { v };
+        let a = abs(x.wrapping_sub(self.mem.r16(DS, 0xC3D0)));
+        let b = abs(y.wrapping_sub(self.mem.r16(DS, 0xC3D4)));
+        let (near, far) = if a > b { (b, a) } else { (a, b) };
+        if (near >> 2).wrapping_add(far) >= 0x320 {
+            return Some(());
+        }
+        self.mem.w16(DS, 0x126E, di);
+        let area = self.mem.r8(DS, 0x05E6);
+        if area != 2 && area != 4 {
+            let v = self.mem.r16(DS, 0x05CA) | 0x40;
+            self.mem.w16(DS, 0x05CA, v);
+        }
+        let Some(k) = (0..0x40u16).find(|&k| self.mem.r8(DS, 0xC954 + k) == flat) else {
+            return Some(());
+        };
+        let kind = (k + 1) as u8;
+        self.mem.w8(DS, 0x126C, kind);
+        let v = self.mem.r16(DS, 0x05C8) | 0x1000;
+        self.mem.w16(DS, 0x05C8, v);
+        let at = self.mem.r16(DS, 0x126E);
+        self.mem.w16(DS, FLAT_AT, at);
+        self.mem.w16(DS, FLAT_AT + 2, seg);
+        let level = self.mem.r8(DS, 0x01AA);
+        self.quest_encounter(files, hooks, 1, kind, level)
+    }
+
+    /// 25CA:0233. A flat's creature (5C8 bit 1000h) placed in slot `di`
+    /// (its record `rec`) takes the item of the flat's square: when the
+    /// square's lookup (292B:0942, 0000:06BE) gives a `+` text (AX 3),
+    /// the first free mark (MARKS, FFFFh) gets the slot, the trigger's
+    /// index and the `+` number, and the trigger's square is put out.
+    fn flat_creature_item(&mut self, di: u16, rec: u16) -> Option<()> {
+        if self.mem.r16(DS, 0x05C8) & 0x1000 == 0 {
+            return Some(());
+        }
+        let (x, y) = (self.mem.r16(DS, FLAT_X) >> 7, self.mem.r16(DS, FLAT_Y) >> 7);
+        let key = (y << 8) | (x & 0xFF);
+        let l = self.square_lookup(key, y, rec)?;
+        if l.ax != 3 {
+            return Some(());
+        }
+        let marks = crate::actors::var::MARKS;
+        let Some(e) = (0..8u16).map(|k| marks + 6 * k).find(|&e| self.mem.r16(DS, e) == 0xFFFF) else {
+            return Some(());
+        };
+        self.mem.w16(DS, e + 4, l.bx);
+        self.mem.w16(DS, l.si, 0xFFFF);
+        self.mem.w16(DS, e + 2, l.si.wrapping_sub(crate::actors::var::TRIGGER_SQUARES));
+        self.mem.w16(DS, e, di);
+        Some(())
     }
 
     /// 1194:8A47. The entry for level + 1 (at most 20) in row `row` of the
