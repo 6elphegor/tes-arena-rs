@@ -143,22 +143,26 @@ class Arena:
         return bytes(self.mu.mem_read(self.lin(seg, 0), 0x10000))
 
     def _setup(self, ret_words, regs):
+        """Every call starts from the same state: the return words on a
+        fresh stack, the segment registers DGROUP, the general registers 0
+        and the flags clear (2, the reserved bit; DF clear), whatever the
+        case before left; then `regs`."""
         mu = self.mu
         ss, sp = 0x9000, 0xfff0
         sp -= 2 * len(ret_words)
         mu.mem_write(self.lin(ss, sp), struct.pack(f'<{len(ret_words)}H', *ret_words))
         for r, v in dict(ds=self.ds, es=self.ds, fs=self.ds, gs=self.ds, ss=ss, sp=sp,
-                         eax=0, ebx=0, ecx=0, edx=0, esi=0, edi=0, ebp=0).items():
+                         eax=0, ebx=0, ecx=0, edx=0, esi=0, edi=0, ebp=0, eflags=2).items():
             mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
         for r, v in regs.items():
             mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
 
-    def _run(self, seg, off, stop_seg, stop_off):
+    def _run(self, seg, off, stop_seg, stop_off, count=50_000_000):
         mu = self.mu
         mu.reg_write(UC_X86_REG_CS, LOAD_SEG + seg)
         mu.reg_write(UC_X86_REG_IP, off)
         self.fault = None
-        mu.emu_start(self.lin(LOAD_SEG + seg, off), self.lin(stop_seg, stop_off), count=50_000_000)
+        mu.emu_start(self.lin(LOAD_SEG + seg, off), self.lin(stop_seg, stop_off), count=count)
         if self.fault is not None:
             raise Fault(self.fault)
         # Unicorn sometimes stops on a faulting DIV/IDIV without reporting
@@ -186,18 +190,10 @@ class Arena:
         return self._run(seg, start, LOAD_SEG + seg, end)
 
     def call_far(self, seg, off, **regs):
-        """Far-call seg:off (image-relative segment) and return AX."""
-        mu = self.mu
-        ss, sp = 0x9000, 0xfff0
-        sp -= 4
-        mu.mem_write(self.lin(ss, sp), struct.pack('<HH', 0, STUB_SEG))
-        for r, v in dict(ds=self.ds, es=self.ds, ss=ss, sp=sp).items():
-            mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
-        for r, v in regs.items():
-            mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
-        mu.reg_write(UC_X86_REG_CS, LOAD_SEG + seg)
-        mu.reg_write(UC_X86_REG_IP, off)
-        self.fault = None
-        mu.emu_start(self.lin(LOAD_SEG + seg, off), self.lin(STUB_SEG, 0), count=10_000_000)
-        assert mu.reg_read(UC_X86_REG_CS) == STUB_SEG, 'did not return'
-        return mu.reg_read(UC_X86_REG_AX)
+        """Far-call seg:off (image-relative segment) and return AX. From
+        the same state as the other calls (`_setup`); a fault the INT hook
+        saw, or a DIV unicorn stopped on, raises Fault; not returning
+        within 10M instructions fails the assertion (a hang)."""
+        self._setup([0, STUB_SEG], regs)
+        self._run(seg, off, STUB_SEG, 0, count=10_000_000)
+        return self.mu.reg_read(UC_X86_REG_AX)

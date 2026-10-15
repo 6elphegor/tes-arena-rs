@@ -204,19 +204,8 @@ def make(exe, patches):
 
 def run_next(a):
     """0000:0ED5 with its call's return and FFF0 on the stack, to a stop."""
-    mu = a.mu
-    ss, sp = 0x9000, 0xFFEC
-    mu.mem_write(a.lin(ss, sp), struct.pack('<HH', 0x1234, 0xFFF0))
-    for r, v in ((UC_X86_REG_DS, a.ds), (UC_X86_REG_ES, a.ds), (UC_X86_REG_FS, a.ds), (UC_X86_REG_GS, a.ds),
-                 (UC_X86_REG_SS, ss), (UC_X86_REG_SP, sp), (UC_X86_REG_SI, 0)):
-        mu.reg_write(r, v)
-    mu.reg_write(UC_X86_REG_CS, LOAD_SEG)
-    mu.reg_write(UC_X86_REG_IP, 0x0ED5)
-    a.fault = None
-    mu.emu_start(a.lin(LOAD_SEG, 0x0ED5), a.lin(STUB_SEG, 0), count=5_000_000)
-    if a.fault is not None:
-        raise Fault(a.fault)
-    assert mu.reg_read(UC_X86_REG_CS) == STUB_SEG, 'did not stop'
+    a._setup([0x1234, 0xFFF0], {})
+    a._run(0, 0x0ED5, STUB_SEG, 0, count=5_000_000)
 
 
 def main():

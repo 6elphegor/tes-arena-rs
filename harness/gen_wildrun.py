@@ -127,17 +127,8 @@ def setup(seed, op):
 
 def call_far_long(a, seg, off):
     """Arena.call_far with a cap of 400M instructions."""
-    mu = a.mu
-    ss, sp = 0x9000, 0xfff0 - 4
-    mu.mem_write(a.lin(ss, sp), struct.pack('<HH', 0, STUB_SEG))
-    for r, v in ((UC_X86_REG_DS, a.ds), (UC_X86_REG_ES, a.ds), (UC_X86_REG_SS, ss), (UC_X86_REG_SP, sp),
-                 (UC_X86_REG_CS, LOAD_SEG + seg), (UC_X86_REG_IP, off)):
-        mu.reg_write(r, v)
-    a.fault = None
-    mu.emu_start(a.lin(LOAD_SEG + seg, off), a.lin(STUB_SEG, 0), count=400_000_000)
-    if a.fault is not None:
-        raise Fault(a.fault)
-    assert mu.reg_read(UC_X86_REG_CS) == STUB_SEG, 'did not return'
+    a._setup([0, STUB_SEG], {})
+    a._run(seg, off, STUB_SEG, 0, count=400_000_000)
 
 
 def main():
@@ -190,13 +181,8 @@ def main():
             if op == 'pack':
                 _, length, bx = extra
                 mu = a.mu
-                sp = 0xFFF0 - 14
-                mu.mem_write(a.lin(0x9000, sp), struct.pack('<7H', 0, STUB_SEG, 0, SRC, 0, DST, length))
-                for r, v in ((UC_X86_REG_DS, a.ds), (UC_X86_REG_ES, a.ds), (UC_X86_REG_SS, 0x9000), (UC_X86_REG_SP, sp),
-                             (UC_X86_REG_BX, bx), (UC_X86_REG_CS, LOAD_SEG + 0x2294), (UC_X86_REG_IP, 0x0D03)):
-                    mu.reg_write(r, v)
-                mu.emu_start(a.lin(LOAD_SEG + 0x2294, 0x0D03), a.lin(STUB_SEG, 0), count=10_000_000)
-                assert mu.reg_read(UC_X86_REG_CS) == STUB_SEG, 'did not return'
+                a._setup([0, STUB_SEG, 0, SRC, 0, DST, length], {'bx': bx})
+                a._run(0x2294, 0x0D03, STUB_SEG, 0, count=10_000_000)
                 ax = mu.reg_read(UC_X86_REG_AX)
                 res = f'{ax:x} {fnv(bytes(mu.mem_read(a.lin(DST, 0), 0x400))):x}'
             else:
