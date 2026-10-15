@@ -261,7 +261,7 @@ writing: 2455 reachable routines (198,014 bytes); 1788 ported in whole or
 part (140,111 bytes), counting far thunks to ported code, the handlers
 the port dispatches on by their offsets, and the routines read by hand as
 trivial or inlined (`tools/triage.tsv`); 72 left to the front end as hooks
-and 74 that the view re-implements; 521 presentation, I/O, driver or
+and 75 that the view re-implements; 520 presentation, I/O, driver or
 hardware routines not ported (the renderer's internals, the menu library,
 input waits, the sound and CyberMan drivers, decode artefacts); no
 game-state routine left open. Every indirect call site is followed or

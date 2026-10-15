@@ -56,11 +56,11 @@ drawing): the renderer's internals mostly land there.
 | reachable | 2455 | 198014 |
 | ported (in whole or part) | 1788 | 140111 |
 | hooks (front end's) | 72 | 5538 |
-| the view's own version | 74 | 9024 |
+| the view's own version | 75 | 9176 |
 | not covered: game state or undetermined | 0 | 0 |
 | &nbsp;&nbsp;of which likely ported inline in a caller | 0 | 0 |
 | &nbsp;&nbsp;of which open | 0 | 0 |
-| not covered: presentation / I/O / hardware | 521 | 43341 |
+| not covered: presentation / I/O / hardware | 520 | 43189 |
 
 By segment:
 
@@ -68,7 +68,7 @@ By segment:
 |---|---:|---:|---:|---:|
 | 0000 | 767 | 66903 | 518 | 41819 |
 | 0FFD | 63 | 2085 | 1 | 6 |
-| 1194 | 862 | 63424 | 751 | 55426 |
+| 1194 | 862 | 63424 | 752 | 55578 |
 | 217B | 18 | 1834 | 15 | 1602 |
 | 21EE | 9 | 951 | 4 | 650 |
 | 222C | 24 | 1592 | 12 | 927 |
@@ -576,7 +576,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:2CC0 | 16 | presentation (read) |  | a window closed [presentation] | vars B7C4 1298 |
 | 1194:2D60 | 79 | under a hook | 1194:158F, 1194:2D5C |  | vars 9030 |
 | 1194:3A51 | 117 | I/O (read) | 0000:102E | startup: the environment scanned for the launch key at 472C, the slot read after it or @ by default, then 3AC5 (load.rs) [I/O] | files screensv.$$2, tempsave.$$$; vars 1A80 1A6C 7D0D |
-| 1194:4943 | 152 | file I/O (read) | 2F9F:001F | a file's 6-byte records searched for a two-byte key [file I/O] | vars 929F 939E 929E 92A0 |
 | 1194:4BCC | 51 | under a hook | 1194:4BC8 |  | vars 9288 |
 | 1194:4F89 | 47 | I/O (read) | 1194:4D91 | a file deleted if it exists [I/O] |  |
 | 1194:4FF7 | 110 | drawing | 0000:1393, 1194:020E, 1194:59CC (+2) |  | vars 05CA A900 |
