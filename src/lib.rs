@@ -39,6 +39,7 @@ pub mod loot;
 pub mod loot_window;
 pub mod machine;
 pub mod mem;
+pub mod mapnotes;
 pub mod mif;
 pub mod newgame;
 pub mod outfit;
