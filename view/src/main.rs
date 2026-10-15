@@ -711,7 +711,7 @@ impl Assets {
     fn sprites(&self, engine: &mut Engine, cam: Camera, ticks: usize, aspect: f32) -> Vec<world::Vertex> {
         let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
         v.extend(world::doors(&engine.m));
-        let focal = (30f32).to_radians().tan() * aspect;
+        let focal = world::TAN_HALF * aspect;
         let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new() };
         if engine.m.sky_draw(&mut draw).is_some() {
             v.extend(draw.out);

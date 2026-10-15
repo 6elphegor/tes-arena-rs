@@ -380,7 +380,7 @@ impl Renderer {
         // the whole target, its eye line moved down to the window's.
         let rows = self.window.rows.clamp(0.05, 1.0);
         let view_h = ((height as f32 * rows).round() as u32).clamp(1, height);
-        let fov = 2.0 * ((30f32).to_radians().tan() * view_h as f32 / height as f32).atan();
+        let fov = 2.0 * (crate::world::TAN_HALF * view_h as f32 / height as f32).atan();
         let shift = 1.0 - 2.0 * self.window.horizon;
         let proj = Mat4::from_translation(Vec3::new(0.0, shift, 0.0)) * Mat4::perspective_lh(fov, width as f32 / view_h as f32, 4.0, 8192.0);
         // The screen quads: rows from the eye line at 100 a half of the

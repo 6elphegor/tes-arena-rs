@@ -949,13 +949,19 @@ pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32,
     best.map(|(_, t)| t)
 }
 
+/// The view's half height (100 of the 320 x 200 screen's rows) over its
+/// focal length: the original projects a point at depth d and height h
+/// to h * 160 / d rows and columns alike (0000:E032: CCF4 and CCF6 hold
+/// A0h).
+pub const TAN_HALF: f32 = 100.0 / 160.0;
+
 /// The line through the click (CB60, CB62: the cursor + 4, 2826:0393)
-/// as (yaw, slope) for `hit`: the view is drawn at 100 / tan 30 degrees
-/// rows a unit of distance (see `render`), its columns at that scale over
-/// a target `aspect` wide; the centre column C3D6, the eye line row C3D8.
+/// as (yaw, slope) for `hit`: the view is drawn at 160 rows a unit of
+/// slope (`TAN_HALF`, see `render`), its columns at that scale over a
+/// target `aspect` wide; the centre column C3D6, the eye line row C3D8.
 pub fn click_ray(m: &Machine, aspect: f32) -> (f32, f32) {
     let r = |at: u16| m.mem.r16(DS, at) as i16 as f32;
-    let rows = 100.0 / 30f32.to_radians().tan();
+    let rows = 100.0 / TAN_HALF;
     let aspect = if aspect > 0.0 { aspect } else { 1.6 };
     let cols = rows * (320.0 / 200.0) / aspect;
     let x = r(arena::click::var::ACTOR_CLICK) - r(0xC3D6);
