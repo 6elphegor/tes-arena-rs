@@ -1,5 +1,5 @@
-"""Emit test vectors for src/haggle.rs (1194:8020, buying, selling and
-the main quest's informant) from the original code.
+"""Emit test vectors for src/haggle.rs (1194:8020, buying, a tavern's
+room, selling and the main quest's informant) from the original code.
 
 Usage: gen_haggle.py ACD_unpacked.EXE GAME_DIR OUT
 
@@ -13,12 +13,17 @@ have their codes substituted by 2DA2:000A: stubbed, counting its calls
 in DGROUP FFE0 (src/haggle.rs `HaggleIo::expand`; the text port is
 verified on its own).
 
-Lines: haggle | price per quality mood mode dl seed gold fe6 fdd | menus |
+Lines: haggle | price per quality mood mode dl seed gold fe6 fdd pre | menus |
        offers | result: "deal EAX" or "none", the inputs used (menus offers
        keys), FNV-1a of DGROUP 1044..1047, 1391..1394, 13CA..13CB,
        6598..65BB (but 65A8, the saved stack pointer), the RNG seed, the
-       gold (05C2), 0FE6, 0FEE..0FEF, 9288 and FFE0..FFE1; or
-       "fault"/"hang" (the script ran out).
+       gold (05C2), 0FE6, 0FEE..0FEF, 9288 and FFE0..FFE1, then FNV-1a of
+       the lines' buffers (929E.., 987A.., 200h each), their colour
+       (137E) and the input asked for (13D3); or "fault"/"hang" (the script ran out).
+
+`pre` is written as a dword at 929A, just before the line: 1194:84F1
+scans the line back from its end to the first zero byte, past its start
+where those bytes aren't zero.
 """
 import os
 import random
@@ -83,7 +88,7 @@ BASE = a.snapshot()
 
 for case in range(int(os.environ.get('N', 2500))):
     a.restore(BASE)
-    mode = rng.choice([1, 2, 4, 5, 6])
+    mode = rng.choice([1, 2, 3, 4, 5, 6])
     price = rng.choice([rng.randint(1, 500), rng.randint(1, 5000), rng.randint(1, 70000), 1, 2, 64001, 65000, 65001,
                         rng.getrandbits(32)])
     per = rng.randint(0, 100)
@@ -98,6 +103,10 @@ for case in range(int(os.environ.get('N', 2500))):
     fe6 = rng.getrandbits(8)
     fdd = rng.randint(0, 15)
     menus = [rng.choice([1, 1, 1, 0, 2, 3]) for _ in range(12)]
+    # A quarter with bytes before the line, none a '%' (a code there
+    # pushes an argument the line's first conversion would take: the port
+    # gives None for it).
+    pre = rng.choice([0, 0, 0, (rng.getrandbits(32) & 0xDADADADA) | 0x02000000, 0x41424344])
     base = price >> 1 if price > 64000 else price
     offers = []
     for _ in range(12):
@@ -116,6 +125,7 @@ for case in range(int(os.environ.get('N', 2500))):
     a.w32(0x05C2, gold)
     a.mu.mem_write(a.lin(a.ds, 0x0FE6), bytes([fe6]))
     a.mu.mem_write(a.lin(a.ds, 0x0FDD), bytes([fdd]))
+    a.w32(0x929A, pre)
     try:
         a._setup([0xFFF0], {'eax': price, 'esi': per, 'ebx': quality, 'ecx': mood,
                             'edx': mode << 8 | dl, 'edi': 0x1A4C})
@@ -128,11 +138,12 @@ for case in range(int(os.environ.get('N', 2500))):
                  + d[0x91F6:0x91FA] + d[0x05C2:0x05C6] + d[0x0FE6:0x0FE7] + d[0x0FEE:0x0FF0] + d[0x9288:0x9289]
                  + d[0xFFE0:0xFFE2])
         result = 'none' if cf else f'deal {eax:x}'
-        res = f'{result} {" ".join(map(str, a.used))} {fnv(state):x}'
+        shown = d[0x929E:0x949E] + d[0x987A:0x9A7A] + d[0x137E:0x137F] + d[0x13D3:0x13D4]
+        res = f'{result} {" ".join(map(str, a.used))} {fnv(state):x} {fnv(shown):x}'
     except Fault as e:
         res = 'hang' if a.fault == 'script' else 'fault'
     except AssertionError:
         res = 'hang'
-    out.write(f'haggle | {price:x} {per:x} {quality:x} {mood:x} {mode:x} {dl:x} {seed:x} {gold:x} {fe6:x} {fdd:x} | '
+    out.write(f'haggle | {price:x} {per:x} {quality:x} {mood:x} {mode:x} {dl:x} {seed:x} {gold:x} {fe6:x} {fdd:x} {pre:x} | '
               f'{" ".join(map(str, menus))} | {",".join(o.decode() for o in offers)} | {res}\n')
 out.close()

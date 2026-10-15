@@ -1,6 +1,7 @@
-//! Haggling over a price (1194:8020), for buying (modes 1 and 2),
-//! selling (mode 4) and the main quest's informant (modes 5 and 6, his
-//! price for the way: 0FEE).
+//! Haggling over a price (1194:8020), for buying (modes 1 and 2, and 3
+//! a tavern's room: the buying path with TAVERN.DAT's lines), selling
+//! (mode 4) and the main quest's informant (modes 5 and 6, his price for
+//! the way: 0FEE).
 //!
 //! The shopkeeper starts at the asking price and has a limit: for a
 //! purchase the lowest price they will take, for a sale the most they
@@ -11,11 +12,14 @@
 //! only, on a roll out of 256) or counters at about the middle of the
 //! two prices, moved by the shop's mood.
 //!
-//! The dialogue is not shown, only what it does to the game: every
-//! message draws one random number (1194:83FD picks one of three lines
-//! of the shop's dialogue file), and a line with an amount ("%mm") stores
-//! the current price as the result (1194:84F1). The player's answers come
-//! from a `HaggleIo`.
+//! Every message draws one random number (1194:83FD picks one of three
+//! lines of the shop's dialogue file). The line is copied to LINE, its
+//! codes made a format there (84F1: %n the name at DS:[65AB], %c entry
+//! DL - 1 of the list at 2A62, %mm the price, which also becomes the
+//! result, %i the text at DS:[1376]) and formatted into SHOWN (0000:8D14);
+//! its line breaks become spaces, the colour 137E is 3Ch, and it is shown
+//! (1194:49FF, `HaggleIo::say`). The player's answers come from a
+//! `HaggleIo`.
 //!
 //! With the informant (modes 5, 6) the price is paid at once from the
 //! player's gold (05C2), before the confirmation, which always agrees;
@@ -74,8 +78,17 @@ pub mod var {
     pub const QUEST_PRICE: u16 = 0x0FEE;
     pub const QUEST_STEP: u16 = 0x0FDD;
     pub const COLOUR: u16 = 0x9288;
-    /// The line read (and, for the informant, substituted).
+    /// The line read (and, for the informant, substituted), the line
+    /// shown, and its colour.
     pub const LINE: u16 = 0x929E;
+    pub const SHOWN: u16 = 0x987A;
+    pub const SHOWN_COLOUR: u16 = 0x137E;
+    /// What the input routine (1194:4E88) is asked for: 0 a key, 1 a
+    /// menu choice, 2 typed text.
+    pub const INPUT_KIND: u16 = 0x13D3;
+    /// The item's name (%i) and the list %c picks from.
+    pub const ITEM: u16 = 0x1376;
+    pub const CATEGORIES: u16 = 0x2A62;
 }
 use var::*;
 
@@ -95,6 +108,9 @@ pub trait HaggleIo {
     fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
         m.expand(files, &mut crate::text::NoTextHooks, DS, di).map(|_| ())
     }
+    /// 1194:49FF: the line at DS:`si` (SHOWN, in colour 137E) shown, before
+    /// the menu, offer or key it goes with.
+    fn say(&mut self, _m: &mut Machine, _si: u16) {}
 }
 
 /// A player who walks away: the menus left (2), no offer typed, keys
@@ -125,11 +141,11 @@ pub enum Haggle {
 impl Machine {
     /// 1194:8020. Haggles over `price` with the player's personality
     /// `per` (0..100, as 1194:5B07 gives it), the shop's `quality` and
-    /// `mood` bytes, `mode` 1, 2 (buying), 4 (selling), 5 or 6 (the
-    /// informant); `di` and `dl` are kept for the dialogue. The dialogue
-    /// file for the mode is loaded into the buffer segment, as the
-    /// original does. None for mode 3 (not ported), where the original
-    /// faults, or where the player stops answering.
+    /// `mood` bytes, `mode` 1, 2 (buying), 3 (a tavern's room), 4
+    /// (selling), 5 or 6 (the informant); `di` and `dl` are kept for the
+    /// dialogue. The dialogue file for the mode is loaded into the buffer
+    /// segment, as the original does. None for another mode, where the
+    /// original faults, or where the player stops answering.
     #[allow(clippy::too_many_arguments)]
     pub fn haggle(
         &mut self,
@@ -143,7 +159,7 @@ impl Machine {
         mode: u8,
         di: u16,
     ) -> Option<Haggle> {
-        if !matches!(mode, 1 | 2 | 4 | 5 | 6) {
+        if !matches!(mode, 1..=6) {
             return None;
         }
         self.mem.w8(DS, HALVED, 0);
@@ -187,6 +203,9 @@ impl Machine {
                 for i in 0..6 {
                     self.mem.w8(DS, TYPED + i, 0);
                 }
+                // 80F7: the prompt (65CA) in colour 3, typed text asked.
+                self.mem.w8(DS, SHOWN_COLOUR, 3);
+                self.mem.w8(DS, INPUT_KIND, 2);
                 let typed = io.text()?;
                 for (i, &c) in typed.iter().take(6).enumerate() {
                     self.mem.w8(DS, TYPED + i as u16, c);
@@ -399,6 +418,7 @@ impl Machine {
     fn haggle_menu(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<u16> {
         let one = self.mem.r16(DS, PRICE) == 1;
         self.haggle_say(files, io, kind)?;
+        self.haggle_ask(1);
         let c = io.menu()?;
         Some(if one && c == 1 { 2 } else { c })
     }
@@ -407,8 +427,11 @@ impl Machine {
     /// informant's (modes 5, 6) asks for a key (13D3 left 0) and always
     /// agrees.
     fn haggle_confirm(&mut self, files: &mut Files, io: &mut impl HaggleIo) -> Option<bool> {
+        let informant = matches!(self.mem.r8(DS, MODE), 5 | 6);
+        self.mem.w8(DS, INPUT_KIND, if informant { 0 } else { 1 });
         self.haggle_say(files, io, 1)?;
-        if matches!(self.mem.r8(DS, MODE), 5 | 6) {
+        self.mem.w8(DS, SHOWN_COLOUR, 3);
+        if informant {
             io.key()?;
             return Some(true);
         }
@@ -420,15 +443,30 @@ impl Machine {
     fn haggle_message(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
         self.mem.w8(DS, COLOUR, 0x3C);
         self.haggle_say(files, io, kind)?;
+        self.haggle_ask(0);
         io.key()
     }
 
-    /// 1194:83FD and 84F1 for modes 1, 2 and 4: message `kind` (0 the
+    /// The prompt after a line (1194:4E54 in colour 3, 137E) and what is
+    /// asked of the input routine (13D3).
+    fn haggle_ask(&mut self, kind: u8) {
+        self.mem.w8(DS, SHOWN_COLOUR, 3);
+        self.mem.w8(DS, INPUT_KIND, kind);
+    }
+
+    /// 1194:83FD, 84F1 and 84C3 for modes 1 to 4: message `kind` (0 the
     /// opening, 1 the confirmation, 2 and 3 refusals, 4 a counter-offer)
     /// is line kind * 15 + tier * 3 + range(0, 3) of the dialogue file in
     /// the buffer segment, where tier is quality / 20 rounded up, less 1
-    /// (all in 8 bits: a quality of 0 wraps). Each "%mm" in the line puts
-    /// the current price (doubled back if halved) in RESULT.
+    /// (all in 8 bits: a quality of 0 wraps). It is copied to LINE, made a
+    /// format (84F1, scanning back from its end to the first zero byte,
+    /// which may lie before LINE: %n, %c, %mm, %i as the module says; each
+    /// "%mm" puts the current price, doubled back if halved, in RESULT),
+    /// formatted into SHOWN and shown. None where a code lies before
+    /// LINE: its argument is pushed too, and the formatter (which reads
+    /// the stack's words as each conversion asks) would take it for the
+    /// line's first; not modelled. The bytes before LINE are DGROUP's
+    /// variables, not text.
     fn haggle_say(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
         if matches!(self.mem.r8(DS, MODE), 5 | 6) {
             return self.haggle_say_informant(files, io, kind);
@@ -438,40 +476,90 @@ impl Machine {
         let base = kind.wrapping_mul(15) as u16 + tier.wrapping_mul(3) as u16;
         let r = self.rng.range(0, 3)?;
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
-        let mut si = self.skip_strings(buf, 0, base.wrapping_add(r));
-        let mut line = Vec::new();
+        let si = self.skip_strings(buf, 0, base.wrapping_add(r));
+        self.haggle_copy(buf, si, LINE);
+        // 84F1: from the end back to a zero byte, each code rewritten for
+        // the formatter, its argument pushed (so the first in the line is
+        // the formatter's first).
+        let mut si = LINE;
+        while self.mem.r8(DS, si) != 0 {
+            si = si.wrapping_add(1);
+        }
+        si = si.wrapping_sub(1);
+        let mut args = Vec::new();
+        let mut early = false;
+        while self.mem.r8(DS, si) != 0 {
+            if self.mem.r8(DS, si) == b'%' {
+                let pushed = args.len();
+                let next = self.mem.r8(DS, si.wrapping_add(1));
+                if next == b'n' {
+                    self.mem.w8(DS, si.wrapping_add(1), b's');
+                    args.push(crate::format::Arg::Str(DS, self.mem.r16(DS, NAME)));
+                } else if next == b'c' {
+                    self.mem.w8(DS, si.wrapping_add(1), b's');
+                    let n = self.mem.r8(DS, DL).wrapping_sub(1) as u16;
+                    args.push(crate::format::Arg::Str(DS, self.skip_strings(DS, CATEGORIES, n)));
+                } else if self.mem.r16(DS, si.wrapping_add(1)) == 0x6D6D {
+                    self.mem.w16(DS, si.wrapping_add(1), 0x756C);
+                    let mut price = self.mem.r16(DS, PRICE) as u32;
+                    if self.mem.r8(DS, HALVED) == 1 {
+                        price = price.wrapping_add(price);
+                    }
+                    args.push(crate::format::Arg::Long(price));
+                    self.mem.w32(DS, RESULT, price);
+                } else if next == b'i' {
+                    self.mem.w8(DS, si.wrapping_add(1), b's');
+                    args.push(crate::format::Arg::Str(DS, self.mem.r16(DS, ITEM)));
+                }
+                early |= args.len() != pushed && si < LINE;
+            }
+            si = si.wrapping_sub(1);
+        }
+        if early {
+            return None;
+        }
+        args.reverse();
+        self.sprintf((DS, SHOWN), (DS, LINE), &args);
+        self.haggle_show(io);
+        Some(())
+    }
+
+    /// 0000:9CA0: the string at seg:`si` copied to DS:`di` with its NUL.
+    fn haggle_copy(&mut self, seg: u16, mut si: u16, mut di: u16) {
         loop {
-            let c = self.mem.r8(buf, si);
+            let c = self.mem.r8(seg, si);
+            self.mem.w8(DS, di, c);
             if c == 0 {
                 break;
             }
-            line.push(c);
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+        }
+    }
+
+    /// 1194:84C3: SHOWN's line breaks (CR, LF) made spaces, the colour
+    /// 3Ch, and the line shown (1194:49FF).
+    fn haggle_show(&mut self, io: &mut impl HaggleIo) {
+        let mut si = SHOWN;
+        loop {
+            let c = self.mem.r8(DS, si);
+            if c == 0 {
+                break;
+            }
+            if c == b'\n' || c == b'\r' {
+                self.mem.w8(DS, si, b' ');
+            }
             si = si.wrapping_add(1);
         }
-        // Scanned from the end; %n, %c and %i come before %mm.
-        for i in (0..line.len()).rev() {
-            if line[i] != b'%' {
-                continue;
-            }
-            let next = line.get(i + 1).copied().unwrap_or(0);
-            if next == b'n' || next == b'c' {
-                continue;
-            }
-            if next == b'm' && line.get(i + 2) == Some(&b'm') {
-                let mut price = self.mem.r16(DS, PRICE) as u32;
-                if self.mem.r8(DS, HALVED) == 1 {
-                    price = price.wrapping_add(price);
-                }
-                self.mem.w32(DS, RESULT, price);
-            }
-        }
-        Some(())
+        self.mem.w8(DS, SHOWN_COLOUR, 0x3C);
+        io.say(self, SHOWN);
     }
 
     /// 1194:83FD..8467 and 84AA for the informant (modes 5, 6): line
     /// step * 15 (8 bits) + kind * 3 (8 bits) of the dialogue file, plus
     /// a d3 but for the confirmation (kind 1), copied to LINE and its
-    /// codes substituted (2DA2:000A, `HaggleIo::expand`).
+    /// codes substituted (2DA2:000A, `HaggleIo::expand`), copied to SHOWN
+    /// and shown (84C3).
     fn haggle_say_informant(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
         let step = (self.mem.r8(DS, QUEST_STEP) as u16 * 15) & 0xFF;
         let mut line = step.wrapping_add((kind as u16 * 3) & 0xFF);
@@ -490,6 +578,9 @@ impl Machine {
             si = si.wrapping_add(1);
             di = di.wrapping_add(1);
         }
-        io.expand(self, files, LINE)
+        io.expand(self, files, LINE)?;
+        self.haggle_copy(DS, LINE, SHOWN);
+        self.haggle_show(io);
+        Some(())
     }
 }

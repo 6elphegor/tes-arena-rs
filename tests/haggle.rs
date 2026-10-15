@@ -79,6 +79,7 @@ fn matches_original() {
         m.mem.w32(DS, 0x05C2, p[7]);
         m.mem.w8(DS, 0x0FE6, p[8] as u8);
         m.mem.w8(DS, 0x0FDD, p[9] as u8);
+        m.mem.w32(DS, 0x929A, p[10]);
         m.load_rng();
         let got = m.haggle(&mut fs, &mut io, p[0], p[1] as u16, p[2] as u8, p[3] as u8, p[5] as u8, p[4] as u8, 0x1A4C);
         let got = match got {
@@ -110,7 +111,8 @@ fn matches_original() {
                     Haggle::Deal(eax) => format!("deal {eax:x}"),
                     Haggle::NoDeal => "none".into(),
                 };
-                format!("{result} {} {} {} {:x}", io.used[0], io.used[1], io.used[2], fnv(state))
+                let shown: Vec<u8> =(0x929Eu16..0x949E).chain(0x987A..0x9A7A).chain(0x137E..0x137F).chain(0x13D3..0x13D4).map(|o| m.mem.r8(DS, o)).collect();
+                format!("{result} {} {} {} {:x} {:x}", io.used[0], io.used[1], io.used[2], fnv(state), fnv(shown))
             }
         };
         assert_eq!(f[4], got, "{line}");
