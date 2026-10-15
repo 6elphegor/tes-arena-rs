@@ -268,7 +268,6 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
         Some(arena::load::Loaded::Missing) => return Err(format!("Slot {slot} is empty in {}.", save.display())),
         _ => return Err(format!("Slot {slot} gave up while loading: {}.", arena::giveup::describe())),
     }
-    e.m.mem.w32(DS, 0xCD4A, 0);
     let run = run_of(&e.m);
     *engine = e;
     Ok(run)
@@ -362,9 +361,6 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             Run::City | Run::Interior(_) | Run::Start | Run::Wild | Run::Dungeon => {
                 let name = m.area_begin(next, h);
                 m.world_begin(name, h);
-                // The view has no sound: the INF's sounds (the hook CD4A,
-                // 23BA:0217, which the 3D mode set) aren't loaded.
-                m.mem.w32(DS, 0xCD4A, 0);
                 (!h.failed).then_some(next)
             }
             Run::End => {
