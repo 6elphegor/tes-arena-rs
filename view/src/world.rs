@@ -29,6 +29,11 @@ pub const SPRITE: u32 = 1;
 /// Vertex flag: placed on the screen (x, y in clip space), behind the
 /// world, not shaded by the lights: the sky's objects.
 pub const SCREEN: u32 = 16;
+/// Vertex flags for the sky's bodies (0000:E41A): BODY, behind the sky's
+/// objects and not remapped by the night; DARK_SKY, a star, drawn only
+/// where the sky under it is dark.
+pub const BODY: u32 = 32;
+pub const DARK_SKY: u32 = 64;
 
 /// Vertex flags: a wall face's side as the original numbers it (CCF8),
 /// plus one, shifted by WALL_SHIFT: 0 its normal -y (north), 1 +x, 2 +y,
@@ -620,8 +625,16 @@ fn sky_files() -> Vec<String> {
     v.extend(["VOLCANO2.DFA".to_string(), "VOLCANO3.IMG".to_string()]);
     // The lightning's bolts (0000:E5C9 loads them into the sky's bank).
     v.extend((1..=6).map(|i| format!("LGLIT0{i}.CFA")));
+    // The sky's bodies (0000:E5C9 too): the sun, the moons' phases, the
+    // stars.
+    v.extend(["SUN.IMG".to_string(), "MOON01.DFA".to_string(), "MOON02.DFA".to_string()]);
+    v.extend((1..=8).map(|i| format!("STAR{i}.IMG")));
     v
 }
+
+/// The atlas entry of the stars' single pixels: colours 40h..4Fh, one
+/// texel each (a cluster's pixel, 2294:03A1).
+pub const STAR_PIXELS: &str = "#STAR PIXELS";
 
 /// Whether a file is a person's image: a view (`01PLTWLK.CFA`: a woman's
 /// with 1 first, the view 1..5, then the look and the action, or a
@@ -732,6 +745,9 @@ pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archi
             p.sheet.sky.insert(name, frames);
         }
     }
+    let strip = crate::flats::Flat { w: 16, h: 1, frames: vec![(0x40..0x50).collect()] };
+    let frames = p.add(&strip);
+    p.sheet.sky.insert(STAR_PIXELS.to_string(), frames);
     let mut sheet = p.sheet;
     sheet.h = ((sheet.pixels.len() as u32).div_ceil(ATLAS)).max(1);
     sheet.pixels.resize((sheet.h * ATLAS) as usize, 0);
@@ -1093,6 +1109,12 @@ pub fn flat_drawn(m: &mut Machine, col: u16, row: u16, n: u16) {
 /// row above it the last), 100 to the half view; rows past `bottom` cut.
 #[allow(clippy::too_many_arguments)]
 pub fn sky_quad(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, horizon: i16, bottom: i16, focal: f32) {
+    sky_quad_flags(out, rect, x, y, centre, horizon, bottom, focal, 0);
+}
+
+/// `sky_quad` with more vertex flags (BODY, DARK_SKY).
+#[allow(clippy::too_many_arguments)]
+pub fn sky_quad_flags(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, horizon: i16, bottom: i16, focal: f32, flags: u32) {
     let rows = (bottom as i32 + 1 - y as i32).clamp(0, rect.h as i32);
     if rows == 0 {
         return;
@@ -1107,6 +1129,6 @@ pub fn sky_quad(out: &mut Vec<Vertex>, rect: Rect, x: i16, y: i16, centre: i16, 
     let (v0, v1) = (rect.y as f32 + IN, (rect.y + rows as u32) as f32 - IN);
     let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
     for i in [0, 1, 2, 0, 2, 3] {
-        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE | SCREEN });
+        out.push(Vertex { pos: p[i], uv: uv[i], layer: 0, light: 1.0, flags: SPRITE | SCREEN | flags });
     }
 }

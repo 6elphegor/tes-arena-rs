@@ -66,7 +66,8 @@
 //! of the 320 x 200 screen), and as debugging aids `give:N` (N items
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
 //! points), `gold:N`, `hp:N` (the health), `day:N` (the clock, 5CC, N days
-//! on), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
+//! on), `mday:N` (the day of the month, CCA8: the moons' places and
+//! phases), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
 //! creature killed a square ahead), `fatigue:N` (the player's fatigue; at
 //! 0 the next minute exhausts them) and `xp:N` (N experience gained: the
 //! next minute checks the level, and a level gained brings the level-up
@@ -475,6 +476,8 @@ struct Assets {
     /// lights and the sky's objects. Redraws between frames reuse it, so
     /// the sky's hook (lightning) steps once a frame, as in the original.
     frame_view: Option<(render::Sky, render::Lights, Vec<world::Vertex>)>,
+    /// The moons' phases' frames (0000:E6CB), kept until the day changes.
+    moons: [usize; 2],
     palette: [[u8; 4]; 256],
     /// CHARSHT.COL: the colours the character sheet's screens (the
     /// equipment screen, the spellbook) are shown in; 1194:1695 loads it
@@ -590,6 +593,62 @@ impl arena::skyobj::SkyHooks for SkyDraw<'_> {
     }
 }
 
+/// The sky's bodies drawn this frame (0000:E41A's draws), as quads: the
+/// sun's and the moons' pictures (`moons`, their phases' frames, kept
+/// across frames as the original keeps the decoded pictures), the stars'
+/// images and pixels.
+struct CelestialDraw<'a> {
+    sheet: &'a world::SpriteSheet,
+    focal: f32,
+    moons: &'a mut [usize; 2],
+    out: Vec<world::Vertex>,
+}
+
+impl CelestialDraw<'_> {
+    fn quad(&mut self, m: &arena::machine::Machine, rect: world::Rect, x: u16, y: u16, flags: u32) {
+        use arena::mem::DS;
+        let r = |at| m.mem.r16(DS, at) as i16;
+        world::sky_quad_flags(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xA91A), self.focal, flags);
+    }
+
+    fn named(&mut self, m: &arena::machine::Machine, name: &str, frame: usize, x: u16, y: u16, flags: u32) {
+        let Some(f) = self.sheet.sky.get(name).copied() else { return };
+        let rect = self.sheet.rects[f.first + frame % f.count];
+        self.quad(m, rect, x, y, flags);
+    }
+}
+
+impl arena::celestial::CelestialHooks for CelestialDraw<'_> {
+    fn moon_phase(&mut self, _m: &mut arena::machine::Machine, name: u16, frame: u16, _dest: u16) {
+        let which = if name == 0xD871 { 0 } else { 1 };
+        self.moons[which] = frame as usize;
+    }
+    fn draw(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16, _w: u16, _h: u16) {
+        use arena::celestial::var::{MOON1, MOON2, SUN};
+        let (name, frame) = match si {
+            SUN => ("SUN.IMG", 0),
+            MOON1 => ("MOON01.DFA", self.moons[0]),
+            MOON2 => ("MOON02.DFA", self.moons[1]),
+            _ => return,
+        };
+        self.named(m, name, frame, x, y, world::BODY);
+    }
+    fn star_pixel(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, colour: u16) {
+        let Some(f) = self.sheet.sky.get(world::STAR_PIXELS).copied() else { return };
+        if !(0x40..0x50).contains(&colour) {
+            return;
+        }
+        let strip = self.sheet.rects[f.first];
+        let rect = world::Rect { x: strip.x + (colour - 0x40) as u32, w: 1, ..strip };
+        self.quad(m, rect, x, y, world::BODY | world::DARK_SKY);
+    }
+    fn star_image(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, image: u16) {
+        use arena::celestial::var::STAR_IMAGES;
+        let Some(i) = (0..8u16).find(|&i| m.mem.r16(arena::mem::DS, STAR_IMAGES + 2 * i) == image) else { return };
+        self.named(m, &format!("STAR{}.IMG", i + 1), 0, x, y, world::BODY | world::DARK_SKY);
+    }
+}
+
 impl LightState {
     /// The table freed and made again from the .LGT named at `name`.
     fn table(&mut self, m: &mut arena::machine::Machine, name: u16) {
@@ -683,6 +742,7 @@ impl Assets {
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
             flash: std::cell::Cell::new(None),
             frame_view: None,
+            moons: [0, 0],
         }
     }
 
@@ -797,8 +857,22 @@ impl Assets {
     fn view_frame(&mut self, engine: &mut Engine, aspect: f32) {
         let (mut sky, lights) = self.light_frame(&mut engine.m);
         let focal = world::TAN_HALF * aspect;
+        // 0000:D4FA..D50D: outdoors, not in fog (C39A bit 20h), the sky's
+        // bodies, then the sky's hook.
+        let mut bodies = Vec::new();
+        let flags = (engine.m.mem.r16(arena::mem::DS, 0xC398), engine.m.mem.r16(arena::mem::DS, 0xC39A));
+        if flags.0 & 4 != 0 && flags.1 & 0x20 == 0 {
+            let mut cd = CelestialDraw { sheet: &self.sheet, focal, moons: &mut self.moons, out: Vec::new() };
+            let ok = engine.m.celestial(&mut cd).is_some();
+            if ok {
+                bodies = cd.out;
+            }
+        }
         let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
-        let quads = if engine.m.sky_draw(&mut draw).is_some() { draw.out } else { Vec::new() };
+        if engine.m.sky_draw(&mut draw).is_some() {
+            bodies.extend(draw.out);
+        }
+        let quads = bodies;
         self.flash.set(draw.flash);
         if let Some(c) = draw.flash {
             sky.fog = Some(c);
@@ -1397,6 +1471,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 let at = arena::inventory::PLAYER_SLOTS + n as u16 * 0x13 + 6;
                 let v = engine.m.mem.r16(arena::mem::DS, at) / 2;
                 engine.m.mem.w16(arena::mem::DS, at, v);
+            }
+            "mday" => {
+                // The day of the month (CCA8, 0..1Fh), a debugging aid for
+                // the moons' places and phases.
+                engine.m.mem.w16(arena::mem::DS, 0xCCA8, n as u16 & 0x1F);
             }
             "day" => {
                 // The clock N days on, a debugging aid (the calendar's
