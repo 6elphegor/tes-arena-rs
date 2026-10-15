@@ -954,6 +954,56 @@ fn the_automap_by_m_and_the_map_button() {
     assert!(!a.map && !a.captured, "the right button opens no automap");
 }
 
+/// The automap's font block (FONT_S.DAT, 0000:7508) is the screen's
+/// own: leaving frees it and puts the game's font back (2EAA..2EC5), and
+/// only a block the fonts' table (91AC) holds is freed (930E). A stale
+/// segment at A86C (the INF loader counts in its low byte; another
+/// engine's block) frees nothing: once the view freed a remembered block
+/// in a title-loaded engine, which was that engine's INF buffer (BA54),
+/// and the next level's INF overran the heap's chain.
+#[test]
+fn the_automap_font_block_freed_on_leaving_and_only_its_own() {
+    let Some(dir) = game_dir() else { return };
+    use arena::level::var::BUFFER_BLOCK;
+    use arena::mem::DS;
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let chain = |m: &arena::machine::Machine| {
+        let mut out = Vec::new();
+        let (mut s, mut o) = (m.mem.r16(DS, 0x0159), m.mem.r16(DS, 0x0157));
+        while out.len() < 4096 {
+            out.push((s, m.mem.r16(s, o + 8), m.mem.r8(s, o + 10)));
+            let n = m.mem.r32(s, o);
+            if n == 0 {
+                break;
+            }
+            (s, o) = ((n >> 16) as u16, n as u16);
+        }
+        out
+    };
+    let before = chain(&a.engine.m);
+    d.key(&mut a, KeyCode::KeyM, None);
+    assert!(a.map);
+    let font = a.engine.m.mem.r16(DS, 0xA86C);
+    assert_ne!(font, 0, "FONT_S.DAT loaded");
+    assert_eq!(a.engine.m.mem.r16(DS, arena::mapnotes::var::FONT + 2), font, "and selected");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(!a.map);
+    assert_eq!(chain(&a.engine.m), before, "the block freed on leaving");
+    assert_eq!(a.engine.m.mem.r16(DS, arena::mapnotes::var::FONT + 2), a.engine.m.mem.r16(DS, 0x102C), "the game's font back");
+    // A86C left naming the INF's buffer: opening and leaving again frees
+    // only the screen's own block.
+    let buffer = a.engine.m.mem.r16(DS, BUFFER_BLOCK + 2);
+    a.engine.m.mem.w16(DS, 0xA86C, buffer);
+    d.key(&mut a, KeyCode::KeyM, None);
+    a.engine.m.mem.w16(DS, 0xA86C, buffer);
+    d.key(&mut a, KeyCode::Escape, None);
+    let m = &a.engine.m;
+    assert_eq!(m.mem.r8(buffer.wrapping_sub(1), 10) & 1, 1, "the INF's buffer still in use");
+    assert!(m.heap_check());
+}
+
 /// Each of the bar's buttons clicked does what its handler does.
 #[test]
 fn each_bar_button_as_the_original_wires_it() {
