@@ -10,8 +10,9 @@ gold (5C2), spells known (50A), the save slot (1A6C), the screen's flags
 (1001, 101D), the word %a shows (5873), A902 and 5C8, and the player's
 spells (DATA 2A80: 32 slots, occupied at random, now and then all); and
 the answers the front end gives: the clicks (each read on the main
-screen as a region, 0..6, or a miss, 7, at an offset in it, and on a form
-as a control's arrow, up or down, its done box, or a miss), the lists'
+screen as a region, 0..6, or a miss, 7, at an offset in it, its bottom
+edge included, which misses; and on a form as a control's arrow, 2, 8, 5
+or 6 rows below its top, up to 5 being up, its done box, or a miss), the lists'
 and menus' picks and the names typed. Once the clicks run out the main
 screen's "exit" or the form's done box is clicked.
 
@@ -105,7 +106,7 @@ def setup(seed):
     for _ in range(byte() % 40):
         r = byte() % 16
         r = (1, 1, 1, 5, 5, 2, 3, 0, 4, 1, 5, 2, 6, 7, 1, 3)[r]
-        clicks.append((r, byte(), byte(), byte() % 4, byte(), byte() & 1))
+        clicks.append((r, byte(), byte(), byte() % 4, byte(), byte() % 4))
     lists = [0xFFFF if byte() < 0x18 else byte() for _ in range(24)]
     menus = [0xFFFF if byte() < 0x18 else byte() % 4 for _ in range(12)]
     names = [NAMES[byte() % len(NAMES)] for _ in range(4)]
@@ -121,13 +122,13 @@ def click_at(a, entry, form):
         if r == 7:
             return (0x10, 0x10)
         x0, y0, x1, y1 = REGIONS[r]
-        return (x0 + ox % (x1 - x0 + 1), y0 + oy % (y1 - y0))
+        return (x0 + ox % (x1 - x0 + 1), y0 + oy % (y1 - y0 + 1))
     rd = lambda o: a.r16(form + o, seg=LOAD_SEG + DATA)
     fx, fy = a.r16(0xA880), a.r16(0xA882)
     if kind < 2:
         n = rd(4)
         c = form + 0x12 + 0x12 * (idx % max(n, 1))
-        return ((fx + rd(c - form) + 1) & 0xFFFF, (fy + rd(c - form + 2) + (2 if up else 8)) & 0xFFFF)
+        return ((fx + rd(c - form) + 1) & 0xFFFF, (fy + rd(c - form + 2) + (2, 8, 5, 6)[up]) & 0xFFFF)
     if kind == 2:
         return ((fx + rd(0xA)) & 0xFFFF, (fy + rd(0xC)) & 0xFFFF)
     return ((fx + 0xF0) & 0xFFFF, (fy + 0x60) & 0xFFFF)

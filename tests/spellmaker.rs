@@ -51,14 +51,14 @@ fn click_at(m: &Machine, e: Click, form: Option<u16>) -> (u16, u16) {
             return (0x10, 0x10);
         }
         let (x0, y0, x1, y1) = REGIONS[r as usize];
-        return (x0 + ox as u16 % (x1 - x0 + 1), y0 + oy as u16 % (y1 - y0));
+        return (x0 + ox as u16 % (x1 - x0 + 1), y0 + oy as u16 % (y1 - y0 + 1));
     };
     let rd = |o: u16| m.mem.r16(DATA, f.wrapping_add(o));
     let (fx, fy) = (m.mem.r16(DS, 0xA880), m.mem.r16(DS, 0xA882));
     if kind < 2 {
         let n = rd(4).max(1);
         let c = 0x12 + 0x12 * (idx as u16 % n);
-        return (fx.wrapping_add(rd(c)).wrapping_add(1), fy.wrapping_add(rd(c + 2)).wrapping_add(if up != 0 { 2 } else { 8 }));
+        return (fx.wrapping_add(rd(c)).wrapping_add(1), fy.wrapping_add(rd(c + 2)).wrapping_add([2, 8, 5, 6][up as usize]));
     }
     if kind == 2 {
         return (fx.wrapping_add(rd(0xA)), fy.wrapping_add(rd(0xC)));
@@ -166,7 +166,7 @@ fn setup(m: &mut Machine, seed: u32) -> Script {
         let oy = s.byte();
         let kind = s.byte() % 4;
         let idx = s.byte();
-        let up = s.byte() & 1;
+        let up = s.byte() % 4;
         sc.clicks.push((r, ox, oy, kind, idx, up));
     }
     for _ in 0..24 {
