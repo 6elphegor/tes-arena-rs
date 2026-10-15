@@ -406,8 +406,19 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
         eprintln!("entering the area gave up: {}", arena::giveup::describe());
         return None;
     }
-    let name = String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)).into_owned();
-    eprintln!("entered {next:?} ({name})");
+    eprintln!("entered {next:?} ({})", area_name(&engine.m));
     Some(next)
 }
 
+
+/// The area's name for the logs: its level file, or for a city (built
+/// from its blocks, LEVEL_NAME "#": 0000:A26F loads no file) the place's
+/// name the status box shows (0A22).
+pub fn area_name(m: &arena::machine::Machine) -> String {
+    let level = m.mem.cstr(DS, arena::transit::var::LEVEL_NAME);
+    if level.first() == Some(&b'#') {
+        format!("{} (#)", String::from_utf8_lossy(m.mem.cstr(DS, arena::status::var::PLACE_NAME)))
+    } else {
+        String::from_utf8_lossy(level).into_owned()
+    }
+}
