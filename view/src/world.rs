@@ -797,8 +797,8 @@ fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shif
 /// - the flats standing in the map (MAP1 words 8xxx: flat low byte +
 ///   FLAT_BASE) at their squares' centres, raised by the flat record's
 ///   Y, animations at frame `tick`;
-/// - the creatures in the actor slots (not inactive, 4000h): sprite C0h
-///   + view (0..4, mirrored with flag 2) is the type's view file, C5h
+/// - the creatures in the actor slots (not inactive, 4000h): sprite C0h +
+///   view (0..4, mirrored with flag 2) is the type's view file, C5h
 ///   (dying) its sixth, any other a flat (the corpse); +D the frame.
 pub fn sprites(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -> Vec<Vertex> {
     sprites_tagged(m, sheet, heading, tick).0
