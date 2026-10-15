@@ -1,5 +1,7 @@
 //! Saving a game (25FD:0113..01CB, 0000:A94E): the files the original
 //! writes, byte for byte, as the loaders in src/save.rs read them back.
+//! The menu before it (25FD:0002..010F, the slot picked and named) is
+//! src/savemenu.rs's `save_menu`.
 //!
 //! - NAMES.DAT: the slots' names, 0x1E0 bytes from 9686 (`save_names`).
 //! - SAVEGAME.nn (`save_level`): the screen (0xFA00 bytes at the far

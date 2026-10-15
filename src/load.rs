@@ -10,7 +10,7 @@
 //! (`save_restore`, 25FD:034B), and the area's entered hook (CD42).
 //!
 //! From the title screen (0000:119D sets 5C8 bit 4) the same runs in
-//! another order: the hook after SAVEGAME's planes (BA76) is set to the
+//! another order (`title_load`): the hook after SAVEGAME's planes (BA76) is set to the
 //! 3D mode (2294:0006), which runs the rebuild first, and the world loop
 //! is entered afresh (0000:A232) to go back, when the area ends, to the
 //! outer loop's code after that area's run (25FD:0539 sets it at BA7A).
@@ -177,9 +177,9 @@ impl Machine {
     /// "Loading...", the working slot's digits set (25FD:022A), the slot's
     /// files copied, CITYDATA, SAVEGAME and its world, SAVEENGN with the
     /// rebuild, 5CA bit 4000h (just loaded) and the hook CD42 (0000:468B,
-    /// `AreaHooks::entered`). None where a part fails (a file missing,
-    /// the heap), or 5C8 bit 4 is set (the title screen's way, which
-    /// enters the world loop afresh: not ported).
+    /// `AreaHooks::entered`). With 5C8 bit 4 (from the title screen) the
+    /// rest is `title_load`'s. None where a part fails (a file missing,
+    /// the heap, a hook not ported).
     pub fn game_load(&mut self, files: &mut Files, slot: u8, hooks: &mut dyn LoadHooks) -> Option<Loaded> {
         self.save_set_slot(slot);
         hooks.sound_off(self);
@@ -203,7 +203,8 @@ impl Machine {
         hooks.slot_files(self, files);
         hooks.citydata(self, files);
         if title {
-            return None;
+            self.title_load(files, hooks)?;
+            return Some(Loaded::Done);
         }
         self.save_load_level(files)?;
         self.save_level_world(files, hooks)?;
@@ -214,6 +215,95 @@ impl Machine {
         }
         hooks.entered(self);
         Some(Loaded::Done)
+    }
+
+    /// 25FD:0309..032D, a load from the title screen after CITYDATA: 5CA
+    /// bit 4000h (just loaded), C38C 0, the hook after SAVEGAME's planes
+    /// (BA76) the 3D mode's level part (2294:0006), and the world loop
+    /// entered afresh (0000:A232..A269): its way back (BA7A) the menu's
+    /// 25FD:032D until the rebuild sets the outer loop's (`load_return`),
+    /// the ceiling 64h, the walking speed, standing (3Ch), the view's
+    /// window (A5D1), the world's entry without an INF (A49C, as A4ED in
+    /// `Engine::world_enter`: the banks, the deep floors, no changing
+    /// squares, the rain's drops, no moving lights, dry ground, the entry
+    /// hook C3B0 and the place hook CD2A where set; the renderer's parts
+    /// drawing only), then SAVEGAME (`save_load_level`) with the hook:
+    /// SAVEENGN and the rebuild (`save_restore`, which with 5C8 bit 4
+    /// leaves the 3D mode to the hook and sets the way back), 5C8 bit 4
+    /// and BA78 cleared, the sky's time (0000:16F7), the rest of
+    /// `mode_3d_level`; C8ED and CB5B as SAVEGAME's end leaves them; the
+    /// entered hook (CD42), the clip put back (A606) and the player's
+    /// position kept (A2A3: BA62), where the loop's frames begin. The
+    /// hook runs inside the original's SAVEGAME load, before its last two
+    /// writes; here after the load, those two written again.
+    pub fn title_load(&mut self, files: &mut Files, hooks: &mut dyn LoadHooks) -> Option<()> {
+        use crate::transit::var::{ENTERED_HOOK, ENTRY_HOOK, PLACE_HOOK};
+        self.load_or16(0x05CA, 0x4000);
+        self.mem.w16(DS, 0xC38C, 0);
+        self.mem.w16(DS, LEVEL_HOOK, 0x0006);
+        self.mem.w16(DS, LEVEL_HOOK + 2, 0);
+        self.mem.w16(DS, RETURN, 0x032D);
+        self.mem.w16(DS, RETURN + 2, 0x25FD);
+        self.mem.w16(DS, 0xD80A, 0xFF9C);
+        self.mem.w16(DS, crate::movement::var::CEILING, 0x64);
+        let v = self.mem.r16(DS, 0xC390);
+        self.mem.w16(DS, crate::controls::var::WALK, v);
+        self.mem.w16(DS, crate::movement::var::HEIGHT, 0x3C);
+        self.view_window();
+        self.ems_reset();
+        let v = self.mem.r16(DS, crate::movement::var::FRAME_SEG).wrapping_add(0xC00);
+        self.mem.w16(DS, crate::movement::var::FLOOR_SOLID, v);
+        for i in 0..0x20 {
+            self.mem.w16(DS, crate::click::var::TEMP_WALLS + 2 * i, 0xFFFF);
+        }
+        self.weather_drops()?;
+        for i in 0..0x60 {
+            self.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
+        }
+        self.mem.w8(DS, 0xCB5B, 1);
+        hooks.view_update(self);
+        self.clip_back();
+        if self.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
+            self.area_entry(hooks);
+        } else if self.mem.r16(DS, ENTRY_HOOK + 2) != 0 {
+            return None;
+        }
+        self.view_window();
+        if self.mem.r32(DS, PLACE_HOOK) == 0x45B2 {
+            self.area_place(hooks);
+        } else if self.mem.r16(DS, PLACE_HOOK + 2) != 0 {
+            return None;
+        }
+        self.save_load_level(files)?;
+        // The hook, 2294:0006.
+        self.mem.w8(DS, 0x3C82, 0);
+        self.mem.w8(DS, 0x680F, 0);
+        self.mem.w16(DS, 0xCCBC, 0);
+        self.save_restore(files, hooks)?;
+        self.load_and16(0x05C8, 0xFFFB);
+        self.mem.w16(DS, LEVEL_HOOK + 2, 0);
+        self.sky_time()?;
+        self.mode_3d_level(hooks);
+        self.mem.w16(DS, crate::level::var::W_C8ED, 0xFFFF);
+        self.mem.w8(DS, 0xCB5B, 0xFF);
+        if self.mem.r32(DS, ENTERED_HOOK) != 0x468B {
+            return None;
+        }
+        hooks.entered(self);
+        self.clip_back();
+        for i in 0..3 {
+            let w = self.mem.r16(DS, crate::level::var::PLAYER_X + 2 * i);
+            self.mem.w16(DS, 0xBA62 + 2 * i, w);
+        }
+        Some(())
+    }
+
+    /// 0000:A606: the clip (A914..A91B) put back from BA58.
+    pub fn clip_back(&mut self) {
+        for i in 0..8u16 {
+            let b = self.mem.r8(DS, 0xBA58 + i);
+            self.mem.w8(DS, 0xA914 + i, b);
+        }
     }
 
     /// 25FD:06A1. The slot's files ("*.nn", the slot at SLOT, its digits

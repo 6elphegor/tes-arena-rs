@@ -1205,3 +1205,94 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
     let t = a.boxes.iter().map(|x| text(x)).find(|t| t.contains("Palace Gates")).unwrap();
     assert!(t.starts_with("As you approach the Palace Gates") && t.trim_end().ends_with("complete..."), "the audience: {t:?}");
 }
+
+/// The user's save (ARENA_SAVE, slot 1) loaded from the title screen's
+/// way (`areas::load_game_title`: 5C8 bit 4, the world loop entered
+/// afresh) and in play's (`areas::load_game`) onto the same fresh start:
+/// the same area, place and game.
+#[test]
+fn a_save_loaded_from_the_title_as_in_play() {
+    use arena::mem::DS;
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let fresh = || {
+        let mut e = world::load(&dir, "START.MIF");
+        areas::start(&mut e, false);
+        e
+    };
+    let mut a = fresh();
+    let ra = areas::load_game(&mut a, &dir, &save, 1).expect("loads in play");
+    let mut b = fresh();
+    let rb = areas::load_game_title(&mut b, &dir, &save, 1).expect("loads from the title");
+    assert_eq!(format!("{ra:?}"), format!("{rb:?}"), "the run");
+    // The game's state the same: the character, the place, the flags;
+    // the title's way differs where the world loop was entered afresh
+    // (its way back, the hook, the ceiling, the sky's time, the rain's
+    // drops, the heap's and EMS's bookkeeping).
+    let same = |at: u16, n: u16| (at..at + n).all(|o| a.m.mem.r8(DS, o) == b.m.mem.r8(DS, o));
+    assert!(same(arena::character::PLAYER, 0x400), "the character");
+    assert!(same(0xC3D0, 6) && same(0x05E6, 1) && same(0x0A46, 1) && same(0x05C8, 4), "the place and the flags");
+    assert!(b.m.mem.r16(DS, 0xBA7A) != 0 && b.m.mem.r16(DS, 0xBA7C) == 0, "the way back: the outer loop's");
+    assert_eq!(b.m.mem.r16(DS, 0x05C8) & 4, 0, "5C8 bit 4 cleared");
+    assert_eq!(b.m.mem.r16(DS, 0xBA76), 6, "the hook's offset kept, its segment cleared");
+    let _ = std::fs::remove_dir_all(&save);
+}
+
+/// Shift+F5's save menu: slot 3's row clicked, a name typed, Enter: the
+/// game saved to a scratch folder (NAMES.DAT with the name, SAVEGAME.03);
+/// then a fresh program's main menu Load, slot 3's row clicked: the game
+/// loaded the title screen's way, where it was saved.
+#[test]
+fn saved_by_the_menu_then_loaded_from_the_title() {
+    use arena::mem::DS;
+    use arena::movement::var::{X, Y};
+    let Some(dir) = game_dir() else { return };
+    let scratch = std::env::temp_dir().join(format!("arena-inputtest-savemenu-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&scratch);
+    std::fs::create_dir_all(&scratch).unwrap();
+    let mut a = app(&dir, &Start { save_dir: Some(scratch.clone()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    d.key(&mut a, KeyCode::F5, None);
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+    assert!(a.saveui.is_some(), "the save menu is up");
+    d.click(&mut a, 160, 4 + 3 * 14 + 3, MouseButton::Left);
+    assert!(a.saveui.as_ref().is_some_and(|u| u.typing.is_some()), "slot 3's name is typed");
+    for c in "Ria".chars() {
+        d.key(&mut a, KeyCode::KeyA, Some(&c.to_string()));
+    }
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.saveui.is_none(), "the menu closed");
+    let names = saveui::read_any_case(&scratch, "NAMES.DAT").expect("NAMES.DAT");
+    assert_eq!(&names[3 * 0x30..3 * 0x30 + 4], b"Ria\0", "slot 3's name");
+    assert!(saveui::read_any_case(&scratch, "SAVEGAME.03").is_some(), "SAVEGAME.03 written");
+    let at = |e: &Engine| (e.m.mem.r16(DS, X), e.m.mem.r16(DS, Y), e.m.mem.r8(DS, arena::trigger::var::AREA));
+    let saved = at(&a.engine);
+
+    let mut engine = world::load(&dir, "START.MIF");
+    let archive = Rc::new(archive::Archive::open(&dir));
+    let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
+    let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.clone()), 0, false);
+    let mut d = Driver::new(&mut b);
+    d.key(&mut b, KeyCode::Enter, None);
+    d.key(&mut b, KeyCode::Enter, None);
+    d.key(&mut b, KeyCode::KeyL, Some("L"));
+    assert!(b.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
+    let mut shot = hud::Screen::new(b.assets.palette);
+    b.saveui.as_ref().unwrap().draw(&mut shot);
+    if let Ok(p) = std::env::var("ARENA_SHOT") {
+        let data: Vec<u8> = shot.px.iter().flat_map(|c| [c[0], c[1], c[2], 0xFF]).collect();
+        let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(&p).unwrap()), hud::W as u32, hud::H as u32);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.write_header().unwrap().write_image_data(&data).unwrap();
+    }
+    d.click(&mut b, 160, 4 + 3 * 14 + 3, MouseButton::Left);
+    assert!(b.saveui.is_none() && b.creation.is_none(), "loaded and playing");
+    assert_eq!(at(&b.engine), saved, "where it was saved");
+    let _ = std::fs::remove_dir_all(&scratch);
+}
