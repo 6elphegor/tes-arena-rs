@@ -225,15 +225,19 @@ impl Machine {
     /// the ceiling 64h, the walking speed, standing (3Ch), the view's
     /// window (A5D1), the world's entry without an INF (A49C, as A4ED in
     /// `Engine::world_enter`: the banks, the deep floors, no changing
-    /// squares, the rain's drops, no moving lights, dry ground, the entry
-    /// hook C3B0 and the place hook CD2A where set; the renderer's parts
-    /// drawing only), then SAVEGAME (`save_load_level`) with the hook:
-    /// SAVEENGN and the rebuild (`save_restore`, which with 5C8 bit 4
-    /// leaves the 3D mode to the hook and sets the way back), 5C8 bit 4
-    /// and BA78 cleared, the sky's time (0000:16F7), the rest of
-    /// `mode_3d_level`; C8ED and CB5B as SAVEGAME's end leaves them; the
-    /// entered hook (CD42), the clip put back (A606) and the player's
-    /// position kept (A2A3: BA62), where the loop's frames begin. The
+    /// squares, the rain's drops, no moving lights, dry ground, the
+    /// buffer block (BA54, CB8Eh bytes from the heap's top), the entry
+    /// hook C3B0 and the place hook CD2A where set, outdoors the sky's
+    /// images; the renderer's parts drawing only), then SAVEGAME
+    /// (`save_load_level`) with the hook: SAVEENGN and the rebuild
+    /// (`save_restore`, which with 5C8 bit 4 leaves the 3D mode to the
+    /// hook and sets the way back), 5C8 bit 4 and BA78 cleared, the sky's
+    /// time (0000:16F7), the rest of `mode_3d_level`; C8ED and CB5B as
+    /// SAVEGAME's end leaves them, and its tail (AA4B..AA5C: the view's
+    /// window, the level's INF, the view updated, the sky's images, as
+    /// `save_level_world`); the entered hook (CD42), the clip put back
+    /// (A606) and the player's position kept (A2A3: BA62), where the
+    /// loop's frames begin. The
     /// hook runs inside the original's SAVEGAME load, before its last two
     /// writes; here after the load, those two written again.
     pub fn title_load(&mut self, files: &mut Files, hooks: &mut dyn LoadHooks) -> Option<()> {
@@ -261,6 +265,14 @@ impl Machine {
             self.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         self.mem.w8(DS, 0xCB5B, 1);
+        // A4C5: the buffer block (BA54, where the INF is read) from the
+        // heap's top. Where none fits EAX's high half is left as it was.
+        let size = self.mem.r16(DS, crate::level::var::BUFFER_SIZE);
+        let seg = self.heap_alloc_high(size)?;
+        if seg == 0 {
+            return None;
+        }
+        self.mem.w32(DS, crate::level::var::BUFFER_BLOCK, (seg as u32) << 16);
         hooks.view_update(self);
         self.clip_back();
         if self.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
@@ -274,6 +286,7 @@ impl Machine {
         } else if self.mem.r16(DS, PLACE_HOOK + 2) != 0 {
             return None;
         }
+        hooks.sky_graphics(self, files);
         self.save_load_level(files)?;
         // The hook, 2294:0006.
         self.mem.w8(DS, 0x3C82, 0);
@@ -286,6 +299,11 @@ impl Machine {
         self.mode_3d_level(hooks);
         self.mem.w16(DS, crate::level::var::W_C8ED, 0xFFFF);
         self.mem.w8(DS, 0xCB5B, 0xFF);
+        // AA4B..AA5C, `save_level_world` with the view's window ported.
+        self.view_window();
+        self.info_load(files, SAVED_INF)?;
+        hooks.view_update(self);
+        hooks.sky_graphics(self, files);
         if self.mem.r32(DS, ENTERED_HOOK) != 0x468B {
             return None;
         }
