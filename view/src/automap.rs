@@ -127,14 +127,16 @@ pub fn notes_here(m: &Machine) -> bool {
 /// A note's text edited in place (0000:9EE9 from 0000:31FE): the text
 /// typed at (x, y) in the notes' font and COLOUR's 6 (A0AE by 9E0A), the
 /// cursor (A0D9) a block a space's width plus one by the font's height
-/// XORed with 6 at its end. Approximate: the original's cursor starts
-/// where the note was clicked and moves with the arrows; the view's
-/// stays at the end, and does not blink.
+/// XORed with 6 at its end, blinking (`hud::cursor_on`). Approximate:
+/// the original's cursor starts where the note was clicked and moves
+/// with the arrows; the view's stays at the end.
 pub fn draw_field(screen: &mut hud::Screen, x: i32, y: i32, typed: &str) {
     let Some(pics) = crate::sheets::loaded() else { return };
     let Some(f) = pics.small.as_ref().or(pics.teeny.as_ref()) else { return };
     screen.text_plain(f, x, y, typed, 6);
-    screen.xor(x + f.width(typed) as i32, y, f.width(" ") as i32 + 1, f.h as i32, 6);
+    if hud::cursor_on() {
+        screen.xor(x + f.width(typed) as i32, y, f.width(" ") as i32 + 1, f.h as i32, 6);
+    }
 }
 
 /// The notes over the automap screen (0000:32FE, `notes_draw`, run on a

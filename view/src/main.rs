@@ -1808,7 +1808,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
             // The inventory (I) and the spellbook (C), up until `close`;
             // their actions as the window's keys and clicks make them.
-            "inv" => st.panel = Some(panels::open_inventory(&mut engine.m)),
+            "inv" => {
+                engine.m.drop_place();
+                st.panel = Some(panels::open_inventory(&mut engine.m));
+            }
             "spells" => st.panel = Some(panels::Panel::Spellbook(Default::default())),
             "close" => st.panel = None,
             "give" => panels::give(&mut engine.m, n as u16),
@@ -1877,7 +1880,15 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 match what {
                     "equip" => panels::equip_line(&mut engine.m, n as usize, &mut said),
                     "select" => panels::select_line(&mut engine.m, n as usize),
-                    "drop" => panels::drop_selected(&mut engine.m, &mut said),
+                    // The drop button, its question (if it asks) answered
+                    // yes, or no with drop:1.
+                    "drop" => {
+                        let mut inv = panels::Inventory::default();
+                        panels::drop_press(&mut engine.m, &mut inv, &mut said);
+                        if inv.asking.is_some() {
+                            panels::drop_answer(&mut engine.m, n == 0, &mut said);
+                        }
+                    }
                     "use" => panels::use_pick(&mut engine.m, &mut engine.files, n as u16, &mut said),
                     _ => {
                         st.panel = None;
@@ -1919,9 +1930,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // equipment ('N'), the logbook (the scroll) and its next page.
             "sheet" => {
                 sheets::pics(&st.assets.archive, &engine.m);
+                engine.m.drop_place();
                 st.panel = Some(panels::Panel::Sheet);
             }
-            "page" => st.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+            "page" => st.panel = Some(panels::equipment_page(&mut engine.m)),
             "log" => {
                 sheets::pics(&st.assets.archive, &engine.m);
                 st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files)));
@@ -2820,7 +2832,7 @@ impl App {
     fn options_ended(&mut self, e: options::Ended) {
         let options::Ended::Left(engine, end) = e else { return };
         self.options = None;
-        self.engine = engine;
+        self.engine = *engine;
         // The keys let go while the screen was up went to the engine it
         // replaced: the game's key state and latches let go here.
         for scan in 1..0x60u8 {
@@ -2913,6 +2925,11 @@ impl App {
             self.panel = None;
             return;
         }
+        // The inventory as the sheet's page would show it: where the
+        // player stands checked first, as the portrait does (1194:5F13).
+        if inventory {
+            self.engine.m.drop_place();
+        }
         self.panel = Some(if inventory { panels::open_inventory(&mut self.engine.m) } else { panels::Panel::Spellbook(Default::default()) });
         if self.captured {
             self.release();
@@ -2948,6 +2965,22 @@ impl App {
                         KeyCode::Escape => inv.using = None,
                         _ => {}
                     }
+                } else if let Some((_, sel)) = inv.asking.as_mut() {
+                    // The drop's yes or no (020E: its keys Y and N, Esc no).
+                    let answer = match code {
+                        KeyCode::ArrowUp | KeyCode::ArrowDown => {
+                            *sel ^= 1;
+                            None
+                        }
+                        KeyCode::Enter | KeyCode::NumpadEnter => Some(*sel == 0),
+                        KeyCode::KeyY => Some(true),
+                        KeyCode::KeyN | KeyCode::Escape => Some(false),
+                        _ => None,
+                    };
+                    if let Some(yes) = answer {
+                        inv.asking = None;
+                        panels::drop_answer(m, yes, &mut said);
+                    }
                 } else {
                     match code {
                         KeyCode::Escape | KeyCode::KeyI => {
@@ -2956,7 +2989,7 @@ impl App {
                         },
                         KeyCode::ArrowUp => panels::scroll(m, -1),
                         KeyCode::ArrowDown => panels::scroll(m, 1),
-                        KeyCode::KeyD => panels::drop_selected(m, &mut said),
+                        KeyCode::KeyD => panels::drop_press(m, inv, &mut said),
                         KeyCode::KeyU => {
                             let names = panels::usable_names(m);
                             if !names.is_empty() {
@@ -2982,7 +3015,7 @@ impl App {
             }
             Some(panels::Panel::Sheet) => match code {
                 // 3276:52B0's records: 'N' the equipment page, Esc leaves.
-                KeyCode::KeyN => self.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+                KeyCode::KeyN => self.panel = Some(panels::equipment_page(m)),
                 KeyCode::Escape | KeyCode::KeyK => self.panel = None,
                 _ => {}
             },
@@ -3017,6 +3050,14 @@ impl App {
                         inv.using = None;
                         panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
                     }
+                } else if let Some((text, _)) = &inv.asking {
+                    let menu = panels::drop_menu(text, 0);
+                    let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
+                    let i = ((y - ey) / lh.max(1)) as usize;
+                    if x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < 2 {
+                        inv.asking = None;
+                        panels::drop_answer(&mut self.engine.m, i == 0, &mut said);
+                    }
                 } else if let Some(b) = panels::button_at(x, y) {
                     match b {
                         panels::Button::Exit => {
@@ -3024,7 +3065,7 @@ impl App {
                             self.panel = back.then_some(panels::Panel::Sheet)
                         },
                         panels::Button::Spellbook => self.panel = Some(panels::Panel::Spellbook(Default::default())),
-                        panels::Button::Drop => panels::drop_selected(&mut self.engine.m, &mut said),
+                        panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
                 } else if let Some(row) = panels::line_at(x, y) {
                     if right {
@@ -3045,7 +3086,7 @@ impl App {
                 }
             }
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
-                Some(sheets::SheetClick::Equipment) => self.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+                Some(sheets::SheetClick::Equipment) => self.panel = Some(panels::equipment_page(&mut self.engine.m)),
                 Some(sheets::SheetClick::Done) => self.panel = None,
                 None => {}
             },
@@ -3143,6 +3184,8 @@ impl App {
     /// touch cast).
     fn open_sheet(&mut self) {
         sheets::pics(&self.assets.archive, &self.engine.m);
+        // As the portrait does before its sheet (1194:5F13).
+        self.engine.m.drop_place();
         self.panel = Some(panels::Panel::Sheet);
     }
 
@@ -3631,6 +3674,7 @@ impl winit::application::ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
+                hud::blink_frame();
                 let cam = self.compose();
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {

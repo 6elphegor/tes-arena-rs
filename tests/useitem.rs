@@ -302,3 +302,116 @@ fn matches_original() {
     }
     assert!(n > 2500, "{n}");
 }
+
+/// Mirrors harness/gen_dropbtn.py `button` after `setup` with op 5: the
+/// question's answer.
+fn button(m: &mut Machine, seed: u32) -> u8 {
+    let mut s = Stream(seed ^ 0x5F13);
+    let mut flags = s.word() & !0x20;
+    if s.byte() < 0x30 {
+        flags |= 0x20;
+    }
+    m.mem.w16(DS, 0x05E0, flags);
+    let lost = if s.byte() < 0x60 { s.byte() } else { 0 };
+    m.mem.w8(DS, 0x12D0, lost);
+    let v = s.word();
+    m.mem.w16(DS, 0x1026, v);
+    let v = s.word();
+    m.mem.w16(DS, 0x102C, v);
+    let answer = s.byte() & 1;
+    let _width = s.byte();
+    let own = (s.byte() < 0xD0) as u8;
+    m.mem.w8(DS, 0x129A, own);
+    if s.byte() < 0x30 {
+        m.mem.w8(DS, 0x1296, 0xFF);
+    }
+    answer
+}
+
+/// Mirrors harness/gen_dropbtn.py `place` (the planes at 7000h and
+/// 8000h).
+fn place(m: &mut Machine, seed: u32) {
+    let mut s = Stream(seed);
+    let mut sq = s.word() & 0xFFFE;
+    if sq == 0xFFFE {
+        sq = 0;
+    }
+    m.mem.w16(DS, 0xCB90, sq);
+    m.mem.w16(DS, 0xD806, 0x7000);
+    m.mem.w16(DS, 0xCCD0, 0x8000);
+    let b = if s.byte() < 0x40 { s.byte() } else { 0 };
+    m.mem.w8(0x7000, sq, b);
+    let fl = s.word();
+    m.mem.w16(0x8000, sq, fl);
+    let mut sub = s.word();
+    if s.byte() < 0x80 {
+        sub = fl.wrapping_sub(0xC00).wrapping_sub((s.byte() % 3) as u16).wrapping_add(1);
+    }
+    m.mem.w16(DS, 0x9030, sub);
+    let mut squares: Vec<u16> = (0..0x17).map(|_| s.word()).collect();
+    if s.byte() < 0x40 {
+        squares[(s.byte() % 0x17) as usize] = sq;
+    }
+    for (i, v) in squares.into_iter().enumerate() {
+        m.mem.w16(DS, 0x1951 + 2 * i as u16, v);
+    }
+    let v = s.word();
+    m.mem.w16(DS, 0x05E0, v);
+    for at in [0xC39A, 0xC398] {
+        let v = if s.byte() < 0x40 { s.word() } else { s.word() & !0x214 };
+        m.mem.w16(DS, at, v);
+    }
+    let v = s.byte();
+    m.mem.w8(DS, 0x12D0, v);
+}
+
+/// The drop button (1194:17D8, `drop_button`) and the place's check
+/// before the sheet (1194:5F13, `drop_place`) against
+/// harness/gen_dropbtn.py's vectors; the questions logged by their SI
+/// (DROP_TEXT).
+#[test]
+fn drop_button_matches_original() {
+    let Some(img) = common::image() else { return };
+    let base = Machine::new(&img);
+    let mut n = 0;
+    for line in include_str!("vectors/dropbtn.txt").lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        assert_eq!(f[0], "dropbtn", "{line}");
+        let op: u8 = f[1].parse().unwrap();
+        let seed = u32::from_str_radix(f[2], 16).unwrap();
+        let mut m = base.clone();
+        let mut asked: Vec<u16> = Vec::new();
+        let before;
+        if op == 0 {
+            setup(&mut m, seed, 5);
+            let answer = button(&mut m, seed);
+            m.load_rng();
+            before = m.clone();
+            let r = m.drop_button(&mut |_m| {
+                asked.push(arena::use_item::var::DROP_TEXT);
+                answer == 0
+            });
+            if r.is_none() {
+                assert!(f[3] == "fault" || f[3] == "hang", "{line}: the port gave up");
+                n += 1;
+                continue;
+            }
+            m.store_rng();
+        } else {
+            place(&mut m, seed);
+            before = m.clone();
+            m.drop_place();
+        }
+        let r: Vec<&str> = f[3].split(' ').collect();
+        assert_eq!(r.len(), 2, "{line}: the original gave up, the port didn't");
+        let changed = (0..=0xFFFFu16)
+            .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+            .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+        let frame = (0..=0xFFFFu16).filter(|&o| m.mem.r8(FRAME, o) != 0).flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(FRAME, o)]);
+        assert_eq!(r[0], format!("{:x}", fnv(changed.chain(frame))), "{line}: DGROUP");
+        let log: Vec<u8> = asked.iter().flat_map(|v| v.to_le_bytes()).collect();
+        assert_eq!(r[1], format!("{:x}", fnv(log)), "{line}: questions");
+        n += 1;
+    }
+    assert!(n > 3500, "{n}");
+}

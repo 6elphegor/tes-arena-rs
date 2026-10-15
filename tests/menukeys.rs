@@ -48,6 +48,9 @@ fn setup(m: &mut Machine, seed: u32) -> Script {
     dl.push(0);
     dl.reverse();
     let carry = s.byte() < 0x80;
+    // The planes 1194:5F13 reads before the sheet, zeroed.
+    m.mem.w16(DS, 0xD806, 0x7000);
+    m.mem.w16(DS, 0xCCD0, 0x8000);
     Script { masks, dl, carry, log: Vec::new() }
 }
 

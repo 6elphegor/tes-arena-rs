@@ -87,6 +87,14 @@ impl HaggleIo for HaggleTalk<'_> {
         }
         Some(())
     }
+    /// The haggle's buttons (NEGOTBUT.IMG) or its yes and no (YESNO.IMG)
+    /// on the shop's screen, as 1194:4B8E puts them at (59h, 7Fh).
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
+        if let Some(b) = self.talk.as_deref_mut().and_then(|t| t.backdrop.as_mut()) {
+            b.picture = Some(name);
+        }
+    }
     fn say(&mut self, m: &mut Machine, si: u16, kind: u8) {
         // The original made its line breaks spaces (1194:84C3) and 49FF
         // wraps it; here it is wrapped at spaces to fit the screen.

@@ -119,22 +119,22 @@ pub fn draw_sheet(screen: &mut Screen, m: &Machine, doll: &[Image]) {
         blit(screen, i);
     }
     if let Some(f) = &pics.arena {
-        sheet_texts(screen, f, m);
+        sheet_texts(screen, f, m, m.mem.r16(DS, 0x05C8) & 0x10 != 0);
     }
     if let Some(i) = &pics.page2 {
         blit(screen, i);
     }
 }
 
-/// 1194:0DE1..0FD7, playing (5C8 bit 10h clear; while creating the
-/// creation's own screen draws them).
-fn sheet_texts(screen: &mut Screen, f: &Font, m: &Machine) {
+/// 1194:0DE1..0FD7, for the sheet and for creation's attribute screen
+/// (1194:122F's redraws): `creating` is 5C8 bit 10h as the texts read it
+/// (the attributes and maxima as they are, not on the 100 scale).
+pub fn sheet_texts(screen: &mut Screen, f: &Font, m: &Machine, creating: bool) {
     let c = SHEET_COLOUR;
     let mut s = |x: i32, y: i32, t: &str| screen.text_plain(f, x, y, t, c);
     let cstr = |seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
     let b = |o: u16| m.mem.r8(DS, PLAYER + o) as u16;
     let w = |o: u16| m.mem.r16(DS, PLAYER + o);
-    let creating = m.mem.r16(DS, 0x05C8) & 0x10 != 0;
     let pct = |v: u16| arena::scale::to100(v as i16) as u16;
     // 0DEC: the gold (ltoa) at (2Dh, 90h).
     s(0x2D, 0x90, &m.mem.r32(DS, 0x05C2).to_string());

@@ -34,6 +34,9 @@ impl ShopHooks for Script<'_> {
     fn message(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([6, si as u32]);
     }
+    fn picture(&mut self, _m: &mut Machine, si: u16) {
+        self.log.extend([12, si as u32]);
+    }
     fn list(&mut self, _m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
         self.log.extend([5, si as u32, cx as u32, di as u32]);
         let v = self.lists.get(self.n[1]).copied().unwrap_or(0xFFFF);
@@ -59,9 +62,6 @@ impl ShopHooks for Script<'_> {
 impl StoreHooks for Script<'_> {
     fn message_box(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([7, si as u32]);
-    }
-    fn picture(&mut self, _m: &mut Machine, si: u16) {
-        self.log.extend([12, si as u32]);
     }
     fn text(&mut self, m: &mut Machine, _files: &mut Files, di: u16) -> Option<()> {
         let number = m.mem.r16(DS, 0x137A);

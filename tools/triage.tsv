@@ -425,3 +425,5 @@
 2542:037C	trivial	near wrapper of 2542:04B1, the status box (status.rs status_text)
 0000:5D4E	driver	EMS handle freed at the program's end (int 67h 45h), thunk of 5D52
 0000:5D52	driver	EMS handle freed at the program's end (int 67h 45h)
+2542:0380	trivial	the bar's map button: 7924 set the automap (045A), else the world map (03BF) (the view's sheets.rs bar_click, as menukeys' MenuKey)
+2542:0486	trivial	the bar's weapon button: ready_weapon's test and toggle (menukeys.rs ready_weapon)

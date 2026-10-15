@@ -538,6 +538,8 @@ impl Machine {
     /// `flat` is one of the 40h at C954 the flat comes alive: 126C its
     /// place + 1, 5C8 bit 1000h, the word kept (FLAT_AT) and one creature
     /// of that kind at the player's level comes (`quest_encounter`).
+    // The arguments are the hook's own (the place, number and map word).
+    #[allow(clippy::too_many_arguments)]
     pub fn flat_creature(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, x: u16, y: u16, flat: u8, seg: u16, di: u16) -> Option<()> {
         if self.mem.r16(DS, FIGHTING) == 0 || self.mem.r16(DS, 0x05C8) & 0x1000 == 0 {
             let v = self.mem.r8(seg, di);

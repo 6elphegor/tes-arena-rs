@@ -27,7 +27,8 @@ use crate::hud::{Font, Screen, Span};
 use crate::interface::Image;
 use arena::machine::Machine;
 use arena::mem::{DATA, DS};
-use arena::use_item::var::{FIRST_LINE, LINES, NOT_OWN, OTHER_LIST, OWN_ITEMS, SELECTED, USABLE_NAMES};
+use arena::use_item::var::{DROP_TEXT, FIRST_LINE, LINES, NOT_OWN, OTHER_LIST, OWN_ITEMS, SELECTED, USABLE_NAMES};
+use arena::use_item::DropButton;
 
 /// The list's place and lines (1194:1DE9..1EA6).
 pub const LIST_X: i32 = 0x0E;
@@ -38,11 +39,10 @@ const SLOTS: u16 = 40;
 
 /// The original's texts (segment 3276): an item that can't be put on,
 /// one a class can't (with the class's name), a second accessory of a
-/// kind (with the kind's name), and dropping with nothing selected.
+/// kind (with the kind's name).
 const CANT_EQUIP: u16 = 0x5A90;
 const CLASS_CANT: u16 = 0x3BEB;
 const ONLY_ONE: u16 = 0x5A74;
-const DROP_WHAT: u16 = 0x5ACB;
 
 /// An image of the game's: the codings `interface::image` reads, and
 /// type 8 (3065:0D2D, LZHUF: the coded size first) decoded by the port's
@@ -162,6 +162,9 @@ pub enum Panel {
 #[derive(Clone, Debug, Default)]
 pub struct Inventory {
     pub using: Option<(Vec<String>, usize)>,
+    /// The drop button's question up (its text, the answer highlighted:
+    /// 0 yes).
+    pub asking: Option<(Vec<u8>, usize)>,
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,
@@ -174,7 +177,8 @@ pub struct Spellbook {
 }
 
 /// The equipment screen opened on the player's own items (1194:23C7's
-/// list): nothing selected, from the first line, no other list.
+/// list; from the sheet 16F4 and 171F): nothing selected, from the first
+/// line, no other list.
 pub fn open_inventory(m: &mut Machine) -> Panel {
     m.mem.w8(DS, OWN_ITEMS, 1);
     m.mem.w8(DS, OTHER_LIST, 0);
@@ -183,6 +187,16 @@ pub fn open_inventory(m: &mut Machine) -> Panel {
     m.mem.w8(DS, FIRST_LINE, 0);
     m.mem.w16(DS, LINES, 0);
     Panel::Inventory(Inventory::default())
+}
+
+/// The sheet's equipment page ('N'): the equipment screen, its exit
+/// back to the sheet.
+pub fn equipment_page(m: &mut Machine) -> Panel {
+    let mut p = open_inventory(m);
+    if let Panel::Inventory(inv) = &mut p {
+        inv.from_sheet = true;
+    }
+    p
 }
 
 /// What the engine says while the inventory or the spellbook acts: the
@@ -279,11 +293,53 @@ pub fn select_line(m: &mut Machine, row: usize) {
     m.mem.w8(DS, SELECTED, if occupied { slot as u8 } else { 0xFF });
 }
 
-/// D: the selected item dropped on the player's square, or "Drop what?".
-pub fn drop_selected(m: &mut Machine, said: &mut Said) {
-    if !m.drop_item() {
-        let t = m.mem.cstr(DATA, DROP_WHAT).to_vec();
-        said.text(&t);
+/// D and the drop button (1194:17D8, `drop_button`): run on a copy
+/// first, so a question it asks ("Do you wish to drop the ...?", or the
+/// item lost where the player stands) is put up and the game left as it
+/// was until it is answered (`drop_answer`); without one it is the
+/// game's. Its refusals are said.
+pub fn drop_press(m: &mut Machine, inv: &mut Inventory, said: &mut Said) {
+    let mut probe = m.clone();
+    let mut asked = None;
+    let r = probe.drop_button(&mut |p| {
+        asked = Some(p.mem.cstr(DS, DROP_TEXT).to_vec());
+        false
+    });
+    match asked {
+        Some(text) => inv.asking = Some((text, 0)),
+        None => {
+            *m = probe;
+            drop_said(m, r, said);
+        }
+    }
+}
+
+/// The drop's question answered (`yes`): the button again with that
+/// answer.
+pub fn drop_answer(m: &mut Machine, yes: bool, said: &mut Said) {
+    let r = m.drop_button(&mut |_| yes);
+    drop_said(m, r, said);
+}
+
+fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
+    match r {
+        Some(DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat) => said.text(m.mem.cstr(DS, DROP_TEXT)),
+        Some(DropButton::Nothing | DropButton::Dropped) => {}
+        None => eprintln!("the drop button gave up: {}", arena::giveup::describe()),
+    }
+}
+
+/// The drop's question as the original's yes-or-no menu (1194:48E9 ->
+/// 020E), entry `sel` highlighted.
+pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
+    let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string() }];
+    crate::hud::Menu {
+        title: crate::hud::lines(text, 0x0F),
+        entries: vec![line("Yes"), line("No")],
+        keys: b"YN".to_vec(),
+        selected: sel,
+        list: false,
+        kind: 0,
     }
 }
 
@@ -407,6 +463,10 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             }
             if let Some((names, sel)) = &inv.using {
                 let hud = crate::hud::Hud { menu: Some(use_menu(names, *sel)), ..Default::default() };
+                crate::hud::compose_over(screen, font, &hud);
+            }
+            if let Some((text, sel)) = &inv.asking {
+                let hud = crate::hud::Hud { menu: Some(drop_menu(text, *sel)), ..Default::default() };
                 crate::hud::compose_over(screen, font, &hud);
             }
         }

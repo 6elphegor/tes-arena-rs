@@ -34,7 +34,7 @@ use crate::character::PLAYER;
 use crate::format::Arg;
 use crate::inventory::{category, item, LAST_COUNT, PLAYER_SLOTS, SLOT_SIZE};
 use crate::machine::Machine;
-use crate::mem::DS;
+use crate::mem::{DATA, DS};
 
 /// DGROUP variables.
 pub mod var {
@@ -77,6 +77,45 @@ pub mod var {
     pub const LEVEL_ITEM_LIST: u16 = 0xA000;
     /// The last special item put on (1194:5074).
     pub const SPECIAL_WORN: u16 = 0x1AA4;
+    /// Where the player stands, as 1194:5F13 found it before the
+    /// character sheet: 5E0 bit 20h no room to drop there, and DROP_LOST
+    /// (12D0, a byte many routines borrow) an item dropped there lost.
+    pub const PLAYER_FLAGS: u16 = 0x05E0;
+    pub const NO_ROOM: u16 = 0x20;
+    pub const DROP_LOST: u16 = 0x12D0;
+    /// The drop button's texts and questions go to DGROUP 1044, in the
+    /// colour at 9288 and the font at B036 (the fonts' records at 1026
+    /// and 102C).
+    pub const DROP_TEXT: u16 = 0x1044;
+}
+
+/// The drop button's texts (segment 3276): no room, the item lost
+/// (asked), not the player's to drop, nothing selected, and the question
+/// ("Do you wish to drop\rthe %s?\r").
+pub mod text {
+    pub const NO_ROOM: u16 = 0x5A4F;
+    pub const LOST: u16 = 0x5A24;
+    pub const CANT_DROP: u16 = 0x5AAE;
+    pub const DROP_WHAT: u16 = 0x5ACB;
+    pub const DROP_FORMAT: u16 = 0x3C08;
+}
+
+/// What the inventory's drop button (1194:17D8) came to; its text, if
+/// any, is at DROP_TEXT.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropButton {
+    /// No room where the player stands: "There is no room to drop this
+    /// here."
+    NoRoom,
+    /// Nothing done: the list isn't the player's own, nothing is carried,
+    /// or the question was answered no.
+    Nothing,
+    /// The list is a shop's or a looting's: "This item can't be dropped."
+    CantDrop,
+    /// Nothing selected: "Drop what?"
+    DropWhat,
+    /// The selected item dropped (`drop_item`).
+    Dropped,
 }
 use var::*;
 
@@ -564,6 +603,119 @@ impl Machine {
         self.mem.w8(DS, DROPPED.wrapping_add(item::FLAGS), f);
         self.drop_to_floor(DROPPED);
         true
+    }
+
+    /// 1194:5F13, before the character sheet (2542:00E5): whether an
+    /// item can be dropped where the player stands. No room (PLAYER_FLAGS
+    /// bit NO_ROOM set, DROP_LOST kept) when the player's square (CB90)
+    /// has a byte in the plane at [D806]; else lost (DROP_LOST 1) when
+    /// C39A has 200h or C398 4; else no room when the square is one of
+    /// the 17h actors' squares at 1951; else lost when C39A has 10h or
+    /// the square's word in the plane at [CCD0] less the word at 9030 is
+    /// C00h or more (DROP_LOST 0 otherwise). Lost or not, the bit is
+    /// cleared. (The actors' squares are read at ES:1951, ES DGROUP from
+    /// 2542:00BE.)
+    pub fn drop_place(&mut self) {
+        let sq = self.mem.r16(DS, 0xCB90);
+        let plane = self.mem.r16(DS, 0xD806);
+        let flags = self.mem.r16(DS, PLAYER_FLAGS);
+        let (c39a, c398) = (self.mem.r16(DS, 0xC39A), self.mem.r16(DS, 0xC398));
+        let busy = self.mem.r8(plane, sq) != 0
+            || (c39a & 0x200 == 0 && c398 & 4 == 0 && (0..0x17u16).any(|i| self.mem.r16(DS, 0x1951 + i * 2) == sq));
+        if busy {
+            self.mem.w16(DS, PLAYER_FLAGS, flags | NO_ROOM);
+            return;
+        }
+        let lost = c39a & 0x210 != 0 || c398 & 4 != 0 || {
+            let floor = self.mem.r16(DS, 0xCCD0);
+            self.mem.r16(floor, sq).wrapping_sub(self.mem.r16(DS, 0x9030)) >= 0xC00
+        };
+        self.mem.w8(DS, DROP_LOST, lost as u8);
+        self.mem.w16(DS, PLAYER_FLAGS, flags & !NO_ROOM);
+    }
+
+    /// 1194:17D8, the inventory's drop button. `ask` is the yes-or-no
+    /// question (1194:48E9, its text at DROP_TEXT), true for yes. In
+    /// order: no room (`drop_place`) says so; the list not the player's
+    /// own does nothing; a shop's or a looting's list (NOT_OWN) can't be
+    /// dropped from; where an item would be lost (DROP_LOST) the player
+    /// is asked whether to drop it anyway; else with nothing carried
+    /// nothing happens (the count kept at 129D otherwise), with nothing
+    /// selected "Drop what?", and the selected item is asked about by
+    /// name. A yes drops it (1194:18F6, `drop_item`, which with nothing
+    /// selected says "Drop what?" too). The texts are copied to DROP_TEXT
+    /// (1194:1BCE); the colour at 9288 is FEh for them and A0h after the
+    /// two refusals; the font (B036) is 1026's for a question and 102C's
+    /// after it (between them 102C's for a question wider than 37h, which
+    /// only its drawing sees). With "Drop what?" up the original waits
+    /// and starts over if an item was selected meanwhile; the port
+    /// returns. None where the item's name gives up.
+    pub fn drop_button(&mut self, ask: &mut dyn FnMut(&mut Machine) -> bool) -> Option<DropButton> {
+        let colour = |m: &mut Machine, c: u8| m.mem.w8(DS, 0x9288, c);
+        if self.mem.r16(DS, PLAYER_FLAGS) & NO_ROOM != 0 {
+            colour(self, 0xFE);
+            self.drop_text(text::NO_ROOM);
+            colour(self, 0xA0);
+            return Some(DropButton::NoRoom);
+        }
+        if self.mem.r8(DS, OWN_ITEMS) == 0 {
+            return Some(DropButton::Nothing);
+        }
+        colour(self, 0xFE);
+        if self.mem.r16(DS, NOT_OWN) != 0 {
+            self.drop_text(text::CANT_DROP);
+            colour(self, 0xA0);
+            return Some(DropButton::CantDrop);
+        }
+        if self.mem.r8(DS, DROP_LOST) != 0 {
+            self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x1026));
+            self.drop_text(text::LOST);
+            let yes = ask(self);
+            self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x102C));
+            return Some(if yes { self.drop_selected() } else { DropButton::Nothing });
+        }
+        let (count, _) = self.count_items(DS, PLAYER_SLOTS);
+        if count == 0 {
+            return Some(DropButton::Nothing);
+        }
+        self.mem.w8(DS, 0x129D, count as u8);
+        let sel = self.mem.r8(DS, SELECTED);
+        if sel == 0xFF {
+            return Some(self.drop_what());
+        }
+        let it = PLAYER_SLOTS.wrapping_add((sel as u16).wrapping_mul(SLOT_SIZE));
+        let name = self.display_name(it)?;
+        self.sprintf((DS, DROP_TEXT), (DATA, text::DROP_FORMAT), &[Arg::Str(DS, name)]);
+        colour(self, 0xFE);
+        self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x1026));
+        let yes = ask(self);
+        self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x102C));
+        Some(if yes { self.drop_selected() } else { DropButton::Nothing })
+    }
+
+    /// 1194:18F6 from the drop button: the selected item dropped, or with
+    /// none "Drop what?".
+    fn drop_selected(&mut self) -> DropButton {
+        if self.mem.r8(DS, SELECTED) == 0xFF {
+            return self.drop_what();
+        }
+        self.drop_item();
+        DropButton::Dropped
+    }
+
+    /// 1194:18CA: "Drop what?" in the colour FEh.
+    fn drop_what(&mut self) -> DropButton {
+        self.drop_text(text::DROP_WHAT);
+        self.mem.w8(DS, 0x9288, 0xFE);
+        DropButton::DropWhat
+    }
+
+    /// 1194:1BCE: a text of segment 3276 copied to DROP_TEXT (0000:9CA0).
+    fn drop_text(&mut self, at: u16) {
+        let t = self.mem.cstr(DATA, at).to_vec();
+        for (i, &c) in t.iter().chain(std::iter::once(&0)).enumerate() {
+            self.mem.w8(DS, DROP_TEXT.wrapping_add(i as u16), c);
+        }
     }
 
     /// 2433:09E1. The item at DGROUP `si` placed on the player's square:

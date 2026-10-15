@@ -33,7 +33,7 @@ pub enum Ended {
     /// Waiting for a click (or "Are you sure ?"'s answer).
     Open,
     /// Left: the engine after the screen, and how.
-    Left(Engine, OptionsEnd),
+    Left(Box<Engine>, OptionsEnd),
 }
 
 pub struct OptionsUi {
@@ -116,8 +116,8 @@ impl OptionsUi {
         match end {
             _ if starved => Ended::Open,
             // The CyberMan's leaving (not reached here) as Resume.
-            None => Ended::Left(e, OptionsEnd::Resume),
-            Some(end) => Ended::Left(e, end),
+            None => Ended::Left(Box::new(e), OptionsEnd::Resume),
+            Some(end) => Ended::Left(Box::new(e), end),
         }
     }
 

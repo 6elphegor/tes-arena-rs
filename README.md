@@ -279,11 +279,11 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2455 reachable routines (198,014 bytes); 1788 ported in whole or
-part (140,111 bytes), counting far thunks to ported code, the handlers
+writing: 2458 reachable routines (198,125 bytes); 1800 ported in whole or
+part (141,037 bytes), counting far thunks to ported code, the handlers
 the port dispatches on by their offsets, and the routines read by hand as
 trivial or inlined (`tools/triage.tsv`); 72 left to the front end as hooks
-and 75 that the view re-implements; 520 presentation, I/O, driver or
+and 75 that the view re-implements; 511 presentation, I/O, driver or
 hardware routines not ported (the renderer's internals, the menu library,
 input waits, the sound and CyberMan drivers, decode artefacts); no
 game-state routine left open. Every indirect call site is followed or
@@ -333,8 +333,12 @@ At the time of writing:
     through 0000:9AE6); no text in the game's files switches font inline
     (0Ch), so that path isn't drawn.
   - The shops' screen (MENUSCRN.IMG and the name's banner, 1194:4B60,
-    4BFF) is drawn behind their questions; the temple's and the haggles'
-    pictures (4B8E) other than the store's, guild's and tavern's aren't.
+    4BFF) is drawn behind their questions, with the pictures 4B8E puts
+    on it (the haggles' NEGOTBUT and YESNO, the temple's and the
+    repairs' YESNO, the guild's and the tavern's).
+  - Typed fields (0000:9EE9) sit where the view places them, not at the
+    callers' own places (the rest's at FCh,44h; 1194:CCCD's at F8h,62h),
+    and their cursor stays at the text's end.
 - **Sound:** the music runs the game's own FM driver ported (its register
   writes the original's); it has not been listened to by a person, and
   there is no SoundFont fallback.

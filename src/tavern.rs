@@ -82,8 +82,6 @@ pub trait TavernHooks: ShopHooks {
     fn room_file(&mut self, _m: &mut Machine) {}
     /// 1194:59CC: a message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 1194:4B8E: the picture named at DS:`si` shown.
-    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:C14E: the room's price (1391) haggled over with the
     /// innkeeper (`Machine::tavern_room_haggle`, 1194:8020 in mode 3):
     /// the price agreed, or the carry when the player walks away. By

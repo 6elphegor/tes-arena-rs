@@ -87,8 +87,6 @@ pub trait GuildHooks: ShopHooks {
     fn stock_write(&mut self, _m: &mut Machine, _name: u16, _bytes: &[u8]) {}
     /// 1194:59CC: a message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 1194:4B8E: the picture named at DS:`si` shown.
-    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:5734 over the stock's texts: a list of `cx` strings at
     /// `seg`:`si`. The pick (FFFFh: none).
     fn stock_list(&mut self, _m: &mut Machine, _seg: u16, _si: u16, _cx: u16) -> u16 {

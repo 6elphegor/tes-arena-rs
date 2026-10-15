@@ -63,6 +63,9 @@ impl ShopHooks for Script {
     fn message(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([11, si as u32]);
     }
+    fn picture(&mut self, _m: &mut Machine, si: u16) {
+        self.log.extend([13, si as u32]);
+    }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.log.extend([8, si as u32, bx as u32, di as u32]);
         let keys = (0..8).take_while(|&i| m.mem.r8(DS, bx + i) != 0).count();
@@ -108,9 +111,6 @@ impl GuildHooks for Script {
     }
     fn message_box(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([10, si as u32]);
-    }
-    fn picture(&mut self, _m: &mut Machine, si: u16) {
-        self.log.extend([13, si as u32]);
     }
     fn stock_list(&mut self, _m: &mut Machine, _seg: u16, si: u16, cx: u16) -> u16 {
         self.log.extend([9, 2, si as u32, cx as u32]);

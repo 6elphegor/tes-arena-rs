@@ -126,9 +126,6 @@ pub trait StoreHooks: ShopHooks {
     fn repair_instead(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
         None
     }
-    /// 1194:4B8E: the picture named at DS:`si` shown (the repairs'
-    /// newold.img and yesno.img).
-    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:A374 with AX 2: the text numbered at 137A written to DS:`di`
     /// (no substitutions, 101C FFh): the text port (`Machine::text`).
     fn text(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {

@@ -407,6 +407,7 @@ impl Travel {
 
     /// 26F7:071F: the marker of kind `kind` (frame `kind` of `pics`) centred
     /// on (x, y), or for a dungeon picked as 20h the colour remapped.
+    #[allow(clippy::too_many_arguments)]
     fn marker(&self, screen: &mut Screen, pics: &[Image], kind: u16, pick: u16, here: bool, x: i32, y: i32) {
         if kind == 3 && pick % 0x40 == 0x20 {
             let mut table = [0u8; 256];

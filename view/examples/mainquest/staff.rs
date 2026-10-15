@@ -476,7 +476,7 @@ fn end(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<()> 
     // outer loop goes on from there; otherwise out the way in.
     if m.mem.r16(DS, 0xC398) & 0x80 != 0 {
         *run = areas::next(engine, dir, *run)?;
-        println!("   after the staff: {run:?} in {}: {}", String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)), flags(&engine.m));
+        println!("   after the staff: {run:?} in {}: {}", areas::area_name(&engine.m), flags(&engine.m));
         return Some(());
     }
     match leave(engine, dir, run, at) {

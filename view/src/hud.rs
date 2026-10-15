@@ -483,11 +483,12 @@ enum Align {
 /// The records 1194:5734 gives 3159:06A0 (DGROUP 5006, 505B, 50B0, 5105,
 /// 515A): the text area (+18h: x, y, w, h), the scroll track (+10h) and
 /// the flags (+20h).
-const RECORD_5006: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_505B: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_50B0: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
-const RECORD_5105: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
-const RECORD_515A: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
+type ListRecord = ((i32, i32, i32, i32), (i32, i32, i32, i32), u16);
+const RECORD_5006: ListRecord = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
+const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
+const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
 
 /// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
 /// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
@@ -517,7 +518,7 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     // 1194:5734 by AX: the panel (its name's offset), the record and BL
     // (the lines' colour); kinds 3 and 5 set the record's 4000h (it has
     // it), kinds 6 and 10 draw the caller's title.
-    let kind = |name: &str, rec: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16), colour: u8, title: Option<(i32, u8)>| {
+    let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
         let (area, track, flags) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
         ListKind { panel: crate::panels::load_image(archive, m, name), area, track, last, colour, title }
@@ -786,8 +787,8 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
 /// Approximate: the callers place the field themselves (the rest's at
 /// FCh,44h, the search's x 55h at y 64h), the view puts it after the
 /// last line's words, a space on (5C30's at its line's start); the
-/// text's colour (9288) is taken as the boxes' 0Fh; the cursor's
-/// 8-frame blink is not drawn (it stays on).
+/// text's colour (9288) is taken as the boxes' 0Fh. The cursor blinks
+/// (`cursor_on`).
 pub fn typed_prompt(screen: &mut Screen, prompt: &str, typed: &str) {
     if let Some(st) = STYLE.get() {
         draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, typed);
@@ -815,7 +816,26 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
     let fx = x + tx + if words > 0 { words + font.width(" ") as i32 } else { 0 };
     let fy = y + ty + last as i32 * lh;
     screen.text_raw(font, fx, fy, typed, 0x0F);
-    screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
+    if cursor_on() {
+        screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
+    }
+}
+
+/// The typed field's cursor blink: 0000:A0D9 XORs the cursor on every
+/// eighth pass of the field's key wait (A84C & 7, the wait going once a
+/// frame through 946A), so it is on for eight frames and off for eight
+/// (the cursor keys' zeroing of the count, A005 and A026, doesn't arise:
+/// the view's cursor stays at the end). The window counts its frames
+/// here (`blink_frame`); a shot, never counting, shows it on.
+static BLINK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+pub fn blink_frame() {
+    BLINK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the typed field's cursor is drawn this frame.
+pub fn cursor_on() -> bool {
+    BLINK.load(std::sync::atomic::Ordering::Relaxed) & 8 == 0
 }
 
 /// A list's line as 2F26:2DF6 draws it: each part but the last (ended by
