@@ -24,6 +24,7 @@ use crate::hud::{Font, Screen};
 use crate::interface::Image;
 use arena::machine::Machine;
 use arena::mem::DS;
+use arena::menukeys::{MenuKey, NoMenuKeyHooks};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -341,7 +342,7 @@ pub enum BarAction {
 /// The bar button at (x, y) of the 320 x 200 screen (the first that
 /// holds it, as 06CE looks them up) and its action; `right` the right
 /// button (7924 clear: the map's world map).
-pub fn bar_click(m: &mut Machine, x: i32, y: i32, right: bool) -> Option<BarAction> {
+pub fn bar_click(m: &mut Machine, files: &mut arena::bsa::Files, x: i32, y: i32, right: bool) -> Option<BarAction> {
     let i = BAR.iter().position(|&(x0, y0, x1, y1)| x >= x0 && x <= x1 && y >= y0 && y <= y1)?;
     Some(match i {
         0 => {
@@ -358,18 +359,42 @@ pub fn bar_click(m: &mut Machine, x: i32, y: i32, right: bool) -> Option<BarActi
             m.pilfer_arm();
             BarAction::None
         }
-        3 => {
-            // 2542:04B1..0515: the text and the player's conditions.
-            m.status_box();
-            let c = m.mem.r8(DS, 0x9288);
-            BarAction::Status(crate::hud::lines(m.mem.cstr(DS, arena::status::var::STATUS_TEXT), c))
-        }
+        3 => status(m),
         // 026D: unless the spellbook is barred (5CA bit 8).
         4 if m.mem.r16(DS, 0x05CA) & 8 != 0 => BarAction::None,
         4 => BarAction::Spells,
         5 => BarAction::Log,
         6 => BarAction::Use,
         7 => BarAction::Camp,
-        _ => BarAction::Sheet,
+        // 00BE, as F1: a touch spell waiting is cast on the player first.
+        _ => match m.portrait(files, &mut NoMenuKeyHooks).unwrap_or(MenuKey::None) {
+            MenuKey::Sheet => BarAction::Sheet,
+            _ => BarAction::None,
+        },
+    })
+}
+
+/// 2542:04B1..0515: the status box's text and the player's conditions.
+fn status(m: &mut Machine) -> BarAction {
+    m.status_box();
+    let c = m.mem.r8(DS, 0x9288);
+    BarAction::Status(crate::hud::lines(m.mem.cstr(DS, arena::status::var::STATUS_TEXT), c))
+}
+
+/// What the menu key the engine took (`Machine::menu_keys`, 2542:0100)
+/// asks of the front end, as the bar's buttons ask it (they share the
+/// handlers); None for Esc's options screen, which isn't the bar's.
+pub fn menu_action(m: &mut Machine, key: MenuKey) -> Option<BarAction> {
+    Some(match key {
+        MenuKey::Options => return None,
+        MenuKey::None | MenuKey::Ready | MenuKey::Pickpocket | MenuKey::TouchCast | MenuKey::Compass => BarAction::None,
+        MenuKey::Spellbook => BarAction::Spells,
+        MenuKey::Status => status(m),
+        MenuKey::Use => BarAction::Use,
+        MenuKey::Automap => BarAction::Automap,
+        MenuKey::TravelMap => BarAction::WorldMap,
+        MenuKey::Sheet => BarAction::Sheet,
+        MenuKey::Log => BarAction::Log,
+        MenuKey::Camp => BarAction::Camp,
     })
 }

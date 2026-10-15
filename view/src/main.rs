@@ -3,16 +3,38 @@
 //!
 //! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]
 //!
-//! Keys: W/S or Up/Down forward and back, A/D strafe, Left/Right turn,
-//! the mouse turns (click the window to capture it, Esc to release),
-//! Space jumps (Shift for a running jump), E or a click (captured) clicks
-//! the centre of the view: opens a door. With --shot it renders one
+//! Keys are the original's. Its menu keys (2542:0100, in this order, the
+//! first pressed taken: `arena::menukeys`, run on the engine at the
+//! press, the key's state set where the game keeps it):
+//!
+//! | Key (scan) | Handler | Action |
+//! |---|---|---|
+//! | Esc (01) | 000A | the options screen |
+//! | A (1E) | 0137 | the weapon readied or put away (unless C39A bit 4000h) |
+//! | C (2E) | 026D | the spellbook, unless 5CA bit 8 |
+//! | P (19) | 0279 | picking pockets armed |
+//! | S (1F) | 037C | the status box |
+//! | U (16) | 034D | the use list |
+//! | M (32) | 045A / 03BF | the automap; with Shift the world map |
+//! | F1 (3B) | 00BE | a touch spell waiting cast on the player, else the sheet |
+//! | F8 (42) | 01C5 | the compass (5C8 bit 2000h) |
+//! | L (26) | 02A3 | the logbook |
+//! | R (13) | 01E6 | camping |
+//!
+//! The frame body reads its own keys from the key state (- and =, F2,
+//! F3, F4, N, B+Q+X, Alt+F5). Moving (2826:0473): Up/Down forward and
+//! back, Left/Right turn, Ctrl+Left/Right strafe, J jumps (Shift for a
+//! running jump). The view's extras, on keys the game leaves alone: the
+//! mouse turns (click the window to capture it, Esc to release), Space
+//! jumps, E or a click (captured) clicks the centre of the view (opens a
+//! door), Q readies as A, I the inventory, K the sheet, F5 (without Alt)
+//! and F9 the quick save and load, F an encounter, Shift+F people. With --shot it renders one
 //! picture after turning by TURN (heading units, 512 a turn) and FRAMES
 //! frames (default 0) of walking forward, and exits; --wait stands still
 //! N frames before the walk, --click clicking first; --at puts the
 //! player in a square's centre, facing HEADING, a debugging aid; --hour
 //! sets the clock to that hour. --fight brings a random encounter at the
-//! start (F does in the window); --people (P) rolls until people come.
+//! start (F does in the window); --people (Shift+F) rolls until people come.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
 //! `walk:N` (frames), `wait:N`, `at:COL:ROW:HEADING` (as --at, then a
 //! frame), `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
@@ -1867,7 +1889,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "bar" => {
                 sheets::pics(&st.assets.archive, &engine.m);
                 let (x, y) = sheets::bar_centre(n as usize);
-                match sheets::bar_click(&mut engine.m, x, y, false) {
+                match sheets::bar_click(&mut engine.m, &mut engine.files, x, y, false) {
                     Some(sheets::BarAction::Automap) => {
                         automap::open(&mut engine, &st.assets.archive);
                         st.map = true;
@@ -2220,15 +2242,18 @@ struct Gpu {
     overlay: hud::Overlay,
 }
 
+/// The movement keys held, as the original's (2826:0473): Up and Down
+/// walk, Left and Right turn, or strafe with Ctrl; J jumps (Space too,
+/// the view's), a running jump with Shift.
 #[derive(Default)]
 struct Keys {
     forward: bool,
     back: bool,
-    left: bool,
-    right: bool,
     turn_left: bool,
     turn_right: bool,
+    ctrl: bool,
     jump: bool,
+    space: bool,
     run: bool,
     /// The right button held (captured): the mouse's motion swings.
     swing: bool,
@@ -2434,12 +2459,13 @@ impl App {
         let axis = |p: bool, n: bool| (p as i16 - n as i16) * 256;
         let look = self.look.round() as i16;
         self.look -= look as f64;
+        let sideways = axis(k.turn_right, k.turn_left);
         let intent = Intent {
             forward: axis(k.forward, k.back),
-            strafe: axis(k.right, k.left),
-            turn: axis(k.turn_right, k.turn_left),
+            strafe: if k.ctrl { sideways } else { 0 },
+            turn: if k.ctrl { 0 } else { sideways },
             look,
-            jump: k.jump,
+            jump: k.jump || k.space,
             run: k.run,
         };
         let tick = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
@@ -2729,6 +2755,12 @@ impl App {
         let options::Ended::Left(engine, end) = e else { return };
         self.options = None;
         self.engine = engine;
+        // The keys let go while the screen was up went to the engine it
+        // replaced: the game's key state and latches let go here.
+        for scan in 1..0x60u8 {
+            self.engine.m.set_key(scan, false);
+            self.engine.m.key_pressed(scan as u16);
+        }
         match end {
             arena::options::OptionsEnd::Resume => {}
             arena::options::OptionsEnd::Save => self.open_saveui(saveui::Kind::Save),
@@ -2961,7 +2993,34 @@ impl App {
     /// A click on the interface bar (`sheets::bar_click`).
     fn bar(&mut self, x: i32, y: i32, right: bool) -> bool {
         sheets::pics(&self.assets.archive, &self.engine.m);
-        let Some(a) = sheets::bar_click(&mut self.engine.m, x, y, right) else { return false };
+        let Some(a) = sheets::bar_click(&mut self.engine.m, &mut self.engine.files, x, y, right) else { return false };
+        self.bar_action(a);
+        true
+    }
+
+    /// A menu key pressed: the menu keys' check (2542:0100,
+    /// `Machine::menu_keys`) run on the engine, and the screen the key it
+    /// took asks for opened, the mouse let go for it, as the bar's button
+    /// with the same handler opens it.
+    fn menu_key(&mut self) {
+        use arena::menukeys::{MenuKey, NoMenuKeyHooks};
+        let key = self.engine.m.menu_keys(&mut self.engine.files, &mut NoMenuKeyHooks).unwrap_or(MenuKey::None);
+        if matches!(key, MenuKey::None | MenuKey::Ready | MenuKey::Pickpocket | MenuKey::TouchCast | MenuKey::Compass | MenuKey::Camp) {
+            if let Some(a) = sheets::menu_action(&mut self.engine.m, key) {
+                self.bar_action(a);
+            }
+            return;
+        }
+        self.release();
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        match sheets::menu_action(&mut self.engine.m, key) {
+            Some(a) => self.bar_action(a),
+            None => self.open_options(),
+        }
+    }
+
+    /// What a bar button (or the menu key with its handler) asks for.
+    fn bar_action(&mut self, a: sheets::BarAction) {
         match a {
             sheets::BarAction::None => {}
             sheets::BarAction::WorldMap => self.open_travel(),
@@ -2985,15 +3044,6 @@ impl App {
             sheets::BarAction::Camp => self.camp = true,
             sheets::BarAction::Sheet => self.panel = Some(panels::Panel::Sheet),
         }
-        true
-    }
-
-    /// The automap screen (M, the map's button), on the player, its font
-    /// the current one.
-    fn open_automap(&mut self) {
-        sheets::pics(&self.assets.archive, &self.engine.m);
-        automap::open(&mut self.engine, &self.assets.archive);
-        self.map = true;
     }
 
     /// A click at (x, y) on the automap screen's map: a turn adding or
@@ -3016,16 +3066,11 @@ impl App {
         self.turn(before, input, Vec::new(), true);
     }
 
-    /// The character sheet (K, the portrait).
+    /// The character sheet (K, the view's: the portrait without its
+    /// touch cast).
     fn open_sheet(&mut self) {
         sheets::pics(&self.assets.archive, &self.engine.m);
         self.panel = Some(panels::Panel::Sheet);
-    }
-
-    /// The logbook (L, the scroll).
-    fn open_log(&mut self) {
-        sheets::pics(&self.assets.archive, &self.engine.m);
-        self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files)));
     }
 
     /// A box of the view's own.
@@ -3170,6 +3215,15 @@ impl App {
     fn input(&mut self, ev: In) {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
+        // A key let go is let go in the game's key state whatever is up,
+        // and its latch (2542:05B8) cleared as the original's next frame
+        // asking for it clears it, so its next press is taken.
+        if let In::Key { code, down: false, .. } = ev {
+            if let Some(scan) = interface::scan_code(code) {
+                self.engine.m.set_key(scan, false);
+                self.engine.m.key_pressed(scan as u16);
+            }
+        }
         match ev {
             In::Resized(w, h) => self.size = (w, h),
             In::Cursor(x, y) => self.cursor = (x, y),
@@ -3336,47 +3390,44 @@ impl App {
                 // Any key pressed during a rest ends it (AFF9); not the key
                 // that asked for the camp (R), which the original's input
                 // step takes before the rest begins.
-                if down && self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
+                let resting = self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0;
+                if down && resting {
                     self.key = true;
                 }
+                // The key's state where the game keeps it (DS:ACB5 + its
+                // scan code), for the frame's own keys (- and =, F2, F3,
+                // F4, N, the debug keys) and the menu keys; a menu key's
+                // press runs the menu keys' check (2542:0100) at once.
+                let scan = interface::scan_code(code);
+                if let Some(scan) = scan {
+                    self.engine.m.set_key(scan, down);
+                }
+                if down && !resting && scan.is_some_and(interface::is_menu_key) {
+                    self.menu_key();
+                }
+                let alt = self.engine.m.mem.r8(arena::mem::DS, arena::controls::var::KEYS + 0x38) != 0;
                 let k = &mut self.keys;
                 match code {
-                    KeyCode::KeyW | KeyCode::ArrowUp => k.forward = down,
-                    KeyCode::KeyS | KeyCode::ArrowDown => k.back = down,
-                    KeyCode::KeyA => k.left = down,
-                    KeyCode::KeyD => k.right = down,
+                    KeyCode::ArrowUp => k.forward = down,
+                    KeyCode::ArrowDown => k.back = down,
                     KeyCode::ArrowLeft => k.turn_left = down,
                     KeyCode::ArrowRight => k.turn_right = down,
-                    KeyCode::Space => k.jump = down,
-                    KeyCode::KeyF if down => world::summon(&mut self.engine),
-                    KeyCode::KeyP if down => world::summon_people(&mut self.engine),
-                    KeyCode::KeyE if down => self.click = true,
-                    KeyCode::KeyR if down => self.camp = true,
-                    KeyCode::KeyI if down => self.toggle_panel(true),
-                    KeyCode::KeyC if down => self.toggle_panel(false),
-                    // Shift+M: the travel map (2542:0193); M the automap.
-                    KeyCode::KeyM if down && k.run => self.open_travel(),
-                    KeyCode::KeyM if down => self.open_automap(),
-                    // The view's keys for the bar's portrait and scroll.
-                    KeyCode::KeyK if down => self.open_sheet(),
-                    KeyCode::KeyL if down => self.open_log(),
-                    // The original's A (2542:0137) and F8 (01C5).
-                    KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
-                    KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),
-                    // The game's debug keys (scan codes 3Ch, 3Dh).
-                    KeyCode::F2 => self.engine.m.set_key(0x3C, down),
-                    KeyCode::F3 => self.engine.m.set_key(0x3D, down),
-                    // The view's quick save and load of slot --slot (the
-                    // game's menus are the options screen's Save and Load).
-                    KeyCode::F5 if down => self.save(),
-                    KeyCode::F9 if down => self.load(),
+                    KeyCode::ControlLeft | KeyCode::ControlRight => k.ctrl = down,
+                    KeyCode::KeyJ => k.jump = down,
                     KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
-                    // The options screen (2542:0100: key 1, Esc), the
-                    // mouse let go for it.
-                    KeyCode::Escape if down => {
-                        self.release();
-                        self.open_options();
-                    }
+                    // The view's extras, on keys the game leaves alone.
+                    KeyCode::Space => k.space = down,
+                    KeyCode::KeyF if down && k.run => world::summon_people(&mut self.engine),
+                    KeyCode::KeyF if down => world::summon(&mut self.engine),
+                    KeyCode::KeyE if down => self.click = true,
+                    KeyCode::KeyI if down => self.toggle_panel(true),
+                    KeyCode::KeyK if down => self.open_sheet(),
+                    KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
+                    // The view's quick save and load of slot --slot (the
+                    // game's menus are the options screen's Save and
+                    // Load); Alt+F5 is the game's debug key.
+                    KeyCode::F5 if down && !alt => self.save(),
+                    KeyCode::F9 if down => self.load(),
                     _ => {}
                 }
             }
