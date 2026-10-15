@@ -64,11 +64,12 @@ pub fn draw(screen: &mut hud::Screen, m: &mut Machine) {
     }
 }
 
-thread_local! {
-    /// The heap block FONT_S.DAT was put in for the engine (freed when the
-    /// screen opens again).
-    static FONT_BLOCK: std::cell::Cell<Option<u16>> = const { std::cell::Cell::new(None) };
-}
+/// The table of the files loaded whole as fonts (0000:7508 puts each
+/// one's segment in its first free word, 930E frees only one found
+/// there): eight words.
+const FONTS: u16 = 0x91AC;
+/// FONT_S.DAT's segment while the screen is up (2D6C).
+const FONT_S: u16 = 0xA86C;
 
 /// The automap screen opened (0000:2CFE..2D2E, `automap_screen_open`),
 /// its font made the current one.
@@ -77,24 +78,43 @@ pub fn open(engine: &mut arena::engine::Engine, archive: &crate::archive::Archiv
     select_font(&mut engine.m, archive);
 }
 
+/// The automap screen left (0000:2EAA..2EC5): FONT_S.DAT's block freed
+/// (930E, only where the fonts' table holds it) and the game's font
+/// (102C) the current one again (9AEA).
+pub fn close(m: &mut Machine) {
+    let seg = m.mem.r16(DS, FONT_S);
+    if let Some(i) = (0..8).find(|i| m.mem.r16(DS, FONTS + 2 * i) == seg) {
+        m.mem.w16(DS, FONTS + 2 * i, 0);
+        m.heap_free(seg);
+    }
+    let v = m.mem.r16(DS, 0x102C);
+    m.mem.w16(DS, arena::mapnotes::var::FONT + 2, v);
+}
+
 /// The automap screen's font made the current one, as the screen does
-/// (0000:2D66 loads FONT_S.DAT whole into a segment, 7508; its redraw
-/// selects it, 3035 calling 9AEA, which sets the far pointer B034's
-/// segment): the file put in a heap block of the engine's, so the notes'
-/// hit test (0000:66F6's widths) measures as the original's does.
+/// (0000:2D66: 7508 loads FONT_S.DAT whole into a block of its own, kept
+/// at A86C and in the fonts' table; its redraw selects it, 3035 calling
+/// 9AEA, which sets the far pointer B034's segment): the file put in a
+/// heap block of the engine's, so the notes' hit test (0000:66F6's
+/// widths) measures as the original's does. With the table full 7508
+/// gives 0.
 fn select_font(m: &mut Machine, archive: &crate::archive::Archive) {
     let Some(d) = archive.read("FONT_S.DAT") else { return };
-    if let Some(old) = FONT_BLOCK.with(|c| c.take()) {
-        m.heap_free(old);
-    }
-    let paras = (d.len().div_ceil(16)).min(0xFFFF) as u16;
-    let Some((seg, _)) = m.heap_alloc(paras) else { return };
-    for (i, &b) in d.iter().enumerate().take(0xFFFF) {
-        m.mem.w8(seg, i as u16, b);
-    }
+    let seg = match (0..8).find(|i| m.mem.r16(DS, FONTS + 2 * i) == 0) {
+        Some(i) => {
+            let paras = (d.len().div_ceil(16)).min(0xFFFF) as u16;
+            let Some((seg, _)) = m.heap_alloc(paras) else { return };
+            for (i, &b) in d.iter().enumerate().take(0xFFFF) {
+                m.mem.w8(seg, i as u16, b);
+            }
+            m.mem.w16(DS, FONTS + 2 * i, seg);
+            seg
+        }
+        None => 0,
+    };
+    m.mem.w16(DS, FONT_S, seg);
     m.mem.w16(DS, arena::mapnotes::var::FONT, 0);
     m.mem.w16(DS, arena::mapnotes::var::FONT + 2, seg);
-    FONT_BLOCK.with(|c| c.set(Some(seg)));
 }
 
 /// Whether the screen has notes here: not where 5E6 is 4, nor in the
