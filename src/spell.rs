@@ -964,12 +964,12 @@ impl Machine {
         Some(())
     }
 
-    /// 2CDD:075A. With flag 80h at +27 a projectile from the player (not
-    /// ported: None); otherwise timed flag 100h with timer +1E × (caster
-    /// level + 1) and strength +0.
+    /// 2CDD:075A. With flag 80h at +27 a ball of light from the player
+    /// (29CF:0270, `light_missile`, its radius from +0); otherwise timed
+    /// flag 100h with timer +1E × (caster level + 1) and strength +0.
     fn sp_kind17(&mut self, x: Fx) -> Option<()> {
         if self.sw(&x, 0x27) & 0x80 != 0 {
-            return None; // 29CF:0270
+            return self.light_missile(self.sw(&x, 0));
         }
         self.sp_or_flags(&x, 0x100);
         let (seg, di) = self.timer_block(x.fs, x.dx)?;
