@@ -162,8 +162,8 @@ pub trait TalkHooks: TextHooks {
     }
     /// 2294:0F33: a chest holding the quest's item (at `si`). The carry:
     /// it was (`quest::quest_chest`).
-    fn quest_chest(&mut self, m: &mut Machine, si: u16) -> bool {
-        m.quest_chest(&mut crate::quest::NoQuestHooks, si).unwrap_or(false)
+    fn quest_chest(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> bool {
+        m.quest_chest(files, &mut crate::quest::NoQuestHooks, si).unwrap_or(false)
     }
     /// The far routine of the building kind `kind` (D48: 4 a tavern, 5 a
     /// temple, 6 an equipment store, 7 a mages' guild; the kinds at 869B,
@@ -1215,11 +1215,11 @@ impl Machine {
             }
             let al = self.flat_of(si) as u8;
             if al == self.g8(CHEST_OPEN) {
-                if hooks.quest_chest(self, si) {
+                if hooks.quest_chest(self, files, si) {
                     return Some(true);
                 }
             } else if al == self.g8(CHEST_LOCKED) {
-                if hooks.quest_chest(self, si) {
+                if hooks.quest_chest(self, files, si) {
                     return Some(true);
                 }
                 return self.chest(hooks, si).map(|()| true);

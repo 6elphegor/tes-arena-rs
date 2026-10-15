@@ -31,7 +31,7 @@ impl QuestHooks for Stubs {
         m.mem.w8(DS, 0xFFE6, b);
         Some(())
     }
-    fn province_load(&mut self, m: &mut Machine, province: u8) {
+    fn province_load(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files, province: u8) {
         let v = m.mem.r16(DS, 0xFFE2).wrapping_add(1);
         m.mem.w16(DS, 0xFFE2, v);
         let b = m.mem.r8(DS, 0xFFE7).wrapping_add(province);

@@ -102,7 +102,7 @@ impl TalkHooks for Script {
         self.log.push(13);
         self.cf()
     }
-    fn quest_chest(&mut self, _m: &mut Machine, si: u16) -> bool {
+    fn quest_chest(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) -> bool {
         self.log.extend([14, si]);
         self.cf()
     }

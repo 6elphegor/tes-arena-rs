@@ -422,6 +422,45 @@ impl Machine {
         Some(self.mem.r8(DS, PROVINCE_DATA))
     }
 
+    /// The current slot's CITYDATA.nn opened as 26F7:0C99..0CB1 and
+    /// 0CF4..0D0B open it: the slot's digits (1A6C) at 1367, its path
+    /// (25FD:0844), then 0000:67C4. None where it is missing.
+    fn citydata_open(&mut self, files: &mut crate::bsa::Files) -> Option<()> {
+        let slot = self.mem.r8(DS, 0x1A6C);
+        let digits = (((slot % 10) as u16) << 8 | (slot / 10) as u16).wrapping_add(0x3030);
+        self.mem.w16(DS, CITYDATA_NAME + 9, digits);
+        let path = self.save_path(CITYDATA_NAME);
+        self.file_open(files, path)
+    }
+
+    /// 26F7:0CF1. Province `province`'s block (0x4CC bytes at 1429)
+    /// written back to CITYDATA.nn at province * 0x4CC (AX the province,
+    /// kept at 129E). None where the file is missing.
+    pub fn city_save_province(&mut self, files: &mut crate::bsa::Files, province: u16) -> Option<()> {
+        self.mem.w16(DS, crate::dungeon::var::PICK_PROVINCE, province);
+        self.citydata_open(files)?;
+        self.file_seek(files, 0, province.wrapping_mul(PROVINCE_BYTES) as u32);
+        self.file_put(files, DS, PROVINCE_DATA, PROVINCE_BYTES);
+        self.file_close(files);
+        Some(())
+    }
+
+    /// 26F7:0C99..0CD6, the write in 26F7:0C0A: the dungeon entry at
+    /// DS:`si` (19h bytes, within the province's block at 1429) written
+    /// to CITYDATA.nn in the province at 129E (PICK_PROVINCE), at
+    /// province * 0x4CC + (`si` - 1429). (The original adds the entry's
+    /// offset to the product's low word only; no province's offset
+    /// carries.) None where the file is missing.
+    pub fn city_save_entry(&mut self, files: &mut crate::bsa::Files, si: u16) -> Option<()> {
+        self.citydata_open(files)?;
+        let province = self.mem.r16(DS, crate::dungeon::var::PICK_PROVINCE);
+        let at = province.wrapping_mul(PROVINCE_BYTES).wrapping_add(si.wrapping_sub(PROVINCE_DATA));
+        self.file_seek(files, 0, at as u32);
+        self.file_put(files, DS, si, 0x19);
+        self.file_close(files);
+        Some(())
+    }
+
     /// 1194:3B84. Fills the location record at seg:rec for location `id`
     /// (0x100 for the Imperial City) from the loaded province data. The
     /// province load (1194:2E18) is assumed done, and the climate byte

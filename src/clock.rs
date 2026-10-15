@@ -57,8 +57,8 @@ pub trait ClockHooks {
     }
     /// 1194:98E8, hourly: the quests' deadlines (`quest::quests_hourly`,
     /// likewise).
-    fn quests_hourly(&mut self, m: &mut Machine) -> Option<()> {
-        m.quests_hourly(&mut crate::quest::NoQuestHooks);
+    fn quests_hourly(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_hourly(files, &mut crate::quest::NoQuestHooks);
         Some(())
     }
     /// 1194:887A: a random encounter check (`encounter::random_encounter`,
@@ -218,7 +218,7 @@ impl Machine {
     /// (unless 5C8 bit 0x20) in areas with level flag 200h or while 1013
     /// is set.
     fn hour_passes(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
-        hooks.quests_hourly(self)?;
+        hooks.quests_hourly(self, files)?;
         if self.mem.r16(DS, 0x05C8) & 0x20 != 0 {
             return Some(());
         }
@@ -352,7 +352,7 @@ impl ClockHooks for NoClockHooks {
     fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
-    fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
+    fn quests_hourly(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
     fn encounter_minute(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
