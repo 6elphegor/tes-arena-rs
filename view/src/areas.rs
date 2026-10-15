@@ -80,9 +80,10 @@ impl AreaHooks for Areas<'_> {
     }
 
     /// 0000:468B: indoors, the level entered (`Machine::area_entered_inside`:
-    /// its lights, the main quest's piece and a side quest's item or
-    /// person placed, its piles of treasure; the automap's STATES and
-    /// the palace's screen aren't the view's yet); outdoors, a town's
+    /// its lights, a main quest dungeon's locks and triggers (STATES.nn),
+    /// the main quest's piece and a side quest's item or person placed,
+    /// its piles of treasure, the palace's automap kept and loaded again,
+    /// `Kept`); outdoors, a town's
     /// buildings listed and its quests made (`Machine::city_entered`,
     /// 0000:46B2).
     fn entered(&mut self, m: &mut Machine) {
@@ -92,7 +93,7 @@ impl AreaHooks for Areas<'_> {
                 m.mem.w16(DS, 0x7A46, 0);
                 return;
             };
-            if m.area_entered_inside(files, &mut arena::hooks::NoStairsHooks).is_none() {
+            if m.area_entered_inside(files, &mut Kept).is_none() {
                 eprintln!("entering the interior met something the original hangs or faults on (0000:4767)");
                 self.failed = true;
             }
@@ -305,6 +306,24 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
 
 /// The area `run` was left: its run ends, the outer loop picks the next
 /// and it is entered. Returns the new run, or None where the game ends
+/// The level's states the stairs and an interior's entry keep: a main
+/// quest dungeon's locks and triggers in STATES.nn (292B:095E, 09AC) and
+/// the automap kept and loaded (0000:368E: 23F1:013C, 0000:3503).
+pub struct Kept;
+
+impl arena::hooks::StairsHooks for Kept {
+    fn automap_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        m.states_keep(files);
+    }
+    fn automap_load(&mut self, m: &mut Machine, files: &mut Files) {
+        m.states_load(files);
+    }
+    fn level_screen(&mut self, m: &mut Machine, files: &mut Files) {
+        m.automap_keep(files);
+        m.automap_load(files);
+    }
+}
+
 /// there or the port can't follow (reported).
 pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let mut files = std::mem::take(&mut engine.files);

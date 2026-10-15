@@ -451,10 +451,10 @@ impl Machine {
         if !self.move_facing(al) || self.mem.r8(DS, CHANGED) != 0 {
             return Some(0);
         }
-        let stairs = |m: &mut Self, hooks: &mut dyn StairsHooks| -> Option<()> {
+        let stairs = |m: &mut Self, files: &mut Files, hooks: &mut dyn StairsHooks| -> Option<()> {
             match m.mem.r32(DS, STAIRS_HOOK) {
                 0 => {}
-                value::STAIRS => m.stairs_hook(hooks),
+                value::STAIRS => m.stairs_hook(files, hooks),
                 _ => return None,
             }
             Some(())
@@ -471,7 +471,7 @@ impl Machine {
             if self.mem.r16(DS, LEVEL_FLAGS) & 0x100 != 0 {
                 return Some(0);
             }
-            stairs(self, hooks)?;
+            stairs(self, files, hooks)?;
             let to = level.wrapping_add(1);
             if to >= self.mem.r8(DS, LEVELS) {
                 return self.move_exit(to);
@@ -479,7 +479,7 @@ impl Machine {
             to
         };
         if i == 0 {
-            stairs(self, hooks)?;
+            stairs(self, files, hooks)?;
         }
         self.mem.w8(DS, LEVEL, to);
         self.move_change_level(files, hooks, regs)?;

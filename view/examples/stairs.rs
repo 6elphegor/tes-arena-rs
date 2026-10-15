@@ -28,10 +28,10 @@ impl arena::hooks::StairsHooks for Show {
         println!("    the light table made again (2294:0B8A)");
         world::light_table(m);
     }
-    fn automap_keep(&mut self, _m: &mut Machine) {
+    fn automap_keep(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {
         println!("    the automap kept (292B:095E)");
     }
-    fn automap_load(&mut self, _m: &mut Machine) {
+    fn automap_load(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {
         println!("    the new level's automap (292B:09AC)");
     }
     fn level_piles(&mut self, m: &mut Machine) -> Option<()> {

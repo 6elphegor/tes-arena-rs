@@ -589,7 +589,7 @@ fn descend_and_open(engine: &mut Engine, n: &str) -> Option<()> {
     use arena::movement::var::{LEVEL, LEVELS, LEVEL_HOOK, X, Y};
     let m = &mut engine.m;
     while m.mem.r8(DS, LEVEL) + 1 < m.mem.r8(DS, LEVELS) {
-        m.stairs_hook(&mut arena::hooks::NoStairsHooks);
+        m.stairs_hook(&mut engine.files, &mut arena::hooks::NoStairsHooks);
         let l = m.mem.r8(DS, LEVEL) + 1;
         m.mem.w8(DS, LEVEL, l);
         if m.level_change(&mut engine.files).is_none() {

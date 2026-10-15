@@ -176,7 +176,7 @@ fn matches_original() {
                 }
                 let before = m.clone();
                 match op {
-                    "stairs" => m.stairs_hook(&mut Counted { level: false }),
+                    "stairs" => m.stairs_hook(&mut files, &mut Counted { level: false }),
                     "level" => {
                         m.level_entered(&mut arena::bsa::Files::default(), &mut Counted { level: true });
                     }
