@@ -107,7 +107,7 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
         entries.push(l.swap_remove(0));
     }
     let keys = m.mem.cstr(DS, bx).to_vec();
-    Menu { title, entries, keys, selected: 0, list: false }
+    Menu { title, entries, keys, selected: 0, list: false, kind: 0 }
 }
 
 impl Talk {
@@ -169,7 +169,7 @@ impl Talk {
             entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
-        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true };
+        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
         self.ask(menu)
     }
 

@@ -358,9 +358,15 @@ impl arena::text::TextHooks for Front<'_> {
         Front::menu(self, m, si, bx, di)
     }
 }
-/// Clicking on people and things: the way told is a note; the lists are
-/// left at once.
+/// Clicking on people and things: the way told is a note; the lists
+/// ("Where is", kind 9) asked through `dialog`.
 impl arena::talk::TalkHooks for Front<'_> {
+    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.list(m, si, cx, ""),
+            None => 0xFFFF,
+        }
+    }
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
         self.note(&s);
