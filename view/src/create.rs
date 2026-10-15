@@ -269,6 +269,24 @@ struct Hooks<'a> {
     boxes: &'a mut VecDeque<Boxed>,
 }
 
+impl Creation {
+    /// The song the original plays at this stage (`arena::music::var`):
+    /// percntro from the intro through the title and the menu (0000:1246),
+    /// evlintro with the opening story (0000:1323), sheet through the
+    /// creation's screens (1194:249B), vision with the vision and the
+    /// farewell (0000:113E, 0D08/0D18).
+    pub fn song(&self) -> Option<u16> {
+        use arena::music::var::*;
+        Some(match self.stage {
+            Stage::Intro | Stage::Title | Stage::MainMenu => PERCNTRO,
+            Stage::Story { .. } => EVLINTRO,
+            Stage::Vision | Stage::Ending => VISION,
+            Stage::Done => return None,
+            _ => SHEET,
+        })
+    }
+}
+
 impl arena::newgame::NewGameHooks for Hooks<'_> {
     fn message_box(&mut self, m: &mut Machine, seg: u16, si: u16) {
         self.boxes.push_back(Boxed { lines: hud::lines(m.mem.cstr(seg, si), COLOUR_B), font: FontId::Arena, back: Back::Stats });

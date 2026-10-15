@@ -83,6 +83,7 @@ dependencies = [
  "bytemuck",
  "glam",
  "libloading",
+ "nuked-opl3",
  "png",
  "pollster",
  "wgpu",
@@ -921,6 +922,12 @@ checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys 0.3.1",
 ]
+
+[[package]]
+name = "nuked-opl3"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe763ce652db623a34372b1628588faaee86af83195175acee070d92d1fe27b7"
 
 [[package]]
 name = "num-traits"

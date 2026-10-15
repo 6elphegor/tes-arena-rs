@@ -108,6 +108,23 @@ impl Machine {
         self.music_start(si);
     }
 
+    /// 1194:DB26's song: after a scene that played its own song, the song
+    /// stopped and, in a building (area 4), the building's song started
+    /// (25FD:051F), else the song playing before (CURRENT) when there is
+    /// one. Memory is left as it is.
+    pub fn music_resume(&mut self) {
+        self.music_stop();
+        if self.mem.r8(DS, crate::trigger::var::AREA) == 4 {
+            let si = self.mem.r16(DS, BUILDING_SONG);
+            self.music_start(si);
+            return;
+        }
+        let si = self.mem.r16(DS, CURRENT);
+        if si != 0 && si != 0xFFFF {
+            self.music_start(si);
+        }
+    }
+
     /// The file 0000:11DA opens for the name at DS:`si`: the name, with
     /// "xfm" for its extension when it is ".xmi" (the dword at its first
     /// '.') and the FM driver is in use (1010).

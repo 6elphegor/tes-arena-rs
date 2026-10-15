@@ -202,8 +202,9 @@ type PaWrite = unsafe extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_vo
 type PaFlush = unsafe extern "C" fn(*mut std::ffi::c_void, *mut i32) -> i32;
 type PaFree = unsafe extern "C" fn(*mut std::ffi::c_void);
 
-/// A PulseAudio playback stream (pa_simple), mono S16LE at RATE.
-struct Pulse {
+/// A PulseAudio playback stream (pa_simple), S16LE at RATE: the sounds'
+/// (mono) and the music's (stereo, `music`).
+pub(crate) struct Pulse {
     _lib: libloading::Library,
     s: *mut std::ffi::c_void,
     write: PaWrite,
@@ -213,6 +214,11 @@ struct Pulse {
 
 impl Pulse {
     fn open() -> Option<Pulse> {
+        Pulse::open_stream(1, c"sounds")
+    }
+
+    /// A stream of `channels` channels, named `name`.
+    pub(crate) fn open_stream(channels: u8, name: &std::ffi::CStr) -> Option<Pulse> {
         // SAFETY: libpulse-simple's C API, called as documented; the
         // functions stay valid while `_lib` is held.
         unsafe {
@@ -222,14 +228,14 @@ impl Pulse {
             let flush: PaFlush = *lib.get(b"pa_simple_flush\0").ok()?;
             let free: PaFree = *lib.get(b"pa_simple_free\0").ok()?;
             // PA_SAMPLE_S16LE 3, PA_STREAM_PLAYBACK 1.
-            let spec = SampleSpec { format: 3, rate: RATE, channels: 1 };
+            let spec = SampleSpec { format: 3, rate: RATE, channels };
             let mut err = 0;
             let s = new(
                 std::ptr::null(),
                 c"Arena".as_ptr(),
                 1,
                 std::ptr::null(),
-                c"sounds".as_ptr(),
+                name.as_ptr(),
                 &spec,
                 std::ptr::null(),
                 std::ptr::null(),
@@ -237,6 +243,14 @@ impl Pulse {
             );
             (!s.is_null()).then_some(Pulse { _lib: lib, s, write, flush, free })
         }
+    }
+
+    /// Writes samples (interleaved by channel), blocking while the server's
+    /// buffer is full.
+    pub(crate) fn write(&self, pcm: &[i16]) {
+        let mut err = 0;
+        // SAFETY: the slice is alive for the call; the stream is open.
+        unsafe { (self.write)(self.s, pcm.as_ptr().cast(), pcm.len() * 2, &mut err) };
     }
 
     /// Plays what comes, a chunk at a time so that a named file can stop

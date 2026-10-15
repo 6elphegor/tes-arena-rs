@@ -92,7 +92,12 @@
 //! Sound (`audio`): the game's sounds play through PulseAudio (opened at
 //! run time; nothing without it); --mute plays none, --sound-log prints
 //! each the game plays (shots play none, and with --sound-log print
-//! them). The animations the game plays (the dream, the Emperor's
+//! them). Music (`music`): the songs the game picks (the town's, then the
+//! weather's and time's; a building's; a dungeon's) play on an emulated
+//! FM chip with the game's timbres (SAMPLE.AD), as its Sound Blaster
+//! driver played them, on a stream of their own; --no-music (or --mute)
+//! plays none, and then no music driver is loaded, as with the original's
+//! "No Music"; --sound-log prints the songs asked for. The animations the game plays (the dream, the Emperor's
 //! audience, the quest's end) show over it, a key their next lines or
 //! their end; `--do movie:NAME[:TEXT]` queues one (a debugging aid).
 
@@ -106,6 +111,7 @@ mod flats;
 mod flc;
 mod hud;
 mod interface;
+mod music;
 mod newgame;
 mod panels;
 mod render;
@@ -728,12 +734,15 @@ const ANIMATE: usize = 4;
 /// for the window and the shots alike.
 static MUTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static SOUND_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// `--no-music`: the sounds without the music (`music`).
+static NO_MUSIC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
     MUTE.store(args.iter().any(|a| a == "--mute"), std::sync::atomic::Ordering::Relaxed);
     SOUND_LOG.store(args.iter().any(|a| a == "--sound-log"), std::sync::atomic::Ordering::Relaxed);
-    args.retain(|a| a != "--mute" && a != "--sound-log");
+    NO_MUSIC.store(args.iter().any(|a| a == "--no-music"), std::sync::atomic::Ordering::Relaxed);
+    args.retain(|a| a != "--mute" && a != "--sound-log" && a != "--no-music");
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
@@ -807,6 +816,11 @@ fn main() {
     }
     let dir = PathBuf::from(&args[1]);
     let mut engine = world::load(&dir, &args[2]);
+    // The music driver loads at the program's start (2F9F:01C7, 035B),
+    // before the first area picks a song.
+    if SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed) || (!MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed)) {
+        music::load_driver(&mut engine.m);
+    }
     let mut creation = None;
     let mut run = match (&new_game, &create_script) {
         (Some(spec), _) => {
@@ -886,8 +900,12 @@ fn main() {
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
     let screen = hud::Screen::new(assets.palette);
     let audio = audio::Audio::new(assets.archive.clone(), !MUTE.load(std::sync::atomic::Ordering::Relaxed), SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
+    let play_music = !MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed);
+    let music = music::Music::new(assets.archive.clone(), play_music, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let mut app = App {
         audio,
+        music,
+        creation_song: None,
         movies: Default::default(),
         assets,
         start: Instant::now(),
@@ -1003,6 +1021,10 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
     played
         .into_iter()
         .filter_map(|(name, text, colour)| {
+            // Its song (the routines that show them take one).
+            if let Some(song) = music::movie_song(name) {
+                engine.m.music_song(song);
+            }
             let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
             flc::Movie::new(archive, name, lines)
         })
@@ -1037,6 +1059,7 @@ fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
 /// boxes of the last turn that showed any, and a question left.
 struct Shot {
     audio: audio::Audio,
+    music: music::Music,
     /// The animations the turns played (`--do`); the first is drawn.
     movies: Vec<flc::Movie>,
     assets: Assets,
@@ -1086,11 +1109,14 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     st.audio.before(&mut engine.m);
+    st.music.before(&mut engine.m);
+    let ticks = engine.frame_ticks() as u32;
     let out = run_turn(engine, &mut st.assets, &input, &mut talk);
     st.audio.after(&mut engine.m);
     let played = std::mem::take(&mut talk.movies);
     let archive = st.assets.archive.clone();
     st.movies.extend(movies_of(engine, &archive, played));
+    st.music.after(&mut engine.m, ticks);
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
         st.boxes = if talk.need.is_some() { talk.since_answer } else { talk.boxes };
@@ -1142,7 +1168,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let assets = Assets::new(dir, &mut engine);
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
+    let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1611,6 +1638,10 @@ struct Pending {
 struct App {
     /// The sound driver (`audio`).
     audio: audio::Audio,
+    /// The music driver (`music`), and the song the creation's screens
+    /// asked for last.
+    music: music::Music,
+    creation_song: Option<u16>,
     /// Animations the game played, shown over it in turn (a key the next
     /// lines or the end); the game waits meanwhile.
     movies: std::collections::VecDeque<flc::Movie>,
@@ -1676,6 +1707,32 @@ struct App {
 }
 
 impl App {
+    /// The movies all shown: the song before them back (1194:DB26).
+    fn movies_over(&mut self) {
+        if self.movies.is_empty() {
+            self.engine.m.music_resume();
+            self.music.after(&mut self.engine.m, 0);
+        }
+    }
+
+    /// The creation's song (`create::Creation::song`), started when it
+    /// changes.
+    fn creation_music(&mut self) {
+        let Some(c) = &self.creation else {
+            self.creation_song = None;
+            return;
+        };
+        let song = c.song();
+        if song != self.creation_song {
+            self.creation_song = song;
+            if let Some(s) = song {
+                self.music.before(&mut self.engine.m);
+                self.engine.m.music_song(s);
+                self.music.after(&mut self.engine.m, 0);
+            }
+        }
+    }
+
     /// A key or click for creation; at its end the game started, in the
     /// start dungeon, its assets made again.
     fn creation_input(&mut self, inp: create::Input) {
@@ -1800,14 +1857,19 @@ impl App {
         self.engine = copy(&before);
         let mut talk = dialog::Talk { answers, ..Default::default() };
         self.audio.before(&mut self.engine.m);
+        self.music.before(&mut self.engine.m);
+        let ticks = self.engine.frame_ticks() as u32;
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
         // A turn stopped at a question is run again once answered: its
-        // sounds are the rerun's.
+        // sounds and songs are the rerun's.
         if talk.need.is_none() {
             self.audio.after(&mut self.engine.m);
             let played = std::mem::take(&mut talk.movies);
             let archive = self.assets.archive.clone();
             self.movies.extend(movies_of(&mut self.engine, &archive, played));
+            self.music.after(&mut self.engine.m, ticks);
+        } else {
+            self.engine.m.songs.clear();
         }
         // The script's answers used become given ones.
         let used = (given.len() + scripted).saturating_sub(talk.answers.len());
@@ -2245,6 +2307,7 @@ impl winit::application::ApplicationHandler for App {
                     }
                     if mv.over {
                         self.movies.pop_front();
+                        self.movies_over();
                     }
                 }
             }
@@ -2409,12 +2472,14 @@ impl winit::application::ApplicationHandler for App {
             mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
             if mv.over {
                 self.movies.pop_front();
+                self.movies_over();
             }
         }
         if let Some(c) = &mut self.creation {
             c.advance(now.duration_since(self.movie_at).as_millis() as u32);
             self.creation_outcome();
         }
+        self.creation_music();
         self.movie_at = now;
         if now >= self.next {
             self.step();
