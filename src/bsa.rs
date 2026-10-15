@@ -600,6 +600,37 @@ impl Machine {
         (n != 0).then_some((seg, off)).or_else(|| crate::giveup::error("0000:7428: an empty file, or no room to read it"))
     }
 
+    /// `file_load` for callers that go on after a failed load (the carry
+    /// set): Some(None) where the file is missing, reads as 0 bytes (both
+    /// after 0000:74E5) or is 64 KiB or larger (closed, carry set, no
+    /// 74E5). None where the open hook is set, or 74E5 would call the
+    /// error hook (ERROR_HOOK, not ported).
+    pub fn file_load_or_carry(&mut self, files: &mut Files, name: u16, seg: u16, off: u16) -> Option<Option<(u16, u16)>> {
+        let failed = |m: &mut Machine| {
+            if m.mem.r32(DS, ERROR_HOOK) != 0 {
+                return crate::giveup::error("0000:74E5: a file not loaded, the error hook set");
+            }
+            Some(None)
+        };
+        let (_, found) = self.file_open_any(files, name)?;
+        if !found {
+            return failed(self);
+        }
+        let size = self.file_seek(files, 2, 0);
+        if size > 0xFFFF {
+            self.file_close(files);
+            return Some(None);
+        }
+        self.mem.w16(DS, OPEN_SIZE, size as u16);
+        self.file_seek(files, 0, 0);
+        let n = if seg != 0 { self.file_read(files, seg, off, size as u16) } else { 0 };
+        self.file_close(files);
+        if n == 0 {
+            return failed(self);
+        }
+        Some(Some((seg, off)))
+    }
+
     /// 0000:6742.
     pub fn file_close(&mut self, files: &mut Files) {
         if self.bsa_cs(CS_IN_BSA) != 0 {
