@@ -250,7 +250,7 @@ impl Machine {
         self.shop_tb(t::WEAPON, 1);
         loop {
             if !self.shop_any_allowed(W_MIN_LEVEL, 18) {
-                return None;
+                return crate::giveup::original("1194:EC02: no weapon allowed: the original rolls for ever");
             }
             let ty = loop {
                 self.shop_setb(KEY, 10);
@@ -301,7 +301,7 @@ impl Machine {
         self.shop_tb(t::WEAPON, 0);
         loop {
             if !self.shop_any_allowed(A_MIN_LEVEL, 11) {
-                return None;
+                return crate::giveup::original("1194:ECED: no armour allowed: the original rolls for ever");
             }
             let ty = loop {
                 let ty = self.shop_rand(0, 11)?;
@@ -547,7 +547,7 @@ impl Machine {
     /// in `mins`. None where no entry allows it (the original hangs).
     fn shop_roll_allowed(&mut self, n: u16, mins: u16) -> Option<u16> {
         if !self.shop_any_allowed(mins, n) {
-            return None;
+            return crate::giveup::original("no entry allowed: the original rolls for ever");
         }
         loop {
             let r = self.shop_rand(0, n)?;

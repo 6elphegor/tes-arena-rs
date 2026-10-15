@@ -184,12 +184,12 @@ const RESOURCES: u16 = 0x91BC;
 /// A division the CPU faults on (#DE).
 fn div32(dx: u16, ax: u16, by: u16) -> Option<(u16, u16)> {
     if by == 0 {
-        return None;
+        return crate::giveup::original("a divide by zero");
     }
     let n = (dx as u32) << 16 | ax as u32;
     let q = n / by as u32;
     if q > 0xFFFF {
-        return None;
+        return crate::giveup::original("a divide overflows");
     }
     Some((q as u16, (n % by as u32) as u16))
 }
@@ -271,7 +271,7 @@ impl Machine {
                 0x6A45 => self.sm_element(files, hooks)?,
                 0x6A6C => self.sm_new(files, hooks)?,
                 0x6BD7 => self.sm_buy(files, hooks)?,
-                _ => return None,
+                _ => return crate::giveup::not_ported("1194:6064: a spellmaker button not in the table"),
             }
         }
         let back = self.sg16(NAME_BACK);
@@ -614,7 +614,7 @@ impl Machine {
         let mut read = |m: &mut Machine, files: &mut Files, at: u16, k: u16| -> Option<()> {
             reads += 1;
             if reads > 0x40000 {
-                return None;
+                return crate::giveup::original("1194:6D87: the description never ends: the original reads on for ever");
             }
             m.file_read(files, DS, at, k);
             Some(())
@@ -852,6 +852,8 @@ impl Machine {
                 }
                 si
             } else {
+                // AX 3h: the list's kind (1194:5734).
+                self.list_kind = 0x3;
                 let ax = hooks.list(self, TEXT, bp);
                 if (ax as i16) < 0 {
                     return Some(());
@@ -906,6 +908,8 @@ impl Machine {
             }
         }
         self.mem.w8(DS, di, 0);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let mut ax = hooks.list(self, LIST_NAMES, dx - LIST_INDEX);
         if (ax as i16) >= 0 {
             ax = self.sg8(LIST_INDEX.wrapping_add(ax)) as u16;
@@ -926,6 +930,8 @@ impl Machine {
         if list == 0 {
             return;
         }
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, list, cx);
         if (ax as i16) < 0 {
             empty(self);
@@ -942,6 +948,8 @@ impl Machine {
         } else {
             return;
         };
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, s, n);
         let v = (ax as u8) | ((n as u8) << 4);
         self.mem.w8(DS, SUBKINDS.wrapping_add(slot), v);
@@ -1249,7 +1257,7 @@ impl Machine {
                 let v = w(self, 0x1E);
                 let q = v / 5;
                 if q > 0xFF {
-                    return None;
+                    return crate::giveup::original("1194:70BA: the cost's divide overflows");
                 }
                 let ax = (v % 5) << 8 | q;
                 let (_, ax) = mul(ax, f1);
@@ -1311,7 +1319,7 @@ impl Machine {
                 let v = get(self).wrapping_add(ax);
                 set(self, v);
             }
-            _ => return None,
+            _ => return crate::giveup::not_ported("1194:70BA: a cost routine not in the table"),
         }
         Some(())
     }
@@ -1339,6 +1347,8 @@ impl Machine {
         }
         let cx = 5u16.wrapping_sub(dx);
         let si = self.skip_strings_at(TARGET_NAMES, dx);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, si, cx);
         if (ax as i16) < 0 {
             return Some(());
@@ -1353,6 +1363,8 @@ impl Machine {
             return Some(());
         }
         self.mem.w8(DS, 0x568C, 0);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, ELEMENT_NAMES, 5);
         self.mem.w8(DS, 0x568C, b'N');
         if (ax as i16) < 0 {
@@ -1433,7 +1445,7 @@ impl Machine {
             di = di.wrapping_add(6);
             n += 1;
             if n > 0x2AAB {
-                return None;
+                return crate::giveup::original("0000:756C: the resource list never ends: the original reads on for ever");
             }
         }
         self.mem.w16(DS, di, ax);

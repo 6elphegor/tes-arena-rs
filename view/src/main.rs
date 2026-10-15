@@ -148,6 +148,7 @@ mod dialog;
 mod doll;
 mod flats;
 mod flc;
+mod fmdrv;
 mod hud;
 #[cfg(test)]
 mod inputtest;
@@ -257,6 +258,11 @@ impl arena::hooks::StairsHooks for Front<'_> {
     fn level_screen(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         arena::hooks::StairsHooks::level_screen(&mut areas::Kept, m, files);
     }
+    /// 26F7:0000, the stairs out of a dungeon: its question isn't drawn
+    /// yet; taken as yes, so the dungeon can be left.
+    fn ask_leave(&mut self, _m: &mut arena::machine::Machine) -> bool {
+        true
+    }
 }
 impl ControlHooks for Front<'_> {
     /// A click on a building's door, a city's gate or an interior's way
@@ -341,11 +347,17 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
     }
 }
 /// The automap's notes: the text typed through the dialog (into 1044,
-/// at most the place's room), the rest drawn by the screen's own pass.
+/// at most the place's room), edited in place on the map (`Talk::text_at`,
+/// `automap::draw_field`), the rest drawn by the screen's own pass.
 impl arena::mapnotes::NoteHooks for Front<'_> {
-    fn type_text(&mut self, m: &mut arena::machine::Machine, _x: u16, _y: u16, _cursor: u16, max: u16) {
+    fn type_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, _cursor: u16, max: u16) {
         if let Some(t) = self.talk.as_deref_mut() {
+            let asked = t.need.is_some();
             t.typed(m, arena::mapnotes::var::TEXT, max as usize, "Your note:");
+            if !asked && t.need.is_some() {
+                let text = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::mapnotes::var::TEXT)).into_owned();
+                t.text_at = Some((x as i16 as i32, y as i16 as i32, text));
+            }
         }
     }
 }
@@ -383,9 +395,15 @@ impl arena::text::TextHooks for Front<'_> {
         Front::menu(self, m, si, bx, di)
     }
 }
-/// Clicking on people and things: the way told is a note; the lists are
-/// left at once.
+/// Clicking on people and things: the way told is a note; the lists
+/// ("Where is", kind 9) asked through `dialog`.
 impl arena::talk::TalkHooks for Front<'_> {
+    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.list(m, si, cx, ""),
+            None => 0xFFFF,
+        }
+    }
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
         self.note(&s);
@@ -455,7 +473,7 @@ impl arena::rest::RestHooks for Front<'_> {
     }
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim().to_string();
+            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim_start().to_string();
             t.typed(m, arena::rest::var::TYPED, 3, &prompt);
         }
     }
@@ -1328,11 +1346,11 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
-        eprintln!("camping met something not ported");
+        eprintln!("camping gave up: {}", arena::giveup::describe());
     }
     if let Some(kind) = input.shop {
         if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
-            eprintln!("the shop met something not ported");
+            eprintln!("the shop gave up: {}", arena::giveup::describe());
         }
     }
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
@@ -1637,6 +1655,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     t.key(&mut engine, code, text);
                 }
             }
+            if let Some(t) = &mut st.travel {
+                t.skip_journey();
+            }
             let mut boxes = Vec::new();
             travel::after(&mut st.travel, &mut engine, &mut boxes);
             if !boxes.is_empty() {
@@ -1710,7 +1731,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 // Spell N of the spellbook cast (29CF:071F), as the
                 // spellbook's pick would.
                 if engine.m.cast_spell(&mut engine.files, &mut arena::cast::NoCastHooks, n as u8).is_none() {
-                    eprintln!("the cast met something not ported");
+                    eprintln!("the cast gave up: {}", arena::giveup::describe());
                 }
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
@@ -1734,7 +1755,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     engine.m.mem.w32(arena::mem::DS, 0x05C2, g);
                 }
                 if engine.m.spellmaker(&mut engine.files, &mut mk, 0x01A4).is_none() {
-                    eprintln!("the spellmaker met something not ported");
+                    eprintln!("the spellmaker gave up: {}", arena::giveup::describe());
                 }
                 for t in &mk.messages {
                     println!("{t}");
@@ -1900,7 +1921,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     // (that is the area's entry, 0000:46B2): made here.
                     engine.m.mem.w16(DS, arena::sidequest::var::PLACE_SEEN, 0xFFFF);
                     if engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
-                        eprintln!("the town's quests met something not ported");
+                        eprintln!("the town's quests gave up: {}", arena::giveup::describe());
                     }
                 }
                 let m = &mut engine.m;
@@ -2091,7 +2112,7 @@ fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (
     let (eye, real) = (words(&engine.m, 0xC3D0), words(&engine.m, 0xBA62));
     put(&mut engine.m, 0xC3D0, real);
     if engine.m.view_click(&mut engine.files, &mut hooks).is_none() {
-        eprintln!("the click met something not ported");
+        eprintln!("the click gave up: {}", arena::giveup::describe());
     }
     let now = words(&engine.m, 0xC3D0);
     put(&mut engine.m, 0xBA62, now);
@@ -2248,6 +2269,9 @@ struct Pending {
     /// The spellmaker's screen behind the question, when the turn stopped
     /// inside it (`Talk::maker`).
     maker: Option<(dialog::Snapshot, Option<u16>)>,
+    /// The text asked for edited in place at this screen point
+    /// (`Talk::text_at`).
+    at: Option<(i32, i32)>,
 }
 
 struct App {
@@ -2530,7 +2554,11 @@ impl App {
                 self.creation_engine = Some(e);
             }
             let maker = talk.maker.take();
-            self.pending = Some(Pending { before, input, given, need, maker });
+            let at = talk.text_at.take().map(|(x, y, text)| {
+                self.typed = text;
+                (x, y)
+            });
+            self.pending = Some(Pending { before, input, given, need, maker, at });
             if self.captured {
                 self.release();
             }
@@ -2561,7 +2589,7 @@ impl App {
                         return;
                     }
                 }
-                None => eprintln!("the frame ended: None"),
+                None => eprintln!("the frame ended: None ({})", arena::giveup::describe()),
             }
             self.last = frame;
         }
@@ -2616,6 +2644,9 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
+                if let Some((x, y)) = self.pending.as_ref().and_then(|p| p.at) {
+                    automap::draw_field(&mut self.screen, x, y, &self.typed);
+                }
             }
         }
         if prof::on() {
@@ -3061,6 +3092,7 @@ impl App {
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
                     h.menu = Some(m);
                 }
+                Some(dialog::Need::Text(_)) if self.pending.as_ref().is_some_and(|p| p.at.is_some()) => {}
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).
@@ -3436,8 +3468,15 @@ impl App {
             self.creation_outcome();
         }
         self.creation_music();
+        // The travel map's passes and journey (the game's turns from the
+        // next tick after it ends).
+        let travelling = self.travel.is_some();
+        if let Some(t) = &mut self.travel {
+            t.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            self.travel_after();
+        }
         self.movie_at = now;
-        if now >= self.next {
+        if now >= self.next && !travelling {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;
             self.next = now + Duration::from_secs_f64(ticks / 18.2);

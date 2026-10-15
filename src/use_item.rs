@@ -238,7 +238,7 @@ impl Machine {
             }
         } else {
             if cx == 0 {
-                return None;
+                return crate::giveup::original("29CF:081F: a divide by zero");
             }
             let bx = cost / cx;
             self.mem.w16(DS, si.wrapping_add(item::HEALTH), health.wrapping_sub(bx));

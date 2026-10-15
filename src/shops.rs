@@ -379,6 +379,8 @@ impl Machine {
             self.mem.w8(DS, COUNT, count + 1);
         }
         let count = self.mem.r8(DS, COUNT);
+        // AX Ah (1194:C4F6): the list's kind (1194:5734).
+        self.list_kind = 0xA;
         let pick = hooks.list(self, 0x110C, count as u16, 0x1044);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
@@ -516,10 +518,10 @@ impl Machine {
             };
             if bless {
                 self.mem.w16(DS, GIVEN, ax);
-                let q = ax.checked_div(self.mem.r16(DS, LEAST))?;
+                let q = ax.checked_div(self.mem.r16(DS, LEAST)).or_else(|| crate::giveup::original("1194:C58B: a least donation of 0: the divide by zero"))?;
                 let p = (q as i16 as i32) * 256;
                 let r = p % 100;
-                let mut v = i16::try_from(p / 100).ok()? as u16;
+                let mut v = i16::try_from(p / 100).ok().or_else(|| crate::giveup::original("1194:C58B: the blessing's divide by 100 overflows"))? as u16;
                 if r.unsigned_abs() >= 0x32 {
                     v = if (q as i16) < 0 { v.wrapping_sub(1) } else { v.wrapping_add(1) };
                 }
@@ -571,7 +573,7 @@ impl Machine {
                 0xC58B => self.temple_bless(hooks)?,
                 0xC36E => self.temple_cure(hooks)?,
                 0xC2C7 => self.temple_heal(hooks),
-                _ => return None,
+                _ => return crate::giveup::not_ported("1194:C65F: a temple choice not in the table"),
             }
         }
         self.mem.w8(DS, SHOP, 0xFF);

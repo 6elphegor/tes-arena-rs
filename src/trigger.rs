@@ -107,8 +107,12 @@ pub trait TriggerHooks {
     fn music(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    /// 1194:D55F and 2433:0199: an interior is left for the outside.
-    fn leave_interior(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+    /// 1194:D55F and 2433:0199: an interior is left for the outside
+    /// (`Machine::staff_leave`, then `Machine::piles_forget` with AX as
+    /// 4D91 leaves it: 0 in the port).
+    fn leave_interior(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.staff_leave(files);
+        m.piles_forget(0);
         Some(())
     }
     /// 217B:027A: a city's gate out to the wilderness.

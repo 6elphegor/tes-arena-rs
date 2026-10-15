@@ -97,12 +97,17 @@ impl Files {
     /// sorted (DOS gives directory order).
     pub fn with_ext(&self, ext: &[u8]) -> Vec<Vec<u8>> {
         let ext = ext.to_ascii_uppercase();
+        self.with_ext_where(|e| e == &ext[..])
+    }
+
+    /// As `with_ext`, the extensions (upper case) that `fits` takes.
+    pub fn with_ext_where(&self, fits: impl Fn(&[u8]) -> bool) -> Vec<Vec<u8>> {
         let mut v: Vec<Vec<u8>> = self
             .names
             .keys()
             .chain(self.written.keys())
             .filter(|n| !self.deleted.contains(*n))
-            .filter(|n| n.rsplit(|&c| c == b'.').next() == Some(&ext[..]) && n.contains(&b'.'))
+            .filter(|n| n.contains(&b'.') && n.rsplit(|&c| c == b'.').next().is_some_and(&fits))
             .cloned()
             .collect();
         v.sort();
@@ -466,7 +471,7 @@ impl Machine {
         if !found {
             files.loose = None;
             if self.mem.r32(DS, ERROR_HOOK) != 0 {
-                return None;
+                return crate::giveup::error("0000:67C8: a file missing, the error hook set");
             }
         }
         Some(found)
@@ -488,7 +493,7 @@ impl Machine {
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
         if self.hook_set(OPEN_HOOK) {
-            return None;
+            return crate::giveup::not_ported("0000:67C4: the open hook set to a routine not ported");
         }
         let raw = self.mem.cstr(DS, name).to_vec();
         if let Some(bytes) = files.read_loose(&raw) {
@@ -585,14 +590,14 @@ impl Machine {
         let size = self.file_seek(files, 2, 0);
         if size > 0xFFFF {
             self.file_close(files);
-            return None;
+            return crate::giveup::error("0000:7428: a file of 64 KiB or more");
         }
         self.mem.w16(DS, OPEN_SIZE, size as u16);
         self.file_seek(files, 0, 0);
         // AX after the close is the read's result (0 if nothing was read).
         let n = if seg != 0 { self.file_read(files, seg, off, size as u16) } else { 0 };
         self.file_close(files);
-        (n != 0).then_some((seg, off))
+        (n != 0).then_some((seg, off)).or_else(|| crate::giveup::error("0000:7428: an empty file, or no room to read it"))
     }
 
     /// 0000:6742.

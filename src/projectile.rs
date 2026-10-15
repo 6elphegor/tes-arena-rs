@@ -397,7 +397,7 @@ impl Machine {
                 p = next;
             }
             if self.list_word(p)? != 0 {
-                return None; // a cycle: the original walks it for ever
+                return crate::giveup::original("0000:BFC0: a cycle in the column list: the original walks it for ever");
             }
             let n = self.node_alloc()?;
             self.mem.w16(DS, p, n);

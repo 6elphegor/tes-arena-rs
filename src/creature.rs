@@ -159,7 +159,7 @@ impl Machine {
         let r = self.cr_next_in(seg);
         let span = hi.wrapping_sub(lo);
         if span == 0 {
-            return None;
+            return crate::giveup::original("0000:6EEA: a range of 0: the original divides by zero");
         }
         Some((r % span).wrapping_add(lo))
     }
@@ -174,7 +174,7 @@ impl Machine {
                 return Some(v);
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("the roll never succeeds: the original rolls for ever");
             }
         }
     }
@@ -582,7 +582,7 @@ impl Machine {
             i = i.wrapping_add(1);
             n += 1;
             if n > 0x10000 {
-                return None;
+                return crate::giveup::original("24FA:0233: the loot condition never found: the original loops for ever");
             }
         }
         let pct = self.mem.r8(DS, loot_var::COND_PCT.wrapping_add(i)) as u16;

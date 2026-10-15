@@ -114,7 +114,7 @@ impl Machine {
                 return Some(());
             }
         }
-        None
+        crate::giveup::original("1194:421C: no free cell for the block: the original rolls for ever")
     }
 
     /// 1194:0316..036A. Places the six fixed blocks (types 0-5), then
@@ -195,7 +195,7 @@ impl Machine {
         let r = self.city_next();
         let count = self.mem.r16(DS, VARIATIONS.wrapping_add(si));
         if count == 0 {
-            return None;
+            return crate::giveup::original("1194:03A2: a block code with no variations: the original divides by zero");
         }
         let var = r % count;
         // AL = tens (low byte of the quotient), AH = units, then a 16-bit

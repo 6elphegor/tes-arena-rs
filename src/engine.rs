@@ -154,7 +154,7 @@ fn world_hook(m: &mut Machine, files: &mut Files, hooks: &mut dyn EngineHooks, s
             hooks.sky(m);
             Some(())
         }
-        _ => None,
+        _ => crate::giveup::not_ported("0000:A8EF: a world-loop hook set to a routine not ported"),
     }
 }
 

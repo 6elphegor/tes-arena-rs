@@ -164,7 +164,7 @@ impl Machine {
             let f = self.mem.r16(DS, 0x05C8) & !2;
             self.mem.w16(DS, 0x05C8, f);
             if hooks.cyber(self) {
-                return None;
+                return crate::giveup::original("2542:000A: the CyberMan's button: the original returns into its pushed registers");
             }
             let mut si = CLICKS;
             loop {
@@ -232,13 +232,13 @@ impl Machine {
                         // a quotient past FFh faults.
                         let d = self.mem.r16(DS, MOUSE_X).wrapping_sub(self.mem.r16(DS, DETAIL_LEFT));
                         if d / 5 > 0xFF {
-                            return None;
+                            return crate::giveup::original("2542:0653: the detail bar's div cl by 5 overflows");
                         }
                         self.mem.w16(DS, DETAIL, d / 5 + 6);
                         self.opt_detail_bar(hooks);
                         None
                     }
-                    _ => return None,
+                    _ => return crate::giveup::not_ported("2542:000A: an options handler not in the table"),
                 };
                 match ended {
                     Some(e) => break 'wait e,

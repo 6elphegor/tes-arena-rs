@@ -100,7 +100,7 @@ impl Machine {
         }
         let Some(zones) = self.heap_alloc_high(LINE_BYTES) else {
             self.heap_free(classes);
-            return None;
+            return crate::giveup::error("1194:2F94: the heap has no room");
         };
         self.mem.w16(DS, ZONES, zones);
         for i in 0..LINE_BYTES {
@@ -274,7 +274,7 @@ impl Machine {
         let days = self.mem.r32(DS, TOTAL) / 100;
         let minutes = self.mem.r32(DS, MINUTES) / 100;
         if days > 0xFFFF || minutes > 0xFFFF {
-            return None;
+            return crate::giveup::original("1194:3332: the journey's divide overflows");
         }
         self.mem.w16(DS, DAYS, days as u16);
         self.mem.w32(DS, MINUTES, minutes * 1440);

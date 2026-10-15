@@ -81,7 +81,7 @@ fn setup(m: &mut Machine, seed: u32) -> Vec<u8> {
     m.mem.w8(DS, 0xC943, c943);
     for r in 0..d {
         for c in 0..w {
-            let i = r << 8 | (c * 2 & 0xFF);
+            let i = (r << 8) | ((c * 2) & 0xFF);
             let v = lcg(&mut x);
             let u = lcg(&mut x);
             let wall = match v & 7 {

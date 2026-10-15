@@ -189,7 +189,7 @@ impl Machine {
         let bx = heal.wrapping_mul(5).wrapping_add(0x3C).wrapping_add(bonus);
         let q = (ax as u32 * bx as u32) / 1000;
         if q > 0xFFFF {
-            return None;
+            return crate::giveup::original("2901:016C: the healing's divide overflows");
         }
         let mut cx = q as u16;
         let mut ax = 0u16;
@@ -217,7 +217,7 @@ impl Machine {
         self.mem.w16(DS, 0x12D0, limit);
         let q = (limit as u32 * hours as u32) / 1000;
         if q > 0xFFFF {
-            return None;
+            return crate::giveup::original("2901:016C: the healing's divide overflows");
         }
         let ax = (q as u16).wrapping_mul(heal.wrapping_mul(5).wrapping_add(0x46));
         let mut f = self.r_g16(0x0201).wrapping_add(ax);

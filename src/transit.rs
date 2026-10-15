@@ -28,6 +28,7 @@
 //!
 //! What draws, loads files or asks the player is `AreaHooks`.
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 use crate::movement::var::{LEVEL, LEVEL_FLAGS, MAP_FLAGS, X, Y};
@@ -114,10 +115,18 @@ pub trait AreaHooks {
     }
     /// The screen after leaving (0000:9426, 9466).
     fn leave_screen(&mut self, _m: &mut Machine) {}
-    /// 1194:D55F and 2433:0199, leaving an interior.
-    fn leave_interior(&mut self, _m: &mut Machine) {}
-    /// 2433:0199, leaving a dungeon.
-    fn leave_dungeon(&mut self, _m: &mut Machine) {}
+    /// 1194:D55F and 2433:0199, leaving an interior: the staff's flags
+    /// and the stock files (`Machine::staff_leave`), the piles forgotten
+    /// (`Machine::piles_forget`, AX as 4D91 leaves it: 0 in the port).
+    fn leave_interior(&mut self, m: &mut Machine, files: &mut Files) {
+        m.staff_leave(files);
+        m.piles_forget(0);
+    }
+    /// 2433:0199, leaving a dungeon (`Machine::piles_forget`, AX as
+    /// 2542:0446 leaves it: 0 in the port).
+    fn leave_dungeon(&mut self, m: &mut Machine) {
+        m.piles_forget(0);
+    }
     /// 0000:1793 with BX 0Ah: `n` townspeople put around the player
     /// (`Machine::spawn_actors(n, 0xA)`).
     fn spawn(&mut self, _m: &mut Machine, _n: u16) {}
@@ -608,7 +617,7 @@ impl Machine {
     ///   2433:0199.
     ///
     /// Leaving sets C398 bit 80h. None for another hook.
-    pub fn area_exit(&mut self, hooks: &mut dyn AreaHooks) -> Option<()> {
+    pub fn area_exit(&mut self, files: &mut Files, hooks: &mut dyn AreaHooks) -> Option<()> {
         match self.mem.r32(DS, EXIT_HOOK) {
             0x4537 => {
                 let l = self.mem.r8(DS, LEVEL).wrapping_add(1);
@@ -637,10 +646,10 @@ impl Machine {
             }
             0x44BD => {
                 self.or16(MAP_FLAGS, 0x80);
-                hooks.leave_interior(self);
+                hooks.leave_interior(self, files);
                 Some(())
             }
-            _ => None,
+            _ => crate::giveup::not_ported("0000:4537: an exit hook not ported"),
         }
     }
 
@@ -762,7 +771,7 @@ impl crate::engine::Engine {
             m.area_entry(hooks);
         }
         if m.mem.r16(DS, 0xCD60) != 0 {
-            return None;
+            return crate::giveup::not_ported("0000:A26F: the level-load hook CD5E set: not ported");
         }
         if m.mem.r8(DS, LEVEL_NAME) != b'#' {
             m.level_load(&mut self.files, LEVEL_NAME)?;

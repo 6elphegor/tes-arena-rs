@@ -310,7 +310,7 @@ impl Machine {
                 Some(false)
             }
             0xAC2A => self.guild_steal(hooks),
-            _ => None,
+            _ => crate::giveup::not_ported("1194:A80D: a guild choice not in the table"),
         }
     }
 
@@ -628,7 +628,7 @@ impl Machine {
             0xAFF9 => self.guild_potions(files, hooks),
             0xB327 => self.guild_items(files, hooks),
             0xB1EA => self.guild_spells(files, hooks),
-            _ => None,
+            _ => crate::giveup::not_ported("1194:AA8C: a guild purchase not in the table"),
         }
     }
 
@@ -648,6 +648,8 @@ impl Machine {
             let end = self.sprintf((DS, di), (DS, text::PRICE_LINE), &[Arg::Int(ax), Arg::Str(DS, name)]);
             self.mem.w16(DS, TEXT, self.guild_scan(DS, di, end));
         }
+        // AX Bh (1194:B06B): the list's kind (1194:5734).
+        self.list_kind = 0xB;
         let pick = hooks.list(self, POTION_TEXTS, 0x0F, 0);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
@@ -840,6 +842,8 @@ impl Machine {
         let old = self.map_bank(0x18, 0);
         let frame = self.mem.r16(DS, FRAME);
         let n = self.mem.r8(DS, STOCK) as u16;
+        // AX 7h (1194:B351): the list's kind (1194:5734).
+        self.list_kind = 0x7;
         let pick = hooks.stock_list(self, frame, 0x7D0, n);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) >= 0 {
@@ -912,7 +916,7 @@ impl Machine {
     /// protection fault on the CPU.
     fn stock_take_out(&mut self, si: u16, cx: u16) -> Option<()> {
         if self.mem.r8(DS, PICK) as u16 >= cx {
-            return None;
+            return crate::giveup::original("1194:5ED1: a pick past the list: the original faults (#GP)");
         }
         self.mem.w8(DS, 0x100C, 0x0B);
         self.table_remove(si, cx);
@@ -1079,6 +1083,8 @@ impl Machine {
             let end = self.sprintf((DS, di), (DS, text::PRICE_LINE), &[Arg::Int(eax as u16), Arg::Str(DS, name)]);
             self.mem.w16(DS, TEXT, self.guild_scan(DS, di, end));
         }
+        // AX Bh (1194:A9F9): the list's kind (1194:5734).
+        self.list_kind = 0xB;
         let pick = hooks.list(self, TEXTS, cx, 0);
         self.mem.w8(DS, PICK, pick as u8);
         (pick as i16) >= 0
@@ -1203,6 +1209,8 @@ impl Machine {
             hooks.message(self, text::NO_ITEMS);
             return Ok(None);
         }
+        // AX Bh (1194:FE4E): the list's kind (1194:5734).
+        self.list_kind = 0xB;
         let pick = hooks.list(self, PICK_TEXTS, n, 0);
         if (pick as i16) < 0 {
             return Ok(None);

@@ -86,7 +86,7 @@ impl ArenaRandom {
         let r = self.next();
         let span = hi.wrapping_sub(lo);
         if span == 0 {
-            return None;
+            return crate::giveup::original("0000:6EEA: a range of 0: the original divides by zero");
         }
         Some((r % span).wrapping_add(lo))
     }

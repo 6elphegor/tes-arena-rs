@@ -170,7 +170,7 @@ impl Machine {
         di: u16,
     ) -> Option<Haggle> {
         if !matches!(mode, 1..=6) {
-            return None;
+            return crate::giveup::not_ported("1194:8020: a haggle mode not ported");
         }
         self.mem.w8(DS, HALVED, 0);
         self.mem.w8(DS, ROUND, 0);
@@ -275,7 +275,7 @@ impl Machine {
                     let d = (limit.wrapping_sub(ax)) << 8;
                     let div = price.wrapping_sub(limit);
                     if div == 0 {
-                        return None;
+                        return crate::giveup::original("0000:52F2: the haggle divides by zero");
                     }
                     let _ = q_d.wrapping_sub(d / div).wrapping_add(per_d);
                     // 81F0: AND clears carry, so JAE is always taken.
@@ -293,7 +293,7 @@ impl Machine {
                     let v = ((ax.wrapping_sub(limit) as i16 as i32) << 8) as u32;
                     let div = price.wrapping_sub(limit) as u32;
                     if div == 0 || v / div > 0xFFFF {
-                        return None;
+                        return crate::giveup::original("0000:52F2: the haggle's divide overflows");
                     }
                     let a = ((v / div) as u16).wrapping_sub(q_d).wrapping_add(per_d);
                     // 820F
@@ -542,7 +542,7 @@ impl Machine {
             si = si.wrapping_sub(1);
         }
         if early {
-            return None;
+            return crate::giveup::not_ported("1194:83FD: a format reading the stack raw: not modelled");
         }
         args.reverse();
         self.sprintf((DS, SHOWN), (DS, LINE), &args);

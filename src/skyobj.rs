@@ -317,7 +317,7 @@ impl Machine {
         }
         let q = (across as i16 as i32 * self.mem.r16(DS, SCALE) as i16 as i32) / ahead as i16 as i32;
         if !(-0x8000..=0x7FFF).contains(&q) {
-            return None;
+            return crate::giveup::original("292B:057F: the projection's divide overflows");
         }
         Some(Some(((q as u16).wrapping_add(self.mem.r16(DS, CENTRE)), self.mem.r16(DS, HORIZON))))
     }
@@ -406,7 +406,7 @@ impl Machine {
         }
         let frames = self.mem.r16(seg, off);
         if frames == 0 {
-            return None;
+            return crate::giveup::original("292B:0201: a DFA of no frames: the original divides by zero");
         }
         let frame = self.mem.r16(DS, 0xCCBC) % frames;
         hooks.draw_dfa(self, seg, off, frame, ax, bx.wrapping_add(1));

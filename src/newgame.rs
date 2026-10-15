@@ -222,7 +222,7 @@ impl Machine {
                 return Some(q);
             }
             if check.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("222C:057F: no question left: the original rolls for ever");
             }
         }
     }
@@ -252,7 +252,7 @@ impl Machine {
         let mut searched = vec![false; 0x10000];
         loop {
             if std::mem::replace(&mut seen[di as usize], true) {
-                return None;
+                return crate::giveup::original("222C:0525: the question not in the file: the original searches for ever");
             }
             if self.info_atoi(es, di) == number {
                 let add = 2 + (number >= 10) as u16;
@@ -260,7 +260,7 @@ impl Machine {
             }
             loop {
                 if std::mem::replace(&mut searched[di as usize], true) {
-                    return None;
+                    return crate::giveup::original("222C:0525: the question not in the file: the original searches for ever");
                 }
                 for _ in 0..0xFDE8u32 {
                     let b = self.mem.r8(es, di);

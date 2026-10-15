@@ -288,7 +288,7 @@ impl Machine {
     fn sq_start(&mut self, si: u16) -> Option<()> {
         let days = self.sq32(TIME) / DAY;
         if days > 0xFFFF {
-            return None;
+            return crate::giveup::original("1194:9B8F: the days overflow a divide");
         }
         self.mem.w32(DS, si + 8, (days * DAY).wrapping_add(0x2D0));
         Some(())
@@ -362,7 +362,7 @@ impl Machine {
             end = end.wrapping_add(1);
             n += 1;
             if n >= 0xFFFE {
-                return None;
+                return crate::giveup::original("1194:9C57: the list has no end: the original reads on for ever");
             }
         }
         // `repne scasb` leaves DI past the NUL.
@@ -387,7 +387,7 @@ impl Machine {
                 return Some(v);
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:0ABF: no other place: the original rolls for ever");
             }
         }
     }
@@ -413,7 +413,7 @@ impl Machine {
                 break r;
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:9462: no quest kind: the original rolls for ever");
             }
         };
         match self.sq16(QUEST_MAKERS + sort * 2) {
@@ -423,7 +423,7 @@ impl Machine {
             0x97F1 => self.quest_make_fetch(files, hooks, si)?,
             0x9786 => self.quest_make_rescue(files, hooks, si)?,
             0x9849 => self.quest_make_guard(files, hooks, si)?,
-            _ => return None,
+            _ => return crate::giveup::not_ported("1194:9462: a quest maker not in the table"),
         }
         self.mem.w8(DS, 0x1404, 0xA);
         Some(())
@@ -558,7 +558,7 @@ impl Machine {
         // earlier code: not followed (None).
         let seg = self.heap_alloc_high(0x280)?;
         if seg == 0 {
-            return None;
+            return crate::giveup::not_ported("1194:9511: a block at 0:0, in low memory: not followed");
         }
         *kept = Some((seg, words, dwords));
         let block = (seg as u32) << 16;
@@ -587,7 +587,7 @@ impl Machine {
             2 | 6 => None,
             // The table gives no other sort; the original would draw from
             // whatever GS:DI held.
-            _ => return None,
+            _ => return crate::giveup::original("1194:9511: a goal sort past the table: the original reads whatever GS:DI held"),
         };
         match list {
             None => {
@@ -613,7 +613,7 @@ impl Machine {
                         break i;
                     }
                     if cycle.cycled(&self.rng) {
-                        return None;
+                        return crate::giveup::original("1194:9511: no goal: the original rolls for ever");
                     }
                 };
                 let v = self.mem.r32(seg, off.wrapping_add(i.wrapping_mul(4))) & 0xFFFF_0000 | i as u32;
@@ -698,7 +698,7 @@ impl Machine {
         let span = self.sq32(si + 0xC).wrapping_sub(self.sq32(si + 8));
         let days = span / DAY;
         if days > 0xFFFF {
-            return None;
+            return crate::giveup::original("1194:9760: the days overflow a divide");
         }
         let level = (self.sq8(LEVEL) as u32) + 1;
         let v = days.wrapping_mul(self.sq8(si + 0x26) as u32).wrapping_mul(level);
@@ -767,7 +767,7 @@ impl Machine {
             }
             // Every entry taken: the original draws for ever.
             if (0..count).all(|r| taken(self, entry(self, r))) || cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:9D64: every errand taken: the original draws for ever");
             }
         };
         self.mem.w32(DS, si + 0x10, giver);
@@ -781,14 +781,14 @@ impl Machine {
                 break r;
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:9D64: no errand: the original rolls for ever");
             }
         };
         match self.sq16(ERRAND_MAKERS + sort * 2) {
             0x9DCF => self.errand_make_plain(si, 0),
             0x9EAB => self.errand_make_plain(si, 1),
             0x9EC4 => self.errand_make_escort(si),
-            _ => None,
+            _ => crate::giveup::not_ported("1194:9D64: an errand maker not in the table"),
         }
     }
 
@@ -856,7 +856,7 @@ impl Machine {
                 return Some(());
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:9DE8: no errand goal: the original rolls for ever");
             }
         }
     }
@@ -1312,7 +1312,7 @@ impl Machine {
             // one at frame:91F0..91F8, made from the file's bytes, and
             // stepped there. With its table on (91F0) not followed.
             if self.mem.r16(frame, 0x91F0) != 0 {
-                return None;
+                return crate::giveup::not_ported("1194:D105: the informant's line with its table on: not followed");
             }
             let mut rng = crate::random::ArenaRandom::new(self.mem.r32(frame, 0x91F6));
             let r = rng.range(0, 3)?;
@@ -1329,7 +1329,7 @@ impl Machine {
             }
             k = k.wrapping_add(1);
             if k == 0 {
-                return None;
+                return crate::giveup::original("1194:D105: the line never found: the original searches for ever");
             }
         }
         hooks.substitute(self, files, 0x929E)?;
@@ -1377,7 +1377,7 @@ impl Machine {
                         ax = ax.wrapping_add(1);
                         steps += 1;
                         if steps > 0x10000 {
-                            return None;
+                            return crate::giveup::original("1194:49FF: the wrap never ends: the original loops for ever");
                         }
                     }
                 }
