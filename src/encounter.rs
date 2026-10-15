@@ -345,14 +345,14 @@ impl Machine {
 
     /// 1194:8F09. The player's square is a building's (a wall word above
     /// 0 with differing bytes: a raised platform).
-    fn in_building(&self) -> bool {
+    pub(crate) fn in_building(&self) -> bool {
         let walls = self.mem.r16(DS, crate::mif::var::MAP1_SEG);
         let w = self.mem.r16(walls, self.mem.r16(DS, 0xCB90));
         (w as i16) > 0 && (w >> 8) as u8 != w as u8
     }
 
     /// 1194:561C. 1 at night (before 6 or from 18 o'clock).
-    fn night(&self) -> u16 {
+    pub(crate) fn night(&self) -> u16 {
         let h = self.mem.r16(DS, 0x05D6);
         (!(6..0x12).contains(&h)) as u16
     }
@@ -414,7 +414,7 @@ impl Machine {
         table(self, bx, ax, dx)
     }
 
-    /// 1194:89D4 (row 0..12; the quests' FFFFh is not ported). By the
+    /// 1194:89D4 (row 0..12; the quests' FFFFh is `quest_encounter`). By the
     /// player's level an entry of the row is chosen (`encounter_entry`);
     /// a creature a quest waits for (1194:A19C, A1D1) doesn't come, nor
     /// another kind than those already fighting; otherwise the creatures
@@ -431,21 +431,47 @@ impl Machine {
         if self.quest_matching(6, 0x30, ty).is_some() || self.quest_matching(4, 0x2F, ty).is_some() {
             return Some(());
         }
-        if self.mem.r16(DS, FIGHTING) != 0 {
-            let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
-            let cur = if self.mem.r16(seg, 0x40D) & 0x1000 != 0 {
-                self.mem.r8(seg, 4)
-            } else {
-                self.mem.r8(seg, 5).wrapping_add(0x18)
-            };
-            if ty != cur {
-                return Some(());
-            }
+        self.encounter_bring(files, hooks, ty, si)
+    }
+
+    /// 1194:8AF0. The first creature's type: a monster's (+4), a person's
+    /// class (+5) + 18h.
+    pub(crate) fn encounter_current(&self) -> u8 {
+        let seg = self.mem.r16(DS, crate::creature::CREATURE_SEG);
+        if self.mem.r16(seg, 0x40D) & 0x1000 != 0 {
+            self.mem.r8(seg, 4)
+        } else {
+            self.mem.r8(seg, 5).wrapping_add(0x18)
+        }
+    }
+
+    /// 1194:8A27..8A46. The entry at `si` (of type `ty`) brought: not
+    /// during a fight with another type (8AF0); the creatures made,
+    /// named and placed.
+    fn encounter_bring(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, ty: u8, si: u16) -> Option<()> {
+        if self.mem.r16(DS, FIGHTING) != 0 && ty != self.encounter_current() {
+            return Some(());
         }
         let n = self.encounter_spawn(files, si)?;
         let people = self.encounter_text(n);
         self.fight_prepare(files, hooks, people as u8)?;
         self.place_creatures(n)
+    }
+
+    /// 1194:89A7. A quest's encounter: unless one is under way (0FF7),
+    /// the entry (`count` creatures of type `ty` at level `level`) put at
+    /// 1296 and brought (89D4 with BX FFFFh: GUARD_RANK 0, so the entry
+    /// is read in DGROUP).
+    pub fn quest_encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, count: u8, ty: u8, level: u8) -> Option<()> {
+        if self.mem.r16(DS, 0x0FF7) != 0 {
+            return Some(());
+        }
+        self.mem.w8(DS, 0x1296, count);
+        self.mem.w8(DS, 0x1297, ty);
+        self.mem.w8(DS, 0x1298, level);
+        self.mem.w16(DS, GUARD_RANK, 0);
+        self.mem.w16(DS, 0x12AC, 0);
+        self.encounter_bring(files, hooks, ty, 0x1296)
     }
 
     /// 1194:8A47. The entry for level + 1 (at most 20) in row `row` of the

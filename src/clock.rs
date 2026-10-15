@@ -67,9 +67,11 @@ pub trait ClockHooks {
     fn encounter(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.random_encounter(files, &mut crate::encounter::NoFightHooks)
     }
-    /// 1194:86F2: the per-minute encounter check (also while resting).
-    fn encounter_minute(&mut self, _m: &mut Machine) -> Option<()> {
-        Some(())
+    /// 1194:86F2: the per-minute encounter check (also while resting): a
+    /// quest's ambush (`sidequest::quest_ambush`, the fight's graphics,
+    /// music and text left out; override to show them).
+    fn encounter_minute(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quest_ambush(files, &mut crate::encounter::NoFightHooks, &mut crate::quest::NoQuestHooks)
     }
     /// 2901:0014..: the player's fatigue went below 0 (in combat they
     /// die; elsewhere they collapse and rest an hour, or die).
@@ -239,7 +241,7 @@ impl Machine {
                 }
             }
         }
-        hooks.encounter_minute(self)?;
+        hooks.encounter_minute(self, files)?;
         let mode = self.mem.r8(DS, 0x05E6);
         let check = mode == 0
             || (self.mem.r16(DS, var::AREA_FLAGS) & 4 == 0 && (mode == 4 || self.mem.r8(DS, 0x1013) == 0));
@@ -331,6 +333,9 @@ impl ClockHooks for NoClockHooks {
         Some(())
     }
     fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+    fn encounter_minute(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
 }

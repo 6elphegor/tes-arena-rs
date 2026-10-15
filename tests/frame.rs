@@ -56,6 +56,9 @@ impl ClockHooks for Hooks {
     fn quests_hourly(&mut self, _m: &mut Machine) -> Option<()> {
         Some(())
     }
+    fn encounter_minute(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
 }
 
 impl FrameHooks for Hooks {

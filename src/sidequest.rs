@@ -1601,6 +1601,102 @@ impl Machine {
         hooks.menu(self, si, 0x8256, 0x8259)
     }
 
+    /// 1194:9F8A. The first quest under way (kind 1), unless its stage
+    /// is 6 (the carry).
+    pub fn quest_under_way(&self) -> Option<u16> {
+        let si = (0..4).map(|i| QUESTS + i * QUEST).find(|&si| self.quest_kind(si) == 1)?;
+        (self.quest_stage(si) != 6).then_some(si)
+    }
+
+    /// 1194:86F2, every minute from the clock: a quest's ambush. Not
+    /// during a scene (5CA bit 200h), a fight (0FF7, 0FFB), on a
+    /// building's square, or inside most buildings (a dungeon, D48 8 and
+    /// up, or a tavern, or once broken into, 191D, are open to it); only
+    /// with a quest under way (9F8A) and when the countdown at 1404 runs
+    /// out. Then a d100 at or under the chance at 681Ah (681Bh with an
+    /// overlay up, 1013; 681Ch outside a tavern, or in a tavern in a
+    /// dungeon or the wild, also making it night, 1238) picks an entry of
+    /// the quest's row (+22h) of the table at 3276:4C65 (45h bytes a row,
+    /// three an entry) by the level (at most 20) plus a d4: its count,
+    /// type and level. By day a type in the list at 681Dh doesn't come;
+    /// nor one of the first creature's type (8AF0). Otherwise the fight
+    /// begins (89A7, 0FFB), with text 506h + the row. The countdown is set
+    /// again to 10..29 after a roll.
+    pub fn quest_ambush(&mut self, files: &mut Files, fight: &mut dyn crate::encounter::FightHooks, hooks: &mut dyn QuestHooks) -> Option<()> {
+        if self.sq16(0x05CA) & 0x200 != 0 || self.sq16(0x0FF7) != 0 || self.sq16(0x0FFB) != 0 || self.in_building() {
+            return Some(());
+        }
+        let kind = self.sq8(BUILDING);
+        if self.sq8(AREA) == 4 && self.sq8(0x191D) == 0 && kind != 4 && kind < 8 {
+            return Some(());
+        }
+        let Some(si) = self.quest_under_way() else { return Some(()) };
+        let n = self.sq8(0x1404).wrapping_sub(1);
+        self.mem.w8(DS, 0x1404, n);
+        if n != 0 {
+            return Some(());
+        }
+        self.mem.w16(DS, CURRENT, si);
+        let row = self.sq16(si + 0x22);
+        self.mem.w16(DS, 0x123A, row);
+        let night = self.night();
+        self.mem.w16(DS, 0x1238, night);
+        let d = self.sq_d100();
+        let mut bx = (self.sq8(0x1013) != 0) as u16;
+        if self.sq8(0x191D) == 0 && (kind != 4 || matches!(self.sq8(AREA), 2 | 3)) {
+            bx = 2;
+            self.mem.w16(DS, 0x1238, 1);
+        }
+        if d as u8 <= self.sq8(0x681A + bx) {
+            self.quest_ambush_comes(files, fight, hooks)?;
+        }
+        let r = self.rng.range(0xA, 0x1E)?;
+        self.mem.w8(DS, 0x1404, r as u8);
+        Some(())
+    }
+
+    /// 1194:8795..8869: the ambush's entry, and the fight.
+    fn quest_ambush_comes(&mut self, files: &mut Files, fight: &mut dyn crate::encounter::FightHooks, hooks: &mut dyn QuestHooks) -> Option<()> {
+        self.mem.w16(DS, 0x123C, 0);
+        let a = self.sq_roll(4)?;
+        let level = (self.sq8(LEVEL) as u16).min(0x14);
+        let at = level.wrapping_add(a).wrapping_mul(3).wrapping_add(self.sq16(0x123A).wrapping_mul(0x45));
+        let data = crate::mem::DATA;
+        let ty = self.mem.r8(data, 0x4C65_u16.wrapping_add(at));
+        let count = self.mem.r8(data, 0x4C66_u16.wrapping_add(at));
+        let lv = self.mem.r8(data, 0x4C67_u16.wrapping_add(at));
+        if self.sq16(0x1238) == 0 {
+            self.mem.w16(DS, 0x123C, 1);
+            let mut k = 0u16;
+            while self.sq8(0x681D + k) != 0 {
+                if self.sq8(0x681D + k) == ty {
+                    return Some(());
+                }
+                k += 1;
+            }
+        }
+        self.mem.w8(DS, 0x929E, count);
+        self.mem.w8(DS, 0x929F, ty);
+        self.mem.w8(DS, 0x92A0, lv);
+        if ty == self.encounter_current() {
+            return Some(());
+        }
+        let f = self.sq16(0x05C8) & !0x1000;
+        self.mem.w16(DS, 0x05C8, f);
+        self.mem.w8(DS, 0x1013, 0);
+        self.mem.w16(DS, 0x1294, 1);
+        self.quest_encounter(files, fight, count, ty, lv)?;
+        self.mem.w16(DS, 0x0FFB, 1);
+        let ax = self.sq16(0x102C);
+        hooks.font(self, 0, ax);
+        let text = self.sq16(0x123A).wrapping_add(0x506);
+        self.mem.w16(DS, crate::quest::var::TEXT, text);
+        self.mem.w8(DS, crate::quest::var::TEXT_FLAG, 0x3C);
+        self.mem.w8(DS, 0x7387, 2);
+        hooks.text_at(self, files, 0, 0)?;
+        Some(())
+    }
+
     /// `f` run with the player put at the place's square (9D51: A48, A4A
     /// in squares to C3D0, C3D4), then put back.
     fn sq_at_place<T>(&mut self, f: impl FnOnce(&mut Machine) -> Option<T>) -> Option<T> {
