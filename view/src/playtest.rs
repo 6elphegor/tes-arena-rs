@@ -277,6 +277,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         boxes: Vec::new(),
         need: None,
         maker_screen: None,
+        backdrop: None,
         status: None,
         panel: None,
         map: false,
@@ -719,13 +720,13 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             t.click(&mut engine, &archive, 62, 180, false);
                             let mut open = Some(t);
                             let mut boxes = Vec::new();
-                            crate::travel::after(&mut open, &mut engine, &mut boxes);
+                            crate::travel::after(&mut open, &mut engine, &mut boxes, true);
                             // No journey: the screen left as Esc leaves it.
                             for _ in 0..4 {
                                 if let Some(t) = open.as_mut() {
                                     t.key(&mut engine, KeyCode::Escape, None);
                                 }
-                                crate::travel::after(&mut open, &mut engine, &mut boxes);
+                                crate::travel::after(&mut open, &mut engine, &mut boxes, true);
                             }
                             if open.is_some() {
                                 println!("ODD frame {n} (travel): the travel map didn't end; {}", place(&engine, run));
