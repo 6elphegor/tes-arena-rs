@@ -50,7 +50,8 @@ RETF, RET = b'\xcb', b'\xc3'
 STUBS = [
     # Drawing, sound, menus, message boxes.
     (0x2294, 0x11F2, RETF), (0x1194, 0x4635, RETF), (0x2294, 0x04F5, RETF), (0x1194, 0xA36C, counter(0xFFE0, True)),
-    (0, 0x7428, RETF), (0, 0x599C, RETF), (0, 0x5104, RETF), (0, 0x0550, RETF), (0x2542, 0x0100, counter(0xFFE2, True)),
+    (0, 0x7428, RETF), (0, 0x599C, RETF), (0, 0x5104, RETF), (0, 0x05B5, counter(0xFFD0, False)), (0x292B, 0x05A2, counter(0xFFD2, True)),
+    (0x2542, 0x0100, counter(0xFFE2, True)),
     (0x1194, 0xDB6C, counter(0xFFE4, True)), (0x1194, 0x3A50, RETF), (0x25FD, 0x0844, RETF), (0x1194, 0x5532, RETF),
     (0x1194, 0xD327, counter(0xFFE6, True)), (0, 0x4F72, RETF), (0x2294, 0x0428, RETF), (0x292B, 0x0530, RETF),
     (0, 0x5A66, RETF), (0x292B, 0x000E, RETF), (0x1194, 0x59C8, counter(0xFFE8, True)), (0x23BA, 0x002A, RETF),
@@ -142,12 +143,23 @@ def setup(seed, holidays):
     w.append((None, 0xFFDE, pb(byte() & 1)))
     w.append((None, 0xC3D0, pk(0x1000 + word() % 0x2000)))
     w.append((None, 0xC3D4, pk(0x1000 + word() % 0x2000)))
-    w.append((None, 0xCB90, pk(word() & 0x7EFE)))
+    cb90 = word() & 0x7EFE
+    w.append((None, 0xCB90, pk(cb90)))
     w.append((None, 0x91F6, bytes(byte() for _ in range(4))))
     # Flats in the wall plane.
     for _ in range(byte() % 24):
         k = byte()
         w.append((WSEG, word() & 0x7FFE, pk((0x8000 if k < 0xC0 else 0x9000) | word() & 0x0F00 | k % 10)))
+    # A level's text shown (0000:0550): its time, its square (the
+    # player's half the time), the text, the riddle waiting (the text's
+    # now and then), the font and the bank.
+    w.append((None, 0x3C82, pb(0 if byte() < 0x60 else byte())))
+    w.append((None, 0x0DBC, pk(cb90 if byte() < 0x80 else word() & 0x7EFE)))
+    txt = word() if byte() < 0xC0 else 0
+    w.append((None, 0x3D42, pk(txt)))
+    w.append((None, 0x7C5E, pk(txt if byte() < 0x60 else word())))
+    w.append((None, 0x102C, pk(word())))
+    w.append((None, 0xC8FE, pb(byte())))
     return w
 
 
@@ -163,6 +175,15 @@ def main():
     a = MouseArena(EXE)
     for seg, off, code in STUBS:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
+    # The riddle's prompt leaves DS and ES at DGROUP, as 292B:05A2 sets
+    # them (0000:059C then reads 3D42 there): mov cx, DGROUP; mov ds, cx;
+    # mov es, cx; inc word [FFD2]; retf.
+    a.mu.mem_write(a.lin(LOAD_SEG + 0x292B, 0x05A2),
+                   b'\xB9' + struct.pack('<H', a.ds) + b'\x8E\xD9\x8E\xC1\xFF\x06\xD2\xFF\xCB')
+    # The text's lines (0000:05B5, called with DS at the EMS frame) end
+    # with DS at DGROUP (05FF): mov cx, DGROUP; mov ds, cx; inc word
+    # [FFD0]; ret.
+    a.mu.mem_write(a.lin(LOAD_SEG, 0x05B5), b'\xB9' + struct.pack('<H', a.ds) + b'\x8E\xD9\xFF\x06\xD0\xFF\xC3')
     a.w16(0x902E, 0)
     a.w16(0x9030, HSEG)
     a.w16(0xBA54, 0)

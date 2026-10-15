@@ -747,6 +747,7 @@ impl crate::engine::Engine {
         if self.m.mem.r32(DS, ENTERED_HOOK) == 0x468B {
             hooks.entered(&mut self.m);
         }
+        self.world_loop_start();
         Some(())
     }
 }

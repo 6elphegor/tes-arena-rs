@@ -58,6 +58,10 @@ fn main() {
     // run in its place), transitions too.
     m.mem.w32(DS, 0xC3B4, 0x2826_0002);
     m.mem.w32(DS, 0xC3AC, 0x0000_4470);
+    // The actors' and the frame body's (C3A4, C3A8), as the 3D mode sets
+    // them (2294:0006).
+    m.mem.w32(DS, 0xC3A4, 0x0000_47FD);
+    m.mem.w32(DS, 0xC3A8, 0x0000_481E);
     // A creature segment for the actors' records.
     let (cseg, _) = m.heap_alloc(0x1000).expect("heap");
     m.mem.w16(DS, 0x1042, cseg);

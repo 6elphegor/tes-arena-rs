@@ -102,6 +102,12 @@ impl FrameHooks for Hooks {
     fn key_d327(&mut self, m: &mut Machine) {
         count(m, 0xFFE6);
     }
+    fn level_text_draw(&mut self, m: &mut Machine) {
+        count(m, 0xFFD0);
+    }
+    fn riddle(&mut self, m: &mut Machine) {
+        count(m, 0xFFD2);
+    }
 }
 
 /// Mirrors harness/gen_frame.py `setup`.
@@ -232,8 +238,8 @@ fn setup(m: &mut Machine, seed: u32, holidays: &[u16]) {
         let v = 0x1000 + s.word() % 0x2000;
         m.mem.w16(DS, at, v);
     }
-    let v = s.word() & 0x7EFE;
-    m.mem.w16(DS, 0xCB90, v);
+    let cb90 = s.word() & 0x7EFE;
+    m.mem.w16(DS, 0xCB90, cb90);
     let b: Vec<u8> = (0..4).map(|_| s.byte()).collect();
     put(m, DS, 0x91F6, &b);
     for _ in 0..s.byte() % 24 {
@@ -243,6 +249,19 @@ fn setup(m: &mut Machine, seed: u32, holidays: &[u16]) {
         let t = if k < 0xC0 { 0x8000 } else { 0x9000 };
         m.mem.w16(WSEG, at, t | w | (k % 10) as u16);
     }
+    // A level's text shown (0000:0550).
+    let v = if s.byte() < 0x60 { 0 } else { s.byte() };
+    m.mem.w8(DS, 0x3C82, v);
+    let v = if s.byte() < 0x80 { cb90 } else { s.word() & 0x7EFE };
+    m.mem.w16(DS, 0x0DBC, v);
+    let txt = if s.byte() < 0xC0 { s.word() } else { 0 };
+    m.mem.w16(DS, 0x3D42, txt);
+    let v = if s.byte() < 0x60 { txt } else { s.word() };
+    m.mem.w16(DS, 0x7C5E, v);
+    let v = s.word();
+    m.mem.w16(DS, 0x102C, v);
+    let v = s.byte();
+    m.mem.w8(DS, 0xC8FE, v);
 }
 
 #[test]
