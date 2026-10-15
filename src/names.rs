@@ -59,9 +59,26 @@ impl Machine {
         self.mem.w8(DS, SEX, sex);
         self.rng.seed = seed;
         self.mem.w8(seg, off, 0);
-        let handle = self.file_open_handle(files, FILE_NAME)?;
+        // Where the port gives up (the names file missing, or a pick
+        // where the original faults) the game's seed is put back and the
+        // file closed, as the routine's end does; left as they were, every
+        // later roll would follow the name's seed. The original has no
+        // such exit.
+        let Some(handle) = self.file_open_handle(files, FILE_NAME) else {
+            self.rng.seed = saved;
+            return None;
+        };
         self.mem.w16(DS, HANDLE, handle);
         let mut o = Out { seg, di: off, al: 0 };
+        let r = self.names_by_kind(files, kind, &mut o);
+        self.file_close(files);
+        self.rng.seed = saved;
+        r?;
+        Some((o.di, o.al))
+    }
+
+    /// `npc_name_al`'s names by kind, from the open names file.
+    fn names_by_kind(&mut self, files: &mut Files, kind: u8, o: &mut Out) -> Option<()> {
         match kind {
             0..=7 => {
                 if kind > 0 {
@@ -73,50 +90,48 @@ impl Machine {
                     self.names_skip_n(files, if n == 0 { 0x10000 } else { n as u32 });
                 }
                 match kind {
-                    1 => self.names_set_1(files, &mut o)?,
+                    1 => self.names_set_1(files, o)?,
                     2 => {
-                        self.names_race(files, &mut o)?;
-                        self.names_copy(SUFFIX, &mut o);
+                        self.names_race(files, o)?;
+                        self.names_copy(SUFFIX, o);
                         // strcpy leaves DI past the NUL.
                     }
-                    _ => self.names_race(files, &mut o)?,
+                    _ => self.names_race(files, o)?,
                 }
             }
             8..=16 => {
                 self.names_skip_n(files, 0x2F);
-                self.names_pick(files, &mut o)?;
-                self.names_one_or_two(files, &mut o)?;
+                self.names_pick(files, o)?;
+                self.names_one_or_two(files, o)?;
             }
             17..=21 => {
                 self.names_skip_n(files, 0x32);
-                self.names_pick(files, &mut o)?;
+                self.names_pick(files, o)?;
                 if kind == 0x15 {
                     self.names_skip(files);
                     for _ in 0..2 {
-                        self.names_pick(files, &mut o)?;
+                        self.names_pick(files, o)?;
                     }
                 } else {
-                    self.names_one_or_two(files, &mut o)?;
+                    self.names_one_or_two(files, o)?;
                 }
             }
             _ => {
                 self.names_skip_n(files, 0x36);
                 let take = kind == 0x16 && self.rng.range(0, 100)? <= 0x19;
                 if take {
-                    self.names_pick(files, &mut o)?;
+                    self.names_pick(files, o)?;
                     self.mem.w8(o.seg, o.di, b' ');
                     o.di = o.di.wrapping_add(1);
                 } else {
                     self.names_skip(files);
                 }
                 for _ in 0..3 {
-                    self.names_pick(files, &mut o)?;
+                    self.names_pick(files, o)?;
                 }
             }
         }
-        self.file_close(files);
-        self.rng.seed = saved;
-        Some((o.di, o.al))
+        Some(())
     }
 
     /// 1194:0940: race names. A male name takes the first two chunks and

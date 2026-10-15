@@ -484,8 +484,11 @@ impl Machine {
         let (seg, _) = self.heap_alloc_bytes(len)?;
         self.file_read(files, seg, 0, len);
         let dst = self.mem.r16(DS, BUFFER_SEG);
-        self.mif_decompress(seg, 0, dst, 0, len)?;
+        // The block is freed even where the port gives up (where the
+        // original faults or hangs), so the heap doesn't lose it.
+        let r = self.mif_decompress(seg, 0, dst, 0, len);
         self.heap_free(seg);
+        r?;
         Some(())
     }
 

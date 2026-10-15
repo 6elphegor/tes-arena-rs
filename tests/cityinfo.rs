@@ -153,3 +153,23 @@ fn matches_original() {
     eprintln!("cityinfo: {n} compared, {stuck} stuck in both");
     assert!(n > 1000, "{n} compared");
 }
+
+/// Where listing another place's buildings gives up (here its province's
+/// data missing), the game's seed is put back and the place's record
+/// (38h paragraphs from the top of the heap) freed, as the end does.
+#[test]
+fn a_listing_given_up_frees_its_record() {
+    let Some(img) = common::image() else { return };
+    let empty = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-citydata");
+    std::fs::create_dir_all(&empty).unwrap();
+    let mut files = arena::bsa::Files::new(&empty).unwrap();
+    let mut m = arena::machine::Machine::new(&img);
+    m.heap_init(0xA000, 0xF000).unwrap();
+    m.mem.w8(arena::mem::DS, 0x0A4C, 3);
+    m.rng.seed = 0x1234_5678;
+    let mut fresh = m.clone();
+    let seg = fresh.heap_alloc_high(0x38).unwrap();
+    assert_eq!(m.city_info(&mut files, 5), None);
+    assert_eq!(m.rng.seed, 0x1234_5678, "the game's seed back");
+    assert_eq!(m.heap_alloc_high(0x38), Some(seg), "the record's block freed");
+}

@@ -309,3 +309,39 @@ fn matches_original() {
     }
     assert!(n > 3500);
 }
+
+/// The end of a new game's start dungeon (`new_game_next`, 0000:0C98..0CA9
+/// with 0CAD) against harness/gen_newgamenext.py's runs, set up as the
+/// transit cases are.
+#[test]
+fn new_game_next_matches_original() {
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0xAFF9, 0);
+    let mut n = 0;
+    for line in include_str!("vectors/newgamenext.txt").lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        assert_eq!(f[0], "newgamenext", "{line}");
+        let mut m = base.clone();
+        setup(&mut m, u32::from_str_radix(f[1], 16).unwrap());
+        let before = m.clone();
+        let (id, si) = match m.new_game_next(&mut Hooks) {
+            Run::Quit | Run::End => (6, None),
+            Run::City => (0, Some(0x1385)),
+            Run::Wild => (1, Some(0x1319)),
+            Run::Dungeon => (3, Some(0x1385)),
+            Run::Interior(n) => (4, Some(n)),
+            Run::Start => (2, Some(0x0A36)),
+        };
+        m.mem.w16(DS, 0xFFD0, id);
+        if let Some(si) = si {
+            m.mem.w16(DS, 0xFFD2, si);
+        }
+        let changed = (0..=0xFFFFu16)
+            .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
+            .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
+        assert_eq!(f[2], format!("{:x}", fnv(changed)), "{line}");
+        n += 1;
+    }
+    assert!(n > 1900);
+}

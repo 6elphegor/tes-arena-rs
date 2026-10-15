@@ -125,7 +125,7 @@ def setup(seed, px, py, corpse):
 a = DosArena(EXE, GAME)
 a.std_devices = True
 for seg, off, code in [(0, 0x1B7F, b'\xc3'), (0, 0xFE58, b'\xc3'), (0, 0xDA8E, b'\xc3'), (0, 0x8FC8, b'\xc3'),
-                       (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb'), (0x29CF, 0x0270, b'\xcc')]:
+                       (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb')]:
     a.patch(seg, off, code)
 a.init_heap()
 a.run_range(0, 0x6F3A, 0x6F87)  # open GLOBAL.BSA

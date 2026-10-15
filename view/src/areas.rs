@@ -46,17 +46,20 @@ impl AreaHooks for Areas<'_> {
         world::lgt(m, self.dir, arena::weather::NORMAL_LGT);
     }
 
-    /// 1194:3AE8 as the view's cities need it: the Imperial City's
-    /// record (province 8) stays the Imperial City, and the terrain
-    /// (record +2Eh, A50), which the original reads from the map file
-    /// (1194:3D91), stays the one the view was started with.
+    /// 1194:3AE8: the record built by 3B84 in full (`city_location`):
+    /// the province's data loaded (3C0D), the climate (record +2Eh, A50)
+    /// read from the terrain map (3D91). The Imperial City's record
+    /// (province 8) stays the Imperial City.
     fn location(&mut self, m: &mut Machine, id: u16) {
         let id = if m.mem.r8(DS, RECORD + 0x24) == 8 { 0x100 } else { id };
-        let terrain = m.mem.r8(DS, arena::weather::var::TERRAIN);
-        if m.city_build_location(DS, RECORD, id, terrain).is_none() {
+        let Some(files) = self.files.as_deref_mut() else {
+            self.failed = true;
+            return;
+        };
+        if m.city_location(files, DS, RECORD, id).is_none() {
+            eprintln!("the location record for location {id:#x} could not be built (1194:3AE8)");
             self.failed = true;
         }
-        m.mem.w8(DS, arena::weather::var::TERRAIN, terrain);
     }
 
     fn weather(&mut self, m: &mut Machine) {
@@ -69,6 +72,7 @@ impl AreaHooks for Areas<'_> {
         let (off, seg) = (m.mem.r16(DS, 0xBA54), m.mem.r16(DS, 0xBA56));
         let Some(files) = self.files.as_deref_mut() else { return };
         if m.mif_build_city(files).is_none() {
+            eprintln!("the city could not be built (1194:0292)");
             self.failed = true;
         }
         m.mem.w16(DS, 0xBA54, off);
@@ -182,6 +186,16 @@ impl arena::load::LoadHooks for Areas<'_> {
     fn renderer(&mut self, m: &mut Machine) {
         world::light_table(m);
     }
+    /// 25FD:06A1: the slot's files copied to the working ones, in the
+    /// engine's files and in the copy these hooks read (`files`, taken
+    /// before the load): the area's entry (`entered`: a town's
+    /// buildings, from CITYDATA) runs inside the load and reads the copy.
+    fn slot_files(&mut self, m: &mut Machine, files: &mut Files) {
+        m.slot_files_in(files);
+        if let Some(copy) = self.files.as_deref_mut() {
+            m.slot_files_in(copy);
+        }
+    }
 }
 
 /// The run of the area the game is in, by 5E6 (an interior's level named
@@ -204,6 +218,7 @@ pub fn run_of(m: &Machine) -> Run {
 /// sounds hook is cleared after, as the view has no sound. Returns the
 /// loaded area's run, or what went wrong.
 pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
+    NEW_GAME.with(|n| n.set(false));
     let mut e = Engine { m: engine.m.clone(), files: engine.files.clone() };
     e.files.add_dir(save).map_err(|err| format!("{}: {err}", save.display()))?;
     let old = e.m.mem.r16(DS, 0xCCC2);
@@ -237,9 +252,22 @@ impl arena::wild::WildHooks for Wild<'_> {
     }
 }
 
+thread_local! {
+    /// The run going is a new game's start dungeon, run straight from its
+    /// start (0000:0C95): it ends through 0000:0C98 (`new_game_next`), not
+    /// the outer loop's switch.
+    static NEW_GAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A new game's start dungeon is the run going (`newgame::play`).
+pub fn new_game_started() {
+    NEW_GAME.with(|n| n.set(true));
+}
+
 /// The area the view starts in, as the outer loop would have entered it:
 /// a city (5E6 0) or an interior (4).
 pub fn start(engine: &mut Engine, city: bool) -> Run {
+    NEW_GAME.with(|n| n.set(false));
     let area = if city { 0 } else { 4 };
     // The working slot (1194:3AC5): the view plays from the game's own
     // *.65 files (CITYDATA.65, SPELLSG.65, ...), where the original first
@@ -277,7 +305,9 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
         m.world_leave(h);
         m.world_end(h);
         m.area_end(run, h);
-        let next = m.area_next(h);
+        // A new game's start dungeon ends at 0000:0C98 (into the town
+        // of the player's province); every other run goes through 0ED5.
+        let next = if run == Run::Start && NEW_GAME.with(|n| n.replace(false)) { m.new_game_next(h) } else { m.area_next(h) };
         match next {
             Run::City | Run::Interior(_) | Run::Start | Run::Wild | Run::Dungeon => {
                 let name = m.area_begin(next, h);
@@ -289,17 +319,21 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             }
             Run::End => {
                 // The game is over: the ending's text (TEXT 137A, through
-                // 1194:A374 into a buffer) on the message line, shown
-                // while its countdown runs (061A, 061E).
+                // 1194:A374) on the message line, shown while its
+                // countdown runs (061A, 061E). Written where the original's
+                // 1194:D459 writes it, a heap block of BB8h bytes (0:9CD2):
+                // the farewell is longer than any DGROUP buffer (one at
+                // 19DE ran over the slot bytes 1A6C and 1A80).
                 if let (Some(ax), Some(files)) = (h.ending, h.files.as_deref_mut()) {
-                    const BUF: u16 = 0x19DE;
-                    m.mem.w16(DS, arena::text::var::TEXT, ax);
-                    if m.text(files, &mut arena::text::NoTextHooks, 2, DS, BUF).is_some() {
-                        let text = String::from_utf8_lossy(m.mem.cstr(DS, BUF)).replace('\r', "\n");
-                        println!("{text}");
-                        m.mem.w16(DS, 0x061A, BUF);
-                        m.mem.w16(DS, 0x061C, DS);
-                        m.mem.w16(DS, 0x061E, 0x7FFF);
+                    if let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) {
+                        m.mem.w16(DS, arena::text::var::TEXT, ax);
+                        if m.text(files, &mut arena::text::NoTextHooks, 2, seg, off).is_some() {
+                            let text = String::from_utf8_lossy(m.mem.cstr(seg, off)).replace('\r', "\n");
+                            println!("{text}");
+                            m.mem.w16(DS, 0x061A, off);
+                            m.mem.w16(DS, 0x061C, seg);
+                            m.mem.w16(DS, 0x061E, 0x7FFF);
+                        }
                     }
                 }
                 eprintln!("the game has ended");

@@ -794,6 +794,15 @@ impl Machine {
     /// square empty on the floor plane. Returns its offset. None where
     /// the original faults (no candidates) or loops forever.
     fn quest_candidate(&mut self, seed: u32) -> Option<u16> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.quest_candidate_seeded(seed);
+        self.seed_back(saved, r)
+    }
+
+    fn quest_candidate_seeded(&mut self, seed: u32) -> Option<u16> {
         let count = self.mem.r8(DS, CANDIDATE_COUNT) as u16;
         // With no usable candidate at all the original rolls forever:
         // known at once, instead of waiting for the RNG to cycle.

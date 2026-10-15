@@ -280,6 +280,20 @@ impl Machine {
     /// key isn't in the index (the original searches forever), a file is
     /// missing or a substitution isn't ported.
     pub fn text(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, mode: u16, es: u16, di: u16) -> Option<(u16, u16)> {
+        // Where the port gives up (a code it doesn't make, or the
+        // original's fault or hang) the nesting is put back as the
+        // routine's exit leaves it, so that later texts don't start one
+        // level in (with the buffers of the next level and a substitution
+        // that skips its text). The original has no such exit.
+        let level = self.t8(LEVEL);
+        let r = self.text_body(files, hooks, mode, es, di);
+        if r.is_none() {
+            self.mem.w8(DS, LEVEL, level);
+        }
+        r
+    }
+
+    fn text_body(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, mode: u16, es: u16, di: u16) -> Option<(u16, u16)> {
         self.mem.w8(DS, NTH, 0);
         let bank = self.t16(BANK);
         self.text_map(bank, 0);
@@ -530,6 +544,29 @@ impl Machine {
     /// where a code's routine isn't ported or the text is empty (the
     /// original then reads its code from the NUL).
     pub fn expand(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, es: u16, di: u16) -> Option<u16> {
+        // Where the port gives up, its exit's work is done (as at 2DA2's
+        // end): the nesting (SUB_LEVEL) as it was on entry, the seed
+        // back, and, at the outer level, the bank mapped before it (8A0C)
+        // mapped again. Without it the next substitution starts nested,
+        // skips its text and maps a stale bank, and the text routine
+        // then reads another bank's bytes as its text (a quest giver's
+        // greeting, 56h, ran on into DGROUP from 1044). The original has
+        // no such exit.
+        let n = self.mem.r8(DATA, SUB_LEVEL);
+        let seed = self.rng.seed;
+        let r = self.expand_body(files, hooks, es, di);
+        if r.is_none() {
+            self.mem.w8(DATA, SUB_LEVEL, n);
+            self.rng.seed = seed;
+            if n <= 1 {
+                let bank = self.t16(0x8A0C);
+                self.ems_map(bank);
+            }
+        }
+        r
+    }
+
+    fn expand_body(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, es: u16, di: u16) -> Option<u16> {
         let saved = self.rng.seed;
         self.mem.w8(DS, 0x8A43, 0);
         let n = self.mem.r8(DATA, SUB_LEVEL);
@@ -1240,12 +1277,20 @@ impl Machine {
                 let saved = self.t8(NO_EXPAND);
                 self.mem.w8(DS, NO_EXPAND, 0xFF);
                 let mut bx = self.t8(0x0A46) as u16;
+                // Where the port gives up the flag is put back too (as the
+                // code's end does); left FFh, no later text would have its
+                // substitutions made. The original has no such exit.
                 if bx == 8 {
-                    bx = self.rng.range(0, 8)?;
+                    let Some(r) = self.rng.range(0, 8) else {
+                        self.mem.w8(DS, NO_EXPAND, saved);
+                        return None;
+                    };
+                    bx = r;
                 }
                 self.mem.w16(DS, TEXT, self.t16(0x8A60_u16.wrapping_add(bx * 2)));
-                self.text(files, hooks, 2, DS, 0x9B66)?;
+                let r = self.text(files, hooks, 2, DS, 0x9B66);
                 self.mem.w8(DS, NO_EXPAND, saved);
+                r?;
                 Res::Str(DS, 0x9B66)
             }
             // %pcf: the player's first name; %pcn: the player's name.

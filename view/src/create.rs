@@ -295,7 +295,7 @@ impl arena::newgame::NewGameHooks for Hooks<'_> {
 
 /// An image with a 12-byte header and its palette after the data
 /// (6-bit; flag 100h), as the .MNU screens are.
-fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
+pub(crate) fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
     let d = archive.read(name)?;
     let (img, used) = crate::interface::image(&d)?;
     let p = d.get(used..used + 0x300)?;
@@ -790,7 +790,7 @@ impl Creation {
     /// The province accepted (28E1), what the player is told (2902), then
     /// the attributes (2A69).
     fn province_accepted(&mut self, engine: &mut Engine, p: u8) -> Stage {
-        if engine.m.province_accepted().is_none() {
+        if engine.m.province_accepted(&mut engine.files).is_none() {
             eprintln!("the place could not be built");
         }
         let m = &mut engine.m;

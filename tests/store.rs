@@ -27,6 +27,10 @@ struct Script {
     haggles: Vec<(bool, u32)>,
     n: [usize; 3],
     log: Vec<u32>,
+    /// The weapons' lines give up (a front end with nothing to list).
+    give_up_lines: bool,
+    /// How often the weapons' lines were asked for.
+    lines_asked: usize,
 }
 
 fn take<T: Copy>(q: &[T], n: &mut usize, default: T) -> T {
@@ -74,6 +78,10 @@ impl StoreHooks for Script {
     }
     fn weapon_lines(&mut self, _m: &mut Machine) -> Option<()> {
         self.log.push(9);
+        self.lines_asked += 1;
+        if self.give_up_lines {
+            return None;
+        }
         Some(())
     }
     fn armor_lines(&mut self, _m: &mut Machine) -> Option<()> {
@@ -442,4 +450,55 @@ fn matches_original() {
 fn store_names(m: &Machine) -> [String; 2] {
     let name = |at: u16| String::from_utf8_lossy(m.mem.cstr(DS, at)).to_ascii_uppercase();
     [name(0x8B09), name(0x8B18)]
+}
+
+/// A store the port gives up in (here its weapons' lines) is left as the
+/// store's end leaves it: no shop (137F FFh), no holiday, the clip (A91A)
+/// as it was and the bank mapped before the store's mapped back, the same
+/// as after a visit that ends.
+#[test]
+fn a_store_given_up_leaves_as_it_ends() {
+    let Some(img) = common::image() else { return };
+    let dir = std::path::PathBuf::from(std::env::var("ARENA_EXE").map_or_else(
+        |_| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into(),
+        |p| std::path::Path::new(&p).parent().unwrap().to_string_lossy().into_owned(),
+    ));
+    let Ok(files) = Files::new(&dir) else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FSEG);
+    let mut tried = 0;
+    for line in include_str!("vectors/store.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let run = |give_up: bool| {
+            let mut m = base.clone();
+            let mut fs = files.clone();
+            let (mut sc, put) = setup(&mut m, seed);
+            for (k, v) in &put {
+                fs.put(k.as_bytes(), v);
+            }
+            sc.give_up_lines = give_up;
+            m.load_rng();
+            let a91a = m.mem.r16(DS, 0xA91A);
+            let r = m.equipment_store(&mut fs, &mut sc);
+            let listed = sc.lines_asked > 0;
+            (r, listed, a91a, m.mem.r16(DS, 0xA91A), m.mem.r8(DS, 0x137F), m.mem.r8(DS, 0x13C9), m.mem.r16(DS, 0x8FA8))
+        };
+        let (a, listed, _, a91a_a, shop_a, holiday_a, bank_a) = run(false);
+        if a.is_none() || !listed || bank_a == 0x18 * 4 {
+            continue;
+        }
+        let (b, _, a91a0, a91a_b, shop_b, holiday_b, bank_b) = run(true);
+        assert_eq!(b, None, "{line}");
+        assert_eq!((shop_b, holiday_b), (0xFF, 0xFF), "no shop, no holiday\n{line}");
+        assert_eq!(a91a_b, a91a0, "the clip back\n{line}");
+        assert_eq!(a91a_b, a91a_a);
+        assert_eq!((shop_a, holiday_a), (0xFF, 0xFF));
+        assert_eq!(bank_b, bank_a, "the bank mapped before back\n{line}");
+        tried += 1;
+        if tried == 20 {
+            break;
+        }
+    }
+    assert!(tried > 0, "no case listed the weapons");
 }

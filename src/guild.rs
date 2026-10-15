@@ -233,6 +233,27 @@ impl Machine {
     /// 1194:A73E. See the module's notes. None where the original faults
     /// or hangs.
     pub fn mages_guild(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
+        // Where the port gives up (a hook with no answer, a routine not
+        // ported), the end's state is left all the same (1194:A7F1): the
+        // clip as it was, no shop, no holiday, and the bank mapped before
+        // the guild's (SAVED_BANK) mapped back. Its stock file isn't
+        // written. The original has no such exit.
+        let saved = self.mem.r16(DS, 0xA91A);
+        let entered = self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0;
+        let r = self.mages_guild_body(files, hooks);
+        if r.is_none() {
+            self.mem.w16(DS, 0xA91A, saved);
+            self.mem.w8(DS, SHOP, 0xFF);
+            self.mem.w8(DS, HOLIDAY, 0xFF);
+            if entered {
+                let bank = self.mem.r16(DS, SAVED_BANK);
+                self.map_bank(bank, 0);
+            }
+        }
+        r
+    }
+
+    fn mages_guild_body(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         let saved = self.mem.r16(DS, 0xA91A);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
             self.mem.w8(DS, SHOP, 7);
@@ -315,10 +336,10 @@ impl Machine {
             }
             let saved = self.rng.seed;
             self.rng.seed = eax;
-            let level = self.shop_roll_level()?;
-            self.shop_price_factors(level)?;
-            self.stock_make()?;
+            // The game's seed back even where the port gives up.
+            let r = self.shop_roll_level().and_then(|level| self.shop_price_factors(level)).and_then(|()| self.stock_make());
             self.rng.seed = saved;
+            r?;
         }
         self.mem.w8(DS, 0x12CB, 0);
         Some(())

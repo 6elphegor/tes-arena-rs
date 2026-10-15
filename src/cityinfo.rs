@@ -87,6 +87,24 @@ impl Machine {
     /// the original faults (no blocks, a division by 0), hangs (a list
     /// with every pair used), the heap is full or a file is missing.
     pub fn city_info(&mut self, files: &mut Files, ax: u16) -> Option<()> {
+        // Where the port gives up (the original's faults and hangs, the
+        // heap full, a file missing), the game's seed is put back and the
+        // other place's record freed, as the end does: left, every later
+        // roll would follow the plan's seed and the heap lose 38h
+        // paragraphs each time. The original has no such exit.
+        let saved = self.rng.seed;
+        let mut block = None;
+        let r = self.city_info_body(files, ax, &mut block);
+        if r.is_none() {
+            if let Some(seg) = block {
+                self.heap_free(seg);
+            }
+            self.rng.seed = saved;
+        }
+        r
+    }
+
+    fn city_info_body(&mut self, files: &mut Files, ax: u16, block: &mut Option<u16>) -> Option<()> {
         let saved = self.rng.seed;
         let (seg, rec) = if ax as u8 != self.ci8(PLACE) {
             // 0000:9CD2: last fit, AX 0. With no room the record would be
@@ -95,6 +113,7 @@ impl Machine {
             if seg == 0 {
                 return None;
             }
+            *block = Some(seg);
             self.city_location(files, seg, 0, ax)?;
             (seg, 0)
         } else {
@@ -144,6 +163,7 @@ impl Machine {
                 self.mem.w16(DS, TEMPLES, k[2]);
             }
             self.heap_free(seg);
+            *block = None;
         }
         self.rng.seed = saved;
         Some(())
@@ -198,6 +218,15 @@ impl Machine {
     /// where every pair the dice can give is already in the list (the
     /// original rolls forever) or the re-rolls pass ROLL_LIMIT.
     fn city_list(&mut self, kind_at: u16, list_at: u16, bl: u8, dl: u8, third: bool) -> Option<u16> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.city_list_seeded(kind_at, list_at, bl, dl, third);
+        self.seed_back(saved, r)
+    }
+
+    fn city_list_seeded(&mut self, kind_at: u16, list_at: u16, bl: u8, dl: u8, third: bool) -> Option<u16> {
         let saved = self.rng.seed;
         let (start, gs) = (self.ci16(list_at), self.ci16(list_at + 2));
         let map = self.ci16(MAP);
@@ -311,7 +340,7 @@ impl Machine {
     /// (y * 140h + x, 16 bits) of TERRAIN.IMG read, the image's 12-byte
     /// header included, made a terrain (`terrain_of`); for 6 the nearest
     /// other terrain (3DF2).
-    fn city_climate(&mut self, files: &mut Files, x: u16, y: u16, province: u8) -> Option<u8> {
+    pub fn city_climate(&mut self, files: &mut Files, x: u16, y: u16, province: u8) -> Option<u8> {
         self.city_load_province(files, province)?;
         let (gx, gy) = self.city_local_to_global(x, y)?;
         self.mem.w16(DS, WORLD, gx);

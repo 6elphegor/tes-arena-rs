@@ -646,6 +646,52 @@ fn a_movie_takes_keys_and_holds_the_game() {
     assert!(frame_no(&a) > frame0, "the game goes on after it");
 }
 
+#[test]
+fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let start = Start { level: "CITY:0:0", ..Default::default() };
+    let mut a = app(&dir, &start);
+    let mut d = Driver::new(&mut a);
+    // Shift+M opens it on the current province's map (2542:0193).
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    d.key(&mut a, KeyCode::KeyM, Some("M"));
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+    assert!(a.travel.is_some(), "Shift+M opens the travel map");
+    // A click on the map picks the nearest place: the journey's box.
+    d.click(&mut a, 135, 58, MouseButton::Left);
+    let journey = a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>().join("\n");
+    assert!(journey.contains("Shornhelm") && journey.contains("days"), "the journey shown: {journey}");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // The same through the scripted path's calls (`--do travel,tclick`).
+    let mut b = app(&dir, &start);
+    Driver::new(&mut b);
+    let archive = b.assets.archive.clone();
+    let mut t = Some(travel::Travel::open(&mut b.engine, &archive).ok().expect("it opens"));
+    t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
+    same(&a, &b, "the place clicked, and Travel::click");
+    // Travel: the journey made, the screen ended, the area left.
+    d.click(&mut a, 62, 180, MouseButton::Left);
+    assert!(a.travel.is_none(), "the screen ends after the journey");
+    t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
+    travel::after(&mut t, &mut b.engine, &mut Vec::new());
+    assert!(t.is_none());
+    same(&a, &b, "Travel clicked, and Travel::click");
+    // The next turns arrive: the town's welcome reads the arrival.
+    let mut welcome = String::new();
+    for _ in 0..20 {
+        d.frame(&mut a);
+        if let Some(b) = a.boxes.front() {
+            welcome = text(b);
+            break;
+        }
+    }
+    assert!(welcome.contains("You have arrived in The City-State of Shornhelm"), "the welcome: {welcome:?}");
+    let here = String::from_utf8_lossy(a.engine.m.mem.cstr(arena::mem::DS, 0x0A22)).into_owned();
+    assert_eq!(here, "Shornhelm", "the location record");
+}
+
 /// The user's save (ARENA_SAVE), copied to a scratch folder so nothing
 /// can write to it.
 fn save_copy() -> Option<PathBuf> {
