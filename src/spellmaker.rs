@@ -852,6 +852,8 @@ impl Machine {
                 }
                 si
             } else {
+                // AX 3h: the list's kind (1194:5734).
+                self.list_kind = 0x3;
                 let ax = hooks.list(self, TEXT, bp);
                 if (ax as i16) < 0 {
                     return Some(());
@@ -906,6 +908,8 @@ impl Machine {
             }
         }
         self.mem.w8(DS, di, 0);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let mut ax = hooks.list(self, LIST_NAMES, dx - LIST_INDEX);
         if (ax as i16) >= 0 {
             ax = self.sg8(LIST_INDEX.wrapping_add(ax)) as u16;
@@ -926,6 +930,8 @@ impl Machine {
         if list == 0 {
             return;
         }
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, list, cx);
         if (ax as i16) < 0 {
             empty(self);
@@ -942,6 +948,8 @@ impl Machine {
         } else {
             return;
         };
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, s, n);
         let v = (ax as u8) | ((n as u8) << 4);
         self.mem.w8(DS, SUBKINDS.wrapping_add(slot), v);
@@ -1339,6 +1347,8 @@ impl Machine {
         }
         let cx = 5u16.wrapping_sub(dx);
         let si = self.skip_strings_at(TARGET_NAMES, dx);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, si, cx);
         if (ax as i16) < 0 {
             return Some(());
@@ -1353,6 +1363,8 @@ impl Machine {
             return Some(());
         }
         self.mem.w8(DS, 0x568C, 0);
+        // AX 3h: the list's kind (1194:5734).
+        self.list_kind = 0x3;
         let ax = hooks.list(self, ELEMENT_NAMES, 5);
         self.mem.w8(DS, 0x568C, b'N');
         if (ax as i16) < 0 {
