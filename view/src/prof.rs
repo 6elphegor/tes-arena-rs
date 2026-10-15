@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 thread_local! {
     static ON: bool = std::env::var_os("ARENA_PROFILE").is_some();
-    static TIMES: RefCell<BTreeMap<&'static str, (u32, Duration, Duration)>> = RefCell::new(BTreeMap::new());
+    static TIMES: RefCell<BTreeMap<&'static str, (u32, Duration, Duration)>> = const { RefCell::new(BTreeMap::new()) };
 }
 
 /// Whether the timers are on.

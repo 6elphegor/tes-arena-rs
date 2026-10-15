@@ -729,31 +729,31 @@ impl Assets {
     }
 
     fn make(dir: &std::path::Path, engine: &mut Engine) -> Self {
-        let flats = world::flats(&engine.m);
-        let archive = Rc::new(archive::Archive::open(dir));
-        let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
+        let flats = prof::time("assets.flats", || world::flats(&engine.m));
+        let archive = prof::time("assets.archive", || Rc::new(archive::Archive::open(dir)));
+        let sheet = prof::time("assets.sheet", || world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m)));
         interface::enter(&mut engine.m);
         // Outdoors, the sky's images (the sun, the moons, the lightning's
         // bolts, the stars) into the sky's bank, as entering the area does
         // (0000:A4E9 calls 0000:E5C9).
-        if engine.m.sky_images(&mut engine.files).is_none() {
+        if prof::time("assets.sky_images", || engine.m.sky_images(&mut engine.files)).is_none() {
             eprintln!("the sky's images did not load");
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
-        engine.m.area_sky(&mut sky);
+        prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
         Assets {
             palette: world::palette(dir),
             charsheet: world::palette_file(dir, "CHARSHT.COL"),
-            textures: world::textures(&engine.m),
+            textures: prof::time("assets.textures", || world::textures(&engine.m)),
             shading: world::shading(&engine.m),
-            mesh: world::mesh(&engine.m),
+            mesh: prof::time("assets.mesh", || world::mesh(&engine.m)),
             sheet,
             dither: ["DITHER.IMG", "DITHER2.IMG"].iter().flat_map(|n| {
                 let mut d = archive.read(n).unwrap_or_default();
                 d.resize(800, 0);
                 d
             }).collect(),
-            interface: interface::Interface::new(archive.clone()),
+            interface: prof::time("assets.interface", || interface::Interface::new(archive.clone())),
             archive,
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
@@ -782,9 +782,18 @@ impl Assets {
         self.mesh = world::mesh(&engine.m);
     }
 
+    fn scene(&self) -> Scene<'_> {
+        Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither }
+    }
+
     fn renderer(&self, device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Renderer {
-        let scene = Scene { palette: self.palette, textures: &self.textures, shading: &self.shading, mesh: &self.mesh, sprites: &self.sheet, dither: &self.dither };
-        Renderer::new(device, queue, format, &scene)
+        Renderer::new(device, queue, format, &self.scene())
+    }
+
+    /// `r` made over for these assets (its pipelines and, where it can,
+    /// its sprite atlas kept: `Renderer::reload`).
+    fn reload_renderer(&self, r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
+        prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
     /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
@@ -2343,7 +2352,7 @@ impl App {
     fn remake_renderer(&mut self) {
         self.remade += 1;
         if let Some(g) = &mut self.gpu {
-            g.renderer = self.assets.renderer(&g.device, &g.queue, g.config.format);
+            self.assets.reload_renderer(&mut g.renderer, &g.device, &g.queue);
         }
     }
 

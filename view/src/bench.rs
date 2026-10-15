@@ -61,7 +61,7 @@ pub fn run(app: &mut App, turns: usize, setup: &str, started: Instant) {
         }
     }
     if app.remade != remade {
-        renderer = app.assets.renderer(&device, &queue, format);
+        app.assets.reload_renderer(&mut renderer, &device, &queue);
         remade = app.remade;
     }
     println!("setup done ({:.1} ms since start-up)", started.elapsed().as_secs_f64() * 1e3);
@@ -73,7 +73,7 @@ pub fn run(app: &mut App, turns: usize, setup: &str, started: Instant) {
         app.keys.turn_right = (i / 30) % 4 == 3;
         step(app);
         if app.remade != remade {
-            renderer = prof::time("renderer.new", || app.assets.renderer(&device, &queue, format));
+            app.assets.reload_renderer(&mut renderer, &device, &queue);
             remade = app.remade;
         }
         let r = Instant::now();
@@ -94,6 +94,50 @@ pub fn run(app: &mut App, turns: usize, setup: &str, started: Instant) {
         });
     }
     let total = t0.elapsed().as_secs_f64();
+    // The last frame drawn again by this renderer (reloaded at each area's
+    // or level's change) and by a new one: the same picture.
+    let picture = |r: &mut crate::render::Renderer, app: &mut App| -> Vec<u8> {
+        let target = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("check"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = target.create_view(&Default::default());
+        let cam = app.compose();
+        let (sky, lights) = app.assets.drawn(&mut app.engine, aspect);
+        let sprites = app.assets.sprites(&mut app.engine, cam, 0, aspect);
+        r.set_sky(sky);
+        r.set_lights(lights);
+        r.set_window(crate::interface::window(&app.engine.m));
+        r.draw(&device, &queue, &view, w, h, cam, &sprites);
+        overlay.draw(&device, &queue, &view, &app.screen);
+        let buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("readback"),
+            size: (w * h * 4) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let mut enc = device.create_command_encoder(&Default::default());
+        enc.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) } },
+            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        );
+        queue.submit([enc.finish()]);
+        buf.slice(..).map_async(wgpu::MapMode::Read, |_| {});
+        device.poll(wgpu::Maintain::Wait);
+        let mapped = buf.slice(..).get_mapped_range();
+        mapped.to_vec()
+    };
+    let kept = picture(&mut renderer, app);
+    let mut fresh = app.assets.renderer(&device, &queue, format);
+    let made = picture(&mut fresh, app);
+    println!("reloaded renderer draws as a new one: {}", kept == made);
     let v = app.engine.view();
     println!("EMS banks kept: {}", app.engine.m.ems.len());
     println!("{turns} turns in {:.2} s ({:.2} ms a turn and redraw); end at ({:#x}, {:#x}) heading {:#x}", total, total * 1e3 / turns.max(1) as f64, v.x, v.y, v.heading);
