@@ -296,11 +296,11 @@ impl arena::talk::TalkHooks for Front<'_> {
     }
     /// 1194:D593: the quest's person speaks (`questui::QuestFront`).
     fn quest_person(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
-        m.quest_person_talk(files, &mut questui::QuestFront(self))
+        m.quest_person_talk(files, &mut questui::QuestFront(self, files.clone()))
     }
     /// 1194:8F1E (from DCE1): the palace's quests.
     fn palace(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
-        m.quests_talk(files, &mut questui::QuestFront(self))
+        m.quests_talk(files, &mut questui::QuestFront(self, files.clone()))
     }
     /// A shop entered: its questions through `dialog` (`shopui`).
     fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
@@ -1366,8 +1366,17 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 // view/examples/town_quests.rs does), then the tavern.
                 use arena::mem::DS;
                 use arena::sidequest::var::{TALK, TALKER};
+                let offered = |m: &arena::machine::Machine| (0..4u16).map(|i| arena::quest::var::OTHERS + i * 0x29).find(|&si| m.quest_kind(si) == 2);
+                if offered(&engine.m).is_none() {
+                    // A town the view starts in hasn't had its quests made
+                    // (that is the area's entry, 0000:46B2): made here.
+                    engine.m.mem.w16(DS, arena::sidequest::var::PLACE_SEEN, 0xFFFF);
+                    if engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
+                        eprintln!("the town's quests met something not ported");
+                    }
+                }
                 let m = &mut engine.m;
-                let giver = (0..4u16).map(|i| arena::quest::var::OTHERS + i * 0x29).find(|&si| m.quest_kind(si) == 2);
+                let giver = offered(m);
                 match giver {
                     Some(si) => {
                         let g = m.mem.r16(DS, si + 0x10);
@@ -1375,6 +1384,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                         m.mem.w16(DS, TALKER, g & 0xFF00 | ((g as u8 as u16) << 1) & 0xFF);
                         st.shop = Some(4);
                         shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+                        let state = ["free", "under way", "offered", "failed"][engine.m.quest_kind(si) as usize & 3];
+                        println!("quest: errand {} {state}", (si - arena::quest::var::OTHERS) / 0x29);
                     }
                     None => println!("no errand offered"),
                 }

@@ -162,7 +162,7 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     }
     /// 1194:8F1E on entering: the quests ended or offered.
     fn quests(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quests_talk(files, &mut QuestFront(&mut *self.front))
+        m.quests_talk(files, &mut QuestFront(&mut *self.front, files.clone()))
     }
     fn expand(&mut self, m: &mut Machine, di: u16) -> u16 {
         if let Some(end) = m.expand(&mut self.files, &mut arena::text::NoTextHooks, DS, di) {
@@ -333,14 +333,14 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     /// 1194:CED7: the main quest's informant.
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quest_informant(files, &mut QuestFront(&mut *self.front)).map(|_| ())
+        m.quest_informant(files, &mut QuestFront(&mut *self.front, files.clone())).map(|_| ())
     }
     /// 1194:8F1E: the quests the talk ends or offers.
     fn quests_talk(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quests_talk(files, &mut QuestFront(&mut *self.front))
+        m.quests_talk(files, &mut QuestFront(&mut *self.front, files.clone()))
     }
     /// 1194:90B9: another queued quest's text taken.
     fn tavern_quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quests_take(files, &mut QuestFront(&mut *self.front))
+        m.quests_take(files, &mut QuestFront(&mut *self.front, files.clone()))
     }
 }

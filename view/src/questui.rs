@@ -24,6 +24,9 @@ use arena::quest::QuestHooks;
 /// The haggle's offer prompt (DGROUP 65CA, 1194:80F7).
 const OFFER_PROMPT: u16 = 0x65CA;
 
+/// The characters to a line a haggle's line is wrapped at.
+const WRAP: usize = 44;
+
 fn line(s: &str) -> Vec<Span> {
     vec![Span { colour: 0x0F, text: s.to_string() }]
 }
@@ -83,7 +86,23 @@ impl HaggleIo for HaggleTalk<'_> {
         Some(())
     }
     fn say(&mut self, m: &mut Machine, si: u16, kind: u8) {
-        self.said = hud::lines(m.mem.cstr(DS, si), 0x0F);
+        // The original made its line breaks spaces (1194:84C3) and 49FF
+        // wraps it; here it is wrapped at spaces to fit the screen.
+        let text = String::from_utf8_lossy(m.mem.cstr(DS, si)).into_owned();
+        let mut wrapped = String::new();
+        let mut col = 0;
+        for word in text.split(' ').filter(|w| !w.is_empty()) {
+            if col > 0 && col + 1 + word.len() > WRAP {
+                wrapped.push('\r');
+                col = 0;
+            } else if col > 0 {
+                wrapped.push(' ');
+                col += 1;
+            }
+            wrapped.push_str(word);
+            col += word.len();
+        }
+        self.said = hud::lines(wrapped.as_bytes(), 0x0F);
         self.kind = kind;
         let p = String::from_utf8_lossy(m.mem.cstr(DS, OFFER_PROMPT)).trim().to_string();
         if !p.is_empty() {
@@ -92,18 +111,39 @@ impl HaggleIo for HaggleTalk<'_> {
     }
 }
 
-/// The quests' hooks for the view.
-pub(crate) struct QuestFront<'a, 'b>(pub(crate) &'a mut Front<'b>);
+/// The quests' hooks for the view. `files` is a copy the hooks without
+/// files use (the texts written or shown, their substitutions).
+pub(crate) struct QuestFront<'a, 'b>(pub(crate) &'a mut Front<'b>, pub(crate) Files);
 
 impl QuestHooks for QuestFront<'_, '_> {
     fn text_at(&mut self, m: &mut Machine, files: &mut Files, mode: u16, di: u16) -> Option<u16> {
         m.text(files, &mut *self.0, mode, DS, di).map(|(ax, _)| ax)
     }
+    /// 1194:A374 with AX 2: text number TEXT written to the buffer at 1044.
+    fn text(&mut self, m: &mut Machine) {
+        if m.text(&mut self.1, &mut *self.0, 2, DS, 0x1044).is_none() {
+            // A substitution the text port doesn't make (as some of %cn's):
+            // nothing written, and its box (`message_box`) left out.
+            m.mem.w8(DS, 0x1044, 0);
+        }
+    }
+    /// 1194:A374 with AX 0: text number TEXT shown.
+    fn text_shown(&mut self, m: &mut Machine) {
+        let _ = m.text(&mut self.1, &mut *self.0, 0, DS, 0x1044);
+    }
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made.
+    fn expand(&mut self, m: &mut Machine, di: u16) {
+        let _ = m.expand(&mut self.1, &mut *self.0, DS, di);
+    }
     fn substitute(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
         m.expand(files, &mut *self.0, DS, di).map(|_| ())
     }
+    /// 1194:59CC; a box without text (a text the port couldn't make) is
+    /// left out.
     fn message_box(&mut self, m: &mut Machine, si: u16) {
-        self.0.message_box(m, si);
+        if m.mem.r8(DS, si) != 0 {
+            self.0.message_box(m, si);
+        }
     }
     fn notice(&mut self, m: &mut Machine, si: u16) {
         self.0.message_box(m, si);
