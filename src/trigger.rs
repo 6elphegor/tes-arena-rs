@@ -76,7 +76,9 @@ pub trait TriggerHooks {
     /// 1194:59C8: the text at DGROUP `text` in a message box.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 23BA:002A: sound `sound` at the place `at`.
-    fn sound(&mut self, _m: &mut Machine, _sound: u16, _at: u16) {}
+    fn sound(&mut self, m: &mut Machine, sound: u16, at: u16) {
+        let _ = m.sound_at(sound, at);
+    }
     /// 0000:3EBE: the guards are called (`Machine::call_guards`).
     fn guards(&mut self, m: &mut Machine) {
         m.call_guards();

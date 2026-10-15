@@ -44,7 +44,29 @@
 //!   list (1194:FC02, F426, F6EC: its own price from the tables at
 //!   22D4/24F4, sorted in, 1194:F37B), and it leaves the inventory
 //!   (1194:788D).
-//! - Repair (1194:C6AC): `StoreHooks::repair`, not ported.
+//! - Repair (1194:C6AC, `store_repair`): the repairs, five records of
+//!   24 bytes at REPAIRS (+0 taken, +1 the dword minute it is ready, +5
+//!   the item, 13h bytes). With one on file, newold.img: "Which job do
+//!   you wish to inspect?" (a yes or no: 0 a new one, 2 leave). An old
+//!   one picked from their names' list (1194:CA02): not ready, the time
+//!   left told (1194:C8FB: days at a day or more, hours past 6 hours,
+//!   else "any minute"; texts 58Ch, 58Dh, 58Bh); ready, "Your %s is
+//!   ready.", its condition made whole (its maximum, +8, into +6; for an
+//!   item of category 2 and kind 0, +6's low byte into +3), or a quest
+//!   piece made again (2686:06E1: 1194:D316, D1F1); taken if not too
+//!   heavy (4D99, below type 8Dh) into the first free slot (copied, from
+//!   ITEM for a quest piece, unequipped), its record removed (1194:C9CC)
+//!   and the items sorted. A new one: with a record free ("Sorry, I
+//!   already have my hands full..." else), an item picked (1194:FE0E);
+//!   one already whole "does not need any repairing" (CA7F); else priced
+//!   (1194:C83B, its +0Ah price: a tenth in gold for 10 days, or 1 gold
+//!   for price days under 10; text 590h with %a the gold, %t the days and
+//!   %i its name, 1194:CCFD) and agreed (yes: paid, 1194:CAF6, ready
+//!   days * 5A0h minutes on, a 16-bit product), or a menu of three: the
+//!   gold typed (CB40: the days the price over it), the days typed (CBD3:
+//!   the gold the price over them), or no (CC77); filed (CA68) and the
+//!   item taken out of the inventory (the weapon class made again when
+//!   it was equipped), the items sorted.
 //! - Steal (1194:FCC6): with a free slot, the lockpicking roll against
 //!   the shop's level (1194:53F9); done, a random record of the weapons
 //!   or the armour (0000:6EEA) is made an item, named ("You successfully
@@ -57,8 +79,9 @@
 //! generator makes them return at once: 0000:8FC4, 77EC, 9466, 541E,
 //! 9AE6, 9AF8, 1194:5496, 54B3, 4B60, 5F8C, 545C, 5FC0, 5E21), as are the
 //! menus, lists, dialogs and messages (`ShopHooks`) and the greeting,
-//! the message boxes, the haggle, the lists' lines and the repairs
-//! (`StoreHooks`). The files are the port's (`Files`: kept in memory).
+//! the message boxes, the haggle, the lists' lines, the repairs'
+//! pictures and texts (`StoreHooks`). The files are the port's
+//! (`Files`: kept in memory).
 //! Assumed: on entering AX and DI are 0 (the bank put back on leaving and
 //! where 1194:FDDD's fill starts are what the caller left there); EMS is
 //! off or the frame's bank is the store's (0000:5C86 then changes
@@ -93,9 +116,18 @@ pub trait StoreHooks: ShopHooks {
     fn weapon_lines(&mut self, _m: &mut Machine) {}
     /// 1194:F204: the armour's lines for the list (at frame:2710).
     fn armor_lines(&mut self, _m: &mut Machine) {}
-    /// 1194:C6AC: the repairs. The carry (the store left).
-    fn repair(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
-        false
+    /// 1194:C6AC in a generator that stubs it: Some(the carry) takes the
+    /// repairs' place; None (the default) runs them (`store_repair`).
+    fn repair_instead(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
+        None
+    }
+    /// 1194:4B8E: the picture named at DS:`si` shown (the repairs'
+    /// newold.img and yesno.img).
+    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:A374 with AX 2: the text numbered at 137A written to DS:`di`
+    /// (no substitutions, 101C FFh): the text port (`Machine::text`).
+    fn text(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
+        m.text(files, &mut crate::text::NoTextHooks, 2, DS, di).map(|_| ())
     }
 }
 
@@ -206,7 +238,10 @@ impl Machine {
                 let cf = match self.mem.r16(DS, ROUTINES.wrapping_add(pick.wrapping_add(pick))) {
                     0xF7A1 => self.store_buy(files, hooks)?,
                     0xF5DB => self.store_sell(files, hooks)?,
-                    0xC6AC => hooks.repair(self, files),
+                    0xC6AC => match hooks.repair_instead(self, files) {
+                        Some(cf) => cf,
+                        None => self.store_repair(files, hooks)?,
+                    },
                     0xFCC6 => self.store_steal(hooks)?,
                     _ => return None,
                 };
@@ -623,7 +658,9 @@ impl Machine {
             hooks.message(self, text::INVENTORY_EMPTY);
             return Some(None);
         }
-        let pick = hooks.list(self, SELL_LIST, n, 0);
+        // DI: where 1194:FBE9 left it, past the last name.
+        let di = self.mem.r16(DS, SELL_NEXT);
+        let pick = hooks.list(self, SELL_LIST, n, di);
         if (pick as i16) < 0 {
             return Some(None);
         }
@@ -765,5 +802,541 @@ impl Machine {
         }
         self.sort_inventory();
         Some(false)
+    }
+}
+
+/// The repairs' variables (DGROUP).
+pub mod repair {
+    /// The gold asked and the days (words), the price as first priced
+    /// (dword), the state of the asking (FFh: done), where the next name
+    /// goes in the list, the number typed.
+    pub const COST: u16 = 0x785F;
+    pub const DAYS: u16 = 0x785D;
+    pub const ASKED: u16 = 0x7861;
+    pub const STATE: u16 = 0x7867;
+    pub const NEXT: u16 = 0x7868;
+    pub const TYPED: u16 = 0x76DE;
+    /// The text's number, its wrap width, no substitutions (FFh), the
+    /// dialog's kind.
+    pub const TEXT: u16 = 0x137A;
+    pub const WIDTH: u16 = 0x137E;
+    pub const NO_EXPAND: u16 = 0x101C;
+    pub const DIALOG: u16 = 0x13D3;
+    /// The formatted texts.
+    pub const SAID: u16 = 0x1116;
+    pub const READY_TEXT: u16 = 0x93CA;
+    /// Texts: the question, "Your %s is ready.", "...does not need any
+    /// repairing.", "...my hands full...", the pictures, the three
+    /// reasons (a list of strings).
+    pub const WHICH: u16 = 0x780A;
+    pub const READY: u16 = 0x782C;
+    pub const WHOLE: u16 = 0x77AD;
+    pub const FULL: u16 = 0x77D2;
+    pub const NEW_OLD: u16 = 0x1346;
+    pub const YES_NO: u16 = 0x132F;
+    pub const REASONS: u16 = 0x7761;
+}
+
+impl Machine {
+    /// 1194:C6AC. The repairs (see the module's notes). The carry (never
+    /// set). None where the original faults or reads on through memory,
+    /// or a text or an item's name can't be made.
+    pub fn store_repair(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<bool> {
+        use repair::*;
+        if self.store_repairs() {
+            hooks.picture(self, NEW_OLD);
+            self.mem.w8(DS, WIDTH, 3);
+            self.split_lines(WHICH);
+            self.mem.w8(DS, DIALOG, 1);
+            let ax = hooks.dialog_at(self, 1, WHICH, 0);
+            if ax == 2 {
+                return Some(false);
+            }
+            if ax != 0 {
+                if let Some(pick) = self.repair_list(hooks)? {
+                    if (pick as i16) < 0 {
+                        return Some(false);
+                    }
+                    return self.repair_collect(files, hooks, pick);
+                }
+            }
+        }
+        self.repair_new(files, hooks)
+    }
+
+    /// 1194:CA02. The jobs' names (each record's item, 1194:7388) one
+    /// after another from 1044, up to the first record not taken, listed
+    /// (1194:5730): the pick, or None (the carry) when the first isn't
+    /// taken.
+    fn repair_list(&mut self, hooks: &mut dyn StoreHooks) -> Option<Option<u16>> {
+        use repair::*;
+        self.mem.w16(DS, NEXT, SCRATCH);
+        let mut bx = 0u16;
+        for i in 0..5u16 {
+            let si = REPAIRS + i * 0x18;
+            if self.mem.r8(DS, si) == 0 {
+                if bx == 0 {
+                    return Some(None);
+                }
+                break;
+            }
+            bx += 1;
+            let name = self.any_item_name(si + 5)?;
+            let di = self.mem.r16(DS, NEXT);
+            let di = self.store_strcpy(name, di);
+            self.mem.w16(DS, NEXT, di);
+        }
+        let di = self.mem.r16(DS, NEXT);
+        Some(Some(hooks.list(self, SCRATCH, bx, di)))
+    }
+
+    /// 1194:C6E7..C7AF. Job `pick` (PICK) collected: told the time left
+    /// when it isn't ready, else made whole and taken.
+    fn repair_collect(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, pick: u16) -> Option<bool> {
+        use repair::*;
+        self.mem.w8(DS, PICK, pick as u8);
+        let si = REPAIRS.wrapping_add((pick & 0xFF).wrapping_mul(0x18));
+        let at = self.mem.r32(DS, si.wrapping_add(1));
+        if at > self.mem.r32(DS, TIME) {
+            self.repair_not_ready(files, hooks, si, at)?;
+            return Some(false);
+        }
+        let it = si.wrapping_add(5);
+        if self.mem.r8(DS, it) & 0x80 != 0 {
+            // 2686:06E1: a quest piece made again at ITEM.
+            let kept = self.mem.r8(DS, PICK);
+            let step = self.quest_step_of(self.mem.r8(DS, it));
+            self.quest_artifact(step)?;
+            self.mem.w8(DS, PICK, kept);
+        } else if self.item_category(DS, it) == 2 && self.armor_kind(DS, it) == 0 {
+            let v = self.mem.r8(DS, it.wrapping_add(6));
+            self.mem.w8(DS, it.wrapping_add(3), v);
+        } else {
+            let v = self.mem.r16(DS, it.wrapping_add(8));
+            self.mem.w16(DS, it.wrapping_add(6), v);
+        }
+        let name = self.any_item_name(it)?;
+        self.store_strcpy(name, NAME);
+        self.sprintf((DS, READY_TEXT), (DS, READY), &[Arg::Str(DS, NAME)]);
+        hooks.message(self, READY_TEXT);
+        if self.mem.r8(DS, it) < 0x8D {
+            let w = self.mem.r16(DS, it.wrapping_add(1));
+            if self.carry_check(&mut Heavy(hooks), w)? {
+                return Some(false);
+            }
+        }
+        let Ok((slot, _)) = self.free_slot(DS, PLAYER) else {
+            hooks.message(self, text::INVENTORY_FULL);
+            return Some(false);
+        };
+        let f = self.mem.r8(DS, slot.wrapping_add(0x0E)) | 0x40;
+        self.mem.w8(DS, slot.wrapping_add(0x0E), f);
+        let f = self.mem.r8(DS, it.wrapping_add(0x0E));
+        if f & 0x80 != 0 {
+            self.mem.w8(DS, it.wrapping_add(0x0E), f & 0x7F);
+        }
+        // 2686:06F9: a quest piece from ITEM.
+        let from = if self.mem.r8(DS, it) & 0x80 != 0 { ITEM } else { it };
+        self.memmove(DS, from, DS, slot, 0x13);
+        self.repair_remove();
+        self.sort_inventory();
+        hooks.picture(self, YES_NO);
+        Some(false)
+    }
+
+    /// 1194:C8FB. How long the job at `si` (ready at minute `at`) still
+    /// takes: a day or more, its days (text 58Ch); more than 168h minutes,
+    /// its hours (58Dh); else "any minute" (58Bh, the minutes passed on
+    /// unused). Its item's name (1194:C971, through ITEM) and the number
+    /// formatted into the text (C992), shown as a box.
+    fn repair_not_ready(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, si: u16, at: u32) -> Option<()> {
+        use repair::*;
+        let left = at.wrapping_sub(self.mem.r32(DS, TIME));
+        let (number, n) = if left >= 0x5A0 {
+            (0x58C, left / 0x5A0)
+        } else if left > 0x168 {
+            (0x58D, left / 0x3C)
+        } else {
+            (0x58B, left)
+        };
+        self.mem.w16(DS, TEXT, number);
+        self.repair_text(files, hooks)?;
+        // 1194:C971.
+        self.memmove(DS, si.wrapping_add(5), DS, ITEM, 0x13);
+        let name = self.any_item_name(ITEM)?;
+        self.store_strcpy(name, NAME);
+        // 1194:C992.
+        self.sprintf((DS, READY_TEXT), (DS, SCRATCH), &[Arg::Str(DS, NAME), Arg::Int(n as u16)]);
+        self.repair_spaces(READY_TEXT);
+        self.mem.w8(DS, WIDTH, 0);
+        self.repair_wrap(READY_TEXT)?;
+        self.mem.w8(DS, WIDTH, 3);
+        self.split_lines(READY_TEXT);
+        self.mem.w8(DS, DIALOG, 0);
+        hooks.dialog_at(self, 0, READY_TEXT, 0);
+        Some(())
+    }
+
+    /// 1194:CC61. The text numbered at TEXT written to 1044 (no
+    /// substitutions, no wrap).
+    fn repair_text(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<()> {
+        use repair::*;
+        self.mem.w8(DS, WIDTH, 0);
+        self.mem.w8(DS, NO_EXPAND, 0xFF);
+        hooks.text(self, files, SCRATCH)
+    }
+
+    /// Line feeds and carriage returns at DS:`si` made spaces (C9A5,
+    /// CD62).
+    fn repair_spaces(&mut self, mut si: u16) {
+        loop {
+            match self.mem.r8(DS, si) {
+                0 => return,
+                0x0A | 0x0D => self.mem.w8(DS, si, 0x20),
+                _ => {}
+            }
+            si = si.wrapping_add(1);
+        }
+    }
+
+    /// 1194:49FF. The text at `si` wrapped at WIDTH characters (3Ch when
+    /// 0): a line's last space before the width made a line feed. None
+    /// where none is found going back (the original reads on through
+    /// memory).
+    fn repair_wrap(&mut self, si: u16) -> Option<()> {
+        use repair::*;
+        let mut ax = 0u16;
+        while self.mem.r8(DS, si.wrapping_add(ax)) != 0 {
+            ax = ax.wrapping_add(1);
+        }
+        let mut si = si;
+        loop {
+            if self.mem.r8(DS, WIDTH) == 0 {
+                self.mem.w8(DS, WIDTH, 0x3C);
+            }
+            let bx = self.mem.r8(DS, WIDTH) as u16;
+            if ax <= bx {
+                return Some(());
+            }
+            si = si.wrapping_add(bx);
+            ax = ax.wrapping_sub(bx);
+            let mut steps = 0u32;
+            loop {
+                match self.mem.r8(DS, si) {
+                    0 => return Some(()),
+                    0x20 => {
+                        self.mem.w8(DS, si, 0x0A);
+                        si = si.wrapping_add(1);
+                        break;
+                    }
+                    _ => {
+                        si = si.wrapping_sub(1);
+                        ax = ax.wrapping_add(1);
+                        steps += 1;
+                        if steps > 0x10000 {
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// 1194:C9CC. Job PICK's record removed: those after it moved down
+    /// one, the last cleared.
+    fn repair_remove(&mut self) {
+        let pick = self.mem.r8(DS, PICK) as u16;
+        let mut si = REPAIRS.wrapping_add(pick * 0x18);
+        let mut di = si;
+        let n = 4u16.wrapping_sub(pick);
+        if n != 0 {
+            si = si.wrapping_add(0x18);
+            for _ in 0..n {
+                (si, di) = self.memmove(DS, si, DS, di, 0x18);
+            }
+        }
+        for i in 0..0x18u16 {
+            self.mem.w8(DS, di.wrapping_add(i), 0);
+        }
+    }
+
+    /// 1194:C7B2. A new job: a record free, an item picked (1194:FE0E),
+    /// not already whole (CA7F), priced and agreed (1194:C83B), filed
+    /// (CA68) and taken out of the inventory.
+    fn repair_new(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<bool> {
+        use repair::*;
+        if self.repair_free().is_none() {
+            hooks.message(self, FULL);
+            return Some(false);
+        }
+        let Some(si) = self.store_pick_item(hooks)? else {
+            return Some(false);
+        };
+        let whole = if self.item_category(DS, si) == 2 && self.armor_kind(DS, si) == 0 {
+            self.mem.r8(DS, si.wrapping_add(3)) == self.mem.r8(DS, si.wrapping_add(8))
+        } else {
+            self.mem.r16(DS, si.wrapping_add(6)) == self.mem.r16(DS, si.wrapping_add(8))
+        };
+        if whole {
+            // 1194:CA7F.
+            let name = self.any_item_name(si)?;
+            self.store_strcpy(name, NAME);
+            self.sprintf((DS, SCRATCH), (DS, WHOLE), &[Arg::Str(DS, NAME)]);
+            hooks.message(self, SCRATCH);
+            return Some(false);
+        }
+        let Some(di) = self.repair_free() else {
+            hooks.message(self, FULL);
+            return Some(false);
+        };
+        let eax = self.mem.r32(DS, si.wrapping_add(0x0A));
+        let Some(at) = self.repair_offer(files, hooks, si, eax)? else {
+            return Some(false);
+        };
+        // 1194:CA68.
+        self.mem.w8(DS, di, 1);
+        self.mem.w32(DS, di.wrapping_add(1), at);
+        self.memmove(DS, si, DS, di.wrapping_add(5), 0x13);
+        let pick = self.mem.r8(DS, PICK) as u16;
+        let equipped = self.mem.r8(DS, si.wrapping_add(0x0E)) & 0x80 != 0;
+        self.remove_item(DS, si, pick);
+        if equipped {
+            self.player_weapon_class();
+        }
+        self.sort_inventory();
+        Some(false)
+    }
+
+    /// 1194:CA53. The first record not taken, or None (the carry).
+    fn repair_free(&self) -> Option<u16> {
+        (0..5u16).map(|i| REPAIRS + i * 0x18).find(|&di| self.mem.r8(DS, di) == 0)
+    }
+
+    /// 1194:C83B. The job on the item at `si`, priced `eax`: offered
+    /// (text 590h) and, refused, asked again from the three reasons
+    /// (REASONS: 1194:CB40, CBD3, CC77) until agreed or left. The minute
+    /// it will be ready (1194:CAF6, paid), or None (left, or not enough
+    /// gold).
+    fn repair_offer(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, si: u16, eax: u32) -> Option<Option<u32>> {
+        use repair::*;
+        self.mem.w32(DS, PRICE, eax);
+        self.mem.w32(DS, ASKED, eax);
+        let name = self.any_item_name(si)?;
+        self.store_strcpy(name, NAME);
+        self.mem.w16(DS, NAME_AT, NAME);
+        // 1194:CAB8.
+        let p = self.mem.r32(DS, PRICE);
+        if p >= 10 {
+            let q = p / 10;
+            self.mem.w16(DS, COST, q as u16);
+            self.mem.w16(DS, DAYS, 10);
+            self.mem.w32(DS, PRICE, q.wrapping_mul(10));
+        } else {
+            self.mem.w16(DS, COST, 1);
+            self.mem.w16(DS, DAYS, p as u16);
+        }
+        self.repair_ask_text(files, hooks, 0)?;
+        self.repair_format()?;
+        match self.repair_yes_no(hooks) {
+            0 => return self.repair_pay(files, hooks),
+            2 => return Some(None),
+            _ => {}
+        }
+        loop {
+            self.mem.w8(DS, STATE, 0);
+            // 1194:CC94 (its font, 0000:9AE6, the screen's).
+            let ax = hooks.list(self, REASONS, 3, REASONS);
+            if (ax as i16) < 0 {
+                return Some(None);
+            }
+            let cf = match self.mem.r16(DS, 0x775Bu16.wrapping_add(ax.wrapping_add(ax))) {
+                0xCB40 => self.repair_reason(files, hooks, false)?,
+                0xCBD3 => self.repair_reason(files, hooks, true)?,
+                0xCC77 => {
+                    self.repair_ask_text(files, hooks, 4)?;
+                    self.mem.w8(DS, WIDTH, 3);
+                    self.split_lines(SCRATCH);
+                    self.mem.w8(DS, DIALOG, 0);
+                    hooks.dialog_at(self, 0, SCRATCH, 0);
+                    self.mem.w8(DS, STATE, 0xFF);
+                    false
+                }
+                _ => return None,
+            };
+            if cf {
+                continue;
+            }
+            if self.mem.r8(DS, STATE) == 0xFF {
+                return Some(None);
+            }
+            return self.repair_pay(files, hooks);
+        }
+    }
+
+    /// 1194:CB40 (`days` false: the gold typed, text 58Ah, then 592h) and
+    /// CBD3 (true: the days, 589h, then 591h): the number typed until it is
+    /// one (nothing typed, or 0, leaves: STATE FFh); the other from the
+    /// first price over it (1 when that is 0 in 16 bits); offered again.
+    /// The carry: refused (asked again).
+    fn repair_reason(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, days: bool) -> Option<bool> {
+        use repair::*;
+        self.mem.w32(DS, TYPED, 0);
+        loop {
+            self.mem.w16(DS, TEXT, if days { 0x589 } else { 0x58A });
+            self.repair_text(files, hooks)?;
+            self.mem.w8(DS, WIDTH, 3);
+            self.split_lines(SCRATCH);
+            self.mem.w8(DS, DIALOG, 2);
+            hooks.dialog_at(self, 2, SCRATCH, TYPED);
+            if self.mem.r8(DS, TYPED) == 0 {
+                self.mem.w8(DS, STATE, 0xFF);
+                return Some(false);
+            }
+            if !self.not_number(TYPED) {
+                break;
+            }
+        }
+        let ax = self.parse_number(TYPED);
+        if ax == 0 {
+            self.mem.w8(DS, STATE, 0xFF);
+            return Some(false);
+        }
+        let (set, other) = if days { (DAYS, COST) } else { (COST, DAYS) };
+        self.mem.w16(DS, set, ax);
+        let q = (self.mem.r32(DS, ASKED) / ax as u32) as u16;
+        self.mem.w16(DS, other, if q != 0 { q } else { 1 });
+        self.repair_ask_text(files, hooks, if days { 1 } else { 2 })?;
+        self.repair_format()?;
+        match self.repair_yes_no(hooks) {
+            0 => {
+                self.mem.w8(DS, STATE, 0);
+                Some(false)
+            }
+            2 => {
+                self.mem.w8(DS, STATE, 0xFF);
+                Some(false)
+            }
+            _ => {
+                if !days {
+                    self.mem.w8(DS, STATE, 0);
+                }
+                Some(true)
+            }
+        }
+    }
+
+    /// 1194:CAF6. Agreed: text 593h shown; the gold paid (COST) and the
+    /// minute it will be ready, DAYS * 5A0h (in 16 bits) on from now; or
+    /// "You don't have enough money." (None). STATE FFh either way.
+    fn repair_pay(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<Option<u32>> {
+        use repair::*;
+        self.repair_ask_text(files, hooks, 3)?;
+        hooks.message(self, SCRATCH);
+        self.mem.w8(DS, DIALOG, 0);
+        let cost = self.mem.r16(DS, COST) as u32;
+        let at = if self.mem.r32(DS, GOLD) < cost {
+            hooks.message(self, text::NOT_ENOUGH);
+            None
+        } else {
+            let gold = self.mem.r32(DS, GOLD) - cost;
+            self.mem.w32(DS, GOLD, gold);
+            let ax = self.mem.r16(DS, DAYS).wrapping_mul(0x5A0);
+            Some((ax as u32).wrapping_add(self.mem.r32(DS, TIME)))
+        };
+        self.mem.w8(DS, STATE, 0xFF);
+        Some(at)
+    }
+
+    /// 1194:CAA7. Text 590h + `cx` written to 1044 (CC61).
+    fn repair_ask_text(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, cx: u16) -> Option<()> {
+        self.mem.w16(DS, repair::TEXT, 0x590 + cx);
+        self.repair_text(files, hooks)
+    }
+
+    /// 1194:CCFD. The text at 1044 formatted into SAID: going back from
+    /// its end to a NUL (past its start while the bytes before it aren't
+    /// one), each "%a" made "%u" with the gold, "%t" "%u" with the days,
+    /// "%i" "%s" with the item's name (NAME_AT); the line breaks made
+    /// spaces and the text wrapped at 3Ch (49FF). The original saves SP at
+    /// 7865 meanwhile, left out. None where no NUL comes going back.
+    fn repair_format(&mut self) -> Option<()> {
+        use repair::*;
+        let mut si = SCRATCH;
+        while self.mem.r8(DS, si) != 0 {
+            si = si.wrapping_add(1);
+        }
+        si = si.wrapping_sub(1);
+        let mut pushed = Vec::new();
+        let mut steps = 0u32;
+        loop {
+            let c = self.mem.r8(DS, si);
+            if c == 0 {
+                break;
+            }
+            if c == b'%' {
+                let next = si.wrapping_add(1);
+                match self.mem.r8(DS, next) {
+                    b'a' => {
+                        self.mem.w8(DS, next, b'u');
+                        pushed.push(Arg::Int(self.mem.r16(DS, COST)));
+                    }
+                    b't' => {
+                        self.mem.w8(DS, next, b'u');
+                        pushed.push(Arg::Int(self.mem.r16(DS, DAYS)));
+                    }
+                    b'i' => {
+                        self.mem.w8(DS, next, b's');
+                        pushed.push(Arg::Str(DS, self.mem.r16(DS, NAME_AT)));
+                    }
+                    _ => {}
+                }
+            }
+            si = si.wrapping_sub(1);
+            steps += 1;
+            if steps > 0x10000 {
+                return None;
+            }
+        }
+        // The last pushed is the first argument.
+        pushed.reverse();
+        self.sprintf((DS, SAID), (DS, SCRATCH), &pushed);
+        self.repair_spaces(SAID);
+        self.mem.w8(DS, WIDTH, 0);
+        self.repair_wrap(SAID)
+    }
+
+    /// 1194:CCA9. SAID asked as a yes or no (yesno.img, colour 60h): its
+    /// AX (0 yes, 2 leave).
+    fn repair_yes_no(&mut self, hooks: &mut dyn StoreHooks) -> u16 {
+        use repair::*;
+        hooks.picture(self, YES_NO);
+        self.mem.w8(DS, COLOUR, 0x60);
+        self.mem.w8(DS, WIDTH, 3);
+        self.split_lines(SAID);
+        self.mem.w8(DS, DIALOG, 1);
+        hooks.dialog_at(self, 1, SAID, 0)
+    }
+
+    /// The store's weapons (`weapons`) or armour for a front end's list:
+    /// each record's name as Buy names it (1194:F768, through TEMPLATE and
+    /// NAME) and its price as Buy asks it (on the shop's holiday, 1194:
+    /// 4A6B). The original's lines (1194:F142, F204: the name, the hands,
+    /// the weight and the price, in the EMS frame) aren't ported.
+    pub fn store_list(&mut self, weapons: bool) -> Vec<(String, u32)> {
+        let (list, count, service) = if weapons { (WEAPON_LIST, WEAPONS, 2) } else { (ARMOR_LIST, ARMOR, 3) };
+        let n = self.mem.r8(DS, count) as u16;
+        let frame = self.mem.r16(DS, FRAME);
+        let mut out = Vec::new();
+        for i in 0..n {
+            self.memmove(frame, list.wrapping_add(i * 13), DS, TEMPLATE, 13);
+            let price = self.mem.r32(DS, TEMPLATE + t::PRICE);
+            let price = if self.mem.r8(DS, HOLIDAY) == 1 { self.holiday_price(price, service) } else { price };
+            let name = match self.store_template_name() {
+                Some(()) => String::from_utf8_lossy(self.mem.cstr(DS, NAME)).into_owned(),
+                None => String::from("?"),
+            };
+            out.push((name, price));
+        }
+        out
     }
 }

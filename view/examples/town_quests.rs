@@ -66,8 +66,8 @@ fn main() {
         println!("the town's quests met something not ported");
         return;
     }
-    let (t, te, s) = counts(m);
-    println!("taverns {t}, temples {te}, stores {s}");
+    let (t, s, te) = counts(m);
+    println!("taverns {t}, equipment stores {s}, temples {te}");
     records(m);
     let Some(si) = (0..4u16).map(|i| OTHERS + i * 0x29).find(|&si| m.quest_kind(si) == 2) else {
         println!("no errand offered");

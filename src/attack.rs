@@ -51,6 +51,8 @@ impl Machine {
         let gear = Gear { armor, ..Gear::default() };
         let (hit, _) = self.roll_to_hit(att, def, location, &gear)?;
         if hit {
+            // 2AA1:00F7: a blow landing sounds 0Ah.
+            self.sound_here(0xA)?;
             self.blow(att, location)?;
         }
         // 2AA1:0166: unsigned, so a negative HP never counts as low.

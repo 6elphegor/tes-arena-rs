@@ -883,6 +883,10 @@ impl Machine {
             tick()?;
             let c = self.mem.r8(es, *di);
             if *di >= end || c == b'@' {
+                // The files 23BA:0217 (at SOUND_HOOK) would load into the
+                // sound slots, in order: the sound driver's, kept for the
+                // front end (`Machine::sound_names`).
+                self.sound_names = self.sound_list();
                 if self.hook_set(SOUND_HOOK) {
                     return None;
                 }
@@ -901,6 +905,19 @@ impl Machine {
             self.mem.w8(DS, SOUNDS + n as u16, k);
         }
         None
+    }
+
+    /// The names in the list at LIST, COUNT of them, each after the last's
+    /// NUL.
+    fn sound_list(&self) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        let mut at = LIST;
+        for _ in 0..self.mem.r8(DS, COUNT) {
+            let name = self.mem.cstr(DS, at).to_vec();
+            at = at.wrapping_add(name.len() as u16 + 1);
+            out.push(name);
+        }
+        out
     }
 
     /// 0000:F2EA. A sound line: its name into the list; returns its

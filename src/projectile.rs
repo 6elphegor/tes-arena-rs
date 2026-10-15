@@ -132,6 +132,9 @@ impl Machine {
         let flat = self.mem.r8(DS, si + f::FLAT);
         self.mem.w8(DS, si + f::LIFE, 0x1E);
         self.sprite_object(si, x, bz, y, flat, 0x1F4)?;
+        // 29CF:036F (02D2): the launch's sound (7) at its square.
+        let at = self.projectile_square(si);
+        self.sound_at(7, at)?;
         let n = self.mem.r16(DS, COUNT).wrapping_add(1);
         self.mem.w16(DS, COUNT, n);
         Some(())
@@ -177,6 +180,11 @@ impl Machine {
         let ny = r(self, si + f::Y).wrapping_add(step(self, COS));
         w(self, f::Y, ny);
         self.sprite_object(si, x, z, y, flat, 0)?;
+        // 29CF:0415: the shot's sound at its square: 7, or 2 for an
+        // arrow (the cast FFFEh).
+        let at = self.projectile_square(si);
+        let n = if r(self, si + f::CAST) == 0xFFFE { 2 } else { 7 };
+        self.sound_at(n, at)?;
         let n = r(self, COUNT).wrapping_add(1);
         self.mem.w16(DS, COUNT, n);
         Some(())
@@ -428,6 +436,14 @@ impl Machine {
         self.mem.w16(DS, COUNT, n);
     }
 
+    /// 29CF:042E. The square of the projectile at `si`, in CB90's form:
+    /// its row high, its column doubled low (8 bits).
+    fn projectile_square(&self, si: u16) -> u16 {
+        let x = self.mem.r16(DS, si + f::X);
+        let y = self.mem.r16(DS, si + f::Y);
+        ((y >> 7) << 8) | ((x >> 7) as u8).wrapping_add((x >> 7) as u8) as u16
+    }
+
     /// 29CF:04E1. The projectile at `si` hit something (`ax` as
     /// `projectile_hits` left it).
     fn projectile_hit(&mut self, si: u16, ax: u16) -> Option<()> {
@@ -447,7 +463,9 @@ impl Machine {
             }
             return Some(());
         }
-        // 29CF:050B: an explosion where it hit.
+        // 29CF:050B: an explosion where it hit, its sound (8) first.
+        let at = self.projectile_square(si);
+        self.sound_at(8, at)?;
         let x = (self.mem.r16(DS, si + f::X) & 0xFF80).wrapping_add(0x40);
         let y = (self.mem.r16(DS, si + f::Y) & 0xFF80).wrapping_add(0x40);
         self.mem.w16(DS, si + f::X, x);

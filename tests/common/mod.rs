@@ -1,4 +1,5 @@
 pub mod blow;
+pub mod clock;
 pub mod controls;
 
 use arena::exe;

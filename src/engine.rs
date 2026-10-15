@@ -48,8 +48,12 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     /// `temp_wall_drawn`).
     fn draw(&mut self, _m: &mut Machine) {}
     /// The door hook (CD46, 0000:A8EF): a door's sound, as the walk
-    /// steps it (`Machine::view_walk_doors`), when the hook is set.
-    fn sound(&mut self, _m: &mut Machine, _sound: u16) {}
+    /// steps it (`Machine::view_walk_doors`), when the hook is set, at the
+    /// door's square (0000:CDD8, CX the door's map offset). The hook the
+    /// 3D mode sets is 23BA:002A (`Machine::sound_at`).
+    fn sound(&mut self, m: &mut Machine, sound: u16, at: u16) {
+        let _ = m.sound_at(sound, at);
+    }
 }
 
 /// How a frame ended.
@@ -119,8 +123,8 @@ impl Engine {
             return Some(Frame::Left);
         }
         m.view_begin();
-        for s in m.view_walk_doors() {
-            hooks.sound(m, s);
+        for (s, at) in m.view_walk_doors() {
+            hooks.sound(m, s, at);
         }
         hooks.draw(m);
         m.temp_walls_frame();
@@ -286,9 +290,9 @@ impl Machine {
     /// positive or kind 0Dh; 0000:CCC3), and steps each time it is met
     /// (`door_drawn`). Not with level flag C39A bit 4, whose squares the
     /// original handles otherwise (0000:CC76). Returns the sounds the
-    /// door hook was called with, in order. A reach of 0 isn't handled
+    /// door hook was called with, in order, each with its door's square. A reach of 0 isn't handled
     /// (the original walks 65535 rings).
-    pub fn view_walk_doors(&mut self) -> Vec<u16> {
+    pub fn view_walk_doors(&mut self) -> Vec<(u16, u16)> {
         let mut sounds = Vec::new();
         let reach = self.mem.r16(DS, 0xC394);
         if (self.mem.r16(DS, HEIGHT) as i16) < 0 || self.mem.r16(DS, LEVEL_FLAGS) & 4 != 0 || reach == 0 {
@@ -316,7 +320,7 @@ impl Machine {
                 if n as u8 == (n >> 8) as u8 && ((n as i16) > 0 || n >> 12 == 0xD) {
                     continue;
                 }
-                sounds.extend(self.door_drawn(sq));
+                sounds.extend(self.door_drawn(sq).map(|s| (s, sq)));
             }
         }
         sounds

@@ -46,6 +46,11 @@ pub trait ShopHooks {
     fn dialog(&mut self, _m: &mut Machine, _kind: u8, _di: u16) -> u16 {
         1
     }
+    /// `dialog` with its text: 1194:4E88 shows the lines 1194:4E54 split
+    /// at DS:`si` (LINES of them, each ending at a NUL), as SI holds them.
+    fn dialog_at(&mut self, m: &mut Machine, kind: u8, _si: u16, di: u16) -> u16 {
+        self.dialog(m, kind, di)
+    }
     /// 1194:5734: a list of `cx` strings at DS:`si` (its title at `di`).
     /// The pick (FFFFh: none).
     fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16, _di: u16) -> u16 {
@@ -251,7 +256,7 @@ impl Machine {
             self.mem.w8(DS, LINE_MARK, 3);
             self.split_lines(0x93CA);
             self.mem.w8(DS, DIALOG, 1);
-            if hooks.dialog(self, 1, 0) != 0 {
+            if hooks.dialog_at(self, 1, 0x93CA, 0) != 0 {
                 return;
             }
             let p = self.mem.r32(DS, PRICE);
@@ -423,7 +428,7 @@ impl Machine {
 
     /// 1194:485C: whether the text at `si` is all digits and not empty
     /// (the carry: not).
-    fn not_number(&self, si: u16) -> bool {
+    pub(crate) fn not_number(&self, si: u16) -> bool {
         let (mut si, mut cx) = (si, 0u16);
         loop {
             let b = self.mem.r8(DS, si);
@@ -439,7 +444,7 @@ impl Machine {
     }
 
     /// 0000:52BA: the number at `si` (a sign, then digits, in 16 bits).
-    fn parse_number(&self, si: u16) -> u16 {
+    pub(crate) fn parse_number(&self, si: u16) -> u16 {
         let (mut si, mut neg) = (si, false);
         match self.mem.r8(DS, si) {
             b'-' => {
@@ -482,7 +487,7 @@ impl Machine {
             self.mem.w8(DS, LINE_MARK, 3);
             self.split_lines(0x75F7);
             self.mem.w8(DS, DIALOG, 2);
-            hooks.dialog(self, 2, TYPED);
+            hooks.dialog_at(self, 2, 0x75F7, TYPED);
             if self.mem.r8(DS, TYPED) == 0 {
                 return Some(());
             }

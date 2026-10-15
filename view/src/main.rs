@@ -56,7 +56,12 @@
 //! `spell:N` (its entry N cast), `close`, `clickat:X:Y` (a click at X, Y
 //! of the 320 x 200 screen), and as debugging aids `give:N` (N items
 //! made and given), `learn:N` (spell N put in the book), `sp:N` (spell
-//! points), `class:N` and `corpse` (a creature killed a square ahead).
+//! points), `gold:N`, `hp:N` (the health), `day:N` (the clock, 5CC, N days
+//! on), `wear:N` (item N's condition halved), `class:N`, `corpse` (a
+//! creature killed a square ahead), `fatigue:N` (the player's fatigue; at
+//! 0 the next minute exhausts them) and `xp:N` (N experience gained: the
+//! next minute checks the level, and a level gained brings the level-up
+//! screen).
 //! M shows the automap (`automap`; `--do map`): the squares the game has
 //! marked seen, kept per area in AUTOMAP.nn (src/automap.rs).
 //!
@@ -78,18 +83,31 @@
 //! comma-separated: a character, `enter`, `esc`, `back`, `up`, `down`,
 //! `type:TEXT`, `click:X:Y` (on the 320 x 200 screen); with --shot the
 //! screen they reach is the picture (the game's, once creation is over).
+//! The menu's Start plays the opening story first (SCROLL.FLC, then
+//! INTRO01..09.IMG, 5 s each); a key ends it and is spent doing so, so a
+//! script gives one (e.g. `esc`) after `S`.
+//!
+//! Sound (`audio`): the game's sounds play through PulseAudio (opened at
+//! run time; nothing without it); --mute plays none, --sound-log prints
+//! each the game plays (shots play none, and with --sound-log print
+//! them). The animations the game plays (the dream, the Emperor's
+//! audience, the quest's end) show over it, a key their next lines or
+//! their end; `--do movie:NAME[:TEXT]` queues one (a debugging aid).
 
 mod archive;
 mod areas;
+mod audio;
 mod automap;
 mod create;
 mod dialog;
 mod flats;
+mod flc;
 mod hud;
 mod interface;
 mod newgame;
 mod panels;
 mod render;
+mod shopui;
 mod world;
 
 use arena::controls::{ControlHooks, Intent};
@@ -138,6 +156,29 @@ impl Front<'_> {
             None => println!("{s}"),
         }
     }
+
+    /// An animation played (with a text's number, as a vision).
+    fn movie(&mut self, name: &'static str, text: Option<u16>, colour: u8) {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.movies.push((name, text, colour)),
+            None => println!("(the animation {name})"),
+        }
+    }
+}
+
+/// The Emperor's audience's screens (`QuestHooks::audience`, 0000:41B6):
+/// MORPH.FLC (2294:0895), then JAGAR.FLC with text 5A7h in 39h
+/// (1194:D459).
+struct Audience<'a, 'b>(&'a mut Front<'b>);
+
+impl arena::quest::QuestHooks for Audience<'_, '_> {
+    fn audience(&mut self, _m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, part: u8) -> Option<()> {
+        if part == 0 {
+            self.0.movie("MORPH.FLC", None, 0);
+            self.0.movie("JAGAR.FLC", Some(0x5A7), 0x39);
+        }
+        Some(())
+    }
 }
 
 /// The stairs' hooks: the light table made again from NORMAL.LGT
@@ -173,6 +214,10 @@ impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
         Front::message_box(self, m, text);
     }
+    /// 0000:41A4..4247: the audience, its screens as animations.
+    fn palace_audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.emperor_audience(files, &mut Audience(self))
+    }
     /// A city's gate out: the city written as the wilderness's blocks
     /// 1..4 (217B:027A; the files are kept in memory).
     fn leave_city(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -186,7 +231,29 @@ impl arena::trigger::TriggerHooks for Front<'_> {
         Some(())
     }
 }
-impl arena::clock::ClockHooks for Front<'_> {}
+/// Exhaustion's boxes, and the level-up screen with its notice and
+/// refusal in boxes (its points spent in turn: no attribute screen yet).
+impl arena::clock::ClockHooks for Front<'_> {
+    fn exhaustion_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        Front::message_box(self, m, si);
+    }
+    fn level_up_screen(&mut self, m: &mut arena::machine::Machine, levels: u16) -> Option<()> {
+        arena::levelup::level_up_around(m, levels, self)
+    }
+}
+impl arena::levelup::LevelUpHooks for Front<'_> {
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        Front::message_box(self, m, si);
+    }
+    /// 1194:122C: the points spent on the attribute screen (`dialog`'s
+    /// question, answered with the clicks), or in turn without one.
+    fn spend(&mut self, m: &mut arena::machine::Machine) {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.spend(m),
+            None => arena::levelup::spend_in_turn(m),
+        }
+    }
+}
 impl arena::frame::FrameHooks for Front<'_> {
     /// 1194:DB6C with the view's own talk hooks.
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -219,6 +286,10 @@ impl arena::talk::TalkHooks for Front<'_> {
     fn loot(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
         m.loot_window(files, &mut LootFront(self), ax, si, seg, bx)
     }
+    /// A shop entered: its questions through `dialog` (`shopui`).
+    fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
+        shopui::shop(self, m, files, kind)
+    }
     /// A dungeon's keeper in the wilderness: in (0000:08EC).
     fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         m.wild_dungeon_entry();
@@ -237,6 +308,23 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
         match self.0.talk.as_deref_mut() {
             Some(t) => t.list(m, si, cx, ""),
             None => 0xFFFF,
+        }
+    }
+    /// 1194:D986: the eighth piece, the quest's end: WALK.FLC and
+    /// AFLC2.FLC, NUJAGDTH.FLC with text 57Ch in 64h, STAFF.FLC and
+    /// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h. (What comes
+    /// after, 0000:9426 on, isn't ported.)
+    fn last_piece(&mut self, _m: &mut arena::machine::Machine) {
+        for (name, text, colour) in [
+            ("WALK.FLC", None, 0),
+            ("AFLC2.FLC", None, 0),
+            ("NUJAGDTH.FLC", Some(0x57C), 0x64),
+            ("STAFF.FLC", None, 0),
+            ("KING.FLC", None, 0),
+            ("NUKING.FLC", Some(0x57D), 0x99),
+            ("NUKING.FLC", Some(0x57F), 0x99),
+        ] {
+            self.0.movie(name, text, colour);
         }
     }
 }
@@ -262,8 +350,10 @@ impl arena::rest::RestHooks for Front<'_> {
             None => println!("{s}"),
         }
     }
+    /// 1194:D3D4: the dream on CHAOSVSN.FLC, its text in 33h (the
+    /// colour of the first level's dream; the others' are taken alike).
     fn dream(&mut self, _m: &mut arena::machine::Machine, text: u16) {
-        self.note(&format!("(a dream: text {text:#x})"));
+        self.movie("CHAOSVSN.FLC", Some(text), 0x33);
     }
 }
 
@@ -631,8 +721,16 @@ impl Assets {
 /// Timer ticks an animation frame lasts.
 const ANIMATE: usize = 4;
 
+/// `--mute` (no sound played) and `--sound-log` (each sound printed),
+/// for the window and the shots alike.
+static MUTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SOUND_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
+    MUTE.store(args.iter().any(|a| a == "--mute"), std::sync::atomic::Ordering::Relaxed);
+    SOUND_LOG.store(args.iter().any(|a| a == "--sound-log"), std::sync::atomic::Ordering::Relaxed);
+    args.retain(|a| a != "--mute" && a != "--sound-log");
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
@@ -778,7 +876,10 @@ fn main() {
     let assets = Assets::new(&dir, &mut engine);
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
     let screen = hud::Screen::new(assets.palette);
+    let audio = audio::Audio::new(assets.archive.clone(), !MUTE.load(std::sync::atomic::Ordering::Relaxed), SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let mut app = App {
+        audio,
+        movies: Default::default(),
         assets,
         start: Instant::now(),
         engine,
@@ -812,6 +913,8 @@ fn main() {
         equip: None,
         map: false,
         creation,
+        creation_engine: None,
+        movie_at: Instant::now(),
     };
     event_loop.run_app(&mut app).expect("run");
 }
@@ -885,6 +988,18 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     TurnOut { frame, level_changed }
 }
 
+/// The animations a turn played (`dialog::Talk::movies`), made: a text's
+/// lines through the text port (1194:D459), the files from the game's.
+fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>) -> Vec<flc::Movie> {
+    played
+        .into_iter()
+        .filter_map(|(name, text, colour)| {
+            let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
+            flc::Movie::new(archive, name, lines)
+        })
+        .collect()
+}
+
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
     Engine { m: engine.m.clone(), files: engine.files.clone() }
@@ -912,6 +1027,9 @@ fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
 /// (`--picks`), the frames run, and what the HUD shows at the end: the
 /// boxes of the last turn that showed any, and a question left.
 struct Shot {
+    audio: audio::Audio,
+    /// The animations the turns played (`--do`); the first is drawn.
+    movies: Vec<flc::Movie>,
     assets: Assets,
     /// The right button and a drag for the next turn (`swing`).
     right: bool,
@@ -928,12 +1046,22 @@ struct Shot {
     panel: Option<panels::Panel>,
     /// The automap shown (`--do map`).
     map: bool,
+    /// The game is over (the player died, or the main quest ended):
+    /// later steps do nothing.
+    over: bool,
+    /// A screen up (the farewell and the main menu, a level's attribute
+    /// screen) and the engine it acts on: fed by `ui:` steps, the shot's
+    /// picture.
+    ui: Option<(create::Creation, Engine)>,
 }
 
 /// One turn with `intent`, its questions answered from `--picks` (then
 /// left, as Esc leaves them: the turn goes on); a frame leaving the area
 /// goes on to the next (`areas::next`, None where it can't).
 fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::transit::Run, st: &mut Shot, intent: &Intent) -> Option<()> {
+    if st.over {
+        return Some(());
+    }
     st.frames += 1;
     let input = TurnIn {
         intent: *intent,
@@ -946,12 +1074,22 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         aspect: 1.6,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
+    st.audio.before(&mut engine.m);
     let out = run_turn(engine, &mut st.assets, &input, &mut talk);
+    st.audio.after(&mut engine.m);
+    let played = std::mem::take(&mut talk.movies);
+    let archive = st.assets.archive.clone();
+    st.movies.extend(movies_of(engine, &archive, played));
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
         st.boxes = if talk.need.is_some() { talk.since_answer } else { talk.boxes };
     }
     if let Some(need) = talk.need {
+        if let (dialog::Need::Spend(snap), None) = (&need, &st.ui) {
+            let mut e = Engine::new((*snap.0).clone(), engine.files.clone());
+            let c = create::Creation::level_up(&mut e.m, st.assets.archive.clone(), dir, st.assets.palette);
+            st.ui = Some((c, e));
+        }
         st.need = Some(need);
     }
     if talk.status.is_some() {
@@ -963,7 +1101,17 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         st.assets.level(engine);
     }
     if out.frame? == arena::engine::Frame::Left {
-        *run = areas::next(engine, dir, *run)?;
+        let next = areas::next(engine, dir, *run);
+        if next.is_none() && engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
+            // The ending's text is on the message line; the farewell's
+            // vision and the main menu come up.
+            st.over = true;
+            print_message(engine, &mut st.message);
+            let c = create::Creation::ending(engine, st.assets.archive.clone(), dir, st.assets.palette);
+            st.ui = Some((c, world::load(dir, "START.MIF")));
+            return Some(());
+        }
+        *run = next?;
         st.assets = Assets::new(dir, engine);
     }
     Some(())
@@ -975,7 +1123,10 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 #[allow(clippy::too_many_arguments)]
 fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
     let run = &mut run;
-    let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false };
+    let assets = Assets::new(dir, &mut engine);
+    // Shots play nothing; with --sound-log they print what would play.
+    let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
+    let st = &mut Shot { audio, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false, ui: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -1014,6 +1165,44 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             continue;
         }
+        if let Some(t) = step.strip_prefix("ui:") {
+            // A key or click (as --create's script) for the screen up, or
+            // time passing for its movie (`ui:ms:N`).
+            if let Some((c, e)) = &mut st.ui {
+                match t.strip_prefix("ms:") {
+                    Some(ms) => c.advance(ms.parse().expect("--do ui:ms:N")),
+                    None => {
+                        for inp in create::parse_script(t) {
+                            c.input(e, inp);
+                        }
+                    }
+                }
+                if let Some(o) = c.outcome() {
+                    println!("ui: {o:?}");
+                    // A level's points spent: the screen closes (the
+                    // window replays the turn with them; here the turn
+                    // went on as Esc leaves the question).
+                    if let create::Outcome::Spent(_) = o {
+                        st.ui = None;
+                        st.need = None;
+                    }
+                }
+            }
+            continue;
+        }
+        if let Some(spec) = step.strip_prefix("movie:") {
+            // A debugging aid: an animation queued as the game's hooks
+            // queue them (NAME, or NAME:TEXT with the text's number in
+            // hex, in colour 33h).
+            let (name, text) = match spec.split_once(':') {
+                Some((n, t)) => (n, Some(u16::from_str_radix(t, 16).expect("--do movie:NAME:TEXT"))),
+                None => (spec, None),
+            };
+            let name: &'static str = Box::leak(name.to_ascii_uppercase().into_boxed_str());
+            let archive = st.assets.archive.clone();
+            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, 0x33)]));
+            continue;
+        }
         if let Some(d) = step.strip_prefix("swing:") {
             // The right button down with a drag (mickeys) for a turn.
             let (dx, dy) = d.split_once(':').expect("--do swing:DX:DY");
@@ -1046,6 +1235,34 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "give" => panels::give(&mut engine.m, n as u16),
             "learn" => panels::learn(&mut engine.m, n as u8),
             "corpse" => println!("corpse: {}", panels::corpse(&mut engine)),
+            "fatigue" => engine.m.mem.w16(arena::mem::DS, 0x0201, n as u16),
+            "xp" => {
+                let at = arena::character::PLAYER + 0x409;
+                let v = engine.m.mem.r32(arena::mem::DS, at).wrapping_add(n as u32);
+                engine.m.mem.w32(arena::mem::DS, at, v);
+                let f = engine.m.mem.r16(arena::mem::DS, 0x05CA) | 0x100;
+                engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+            }
+            "wear" => {
+                // Item N's condition (+6) halved, a debugging aid.
+                let at = arena::inventory::PLAYER_SLOTS + n as u16 * 0x13 + 6;
+                let v = engine.m.mem.r16(arena::mem::DS, at) / 2;
+                engine.m.mem.w16(arena::mem::DS, at, v);
+            }
+            "day" => {
+                // The clock N days on, a debugging aid (the calendar's
+                // other fields are left).
+                let t = engine.m.mem.r32(arena::mem::DS, 0x05CC).wrapping_add(n as u32 * 1440);
+                engine.m.mem.w32(arena::mem::DS, 0x05CC, t);
+            }
+            "hp" => {
+                // The player's health, a debugging aid.
+                engine.m.mem.w16(arena::mem::DS, 0x01FD, n as u16);
+            }
+            "gold" => {
+                // The player's gold, a debugging aid.
+                engine.m.mem.w32(arena::mem::DS, 0x05C2, n as u32);
+            }
             "sp" => {
                 // The spell points and their maximum, a debugging aid.
                 engine.m.mem.w16(arena::mem::DS, 0x020A, n as u16);
@@ -1124,6 +1341,14 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             _ => panic!("--do: {step}?"),
         }
     }
+    if let Some((c, e)) = &st.ui {
+        // The screen up is the picture.
+        let mut screen = hud::Screen::new(st.assets.palette);
+        c.draw(&mut screen, &e.m);
+        create::Creation::save_png(&screen, out);
+        println!("{out}: screen up");
+        return;
+    }
     let (w, h) = (640u32, 400u32);
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("adapter");
@@ -1156,7 +1381,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         match st.need.clone() {
             Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
             Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
-            None => {}
+            Some(dialog::Need::Spend(_)) | None => {}
         }
         let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
         st.assets.interface.draw(&mut screen, &font, &engine.m);
@@ -1167,6 +1392,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
             automap::draw(&mut screen, &engine.m);
+        }
+        // An animation the turns played: its first frame and lines.
+        if let Some(mv) = st.movies.first() {
+            println!("animations played: {}", st.movies.len());
+            mv.draw(&mut screen, &font);
         }
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
     }
@@ -1334,6 +1564,11 @@ struct Pending {
 }
 
 struct App {
+    /// The sound driver (`audio`).
+    audio: audio::Audio,
+    /// Animations the game played, shown over it in turn (a key the next
+    /// lines or the end); the game waits meanwhile.
+    movies: std::collections::VecDeque<flc::Movie>,
     /// The automap shown (M).
     map: bool,
     assets: Assets,
@@ -1384,8 +1619,15 @@ struct App {
     panel: Option<panels::Panel>,
     equip: Option<Option<interface::Image>>,
     /// Character creation under way (`--create`): its screens instead of
-    /// the game, which starts when it ends.
+    /// the game, which starts when it ends. Also the main menu after a
+    /// game's end, and the attribute screen of a level gained.
     creation: Option<create::Creation>,
+    /// The engine those screens act on when it isn't the game's: for a
+    /// level's points, a copy of the state the game asked in (the turn
+    /// replays with the clicks).
+    creation_engine: Option<Engine>,
+    /// When the screens' movie last advanced.
+    movie_at: Instant,
 }
 
 impl App {
@@ -1393,13 +1635,67 @@ impl App {
     /// start dungeon, its assets made again.
     fn creation_input(&mut self, inp: create::Input) {
         let Some(c) = &mut self.creation else { return };
-        c.input(&mut self.engine, inp);
-        if c.done() {
-            self.creation = None;
-            newgame::play(&mut self.engine);
-            self.assets = Assets::new(&self.dir, &mut self.engine);
-            self.remake_renderer();
+        match &mut self.creation_engine {
+            Some(e) => c.input(e, inp),
+            None => c.input(&mut self.engine, inp),
         }
+        self.creation_outcome();
+    }
+
+    /// What the screens up ended in: the game started (a character made),
+    /// a game loaded (the main menu's Load), the program left (Exit), or
+    /// a level's points answered (the turn replayed with the clicks).
+    fn creation_outcome(&mut self) {
+        let Some(outcome) = self.creation.as_ref().and_then(|c| c.outcome()) else { return };
+        match outcome {
+            create::Outcome::Play => {
+                self.creation = None;
+                newgame::play(&mut self.engine);
+                self.run = arena::transit::Run::Start;
+                self.assets = Assets::new(&self.dir, &mut self.engine);
+                self.remake_renderer();
+                self.last = Some(arena::engine::Frame::Running);
+            }
+            create::Outcome::Load => {
+                let loaded = match self.save_dir.clone() {
+                    Some(dir) => load_from(&mut self.engine, &self.dir.clone(), &dir, self.slot),
+                    None => Err("No save directory (--save-dir).".to_string()),
+                };
+                match loaded {
+                    Ok((msg, run)) => {
+                        self.creation = None;
+                        self.run = run;
+                        self.assets = Assets::new(&self.dir, &mut self.engine);
+                        self.remake_renderer();
+                        self.last = Some(arena::engine::Frame::Running);
+                        self.say(&msg);
+                    }
+                    Err(msg) => {
+                        eprintln!("{msg}");
+                        if let Some(c) = &mut self.creation {
+                            c.back_to_menu();
+                        }
+                    }
+                }
+            }
+            create::Outcome::Exit => std::process::exit(0),
+            create::Outcome::Spent(clicks) => {
+                self.creation = None;
+                self.creation_engine = None;
+                self.answer(dialog::Answer::Spend(clicks));
+            }
+        }
+    }
+
+    /// The game over (5B1 bit 100h): the farewell's vision, then the main
+    /// menu, on a fresh engine (the start dungeon loaded, as a new game
+    /// or a load begins from the program's own state).
+    fn game_over(&mut self) {
+        let archive = self.assets.archive.clone();
+        let c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette);
+        self.engine = world::load(&self.dir, "START.MIF");
+        self.creation = Some(c);
+        self.movie_at = Instant::now();
     }
 
     /// Whether the game waits for the player (a box, a question).
@@ -1409,7 +1705,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() {
             return;
         }
         let k = &self.keys;
@@ -1458,7 +1754,16 @@ impl App {
         answers.extend(self.script.iter().cloned());
         self.engine = copy(&before);
         let mut talk = dialog::Talk { answers, ..Default::default() };
+        self.audio.before(&mut self.engine.m);
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
+        // A turn stopped at a question is run again once answered: its
+        // sounds are the rerun's.
+        if talk.need.is_none() {
+            self.audio.after(&mut self.engine.m);
+            let played = std::mem::take(&mut talk.movies);
+            let archive = self.assets.archive.clone();
+            self.movies.extend(movies_of(&mut self.engine, &archive, played));
+        }
         // The script's answers used become given ones.
         let used = (given.len() + scripted).saturating_sub(talk.answers.len());
         let mut given = given;
@@ -1476,6 +1781,12 @@ impl App {
             self.engine = copy(&before);
             self.selected = 0;
             self.typed.clear();
+            if let dialog::Need::Spend(snap) = &need {
+                let mut e = Engine::new((*snap.0).clone(), self.engine.files.clone());
+                let c = create::Creation::level_up(&mut e.m, self.assets.archive.clone(), &self.dir, self.assets.palette);
+                self.creation = Some(c);
+                self.creation_engine = Some(e);
+            }
             self.pending = Some(Pending { before, input, given, need });
             if self.captured {
                 self.release();
@@ -1498,6 +1809,10 @@ impl App {
                         self.assets = Assets::new(&self.dir, &mut self.engine);
                         self.remake_renderer();
                         self.last = Some(arena::engine::Frame::Running);
+                        return;
+                    }
+                    if self.engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
+                        self.game_over();
                         return;
                     }
                 }
@@ -1718,7 +2033,8 @@ impl App {
                     h.menu = Some(m);
                 }
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
-                None => {}
+                // A level's points: the attribute screen (`creation`).
+                Some(dialog::Need::Spend(_)) | None => {}
             }
         }
         h
@@ -1758,6 +2074,8 @@ impl App {
                     }
                 }
             }
+            // The attribute screen takes the keys (`creation_input`).
+            dialog::Need::Spend(_) => {}
             dialog::Need::Text(_) => match code {
                 KeyCode::Enter | KeyCode::NumpadEnter => {
                     let t = std::mem::take(&mut self.typed);
@@ -1852,6 +2170,21 @@ impl winit::application::ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
+            // An animation up: a key or a click its next lines, or its end.
+            WindowEvent::MouseInput { state: ElementState::Pressed, .. } | WindowEvent::KeyboardInput { event: winit::event::KeyEvent { state: ElementState::Pressed, .. }, .. }
+                if !self.movies.is_empty() =>
+            {
+                if let Some(mv) = self.movies.front_mut() {
+                    if mv.lines.is_empty() {
+                        mv.over = true;
+                    } else {
+                        mv.key();
+                    }
+                    if mv.over {
+                        self.movies.pop_front();
+                    }
+                }
+            }
             WindowEvent::MouseInput { state, button, .. } if self.creation.is_some() => {
                 if state == ElementState::Pressed && button == MouseButton::Left {
                     let (x, y) = self.screen_point();
@@ -1945,8 +2278,10 @@ impl winit::application::ApplicationHandler for App {
                 let cam = camera(&self.engine);
                 let hud = self.hud();
                 self.screen.clear();
-                if let Some(c) = &self.creation {
-                    c.draw(&mut self.screen, &self.engine.m);
+                if let Some(mv) = self.movies.front() {
+                    mv.draw(&mut self.screen, &self.font);
+                } else if let Some(c) = &self.creation {
+                    c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
                 } else {
                     self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
                     self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
@@ -2002,6 +2337,17 @@ impl winit::application::ApplicationHandler for App {
         // taking `frame_ticks`); drawing goes as fast as the display. While
         // the game waits for the player, no time passes.
         let now = Instant::now();
+        if let Some(mv) = self.movies.front_mut() {
+            mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            if mv.over {
+                self.movies.pop_front();
+            }
+        }
+        if let Some(c) = &mut self.creation {
+            c.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            self.creation_outcome();
+        }
+        self.movie_at = now;
         if now >= self.next {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;

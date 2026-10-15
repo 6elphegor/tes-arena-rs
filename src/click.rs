@@ -229,6 +229,8 @@ impl Machine {
             self.mem.w8(DS, LOCK_COUNT, n.wrapping_add(1));
             self.mem.w16(DS, LOCK_SPELL, 0);
             self.outcome(true);
+            // 2826:096E: the lock's sound (15h).
+            self.sound_here(0x15)?;
         }
         let at = self.mem.r16(DS, TARGET_SPELL);
         if at != 0 {
@@ -428,7 +430,10 @@ impl Machine {
         let at = self.mem.r16(DS, DOOR_AT);
         let w = self.mem.r16(walls, at) | 0x200;
         self.mem.w16(walls, at, w);
-        Some(())
+        // 2826:0A6F: the door's opening sound (C3C0 by bits 6-7 of its low
+        // byte).
+        let n = self.mem.r8(DS, 0xC3C0 + (w as u8 >> 6) as u16) as u16;
+        self.sound_here(n)
     }
 
     /// 2826:0AAB for the player: the lock on the door at column `col`,

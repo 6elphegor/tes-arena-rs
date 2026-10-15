@@ -19,6 +19,15 @@ use arena::machine::Machine;
 use arena::mem::DS;
 use std::collections::VecDeque;
 
+/// A click on the attribute screen (1194:122C's, as creation's):
+/// an attribute's line picked (`Machine::creation_select`), or the arrows
+/// clicked at a row (`creation_arrow`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Click {
+    Select(u16),
+    Arrow(u16),
+}
+
 /// An answer given.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
@@ -26,6 +35,19 @@ pub enum Answer {
     Pick(u16),
     /// Text typed (the rest's hours).
     Text(String),
+    /// A level's points spent: the clicks, in order.
+    Spend(Vec<Click>),
+}
+
+/// The game's state when it asked (the level-up screen shows the
+/// attributes as they are and as the clicks change them).
+#[derive(Clone)]
+pub struct Snapshot(pub Box<Machine>);
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Snapshot")
+    }
 }
 
 /// A question waiting for its answer.
@@ -34,6 +56,8 @@ pub enum Need {
     Menu(Menu),
     /// Text to type, its prompt.
     Text(String),
+    /// A level's points to spend (1194:122C), on the attribute screen.
+    Spend(Snapshot),
 }
 
 /// A turn's answers and what it showed.
@@ -48,6 +72,10 @@ pub struct Talk {
     pub since_answer: Vec<Vec<Vec<Span>>>,
     /// The rest's hours, last shown.
     pub status: Option<String>,
+    /// The animations the turn played (1194:D45D, 2294:0895): the file,
+    /// the text's number shown with it (as a vision, 1194:D459) and its
+    /// colour; the front end plays them after the turn.
+    pub movies: Vec<(&'static str, Option<u16>, u8)>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -119,11 +147,60 @@ impl Talk {
         for _ in 0..cx.min(64) {
             let s = m.mem.cstr(DS, at);
             at = at.wrapping_add(s.len() as u16 + 1);
-            entries.push(vec![Span { colour: 0x0F, text: String::from_utf8_lossy(s).into_owned() }]);
+            // An entry of several lines (the tavern's "price\nname") on one.
+            let mut entry: Vec<Span> = Vec::new();
+            for l in hud::lines(s, 0x0F) {
+                if !entry.is_empty() && !l.is_empty() {
+                    entry.push(Span { colour: 0x0F, text: "  ".into() });
+                }
+                entry.extend(l);
+            }
+            entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
         let menu = Menu { title, entries, keys: Vec::new(), selected: 0 };
         self.ask(menu)
+    }
+
+    /// A menu made by the front end (the shops' yes or no, the haggle's
+    /// moves): the next answer, or the question left (FFFFh).
+    pub fn ask_menu(&mut self, menu: Menu) -> u16 {
+        if self.need.is_some() {
+            return 0xFFFF;
+        }
+        self.ask(menu)
+    }
+
+    /// Lines shown in a box, as a message box's.
+    pub fn lines_box(&mut self, lines: Vec<Vec<Span>>) {
+        if self.need.is_some() {
+            return;
+        }
+        for l in &lines {
+            println!("{}", hud::plain(l));
+        }
+        self.boxes.push(lines.clone());
+        self.since_answer.push(lines);
+    }
+
+    /// Text typed under `prompt`: the next answer, or None (the question
+    /// left: nothing typed).
+    pub fn typed_text(&mut self, prompt: &str) -> Option<String> {
+        if self.need.is_some() {
+            return None;
+        }
+        match self.answers.front() {
+            Some(Answer::Text(t)) => {
+                let t = t.clone();
+                self.answers.pop_front();
+                self.since_answer.clear();
+                Some(t)
+            }
+            _ => {
+                self.need = Some(Need::Text(prompt.to_string()));
+                None
+            }
+        }
     }
 
     /// `menu` asked: the next answer, or the question left (FFFFh).
@@ -160,6 +237,40 @@ impl Talk {
                 m.mem.w8(DS, at + t.len().min(max) as u16, 0);
             }
             _ => self.need = Some(Need::Text(prompt.to_string())),
+        }
+    }
+}
+
+impl Talk {
+    /// A level's points spent (`LevelUpHooks::spend`): the clicks given,
+    /// or the question left. Left, the points still go (in turn, the rest
+    /// dropped), as the level-up loops until none are left: the turn is
+    /// thrown away anyway.
+    pub fn spend(&mut self, m: &mut Machine) {
+        let leave = |m: &mut Machine| {
+            arena::levelup::spend_in_turn(m);
+            m.mem.w8(DS, arena::newgame::var::POINTS, 0);
+        };
+        if self.need.is_some() {
+            return leave(m);
+        }
+        match self.answers.front() {
+            Some(Answer::Spend(clicks)) => {
+                let clicks = clicks.clone();
+                self.answers.pop_front();
+                self.since_answer.clear();
+                for c in clicks {
+                    match c {
+                        Click::Select(r) => m.creation_select(r),
+                        Click::Arrow(y) => m.creation_arrow(y),
+                    }
+                }
+                println!("[points spent]");
+            }
+            _ => {
+                self.need = Some(Need::Spend(Snapshot(Box::new(m.clone()))));
+                leave(m);
+            }
         }
     }
 }

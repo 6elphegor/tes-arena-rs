@@ -27,12 +27,21 @@ pub struct Areas<'a> {
     pub files: Option<&'a mut Files>,
     /// Something the original does here failed in the port.
     pub failed: bool,
+    /// The game ended (the player died, or the main quest is over): its
+    /// text's number (1194:D459's AX).
+    pub ending: Option<u16>,
 }
 
 /// The location record the view's cities use (as `world::city_load`).
 const RECORD: u16 = 0x0A22;
 
 impl AreaHooks for Areas<'_> {
+    /// 1194:D459, the ending: its animation (SI, DI name it) isn't
+    /// shown; its text (AX) is put on the message line by `next`.
+    fn ending(&mut self, _m: &mut Machine, ax: u16, _si: u16, _di: u16) {
+        self.ending = Some(ax);
+    }
+
     fn normal_lgt(&mut self, m: &mut Machine) {
         world::lgt(m, self.dir, arena::weather::NORMAL_LGT);
     }
@@ -203,7 +212,7 @@ pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Resu
     let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
     let mut copy = e.files.clone();
-    let h = &mut Areas { dir, files: Some(&mut copy), failed: false };
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
     let r = e.m.game_load(&mut e.files, slot, h);
     let failed = h.failed;
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
@@ -249,7 +258,7 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
 pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let mut files = std::mem::take(&mut engine.files);
     let r = {
-        let h = &mut Areas { dir, files: Some(&mut files), failed: false };
+        let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None };
         let m = &mut engine.m;
         m.world_leave(h);
         m.world_end(h);
@@ -264,6 +273,24 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
                 m.mem.w32(DS, 0xCD4A, 0);
                 (!h.failed).then_some(next)
             }
+            Run::End => {
+                // The game is over: the ending's text (TEXT 137A, through
+                // 1194:A374 into a buffer) on the message line, shown
+                // while its countdown runs (061A, 061E).
+                if let (Some(ax), Some(files)) = (h.ending, h.files.as_deref_mut()) {
+                    const BUF: u16 = 0x19DE;
+                    m.mem.w16(DS, arena::text::var::TEXT, ax);
+                    if m.text(files, &mut arena::text::NoTextHooks, 2, DS, BUF).is_some() {
+                        let text = String::from_utf8_lossy(m.mem.cstr(DS, BUF)).replace('\r', "\n");
+                        println!("{text}");
+                        m.mem.w16(DS, 0x061A, BUF);
+                        m.mem.w16(DS, 0x061C, DS);
+                        m.mem.w16(DS, 0x061E, 0x7FFF);
+                    }
+                }
+                eprintln!("the game has ended");
+                None
+            }
             other => {
                 eprintln!("the next area isn't followed yet: {other:?}");
                 None
@@ -276,7 +303,7 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let mut copy = files.clone();
     engine.files = files;
     let next = r?;
-    let h = &mut Areas { dir, files: Some(&mut copy), failed: false };
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
     if engine.world_enter(h).is_none() || h.failed {
         eprintln!("entering the area met code not ported");
         return None;

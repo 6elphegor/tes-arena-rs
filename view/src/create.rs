@@ -27,8 +27,17 @@
 //!   points are left;
 //! - the face (2BC5): FACES1r.CIF or FACESF1r.CIF (r the race), clicked
 //!   through (the regions at 3276:5E90), then Done;
-//! - the vision's text (1194:D459 with text 578h; its picture, VISION.FLC,
-//!   isn't played here), then the game.
+//! - the vision (1194:D459 with text 578h): VISION.FLC playing (`flc`)
+//!   with its text three lines at a time, then the game.
+//!
+//! Before it, as the original starts (0000:10C9): INTRO.FLC (0000:125C),
+//! TITLE.IMG, then the main menu (MENU.IMG, 0000:10FA: its regions at
+//! 3276:6300, keys L, S and E: Load, Start a new game, Exit). The opening
+//! story on SCROLL.FLC (0000:1323) isn't played. At a game's end
+//! (`Creation::ending`) the farewell's vision (text 57Ah on VISION.FLC, or
+//! 57Bh on JAGAR.FLC while F77 is set: 0000:0D01..0D3E), then the main
+//! menu again. On a level gained (`Creation::level_up`) the attribute
+//! screen alone, its clicks kept for the turn to replay (1194:122C).
 //!
 //! Approximate: the boxes and menus are PARCH.CIF's nine tiles around the
 //! text, centred (the original's sizes and the keys' highlights aren't
@@ -37,6 +46,8 @@
 //! and the music are left out.
 
 use crate::archive::Archive;
+use crate::dialog::Click;
+use crate::flc::Movie;
 use crate::hud::{self, Font, Screen, Span, H, W};
 use crate::interface::Image;
 use arena::engine::Engine;
@@ -82,10 +93,13 @@ pub enum Input {
     Up,
     Down,
     Click(i32, i32),
+    /// Time passing, in milliseconds (a movie's frames).
+    Wait(u32),
 }
 
 /// `--create`'s steps: a character (`G`), `enter`, `esc`, `back`, `up`,
-/// `down`, `type:TEXT` (its characters), `click:X:Y`, comma-separated.
+/// `down`, `type:TEXT` (its characters), `click:X:Y`, `wait:MS` (time for
+/// a movie), comma-separated.
 pub fn parse_script(s: &str) -> Vec<Input> {
     let mut out = Vec::new();
     for t in s.split(',').filter(|t| !t.is_empty()) {
@@ -98,6 +112,8 @@ pub fn parse_script(s: &str) -> Vec<Input> {
             _ => {
                 if let Some(text) = t.strip_prefix("type:") {
                     out.extend(text.bytes().map(Input::Char));
+                } else if let Some(ms) = t.strip_prefix("wait:") {
+                    out.push(Input::Wait(ms.parse().expect("wait:MS")));
                 } else if let Some(xy) = t.strip_prefix("click:") {
                     let (x, y) = xy.split_once(':').expect("--create click:X:Y");
                     out.push(Input::Click(x.parse().expect("click:X:Y"), y.parse().expect("click:X:Y")));
@@ -163,9 +179,37 @@ enum Stage {
     Stats,
     Choose(Ask),
     Face,
-    Vision(Vec<Vec<Span>>, usize),
+    /// The movies (`Creation::movie`): the intro, the vision after
+    /// creation, the farewell at a game's end.
+    Intro,
+    Vision,
+    Ending,
+    /// The opening story after the menu's Start (0000:1323): SCROLL.FLC
+    /// (the movie), then INTRO01..09.IMG (`pic` 1..9, its picture and
+    /// the colours the movie left) for 350 screen refreshes each (5 s at
+    /// 70 Hz, 0000:13BF); a key ends it all (ACB6). Then `next`, the
+    /// class's first question, made at the Start.
+    Story { pic: u8, ms: u32, img: Option<Box<(Image, [[u8; 4]; 256])>>, next: Box<Stage> },
+    Title,
+    MainMenu,
     Done,
 }
+
+/// How creation (or the screen up) ended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    /// The character made: the game to start.
+    Play,
+    /// The main menu's Load and Exit.
+    Load,
+    Exit,
+    /// A level's points spent, by these clicks.
+    Spent(Vec<Click>),
+}
+
+/// The main menu's regions (3276:6300, three: Load, Start, Exit; their
+/// keys at +59h).
+const MENU_REGIONS: u16 = 0x6300;
 
 /// The game's pictures for creation, decoded once.
 struct Pics {
@@ -210,6 +254,14 @@ pub struct Creation {
     name: String,
     /// The text colour now (9288).
     colour: u8,
+    /// The movie playing (Intro, Vision, Ending).
+    movie: Option<Movie>,
+    /// TITLE.IMG and MENU.IMG, in their own colours.
+    title: Option<(Image, [[u8; 4]; 256])>,
+    menu_pic: Option<(Image, [[u8; 4]; 256])>,
+    /// On a level gained: the clicks so far.
+    level_up: Option<Vec<Click>>,
+    outcome: Option<Outcome>,
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -288,14 +340,144 @@ impl Creation {
             game,
             faces: Vec::new(),
         };
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A };
-        c.stage = Stage::Method(c.method(m));
+        let title = image_with_palette(m, &archive, "TITLE.IMG");
+        let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, outcome: None };
+        // The program's start (0000:10C9): the intro (0000:125C), the
+        // title, the menu.
+        c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
+        c.stage = if c.movie.is_some() { Stage::Intro } else { c.after_intro() };
         c
+    }
+
+    /// A game over (5B1 bit 100h): the farewell's vision (0000:0CE9..0D3E:
+    /// text 57Bh on JAGAR.FLC in colour F5h while F77 is set, else 57Ah on
+    /// VISION.FLC in 2Fh; none when F77 is 9), then the main menu.
+    pub fn ending(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
+        // The text made from the game as it ended (the player's name in
+        // it), before creation's set-up clears the state.
+        let f77 = engine.m.mem.r8(DS, 0x0F77);
+        let (text, flc, colour) = if f77 != 0 { (0x57B, "JAGAR.FLC", 0xF5) } else { (0x57A, "VISION.FLC", 0x2F) };
+        let lines = if f77 != 9 { vision_text(engine, text, colour) } else { Vec::new() };
+        let mut c = Creation::new(engine, archive, dir, game);
+        c.movie = None;
+        c.stage = Stage::MainMenu;
+        if f77 != 9 {
+            c.movie = Movie::new(&c.archive, flc, lines);
+            if c.movie.is_some() {
+                c.stage = Stage::Ending;
+            }
+        }
+        c
+    }
+
+    /// A level gained (1194:1034): the attribute screen (1194:122C) over
+    /// the state `m` (the attributes in percent), its clicks kept.
+    pub fn level_up(m: &mut Machine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
+        let font = |n: &str| Font::load(&archive, n).unwrap_or_else(|| panic!("{n}"));
+        let fonts = Fonts { a: font("FONT_A.DAT"), c: font("FONT_C.DAT"), arena: font("ARENAFNT.DAT"), teeny: font("TEENYFNT.DAT") };
+        let pics = Pics {
+            start: None,
+            map: None,
+            noexit: None,
+            top: None,
+            scroll: None,
+            charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
+            bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
+            updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
+            parch: archive.read("PARCH.CIF").map(|d| d.chunks(400).map(<[u8]>::to_vec).collect()).unwrap_or_default(),
+            charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
+            game,
+            faces: Vec::new(),
+        };
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), outcome: None }
+    }
+
+    /// Back on the main menu (a load that failed).
+    pub fn back_to_menu(&mut self) {
+        self.outcome = None;
+        self.stage = Stage::MainMenu;
+    }
+
+    /// After the intro: the title (a key or click), else the menu.
+    fn after_intro(&self) -> Stage {
+        if self.title.is_some() { Stage::Title } else { Stage::MainMenu }
+    }
+
+    /// How it ended, once it has: the game to play, Load or Exit picked,
+    /// or a level's points spent.
+    pub fn outcome(&self) -> Option<Outcome> {
+        if !self.boxes.is_empty() {
+            return None;
+        }
+        match (&self.outcome, &self.stage) {
+            (Some(o), _) => Some(o.clone()),
+            (None, Stage::Done) => Some(Outcome::Play),
+            _ => None,
+        }
+    }
+
+    /// Time passing (milliseconds) for the movie playing: its frames; at
+    /// its end (no text: once through) the next screen.
+    pub fn advance(&mut self, ms: u32) {
+        if let Some(mv) = &mut self.movie {
+            mv.advance(ms);
+        }
+        self.movie_over();
+        self.story(ms);
+    }
+
+    /// The opening story's pictures: each for 5 s, in the colours the
+    /// movie left, then the next stage.
+    fn story(&mut self, ms: u32) {
+        let Stage::Story { pic, ms: shown, img, .. } = &mut self.stage else { return };
+        if *pic == 0 {
+            return;
+        }
+        *shown += ms;
+        if *shown < 5000 {
+            return;
+        }
+        *shown = 0;
+        *pic += 1;
+        if *pic > 9 {
+            if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
+                self.stage = *next;
+            }
+            return;
+        }
+        let pal = img.as_ref().map(|b| b.1).unwrap_or([[0; 4]; 256]);
+        *img = intro_pic(&self.archive, *pic, pal).map(Box::new);
+    }
+
+    /// The next screen when the movie is over.
+    fn movie_over(&mut self) {
+        if !self.movie.as_ref().is_some_and(|m| m.over) {
+            return;
+        }
+        if let Stage::Story { pic: 0, .. } = self.stage {
+            // The movie over: its colours stay for the pictures.
+            let pal = self.movie.as_ref().map(|m| m.flc.palette).unwrap_or([[0; 4]; 256]);
+            self.movie = None;
+            if let Stage::Story { pic, img, .. } = &mut self.stage {
+                *pic = 1;
+                *img = intro_pic(&self.archive, 1, pal).map(Box::new);
+            }
+            return;
+        }
+        let next = match self.stage {
+            Stage::Intro => self.after_intro(),
+            Stage::Ending => Stage::MainMenu,
+            Stage::Vision => Stage::Done,
+            _ => return,
+        };
+        self.movie = None;
+        self.stage = next;
     }
 
     /// Whether creation is over (the game to be started).
     pub fn done(&self) -> bool {
-        matches!(self.stage, Stage::Done) && self.boxes.is_empty()
+        matches!(self.stage, Stage::Done) && self.boxes.is_empty() && self.outcome.is_none()
     }
 
     /// The text at `seg`:`fmt` made with `args` into the buffer (as the
@@ -338,14 +520,73 @@ impl Creation {
 
     /// A key or click.
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
+        if let Input::Wait(ms) = inp {
+            return self.advance(ms);
+        }
         if !self.boxes.is_empty() {
             if matches!(inp, Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..)) {
                 self.boxes.pop_front();
             }
             return;
         }
+        if let Stage::Story { .. } = self.stage {
+            // A key ends the whole story (0000:1314, 137F: ACB6).
+            if !matches!(inp, Input::Up | Input::Down) {
+                self.movie = None;
+                if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
+                    self.stage = *next;
+                }
+            }
+            return;
+        }
+        if matches!(self.stage, Stage::Intro | Stage::Vision | Stage::Ending) {
+            // A key the next lines (or, the intro, its end).
+            if let Some(mv) = &mut self.movie {
+                if !matches!(inp, Input::Up | Input::Down) {
+                    if matches!(self.stage, Stage::Intro) {
+                        mv.over = true
+                    } else {
+                        mv.key()
+                    }
+                }
+            }
+            return self.movie_over();
+        }
         let stage = std::mem::replace(&mut self.stage, Stage::Done);
         self.stage = match stage {
+            Stage::Title => match inp {
+                Input::Up | Input::Down => Stage::Title,
+                _ => Stage::MainMenu,
+            },
+            Stage::MainMenu => {
+                let key = |m: &Machine, i: u16| m.mem.r8(DATA, MENU_REGIONS + i * REGION + 0x59);
+                let pick = match inp {
+                    Input::Char(c) => (0..3u16).find(|&r| key(&engine.m, r) == c.to_ascii_uppercase()),
+                    Input::Click(x, y) => self.region(&engine.m, MENU_REGIONS, 3, x, y),
+                    _ => None,
+                };
+                match pick {
+                    Some(0) => {
+                        self.outcome = Some(Outcome::Load);
+                        Stage::MainMenu
+                    }
+                    Some(1) => {
+                        // 0000:1131: the opening story (0000:1323), then
+                        // creation (1194:2498), which starts from a cleared
+                        // state (1194:24A6).
+                        engine.m.newgame_reset();
+                        self.colour = COLOUR_A;
+                        let next = Box::new(Stage::Method(self.method(&mut engine.m)));
+                        self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
+                        Stage::Story { pic: 0, ms: 0, img: None, next }
+                    }
+                    Some(_) => {
+                        self.outcome = Some(Outcome::Exit);
+                        Stage::MainMenu
+                    }
+                    None => Stage::MainMenu,
+                }
+            }
             Stage::Method(mut ask) => match self.ask_input(&mut ask, inp) {
                 None => Stage::Method(ask),
                 Some(0) => {
@@ -452,16 +693,7 @@ impl Creation {
                 Some(_) => self.roll(engine),
             },
             Stage::Face => self.face_input(engine, inp),
-            Stage::Vision(lines, page) => match inp {
-                Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..) => {
-                    if (page + 1) * VISION_ROWS < lines.len() {
-                        Stage::Vision(lines, page + 1)
-                    } else {
-                        Stage::Done
-                    }
-                }
-                _ => Stage::Vision(lines, page),
-            },
+            s @ (Stage::Intro | Stage::Vision | Stage::Ending | Stage::Story { .. }) => s,
             Stage::Done => Stage::Done,
         };
     }
@@ -603,9 +835,24 @@ impl Creation {
     fn stats_input(&mut self, engine: &mut Engine, inp: Input) -> Stage {
         let m = &mut engine.m;
         let key = |m: &Machine, i: u16| m.mem.r8(DATA, STAT_REGIONS + i * REGION + 0x59);
-        let done = |c: &Self, m: &mut Machine| {
+        let done = |c: &mut Self, m: &mut Machine| {
+            if let Some(clicks) = &c.level_up {
+                // 1194:122C's end: refused (3E17) while points are left.
+                if m.mem.r8(DS, arena::newgame::var::POINTS) != 0 {
+                    let l = hud::lines(m.mem.cstr(DS, 0x3E17), COLOUR_B);
+                    c.push_box(l, FontId::Arena, Back::Stats);
+                } else {
+                    c.outcome = Some(Outcome::Spent(clicks.clone()));
+                }
+                return Stage::Stats;
+            }
             // 1194:2CD0: "Which dost thou choose?", in FONT_A.
             Stage::Choose(c.menu(m, (DATA, 0x3A43), &[], 0x3F9C, 0x3F9F, FontId::A))
+        };
+        let record = |c: &mut Self, k: Click| {
+            if let Some(v) = &mut c.level_up {
+                v.push(k);
+            }
         };
         match inp {
             Input::Esc => done(self, m),
@@ -613,23 +860,28 @@ impl Creation {
                 let c = c.to_ascii_uppercase();
                 if let Some(r) = (1..=8u16).find(|&r| key(m, r) == c) {
                     m.creation_select(r);
+                    record(self, Click::Select(r));
                 }
                 Stage::Stats
             }
             // The arrows' halves (a convenience: the original's are clicked).
             Input::Up | Input::Down => {
                 let mid = m.mem.r8(DS, arena::newgame::var::ARROWS) as u16;
-                m.creation_arrow(if inp == Input::Up { mid } else { mid + 1 });
+                let y = if inp == Input::Up { mid } else { mid + 1 };
+                m.creation_arrow(y);
+                record(self, Click::Arrow(y));
                 Stage::Stats
             }
             Input::Click(x, y) => match self.region(m, STAT_REGIONS, 10, x, y) {
                 Some(0) => done(self, m),
                 Some(r @ 1..=8) => {
                     m.creation_select(r);
+                    record(self, Click::Select(r));
                     Stage::Stats
                 }
                 Some(9) => {
                     m.creation_arrow(y as u16);
+                    record(self, Click::Arrow(y as u16));
                     Stage::Stats
                 }
                 _ => Stage::Stats,
@@ -699,7 +951,8 @@ impl Creation {
         if lines.iter().all(|l| l.is_empty()) {
             return Stage::Done;
         }
-        Stage::Vision(lines, 0)
+        self.movie = Movie::new(&self.archive, "VISION.FLC", lines);
+        if self.movie.is_some() { Stage::Vision } else { Stage::Done }
     }
 
     /// A menu's or list's answer to `inp`: an entry, FFFFh for Esc, or
@@ -727,7 +980,7 @@ impl Creation {
                     }
                 }
             }
-            Input::Back => {}
+            Input::Back | Input::Wait(_) => {}
         }
         if ask.sel < ask.top {
             ask.top = ask.sel;
@@ -757,8 +1010,25 @@ impl Creation {
             (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
             (None, Stage::Map | Stage::ProvinceYes(..)) => Back::Map,
             (None, Stage::Stats | Stage::Choose(_) | Stage::Face) => Back::Stats,
-            (None, Stage::Vision(..) | Stage::Done) => Back::Black,
+            (None, Stage::Vision | Stage::Done | Stage::Intro | Stage::Ending | Stage::Title | Stage::MainMenu | Stage::Story { .. }) => Back::Black,
         };
+        if let (Some(mv), None) = (&self.movie, self.boxes.front()) {
+            return mv.draw(screen, &self.fonts.arena);
+        }
+        if self.boxes.is_empty() {
+            let pic = match &self.stage {
+                Stage::Title => self.title.as_ref(),
+                Stage::MainMenu => self.menu_pic.as_ref(),
+                Stage::Story { img, .. } => img.as_deref(),
+                _ => None,
+            };
+            if let Some((i, pal)) = pic {
+                screen.set_palette(*pal);
+                screen.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+                screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                return;
+            }
+        }
         self.draw_back(screen, m, back);
         if let Some(b) = self.boxes.front() {
             self.draw_box(screen, &b.lines, b.font, None);
@@ -778,16 +1048,6 @@ impl Creation {
                 let mut lines = prompt.clone();
                 lines.push(vec![Span { colour: self.colour, text: format!("{typed}_") }]);
                 self.draw_box(screen, &lines, FontId::A, None);
-            }
-            Stage::Vision(lines, page) => {
-                let f = &self.fonts.arena;
-                let lh = f.h as i32 + 2;
-                let shown: Vec<_> = lines.iter().skip(page * VISION_ROWS).take(VISION_ROWS).collect();
-                let y0 = H as i32 - 16 - shown.len() as i32 * lh;
-                for (i, l) in shown.iter().enumerate() {
-                    let w = f.width(&hud::plain(l)) as i32;
-                    self.spans(screen, f, (W as i32 - w) / 2, y0 + i as i32 * lh, l);
-                }
             }
             _ => {}
         }
@@ -841,7 +1101,7 @@ impl Creation {
         // the 100 scale (1194:5B07). On the faces' screen the original
         // doesn't draw them again: they stay as they were before they were
         // kept on the 256 scale (2D28), which the 100 scale gives back.
-        let creating = m.mem.r16(DS, 0x05C8) & 0x10 != 0 && !matches!(self.stage, Stage::Face);
+        let creating = (m.mem.r16(DS, 0x05C8) & 0x10 != 0 && !matches!(self.stage, Stage::Face)) || self.level_up.is_some();
         let scale = |v: u16| {
             let p = v as u32 * 100;
             (p / 256 + (p % 256 >= 0x80) as u32) as u16
@@ -962,8 +1222,6 @@ impl Creation {
     }
 }
 
-/// The vision's lines a page.
-const VISION_ROWS: usize = 6;
 const TILE: i32 = 20;
 const MARGIN: i32 = 12;
 
@@ -990,4 +1248,47 @@ fn boxed(tw: i32, th: i32) -> Rect {
     let rows = ((th + 2 * MARGIN - 4 + TILE - 1) / TILE).clamp(2, H as i32 / TILE);
     let (w, h) = (cols * TILE, rows * TILE);
     Rect { x: (W as i32 - w) / 2, y: (H as i32 - h) / 2, w, h }
+}
+
+/// INTROnn.IMG (`n` 1..9; the digit at 4DD7 counted up, 0000:137B),
+/// shown in the colours `pal`.
+fn intro_pic(archive: &Archive, n: u8, pal: [[u8; 4]; 256]) -> Option<(Image, [[u8; 4]; 256])> {
+    let d = archive.read(&format!("INTRO0{n}.IMG"))?;
+    crate::interface::image(&d).map(|(i, _)| (i, pal))
+}
+
+/// An image (12-byte header; LZSS or the type-8 coding) with its 6-bit
+/// palette after the data (flag 100h), as TITLE.IMG and MENU.IMG are.
+fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256])> {
+    let d = archive.read(name)?;
+    let size = u16::from_le_bytes([*d.get(10)?, *d.get(11)?]) as usize;
+    let img = crate::interface::image(&d).map(|(i, _)| i).or_else(|| crate::panels::image_type8(m, &d))?;
+    let p = d.get(12 + size..12 + size + 0x300)?;
+    let mut pal = [[0u8; 4]; 256];
+    for (i, c) in pal.iter_mut().enumerate() {
+        let v = |k: usize| {
+            let x = p[3 * i + k] & 0x3F;
+            x << 2 | x >> 4
+        };
+        *c = [v(0), v(1), v(2), 0xFF];
+    }
+    Some((img, pal))
+}
+
+/// Text number `n` made (1194:A374 into a buffer, as 1194:D459 makes the
+/// vision's) as lines in colour `colour`.
+pub(crate) fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
+    let m = &mut engine.m;
+    let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
+        return Vec::new();
+    };
+    m.mem.w16(DS, 0x137A, n);
+    m.mem.w8(DS, 0x137E, 0);
+    m.mem.w8(DS, 0x101C, 0);
+    let text = match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, seg, off) {
+        Some(_) => engine.m.mem.cstr(seg, off).to_vec(),
+        None => Vec::new(),
+    };
+    engine.m.heap_free(seg);
+    hud::lines(&text, colour)
 }

@@ -196,6 +196,11 @@ impl Machine {
         let table = if (7..=9).contains(&shown) { SWINGS_HANDS } else { SWINGS };
         let first = self.mem.r8(DS, table.wrapping_add(sector)) as u16;
         self.mem.w16(DS, FRAME, first);
+        // 0000:3D02: the swing's sound (0Bh). (Its volume's divide can't
+        // fault at the player's own square with a volume percent of 100
+        // or less; past that the original faults, which this bool can't
+        // say.)
+        let _ = self.sound_here(0xB);
         true
     }
 
@@ -223,6 +228,8 @@ impl Machine {
             let Some(i) = (0..0x10).find(|&i| self.mem.r8(DS, TRIGGERS + i) == w as u8) else {
                 return Some(());
             };
+            // 0000:3D76: the blow on the wall (1Bh).
+            self.sound_here(0x1B)?;
             let table = if self.mem.r16(DS, LEVEL_FLAGS) & 0x200 != 0 { 0x67FE } else { 0x67EE };
             let kind = self.mem.r8(DS, table + i);
             // 0000:50A9: kinds 2 and 3 are always closed.
@@ -263,6 +270,8 @@ impl Machine {
             }
             _ => return Some(()),
         }
+        // 0000:3E29: the blow (1Bh).
+        self.sound_here(0x1B)?;
         let f = self.mem.r16(DS, 0x05CA) | 0x20;
         self.mem.w16(DS, 0x05CA, f);
         let damage = self.player_bash_damage()?;
@@ -281,12 +290,18 @@ impl Machine {
         if (at as i16) >= 0 {
             let v = 0x8000 | self.mem.r8(DS, 0xC93C) as u16;
             self.mem.w16(walls, at, v);
+            // (0000:3E7E, 2433:0C75, isn't ported.) 3E83: broken (15h).
+            self.sound_here(0x15)?;
         } else {
             let at = at & 0x7FFF;
             let rec = self.mem.r16(DS, BASH_LOCK);
             self.mem.w16(DS, rec, 0xFFFF);
             let v = self.mem.r16(walls, at) | 0x200;
             self.mem.w16(walls, at, v);
+            // 0000:3EA6: the door's opening sound (C3C0 by bits 6-7 of its
+            // low byte).
+            let n = self.mem.r8(DS, 0xC3C0 + (v as u8 >> 6) as u16) as u16;
+            self.sound_here(n)?;
         }
         Some(())
     }

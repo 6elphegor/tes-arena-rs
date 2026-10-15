@@ -51,7 +51,9 @@ pub trait SkyHooks {
     /// is at seg:off; +6, +8 its x and y) drawn.
     fn bolt(&mut self, _m: &mut Machine, _seg: u16, _off: u16, _frame: u16) {}
     /// 23BA:002A: sound `sound` played at square `at` (CB90's form).
-    fn sound(&mut self, _m: &mut Machine, _sound: u16, _at: u16) {}
+    fn sound(&mut self, m: &mut Machine, sound: u16, at: u16) {
+        let _ = m.sound_at(sound, at);
+    }
 }
 
 /// `SkyHooks` that load nothing.
