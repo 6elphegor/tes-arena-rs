@@ -380,9 +380,8 @@ fn camping_with_typed_hours_as_by_script() {
 #[test]
 fn f5_saves_and_f9_loads_back() {
     let Some(dir) = game_dir() else { return };
-    let saves = std::env::temp_dir().join(format!("arena-inputtest-{}", std::process::id()));
-    std::fs::create_dir_all(&saves).unwrap();
-    let mut a = app(&dir, &Start { save_dir: Some(saves.clone()), ..Default::default() });
+    let saves = Scratch::new("f5");
+    let mut a = app(&dir, &Start { save_dir: Some(saves.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frames(&mut a, 2);
     let at = |app: &App| {
@@ -402,7 +401,6 @@ fn f5_saves_and_f9_loads_back() {
     assert_ne!(at(&a), saved, "the walk moved the player");
     d.key(&mut a, KeyCode::F9, None);
     assert_eq!(at(&a), saved, "F9 brings the player back where F5 saved");
-    let _ = std::fs::remove_dir_all(&saves);
 }
 
 #[test]
@@ -694,10 +692,9 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
 
 /// The user's save (ARENA_SAVE), copied to a scratch folder so nothing
 /// can write to it.
-fn save_copy() -> Option<PathBuf> {
+fn save_copy() -> Option<Scratch> {
     let save = PathBuf::from(std::env::var("ARENA_SAVE").ok()?);
-    let to = std::env::temp_dir().join(format!("arena-inputtest-save-{}", std::process::id()));
-    std::fs::create_dir_all(&to).ok()?;
+    let to = Scratch::new("save");
     for e in std::fs::read_dir(&save).ok()? {
         let e = e.ok()?;
         if e.file_type().ok()?.is_file() {
@@ -705,6 +702,35 @@ fn save_copy() -> Option<PathBuf> {
         }
     }
     Some(to)
+}
+
+/// A scratch folder of the test's own (tests run in parallel in one
+/// process, so the process id alone is shared), removed when the test
+/// ends, a failed one included.
+struct Scratch(PathBuf);
+
+impl Scratch {
+    fn new(what: &str) -> Scratch {
+        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let to = std::env::temp_dir().join(format!("arena-inputtest-{what}-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&to);
+        std::fs::create_dir_all(&to).expect("a scratch folder");
+        Scratch(to)
+    }
+}
+
+impl std::ops::Deref for Scratch {
+    type Target = PathBuf;
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 #[test]
@@ -716,7 +742,7 @@ fn the_spellmaker_clicked_live_as_by_script() {
     };
     // Drakain before Daggerfall's guild master: the menu's Spellmaker (2),
     // then the screen's click at (35, 75) (an effect's list), entries 0.
-    let start = |picks| Start { hour: None, picks, load: Some((save.clone(), 1)), ..Default::default() };
+    let start = |picks| Start { hour: None, picks, load: Some((save.to_path_buf(), 1)), ..Default::default() };
     let mut a = app(&dir, &start(""));
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
@@ -738,7 +764,6 @@ fn the_spellmaker_clicked_live_as_by_script() {
     let maker = |app: &App| app.pending.as_ref().and_then(|p| p.maker.as_ref()).map(|(_, form)| *form);
     assert_eq!(maker(&a), maker(&b), "the same form open");
     assert!(maker(&a).flatten().is_some(), "a form open after the clicks");
-    let _ = std::fs::remove_dir_all(&save);
 }
 
 /// Where entry `i` of the question shown can be clicked (`hud::menu_pick`
@@ -1004,9 +1029,8 @@ fn notes_drawn(app: &App) -> Vec<(u16, u16, String)> {
 #[test]
 fn a_note_added_on_the_automap_by_a_click_and_keys() {
     let Some(dir) = game_dir() else { return };
-    let saves = std::env::temp_dir().join(format!("arena-inputtest-notes-{}", std::process::id()));
-    std::fs::create_dir_all(&saves).unwrap();
-    let mut a = app(&dir, &Start { save_dir: Some(saves.clone()), ..Default::default() });
+    let saves = Scratch::new("notes");
+    let mut a = app(&dir, &Start { save_dir: Some(saves.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
     let before = notes_drawn(&a);
@@ -1068,7 +1092,6 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     d.key(&mut a, KeyCode::F9, None);
     let loaded = notes_drawn(&a);
     assert!(loaded.iter().any(|n| n.2 == "X") && !loaded.iter().any(|n| n.2 == "Y"), "the save's note loaded back: {loaded:?}");
-    let _ = std::fs::remove_dir_all(&saves);
 }
 
 /// The squares of trigger walls whose trigger's index (in TRIGGERS)
@@ -1156,7 +1179,7 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
         eprintln!("skipping: no ARENA_SAVE");
         return;
     };
-    let mut a = app(&dir, &Start { hour: None, load: Some((save, 1)), ..Default::default() });
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
     clear(&mut d, &mut a);
@@ -1238,7 +1261,6 @@ fn a_save_loaded_from_the_title_as_in_play() {
     assert!(b.m.mem.r16(DS, 0xBA7A) != 0 && b.m.mem.r16(DS, 0xBA7C) == 0, "the way back: the outer loop's");
     assert_eq!(b.m.mem.r16(DS, 0x05C8) & 4, 0, "5C8 bit 4 cleared");
     assert_eq!(b.m.mem.r16(DS, 0xBA76), 6, "the hook's offset kept, its segment cleared");
-    let _ = std::fs::remove_dir_all(&save);
 }
 
 /// Shift+F5's save menu: slot 3's row clicked, a name typed, Enter: the
@@ -1250,10 +1272,8 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     use arena::mem::DS;
     use arena::movement::var::{X, Y};
     let Some(dir) = game_dir() else { return };
-    let scratch = std::env::temp_dir().join(format!("arena-inputtest-savemenu-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&scratch);
-    std::fs::create_dir_all(&scratch).unwrap();
-    let mut a = app(&dir, &Start { save_dir: Some(scratch.clone()), ..Default::default() });
+    let scratch = Scratch::new("savemenu");
+    let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
     a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
@@ -1276,7 +1296,7 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let mut engine = world::load(&dir, "START.MIF");
     let archive = Rc::new(archive::Archive::open(&dir));
     let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
-    let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.clone()), 0, false);
+    let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.to_path_buf()), 0, false);
     let mut d = Driver::new(&mut b);
     d.key(&mut b, KeyCode::Enter, None);
     d.key(&mut b, KeyCode::Enter, None);
@@ -1294,5 +1314,4 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     d.click(&mut b, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(b.saveui.is_none() && b.creation.is_none(), "loaded and playing");
     assert_eq!(at(&b.engine), saved, "where it was saved");
-    let _ = std::fs::remove_dir_all(&scratch);
 }
