@@ -427,7 +427,7 @@ impl Machine {
     }
 
     /// 0000:52BA: the number at `si` (a sign, then digits, in 16 bits).
-    fn parse_number(&self, si: u16) -> u16 {
+    pub(crate) fn parse_number(&self, si: u16) -> u16 {
         let (mut si, mut neg) = (si, false);
         match self.mem.r8(DS, si) {
             b'-' => {

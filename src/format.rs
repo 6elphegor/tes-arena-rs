@@ -1,5 +1,5 @@
 //! The game's sprintf (0000:8D14, formatter 0000:8D6E), for formats
-//! whose conversions are `%s`, `%d` and `%%`.
+//! whose conversions are `%s`, `%d`, `%u`, `%ld`, `%lu` and `%%`.
 
 use crate::machine::Machine;
 use crate::mem::DS;
@@ -8,14 +8,19 @@ use crate::mem::DS;
 const NO_CR: u16 = 0xA902;
 /// End of the buffer 0000:7028 converts numbers in (backwards).
 const UTOA_END: u16 = 0xA933;
+/// End of the buffer 0000:75B4 converts dwords in (backwards, in the
+/// format's segment).
+const LTOA_END: u16 = 0x94F6;
 
 /// An argument of `sprintf`.
 #[derive(Clone, Copy, Debug)]
 pub enum Arg {
     /// A string, by far pointer (`%s`).
     Str(u16, u16),
-    /// A word (`%d`, signed).
+    /// A word (`%d`, signed; `%u`).
     Int(u16),
+    /// A dword (`%ld`, signed; `%lu`).
+    Long(u32),
 }
 
 impl Machine {
@@ -69,6 +74,40 @@ impl Machine {
                         (b'u', Some(&Arg::Int(v))) => {
                             for d in self.utoa(v) {
                                 put(self, d, false);
+                            }
+                        }
+                        // 0000:8E39: `%lu` through 0000:75B4, `%ld` through
+                        // 75F6 (a minus sign, then the same): the digits
+                        // are written backwards into the format's segment,
+                        // ending at 94F6, and copied out.
+                        (b'l', Some(&Arg::Long(v))) => {
+                            let kind = self.mem.r8(fseg, p);
+                            p = p.wrapping_add(1);
+                            let mut v = v;
+                            match kind {
+                                b'u' => {}
+                                b'd' => {
+                                    if (v as i32) < 0 {
+                                        v = v.wrapping_neg();
+                                        put(self, b'-', false);
+                                    }
+                                }
+                                k => unimplemented!("sprintf %l{}", k as char),
+                            }
+                            let mut at = LTOA_END;
+                            loop {
+                                self.mem.w8(fseg, at, b'0' + (v % 10) as u8);
+                                at = at.wrapping_sub(1);
+                                v /= 10;
+                                if v == 0 {
+                                    break;
+                                }
+                            }
+                            let mut q = at.wrapping_add(1);
+                            while q != LTOA_END.wrapping_add(1) {
+                                let d = self.mem.r8(fseg, q);
+                                put(self, d, false);
+                                q = q.wrapping_add(1);
                             }
                         }
                         (s, a) => unimplemented!("sprintf %{} with {a:?}", s as char),

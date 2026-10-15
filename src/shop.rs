@@ -126,7 +126,7 @@ impl Machine {
 
     /// 1194:7596. Item types with bit 7 set map through the signed table
     /// at DGROUP 36DD.
-    fn shop_map_type(&self, ty: u8) -> u16 {
+    pub(crate) fn shop_map_type(&self, ty: u8) -> u16 {
         if ty & 0x80 != 0 {
             self.mem.r8(DS, TYPE_MAP + (ty & 0x7f) as u16) as i8 as i16 as u16
         } else {
@@ -557,7 +557,7 @@ impl Machine {
     /// 1194:B566. Trinket (kind 0): a sub-kind by d100 against 1DEB (or
     /// forced by 13C8), then one of three variants (B718/B74B/B77E) each
     /// with its own type table, then the price (B5B5).
-    fn shop_magic_kind0(&mut self) -> Option<()> {
+    pub(crate) fn shop_magic_kind0(&mut self) -> Option<()> {
         self.shop_add_key16(10);
         self.shop_mt(0, 0);
         let forced = self.shop_b(SHOP_FLAG);
@@ -609,7 +609,7 @@ impl Machine {
 
     /// 1194:B617. Kind 1, only from item level 7; Some(false) (CF set)
     /// below that.
-    fn shop_magic_kind1(&mut self) -> Option<bool> {
+    pub(crate) fn shop_magic_kind1(&mut self) -> Option<bool> {
         if self.shop_b(LEVEL) < 7 {
             return Some(false);
         }
@@ -645,7 +645,7 @@ impl Machine {
     /// 1194:B6B0. Kind 2: a sub-kind of 4, and a grade from 76..=99
     /// against 20D3; the price is the grade's table entry × 50, cut to
     /// 16 bits.
-    fn shop_magic_kind2(&mut self) -> Option<()> {
+    pub(crate) fn shop_magic_kind2(&mut self) -> Option<()> {
         self.shop_add_key16(1000);
         self.shop_mt(0, 2);
         // B848 always sets 7109 = 1, so the sub-kind is always rolled.
