@@ -50,7 +50,10 @@ def usage(src):
     m = re.search(r'Usage: gen_\w+\.py ([^\n]*)', src)
     if not m:
         return ['ACD_unpacked.EXE', 'OUT']
-    return [t for t in m.group(1).split() if not t.startswith('[')]
+    # A parenthesised note after the arguments (`(SHARD=k/K: par.py)`)
+    # isn't one of them.
+    line = m.group(1).split('(')[0]
+    return [t for t in line.split() if not t.startswith('[')]
 
 
 def plan(name, env):
