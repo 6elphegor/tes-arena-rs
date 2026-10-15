@@ -794,7 +794,7 @@ impl Machine {
     /// Imperial province or where A4C is not among the 3Ah at 47E2);
     /// entries whose name word equals the last one named are left out.
     /// A byte `al` ends the list (0 once a name was written). Each name is
-    /// 1194:E539's, its suffix list E56B's.
+    /// 1194:E539's, its suffix list 1194:E56B's.
     fn names_a(&mut self, al: u8) {
         let n = self.g16(PLACES_A_COUNT);
         if n == 0 {

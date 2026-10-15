@@ -372,7 +372,7 @@ impl Machine {
         self.tm16(DAYS)
     }
 
-    /// 1194:2F69 with 2F4D and 30F1: DAYS `ax`, kept to 1..7D0h (signed);
+    /// 1194:2F69 with 1194:2F4D and 1194:30F1: DAYS `ax`, kept to 1..7D0h (signed);
     /// the travel animation loaded and its frame from 0; then each day 5A0h
     /// minutes pass and the animation steps (frames 0..0Ah).
     fn travel_days_pass(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks, ax: u16) -> Option<()> {

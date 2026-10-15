@@ -334,7 +334,7 @@ impl Engine {
             return Some(Frame::Left);
         }
         m.mem.w8(DS, STAGE, 0x0B);
-        // A919: the eye 1Eh behind the player (the sine table at B03C, the
+        // 0000:A919: the eye 1Eh behind the player (the sine table at B03C, the
         // cosine's at B13C; the high word of each product).
         let b = (r(m, HEADING).wrapping_add(0x100) & 0x1FF).wrapping_mul(2);
         let s = r(m, 0xB03C_u16.wrapping_add(b)) as i16 as i32;

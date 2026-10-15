@@ -305,7 +305,7 @@ impl Machine {
         self.mem.w8(DS, 0x8A56, saved);
     }
 
-    /// 1194:9C96 (`flag` 0) / 9C9B (TEXT_FLAG already set, here `flag`):
+    /// 1194:9C96 (`flag` 0) / 1194:9C9B (TEXT_FLAG already set, here `flag`):
     /// text `text` written (A374, mode 2) and shown in a message box,
     /// in colour 60h, or EEh with its second font when 5C8 bit 20h is set.
     pub(crate) fn quest_message(&mut self, hooks: &mut dyn QuestHooks, text: u16, flag: u8) {

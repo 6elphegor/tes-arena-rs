@@ -1119,7 +1119,7 @@ impl Machine {
 
     /// 1194:C83B. The job on the item at `si`, priced `eax`: offered
     /// (text 590h) and, refused, asked again from the three reasons
-    /// (REASONS: 1194:CB40, CBD3, CC77) until agreed or left. The minute
+    /// (REASONS: 1194:CB40, 1194:CBD3, 1194:CC77) until agreed or left. The minute
     /// it will be ready (1194:CAF6, paid), or None (left, or not enough
     /// gold).
     fn repair_offer(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks, si: u16, eax: u32) -> Option<Option<u32>> {

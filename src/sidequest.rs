@@ -448,7 +448,7 @@ impl Machine {
 
     /// 1194:97F1 (stage 4): an item's number (9815), a person (97C0), the
     /// deadline there and back, a size, the reward by the place's size
-    /// (9825), an item (97AD), then +24h the place here.
+    /// (1194:9825), an item (1194:97AD), then +24h the place here.
     fn quest_make_fetch(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) -> Option<()> {
         self.sq_stage_set(si, 4);
         let r = self.sq_roll(0x12)? as u8;
@@ -771,7 +771,7 @@ impl Machine {
         self.errand_reward(si)
     }
 
-    /// 1194:9EC4 (stage 3): the names' seed, the escort's size (9EDD), a
+    /// 1194:9EC4 (stage 3): the names' seed, the escort's size (1194:9EDD), a
     /// goal in town, a day's deadline, a reward.
     fn errand_make_escort(&mut self, si: u16) -> Option<()> {
         self.sq_stage_set(si, 3);
@@ -866,7 +866,7 @@ impl Machine {
             return Some(());
         }
         if self.sq8(TALK) == 4 {
-            // 8F50: the errands offered whose giver this is.
+            // 1194:8F50: the errands offered whose giver this is.
             for i in 0..4 {
                 let si = OTHERS + i * ERRAND;
                 if self.quest_kind(si) == 2 && self.sq_talker() == self.sq16(si + 0x10) {
@@ -1566,7 +1566,7 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:D863. The text at 9622 shown in pages: split (D8DE, 0Ah
+    /// 1194:D863. The text at 9622 shown in pages: split (1194:D8DE, 0Ah
     /// lines a page, each page's last line feed or return a NUL), the
     /// fonts set, colour 60h, each page but the last in a message box,
     /// the last offered with its yes and no (020E, the keys at 8256h, the

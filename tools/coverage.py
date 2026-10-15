@@ -20,8 +20,14 @@ The graph
   calls (9A) as new routine entries. A jump to another routine's entry
   ends the walk there (a tail call).
 - Indirect calls and jumps through [reg+disp] are resolved where the
-  table holds a run of offsets that decode as code in the same segment
-  (a heuristic); the rest are counted as unresolved.
+  table holds a run of offsets that decode as code in the same segment:
+  up to a `cmp reg, n` bound just before, or without one, while each
+  entry starts like a routine (a known one, or code right after a
+  return or padding). Calls through a DGROUP word or dword ([N]) take
+  its value in the image and every immediate the code stores to it
+  (`mov word/dword ptr [N], imm`); discovery repeats until it stops
+  growing, since stores found later resolve calls walked earlier. The
+  rest are counted (distinct sites) as unresolved.
 
 Coverage
 - Every SEG:OFF in src/*.rs is a claim. One in a doc comment of a trait
@@ -123,7 +129,12 @@ class Graph:
         self.segs = sorted(s for s in segs if s * 16 < len(img) and s not in (DGROUP, DATA))
         self.entries = {}          # (seg, off) -> set of caller entries
         self.unresolved = 0
+        self.unresolved_sites = set()
         self.tables = 0
+        # Immediates stored to DGROUP words and dwords (`mov word/dword
+        # ptr [N], imm`), for the pointers called through them.
+        self.ptr_writes = collections.defaultdict(set)
+        self.known = set()
 
     def seg_end(self, seg):
         later = [s for s in self.segs if s > seg]
@@ -152,6 +163,42 @@ class Graph:
             o = (o + i.size) & 0xFFFF
         return True
 
+    def start_like(self, seg, off):
+        """A routine could start at seg:off: a known one, or code right
+        after a return or a padding nop."""
+        if (seg, off) in self.known:
+            return True
+        lin = seg * 16 + off
+        return lin > 0 and self.img[lin - 1] in (0xC3, 0xCB, 0xC2, 0xCA, 0xCF, 0x90) and self.decodes(seg, off)
+
+    def pointer(self, seg, i):
+        """Targets of `call word ptr [N]` (near, in this segment) and
+        `lcall [N]` (far) through a DGROUP variable: its value in the
+        image and the immediates the code stores to it."""
+        m = re.fullmatch(r'(?:word ptr |dword ptr )?\[(0x[0-9a-f]+)\]', i.op_str)
+        if not m:
+            return []
+        n = int(m.group(1), 16)
+        g = DGROUP * 16 + n
+        out = set()
+        if i.mnemonic == 'call':
+            cands = set(self.ptr_writes[(n, 'w')])
+            if g + 2 <= len(self.img):
+                cands.add(struct.unpack_from('<H', self.img, g)[0])
+            out = {(seg, t) for t in cands if self.start_like(seg, t)}
+        else:
+            cands = set()
+            for v in self.ptr_writes[(n, 'd')]:
+                cands.add((v >> 16, v & 0xFFFF))
+            for o in self.ptr_writes[(n, 'w')]:
+                for sg in self.ptr_writes[(n + 2, 'w')]:
+                    cands.add((sg, o))
+            if g + 4 <= len(self.img):
+                o, sg = struct.unpack_from('<HH', self.img, g)
+                cands.add((sg, o))
+            out = {(sg, o) for sg, o in cands if sg in self.segs and self.start_like(sg, o)}
+        return sorted(out)
+
     def table(self, seg, i, seen):
         """Targets of `call/jmp word ptr [reg+disp]` with a table base
         (disp >= 100h) and a bound (`cmp reg, n` in the 40 bytes before):
@@ -170,7 +217,10 @@ class Graph:
             if c.mnemonic == 'cmp' and cm:
                 bound = int(cm.group(2), 0)
                 break
-        if bound is None or bound > 64:
+        unbounded = bound is None
+        if unbounded:
+            bound = 63
+        elif bound > 64:
             return []
         base = seg * 16 if m.group(1) else DGROUP * 16
         out = []
@@ -179,7 +229,7 @@ class Graph:
             if p + 2 > len(self.img):
                 break
             t = struct.unpack_from('<H', self.img, p)[0]
-            if not self.decodes(seg, t):
+            if not self.decodes(seg, t) or (unbounded and not self.start_like(seg, t)):
                 break
             out.append(t)
         return out if len(out) >= 2 else []
@@ -203,6 +253,10 @@ class Graph:
                     break
                 seen[o] = i
                 b, mn = i.bytes, i.mnemonic
+                if mn == 'mov':
+                    pw = re.fullmatch(r'(word|dword) ptr \[(0x[0-9a-f]+)\], (0x[0-9a-f]+|\d+)', i.op_str)
+                    if pw:
+                        self.ptr_writes[(int(pw.group(2), 16), pw.group(1)[0])].add(int(pw.group(3), 0))
                 nxt = (o + i.size) & 0xFFFF
                 op = b[0]
                 prefix = 0
@@ -225,17 +279,25 @@ class Graph:
                 if mn == 'call':
                     if i.op_str.startswith('0x'):
                         callees.add((seg, int(i.op_str, 16) & 0xFFFF))
+                    elif self.pointer(seg, i):
+                        self.tables += 1
+                        callees.update(self.pointer(seg, i))
                     else:
                         t = self.table(seg, i, seen)
                         if t:
                             self.tables += 1
                             callees.update((seg, x) for x in t)
                         else:
-                            self.unresolved += 1
+                            self.unresolved_sites.add((seg, o, mn, i.op_str))
                     o = nxt
                     continue
                 if mn == 'lcall':
-                    self.unresolved += 1
+                    t = self.pointer(seg, i)
+                    if t:
+                        self.tables += 1
+                        callees.update(t)
+                    else:
+                        self.unresolved_sites.add((seg, o, mn, i.op_str))
                     o = nxt
                     continue
                 if mn == 'jmp':
@@ -251,10 +313,10 @@ class Graph:
                             self.tables += 1
                             todo.extend(t)
                         else:
-                            self.unresolved += 1
+                            self.unresolved_sites.add((seg, o, mn, i.op_str))
                     break
                 if mn == 'ljmp':
-                    self.unresolved += 1
+                    self.unresolved_sites.add((seg, o, mn, i.op_str))
                     break
                 if mn.startswith('j') or mn.startswith('loop') or mn == 'jcxz':
                     if i.op_str.startswith('0x'):
@@ -263,17 +325,29 @@ class Graph:
         return seen, callees
 
     def build(self, roots):
-        entries = {}
-        todo = list(roots)
-        while todo:
-            r = todo.pop()
-            if r in entries or r[0] not in self.segs:
-                continue
-            entries[r] = set()
-            _, callees = self.walk(r[0], r[1], set())
-            for c in callees:
-                todo.append(c)
-        # Bodies with the full entry set (tail calls end a body), callers.
+        # Discovery, again until it stops growing: the pointers stored by
+        # code found later resolve calls walked earlier.
+        size = -1
+        for _ in range(8):
+            entries = {}
+            todo = list(roots)
+            while todo:
+                r = todo.pop()
+                if r in entries or r[0] not in self.segs:
+                    continue
+                entries[r] = set()
+                _, callees = self.walk(r[0], r[1], set())
+                for c in callees:
+                    todo.append(c)
+            self.known = set(entries)
+            if len(entries) == size:
+                break
+            size = len(entries)
+        # Bodies with the full entry set (tail calls end a body), callers;
+        # the indirect sites counted on this pass only.
+        self.unresolved = 0
+        self.unresolved_sites = set()
+        self.tables = 0
         stop = set(entries)
         self.bodies = {}
         self.callees = {}
@@ -285,6 +359,7 @@ class Graph:
                 if c in entries:
                     entries[c].add(e)
         self.entries = entries
+        self.unresolved = len(self.unresolved_sites)
 
 
 def far_pointer_roots(g):
@@ -300,13 +375,27 @@ def far_pointer_roots(g):
 
 
 CLAIM = re.compile(r'\b([0-9A-F]{4}):([0-9A-F]{4})\b')
+# A bare offset in a comment: four upper-case hex digits standing alone
+# (not 0x.., not part of a longer number, not followed by h).
+BARE = re.compile(r'(?<![0-9A-Za-z_:])([0-9A-F]{4})(?![0-9A-Za-z_:])')
+
+
+class Claims(collections.defaultdict):
+    """The claims by address, with the bare offsets still to resolve."""
+
+    def __init__(self):
+        super().__init__(set)
+        self.bare = []
 
 
 def claims(repo):
     """(seg, off) -> set of kinds: 'ported', 'hook', 'view'; where; and
     the entries the port names: the first address of a `///` block right
     above a `fn` in src/ outside the hooks traits."""
-    out = collections.defaultdict(set)
+    # Bare offsets in comments ("8575: the menu") are kept in `out.bare`,
+    # resolved later against the routine entries of the segments the same
+    # file names.
+    out = Claims()
     where = collections.defaultdict(set)
     named_entries = set()
     for sub, kind_default in (('src', 'ported'), ('view/src', 'view')):
@@ -318,6 +407,8 @@ def claims(repo):
             depth = 0
             hooks_depth = None
             block_first = None
+            segs = set()
+            bare = []
             for line in open(os.path.join(d, name), encoding='utf-8'):
                 s = line.strip()
                 if s.startswith('///'):
@@ -343,7 +434,27 @@ def claims(repo):
                     a = (int(m.group(1), 16), int(m.group(2), 16))
                     out[a].add(kind)
                     where[a].add(f'{sub}/{name}')
+                    segs.add(a[0])
+                if '//' in line:
+                    comment = line[line.index('//'):]
+                    for m in BARE.finditer(CLAIM.sub(' ', comment)):
+                        bare.append((int(m.group(1), 16), kind))
+            out.bare.extend((segs, off, kind, f'{sub}/{name}') for off, kind in bare)
     return out, where, named_entries
+
+
+def resolve_bare(cl, g):
+    """The routine entries named only by a bare offset in a comment of a
+    file that names their segment: address -> files. Not claims: such a
+    mention is as often a routine left out ("stubbed: 9466, 545C") or a
+    variable as one ported inline, so they are listed for checking."""
+    out = collections.defaultdict(set)
+    for segs, off, kind, f in cl.bare:
+        for sg in segs:
+            a = (sg, off)
+            if a in g.entries and not cl.get(a):
+                out[a].add(f)
+    return out
 
 
 def classify(g, e):
@@ -407,6 +518,7 @@ def main():
     extra = {e for e in port_entries if e[0] in g.segs and e not in graph_only and g.decodes(*e)}
     g.build(roots | extra)
     added = len(g.entries) - len(graph_only)
+    bare = resolve_bare(cl, g)
 
     by_seg = collections.defaultdict(list)
     for (s, o) in g.entries:
@@ -451,6 +563,7 @@ def main():
     hooks = [e for e in g.entries if status.get(e) == 'hook']
     viewed = [e for e in g.entries if status.get(e) == 'view']
     rest = [e for e in g.entries if e not in status]
+    rest_set = set(rest)
     cls = {e: classify(g, e) for e in rest}
     # Reached only through code the port leaves to the front end (a hook's
     # or the view's routine, or presentation below them): the front end's.
@@ -569,7 +682,10 @@ def main():
     w('pointer constant the relocation table fixes up (far calls, far pointers')
     w('written as immediates or stored in tables), following near and far calls;')
     w('indirect calls through tables are resolved where the table reads as a run')
-    w('of code offsets. The port\'s claims are the SEG:OFF addresses in its')
+    w('of code offsets (bounded by a `cmp` before the call, or each entry')
+    w('starting like a routine), and calls through a DGROUP pointer [N] by its')
+    w('value in the image and the immediates the code stores to it.')
+    w('The port\'s claims are the SEG:OFF addresses in its')
     w('sources: in a `...Hooks` trait\'s docs a hook (left to the front end),')
     w('elsewhere in `src/` ported, in `view/src/` the front end\'s own version.')
     w('A routine counts as ported when a ported address falls on its entry or')
@@ -673,6 +789,20 @@ def main():
         shown += 1
         if shown >= 40:
             break
+    w('')
+    w('## Named in passing')
+    w('')
+    w('Uncovered routines whose offset appears bare (no segment) in a comment')
+    w('of a port file that names their segment. Such a mention is as often a')
+    w('routine ported inline as one deliberately left out ("stubbed: ...") or a')
+    w('variable that happens to share the number, so they are not counted as')
+    w(f'ported; {len(bare)} to check, largest first:')
+    w('')
+    w('| routine | bytes | files |')
+    w('|---|---:|---|')
+    for e in sorted(bare, key=lambda e: (-size[e], e)):
+        if e in rest_set:
+            w(f'| {fmt(e)} | {size[e]} | {", ".join(sorted(os.path.basename(f) for f in bare[e]))} |')
     w('')
     w('## All uncovered routines')
     w('')
