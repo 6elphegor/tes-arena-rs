@@ -114,7 +114,7 @@ impl QuestHooks for Log {
     fn message_box(&mut self, _m: &mut Machine, si: u16) {
         self.0.extend([2, si]);
     }
-    fn expand(&mut self, _m: &mut Machine, di: u16) {
+    fn expand(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, di: u16) {
         self.0.extend([3, di]);
     }
     fn province_load(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, province: u8) {
@@ -152,7 +152,7 @@ fn matches_original() {
         m.load_rng();
         let before = m.clone();
         let mut log = Log::default();
-        let cf = if op == 0 { m.quest_item_taken(&mut log) } else { m.quest_chest(&mut arena::bsa::Files::default(), &mut log, RECORD) };
+        let cf = if op == 0 { m.quest_item_taken(&mut arena::bsa::Files::default(), &mut log) } else { m.quest_chest(&mut arena::bsa::Files::default(), &mut log, RECORD) };
         let Some(cf) = cf else {
             assert!(f[3] == "hang" || f[3] == "fault", "{line}");
             continue;

@@ -79,8 +79,11 @@ pub trait QuestHooks {
     }
     /// 1194:A374 with AX 0 (A36C): text number TEXT shown.
     fn text_shown(&mut self, _m: &mut Machine) {}
-    /// 2DA2:000A: the text at DS:`di` has its substitutions made.
-    fn expand(&mut self, _m: &mut Machine, _di: u16) {}
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made (the
+    /// text port, `Machine::expand`; what it can't make is left).
+    fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) {
+        let _ = m.expand(files, &mut crate::text::NoTextHooks, DS, di);
+    }
     /// 26F7:0C0A's write of the dungeon entry at DS:`si` (19h bytes) to
     /// CITYDATA, in its province (PICK_PROVINCE; `Machine::city_save_entry`).
     fn entry_save(&mut self, m: &mut Machine, files: &mut Files, si: u16) {
@@ -436,7 +439,7 @@ impl Machine {
     /// substitutions made and is shown. Returns the carry: set (the item
     /// stays) when no quest wants it. None where the original loops
     /// forever (every item taken).
-    pub fn quest_item_taken(&mut self, hooks: &mut dyn QuestHooks) -> Option<bool> {
+    pub fn quest_item_taken(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
         let here = self.mem.r8(DS, HERE_PLACE) & 0x1F;
         let Some(si) = (0..4u16)
             .map(|i| QUESTS + i * 0x34)
@@ -461,7 +464,7 @@ impl Machine {
         let ax = self.mem.r16(DS, 0x102C);
         hooks.font(self, 0, ax);
         self.quest_strcpy(0x6E0A, 0x1044);
-        hooks.expand(self, 0x1044);
+        hooks.expand(self, files, 0x1044);
         hooks.message_box(self, 0x1044);
         Some(false)
     }
@@ -562,7 +565,7 @@ impl Machine {
         hooks.text_shown(self);
         self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%adn"));
         self.mem.w8(DS, 0x92A2, 0);
-        hooks.expand(self, 0x929E);
+        hooks.expand(self, files, 0x929E);
         let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
         let ax = self.quest_dungeon_entry(files, hooks, province, 1, 0, 0x929E)?;
         self.mem.w8(DS, NEXT_PLACE, ax as u8);

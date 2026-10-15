@@ -86,7 +86,7 @@ impl TalkHooks for Script {
         self.log.extend([9, si]);
         Some(self.cf())
     }
-    fn quest_item(&mut self, _m: &mut Machine, si: u16) -> bool {
+    fn quest_item(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) -> bool {
         self.log.extend([10, si]);
         self.cf()
     }

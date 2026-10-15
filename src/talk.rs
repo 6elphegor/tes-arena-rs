@@ -143,8 +143,8 @@ pub trait TalkHooks: TextHooks {
     /// 1194:9F04: the level's quest item at `si` is taken. The carry: it
     /// stays (`quest::quest_item_taken`; it stays too where the original
     /// would loop forever).
-    fn quest_item(&mut self, m: &mut Machine, _si: u16) -> bool {
-        m.quest_item_taken(&mut crate::quest::NoQuestHooks).unwrap_or(true)
+    fn quest_item(&mut self, m: &mut Machine, files: &mut Files, _si: u16) -> bool {
+        m.quest_item_taken(files, &mut crate::quest::NoQuestHooks).unwrap_or(true)
     }
     /// 1194:D593: the quest's person speaks.
     fn quest_person(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
@@ -348,7 +348,7 @@ impl Machine {
         let bl = bx as u8;
         if self.g8(0x05E6) != 4 {
             if bl == self.g8(QUEST_ITEMS) || bl == self.g8(QUEST_ITEMS + 1) {
-                if hooks.quest_item(self, si) {
+                if hooks.quest_item(self, files, si) {
                     return Some(());
                 }
                 let si = self.g16(CLICKED);
