@@ -244,6 +244,24 @@ fn talk_menu_by_letter_as_by_script() {
 }
 
 #[test]
+fn where_is_shows_its_list_and_tells_the_way_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    let m = menu(&a).expect("a menu").clone();
+    let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
+    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    // "Where is": 1194:5734 with AX 9 (POPUP11.IMG, the record at 5105).
+    let l = menu(&a).expect("the places' list").clone();
+    assert!(l.list && l.kind == 9, "a list of kind 9: {} {}", l.list, l.kind);
+    assert!(!l.entries.is_empty());
+    d.key(&mut a, KeyCode::Enter, None);
+    let (mut b, _) = talk_start(&dir, "1,0");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "a place picked by Enter and by --picks 1,0");
+}
+
+#[test]
 fn esc_leaves_the_talk_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
