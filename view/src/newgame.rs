@@ -55,6 +55,11 @@ pub fn start(engine: &mut Engine, spec: &str) {
 /// dungeon (0000:0C66, its run 0997).
 pub fn play(engine: &mut Engine) {
     let m = &mut engine.m;
+    // The working slot (1194:3AC5) the game's own *.65 files, as
+    // `areas::start` sets it: without it a save copies no CITYDATA (or the
+    // slot's other files) and loading it back gives up at CITYDATA.nn
+    // (1194:2E18).
+    m.working_slot_set(65);
     if m.game_date().is_none() || m.weather_roll().is_none() {
         eprintln!("the game's date or weather could not be set");
     }

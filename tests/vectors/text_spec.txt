@@ -129,3 +129,10 @@ ds 0000 aim 40 137A:w1,05D2:w3,BB09:b0,0D48:b1,0DA8:b4,6E54:b0
 # 101h, so that %en finds it.
 ds 0000 aim 40 137A:w4,0D48:b6,0FD2:w102
 c 0000 aim 80 0200:w101
+# A quarter of the cases aimed at %nt in a building (text 596h: "Best ale
+# in %cn, here at the %nt."; 5E6 4, 5C8 bit 4000h clear, not in the
+# wilderness, AB2 1) at FD2 102h (key 101h, the low byte halved), and half
+# with the taverns' list's first entry key 101h, so that 1194:3EB1 finds
+# it.
+ds 0000 aim 40 137A:w596,05E6:b4,05C8:w0,C39A:w0,0AB2:b1,0FD2:w102
+c 0000 aim 80 0100:w101

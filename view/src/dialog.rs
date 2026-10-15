@@ -216,7 +216,9 @@ impl Talk {
     fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {
             Some(Answer::Pick(p)) => {
-                let p = *p;
+                // Only an entry shown can be picked (1194:020E, 5734 give
+                // an entry or Esc): an answer past them is Esc.
+                let p = if (*p as usize) < menu.entries.len() { *p } else { 0xFFFF };
                 self.answers.pop_front();
                 self.since_answer.clear();
                 println!("[{}] -> {}", menu.title.iter().map(|l| hud::plain(l)).collect::<Vec<_>>().join(" ").trim(), p as i16);
