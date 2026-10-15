@@ -102,6 +102,7 @@ mod audio;
 mod automap;
 mod create;
 mod dialog;
+mod doll;
 mod flats;
 mod flc;
 mod hud;
@@ -1397,7 +1398,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
-            panels::draw(&mut screen, &font, equip.as_ref(), panel, &engine.m);
+            let doll = doll::images(&st.assets.archive, &engine.m);
+            panels::draw(&mut screen, &font, equip.as_ref(), &doll, panel, &engine.m);
         }
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
@@ -2298,7 +2300,8 @@ impl winit::application::ApplicationHandler for App {
                     if self.panel.is_some() {
                         self.equip_image();
                         let equip = self.equip.as_ref().and_then(|e| e.as_ref());
-                        panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
+                        let doll = doll::images(&self.assets.archive, &self.engine.m);
+                        panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
                     }
                     hud::compose_over(&mut self.screen, &self.font, &hud);
                     if self.map {
