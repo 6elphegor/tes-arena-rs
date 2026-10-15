@@ -79,6 +79,18 @@ fn kept(engine: &Engine) -> (Vec<u8>, u16, u16, u16, u16) {
     (engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME).to_vec(), r(X), r(Y), r(HEIGHT), r(HEADING))
 }
 
+/// The CITYDATA check (242A:000E) after a load: a failure reported.
+fn citydata(engine: &mut Engine, n: usize, run: &arena::transit::Run, issues: &std::cell::Cell<usize>) {
+    let mut bad = false;
+    if engine.m.citydata_check(&mut engine.files, &mut |_, _| bad = true).is_none() {
+        println!("NONE frame {n} (citydata check); {}", place(engine, run));
+        issues.set(issues.get() + 1);
+    } else if bad {
+        println!("ODD frame {n}: the CITYDATA check failed after a load; {}", place(engine, run));
+        issues.set(issues.get() + 1);
+    }
+}
+
 /// The odd states looked for after each turn, and round 3's invariants:
 /// the heap's chain whole (`heap_check`), the EMS bank mapped one there
 /// is (EMS_MAPPED a page times 4, below EMS_PAGES), the text system's
@@ -182,6 +194,14 @@ enum Act {
     /// world map and another province, a place clicked and Travel: a
     /// journey when the click named one, the screen left otherwise.
     Travel,
+    /// The save menu (a slot clicked, a name typed) and the load menu in
+    /// play (`saveui`), the state compared as the save and load's.
+    Menus,
+    /// A fresh program's title Load (`load_game_title`) of the last save
+    /// the menus made, and play going on from it.
+    TitleLoad,
+    /// A palace door clicked (the Imperial City's triggers 11..13).
+    Palace,
     /// A button of the bar clicked (the automap, the status box, the
     /// logbook, the sheet, camping...), the automap's buttons pressed.
     Screens,
@@ -264,9 +284,13 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         crate::save_to(&mut engine, sdir, slot, st.assets.palette);
     }
     // A sub-step that gives up (None) is reported and the run goes on.
-    let report_none = |what: &str, n: usize, engine: &Engine, run: &arena::transit::Run| {
-        println!("NONE frame {n} ({what}): {}", place(engine, run));
+    let report_none = |what: &str, n: usize, engine: &Engine, run: &arena::transit::Run| match engine.m.gave_up {
+        Some(why) => println!("ORIGFAULT frame {n} ({what}): {why}; {}", place(engine, run)),
+        None => println!("NONE frame {n} ({what}): {}", place(engine, run)),
     };
+    // An original fault met in a turn: the game reloaded from the save, as
+    // after a death (the original would have crashed there).
+    let fault = std::cell::Cell::new(false);
     let issues = std::cell::Cell::new(0usize);
     let mut last_odd = None;
     let mut watch: Option<Watch> = None;
@@ -278,6 +302,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if std::env::var_os("PT_TRACE").is_some() {
             eprintln!("TRACE frame {n} ({what}) {}", place(engine, run));
         }
+        engine.m.gave_up = None;
         let r = catch_unwind(AssertUnwindSafe(|| shot_frame(dir, engine, run, st, &intent)));
         let ms = t.elapsed().as_millis();
         if ms > 1000 {
@@ -286,6 +311,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         match r {
             Ok(Some(())) => {}
             Ok(None) => {
+                if let Some(why) = engine.m.gave_up {
+                    println!("ORIGFAULT frame {n} ({what}): {why}; {}", place(engine, run));
+                    if tours && saves.is_some() {
+                        fault.set(true);
+                        return true;
+                    }
+                    return false;
+                }
                 println!("NONE frame {n} ({what}): {}", place(engine, run));
                 return false;
             }
@@ -336,11 +369,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     }
     println!("start: {}", place(&engine, run));
     let mut act = Act::Walk(256, 0, 0);
+    // The slot the menus last saved, for a title's Load.
+    let mut last_menu_slot: Option<u8> = None;
     let mut left = 0;
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     while alive && n < frames {
-        if st.over {
-            // Dead (or the game won): with a save, loaded back.
+        if st.over || fault.replace(false) {
+            // Dead (or the game won, or an original fault met): with a save,
+            // loaded back.
             match (tours, saves) {
                 // As the window does after the game's end (`game_over`): the
                 // main menu's Load on a fresh engine, the start dungeon loaded.
@@ -367,7 +403,10 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if left == 0 {
             left = 5 + dice.below(40) as usize;
             act = if tours && dice.below(100) < tours_pc {
-                match dice.below(22) {
+                match dice.below(25) {
+                    22 => Act::Menus,
+                    23 => Act::TitleLoad,
+                    24 => Act::Palace,
                     0..=3 => Act::Door,
                     4..=5 => Act::Stairs,
                     6..=8 => Act::Talk,
@@ -394,7 +433,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 _ => Act::SaveLoad,
                 }
             };
-            if let Act::Door | Act::Stairs | Act::Talk | Act::Shop(_) | Act::Quest | Act::Cast | Act::Xp | Act::Items | Act::Die | Act::Travel | Act::Screens | Act::Note = act {
+            if let Act::Door | Act::Stairs | Act::Talk | Act::Shop(_) | Act::Quest | Act::Cast | Act::Xp | Act::Items | Act::Die | Act::Travel | Act::Screens | Act::Note | Act::Menus | Act::TitleLoad | Act::Palace = act {
                 left = 12;
             }
         }
@@ -420,6 +459,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::Travel => "travel",
             Act::Screens => "screens",
             Act::Note => "note",
+            Act::Menus => "menus",
+            Act::TitleLoad => "title load",
+            Act::Palace => "palace",
         };
         // A test aid, as --do hp is: the player healed when below a third,
         // so a run goes on past its fights.
@@ -716,6 +758,126 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     crate::automap::open(&mut engine, &archive);
                     st.note = Some((dice.below(320) as u16, dice.below(150) as u16));
                     *counts.entry("notes").or_default() += 1;
+                }
+            }
+            Act::Menus => {
+                if let (11, Some((sdir, own))) = (left, saves) {
+                    use winit::keyboard::KeyCode;
+                    // One of the menu's ten slots, not the run's own.
+                    let mut slot = dice.below(10) as u8;
+                    if slot == own {
+                        slot = (slot + 1) % 10;
+                    }
+                    let row = |s: u8| 4 + s as i32 * 14 + 3;
+                    let archive = st.assets.archive.clone();
+                    let was = kept(&engine);
+                    let (mut ui, mut e) = crate::saveui::SaveUi::open(crate::saveui::Kind::Save, &engine, sdir, &archive);
+                    if let crate::saveui::Ended::Open = e {
+                        e = ui.click(160, row(slot), false);
+                    }
+                    if let crate::saveui::Ended::Open = e {
+                        for c in format!("pt{n}").chars() {
+                            ui.key(KeyCode::KeyA, Some(&c.to_string()));
+                        }
+                        e = ui.key(KeyCode::Enter, None);
+                    }
+                    match e {
+                        crate::saveui::Ended::Save(e2, s) => {
+                            engine = e2;
+                            let msg = crate::save_to(&mut engine, sdir, s, st.assets.palette);
+                            if msg.contains("failed") {
+                                println!("ODD frame {n} (menus): {msg}; {}", place(&engine, run));
+                                issues.set(issues.get() + 1);
+                            }
+                            *counts.entry("menu saves").or_default() += 1;
+                            let (mut ui, mut e) = crate::saveui::SaveUi::open(crate::saveui::Kind::Load, &engine, sdir, &archive);
+                            if let crate::saveui::Ended::Open = e {
+                                e = ui.click(160, row(s), false);
+                            }
+                            match e {
+                                crate::saveui::Ended::Load(mut e3, s3) => match crate::areas::load_game(&mut e3, dir, sdir, s3) {
+                                    Ok(r) => {
+                                        engine = e3;
+                                        *run = r;
+                                        st.assets = Assets::new(dir, &mut engine);
+                                        *counts.entry("menu loads").or_default() += 1;
+                                        if was != kept(&engine) {
+                                            println!("SAVELOAD frame {n} (menus): slot {s3}; before {:?}; after {}", String::from_utf8_lossy(&was.0), place(&engine, run));
+                                            issues.set(issues.get() + 1);
+                                        }
+                                        citydata(&mut engine, n, run, &issues);
+                                        last_menu_slot = Some(s3);
+                                    }
+                                    Err(err) => {
+                                        println!("SAVELOAD frame {n} (menus): load failed: {err}; {}", place(&engine, run));
+                                        issues.set(issues.get() + 1);
+                                    }
+                                },
+                                crate::saveui::Ended::Left(m) => {
+                                    println!("ODD frame {n} (menus): the load menu left ({m:?}); {}", place(&engine, run));
+                                    issues.set(issues.get() + 1);
+                                }
+                                _ => {
+                                    println!("ODD frame {n} (menus): the load menu didn't take slot {s}; {}", place(&engine, run));
+                                    issues.set(issues.get() + 1);
+                                }
+                            }
+                        }
+                        // A refusal (in a shop, say) is the game's.
+                        crate::saveui::Ended::Left(_) => *counts.entry("menu refused").or_default() += 1,
+                        _ => {
+                            println!("ODD frame {n} (menus): the save menu didn't end; {}", place(&engine, run));
+                            issues.set(issues.get() + 1);
+                        }
+                    }
+                }
+            }
+            Act::TitleLoad => {
+                if let (11, Some((sdir, _)), Some(slot)) = (left, saves, last_menu_slot) {
+                    let archive = st.assets.archive.clone();
+                    let fresh = crate::world::load(dir, "START.MIF");
+                    let (mut ui, mut e) = crate::saveui::SaveUi::open(crate::saveui::Kind::TitleLoad, &fresh, sdir, &archive);
+                    if let crate::saveui::Ended::Open = e {
+                        e = ui.click(160, 4 + slot as i32 * 14 + 3, false);
+                    }
+                    match e {
+                        crate::saveui::Ended::Load(mut e2, s) => match crate::areas::load_game_title(&mut e2, dir, sdir, s) {
+                            Ok(r) => {
+                                engine = e2;
+                                *run = r;
+                                st.assets = Assets::new(dir, &mut engine);
+                                st.over = false;
+                                st.ui = None;
+                                *counts.entry("title loads").or_default() += 1;
+                                citydata(&mut engine, n, run, &issues);
+                            }
+                            Err(err) => {
+                                println!("SAVELOAD frame {n} (title load): {err}; {}", place(&engine, run));
+                                issues.set(issues.get() + 1);
+                            }
+                        },
+                        _ => {
+                            println!("ODD frame {n} (title load): the menu didn't load slot {slot}; {}", place(&engine, run));
+                            issues.set(issues.get() + 1);
+                        }
+                    }
+                }
+            }
+            Act::Palace => {
+                // In the Imperial City, the doors whose trigger is one of the
+                // palace's (11..13 of the table at C917, 0000:4192).
+                if left == 11 {
+                    let trig: Vec<u8> = (0..0x10).map(|i| engine.m.mem.r8(DS, arena::movement::var::TRIGGERS + i)).collect();
+                    let palace: Vec<u8> = trig.iter().enumerate().filter(|(i, _)| (11..=13).contains(i)).map(|(_, &t)| t).filter(|&t| t != 0).collect();
+                    let city = engine.m.mem.cstr(DS, 0x0A22).eq_ignore_ascii_case(b"Imperial City");
+                    let doors = if city { facing(&engine, |w| w != 0 && ((w as i16) < 0 || (w >> 8) as u8 == w as u8) && palace.contains(&(w as u8 & 0x3F))) } else { Vec::new() };
+                    if !doors.is_empty() {
+                        let d = doors[dice.below(doors.len() as u64) as usize];
+                        stand(&mut engine, d);
+                        *counts.entry("palace door").or_default() += 1;
+                    }
+                } else if left == 9 || left == 5 {
+                    st.clicked = crate::centre_click(&mut engine, &mut st.boxes);
                 }
             }
             Act::SaveLoad => {
