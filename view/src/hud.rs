@@ -430,6 +430,17 @@ struct ListKind {
     panel: Option<crate::interface::Image>,
     area: (i32, i32, i32, i32),
     track: (i32, i32, i32, i32),
+    /// How a line's last part is drawn: the record's flags (+20h) pick
+    /// the line's routine (3159:0718, the table at B7FE: 0000:9E06 at the
+    /// area's x plus one, 5364 centred on its middle with 1000h, 9370
+    /// ending at its right edge with 2000h).
+    last: Align,
+}
+
+#[derive(Clone, Copy)]
+enum Align {
+    Left,
+    Right,
 }
 
 static STYLE: std::sync::OnceLock<Style> = std::sync::OnceLock::new();
@@ -448,9 +459,11 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     // (1194:A9F9, BB9E, the loot window's): NEWPOP.IMG, the record at
     // 5006: the text from 54h, 21h, 96h x 3Ch, the track 44h, 1Eh, 6 x 3Ch.
     let (area, track) = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52));
-    let wide = ListKind { panel: crate::panels::load_image(archive, m, "POPUP3.IMG"), area, track };
-    let armour = ListKind { panel: crate::panels::load_image(archive, m, "POPUP4.IMG"), area, track };
-    let narrow = ListKind { panel: crate::panels::load_image(archive, m, "NEWPOP.IMG"), area: (0x54, 0x21, 0x96, 0x3C), track: (0x44, 0x1E, 6, 0x3C) };
+    // The record at 50B0 has flags 6000h: its lines end at the right.
+    let wide = ListKind { panel: crate::panels::load_image(archive, m, "POPUP3.IMG"), area, track, last: Align::Right };
+    let armour = ListKind { panel: crate::panels::load_image(archive, m, "POPUP4.IMG"), area, track, last: Align::Right };
+    // 5006: 4000h, its lines from the left.
+    let narrow = ListKind { panel: crate::panels::load_image(archive, m, "NEWPOP.IMG"), area: (0x54, 0x21, 0x96, 0x3C), track: (0x44, 0x1E, 6, 0x3C), last: Align::Left };
     let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, wide, armour, narrow });
 }
 
@@ -679,6 +692,41 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
     }
 }
 
+/// A list's line as 2F26:2DF6 draws it: each part but the last (ended by
+/// a `\n`) by 2E12 at its column plus one (`\tNNN`; the area's x plus one
+/// without), in FDh (the record's +28h) unless it sets its own colour;
+/// the last part by the line's routine (`ListKind::last`), its own column
+/// unread (2E12 hands back the x it was given).
+fn list_line(screen: &mut Screen, font: &Font, kind: &ListKind, y: i32, line: &[Span]) {
+    let area = kind.area;
+    // The parts: each with its column (None: none).
+    let mut parts: Vec<(Option<i32>, Vec<Span>)> = vec![(None, Vec::new())];
+    for s in line {
+        match column(s) {
+            Some(c) => {
+                if !parts.last().unwrap().1.is_empty() {
+                    parts.push((None, Vec::new()));
+                }
+                parts.last_mut().unwrap().0 = (c != 0).then_some(c);
+            }
+            None => parts.last_mut().unwrap().1.push(s.clone()),
+        }
+    }
+    let n = parts.len();
+    for (i, (col, spans)) in parts.into_iter().enumerate() {
+        let w = spans.iter().map(|s| font.width(&s.text) as i32).sum::<i32>();
+        let x = if i + 1 < n {
+            col.unwrap_or(area.0) + 1
+        } else {
+            match kind.last {
+                Align::Left => area.0 + 1,
+                Align::Right => area.0 + area.2 - w,
+            }
+        };
+        screen.spans_game(font, x, y, &spans, false, 0xFD);
+    }
+}
+
 /// A list as 1194:5734 shows it: its kind's panel where its header puts
 /// it; the lines in the text area from its top plus one, a font's height
 /// apart, in colour FDh (the record's +28h), from the area's x plus one
@@ -706,7 +754,7 @@ fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
         if k == menu.selected {
             screen.darken(area.0, y, area.2, fh);
         }
-        screen.spans_game(font, area.0 + 1, y, e, true, 0xFD);
+        list_line(screen, font, kind, y, e);
     }
     let n = menu.entries.len();
     if n > rows {
