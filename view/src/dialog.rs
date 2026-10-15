@@ -37,6 +37,8 @@ pub enum Answer {
     Text(String),
     /// A level's points spent: the clicks, in order.
     Spend(Vec<Click>),
+    /// A click at (x, y) of the 320 x 200 screen (the spellmaker's).
+    Click(u16, u16),
 }
 
 /// The game's state when it asked (the level-up screen shows the
@@ -58,6 +60,9 @@ pub enum Need {
     Text(String),
     /// A level's points to spend (1194:122C), on the attribute screen.
     Spend(Snapshot),
+    /// A click on the spellmaker's screen (1194:5651), or on its form
+    /// open (its record at DATA:form): the screen is `Talk::maker`.
+    Spellmaker,
 }
 
 /// A turn's answers and what it showed.
@@ -76,6 +81,10 @@ pub struct Talk {
     /// the text's number shown with it (as a vision, 1194:D459) and its
     /// colour; the front end plays them after the turn.
     pub movies: Vec<(&'static str, Option<u16>, u8)>,
+    /// The spellmaker's screen behind its questions: the game as its last
+    /// click was asked, and the form open then (DATA:form). Kept when the
+    /// turn stops inside the spellmaker.
+    pub maker: Option<(Snapshot, Option<u16>)>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -277,13 +286,45 @@ impl Talk {
     }
 }
 
-/// `--picks`: entries' numbers, or `tTEXT` for text typed, comma-separated.
+impl Talk {
+    /// The spellmaker's next click (1194:5651), on its screen or on the
+    /// form open (DATA:`form`): the click given, or None (the question
+    /// left; the caller clicks as leaving does). The screen as asked is
+    /// kept (`maker`).
+    pub fn spell_click(&mut self, m: &Machine, form: Option<u16>) -> Option<(u16, u16)> {
+        if self.need.is_some() {
+            return None;
+        }
+        self.maker = Some((Snapshot(Box::new(m.clone())), form));
+        match self.answers.front() {
+            Some(Answer::Click(x, y)) => {
+                let c = (*x, *y);
+                self.answers.pop_front();
+                self.since_answer.clear();
+                println!("[spellmaker click {}, {}]", c.0, c.1);
+                Some(c)
+            }
+            _ => {
+                self.need = Some(Need::Spellmaker);
+                None
+            }
+        }
+    }
+}
+
+/// `--picks`: entries' numbers, `tTEXT` for text typed, or `cX:Y` for a
+/// click at (X, Y) of the screen (the spellmaker's), comma-separated.
 pub fn parse_answers(s: &str) -> VecDeque<Answer> {
     s.split(',')
         .filter(|a| !a.is_empty())
-        .map(|a| match a.strip_prefix('t') {
-            Some(t) => Answer::Text(t.to_string()),
-            None => Answer::Pick(a.parse::<i32>().expect("--picks N,..,tTEXT") as u16),
+        .map(|a| {
+            if let Some(t) = a.strip_prefix('t') {
+                return Answer::Text(t.to_string());
+            }
+            if let Some((x, y)) = a.strip_prefix('c').and_then(|c| c.split_once(':')) {
+                return Answer::Click(x.parse().expect("--picks cX:Y"), y.parse().expect("--picks cX:Y"));
+            }
+            Answer::Pick(a.parse::<i32>().expect("--picks N,..,tTEXT,cX:Y") as u16)
         })
         .collect()
 }

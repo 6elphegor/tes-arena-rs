@@ -109,6 +109,20 @@ pub mod var {
 }
 use var::*;
 
+/// The sky's images (0000:E5C9): the sun's, the moons', the bolts' and
+/// the stars' names (the bolts' and stars' digits counted up), the stars'
+/// images' offsets, the star field and its clusters, the sky's bank.
+const SUN: u16 = 0xD869;
+const MOON1: u16 = 0xD871;
+const MOON2: u16 = 0xD87C;
+const STAR_NAME: u16 = 0xD890;
+const BOLT_NAME: u16 = 0xD8A2;
+const STAR_IMAGES: u16 = 0xE032;
+const STAR_FIELD: u16 = 0xD8C6;
+const CLUSTERS: u16 = 0xDA56;
+const SKY_BANK: u16 = 0xC8F3;
+const OPEN_SIZE: u16 = 0xA90C;
+
 const SIN: u16 = 0xB03C;
 const COS: u16 = 0xB13C;
 const BANK_TABLE: u16 = 0x8FAA;
@@ -460,5 +474,138 @@ impl Machine {
             hooks.sound(self, 0x1C, at);
         }
         Some(())
+    }
+
+    /// 0000:E5C9. Outdoors (C398 bit 4), with a sky's bank (C8F3, not
+    /// negative): its images loaded into that bank, mapped. CB36 FFh; the
+    /// sun (SUN, sun.img) at frame:8000, its far pointer at CD92; the two
+    /// moons' sizes from their headers (`moon_size`, 0000:E6AF: E04A/E04C,
+    /// E04E/E050), the room for their frames after the sun (far pointers
+    /// at CCAA, CCAE); the six lightning bolts (lglit01..06.cfa) after
+    /// that, each one's offset in BOLTS (high word FFFFh); the eight stars
+    /// (star1..8.img) after them, their offsets at STAR_IMAGES; then the
+    /// star field (`star_field`, 0000:E77A). None where a file is missing
+    /// (the original goes on with 0:0).
+    pub fn sky_images(&mut self, files: &mut crate::bsa::Files) -> Option<()> {
+        if self.mem.r16(DS, 0xC398) & 4 == 0 || self.mem.r8(DS, SKY_BANK) & 0x80 != 0 {
+            return Some(());
+        }
+        self.ems_map(self.mem.r8(DS, SKY_BANK) as u16);
+        self.mem.w8(DS, 0xCB36, 0xFF);
+        let frame = self.mem.r16(DS, FRAME_SEG);
+        self.file_load(files, SUN, frame, 0x8000)?;
+        self.mem.w32(DS, 0xCD92, (frame as u32) << 16 | 0x8000);
+        let bp = self.mem.r16(DS, OPEN_SIZE);
+        let (w, h) = self.moon_size(files, MOON1)?;
+        self.mem.w16(DS, 0xE04A, w);
+        self.mem.w16(DS, 0xE04C, h);
+        let first = w.wrapping_mul(h);
+        self.mem.w32(DS, 0xCCAA, (frame as u32) << 16 | bp.wrapping_add(0x8000) as u32);
+        let (w, h) = self.moon_size(files, MOON2)?;
+        self.mem.w16(DS, 0xE04E, w);
+        self.mem.w16(DS, 0xE050, h);
+        let second = first.wrapping_add(bp).wrapping_add(0x8000);
+        self.mem.w32(DS, 0xCCAE, (frame as u32) << 16 | second as u32);
+        let mut di = second.wrapping_add(w.wrapping_mul(h));
+        self.mem.w8(DS, BOLT_NAME + 6, b'1');
+        for i in 0..6u16 {
+            self.file_load(files, BOLT_NAME, frame, di)?;
+            self.mem.w16(DS, BOLTS + 4 * i, di);
+            self.mem.w16(DS, BOLTS + 4 * i + 2, 0xFFFF);
+            di = di.wrapping_add(self.mem.r16(DS, OPEN_SIZE));
+            let d = self.mem.r8(DS, BOLT_NAME + 6).wrapping_add(1);
+            self.mem.w8(DS, BOLT_NAME + 6, d);
+        }
+        self.mem.w8(DS, STAR_NAME + 4, b'1');
+        for i in 0..8u16 {
+            self.file_load(files, STAR_NAME, frame, di)?;
+            self.mem.w16(DS, STAR_IMAGES + 2 * i, di);
+            di = di.wrapping_add(self.mem.r16(DS, OPEN_SIZE));
+            let d = self.mem.r8(DS, STAR_NAME + 4).wrapping_add(1);
+            self.mem.w8(DS, STAR_NAME + 4, d);
+        }
+        self.star_field()
+    }
+
+    /// 0000:E6AF. A moon's .DFA header (10 bytes) read to 929E: its width
+    /// and height (+6, +8).
+    fn moon_size(&mut self, files: &mut crate::bsa::Files, name: u16) -> Option<(u16, u16)> {
+        self.file_open(files, name)?;
+        self.file_read(files, DS, 0x929E, 0xA);
+        self.file_close(files);
+        Some((self.mem.r16(DS, 0x92A4), self.mem.r16(DS, 0x92A6)))
+    }
+
+    /// 0000:E77A. The night sky's stars from the area's seed (CB6E; the
+    /// game's seed put back after): 28h of 10 bytes at STAR_FIELD, each a
+    /// place (three of `star_coordinate`), then, one time in four, a
+    /// single star of one of eight images (+6 0, +8 the image: 5..7 once
+    /// each, marked at D89F..D8A1), else a cluster (+6 its count, 2..5;
+    /// +8 its points, 6 bytes each from CLUSTERS: two offsets, rng >> 9
+    /// signed, and a colour 40h + rng % 10). Where the clusters reach
+    /// STAR_IMAGES it stops, through an INT 3 (0000:E83B, which DOS's
+    /// handler passes over).
+    fn star_field(&mut self) -> Option<()> {
+        self.store_rng();
+        let saved = self.mem.r32(DS, crate::random::SEED);
+        let seed = self.mem.r32(DS, 0xCB6E);
+        self.mem.w32(DS, crate::random::SEED, seed);
+        self.load_rng();
+        for i in 0..3u16 {
+            self.mem.w8(DS, 0xD89F + i, 0);
+        }
+        let mut si = STAR_FIELD;
+        let mut di = CLUSTERS;
+        'stars: for _ in 0..0x28 {
+            for k in 0..3u16 {
+                let v = self.star_coordinate();
+                self.mem.w16(DS, si + 2 * k, v);
+            }
+            if self.rng.next() & 3 == 0 {
+                self.mem.w8(DS, si + 6, 0);
+                let bx = loop {
+                    let bx = self.rng.next() & 7;
+                    if bx < 5 {
+                        break bx;
+                    }
+                    if self.mem.r8(DS, 0xD89A + bx) == 0 {
+                        self.mem.w8(DS, 0xD89A + bx, 1);
+                        break bx;
+                    }
+                };
+                self.mem.w16(DS, si + 8, bx);
+            } else {
+                if di >= STAR_IMAGES {
+                    break 'stars;
+                }
+                let n = (self.rng.next() & 3) + 2;
+                self.mem.w16(DS, si + 6, n);
+                self.mem.w16(DS, si + 8, di);
+                for _ in 0..n {
+                    let x = ((self.rng.next() as i16) >> 9) as u16;
+                    self.mem.w16(DS, di, x);
+                    let y = ((self.rng.next() as i16) >> 9) as u16;
+                    self.mem.w16(DS, di + 2, y);
+                    let c = self.rng.next() % 10 + 0x40;
+                    self.mem.w16(DS, di + 4, c);
+                    di += 6;
+                    if di >= STAR_IMAGES {
+                        break 'stars;
+                    }
+                }
+            }
+            si += 10;
+        }
+        self.store_rng();
+        self.mem.w32(DS, crate::random::SEED, saved);
+        self.load_rng();
+        Some(())
+    }
+
+    /// 0000:E83D with DL 2: a star's coordinate, 800h..17FFh, negative
+    /// where bit 1 of the low byte is set.
+    fn star_coordinate(&mut self) -> u16 {
+        let v = (self.rng.next() & 0xFFF) + 0x800;
+        if v & 2 != 0 { v.wrapping_neg() } else { v }
     }
 }

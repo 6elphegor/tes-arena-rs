@@ -118,6 +118,12 @@ impl Engine {
         m.mem.w16(DS, 0xBA60, t);
         m.actors_update(files)?;
         m.projectiles_update()?;
+        // 0000:A2CE, A2D7: the view's window for the frame, then the
+        // walk's bob and its footstep.
+        m.view_window();
+        if let Some((s, at)) = m.walk_bob() {
+            hooks.sound(m, s, at);
+        }
         m.physics_frame(files, &mut Physics { input: &input, hooks })?;
         if m.mem.r16(DS, MAP_FLAGS) & 0x80 != 0 {
             return Some(Frame::Left);
@@ -127,6 +133,13 @@ impl Engine {
             hooks.sound(m, s, at);
         }
         hooks.draw(m);
+        // 0000:A36F..A37B, C9E8: the trigger squares at the end of the
+        // walk, while the eye isn't below the floor.
+        if (m.mem.r16(DS, HEIGHT) as i16) >= 0 {
+            if let Some((s, at)) = m.trigger_squares()? {
+                hooks.sound(m, s, at);
+            }
+        }
         m.temp_walls_frame();
         m.frame_body(files, hooks)?;
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);

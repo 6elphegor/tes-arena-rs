@@ -149,17 +149,22 @@ fn nth(m: &Machine, mut si: u16, n: u16) -> String {
 
 /// Draws the last screen (and the form over it, when one was up last).
 pub fn draw(screen: &mut Screen, font: &Font, archive: &Archive, files: &Files, maker: &Maker) {
-    let Some(base) = maker.screen.as_ref().or(maker.form.as_ref().map(|f| &f.0)) else { return };
+    match (&maker.form, &maker.screen) {
+        (Some((m, f)), _) => draw_state(screen, font, archive, files, m, Some(*f)),
+        (None, Some(m)) => draw_state(screen, font, archive, files, m, None),
+        (None, None) => {}
+    }
+}
+
+/// Draws the screen as the game `m` has it, and the form whose record is
+/// at DATA:`form` over it when one is open.
+pub fn draw_state(screen: &mut Screen, font: &Font, archive: &Archive, files: &Files, m: &Machine, form: Option<u16>) {
     let Some(d) = archive.read("SPELLMKR.IMG") else { return };
     let Some((img, used)) = image(&d) else { return };
     if let Some(p) = palette(&d, used) {
         screen.set_palette(p);
     }
     screen.blit(0, 0, img.w, img.h, &img.px, 200);
-    let m = match &maker.form {
-        Some((m, _)) => m,
-        None => base,
-    };
     let c = 0xA0u8;
     let mut mm = m.clone();
     let (cost, per) = mm.made_spell_cost();
@@ -183,7 +188,7 @@ pub fn draw(screen: &mut Screen, font: &Font, archive: &Archive, files: &Files, 
             }
         }
     }
-    let Some((m, f)) = &maker.form else { return };
+    let Some(f) = form else { return };
     let name = text(m, DS, m.mem.r16(DATA, f.wrapping_add(2)));
     let Some(d) = archive.read(&name.to_ascii_uppercase()) else { return };
     let Some((img, _)) = image(&d) else { return };
