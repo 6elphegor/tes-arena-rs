@@ -462,7 +462,7 @@ impl Machine {
     /// 1194:5ED1 (through 5ECD): the entry PICK of the table at
     /// frame:`si` (the pick's own) taken out: the `cx` - 1 - PICK entries
     /// after it (ENTRY bytes each) move down one and the last is cleared.
-    fn table_remove(&mut self, si: u16, cx: u16) {
+    pub(crate) fn table_remove(&mut self, si: u16, cx: u16) {
         let frame = self.mem.r16(DS, FRAME_SEG);
         let size = self.mem.r8(DS, ENTRY) as u16;
         let pick = self.mem.r8(DS, PICK) as u16;

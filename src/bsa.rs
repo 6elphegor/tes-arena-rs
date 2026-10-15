@@ -73,11 +73,16 @@ pub struct Files {
     /// Files the game wrote (`Machine::file_write`), by upper-case name:
     /// kept here, not on disk, and found before the directories' files.
     written: HashMap<Vec<u8>, Rc<[u8]>>,
+    /// The open loose file's name, so writes to it are kept (`file_put`).
+    loose_name: Option<Vec<u8>>,
+    /// Files the game deleted (`Machine::file_delete`): hidden from then
+    /// on, the directories' files too (nothing is deleted on disk).
+    deleted: std::collections::HashSet<Vec<u8>>,
 }
 
 impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
-        let mut files = Self { names: HashMap::new(), bsa: None, loose: None, written: HashMap::new() };
+        let mut files = Self { names: HashMap::new(), bsa: None, loose: None, written: HashMap::new(), loose_name: None, deleted: Default::default() };
         files.add_dir(dir)?;
         Ok(files)
     }
@@ -85,6 +90,25 @@ impl Files {
     /// A file the game wrote, by DOS name (its last component).
     pub fn written(&self, name: &[u8]) -> Option<&[u8]> {
         self.written.get(&Self::base(name).to_ascii_uppercase()).map(|d| &d[..])
+    }
+
+    /// Puts a file (by DOS name) among those the game wrote: a saved
+    /// game's files, or a test's.
+    pub fn put(&mut self, name: &[u8], data: &[u8]) {
+        let base = Self::base(name).to_ascii_uppercase();
+        self.deleted.remove(&base);
+        self.written.insert(base, Rc::from(data));
+    }
+
+    /// Whether the game deleted the file (by DOS name).
+    pub fn was_deleted(&self, name: &[u8]) -> bool {
+        self.deleted.contains(&Self::base(name).to_ascii_uppercase())
+    }
+
+    /// Whether a loose file of that name exists (DOS find first).
+    pub fn exists(&self, name: &[u8]) -> bool {
+        let base = Self::base(name).to_ascii_uppercase();
+        !self.deleted.contains(&base) && (self.written.contains_key(&base) || self.names.contains_key(&base))
     }
 
     fn base(name: &[u8]) -> &[u8] {
@@ -106,6 +130,9 @@ impl Files {
     /// to the directories given here.
     fn read_loose(&self, name: &[u8]) -> Option<Rc<[u8]>> {
         let base = Self::base(name).to_ascii_uppercase();
+        if self.deleted.contains(&base) {
+            return None;
+        }
         if let Some(d) = self.written.get(&base) {
             return Some(d.clone());
         }
@@ -295,7 +322,60 @@ impl Machine {
     pub fn file_write(&mut self, files: &mut Files, name: u16, seg: u16, off: u16, n: u16) {
         let data: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
+        files.deleted.remove(&base);
         files.written.insert(base, Rc::from(data));
+    }
+
+    /// 0000:677A. Creates (or empties) the file named at DS:`name` (DOS
+    /// create, 3Ch) and makes it the open file; the original keeps the
+    /// handle at CS:6837 (its error code on a failure, which the port
+    /// never has). OPEN_NAME is set as for an open.
+    pub fn file_create(&mut self, files: &mut Files, name: u16) {
+        self.mem.w16(DS, OPEN_NAME, name);
+        self.mem.w16(DS, OPEN_NAME + 2, DS);
+        let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
+        let empty: Rc<[u8]> = Rc::from(Vec::new());
+        files.deleted.remove(&base);
+        files.written.insert(base.clone(), empty.clone());
+        files.loose = Some((empty, 0));
+        files.loose_name = Some(base);
+        self.mem.w8(0, CS_IN_BSA, 0);
+        self.mem.w16(0, CS_HANDLE, LOOSE_DOS_HANDLE);
+    }
+
+    /// 0000:6DDC. Writes `n` bytes from `seg`:`off` to the open file at
+    /// its position (DOS write, 40h: over what is there, the file growing
+    /// past its end, never shortened). Returns AX, the count written (0
+    /// with no loose file open, where DOS would fail).
+    pub fn file_put(&mut self, files: &mut Files, seg: u16, off: u16, n: u16) -> u16 {
+        let (Some(f), Some(name)) = (files.loose.as_mut(), files.loose_name.clone()) else { return 0 };
+        let mut data = f.0.to_vec();
+        let pos = f.1 as usize;
+        if data.len() < pos + n as usize {
+            data.resize(pos + n as usize, 0);
+        }
+        for i in 0..n as usize {
+            data[pos + i] = self.mem.r8(seg, off.wrapping_add(i as u16));
+        }
+        let rc: Rc<[u8]> = Rc::from(data);
+        f.0 = rc.clone();
+        f.1 = f.1.wrapping_add(n as u32);
+        files.written.insert(name, rc);
+        n
+    }
+
+    /// 0000:9DC2. Deletes the file named at DS:`name` (DOS 41h).
+    pub fn file_delete(&mut self, files: &mut Files, name: u16) {
+        let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
+        files.written.remove(&base);
+        files.deleted.insert(base);
+    }
+
+    /// 0000:600C with CX 0: whether a file named at DS:`name` exists (DOS
+    /// find first, 4Eh; the carry clear when found). The DTA's address it
+    /// returns in DX:AX is left out.
+    pub fn file_find(&self, files: &Files, name: u16) -> bool {
+        files.exists(self.mem.cstr(DS, name))
     }
 
     /// 0000:67C4. Opens the file named at DS:`name`: a loose file if one
@@ -348,6 +428,7 @@ impl Machine {
         if let Some(bytes) = files.read_loose(&raw) {
             self.mem.w16(DS, OPEN_SIZE, bytes.len() as u16);
             files.loose = Some((bytes, 0));
+            files.loose_name = Some(Files::base(&raw).to_ascii_uppercase());
             return Some((LOOSE_DOS_HANDLE, true));
         }
         Some((2, self.bsa_find(files, name)))
