@@ -1087,6 +1087,7 @@ fn main() {
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
     let assets = Assets::new(&dir, &mut engine);
     let font = hud::Font::load(&assets.archive, FONT).expect("ARENAFNT.DAT");
+    hud::init_style(&assets.archive, &engine.m);
     let screen = hud::Screen::new(assets.palette);
     let audio = audio::Audio::new(assets.archive.clone(), !MUTE.load(std::sync::atomic::Ordering::Relaxed), SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let play_music = !MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed);
@@ -1247,6 +1248,12 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
     Engine { m: engine.m.clone(), files: engine.files.clone() }
+}
+
+/// The window the game centres its boxes in (A914, A916, A918, A91A).
+fn game_clip(m: &arena::machine::Machine) -> (i32, i32, i32, i32) {
+    let r = |at| m.mem.r16(arena::mem::DS, at) as i16 as i32;
+    (r(0xA914), r(0xA916), r(0xA918), r(0xA91A))
 }
 
 /// The message line (061A, shown while 061E counts down) as the HUD's.
@@ -1710,7 +1717,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let view = target.create_view(&Default::default());
     r.draw(&device, &queue, &view, w, h, cam, &sprites);
     if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
-        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, level: hud::level_text(&engine.m), ..Default::default() };
+        hud::init_style(&st.assets.archive, &engine.m);
+        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, level: hud::level_text(&engine.m), clip: game_clip(&engine.m), ..Default::default() };
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
@@ -2437,7 +2445,7 @@ impl App {
 
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
-        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), level: hud::level_text(&self.engine.m), ..Default::default() };
+        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), level: hud::level_text(&self.engine.m), clip: game_clip(&self.engine.m), ..Default::default() };
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             h.status = self.status.clone();
         }
@@ -2541,14 +2549,8 @@ impl App {
             return;
         }
         let hud = self.hud();
-        if let Some(menu) = &hud.menu {
-            let (ex, ey, lh, ew) = hud::menu_layout(&self.font, menu);
-            if x >= ex - 3 && x < ex + ew + 3 && y >= ey {
-                let i = ((y - ey) / lh) as usize;
-                if i < menu.entries.len() {
-                    self.answer(dialog::Answer::Pick(i as u16));
-                }
-            }
+        if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
+            self.answer(dialog::Answer::Pick(i as u16));
         }
     }
 }

@@ -56,7 +56,7 @@ struct ShopFront<'a, 'b> {
     front: &'a mut Front<'b>,
     files: Files,
     /// The store's list made for the next list asked.
-    lines: Option<Vec<String>>,
+    lines: Option<Vec<Vec<Span>>>,
     /// The picture shown last (4B8E).
     picture: u16,
     /// Files the guild wrote (its stock), for the game's files after.
@@ -95,6 +95,7 @@ impl ShopFront<'_, '_> {
             entries: entries.iter().map(|e| line(e)).collect(),
             keys: entries.iter().map(|e| e.as_bytes()[0]).collect(),
             selected: 0,
+            list: false,
         };
         match self.talk() {
             Some(t) => t.ask_menu(menu),
@@ -147,9 +148,8 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         }
     }
     fn list(&mut self, m: &mut Machine, si: u16, cx: u16, _di: u16) -> u16 {
-        if let Some(lines) = self.lines.take() {
-            let entries: Vec<&str> = lines.iter().map(String::as_str).collect();
-            let menu = Menu { title: Vec::new(), entries: entries.iter().map(|e| line(e)).collect(), keys: Vec::new(), selected: 0 };
+        if let Some(entries) = self.lines.take() {
+            let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true };
             return match self.talk() {
                 Some(t) => t.ask_menu(menu),
                 None => 0xFFFF,
@@ -211,50 +211,24 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
 }
 
 /// The `n` list lines 1194:F142 or F204 wrote one after another into the
-/// EMS frame from `at`, each a row: its fields (`\n` between them, each
-/// from a column, `\t` and three digits: its x on the 320-wide screen)
-/// padded to their columns at about five pixels a character.
-fn frame_lines(m: &Machine, at: u16, n: usize) -> Vec<String> {
+/// EMS frame from `at`, each a row of its fields (`row`).
+fn frame_lines(m: &Machine, at: u16, n: usize) -> Vec<Vec<Span>> {
     let frame = m.mem.r16(DS, 0x9030);
     let mut out = Vec::new();
     let mut at = at;
     for _ in 0..n {
         let raw = m.mem.cstr(frame, at).to_vec();
         at = at.wrapping_add(raw.len() as u16 + 1);
-        out.push(lay_out(&raw));
+        out.push(row(&raw));
     }
     out
 }
 
 /// A list line's fields (`\n` between them, each from a column: `\t` and
-/// three digits, its x on the 320-wide screen) as one row, padded to
-/// their columns at about five pixels a character.
-fn lay_out(raw: &[u8]) -> String {
-    let mut row = String::new();
-    let mut first = None;
-    {
-        for field in raw.split(|&b| b == b'\n') {
-            let (col, text) = match field {
-                [b'\t', a, b, c, rest @ ..] if [a, b, c].iter().all(|d| d.is_ascii_digit()) => {
-                    let col = ((a - b'0') as usize) * 100 + ((b - b'0') as usize) * 10 + (c - b'0') as usize;
-                    (Some(col), rest)
-                }
-                _ => (None, field),
-            };
-            if let Some(col) = col {
-                let base = *first.get_or_insert(col);
-                let want = col.saturating_sub(base) / 5;
-                while row.chars().count() < want {
-                    row.push(' ');
-                }
-                if !row.is_empty() && !row.ends_with(' ') {
-                    row.push(' ');
-                }
-            }
-            row.push_str(&String::from_utf8_lossy(text).replace('\r', ""));
-        }
-    }
-    row
+/// three digits, its x on the 320-wide screen) as one row of spans, the
+/// columns kept (`hud::column`): a list draws each field at its x.
+fn row(raw: &[u8]) -> Vec<Span> {
+    hud::lines(raw, 0x0F).into_iter().flatten().collect()
 }
 
 /// The mages' guild: its menus, lists, haggling and boxes as the store's;
@@ -286,9 +260,9 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
         for _ in 0..cx {
             let raw = m.mem.cstr(seg, at).to_vec();
             at = at.wrapping_add(raw.len() as u16 + 1);
-            entries.push(line(&lay_out(&raw)));
+            entries.push(row(&raw));
         }
-        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0 };
+        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true };
         match self.talk() {
             Some(t) => t.ask_menu(menu),
             None => 0xFFFF,

@@ -308,6 +308,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
         entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone() }]).collect(),
         keys: Vec::new(),
         selected: sel,
+        list: false,
     }
 }
 

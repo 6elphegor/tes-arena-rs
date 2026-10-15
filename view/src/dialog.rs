@@ -107,7 +107,7 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
         entries.push(l.swap_remove(0));
     }
     let keys = m.mem.cstr(DS, bx).to_vec();
-    Menu { title, entries, keys, selected: 0 }
+    Menu { title, entries, keys, selected: 0, list: false }
 }
 
 impl Talk {
@@ -156,18 +156,20 @@ impl Talk {
         for _ in 0..cx.min(64) {
             let s = m.mem.cstr(DS, at);
             at = at.wrapping_add(s.len() as u16 + 1);
-            // An entry of several lines (the tavern's "price\nname") on one.
+            // An entry of several parts (the tavern's "\t200%u gp\n%s") on
+            // one line: a part without a column of its own starts back at
+            // the list's x (2F26:2E12), marked `\t000`.
             let mut entry: Vec<Span> = Vec::new();
             for l in hud::lines(s, 0x0F) {
                 if !entry.is_empty() && !l.is_empty() {
-                    entry.push(Span { colour: 0x0F, text: "  ".into() });
+                    entry.push(Span { colour: 0x0F, text: "\t000".into() });
                 }
                 entry.extend(l);
             }
             entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
-        let menu = Menu { title, entries, keys: Vec::new(), selected: 0 };
+        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true };
         self.ask(menu)
     }
 
