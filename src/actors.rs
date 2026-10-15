@@ -237,6 +237,10 @@ impl Machine {
             // 0000:2837: now and then a sound.
             if self.mem.r8(DS, 0x100D) & 0x80 == 0 && self.rng.next() <= 0x7D0 {
                 self.mem.w8(DS, 0xC887, 0x20);
+                // 0000:284B: the creatures' sound (20h, its slot just set)
+                // at the nearest one's square.
+                let at = self.mem.r16(DS, NEAR_SQUARE);
+                self.sound_at(0x20, at)?;
             }
         }
         Some(())
@@ -1065,7 +1069,8 @@ impl Machine {
         if self.act16(si, f::SOUNDED) == 0 {
             let n = self.act16(si, f::SOUNDED).wrapping_add(1);
             self.set_act16(si, f::SOUNDED, n);
-            // (23BA:002A: its death sound.)
+            // 0000:21C7: its death sound (14h, at the player's square).
+            self.sound_here(0x14)?;
         }
         Some(())
     }

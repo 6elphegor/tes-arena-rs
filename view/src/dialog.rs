@@ -72,6 +72,10 @@ pub struct Talk {
     pub since_answer: Vec<Vec<Vec<Span>>>,
     /// The rest's hours, last shown.
     pub status: Option<String>,
+    /// The animations the turn played (1194:D45D, 2294:0895): the file,
+    /// the text's number shown with it (as a vision, 1194:D459) and its
+    /// colour; the front end plays them after the turn.
+    pub movies: Vec<(&'static str, Option<u16>, u8)>,
 }
 
 /// The game's text at DS:`at`, as lines.

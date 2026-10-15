@@ -60,6 +60,7 @@ pub mod shops;
 pub mod sidequest;
 pub mod sky;
 pub mod skyobj;
+pub mod sound;
 pub mod spell;
 pub mod store;
 pub mod strike;

@@ -82,6 +82,7 @@ dependencies = [
  "arena",
  "bytemuck",
  "glam",
+ "libloading",
  "png",
  "pollster",
  "wgpu",

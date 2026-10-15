@@ -12,3 +12,5 @@ pollster = "0.4"
 bytemuck = { version = "1", features = ["derive"] }
 glam = "0.29"
 png = "0.17"
+# The sound driver opens libpulse-simple at run time (view/src/audio.rs).
+libloading = "0.8"

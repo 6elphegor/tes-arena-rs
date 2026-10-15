@@ -126,7 +126,9 @@ pub trait TalkHooks: TextHooks {
         m.loot_window(files, &mut crate::loot_window::NoLootHooks, ax, si, seg, bx)
     }
     /// 23BA:002A: sound `ax` at the square `cx`.
-    fn sound(&mut self, _m: &mut Machine, _ax: u16, _cx: u16) {}
+    fn sound(&mut self, m: &mut Machine, ax: u16, cx: u16) {
+        let _ = m.sound_at(ax, cx);
+    }
     /// 2DA2:000A: the text at DS:`di` has its substitutions made; DI
     /// after (at its NUL), when the front end does it itself; by default
     /// (None) the port's `Machine::expand` runs.

@@ -210,6 +210,8 @@ impl Machine {
                 self.impact(cast, x, y)?;
             } else {
                 self.load_cast_hands(files, gs, spell)?;
+                // 29CF:0040: the spell's sound (8) at the player's square.
+                self.sound_here(8)?;
                 let (x, y) = (self.mem.r16(DS, 0xC3D0), self.mem.r16(DS, 0xC3D4));
                 self.impact(cast, x, y)?;
             }

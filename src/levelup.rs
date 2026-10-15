@@ -68,7 +68,9 @@ const ITEMS: u16 = 0x0212;
 pub trait LevelUpHooks {
     /// 23BA:012B: the sound named at DS:`si` played (the notice's
     /// FANFARE1.VOC).
-    fn sound(&mut self, _m: &mut Machine, _si: u16) {}
+    fn sound(&mut self, m: &mut Machine, si: u16) {
+        m.sound_file(si);
+    }
     /// 1194:158F: the screen kept (CHARSHET.$$$), unless 5E0 bit 200h.
     fn keep_screen(&mut self, _m: &mut Machine) {}
     /// The screen drawn: 0000:541E, A611, the view filled (9A98), 9426,
