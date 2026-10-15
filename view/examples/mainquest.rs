@@ -543,6 +543,10 @@ fn trip(engine: &mut Engine, dir: &std::path::Path, run: Run, p: u8, i: u8, n: &
     let carry = m.travel_map_end(&mut h, start);
     m.map_button_done(carry);
     println!("   travelled: here {} {:#x} (kind {}), 5E6 {}, the carry {carry}", m.mem.r8(DS, HERE_PROVINCE), m.mem.r8(DS, HERE_ID), m.mem.r8(DS, HERE_KIND), m.mem.r8(DS, 0x05E6));
+    // The PC's clock goes on while the map is used (20 seconds of it): a
+    // town's quests are seeded by it (1194:9358), and at 0 the seed stays
+    // 0, so a town first in its province rolls for ever (0ABF).
+    engine.tick(364);
     let r = areas::next(engine, dir, run);
     let m = &engine.m;
     println!("   entered {r:?}: level {} of {}, the piece's square (FEE) {:04x}: {}", m.mem.r8(DS, arena::movement::var::LEVEL), m.mem.r8(DS, arena::movement::var::LEVELS), m.mem.r16(DS, 0x0FEE), state(m));
@@ -588,25 +592,21 @@ fn rest(engine: &mut Engine, n: &str) {
     println!("   rested: {}; {}", dream(m), state(m));
 }
 
-/// The stairs taken down to the last level (0000:51B8, the level reloaded
-/// (0000:EBB5), the hook C3B8: 0000:44D7), then the chest at the piece's
-/// square (FEE) clicked (292B:06DC, whose chest runs 2294:0F33).
+/// The stairs taken down to the last level as `staff::change_level`
+/// takes them (the stairs' hook, the level reloaded, 0000:EBB5, its INF
+/// loaded where one was named, the hook C3B8: 0000:44D7, where 2294:0E90
+/// puts the chest), then the chest at the piece's square (FEE) clicked
+/// (292B:06DC, whose chest runs 2294:0F33).
 fn descend_and_open(engine: &mut Engine, n: &str) -> Option<()> {
-    use arena::movement::var::{LEVEL, LEVELS, LEVEL_HOOK, X, Y};
-    let m = &mut engine.m;
-    while m.mem.r8(DS, LEVEL) + 1 < m.mem.r8(DS, LEVELS) {
-        m.stairs_hook(&mut engine.files, &mut arena::hooks::NoStairsHooks);
-        let l = m.mem.r8(DS, LEVEL) + 1;
-        m.mem.w8(DS, LEVEL, l);
-        if m.level_change(&mut engine.files).is_none() {
-            println!("{n}. level {l}: the level's change met something not ported");
-            return None;
-        }
-        if m.mem.r32(DS, LEVEL_HOOK) == arena::hooks::value::LEVEL_ENTERED && m.level_entered(&mut engine.files, &mut arena::hooks::NoStairsHooks).is_none() {
-            println!("{n}. level {l}: its entry met something not ported");
+    use arena::movement::var::{LEVEL, LEVELS, X, Y};
+    while engine.m.mem.r8(DS, LEVEL) + 1 < engine.m.mem.r8(DS, LEVELS) {
+        let l = engine.m.mem.r8(DS, LEVEL) + 1;
+        if staff::change_level(engine, l).is_none() {
+            println!("{n}. level {l}: the level's change gave up: {}", arena::giveup::describe());
             return None;
         }
     }
+    let m = &mut engine.m;
     let sq = m.mem.r16(DS, 0x0FEE);
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     println!("{n}. the last level ({}): the piece's square {sq:04x} holds {:04x} (the chest flat C93B {:02x})", m.mem.r8(DS, LEVEL), m.mem.r16(walls, sq), m.mem.r8(DS, 0xC93B));

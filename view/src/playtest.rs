@@ -277,6 +277,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         boxes: Vec::new(),
         need: None,
         maker_screen: None,
+        backdrop: None,
         status: None,
         panel: None,
         map: false,
@@ -390,6 +391,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     let mut last_menu_slot: Option<u8> = None;
     let mut left = 0;
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    // The automap screen up for a note's turn (`crate::automap::close`).
+    let mut map_open = false;
     while alive && n < frames {
         if st.over || fault.replace(false) {
             // Dead (or the game won, or an original fault met): with a save,
@@ -717,15 +720,19 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             let (x, y) = (10 + dice.below(300) as i32, 5 + dice.below(155) as i32);
                             t.click(&mut engine, &archive, x, y, false);
                             t.click(&mut engine, &archive, 62, 180, false);
+                            // A journey's horse (HORSE.DFA, a frame a day)
+                            // played out, as the window's time plays it.
+                            t.advance(60_000);
                             let mut open = Some(t);
                             let mut boxes = Vec::new();
-                            crate::travel::after(&mut open, &mut engine, &mut boxes);
+                            crate::travel::after(&mut open, &mut engine, &mut boxes, true);
                             // No journey: the screen left as Esc leaves it.
                             for _ in 0..4 {
                                 if let Some(t) = open.as_mut() {
                                     t.key(&mut engine, KeyCode::Escape, None);
+                                    t.advance(60_000);
                                 }
-                                crate::travel::after(&mut open, &mut engine, &mut boxes);
+                                crate::travel::after(&mut open, &mut engine, &mut boxes, true);
                             }
                             if open.is_some() {
                                 println!("ODD frame {n} (travel): the travel map didn't end; {}", place(&engine, run));
@@ -754,6 +761,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                 engine.m.automap_view_button(dice.below(5) as u16);
                                 engine.m.automap_origin();
                             }
+                            crate::automap::close(&mut engine.m);
                             *counts.entry("automap").or_default() += 1;
                         }
                         Some(crate::sheets::BarAction::Status(lines)) => {
@@ -775,6 +783,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     crate::sheets::pics(&archive, &engine.m);
                     crate::automap::open(&mut engine, &archive);
                     st.note = Some((dice.below(320) as u16, dice.below(150) as u16));
+                    map_open = true;
                     *counts.entry("notes").or_default() += 1;
                 }
             }
@@ -926,6 +935,10 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             }
         }
         alive = turn(&mut engine, st, run, intent, name, n);
+        // The note's turn done (its click on the map), the screen left.
+        if std::mem::take(&mut map_open) {
+            crate::automap::close(&mut engine.m);
+        }
     }
     let result = if st.over {
         "over (the game ended)".to_string()

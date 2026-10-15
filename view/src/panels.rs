@@ -12,8 +12,9 @@
 //! line puts the item on or takes it off (1194:1AFB, `equip_click`); a
 //! right click selects it (1296), which D drops (1194:18F6,
 //! `drop_item`); U lists the items with an effect and uses the one picked
-//! (24FA:07CD, `use_item`). The paper doll on the right (1194:23E5) and
-//! the screen's buttons are not drawn: the right of the screen is dark.
+//! (24FA:07CD, `use_item`). The paper doll on the right (1194:23E5,
+//! `doll`) is drawn first, EQUIP.IMG (the list's panel and the buttons)
+//! over it.
 //!
 //! The spellbook lists the player's spells (the records of SPELLSG with a
 //! name, 29CF:0679) with their cost at the player's level, and casts the

@@ -133,12 +133,17 @@ const SQUARE: u16 = 0xCB90;
 /// Low down means under this height.
 const LOW: i16 = 0x3C;
 
-/// The way out's hooks from the stairs': the question to leave theirs.
+/// The way out's hooks from the stairs': the question to leave and the
+/// level's states kept (292B:095E) theirs.
 struct Exit<'a>(&'a mut dyn StairsHooks);
 
 impl crate::transit::AreaHooks for Exit<'_> {
-    fn ask_leave(&mut self, m: &mut Machine) -> bool {
-        self.0.ask_leave(m)
+    fn ask_leave(&mut self, m: &mut Machine, files: &mut Files) -> bool {
+        self.0.ask_leave(m, files)
+    }
+    /// 292B:095E, as the stairs keep a level's states.
+    fn automap(&mut self, m: &mut Machine, files: &mut Files) {
+        self.0.automap_keep(m, files);
     }
 }
 

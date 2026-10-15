@@ -51,8 +51,9 @@ impl LootHooks for Script {
         self.log.push(5);
         take(&self.cfs, &mut self.n[1], true)
     }
-    fn last_piece(&mut self, _m: &mut Machine) {
+    fn last_piece(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(6);
+        Some(())
     }
     fn piles(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(7);

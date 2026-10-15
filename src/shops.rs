@@ -36,6 +36,10 @@ use crate::mem::DS;
 pub trait ShopHooks {
     /// 1194:4D31: a message box with the text at DS:`si`.
     fn message(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:4B60 and 4BFF on entering: the shop's screen (MENUSCRN.IMG)
+    /// and its name at DS:`si` on a banner across its top (FONT_C.DAT on
+    /// MENU_CTR.IMG's tiles between MENU_LFT and MENU_RT).
+    fn banner(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:020E: a menu, its title at `si`, its keys at `bx`, its
     /// entries' table at `di`. The pick (FFFFh: none).
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
@@ -560,6 +564,7 @@ impl Machine {
         self.mem.w32(DS, 0x929E, 0x6D65_7425);
         self.mem.w16(DS, 0x92A2, 0);
         hooks.expand(self, 0x929E);
+        hooks.banner(self, 0x929E);
         hooks.quest_check(self);
         hooks.quests(self, files)?;
         let h = if self.shop_holiday() { 1 } else { 0xFF };

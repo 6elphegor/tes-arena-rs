@@ -39,7 +39,30 @@ pub enum Answer {
     Spend(Vec<Click>),
     /// A click at (x, y) of the 320 x 200 screen (the spellmaker's).
     Click(u16, u16),
+    /// The travel map shown on the way out of a dungeon (26F7:0000): the
+    /// game as its screen ended, and its carry.
+    Travel(World, bool),
 }
+
+/// The game and its files at a point of a turn: where the travel map
+/// began (a question's) or ended (its answer). The turn run again
+/// reaches the same point, and an answer's game goes on from there.
+#[derive(Clone)]
+pub struct World(pub Box<(Machine, arena::bsa::Files)>);
+
+impl std::fmt::Debug for World {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("World")
+    }
+}
+
+impl PartialEq for World {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(&*self.0, &*other.0)
+    }
+}
+
+impl Eq for World {}
 
 /// The game's state when it asked (the level-up screen shows the
 /// attributes as they are and as the clicks change them).
@@ -63,6 +86,9 @@ pub enum Need {
     /// A click on the spellmaker's screen (1194:5651), or on its form
     /// open (its record at DATA:form): the screen is `Talk::maker`.
     Spellmaker,
+    /// The travel map, from the game as the way out of a dungeon showed
+    /// it (26F7:0000 with 1A81 set).
+    Travel(World),
 }
 
 /// A turn's answers and what it showed.
@@ -88,6 +114,9 @@ pub struct Talk {
     /// The text asked for edited in place (0000:9EE9 with the automap's
     /// notes): the field's screen point and the text there at the start.
     pub text_at: Option<(i32, i32, String)>,
+    /// The shop's screen the turn is inside (`crate::shopui::Backdrop`):
+    /// drawn behind its questions.
+    pub backdrop: Option<crate::shopui::Backdrop>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -312,6 +341,32 @@ impl Talk {
             _ => {
                 self.need = Some(Need::Spellmaker);
                 None
+            }
+        }
+    }
+}
+
+impl Talk {
+    /// 26F7:0000 on the way out of a dungeon: the travel map's answer
+    /// (the game as it ended taken on, its carry), or the question left
+    /// (stay: no journey made).
+    pub fn travel(&mut self, m: &mut Machine, files: &mut arena::bsa::Files) -> bool {
+        if self.need.is_some() {
+            return false;
+        }
+        match self.answers.front() {
+            Some(Answer::Travel(w, carry)) => {
+                let carry = *carry;
+                m.clone_from(&w.0 .0);
+                files.clone_from(&w.0 .1);
+                self.answers.pop_front();
+                self.since_answer.clear();
+                println!("[travel map] -> {}", if carry { "left" } else { "stayed" });
+                carry
+            }
+            _ => {
+                self.need = Some(Need::Travel(World(Box::new((m.clone(), files.clone())))));
+                false
             }
         }
     }

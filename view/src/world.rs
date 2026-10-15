@@ -558,11 +558,11 @@ pub fn pick(m: &Machine, reach: u16) -> Option<u16> {
 
 /// `pick`, with how far along the line the square was met.
 pub fn pick_at(m: &Machine, reach: u16) -> Option<(u16, f32)> {
-    pick_where(m, reach, |_| true)
+    pick_where(m, reach, |_, _| true)
 }
 
 /// `pick_at`, meeting only the squares `meets` takes.
-fn pick_where(m: &Machine, reach: u16, meets: impl Fn(u16) -> bool) -> Option<(u16, f32)> {
+fn pick_where(m: &Machine, reach: u16, meets: impl Fn(u16, u16) -> bool) -> Option<(u16, f32)> {
     let w = m.mem.r16(DS, 0xC357).min(128) as i32;
     let d = m.mem.r16(DS, 0xC359).min(128) as i32;
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
@@ -583,7 +583,7 @@ fn pick_where(m: &Machine, reach: u16, meets: impl Fn(u16) -> bool) -> Option<(u
         }
         let sq = (row << 8 | col << 1) as u16;
         let v = m.mem.r16(walls, sq);
-        if v != 0 && meets(v) {
+        if v != 0 && meets(sq, v) {
             return Some((sq, t));
         }
     }
@@ -892,7 +892,8 @@ fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shif
 
 /// This frame's billboards, facing a camera turned to `heading`:
 /// - the flats standing in the map (MAP1 words 8xxx: flat low byte +
-///   FLAT_BASE) at their squares' centres, raised by the flat record's
+///   FLAT_BASE; else the floor plane's low byte less 1, on the square's
+///   platform) at their squares' centres, raised by the flat record's
 ///   Y, animations at frame `tick`;
 /// - the creatures in the actor slots (not inactive, 4000h): sprite C0h +
 ///   view (0..4, mirrored with flag 2) is the type's view file, C5h
@@ -938,17 +939,32 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
         }
         s
     };
+    let floors = m.mem.r16(DS, arena::mif::var::FLOOR_SEG);
     for row in 0..d {
         for col in 0..w {
             let v = m.mem.r16(walls, (row << 8) | (col << 1));
-            if v >> 12 != 8 {
+            // A flat in the floor plane (its low byte less 1, as the
+            // lights read it, 0000:0810, and a click takes it, 292B:0853:
+            // Black Gate's hammer) stands on the square's platform, if any.
+            let fb = m.mem.r8(floors, (row << 8) | (col << 1));
+            // A creature's flat (bit 2 of its high byte, 25CA:0200) isn't
+            // drawn: the drawing calls the hook CD56 instead (0000:CF96,
+            // `creature_flats_seen`).
+            let (n, base_y) = if v >> 12 == 8 {
+                if v & 0x200 != 0 {
+                    continue;
+                }
+                (((v & 0xFF) + base) as usize, 0.0)
+            } else if fb != 0 {
+                let top = if v != 0 && v & 0x8000 == 0 && (v >> 8) as u8 != v as u8 { m.move_wall_height(v).0 as i16 as f32 } else { 0.0 };
+                ((fb as u16 - 1 + base) as usize, top)
+            } else {
                 continue;
-            }
-            let n = ((v & 0xFF) + base) as usize;
+            };
             if let Some(f) = flat(n) {
                 let (x, y) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
                 let start = out.len();
-                billboard(&mut out, frame_of(f, tick), x, y, lift(n), size(n as u8, 0), right, false);
+                billboard(&mut out, frame_of(f, tick), x, y, base_y + lift(n), size(n as u8, 0), right, false);
                 tags.push((Target::Flat { col, row, n: n as u16 }, start..out.len()));
             }
         }
@@ -1101,8 +1117,10 @@ pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32,
     let a = heading / 512.0 * std::f32::consts::TAU;
     let (fx, fz) = (a.sin(), a.cos());
     let (rx, rz) = (a.cos(), -a.sin());
-    // The wall in the way: a square holding flats is passed through.
-    let wall = pick_where(m, m.mem.r16(DS, 0xC394), |v| v >> 12 != 8).map_or(f32::MAX, |(_, t)| t);
+    // The wall in the way: a square holding flats (in the walls, or on
+    // the floor: a platform with one on it) is passed through.
+    let floors = m.mem.r16(DS, arena::mif::var::FLOOR_SEG);
+    let wall = pick_where(m, m.mem.r16(DS, 0xC394), |sq, v| v >> 12 != 8 && m.mem.r8(floors, sq) == 0).map_or(f32::MAX, |(_, t)| t);
     let mut best: Option<(f32, Target)> = None;
     for (target, range) in tags {
         if let Target::Flat { n, .. } = target {
@@ -1134,6 +1152,62 @@ pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32,
         }
     }
     best.map(|(_, t)| t)
+}
+
+/// The creatures' flats the drawing reaches (0000:CF96: a map flat with
+/// bit 2 of its high byte goes to the hook CD56, 25CA:0271, instead of
+/// being drawn), as (column, row, the word's offset in MAP1_SEG).
+///
+/// Approximate: the original's ray caster reaches the squares its rays
+/// pass; here a square is reached when its centre is inside the view's
+/// columns (45 degrees either side, 160 columns a unit of tan) and the
+/// line to it crosses no wall, nearest first.
+pub fn creature_flats_seen(m: &Machine) -> Vec<(u16, u16, u16)> {
+    let w = m.mem.r16(DS, 0xC357).min(128) as i32;
+    let d = m.mem.r16(DS, 0xC359).min(128) as i32;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    use arena::movement::var::{HEADING, X, Y};
+    let (x, y) = (m.mem.r16(DS, X) as f32, m.mem.r16(DS, Y) as f32);
+    let a = m.mem.r16(DS, HEADING) as f32 / 512.0 * std::f32::consts::TAU;
+    let (fx, fy) = (a.sin(), a.cos());
+    let start = (x as i32 >> 7, y as i32 >> 7);
+    let mut seen = Vec::new();
+    for row in 0..d {
+        for col in 0..w {
+            let di = (row << 8 | col << 1) as u16;
+            let v = m.mem.r16(walls, di);
+            if v >> 12 != 8 || v & 0x200 == 0 {
+                continue;
+            }
+            let (cx, cy) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
+            let (dx, dy) = (cx - x, cy - y);
+            let ahead = dx * fx + dy * fy;
+            let side = dx * fy - dy * fx;
+            if (col, row) != start && (ahead <= 0.0 || side.abs() > ahead) {
+                continue;
+            }
+            let dist = (dx * dx + dy * dy).sqrt();
+            let mut t = 4.0;
+            let mut open = true;
+            while t < dist {
+                let (c, r) = ((x + dx / dist * t) as i32 >> 7, (y + dy / dist * t) as i32 >> 7);
+                t += 4.0;
+                if (c, r) == start || (c, r) == (col, row) || c < 0 || r < 0 || c >= w || r >= d {
+                    continue;
+                }
+                let u = m.mem.r16(walls, (r << 8 | c << 1) as u16);
+                if u != 0 && u >> 12 != 8 {
+                    open = false;
+                    break;
+                }
+            }
+            if open {
+                seen.push((dist, (col as u16, row as u16, di)));
+            }
+        }
+    }
+    seen.sort_by(|a, b| a.0.total_cmp(&b.0));
+    seen.into_iter().map(|(_, s)| s).collect()
 }
 
 /// The view's half height (100 of the 320 x 200 screen's rows) over its

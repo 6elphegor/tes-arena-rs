@@ -55,6 +55,15 @@ fn squares(m: &Machine, pick: impl Fn(u16) -> bool) -> Vec<u16> {
     (0..rows).flat_map(|r| (0..cols).map(move |c| r << 8 | c << 1)).filter(|&sq| pick(m.mem.r16(walls, sq))).collect()
 }
 
+/// The floor plane's squares holding a flat (its low byte, the flat's
+/// number + 1, as the INF's scan 0000:EC5F and the renderer read it:
+/// a flat standing on a raised platform) whose number `pick` takes.
+fn floor_flats(m: &Machine, pick: impl Fn(u8) -> bool) -> Vec<u16> {
+    let floors = m.mem.r16(DS, arena::mif::var::FLOOR_SEG);
+    let (rows, cols) = (m.mem.r16(DS, 0xC359), m.mem.r16(DS, 0xC357));
+    (0..rows).flat_map(|r| (0..cols).map(move |c| r << 8 | c << 1)).filter(|&sq| m.mem.r8(floors, sq) != 0 && pick(m.mem.r8(floors, sq).wrapping_sub(1))).collect()
+}
+
 /// The squares whose wall is a trigger (0000:43B1) of index `pick`.
 fn triggers(m: &Machine, pick: impl Fn(u16) -> bool) -> Vec<u16> {
     squares(m, |w| {
@@ -126,8 +135,24 @@ impl arena::loot_window::LootHooks for Loot {
     fn text(&mut self, m: &mut Machine, _mode: u16) {
         println!("    [text {:#x}]", m.mem.r16(DS, 0x137A));
     }
-    fn last_piece(&mut self, m: &mut Machine) {
+    fn last_piece(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         println!("    [the eighth piece: 1194:D986] {}", flags(m));
+        m.staff_end(files, &mut End)
+    }
+}
+
+/// The staff made whole's scenes printed.
+struct End;
+
+impl arena::staffend::EndHooks for End {
+    fn movie(&mut self, m: &mut Machine, _files: &mut Files, si: u16) {
+        println!("    [movie] {}", show(m, si));
+    }
+    fn speech(&mut self, m: &mut Machine, _files: &mut Files, ax: u16, _si: u16, di: u16) {
+        println!("    [speech] text {ax:#x} over {} in {:#x}", show(m, di), m.mem.r8(DS, 0x9288));
+    }
+    fn line(&mut self, m: &mut Machine, si: u16, y: u16) {
+        println!("    [house, row {y:#x}] {}", show(m, si));
     }
 }
 
@@ -219,8 +244,11 @@ fn person(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<b
 struct LeaveYes;
 
 impl arena::transit::AreaHooks for LeaveYes {
-    fn ask_leave(&mut self, _m: &mut Machine) -> bool {
+    fn ask_leave(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
         true
+    }
+    fn automap(&mut self, m: &mut Machine, files: &mut Files) {
+        m.states_keep(files);
     }
 }
 
@@ -258,7 +286,7 @@ fn leave(engine: &mut Engine, dir: &std::path::Path, run: &mut Run, at: u8) -> O
 /// hook (CD6E), the level reloaded (0000:EBB5), its INF loaded where
 /// one was named (F7B5..F7F5), the hook C3B8 (a dungeon's level
 /// entered).
-fn change_level(engine: &mut Engine, to: u8) -> Option<()> {
+pub fn change_level(engine: &mut Engine, to: u8) -> Option<()> {
     use arena::movement::var::{LEVEL, LEVEL_HOOK};
     let m = &mut engine.m;
     if m.mem.r32(DS, arena::movement::var::STAIRS_HOOK) == arena::hooks::value::STAIRS {
@@ -279,7 +307,9 @@ fn change_level(engine: &mut Engine, to: u8) -> Option<()> {
 
 /// A dungeon's levels gone through from the one entered (on to the
 /// far end, then back the other way) until one holds the staff's flat
-/// (C941, the INF's ITEM 13) in its walls, and it clicked.
+/// (C941, the INF's ITEM 13) in its walls or on its floor (Black Gate's
+/// hammer stands on a platform: the floor plane's low byte), and it
+/// clicked (the loot window takes it off whichever holds it, 2433:05D9).
 fn take_staff(engine: &mut Engine, n: &str) -> Option<()> {
     use arena::movement::var::{LEVEL, LEVELS};
     let (start, levels) = (engine.m.mem.r8(DS, LEVEL), engine.m.mem.r8(DS, LEVELS));
@@ -291,7 +321,9 @@ fn take_staff(engine: &mut Engine, n: &str) -> Option<()> {
         }
         let m = &mut engine.m;
         let staff = m.mem.r8(DS, 0xC941);
-        if let Some(&sq) = squares(m, |w| w == 0x8000 | staff as u16).first() {
+        let walls = squares(m, |w| w == 0x8000 | staff as u16);
+        let floors = if staff == 0xFF { vec![] } else { floor_flats(m, |f| f == staff) };
+        if let Some(&sq) = walls.first().or(floors.first()) {
             println!("{n}. level {l}: the staff's flat {staff:#x} at {sq:04x}");
             click(engine, sq, staff)?;
             println!("   {}", flags(&engine.m));
@@ -420,8 +452,8 @@ fn stages(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<(
 /// palace's door used (0000:4192: at stage 8 the audience, 0000:41A4,
 /// into the palace's lower levels; at 9 the artifact's, text 5DDh), the
 /// staff's flat taken there (2433:0BF4 at stage 8: D363 and, for the
-/// eighth, D986) and the way out (the outer loop: 5B1 bit 100h, the
-/// game's end).
+/// eighth, D986: the staff made whole, `arena::staffend`) and the area
+/// left by the loot window (C398 bit 80h; 5E6 0): the game goes on.
 fn end(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<()> {
     *run = trip(engine, dir, *run, 8, 0, "8")?;
     day(engine)?;
@@ -438,7 +470,15 @@ fn end(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<()> 
     *run = areas::next(engine, dir, *run)?;
     let at = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     take_staff(engine, "8")?;
-    println!("   5B1 {:04x}", engine.m.mem.r16(DS, 0x05B1));
+    let m = &engine.m;
+    println!("   5B1 {:04x}, 5E6 {}, C398 {:04x}", m.mem.r16(DS, 0x05B1), m.mem.r8(DS, 0x05E6), m.mem.r16(DS, 0xC398));
+    // The loot window left the area (C398 bit 80h, 2433:0600): the
+    // outer loop goes on from there; otherwise out the way in.
+    if m.mem.r16(DS, 0xC398) & 0x80 != 0 {
+        *run = areas::next(engine, dir, *run)?;
+        println!("   after the staff: {run:?} in {}: {}", String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)), flags(&engine.m));
+        return Some(());
+    }
     match leave(engine, dir, run, at) {
         Some(()) => println!("   after: {run:?}"),
         None => println!("   the way out ended the run (see above)"),

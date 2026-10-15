@@ -105,12 +105,14 @@ pub trait AreaHooks {
     /// 2294:11F2, around a city's run.
     fn city_screen(&mut self, _m: &mut Machine) {}
     /// 292B:095E: a main quest dungeon's level's locks and triggers kept
-    /// in STATES.nn (`Machine::states_keep`, which needs the files).
-    fn automap(&mut self, _m: &mut Machine) {}
-    /// 26F7:0000, asked on the way out of a dungeon: whether to leave
-    /// (the view saved and put back around it, 0000:A611/A606/A5D1, and
-    /// redrawn after, A6B5, 2542:0446). The default stays.
-    fn ask_leave(&mut self, _m: &mut Machine) -> bool {
+    /// in STATES.nn (`Machine::states_keep`; by default nothing).
+    fn automap(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// 26F7:0000, the travel map shown on the way out of a dungeon (1A81
+    /// set: from anywhere): its carry (a journey made, or another place
+    /// chosen) whether to leave (the view saved and put back around it,
+    /// 0000:A611/A606/A5D1, and redrawn after, A6B5, 2542:0446). The
+    /// default stays.
+    fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
     }
     /// The screen after leaving (0000:9426, 9466).
@@ -623,7 +625,7 @@ impl Machine {
             0x4537 => {
                 let l = self.mem.r8(DS, LEVEL).wrapping_add(1);
                 self.mem.w8(DS, LEVEL, l);
-                hooks.automap(self);
+                hooks.automap(self, files);
                 let l = self.mem.r8(DS, LEVEL).wrapping_sub(1);
                 self.mem.w8(DS, LEVEL, l);
                 let f = self.mem.r16(DS, 0x05C8);
@@ -632,7 +634,7 @@ impl Machine {
                         self.and16(0x05C8, 0xBFFF);
                     } else {
                         self.mem.w8(DS, 0x1A81, 1);
-                        let leave = hooks.ask_leave(self);
+                        let leave = hooks.ask_leave(self, files);
                         self.mem.w8(DS, 0x1A81, 0);
                         if !leave {
                             return Some(());
