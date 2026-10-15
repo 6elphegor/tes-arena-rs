@@ -290,7 +290,7 @@ impl Machine {
         if (at as i16) >= 0 {
             let v = 0x8000 | self.mem.r8(DS, 0xC93C) as u16;
             self.mem.w16(walls, at, v);
-            // (0000:3E7E, 2433:0C75, isn't ported.) 3E83: broken (15h).
+            // (0000:3E7E; 2433:0C75 is a bare RETF.) 3E83: broken (15h).
             self.sound_here(0x15)?;
         } else {
             let at = at & 0x7FFF;

@@ -195,10 +195,13 @@ pub trait TalkHooks: TextHooks {
     /// 217B:0682: the way in the wild (`kind` 1 the nearest inn, 2
     /// temple, 0 dungeon).
     fn wild_way(&mut self, _m: &mut Machine, _kind: u16) {}
-    /// 0000:06BE: the level's text or item at map square `ax` (row
-    /// high, column low). Some((its record, its number)): CF clear.
-    fn square_text(&mut self, _m: &mut Machine, _ax: u16) -> Option<(u16, u16)> {
-        None
+    /// 0000:06BE through 292B:0942: the level's text or item at map
+    /// square `ax` (row high, column low; BX the row, as 0942 leaves it).
+    /// Some((its record, BX)): CF clear (`Machine::square_lookup`). None
+    /// where it isn't there, or its scan never ends.
+    fn square_text(&mut self, m: &mut Machine, ax: u16) -> Option<(u16, u16)> {
+        let l = m.square_lookup(ax, ax >> 8, 0)?;
+        (!l.not_found).then_some((l.si, l.bx))
     }
 }
 
