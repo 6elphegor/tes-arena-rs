@@ -184,14 +184,15 @@ pub fn light_table(m: &mut Machine) -> u16 {
     light
 }
 
-/// A city, from `PROVINCE:INDEX[:TERRAIN:WEATHER]`: province 0..7 (8 the
+/// A city, from `PROVINCE:INDEX[:TERRAIN:WEATHER[:DAY]]`: province 0..7 (8 the
 /// Imperial City), the location in it (0..7 city-states, 8..15 towns,
 /// 16..31 villages), the terrain class (A50; 1 by default: the climate
 /// DA8 is 0 for 1 and 4, 4, the desert, for 3 and 5, else 8) and the
 /// weather as the season's roll gives it (0 clear, 1 and 6 overcast with
 /// fog, 2 rain, 3 snow, both with fog one day in four, 4 snow with fog, 5
 /// rain with fog, 7 snow, fog on a roll), set up as entering the area
-/// does (0000:0F05, `weather_set`; the zone is taken as 0). The
+/// does (0000:0F05, `weather_set`; the zone is taken as 0) on the day of
+/// the year DAY (CCA8, 0 by default: rain and snow then bring fog). The
 /// location's record is built from CITYDATA.65 (1194:3B84) and its city
 /// from its blocks (1194:0292); it is outdoors (C398 bit 4), and its INF
 /// is the one for the climate and weather (0000:0896).
@@ -199,7 +200,7 @@ fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
     const RECORD: u16 = 0x0A22;
     const PROVINCE_DATA: u16 = 0x1429;
     const PROVINCE_BYTES: usize = 0x4CC;
-    let v: Vec<u16> = spec.split(':').map(|x| x.parse().expect("CITY:PROVINCE:INDEX[:TERRAIN:WEATHER]")).collect();
+    let v: Vec<u16> = spec.split(':').map(|x| x.parse().expect("CITY:PROVINCE:INDEX[:TERRAIN:WEATHER[:DAY]]")).collect();
     let (province, index) = (v[0].min(8), v.get(1).copied().unwrap_or(0));
     let data = std::fs::read(dir.join("CITYDATA.65")).expect("CITYDATA.65");
     let p = province as usize;
@@ -212,6 +213,9 @@ fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
     m.mem.w8(DS, arena::weather::var::TERRAIN, v.get(2).copied().unwrap_or(1) as u8);
     m.mem.w8(DS, arena::weather::var::ZONE, 0);
     m.mem.w8(DS, arena::weather::var::ZONE_WEATHER, v.get(3).copied().unwrap_or(0) as u8);
+    if let Some(&day) = v.get(4) {
+        m.mem.w16(DS, arena::weather::var::DAY, day);
+    }
     m.weather_set(&mut Lgt(dir));
     let f = m.mem.r16(DS, 0xC398) | 4;
     m.mem.w16(DS, 0xC398, f);
@@ -614,6 +618,8 @@ fn sky_files() -> Vec<String> {
     v.extend((1..=10).map(|i| format!("TEMP{i:02}.IMG")));
     v.extend((1..=17).map(|i| format!("CLOUD{i:02}.IMG")));
     v.extend(["VOLCANO2.DFA".to_string(), "VOLCANO3.IMG".to_string()]);
+    // The lightning's bolts (0000:E5C9 loads them into the sky's bank).
+    v.extend((1..=6).map(|i| format!("LGLIT0{i}.CFA")));
     v
 }
 
@@ -714,7 +720,13 @@ pub fn sprite_sheet(flats: &[Option<crate::flats::Flat>], archive: &crate::archi
         }
     }
     for name in sky_files() {
-        let kind = if name.ends_with(".DFA") { 1 } else { 0 };
+        let kind = if name.ends_with(".DFA") {
+            1
+        } else if name.ends_with(".CFA") {
+            0x80
+        } else {
+            0
+        };
         if let Some(f) = archive.read(&name).as_deref().and_then(|d| crate::flats::decode(kind, d)) {
             let frames = p.add(&f);
             p.sheet.sky.insert(name, frames);
