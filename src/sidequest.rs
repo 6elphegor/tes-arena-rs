@@ -1317,7 +1317,7 @@ impl Machine {
     /// from each line's end back to a space, made a line feed. None
     /// where no space is found going back (the original reads on through
     /// memory).
-    fn sq_wrap(&mut self, si: u16) -> Option<()> {
+    pub(crate) fn sq_wrap(&mut self, si: u16) -> Option<()> {
         let mut ax = 0u16;
         while self.sq8(si.wrapping_add(ax)) != 0 {
             ax = ax.wrapping_add(1);
@@ -1451,7 +1451,7 @@ impl Machine {
 
     /// 0000:9C2C. The strings at DS:`si` and DS:`di` equal, ignoring the
     /// case of a..z: Some(SI past the NUL) when equal.
-    fn sq_streq(&self, mut si: u16, mut di: u16) -> Option<u16> {
+    pub(crate) fn sq_streq(&self, mut si: u16, mut di: u16) -> Option<u16> {
         let up = |b: u8| if b.is_ascii_lowercase() { b - 0x20 } else { b };
         loop {
             let (a, b) = (up(self.sq8(si)), up(self.sq8(di)));
