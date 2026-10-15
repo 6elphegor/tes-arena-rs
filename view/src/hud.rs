@@ -63,7 +63,8 @@ pub struct Span {
 }
 
 /// The game's text at DS:`at` split into lines of coloured spans: `\t`
-/// and a byte set the colour, `\r` (or `\n`) ends a line.
+/// and a byte set the colour, `\t` and three digits a column (the lines
+/// of the shops' lists: two spaces here), `\r` (or `\n`) ends a line.
 pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
     let mut out = vec![Vec::new()];
     let mut colour = colour;
@@ -76,6 +77,12 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
+            b'\t' if bytes.get(i + 1..i + 4).is_some_and(|d| d.iter().all(u8::is_ascii_digit)) => {
+                if !cur.is_empty() {
+                    cur.push_str("  ");
+                }
+                i += 3;
+            }
             b'\t' => {
                 flush(&mut out, &mut cur, colour);
                 if let Some(&c) = bytes.get(i + 1) {
