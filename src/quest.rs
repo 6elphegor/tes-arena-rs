@@ -628,7 +628,7 @@ impl Machine {
     /// 2710h for kind 0Dh; 13E8 bits 6 and 3). Then all: 13E8 bit 0, 13EC
     /// FFh, 13EB from 78B3 + k, 13DA k | 80h, the dword 13E4 100000 and,
     /// but for kind 0Dh, 13E0 and 13E2 25000.
-    fn quest_artifact(&mut self, step: u16) -> Option<()> {
+    pub(crate) fn quest_artifact(&mut self, step: u16) -> Option<()> {
         let k = self.mem.r8(DS, main_quest::PIECES.wrapping_add(step)) & 0x7F;
         self.mem.w8(DS, 0x13C8, k);
         let ty = self.mem.r8(DS, 0x36DD + k as u16);

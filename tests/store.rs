@@ -77,9 +77,9 @@ impl StoreHooks for Script {
     fn armor_lines(&mut self, _m: &mut Machine) {
         self.log.push(10);
     }
-    fn repair(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
+    fn repair_instead(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
         self.log.push(11);
-        false
+        Some(false)
     }
 }
 

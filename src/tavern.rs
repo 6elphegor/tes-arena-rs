@@ -409,7 +409,7 @@ impl Machine {
                 self.mem.w8(DS, 0x137E, 3);
                 self.split_lines(text::HOW_MANY_DAYS);
                 self.mem.w8(DS, 0x13D3, 2);
-                hooks.dialog(self, 2, TYPED);
+                hooks.dialog_at(self, 2, text::HOW_MANY_DAYS, TYPED);
                 if self.rest_digits(TYPED) {
                     break;
                 }
@@ -469,7 +469,7 @@ impl Machine {
         self.mem.w8(DS, 0x137E, 3);
         self.split_lines(text::SNEAK);
         self.mem.w8(DS, 0x13D3, 1);
-        if hooks.dialog(self, 1, 0) != 0 {
+        if hooks.dialog_at(self, 1, text::SNEAK, 0) != 0 {
             return Some(false);
         }
         let (ok, chance) = self.lockpick()?;
