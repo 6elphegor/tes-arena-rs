@@ -38,6 +38,7 @@ pub mod log;
 pub mod loot;
 pub mod loot_window;
 pub mod machine;
+pub mod menukeys;
 pub mod mapscreen;
 pub mod mem;
 pub mod mapdraw;
