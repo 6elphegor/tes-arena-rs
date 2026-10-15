@@ -413,5 +413,35 @@ fn stages(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<(
         }
     }
     println!("== the eight pieces: {}", flags(&engine.m));
+    end(engine, dir, run)
+}
+
+/// Stage 8 on: the Imperial City (province 8) travelled to, the
+/// palace's door used (0000:4192: at stage 8 the audience, 0000:41A4,
+/// into the palace's lower levels; at 9 the artifact's, text 5DDh), the
+/// staff's flat taken there (2433:0BF4 at stage 8: D363 and, for the
+/// eighth, D986) and the way out (the outer loop: 5B1 bit 100h, the
+/// game's end).
+fn end(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) -> Option<()> {
+    *run = trip(engine, dir, *run, 8, 0, "8")?;
+    day(engine)?;
+    let Some(&sq) = triggers(&engine.m, |i| (11..=13).contains(&i)).first() else {
+        println!("   no palace door");
+        return None;
+    };
+    println!("8. the palace's door at {sq:04x}: {}", flags(&engine.m));
+    door(engine, sq)?;
+    println!("   {} (5E6 {}, left {})", flags(&engine.m), engine.m.mem.r8(DS, 0x05E6), engine.m.mem.r16(DS, 0xC398) & 0x80 != 0);
+    if engine.m.mem.r16(DS, 0xC398) & 0x80 == 0 {
+        return Some(());
+    }
+    *run = areas::next(engine, dir, *run)?;
+    let at = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
+    take_staff(engine, "8")?;
+    println!("   5B1 {:04x}", engine.m.mem.r16(DS, 0x05B1));
+    match leave(engine, dir, run, at) {
+        Some(()) => println!("   after: {run:?}"),
+        None => println!("   the way out ended the run (see above)"),
+    }
     Some(())
 }
