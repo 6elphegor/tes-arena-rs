@@ -19,6 +19,15 @@ use arena::machine::Machine;
 use arena::mem::DS;
 use std::collections::VecDeque;
 
+/// A click on the attribute screen (1194:122C's, as creation's):
+/// an attribute's line picked (`Machine::creation_select`), or the arrows
+/// clicked at a row (`creation_arrow`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Click {
+    Select(u16),
+    Arrow(u16),
+}
+
 /// An answer given.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
@@ -26,6 +35,19 @@ pub enum Answer {
     Pick(u16),
     /// Text typed (the rest's hours).
     Text(String),
+    /// A level's points spent: the clicks, in order.
+    Spend(Vec<Click>),
+}
+
+/// The game's state when it asked (the level-up screen shows the
+/// attributes as they are and as the clicks change them).
+#[derive(Clone)]
+pub struct Snapshot(pub Box<Machine>);
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Snapshot")
+    }
 }
 
 /// A question waiting for its answer.
@@ -34,6 +56,8 @@ pub enum Need {
     Menu(Menu),
     /// Text to type, its prompt.
     Text(String),
+    /// A level's points to spend (1194:122C), on the attribute screen.
+    Spend(Snapshot),
 }
 
 /// A turn's answers and what it showed.
@@ -160,6 +184,40 @@ impl Talk {
                 m.mem.w8(DS, at + t.len().min(max) as u16, 0);
             }
             _ => self.need = Some(Need::Text(prompt.to_string())),
+        }
+    }
+}
+
+impl Talk {
+    /// A level's points spent (`LevelUpHooks::spend`): the clicks given,
+    /// or the question left. Left, the points still go (in turn, the rest
+    /// dropped), as the level-up loops until none are left: the turn is
+    /// thrown away anyway.
+    pub fn spend(&mut self, m: &mut Machine) {
+        let leave = |m: &mut Machine| {
+            arena::levelup::spend_in_turn(m);
+            m.mem.w8(DS, arena::newgame::var::POINTS, 0);
+        };
+        if self.need.is_some() {
+            return leave(m);
+        }
+        match self.answers.front() {
+            Some(Answer::Spend(clicks)) => {
+                let clicks = clicks.clone();
+                self.answers.pop_front();
+                self.since_answer.clear();
+                for c in clicks {
+                    match c {
+                        Click::Select(r) => m.creation_select(r),
+                        Click::Arrow(y) => m.creation_arrow(y),
+                    }
+                }
+                println!("[points spent]");
+            }
+            _ => {
+                self.need = Some(Need::Spend(Snapshot(Box::new(m.clone()))));
+                leave(m);
+            }
         }
     }
 }
