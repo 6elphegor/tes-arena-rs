@@ -563,7 +563,7 @@ impl Machine {
 
     /// 0000:7052: `v` in decimal at DS:`di`, NUL-terminated (through
     /// 7028's buffer ending at A933).
-    fn sm_itoa(&mut self, v: u16, di: u16) {
+    pub(crate) fn sm_itoa(&mut self, v: u16, di: u16) {
         let digits = self.utoa(v);
         for (i, &d) in digits.iter().enumerate() {
             self.mem.w8(DS, di.wrapping_add(i as u16), d);
