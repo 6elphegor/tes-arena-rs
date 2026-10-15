@@ -112,8 +112,9 @@ impl TavernHooks for Script {
         let (cf, eax) = take(&self.haggles, &mut self.n[4], (true, 0));
         (eax, cf)
     }
-    fn rumours(&mut self, _m: &mut Machine) {
+    fn rumours(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<bool> {
         self.log.push(15);
+        Some(true)
     }
 }
 

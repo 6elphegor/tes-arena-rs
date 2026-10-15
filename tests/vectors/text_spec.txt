@@ -123,3 +123,9 @@ data 7387 b 4
 # day in region 3, clear, climate 4; its third variant), where the filter
 # drops the space the break became.
 ds 0000 aim 40 137A:w1,05D2:w3,BB09:b0,0D48:b1,0DA8:b4,6E54:b0
+# A quarter of the cases aimed at a store's entrance (text 4: "You enter
+# %en..."), in an equipment store (D48 6) at FD2 102h (whose key, the low
+# byte halved, is 101h), and half with the places list's first entry key
+# 101h, so that %en finds it.
+ds 0000 aim 40 137A:w4,0D48:b6,0FD2:w102
+c 0000 aim 80 0200:w101

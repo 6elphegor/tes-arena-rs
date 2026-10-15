@@ -72,11 +72,13 @@ impl StoreHooks for Script {
         let (cf, eax) = take(&self.haggles, &mut self.n[2], (true, 0));
         (eax, cf)
     }
-    fn weapon_lines(&mut self, _m: &mut Machine) {
+    fn weapon_lines(&mut self, _m: &mut Machine) -> Option<()> {
         self.log.push(9);
+        Some(())
     }
-    fn armor_lines(&mut self, _m: &mut Machine) {
+    fn armor_lines(&mut self, _m: &mut Machine) -> Option<()> {
         self.log.push(10);
+        Some(())
     }
     fn repair_instead(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
         self.log.push(11);

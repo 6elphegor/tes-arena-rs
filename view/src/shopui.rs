@@ -7,9 +7,9 @@
 //!   kind 1 as a question whose answers follow the picture shown before it
 //!   (newold.img: a new job or an old one; else yes or no; Esc leaves),
 //!   kind 2 with a number typed.
-//! - The store's lists of weapons and armour are made here (the
-//!   original's lines, 1194:F142 and F204, aren't ported): each record's
-//!   name as Buy names it and its price.
+//! - The store's lists of weapons and armour are the original's lines
+//!   (1194:F142 and F204, `Machine::store_lines`): name, hands (or the
+//!   armour's kind), weight and price, laid out by their columns.
 //! - The store's haggling runs the haggle port (1194:8020, modes 1 and 4):
 //!   each round accept, make an offer (typed) or leave; the shopkeeper's
 //!   lines aren't ported, so only the price asked first is shown. The
@@ -28,16 +28,23 @@ use arena::mem::DS;
 const NEW_OLD: u16 = 0x1346;
 
 /// The shop of building kind `kind` (D48: 4 the tavern, 5 the temple, 6
-/// the equipment store), as the talk enters it (`TalkHooks::shop`). The
-/// mages' guild (7) isn't ported.
+/// the equipment store, 7 the mages' guild), as the talk enters it
+/// (`TalkHooks::shop`).
 pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
-    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0 };
-    match kind {
+    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new(), button: None };
+    let r = match kind {
         5 => m.temple(files, &mut ui),
         4 => m.tavern_shop(files, &mut ui),
         6 => m.equipment_store(files, &mut ui),
+        7 => m.mages_guild(files, &mut ui),
         _ => Some(()),
+    };
+    // The guild's stock file, written through its hooks, kept with the
+    // game's files.
+    for (name, bytes) in ui.written {
+        files.store(&name, bytes);
     }
+    r
 }
 
 /// The front end's side of a shop. `files` is a copy the hooks without
@@ -49,6 +56,10 @@ struct ShopFront<'a, 'b> {
     lines: Option<Vec<String>>,
     /// The picture shown last (4B8E).
     picture: u16,
+    /// Files the guild wrote (its stock), for the game's files after.
+    written: Vec<(Vec<u8>, Vec<u8>)>,
+    /// The guild's spell screen: the button picked (a click inside it).
+    button: Option<(u16, u16)>,
 }
 
 fn line(s: &str) -> Vec<Span> {
@@ -208,20 +219,136 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
             _ => (eax, true),
         }
     }
-    fn weapon_lines(&mut self, m: &mut Machine) {
-        self.lines = Some(store_lines(m, true));
+    fn weapon_lines(&mut self, m: &mut Machine) -> Option<()> {
+        m.store_lines(true)?;
+        self.lines = Some(frame_lines(m, 0x0FA0, m.mem.r8(DS, 0x12C6) as usize));
+        Some(())
     }
-    fn armor_lines(&mut self, m: &mut Machine) {
-        self.lines = Some(store_lines(m, false));
+    fn armor_lines(&mut self, m: &mut Machine) -> Option<()> {
+        m.store_lines(false)?;
+        self.lines = Some(frame_lines(m, 0x2710, m.mem.r8(DS, 0x12CF) as usize));
+        Some(())
     }
     fn picture(&mut self, _m: &mut Machine, si: u16) {
         self.picture = si;
     }
 }
 
-/// The store's weapons or armour, each "name - price gp".
-fn store_lines(m: &mut Machine, weapons: bool) -> Vec<String> {
-    m.store_list(weapons).into_iter().map(|(name, price)| format!("{name} - {price} gp")).collect()
+/// The `n` list lines 1194:F142 or F204 wrote one after another into the
+/// EMS frame from `at`, each a row: its fields (`\n` between them, each
+/// from a column, `\t` and three digits: its x on the 320-wide screen)
+/// padded to their columns at about five pixels a character.
+fn frame_lines(m: &Machine, at: u16, n: usize) -> Vec<String> {
+    let frame = m.mem.r16(DS, 0x9030);
+    let mut out = Vec::new();
+    let mut at = at;
+    for _ in 0..n {
+        let raw = m.mem.cstr(frame, at).to_vec();
+        at = at.wrapping_add(raw.len() as u16 + 1);
+        out.push(lay_out(&raw));
+    }
+    out
+}
+
+/// A list line's fields (`\n` between them, each from a column: `\t` and
+/// three digits, its x on the 320-wide screen) as one row, padded to
+/// their columns at about five pixels a character.
+fn lay_out(raw: &[u8]) -> String {
+    let mut row = String::new();
+    let mut first = None;
+    {
+        for field in raw.split(|&b| b == b'\n') {
+            let (col, text) = match field {
+                [b'\t', a, b, c, rest @ ..] if [a, b, c].iter().all(|d| d.is_ascii_digit()) => {
+                    let col = ((a - b'0') as usize) * 100 + ((b - b'0') as usize) * 10 + (c - b'0') as usize;
+                    (Some(col), rest)
+                }
+                _ => (None, field),
+            };
+            if let Some(col) = col {
+                let base = *first.get_or_insert(col);
+                let want = col.saturating_sub(base) / 5;
+                while row.chars().count() < want {
+                    row.push(' ');
+                }
+                if !row.is_empty() && !row.ends_with(' ') {
+                    row.push(' ');
+                }
+            }
+            row.push_str(&String::from_utf8_lossy(text).replace('\r', ""));
+        }
+    }
+    row
+}
+
+/// The mages' guild: its menus, lists, haggling and boxes as the store's;
+/// the spell's screen (1194:68A3, its buttons Back, Buy and Exit along
+/// its bottom, clicked at y B8h up: x 5..69h, 78h..BEh, 11Dh..136h) asked
+/// as a question whose answer is a click inside the button picked.
+impl arena::guild::GuildHooks for ShopFront<'_, '_> {
+    fn stock_file(&mut self, m: &mut Machine, name: u16) -> Option<Vec<u8>> {
+        let name = m.mem.cstr(DS, name).to_vec();
+        if let Some((_, b)) = self.written.iter().rev().find(|(n, _)| n.eq_ignore_ascii_case(&name)) {
+            return Some(b.clone());
+        }
+        self.files.data(&name).map(|d| d.to_vec())
+    }
+    fn stock_write(&mut self, m: &mut Machine, name: u16, bytes: &[u8]) {
+        let name = m.mem.cstr(DS, name).to_vec();
+        self.files.store(&name, bytes.to_vec());
+        self.written.push((name, bytes.to_vec()));
+    }
+    fn message_box(&mut self, m: &mut Machine, si: u16) {
+        self.front.message_box(m, si);
+    }
+    fn picture(&mut self, _m: &mut Machine, si: u16) {
+        self.picture = si;
+    }
+    fn stock_list(&mut self, m: &mut Machine, seg: u16, si: u16, cx: u16) -> u16 {
+        let mut entries = Vec::new();
+        let mut at = si;
+        for _ in 0..cx {
+            let raw = m.mem.cstr(seg, at).to_vec();
+            at = at.wrapping_add(raw.len() as u16 + 1);
+            entries.push(line(&lay_out(&raw)));
+        }
+        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0 };
+        match self.talk() {
+            Some(t) => t.ask_menu(menu),
+            None => 0xFFFF,
+        }
+    }
+    /// 1194:8020 in mode 1 (buying), the seller named at 1A4C. The
+    /// original maps EMS bank [1032] before loading the dialogue into the
+    /// frame (1194:8665, the bank before kept at A88E) and maps it back on
+    /// every way out (8:82D1..83D3); the haggle port loads into the frame
+    /// as it is, which in the guild holds the stock (bank 18h), so the
+    /// swap is made around it here.
+    fn haggle(&mut self, m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
+        use arena::level::var::EMS_MAPPED;
+        let old = m.mem.r16(DS, EMS_MAPPED) >> 2;
+        m.ems_map(m.mem.r16(DS, 0x1032));
+        let mut io = HaggleTalk { talk: self.front.talk.as_deref_mut(), asked: price };
+        let r = match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 1, 0x1A4C) {
+            Some(Haggle::Deal(p)) => (p, false),
+            _ => (price, true),
+        };
+        m.ems_map(old);
+        r
+    }
+    fn spell_screen(&mut self, m: &mut Machine) {
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, 0x57E6)).into_owned();
+        let pick = self.ask(vec![line(&name)], &["Buy", "Back", "Exit"]);
+        self.button = Some(match pick {
+            0 => (0x90, 0xC0),
+            1 => (0x30, 0xC0),
+            _ => (0x120, 0xC0),
+        });
+    }
+    fn click(&mut self, _m: &mut Machine) -> (u8, u16, u16) {
+        let (x, y) = self.button.take().unwrap_or((0x120, 0xC0));
+        (1, x, y)
+    }
 }
 
 impl arena::tavern::TavernHooks for ShopFront<'_, '_> {

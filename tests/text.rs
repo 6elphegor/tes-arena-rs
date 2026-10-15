@@ -160,7 +160,8 @@ fn matches_original() {
                 .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DATA, o)]);
             let text = (0..0x200u16).map(|o| m.mem.r8(OUT_SEG, o));
             let frame = (0..=0xFFFFu16).map(|o| m.mem.r8(FRAME, o));
-            format!("{:x} {:x} {:x} {:x}", fnv(changed), fnv(dchanged), fnv(text), fnv(frame))
+            let places = (0x8A52..0x8A56u16).map(|o| m.mem.r8(CSEG, o));
+            format!("{:x} {:x} {:x} {:x} {:x}", fnv(changed), fnv(dchanged), fnv(text), fnv(frame), fnv(places))
         });
         match got {
             Some(g) => {
@@ -176,5 +177,5 @@ fn matches_original() {
     // A None where the original goes on is only right for the code not
     // ported: these counts are the vectors' (a change that makes the port
     // give up more often shows here).
-    assert_eq!((skipped, stuck), (57, 379), "not ported, stuck in both");
+    assert_eq!((skipped, stuck), (35, 676), "not ported, stuck in both");
 }

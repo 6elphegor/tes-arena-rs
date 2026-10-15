@@ -183,7 +183,9 @@ def main():
             dchanged = changes(before_data, after_data)
             text = bytes(a.mu.mem_read(a.lin(OUT_SEG, 0), 0x200))
             frame = a.seg_bytes(FRAME)
-            res = f'{fnv(changed):x} {fnv(dchanged):x} {fnv(text):x} {fnv(frame):x}'
+            # %en writes 8A52, 8A54 in the places list's segment (CSEG).
+            places = bytes(a.mu.mem_read(a.lin(LOAD_SEG + CSEG, 0x8A52), 4))
+            res = f'{fnv(changed):x} {fnv(dchanged):x} {fnv(text):x} {fnv(frame):x} {fnv(places):x}'
             if dump:
                 open(OUT + '.ds', 'w').write(''.join(f'{i:04x} {before[i]:02x} {after[i]:02x}\n' for i in range(0x10000) if after[i] != before[i]))
                 open(OUT + '.frame', 'wb').write(frame)
