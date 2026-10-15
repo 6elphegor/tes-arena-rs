@@ -12,7 +12,10 @@ the random seed; then runs 1194:887A with the game's heap set up and
 DOS handle 5 taken (GLOBAL.BSA's in the game).
 
 Stubbed as gen_guards.py: the fight's graphics and music count calls at
-DGROUP FFE0..FFE4. The people's graphics list (2686:0423) runs.
+DGROUP FFE0..FFE4; Jagar's movie and text (1194:D45D) at FFE6 (the
+text, AX, kept at FFEC), the
+view's save and restore around it (0000:A611, A6B5) at FFE8, FFEA.
+The people's graphics list (2686:0423) runs.
 
   encounter | seed | result
 
@@ -80,6 +83,12 @@ def setup(seed):
     w.append((CSEG, 5, pb(byte() % 8)))
     w.append((CSEG, 0x40D, pk(word() & 0x1000)))
     w.append((None, 0x91F6, bytes(byte() for _ in range(4))))
+    # The main quest's encounters (5C8 bit 8000h): Jagar's words first
+    # when F77 is set (1194:D91C).
+    if byte() < 0x40:
+        w.append((None, 0x05C8, pk(0x8000)))
+        w.append((None, 0x0F77, pb(0 if byte() < 0x40 else byte() % 9)))
+        w.append((None, 0xA902, pk(word())))
     return w
 
 
@@ -88,7 +97,8 @@ def main():
     out = open(OUT, 'w', buffering=1)
     a = DosArena(EXE, GAME)
     for seg, off, code in [(0, 0x1AF9, counter(0xFFE0, True)), (0, 0x1A5C, counter(0xFFE2, True)),
-                           (0x23BA, 0x01C7, counter(0xFFE4, True))]:
+                           (0x23BA, 0x01C7, counter(0xFFE4, True)), (0x1194, 0xD45D, bytes.fromhex('a3ecffff06e6ffc3')),
+                           (0, 0xA611, counter(0xFFE8, True)), (0, 0xA6B5, counter(0xFFEA, True))]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     for o, v in [(0xD806, WSEG), (0xCCD0, FSEG), (0x1042, CSEG), (0x9030, FRAME), (0xCCCE, FRAME + 0xC00),
                  (0x91F0, 0), (0x05C8, 0), (0xC38E, 0xC0), (0xC357, 0x80), (0xC359, 0x80)]:
