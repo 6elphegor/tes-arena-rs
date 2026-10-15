@@ -13,7 +13,18 @@
 //! turn slower than a second, and odd states (the player off the map,
 //! its height out of range). The run stops at the first None or panic,
 //! the state then being the port's guess. The last line sums it up:
-//! `PLAYTEST seed .. frames .. result ..`.
+//! `PLAYTEST seed .. frames .. result ..`. A None that a port routine
+//! marks as the original's own fault (`Machine::gave_up`, set by
+//! `original_fault`) prints `ORIGFAULT frame ..: why` instead; with
+//! `--save-dir` and the targeted acts on, the run then reloads its save
+//! and goes on.
+//!
+//! The targeted acts (`PT_TOURS` percent of turns) also use the game's
+//! save and load menus (a slot clicked, a name typed, Enter; then the
+//! same slot loaded back and compared), load that slot from a fresh
+//! title screen's Load and play on, walk up to the Imperial City's
+//! palace doors (trigger entries 11..13) and click, and after each load
+//! run the CITYDATA check (242A:000E), reporting a failure as odd.
 //!
 //! The targeted acts also travel (the map opened, a random place or
 //! region clicked, Travel), open the bar's screens (automap, sheet,
