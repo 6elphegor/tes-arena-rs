@@ -468,9 +468,13 @@ fn camera(engine: &Engine) -> Camera {
 
 /// What drawing a level needs, read once from the engine after loading.
 struct Assets {
-    /// The lightning's flash colour of the last `sprites` (the sky's hook
+    /// The lightning's flash colour of the last game frame (the sky's hook
     /// drawing it), for the sky.
     flash: std::cell::Cell<Option<u8>>,
+    /// What the last game frame left to draw (`view_frame`): the sky, the
+    /// lights and the sky's objects. Redraws between frames reuse it, so
+    /// the sky's hook (lightning) steps once a frame, as in the original.
+    frame_view: Option<(render::Sky, render::Lights, Vec<world::Vertex>)>,
     palette: [[u8; 4]; 256],
     /// CHARSHT.COL: the colours the character sheet's screens (the
     /// equipment screen, the spellbook) are shown in; 1194:1695 loads it
@@ -678,6 +682,7 @@ impl Assets {
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
             flash: std::cell::Cell::new(None),
+            frame_view: None,
         }
     }
 
@@ -776,16 +781,39 @@ impl Assets {
     /// This frame's billboards, animations stepping every `ANIMATE` ticks,
     /// and the sky's objects (2294:0A5D) for a view `aspect` wide. After
     /// `light_frame`, whose fog step the sky's hook runs first.
-    fn sprites(&self, engine: &mut Engine, cam: Camera, ticks: usize, aspect: f32) -> Vec<world::Vertex> {
+    fn sprites(&self, engine: &mut Engine, cam: Camera, ticks: usize, _aspect: f32) -> Vec<world::Vertex> {
         let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
         v.extend(world::doors(&engine.m));
+        if let Some((_, _, sky)) = &self.frame_view {
+            v.extend(sky.iter().copied());
+        }
+        v
+    }
+
+    /// After a game frame: the frame's sky and lights (`light_frame`), then
+    /// the sky's hook (2294:0A5D: its objects and the lightning, the flash
+    /// filling the sky) for a view `aspect` wide, kept for the redraws
+    /// until the next frame.
+    fn view_frame(&mut self, engine: &mut Engine, aspect: f32) {
+        let (mut sky, lights) = self.light_frame(&mut engine.m);
         let focal = world::TAN_HALF * aspect;
         let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
-        if engine.m.sky_draw(&mut draw).is_some() {
-            v.extend(draw.out);
-        }
+        let quads = if engine.m.sky_draw(&mut draw).is_some() { draw.out } else { Vec::new() };
         self.flash.set(draw.flash);
-        v
+        if let Some(c) = draw.flash {
+            sky.fog = Some(c);
+        }
+        self.frame_view = Some((sky, lights, quads));
+    }
+
+    /// The sky and the lights to draw: the last frame's (`view_frame`),
+    /// made now if no frame has run since the assets were made.
+    fn drawn(&mut self, engine: &mut Engine, aspect: f32) -> (render::Sky, render::Lights) {
+        if self.frame_view.is_none() {
+            self.view_frame(engine, aspect);
+        }
+        let (sky, lights, _) = self.frame_view.as_ref().unwrap();
+        (*sky, lights.clone())
     }
 }
 
@@ -1070,6 +1098,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         engine.m.automap_load(&mut engine.files);
     }
     let level_changed = stairs || wild_moved(engine, window);
+    assets.view_frame(engine, input.aspect);
     TurnOut { frame, level_changed }
 }
 
@@ -1327,8 +1356,6 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 // sky every frame; a shot only at its end).
                 for _ in 0..n {
                     shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
-                    let cam = camera(&engine);
-                    st.assets.sprites(&mut engine, cam, 0, 1.6);
                     if st.assets.flash.get().is_some() {
                         break;
                     }
@@ -1510,12 +1537,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = st.assets.renderer(&device, &queue, format);
-    let (mut sky, lights) = st.assets.light_frame(&mut engine.m);
+    let (sky, lights) = st.assets.drawn(&mut engine, w as f32 / h as f32);
     let cam = camera(&engine);
     let sprites = st.assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
-    if let Some(c) = st.assets.flash.get() {
-        sky.fog = Some(c);
-    }
     r.set_sky(sky);
     r.set_lights(lights);
     r.set_window(interface::window(&engine.m));
@@ -2500,12 +2524,9 @@ impl winit::application::ApplicationHandler for App {
                     };
                     let view = frame.texture.create_view(&Default::default());
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-                    let (mut sky, lights) = self.assets.light_frame(&mut self.engine.m);
                     let aspect = g.config.width as f32 / g.config.height.max(1) as f32;
+                    let (sky, lights) = self.assets.drawn(&mut self.engine, aspect);
                     let sprites = self.assets.sprites(&mut self.engine, cam, ticks, aspect);
-                    if let Some(c) = self.assets.flash.get() {
-                        sky.fog = Some(c);
-                    }
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
                     g.renderer.set_window(interface::window(&self.engine.m));
