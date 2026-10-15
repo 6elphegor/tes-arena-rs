@@ -132,6 +132,7 @@ mod playtest;
 mod prof;
 mod questui;
 mod render;
+mod sheets;
 mod shopui;
 mod spellmaker;
 mod travel;
@@ -1727,7 +1728,49 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     println!("spell {i}: {} ({}), cost {}", sp.name, sp.index, sp.cost);
                 }
             }
-            "map" => st.map = !st.map,
+            "map" => {
+                sheets::pics(&st.assets.archive, &engine.m);
+                engine.m.automap_view_open();
+                st.map = !st.map;
+            }
+            // The automap screen's button N (0 up, 1 down, 2 right, 3 left,
+            // 4 the centre).
+            "mapbtn" => {
+                engine.m.automap_view_button(n as u16);
+                engine.m.automap_origin();
+            }
+            // The character sheet (the portrait), its page turned to the
+            // equipment ('N'), the logbook (the scroll) and its next page.
+            "sheet" => {
+                sheets::pics(&st.assets.archive, &engine.m);
+                st.panel = Some(panels::Panel::Sheet);
+            }
+            "page" => st.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+            "log" => {
+                sheets::pics(&st.assets.archive, &engine.m);
+                st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files)));
+            }
+            "nextpage" => {
+                if let Some(panels::Panel::Log(log)) = st.panel.as_mut() {
+                    if log.page + 1 < log.pages.len() {
+                        log.page += 1;
+                    }
+                }
+            }
+            // The bar's button N clicked at its centre (`sheets::bar_click`).
+            "bar" => {
+                sheets::pics(&st.assets.archive, &engine.m);
+                let (x, y) = sheets::bar_centre(n as usize);
+                match sheets::bar_click(&mut engine.m, x, y, false) {
+                    Some(sheets::BarAction::Automap) => st.map = true,
+                    Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
+                    Some(sheets::BarAction::Spells) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
+                    Some(sheets::BarAction::Log) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
+                    Some(sheets::BarAction::Sheet) => st.panel = Some(panels::Panel::Sheet),
+                    Some(a) => println!("bar {n}: {a:?}"),
+                    None => {}
+                }
+            }
             "camp" => {
                 st.camp = true;
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
@@ -2525,7 +2568,7 @@ impl App {
         let open = match &self.panel {
             Some(panels::Panel::Inventory(_)) => inventory,
             Some(panels::Panel::Spellbook(_)) => !inventory,
-            None => false,
+            Some(_) | None => false,
         };
         if open {
             self.panel = None;
@@ -2568,7 +2611,10 @@ impl App {
                     }
                 } else {
                     match code {
-                        KeyCode::Escape | KeyCode::KeyI => self.panel = None,
+                        KeyCode::Escape | KeyCode::KeyI => {
+                            let back = inv.from_sheet;
+                            self.panel = back.then_some(panels::Panel::Sheet)
+                        },
                         KeyCode::ArrowUp => panels::scroll(m, -1),
                         KeyCode::ArrowDown => panels::scroll(m, 1),
                         KeyCode::KeyD => panels::drop_selected(m, &mut said),
@@ -2595,6 +2641,17 @@ impl App {
                     book.first = book.first.min(book.selected).max((book.selected + 1).saturating_sub(shown));
                 }
             }
+            Some(panels::Panel::Sheet) => match code {
+                // 3276:52B0's records: 'N' the equipment page, Esc leaves.
+                KeyCode::KeyN => self.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+                KeyCode::Escape | KeyCode::KeyK => self.panel = None,
+                _ => {}
+            },
+            Some(panels::Panel::Log(log)) => match code {
+                KeyCode::Escape | KeyCode::KeyL => self.panel = None,
+                _ if log.page + 1 < log.pages.len() => log.page += 1,
+                _ => {}
+            },
             None => {}
         }
         if let Some(sel) = cast {
@@ -2623,7 +2680,10 @@ impl App {
                     }
                 } else if let Some(b) = panels::button_at(x, y) {
                     match b {
-                        panels::Button::Exit => self.panel = None,
+                        panels::Button::Exit => {
+                            let back = inv.from_sheet;
+                            self.panel = back.then_some(panels::Panel::Sheet)
+                        },
                         panels::Button::Spellbook => self.panel = Some(panels::Panel::Spellbook(Default::default())),
                         panels::Button::Drop => panels::drop_selected(&mut self.engine.m, &mut said),
                     }
@@ -2645,6 +2705,16 @@ impl App {
                     }
                 }
             }
+            Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
+                Some(sheets::SheetClick::Equipment) => self.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() })),
+                Some(sheets::SheetClick::Done) => self.panel = None,
+                None => {}
+            },
+            Some(panels::Panel::Log(log)) => match sheets::log_click(x, y) {
+                Some(true) => self.panel = None,
+                Some(false) if log.page + 1 < log.pages.len() => log.page += 1,
+                _ => {}
+            },
             None => {}
         }
         if let Some(sel) = cast {
@@ -2652,6 +2722,52 @@ impl App {
             panels::cast(&mut self.engine, sel, &mut said);
         }
         self.boxes.extend(said.boxes);
+    }
+
+    /// A click on the interface bar (`sheets::bar_click`).
+    fn bar(&mut self, x: i32, y: i32, right: bool) -> bool {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        let Some(a) = sheets::bar_click(&mut self.engine.m, x, y, right) else { return false };
+        match a {
+            sheets::BarAction::None => {}
+            sheets::BarAction::WorldMap => self.open_travel(),
+            sheets::BarAction::Automap => self.map = true,
+            sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
+            sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
+            sheets::BarAction::Log => self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files))),
+            sheets::BarAction::Use => {
+                let names = panels::usable_names(&self.engine.m);
+                if !names.is_empty() {
+                    let mut p = panels::open_inventory(&mut self.engine.m);
+                    if let panels::Panel::Inventory(inv) = &mut p {
+                        inv.using = Some((names, 0));
+                    }
+                    self.panel = Some(p);
+                }
+            }
+            sheets::BarAction::Camp => self.camp = true,
+            sheets::BarAction::Sheet => self.panel = Some(panels::Panel::Sheet),
+        }
+        true
+    }
+
+    /// The automap screen (M, the map's button), on the player.
+    fn open_automap(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.engine.m.automap_view_open();
+        self.map = true;
+    }
+
+    /// The character sheet (K, the portrait).
+    fn open_sheet(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.panel = Some(panels::Panel::Sheet);
+    }
+
+    /// The logbook (L, the scroll).
+    fn open_log(&mut self) {
+        sheets::pics(&self.assets.archive, &self.engine.m);
+        self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files)));
     }
 
     /// A box of the view's own.
@@ -2866,9 +2982,25 @@ impl App {
             In::Key { code, down: true, text } if self.travel.is_some() && !self.waiting() => {
                 self.travel_input(|t, e, _| t.key(e, code, text.as_deref()));
             }
-            // Uncaptured, the bar's map button right-clicked: the travel
-            // map (2542:0380 with no left release).
-            In::Button { down: true, button: MouseButton::Right } if !self.captured && travel::on_map_button(self.screen_point()) => self.open_travel(),
+            // The automap screen up: its buttons and its exit (0000:2E30).
+            In::Button { down: true, .. } if self.map => {
+                let (x, y) = self.screen_point();
+                if automap::exit_at(x, y) {
+                    self.map = false;
+                } else if let Some(b) = automap::button_at(x, y) {
+                    self.engine.m.automap_view_button(b);
+                    self.engine.m.automap_origin();
+                }
+            }
+            In::Button { .. } if self.map => {}
+            // Uncaptured, a click on the interface bar (rows 147 on) is its
+            // button's (2542:06CE); off the buttons it captures the mouse.
+            In::Button { down: true, button } if !self.captured && self.screen_point().1 >= 147 => {
+                let (x, y) = self.screen_point();
+                if !self.bar(x, y, button == MouseButton::Right) {
+                    self.capture();
+                }
+            }
             // The right button held: dragging swings the weapon (0000:3C9F).
             In::Button { down, button: MouseButton::Right } if self.captured => self.keys.swing = down,
             // Uncaptured, a left click in the view clicks where it is (a
@@ -2887,6 +3019,26 @@ impl App {
                 }
                 if down && self.panel.is_some() {
                     self.panel_key(code);
+                    return;
+                }
+                if self.map {
+                    // The automap screen: Esc or M leaves; the arrows and
+                    // Home are its buttons (a convenience of the view's).
+                    let b = match code {
+                        _ if !down => return,
+                        KeyCode::Escape | KeyCode::KeyM => {
+                            self.map = false;
+                            return;
+                        }
+                        KeyCode::ArrowUp => 0,
+                        KeyCode::ArrowDown => 1,
+                        KeyCode::ArrowRight => 2,
+                        KeyCode::ArrowLeft => 3,
+                        KeyCode::Home => 4,
+                        _ => return,
+                    };
+                    self.engine.m.automap_view_button(b);
+                    self.engine.m.automap_origin();
                     return;
                 }
                 // Any key pressed during a rest ends it (AFF9); not the key
@@ -2912,7 +3064,10 @@ impl App {
                     KeyCode::KeyC if down => self.toggle_panel(false),
                     // Shift+M: the travel map (2542:0193); M the automap.
                     KeyCode::KeyM if down && k.run => self.open_travel(),
-                    KeyCode::KeyM if down => self.map = !self.map,
+                    KeyCode::KeyM if down => self.open_automap(),
+                    // The view's keys for the bar's portrait and scroll.
+                    KeyCode::KeyK if down => self.open_sheet(),
+                    KeyCode::KeyL if down => self.open_log(),
                     // The original's A (2542:0137) and F8 (01C5).
                     KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
                     KeyCode::F8 if down => interface::toggle_compass(&mut self.engine.m),

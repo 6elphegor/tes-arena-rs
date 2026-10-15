@@ -68,6 +68,7 @@ pub mod skyobj;
 pub mod sound;
 pub mod spell;
 pub mod spellmaker;
+pub mod status;
 pub mod squares;
 pub mod steps;
 pub mod store;

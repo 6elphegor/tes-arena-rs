@@ -68,9 +68,6 @@ const SEARCH: (i32, i32, i32, i32) = (34, 167, 18, 28);
 const TRAVEL: (i32, i32, i32, i32) = (53, 167, 18, 28);
 const EXIT: (i32, i32, i32, i32) = (72, 167, 18, 29);
 
-/// The bar's map button (DGROUP 5BD2's second region, 2542:0380).
-pub const MAP_BUTTON: (i32, i32, i32, i32) = (120, 153, 24, 18);
-
 /// The location records' lists (19h bytes each).
 const CITIES: u16 = 0x1445;
 const TOWNS: u16 = 0x150D;
@@ -490,11 +487,6 @@ fn list_at(names: &[String], x: i32, y: i32) -> Option<usize> {
         let (cx, cy) = list_cell(i);
         x >= cx && x < cx + 130 && y >= cy && y < cy + 9
     })
-}
-
-/// Whether (x, y) is on the bar's map button.
-pub fn on_map_button((x, y): (i32, i32)) -> bool {
-    inside(MAP_BUTTON, x, y)
 }
 
 /// After an input to the travel map: its boxes to `boxes`; ended, it goes
