@@ -1277,12 +1277,20 @@ impl Machine {
                 let saved = self.t8(NO_EXPAND);
                 self.mem.w8(DS, NO_EXPAND, 0xFF);
                 let mut bx = self.t8(0x0A46) as u16;
+                // Where the port gives up the flag is put back too (as the
+                // code's end does); left FFh, no later text would have its
+                // substitutions made. The original has no such exit.
                 if bx == 8 {
-                    bx = self.rng.range(0, 8)?;
+                    let Some(r) = self.rng.range(0, 8) else {
+                        self.mem.w8(DS, NO_EXPAND, saved);
+                        return None;
+                    };
+                    bx = r;
                 }
                 self.mem.w16(DS, TEXT, self.t16(0x8A60_u16.wrapping_add(bx * 2)));
-                self.text(files, hooks, 2, DS, 0x9B66)?;
+                let r = self.text(files, hooks, 2, DS, 0x9B66);
                 self.mem.w8(DS, NO_EXPAND, saved);
+                r?;
                 Res::Str(DS, 0x9B66)
             }
             // %pcf: the player's first name; %pcn: the player's name.

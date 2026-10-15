@@ -151,6 +151,15 @@ impl Machine {
     /// the one they were made for (see the module's notes). None where
     /// the original faults or never ends, or a hook fails.
     pub fn quests_place(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.quests_place_seeded(files, hooks);
+        self.seed_back(saved, r)
+    }
+
+    fn quests_place_seeded(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         let saved = self.rng.seed;
         self.quests_place_in(files, hooks)?;
         self.rng.seed = saved;
@@ -518,6 +527,29 @@ impl Machine {
     /// or none (6) +0's high word and 1. The block is freed. None where
     /// the heap has no room (see below).
     fn quest_goal(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16) -> Option<()> {
+        // Where the port gives up while the other place's lists are in
+        // use (a hook with no answer, the original's faults), the town's
+        // own lists and counts are put back and the block freed, as the
+        // end does; left, the town's lists would point into a freed
+        // block. The original has no such exit.
+        let mut kept = None;
+        let r = self.quest_goal_body(files, hooks, si, &mut kept);
+        if r.is_none() {
+            if let Some((seg, words, dwords)) = kept {
+                self.heap_free(seg);
+                for (o, v) in words {
+                    self.mem.w16(DS, o, v);
+                }
+                for (o, v) in dwords {
+                    self.mem.w32(DS, o, v);
+                }
+            }
+        }
+        r
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn quest_goal_body(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, si: u16, kept: &mut Option<(u16, [(u16, u16); 5], [(u16, u32); 3])>) -> Option<()> {
         let place = self.sq_other_place()?;
         self.mem.w8(DS, si + 0x24, place as u8);
         let words = [COUNT_STORES, COUNT_TAVERNS, COUNT_TEMPLES, PALACE, 0x138F].map(|o| (o, self.sq16(o)));
@@ -528,6 +560,7 @@ impl Machine {
         if seg == 0 {
             return None;
         }
+        *kept = Some((seg, words, dwords));
         let block = (seg as u32) << 16;
         self.mem.w32(DS, LIST_TAVERNS, block);
         self.mem.w32(DS, LIST_TEMPLES, block | 0x100);
@@ -589,6 +622,7 @@ impl Machine {
         }
         let block = self.sq16(LIST_TAVERNS + 2);
         self.heap_free(block);
+        *kept = None;
         for (o, v) in words {
             self.mem.w16(DS, o, v);
         }

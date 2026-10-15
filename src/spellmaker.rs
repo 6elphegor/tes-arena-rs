@@ -220,6 +220,24 @@ impl Machine {
     /// 1194:6064 with SI the player's record (1A4). None where the
     /// original faults or hangs.
     pub fn spellmaker(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks, si: u16) -> Option<()> {
+        // Where the port gives up (a hook with no answer, a routine not
+        // ported), the name's backing block is freed and the cursors
+        // dropped, as the end does, so neither is lost. The original has
+        // no such exit.
+        let mut held = (None, None);
+        let r = self.spellmaker_body(files, hooks, si, &mut held);
+        if r.is_none() {
+            if let Some(back) = held.0 {
+                self.heap_free(back);
+            }
+            if let Some(cursors) = held.1 {
+                self.resource_drop(cursors);
+            }
+        }
+        r
+    }
+
+    fn spellmaker_body(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks, si: u16, held: &mut (Option<u16>, Option<u16>)) -> Option<()> {
         self.mem.w16(DS, PLAYER, si);
         let level = self.mem.r8(DS, si.wrapping_add(6)) as u16 + 1;
         self.mem.w16(DS, LEVEL, level);
@@ -228,9 +246,11 @@ impl Machine {
         self.mem.w16(DS, LOWEST + 4, 0);
         let (seg, _) = self.heap_alloc_bytes(0x84 * 0xA)?;
         self.mem.w16(DS, NAME_BACK, seg);
+        held.0 = Some(seg);
         self.mem.w8(DS, COLOUR, 0xFE);
         let r = self.resource_add(files, CURSOR_FILE, 3, 3)?;
         self.mem.w16(DS, CURSORS, r);
+        held.1 = Some(r);
         self.sm_draw(files, hooks)?;
         loop {
             let (ax, bx) = self.sm_click(hooks, None);
@@ -256,6 +276,7 @@ impl Machine {
         }
         let back = self.sg16(NAME_BACK);
         self.heap_free(back);
+        *held = (None, None);
         // 1194:55B6: the palette's buffer cleared (then faded to it, and
         // the screen cleared: the front end's).
         for i in 0..0x300u16 {

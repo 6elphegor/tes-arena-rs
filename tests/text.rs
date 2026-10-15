@@ -229,3 +229,33 @@ fn a_substitution_given_up_leaves_the_nesting() {
     assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0);
     assert_eq!(m.mem.r16(DS, 0x8FA8), 0x11 << 2);
 }
+
+/// %oth (2DA2:0B2B) sets NO_EXPAND around its own text; where that text
+/// gives up (here a key missing from the index), the flag is put back as
+/// the code's end puts it, so later texts still have their substitutions.
+#[test]
+fn an_oath_given_up_leaves_no_expand() {
+    use arena::text::var::{BANK, NO_EXPAND, SUB_LEVEL};
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut m = Machine::new(&img);
+    m.heap_init(HEAP.0, HEAP.1).unwrap();
+    assert!(m.bsa_open(&mut files));
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w8(DS, 0x8FA6, 1);
+    m.mem.w16(DS, 0x9032, 0x20);
+    m.mem.w16(DS, BANK, 0x1F);
+    m.ems_map(0x11);
+    m.mem.w8(DATA, SUB_LEVEL, 0);
+    m.mem.w8(DS, NO_EXPAND, 0);
+    // The province's oath: a text key the index doesn't have.
+    m.mem.w8(DS, 0x0A46, 0);
+    m.mem.w16(DS, 0x8A60, 0x7FFF);
+    for (i, &b) in b"By %oth\0".iter().enumerate() {
+        m.mem.w8(OUT_SEG, i as u16, b);
+    }
+    assert_eq!(m.expand(&mut files, &mut Count, OUT_SEG, 0), None);
+    assert_eq!(m.mem.r8(DS, NO_EXPAND), 0, "substitutions not left off");
+    assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0, "the nesting back");
+}

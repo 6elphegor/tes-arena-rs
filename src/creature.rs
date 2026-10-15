@@ -390,6 +390,15 @@ impl Machine {
     }
 
     fn cr_expand(&mut self, files: Option<&mut Files>, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
+        // Where the port gives up, the game's seed is put back as the
+        // end puts it, not left at the one this rolled with. The
+        // original has no such exit.
+        let saved = self.rng.seed;
+        let r = self.cr_expand_seeded(files, seed_seg, seed_off, seg, rec);
+        self.seed_back(saved, r)
+    }
+
+    fn cr_expand_seeded(&mut self, files: Option<&mut Files>, seed_seg: u16, seed_off: u16, seg: u16, rec: u16) -> Option<()> {
         let saved = self.rng.seed;
         for i in 0..RECORD_SIZE {
             self.mem.w8(seg, rec.wrapping_add(i), 0);

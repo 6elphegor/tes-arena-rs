@@ -87,6 +87,17 @@ impl Machine {
         self.rng.store(&mut self.mem);
     }
 
+    /// `r`, with the RNG seed put back to `saved` where it is None: for
+    /// routines that roll with a seed of their own and put the game's back
+    /// at their end, where the port gives up before that end (the original
+    /// has no such exit).
+    pub(crate) fn seed_back<T>(&mut self, saved: u32, r: Option<T>) -> Option<T> {
+        if r.is_none() {
+            self.rng.seed = saved;
+        }
+        r
+    }
+
     /// Whether the hook (far pointer) at DS:`at` is set. The original
     /// tests the segment word (0000:A8EF and its inline copies), which is
     /// never 0 for a routine of its own: the image is relocated when it is
