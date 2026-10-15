@@ -323,7 +323,7 @@ pub fn drop_answer(m: &mut Machine, yes: bool, said: &mut Said) {
 
 fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
     match r {
-        Some(DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat) => said.text(&m.mem.cstr(DS, DROP_TEXT).to_vec()),
+        Some(DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat) => said.text(m.mem.cstr(DS, DROP_TEXT)),
         Some(DropButton::Nothing | DropButton::Dropped) => {}
         None => eprintln!("the drop button gave up: {}", arena::giveup::describe()),
     }

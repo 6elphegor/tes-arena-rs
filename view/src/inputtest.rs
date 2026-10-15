@@ -435,8 +435,11 @@ fn the_drop_button_asks_and_refuses_as_the_original() {
     let items = |app: &App| panels::item_lines(&app.engine.m).len();
     d.key(&mut a, KeyCode::KeyI, None);
     // I checks where the player stands as the portrait does (1194:5F13):
-    // the start's square has room and keeps what is dropped.
+    // the start's square has room, but would lose what is dropped (12D0
+    // set); the plain path is taken from a square that keeps it.
     assert_eq!(a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x20, 0, "room here");
+    assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x12D0), 1, "the start's square loses it");
+    a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 0);
     // Nothing selected: "Drop what?".
     d.key(&mut a, KeyCode::KeyD, None);
     assert!(a.boxes.iter().any(|b| text(b).contains("Drop what?")), "nothing selected");
@@ -488,6 +491,8 @@ fn inventory_by_i_and_a_click_equips_as_panels_do() {
     let mut b = app(&dir, &Start::default());
     setup(&mut b);
     Driver::new(&mut b);
+    // I checks the player's place first (1194:5F13), as the portrait does.
+    b.engine.m.drop_place();
     b.panel = Some(panels::open_inventory(&mut b.engine.m));
     let mut said = panels::Said::default();
     panels::equip_line(&mut b.engine.m, 0, &mut said);
