@@ -33,7 +33,10 @@
 //! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
 //! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
 //! as the game loads in play (src/load.rs), into whatever area it was
-//! saved in; --load loads it at the start. While the game waits for an
+//! saved in; --load loads it at the start. Shift+F5 and Shift+F9 open the
+//! game's save and load menus on --save-dir (`saveui`: a slot clicked, a
+//! name typed, Enter; Esc or the right button leaves), and the main
+//! menu's Load opens the load menu, loading the title screen's way. While the game waits for an
 //! answer no time passes.
 //!
 //! The player's interface is drawn from the game's own graphics as the
@@ -132,6 +135,7 @@ mod playtest;
 mod prof;
 mod questui;
 mod render;
+mod saveui;
 mod sheets;
 mod shopui;
 mod spellmaker;
@@ -1226,6 +1230,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         slot,
         panel: None,
         travel: None,
+        saveui: None,
         equip: None,
         map: false,
         creation,
@@ -2124,8 +2129,8 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
         return format!("{}: {e}", dir.display());
     }
     // The saved position (BA62: x, z, y), which saving the level makes the
-    // player's (25FD's caller sets it in the original; the save menu,
-    // 25FD:004F..00D0, isn't ported): the player's.
+    // player's (the world loop keeps it each frame, A2A3; the view's
+    // frames don't): the player's.
     use arena::save_write::var::{POSITION, SAVED_POSITION};
     for i in 0..3 {
         let w = engine.m.mem.r16(arena::mem::DS, POSITION + 2 * i);
@@ -2161,6 +2166,12 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
         if let Err(e) = std::fs::write(&p, data) {
             eprintln!("{}: {e}", p.display());
         }
+    }
+    // The CITYDATA check after it (25FD:020C, 242A:000E).
+    let mut bad = false;
+    let _ = engine.m.citydata_check(&mut engine.files, &mut |_, _| bad = true);
+    if bad {
+        return "The save's CITYDATA failed the game's check.".to_string();
     }
     format!("Saved to slot {slot} in {}.", dir.display())
 }
@@ -2276,6 +2287,9 @@ struct App {
     panel: Option<panels::Panel>,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
+    /// The save or load menu up (`saveui`: Shift+F5, Shift+F9, the main
+    /// menu's Load).
+    saveui: Option<saveui::SaveUi>,
     equip: Option<Option<interface::Image>>,
     /// Character creation under way (`--create`): its screens instead of
     /// the game, which starts when it ends. Also the main menu after a
@@ -2342,24 +2356,14 @@ impl App {
                 self.last = Some(arena::engine::Frame::Running);
             }
             create::Outcome::Load => {
-                let loaded = match self.save_dir.clone() {
-                    Some(dir) => load_from(&mut self.engine, &self.dir.clone(), &dir, self.slot),
-                    None => Err("No save directory (--save-dir).".to_string()),
-                };
-                match loaded {
-                    Ok((msg, run)) => {
-                        self.creation = None;
-                        self.run = run;
-                        self.assets = Assets::new(&self.dir, &mut self.engine);
-                        self.remake_renderer();
-                        self.last = Some(arena::engine::Frame::Running);
-                        self.say(&msg);
-                    }
-                    Err(msg) => {
-                        eprintln!("{msg}");
-                        if let Some(c) = &mut self.creation {
-                            c.back_to_menu();
-                        }
+                // The load menu from the title (`saveui`), then the
+                // title-screen load (`areas::load_game_title`).
+                if self.save_dir.is_some() {
+                    self.open_saveui(saveui::Kind::TitleLoad);
+                } else {
+                    eprintln!("No save directory (--save-dir).");
+                    if let Some(c) = &mut self.creation {
+                        c.back_to_menu();
                     }
                 }
             }
@@ -2390,7 +2394,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() {
             return;
         }
         let k = &self.keys;
@@ -2545,6 +2549,9 @@ impl App {
         self.screen.clear();
         if let Some(mv) = self.movies.front() {
             mv.draw(&mut self.screen, &self.font);
+        } else if let Some(ui) = &self.saveui {
+            self.screen.set_palette(self.assets.palette);
+            ui.draw(&mut self.screen);
         } else if let Some(c) = &self.creation {
             c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
         } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
@@ -2599,6 +2606,66 @@ impl App {
             None => "No save directory (--save-dir).".to_string(),
         };
         self.say(&msg);
+    }
+
+    /// The save or load menu opened on the engine (`saveui`).
+    fn open_saveui(&mut self, kind: saveui::Kind) {
+        let Some(dir) = self.save_dir.clone() else {
+            self.say("No save directory (--save-dir).");
+            return;
+        };
+        let (ui, e) = saveui::SaveUi::open(kind, &self.engine, &dir, &self.assets.archive);
+        self.saveui = Some(ui);
+        self.saveui_ended(e);
+    }
+
+    /// What the menu's last input ended in: still open, a slot to save
+    /// (`save_to` on the engine after the menu), a slot to load
+    /// (in play `areas::load_game`, from the title `load_game_title`), or
+    /// the menu left (a title's back to the main menu).
+    fn saveui_ended(&mut self, e: saveui::Ended) {
+        let Some(kind) = self.saveui.as_ref().map(|u| u.kind) else { return };
+        let Some(dir) = self.save_dir.clone() else { return };
+        let title = kind == saveui::Kind::TitleLoad;
+        match e {
+            saveui::Ended::Open => return,
+            saveui::Ended::Save(engine, slot) => {
+                self.engine = engine;
+                let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette);
+                self.say(&msg);
+            }
+            saveui::Ended::Load(mut engine, slot) => {
+                let game = self.dir.clone();
+                let r = if title { areas::load_game_title(&mut engine, &game, &dir, slot) } else { areas::load_game(&mut engine, &game, &dir, slot) };
+                match r {
+                    Ok(run) => {
+                        self.engine = engine;
+                        self.creation = None;
+                        self.run = run;
+                        self.assets = Assets::new(&self.dir, &mut self.engine);
+                        self.remake_renderer();
+                        self.last = Some(arena::engine::Frame::Running);
+                        self.say(&format!("Loaded slot {slot}."));
+                    }
+                    Err(msg) => {
+                        eprintln!("{msg}");
+                        self.say(&msg);
+                        if let Some(c) = &mut self.creation {
+                            c.back_to_menu();
+                        }
+                    }
+                }
+            }
+            saveui::Ended::Left(msg) => {
+                if let Some(m) = msg {
+                    self.say(&m);
+                }
+                if let Some(c) = &mut self.creation {
+                    c.back_to_menu();
+                }
+            }
+        }
+        self.saveui = None;
     }
 
     /// F9: the slot's game loaded back (`load_from`).
@@ -3065,6 +3132,21 @@ impl App {
                     }
                 }
             }
+            // The save or load menu up: its clicks and keys (`saveui`).
+            In::Button { down: true, button } if self.saveui.is_some() => {
+                let (x, y) = self.screen_point();
+                if let Some(ui) = &mut self.saveui {
+                    let e = ui.click(x, y, button == MouseButton::Right);
+                    self.saveui_ended(e);
+                }
+            }
+            In::Key { code, down: true, text } if self.saveui.is_some() => {
+                if let Some(ui) = &mut self.saveui {
+                    let e = ui.key(code, text.as_deref());
+                    self.saveui_ended(e);
+                }
+            }
+            In::Button { .. } | In::Key { .. } if self.saveui.is_some() => {}
             In::Button { button, down } if self.creation.is_some() => {
                 if down && button == MouseButton::Left {
                     let (x, y) = self.screen_point();
@@ -3191,6 +3273,12 @@ impl App {
                     // The game's debug keys (scan codes 3Ch, 3Dh).
                     KeyCode::F2 => self.engine.m.set_key(0x3C, down),
                     KeyCode::F3 => self.engine.m.set_key(0x3D, down),
+                    // Shift: the game's save and load menus (the original
+                    // reaches them through its Esc screen's buttons,
+                    // 2542:0617 and 061E, not ported); alone the quick
+                    // save and load of slot --slot.
+                    KeyCode::F5 if down && k.run => self.open_saveui(saveui::Kind::Save),
+                    KeyCode::F9 if down && k.run => self.open_saveui(saveui::Kind::Load),
                     KeyCode::F5 if down => self.save(),
                     KeyCode::F9 if down => self.load(),
                     KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,

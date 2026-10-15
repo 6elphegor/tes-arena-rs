@@ -1,5 +1,7 @@
 //! Saving a game (25FD:0113..01CB, 0000:A94E): the files the original
 //! writes, byte for byte, as the loaders in src/save.rs read them back.
+//! The menu before it (25FD:0002..010F, the slot picked and named) is
+//! src/savemenu.rs's `save_menu`.
 //!
 //! - NAMES.DAT: the slots' names, 0x1E0 bytes from 9686 (`save_names`).
 //! - SAVEGAME.nn (`save_level`): the screen (0xFA00 bytes at the far
@@ -18,8 +20,7 @@
 //! The slot's files copied (25FD:0612, 056F) are `load.rs`'s, through
 //! `Files`; the automap kept and loaded (23F1:0145, 0000:3503) is
 //! `automap.rs`'s; the save's end (25FD:01CB on) is `save_finish` below.
-//! Not ported: the menu and the name typed (25FD:004F..00D0) and the
-//! CITYDATA check (242A:000E), left to the front end.
+//! The CITYDATA check after it (242A:000E) is `Machine::citydata_check`.
 
 use crate::machine::Machine;
 use crate::mem::DS;

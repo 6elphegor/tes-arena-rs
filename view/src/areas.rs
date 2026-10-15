@@ -228,8 +228,24 @@ pub fn run_of(m: &Machine) -> Run {
 /// sounds hook is cleared after, as the view has no sound. Returns the
 /// loaded area's run, or what went wrong.
 pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
+    load_game_as(engine, dir, save, slot, false)
+}
+
+/// A saved game loaded from the title screen's Load (0000:119D sets 5C8
+/// bit 4 for it): the same, but the game's title-screen way
+/// (`Machine::title_load`: the world loop entered afresh, the rebuild run
+/// as the 3D mode's hook).
+pub fn load_game_title(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
+    load_game_as(engine, dir, save, slot, true)
+}
+
+fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: bool) -> Result<Run, String> {
     NEW_GAME.with(|n| n.set(false));
     let mut e = Engine { m: engine.m.clone(), files: engine.files.clone() };
+    if title {
+        let v = e.m.mem.r16(DS, 0x05C8) | 4;
+        e.m.mem.w16(DS, 0x05C8, v);
+    }
     e.files.add_dir(save).map_err(|err| format!("{}: {err}", save.display()))?;
     let old = e.m.mem.r16(DS, 0xCCC2);
     e.m.heap_free(old);

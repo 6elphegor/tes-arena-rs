@@ -525,13 +525,29 @@ impl Machine {
     pub fn mode_3d(&mut self, hooks: &mut dyn AreaHooks) {
         self.mem.w16(DS, 0x1947, 0);
         self.mem.w16(DS, 0xC38C, 0);
+        self.mode_3d_level(hooks);
+        hooks.ems_free(self);
+        self.and16(0xA902, 0xFFFE);
+        for i in 0..0x18 {
+            self.mem.w16(DS, 0x0622 + 2 * i, 0xFFFF);
+        }
+        for i in 0..0x20 {
+            self.mem.w16(DS, 0x0F88 + 2 * i, 0xFFFF);
+        }
+    }
+
+    /// 2294:0006..01F0, the 3D mode's part that a title-screen load runs
+    /// as the hook after SAVEGAME's planes (BA76; `Machine::game_load`):
+    /// see `mode_3d`. With 5C8 bit 4 (that load) the rebuild comes first
+    /// (25FD:034B, `restore_level`), then 5C8 bit 4 and BA78 are cleared.
+    pub fn mode_3d_level(&mut self, hooks: &mut dyn AreaHooks) {
         self.mem.w8(DS, 0x3C82, 0);
         self.mem.w8(DS, 0x680F, 0);
         self.mem.w16(DS, 0xCCBC, 0);
         if self.mem.r16(DS, 0x05C8) & 4 != 0 {
+            hooks.restore_level(self);
             self.and16(0x05C8, 0xFFFB);
             self.mem.w16(DS, 0xBA78, 0);
-            hooks.restore_level(self);
         }
         if hooks.music(self) == 8 && self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
             hooks.townsfolk_graphics(self);
@@ -579,14 +595,6 @@ impl Machine {
         let row = self.mem.r16(DS, Y) >> 7;
         self.mem.w16(DS, 0xCB90, (row & 0xFF) << 8 | (col.wrapping_add(col) & 0xFF));
         hooks.hook_2631(self);
-        hooks.ems_free(self);
-        self.and16(0xA902, 0xFFFE);
-        for i in 0..0x18 {
-            self.mem.w16(DS, 0x0622 + 2 * i, 0xFFFF);
-        }
-        for i in 0..0x20 {
-            self.mem.w16(DS, 0x0F88 + 2 * i, 0xFFFF);
-        }
     }
 
     /// The way out of a level (the hook CD4E), when the stairs lead past

@@ -143,6 +143,13 @@ impl Files {
         self.written.insert(base, Rc::from(data));
     }
 
+    /// The file (by DOS name) deleted, as DOS 41h deletes it.
+    pub fn delete(&mut self, name: &[u8]) {
+        let base = Self::base(name).to_ascii_uppercase();
+        self.written.remove(&base);
+        self.deleted.insert(base);
+    }
+
     /// Whether the game deleted the file (by DOS name).
     pub fn was_deleted(&self, name: &[u8]) -> bool {
         self.deleted.contains(&Self::base(name).to_ascii_uppercase())
