@@ -1,0 +1,3000 @@
+levelup | bfb53fbe | 0 | 10daaab4d014ab1e
+levelup | a10b9411 | 1 | b28154ffbceeb7c2 1c56050fe8be70ed 87314b07d8ffa693
+levelup | 6c50efef | 0 | 6543f3963ac66cfa
+levelup | 3a7179fa | 1 | cbf29ce484222325 fabaceeb9f7f1d50 b661c23255cd5850
+levelup | d137ed94 | 0 | 4d6f23499e98a3d1
+levelup | 672ece2f | 1 | 6e39ca05686edcac 564c5773cb794a45 d4aa80ff94e752b6
+levelup | 757e5059 | 0 | e857e23d48eff1ff
+levelup | 64757214 | 1 | fac6d878aaebb4d8 1faedcdbcbda482c 856bcd5e5427683b
+levelup | 795194c7 | 0 | 53b9ed03b91243cd
+levelup | 1eccecee | 1 | 4c503cadfa88adec b6c9c9afee31da39 d20ce941b1e798a5
+levelup | 8b745226 | 0 | b8572d4221c97d5e
+levelup | da271132 | 1 | 8a8a4917a8508d37 1877beffe7c0141b d481aef73ac61c9c
+levelup | da9245b6 | 0 | a038dcbfe250f2aa
+levelup | cff99533 | 1 | cbf29ce484222325 d52a5e5bfc17cd7b 6355016ef08b747f
+levelup | ce3b77ca | 0 | dad10921a7a0a701
+levelup | cbaecf7f | 1 | cbf29ce484222325 807ef4964865165c bd19ca1ec56d9a33
+levelup | 713af236 | 0 | 560d0faab45c3f34
+levelup | fe61c6da | 1 | 7f5818d38de72c2f 76921715f90f0deb 50818e1af338de82
+levelup | d0e335d4 | 0 | d3b9b2bcb8622bfc
+levelup | 4b95c4c6 | 1 | 680100fca65c491c 9c9678faddcfd957 b9f6afdf31490f67
+levelup | 2a43cc33 | 0 | 53057c58f5ccdd93
+levelup | 627e036c | 1 | 2cac19c1e23dc50c d91d738ee8cd28c1 2fd1788024690903
+levelup | f808b583 | 0 | 5015e60634b402fa
+levelup | 75229493 | 1 | 914a82d27f2bd117 1af76a3a2bd967da 76c56502c807788f
+levelup | 8548f87e | 0 | 6cb06092358b580e
+levelup | a877321b | 1 | d0aafd18672dfd0c 8b19301358833ee8 b504c7c7af92d408
+levelup | 31fe5ea3 | 0 | 389fb2e1fc29f801
+levelup | 7bb9dbcc | 1 | d0aaaf18672d7882 53e74be007e6a3cc b646184bf75a95b5
+levelup | 621b7681 | 0 | 4fb7b44bd95edfe3
+levelup | c5bb1da1 | 1 | 526e321587acfd42 4e8617bef2a986ba 9c39cbd74b26a549
+levelup | 484a9ec1 | 0 | 5e22027e0e0dfecf
+levelup | e17368cb | 1 | 82f2b44336af34f3 3532536f27cd7fac 25ee24e3552c5bff
+levelup | 2325bde4 | 0 | d41036378af5a59f
+levelup | e801bcd9 | 1 | cbf29ce484222325 10cd87c3f54b22f0 79d5c6720a49207
+levelup | b8af4d96 | 0 | b63fe56c4630e406
+levelup | 31c5f5ad | 1 | d568b22217585c3e 566c9d1f82d232af 9fd7c99be4662e4a
+levelup | 85f066b8 | 0 | 39ef25f5df4cbe7c
+levelup | 361947e3 | 1 | 9ec1a3bf33659cf6 c0b5b9c027aafde2 aca2a528fb1f33c7
+levelup | 272c787c | 0 | c8f8a1427cfe0073
+levelup | cd1c30fb | 1 | e03f08a656adbe69 dcc0c9c5cd78903f d46c37b143c98513
+levelup | 3d15dbce | 0 | 3daec7a7b955ebfa
+levelup | 80509f1 | 1 | be57383c6ea9ea55 febcbd400617a5e4 ba6d5c48587429f9
+levelup | f45bac70 | 0 | 85ce65bf5bfa4295
+levelup | dfe1fec8 | 1 | 42f45e9600eb276d 63b617af85447d25 6ee3a7593c2b869d
+levelup | 1390a41f | 0 | 41c17ac6aa90afd1
+levelup | e7d7da70 | 1 | aa8b4471627da715 e08e272502f11165 40d575abb92f40eb
+levelup | 3bcbe4b0 | 0 | 31ce64f5aa12bf59
+levelup | 6b8d2c52 | 1 | 685fe89fc9d0fcef 7e7b401e181e4bda 1a80382dd92048af
+levelup | a344f033 | 0 | 7726388b9077f26b
+levelup | 4ea58823 | 1 | 8dc8bece9248f3f9 70e36eacedccebd0 51725258ceecc58b
+levelup | 727a6ffe | 0 | 81f625680856eff1
+levelup | 12ed5246 | 1 | a363d3f26ad4ca7a 4aac3502222a06b3 2806361ec64d0c8c
+levelup | 3153ec33 | 0 | 335e16ab29d6d73e
+levelup | 6f9d5fc8 | 1 | d0aada18672dc193 4095014430ac8bfe 6179543bfd7da5e8
+levelup | bfb0a8fc | 0 | 53840bb3f31438f2
+levelup | fc3c242 | 1 | 2f36ddcd2430a715 f0bc7b4a342a5431 feed19e5065c08c2
+levelup | 9e962f7a | 0 | b61ace0551e12093
+levelup | 81002e31 | 1 | cbf29ce484222325 471c76c6be4c0cad a011d58ded88d7e3
+levelup | dd2be7b0 | 0 | 17767752ec4e9d90
+levelup | 2f96ef7 | 1 | ffe944f81dd9269d 55d5731fa11bfcdd 7008c7dc850e2aa3
+levelup | 2eb19ba1 | 0 | 382a1cd7be6bbb44
+levelup | 85931b82 | 1 | 4c3b66e7a832638f c474d82ff70518b2 a918981973ad80ed
+levelup | f07915a1 | 0 | d4ec7656a25c12b7
+levelup | 4ae6ede8 | 1 | 2ed85d750ad945bf 5d0369ed1390d5c5 bc5bb6d66ced602d
+levelup | 9e6d5b9a | 0 | a3f4fad82b8b55bf
+levelup | 5e3da8b4 | 1 | e9930b86de533987 8d92d6b2142c8ef1 425629f786240169
+levelup | d3d7e4a0 | 0 | 826893f89fbc5955
+levelup | d4122d1d | 1 | d0ab2218672e3beb 940605521d4b1778 aaec1f4fbddfecbf
+levelup | 63296325 | 0 | eae21ea7bfe3445
+levelup | a37b5a2d | 1 | 75b087a2b0c73d3f 4906c6b5f7e473bf b6c4e69176ee607b
+levelup | 6dbd1be1 | 0 | e53134a9e23e4788
+levelup | f16e017c | 1 | 3cdf4089d7fef534 37519288bbe2bfbd 1f92dc97c812586
+levelup | 63c5f6e5 | 0 | f1f743ddc513ef53
+levelup | fd270eb9 | 1 | e953f0e9af34d36e 7d01fe3a9f817229 fa3f473c49658107
+levelup | a1da6ee6 | 0 | bcff8daaf4a94e4c
+levelup | a42ac7f | 1 | 720f519920459529 821deb7881a1b78f 35ebb95232cb34e2
+levelup | c08915da | 0 | b14fb18d60fad5a4
+levelup | de3580cb | 1 | 9e254f24e57149e8 25712f268cf0d550 eb84adbd5e950d54
+levelup | b59b7fa4 | 0 | e749b04ae592affa
+levelup | 16cbed21 | 1 | c59216c6b94f6b3 ba9944b5acabe03e 5c848c0ec733a622
+levelup | 8f15e7c5 | 0 | fbcf493e2b67c26d
+levelup | 358ca498 | 1 | stuck
+levelup | d7290483 | 0 | c559985f5fccf86a
+levelup | 51768b3c | 1 | 9e2089df2e991c8a 1f284dbe77842c15 18e380e59955c902
+levelup | 6470e82d | 0 | 2f9ec045470a8048
+levelup | ef3e297a | 1 | cbf29ce484222325 ab6b1edfc1cf08e6 9ce33ebf38af9812
+levelup | e99adad0 | 0 | 6c3fa54b1831784c
+levelup | faaabef7 | 1 | fca9863e817dc0e2 78958e76fe744d53 dd5e8ea5edc4e598
+levelup | b65fd447 | 0 | 79a9cbf8e6d0ed85
+levelup | 459bfaab | 1 | cbf29ce484222325 f4b4d7d50a1c34e0 c6a51be67f66abbd
+levelup | aab080a8 | 0 | 21ffb806957730f8
+levelup | 9db97889 | 1 | a9a2eb6ca9364e66 634450d0a3ec0ed8 d0388bb6fb3bab05
+levelup | 155b559e | 0 | 29bb6746023b0329
+levelup | 4ff7e813 | 1 | d0aa4318672cc0fe 548fdd9b4b317590 c5140441b6ae2c73
+levelup | e58242c6 | 0 | aaade105abc21d8d
+levelup | 8f5453e0 | 1 | f315a02121eb37a1 ea3d5edc537aff09 3dfb13686cc3243a
+levelup | 877e4450 | 0 | caf6666fc445464d
+levelup | ca7bfa26 | 1 | cbf29ce484222325 b009e71e712ba12f 85342e8bc2f5345c
+levelup | 90784685 | 0 | 296ecec46c4119b5
+levelup | 569cc7ad | 1 | cbf29ce484222325 6bff2c24973a13a7 413c326513d7db27
+levelup | 2113d1cc | 0 | 993261a628195816
+levelup | a61d686b | 1 | 67456261690a0c3e 4784194f410b22a4 f95ff794d63b2c87
+levelup | 25b7757b | 0 | 3bba46ec4d5a8d9
+levelup | 774cbf61 | 1 | c6758a84113b2533 9a710a4cf1867a17 3d2813f4d60f86ec
+levelup | 17bfba4d | 0 | efccf0b32228915c
+levelup | f34c628a | 1 | cf67da125207c8f7 fd4011e68284e9b1 c7f929e19dab3ba7
+levelup | 9f12f0ca | 0 | 8986138394a54720
+levelup | e4c9aeb4 | 1 | 5c27cefabe2b4d25 85032fa97a79f77e 152d75dfb3232ced
+levelup | c73089b1 | 0 | fb81886a1aabcf72
+levelup | d4e2d241 | 1 | 67348174540e498a 892688d538874e8e c8639e29bbb596b9
+levelup | 2926d094 | 0 | 64424ab8910b5c09
+levelup | 311a6780 | 1 | 31fc3c41d07e2d9f c42400898c8ab16 ecdab81ff208e8dc
+levelup | d27fd274 | 0 | fe5cf12634fce71e
+levelup | 3b300b72 | 1 | 6d33c3373fe2e225 7d706e2157b542a4 98f77c15f2013892
+levelup | b2ac2e5 | 0 | 694f0cf84cc7bbae
+levelup | 4538bd76 | 1 | cbf29ce484222325 4cc9940813a0fa66 81007a61ae665078
+levelup | a29c6a5a | 0 | 27aa55984c928cfb
+levelup | 403a8a97 | 1 | 71352199814ce78d 7a5058000309bd66 b0b579ceb27e8804
+levelup | 28dedc70 | 0 | 20ff430e56923302
+levelup | dbce0413 | 1 | cbf29ce484222325 4353810784403e1 4bb1abbbc15daed6
+levelup | 14dac73e | 0 | cd7f40ff86aee022
+levelup | 57005e72 | 1 | 9abcaa438e717e69 4aba3c66159a87b6 e6e2b5c0b9456d9c
+levelup | 3df956 | 0 | a214de7a0e745ac2
+levelup | b69424fb | 1 | 3a0191aa1d79c3a7 67707712df11ef41 369c15a7e75c2d7e
+levelup | a6182dc9 | 0 | b766f6a504565316
+levelup | c94f8c2f | 1 | d0aae218672dcf2b b2cf199794a9eecc de139e112bf9bcb4
+levelup | f61b4534 | 0 | 6756981d1e9975e6
+levelup | cefb5404 | 1 | 617b3379d97a1ea1 634eb5ad2d4e6de3 6e753ede8f3e4f3e
+levelup | 9fdac942 | 0 | 490b68dd66f6088a
+levelup | bdc562a2 | 1 | c4f2b3ae0bc15028 1c25fbbcc957dd56 119513f170f9ff55
+levelup | ab6a5064 | 0 | 39bd6e9c3af8e2d2
+levelup | ecc64914 | 1 | baf4d489cf447e8e 530339f7a7a422a4 8ecf19e88f6b1bdc
+levelup | 4b88883d | 0 | 508670453a2a0383
+levelup | b9cc149a | 1 | 93ee578f207d484e daebef0feaee2b72 51b7d4bd08b6f211
+levelup | 1f124a4d | 0 | dafbab80686c0e77
+levelup | 1ee6916b | 1 | 17aec4137d7fa969 ebd956e51b08415e 280b3d1bb23aee9d
+levelup | 9a4e9da9 | 0 | 8a2c1e20cefdd834
+levelup | fcdf7aa7 | 1 | 70dd970f00aa05c b54b7023d45eaccd ce5b2a97e2b7bc6f
+levelup | 89653803 | 0 | 478767ebd193d3d0
+levelup | 9e1fabdb | 1 | 78c55a748c5ab0b1 2f0a4e9480f939fc eb8608f24ba58c08
+levelup | c467b9d4 | 0 | c68650b5de2733b4
+levelup | c3d2aa8 | 1 | 80ea71692e69479b 991547306fbb7951 2c7485a243dc6e4d
+levelup | d29381f7 | 0 | 67b36df36bc88973
+levelup | 5b0a3101 | 1 | 7b6c5c0e3df0a8cd 2807a73eabb31c68 74b1409fed1ae22a
+levelup | 71dbad97 | 0 | 9db932ee8ba9b858
+levelup | c0161197 | 1 | c5ddc4d022a9a8ed 9834537c158dd02b 85d6b3602a25829b
+levelup | a884b773 | 0 | 1a37df44fb642c0d
+levelup | 33d37b36 | 1 | dd221c13427a2b0a 486e63d44d0e9d1d 818ef694badd719
+levelup | e8b45ca3 | 0 | e1c00545b5d37a8
+levelup | f213fe62 | 1 | 411eb7ae037fe85 f05cc6bd1588a35 5cc3193a091f9d94
+levelup | 46ccb234 | 0 | 3e3d35254beb3be
+levelup | 1c0f506d | 1 | b13cfba5ed3e1191 ec13f480759f8f74 97681f98d9635cb9
+levelup | b149b79 | 0 | 4a757fd7e6b5cd8b
+levelup | f7522c38 | 1 | cbf29ce484222325 16b3537ff05fdd31 b9dc27767ce8d702
+levelup | 34f2e94c | 0 | b70ae066e016cf0d
+levelup | 12d71c48 | 1 | d0aaee18672de38f d8f26bd13083f1ec 5903405ba38d49b4
+levelup | 68efa094 | 0 | 76875ac6900e7540
+levelup | 4116f49f | 1 | ea2cb7d2d41762f7 314d2cc087ed22e2 4746d4f24389860
+levelup | d2d51994 | 0 | 1eebcbdb8d1d0490
+levelup | ca910cdd | 1 | cbf29ce484222325 e6827d551098b568 7e09c56e91ad6ad6
+levelup | 632ddb85 | 0 | 3ea0766ddfd15eaf
+levelup | f3f0dcea | 1 | 5e38bb9018db62f9 b94fa19b7e0730ed 530f0c94d46d259a
+levelup | e1efd4ed | 0 | 99ed53f3db4f374a
+levelup | 1b0dba5e | 1 | b790ca6653321614 a64dff04973dbfd6 565325b430bc9245
+levelup | ff1bd5c7 | 0 | 68909ec192b2f447
+levelup | 56e7f906 | 1 | 613460839cac7ada 59d80de01e4cb0ef 53760c3fe6edf406
+levelup | 78416c5b | 0 | 548a63226391798d
+levelup | b0af5988 | 1 | 3fcc19653679a7a3 bb6533ea56ec098f 8d6afdfa53db6223
+levelup | 1c3254eb | 0 | ce586a19613f2ee7
+levelup | e8abfc51 | 1 | 4a5a3affd82e5364 a3eee5b9951e1af8 ea61ff546c9a2492
+levelup | 7e37f7d | 0 | eac780e864ed8155
+levelup | 741fc006 | 1 | 167057f0ef20f98b b4cc3fdf891849b d66ba26a009acc2d
+levelup | 63e7d120 | 0 | ea7c70302e932e70
+levelup | c966c98c | 1 | 68f0bba92b05a6be 7e8f30df6287f6e9 eb75839e17bf4688
+levelup | f6ff29e2 | 0 | 8881f27182fa1ffb
+levelup | e6b176 | 1 | stuck
+levelup | a7b00682 | 0 | 5aa59333620ef764
+levelup | f56e89ee | 1 | 564b67ea14222a1 ea213652d4bcf0ec 561d333e126f5d16
+levelup | 9bd695a | 0 | 8cb71b21d38b617e
+levelup | 9400ec51 | 1 | 6e2463348de0f17c 5e349cdeacb05658 ccc7ba192d53eb4
+levelup | c0a3be98 | 0 | b4f555f48990664c
+levelup | cb42ed49 | 1 | ca77fbb0a774d212 e55843617080524f 5a138a81b68cbe8e
+levelup | 9d5842d6 | 0 | 6fc0890f16fc6688
+levelup | 6e9d0d6a | 1 | cbf29ce484222325 c61b09f3100c20f d834e180a5993a52
+levelup | 71d9997f | 0 | 63728e3ec02818e8
+levelup | e9344180 | 1 | 4b45ef98331e8264 6b9c1cdcf292f6e9 3ecea968ecec39dc
+levelup | 514d1dd1 | 0 | df25c088d3753dde
+levelup | a7d1460a | 1 | c1811b576fd3265e 741796c2d78823ce b7a853f66e5eb7b3
+levelup | 42448144 | 0 | 1deb05cf3fdf514b
+levelup | 57a85f0c | 1 | 992e6a2f39688e3b dff63b08231823ed 9dcd93eb7b62b7af
+levelup | 1f70b735 | 0 | d6a7074152fa414f
+levelup | 5824e16 | 1 | 6dbb7da5e4b9f797 997afc9c85fbc33a 4ed1236c55caf13f
+levelup | 4a7da600 | 0 | 5473833d856eb9dd
+levelup | 40d2a889 | 1 | 7dd15fef3ae46fd9 52c09ebdc4c9d200 715cecc105480cbf
+levelup | 5d074a69 | 0 | 1280e6d48b1deded
+levelup | 991d19db | 1 | dbb164832d73509d 505d72dff052d121 1a1c40beb310f884
+levelup | 8a3841b7 | 0 | 9f25f04e06978e2
+levelup | 1a85a18d | 1 | cbf29ce484222325 c905b750981f9fb7 4dce5e45bd0f7cb9
+levelup | e6ced609 | 0 | e8f0c4674e36ca66
+levelup | 315fdff3 | 1 | cbf29ce484222325 bc80fcd24e18b3b9 887337ea6511d803
+levelup | 808da898 | 0 | 8abd8aa377628a39
+levelup | a61d2dfb | 1 | cbf29ce484222325 6b47c0a86146dcfd d4c85e12418cf0f
+levelup | 5d69aaa4 | 0 | a196701ed4549c41
+levelup | 711a3535 | 1 | 95e234a0fb9b6584 88f50724da01b14b 16b97828ca44ac60
+levelup | 4bd5a986 | 0 | 15e89d2c2f161c10
+levelup | 7dc08b8d | 1 | daa1db70b4e06a12 e4ab453dd10e82ba 2efcf6c15a9bd925
+levelup | 287b45a2 | 0 | 1ceb97fe79c42888
+levelup | 242b416f | 1 | 47b2774c81a0627c 8bdcb8ae27a80334 ccb91ad8e6e4553d
+levelup | 406682fd | 0 | 4bd53b63ea7c6394
+levelup | 8cb4010f | 1 | 5c20c61edf007ce5 2db92df43f04d1f8 1800edd1a19c401a
+levelup | c05e830 | 0 | a0198b800805bc73
+levelup | ae86f0c5 | 1 | c3e1ffc68f46a290 be69e76ac4df4d99 a6aab6fed3c61600
+levelup | a08f3137 | 0 | 8fd13ebe3f423103
+levelup | 53528688 | 1 | 9ea31c43fa603212 fa455209cc6d4dcf b23f47f4e3b5ff87
+levelup | 2f208a09 | 0 | e4928105f77205d2
+levelup | 110aa3bd | 1 | e96c6429464d2ebf 71895554fbb36c33 588e0bdecd259a0f
+levelup | b85d4634 | 0 | 7577fdf519c2c93d
+levelup | fae4900b | 1 | b170197b7ed06906 45e399eba3a7209f 72273b15fdfcac49
+levelup | a5b76355 | 0 | 8bf06937090a054
+levelup | 72d76aa2 | 1 | 304ee8cd02445ec1 9cff8f32dde61cc2 596ec1ac5e5f7531
+levelup | beb636e3 | 0 | 1e3875ac72c2ccd5
+levelup | 15603cdb | 1 | 9c55c884b84a123f 127e7d4cf4dd86a0 b25d61ae30ae6e23
+levelup | 559751f | 0 | 65fd9775af9b49f0
+levelup | 7cfc09bf | 1 | d03d693157ea9361 f8b12592d10c0768 939837ee46867160
+levelup | cffdca0 | 0 | 2704cf11e779a8f7
+levelup | d0d72bb8 | 1 | fbeb185fad27756c 21f3409d54c04cd1 743ba6348ee31734
+levelup | 18496235 | 0 | 612343ea6b689235
+levelup | d453f105 | 1 | 1cf66c8ed181b36f 82725deec36d67ac 1b35910769cc9d66
+levelup | d4c07d8 | 0 | c57f7d78bec52144
+levelup | f3a7211a | 1 | d60d0b337ee4caef afc6f2ac3449d778 e55a366c01138c0f
+levelup | 87ad384e | 0 | f8dbd1ccf7474624
+levelup | d0f467be | 1 | 4b05ae63a6fbb62f 227e2683a6ffded8 7e877bb9027639e3
+levelup | ef10ec55 | 0 | beea8b161aa61d75
+levelup | 7893c6c3 | 1 | 20cf74767b205569 12662d5b1a1baf8d 309c197e712e5e49
+levelup | 96b67e3 | 0 | 18ef8f367a2b3901
+levelup | 49f04320 | 1 | c87f5f523d715d49 2704ab77f19f129e 34abe944d5bd6462
+levelup | eb431785 | 0 | b7a50bedff0b570f
+levelup | 6142f790 | 1 | b13081e22b78bc41 b16ca8dc980a028a 890989b1721813ab
+levelup | e1e48083 | 0 | 96f82c8c57f874e6
+levelup | 48ec5868 | 1 | a293d91187db8670 71922a016739a6d2 6cc2ae0e7f2729d5
+levelup | f04f97f1 | 0 | f1f72362b814830c
+levelup | f4b2da7a | 1 | 3ac0711d0137e1a1 b45f9ece5b3d41fb a3a5c7ba727e353c
+levelup | 8dbe41c | 0 | 7d8b55c480302b23
+levelup | c9c38237 | 1 | ec2afe739815f432 7a80c436e38a3a5c 1f6c6b1a2979b5aa
+levelup | 544861a7 | 0 | 80b29c6f5d490106
+levelup | e29e1c1c | 1 | 3a3ebb24bcb3d467 176ec6d1ec07bbe6 61fa1c20d1726338
+levelup | 13ddf2e7 | 0 | a1fb5eb6b8667bfe
+levelup | 710e78ee | 1 | de8ec93d7407e764 34116a03e6dbcb2f 32110decb262f76a
+levelup | 98692821 | 0 | 401a5805be5ddcf2
+levelup | 32600998 | 1 | d4e8a534c05a52f3 4afa540500f9c87e 57efb2c612439049
+levelup | bf2236cb | 0 | 41d636b5c1097225
+levelup | b9377c4c | 1 | 421cb7f0d60c3f3d 736e71ffe9afeeb1 c7b57ebad0c9e205
+levelup | 87d73bf5 | 0 | bd08b44d7aec68ec
+levelup | f8e3d656 | 1 | 4e88f1048b7dbd97 b5b5da73bd3f8c60 7acd3a0b7d0912ca
+levelup | 96066575 | 0 | d0df87394cc0de07
+levelup | 4009d1b5 | 1 | 8d1ac31da9a49d5b 2f56fcb120a18b4d 61f6a570e3a8bb3c
+levelup | 296d4fc6 | 0 | a6dd69259ef81a0c
+levelup | 259e4142 | 1 | 75863ad3ea4d510 6745e152dd77ae8e c1c22b2f7e814b17
+levelup | b307d25f | 0 | 469d0d2c1e53a21b
+levelup | f52f3196 | 1 | 214a0f81c3f7e3a2 73ced5dbc2fad5f6 172167c2dab434b8
+levelup | 2ad42ef0 | 0 | 6ceb116fba7062ee
+levelup | 43896457 | 1 | 1e1aa4bf63dffdfc 3e979769dfda7a71 1ad3ae47897994b2
+levelup | 13c07f1e | 0 | 8f97da1426ace20
+levelup | 964ac217 | 1 | c3073b239092ccf8 2fcfe177bd99bd9e 542845abbc028176
+levelup | 4b75a457 | 0 | 5e1ee2e8fc8cd9bf
+levelup | 9536e101 | 1 | 641d46329d927251 1702d964fe86b9a6 5d32abb4edbcd628
+levelup | e6b8b4ad | 0 | 35780afa3c6f26eb
+levelup | 4f501d3e | 1 | d0aae318672dd0de 6e2522a5c0903ea8 42a50181e9b0767a
+levelup | e4c5336e | 0 | 25c5030090b36d31
+levelup | 89820013 | 1 | f122a1e8fabfc7e8 8784cb9dfd3ddf19 fa7aafcd844b81c7
+levelup | 149a8f5c | 0 | b97267e38582f02a
+levelup | b440d156 | 1 | 10954719061c0389 d414447e5d3e4b6d 76c793a1f95f704c
+levelup | cbc84814 | 0 | 82cd579cd2f936c3
+levelup | 5ce0f5f8 | 1 | fe8f8479caa9d90 a0c5a35f0464b630 b7dcc6a5f0f4a1ed
+levelup | 79b1f7d5 | 0 | 1319d2b14c34b480
+levelup | c5c78fb0 | 1 | 5e6fb551382395ab b3b06a81c620939c 3e07678df3c37ef3
+levelup | 70e47ea6 | 0 | d3d2ba61b2afccfd
+levelup | 163f7e58 | 1 | b610f839cbafd555 e066017f678b9500 fc9a0e202069f011
+levelup | 52be166f | 0 | 68af22c2bfc31677
+levelup | afcacb34 | 1 | a5155c6234993e0e 81fea0734db1e0db 88f9adaf8f584dd8
+levelup | 8d7171fb | 0 | e9faa2bf0cf04a4b
+levelup | 72ad592b | 1 | 16158ab8ff058060 72f780905af40188 254735d8ffe8be1c
+levelup | 4a4a8cad | 0 | f4becc32b65feb1
+levelup | 12d6a646 | 1 | 73972b207092e55a 67492a3bb875f782 456cc71493095e0d
+levelup | 9a1b5320 | 0 | 46b43fd9f967aa96
+levelup | 3d2443d5 | 1 | c91d4c47c5891bfe cf46248d958e5651 f9df2ccf69c39fa4
+levelup | 6a735525 | 0 | a3628e94d30db24f
+levelup | a2a5fd1b | 1 | a0e10cfa4f1c82bd 9b03448f2070ff89 7bca2ae243b41bea
+levelup | 838cf348 | 0 | e2749615d28c4428
+levelup | 142d2824 | 1 | cbf29ce484222325 cc6f6568588ae27d b10e271845529046
+levelup | 583b7d18 | 0 | 5e3553647e6fc401
+levelup | abac30a2 | 1 | 343d68ecdc49ba29 54cd10c23c2009d3 50ddd2fdda31063
+levelup | 1115779 | 0 | 2bdc4bc95cc528f0
+levelup | 2a4bbb96 | 1 | 7cb92280a6ea3cdc 570b25ed7e56eb58 2f8907c07e26d412
+levelup | c08c7fef | 0 | 7b5aad79e9b0c7d6
+levelup | 9bfe4a65 | 1 | bf50217f9d46deef f5f5acefdd7ab27f c51391c1c135a243
+levelup | ab99626a | 0 | 4845fda9057e3575
+levelup | 9ffacd71 | 1 | 82ceb496be60e7c0 c29207ac1cf31d34 23e20a8708065b57
+levelup | 8d23e1a1 | 0 | e5a7b8732e636b1f
+levelup | 64614aac | 1 | ec75ceb2716c8745 406fc647142d5e11 e3c38b66083b34ee
+levelup | cf3d90a2 | 0 | d0bd7a9b35c57fbb
+levelup | 2f4c0253 | 1 | cbf29ce484222325 4b5b1e83bcb5005d f1b129e963a3e34e
+levelup | 97746f10 | 0 | 49111da7732f38d3
+levelup | 5c9e6582 | 1 | d0aa6f18672d0bc2 d7a1d12035056985 494824bdc537bbc2
+levelup | 2bf62f4f | 0 | da96fb1d83e4bc1c
+levelup | c35b0ecd | 1 | dfcbaedcbd9b22d5 fd34820197cf1d9c 7d21fbd58c91e4d1
+levelup | eae590ac | 0 | 2528d13b6bfca90
+levelup | 6c112432 | 1 | d0aaa218672d626b abc08d75c8c82645 7520f808d77e4032
+levelup | dd186551 | 0 | beff686dda15396a
+levelup | b12eee1d | 1 | d0aabb18672d8ce6 edfb386fc21c1a7 69e7674f617b68c6
+levelup | 76901fa | 0 | 980c3894da28edc3
+levelup | 22bf341e | 1 | 3e312f6f6b563c21 3dc1917f38907382 f3394700e1b7b50a
+levelup | 7de561cd | 0 | b32fd68b6fe09f59
+levelup | c05e2c5c | 1 | cb5cd4acb75efae da79cea95d278c44 ad4ca1d45382b1db
+levelup | d103c85a | 0 | 8d58009a331b8914
+levelup | 332b2c5f | 1 | 2ec8428e03cefb54 11cb11194d8531dc 5be3dffd9dc068f6
+levelup | 7154cfc5 | 0 | 57f6cacb219bceeb
+levelup | 14cc066e | 1 | c827a502d32b4179 9a1d01a4e44e757b cdca0045a9179ab7
+levelup | ba1710ad | 0 | 74fe555c609d182f
+levelup | 95fd0785 | 1 | d0aa9c18672d5839 62e870fc22255f53 6e483cf817b57c45
+levelup | 503492c9 | 0 | e5ce4ca94dc82b91
+levelup | 4f29d1e5 | 1 | b25a9b8714a0eaf8 4a8c395cab61dc7d d01ca9557cf74d
+levelup | 972cdb61 | 0 | ab6688bdaf14b764
+levelup | 7bb35bff | 1 | cbf29ce484222325 af60d8f9d327e90b 91bfbd1bb5453bb5
+levelup | ba752136 | 0 | 4d420dfdcadb4518
+levelup | b8164374 | 1 | cbf29ce484222325 e2913563a7f38d62 8e15eefeca71e5b1
+levelup | 980f8436 | 0 | daced37fe2c216b6
+levelup | f0d9ce7e | 1 | 94b9cc0e7e57b78f e37109997431fc3c 4d5b8be2210a5afc
+levelup | e8c33af2 | 0 | 64535730212353f
+levelup | 88fbc2a1 | 1 | 9b4ff169df7b3459 2d9ef330064a0e2f c995c00163213392
+levelup | 4a5dbafd | 0 | e9428c882b3a6d32
+levelup | 4cb26346 | 1 | 452bcb0cc09c43b 46ecca760cc6e5cf 39d32674abcba944
+levelup | fa250efd | 0 | 6ba2004f00d538d6
+levelup | 294ab625 | 1 | 9f79a9bc07ea45a9 922d79da04ccfd18 f064c0709df142d1
+levelup | c93d1372 | 0 | c2e0a7a709d0efce
+levelup | 50442009 | 1 | 447a843330c49255 61d4e0d4afc1f408 4a7b824a1284063b
+levelup | 30d827c0 | 0 | d6bc1286f358b09d
+levelup | 26b444a2 | 1 | 585e20a09409b393 684a759b6ea17b7e 9e0a1f14dc089699
+levelup | cf646995 | 0 | 95ce6fa535ca32c2
+levelup | 3858aa25 | 1 | d1ebd6f35dd4376d b1e3f107c6a4ae57 f20e6c4c7cd94d64
+levelup | 2bd9eb3e | 0 | cd44ba66032d405e
+levelup | c02c1e0d | 1 | 829ff0af0b941c34 9cc502bb2bd54cdf d4264e80fa71cd8d
+levelup | 92344c85 | 0 | a1050252a0bb444a
+levelup | 95419efa | 1 | 80b201e1bbf5e940 68cb4da08f4fa7a 4da54a0c6898cc37
+levelup | 1ef3a100 | 0 | e2e76b54ecd78db1
+levelup | 69c9675d | 1 | eb4260f1fde3bef8 50c86c04fcdb4a89 478b3c6c38dda7fb
+levelup | 643d9507 | 0 | ea3d3341d23cef5c
+levelup | 1527e0a7 | 1 | a55ce684de4979ef 5303e5d4234b7dbc 272655bf31b1ca08
+levelup | e7f2c789 | 0 | 2e7f43856e767082
+levelup | 940996d5 | 1 | 1fa3cc900da5093b c285a886d3dc524d 2aa23dce29ee0311
+levelup | 598bcc32 | 0 | a988434c2ebca029
+levelup | ca135abc | 1 | d3099917d4a459 3cb691c95c4e171c a05d9e1f28d7e2b3
+levelup | db019b46 | 0 | 8e35ffd21ba8369c
+levelup | 64793a88 | 1 | f436e3de661dab99 c92b324a23d3ee9 ad7cd2dcd3b604e1
+levelup | be8778b5 | 0 | 4d368fa34400dc
+levelup | 4ff040d7 | 1 | c17a825fd7fa6125 5b459f39bb02863a 609bd211b043e390
+levelup | fa9c061c | 0 | b2ed1498dfa1142d
+levelup | f8ee3282 | 1 | cbf29ce484222325 6605c5072de8edbc ad75be62df90dcd1
+levelup | 157299d2 | 0 | 6625d98177c088fb
+levelup | 4286d160 | 1 | cbf29ce484222325 fa54bb629983fafb f67b4d796d40aa44
+levelup | f977b696 | 0 | 4d096818dc925968
+levelup | 54611db4 | 1 | 9d2665934aa57f18 c7c10b369998b4ff bb0ef6d192530f7c
+levelup | 377a5191 | 0 | 79e2c0ecddb7a20e
+levelup | a2772388 | 1 | cd90640f214ec979 fdfd85f73d8650b9 b093edcbe0e206ad
+levelup | 3e683c43 | 0 | 377cf291702eb5f
+levelup | 66e26247 | 1 | cbf29ce484222325 ab6ae77b867f6112 4e06ebf3d6c34667
+levelup | 3b900aa3 | 0 | 1c0197fa02b37f69
+levelup | 2def0546 | 1 | ece95f3a3a3faa9b 2668f9a3be9b0eef 24ae9c27e539ec3f
+levelup | a2b93c51 | 0 | 29935efd3ed5013e
+levelup | 5089d656 | 1 | 8041649b7c75c238 ef592af79281d6ee 863f302c7e01092f
+levelup | 54b0621 | 0 | e35999e1daae7b34
+levelup | a187c3e7 | 1 | d3baa3aea95f1eaa 8326be0b6c2dc126 1a36ec44571722cc
+levelup | 9ccc0679 | 0 | a82c3aca3d448024
+levelup | 863c6512 | 1 | e73a06372d24a6a3 3a5a4427905219c1 737f01ef999dfb61
+levelup | afaf1443 | 0 | 49713902f2d1ccd0
+levelup | a5740f8a | 1 | 6c8b1907d0b62c91 2a1f316db7014d6c 24ef03b98955a54
+levelup | 6d17fac | 0 | 306ea3f2b16a612a
+levelup | 2c2bb9bc | 1 | 62ad0a3b384db25 7f2138759cf5bcf6 b16cf333ec0dba53
+levelup | 2e07cffc | 0 | d78bd5e9ce5b227e
+levelup | 5470137a | 1 | da24b810c3e2bd27 f796af485ccbd53e 22582cca78dad9b5
+levelup | 56d74a98 | 0 | 52afb71aa265ca84
+levelup | cfad8706 | 1 | 88999b4bbf2fc01b 982346e09eec4809 debc0ba3e4b9f73b
+levelup | abc394c3 | 0 | cf8e4e427cf9f252
+levelup | 25248322 | 1 | b7a7a971374f3a0d 425e9aeb3d5258cd c06eac5b822cf338
+levelup | 65b5d367 | 0 | 630e0463093e5769
+levelup | 79038062 | 1 | a27b128bba8b7891 8041af35300ea5eb 1128e3c7f98220be
+levelup | 541a6b1b | 0 | 610a5e54fede5f1b
+levelup | 18a90d06 | 1 | e38f0e11a28c8eb 31823b7ca2c08680 ab9cdfa966d29bbe
+levelup | c4b44317 | 0 | 3c483d9a5968f416
+levelup | ae355091 | 1 | c8f91a4cf41352be 9add478c271dac4d 3163ee1ddea5bbb3
+levelup | 869b0ca5 | 0 | 25352f4ff9a17fec
+levelup | aea5f90e | 1 | 16cf82b7cc3cab0 c6b11a77e46575ac 18ca58382802d09e
+levelup | ada694da | 0 | 8abf56fba5ca6be4
+levelup | 685087ce | 1 | cbf29ce484222325 45ec2f97a1b335ff 23ee2023a7699797
+levelup | 2877f793 | 0 | 6c250bf2ebab1c50
+levelup | 48c61860 | 1 | 3b6433c581d0ec53 b36368ed5ccf7ad0 b2fc281a30210d0c
+levelup | 9362560a | 0 | aa892413c57b08a9
+levelup | 18fa61c1 | 1 | c81fd07f082f4da1 65f66ad3bf798351 936fc843640b0086
+levelup | 2f5a637d | 0 | 64e53257d7761ef0
+levelup | c66db1ab | 1 | 35994f6e0ad9ddeb 1eea3bb449d22c64 8e5e256db60c1689
+levelup | 35ef34c9 | 0 | 336c9a3e159f0ef0
+levelup | b6a37c9a | 1 | 347826d34d4e5124 b06c8c1322d99f07 dba68e695f5fe677
+levelup | 776e9497 | 0 | 5bdd2315e64c72c3
+levelup | 692307fa | 1 | 98987392a3323f5b 7a12023b52fcc7cf ed074fcfad36298
+levelup | cb2320f3 | 0 | e0c65af66ace550a
+levelup | 36a06d57 | 1 | d0aa9118672d4588 9cae88b749d989ac 68d1a8a0ac8c8fe4
+levelup | f16984cb | 0 | acf62a5a6b13eb39
+levelup | 654ba26a | 1 | 44918259eedc7d06 53ed9ceb224a7d2b 6d796bbf8bba8d96
+levelup | 92be2945 | 0 | 5d0587c78af8a84b
+levelup | 51080503 | 1 | d5feefebdc5d90d6 fe2ba0b52a08f950 bbc25bf9f790a810
+levelup | f4601f2d | 0 | 8e44e1e06f858f54
+levelup | e0a679b2 | 1 | 8ccf0982896bf6e1 39ce277cbac63cc4 cbdcb023ce55cbe8
+levelup | 39a988f3 | 0 | b753f2efe73d526a
+levelup | 524dbe43 | 1 | d0aadd18672dc6ac 681c597c5ed53ce1 41adbfe62fcc339d
+levelup | aea7bd3d | 0 | b16f32cc5042618e
+levelup | a227309b | 1 | 5bacf55286649b07 b21fd3a7b790f541 673cb4152600f818
+levelup | a845454d | 0 | 1f0480bde9e7b171
+levelup | 3bf12028 | 1 | d2876bd108d1ebc8 476b470fb230bee3 f3e5e65b28a26e00
+levelup | fe1f68b8 | 0 | a203f23eaff385f6
+levelup | fe138cfd | 1 | cc9b1c42f722ec4b 86ddbf7e61a76d5e 133134c75204d3d9
+levelup | ffdc7e3e | 0 | 62a9dcd135e8e832
+levelup | df57df9a | 1 | 5e54f4d238400a39 61792b234abac243 454facd3ae2b86b8
+levelup | eaf4ffdb | 0 | 6f73e868ab1abed4
+levelup | a1cf4c20 | 1 | 7d15b20caa3220c0 23673a30bdbcf54d 35f97ed961ec8b08
+levelup | 4279a935 | 0 | 1982df01e8006f82
+levelup | bdbd0433 | 1 | e80035db902e5f3 ecebc1158021c64e b7bcd714b49a3b56
+levelup | e129f18c | 0 | d6afde4eccb96b65
+levelup | c9d850be | 1 | 2fb574e64a47aea7 fa212a4bf1adec4d 18c4a0400de9eadf
+levelup | 6a33d916 | 0 | 7e248cf3e9533fa9
+levelup | 71cc5819 | 1 | 2a2506c6280535d2 57168438c576674c a5e97f7b36f763f4
+levelup | cbab11dc | 0 | c549bfed9b8e2985
+levelup | f03d4056 | 1 | 5437a25dd392b969 357d2398fd1eeb22 6716fb93ae07b498
+levelup | a4ef4765 | 0 | a5346b1d358f577f
+levelup | e149a553 | 1 | dfc382adc259aa31 4331658568f446c2 a96fc988f15c59a3
+levelup | 4892b05a | 0 | 9b0e21971ff33b70
+levelup | 54171529 | 1 | 86a6d4e8163de766 50e1175b30f8ae5e 4f32ae1b8fddca01
+levelup | 1d3bca8c | 0 | 99d03cee09aefd2a
+levelup | b9536ce9 | 1 | stuck
+levelup | de238d87 | 0 | 3438aed4c8a35369
+levelup | cd0bfb0a | 1 | 181aa5c9663b0337 fe1e63cab4303035 900633bed8741513
+levelup | c82a01d5 | 0 | 4abe73c263ebba3b
+levelup | 63511881 | 1 | 683d0f1c4934cf7 9dab96e86c88d974 9281f865a0b41fe4
+levelup | 22c7e2f0 | 0 | c348d83b6f514a0f
+levelup | d3895285 | 1 | e10d95bad0a9f9d6 f571ce09f5812d53 e57394a42e6c70d5
+levelup | 9720520d | 0 | ecd3ff80d3df047e
+levelup | 1565bdec | 1 | ac36af767e20998a e6f1e29ce5291993 37dbc8c10798222b
+levelup | a9ce06cb | 0 | 44023245c8f111e5
+levelup | 738ccdbe | 1 | 547ea02632acb49b c070708b13488978 e06a48ed1215deb9
+levelup | 9697c5be | 0 | 65b9c382d8f48fbc
+levelup | 81f13aa2 | 1 | e200e1583116b9e2 e30180115f9dc173 b6ae410ac4afe16e
+levelup | 4a99a8e2 | 0 | d925026a731f9e85
+levelup | 62c0fe45 | 1 | cbf29ce484222325 310075c2b422a4b2 9660b757a664e989
+levelup | 7b4ccb22 | 0 | 976379a22c61d2a0
+levelup | bd01a7ec | 1 | 2a484e7c5774f8e3 7f4f429eda65c940 8b438d020015cb18
+levelup | f40334e1 | 0 | 39f9890beb7bd21f
+levelup | 22829b9b | 1 | cbf29ce484222325 3b657126e5db527a 136a49a0ed57c21c
+levelup | 336b4b1 | 0 | 7e576bca68b1b1bb
+levelup | 612e362d | 1 | d0ab3518672e5c34 be00110bd626a2d0 8dacbb902f242f4a
+levelup | a9c2740c | 0 | 7d4fa84654c9753c
+levelup | 1c3ffd66 | 1 | c67533cfe0d2bec8 bf76d38781052a13 db183294c406bdbb
+levelup | 149cb770 | 0 | dc20ff17e7f90374
+levelup | 237fd188 | 1 | a3a6204faa1d93e2 a51f78e62149aede bb5dd372d9acdb38
+levelup | 2883e21d | 0 | f770130ae5728493
+levelup | 6c63684 | 1 | a2109f7596ab52a0 3cbc4bae44aa46ff 738751b5d894ae40
+levelup | cca3a81e | 0 | e7d5a8e8c76936f1
+levelup | b1205b36 | 1 | bf4e18106bddfc5c e8860a744c43ed8b 44f3b35bfa6dd45d
+levelup | 8f9189ab | 0 | fde84a8816d7e7dc
+levelup | d8c1bdd7 | 1 | bb6750cd7b9fabf3 f9f9b20470e385df 67fb0f830fe27f5c
+levelup | 7ce94cb | 0 | 8b34f4c59386962
+levelup | 8842c9b1 | 1 | e1ad7c78335f5d89 410c52ef56580ab0 5228dd25f99714bc
+levelup | a685cd3f | 0 | 6a27c0ecd26fe1cd
+levelup | da547b05 | 1 | f157095897f44dd7 81d6719cc7bb0290 f17da46333974a1a
+levelup | 15f3dbbb | 0 | 5d58daa7433c77d5
+levelup | 54820961 | 1 | 3e7bf4bcc8fa09ec 79c7b5b9a057488c 3ee6bdb20d4a1bf9
+levelup | c1070ccb | 0 | edf5bbb3c8148e8c
+levelup | 8e4c34b6 | 1 | 886ce726a0178bb8 40d1298b015dc38 8e50fc7b34bd27aa
+levelup | f456d518 | 0 | cc5f97c290daef20
+levelup | f26f2f86 | 1 | cbf29ce484222325 8d7532a7cb558c82 3e4263d63aa5a3c4
+levelup | a79e6a02 | 0 | d246746484cd1862
+levelup | 59ec1393 | 1 | b0c422a9a881b69b 37e0bafb10d78835 730d2e163d625fc2
+levelup | 30f8d582 | 0 | 43a431fe1d8f70ea
+levelup | 8b7f7af0 | 1 | 1092ab4ffdf35b4e d2d831908df2254d 9fc3c839f27e5ab3
+levelup | 61a5563e | 0 | 9c7704e7bc9d3457
+levelup | a2e574b0 | 1 | cbf29ce484222325 b30f814a60232b62 a0ab7d6bf44e5b9f
+levelup | b4fd13d3 | 0 | 56f108ee6f20d0f0
+levelup | d75fea75 | 1 | df64690e28d7922c 22d5451c7eeeacce 59ea538459cf19a2
+levelup | 2ae95575 | 0 | 5019c12a71168980
+levelup | 8aeab4a0 | 1 | 35d2cad3db61b94 c70b0655ab779938 5637bfdd63a43cff
+levelup | c35b4a93 | 0 | fb8ac9004fbfe85d
+levelup | f8c632cc | 1 | a6cfedfbe6cf2db7 d2849e60889540a8 dec211180249cd3c
+levelup | 4b01f045 | 0 | 43f1d81fba811da5
+levelup | d6e56c85 | 1 | 126dbce4b25af44f 1ccf034589a3db4a 71b56d8554ddb6d4
+levelup | bb87e37b | 0 | 7912f6a68b248204
+levelup | 3a214b2f | 1 | ba46d603a4a76e74 ab54049cffb56342 69da86dc1fcfc6f5
+levelup | 64ca419f | 0 | a29721db1755b9a5
+levelup | 39e23702 | 1 | 917664cc4b9dc103 aa62145a844b858f 565434c7a67d475b
+levelup | 5edd1823 | 0 | c633a1ff1e8d933e
+levelup | 74e376ab | 1 | 624c19d3a8ea09cd 155edf0cfc0f2826 1993bb373abb9487
+levelup | 9dcf071a | 0 | 2555435a0224cdf0
+levelup | fe28e325 | 1 | ba87b0abc5f40912 bd51a4948b0e949a 21e746a5c798963d
+levelup | 67190be2 | 0 | dbe08d412e55157b
+levelup | 92039942 | 1 | 4a134e2a161e9b76 c9424c9a0ab67eaa b61712561208ac88
+levelup | a245d0bc | 0 | 5e6044c19b809734
+levelup | 8391cd84 | 1 | cebb66b2ae640c0 3514ac870e658b39 899f18c294e03be2
+levelup | 83307d69 | 0 | 13b6eceb9d071245
+levelup | b7feeda7 | 1 | d8de2d703e90afb0 d2975137cabb6522 a5bcf28b5c6717e7
+levelup | c23564bf | 0 | 12291a017b2ea08f
+levelup | 67f0f353 | 1 | e8a0cd178e38bc7c a4ed3ce88c531e05 144cc79d7f797e4f
+levelup | b7620d91 | 0 | cef4be5d4f215047
+levelup | eb1cfe3c | 1 | 532927e2202870b7 1d22bc2c9a325c94 245286d11902f06a
+levelup | aeda1b5d | 0 | f7d532131e8bca72
+levelup | 23893869 | 1 | a7e826104558216a 59cbb42f0a278b20 6a84c3904bab1c9a
+levelup | d7bc6cf6 | 0 | ea4a44d08108227b
+levelup | 82d5a9e5 | 1 | f99f437440dd3607 ededd8fe31bd01af c07d939d2e0004a4
+levelup | 3a76c704 | 0 | 7c28082f73485135
+levelup | da952f2 | 1 | a00a6fd7d027af6e dc91bcdda946d5ca 28361bfb7c030d38
+levelup | 23ac9205 | 0 | e61986865412f033
+levelup | 800e13c6 | 1 | 961c49ee3358b15a d46129c66ce17174 8912203cdffe51fa
+levelup | 23916b43 | 0 | c6eee58c68d8aef
+levelup | dbb9c913 | 1 | 4a26d5e2c4e96eb9 59393ac5498762ff 624baccd85fed245
+levelup | d2b2b51 | 0 | fded0afc8aaa1e92
+levelup | 96c033c4 | 1 | 3ac66e08880eb832 e9cfc47b7196795c 8e3b8de3ff53b992
+levelup | fed85d84 | 0 | 5f6ca9a0abace33d
+levelup | 7bc39954 | 1 | 692543f92a2ad3dd ed6b64d636f5d308 818fdb6e67b92c3c
+levelup | 86467562 | 0 | 9ed44a61127f36aa
+levelup | 726c2bb1 | 1 | 563e828f38764562 ffd48fc8ced80351 2db6f37f33bc5f6c
+levelup | 79088372 | 0 | 420c50c7dc023fe5
+levelup | 11f61e98 | 1 | 6c5c041cd7504470 3eca44cd5d77d022 c66d65347dcdab8e
+levelup | 60e7c2ec | 0 | d4feead3effe779b
+levelup | 1d8912cb | 1 | ef43c96d3bace596 90ed2d2e824cc0e5 e159f527b317d438
+levelup | 4b0e6af8 | 0 | fafee6be9fd75bea
+levelup | 29a09891 | 1 | 2e234a4895434e32 37a988f9ba95800 fac4a78ad02244d2
+levelup | 398a1ac3 | 0 | 4f76140eb1019067
+levelup | 88edb73d | 1 | stuck
+levelup | 1b5801a9 | 0 | fe3735feca4786f3
+levelup | e6f1006f | 1 | cbf29ce484222325 a4e85e96f1dc4191 b4c975238893e25e
+levelup | 630915d0 | 0 | 75b7556b72944808
+levelup | f4d6b97 | 1 | cc5da75865923e80 958ff0cb1f16317c fbe05453d68e0c5
+levelup | 8730375d | 0 | bb72cd629cbd99c8
+levelup | 9bc5b2c3 | 1 | 3716b42cc8fb6561 2702852818f99134 9777f4708c006d64
+levelup | 2af9ebbc | 0 | 10b09e1ed84104ee
+levelup | 847a0aa4 | 1 | 69c9efda545a3283 8423c8e926b5049a ff6049846f6edf71
+levelup | d8c46d89 | 0 | 21d67c15280590b1
+levelup | 61a03ceb | 1 | 57000b93143360aa e4c05925535c3a91 fb1d5edf51d91824
+levelup | f6c749f | 0 | f5064f5859f019d1
+levelup | 46489544 | 1 | d0aa7c18672d21d9 b68b5f00c5bed614 b8d60a4fc201b26a
+levelup | 1178918c | 0 | 1dbf96d1162a7793
+levelup | e08241ac | 1 | e5e9a8c3f65f73d6 65e098cfe32b7522 cb186b054f2b9f70
+levelup | dadff807 | 0 | 2236f4ea2c9d916a
+levelup | c45e3bf5 | 1 | d0aaf218672dea5b 81c36a8fb4b4d38c 6e9acbb815bf384d
+levelup | 168e37ca | 0 | ad5a697ffcafce01
+levelup | eb226ed8 | 1 | 221d56577358831c 2853b9bc80de0786 f87ee6b41554830b
+levelup | a76b4241 | 0 | 14f29b9b38b29900
+levelup | 3ea47d6 | 1 | cbf29ce484222325 a06a4911a4d67a34 22e70f502f7d9fd3
+levelup | 3ce6f5fc | 0 | 4f03475b2bc17c8f
+levelup | 2f139582 | 1 | bedce5a39cd5dffd 3ae94c321568b63 463b581e598a7d0a
+levelup | dd236d7 | 0 | e172a8a21704761b
+levelup | 80d2b398 | 1 | d0aa9518672d4c54 bdcb802f6857ad9a c3078b80b02bef30
+levelup | 577c6ca1 | 0 | 6f9dd8ccc0bdeae
+levelup | 641ee3c9 | 1 | 96aecf000fe5620a dc1295a853e4c467 b68ac0d9b50f8cb4
+levelup | b8281bda | 0 | 53e70aa21225484c
+levelup | 3c4310f7 | 1 | 1f1baffdf80ffc82 5b048ed6e2b10678 bc83053b56baf13b
+levelup | 2c38e3c1 | 0 | b9085e2668c95d17
+levelup | b18b389e | 1 | 5bdccf1bf908ddc8 c9f34804a80fd99b 959fc1645542a5db
+levelup | 1b2e02b3 | 0 | 865e297df177e321
+levelup | f235b6cf | 1 | a4295b14e89d21f 69996c71705dbd58 415db37827be040e
+levelup | e9f9d2d0 | 0 | 78ad01bbecd26a69
+levelup | 9b277e7f | 1 | a9911c92cd8a71f1 65ee360b5df9a73e ff677528e4d760d
+levelup | a08387e9 | 0 | ed365539f3b4df59
+levelup | e372f619 | 1 | f8ab31b621058049 79a6c0f35e98ac85 71c6ccaba140ccd0
+levelup | 1be6b580 | 0 | 5267372792e943d0
+levelup | d93e7ddd | 1 | 9f56a5751700ee30 b4bfadd66ce071d3 9b71865f448e1850
+levelup | 49ef9aa2 | 0 | 99469bd44bd09634
+levelup | bbdfac0b | 1 | 2561590314b3459d c3023eadac32ebc9 752d66802bd353c
+levelup | 3a472022 | 0 | bf7b0667e835a6c4
+levelup | 206eccf1 | 1 | 5654f44d271f9771 1e76100a6a51acb5 1d03b6a0687fcc4e
+levelup | d2daf23 | 0 | e5ddb3bf54935f62
+levelup | 488a5367 | 1 | d0ab0618672e0c57 6071d582eb585f0b d1784acba7beb262
+levelup | 3ba23e7a | 0 | 1bdb6861f3b365bf
+levelup | f707c538 | 1 | 8bdaba9a69036cf2 62a845410ce28313 e0f8ba4960db77db
+levelup | 77a10ca5 | 0 | 41f3fdcffed7256
+levelup | fa42e71e | 1 | a401d05d04f6ca98 b3b4ec6cb6b92e62 5ceff1236b613cb
+levelup | 440b2ef6 | 0 | 208c2e7469c9e4ef
+levelup | 8f83dcdd | 1 | f441420b2ec82da1 e8a19287a8a43f2b ef41407233a12b6a
+levelup | 48226b50 | 0 | ea6749addd682282
+levelup | e02297e | 1 | 4d4640bcb94afc96 3fdca2edcd723647 1b3265673ad9508e
+levelup | f26b27a0 | 0 | c6c438a3a8a75b2a
+levelup | 6596c6c5 | 1 | 5d3ea039c546a3d4 3564b83165eae2ee 17d496ac1843a0a6
+levelup | 98c98513 | 0 | 99a8a39e96dc4714
+levelup | 561aae0 | 1 | cbf29ce484222325 89721026365b68da 921ac5e16a6b5807
+levelup | 1ff38327 | 0 | 5d2f9bba5afbb4bf
+levelup | 8dea4cae | 1 | cbf29ce484222325 7fc8cb9b926b4cff c498d3f6142e2616
+levelup | 440ae4ec | 0 | 7ab88cece07be455
+levelup | a33360ee | 1 | efe62a1da4e675df 5b6df9430be24123 4d37964ca1794daf
+levelup | efa5b87b | 0 | 51f75393d38300ae
+levelup | 452dd971 | 1 | b6a54160ffce060c 458f9b2fe24b3268 fe35ccc22836ae6b
+levelup | 30390dc2 | 0 | 169da84436af6d56
+levelup | 35654848 | 1 | ad8a316fa23452b8 e28d6559ed5981b0 f105055442406779
+levelup | dd318a1f | 0 | cbe21c665c60cb4e
+levelup | 83b08b47 | 1 | dcfbff7976feb184 bcd3b6c617ec96d1 cb860bbdf06fb572
+levelup | adb5f589 | 0 | fc9e08711cc619ff
+levelup | 3539dad5 | 1 | 3bd913c35d275265 ff0b14b4118dccd7 430b3c8853126c26
+levelup | 52c8743a | 0 | c579a82fd312598a
+levelup | 81236627 | 1 | 517cd59171ed7d51 c81cc732990dfc89 9386e885f1f180be
+levelup | 8d374a21 | 0 | ee235f48ba099b32
+levelup | fe4f7921 | 1 | 52ad80d3f616cbb4 940c12c8348918e9 d511f600b4e893e1
+levelup | 9982040a | 0 | a70c0c512b731903
+levelup | 2071e803 | 1 | c07d9aa9c2f10f8c b56b8f694e170708 498a199ba63fc8d
+levelup | 176e3fb8 | 0 | e4b43530c57da85d
+levelup | 7c4c182f | 1 | 63dc6fcad2ba4f4b ee9f4dd0150dfbe5 e631d279789d86c7
+levelup | 9a5c826e | 0 | cd398658b47e0350
+levelup | bf8d78e1 | 1 | 18ce8cd9bb225dfe 220c38ce0854b520 777f52330f080db
+levelup | b4f23cdd | 0 | 5117664dd9651b07
+levelup | 157f904d | 1 | 6721f11020df4f3d 8b98d8fdb7204707 80da87e02500961e
+levelup | 42b8c496 | 0 | 214c96c2040a5a08
+levelup | a1d68418 | 1 | bbf30a61023102f6 e6717fbc1355994a 66458b0e74aa78d9
+levelup | f8d99922 | 0 | bd2a480bbc914b0b
+levelup | 38500856 | 1 | 30546b9509f6acb 2fa70ad5bcec5b31 b1eba885e92a9cb
+levelup | 8d70578c | 0 | 4659d0dadc3a170a
+levelup | 6f105ca7 | 1 | 8ff28306c1d8e7b2 1281333dffff3251 d9b57ce216909f5e
+levelup | 130f5206 | 0 | 2987ea6052498d1c
+levelup | 2f179d00 | 1 | d0ab1118672e1f08 acd003914af44a93 c59941b89f437839
+levelup | 203817f1 | 0 | 5c8b36e22d48605f
+levelup | fb7b25ac | 1 | 7f4d0b3284f049 46d26cc8e7f92d9e 815cba3797438ef1
+levelup | f898ef4 | 0 | 2bb172d9b0eaece5
+levelup | 70b9c771 | 1 | 764ce9b8a488d1bb 3de9bbd0196eb885 9a44933239749512
+levelup | c593862e | 0 | 8c3a35f11db1bc0b
+levelup | 4e7d47c8 | 1 | baaaf2bb8d3ea320 ced83f6ac8fe7ed3 ed8ebc88e477e90a
+levelup | 54228381 | 0 | 2fc6b0be3cddbc6b
+levelup | eb0ad48d | 1 | 14c90cd7ea845dd2 b2fad9733ca7d225 a34389650a5f050e
+levelup | 888c3f1c | 0 | cc5b5b296138136a
+levelup | b0c5ff83 | 1 | 29f8684b2a8abd5 467e9ccf38ec925e e900ae7d586b3575
+levelup | a2769dc5 | 0 | d57057a56cd4543
+levelup | 9c386e6b | 1 | a32b67d27d7fe686 968602d1982743e3 28ffeef8d670fe43
+levelup | b4b44908 | 0 | 1b7bb41cbbddf60e
+levelup | 8323502b | 1 | 97a904282b2f6073 d25fa8727967f3d8 643873babcef10e6
+levelup | b6a04f4 | 0 | d449784ae4027173
+levelup | cde4a26e | 1 | c5e45be84c0367ea a5dd3254264fa0a7 6971444fbb79c503
+levelup | effe61ae | 0 | 58ee048b1720c2cc
+levelup | ed1503a9 | 1 | 1f6642df290eaea1 25eeaac2decd115b 8faec7ef475319e2
+levelup | ca0f3472 | 0 | 9e5d3e78b80fec7a
+levelup | e967553b | 1 | 12573471453d4f10 4227ea4769c803c3 97c9527e30b93f72
+levelup | 2812048e | 0 | 64e677769bc2f404
+levelup | d52364cc | 1 | fafebf686d4c4c12 9584e8cc2218838 d6a3fb410a07fe21
+levelup | 62206765 | 0 | 88ac24140662adba
+levelup | f8e8415 | 1 | 7052b24b8c35c175 7d0becd1818bee41 aa61740dd428dfc2
+levelup | 80d35629 | 0 | 6c0b391f191aca06
+levelup | 5f43738f | 1 | 8251637f1c48e362 e8457947fec8c0ab 30f96e3e40cd809c
+levelup | dda752a5 | 0 | f29124c94b4f6a23
+levelup | e8aee323 | 1 | 9eac67bb5bdea6e8 2dad78726607fcf9 aaef022e6a9816d2
+levelup | e863f45a | 0 | 67996cde59e3f96e
+levelup | 28bf2547 | 1 | 74a4d8c0d69c770d 8898b940253cd90b 9f301a391114a48
+levelup | b7145477 | 0 | a9e0172409679a78
+levelup | 8ccab85d | 1 | 3d5f41bf885eec69 3488f70660ef5cde 374cb14ed9a9f073
+levelup | 17031fca | 0 | bb4ef6b04ae0dfcb
+levelup | 290faf46 | 1 | a67a1647440fc400 76b04cbbb97e71b5 23914468f614254
+levelup | dec8a4f4 | 0 | d52dba27d4071d89
+levelup | f941e1f8 | 1 | 53bb14863d3a17ec d25b1514004aae8a 61b1edc2c97c036a
+levelup | a747092f | 0 | ab5bef080b42289b
+levelup | da3e0a33 | 1 | d0aaba18672d8b33 e4ddb71990f658ff 1959d86394d5d00
+levelup | a34e29a0 | 0 | 87b68b9e7e29621a
+levelup | 3271dbf9 | 1 | 854535730438f533 5df5365a23dde81e 221c7fd1debf046f
+levelup | 3a3bb735 | 0 | defa76560452ec12
+levelup | c1e1173f | 1 | cbf29ce484222325 47421abd6a49202 c2d8662c1fd7583b
+levelup | c1678b1c | 0 | d3cfbe38d32c341f
+levelup | 6478e76b | 1 | 20e6866470f0a46e 7470af86eded3e1d 33450a179a84cc37
+levelup | 3c56021 | 0 | 559fbcaa7b646a88
+levelup | 14ae7a49 | 1 | f6960ac9e6fa3bc0 278ffef1cb4b717f b00a188f9e066a4f
+levelup | 13bc6171 | 0 | 3a384c338cd84fd1
+levelup | 7cd810d6 | 1 | d6c34d9a53a6d5f6 3d2789caf4b1404d 5f7cf92129833ac8
+levelup | bf6bdea5 | 0 | 6ae559a2d1a297df
+levelup | a05fde6a | 1 | cbf29ce484222325 ad5fb0b676f9b027 62cc970bfa9b708f
+levelup | c16525a9 | 0 | ca7ba80d76d7480f
+levelup | 48fc8a7e | 1 | a0919ce17fb81947 9410c2fd030d4bb4 6bb1733f3c4a7809
+levelup | 5c50a53e | 0 | b34609626b9dc0f
+levelup | 8cdf0adf | 1 | a00c119842730ee1 6752d4ee29b3569e 25f126fd38dd1017
+levelup | 98e16278 | 0 | e964c721f54cfa60
+levelup | 3765b015 | 1 | ab49715f5f5ed671 c001d335c551664 972508722e8448d6
+levelup | 51e57ed5 | 0 | e6e46e6478adc6dc
+levelup | 5177054a | 1 | 75ad31e8ae720b47 95304840df9b1627 586c78412a714f13
+levelup | 7097aff1 | 0 | c8ccaf913a6a9055
+levelup | adcd2326 | 1 | 8380b0a487f3798 8ddffcb12628ed77 d61e9973bcb5d7f9
+levelup | 9f63e6ce | 0 | 1129ed8b2af375bc
+levelup | a9c8a201 | 1 | f0b3cda180737b64 a1082a6153c6ab32 d29b659a24e33d41
+levelup | 361c8712 | 0 | e148d2a77f6e411e
+levelup | 7b999985 | 1 | b03d4a6217b01d28 e66d9c95d0088bce 8eaff6e088bdffa8
+levelup | 237d2c17 | 0 | 943ec45798f7fd6c
+levelup | ad37d213 | 1 | 44593e9f15cfa088 1b58ec20d13a993f 6f866310f164f653
+levelup | 611f724d | 0 | b6d166e4cfbb4920
+levelup | ccc50666 | 1 | a2fb91f29adca4a6 40c79d5f9097aa21 97d506fdd54ae032
+levelup | e851256d | 0 | fc52db50c1d9c366
+levelup | 65dbb33e | 1 | b13e023068ad808e 4d9a10ae93ef5409 6ae29eb4fe0924ee
+levelup | efe0431 | 0 | 7e6246609f912dad
+levelup | d5a9ebab | 1 | b877cc1771d478d7 52a90d0b1738c5db 586e85439c1260f
+levelup | e43210f1 | 0 | 1c542f948f4d67f
+levelup | fc135836 | 1 | 9668dba8b8cecb5a 6da3df96601b2ec0 d86dac2034e6633f
+levelup | bffaf5ee | 0 | 7a80233bf6a6b790
+levelup | a6ccca65 | 1 | 7ae61cdd7714bcfb 90182c1c091a364f 87ca0cabd907e835
+levelup | ddb6344a | 0 | 402cc7dce3cea62b
+levelup | 7814fb77 | 1 | 894538130d0b80fc 519535b62b5cbbc9 d7da7aa9807811dc
+levelup | 98f1b05e | 0 | c160ad00d7ba582d
+levelup | e9b54a4f | 1 | d0ab2d18672e4e9c 24c99f9d2d59aaa b47944ad1b8930fb
+levelup | 98ffc193 | 0 | c1f52a3387f0cd5
+levelup | a6e423b4 | 1 | 7d6ca79025a2e232 b9829e4a54c85424 254eb1b3ce39a765
+levelup | 6170d635 | 0 | 8745d5d86735632f
+levelup | d3854aa9 | 1 | d01073fbbec8b956 be8c15027b193f80 6c18214c8baa36f5
+levelup | f372db8d | 0 | 72aabafcc5c5d8ce
+levelup | 68e4d75d | 1 | d0aa7818672d1b0d 7231dc9063b387db 3e43b95346782cd8
+levelup | 2d4d5766 | 0 | 8d7828c46ec89405
+levelup | e13afe8b | 1 | 3ba3e6604e2c1ff0 eb902cc47a6d354c e84229f93b967591
+levelup | ec9ac708 | 0 | 30c085dfadade5bc
+levelup | 63cb7bbf | 1 | 6123cb511facc572 5c6d03d9791bc7b3 4f2d2e08a9058ec0
+levelup | 299ea42a | 0 | adf70b0231e9ef
+levelup | 880dfc87 | 1 | 79f641a892daed36 69e8f5adf83722f0 22a988c256970b22
+levelup | 55d2a014 | 0 | d8fe6cd971f38949
+levelup | 5056f634 | 1 | 913af8c57af89b85 5f99938121a327d9 9367507a038b037c
+levelup | 946178db | 0 | 367d0e6fad3c105b
+levelup | 142bb3dc | 1 | d258e8c5bb5600a7 2bf1099baf0a9651 d956c9bd8a4182f1
+levelup | 9e426bf6 | 0 | 438100dc4e4851a3
+levelup | 385e65c3 | 1 | a40d02814d410b9d 25c52553b786be19 f93448d3c149cb22
+levelup | b3057473 | 0 | 39de0006a3a714cc
+levelup | cf158bac | 1 | 85ad4f37ba6d42f0 cff7ee0c9db482f0 96a8717915449049
+levelup | 86d4714a | 0 | 5c7feb99f6dd5c1c
+levelup | ecd6b865 | 1 | a86d578f237d9ba9 273974562a216ec2 6d539c39c9924aa9
+levelup | b55b4a7a | 0 | 592b51565e9a8d48
+levelup | ed5475fe | 1 | d063827bf93034b4 3b3bea0071154156 41f631184b3c0aa1
+levelup | 4ad2b3c2 | 0 | f2db43b50c53b1e7
+levelup | 921c81f2 | 1 | b7fcd51a15ab96d5 98e5db5ac2ee7f2e 9c7ea6928abdf0bf
+levelup | 5a3c6568 | 0 | 147f8102bfab0b41
+levelup | de3de5a5 | 1 | d222d9a56d3c93a6 900c04cc71974cb5 51f1ed7d873bdd46
+levelup | 95ac6248 | 0 | 4cc8d90d4804e97f
+levelup | a29f147c | 1 | d0ab2a18672e4983 2f951fdb0cb98f67 3968cd4946a3771c
+levelup | f823f1ac | 0 | 7a27b7ba93b228d3
+levelup | 65aee03e | 1 | 42055ca3e417b768 ff6f8d4a4f8c6f50 71a7a2a9b6562d2f
+levelup | 5c96b9e9 | 0 | 49f70d8fb55a745
+levelup | b41233b1 | 1 | 12184c5dbe2622ad 6c7a73cd3196e365 66af5e8996dfb730
+levelup | bd6651b4 | 0 | c7788a488eab7271
+levelup | c4319d79 | 1 | eedaca4da56de339 430e0c98e788f898 3705d4e5f673b986
+levelup | 31acb3b5 | 0 | 342bff861f0e7784
+levelup | 88c74716 | 1 | 352883d618ae6802 c7dcc18f46c5d6a a549aa0c5bc058c9
+levelup | 8ad137a1 | 0 | 6abd0131af1feb37
+levelup | a3f0bb86 | 1 | b3992f7a2cc4a1e5 48ae3e526e550704 93dd35367df286aa
+levelup | 63fe6817 | 0 | 7d48094ab33d92fc
+levelup | 54e63b9a | 1 | 4cb2f5962c07d89e d5a653d8712badc5 f1ba3d1dcb14aeb7
+levelup | ee87926 | 0 | 18ec1860c974721b
+levelup | 54a9fe61 | 1 | d0ab1118672e1f08 4aeb2c5dd0a85fef 6e48387b27963692
+levelup | 512b6fd1 | 0 | e42ab9c5aa0a5d76
+levelup | 6be1d44d | 1 | 15489d2bfbf68a9b e3ab45f57a258527 44ce1a3e1614c5f6
+levelup | 67c8cdb8 | 0 | a8de7c8ba4d7e470
+levelup | 8c33d1e7 | 1 | c0c7a25c19fe7a5f 6330b1d8c4e7559d f4d64dc55839d1f5
+levelup | e75a612f | 0 | db9383b27acc44a4
+levelup | 6cbbc0ce | 1 | cbf29ce484222325 4f50b39e2b9acc2e 49fbefb9de238975
+levelup | d6f8f0bd | 0 | 90d05039424f001d
+levelup | 4ec54b17 | 1 | cbf29ce484222325 b50b9fb8eb53b765 a15c6a6048942975
+levelup | 6e141132 | 0 | 9614cb15d7877281
+levelup | a5fb7e4d | 1 | 931d3b6fd0561560 bc741119bf0f5477 7fb3ffc1fd36caef
+levelup | 4645010c | 0 | c6edacc7aa431183
+levelup | 5eaadc5c | 1 | 6a56b163c44397a9 f416afa6e9436816 eaeb3e05b8114ec7
+levelup | af07c6d1 | 0 | daad6f65314706e9
+levelup | d4b06ee | 1 | 5ce2327ceafb77b9 eaf1d7120e1e4ca0 42ed657c254b1298
+levelup | 87267207 | 0 | ef95f709372b8b8f
+levelup | 2a49e7b | 1 | c5dd19ad5f374a4e df8647beff1cb5ac 8e397ed13b2f79b7
+levelup | 5ece2807 | 0 | 64a9982773ccc145
+levelup | 8b9da1a | 1 | 3cc9a4fb9b93bb9d 35f6f486a7d7abc8 319fb0b109cd039d
+levelup | baf62f5 | 0 | a0668f8cd301724a
+levelup | b41a40b7 | 1 | d90da8e0f2012301 9f8eaaf63dd2d56d d51e88bc2341c3d8
+levelup | 44a8c639 | 0 | 2caf23acc0d90797
+levelup | 4a0ba679 | 1 | 887ce0d5fd797857 4c278ecdacc70600 c84224beba28ae59
+levelup | a512a3fe | 0 | 2179f7ead7d9b034
+levelup | 9e7fb347 | 1 | 7ce6c0bf63dd653c bd64a0f15901be62 d9241b1bc88b2c7
+levelup | cea9dc48 | 0 | cd3a8cbc86d1baef
+levelup | c9c082ba | 1 | cbf29ce484222325 a90fc4f3d83ca674 e7f94e6000e479f0
+levelup | f178aa9 | 0 | a4a2c4c9903cffba
+levelup | a3c8786a | 1 | cbf29ce484222325 c0c65babe0367545 3252207cd99dfd5b
+levelup | 10548fae | 0 | 9ad7d9fb76272287
+levelup | e842d57e | 1 | f8bb99633e82fd98 32f6af784dc85eb0 e093d5792a3b3bc4
+levelup | 52466f85 | 0 | d0eaaccb779c87cb
+levelup | f2d4b5ad | 1 | stuck
+levelup | 6deede55 | 0 | c6f7e7451fdbbcdc
+levelup | 98df993b | 1 | 8783b4471936969f a1a46fcff8e4e053 9fe4d97dacf63457
+levelup | df3ae346 | 0 | a80637130bf9f6f4
+levelup | 9501f41c | 1 | c0531bed9d124db2 2f60cabb38554f3e e2ef5421affc1dad
+levelup | 484d2f29 | 0 | aeaa0d23c69f7893
+levelup | 23d850b | 1 | fc0790a4ee1cdd89 dfbf120845b54c2 a87905488391b8a9
+levelup | 49c8211c | 0 | 7b36314930fd3637
+levelup | 1d37f88 | 1 | 75adfacab8abfe5d 672a692d29db3e9a 1733a4a0581cf63c
+levelup | c00f789 | 0 | 94ee0b2bf1b98c4d
+levelup | 9c0fc793 | 1 | 94bd521a4b7370fd 3a19ff0e32f3d698 6b2996eb55bfae54
+levelup | aefe6c3 | 0 | 17dd672f6f6962be
+levelup | 175864fc | 1 | f827421ce2f3db37 2e97bda21a138276 ceb669badcd5f2b5
+levelup | c22cd666 | 0 | a97fb46beea0aa1d
+levelup | 79c66a3a | 1 | 7ac830abaa30cb98 25ad4a4a30144a11 17d04a277e67f672
+levelup | 231b8830 | 0 | 2d127d685133ba2
+levelup | b5bb7bc2 | 1 | 38febbe876e21383 ba0e315d8662639f e463fd15bcba407d
+levelup | 9582f316 | 0 | 75dc695780190945
+levelup | eeee24de | 1 | 1bfebb988ea43f76 ca952677cd359325 6b05ca5ce7ec6bb6
+levelup | b75ecbb8 | 0 | 33aef7e4b3053510
+levelup | 3e040396 | 1 | 8a9433d71697d005 fe95216e3753ea7b 69d4622859513983
+levelup | ebb45818 | 0 | e5cab41af8b67682
+levelup | 2eb131d | 1 | 41033c10b20125d1 45b387a860fd9f80 33771963392d2a2e
+levelup | f2723c33 | 0 | 200186b113d31722
+levelup | c096c64c | 1 | 3fbb992b328bf557 3f7d1275c8bf6d8c a71ff486c449b901
+levelup | 1540d152 | 0 | 4df36ef522c6ca9c
+levelup | 3ce24808 | 1 | 5443b6304784c492 72a0655184047e03 97d9ea8c66887654
+levelup | ddbd5da6 | 0 | 12c42ebf9b7007
+levelup | 8f26419b | 1 | cbf29ce484222325 8466a1d75ba9a3da d881aa08acfa9953
+levelup | 1c6065c7 | 0 | c6a3cc381eceeeaf
+levelup | f8758d94 | 1 | 6db587874a02c53e c6ad72692476e1a4 3b428d722419282f
+levelup | 937444bc | 0 | 892a791db407e1f8
+levelup | f04832ee | 1 | 6812934108cbcf3a bce3d63e40e71038 c5af06fcafc550fd
+levelup | 929bc4ad | 0 | 71f2e650addd23ce
+levelup | fe928e1f | 1 | 416512978ed63dd3 d76902f73e8ef977 857548617c8fe208
+levelup | 68b52c20 | 0 | e22dd2feab8a221f
+levelup | c64cbfd4 | 1 | 6039a2a2d2c03ce7 c10d8b1a3f19ca07 967a339494754fd7
+levelup | 601f68d5 | 0 | a98383b603716063
+levelup | 892d8bac | 1 | a3d0af049f4f8e69 ec8f31b5bc90bc7c e9965c3558ac0866
+levelup | 2b87f047 | 0 | 6caf66ce63dad276
+levelup | be7d9899 | 1 | a52b5f87ebce000a fd43dc8b1df6c728 b0a7aa5eededd86e
+levelup | ba5bbb8c | 0 | 6259d9ef8df8e125
+levelup | 44856c5a | 1 | ed6a73495ad6fd5d 720cfba8b89849df b0143c595cf1db84
+levelup | 4450c3a0 | 0 | 2e457460807f333b
+levelup | dd9b7ae0 | 1 | cbf29ce484222325 7865e6940beb0155 fe016a1c4818f2
+levelup | 6a035268 | 0 | c297f6c3cda05e3b
+levelup | dda62b71 | 1 | e425ff70195517d0 7ba6889b35b81cc8 a4a2f6d1ceee65d
+levelup | ec66e136 | 0 | 2a6694521b023567
+levelup | 294dc136 | 1 | 3553be0d457543c0 c1cdef628ffb388e f154671c2dfa6fd7
+levelup | 58ebd5e8 | 0 | c344fc2070cbfced
+levelup | 84be8bfb | 1 | d0aa6218672cf5ab 4a45a0b5686baf85 fcea2be3ff3ce937
+levelup | be437a7c | 0 | 62e27aae293b7722
+levelup | 4ec56cae | 1 | b0ae5925b07c2498 4fa8f1c7139a6a90 7882df4b786f7e1d
+levelup | cabde9b2 | 0 | 48e1aeac0226f822
+levelup | e095213b | 1 | d8bfd74efb99f000 d9e95fab160b1bc4 dfbf53de44133575
+levelup | b35573f6 | 0 | 973c51b18ccbd128
+levelup | e3ae8359 | 1 | 1a4a010a9a1d609e 3e0de278428b695b 155cffa32c67da76
+levelup | 75161ca1 | 0 | b4937654c948fd1b
+levelup | 9b39006e | 1 | 2b93735d58446a08 8eb5571629c5c594 6a82b1fec820398e
+levelup | 32d782ee | 0 | 29ae44b7027f33ab
+levelup | 31c4b828 | 1 | f4769c3908bd8b71 5d6abb400c57bc7d 72c833a43b9e1acf
+levelup | 44cd480e | 0 | df5a7588c765820d
+levelup | 1a015ef9 | 1 | 4eb7c424e3a06e88 1d348322f8f3b1a3 5100a7a561d366a3
+levelup | dac40d33 | 0 | f7249d43006c2a9e
+levelup | 7f6ab7b7 | 1 | cbf29ce484222325 81108acd4d8bb5c4 891fae6ecc07aa0f
+levelup | 957817f8 | 0 | 39dd756cb2110d01
+levelup | b6de02cd | 1 | d0aa9c18672d5839 eb3fde1d6aa6487d afdee93b1e2c3069
+levelup | 598a4c21 | 0 | 66430b5e42a4485b
+levelup | adcfc03 | 1 | 540803104318d876 e5f6aebc344cc588 b022b7be948e118
+levelup | d4565936 | 0 | df2983464a2e77cb
+levelup | a2afd461 | 1 | 8a12c0d3c77fe555 1d8df7ff68e51120 8903b36004356b6d
+levelup | e0d76076 | 0 | 9f45e8963d6d713f
+levelup | 245d8d3b | 1 | 275c3bb9382b6f70 5892b53d23c71712 3f9cf4eb780b7e55
+levelup | 97fef8c5 | 0 | b3264b76402bc66d
+levelup | 35d857ac | 1 | 96932958a0616190 8185bcc6dcb8f82 2df373279d2df50e
+levelup | d13df6b | 0 | a4635d64eea44612
+levelup | 4ef1b42d | 1 | d0e59e05b85d348c e5cfad6037eb4e64 dca5eb6e373bb4a1
+levelup | abe0c2e7 | 0 | 2461d65d04ac20f9
+levelup | 47b6a8ec | 1 | a0877c7f168a46e5 7308178fb1a2f927 9ec4561aadf1dd60
+levelup | 2407c7b4 | 0 | 16282cf47898485d
+levelup | 4d1225ae | 1 | 67bb7e49d1b1928c a2d6a0d2ca97e8a3 2f00ff22a13e5005
+levelup | 87b75ab8 | 0 | cf83060fcbd1e0dc
+levelup | 1ed7844e | 1 | 2f65ed503445cacb 2ddb633b0a9b7310 8c92b821b09a55f3
+levelup | 2384932d | 0 | 3dbcc5bcd714045
+levelup | 3987dff0 | 1 | 921df244b67da89c 383558739d691ba2 56323ad95f2961e5
+levelup | 558ca120 | 0 | c81c982b5bca35e3
+levelup | 6d086554 | 1 | c2c4850b7513a77e 8717a569217be14 bd959f312ce6da67
+levelup | 4540a66c | 0 | 9610155373e6fafa
+levelup | 5cf463b0 | 1 | cbf29ce484222325 b1ce2d38c23bfacf a35659716e3d55c2
+levelup | db0de7cc | 0 | 91fc1e8848b90925
+levelup | 4281f402 | 1 | 3aa7f315d74208e8 36ac3388738ab1f2 51a180a83536bea
+levelup | 2cc714c | 0 | cbc9822d65dcb440
+levelup | 905f00dc | 1 | 63d653ab4cb89333 2ecb09473cde2d05 4342975f24b97382
+levelup | 211d62d5 | 0 | c7eca7aa30ee988d
+levelup | 6d500cc | 1 | 6c3f66e9894e7498 4ac3e6619c282b81 92c7ce3cff48431b
+levelup | 9c213737 | 0 | cb66fa2b4bb4dc30
+levelup | b898347a | 1 | 56f26f69053ea967 792650783371048d 4706bcfe6ffb6168
+levelup | 2ecf33e5 | 0 | b1be1436d44d367d
+levelup | cccedbff | 1 | 421ffec703790402 7221b7d7c5597450 8a505b37991d20f8
+levelup | d62c0134 | 0 | f035f53b14d6ffd8
+levelup | 945a2367 | 1 | 8b0e90cb3a8c9d43 a4c26d0a5904b517 42a442fef2a6e807
+levelup | aae6a8ca | 0 | bdb901ae6722a899
+levelup | 29084137 | 1 | a2625ed64dc7ff0a 9eac44d204f7732 d7d40ecec52d4022
+levelup | ca86a49c | 0 | c90dbd6f0cda9761
+levelup | 347c014 | 1 | de17f0f9f2bdb5be 12dc2f03d757885f 75ecd355b37f26ad
+levelup | 30a0ef4a | 0 | b07b6260f28bfa0d
+levelup | 1abbb68a | 1 | 91fcbb3f4ee0db10 812fe03c5fba3c03 526ec4e4b9ba8b59
+levelup | 54b87d9c | 0 | 5ef81d360963459d
+levelup | 245bb8d6 | 1 | d0aa5f18672cf092 f795f657a2e81e29 a7ae6a5233b33293
+levelup | 511dcf30 | 0 | c476b5cd56d330a
+levelup | c8a4c89f | 1 | a0b7685e3176e013 c16b8953a0b70d78 b830f733eeb8244e
+levelup | e4539d57 | 0 | 284a6a707b27f40b
+levelup | 2e1d947d | 1 | f0052482f107b03b 81e36738bfdc0e90 b6d6870064098a57
+levelup | 52a4d952 | 0 | 6d911f310fa033c5
+levelup | d6c5eb52 | 1 | 624a3820df0d3ba8 32e7babe505635c4 c775e7b02b1d8fca
+levelup | 1af20079 | 0 | c0218a4c99e7755
+levelup | 79f9f25a | 1 | 850be1ae01cf5d43 382f6d99db2e4c7e 1c065e3b52cad2db
+levelup | df513bc | 0 | 8c86d60fe354ed4a
+levelup | dfa483cd | 1 | 71390ee1ecfd6b02 f193befedf195d3 e5c42254f5b6ddef
+levelup | 46a85f2a | 0 | aa153e807f2a71af
+levelup | 553289e6 | 1 | 3dc662022f3bcff6 57a652c3b83bb73a fcd8c9665a55d4e
+levelup | c43e0852 | 0 | 70d27c64d7902ebd
+levelup | d9f5c24b | 1 | a1bdc4815daa1a0a 3da1deda8948edae 8ee339df75ad199c
+levelup | 5f8bb2c1 | 0 | 8a015d0edff54e46
+levelup | 90287209 | 1 | ad448081b11e7406 1279072bfbf4eec5 39f5c74e7ef4496
+levelup | 9f36a77 | 0 | d4c580fec9494014
+levelup | b0b71db7 | 1 | 1c182d7d7945d134 dfce1cce3a4c81b0 b1ecd51d8f41e16b
+levelup | d3849ea4 | 0 | 701451b99c1284e3
+levelup | dea0ea92 | 1 | d0aab418672d8101 527b413a7ad1ad9e 46b1fd0e96b4780d
+levelup | e74fb034 | 0 | c9251f4d144a80c4
+levelup | ede48eb7 | 1 | 114d032e8ed8f36c 6796e14e6ae5a335 6fb0f791f7c5e9ae
+levelup | b0782705 | 0 | ad87a1cb91b37cbe
+levelup | 5ae43c33 | 1 | d0aaf918672df640 f5d4d2bc1eb66916 3200998ac8aecfb3
+levelup | 6541c233 | 0 | fb9aa22730c71ae
+levelup | 95828ee0 | 1 | ce7e149ff9951689 9277accd10a5a5b9 96920f340c893a30
+levelup | 58dc6e03 | 0 | c993c5bb2b1aad9
+levelup | 88282380 | 1 | 8971290faf25b53b 1ba019ce9d6a1a26 14b5509911fb5a40
+levelup | 35fbc944 | 0 | 1e9a58d321a6ffd0
+levelup | ac0d529e | 1 | d80fc3b328519090 c090e9636202d376 bd693724f193dab5
+levelup | dbd64f69 | 0 | 9c353176c6d2169e
+levelup | a3346152 | 1 | eb7854d554413ab4 5416c07c27d9942f e23d8d1d7b748aac
+levelup | 4f5d7e1b | 0 | c024f23c5a164030
+levelup | 1d19858e | 1 | b4452bb76b09b55b 27df99917887b6f9 d8267b42b0fe1a3e
+levelup | 4487bb67 | 0 | 342dce9f159b4d00
+levelup | 6d33cb85 | 1 | cbf29ce484222325 54b98a82c0cdd6ff 51d22f12a9fbab14
+levelup | 7806bde9 | 0 | b801e96f39858a2d
+levelup | 42cab71d | 1 | cbf29ce484222325 d3af4654105cc4b 8480f4452f57d909
+levelup | adcf792c | 0 | 42b8529e68b26d6e
+levelup | 8b3715cc | 1 | 333442a4481eab7c 4250073590f4c851 e84288720466bc68
+levelup | 5deac21a | 0 | ef37a04c24c66f31
+levelup | 64fef104 | 1 | be5db4fe076ed806 8dcbda617d217904 ed961f7428bdd3f1
+levelup | e85924b0 | 0 | c46c420bcfe81b52
+levelup | 4d2dd1e4 | 1 | cbf29ce484222325 77ef86fa1479abfe ed2ca71a4760d415
+levelup | 53c0c10 | 0 | 1128b7d1ec28795e
+levelup | 67260e22 | 1 | cbf29ce484222325 25130f9a9cbb9217 167b8f2c32accce
+levelup | d6ef3f58 | 0 | 83b37b08e3fd390d
+levelup | 9e599d9e | 1 | 1c30b537ee0f976f 6d79fe33314b0614 4a16653a3a6df993
+levelup | 5b829cd5 | 0 | 6847a66c993fc7bb
+levelup | b30737e7 | 1 | cbf29ce484222325 304d3bf04625343e 4f0ed1e0fa34ab
+levelup | 265024fd | 0 | 207d6545795d9d93
+levelup | 6272cb76 | 1 | b01cb5631cc3e0d0 ec786045571282fa 278e91cc1c87bdbb
+levelup | a2f3defb | 0 | f1567b10864a003f
+levelup | 2030ab89 | 1 | cbf29ce484222325 dad28059ff75dfa4 bd02ab73feee87d2
+levelup | 3a7ea4f5 | 0 | d06f68fa2b3fb7e9
+levelup | 7bc4e9cc | 1 | a2c9aaeefc1cb70 c16cfd6631d22328 e6b34653470e6726
+levelup | 1cd448e9 | 0 | 9e971e25cc335b8
+levelup | 5bfdec17 | 1 | stuck
+levelup | 98498d5a | 0 | 3139291b919c322a
+levelup | 9e963c16 | 1 | 2ff8fbb5a51d9109 c6a9aea56c66174b a36f1d5ed268c24b
+levelup | 49d46aa1 | 0 | 4d7d0104bcf2fdaa
+levelup | 895db5f0 | 1 | d0aaf218672dea5b 11d83fecab3b5f22 3e7c0a3cfaa5b9ff
+levelup | a398da77 | 0 | 4bb1ad03765da2e6
+levelup | 3ff17610 | 1 | 9f4b976c906e27ac 891d7105fadc5c57 8480619951b8d40d
+levelup | 2b15b5f8 | 0 | e083d2c7b482936e
+levelup | 9cad5bf | 1 | 27a4352998a1c2 8480529d5c1a3d93 6e0dc488d19cf315
+levelup | a6b6cf7 | 0 | 99a59a57b1609fa9
+levelup | be9e4264 | 1 | d0ab1118672e1f08 1d7b76b8f06a0a43 36baf2b5294a8099
+levelup | 619d9da7 | 0 | 9d12d1f36855fe3c
+levelup | 6023eed5 | 1 | 23a0a842dd3be430 9728a6d83815107f 600c3ad6287d3cb3
+levelup | e1f05ce4 | 0 | 57115347cf81753c
+levelup | e5b056d8 | 1 | cbf29ce484222325 bcf62a87900cf3e0 2aeb5e035c58576
+levelup | ec26cc97 | 0 | 7021b0aa55e5541
+levelup | b9a75cff | 1 | 3f395dbdf6af3f43 508e26ef545b299b a2f7c18338aa2260
+levelup | c3bf8efd | 0 | f9fb504c7c9f9e82
+levelup | 343f9fe5 | 1 | d0aa6218672cf5ab fee34d1c9dd1a601 d7364f45994cc6d7
+levelup | 36426dfc | 0 | 92d93f9227794014
+levelup | 5b82e8e9 | 1 | d0aa7318672d128e b43ea28f734f460d 35a7b9153bdbe9be
+levelup | 14f36a83 | 0 | 9cd69fe58e900436
+levelup | 1f3b595d | 1 | 4d6e061b82289463 8da93ec15f7407a5 8bf26734086aea71
+levelup | 54a21013 | 0 | 5b7a07a86b47637b
+levelup | c835d946 | 1 | c8abb50a0a27fd96 78187113ad0d4347 84cae719e7ff6114
+levelup | 3c09194 | 0 | 9cab6a322d76f155
+levelup | 2c5568b0 | 1 | e34620c9140e4dc9 f80f8c9bfe8018de dd9ae1acbf5bcddc
+levelup | 2237015 | 0 | 84a72ec6f612de19
+levelup | c021dda7 | 1 | c1599473a3597d70 ba343839f0a316dc a576e96080f8f3b7
+levelup | e8e85d5a | 0 | 360e402d33f7d57b
+levelup | 58cf41c9 | 1 | 2efb0c25f316603e 5138fc8489e2c0b1 47ddc902088ccf98
+levelup | e8e999da | 0 | 8ba2245601227cbf
+levelup | f71b5ecf | 1 | 976013c1ecd08374 87406e9a97af453 153cd40e330433ff
+levelup | 527a123e | 0 | 797d244dd36840a
+levelup | c98c8410 | 1 | 95989cfef1372e92 f3db937b4dceb889 7c0fccb5718ee63b
+levelup | aa0bb037 | 0 | 810601e04b57c258
+levelup | 8c4723c6 | 1 | a7b94c41f74e7860 ae6d76998667dc65 54a03b3353c8b702
+levelup | 311c5efd | 0 | e04cb1f2ad3e044d
+levelup | 1ce1b701 | 1 | 623a3431a7bd59cd 8accb2a279237e4c fb80bf53edd76f28
+levelup | ed285cd9 | 0 | 6a96cef0d25275b0
+levelup | f734f9f5 | 1 | 282083ff3cc28dd6 e58f33229a94c96b c18a0acde0dc20a1
+levelup | 4c3ea0e6 | 0 | 482d7895592b7312
+levelup | 46e63607 | 1 | 51eee9e4cd8b7775 3ec8c4392f613c11 19c6862febba696a
+levelup | 50702423 | 0 | f24a135328d4aff0
+levelup | 85a9ea41 | 1 | fe8373a6056325d0 4b41d8d4bcf9f1e6 a3bd85766f14aac5
+levelup | c72acf27 | 0 | 58f5fdd1d134c523
+levelup | 71c8c56c | 1 | ed8be1586922775f db577f67e33b6a93 5c3a1417ca433f5d
+levelup | 3346abf2 | 0 | fda975e245164085
+levelup | 8796d644 | 1 | 578ac0b357f9dd9f 1d1d74a05080c00b bdd3c5e77a7a6e45
+levelup | 26b9111 | 0 | 34f46d29ab97fae2
+levelup | 7cd1375e | 1 | 8481631165921105 6aa5550689f98de2 75ed945fba45aedc
+levelup | 32032c38 | 0 | 9a9b059e123e9c1c
+levelup | 63a3073e | 1 | 4afafeb7c0449a24 74d4356aadd267de de7fa61cab8bb17c
+levelup | 595ca581 | 0 | d65b78ab52f56ddb
+levelup | 22cc1085 | 1 | 2871ba26e52733ce b79f8982a53ff495 27c1b53d5629ab1d
+levelup | 62887b8a | 0 | c90ef75c07f7b902
+levelup | 44612378 | 1 | d0aafd18672dfd0c 24eeacc1fc34e7a6 94feb6ad21761695
+levelup | 179774ef | 0 | bc89df9ffd475aea
+levelup | a16da9d7 | 1 | 9588af0fa2d97e9d c620d6eaedd4a366 6120388060e7a0c9
+levelup | 66a4393d | 0 | c3fd6e78444d4364
+levelup | e2395005 | 1 | e280d955fae2f1c0 4909fdc982ae33e1 402efa039e8a987d
+levelup | 30b4aec | 0 | 8a8db760e64e82ee
+levelup | 5d6ef4e5 | 1 | d0aade18672dc85f d24e0db9fa2bd1da f0410fabfc74f491
+levelup | c137f2b4 | 0 | d0cc264615a90388
+levelup | 460df5c7 | 1 | 56f767baea5dd3f5 ee4dc59efea9b8e1 3c417d68950c00ac
+levelup | 56fdd63b | 0 | 19886ed59067a080
+levelup | fcc71845 | 1 | 4cc4aa9fb3826471 beba309af1c7d742 79519c87b3d3b4bf
+levelup | 54fd8964 | 0 | dcaf39a78e2d242d
+levelup | 31c60a82 | 1 | 72658b62253cfbcc 9230a83918b4a501 d4c95f427b35ac83
+levelup | 9141766b | 0 | ccc98b39846d445
+levelup | e09f3aef | 1 | 4b2efda77367792 52af84333ec65421 b09010fa4a7ac28e
+levelup | 8a042282 | 0 | 232a3e42e6552a53
+levelup | dc651531 | 1 | cbf29ce484222325 82da5451ff2f8f54 ff903f8be39b253b
+levelup | 75b19362 | 0 | d862df6175e1314d
+levelup | d7439933 | 1 | c281a89d2999ae2d 7bcae82285141f5f bb3ebc698b30c5ce
+levelup | 7dac8f01 | 0 | 8755be86dbbc21fe
+levelup | 3a46838e | 1 | c9260cde006a49c7 a8be4488ff7e7631 c13272a2dbac6cf5
+levelup | f4a4d0f3 | 0 | c7969ac63866da23
+levelup | dadddc54 | 1 | 7f4ecbebf1fab364 34c298fc51fb5bc6 7e8014b25e8f52f5
+levelup | e46b3f2e | 0 | 65ad2df6859cb92b
+levelup | bbc8ed8d | 1 | cbf29ce484222325 3a0bf03fcd2b0de3 28abddd8f3e97c9a
+levelup | 1381ecee | 0 | 7391769de684914d
+levelup | 2ba07dbb | 1 | 8c405d41b1c8f776 1a62c06d7193078c 6fee9d1a5eb3d0c4
+levelup | 18cf19d | 0 | bf1a3beeb9929602
+levelup | 2ea07b93 | 1 | 58ba71d8a5b0a38c 240834dae241f3cf 38f72d8c815bc3d3
+levelup | 9ebbfc78 | 0 | 2d76a9b97e20228b
+levelup | 26fa05b4 | 1 | 1258befb142f1d8a 19d50d20d7fdd74e e4c1cd5101680c77
+levelup | b6e1fb14 | 0 | c543220c98c1a5b2
+levelup | 69100ef8 | 1 | 3612429eca34e933 c820d917973d9832 a5b70a5ecc1dbf2f
+levelup | 752dd2b0 | 0 | f31f06025a0b614d
+levelup | fa4d6016 | 1 | f5852edd32c90806 2e15e280a2a5db55 99ee8c2d9160b83a
+levelup | 2edadc32 | 0 | 922f755a1dec5167
+levelup | 5aacb1c6 | 1 | a15f33cb6bf17a9a 8d67840b5ccd21b7 1c7117228e463c8d
+levelup | a3ef1226 | 0 | ef362912f56d28ce
+levelup | 2ec2d0b8 | 1 | cbf29ce484222325 690f438ff74b3208 db058d2b94cb3859
+levelup | 11d0e80f | 0 | d691905489ab3e4c
+levelup | 5b80c243 | 1 | f8bbefdcf0bc0e82 84ad188345b13da4 a72379a3e177961c
+levelup | e61cc0e3 | 0 | 3672d4d75d21f7b5
+levelup | d14a5796 | 1 | 83ac21bfae752093 d1b13db669f5a934 2924676bb8fd9f20
+levelup | 6b07c393 | 0 | 45ab5aafa39a8ea7
+levelup | 50ce4b78 | 1 | cbf29ce484222325 5ffe6fe5920fff0d 69f9a0b67cb6c706
+levelup | aaa28d00 | 0 | 152b1fbc18fd5cc2
+levelup | 9acf5dd3 | 1 | 3d141720af71509b 694e1fcdc4449591 30255aa37beb6eed
+levelup | 15aefef9 | 0 | e50cba5fc64c0319
+levelup | 8f2e656a | 1 | 228d838a44fed8df 672ca6a94c998b1e cb84cf9de75934b0
+levelup | 9cdd7f56 | 0 | b0f3bc527e400fa9
+levelup | f5dce0fc | 1 | 822f17cb2c152d64 817fa9667d6f0e30 b29ad0d2277b2bbe
+levelup | ee6a26e6 | 0 | cdcc55d999a8834f
+levelup | 42c8b20 | 1 | 17050cd8ed86f84f 90027331ffa18f9e 6b45fddcad0d87df
+levelup | 236c2c42 | 0 | 8abdd4b7c212769a
+levelup | d7fb2a37 | 1 | 4f624905cce48a30 e651ab618812b8a3 3662df92ab979c1a
+levelup | 6fae3b53 | 0 | f38df08c3d0566da
+levelup | 69e3ed3b | 1 | d0aaab18672d71b6 122782b54f9e8d62 9c8fdd4801e62dae
+levelup | 31c408e7 | 0 | 515e43391d9c70a1
+levelup | ab19bd64 | 1 | 98adf2cb004515ed f9ac33d53ab45c10 1dda30c80c7c1003
+levelup | cc1fa30f | 0 | d03b8c33cdf60cae
+levelup | 960aecc0 | 1 | 3d989e4074ad3f10 3a352481c9c0ed9c 3fe59cc17876dd9e
+levelup | 102dc6ee | 0 | 2472ca483fcf59b0
+levelup | 94f4d81e | 1 | cbc8a064df386efd 9d52d620cae0241e 983d1cc1e34a64b3
+levelup | dd9130a9 | 0 | c2f0c23fc075044
+levelup | 252fcb3f | 1 | 8f834e2b6c541a2 f98a88833372ca73 3135403962021828
+levelup | 5e7116af | 0 | b2205b2c31ca7445
+levelup | ab9363f0 | 1 | 75f3a3b1c63eb89f 713d5a2f7f8eb904 49c30c544dbb8cf1
+levelup | 591b1185 | 0 | 3690f1824b0aff85
+levelup | 37655cf9 | 1 | de6a9f9c6d46fcc3 a9deeb2cbc8475ba 21ceba9534ab0f03
+levelup | bfdf5680 | 0 | 9bc0b6c95251435a
+levelup | 30b6d19e | 1 | d0ab0118672e03d8 137b2787ac1ff200 f10a207c098686e7
+levelup | fa2e435 | 0 | ce34ec050c785c5a
+levelup | f2b2676b | 1 | a733c19d6d5680cc ebcf3347d727cf98 34bb5112cee865c8
+levelup | 7cc48c23 | 0 | 8e9fa1f23e635cdf
+levelup | ea676e1 | 1 | cbf29ce484222325 4cb2f1e33b250742 817fad354a16c416
+levelup | bd4d68ea | 0 | cb98ae1ec81b8991
+levelup | 1afabd0c | 1 | cbf29ce484222325 16e79442a5ccde6e ff2cc4f53b3291a5
+levelup | a8c6434b | 0 | fa6e4d35580bddab
+levelup | a8c2fef3 | 1 | stuck
+levelup | b9f284b2 | 0 | d72b3845cc7e3a92
+levelup | e2d989a | 1 | 1b33b5693c9deef1 8f888aa03965bfbd 69b58d6d725c0062
+levelup | 40326c67 | 0 | 94cf50e68bf8a836
+levelup | 359ed746 | 1 | 825718a04d543134 5f9bad8f1fa7ba9f c04cdb58c40eef12
+levelup | de034bf5 | 0 | f3bec0bd3deb042b
+levelup | 17ab72fd | 1 | f73399949cd58b74 710f63e1b551ea04 aa70390c3672644
+levelup | 48dd68ff | 0 | 178927e9abed8e32
+levelup | cb5190df | 1 | cbf29ce484222325 3093c08717f9065b df5301290ebce992
+levelup | 6229edab | 0 | 3ec644f227226331
+levelup | dca5f9b7 | 1 | fb9a5eb2370c22b8 6772f59342318331 ae1182e5cdd2e6f9
+levelup | 5242a33e | 0 | 3e6fc7626a479948
+levelup | 16375529 | 1 | e8cd5eb27d5cce5e 6f4079503bb8f001 d19e4b41979b8ebd
+levelup | ea23d8ad | 0 | cb2f48cdae24f8a8
+levelup | c9467cc | 1 | d3b650e2c12de90f e25777b74f6755ff c8c23e5b662c3e27
+levelup | e34771cc | 0 | 5763cdea79c53ba0
+levelup | bc95fcac | 1 | da2a087bff6e45a9 f6febe71da2f3d29 438eaa2af6115854
+levelup | e31a4be5 | 0 | bd49c92b9b97d71c
+levelup | 93e6aba5 | 1 | 78cd3f897d41e753 3b98387aa3abb006 2420fe360cc0aa47
+levelup | f18c26c8 | 0 | 3568af0ef00b4407
+levelup | 1e6cd3cc | 1 | bfc0ee1a21c3b211 c841c934a6911bb 91c668d47b5f5351
+levelup | b2ea4f11 | 0 | 15946f1186c03117
+levelup | 1136947d | 1 | dec65260f5ff01bc c9b16ce858efb366 84722d99fe2a5130
+levelup | 333afa5c | 0 | 3efd8d3c6291352e
+levelup | d0b174c8 | 1 | cbf29ce484222325 b886856235b5ce34 d37a4bdf25ef13fb
+levelup | c08913a | 0 | ede15433ca0aa7f2
+levelup | c4c0d118 | 1 | 2b104fb1d3c210cd cf6b0ca9bb125ba 5a12cd5b7a355890
+levelup | e8b16cc3 | 0 | 61b3a890a4b9ca53
+levelup | 847b3186 | 1 | cbf29ce484222325 2113714518553af1 c6c53944f2a32294
+levelup | 85ef3103 | 0 | ffa41c466c04617f
+levelup | 6954ff57 | 1 | 7a82b4ee68f5a27c 8e8444080463f991 bdd8de1e3fa147c5
+levelup | 24b59bf0 | 0 | 2264beff03f91255
+levelup | 9da73a2c | 1 | d0aa4d18672cd1fc 265f4f43192d02eb e380f32d87d03bd9
+levelup | 32bd264f | 0 | 3be6f8b0bbc53172
+levelup | e013219 | 1 | f3574441816fe43e 4e212bf6a699e8c4 44f3da9b07a5e4d0
+levelup | 91978e9b | 0 | 8bfc7b8e7d36e4a0
+levelup | 788c3556 | 1 | 4e37480474de9749 f1b348f27b22d5bc edb7599de00ea777
+levelup | 80c93b1a | 0 | 3775d80556e200ad
+levelup | 5e5e3199 | 1 | 3a9b3dd4a9ffbdbe 1ab6195d0832ee9a 24e8bad5cea6070d
+levelup | d57c41b6 | 0 | a16bbcfd64fc76aa
+levelup | 7672f571 | 1 | 823d3917b207432f 142a90814fde50d4 97ee9f8418390937
+levelup | 7cfa81e0 | 0 | ea57a7b373a9ecd4
+levelup | 2f343a8b | 1 | 4a73310f71b2db68 aa3240a3dd236172 ab9e84fa19cde714
+levelup | f8762330 | 0 | d1774a4371e57ba2
+levelup | 93829c55 | 1 | a4b9bd3d190b5e6f e18d37d7fef4203e a229c86c23866f86
+levelup | 987420e7 | 0 | 6f2bffaa476d9676
+levelup | 3325c25b | 1 | cbf29ce484222325 f7a9c31132f3dce4 d9a1669e84b6d767
+levelup | abe11833 | 0 | 57234c1c7f7a9e1d
+levelup | 26a030ea | 1 | 1b51a90bb9b10010 a99a925276a61e0f 69a6a928bd8d8fee
+levelup | 11908bab | 0 | 1fcfee816d285ec1
+levelup | 45b70695 | 1 | 9e290aa6bc7b1fec c5681c216056449b d1eb4c2c65f12816
+levelup | 3df4f81b | 0 | 8cd5696f1adf2a
+levelup | 3bb5c07f | 1 | cbf29ce484222325 3baa7324f4be3974 15b1e73a6dda0904
+levelup | 991c6b4a | 0 | 4e219b7f34f43330
+levelup | 99adac4a | 1 | 85bffc7b1cf63e8 16a7b57f7ddbd737 1371fbc124efc25f
+levelup | a1728bdb | 0 | 157c4242260d7929
+levelup | 95d5e4c | 1 | ede0b032f1ce9ac2 e74234b5194f8bf3 eaed30003ff57404
+levelup | 25482419 | 0 | 6c26a847ecf663a5
+levelup | 28a049ff | 1 | 88f1bdb8037bf4a9 e308f096820099d2 ec2f39f974c9e762
+levelup | a1a89248 | 0 | 50ddeb3b94dc34b4
+levelup | 4fe4e816 | 1 | c7eefe8e5fc6ce77 c00c8896f7dc5dd6 e99ac408025bdf16
+levelup | 4aeda0be | 0 | 1ceea700402240c0
+levelup | 52511857 | 1 | ac5cd7c16871cc6c 6157ff715e81c2f5 b067b1c071deeb66
+levelup | fd8e764b | 0 | 993f6ecefd109c44
+levelup | 4a4a2ebb | 1 | 6d6a17d0fbb13e52 e4fb4a1e5a03105d cd625be981d44cea
+levelup | 9f5129be | 0 | d9fbdbf9c14b6858
+levelup | 559ddc36 | 1 | d48e6da1d8fb3144 f023640a6af367f7 a6cf92c3dd9ccd8d
+levelup | 88c6a8dd | 0 | 666f0a358e7406c3
+levelup | 44f29420 | 1 | cbf29ce484222325 53b45bc70192fa3e 24405c940d4cfc6a
+levelup | 42613882 | 0 | efc86cdc8ffa5f0f
+levelup | 62cf5105 | 1 | 18a1120811d349f8 293356d69da22e32 fcbb937c0ef62dda
+levelup | 90d272a1 | 0 | 6c4bfe8c2169eb03
+levelup | 5f3363f5 | 1 | 6ef3555e8eadfe9d 8e74a2c1d2aac471 4e4573cbb208ace4
+levelup | 29ab33b | 0 | 90dae7d2274b0073
+levelup | c52b9b3f | 1 | 1acff3deef673e0d 641c48a3dd4f9236 a2751ac6141301ec
+levelup | 72d3e921 | 0 | e1812e2f36942e31
+levelup | 65a3dcd5 | 1 | f7327c9a23e60dac ff8e4c2020a811a4 dfe3631fb44c0488
+levelup | 6f2aa6cd | 0 | 8a356d10d599399e
+levelup | e23c2439 | 1 | cbf29ce484222325 39f56cddc5916f65 472ec2c66f16a244
+levelup | c2a5ac4c | 0 | ff71de3e75ce2ff
+levelup | f7c54ed1 | 1 | dc1969e82b6e93a4 6a876e3f81849337 4d5871b2ce9dbbd6
+levelup | f138e38c | 0 | d9eb85493cb623d9
+levelup | 78ba038d | 1 | cbf29ce484222325 8f0b6976345bbc34 ab1a48058abb4815
+levelup | dfec28d1 | 0 | d3b8440eaed4fe1f
+levelup | 83e8732 | 1 | cbf29ce484222325 8acf23e04326652f d77fc3df1a6795cb
+levelup | 57161d33 | 0 | fb07b482c22a0587
+levelup | 67c351d1 | 1 | cf9f47a78cfff21e 60899172ed52c0b7 22d8d6c735a4fbe9
+levelup | 702663f7 | 0 | 215d7bda36375548
+levelup | 3286218 | 1 | b346cea73208a223 9c04556c8dbb641a 2120eca18ca34666
+levelup | 8c809224 | 0 | afaf54f9be5ca08f
+levelup | 22461d10 | 1 | 6a36c1cd0d0064b7 81be18ac2a6cae0f 81be8cd9040580ec
+levelup | 90b5a4fb | 0 | d8df31aa262ec7b2
+levelup | fe3c4e3a | 1 | 89c49ca466fdca28 28cf24bd2e98826a bdf26596b4e2ec6d
+levelup | 117a76b | 0 | 9e4b335415fea692
+levelup | d93f8316 | 1 | 2fcbd3c4a1ff35a2 40277c98d0732857 3a265d4f8fbbe804
+levelup | cad4c1be | 0 | 763e66b673b51826
+levelup | fe94b34c | 1 | cbf29ce484222325 c9212eb9775b44dc 2cea5cfebb3cd7ba
+levelup | 2850b3bb | 0 | eff91bcdd597b414
+levelup | 88d321a8 | 1 | 39c811f1dc1bfecd 7eab44368a23a61d 55e424dc9706bcbf
+levelup | a10aee71 | 0 | 9dcdcdd83e8b676e
+levelup | 23f5dbe2 | 1 | 69d2f6f6cbf57676 2063e50d24d84c9c 15b2b1e5389c5c7b
+levelup | eb37e6ea | 0 | 6ef792b6b4a62a74
+levelup | 9af5cf88 | 1 | c64b2035e629220 1fbe7d27093a1931 4883c510c0d78810
+levelup | 9b666bcc | 0 | 6f51c46d57633e74
+levelup | 6f7cff20 | 1 | b68643839113ec01 f9973314d23ec3a0 fa427ef4d0abe51f
+levelup | 57efafc1 | 0 | 5b57278edb7b7d80
+levelup | f14fe36a | 1 | 5c1fd9c6463ee5a0 d24ae28e46051c31 258dcf1231a4c8ab
+levelup | 527aad19 | 0 | 50220a96b0778d25
+levelup | 82fe67cf | 1 | d2860ea8f90888c9 552f8467e9d5f149 94aca3010a5bb3e6
+levelup | c2402031 | 0 | 4631994a181cc6bf
+levelup | 4a4a107 | 1 | ac5bb796d4d1c990 ecf5ff05d165a5d3 b07efc0bdca9e33e
+levelup | 3fd89df4 | 0 | d439b60e7ee5b79c
+levelup | 646a71e8 | 1 | 7b3e18aea50e1f95 c627ddcc539a97a3 e432cd27fc405c86
+levelup | 94fe5aed | 0 | 7810cf85f48e33f9
+levelup | cea70efb | 1 | 6abf50da22b56b90 d689057a691aff6b 820ad3b40cd1d501
+levelup | 33192477 | 0 | 7a49dc07b39ec655
+levelup | 2fed2b3c | 1 | c0ebb160a4912f70 ae5a1de1409c51da c6e4e1db11c1f47e
+levelup | 44aa13 | 0 | f96e8fa5a6191112
+levelup | eab97be6 | 1 | 612ba656b00c6d42 b6b7e64a492fea4d 84295ae63ba633e5
+levelup | bb27b112 | 0 | ed0f7a05cd1a60a0
+levelup | d7e6defd | 1 | 39d85da0301ede4a bd95220c000a3901 24f20f708ed1acf4
+levelup | 8cd6946f | 0 | c2723ec152e2459f
+levelup | 91cb586f | 1 | cbf29ce484222325 a2cdb6f958083a63 68ab6f6cb7c51c94
+levelup | b89cfd76 | 0 | 4939a88be0e22a96
+levelup | 13534eb4 | 1 | a9da88caadfcea4e 61a92afd052acc05 f5fad8a831dce9fa
+levelup | 75914b18 | 0 | 354789d6d21f648a
+levelup | f8241406 | 1 | a9bbf36949ab9eea 634f650fe1436f40 3fd1b54bf2fcd2bb
+levelup | f8f95043 | 0 | 3778a7507d69e2b5
+levelup | 39b97621 | 1 | 25d29726e17f44ec 968681ffb40a8bcd dab2760fbf1516bd
+levelup | f529af43 | 0 | d530f2daa01bd5b0
+levelup | 5f0cf89c | 1 | 73ff9398f916d522 b9436e3dd190a6b0 66b2874d67497a27
+levelup | cf1fab01 | 0 | 85a74d2c0af1cb2b
+levelup | e4d39fba | 1 | 5de0931423785791 73970cf11db572e8 69cb705751d255db
+levelup | e575fab5 | 0 | 7c5d69974414596b
+levelup | 7c621521 | 1 | cbf29ce484222325 25e6904a2b4473d8 6589fe9cc2f77947
+levelup | 96df6e9c | 0 | 5b9caf8c3f346e34
+levelup | 2ada396d | 1 | 9d96706f69a4a7ed 759033f2d713b17d 8ed2c2d2756162a5
+levelup | 8c647f91 | 0 | 687aeccae7604bb1
+levelup | f87916cd | 1 | 61e3fde2a3ab4b41 4d118b49c7049944 5308048b204e173b
+levelup | c9149283 | 0 | 56938b5c067bc75e
+levelup | 957d576 | 1 | 31c275b4f2b9d1d7 27ab9d379d962c6 6067ed478fc12640
+levelup | ce1c94d | 0 | 9bbb1884b28ba757
+levelup | 1fd1b2d0 | 1 | 7c630fc5594480fc bbd682ce05fb651e b32832d01698e904
+levelup | 8567cffb | 0 | e3a23198edb11b88
+levelup | f9edb4aa | 1 | c4afd945eae7eb7b 32b1481b4068d6e9 bd8406f298d590d5
+levelup | 62a6cf23 | 0 | f33639e930415b57
+levelup | 43857545 | 1 | d0ab2218672e3beb 5476dce8575de1dd e03f8c9245a4ff81
+levelup | 9b0491fa | 0 | 3cf48f5c4f2aeb41
+levelup | 94cc565f | 1 | 273decd1ee8f009b e19bd8a73da5c9e2 40ca1b8fbc17e63a
+levelup | 65a664b7 | 0 | f458ce7608b1bdf4
+levelup | 9c086ef7 | 1 | 24a161e92b71b440 4ace3e2a7f3cee3e e507a6fa6b688521
+levelup | da60d3c | 0 | 1146999255b175ea
+levelup | edad124a | 1 | cbf29ce484222325 75155a88c27f7c0f b2be310dfce276d2
+levelup | 396cb31f | 0 | 9ed01fe5635f9463
+levelup | e4f983a8 | 1 | 3e1320ac96075c2d 558e7212a06d3716 70d2bb5a2e55bdbb
+levelup | efd2439d | 0 | 333ad567c487a038
+levelup | 308a55ae | 1 | 5adb817f1580c13c 2944a811fea3ad3e 8895c7dc8aa18515
+levelup | 6c931461 | 0 | a5b2f815e2974e5c
+levelup | 1eb341d1 | 1 | 569f97513328a782 656f8710c59e7d3b d6d1a860cda00351
+levelup | 7f0363f4 | 0 | 9638c6613c8250d8
+levelup | 249df360 | 1 | 57ead8d8b94aa78c bab8b969f5568a09 d18f0b3397e058ef
+levelup | 4801aecc | 0 | 851c737e3263c9e4
+levelup | 2b971b1d | 1 | cbf29ce484222325 71964a4f9ef98952 dd8b4f6089cf6b80
+levelup | 9e68e3ba | 0 | d98682fb5730a8a5
+levelup | 5898184d | 1 | cbf29ce484222325 7b3cbb5c9f1e2016 f6a403f480a647e0
+levelup | 2b3aa6de | 0 | 96a2a9aac0058cd
+levelup | 318f384f | 1 | 6d08485135b03cf3 6d137cf037b11e79 92c2752af69cd5f7
+levelup | db494013 | 0 | a504e104da7af3c3
+levelup | eb482dce | 1 | 46c41869d54a6bc9 6571171f8cd926a4 e6582d757c50d42
+levelup | 7e3543ab | 0 | 87aaa2e678235f1e
+levelup | ac9090bc | 1 | 698b3f87a8b64474 ab1acbbc295792c8 644103dd7dc1ce9
+levelup | 58e664b5 | 0 | 239cd6fea528646f
+levelup | e54ab443 | 1 | cbf29ce484222325 edf2242199e44e56 e96660806cde40be
+levelup | 13bb587a | 0 | 62822e2a7e3d40d9
+levelup | 2a10a98e | 1 | f4436f86dfe9b5ab 95930667569c0e75 c08c6d3063d8cf15
+levelup | 8c63385 | 0 | 97c528e3d2933b1
+levelup | 64958b84 | 1 | d20d93d5c1b6ce1d e0d31a0714f18548 406384f328b5bb8b
+levelup | 458ee401 | 0 | 7c13c7454b79194b
+levelup | 85b3215f | 1 | b1e6ba0656a8d48a d37a54137acce5c6 b18640bdba7d8076
+levelup | 95e57481 | 0 | 321b692e44ea07b9
+levelup | 4d250bfe | 1 | 4241ba01341e86ac cf9d5341fdcc246a 7c142ae7f6246c74
+levelup | 2c79bf13 | 0 | 1cb4550286aeb55
+levelup | 9bce36d6 | 1 | 7596d592d284e2d1 3ba234c5f7295f9d bdddd3a396f21613
+levelup | 69c269be | 0 | 301d2752267c4b13
+levelup | a93c31ea | 1 | deecec9eb47121d3 b456c7e6863458c8 ddb10312e40e8b75
+levelup | b91d2c5c | 0 | deff1c624ce1cfd1
+levelup | 594cb3b6 | 1 | f99d37d50e01e3aa 1606d4b08e4e199c 77ed3b21e2406429
+levelup | 78a32a11 | 0 | deb1534588371059
+levelup | 5123dff6 | 1 | cbf29ce484222325 b80825c1357aa3f3 6af3d5d886ab0610
+levelup | e92ff263 | 0 | 1e16cc7cbc393eb5
+levelup | c9a878f1 | 1 | 80552f86d50a9371 3ffddb34cf044940 6529d864c1a1b083
+levelup | 17cf8d05 | 0 | 99bb32fd40ae2a2
+levelup | a6eb6ea6 | 1 | d4ee3a908f2c7e00 36fe16ab1004af92 f1643bd2e4af086c
+levelup | 78aac68e | 0 | a8da7c81a9d49d3f
+levelup | 9e479696 | 1 | c4124736938d0f4d c0fb6b80b7f80324 9c9d12f918226b8b
+levelup | a5b5abc0 | 0 | 8ec564f3a6fff70d
+levelup | 686d1628 | 1 | cbf29ce484222325 b0223ba2d74c48ca b8b5cbc72fc1625b
+levelup | 4645d45 | 0 | 8460dc6a77c56e22
+levelup | 6d311374 | 1 | a3da9d206dddfcaf f658835acb1132ee 6646b873a60f506e
+levelup | 33dd3042 | 0 | 2393d38f58aa4ae2
+levelup | 59be53df | 1 | 52cc3302e808b63c ac90bb896580b660 2b0cc6ac1f9080ec
+levelup | 585edc1 | 0 | e84d22792a274760
+levelup | cef6da4e | 1 | cbf29ce484222325 74d3801f3793b04a 9a71c4098df19cb3
+levelup | a5c66425 | 0 | 91fd4a3722eeffc9
+levelup | bcf8a279 | 1 | d0aa6918672d0190 ca37eb3e90f5754b 3b2aab8a853b60c1
+levelup | 1943c24d | 0 | 4ad7558d35391708
+levelup | 5fb76f02 | 1 | f5057cbfb5874600 15bc1319b0da01ba d73823a54fa1ec20
+levelup | 1e0002d0 | 0 | 4302336a47273694
+levelup | 1753d088 | 1 | stuck
+levelup | c2ab1b8b | 0 | c028e502a33c5dfb
+levelup | f8ba8560 | 1 | 455df981d822bfab ff865e602970881e 42d8ce7e3ad59341
+levelup | 5d707d4c | 0 | 537e86d4a9dc692
+levelup | f5f8072 | 1 | eededc582a767f1b ba42e01c5de1b391 d430141f4e1b8c5f
+levelup | e73549c1 | 0 | 358d04e6a78585b1
+levelup | 1558360 | 1 | 65f00dc7d1bb77c2 e4b6bf3252064f35 6f3b3c02426cf1cf
+levelup | c252d339 | 0 | 8a25bf8fc7e41fa1
+levelup | e343ba6c | 1 | 13b3a513fcf65f28 d3004975c1787f1d 288f4e373b8bcfab
+levelup | a3e7bfa7 | 0 | 493dcdf48fe4f997
+levelup | 30598399 | 1 | 592b69c654397690 9984f22f09ab5325 227a33fb97590f9f
+levelup | b6655903 | 0 | fe4ba358bbf1f6d2
+levelup | c67d529e | 1 | 2020bc0307187de 43b8090d8de5940f 4df4766af52ccf6e
+levelup | aff04986 | 0 | fa1740a1e8e3f78d
+levelup | 23bf4f5 | 1 | cbf29ce484222325 458d1d073730da0d 96fca7fbb896ab33
+levelup | c900cc3 | 0 | 6a40f71c6ba4fc6e
+levelup | f00b32a4 | 1 | 78f576bc79f8a655 4eafa6883c845bcb a9478874c01b68f8
+levelup | 4394461c | 0 | a21afb566137f069
+levelup | 1f871738 | 1 | 971e4c88ce179d1b d50fbe3a7e06629 dcc3a9d1f3772a30
+levelup | 98a496c9 | 0 | 95f956291e2c0d66
+levelup | ae29f106 | 1 | cbf29ce484222325 61261967f787c5b1 f8145aa5946d610b
+levelup | bf201969 | 0 | 771bebefba09667b
+levelup | b5acc443 | 1 | e2a6e320384b4346 88e21eba446732cf 2f5b76e248efbac7
+levelup | 9ebd93b6 | 0 | a157eb16009b89d8
+levelup | c98dec72 | 1 | 28b54a49d530a3a1 1c1d92319f1f4c0b 6d02a6a59c4b082
+levelup | 8a5029e5 | 0 | 9606b1b1e1532066
+levelup | 19171c41 | 1 | d81b422f6c40b547 8b14e90402795c72 a83bedbd76f5e3c7
+levelup | 98666b79 | 0 | 6e19cc3935dba3e2
+levelup | 1680d634 | 1 | c28055a1ad5a686d c059f2eb2df8fdfa 7fa224d699a71854
+levelup | 78ea1580 | 0 | 7944ae727970cc6e
+levelup | 73c4c918 | 1 | f5373da5411c1fd9 488ede27decd0a24 1fa5a6d58293c671
+levelup | 4f6e6916 | 0 | c80768c280fffbf1
+levelup | 160a7b50 | 1 | d0aafa18672df7f3 44c77595e1c847f3 a372c3ee3cc4851e
+levelup | a499962 | 0 | c333827fce02e8ae
+levelup | ff0c1fd6 | 1 | a70f0632ab45b26d 941383927303474d 9c77465f9be23493
+levelup | 9ab6f14f | 0 | 7247d8ce577638d8
+levelup | 5487db18 | 1 | 5d99e9171b6856ec dce5badc7c819913 2d32e6d28f9f8355
+levelup | 5e98b6c3 | 0 | c3821076bccd96bc
+levelup | db0b2a91 | 1 | cbf29ce484222325 2216d80bd6120dd5 3a337bf58e2a0d24
+levelup | 37ee693d | 0 | ea343777d269caea
+levelup | 21cf9fa | 1 | bd2cabe0a2aaeedf a611ca14ac4b7af 51ccad4d8a14e8ed
+levelup | adc04a4f | 0 | 41679441590b8c64
+levelup | 373f7160 | 1 | e3335673183d3f04 a9ac97a3031541c0 d0de392366c4681f
+levelup | 54fe2fb6 | 0 | 732f3eeb5a407380
+levelup | 971db017 | 1 | 887f814111781f2a a14499b72fcada82 70f46ac35452727
+levelup | da89e938 | 0 | 5293ea93025571f8
+levelup | 48701dd | 1 | c763d38b58c03dcf d929195724752eca 1bbcf9b0e3eea2ad
+levelup | 7e777d27 | 0 | 219807fa9cbbe514
+levelup | 93ce9655 | 1 | cbf29ce484222325 69a53d2e3c185c13 1d0db24cf6f759e2
+levelup | fb381b2a | 0 | e4cf800135e22f27
+levelup | f7c9c949 | 1 | f60ae08778cb221 c5ea7ab7d2384932 362a2ede91b0070f
+levelup | d9a2e56f | 0 | 9378467012b864b1
+levelup | d26bc983 | 1 | 35decfd7bfb96d2c 295038527dbe102 7bcf47be7ae7eb70
+levelup | a98242a9 | 0 | 53a0379f1df002a4
+levelup | 60d54cea | 1 | c4af0c65bb0b6f75 26bbf5573438ff22 13364b37de709dfd
+levelup | 5ed30763 | 0 | a087566230a38d63
+levelup | 84330597 | 1 | cbf29ce484222325 b31ac7ba33e195a1 476aec1c76c32db6
+levelup | cc4980bf | 0 | b6b24ded1e68b6ed
+levelup | 4a98e696 | 1 | 5029aa53f3a59a3c e331b1d266571df8 ae3c3cc9ac259b6e
+levelup | d4c239a9 | 0 | 14e3b656f7be42a4
+levelup | db7a48f6 | 1 | 86c3c67ab828d947 fb5fddea45981fe0 489033c3d19cbc52
+levelup | 5864e7be | 0 | 19b79d2b8f9fed5
+levelup | b5dd1f85 | 1 | f820b76591618d4c 7120f224743258a3 8801e9ad66640937
+levelup | 36529ab4 | 0 | 9d7d255a4c480ad1
+levelup | b36ff253 | 1 | 823efe964b40e203 16c492856690910d b051d7ba544fb05a
+levelup | 63812cc1 | 0 | 62fe88df9ec8adfd
+levelup | a1867a99 | 1 | 72bb3e7f6a1d93c0 63c9d63e8e0241a5 e7e4d582edb9f6e3
+levelup | dbc6ee26 | 0 | 834fb8b2abd11d0c
+levelup | 109115f3 | 1 | 567c4d5b95b3cc03 41ecaf9f2ad1ba29 5f0f0ff2eb703a1f
+levelup | 3981467c | 0 | 16c2762b62fae9ba
+levelup | a666502d | 1 | 4ab27af04b2d81e1 a73c251657c13b31 d387973ef851f80a
+levelup | 7bcdd98b | 0 | 7403529d228681a9
+levelup | 66cc32d8 | 1 | 3f7f40fa6072d944 a22ecd61a440daad 24973326431fc568
+levelup | ae9c76d5 | 0 | cc9fbe2a83a95a89
+levelup | 2e728e2d | 1 | d0ab1d18672e336c ee65ca2110744b4c 6915f76ef7d8e48a
+levelup | 2e7abcff | 0 | 5213ddeed263c765
+levelup | 4ec11494 | 1 | cbf29ce484222325 7ff01b9e6f54450d d429d5659d47ce01
+levelup | 8702b944 | 0 | 4bc2aa57b5538b5b
+levelup | 50dd41df | 1 | 3d2c286fd22d8058 30e9a7b8f1f2dad8 c834d9a6e799438c
+levelup | 5fef2c60 | 0 | 96c92d9cd9f8fdca
+levelup | 29b2b81d | 1 | 28e39a8989e57379 c2fc005c4a6f47cd ab8e3fc490b4ae84
+levelup | 76c80ee0 | 0 | 75cfe318ec2f617b
+levelup | 1e4283bf | 1 | 156a61921373bda6 52989bed27c60a05 1a557cce27fd9047
+levelup | 1274bdd1 | 0 | cb31d72142c75896
+levelup | a3ad0ac5 | 1 | a315d5634335721b 34b36be2e1b206a4 90eccd7a35b1188e
+levelup | b57a0e15 | 0 | b7ed48a6792d119a
+levelup | 48cd3733 | 1 | bad190671fa8bf22 416357999bcb8a6 48a95267f142345f
+levelup | c33b5467 | 0 | b5d25277e1325148
+levelup | 6972027a | 1 | 66be3b332b1d9c0b 331a93287bcacb8a 6c2c89313ca9212a
+levelup | fb10e282 | 0 | d7f53b740c2c421a
+levelup | d9ce62a7 | 1 | cbf29ce484222325 db98c749038b1425 6188abf43583bfdb
+levelup | 96ad0108 | 0 | dded1d1382ec4354
+levelup | df605997 | 1 | 760337853d8fd01 8517edb1c249c70b cbce346f6bceaf59
+levelup | b71a40ea | 0 | 9bdca434bab006e8
+levelup | ab4b8700 | 1 | 9b67bf0005c09392 aded3e27e27706d8 fafe9ad47a3eb7b9
+levelup | e139e588 | 0 | 5dc2254c66e39d92
+levelup | 3888d4e4 | 1 | bd61d88df38b65fd 708721d1832197d7 459ccbd5f4e4ba98
+levelup | 32cf3a3 | 0 | e0f12ec8e7c9bd81
+levelup | 91483599 | 1 | 3a6ca8585ae14093 5df4474182b2a5dc 271d6fe75119e535
+levelup | aec12379 | 0 | 1c8cdff4b5954210
+levelup | 4c776b4c | 1 | 994c3ac725b3c657 f84724faadfc9996 fbc2741ef34d222e
+levelup | 134e2d23 | 0 | 322ac24d20002a3a
+levelup | 2e6aa1c | 1 | d8d54d25321b1ad6 9709268600698d9a 9a42c68daf4c6fc9
+levelup | c31a1a2a | 0 | 6ba66bde714245
+levelup | 3db9dd98 | 1 | 3d42ebc32b4a50c8 20fff86300e32df2 f0c49d9b9141b8f0
+levelup | d302ba5c | 0 | cfae592dc8af431e
+levelup | f6792bbd | 1 | 21f1afffd3660f5d 5e1873d88a22ad69 152396be00a1efb2
+levelup | c28bac1c | 0 | 8890a56c62cf436f
+levelup | 8e9e1dd2 | 1 | e0084904b902639f a8db2858e1db8d80 eefbf4be17343d85
+levelup | 41f66d19 | 0 | a7180006a5e47f8a
+levelup | 860ae9ab | 1 | 3a10dae65be73e7f 1d216f81ba7752fb 138c19415e8bd811
+levelup | 7cfc62c6 | 0 | a70b3e7b3af2b46a
+levelup | 2873a42f | 1 | ce3f9f58432ab566 54766346f54b0149 34cfcbbd0aa90bbd
+levelup | fed9895 | 0 | cdbb1b2ebe018090
+levelup | 4f609859 | 1 | b2403b4a059b61d1 7ec7f186b269ff8c 1dc8eaa2cbe9c80c
+levelup | 34d88153 | 0 | 52d3121d648b13c2
+levelup | 4c146c1 | 1 | stuck
+levelup | 3d17925f | 0 | d8079ca1f02fc30e
+levelup | b180755e | 1 | cbf29ce484222325 aa9bdfcb3c8b933c 7d2afa08a8783fa4
+levelup | 94484ba3 | 0 | 66001358735418fa
+levelup | 365703af | 1 | 5d7422bbc20571a3 61bdf9ec6c3dbe5c 25829ed0c83e98a4
+levelup | d265ab27 | 0 | 504895f19dde361f
+levelup | f254e4fe | 1 | 4b39fd4d74f8ccb7 fa2065bf321d00b0 7d1b2830e4cb9015
+levelup | 27adfaa3 | 0 | 9f657ad43c87f778
+levelup | 9effe781 | 1 | cbf29ce484222325 a20329be3253df99 a501b2e0275a5f36
+levelup | cc5bed2e | 0 | 9f318b3ef8366985
+levelup | 2b2e8839 | 1 | d26a93d6586490b8 6ced1f961ee94a6c 2fd72da025367f09
+levelup | de95dd89 | 0 | b228e451a187c794
+levelup | 274f7344 | 1 | 28d5acbc451d5208 3e5f0bdec11626d7 3aac8def38ed7ad7
+levelup | 7e87b56a | 0 | 4df3c494f3544d3b
+levelup | e17b935 | 1 | e487cb0b05a1b889 2ee6bdabf16a0edf 3c1074b3352107f6
+levelup | 47812e0d | 0 | 5932e441dc3a19cc
+levelup | 4c20859 | 1 | a5630e53f4a2ec59 b7f2eb3a1efc4b84 7d8b9c5bd094b744
+levelup | 7ddc819e | 0 | 7d0bcb88bc2465f8
+levelup | 28576853 | 1 | cbf29ce484222325 2020013e2470eee5 c3bc963d065df1ea
+levelup | f2b83fa2 | 0 | afdae4ddd46c6a44
+levelup | 74ab9b12 | 1 | 32f8d73087592834 14749f6979da5984 fa05fa2fe9669390
+levelup | f3ba68fc | 0 | 876d01dd6cdeb878
+levelup | ff607cdd | 1 | ab19ff66011f67be bad3f52a6dd1020f d46bfb0123c10a2
+levelup | 5d926a5d | 0 | 70a872e4ad0cd64f
+levelup | ba912636 | 1 | 93cbfecd2fec46bd b116eeddd8e09445 8b99105e9df12a49
+levelup | 11b1c2a0 | 0 | 62d3118bc0335aaf
+levelup | 2befa9c7 | 1 | 99e1d763f9312827 b9a5329d23ab13f7 4a582df1fbc3cef7
+levelup | 71c6e0e | 0 | 7dcf5683f83e1dbf
+levelup | 164ba208 | 1 | a1065dfb1da056b8 2b65e943374b3f08 6bb5bfd6b4975e54
+levelup | 548973e0 | 0 | 9393b3bb5eed9833
+levelup | 32436a9d | 1 | d709b40f4e80ed3e fd6b37ed598a99d4 622d0c9e020edb4c
+levelup | f535aa35 | 0 | b36bbfd3df426e6f
+levelup | 191b91c3 | 1 | 7e8602b5bc83138 8f5895dcabb4a4d4 e83ac8ebc0832270
+levelup | 1b81fda2 | 0 | 8da363b292b554ba
+levelup | 4bc3e539 | 1 | 85de368a107d93ed 4011c7e55bf72956 7f2ccc0404903563
+levelup | e3113de0 | 0 | c3ea15c69248d614
+levelup | ac09b14a | 1 | af4d9b2d4e8326b3 85817dbe3cf81651 52420ab5cffc411
+levelup | 72284ec9 | 0 | 4d9c6e5453383e5e
+levelup | 4bdf8d0f | 1 | cbf29ce484222325 6c75e08ef5afb16c 397904cc10162b35
+levelup | 76126115 | 0 | 26338cca2eb96b0e
+levelup | 983221c0 | 1 | cbf29ce484222325 7b76e7981920eefa fdb22bbd66d21466
+levelup | 6d75f1f3 | 0 | f690cb011aea635e
+levelup | 3931ead0 | 1 | b3d8187cb81dd34d fae071a8c667b00f bc841970d2b1a5c7
+levelup | c071207c | 0 | 508fc42a7b71fe2e
+levelup | 334a5ad3 | 1 | 42e27a123e1b8c21 5772d2dd27448a98 30196e66acd05424
+levelup | ca1b58e7 | 0 | 79a36efd34c6f2dc
+levelup | c287c36 | 1 | 47b5e68a37736282 b28160443b17185b 930e6fb39c36c761
+levelup | fffffc95 | 0 | df3cd062e5559fae
+levelup | b21f6e64 | 1 | 765df84543e1fd5c 47cc6b9afdb6875d 5dadabc3a8774eb7
+levelup | 154d009d | 0 | b744af572a16366d
+levelup | f9845aac | 1 | 4daf032cdaee8943 3fc2eb345067e57b 5e6cb6263a7f866a
+levelup | a07e5475 | 0 | 3617f3354bd4fa4c
+levelup | 77d7e8e5 | 1 | 129353c039bebf9c 29058f36779c028a 3115a742481fd7c1
+levelup | b79a7855 | 0 | 9d31eccb6d575937
+levelup | cad12ef9 | 1 | 7d1f541ea3494146 10c00677a9e91dae 3d9ce5fe9660f8bd
+levelup | e0a42051 | 0 | 2c1e9507219139b2
+levelup | c6c9204d | 1 | 822f2a816a44e3be 666ecf27e03ccac8 ea44b495011e5d6a
+levelup | fc2d77f | 0 | 3488e9a25482e9eb
+levelup | d7d06b39 | 1 | cbf29ce484222325 e59151713bb6cba0 903e481a4a36ae25
+levelup | f85409f5 | 0 | d94b4ed03d957875
+levelup | 116d1f89 | 1 | 3d4706b4f9945766 2c42fbc98ff13247 e78289d5a823e611
+levelup | c9bde46e | 0 | d6acbb8e6b26bb3a
+levelup | 4284c49d | 1 | cbf29ce484222325 7c15bf007749c8d5 ed9708c5f0edfae9
+levelup | 750c5f3b | 0 | d45177878e70c550
+levelup | 88ccae2c | 1 | 49cf52977de1dcc9 b8a9cf7c9ac07631 188dcc41383ed715
+levelup | 833e7a0a | 0 | bcc0b2efa4d17855
+levelup | 6b6fc31a | 1 | ad8224e926907f48 4c1a3f2369f567df e4fb928efed5cef3
+levelup | 7b6697a1 | 0 | 298811d71505cb21
+levelup | f14c5bdb | 1 | e283f98426eccb8d db482e902497a4f0 7b014751163f7f56
+levelup | e51ac38f | 0 | 97a12556980bb8ce
+levelup | 9f7718b4 | 1 | ea0279a706da9cdf 804755ae56cb1dc9 6df081b2b2b1eb28
+levelup | 17d80cb5 | 0 | 49e78cf599284835
+levelup | d4344b36 | 1 | 9c0f67eb78501703 d62b44adf360fcb0 139d25dfc62425ed
+levelup | 1685729d | 0 | 3470d7ab2b94cec7
+levelup | 8a8c97f8 | 1 | cbf29ce484222325 81d6ab9dbf1804f3 dd34c282f0e915d8
+levelup | 56a9da7a | 0 | 2ed82b28b24caec3
+levelup | f6bbe5bc | 1 | 2797f19124b19355 46b4c371f17f9d90 d98b1da00367a4f8
+levelup | 67798614 | 0 | ba1347de503982d9
+levelup | 20c506d6 | 1 | ac73d58e6536e472 e5f8e6c567aa634a feee618978699b8c
+levelup | ad7b4f43 | 0 | 22201ed136a8a6fb
+levelup | f2d2013c | 1 | ff578122d4eefe5c 9a3d12f3476487de 9a3121850b7f3250
+levelup | 1c834f67 | 0 | 9581373a05f9d717
+levelup | ff3452d3 | 1 | 519fee4451304a82 b979d05f1ab32939 14eb4605ed792661
+levelup | f0728823 | 0 | f9a21f25f4f0974e
+levelup | 395005f1 | 1 | 79d3f629b8552a77 5ce5fc91cc387130 e8df47720d6454ca
+levelup | 882fdc7 | 0 | 7c357be36b5a8b4c
+levelup | cad882af | 1 | ed99a53a16cd5b9d 60766cfeaa622cda 2e742647b8996c70
+levelup | 23e8fd10 | 0 | 9b99793c2a6625c7
+levelup | 5e65498c | 1 | cbf29ce484222325 7be284f27908704f 71282c450ec20c6f
+levelup | ccdb994b | 0 | dd43c1ac16868c2c
+levelup | f32fb884 | 1 | 59cc0dbcc1e34602 4fc622379e6acb6f e0d7995f1ffff4af
+levelup | a573b50e | 0 | 9cd940f82b782fb2
+levelup | f1cf6592 | 1 | 5454987219efa547 cfdd56e17f65aed9 6c7b7df4ea8ba354
+levelup | 76d6abd2 | 0 | f723f689f7a1278a
+levelup | 601de067 | 1 | 820118d2af632179 62a3a69643d2ae7e 5a29e4864c92a95e
+levelup | 8e37a9f6 | 0 | fa2240fd62b5cb84
+levelup | fd026e4f | 1 | 2c4ec5482553f639 d12052d48cb824a0 3180b586020393fd
+levelup | 153c2467 | 0 | 6ad9bffaee4ed965
+levelup | 56c68083 | 1 | 3935e067eabb6424 3283415af7d0b726 3ec5c8346785a31b
+levelup | 78dc2d7c | 0 | c0ea2e7dd55de227
+levelup | 4ce3329d | 1 | 83114dea994be326 f6aa4427f31f3508 a277e2f231ab4e9e
+levelup | 86b2716e | 0 | 98e59e48c22d72ff
+levelup | aab4a50f | 1 | 4bf6cef7c637f694 e09f07f1e3f524d9 a51becbd7405f250
+levelup | 7f1b7e1d | 0 | 9be519b686c87f42
+levelup | 2fa5ce78 | 1 | 90ef180ce5025847 759494544118558e 9379cfdeeff94391
+levelup | 4d022ba1 | 0 | 1203494689868c39
+levelup | c4fc64b2 | 1 | d296d7e6875f1f46 2a44ac74533d76b4 2a0ffb668b85c2c0
+levelup | 4e4d3634 | 0 | d63cc8b60ff03544
+levelup | cdaa670c | 1 | ba9c8cea711ca0dd 1c1a89ce921b0953 d092e3d88c06dea8
+levelup | f1a2145c | 0 | 8041d9b427582f62
+levelup | 3cd1e885 | 1 | 81149f05299bb680 82dc5769b06989ba 7596a453c04b0f0f
+levelup | 39036861 | 0 | da6103f0c68f0825
+levelup | 3838ca5b | 1 | 411e22bd343030fc 9410930bc04c6e2e 8b5d6c5e35008871
+levelup | 8b826e1f | 0 | bd3d37531571cd01
+levelup | e63f94f4 | 1 | e2848c928b4ac654 e2ad5d389b5b3a8c 1ed6681d8c4f79b2
+levelup | 3e987311 | 0 | 854ccb462d46c1d4
+levelup | 10703979 | 1 | 74268d9bf841cd73 30e604f1f7ba8aea b0c7ceb1496c8151
+levelup | a7a6f9ce | 0 | b4c55d51801cfa8e
+levelup | a224cc64 | 1 | cbf29ce484222325 81273e8b750ac25c 6ddcb8f92512ccc1
+levelup | 9900c229 | 0 | 41d73ae618d55e61
+levelup | a66fd72b | 1 | b9609ca0d7c3245b bde6f2a42c344a72 b27f8ee6d48f448
+levelup | e941970d | 0 | af4c09c2e7172809
+levelup | 8fc73873 | 1 | d0aaa118672d60b8 e9773b4eb459fe4 b682579cf99e5c71
+levelup | e4b684a4 | 0 | 63f51aab6cbf0bd
+levelup | 995c05a1 | 1 | 2941a6778be7a8ba c674772df4021369 14c8620f517e7fc7
+levelup | 5c0bca7d | 0 | 57eafcffdea6f690
+levelup | 616173dd | 1 | cbf29ce484222325 41f2000aaab73ef5 834d933cb0ebc136
+levelup | 13b2fd1e | 0 | e4b36a31acb565ec
+levelup | dcf0fcf6 | 1 | d0aae318672dd0de a9d7bf534b6779e8 b73684f03de976dc
+levelup | 4b2c2975 | 0 | f765386f1ba99942
+levelup | a510670 | 1 | 5b9c477cda3b0bbf 7e337aaaf1737e25 c696865ccf004181
+levelup | f0be062f | 0 | 87c28cc0e2734ce0
+levelup | 5e756104 | 1 | b1bd3b37e537cbf6 8c65b556ff9c6dc6 cf2789e1b50a65ba
+levelup | 42ffcc57 | 0 | 3d408a58111a7904
+levelup | 3ac48bb2 | 1 | cbf29ce484222325 2a3dc4016d8f1934 cc0aa5953b50306e
+levelup | 407e7b02 | 0 | 6ce876b2523e799d
+levelup | 69ce2ad6 | 1 | d46c0a8dd70b99df f8cc44556fec7fc6 735256c6f1f1c88c
+levelup | 5ab9206d | 0 | 3baa0f90edac1cdc
+levelup | b6bdec48 | 1 | cbf29ce484222325 1761f85d96302641 b7599b2be17f57f4
+levelup | def2506e | 0 | 5cfd612dc97a5083
+levelup | 12f81dab | 1 | 26cd1939770052ff aa826545816cfe55 1349fa56044add20
+levelup | 98cfd7f7 | 0 | 915e967fa3015fd8
+levelup | 97594ef1 | 1 | 5fe6fecad15e5309 25d7768882a3b2ef 8ea436ade06e8f2
+levelup | ef0bbd34 | 0 | 6501bb7f0b34c20f
+levelup | 3a4d69de | 1 | 5c35bf037a52b3f8 1309464fb870d041 e37316a36d7ebcdf
+levelup | 93fed04 | 0 | 6546da8ffccb8d14
+levelup | 829c6baa | 1 | 40351960edf67a81 ff750f01c7d56fa0 1948b396aed7eb78
+levelup | 401bf0b6 | 0 | 2f891555b3314844
+levelup | e4427f8c | 1 | 77a1cd5c530b2721 1c43f6bbda381dee c0e958c67db6ea48
+levelup | 9c05b6c6 | 0 | 815ee47d1db75780
+levelup | fe2e28d7 | 1 | 5c0e37054457d1c3 652888fe8ed37332 e2de94e504ff59f4
+levelup | e0db29dc | 0 | 554041a0de27eeba
+levelup | 860933d2 | 1 | d5cdc02e7f5e946e 72ac1c170a58265f d2c1222aeb997c55
+levelup | bc44008b | 0 | 7131c1b2e1406e9b
+levelup | 7763bae0 | 1 | bfefcacbf5ddc9dd 93ae8c92496476cf 936edc47f99d542d
+levelup | 441359d0 | 0 | 643aee3b0a10ceac
+levelup | 36f7ba7d | 1 | d0aad818672dbe2d 6b62bf108302dd63 8e9a125b29d4e6f7
+levelup | 7501072 | 0 | 15a1ec0fa40b1f43
+levelup | a5d2f073 | 1 | cbf29ce484222325 fb63d909cbb9479 42058a722457a336
+levelup | 9f37841e | 0 | 37b7b99aca8f5ffd
+levelup | aca0c42f | 1 | fdfa5c6f955854b0 5222dfe940f59a99 1e39834dd73ee89d
+levelup | 1bd0e2cd | 0 | f2a6f7ad1a8b4878
+levelup | d177aaef | 1 | 3874732cb250c7f8 11aecc9308e598ff 44eb112d1e1104e0
+levelup | 45acfaac | 0 | f5f965073572d3e
+levelup | 2650e6fa | 1 | cbf29ce484222325 aadd6e2bc525435e 11e9e257a7cd2be1
+levelup | 60be5ccd | 0 | ac3a2e78d83fe833
+levelup | 60dd8d44 | 1 | d79aa696b3cd3cd2 90546843588b209c eeda3c404e0e3d06
+levelup | 309b009 | 0 | 391bf0beaf86b558
+levelup | c2135f0a | 1 | d0aaa218672d626b bf4b149069bd1ec7 e69fee38cbc271ba
+levelup | d3e89790 | 0 | 17bcae5c3c757fea
+levelup | f127255 | 1 | stuck
+levelup | e3e6d18 | 0 | 3a25937bcf44d14c
+levelup | e6d97acf | 1 | e220a903584904f1 5682a043b08ec786 7738f8f2ac93ef17
+levelup | f63ee092 | 0 | e9463fae0452b5df
+levelup | 897bee41 | 1 | 7b2ec790da04c15b 5a7addd29d5e8876 6ab81653f55ecf93
+levelup | f04d51f3 | 0 | 9f6cf85c0668fbaa
+levelup | 56c8463a | 1 | 8a13149e42ea7073 3635d4ca525eb7e0 2edf7daf04fe98d5
+levelup | 500aa8d4 | 0 | 7238f1a9c9f4507c
+levelup | 7012d29f | 1 | 98b19c7320eb04c0 ba8791facb258966 8235a2fb40f58719
+levelup | f6648d4 | 0 | e500558ba04e5cf
+levelup | 59c89568 | 1 | 8b1f560ea84b4dc0 93b44b1b88fa4323 88bb6a49b944de3c
+levelup | dcf3345 | 0 | 2064404909e59cc6
+levelup | 6a63d320 | 1 | f0c41bf97548ea88 9583e1026542b224 46cd8cbeacaf5a3c
+levelup | 1c9408f2 | 0 | c33e4cb47638a7cf
+levelup | 88bb8323 | 1 | cbf29ce484222325 df174163b57154c4 65bf707045ba21da
+levelup | 9d11fdb1 | 0 | 59696741241e01cf
+levelup | 9cf46a43 | 1 | f1190a9f65fd5b35 ad3104e5bed6a197 73d8f0a14eead1cb
+levelup | 7c3d66eb | 0 | 75936e9d63db8084
+levelup | 72183f16 | 1 | dd82aa74ba5c8081 96d08ba476749a46 2a002ac87153ec3f
+levelup | 45adc1e6 | 0 | 1b75d339af187384
+levelup | d8b1c94c | 1 | d98134aa4f95f442 6c6f4a6320d7a473 a15ae6eb500a6ae7
+levelup | 3a3e9125 | 0 | 5aad830e079cbb6e
+levelup | fe6491c5 | 1 | aeacd8633a8cea99 a102cae9c7923991 c589a8b2c2e35b2d
+levelup | ee9ed5d6 | 0 | 254aa3fce447084f
+levelup | 38870994 | 1 | d78389a80017ff8b 6e94c1663f537a98 cbdad2b15a64e98e
+levelup | f726c89a | 0 | 8a28f0af2c2cc5ee
+levelup | a516a3fe | 1 | 1a286988c7a19e2 919a96788e0fb5a6 69ab86ea1607152b
+levelup | b65f0c1a | 0 | 24d943be88215386
+levelup | 2abe4556 | 1 | 7050326a1996db6e ea2ba3095ffe078b 66606dcc566783b5
+levelup | 3257a603 | 0 | f7a0f788bb6d872f
+levelup | 8505e854 | 1 | 8a0690feefb32210 a2a5cd702a20df3f e5c3a75f58a472b8
+levelup | 2e971f93 | 0 | 4dbe3ecf313b67ed
+levelup | 74d0e903 | 1 | 2fda15c5e1939ab8 c6d42dee0581c60f eed6fd71a097e47c
+levelup | 8a24b89a | 0 | 9cc0beb809871f10
+levelup | 69f20059 | 1 | dd9f0f1527fc5771 1d482c74b850b782 37d610f4da460f82
+levelup | c0edf3f5 | 0 | 5df3b36531efa35
+levelup | 71aec019 | 1 | 7484340782153b99 641333d6203da88 84a094e33d131d32
+levelup | 330ea85a | 0 | d8c9521d7ba3a8d0
+levelup | f449fba5 | 1 | 36c6f42f0567a2b5 b4a5215bd28ad5b6 c3b2321c6340f8e
+levelup | a3f6b463 | 0 | 48e2f9b0fb5441f0
+levelup | 7150a7e2 | 1 | 2772e097c27ab0d1 98473fd65a89a6e1 b43f0d113df4e9fa
+levelup | 92ec75e5 | 0 | 41f00401c0cabc3a
+levelup | b11d3ee6 | 1 | 92dbd69a95cb48bb f7f5939c0409acab e2ad1b8c1329d581
+levelup | e8bda31a | 0 | a4fcdfdac9aa435a
+levelup | 5d7860fe | 1 | 5fb5375bb20c11e2 65ac8cb7e37edf6c 952b01953a74db85
+levelup | 51934a27 | 0 | 8c5bbb49f69839b7
+levelup | 2d20ecc1 | 1 | 24cc48edc6d98270 21755125f5c9e655 5b5f11a2a79a64ef
+levelup | ba57c2dd | 0 | 2a0d5b8a9d5a004e
+levelup | d78b38b | 1 | 7366aff1c0f6b9da ef9760e96910bd5e 94a381a8098ee2c3
+levelup | cbbf0d01 | 0 | c22fef311e1fc7a0
+levelup | 8daa279a | 1 | 43a4765dc8bff728 585c5936b75eed8e 6d097db228e52eaa
+levelup | 4aad8efb | 0 | 7a0a07b575c0045d
+levelup | 9e78785 | 1 | 9e6ac38c77b8ea1 80c4e0a7d721a364 bf69b7b9c89b6a59
+levelup | 9edc2842 | 0 | 57d2c7b32c43be38
+levelup | dd1d4c2a | 1 | e56913b8a45a5bf9 560db6621ad26170 c9245d1033d77f90
+levelup | e99e9eb | 0 | d7021b316760363
+levelup | 1b11f37f | 1 | 69a18b970ace1ae9 8f5efd47c5c10b59 9e611de56f125f8b
+levelup | 50b34f82 | 0 | e3482726ecdc143e
+levelup | d5105562 | 1 | 21dcd5c4698fb4d7 a6030d4dce1536e3 4751d5cb1388a476
+levelup | 5b7bb71 | 0 | 972270ff1d40a447
+levelup | c83fdc7c | 1 | 4549f1a22a6965c0 669322da43b841b0 7d15b74f3c966b42
+levelup | 432e0502 | 0 | 8129476bca35158c
+levelup | 9dfa9764 | 1 | fd62023d8103a26f 80ce30b07fe58545 f28ffae5d3327f3d
+levelup | 59c404ea | 0 | 45d7d52445061632
+levelup | 2c417d85 | 1 | d0aaac18672d7369 df2ced7ffd7df8c6 ae5da3be7a100494
+levelup | 8a9786b6 | 0 | e2d6250fb978b3e8
+levelup | b2960715 | 1 | 5b464f305973cdab 8c2003946b20654d 846307fc5228c986
+levelup | e583f7cf | 0 | 211bd822d235d8e0
+levelup | 1eb1fe4e | 1 | 96e6f59698ea1c97 e79f16132d55cbf7 bede3d4cd4a1375
+levelup | cb2486ef | 0 | 9f8bce4da036eb63
+levelup | 4a39e8f0 | 1 | 32c6fdb377f264f2 78b4f9fc8300bdeb 1fe6ed84cb89225e
+levelup | 9a5c6a21 | 0 | 4e26a631f9fe008b
+levelup | da950b25 | 1 | 3f5d387202d6ca90 4cbb6f43e321e5a9 f4ffcac1fcde4ef3
+levelup | bdf6cba5 | 0 | 7cd3494ba2d65d50
+levelup | 27fbcc44 | 1 | a6b2a67deb59fcd1 cfbca3984ac89216 e2fc7e61714d9c1d
+levelup | 5ede698e | 0 | 24af01b2503c0476
+levelup | 599c35a5 | 1 | b90c3e87c4f69fda 9c08041118145c03 56a685e35f5df9ef
+levelup | eba826f2 | 0 | 6654146e62b5418d
+levelup | a9a6ae4d | 1 | ce4df1eccdee9689 68959f0563dce983 1d93c8aa1c4caf4b
+levelup | 89eba0eb | 0 | 97127883e35ab317
+levelup | bd00ca12 | 1 | 3d7510fb2256c7a2 743caceb59b20f1b 5be4850fa8e5afa3
+levelup | 7b2e10dc | 0 | 7bc471d90ee4692e
+levelup | 9bc82268 | 1 | c0216692916bfa2f b0f586eda672db6e 58684e1af9febb33
+levelup | f6c56c9a | 0 | 2e57c4a59207a9d8
+levelup | 28430bad | 1 | d0ab3318672e58ce f1671409d962b68f 31277bfa9fc879b2
+levelup | bf56264d | 0 | 50867f6c4076cfb7
+levelup | 776d71db | 1 | cbf29ce484222325 a768fed780644f99 2a8dfe1502eba455
+levelup | 1b399de | 0 | dc455347a64a5ab9
+levelup | 276d168d | 1 | 4b48aec8478f721a 3a615a5e074a7d85 e71baf7c29d1d775
+levelup | 2cc8b133 | 0 | d040e4c6f8553828
+levelup | 6d987f90 | 1 | e749a7c5f7c738e6 1cd2f7bd37b5cadf ad077b5f41409187
+levelup | 22539dcc | 0 | 7ebbddaa4fd59c8a
+levelup | 5cbbe2f1 | 1 | 1829ab9b76b9fed3 25756f6461173fef be7ad63c80ad1e27
+levelup | b20df629 | 0 | f64f1b2bef6a315a
+levelup | 81ca1f51 | 1 | 68b6e6914e82edf5 b4c690563785bcbb 41b60d9a6010c3f1
+levelup | f0e529ed | 0 | 10726cbc0b33f5c6
+levelup | 26449b9d | 1 | 495ba3264cecb86a ad2761ad0a4fe9ab b3d73a0a83c57139
+levelup | b7c7cf8d | 0 | 3df76f67caa31e3f
+levelup | c964c1be | 1 | d0aaff18672e0072 54f60b6aa857df9 c71e379e7fe685ea
+levelup | ff1ef04b | 0 | f1ef84889ed6d57b
+levelup | 7e8a4efb | 1 | b896d9be64564b60 f3683d918f20c1b0 a37359b502a20ed6
+levelup | b8f65639 | 0 | f0993d2a6b20ae5f
+levelup | c5a108b7 | 1 | 8edf07d429b23fd2 639542c492966d7e d464d820235ce901
+levelup | 4b4c003a | 0 | 8aace5da1d00b7e8
+levelup | 58f21613 | 1 | e7b0cf3e169df3e1 236603591aaa09ca 5887bd127f06bc02
+levelup | 31409117 | 0 | 3ac1c097ca7e0ce0
+levelup | 86b9cd75 | 1 | e6bf2680014eb2bc 58810a2652827c04 9e97b2aaa4b4449b
+levelup | af9dc44b | 0 | f6dd8217f40bf6a9
+levelup | bbe9755b | 1 | e6c75664af6dc39b 8a564e870a01988 ed89f640a158132c
+levelup | ea9cb9af | 0 | cafbe14b4d858525
+levelup | 553d88f8 | 1 | 316180b4ee8cc690 489859d8b3cd4d27 fe272c6fa5b392b3
+levelup | 40b9ed0b | 0 | 253ce69859cbc1fa
+levelup | 21abe820 | 1 | 28a945d20b5dcb89 b58a2b2942bb96c8 88ca11f7ef1e51cc
+levelup | de4ee574 | 0 | caab2bc9e987af02
+levelup | 182b0023 | 1 | b5714ba2aed9e5ed c50ca8cc0720b3a5 8a7e042ee6187f11
+levelup | daf2944b | 0 | aef3a3de5d9a72aa
+levelup | 6338c377 | 1 | e685055b85a4b38d c142d0fedbd5708f a71ff28d2a9c6ab8
+levelup | 49a43d78 | 0 | 14d127da07a41fd3
+levelup | dbd833d6 | 1 | 3e5e853b2ca71589 34b922ee31f55503 d8d0465ff928f1ad
+levelup | 42b1f149 | 0 | f05873e53f1af72
+levelup | 74b34b66 | 1 | cbf29ce484222325 5756647bb0208439 a757a85ea30d796f
+levelup | 8d6797a | 0 | 6ef6171bed8d0f4d
+levelup | e37a44b5 | 1 | d0ab3518672e5c34 c7d0c35d18bf0142 da00d51bbcd1d8cd
+levelup | 752717f | 0 | 92f37fdd06d53505
+levelup | 8eff7287 | 1 | 4bfe725fd885547b e122bff4a7cd3ed9 b3b81b6e10919348
+levelup | 4870c0d | 0 | 47b42f6d1bcb25c5
+levelup | b717edd9 | 1 | 92d07ec2ca30a799 566fe9cffd452ef3 8bd1e16d6f89d02f
+levelup | 4143cb29 | 0 | aa4783b1cc830a00
+levelup | a66548e7 | 1 | cbf29ce484222325 b21e1b430b30d237 67d8fe1e11b383d8
+levelup | 2412d8d7 | 0 | 8a76ef2a5290bedb
+levelup | f038fa9c | 1 | 58837bbe43bcff2e 2897c68f2e220f28 ee9c7252240aa0fb
+levelup | 2ba4167a | 0 | b1f7165c7c846409
+levelup | 6672d0b9 | 1 | 653a6fdcce7c286e 1199173481f69a68 7bdcf15cf29b7c07
+levelup | 3ad693f7 | 0 | 6ba8bf46381a0071
+levelup | 5bff0a4f | 1 | 785e149eb843347e 819c519379b981be 9b1e673629510fb7
+levelup | ab422f35 | 0 | 920da0586990576d
+levelup | 62a02498 | 1 | d0aad218672db3fb 9478a57131645f3b d8aa05d09cd122ef
+levelup | e02cfcd | 0 | 2b319fdd72bb12ed
+levelup | a9202596 | 1 | 4dbad8c6958c5c88 73b0b56d031380e ee828c8e13088463
+levelup | d6299a5b | 0 | 18de56f88eea2c6a
+levelup | f082ba48 | 1 | ad51b753ecdcd93d f5749344501ad779 90b123efb5f4873b
+levelup | 497d4de1 | 0 | e7963caac43b9828
+levelup | 5dade597 | 1 | dd45db7431f9eda9 ea1ea84baaa1c630 88052560fffd5368
+levelup | ea29985 | 0 | e256cd525dcb810b
+levelup | b53e3b9 | 1 | cbf29ce484222325 de4b0f73337239ad e1e3eaad4da3c3f1
+levelup | 623fef1e | 0 | bba1fc85e75e555
+levelup | 79013025 | 1 | e3592f95c72c4e15 cab83a7125b3034f 6f1a625cd09dbccd
+levelup | c573a7bd | 0 | 7a9033fc1665d6bf
+levelup | 3440419e | 1 | affc90e20372fd28 16b6145765d1f606 2db708f052aca85c
+levelup | 359c0b6d | 0 | 6d04383ece16f8f6
+levelup | eccc2108 | 1 | fe492ecf101dbe7d a4470895691c3af5 149d8e18303013d9
+levelup | ab2a96b2 | 0 | 21adc1bf91ef50ef
+levelup | e7f93905 | 1 | 113be4bc651ec21c f0736c7da76a6683 fd7e1d6871abee5f
+levelup | a5ec344f | 0 | 85ac29820168c800
+levelup | 561c71b3 | 1 | 32c8d27f781565b7 398a2f1df2aae4aa 375eb02100a11964
+levelup | c509092d | 0 | 973f0c30f1e7d73b
+levelup | 45fd9083 | 1 | 43ff1609b8121c36 d9863c252664a05 70e32ad481af192d
+levelup | 8962afb1 | 0 | 45aa9312eff34928
+levelup | e25e2920 | 1 | stuck
+levelup | cdf95b94 | 0 | bbaedcef8dd9d5c
+levelup | f54480a4 | 1 | cbf29ce484222325 ce00abe052ca6dcd bb06cfbc4e83fa7a
+levelup | 8be5188a | 0 | 3992921a2dce7b64
+levelup | c46ea48a | 1 | d0aae418672dd291 9411cf19d52fa163 1295f589c7d3526c
+levelup | 3ed886b7 | 0 | 6b13236e1fd9ec1
+levelup | 5751d88c | 1 | stuck
+levelup | 57f32960 | 0 | a578689f6c3b1735
+levelup | 83cccd53 | 1 | d0ab2a18672e4983 fa060587c2c194f8 949452ed23bf0d78
+levelup | b7a00d97 | 0 | 30ce97ccf6eca925
+levelup | 3f1a9e9a | 1 | de5c633288d3bd92 3d8cd03d73c04c00 4e360654814b4a56
+levelup | 959a8c05 | 0 | 62cedc2a4f494320
+levelup | c5b7d234 | 1 | 3b03bd6b5ac2a805 c5ca858fbf6ab327 57235de993856bf1
+levelup | 96e4c1e1 | 0 | d7eeed8079139ba0
+levelup | 4dafdd43 | 1 | 7a09f0112336da7d 8b6529419249b144 e6cdce98715cd3ca
+levelup | 3ca1b61e | 0 | 9ab2e9e576be017f
+levelup | 27e8e620 | 1 | 79a770ea1f7ba6b2 95f68b93721f3254 cf5036668b8eadac
+levelup | fdf8185a | 0 | 87048bed1f43f1fb
+levelup | f50785c4 | 1 | c9969d30e4b04787 5f39a11e193c8602 7d216dc275197851
+levelup | e8e25de0 | 0 | 5ce927115ba0414e
+levelup | 235566e6 | 1 | 71d746c585efdead cd1f63302d04f21 ece4b5c5a5a57120
+levelup | 6937237a | 0 | f8c4b4624bbb73a3
+levelup | 25aa4399 | 1 | aea381a28b977823 f0f41501bcd4a53f 83b34dd45dcb8a5a
+levelup | 86c0c18f | 0 | f2e0bf085e6cc2e7
+levelup | 23869258 | 1 | cbf29ce484222325 bcccf0891f7830c4 22d5f805a12afa68
+levelup | 6d8d9db6 | 0 | 82d731228d18a923
+levelup | d15d08ef | 1 | 42d58e68a669cd02 2c194104650eb8bf f7df2696fb6895ef
+levelup | a187bc2f | 0 | ab4fb2aac20f759
+levelup | 114d8cc1 | 1 | f999538d7dcf882f f18e3493ced5c854 35ffefca35c4f729
+levelup | f07c4cd0 | 0 | b6c6ee4cee3af301
+levelup | 159fbfbf | 1 | f3d9e1a71267e70f 1c3cf1cc44575ede 3ed809e43d58161c
+levelup | cdc5199 | 0 | 620d04ff78ef4ef4
+levelup | 7eb03b06 | 1 | cbf29ce484222325 9e375a584032de2 e3171fe1339cb1b5
+levelup | 1a8e1501 | 0 | caa5a34cc94cb16f
+levelup | 75bccfaf | 1 | 259e12fdf1039a06 30d4d5ccbd744af3 8a5ed0356c13afe3
+levelup | 6ce6c881 | 0 | d2ddb19281405654
+levelup | 4f5bbaa0 | 1 | 6687589ab9d40dac ea15eb376af7e1d3 2503124d0782da88
+levelup | e455681a | 0 | 2894dbfa28f378f5
+levelup | 2b95c408 | 1 | 5b25580a26df81b4 3f28b983cebce5ba a0289c30e5730575
+levelup | 7db3d4be | 0 | 4f6f333b9a08eac5
+levelup | 67b978a7 | 1 | d0aa4518672cc464 b233b2c8fc5fb909 e72ea2258c7ab1ca
+levelup | ee4e4ca6 | 0 | c09a16335341a17c
+levelup | cd484ee7 | 1 | cbf29ce484222325 b3df8da9938be741 a7f9da6b218a9eed
+levelup | 30c72869 | 0 | 8a4e9a8fd7f44b06
+levelup | f3ffcf3a | 1 | d0aa6c18672d06a9 6c6b8b0d0d2fdc0 a921803aba9de8a5
+levelup | a3be8b98 | 0 | 919b7792d23e950e
+levelup | fb70b4af | 1 | 7aea591da1034319 acee13261626ca73 8fcd9b89c45d690f
+levelup | 770ef4c1 | 0 | 3f5c2d778f0e6677
+levelup | 86638f1c | 1 | stuck
+levelup | 1f4f3354 | 0 | ab29bd945b0cab10
+levelup | e7152a54 | 1 | d0aa7018672d0d75 b23b1cfdb728e6cd 36468104382e1f51
+levelup | ea6c0c12 | 0 | c340651c61c80215
+levelup | 29923a9f | 1 | 40407d93dd4ff5f5 184a2f69da92882c a711cd6e97727f54
+levelup | c24b04f2 | 0 | a2adc0a7e10916d9
+levelup | 1ca708e8 | 1 | cbf29ce484222325 37a3e7d4702dd888 c0d3cd5a124cea52
+levelup | 2ec246e7 | 0 | 1a7ecdc27c75501c
+levelup | b4240554 | 1 | d0ab1218672e20bb b816027358779111 94bda4877b0af217
+levelup | 6f269bd7 | 0 | 4e29b3f38ad2cfdc
+levelup | 40cbf19e | 1 | 9019bc9423b70cbc 1ba2763a89b2910c ba7e6ba04ae7fab2
+levelup | 97c71a56 | 0 | 9093093b82b8fece
+levelup | b7b9d055 | 1 | cbf29ce484222325 49b8b4604721cef8 75bfdaabed51501f
+levelup | 996b2721 | 0 | c44c688f90d9235
+levelup | 2834c168 | 1 | 24f18899b8eff055 790ebb47ea0de94c 1d9e23be4f4ac390
+levelup | 707b86ea | 0 | ba9e401c4c40e51f
+levelup | 8ad4fc40 | 1 | be2890285d2110b7 1a4f8ac14319c789 7b464da476c72738
+levelup | 9461cbce | 0 | ada8df0fa027fe13
+levelup | 8c0b8a8c | 1 | 6835c27779c99505 c49ac3cda86c1ff2 7bbf47a9c9d500a
+levelup | 18c4e2c2 | 0 | 76b084736e71e9db
+levelup | 2b8bbc9f | 1 | cbf29ce484222325 1efcae29b01c6340 4312fe5faf37ba9e
+levelup | 28ce9f6c | 0 | 2e266118b504f071
+levelup | b2c0d8b7 | 1 | 9bc58dd12f8c490d 668a2ea79313ddc2 fc0fab6c6fc44e9a
+levelup | 9746eae7 | 0 | d37ec5273395d4fa
+levelup | 934e3e1d | 1 | 3d38498786ae9ac 836ea879149ec309 b44cfba93bb728be
+levelup | 56b99522 | 0 | b8d1dd0e965bdbcd
+levelup | 65e6e21a | 1 | cbf29ce484222325 1a084db98ad41834 5a5eec5b38f84c84
+levelup | 9bceb11 | 0 | 51ad8c71f258d598
+levelup | 261364cf | 1 | 3dc9763217555f9e f3ed4c710c8478b8 dbb193f90769345d
+levelup | d78caded | 0 | c1f145f9d5d42c9b
+levelup | cb9864e8 | 1 | ff3b1de519868e64 7d0b09814b0a7f83 d2f7bee0e2b4b89a
+levelup | dbc2a84 | 0 | 1649494661e95005
+levelup | 1658e0f9 | 1 | aef12a3c40648ab3 d81b91c812a79d0c d827e70cc3f2645f
+levelup | a658b9b9 | 0 | c0b796ac342a1d3c
+levelup | 2987997e | 1 | d0aae318672dd0de 104d5b1f7c428f0d 9690c532e24f457f
+levelup | d7ff4942 | 0 | 6ddb449e8e4e458f
+levelup | 1b174210 | 1 | b9c34534f36d07a9 201283adf94184d2 cb73b482bb6ced99
+levelup | e5fe6b61 | 0 | 716055b762a516e9
+levelup | 34b5 | 1 | f115080f4e9d42be 6877fa03f44fd9a5 38d9add765ac081c
+levelup | dc18407c | 0 | b40822164963363a
+levelup | 1de58275 | 1 | d0aa9618672d4e07 ba64c6b131fb6059 e68001aa0a1fd390
+levelup | 52f51b79 | 0 | 748c7217b8c6e3a3
+levelup | 24f4d8f3 | 1 | 7bc17f5722f2058c f980ee2f5c484f2c 8319b50ef144e687
+levelup | 3d2c9595 | 0 | 30e9f7ffcadc284c
+levelup | 668e2db6 | 1 | cbf29ce484222325 94077ddfa2a0d462 b8c56284042d4fff
+levelup | 447a58ac | 0 | 150d825b21c97460
+levelup | 6ad32746 | 1 | 3c3395316d20049 bd199cb2538b3640 2a1c22b0860e670c
+levelup | e32d0f40 | 0 | 792703cf94abc0fd
+levelup | d382a353 | 1 | d5c101fd107e0f48 5e838a312e1fb21f 675b56b75aa596d1
+levelup | 9bff5dc1 | 0 | d6ce0ab0110901bd
+levelup | f2bbc90f | 1 | 99bab17afae04f27 8f4f58a2029b97c2 890d48d5f0ad83ee
+levelup | 4d9a5794 | 0 | f0c81fa3a651ed46
+levelup | efac13d0 | 1 | f3e9b53663ab31aa c483913b1897a7a1 e9e6f5ee829ec068
+levelup | ee31cdd4 | 0 | 2cbec419996fbe06
+levelup | 35786aae | 1 | 295d5e92f8501e9c 9e0895a6697e8e8c 30777f6381c89646
+levelup | d242dc72 | 0 | ceee3791848d3bd8
+levelup | c85f682d | 1 | cbf29ce484222325 e42c02f26bc533ea 81d2cfb9b68ad3db
+levelup | 259e2900 | 0 | 10aa7a372d85978e
+levelup | a3349448 | 1 | 897e640662011016 3b2f16c7c03db9a 5610938313101bfc
+levelup | 3c5f51c4 | 0 | 56551c3216ad2d5
+levelup | cc79748d | 1 | c90e2aa11c6a74c5 831d480b39890204 14df2af01c8c81c3
+levelup | 480a291d | 0 | 375ad1812affc43e
+levelup | dda0d29c | 1 | fb03060c7a8b5ba0 d5e934ea6e5791db 279b8a911036f36f
+levelup | 945eb4e7 | 0 | c3d6de528685902e
+levelup | d975a25b | 1 | cbf29ce484222325 59641117db0cb4d4 12e2d3dab19d3aa3
+levelup | 102e3570 | 0 | 6b37cc571f54e1d1
+levelup | b37d7804 | 1 | 961642346d6e24dc eb75a145a65dd3c0 c4865657d3f58ce8
+levelup | 1dd831d7 | 0 | 7cd6ff8522e0c96f
+levelup | d7530790 | 1 | ab7afc4803d395d7 7889013d9c4ab959 d47a11efda3a4b82
+levelup | 390cb00d | 0 | 515bb41cb89564b
+levelup | 56d6c84f | 1 | 3299fe3c011d5dfb 8168d9e75033bc73 b81ae5cdc063bed0
+levelup | 9f4296df | 0 | a6f10383cde0edfe
+levelup | 9991f15b | 1 | cbf29ce484222325 fe22ac05bd92b758 41d13b4d82c0384b
+levelup | 124b2d9d | 0 | d0e09b6e77b5ce73
+levelup | 12983939 | 1 | e6523ad7b67e02eb 12fc30ea88ece8e 2d695055fd1fbae7
+levelup | 83d9a74b | 0 | 38cf1089a511328c
+levelup | 660cfc6c | 1 | d0aab818672d87cd 94222b0c17042afb 34a2dd12d72ec2d0
+levelup | 1ca5df10 | 0 | 153bb76a5e384af6
+levelup | 994facc0 | 1 | cbf29ce484222325 d1008c48938953c1 17266011421bf727
+levelup | a9fe079f | 0 | 7aadd4bd1c0d137e
+levelup | da6d7a65 | 1 | 5e1dc950c6ed009a 932a019fd7f447e7 231b2feb60058f2e
+levelup | 6474bc59 | 0 | b83e0e6db99dd073
+levelup | dda744f3 | 1 | 4b427181d74ab1f3 7767a16ade955ecb 4f19746cc3c5d731
+levelup | 5bd76a0c | 0 | 65e74dad9e713abf
+levelup | 6bd7e708 | 1 | f02f8e893ef70e72 5404d0f1c28f0418 6cdd2b67dc685063
+levelup | bda17848 | 0 | e9cc6674f86a8bcf
+levelup | 3f04148b | 1 | 166a0aa173362da7 6aa318a4daf520da 5b9debc97be2321d
+levelup | 528800e7 | 0 | 53b67c5cff956b0
+levelup | c32f7925 | 1 | 8135f5062863a8a0 b13d560e7dd0de68 b6dbf88192b08a6a
+levelup | c8ff58cb | 0 | e0ad3f53e7775c4f
+levelup | 482fd844 | 1 | 52213fbb2bfd9674 be5bde95bf3e44b5 dec040d1f45d54df
+levelup | 320f6d3a | 0 | 74c8fe40bd4094bd
+levelup | 8f821d8c | 1 | 1182953144dbd07f 998065fb8aff529b a8847c6a937e6a71
+levelup | f4c3397c | 0 | a46a1b59737ad036
+levelup | 8f24df57 | 1 | 75156ddb38b7f567 bb3e8b3c977a6826 3655053017384dac
+levelup | 9a7f14a4 | 0 | a019b6733d65714d
+levelup | 50ace158 | 1 | ebab85b050ef750f 60ba264749b26c06 5c2cddcc2edb91e3
+levelup | e1f40aba | 0 | a4683eb8cffc3c01
+levelup | 847e48dd | 1 | 896db66a122986b0 50f72f826e9a355c 9b0b6f743dcf447f
+levelup | ceec768f | 0 | 529e3114a57660b1
+levelup | 9cd48795 | 1 | b3505306529e22df b2fb9341ca634adb 8dfef502d5d0857e
+levelup | 859abda4 | 0 | 50ecf3ec44cb2ffd
+levelup | bf0d817 | 1 | c3360e9d9d891152 8818f332f2bd044f fda636d6fcd7b350
+levelup | d5aa6522 | 0 | b68082c4e730a21c
+levelup | fdc8951f | 1 | d2cdf9176e2b3fc2 1c43ed15547fbfa4 97c1ce70cc41c8c
+levelup | b2350c62 | 0 | 77cb7252897d8de9
+levelup | b85e6fe8 | 1 | 2987a1ded18deb72 53b4187cae200a8e f427b30f500bd30d
+levelup | 2b47f70a | 0 | 2a33c5352475ff69
+levelup | a3fec1c9 | 1 | 741031a055268c99 7323e33579a1a2f8 fb4a5bbddbae6fa8
+levelup | d055f5b8 | 0 | a9d5bb13a2f62ffd
+levelup | a192f170 | 1 | cbf29ce484222325 9542a0275e02282a 577b6b05c11f61b2
+levelup | 25c6e5d8 | 0 | 926d518294412e7b
+levelup | 79e9b27f | 1 | 9a743183861f0624 c051b3f19570a555 cd97ace5221574e4
+levelup | 828621ba | 0 | 32d883778d4f02ac
+levelup | cda2c570 | 1 | cb06b743809344e0 78f887f18346ee42 32f462920c169cb4
+levelup | 9b50e89 | 0 | 45fd9f308740e626
+levelup | 8f3b7348 | 1 | 9b7c7f65bf784c94 29b630c50afaa322 6ba842e47224c51d
+levelup | d29e1fe8 | 0 | e926ddd879ccdc43
+levelup | 771437af | 1 | db7ec9438167d2ad a9eea04fb91f74cf c0943be70450846e
+levelup | 9593a913 | 0 | df6036765a066990
+levelup | b43bd9ac | 1 | adbce9c0379e10b1 42d098a7263d34e3 82705a6932a448d0
+levelup | b68b21ae | 0 | f8f702240a11590a
+levelup | 693ff151 | 1 | cbf29ce484222325 7f761a06cbbf9c09 fede498a1972b1be
+levelup | 7445bf5f | 0 | fafeece629872a59
+levelup | 8784ed58 | 1 | d0ab2018672e3885 dab21c88ac3e8fe7 aa038407f95aa8a0
+levelup | 4b573ac3 | 0 | f3564f031fd7c18d
+levelup | 8934cca0 | 1 | 84ecabae317b56da 432c07f82ee11e6b 9e89a7e7b595798a
+levelup | 5d2119b9 | 0 | 580867089d8e128e
+levelup | 609930c4 | 1 | 95e523e4a4a7afdf 23297e8baead608a 2a1934842d74cdfc
+levelup | af5e0088 | 0 | 4c7674e69c7c75e2
+levelup | cf98e646 | 1 | bebc62b5c2807797 3b86bb0d1665b5e3 ce95f91689a03ff1
+levelup | c9b6c53d | 0 | af54fa6d7ed9dc1c
+levelup | c7603e8 | 1 | 2bb2970b01377459 982a0682ba01f0ec 6c3c0e05ca3d4fec
+levelup | c38a09c6 | 0 | 88aed0b084fd2f5
+levelup | fbe8dd15 | 1 | fa33ad06d14f016f 93bf19c1e3c38592 25d9203e4ae955d8
+levelup | 9a5bd4 | 0 | c5fac298473a4634
+levelup | f779262f | 1 | 74ca39e91fb2769 164eba8a618b24cf f91913d33f7c4fb3
+levelup | 96a752ca | 0 | 9fe842543aab7e4b
+levelup | 2983c8ae | 1 | b509003bf69eba15 406adb278f7c2cab b70be32e690297ea
+levelup | 2fece285 | 0 | 14620a5ff18f028
+levelup | d5309fcf | 1 | 42f564f5f857dc9c 86d45725463d8511 f087c0098a3999c5
+levelup | ad4d2f8 | 0 | 1001a82311536c6e
+levelup | f80e662 | 1 | d0aa9918672d5320 e59a339cfb220433 fa17d65255be5951
+levelup | 2f44a67a | 0 | c87071ae9123344
+levelup | 2b618287 | 1 | 88f5304781ca79a1 1a97778cea648010 1edb34c1c3923af
+levelup | e0917aa8 | 0 | 4d9e73045d08dfa3
+levelup | c33bb698 | 1 | fa09736766027ab9 4a693c30ce61eae9 def1fb67c23a4818
+levelup | 5ee97975 | 0 | fad037406ea69ec9
+levelup | 2ab5e6e8 | 1 | 6bb656486c5edbd9 307a74158970ba64 9bc1f8cbb1b0e1f8
+levelup | f50ac010 | 0 | f0e671eb587ccd90
+levelup | 83cf4419 | 1 | 96cd0d360d327024 1d1f984a748dfbe 195f7290aee7013c
+levelup | e327321d | 0 | 1f917ed9dd83cd2b
+levelup | 2c140486 | 1 | cbf29ce484222325 75d54d06e29eb4e4 c855fdf462ba2b9c
+levelup | fb011e38 | 0 | aa0c6eb3cc5625d3
+levelup | 8123960f | 1 | 4fbffa67a6130f48 309e42cb33a8e8e4 33bcb566997c1a6f
+levelup | ad1ffcbf | 0 | 60c15cd7af6cbf73
+levelup | edeb922e | 1 | ff478090f1c200bd 23684c0877992038 8879e490fe7497ef
+levelup | d63750f6 | 0 | f4bd8d4d7a0beb8c
+levelup | 68aba8d7 | 1 | 1a873b36ff5c557d f26a08afe13e8a48 249e1e343a88ee09
+levelup | 7cf2c961 | 0 | a31d5d6d790c59e4
+levelup | b23d3f4a | 1 | cbf29ce484222325 ef24b12ac3c570e1 4555e244bab43a1b
+levelup | fef626e | 0 | c920cab152ed8ab
+levelup | bb795d46 | 1 | 14d5e9dc24c49d8b f84a29e639dcaa4e cf0144db331b2a89
+levelup | d546cc44 | 0 | 140ab0fc4b2167d2
+levelup | 1807f89d | 1 | cbf29ce484222325 e739ca138b5e0eb0 9c6ec3a07f1c3025
+levelup | c75730bb | 0 | e4736d1d131452e5
+levelup | 7c332ea5 | 1 | 91e543c92f8409b7 6cf38f25005475cf 37aa486b665c4681
+levelup | 46e4f480 | 0 | ba1ce13aca258540
+levelup | 7091767e | 1 | 4e8862681687071c 8905315a9e89f2e2 1ed856f893aac5e4
+levelup | 961bd3e1 | 0 | 5d5866be2df040ed
+levelup | 398a0b8b | 1 | cbf29ce484222325 a0a1d4c02e7ab0b4 2ee6681b5d51049b
+levelup | 98ed3dfe | 0 | 27ddae55b1dea246
+levelup | 5087f506 | 1 | ac41826fde3aa5e7 63740ec9021c20ce baeb70f2ea5c1bfb
+levelup | 9026065 | 0 | 4b40a80fc1578c49
+levelup | 63901be | 1 | eab50d0eebe7f8a8 193e23683a79413b 63fbbc6d71659ad1
+levelup | dc193893 | 0 | f2b3e458dcc044e
+levelup | ca0b81a0 | 1 | 389ad7c9282b00fc e05eeee9b2320a66 e771b4c242d9b746
+levelup | a59cc0ac | 0 | f610909841f2c212
+levelup | aab53a99 | 1 | cbf29ce484222325 9a57b27b4f520314 2e8c5872089b484d
+levelup | 2460687c | 0 | b74f5d44a93ae61f
+levelup | facbe8e3 | 1 | a55de8f9dcda2682 65cb2ffa893430eb f3669f8b7f5c379e
+levelup | 2d6b957b | 0 | 814d7c86dbd973ad
+levelup | 2b42eda9 | 1 | 9762c0583cf77dfb cf3dad6e443c7969 1bf1284157b568dc
+levelup | b962f44c | 0 | 6786794065c1aec7
+levelup | 14347d61 | 1 | 779ec45ef74dafcb 3b05b8b156fcd0cf 67a2200c9a04b685
+levelup | 85d186ca | 0 | 7dde8d23ec1a4bdd
+levelup | 4ae066c6 | 1 | 2ce1570971afd5f2 6a5df6c899819a70 29640f142beaff49
+levelup | 9a395da3 | 0 | 942af0422065f261
+levelup | c41254a4 | 1 | 3b6966afd9cc7780 e43ee434dda8d98a c6cfe84600cfb381
+levelup | 66ae6de | 0 | 6385f5f31e6cf99d
+levelup | bd5d8438 | 1 | c6c5ee5d8d1d1df9 cfa3d0cf48928d4f 75994104a74b2b60
+levelup | 6690cde9 | 0 | d6626cbc05ce63ca
+levelup | fd103f46 | 1 | bd3a0ff91aabf9af af649158f6ded5a2 1baf0122d3dcce96
+levelup | 56357e5c | 0 | 63900cbd7c7a9028
+levelup | 6dbf7480 | 1 | c9a574154fde5fd 911448e1fd5e5e38 bf4ed812641c12dd
+levelup | 1542f087 | 0 | 5f7603889c9af8f6
+levelup | 3abf4e92 | 1 | 7cc527126eecb81b 5b816d57e16597a0 508193fe9ae5be6a
+levelup | 95f75dcd | 0 | 1ad49d89b55a66a9
+levelup | 5dd60906 | 1 | cbf29ce484222325 f4601ed0d7be721e baa535a8e28bb98e
+levelup | d37887c6 | 0 | 8872e5072cdec44c
+levelup | 5d7f5a2f | 1 | 6d1b15fd698b91 192ba81304ecb742 b3f88b1d200c542e
+levelup | 36a1c3c8 | 0 | d3330d6677a794d2
+levelup | 6b85902b | 1 | 9ee50c37a95c07ab 7a868d7f4b78f8a0 a67b36edad9ea635
+levelup | 1b2d244e | 0 | 5edc2d637f35d23f
+levelup | f8021fa5 | 1 | bd8964685425c254 2b769b2cb62c4ea1 90b7c2ca171c1f2f
+levelup | dc77d074 | 0 | d71637df24528b4e
+levelup | 440aa6bc | 1 | 579bd0492321f0e7 bf785265d1505b8f 70eefc71d489a0bb
+levelup | 3ab399e5 | 0 | e15984e8bd3271cf
+levelup | 24661494 | 1 | 1253d9be7ba25689 b6768e9323766780 61f8eb77a9919d37
+levelup | c7d959da | 0 | 293c77cd8e565fb5
+levelup | ccd8890 | 1 | cbf29ce484222325 4f36366038536253 8e40f0220e363489
+levelup | 164a9109 | 0 | 13517002bcde5142
+levelup | 2539928c | 1 | 31b2e3471c158670 8c15a5259d611ef 7b9e7a6272718747
+levelup | 2964b34e | 0 | c80d4b6afa49bf09
+levelup | 52ffcaa1 | 1 | 4d423bed40a8f383 2169caa2d783584d 154bed3245405fef
+levelup | 52c42550 | 0 | f41ff4e42aad03e1
+levelup | 9383224 | 1 | c4c1642e8e96f411 303fdfa683590589 30c5a1be99dff21
+levelup | e64cabd | 0 | 2e486656ab073125
+levelup | d59e44a1 | 1 | cbf29ce484222325 244fabdef46e6eca a6e9a6cb9b971233
+levelup | 42cb7468 | 0 | 510a0169fb487617
+levelup | f622e057 | 1 | cbf29ce484222325 7f036ad65ea17efc de6adb5323c60c75
+levelup | 3e026d5f | 0 | 95fce62d256eff9f
+levelup | 66f9a777 | 1 | e151ca517f26208f 4cc0dd1490d492ba 33e5db2363065a7a
+levelup | a29308cf | 0 | ee515550eaaf747f
+levelup | 7a3f1727 | 1 | 94ab194506f778df 18a6697e886c3ac3 7b641e32ab952fb8
+levelup | f19cc134 | 0 | 77c8850a1a1ded3
+levelup | 2ed17dd5 | 1 | 49f45cd687b145a7 63ab9dbaa0755391 61bf96f2c7e563ac
+levelup | 1364f6be | 0 | 1e84f0626b923fc9
+levelup | a8e13f0b | 1 | cbf29ce484222325 c8b45ce40056ea6e 379ed86e8d8d2daa
+levelup | 384690ec | 0 | fc6161f329e29288
+levelup | 352eafe6 | 1 | 9507738b9767b3d8 1e73952c38ec49bb 4db873a20ef73fd9
+levelup | 31b061b6 | 0 | ec1a2a5d1fed2f7a
+levelup | 13c58d20 | 1 | cbf29ce484222325 784349b7c4cb7573 f67cf6bac8963775
+levelup | 97577606 | 0 | 1a29d248dad4d12d
+levelup | dbf457dc | 1 | c7c07bad052dc3d9 1722be35efdfba51 5be77c826cbbbb86
+levelup | dc221ee7 | 0 | f2e3040fa007fdd3
+levelup | 5038f65e | 1 | 9a9710e55d8539c7 405aa9a175ae66d6 c594e979e9dac69e
+levelup | 6da75914 | 0 | 27fadc1bc9692c40
+levelup | a65df5ef | 1 | a6c7d804046b1ff 9ef46e2f57cdb152 7066bdddf11168e4
+levelup | b469f2db | 0 | 55f8f35a839847ec
+levelup | 19036089 | 1 | 5ddf4e6a79ebea6c da1080f884234b8f 1ab7201d1a878868
+levelup | 7b9b99d7 | 0 | 33acc909a190a65c
+levelup | fb3bc686 | 1 | 96a838d0a893a3a 5487d8857471db93 4e19e7cb9b5aff46
+levelup | 398cfe06 | 0 | f81c8b2accc8536f
+levelup | a8fc50de | 1 | 1b2df2ed6ee81847 e2b8fd304a011ac1 4c1ea1da3ac263bd
+levelup | ab9aea0 | 0 | add9b1294087cecf
+levelup | e5047789 | 1 | 71f7667c04862c73 8e0f28104ab98f56 4e83286fec0e4d4d
+levelup | 6f40875c | 0 | 45fd634972b45132
+levelup | ad3ce154 | 1 | 72cab04077ffae28 5ee6d87d23c91b89 3989d90dfdfa5fa8
+levelup | a2c068e1 | 0 | d9ad600df6e9ad50
+levelup | 4654e5bb | 1 | 582af646e667932f 1fdfbf001a867449 a0e237d52e6f031d
+levelup | 59ab8739 | 0 | 73493359742b8433
+levelup | 2243ff0a | 1 | f353b77e3180fb8b 5b1bfb1b20ad0e54 5fd744902cb10344
+levelup | 2b317013 | 0 | 8db91aa5f3db0ab7
+levelup | aa526a4e | 1 | 2b0c1b0f04910025 9b861ed749dfc9f7 4fde24249ecb9af8
+levelup | 550640dc | 0 | a5698c232556db84
+levelup | b5175657 | 1 | 8a2951533afcf0e1 e1e03f55f0ea47b7 df7f3434099f86ca
+levelup | 3b44f06f | 0 | 4a7029548eec1691
+levelup | c7523160 | 1 | 6b307d547d663b2e 9099b18c8d74af22 b4add02ad453e1f0
+levelup | db086b26 | 0 | ec67d7f2fe5cfdfb
+levelup | 76469d52 | 1 | fd75b1d7fb8bb42f 1cfab2cd1a3a7de3 2a8c7f724ffae9c0
+levelup | 30126e43 | 0 | 43c3fe2ca30e7f1f
+levelup | ba8b41e0 | 1 | 1b9d8325c951541 d980aa61dfb723c1 eb80269061766a6b
+levelup | 5d7bfa36 | 0 | 81ad759a66396c90
+levelup | 101a012c | 1 | 7c91f489afa4ab00 bb8b6bd9790292a8 29ee2b459f6ec14
+levelup | ab656b86 | 0 | a8a4a2ed0907a059
+levelup | c24d076f | 1 | d0aa6e18672d0a0f ea2915d142c41d9f 214425cc24b777a4
+levelup | 20144215 | 0 | ef4ea0579d19cf6d
+levelup | b9fc0f32 | 1 | b0b47bf81a840eb7 1bcc6cbeeca61438 2ff95c5d867e4bec
+levelup | 7f4d8edf | 0 | 449cfc125b6e061d
+levelup | 2d6bc358 | 1 | 39d9b14f8bf84e68 b9272f61a9b6600e 7de8f367dbead8f8
+levelup | a8b0bef0 | 0 | 39b236e550ca2772
+levelup | fb347050 | 1 | 7b4d30fa1fa7ad8 a347b3525d0a7868 755402d330b7876c
+levelup | 7b166ae0 | 0 | 681e139131f2ed6
+levelup | 79069b27 | 1 | e8976983bd463aac 9bbbf67a7a5dbbbf 7dc08852dab39437
+levelup | 35732da2 | 0 | 906a8cc910e12290
+levelup | c94c1fc5 | 1 | 73839bdbd249b42f 3e2d8ccc82c3cb61 312271ecabfde24d
+levelup | a2134f63 | 0 | 599a551d17f063cb
+levelup | 9924f507 | 1 | 50274eaf84ed0ab7 e80b24b746b8f586 3bb3f65d46b2df3d
+levelup | 17a8a753 | 0 | 9c72ba35cf8bdd28
+levelup | ae1ca5b7 | 1 | f47e52b89aca5c26 6d184748a27c58ab 1e7c7a00756f81eb
+levelup | 599e0f7a | 0 | 5c77e5f569ba9256
+levelup | 5cb2202 | 1 | 27a7e6836543251b dfc4e9ca72b92e68 48719a496a69bfc8
+levelup | 6ce6496e | 0 | 9e22f76527a62c84
+levelup | 3a5de258 | 1 | 711a2f9ef12ed177 aafca4326549051c e30e983ef6feed1e
+levelup | d1d2ee44 | 0 | 6776a0766b6d1ef
+levelup | 7477ac8f | 1 | e5eb7c99f8c109c9 96715d2db5e759bb ffa0058d7b7ada87
+levelup | c34ed0ef | 0 | 127b1cbe0ad39256
+levelup | 5f6c255a | 1 | 8f3bbc5f1e3e748a 90d35006dc7ef5f3 e4024329f6f9933c
+levelup | 70aafbd9 | 0 | 29395a25aaac905a
+levelup | 52f9c037 | 1 | bce083abbb90aca7 f3e5542882320235 393265f90203f0ab
+levelup | 44588e50 | 0 | 243ac47a99986280
+levelup | 24a1b523 | 1 | 3091975d08e51846 5003fa10ac6a1d4c ecb88d708ced5d96
+levelup | 77e1eef4 | 0 | a48c366fd602f50
+levelup | b44877cf | 1 | 26bb43b4ffd85a3a 37514c7a959435d9 bb17befa6c7785e3
+levelup | c7a4ba1c | 0 | c85dc9d8b0ecf5bf
+levelup | 5dd35a5d | 1 | c9b00c1174b7852a 14e70490aa02bc5d f95a15b296de1bf8
+levelup | 2a2df457 | 0 | c8d3c41df4dbd02
+levelup | ccafa491 | 1 | f21b458ffa8c4032 ef5f3c13e40a1419 e4ba1cede4fd7a89
+levelup | b15990a8 | 0 | 2771b2b14d80874b
+levelup | ed72744a | 1 | stuck
+levelup | 5374436d | 0 | a3093113380902ea
+levelup | 21a424e | 1 | stuck
+levelup | 969ac03f | 0 | 9a2fb505c86166ae
+levelup | b6024b77 | 1 | b7c33237fc768fd1 81052927620e4405 cf68fa662d126be7
+levelup | 6c9caf92 | 0 | 1b4546660b37b08f
+levelup | 30ec422b | 1 | 1b15ea1036f4cbb7 c8108e335a05cd6c ceafefad06953c70
+levelup | 42327052 | 0 | b0f3add38e847b24
+levelup | 2b15b188 | 1 | 949c88ec1dd1294b fcc986b024e5c6b b9cdb139196c326d
+levelup | 6ed80f32 | 0 | 80836fc53d9a5f3c
+levelup | 3b4d4f16 | 1 | 440124e5173ed2c8 5dc976a1b04cb216 5cb2ae2d068150c4
+levelup | 80516b6f | 0 | 768ea8b8ff741e48
+levelup | ce128dcf | 1 | 31fec4ece07fc90b 25b369414909515a 5b26a31f614d9c6d
+levelup | 3221ab62 | 0 | 2617fe7538c36bb6
+levelup | 1695095c | 1 | 25d4d83eee4b0d73 5beb20b4c7ebff7c 6bee3e5a229059f4
+levelup | 45a90b40 | 0 | 4bc523d312ba496a
+levelup | c077e284 | 1 | 695ce44ebbae5240 8019c47ae58855de f08827a839fd8cf7
+levelup | 4891ead6 | 0 | db7c9dfcf44ac188
+levelup | 3c26cf98 | 1 | 8ce9a6e970040c5 7fb0416201f0d19d 5a60aa80098f6e58
+levelup | 7ede3206 | 0 | c14e9db211327d67
+levelup | 594f3b7 | 1 | 3ca213535d1c1040 ffd6e7f139056295 f85e934c0da3e84e
+levelup | 16890218 | 0 | 8e832464b849afa1
+levelup | 9c2586da | 1 | 727b657ee480c8ca aa055d087b7161a9 351861764711faef
+levelup | c298f815 | 0 | 22127628a157b121
+levelup | 48d59c8 | 1 | bc9c241132f15144 8f42555244288213 b98676f331d0c754
+levelup | 9a7fd1ee | 0 | cbc02147a65aa808
+levelup | 51dcc60d | 1 | cbf29ce484222325 95d4c34833be6104 d4e1deeacf5d99a0
+levelup | b598264b | 0 | 3f71e80b0b88560f
+levelup | d6103ca5 | 1 | df83f4af6739a80b 26222e2bb85d87c1 e49db39cd1151aaa
+levelup | 31a270c5 | 0 | 5af6d3a088c243d2
+levelup | 326e2b0c | 1 | d26da9fc56f78a6e 7648e97cb3876f72 146d31fa3ccc3bd9
+levelup | 643e76f | 0 | 8b1051f39c83a20
+levelup | ad38f8db | 1 | cbf29ce484222325 cc49e3617e56413a 619f228a20780b7
+levelup | 460e2c30 | 0 | 4859c7d6bc25a427
+levelup | 4dfbecd0 | 1 | 80be7be9c9a5e247 a5278095d2f7b126 686db6c4f5d5cecd
+levelup | f25c8aa2 | 0 | b21e1fb55fa86cb
+levelup | 1e10fb1e | 1 | d0ab3718672e5f9a 5ff9c43de54fa21b 8e16f41eb642da3d
+levelup | 6c63e4a2 | 0 | 2f6f9e666d9558
+levelup | 2a913ca4 | 1 | 58c085128153c21c f6e8a3316e674eb7 eb3cdbade733a9e1
+levelup | bfbc775a | 0 | 62db798799aad0a4
+levelup | a81c49ef | 1 | 6614cd5d1df01d61 b5ee4c3335eae455 48776903aec703ab
+levelup | 1501c221 | 0 | c553a938342dcb49
+levelup | 750f4cd | 1 | d9b2131a6b10a072 9e1024945872dc4f a9d4855ff273a3c9
+levelup | 7cecd3b3 | 0 | 1983f57f5a81aed1
+levelup | f0004fdb | 1 | 33c1434591353ded d45c892a12a9b817 cd5dcab0cc627696
+levelup | 5504ec7b | 0 | 5451b972a74d5d85
+levelup | d9a5d37b | 1 | 17be6c1c45ee6379 c70c4d663f3e48df e0f5d1e9df288e1
+levelup | 4274e8e4 | 0 | 5a851003f2c5c275
+levelup | 5adc0cf | 1 | e519da21d37fd55b 24e9bc1e02d9a391 7b2e75e1ba1ca602
+levelup | 4a37d6c2 | 0 | 69e506032eea9097
+levelup | 2e3c4dec | 1 | d0ab2818672e461d 1f587ececf229f20 5020b63fccc13ddd
+levelup | b74a47e3 | 0 | 8aca98f98ec34ffd
+levelup | 6ebf8d5 | 1 | 29c2e2365d54c120 f2c00d0d3465ad35 7dfd744cc46939a0
+levelup | 65ec4959 | 0 | 12bd80e7d9a34885
+levelup | 69f91ad5 | 1 | 812ee9e1f34ae124 e845e5c5b01f6ba c1f4ee35cccab4
+levelup | d89d2d76 | 0 | 6dcb3fa028fa8766
+levelup | 6497fe29 | 1 | 9c95e153965e9fce 13c437979fbf4795 ed23f12056048dfe
+levelup | d37b8baf | 0 | 9f318a6e625be62c
+levelup | 7528a403 | 1 | 2304adab4c2cc55e 15c0f4a8a44852f3 cc1626551ce108ec
+levelup | f2d0be62 | 0 | a870bc4a43468229
+levelup | 7023cbda | 1 | d0aa7718672d195a 2632adbb777c569d 805da2d90132efb5
+levelup | 2b014352 | 0 | 801c3cfc88a5dc55
+levelup | 2c3eb62f | 1 | 7343fe70259fcf10 eebc3d5512e2f017 b85fb695eed9637e
+levelup | 74cdb479 | 0 | 68ab6f81c9b8bac
+levelup | aa0ac97b | 1 | de457f9430437419 2e836f159701da2e 7c6d2263ecc963e
+levelup | be88865a | 0 | 8d812f3be3651528
+levelup | 4ad364f7 | 1 | 7d2c82a5b81c199b 4ebb30f29a508530 6056cfd64607c0bc
+levelup | e41e9595 | 0 | f2220e8e324d8416
+levelup | b2dc8a5d | 1 | 1f564d7ef3a7000f ab3fe206a9c04fad bb09812299535bee
+levelup | 900ef989 | 0 | 5842a558dd981e92
+levelup | 9c0a4164 | 1 | d4f31f55115a65cf d5d4f316bfd264eb 2328cae656529b0e
+levelup | 80b2c408 | 0 | 1e4b0123c81f7155
+levelup | 367bdc6d | 1 | b6781e150241075c b3dcd36dc2ecdbf2 e3bf26cb19d00820
+levelup | 4eb8617a | 0 | bd412ad8753ca392
+levelup | 70fe7289 | 1 | cbf29ce484222325 e1a3d853dd17320 dfa42b2fa650604b
+levelup | c2181cef | 0 | 6d9c374fdda3fe7b
+levelup | e9ebb777 | 1 | 96f41703f7774439 3ba002c80975bf7f c77e8fb781de7e9a
+levelup | cdedcaf | 0 | ebb040b583b94471
+levelup | a96de8c6 | 1 | bb7b5e379f4d3bfd d05aa530cfef1db5 e437435c010b1cfb
+levelup | e18d5da5 | 0 | 5afecc38b5183aa8
+levelup | fb6b1d1f | 1 | 6ff28c83b1257f78 c0b5945f9b4f2ae8 ef3084242e275915
+levelup | ad31bf4a | 0 | c1d730ed9794c330
+levelup | 5e3045f3 | 1 | a9aa2d4acfc3c419 853729fc56951e51 177b789a7ae409bb
+levelup | 68327703 | 0 | 8607c580ee5a710d
+levelup | ef0bd518 | 1 | f6032005d8d96321 206c679f9b206893 479a6851f77b5d
+levelup | 1aac0d65 | 0 | 97df80f6c09bc097
+levelup | a167b96d | 1 | e6befd8e977243c 7843fa466ae8eb4d aa8bfff42d40af7d
+levelup | 36c1a2f6 | 0 | 8be8cfb5c7f89101
+levelup | 3609e5f5 | 1 | f791d64d7499b2a4 202fb8491dc3b7bd 4aabe97b0bd6611d
+levelup | 27017342 | 0 | bf2e947e79e9fb62
+levelup | 689d305 | 1 | 7cb15e0879fce0a3 7bde8a161481d0e 84da94cf4455dcac
+levelup | e32004b2 | 0 | 162f1c6025c524c9
+levelup | f42abb01 | 1 | d0aa8b18672d3b56 654f3b35902bd962 2bb72885578bff4d
+levelup | 4a7667f2 | 0 | 8580562029529039
+levelup | 12fae896 | 1 | 929118595f680c47 49695c0fcdc8076e ee79b953f961f00d
+levelup | d1155851 | 0 | 943109a4c440bbc2
+levelup | 67507690 | 1 | e4681f5d2186b217 e7fae1ccbe1d4932 54085a5bfa444627
+levelup | 68104143 | 0 | 2719088ff224864d
+levelup | 4378fb6e | 1 | cbf29ce484222325 e511c157970f8a42 8f13b20087476deb
+levelup | d9874a6e | 0 | b3e03691330545d2
+levelup | 6c1c591 | 1 | cbf29ce484222325 3b84e575a5b98152 63cad78ce5559677
+levelup | 3eb34549 | 0 | 60696c01c9a541cc
+levelup | b1bfb290 | 1 | cbf29ce484222325 97f6e36d91acc652 e313b58117410fee
+levelup | 72e80478 | 0 | eeed90fad7406dde
+levelup | c64db90b | 1 | ffe12094bfc41220 2d267bca76717a94 7f0a032093190118
+levelup | 6528d174 | 0 | f78ec403b0ec4d34
+levelup | 5c3ff342 | 1 | 6373689c91fdd089 7c2e703891349f02 2ba02ae37004eb1c
+levelup | 95f0e56e | 0 | cfd34a18311053a0
+levelup | 6dafdb16 | 1 | cbf29ce484222325 d47f42d7a0c9b5cc 6e6510b6ef86e3f3
+levelup | fbb8ef07 | 0 | 6a18112aa1e4984e
+levelup | 87780aa0 | 1 | b44675a9010a77 d50a06d6f146b6da 108f4ba952802fbd
+levelup | e56f6f00 | 0 | ebe550e335335777
+levelup | 42f178ba | 1 | e1616d18d28e2f09 137f5dd0257e596a fa650e12a604646a
+levelup | c7faf3f9 | 0 | d498e34a43b782ea
+levelup | efdb037 | 1 | 6af28ff0fe1e7e78 372f408a882409 f38379d81f417be5
+levelup | 89f89199 | 0 | 6983fff3265ac9b5
+levelup | 24613220 | 1 | ae4e4fa9ac1bab23 c668d833abfdbdc1 2c9c92fbed502293
+levelup | d660e27f | 0 | 40e4f914af95ff51
+levelup | 93ef1774 | 1 | cbf29ce484222325 8c1c6b351d3fa49a c6041cf6a2de0ed6
+levelup | 6178c5a0 | 0 | be614a58ce161ea7
+levelup | 1e8d67bc | 1 | cbf29ce484222325 23eaaa8ec01e0fdb 5b30d64e7564c713
+levelup | 17727cb5 | 0 | 8d5abe4b6f90b3bf
+levelup | 63d1f69a | 1 | cf7df339b91905ad 3f76e87c788e0727 8faaa8098bc032a4
+levelup | a4f320c5 | 0 | 3803e5ec36fb813a
+levelup | 6a2509d2 | 1 | cbf29ce484222325 6ef52de595d840bf 25d0d890cb09fa6d
+levelup | 999e8ed0 | 0 | e9ce3340b12171a2
+levelup | 8bdf0060 | 1 | 50130539deacc513 3f3ff307985c2d83 786e811dfe6952af
+levelup | be68b2ae | 0 | e2fc80ce0bccc42f
+levelup | 931caa75 | 1 | a670a95c46562331 e4911f84b4142c3c 4dc79822b34c63a5
+levelup | d4a5e276 | 0 | a210afed80bf04d9
+levelup | d1979182 | 1 | 2121dab0653e573 1de308a8cc635c38 a31d9d2e4b29c257
+levelup | 69715f76 | 0 | 1074cf9a598aa37
+levelup | e777fbc7 | 1 | cbf29ce484222325 ddf643b923aa76ea f3f3296444c032b2
+levelup | 232fc44a | 0 | ea811ac912feca4b
+levelup | e2866a1a | 1 | a0ecd7123175685a 53e5afca52c79da8 a420dbebcb99b81c
+levelup | 5fc9aafe | 0 | 1b32542ac23f516f
+levelup | 651e986d | 1 | 9d62329f5bdf8641 d418290f0f843067 21c1911a3856e50b
+levelup | 6b38e394 | 0 | b59f06a512c00615
+levelup | f88f8ded | 1 | e7f9caa259b57c56 c426a2593ecabf6 df2af79e2c3c6100
+levelup | 8d2cfaa7 | 0 | 8416d89b34d8cf62
+levelup | c885c04e | 1 | cbf29ce484222325 8bf6e026638fed28 e321f776eae6cbec
+levelup | ff112f40 | 0 | 8da9e85d308f6279
+levelup | 2224e248 | 1 | 9c77ad98e75da9b5 e747c870212443fa b971896a9a98b25b
+levelup | 34eaa184 | 0 | edf3930173db9c73
+levelup | 175cdb6 | 1 | ac4d73bda441e4ab 9292dbb0b8a29610 fcc24ebf8816065
+levelup | 91e0fb4b | 0 | 898701d24f1e9c64
+levelup | 6fa85ab2 | 1 | 4b7433fc159b0134 18c423089cc3de78 2797672884af8f89
+levelup | 6875db4 | 0 | 9659f6a93f4d1ec6
+levelup | 6a84ffe5 | 1 | 6d235bc4712ed81f 3dc848e22949a09a bdde04132a60e927
+levelup | 12fcedad | 0 | 4484789290a0da45
+levelup | 63ff515d | 1 | 8ba65bc20f92623c e81d0530f66ad480 fa6f3c219b410004
+levelup | a5c2d1c3 | 0 | aee290a5b3be9b11
+levelup | 2bab67de | 1 | cbf29ce484222325 53c76004f7f44fbe 2c4e33d2ee370bdd
+levelup | f467ec88 | 0 | 6063f6dc4ff909d6
+levelup | 926f80f0 | 1 | 744c1abbe996953a 71d166c047329af8 f6dd86adf9102a3d
+levelup | 3a072060 | 0 | 1021ce5f7c8f8015
+levelup | d6fd15c4 | 1 | 9a0139ab700da750 ce6f7edbdf60c419 24222f595fbc4400
+levelup | 584651ae | 0 | f62df26ba36a8e6b
+levelup | a80cefbf | 1 | 1fc826055e1d483e 6e557ea7f48d0b05 78347dcd50f4aa88
+levelup | 5c6b1fdb | 0 | 364f54c402aed709
+levelup | 4336e2c4 | 1 | b2e3dd298ba573e8 40f7bea4545aec88 b7ee6433de5890a
+levelup | f68312b | 0 | fbddc885a3b12fba
+levelup | af299dc4 | 1 | 3071fce8b0b37255 ef4379234bdff9ff 415c6bbc88267b24
+levelup | efb0ea38 | 0 | 7a1ef088d1e90134
+levelup | b53e8916 | 1 | cf1c0305ef6cb56e 8afe781fe9759d9a bdd5ae425ca01ca8
+levelup | 98736207 | 0 | 28a5f8b128540ec4
+levelup | e64d0025 | 1 | c9e737c471896948 dd52d0f3eb87dc6a fc05b3bce1b92d1
+levelup | fbfdb307 | 0 | 7a512f46bc7b583f
+levelup | aa7ca2cf | 1 | 17ce2af4a462e5f3 5ffaaf2ff62aa0e6 4b06d868b166243a
+levelup | 57555263 | 0 | ea7c8d5c7482bc6d
+levelup | 9ccd8dec | 1 | stuck
+levelup | 3179b249 | 0 | 19ff2bac778646f0
+levelup | 1fde6f9f | 1 | cbf29ce484222325 2fd8ce97210a9ff4 d2f36953c9ea264b
+levelup | c3d8c823 | 0 | a1f6a01ae5fd1dae
+levelup | 23fa5025 | 1 | cbf29ce484222325 f194be3a2646f04a c115001d324666d1
+levelup | 1de5f4f1 | 0 | c3dab05fb3f8405
+levelup | 572358de | 1 | 5d19f05ed2f6e368 1e8a7fc15837edbd ffcd6823074fee61
+levelup | 70ad23fc | 0 | 7342b513a2f9fa0d
+levelup | c09cfbd0 | 1 | c2951c73364b0f1 6e3c2747d99c0ebb bb8e21919dc779e7
+levelup | 4dcd6d2d | 0 | 601d0edd476cb1a8
+levelup | bd288d51 | 1 | d0aad618672dbac7 9daa003d667ddf76 e83d8517843ad656
+levelup | 1ed02c2d | 0 | aa08f6fabf9afe96
+levelup | 25267f54 | 1 | dde3fea225881e73 cce52cbca159a827 4e8ebc6dcf3185d0
+levelup | d0e236f2 | 0 | 9d6ac32aa65daf20
+levelup | 75c9d812 | 1 | 27f73c6d454edb25 f000f65cdb1f7278 67e80d9d88cc24e5
+levelup | 29488e97 | 0 | a5a1036a6dc1fad7
+levelup | 33f3028b | 1 | c7e053721eb1a597 85e1e0772296ac67 754e69d70da625d5
+levelup | b9b29b59 | 0 | b6e41c20ac82239a
+levelup | 11c4b8a4 | 1 | bb2405d1a743e8f5 e011b968fbc6d336 c342837eddb8f8f4
+levelup | edfbaafc | 0 | 90d2781aa2bcbda2
+levelup | 5504be45 | 1 | e75d5301bc0cff20 4db7a5b37c4e1ce6 cd0e6078a26f8487
+levelup | b423a67f | 0 | 268c9b37b7df578f
+levelup | b31bab8c | 1 | cbf29ce484222325 fc4530a15ba25719 cc1f60cae7254a9a
+levelup | 236c8b0f | 0 | 8ac084c2ade11b6d
+levelup | e951af01 | 1 | fdc4df8b1b818093 df948b99d097a9d0 e7b47e5c393ed17f
+levelup | 2a8e60fc | 0 | 769a7beba8fe92
+levelup | 41a39125 | 1 | 759b76c5fb6ac6c6 2c2acc00cccc5386 19d7a595f62b8ed4
+levelup | c59fdf4c | 0 | 9c75c886c814955b
+levelup | 95f0936b | 1 | 3addc748bf21fc73 df796fde6965d167 a64b9a507325d4ed
+levelup | f7a455b9 | 0 | b94f69f7b9f7fd1d
+levelup | a4349d7d | 1 | cbf29ce484222325 66e4469a674f4e76 35599f1a25e81a6d
+levelup | f21da136 | 0 | a38d8da4a173315a
+levelup | b7f9b885 | 1 | b9776dabaacdf531 4290ce4325b3413d f3d32a9b6e3bdd3c
+levelup | fce8a4ac | 0 | a43fdb76e7ece811
+levelup | 5114d3fb | 1 | cbf29ce484222325 b6b35f647e2a541f 5cf52336023f0290
+levelup | 34dd0452 | 0 | b5bb5174dab0e5a2
+levelup | e269322a | 1 | 54a0f1b02046dcc7 1ed80495fd9ecaa c6bb374bb0c92444
+levelup | 24225d8a | 0 | 1328ccb475ad1738
+levelup | 4f844119 | 1 | ec25781c8cfdfd41 6b209afe8ad47cdf 755afdb02c18628f
+levelup | cc43bf4f | 0 | 87fce78291189789
+levelup | f2a2ab2a | 1 | d0aa7718672d195a cd0ebaa1cbb743e1 d5712b3a06988d2e
+levelup | bffd6128 | 0 | af8c54667ea76bdb
+levelup | 849d04fd | 1 | 21ea350d110e6f0e 5467166949e4797d 894de132dd7adea3
+levelup | cfeb1f27 | 0 | f77f248741cab2a1
+levelup | e287e1ea | 1 | f44a178498e8e899 8b300984f2d0e8c3 d14a43d8635aea5a
+levelup | 3010cbff | 0 | 1c53de28a3ee9677
+levelup | 68aefb1e | 1 | 3d202f826f792677 7f6d1bfc2cb5c310 4547ade0aed6c0a2
+levelup | e8af6707 | 0 | ecf7e6121b79586e
+levelup | 12b8a6ea | 1 | 1838bba5c8bb8636 c33810c37dd51fee 384980fabd9c8e5b
+levelup | 4c81b34d | 0 | 44a041295a46ee8
+levelup | 22f03fcd | 1 | b4642e36cee4fa66 2c6b8e1533ab76b9 6b999352dc3fff58
+levelup | 8fe050f2 | 0 | 8db87a9bce805c8f
+levelup | 1ae06767 | 1 | cbf29ce484222325 5da016503d2d289e ae309dd32ffa936f
+levelup | e04642dc | 0 | 7ceb5e9e0857080d
+levelup | d4e05532 | 1 | dcfff367ad602972 24e92f70bc0b6041 c90f4a0ce7a85a13
+levelup | 62616ab2 | 0 | f421747f9152856b
+levelup | 2637b4f7 | 1 | 388aed2c9fb39b30 aef00b1506c3806 f985b0c37ea9a2c3
+levelup | 49340b09 | 0 | b656fb13f2213d4a
+levelup | 480bd260 | 1 | 4a7146e6be499149 5ee8f9eb76730a30 5769dc6fc7999fbd
+levelup | c53f9322 | 0 | 771b5547027226d7
+levelup | 9cf3675f | 1 | 77f9b73f8894d504 c0c6f560a2a9d588 f2b9e3aa50882a75
+levelup | 51819ac | 0 | ef44f4029d415cb4
+levelup | 7fb732aa | 1 | 1c1d3c95366c2a92 d08789f76e2faa74 972d62d363ea3a69
+levelup | 5bf1ac39 | 0 | 462978466269ad23
+levelup | ccfe2029 | 1 | ebdbb681f76ac28e 5b9072a9918d8d2e 44ae521da32c98f9
+levelup | cc6e178f | 0 | 66577f2d4e09de11
+levelup | 2999b750 | 1 | 8386bbb536cccf31 a15f5776bed29ee6 f5fbdd48ddf25a10
+levelup | 5eccedd3 | 0 | c3b44b6ad4279727
+levelup | 1966d40c | 1 | 8842849ca9666f28 78e63ccb18cd025d ea818458b8998f33
+levelup | c7f25c0b | 0 | 6dc8421d9157313f
+levelup | 96ef678d | 1 | 8371a9a41fcf9d96 570dd22e16e39753 b4d4fd58925fbe9f
+levelup | 8fe11ed4 | 0 | 8d5544ba7eb3bfe
+levelup | 1efe074a | 1 | df402ab764406f6a 668a70c1544d39e6 f195f7e9ae0c704d
+levelup | 494925c5 | 0 | 900c367cd3ee30df
+levelup | 3c09b345 | 1 | 41db6e92970f0217 db63ef16ba175f76 df0c68ca099c9ee0
+levelup | b1d6d492 | 0 | f867eb611c36fe8a
+levelup | 84033098 | 1 | 175925d6cb162d27 79a95b87288db1ef 71a1bb91e87c5c22
+levelup | 7536186 | 0 | 387c01e80ef56fdc
+levelup | e9a2e212 | 1 | cbf29ce484222325 fc289c5cca60570a 709c0cbfaca732b0
+levelup | b22055c0 | 0 | bd3d12d1bb3d4dda
+levelup | 6119ced4 | 1 | 718e6eebd3149aec 1567b965ba0df158 32d8a8c5f3d032a6
+levelup | 53533b2e | 0 | 584c3b5ad7386fb1
+levelup | 1be07f72 | 1 | cbf29ce484222325 c25ca6c936b51f36 577f9bfe695d1a10
+levelup | 9115316e | 0 | 282d396f8297e33e
+levelup | aa3a76c5 | 1 | 4299cf71653be696 6c04b71076f13ca5 b20ec7495abbfac2
+levelup | f8f74573 | 0 | 7222cef43acb9bcd
+levelup | 91270e05 | 1 | e5e0c2e63a8129ec 66173bafe814a397 26718002cebcbda6
+levelup | 458f6dc0 | 0 | 27c1185e643e8a2f
+levelup | ed05caa8 | 1 | cbf29ce484222325 4f6ed4007bfaefec 53fd2caeab6509c
+levelup | b974ecff | 0 | eedc9d3496278b9a
+levelup | c1e4699c | 1 | e120dca7f9ed9ce4 4947731a355467a9 33e3eb5c96e11f5b
+levelup | ebf34ca4 | 0 | 8fd0f692ba54c623
+levelup | 2cd70288 | 1 | a137209ab7b22aa8 8816a147c69d39aa 253ada59dd405b0e
+levelup | 21835a88 | 0 | e5b34f2a016ca39a
+levelup | f8c5c7f2 | 1 | ff9e99617dd6ec80 958dd10e3e4527fe ff49415f85bce4bc
+levelup | 9e45c31f | 0 | 687c16c2dc2d45da
+levelup | 633a43fe | 1 | cbf29ce484222325 2b3b95ebdc366b21 5252ce8d92cd7956
+levelup | 75bb8a12 | 0 | 879cff662c2963e1
+levelup | 7ea54fbd | 1 | 11856ea531073701 5514a783ce7fbe90 61f56bfa494848b6
+levelup | 455fadba | 0 | b9d640d5b15e5b4
+levelup | 1a1d8995 | 1 | dfb42f7677a7fa59 7829a0d9b4e9760d ebda62ff57737867
+levelup | 4134dc5 | 0 | dfba47ecdf9af6ae
+levelup | f5d361b9 | 1 | eed53d8747728021 7bc60827cc2e7460 d8d2c2dd0bee1c4
+levelup | 11465cbd | 0 | db25b050966a6e6e
+levelup | 2847ecdc | 1 | d0aa6818672cffdd 8592735a839bf2ca 5441c99ee72fe7fc
+levelup | 2ff05a0a | 0 | d1562f4b7552637
+levelup | 8636bc7e | 1 | 8ab534d88f9f7907 c11b83bb785d4845 fa324a650183df29
+levelup | 7291597d | 0 | 82a5797e134ab66a
+levelup | de79291f | 1 | 9c152c6bf8ab5dc0 ed9167a2ce5598d7 c045f875a20b9445
+levelup | f9cf1cdd | 0 | edd7a887571ce4ed
+levelup | 3725ac62 | 1 | 7ec96e2b9e6e892b b729b826e536eb7a 1fb18f848876efad
+levelup | 2867b81e | 0 | a81ff369fefbf20b
+levelup | 454c6405 | 1 | cbf29ce484222325 8f71599b9e927997 cf04d859bc9bf95c
+levelup | a7ec056e | 0 | a93f885e58d8e219
+levelup | 37694a1d | 1 | 4c3a79ccded5c49b e00902c880979ef7 4415dd53b138e41
+levelup | 810084a7 | 0 | a1a36fe935be3875
+levelup | 1de7a9de | 1 | cbf29ce484222325 ccce743bc11f1cf4 f3467331cc352dbe
+levelup | 1ec380c7 | 0 | 58fa19903927f795
+levelup | 9cd8ddc1 | 1 | e808ae2234eabf81 a43ec632d005d5b2 81ef1fd2efabbd5f
+levelup | e5c4be0c | 0 | a74c7ae385da6a89
+levelup | 7b65f3c1 | 1 | d0aa8518672d3124 e6d9100a6c401802 dd9588a2e372c6af
+levelup | 77272814 | 0 | bbced8174d153c2c
+levelup | 42ea3699 | 1 | 2a17e2ea2a0fb729 f6ae86b1b8a35911 97cb17db5124f291
+levelup | d0444a19 | 0 | a550e12390e0e71d
+levelup | a3c3c38e | 1 | 3aff4f3b5803ec58 e28ff50787248e86 59c4f715f203d62
+levelup | 51affc11 | 0 | d8fe6072aeada951
+levelup | 8e420f41 | 1 | 2e7377562458eed8 3d7016eddfcd2896 c0f12ef1591529f2
+levelup | fbb6b47b | 0 | 5b2d25a53c579f18
+levelup | cab78b56 | 1 | 61e02ca9c5ce2916 d24649ac55467edc d4ca5aacea8b51bf
+levelup | caa1770e | 0 | e84354851a7986db
+levelup | 6573bda2 | 1 | c617b00baf0d9866 6cf4e0e5475cf054 eaad2cb490f2ffb8
+levelup | 6ff1125f | 0 | 1a745cbeeb3f7bf5
+levelup | 583ae1c0 | 1 | 672bdd3869c1554b 515f1c49a49c126d e6134d9743685d14
+levelup | 1b84be6c | 0 | d4b8d26a323c60e6
+levelup | 5a0e35f5 | 1 | d0aa4718672cc7ca 481343cae3583f45 c7ffa33d9b612129
+levelup | 703c37fe | 0 | 6028285d74dbd8b2
+levelup | 71827971 | 1 | cbf29ce484222325 410d47bd690d2e09 8d3119e3add1d7e7
+levelup | 25dcc52e | 0 | 2d0ece67f7e54052
+levelup | 69113a5a | 1 | cbf29ce484222325 2a3afd82c8b8c30 b8c6a06644291f61
+levelup | 9379fa88 | 0 | 24a0bdb000ee3383
+levelup | e8c552e2 | 1 | 4c0a68e039847c1e 34af8d9a69d3892b e9e1f371a297e9bd
+levelup | 3f496833 | 0 | e78e42baa488b58f
+levelup | cecff13a | 1 | ce83fe1e29dc59cf 252b541aa64f702d 39f085c8aeb608e9
+levelup | c1218a03 | 0 | dbe2b589c3199b4c
+levelup | e3de06d8 | 1 | d354529f372c2fbf 96c0dfd62d0cfbac 9e94e6f9e940c8d4
+levelup | 84affc8 | 0 | 29ca3fa27820a308
+levelup | 3dab2332 | 1 | bfa502c8f5f304e4 215d4a00bb3ea63 f237b688848734c7
+levelup | 191aa77b | 0 | af00f67af31706ef
+levelup | 13506bcb | 1 | 79f72dbd5107327e 43772d1937eb499e 4a9fcc37e9426233
+levelup | c2dbcb56 | 0 | f6dd8ccc78359a0d
+levelup | 6cb8def | 1 | d692f9f969acdb9 f4c3a64061c70437 7037fd10ad6d9a00
+levelup | ca343b0 | 0 | 76eb1d0781f21fe2
+levelup | 6af797e1 | 1 | dd3423d895265512 c1731d93161e133d 7959dc25e222d053
+levelup | d7657996 | 0 | 6502ab4323949993
+levelup | 94c130bd | 1 | stuck
+levelup | 81d6064d | 0 | 3ac6029213793492
+levelup | 1a0eb4c1 | 1 | b243dfb776a9f719 1412320046c8fd74 ab895da67613bf45
+levelup | 85e4e1e5 | 0 | 15f3f0dabe1884e
+levelup | 3381117c | 1 | 2f1f7a70ad29a6c5 b4edecb6a953b807 26f4a24899201511
+levelup | 79d98260 | 0 | d7ffcef4968b71ae
+levelup | f4d1a3d4 | 1 | f7729431fc43feed b1acefbfc3cf84f0 20b764606094a
+levelup | 5f40be26 | 0 | 5470bfac8725ca83
+levelup | d456b8a4 | 1 | 3dd647f922f85f60 7af635964c29b770 4f786a590885d510
+levelup | 41d36def | 0 | 2a6cb5000a4c7b0d
+levelup | b6f03bbd | 1 | c7becb9a730397bc a09f650f6a464516 c1c2e97b07c6e1da
+levelup | e0b29f05 | 0 | f6e5701f21e77692
+levelup | 4cd13ea0 | 1 | d0aaf318672dec0e c7bde1d1a05e1f59 a3c6cbc41933281a
+levelup | 2d413cdc | 0 | 2c2ff7befc3278f1
+levelup | 6e5268fc | 1 | d0aa5018672cd715 e37831c78d910e3 b54488078889b003
+levelup | dd842d5d | 0 | 7fa90a4a6c3c32ee
+levelup | 241adca3 | 1 | 354c91951d6f5cf4 36fd6edf9b447ca6 5e0fc8afb79fc8f2
+levelup | 72231a47 | 0 | 11c1c13f0133de6f
+levelup | ee513383 | 1 | 1057e21e3ff209c6 4a709142bb9e41f1 c9c43e09b72332fe
+levelup | 8e862bae | 0 | 2c25667d3798476f
+levelup | 3cfae7b6 | 1 | a81af1fc04479d65 6c721899b7297a51 19597e8f7e8b1280
+levelup | e66875 | 0 | 10bc1ab58bf8822a
+levelup | 4a24e56c | 1 | 947e1755556014e2 16c55e039e68842f b9885861c8fa1a3d
+levelup | 204e81a2 | 0 | e96966146e1de57a
+levelup | d5a0780e | 1 | 4855abbe6dad9a2 6985d37d8145eb36 e514104f31e6501c
+levelup | f573d83 | 0 | 11d837904ef1cab6
+levelup | adcddefc | 1 | 1c016c742ba7c93d 1a5cb14a555123c8 33ce2a9d333460f9
+levelup | 89e6f747 | 0 | 1ed407065febd1a4
+levelup | 49a42210 | 1 | cbf29ce484222325 f56777d23fb158c2 890cac8518f4b648
+levelup | 7b4a16c2 | 0 | 1ba399cfe42b06c
+levelup | 77431998 | 1 | d0aaff18672e0072 1ca63b9607a5f42b 8b4dd2aabc8fe925
+levelup | 7d599a93 | 0 | 2a286d877b5b40ce
+levelup | 94f093b4 | 1 | b3cbac9d83205ab7 b4cc7e372c1c821 aa2d428434c68eb6
+levelup | 5f3ecb2e | 0 | 751a97d6144724c6
+levelup | 5f31e1f8 | 1 | d0aa4818672cc97d e1c4d6de93307fdc 14e0b2cf0c168817
+levelup | e5414c60 | 0 | 4e070f350c121dab
+levelup | e99a0f21 | 1 | ca8c29de1dffae3e 60d0c3d080c64aac 24749b1ca9177cc3
+levelup | bcab6a8b | 0 | 6d6154696c464559
+levelup | 8091fa15 | 1 | 2b1c67f4a8cf6dea c56de54bc9e9e85b 88146de2a745f54b
+levelup | e152efb1 | 0 | f80af815dde7d996
+levelup | 14e6dfc8 | 1 | c41b94aefc5d65d8 3517c40d5c347269 3b172d2553d6ecd1
+levelup | 10b4ae84 | 0 | 19f46ca4883c0d63
+levelup | 48edb338 | 1 | af3f79c8aad78ef9 43e44d527b20e83c d108e86d1659b425
+levelup | 4ac00adc | 0 | e3ca2d431cfa5edc
+levelup | 9055a981 | 1 | d0aae018672dcbc5 ad217b64755f4a0b 385e31f4940b727d
+levelup | 4a2ccf7a | 0 | b9650a9956d5023
+levelup | 7d1468fe | 1 | 1572355910926eff 8104cded5ac020ca 263305dbb312f5a9
+levelup | 9e70ed6e | 0 | 570d335893230837
+levelup | 71c0335c | 1 | 9ad137f69eea1fb7 227c0d38a43c0d1b 480e8f72c60fb877
+levelup | bc65dcd1 | 0 | 6d930e0ca9600c49
+levelup | 9431b2a9 | 1 | cbf29ce484222325 ede8d5db4e71527c 3dcd176b0b2c7c40
+levelup | d20ce91a | 0 | 88d2993835679234
+levelup | 70d01a0a | 1 | d2c0d087f3657180 913a9ce90834bfb9 d763cab825c6a880
+levelup | 8b672483 | 0 | 40b887a4bbe2ceae
+levelup | 65be7864 | 1 | cbf29ce484222325 d3dd0d7c5e8239f3 37fd7b47420464f5
+levelup | ca52fe3d | 0 | 10c2b6868d614c34
+levelup | 19ee2b50 | 1 | 9fc07900eb2808fd 8337f13e872f2fb3 6173aa7918e15353
+levelup | a76907fa | 0 | 7ff1b5a2bc4322bc
+levelup | 3ede9aff | 1 | aca1d193d32efc3e 522022fedc419a6b 9e69fa71928b1eeb
+levelup | be223db3 | 0 | ffd4b0e8633cfa24
+levelup | 169c3a57 | 1 | 7c096e8b5a8095d0 98b6d1fc6bec9500 6151a8f73147cdfd
+levelup | 1c46181e | 0 | d769f7f1901fbef9
+levelup | bfd813cf | 1 | f1bbc14d0200dd97 4fbab81c9ff354ad 2baf85d15a8882f8
+levelup | c27adc5d | 0 | d19a26147c9b4241
+levelup | 593c958a | 1 | cb50af441179d36c c8f299acca58e975 e9a7e03522bebab6
+levelup | 5274c977 | 0 | 2e3cc611ca5000e2
+levelup | d5eb22f7 | 1 | 5c1739c5d2a05ac2 a8884efd2759b58 a654aad7c73a5a6b
+levelup | b289d590 | 0 | da896c1d7cf1015f
+levelup | 7f01c035 | 1 | 4df707e0a93935e8 ac3d28e159bb16e6 42ba2f079d6ec3d1
+levelup | cc77cd9f | 0 | ac9fe03eed7fcfbb
+levelup | badb654 | 1 | d6ce8cb2b62ceebf 9d8ee534ac7b443c 310b7ba37c2c90ad
+levelup | 2b4ed195 | 0 | 79088776d95c39fb
+levelup | 1a3c6137 | 1 | cbf29ce484222325 f156bec2c15a0492 10cefee9ad963a69
+levelup | 917900c7 | 0 | 19b3199eb6218a13
+levelup | 6907ff81 | 1 | 136a79025b9a895a edcfcc636085a4a3 6b02995e4477cfd3
+levelup | c881717f | 0 | 3565dfba3aaec48b
+levelup | daac0e22 | 1 | 833e64011e4d5786 13e46bf6b260ca3a 208bdd695aca2445
+levelup | af9bb2b4 | 0 | 151961c9bf8e389d
+levelup | 93376cfc | 1 | 47bdb6caaeb44799 ebafaeff26a75ef8 fbe710ead12b4803
+levelup | 1be50559 | 0 | bf9ced425f5cdf
+levelup | cd29da76 | 1 | 97f6160eebc4d17f 309e7776604ad2cb dd6d7b3e5f334df9
+levelup | b834edfe | 0 | a2e7269ed0a8e3fc
+levelup | f798e184 | 1 | d0aad518672db914 d083c616d8384f f1cd81ff801df5c2
+levelup | bb542f70 | 0 | fc5872ee2dc0a0ed
+levelup | f410f50d | 1 | d0aa7c18672d21d9 c21c6d6019f38aa8 468f43671773ac62
+levelup | 6f71e5ad | 0 | 51360bf331f1c57f
+levelup | 8b28ce2b | 1 | 6afeea56f000364d e8aa6ccdc0d52935 45ed1ec488c294b3
+levelup | f9bd2678 | 0 | 2e1e45c099a20df
+levelup | e50fe0b5 | 1 | 60c12fc1c17d053b fa3797b38583c7c9 d747332e03ce0fb0
+levelup | 80fd893 | 0 | 964483a15c4dd057
+levelup | ce097a2b | 1 | b95e6931b9254825 22da1eb7026324ae b538aa2ee8852938
+levelup | e81155ae | 0 | a1744af76c0003c0
+levelup | b484facc | 1 | 6ee610601275654d cd99c41ed335112 47f51d1a8cabb1f8
+levelup | dfd1c73f | 0 | 57ef6487f2fd0630
+levelup | a1c816d8 | 1 | 6ce7a887aeaf0e8d b24458b6bbed4f7d 790f27397a5bb691
+levelup | d0b66057 | 0 | 585f27b5ce8c601a
+levelup | 6e6845a4 | 1 | cbf29ce484222325 faa66a53d8413242 f3dc215e8c473735
+levelup | a7132db9 | 0 | 8d4b3afe23490b90
+levelup | 547ac592 | 1 | e810a395cad21dcf 78ef375f5f183357 84d02c7b5051dfb3
+levelup | 44d9e82b | 0 | a1a3e0fe8030f13
+levelup | 9e80b76a | 1 | f881a527e0e6a6e edc46f92cb3e239e c61619928dee9910
+levelup | 4852d1b6 | 0 | cc58850fcc81b689
+levelup | 40e9404e | 1 | cdc8e009ab99d4ac 68f90084ff3fe777 11781e568d21d1ff
+levelup | b4742052 | 0 | 2eb287ac73ba3802
+levelup | b9663a5f | 1 | 124333ac9333fa76 c624a27f2c49fe7 28ba23d9a1baa7a7
+levelup | 2bb437e0 | 0 | 11c699b611bafa6d
+levelup | 5895279e | 1 | a1331d728d1b769b c2187e99f669d604 7891a5f7a015fa7f
+levelup | aa1cd422 | 0 | 66b9b2b3abc0b557
+levelup | 107971a4 | 1 | b8ecd2ba3dcd5b37 494e0edbf4f2b6a5 1ef8bc4168faf491
+levelup | 7988e811 | 0 | ab226f110580747b
+levelup | 295b20c0 | 1 | 55b591aeb61b2c6b 286aecea9aa8bb73 cd5edb040c80be11
+levelup | d2d44446 | 0 | f10708084602e32f
+levelup | 554b2809 | 1 | cbf29ce484222325 7cd5e23d706763a8 c1f1af8953aed2d3
+levelup | cdcfdbfd | 0 | fa53039d7afda0f4
+levelup | e11cc9e2 | 1 | cbf29ce484222325 d45059d574eb99a0 91451eb89ccd90f3
+levelup | fd76460d | 0 | ce6a0319355fda44
+levelup | 17748e7 | 1 | 10008cfed5fbd825 cca07f4ca435a3df fd20583d32efb6e1
+levelup | a0d02983 | 0 | 73048e98f4d559f2
+levelup | f32600c9 | 1 | 11c231edf872606e 8ff59a011f4e7df5 44fa0aed02fcf817
+levelup | 82ecc616 | 0 | 9a6331017dd4603e
+levelup | bf60d9e | 1 | d6e3fa6d81ab22a 122bb416d274c27a be2867750900a3c9
+levelup | a547ee53 | 0 | 720ca9061ae4ed48
+levelup | 185db394 | 1 | e7ba66445495b7f3 59fac458fa637555 55bac1469ff850ca
+levelup | 9ebbaf8a | 0 | e9a2111d45bf2e8c
+levelup | 7084fea0 | 1 | d0ab1c18672e31b9 24367897a9fc2ed4 118a3f86eeeb07a2
+levelup | e7f6e35d | 0 | 8cadd434b2e08f84
+levelup | e96f0ee7 | 1 | f6f3d02c83fd5621 7672832e010fc6de 61f70e74cf8fa78
+levelup | f1d6f08e | 0 | c272a5e1b7d122c9
+levelup | 7a86d9ad | 1 | c6843c726f02bed1 8b954ebb311800f8 2cc4e2fcc7b2b7e9
+levelup | 9d644dba | 0 | e2b5e4aa632c7f3a
+levelup | 5c5321f8 | 1 | 76c90482b9cd418 2b3b54c9b3e7c00f 592471cc017e1889
+levelup | bd022751 | 0 | 53059ab6cfb405b8
+levelup | b5e60fcf | 1 | 7f8206661e053a2f 86d016e43df98585 4babe14f14797160
+levelup | 6ac9a7af | 0 | daca1676839e47dc
+levelup | a8b363bf | 1 | 311ef276c999fb8f 3b3b613e1ccaa773 dfb9d7b58b692c8f
+levelup | a92dd6b4 | 0 | fb1452874b3b5877
+levelup | 5bfdba02 | 1 | cbf29ce484222325 3f251fafd2de5925 eb43354926ef6a54
+levelup | 6b610c60 | 0 | 4cb04a0f38c597f0
+levelup | b8ef2390 | 1 | dabbbb1efbdaaebd f6fd2f4f0b6bfb5c 2afa6d3cc000f806
+levelup | e0d405cb | 0 | 79f2a50b8566589a
+levelup | 1187a767 | 1 | dad86550a31493fa cf5445ce92eeb7f4 24db37b325bfcf28
+levelup | 88793743 | 0 | dfe644884ae86a95
+levelup | bf1a5c24 | 1 | cbf29ce484222325 e91159fe9fad3e79 b1bd36a20564d7a5
+levelup | 67bf7f7f | 0 | ea4268deed283c1e
+levelup | c4175926 | 1 | 844469cad8ddb487 1fd6f453a4d818f3 8dd2d3f948a5bd79
+levelup | 7786cbbf | 0 | 8d6fd98bb4e261f8
+levelup | b04ebd23 | 1 | dc9a2c4ef15cc1eb 6994272bddabd3c9 2a6a9573f05a6848
+levelup | bd705479 | 0 | 72eedb20cc2b27e5
+levelup | 4232170b | 1 | ec8e340dae67b907 880979faa13faa44 9da37d994ff1f23e
+levelup | 15049e2c | 0 | c098f4f0e935cb8b
+levelup | ec77eb25 | 1 | stuck
+levelup | b5556767 | 0 | f0ec0baaf7842991
+levelup | e40b397f | 1 | 82fe196b5f29a7a1 636081cae103a792 1d850aaa0b521f2b
+levelup | 19eeef43 | 0 | 1ac6cfaf593aad3d
+levelup | d3c759be | 1 | 9d5a447eb10bddd 33578efb43c2ef4e fb140e18465cff29
+levelup | 1cbaff0e | 0 | 3f42ab6fd933f6f2
+levelup | f055320a | 1 | cbf29ce484222325 7fa866c98a21dc22 fbfa2580d950adb7
+levelup | 8feabb8f | 0 | 44e7410e28932104
+levelup | 4b2337e8 | 1 | 28e89d63d2066d66 aa15c83893c2a2fa ec965ab4f8cdc536
+levelup | b510dfaa | 0 | 75df11ffdac8ccdf
+levelup | 45524d34 | 1 | ea840576fe634195 cbe29263c91dd169 e57f79fce86ef809
+levelup | b952ec0 | 0 | ef1fb76d14e2421
+levelup | 45ef1f5a | 1 | cbf29ce484222325 c2d1731198822926 78739788acf38790
+levelup | 46882b1 | 0 | 6f63a731d31fb6c
+levelup | cc064927 | 1 | 78592ff5e8af6e2f ddafa6784fd2ecef 11f0825b21988aab
+levelup | ab6ef3f2 | 0 | 339c2bc42fbc0872
+levelup | 2edd4783 | 1 | cbf29ce484222325 324e9c9cbe571588 7ffa8534904bc273
+levelup | 6c449636 | 0 | e58aab19311f1f6e
+levelup | 393efd7b | 1 | 38edb4a6fdb4e6c4 9d647d64d2b5c3a0 f8c16a3a0ce5b7cb
+levelup | 6570011 | 0 | 42eeba1618ddd77b
+levelup | 91ee6fa5 | 1 | d2c1a57f2e40dcf7 16e0fe73ab76b787 b62e5ba3bb57f596
+levelup | d39028ea | 0 | 7ec7c075001aa4a
+levelup | e5c84884 | 1 | 461836ad678940f9 e101191bfc8f5809 5f4508273043f206
+levelup | db0d35c9 | 0 | 2082f7aea52521e6
+levelup | e1a7636b | 1 | 48174abfbe44d46d 9d3518bcc8618844 8d74321261df9c09
+levelup | be3ee253 | 0 | f88c126356ffba98
+levelup | de459e11 | 1 | 58e2ab28650ab645 fdae224c81941f82 335da565b8f0872e
+levelup | 7e107c53 | 0 | f053ee77d4375960
+levelup | 254ee45e | 1 | d0aa5c18672ceb79 be902a0d66bbcf59 f256c8812c800f47
+levelup | 35ff4fe4 | 0 | 3b9e526fc247b0ef
+levelup | cd014480 | 1 | 48b3ec9a1349554a 1d72e4353abdbf3c 748f990b6830ea96
+levelup | 6a7c0be2 | 0 | 3b3623838022c717
+levelup | a4c96396 | 1 | ae12a83055dff3dd 39a332570fb2fb2 60b31434112f1215
+levelup | 16b35478 | 0 | 323b783043f571a1
+levelup | 7d20dac | 1 | aaa9bb1bc9de221e dd9386dd70fa440b 7a1bbd748af39ff1
+levelup | 59f691dd | 0 | d53563064d6a4618
+levelup | 90f3dc7f | 1 | 1ceab4029f5cd18d f39b7d83450cb2e5 286e770ec9632316
+levelup | c55ff909 | 0 | ac231d01e2035d9b
+levelup | 5a134588 | 1 | d21d7748d74f39d7 b26fc63afbefe94b 1c96a138212cb140
+levelup | 48a5c5b0 | 0 | 76cac6e7efe2bc07
+levelup | 83d0b57 | 1 | cbf29ce484222325 578a02e39d244aa2 771c34eddceb30b2
+levelup | e618c3f0 | 0 | e7cd92d95c1623f6
+levelup | d2778701 | 1 | adc9a2e0ced4cdb1 fac872191c4d7754 85e061a9f795c439
+levelup | 52dec2d1 | 0 | 599fcaf2e00e2b16
+levelup | 73ccd34c | 1 | 669f210e7910c82f 8e8742742fab6c6a 1ce49eaaf7977faf
+levelup | 37a773dd | 0 | 25587e632a9046f7
+levelup | be8e14ba | 1 | 26800e1c01ee2a7c 8baf2c9ec85c8222 a8b78a44e6e920ae
+levelup | 69611796 | 0 | b0ebf77ab6d78b9f
+levelup | 7da83fd5 | 1 | e11d45b45b3fc29f 990aa0d29912e0d5 178391ab9bcd2936
+levelup | 8e6bf5f3 | 0 | 84a36a1cc9a38b10
+levelup | 54ba1bd | 1 | 885e170ad0d583d6 c53e2de94a8842b0 3117766e785fa07e
+levelup | 222f4495 | 0 | 873c7599f2d4be74
+levelup | d816e3a1 | 1 | cbf29ce484222325 84bd44b1a2356dd4 ea34f5f699d22173
+levelup | 63d3e598 | 0 | 94b04624993c8c2d
+levelup | 636a9a8d | 1 | d6070c991088c50b 51073cbc19b6657e c7cbf347eb8b7c55
+levelup | 3d7d1b87 | 0 | 4c68c76b8fee81cc
+levelup | 53fac2de | 1 | 5bb277c3c3fb6ee4 d9ce0cde6419079b 673afe521ea248bf
+levelup | af964715 | 0 | bd35c4da8d90ab09
+levelup | 1fcb9115 | 1 | fc887004ffdbf25f 5114033f1694ce3b 43a3e0a3a51891ef
+levelup | 13a6ece9 | 0 | 4151d3bd4aa174a6
+levelup | 57a24275 | 1 | 7aed1c49e88f2c48 db9d042f706964dd 82b8a8815011f56f
+levelup | 42df8dc8 | 0 | 9be31c3420bb32ae
+levelup | 852b131e | 1 | abe3439bb14491fb 2d4efa8219c284b4 e7e4411414eea86
+levelup | 824da2cf | 0 | af0b1e9b3783aaa2
+levelup | 4d94e17d | 1 | cbf29ce484222325 8a33933dd2ed4340 514e1c6fb4a79de
+levelup | c913f078 | 0 | e57afd97c861e204
+levelup | a020bfd1 | 1 | 5e68c6b63f434c4f 75321fc3184ffec4 b5db938e16e07fd3
+levelup | 5267b69c | 0 | ceb706b70949b2d2
+levelup | f8c34507 | 1 | 9a501cae69b7acd3 9a948439291bcd7f f705b29fe61b6ce1
+levelup | d4f2f702 | 0 | fba9f800ff05ac20
+levelup | c5e6b4eb | 1 | 92723478380d40f3 89b74e2a320637e4 21284d04d5cdb5dc
+levelup | 242ea930 | 0 | dcea863d28f37307
+levelup | 6ed59de9 | 1 | cf6e4f1ad108f8f4 a99e0445e15d2423 58ac603b4cb29d9a
+levelup | a6e6212 | 0 | 76ca09aaf1ff8c82
+levelup | 86036b71 | 1 | 2989a443c910ffe4 1c95cc56f1e4d921 ca3219dbab2e2231
+levelup | 39970049 | 0 | 8814eff99c5c4f43
+levelup | dfb63b51 | 1 | cbf29ce484222325 a2d53353107faffd 3f092bfecd421c2b
+levelup | 32edff6f | 0 | 4b8e4bdf34eb7cad
+levelup | 167a7198 | 1 | b9863abd468d73b5 bfafa4564500e8c7 5781f27a4fa44243
+levelup | 5818fc52 | 0 | e9cb46906638ea6
+levelup | 3b5a8c27 | 1 | 6f51f6f4207fcdb 403e9c43fe0c0151 6dc7d379f44a1f10
+levelup | 946da82f | 0 | 214d5e1ab91649f6
+levelup | f1198830 | 1 | a5292663a212f2b4 8924e1ad0d5ddb15 40450223ad19cbd9
+levelup | 322bcaba | 0 | 7dcb9114d7376d31
+levelup | bd251ec1 | 1 | 59b0ee0e12957a6a 3808088c081b59d1 d59c7c8732b8df3c
+levelup | ac76c384 | 0 | 868668ab523af996
+levelup | 951211e8 | 1 | 58da5188475146b4 f25105ec46e13aa5 82ca64f53c1b0523
+levelup | ace0cf05 | 0 | 89fb1be218bc1553
+levelup | 79c196e | 1 | 6fd12158e983b81a 1a5a01babfde2e5a 8ced19926dfd90b7
+levelup | 45e09fc8 | 0 | 71c3f368b7a4b752
+levelup | 8af4f36 | 1 | c71956fe560d49fe d55c24e576ec407 684397865246e718
+levelup | fde2757d | 0 | 9ec80b21e05a521a
+levelup | a8fca438 | 1 | cbf29ce484222325 a3dffd35a4e4b284 14a0b4795e37b7ed
+levelup | 265ef902 | 0 | 74430aa9f2ba5e33
+levelup | 438314e1 | 1 | cbf29ce484222325 11a889353c0eb367 54e625c403a3ddc8
+levelup | 51f90b0d | 0 | b174b543300b2ae9
+levelup | 81aa926a | 1 | cbf29ce484222325 6ea70d2c0f1f9f60 68bb9c9d239c1740
+levelup | 3f0aa687 | 0 | ece648b5032867d4
+levelup | db824ac4 | 1 | bfeb24445f616e84 685b0f835892b779 b1dda749d634e863
+levelup | 5be047c3 | 0 | 89693443a60ae72a
+levelup | 58f8f6af | 1 | 9814ba03b234e82d 277857b5d2c39519 d706d6c4b253e00b
+levelup | 7d4dcd78 | 0 | be542a87e88310b1
+levelup | e02f7bbb | 1 | a4b85cc51d31cbab 443ee59f90bb8c95 756fbd0eff305c70
+levelup | a300c9a2 | 0 | 68ba4cd7d57b6ba4
+levelup | 7d8bb46 | 1 | cbf29ce484222325 78e53d350ec94010 1c905a5c381af11a
+levelup | 15661960 | 0 | 5b6a1cfd140c0a77
+levelup | 47309e4a | 1 | 67bb33b8120acb3f 8e44ff1e120c9acd f957dd057f3de07c
+levelup | 94570c07 | 0 | 2f4cc5e5fafc7eda
+levelup | fbf6ecca | 1 | da2e515e52860fd4 ad10dd9528f53a9b 69e8b8bee25827d7
+levelup | 18843541 | 0 | 25f531f037cbb92
+levelup | e9693311 | 1 | d56e8d53ece02a58 fa2bd69a3e7b1bf4 13e6c5b40a654555
+levelup | b31c690 | 0 | a9846d1e51ae306f
+levelup | ab4ef157 | 1 | 3201cc8b8aae3c1b 6cd20224103d7658 3c5a6764ff47a8dc
+levelup | 84575e47 | 0 | 8c928ec0920a2b9
+levelup | 8754b11b | 1 | d0aa4018672cbbe5 eb14ca479c9a515e 440264c95fd6c368
+levelup | 458a2dad | 0 | 4948eb2645f8b99e
+levelup | 19d125d0 | 1 | 72d86b1364977ea8 728e00b3532be41b c0e94676c39c1978
+levelup | fa018597 | 0 | 997049c75da06fec
+levelup | e1a4ce0f | 1 | 54afe43525ea927e 96748b36e54207ce 91594f49b418beea
+levelup | ddaa72e8 | 0 | 6068dafebb8eadf8
+levelup | fd128d0f | 1 | dd7caef848b32903 6bd71037193f67f e5c9eb52b69662b5
+levelup | d06f4ec8 | 0 | 5038069ceb0b0db4
+levelup | 90b13fc6 | 1 | cfca97e065625f92 dc49c39e47b481c f73a12f9db9216bf
+levelup | ae764715 | 0 | 7ff43d3a4a8dfd57
+levelup | 853c4642 | 1 | 59d4cbe84d7e1220 340bcee2c8ce7a60 14fd6c5902e5c790
+levelup | 8786a8cf | 0 | 65f60b73b7c0541a
+levelup | 8b953b1e | 1 | f456304c2ff26f8f 775e4b460368dc39 4f08882c2a292c4a
+levelup | 66dab634 | 0 | 8557b769f2b1473d
+levelup | 46d49130 | 1 | c28b401ddc8103dd 59c53b2927a47cd1 4796b109a95ff609
+levelup | 9f6fbfb4 | 0 | 1c2e9f45a0ad40df
+levelup | 80374f99 | 1 | 1e105734b2a9c060 7eab11189f92a7f0 bb308e89110ce091
+levelup | 2b487328 | 0 | e7292968e504263d
+levelup | f1ecec39 | 1 | b383612d24a8e56d fa22d475ab025718 82929fb79347aabe
+levelup | 9393ee68 | 0 | 7ab35d3dbbf160ca
+levelup | 8364d35 | 1 | cbf29ce484222325 5ba341941e5bfd95 caf00523ae5734a2
+levelup | ed39124f | 0 | 4eda8932a5ae1894
+levelup | efaf8187 | 1 | b7bfbd1ec48de3c0 79753fb3cea409d7 7919b09942c86459
+levelup | 4e95e01c | 0 | 7090da0fb60b27b4
+levelup | 2cf3085 | 1 | f8008e776d4d6508 7208da3b75b2163 3cacbb398f4fbef0
+levelup | 3d2b0c3e | 0 | 5d4078c2b187a46c
+levelup | 9d3dd5af | 1 | 81bee66dd960fa86 a65fecd4405474b8 dc4d7f9a7a258ca8
+levelup | 851e5c47 | 0 | 262bf72cb1d56b0b
+levelup | b8229e2d | 1 | 8b8209d825c9cf4d 6dbda10748814a6a 87c6ea88261437d5
+levelup | 51f03bdf | 0 | 7d3b44cf9fac0dca
+levelup | 17c33131 | 1 | cbf29ce484222325 4eb72b85687e0525 678274afbde0b21
+levelup | cdf5f715 | 0 | d1eeecc641f96c08
+levelup | 5a6e2277 | 1 | d65d9cb6356f4011 e87db8cbac56451d adb72a46704ccb9
+levelup | e3b1fe47 | 0 | 840edec86af3e3d1
+levelup | 892acfba | 1 | 91100b3fff06e2b8 8755dd71b7f8b22b c2277a9d0c4714ec
+levelup | 8b5a2765 | 0 | a726f7d0d2975546
+levelup | cbef51ba | 1 | 82f2c451eea92b56 5194705f25075468 28c4c0053d7c1f1e
+levelup | 9d3d06a2 | 0 | 93233c3a0c89cc6a
+levelup | 6a506f47 | 1 | 69143a2b0c5c6ef8 3818df0757d298d5 200a1faa9026fed8
+levelup | c5502766 | 0 | eb4ee9fcb9fb96fa
+levelup | 80d0ee7c | 1 | a49346e1900ac2e6 128e736d25063bd3 567f953f55f8a419
+levelup | 4b5779ec | 0 | 8436507692f9c968
+levelup | 38ed3e5 | 1 | 474fa0c87fec5736 dc06ac81054a91b0 bcf5aa7c16367af0
+levelup | bb986b3c | 0 | b5e1f66ef154f38d
+levelup | b61ea69 | 1 | 457a7d02799c8da1 96eadb51592d013f dc0ada397014399a
+levelup | 2f98f36f | 0 | 8b1812e86b08b428
+levelup | 69ad17fa | 1 | ef114470b6690634 c074eff6263c9423 97805cd0ae81b085
+levelup | 11e3a394 | 0 | fc6b332ddcacc8a
+levelup | bba6aea4 | 1 | 195007910d85913d 6064c0603e5de7e2 1ccf8adc14f964b2
+levelup | 27dbaa62 | 0 | e6120da0270ea16a
+levelup | 23bc4024 | 1 | 43d9f7dd55de1883 725406b4df52bca2 d372590984b00644
+levelup | af3fca7c | 0 | c3eb4cdc5622efe8
+levelup | 6f0101a9 | 1 | 6ead66a027da100f f329c20c3f6badd6 76c3e7b14e5ddf5a
+levelup | 138e2942 | 0 | 404d3d8d0e9917eb
+levelup | 39d03b46 | 1 | cbf29ce484222325 c62c351dc8738636 a25d446dc53c8a9f
+levelup | d9d4c2a | 0 | f4be3b7da1fa07ce
+levelup | 5d76dd82 | 1 | eb67aa8125e48e98 96e6265ef59521b3 a34539f66948b77b
+levelup | dc968da6 | 0 | 75fa8e3b3625f3bb
+levelup | 8c33caa6 | 1 | dc5a8448135e2efd 3a7a9858680b4292 b5c2a784a22b99b8
+levelup | 9dcb18b0 | 0 | 9913ba8093a34ae
+levelup | b888167 | 1 | ec7511bfa45ff499 b28ad66d8598eece 8ad19cb71fcbfd87
+levelup | 8e7753e5 | 0 | 908cb656d6aafa82
+levelup | fa06ab4a | 1 | 1acb7a594771b97b 80bb4df68a819c91 c8d7501ee316edaf
+levelup | 1692f9be | 0 | e890b2dcacc2ab2b
+levelup | 62af3956 | 1 | 66ecd0e0097b3fa2 be3de69eb128c200 ddff2c6082102ce7
+levelup | cea4e09f | 0 | 24c11ee5372d050e
+levelup | 581720bc | 1 | c00c54338553ebc5 12638a7f1a4695d6 3972a490ed6dc0c7
+levelup | def3bf7 | 0 | b72b6c2ae407ecc4
+levelup | 4ec2a9ed | 1 | d0ab2a18672e4983 c3e9d6f32f12d322 b27c4e57a0829c10
+levelup | 3e347d28 | 0 | e36f612a7a2aca33
+levelup | 4e0f9b7c | 1 | 31b0758a2d8e4d69 51acb8ec9296989c 2e01bc0407bd66b6
+levelup | 53373bba | 0 | d5c0045ccc219fa7
+levelup | cbe8829d | 1 | cbf29ce484222325 3b277a00b2ace4f6 e55fa322c1c5b26a
+levelup | 3213bd12 | 0 | a6c1bf03de359202
+levelup | 33a28848 | 1 | b971231dc0f3ca70 cebc7e084405b5b8 1519a6736391a78e
+levelup | dff2961a | 0 | 1adec6a069227caa
+levelup | c3f096cb | 1 | cbf29ce484222325 1a3525f0a081a980 c1f1ee3fa1c7e406
+levelup | 8b98cd8f | 0 | 2a1dac608b224ddf
+levelup | ea9dd0fa | 1 | c1336d5e164fb9ae fcaaf98aa447d5ee 7f6a09f33b770cb1
+levelup | 180b2395 | 0 | 4b07df1291cdf79c
+levelup | 4fb3f70f | 1 | 5d3073f82cb833c2 1cafd3748f729807 1a03cc4e077c1783
+levelup | 6488932b | 0 | f4d97cc735efb838
+levelup | 9e675401 | 1 | b6bacfe121cc30f1 59e4ca978b6822aa 623a9c589841e00c
+levelup | 16be5657 | 0 | 5048a06fafb055a7
+levelup | 662ad826 | 1 | 2fcd282c1b7321cf ee05fa76665909ec c0e7fadc49ab69a7
+levelup | ac94501e | 0 | 413a0d1c1093b695
+levelup | 300f4836 | 1 | b7c0c4d7ced083bf faec3a6c4570ab25 91a746e82048835e
+levelup | 6f85a95e | 0 | a6e9a8932909b4c3
+levelup | 6cc73449 | 1 | cbf29ce484222325 6c7a4ea896f6300 1c2b5bcc9706ac6d
+levelup | 226c61fb | 0 | aa1a2b27d2608ad
+levelup | b38619f2 | 1 | b27d1ed42b7e925a 4624d25391c1731d 57d609adcd8679e6
+levelup | f47c4895 | 0 | a4b637e1b37ae048
+levelup | bbf832ac | 1 | cdc6f4dd8c679d90 491e87367e594279 5ba909f77afb773c
+levelup | 6fd1bb7 | 0 | eb77f570f3c69c60
+levelup | ce3f4f75 | 1 | 85bcd8ea0837c62 bdce024cf2e20d54 a92653c93b0b37e4
+levelup | 5ba47e7f | 0 | cd9aa731c672ae01
+levelup | d8274b5d | 1 | 4371c59dce9259b4 f75f15679a0f48a7 1aa6dd154b7b8c55
+levelup | 6a9990ec | 0 | 9da83ffe952c8135
+levelup | a02150d2 | 1 | 3dc5543dd8c28ceb 549307bd8089568f 9a543bd970c0cbfa
+levelup | 29648b18 | 0 | 7060dee50378d10d
+levelup | 823b1eca | 1 | af499db9f6fc5072 310e8e316d382a86 e39e628955135bfe
+levelup | 1f4e8199 | 0 | 849933432ef77d06
+levelup | 8e0d6cb4 | 1 | a1277afe05d9e13a e4838e3f2d874bf9 9fa4f0f83877dd91
+levelup | cb1cbdf | 0 | 826a90c36671ef2f
+levelup | a1bc3377 | 1 | cbf29ce484222325 3e967cc1d5656fa6 a0cf8b05e2feb8d6
+levelup | 25c65020 | 0 | c346ed2facdfc355
+levelup | fd5722d7 | 1 | 1a914389421802be 83326529517a3f51 81f51bdb1e393e60
+levelup | 19610f0b | 0 | 3ff85b2385831f65
+levelup | ac602465 | 1 | 78796f37554c49d3 6718a231df6a488c 11c3dcc75cfb7f94
+levelup | ec4165b2 | 0 | 62ff2694e4f9e792
+levelup | d8666348 | 1 | a5f015ff53065f75 e5632aba81811aed b933f734c47eb635
+levelup | 3ae37bb0 | 0 | 2ab1e1f78b8249a6
+levelup | 9a726374 | 1 | ddf64c2994483920 4734faaac24f0453 2f434cefb147dc68
+levelup | d24bd5ed | 0 | eefa01d14a63297c
+levelup | 5c654b01 | 1 | 26119bbea956688f 15edeaf7eadcdcf6 ff1332b7b73e2aea
+levelup | c58024f6 | 0 | 29db6bcc678dcb00
+levelup | 4d1731fe | 1 | 721e5291d494545d 8e53957212c74b58 f3551a3a626ee605
+levelup | 1d0dabba | 0 | bdabe2b8c6790d9c
+levelup | 90688b7d | 1 | b2c63e8fd53b126b bfeb28f132772790 c53d288ec6055334
+levelup | 316cd37 | 0 | 99930adeb0f706a9
+levelup | fdc7d363 | 1 | cbf29ce484222325 542dc9a86b13b20e cb482f37a653501
+levelup | d6aa4059 | 0 | 2bd596c5d020b3c
+levelup | 1f1b730b | 1 | stuck
+levelup | 4d3186d7 | 0 | b7bfbdbd2f555798
+levelup | d7778439 | 1 | 4c1807d6421874e9 e55037588a50da2d 653923c66a6bd23c
+levelup | 40fafe8c | 0 | df5877f422a90f72
+levelup | 89297615 | 1 | 29a5bdcad9b1dc83 dd0270726ce6bba3 db180c81e417737b
+levelup | f7ccf75 | 0 | f4ef6c3d8d75d77
+levelup | ee94a1fb | 1 | bbd3b67d5777c9ba 4f0b2a3a27729651 fc3dcdc203aebe2
+levelup | af1219e4 | 0 | f36e64ee828e68bc
+levelup | a44ec277 | 1 | f2c17ea584d84d1c 56c86b4a1264a6fd 1a469e6664b4aa38
+levelup | af85be77 | 0 | 44f460a5e145ca2e
+levelup | cd146ea2 | 1 | 16fda8c234bb37d7 56472fe24d32d288 6e5aad2b3cca48d6
+levelup | f1cbbb3d | 0 | d5c28795dee9f89a
+levelup | 20908bed | 1 | 18de2d87541d73ab be08edb120447447 9e4ec8b6cc03f434
+levelup | e0888384 | 0 | c1044be8afc502ae
+levelup | b178462f | 1 | 5e96c171ff95b16b 7bac879c4fd79f26 c82be6f0d8c0e24f
+levelup | da286a7e | 0 | c9ebcbed2576c145
+levelup | f0af185f | 1 | f1d5e4461419a6db a5feba09bfa4fad0 1eb2844b63d52462
+levelup | c2e2ac3d | 0 | ed66efcb060f2b69
+levelup | 2464d618 | 1 | 1a6fa06a60f7146f 6b2f1e3dca187386 451e414f8af35edc
+levelup | 2367f3fb | 0 | b1d20da4c42fb278
+levelup | 87ecd2a0 | 1 | 6e030844950af60f f1b780cd90f094f9 c5c8a0372e8a4be4
+levelup | 5be4690e | 0 | 17e7b7d2e2af1f4d
+levelup | f8b01fe5 | 1 | 3b53ad62a5c679b8 4faed25258edd4e1 3a4ed165f0f1d4f2
+levelup | 913a26d5 | 0 | 153ce8c980deb993
+levelup | 6ac8d48b | 1 | cbf29ce484222325 c255cd5a6eb83790 17b59fefb5e80c5e
+levelup | 2bf9b325 | 0 | a419bf298e641e6e
+levelup | fce2f85b | 1 | a0a02814f2d35682 5524f7663f906d2b 9c67d781c9cf9154
+levelup | 3b9d4f60 | 0 | 8f703f0969a44a4c
+levelup | 997d3b7b | 1 | ef9c1b6ef5040cd8 a0c46a97423fca08 630925d50202951c
+levelup | 362d8f1b | 0 | ef94069c3330d6be
+levelup | 255b39b5 | 1 | d2eedf714a52b0e7 3af728b97d4d5617 f64fc97f5e781794
+levelup | 53bc10f9 | 0 | 8db1aa997e0bf2c7
+levelup | 1474395d | 1 | 44b0adf4601b9c62 e53b392c289932a0 4283e1911742960f
+levelup | 7bebede0 | 0 | f66623a145ff68f9
+levelup | 837a6705 | 1 | bdb2f873dea46572 51dd36b6e5b6b7c2 4349289cccd1ab01
+levelup | 845f001f | 0 | f1a0b595667f82f1
+levelup | cd7095d4 | 1 | f01de0ab59e8b5d8 92ebe75804e130ed 1a70b48c37c0db
+levelup | d9572568 | 0 | ac7ac2f4f7a257b5
+levelup | 85f6a061 | 1 | ca72bbd30007975c f9aaae52cd8e5d93 22c86250877abe5c
+levelup | 4f3d72b2 | 0 | e284bd7d6f59fec2
+levelup | 2478dced | 1 | 1c19f68c7af1fba6 58afa4262a56175d d91100a2a86072c0
+levelup | 1e9bcc90 | 0 | e4dddbb2ed6ee3b5
+levelup | ca873599 | 1 | 32da29dca4e81767 ad47d64fa1610257 ad6999595293e4bc
+levelup | 31c5e50 | 0 | 9d1d99a282b9a52c
+levelup | aa4c099 | 1 | 6de7d097af1d4f46 2aa9c40c0d247f96 b023a8a17eeee416
+levelup | e8ba88bd | 0 | 7a2a725a730a9361
+levelup | 50ef33aa | 1 | 36bf03520c217cdc 10f6c48e8ce8484b 84d503e3d68d6d6f
+levelup | 244dfaae | 0 | 6471eb5912f5043
+levelup | 3859fd60 | 1 | bb6bedc6cc3d6e49 38ad8b4bc9e7cce4 ffa31ef8493e11db
+levelup | cdacad99 | 0 | c0e0f50a5d2e26c
+levelup | 6edb0ed2 | 1 | 878c6dce37aeec8f 1d7caff44afb4981 7e48a872234f6489
+levelup | a5ab03d9 | 0 | 7893c6bb515a835f
+levelup | ab4aa25b | 1 | 8768b5cbc61d9c8c b4b6bade6e48532 383979b4e347d681
+levelup | cf9f140d | 0 | 513906d83573e1d1
+levelup | 1163fa0f | 1 | b820d2132c0c3329 bcb0e0e38ee1e9e7 3011e14ec4d574ea
+levelup | 26034bf1 | 0 | b5708dc3356e8545
+levelup | e7265563 | 1 | d0aae018672dcbc5 34754ccefc103279 acddf9b2164052cb
+levelup | 5fc83e1e | 0 | d9172c1ba054c994
+levelup | 76e75ce | 1 | 7ebbe87c9d9db618 1b11748ba735a1af 399b4a5a35227ad4
+levelup | 3603021b | 0 | bdf3635f517ccbc2
+levelup | c73678b9 | 1 | 386397f39dfa6a25 f5c5cdb20d60eb12 1840f94d979c8508
+levelup | 19da657 | 0 | 4a9b9c05b9dfbd14
+levelup | c126a07b | 1 | 7a07f4115a395e17 bd808a8847c15f0d af0d129210fc09b9
+levelup | d157ab11 | 0 | b8739187f79de816
+levelup | c75121c4 | 1 | cbf29ce484222325 ecd8fc6c53d156d2 c4d565e63c70f769
+levelup | 56d67197 | 0 | 1577547c71ac3b3
+levelup | 8af75c6 | 1 | f764b528bf0a70f8 fb278feffef35d6c 93704f0ced800d0f
+levelup | 4279f6d7 | 0 | d5eedc1521a9b5f8
+levelup | 47d3b859 | 1 | ae33b6b7f2ec2e87 fd91156f852c9181 889160549b909e20
+levelup | af50f32f | 0 | 95162bf7668785b1
+levelup | 3a515f96 | 1 | cbf29ce484222325 fcb656484bf55976 a3d498f3e93640a3
+levelup | b3c67497 | 0 | ba68ba2ccfa4e3c9
+levelup | 71fa056a | 1 | 91b531705b951afc 69716c6af06a19b8 dfba7a2f4aa4a22b
+levelup | 30b53456 | 0 | 240de78ce57c450d
+levelup | b2c148a | 1 | 23baa62ffed0bb6b 77b20232d1498fc5 92f5cb50379c3dd8
+levelup | 67d0f2fb | 0 | 4ac65d02f767fd86
+levelup | d3c2375 | 1 | 7e3552c7383d37e5 b19bb319f0d59037 8309ea1b3aba4252
+levelup | 31a68be0 | 0 | 30f55eef5fcbe855
+levelup | a31d4a37 | 1 | eac84d3f2322d24d 694bb3dbfba863e0 591e98e51fbc3bb1
+levelup | e652050f | 0 | ac7680db48cb3873
+levelup | a99fcb62 | 1 | 11e4e433502f649b 5e8ce053fc16d8f0 c343ca7b760b482a
+levelup | c5b72c58 | 0 | 705bc2290ffe57e9
+levelup | 67259d97 | 1 | a8012b040c101fc 89dd9bb4410717e6 680566ad70c1515c
+levelup | 67d5575d | 0 | 55457a020621e50a
+levelup | 9b0af9d5 | 1 | 9f1b2e26a43d7858 e88a38ce0bb7620c 49a611b7f575c5fd
+levelup | 49f63a48 | 0 | 11ed69de8ca9f25a
+levelup | 67026f99 | 1 | 68d81058731a4250 9cf239e9000e6bb9 399498c46ba7c050
+levelup | cea9b907 | 0 | cbe38fba5033402b
+levelup | 4ff8237f | 1 | 593f04da686be928 cdb0909664e75284 ac7d6b64907d35aa
+levelup | 395b4430 | 0 | dd7e2dd6dc314c0a
+levelup | eb467488 | 1 | fe8a7c81ea3f18a3 42a4168e96d87d2b 478c1a7d750cd857
+levelup | 687617fe | 0 | b9b11ae2625c7ab5
+levelup | 5cfc6fbb | 1 | e4bc048633ee6de8 6e7be0ee17f2c345 4e35cd1ee3cc742b
+levelup | d58e062 | 0 | e5ceb8580c8bd97c
+levelup | 4646a17f | 1 | 4234c892243fb28d b7a94d170e27ff64 b6fe7e3eb7887bdf
+levelup | 37597c61 | 0 | 5c8439b5f812e59b
+levelup | b0ef01e7 | 1 | 5ab5c8bd223e05f6 7b613f44eefea32d b646b44b02d2da95
+levelup | 2b7beaa1 | 0 | 53ca4e79364d3653
+levelup | 7465b260 | 1 | cbf29ce484222325 1a7f768dd26f1bdf 1994cfc5e8727a32
+levelup | 4547acd4 | 0 | b045c37c574eaf52
+levelup | 107fd5ec | 1 | 20af79fb86c8cc83 c980850931cb9ddb 31a12b6f1b8a8378
+levelup | e1847a00 | 0 | 8785dc27f0a5ca5
+levelup | dd1c5b5a | 1 | 3e98c044ce1c863 d17ecb363ffe2c87 21953b92e9235f07
+levelup | d3782e91 | 0 | 4d7035f2cc6100b1
+levelup | b3b1ebc5 | 1 | d0aa9c18672d5839 f55742de4c50aaab 8c791b7842c33a67
+levelup | 35390ea5 | 0 | 533772dafdc2afb7
+levelup | 3d29076f | 1 | f3c531f8ed9086fb c8ca74917c3bca79 1dd6d327c6e443f3
+levelup | 1144981f | 0 | 9bb75c0123f0f9eb
+levelup | 7a81a558 | 1 | d24e6969f8fbe694 2633b4ecfb20a0f8 e59313b15fece7a2
+levelup | 125b965f | 0 | a4e23e425d8f15b8
+levelup | a687b3f6 | 1 | d0aa8618672d32d7 cf86328693e687d6 6608581ecf0d0aac
+levelup | ab9fe667 | 0 | e36b4d2c33809b72
+levelup | 8734ae7f | 1 | stuck
+levelup | 18f5db1 | 0 | 9ec6261b144a17ab
+levelup | 59e12d21 | 1 | a1c9a8d81be19382 b7bc03e67312762d b32c458aecb85c8d
+levelup | e7bce89f | 0 | 55e02b6b5ae66ac2
+levelup | a4325d20 | 1 | ffd0b4fbe6cbf22b feb72be1bcd7c49c 49871da240d02c57
+levelup | 39cdcc9e | 0 | 9fdbb5be2260bdbf
+levelup | 3a3889b7 | 1 | 2b7d66fa75bb6318 e9bd3de802eda1f3 3b9928188cc36f85
+levelup | 4a49ee06 | 0 | 626ba31a4dae5a8a
+levelup | 31094ba5 | 1 | 7bd06901f93ba61c 3c4715ce4b9ad702 822e3d4f1217e210
+levelup | 934e8b72 | 0 | 80d2f143d1caf519
+levelup | 2909551e | 1 | 430af99233af9079 e6dd1540a3327673 6d85bb7ee42af505
+levelup | 80f20e76 | 0 | 7323bcd5baf2bdd1
+levelup | 141a7d21 | 1 | ba48abe1f20fc49 a0af0f912a2fea4a af0c356ab27d8f25
+levelup | 409b6c3a | 0 | d2d81dc94b27ce7b
+levelup | 8e6b89b5 | 1 | 324f045cc93336e4 9f3a551eacee5713 111c870ff7e2aeb
+levelup | e50e1f4a | 0 | a4858471c5e0ac84
+levelup | bbc9e276 | 1 | e77880bc8680ae9a 35653831cb371fa7 d80c8ae7b31d4b62
+levelup | b3aad44f | 0 | 596320aecbccb9cc
+levelup | 7831b5 | 1 | cbf29ce484222325 3e47965effebce44 183c64feda0e3ceb
+levelup | 96489750 | 0 | ea630984c83bdaba
+levelup | 9af06783 | 1 | cbf29ce484222325 5d763fbeb8f18556 8a9fb5845cb309de
+levelup | 9b4ef10e | 0 | 4e3a1172aeaa8d18
+levelup | 43cf931c | 1 | 538c130bf9956f21 312c5302e945bfbc e66ef7e61b968b7f
+levelup | 9759a171 | 0 | 2ef6a06bc1effb9c
+levelup | aa65c2d7 | 1 | d0ab3418672e5a81 15e0b235d237c1af 3b3cb91dd4ebdbe3
+levelup | 83d9f1d6 | 0 | 18fcabd0ea2b0834
+levelup | a5468b26 | 1 | d8aabb1a988b72e2 4953f731352c196a 52a0d2def8aef894
+levelup | 83489a56 | 0 | 65b285762e2fdaea
+levelup | fb54b38d | 1 | d0746a70dcf5f3f0 48ed154aba86727c 281dc1a98301ad4f
+levelup | 331a9736 | 0 | 1961d40f011cbf6d
+levelup | 58c1db1 | 1 | bf9db55a197bb93e 437151e78e19d055 8a8c6924bc895bd3
+levelup | aee1c69a | 0 | a823cbe2c5b7c085
+levelup | 99ae04ac | 1 | ea36db92eb46d325 283f3af1340ab423 a5ffc0b47f5dada4
+levelup | 9bd80fdd | 0 | e85c44e446d913b7
+levelup | 25a4ae72 | 1 | 39f6b35580a52031 987a7e8d8a490d53 b4a684444700506
+levelup | e8a3706c | 0 | 5906e17c8a802be3
+levelup | 101a7696 | 1 | 4c5ea324930683bf ad52bb1a920ef54c 761bde30e59c21a5
+levelup | cc559df6 | 0 | 599a0db9a6cdf47
+levelup | c6c4ac08 | 1 | 99237d372178bf5a 350288a59179ff75 6c7facb3347e3a51
+levelup | 28b35bd7 | 0 | 441e760c3f3a312b
+levelup | 7e5cd2e | 1 | c1d62ed933916eb9 7c8ef7e89a67f66b 63fe1c21f397a46
+levelup | 8d9bdaf9 | 0 | ed613cb4fd5de90c
+levelup | 98285208 | 1 | 2b4231562ced3788 7e58b0197c9fd4ef 9bcc8f9693410b5f
+levelup | 5df197c4 | 0 | 44331b56529bc4a8
+levelup | 1f61ed29 | 1 | stuck
+levelup | 307ef995 | 0 | 1b768a0ea7c6defa
+levelup | 1fbe4ffd | 1 | 3e448e7d364d90ea 5184d70959a4cba4 d2011fd0207388a2
+levelup | 30fa0089 | 0 | 58e0c9dba184b470
+levelup | f27f0232 | 1 | 45a07d169cb01723 1722de33c13164f9 62ca2563110b2cac
+levelup | 49c67d5a | 0 | 229d604ba51c9884
+levelup | c90b312c | 1 | 2c09652eb1df828e 6a61f373857663c4 64c5f0c2ef0e4b7c
+levelup | c06cc331 | 0 | 874797654e8a0abf
+levelup | ea033b76 | 1 | 297e20611e3867a5 20a958e70ae64241 6b2a4f57fa2917ef
+levelup | 468d1b2a | 0 | 24bc67004d446e25
+levelup | dc3a706a | 1 | a89e3f138592cce0 5b9d6bb1ce9d057d 667281148f0400d8
+levelup | 33d187da | 0 | 1bad6bee0dec2f9a
+levelup | 4d3a0373 | 1 | d83c14b294a629ac abb32b927dc70a77 ee699a4abd0f4e70
+levelup | 912854d8 | 0 | 7e64cc9267e747b
+levelup | 5806a6ef | 1 | 4558dbd033568871 666b6cd1a811c31c a3172b203a571b4f
+levelup | 4a8d84ae | 0 | c852c1b0187d7b11
+levelup | 461560d8 | 1 | 4c2e80440ef8c393 ad9bd165a37c2606 41c4a56c8643f75e
+levelup | 9203eb6f | 0 | 60e3c55e7e84e0ef
+levelup | 74c615f1 | 1 | 1e0df479562e06f2 ef8f13c7021b7151 5d4e544d441bb4fb
+levelup | 7dc35e11 | 0 | 98da9c3285177b97
+levelup | 34c96678 | 1 | 89187273bc093e71 62d5b816316eaa10 f3b7f778b363b0a3
+levelup | 85d03d32 | 0 | b2b569ba56dd654
+levelup | e1705a0d | 1 | cbf29ce484222325 6d5fee8f1f742440 578e783bbbbbaf47
+levelup | 893e123e | 0 | c40d4a12e4371061
+levelup | 488a257a | 1 | 7586e6f907583b20 83dbb2acaba5d40a 353f4527dddc7dc6
+levelup | e9bf3152 | 0 | 8986b833cbff64bf
+levelup | 6ebc33f0 | 1 | ed04d4f47fb5637c 90bcb040d39715a 56838a40b507da2e
+levelup | 7962a245 | 0 | 86db2d37ab383288
+levelup | ad276db7 | 1 | c128c10775a1688a 555e70305c44db68 216fa7b6ec9cdf73
+levelup | abe1713d | 0 | c6512b8066d5fb4d
+levelup | cf1f79f1 | 1 | d0aaf618672df127 d515dd7c7494bbc9 ef348d2ec687e668
+levelup | e0427ce7 | 0 | aefbdcd40bfe76d
+levelup | 3f23094b | 1 | 60638873f81881bd f5f4a3dbdae88c50 856f448b3e635abd
+levelup | 25600f84 | 0 | c72806030b1ae333
+levelup | fae0b32f | 1 | 6fbcd057c6c1c1eb 4f16348a337ac761 2aa6b18532a7a27
+levelup | 1e11ccb1 | 0 | ab520b9b3d43babe
+levelup | 5b931c8c | 1 | 406613beb05b6ca7 6dbe0c6ea36d34a3 80748fd271fc1208
+levelup | 891d952a | 0 | 9dfdd49a5159eab1
+levelup | 6da68aca | 1 | e0b83cb141f14c56 3156223ea2cfc07a 49ad651eed17a0e9
+levelup | 4cea9c4b | 0 | 2705a1456c37a444
+levelup | 6bad7c6b | 1 | 3ba03ab6941eaab2 2483129e999d173d 584dd0a4f686df8
+levelup | e0a20310 | 0 | f86fe5fa45f758ad
+levelup | 143c54b4 | 1 | 87aebd9658998419 3fae035c6a8d9138 51c1542d06b49b1b
+levelup | 4e07b1e8 | 0 | 625c9993da92b4aa
+levelup | 6c38cde3 | 1 | stuck
+levelup | 471c0c28 | 0 | 5a49609debc33f59
+levelup | 2046bca5 | 1 | 2cc588f7a01a693b 320add8152adea18 455d99cbc4016f46
+levelup | f6adf7fd | 0 | b855566d91f3ca56
+levelup | 625a5679 | 1 | 39565ee36cd3d0df 669a034a189ccf9f 2993e1fabdab1ab0
+levelup | 3f960a70 | 0 | 16c0cec7c4698b84
+levelup | bc769653 | 1 | 5732f57a519035f6 618d75384b8874bd b9a58930d25eea65
+levelup | 7b13f9cc | 0 | 66ef62fc300e1d29
+levelup | 907f746 | 1 | f4aa3a5de1dc7be3 cb2a5868c67d7628 31b179c2f0966ac3
+levelup | 613b017e | 0 | b423b0f0023a0888
+levelup | 8ec21a2a | 1 | cbf29ce484222325 6a8a81a4821b7501 3e65feda1511f8d5
+levelup | 11554ca3 | 0 | 32111d9ad3e81e75
+levelup | 64c70e78 | 1 | ac1f834a27533279 69d34ff40dd839ae 582476f840df08bf
