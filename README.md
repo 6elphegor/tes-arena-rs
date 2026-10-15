@@ -92,17 +92,39 @@ printed), `movie:NAME[:TEXT[:COLOUR]]`, `spellmaker`, `ui:TOKEN` (and
 `fatigue:N`, `xp:N`. `view/src/main.rs` describes each where it parses
 it.
 
-Keys in the window: W/S or Up/Down walk, A/D strafe, Left/Right turn, the
-mouse turns (click to capture, Esc releases); Space jumps (Shift: a running
-jump); E or a captured click clicks the view's centre; Q readies the weapon
-and a right-button drag swings it; I the inventory (a click equips, a right
-click selects, D drops, U uses), C the spellbook, K the character sheet (N
-its equipment page), L the logbook, M the automap (arrows and Home move it,
-a click places or edits a note), Shift+M the travel map, R camps, F5 saves,
-F9 loads, F2/F3 the game's keys, F8 the compass, F a random encounter, P
-people. The interface bar's nine buttons work as the original's (the map
-button's right click is the travel map). Menus take arrows and Enter, an
-entry's letter or number, a click, or the mouse wheel; Esc leaves them.
+Keys in the window are the original's. The game's menu keys (2542:0100,
+asked in this order, one a frame; `src/menukeys.rs` runs them on the
+engine):
+
+| Key | What the original does |
+|---|---|
+| Esc | the options screen (sound, music, detail; New, Load, Save, Exit, Resume) |
+| A | ready or put away the weapon (a right-button drag swings it) |
+| C | the spellbook (unless barred) |
+| P | arm picking pockets (the next click on someone) |
+| S | the status box |
+| U | the list of items to use |
+| M | the automap (arrows and Home move it, a click places or edits a note); Shift+M the world map |
+| F1 | cast the waiting touch spell on yourself, else the character sheet (N its equipment page) |
+| F8 | the compass, shown or hidden |
+| L | the logbook |
+| R | camp |
+
+Moving (2826:0473): Up/Down walk, Left/Right turn, Ctrl+Left/Right strafe,
+J jumps (Shift: a running jump). The frame's own keys read the game's key
+state as the original does: - and = the view's reach, F4 (5CA bit 2), N,
+F2 and F3 (the position and the flash mode), and the debug combinations
+(B+Q+X, Alt+F5, which wipes the quest's state). The interface bar's nine
+buttons run the same handlers (the map button's right click is the world
+map, the portrait is F1's).
+
+The view's extras, on keys the game leaves alone: the mouse turns (click to
+capture, Esc releases), Space jumps too, E or a captured click clicks the
+view's centre, Q readies the weapon as A does, I the inventory (a click
+equips, a right click selects, D drops, U uses), K the character sheet
+(without F1's touch cast), F5 quick-saves (not with Alt) and F9 loads the
+--slot, F a random encounter, Shift+F people. Menus take arrows and Enter,
+an entry's letter or number, a click, or the mouse wheel; Esc leaves them.
 While the game waits for an answer no game time passes.
 
 Sound plays through PulseAudio, opened at run time (nothing plays without
@@ -257,15 +279,17 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2256 reachable routines (189,658 bytes); 1524 ported in whole or
-part (125,590 bytes), counting far thunks to ported code and the routines
-read by hand as trivial or inlined (`tools/triage.tsv`); 69 left to the
-front end as hooks and 69 that the view re-implements; 499 presentation,
-I/O, driver or hardware routines not ported (the renderer's internals, the
-menu library, input waits, the sound and CyberMan drivers, decode
-artefacts); 95 game-state routines (4,068 bytes) not named by the port that
-look ported inline in a caller, with none left open. Code reached only
-through the 46 unresolved indirect calls isn't counted.
+writing: 2455 reachable routines (198,014 bytes); 1788 ported in whole or
+part (140,111 bytes), counting far thunks to ported code, the handlers
+the port dispatches on by their offsets, and the routines read by hand as
+trivial or inlined (`tools/triage.tsv`); 72 left to the front end as hooks
+and 75 that the view re-implements; 520 presentation, I/O, driver or
+hardware routines not ported (the renderer's internals, the menu library,
+input waits, the sound and CyberMan drivers, decode artefacts); no
+game-state routine left open. Every indirect call site is followed or
+explained: the ones no table or pointer heuristic resolves were traced by
+hand (`INDIRECT` in the tool), 15 with no target in the image (window
+callbacks, code generated at run time, a chained interrupt, a return).
 
 ## Known gaps and approximations
 
@@ -281,6 +305,10 @@ At the time of writing:
   - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
     check (242A:000E) and loading from the title screen (5C8 bit 4) are not
     ported; the view saves to and loads from a fixed slot.
+  - A monster's flat coming alive near the player (25CA:0271,
+    `flat_creature`) is ported and tested, but the view doesn't call it
+    yet: the original runs it from its drawing (0000:CF96, a flat with
+    bit 2 drawn).
   - The staff walkthrough (`mainquest GAME_DIR STAFF:CITY:3:3 9`) runs
     from a new game through the eight pieces, the Emperor's audience, the
     palace's piece and the staff made whole (1194:D986), and is back in

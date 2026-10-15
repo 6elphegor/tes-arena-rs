@@ -1148,7 +1148,7 @@ pub fn hit(m: &Machine, sheet: &SpriteSheet, eye: (f32, f32, f32), heading: f32,
 /// A0h).
 pub const TAN_HALF: f32 = 100.0 / 160.0;
 
-/// The line through the click (CB60, CB62: the cursor + 4, 2826:0393)
+/// The line through the click (CB60, CB62: the cursor + 4, 2826:0A52)
 /// as (yaw, slope) for `hit`: the view is drawn at 160 rows a unit of
 /// slope (`TAN_HALF`, see `render`), its columns at that scale over a
 /// target `aspect` wide; the centre column C3D6, the eye line row C3D8.

@@ -414,9 +414,9 @@ fn f5_saves_and_f9_loads_back() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     // Walk away, then load.
-    a.input(In::Key { code: KeyCode::KeyW, down: true, text: None });
+    a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
     d.frames(&mut a, 20);
-    a.input(In::Key { code: KeyCode::KeyW, down: false, text: None });
+    a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
     assert_ne!(at(&a), saved, "the walk moved the player");
     d.key(&mut a, KeyCode::F9, None);
     assert_eq!(at(&a), saved, "F9 brings the player back where F5 saved");
@@ -457,6 +457,10 @@ fn inventory_by_i_and_a_click_equips_as_panels_do() {
 fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     let Some(dir) = game_dir() else { return };
     let setup = |app: &mut App| {
+        // A caster (class bit 20h): others have the spellbook barred
+        // (5CA bit 8, 292B:032A), C then opening nothing.
+        let c = app.engine.m.mem.r8(arena::mem::DS, 0x01A9) | 0x20;
+        app.engine.m.mem.w8(arena::mem::DS, 0x01A9, c);
         panels::learn(&mut app.engine.m, 0);
         app.engine.m.mem.w16(arena::mem::DS, 0x020A, 500);
         app.engine.m.mem.w16(arena::mem::DS, 0x020C, 500);
@@ -854,6 +858,7 @@ fn the_wheel_moves_a_menus_entry() {
 fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
     let Some(dir) = game_dir() else { return };
     let mut a = app(&dir, &Start::default());
+    named(&mut a);
     let mut d = Driver::new(&mut a);
     d.key(&mut a, KeyCode::KeyK, None);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "K opens the sheet");
@@ -964,7 +969,7 @@ fn each_bar_button_as_the_original_wires_it() {
         d.click(a, x, y, MouseButton::Left);
         assert!(!a.captured, "button {i} doesn't capture the mouse");
     };
-    // 0, the crossed swords: the weapon readied, as Q.
+    // 0, the crossed swords: the weapon readied, as Q (the view's).
     let (mut a, mut d) = fresh();
     let (mut b, mut db) = fresh();
     click(&mut a, &mut d, 0);
@@ -1021,8 +1026,9 @@ fn each_bar_button_as_the_original_wires_it() {
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 7);
     assert!(a.camp, "camp");
-    // 8, the portrait: the sheet.
+    // 8, the portrait: the sheet (00BE: the player named).
     let (mut a, mut d) = fresh();
+    named(&mut a);
     click(&mut a, &mut d, 8);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the sheet");
 }
@@ -1443,4 +1449,185 @@ fn the_options_screens_new_goes_to_the_main_menu() {
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x20, 0x80, MouseButton::Left);
     assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
+}
+
+/// The player given a name (01AD), as every game's player has: the
+/// sheet (2542:00BE) only opens for one; the view's bare start has none.
+fn named(a: &mut App) {
+    a.engine.m.mem.w8(arena::mem::DS, arena::menukeys::var::NAME, b'A');
+    a.engine.m.mem.w8(arena::mem::DS, arena::menukeys::var::NAME + 1, 0);
+}
+
+/// Presses `code` as the window would (`Driver::key`), Shift held when
+/// `shift`.
+fn press(d: &mut Driver, a: &mut App, code: KeyCode, shift: bool) {
+    if shift {
+        a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    }
+    d.key(a, code, None);
+    if shift {
+        a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+    }
+}
+
+/// Each of the original's menu keys (2542:0100) does what its handler
+/// does: the state-only ones as the engine's own routines (or the bar's
+/// button with the same handler), the others open that handler's screen.
+#[test]
+fn each_original_menu_key_as_its_handler() {
+    let Some(dir) = game_dir() else { return };
+    use arena::mem::DS;
+    let fresh = || {
+        let mut a = app(&dir, &Start::default());
+        let mut d = Driver::new(&mut a);
+        d.frame(&mut a);
+        (a, d)
+    };
+    let bar = |a: &mut App, d: &mut Driver, i: usize, right: bool| {
+        let (x, y) = sheets::bar_centre(i);
+        d.click(a, x, y, if right { MouseButton::Right } else { MouseButton::Left });
+    };
+    // A: the weapon readied (0137), as the swords (0486); again, put away.
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyA, false);
+    bar(&mut b, &mut db, 0, false);
+    same(&a, &b, "A and the swords");
+    assert!(a.engine.m.mem.r16(DS, 0x05E0) & 0x10 != 0, "A readies");
+    press(&mut d, &mut a, KeyCode::KeyA, false);
+    assert!(a.engine.m.mem.r16(DS, 0x05E0) & 0x10 == 0, "A again puts it away");
+    // A held (the window's repeats): one press, one toggle.
+    let (mut a, _) = fresh();
+    for _ in 0..3 {
+        a.input(In::Key { code: KeyCode::KeyA, down: true, text: None });
+    }
+    a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
+    assert!(a.engine.m.mem.r16(DS, 0x05E0) & 0x10 != 0, "a held A toggles once");
+    // A with C39A bit 4000h: nothing.
+    let (mut a, mut d) = fresh();
+    let f = a.engine.m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS) | 0x4000;
+    a.engine.m.mem.w16(DS, arena::movement::var::LEVEL_FLAGS, f);
+    let was = a.engine.m.mem.r16(DS, 0x05E0);
+    press(&mut d, &mut a, KeyCode::KeyA, false);
+    assert_eq!(a.engine.m.mem.r16(DS, 0x05E0), was, "A barred");
+    // P: picking pockets armed (0279), as the hand.
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyP, false);
+    bar(&mut b, &mut db, 2, false);
+    same(&a, &b, "P and the hand");
+    assert!(a.engine.m.mem.r16(DS, 0x05CA) & 1 != 0, "P arms picking");
+    // F8: the compass (01C5: 5C8 bit 2000h).
+    let (mut a, mut d) = fresh();
+    let was = a.engine.m.mem.r16(DS, 0x05C8);
+    press(&mut d, &mut a, KeyCode::F8, false);
+    assert_eq!(a.engine.m.mem.r16(DS, 0x05C8), was ^ 0x2000, "F8 flips the compass");
+    // C: the spellbook (026D), unless 5CA bit 8 (set for classes that
+    // don't cast, as the view's bare start's player).
+    let (mut a, mut d) = fresh();
+    let f = a.engine.m.mem.r16(DS, 0x05CA) & !8;
+    a.engine.m.mem.w16(DS, 0x05CA, f);
+    press(&mut d, &mut a, KeyCode::KeyC, false);
+    assert!(matches!(a.panel, Some(panels::Panel::Spellbook(_))), "C opens the spellbook");
+    let (mut a, mut d) = fresh();
+    let f = a.engine.m.mem.r16(DS, 0x05CA) | 8;
+    a.engine.m.mem.w16(DS, 0x05CA, f);
+    press(&mut d, &mut a, KeyCode::KeyC, false);
+    assert!(a.panel.is_none(), "C barred");
+    // S: the status box (037C -> 04B1), as the staff.
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyS, false);
+    bar(&mut b, &mut db, 3, false);
+    assert!(!a.boxes.is_empty(), "S shows the status box");
+    assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), b.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), "S and the staff");
+    // U: the use list (034D), as the fist.
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyU, false);
+    bar(&mut b, &mut db, 6, false);
+    let using = |x: &App| matches!(&x.panel, Some(panels::Panel::Inventory(i)) if i.using.is_some());
+    assert_eq!(using(&a), using(&b), "U and the fist");
+    // M: the automap (045A); Shift+M the world map (03BF), as the map's
+    // right button.
+    let (mut a, mut d) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyM, false);
+    assert!(a.map, "M opens the automap");
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyM, true);
+    bar(&mut b, &mut db, 1, true);
+    assert!(!a.map, "Shift+M: no automap");
+    assert_eq!((a.travel.is_some(), a.boxes.len()), (b.travel.is_some(), b.boxes.len()), "Shift+M and the map's right button");
+    // F1: the sheet (00BE), as the portrait; with no name, nothing.
+    let (mut a, mut d) = fresh();
+    named(&mut a);
+    press(&mut d, &mut a, KeyCode::F1, false);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "F1 opens the sheet");
+    let (mut a, mut d) = fresh();
+    a.engine.m.mem.w8(DS, arena::menukeys::var::NAME, 0);
+    press(&mut d, &mut a, KeyCode::F1, false);
+    assert!(a.panel.is_none(), "F1 with no name");
+    // L: the logbook (02A3); R: camping (01E6).
+    let (mut a, mut d) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyL, false);
+    assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "L opens the logbook");
+    let (mut a, mut d) = fresh();
+    press(&mut d, &mut a, KeyCode::KeyR, false);
+    assert!(a.camp, "R asks for camping");
+    // Esc: the options screen (000A).
+    let (mut a, mut d) = fresh();
+    press(&mut d, &mut a, KeyCode::Escape, false);
+    assert!(a.options.is_some(), "Esc opens the options");
+}
+
+/// The movement keys as the original's (2826:0473): Up walks, Left turns,
+/// Ctrl+Left strafes; W, A, S and D move nothing (A and S are the
+/// game's menu keys).
+#[test]
+fn the_movement_keys_as_the_originals() {
+    let Some(dir) = game_dir() else { return };
+    let start = Start { at: Some((59, 8, 0)), ..Default::default() };
+    // Against standing still the same frames (the start may settle).
+    let run = |code: Option<KeyCode>, ctrl: bool| {
+        let mut a = app(&dir, &start);
+        let mut d = Driver::new(&mut a);
+        d.frame(&mut a);
+        if ctrl {
+            a.input(In::Key { code: KeyCode::ControlLeft, down: true, text: None });
+        }
+        if let Some(code) = code {
+            a.input(In::Key { code, down: true, text: None });
+        }
+        d.frames(&mut a, 6);
+        let w = a.engine.view();
+        (w.x, w.y, w.heading)
+    };
+    let still = run(None, false);
+    let hold = |code: KeyCode, ctrl: bool| {
+        let w = run(Some(code), ctrl);
+        ((w.0, w.1) != (still.0, still.1), w.2 != still.2)
+    };
+    assert!(hold(KeyCode::ArrowLeft, false).1, "Left turns");
+    assert_eq!(hold(KeyCode::ArrowLeft, true), (true, false), "Ctrl+Left strafes");
+    assert!(hold(KeyCode::ArrowUp, false).0, "Up walks");
+    for k in [KeyCode::KeyW, KeyCode::KeyD] {
+        assert_eq!(hold(k, false), (false, false), "{k:?} moves nothing");
+    }
+}
+
+/// The frame's own keys read from the game's key state: F4 held over a
+/// frame flips 5CA bit 2 (0000:481E).
+#[test]
+fn the_frames_keys_from_the_key_state() {
+    let Some(dir) = game_dir() else { return };
+    use arena::mem::DS;
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let was = a.engine.m.mem.r16(DS, 0x05CA);
+    a.input(In::Key { code: KeyCode::F4, down: true, text: None });
+    d.frame(&mut a);
+    a.input(In::Key { code: KeyCode::F4, down: false, text: None });
+    assert_eq!(a.engine.m.mem.r16(DS, 0x05CA) & 2, (was ^ 2) & 2, "F4 flips 5CA bit 2");
 }

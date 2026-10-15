@@ -322,15 +322,86 @@ pub fn window(m: &Machine) -> crate::render::Window {
     crate::render::Window { rows: rows / 200.0, horizon: horizon.clamp(0.0, 1.0) }
 }
 
-/// The weapon readied or put away (the menu keys' 'A', 2542:0137..0144):
-/// unless C39A bit 4000h, 5E0 bit 10h toggled and the hands' frame 1Eh.
+/// The weapon readied or put away (the menu keys' 'A', 2542:0137..0144;
+/// `Machine::ready_weapon`).
 pub fn ready(m: &mut Machine) {
-    if m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS) & 0x4000 != 0 {
-        return;
-    }
-    let f = m.mem.r16(DS, 0x05E0) ^ 0x10;
-    m.mem.w16(DS, 0x05E0, f);
-    m.mem.w16(DS, arena::weapon::var::FRAME, 0x1E);
+    m.ready_weapon();
+}
+
+/// The original's scan code (set 1, the byte at DS:ACB5 + scan it keeps
+/// per key) for a key of the window's, for the keys the game reads.
+pub fn scan_code(code: winit::keyboard::KeyCode) -> Option<u8> {
+    use winit::keyboard::KeyCode as K;
+    Some(match code {
+        K::Escape => 0x01,
+        K::Digit1 => 0x02,
+        K::Digit2 => 0x03,
+        K::Digit3 => 0x04,
+        K::Digit4 => 0x05,
+        K::Digit5 => 0x06,
+        K::Digit6 => 0x07,
+        K::Digit7 => 0x08,
+        K::Digit8 => 0x09,
+        K::Digit9 => 0x0A,
+        K::Digit0 => 0x0B,
+        K::Minus => 0x0C,
+        K::Equal => 0x0D,
+        K::Backspace => 0x0E,
+        K::Tab => 0x0F,
+        K::KeyQ => 0x10,
+        K::KeyW => 0x11,
+        K::KeyE => 0x12,
+        K::KeyR => 0x13,
+        K::KeyT => 0x14,
+        K::KeyY => 0x15,
+        K::KeyU => 0x16,
+        K::KeyI => 0x17,
+        K::KeyO => 0x18,
+        K::KeyP => 0x19,
+        K::Enter | K::NumpadEnter => 0x1C,
+        K::ControlLeft | K::ControlRight => 0x1D,
+        K::KeyA => 0x1E,
+        K::KeyS => 0x1F,
+        K::KeyD => 0x20,
+        K::KeyF => 0x21,
+        K::KeyG => 0x22,
+        K::KeyH => 0x23,
+        K::KeyJ => 0x24,
+        K::KeyK => 0x25,
+        K::KeyL => 0x26,
+        K::ShiftLeft => 0x2A,
+        K::KeyZ => 0x2C,
+        K::KeyX => 0x2D,
+        K::KeyC => 0x2E,
+        K::KeyV => 0x2F,
+        K::KeyB => 0x30,
+        K::KeyN => 0x31,
+        K::KeyM => 0x32,
+        K::ShiftRight => 0x36,
+        K::AltLeft | K::AltRight => 0x38,
+        K::Space => 0x39,
+        K::F1 => 0x3B,
+        K::F2 => 0x3C,
+        K::F3 => 0x3D,
+        K::F4 => 0x3E,
+        K::F5 => 0x3F,
+        K::F6 => 0x40,
+        K::F7 => 0x41,
+        K::F8 => 0x42,
+        K::F9 => 0x43,
+        K::F10 => 0x44,
+        K::ArrowUp => 0x48,
+        K::ArrowLeft => 0x4B,
+        K::ArrowRight => 0x4D,
+        K::ArrowDown => 0x50,
+        _ => return None,
+    })
+}
+
+/// Whether `scan` is one of the menu keys 2542:0100 asks about.
+pub fn is_menu_key(scan: u8) -> bool {
+    use arena::menukeys::key;
+    [key::ESC, key::A, key::C, key::P, key::S, key::U, key::M, key::F1, key::F8, key::L, key::R].contains(&(scan as u16))
 }
 
 /// The compass shown or hidden (the menu keys' F8, 2542:01C5).

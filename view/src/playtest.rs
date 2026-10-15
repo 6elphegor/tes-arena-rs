@@ -747,7 +747,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     let archive = st.assets.archive.clone();
                     crate::sheets::pics(&archive, &engine.m);
                     let (x, y) = crate::sheets::bar_centre(dice.below(9) as usize);
-                    match crate::sheets::bar_click(&mut engine.m, x, y, dice.below(4) == 0) {
+                    match crate::sheets::bar_click(&mut engine.m, &mut engine.files, x, y, dice.below(4) == 0) {
                         Some(crate::sheets::BarAction::Automap) => {
                             crate::automap::open(&mut engine, &archive);
                             for _ in 0..1 + dice.below(4) {
