@@ -121,7 +121,16 @@ pub trait HaggleIo {
     /// asking price, 1 the confirmation, 2 a refusal, 3 the last word, 4
     /// a counter-offer).
     fn say(&mut self, _m: &mut Machine, _si: u16, _kind: u8) {}
+    /// 1194:4B8E: the picture named at DS:`si` shown under the dialogue:
+    /// the haggle's buttons (NEGOTBUT, 1322) from its start and after
+    /// each answer, its yes and no (YESNO, 132F) for a confirmation and
+    /// for the menu at a price of 1.
+    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
 }
+
+/// The haggle's pictures (DGROUP): NEGOTBUT.IMG and YESNO.IMG.
+const NEGOTBUT: u16 = 0x1322;
+const YESNO: u16 = 0x132F;
 
 /// A player who walks away: the menus left (2), no offer typed, keys
 /// pressed. For where no one answers (a front end's hooks answer for
@@ -186,6 +195,7 @@ impl Machine {
         self.mem.w16(DS, NAME, di);
         self.mem.w8(DS, DL, dl);
         self.mem.w8(DS, MODE, mode);
+        io.picture(self, NEGOTBUT);
         // 1194:8665: the dialogue's EMS bank (1032) mapped, the one mapped
         // before kept at OLD_BANK (with EMS off AX as left there: SI, the
         // personality, 8061), and the mode's dialogue file loaded into the
@@ -443,6 +453,9 @@ impl Machine {
     /// choice of 1 counts as 2 (leave).
     fn haggle_menu(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<u16> {
         let one = self.mem.r16(DS, PRICE) == 1;
+        if one {
+            io.picture(self, YESNO);
+        }
         self.haggle_say(files, io, kind)?;
         self.haggle_ask(1);
         let c = io.menu()?;
@@ -454,14 +467,20 @@ impl Machine {
     /// agrees.
     fn haggle_confirm(&mut self, files: &mut Files, io: &mut impl HaggleIo) -> Option<bool> {
         let informant = matches!(self.mem.r8(DS, MODE), 5 | 6);
+        if !informant {
+            io.picture(self, YESNO);
+        }
         self.mem.w8(DS, INPUT_KIND, if informant { 0 } else { 1 });
         self.haggle_say(files, io, 1)?;
         self.mem.w8(DS, SHOWN_COLOUR, 3);
         if informant {
             io.key()?;
+            io.picture(self, NEGOTBUT);
             return Some(true);
         }
-        Some(io.menu()? == 0)
+        let yes = io.menu()? == 0;
+        io.picture(self, NEGOTBUT);
+        Some(yes)
     }
 
     /// 1194:862E: a message (kind 2 a refusal, 3 the last one) in colour
@@ -470,7 +489,9 @@ impl Machine {
         self.mem.w8(DS, COLOUR, 0x3C);
         self.haggle_say(files, io, kind)?;
         self.haggle_ask(0);
-        io.key()
+        io.key()?;
+        io.picture(self, NEGOTBUT);
+        Some(())
     }
 
     /// The prompt after a line (1194:4E54 in colour 3, 137E) and what is

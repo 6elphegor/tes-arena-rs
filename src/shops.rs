@@ -40,6 +40,11 @@ pub trait ShopHooks {
     /// and its name at DS:`si` on a banner across its top (FONT_C.DAT on
     /// MENU_CTR.IMG's tiles between MENU_LFT and MENU_RT).
     fn banner(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:4B8E: the picture named at DS:`si` shown on the shop's screen
+    /// (the temple's healing: YESNO.IMG under its question; the store's
+    /// repairs NEWOLD.IMG and YESNO.IMG; the guild's and the tavern's
+    /// theirs).
+    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:020E: a menu, its title at `si`, its keys at `bx`, its
     /// entries' table at `di`. The pick (FFFFh: none).
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
@@ -257,6 +262,8 @@ impl Machine {
         if eax != 0 {
             self.mem.w32(DS, PRICE, eax);
             self.sprintf((DS, 0x93CA), (DS, 0x76A7), &[Arg::Int(eax as u16)]);
+            // C30D: YESNO.IMG (132F) under the question.
+            hooks.picture(self, 0x132F);
             self.mem.w8(DS, LINE_MARK, 3);
             self.split_lines(0x93CA);
             self.mem.w8(DS, DIALOG, 1);

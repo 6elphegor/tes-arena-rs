@@ -176,6 +176,9 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn banner(&mut self, m: &mut Machine, si: u16) {
         self.show_banner(m, si);
     }
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        self.show_picture(m, si);
+    }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.front.menu(m, si, bx, di)
     }
@@ -274,9 +277,6 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
         self.lines = Some(frame_lines(m, 0x2710, m.mem.r8(DS, 0x12CF) as usize));
         Some(())
     }
-    fn picture(&mut self, m: &mut Machine, si: u16) {
-        self.show_picture(m, si);
-    }
 }
 
 /// The `n` list lines 1194:F142 or F204 wrote one after another into the
@@ -323,9 +323,6 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-    }
-    fn picture(&mut self, m: &mut Machine, si: u16) {
-        self.show_picture(m, si);
     }
     fn stock_list(&mut self, m: &mut Machine, seg: u16, si: u16, cx: u16) -> u16 {
         let mut entries = Vec::new();
@@ -429,9 +426,6 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-    }
-    fn picture(&mut self, m: &mut Machine, si: u16) {
-        self.show_picture(m, si);
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
