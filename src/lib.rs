@@ -23,6 +23,7 @@ pub mod engine;
 pub mod exe;
 pub mod format;
 pub mod frame;
+pub mod giveup;
 pub mod guild;
 pub mod haggle;
 pub mod heap;
