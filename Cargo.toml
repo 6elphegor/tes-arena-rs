@@ -7,3 +7,8 @@ edition = "2024"
 
 [workspace]
 members = [".", "view"]
+
+# The FM chips (two, at 49716 Hz each): unoptimised they are
+# the music tests' (and a debug build's playback's) bottleneck.
+[profile.dev.package.nuked-opl3]
+opt-level = 3

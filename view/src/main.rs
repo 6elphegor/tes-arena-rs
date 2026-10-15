@@ -124,6 +124,7 @@ mod dialog;
 mod doll;
 mod flats;
 mod flc;
+mod fmdrv;
 mod hud;
 #[cfg(test)]
 mod inputtest;
