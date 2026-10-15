@@ -774,28 +774,35 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
     }
 }
 
-/// A typed prompt as 1194:4800 draws it: the prompt in a box by 965A
-/// with CX 7 (centred in the clip) and a margin of 0Ah, its trailing
-/// spaces the field's room; then 0000:9EE9's field in the boxes' font
-/// ([102C]): the text typed (A0AE, by 9E0A) and the cursor (A0D9), a
-/// block the width of the character under it (at the end a space's, plus
-/// one) by the font's height, XORed with the text's colour. Approximate:
-/// the callers place the field themselves (the rest's hours at FCh,44h,
-/// the repair's at F8h,62h), the view puts it after the prompt's last
-/// word, a space on; the text's colour (9288) is taken as the boxes'
-/// 0Fh; the cursor's 8-frame blink is not drawn (it stays on).
+/// A typed prompt as the original draws it: the prompt in a box by 965A
+/// with CX 7 (centred in the clip) and a margin of 0Ah; then 0000:9EE9's
+/// field in the boxes' font ([102C]): the text typed (A0AE, by 9E0A) and
+/// the cursor (A0D9), a block the width of the character under it (at
+/// the end a space's, plus one) by the font's height, XORed with the
+/// text's colour. Two callers: 1194:4800 (the rest's hours, the
+/// repair's), whose prompt ends in spaces, the field's room on its line;
+/// 1194:5C30 (the travel map's search, the names), whose prompt is
+/// formatted "%s\r" and 17 spaces, the field's line under it.
+/// Approximate: the callers place the field themselves (the rest's at
+/// FCh,44h, the search's x 55h at y 64h), the view puts it after the
+/// last line's words, a space on (5C30's at its line's start); the
+/// text's colour (9288) is taken as the boxes' 0Fh; the cursor's
+/// 8-frame blink is not drawn (it stays on).
+pub fn typed_prompt(screen: &mut Screen, prompt: &str, typed: &str) {
+    if let Some(st) = STYLE.get() {
+        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, typed);
+    }
+}
+
+/// `typed_prompt` centred in the clip `c`.
 fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, typed: &str) {
     let font = &st.box_font;
     let mut text = lines(prompt.as_bytes(), 0x0F);
-    // Room for the field when the prompt leaves none.
-    let field = font.width(typed) as i32 + font.width(" ") as i32 + 1;
+    if !prompt.ends_with(' ') {
+        text.push(vec![Span { colour: 0x0F, text: " ".repeat(17) }]);
+    }
     let last = text.len() - 1;
     let words = font.width(plain(&text[last]).trim_end()) as i32;
-    let room = font.width(&plain(&text[last])) as i32 - words;
-    if room < field + font.width(" ") as i32 {
-        let pad = ((field + font.width(" ") as i32 - room) / font.width(" ").max(1) as i32 + 1) as usize;
-        text[last].push(Span { colour: 0x0F, text: " ".repeat(pad) });
-    }
     let (w, h, tx, ty) = box_size_margin(st, font, &text, 10);
     let (x, y) = ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2);
     screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
@@ -805,7 +812,7 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
         let lx = if i < last { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, 0x0F);
     }
-    let fx = x + tx + words + font.width(" ") as i32;
+    let fx = x + tx + if words > 0 { words + font.width(" ") as i32 } else { 0 };
     let fy = y + ty + last as i32 * lh;
     screen.text_raw(font, fx, fy, typed, 0x0F);
     screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);

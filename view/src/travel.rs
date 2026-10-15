@@ -523,9 +523,9 @@ impl Travel {
         }
         match &self.asking {
             Some(Asking::Name(s)) => {
-                screen.panel(60, 80, 200, 30, 0xDF);
-                screen.text(font, 66, 85, "Enter the name of a place:", 0xDF);
-                screen.text(font, 66, 96, &format!("{s}_"), 0x0F);
+                // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1.
+                let prompt = String::from_utf8_lossy(m.mem.cstr(DS, 0x6AD1)).into_owned();
+                hud::typed_prompt(screen, &prompt, s);
                 return;
             }
             Some(Asking::List(names, _)) => {
