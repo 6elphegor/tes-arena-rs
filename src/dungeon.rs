@@ -147,7 +147,7 @@ pub struct Pick {
 impl Machine {
     /// 0000:75B0. Writes `v` in decimal at DS:di, NUL-terminated; the
     /// digits are first written backwards into DGROUP ending at 94F6.
-    fn dun_ultoa(&mut self, v: u32, di: u16) {
+    pub(crate) fn dun_ultoa(&mut self, v: u32, di: u16) {
         let mut p = ULTOA_END;
         let mut v = v;
         loop {

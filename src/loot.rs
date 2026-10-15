@@ -99,17 +99,17 @@ impl Machine {
     fn set_tb(&mut self, f: u16, v: u8) {
         self.setb(TEMPLATE + f, v)
     }
-    fn ib(&self, f: u16) -> u8 {
-        self.b(ITEM + f)
+    fn iat(&self, at: u16, f: u16) -> u8 {
+        self.b(at.wrapping_add(f))
     }
-    fn set_ib(&mut self, f: u16, v: u8) {
-        self.setb(ITEM + f, v)
+    fn set_iat(&mut self, at: u16, f: u16, v: u8) {
+        self.setb(at.wrapping_add(f), v)
     }
-    fn or_ib(&mut self, f: u16, v: u8) {
-        self.set_ib(f, self.ib(f) | v)
+    fn or_iat(&mut self, at: u16, f: u16, v: u8) {
+        self.set_iat(at, f, self.iat(at, f) | v)
     }
-    fn and_ib(&mut self, f: u16, v: u8) {
-        self.set_ib(f, self.ib(f) & v)
+    fn and_iat(&mut self, at: u16, f: u16, v: u8) {
+        self.set_iat(at, f, self.iat(at, f) & v)
     }
     fn add_key(&mut self, v: u8) {
         self.setb(DEDUP_KEY, self.b(DEDUP_KEY).wrapping_add(v))
@@ -285,16 +285,22 @@ impl Machine {
 
     /// 1194:F312. Health from a condition code: 0x80 -> 50, 0x40 -> 25,
     /// otherwise the high byte times 100. Magic items get their template
-    /// price instead when it is higher, capped at 50000.
+    /// price instead when it is higher, capped at 50000. Into the item at
+    /// `at` (the original's SI).
     pub fn set_condition(&mut self, code: u16) {
+        self.set_condition_at(ITEM, code);
+    }
+
+    /// `set_condition` into the item at `at`.
+    pub fn set_condition_at(&mut self, at: u16, code: u16) {
         let mut h = match code {
             0x80 => 50,
             0x40 => 25,
             _ => (code >> 8) * 100,
         };
         let store = |m: &mut Self, h: u16| {
-            m.mem.w16(DS, ITEM + it::HEALTH, h);
-            m.mem.w16(DS, ITEM + it::MAX_HEALTH, h);
+            m.mem.w16(DS, at + it::HEALTH, h);
+            m.mem.w16(DS, at + it::MAX_HEALTH, h);
         };
         store(self, h);
         if self.tb(t::MAGIC) != 0 {
@@ -317,96 +323,109 @@ impl Machine {
         }
     }
 
-    /// 1194:F031. Turns the template into a weapon item.
+    /// 1194:F031. Turns the template into a weapon item at ITEM (13DA).
     pub fn finish_weapon(&mut self) {
+        self.finish_weapon_at(ITEM);
+    }
+
+    /// 1194:F031 with SI `at`: ITEM (13DA) cleared, then the weapon's
+    /// fields set (or OR'd into) the item at `at`, as the original writes
+    /// through SI.
+    pub fn finish_weapon_at(&mut self, at: u16) {
         self.clear_item();
-        self.or_ib(it::FLAGS, 0x40);
-        self.or_ib(it::FLAGS, 4);
+        self.or_iat(at, it::FLAGS, 0x40);
+        self.or_iat(at, it::FLAGS, 4);
         // 1194:F0DA
         let ty = self.tb(t::TYPE) as u16;
         let dmg = self.mem.r16(DS, W_DAMAGE + 2 * ty);
-        self.mem.w16(DS, ITEM + it::DAMAGE_MIN, dmg);
-        self.set_ib(it::HANDS, self.b(W_HANDS + ty));
+        self.mem.w16(DS, at + it::DAMAGE_MIN, dmg);
+        self.set_iat(at, it::HANDS, self.b(W_HANDS + ty));
         if self.tb(t::MAGIC) != 0 {
-            self.or_ib(it::FLAGS, 1);
+            self.or_iat(at, it::FLAGS, 1);
             let m = self.tb(t::MATERIAL);
-            self.set_ib(it::MATERIAL, m);
+            self.set_iat(at, it::MATERIAL, m);
             if m == 0 {
-                self.set_ib(it::DAMAGE_MAX, self.ib(it::DAMAGE_MAX).wrapping_sub(2));
+                self.set_iat(at, it::DAMAGE_MAX, self.iat(at, it::DAMAGE_MAX).wrapping_sub(2));
             } else if m != 0xFF {
                 // Sign-extended, then divided unsigned.
                 let bonus = self.b(MATERIAL_BONUS + m as u16) as i8 as i16 as u16;
                 let v = (bonus / 5) as u8;
-                self.set_ib(it::DAMAGE_MIN, self.ib(it::DAMAGE_MIN).wrapping_add(v));
-                self.set_ib(it::DAMAGE_MAX, self.ib(it::DAMAGE_MAX).wrapping_add(v));
+                self.set_iat(at, it::DAMAGE_MIN, self.iat(at, it::DAMAGE_MIN).wrapping_add(v));
+                self.set_iat(at, it::DAMAGE_MAX, self.iat(at, it::DAMAGE_MAX).wrapping_add(v));
             }
-            self.set_ib(it::ENCHANT, self.tb(t::ENCHANT));
-            self.set_ib(it::ENCHANT_SPELL, self.tb(t::ENCHANT_SPELL));
-            self.set_ib(it::ENCHANT_VALUE, self.tb(t::ENCHANT_VALUE));
+            self.set_iat(at, it::ENCHANT, self.tb(t::ENCHANT));
+            self.set_iat(at, it::ENCHANT_SPELL, self.tb(t::ENCHANT_SPELL));
+            self.set_iat(at, it::ENCHANT_VALUE, self.tb(t::ENCHANT_VALUE));
         } else {
-            self.and_ib(it::FLAGS, 0xFE);
-            self.set_ib(it::MATERIAL, 0xFF);
+            self.and_iat(at, it::FLAGS, 0xFE);
+            self.set_iat(at, it::MATERIAL, 0xFF);
         }
         let p = self.item_price();
-        self.mem.w32(DS, ITEM + it::PRICE, p);
+        self.mem.w32(DS, at + it::PRICE, p);
         self.mem.w32(DS, BASE_PRICE, p);
-        self.set_ib(it::TYPE, ty as u8);
+        self.set_iat(at, it::TYPE, ty as u8);
         let code = self.mem.r16(DS, W_CONDITION + 2 * ty);
-        self.mem.w16(DS, ITEM + it::CONDITION_CODE, code);
-        self.set_condition(code);
+        self.mem.w16(DS, at + it::CONDITION_CODE, code);
+        self.set_condition_at(at, code);
     }
 
-    /// 1194:EEE2. Turns the template into an armour item.
+    /// 1194:EEE2. Turns the template into an armour item at ITEM (13DA).
     pub fn finish_armor(&mut self) {
+        self.finish_armor_at(ITEM);
+    }
+
+    /// 1194:EEE2 with SI `at`: ITEM (13DA) cleared (E97B), then the
+    /// armour's fields set (or OR'd into) the item at `at`.
+    pub fn finish_armor_at(&mut self, at: u16) {
         self.clear_item();
-        self.or_ib(it::FLAGS, 0x40);
-        self.and_ib(it::FLAGS, 0xCF);
+        self.or_iat(at, it::FLAGS, 0x40);
+        self.and_iat(at, it::FLAGS, 0xCF);
         let ty = self.tb(t::TYPE);
-        self.set_ib(it::TYPE, ty);
+        self.set_iat(at, it::TYPE, ty);
         let p = self.item_price();
-        self.mem.w32(DS, ITEM + it::PRICE, p);
+        self.mem.w32(DS, at + it::PRICE, p);
         let ty = ty as u16;
         if self.tb(t::MAGIC) == 1 {
             // Magic armour always uses the plate condition table.
             let code = self.mem.r16(DS, A_PLATE_CONDITION + 2 * ty);
-            self.mem.w16(DS, ITEM + it::CONDITION_CODE, code);
-            self.set_condition(code);
-            self.or_ib(it::FLAGS, 1);
-            self.set_ib(it::DAMAGE_MIN, 0x2D);
+            self.mem.w16(DS, at + it::CONDITION_CODE, code);
+            self.set_condition_at(at, code);
+            self.or_iat(at, it::FLAGS, 1);
+            self.set_iat(at, it::DAMAGE_MIN, 0x2D);
             let m = self.tb(t::MATERIAL);
-            self.set_ib(it::MATERIAL, m);
+            self.set_iat(at, it::MATERIAL, m);
             if m != 0xFF {
-                let r = self.ib(it::DAMAGE_MIN).wrapping_add(self.b(MATERIAL_BONUS + m as u16));
-                self.set_ib(it::DAMAGE_MIN, r);
-                self.or_ib(it::FLAGS, 1);
+                let r = self.iat(at, it::DAMAGE_MIN).wrapping_add(self.b(MATERIAL_BONUS + m as u16));
+                self.set_iat(at, it::DAMAGE_MIN, r);
+                self.or_iat(at, it::FLAGS, 1);
             }
-            self.set_ib(it::ENCHANT, self.tb(t::ENCHANT));
-            self.set_ib(it::ENCHANT_SPELL, self.tb(t::ENCHANT_SPELL));
-            self.set_ib(it::ENCHANT_VALUE, self.tb(t::ENCHANT_VALUE));
+            self.set_iat(at, it::ENCHANT, self.tb(t::ENCHANT));
+            self.set_iat(at, it::ENCHANT_SPELL, self.tb(t::ENCHANT_SPELL));
+            self.set_iat(at, it::ENCHANT_VALUE, self.tb(t::ENCHANT_VALUE));
         } else {
-            self.and_ib(it::FLAGS, 0xFE);
+            self.and_iat(at, it::FLAGS, 0xFE);
             let (kind_bits, table, kind, rating) = match self.tb(t::ARMOR_KIND) {
                 0 => (0x00, A_PLATE_CONDITION, 0, 0x2D),
                 1 => (0x10, A_CHAIN_CONDITION, 1, 0x1E),
                 _ => (0x20, A_LEATHER_CONDITION, 2, 0x0F),
             };
-            self.or_ib(it::FLAGS, kind_bits);
+            self.or_iat(at, it::FLAGS, kind_bits);
             let code = self.mem.r16(DS, table + 2 * ty);
-            self.mem.w16(DS, ITEM + it::CONDITION_CODE, code);
-            self.set_condition(code);
-            self.set_ib(it::MATERIAL, kind);
-            self.set_ib(it::DAMAGE_MIN, rating);
+            self.mem.w16(DS, at + it::CONDITION_CODE, code);
+            self.set_condition_at(at, code);
+            self.set_iat(at, it::MATERIAL, kind);
+            self.set_iat(at, it::DAMAGE_MIN, rating);
         }
         // 1194:7502: types 7..=10 are shields, with a fixed rating.
-        let ty = self.ib(it::TYPE) as u16;
+        let ty = self.iat(at, it::TYPE) as u16;
         if (7..=10).contains(&ty) {
-            self.set_ib(it::DAMAGE_MIN, self.b(SHIELD_RATING + ty - 7));
-            self.and_ib(it::FLAGS, 0xCF);
-            let m = self.ib(it::MATERIAL) as i8;
-            if self.ib(it::FLAGS) & 1 != 0 && m != -1 {
+            self.set_iat(at, it::DAMAGE_MIN, self.b(SHIELD_RATING + ty - 7));
+            self.and_iat(at, it::FLAGS, 0xCF);
+            let m = self.iat(at, it::MATERIAL) as i8;
+            if self.iat(at, it::FLAGS) & 1 != 0 && m != -1 {
                 let bonus = self.b(MATERIAL_BONUS.wrapping_add(m as i16 as u16));
-                let r = self.ib(it::DAMAGE_MIN).wrapping_add(bonus);
-                self.set_ib(it::DAMAGE_MIN, r.min(0x2D));
+                let r = self.iat(at, it::DAMAGE_MIN).wrapping_add(bonus);
+                self.set_iat(at, it::DAMAGE_MIN, r.min(0x2D));
             }
         }
     }
