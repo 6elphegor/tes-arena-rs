@@ -1,6 +1,7 @@
 pub mod blow;
 pub mod clock;
 pub mod controls;
+pub mod level;
 
 use arena::exe;
 
