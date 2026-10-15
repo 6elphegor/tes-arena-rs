@@ -349,6 +349,57 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
         let (x, y) = self.button.take().unwrap_or((0x120, 0xC0));
         (1, x, y)
     }
+    /// The spellmaker (1194:6064 with SI the player), its clicks, lists
+    /// and name answered through `dialog` (`LiveMaker`); its screen is
+    /// drawn behind its questions (`Talk::maker`).
+    fn spellmaker(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        let r = m.spellmaker(files, &mut LiveMaker { front: &mut *self.front }, 0x01A4);
+        if let Some(t) = self.talk() {
+            if t.need.is_none() {
+                t.maker = None;
+            }
+        }
+        r
+    }
+}
+
+/// The spellmaker's hooks in the window: each click (a click on its
+/// screen or form), list, menu and name typed is an answer of the turn's
+/// (`Talk::spell_click`, `list`, `menu`, `typed`); with none left the
+/// click leaves as the port's default does (the screen's "exit", the
+/// form's done box), the turn being thrown away.
+struct LiveMaker<'a, 'b> {
+    front: &'a mut Front<'b>,
+}
+
+impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
+    fn click(&mut self, m: &mut Machine, form: Option<u16>) -> (u16, u16) {
+        if let Some(c) = self.front.talk.as_deref_mut().and_then(|t| t.spell_click(m, form)) {
+            return c;
+        }
+        arena::spellmaker::NoSpellmakerHooks.click(m, form)
+    }
+    fn list(&mut self, m: &mut Machine, si: u16, cx: u16) -> u16 {
+        match self.front.talk.as_deref_mut() {
+            Some(t) => t.list(m, si, cx, ""),
+            None => 0xFFFF,
+        }
+    }
+    fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
+        match self.front.talk.as_deref_mut() {
+            Some(t) => t.menu(m, si, bx, di),
+            None => 0xFFFF,
+        }
+    }
+    fn message_box(&mut self, m: &mut Machine, si: u16) {
+        self.front.message_box(m, si);
+    }
+    /// The name typed into DS:`si` (581A, 1Fh characters and a NUL).
+    fn type_name(&mut self, m: &mut Machine, si: u16) {
+        if let Some(t) = self.front.talk.as_deref_mut() {
+            t.typed(m, si, 0x1F, "The spell's name?");
+        }
+    }
 }
 
 impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
