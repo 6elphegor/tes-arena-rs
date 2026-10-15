@@ -14,8 +14,13 @@
 //! cities, 8 towns (150D), 16 villages (15D5); its dungeons from 1765. A
 //! pick is the record's index: 0..1Fh a place, 20h on a dungeon.
 //!
-//! The drawing, the window and its texts, the travel animation and the
-//! arrival's log entry (26F7:08F7) are `TravelHooks`.
+//! On arrival (26F7:08F7, `travel_arrival`) the text the town's welcome
+//! shows (0000:4ACD) is written to entercty.$$$: where the player has
+//! arrived, the date, the days the journey took and the place's
+//! description.
+//!
+//! The drawing, the window and its texts and the travel animation are
+//! `TravelHooks`.
 
 use crate::bsa::Files;
 use crate::clock::ClockHooks;
@@ -109,8 +114,25 @@ pub trait TravelHooks: ClockHooks {
     fn location(&mut self, _m: &mut Machine, _id: u16) {}
     /// 1194:3B0C: a dungeon's location record built (AX `id`, BX `bx`).
     fn dungeon_location(&mut self, _m: &mut Machine, _id: u16, _bx: u16) {}
-    /// 26F7:08F7: the arrival's entry in the log.
-    fn arrival_log(&mut self, _m: &mut Machine) {}
+    /// 26F7:08F7: whether the front end made the arrival's text itself;
+    /// false (the default) runs `Machine::travel_arrival`.
+    fn arrival_log(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
+        Some(false)
+    }
+    /// 1194:A36C with AX 2: text TEXT (137A) copied to DS:`di`
+    /// (`Machine::text`).
+    fn arrival_text(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
+        m.text(files, &mut crate::text::NoTextHooks, 2, DS, di).map(|_| ())
+    }
+    /// 25FD:0844 then 0000:9DC2: the file named at DS:`si` deleted.
+    fn arrival_delete(&mut self, m: &mut Machine, files: &mut Files, si: u16) {
+        m.file_delete(files, si);
+    }
+    /// 25FD:0844 then 0000:9DD2: `cx` bytes from DS:`di` written to a new
+    /// file named at DS:`si`.
+    fn arrival_write(&mut self, m: &mut Machine, files: &mut Files, si: u16, di: u16, cx: u16) {
+        m.file_write(files, si, DS, di, cx);
+    }
     /// 3159:0006: the map's window closed.
     fn close(&mut self, _m: &mut Machine) {}
 }
@@ -335,7 +357,9 @@ impl Machine {
                 let (id, bx) = (self.tm8(DEST_ID) as u16, self.tm16(DEST_Y));
                 hooks.dungeon_location(self, id, bx);
             }
-            hooks.arrival_log(self);
+            if !hooks.arrival_log(self, files)? {
+                self.travel_arrival(files, hooks)?;
+            }
             self.travel_clear();
             self.mem.w8(DS, CHOSEN, 0);
         }
@@ -404,6 +428,128 @@ impl Machine {
             self.advance_minutes(files, minutes, hooks)?;
         }
         Some(())
+    }
+
+    /// 26F7:08F7. The arrival's text, unless the destination is a dungeon
+    /// (DEST_KIND 3): in ARRIVAL (10A8, 19Bh bytes cleared) "You have
+    /// arrived in ", then "The <kind> of <name>\rin <province>
+    /// Province.\r" (the kind's name the (id mod 20h) / 8th from 18F5,
+    /// formatted at 9C62), or in the Imperial province (SHOWN 8) "the
+    /// Imperial City. "; "The date is\r" and the date (0000:1508); " It
+    /// took %d days to reach your goal. " with the days (1927, at least
+    /// 1); and the place's text copied (1194:A36C, AX 2): 258h + province
+    /// * 8 + index for a city, 58Eh for a town, 58Fh for a village. The
+    /// text's LFs and CRs made spaces, wrapped at 32h (1194:49FF), the
+    /// wraps made CRs, a CR and a NUL put after it, and the text (its
+    /// length then + 2) written to entercty.$$$ (130C), which the town's
+    /// welcome shows; 5C8 bit 100h set.
+    pub fn travel_arrival(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks) -> Option<()> {
+        const ARRIVAL: u16 = 0x10A8;
+        const SCRATCH: u16 = 0x9C62;
+        const FILE: u16 = 0x130C;
+        self.mem.w8(DS, ARRIVAL, 0);
+        if self.tm8(DEST_KIND) == 3 {
+            return Some(());
+        }
+        self.mem.w16(DS, 0x6ACD, SCRATCH);
+        for i in 0..0x19Bu16 {
+            self.mem.w8(DS, ARRIVAL + i, 0);
+        }
+        self.arrival_copy(ARRIVAL, DATA, 0x4F05);
+        let index = self.tm8(HERE_ID) as u16 % 0x20;
+        self.mem.w16(DS, 0x6ACF, index);
+        let mut si = 0x6C42;
+        if self.tm8(SHOWN) != 8 {
+            let kind = self.skip_strings(DS, 0x18F5, index >> 3);
+            let scratch = self.tm16(0x6ACD);
+            self.sprintf((DS, scratch), (DATA, 0x4F74), &[Arg::Str(DS, kind), Arg::Str(DS, DEST_NAME), Arg::Str(DS, 0x1429)]);
+            si = scratch;
+        }
+        self.arrival_cat(ARRIVAL, DS, si);
+        self.arrival_cat(ARRIVAL, DATA, 0x4F1A);
+        let scratch = self.tm16(0x6ACD);
+        let minutes = self.mem.r32(DS, 0x05CC);
+        self.log_date(minutes, scratch);
+        self.arrival_cat(ARRIVAL, DS, scratch);
+        if (self.tm16(DAYS) as i16) <= 1 {
+            self.mem.w16(DS, DAYS, 1);
+        }
+        let days = self.tm16(DAYS);
+        self.sprintf((DS, scratch), (DATA, 0x4F27), &[Arg::Int(days)]);
+        self.arrival_cat(ARRIVAL, DS, scratch);
+        let text = if index >= 0x10 {
+            0x58F
+        } else if index >= 8 {
+            0x58E
+        } else {
+            ((self.tm8(HERE_PROVINCE) as u16) << 3).wrapping_add(index).wrapping_add(0x258)
+        };
+        self.mem.w16(DS, 0x137A, text);
+        // repne scasb from ARRIVAL, CX 3E8h, then dec di.
+        let end = (0..0x3E8u16).find(|&k| self.tm8(ARRIVAL.wrapping_add(k)) == 0).unwrap_or(0x3E7);
+        self.mem.w8(DS, 0x101C, 1);
+        self.mem.w8(DS, 0x137E, 0x32);
+        hooks.arrival_text(self, files, ARRIVAL.wrapping_add(end))?;
+        self.mem.w16(DS, 0x6ACD, 0x1044);
+        let len = self.arrival_len(ARRIVAL).wrapping_add(2);
+        self.arrival_replace(ARRIVAL, 0x0A, 0x20);
+        self.arrival_replace(ARRIVAL, 0x0D, 0x20);
+        self.mem.w8(DS, 0x137E, 0x32);
+        self.sq_wrap(ARRIVAL)?;
+        self.arrival_replace(ARRIVAL, 0x0A, 0x0D);
+        // repne scasb, CX 19Ch: DI past the NUL (or past the last byte).
+        let di = (0..0x19Cu16).find(|&k| self.tm8(ARRIVAL.wrapping_add(k)) == 0).map_or(0x19C, |k| k + 1);
+        let di = ARRIVAL.wrapping_add(di);
+        self.mem.w8(DS, di.wrapping_sub(1), 0x0D);
+        self.mem.w16(DS, di, 0);
+        hooks.arrival_delete(self, files, FILE);
+        hooks.arrival_write(self, files, FILE, ARRIVAL, len);
+        let f = self.tm16(0x05C8) | 0x100;
+        self.mem.w16(DS, 0x05C8, f);
+        Some(())
+    }
+
+    /// 0000:9CA0 with ES DGROUP: the string at `seg`:`si` copied to DS:`di`
+    /// with its NUL.
+    fn arrival_copy(&mut self, di: u16, seg: u16, si: u16) {
+        let mut i = 0u16;
+        loop {
+            let c = self.mem.r8(seg, si.wrapping_add(i));
+            self.mem.w8(DS, di.wrapping_add(i), c);
+            if c == 0 {
+                break;
+            }
+            i = i.wrapping_add(1);
+        }
+    }
+
+    /// 0000:9BD0: the string at `seg`:`si` appended to the one at DS:`di`.
+    fn arrival_cat(&mut self, di: u16, seg: u16, si: u16) {
+        let end = di.wrapping_add(self.arrival_len(di));
+        self.arrival_copy(end, seg, si);
+    }
+
+    /// 0000:9CAC: the length of the string at DS:`di`.
+    fn arrival_len(&self, di: u16) -> u16 {
+        let mut n = 0u16;
+        while self.tm8(di.wrapping_add(n)) != 0 {
+            n = n.wrapping_add(1);
+        }
+        n
+    }
+
+    /// 1194:49DF: in the string at `si` (its length first), each `al`
+    /// made `bl`.
+    fn arrival_replace(&mut self, si: u16, al: u8, bl: u8) {
+        let n = self.arrival_len(si);
+        for i in 0..n {
+            let at = si.wrapping_add(i);
+            match self.tm8(at) {
+                0 => break,
+                c if c == al => self.mem.w8(DS, at, bl),
+                _ => {}
+            }
+        }
     }
 
     /// 26F7:07A9. The choice undone: the name's 14h bytes, the province,

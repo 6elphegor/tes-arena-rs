@@ -1317,7 +1317,7 @@ impl Machine {
     /// from each line's end back to a space, made a line feed. None
     /// where no space is found going back (the original reads on through
     /// memory).
-    fn sq_wrap(&mut self, si: u16) -> Option<()> {
+    pub(crate) fn sq_wrap(&mut self, si: u16) -> Option<()> {
         let mut ax = 0u16;
         while self.sq8(si.wrapping_add(ax)) != 0 {
             ax = ax.wrapping_add(1);
