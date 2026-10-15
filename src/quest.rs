@@ -90,6 +90,67 @@ pub trait QuestHooks {
     /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
     /// written to 19DE, before its message box.
     fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
+    /// 1194:3EC3 (and far 3EBF): the place `place`'s buildings listed
+    /// (its plan, `Machine::city_plan_for_record`, then each block's .MIF
+    /// header read for the counts at 1387/1389/138B and the lists at
+    /// 1AB5/1004/1008). Not ported (file I/O): None by default.
+    fn city_info(&mut self, _m: &mut Machine, _files: &mut Files, _place: u8) -> Option<()> {
+        None
+    }
+    /// 1194:2E69 (far): the days the journey set up at 193D..1944 takes,
+    /// left at 1927 (`Machine::travel_days`).
+    fn travel(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.travel_days(files).map(|_| ())
+    }
+    /// 0000:9D60: the PC's timer ticks (the BIOS's dword at 0:046C).
+    fn bios_ticks(&mut self, _m: &mut Machine) -> u32 {
+        0
+    }
+    /// 1194:A374 with AX `mode` (0 shown, 1 offered with its yes and no,
+    /// 2 written to DS:`di`): the text port (`Machine::text`, its menu
+    /// left). AX, a menu's pick (0 the first).
+    fn text_at(&mut self, m: &mut Machine, files: &mut Files, mode: u16, di: u16) -> Option<u16> {
+        m.text(files, &mut crate::text::NoTextHooks, mode, DS, di).map(|(ax, _)| ax)
+    }
+    /// 2DA2:000A: the text at DS:`di` has its substitutions made (the
+    /// text port, `Machine::expand`).
+    fn substitute(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
+        m.expand(files, &mut crate::text::NoTextHooks, DS, di).map(|_| ())
+    }
+    /// 1194:020E: a menu, its title at DS:`si`, its keys at `bx`, its
+    /// entries' table at `di`. The pick (FFFFh: none).
+    fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
+        0xFFFF
+    }
+    /// 1194:8020 in modes 5 and 6 (not ported, see `haggle`): the main
+    /// quest's informant haggled with over `price` (0FEE), the player's
+    /// personality `per` (1194:5B07 of 1D3), quality 1Eh, mood 28h. The
+    /// carry: no deal. None by default.
+    fn informant_haggle(&mut self, _m: &mut Machine, _files: &mut Files, _price: u32, _per: u16, _mode: u8) -> Option<bool> {
+        None
+    }
+    /// 0000:7428 with ES:DI the EMS frame (9030):0: the file named at
+    /// DS:`name` loaded there (`Machine::file_load`).
+    fn frame_load(&mut self, m: &mut Machine, files: &mut Files, name: u16) -> Option<()> {
+        let frame = m.mem.r16(DS, 0x9030);
+        m.file_load(files, name, frame, 0).map(|_| ())
+    }
+    /// 1194:4B8E: the picture named at DS:`si` shown.
+    fn picture(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:4E88: the text's window (its lines at 929E), of kind 13D3 (1
+    /// yes or no: AX 0 yes). Its AX.
+    fn dialog(&mut self, _m: &mut Machine, _kind: u8) -> u16 {
+        1
+    }
+    /// 1194:4D31: a message with the text at DS:`si`.
+    fn notice(&mut self, _m: &mut Machine, _si: u16) {}
+    /// The Emperor's audience's screens (0000:41B6..4216): `part` 0 the
+    /// speech (1194:DAF0, 2294:0895, 1194:D459 with text 5A7h and the
+    /// picture at 884Ch, 55B2, 55D5), 1 its end (1194:DB26), 2 the view
+    /// cleared (0000:9A98 over 140h x C8h, 55D5).
+    fn audience(&mut self, _m: &mut Machine, _files: &mut Files, _part: u8) -> Option<()> {
+        Some(())
+    }
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {
@@ -237,7 +298,7 @@ impl Machine {
     /// 1194:9C96 (`flag` 0) / 9C9B (TEXT_FLAG already set, here `flag`):
     /// text `text` written (A374, mode 2) and shown in a message box,
     /// in colour 60h, or EEh with its second font when 5C8 bit 20h is set.
-    fn quest_message(&mut self, hooks: &mut dyn QuestHooks, text: u16, flag: u8) {
+    pub(crate) fn quest_message(&mut self, hooks: &mut dyn QuestHooks, text: u16, flag: u8) {
         self.mem.w8(DS, TEXT_FLAG, flag);
         self.mem.w16(DS, TEXT, text);
         self.mem.w8(DS, TEXT_FLAG2, 0);
@@ -390,7 +451,7 @@ impl Machine {
     }
 
     /// 0000:9CA0: the string at DS:`si` copied to DS:`di`, NUL included.
-    fn quest_strcpy(&mut self, mut si: u16, mut di: u16) {
+    pub(crate) fn quest_strcpy(&mut self, mut si: u16, mut di: u16) {
         loop {
             let b = self.mem.r8(DS, si);
             self.mem.w8(DS, di, b);
@@ -502,7 +563,7 @@ impl Machine {
     /// province (A46) loaded again. Returns AX, the entry's index. The
     /// entry written is the index's (modes 0, 1 and 4), the first fixed
     /// one (2) or the second (3 and more but 4).
-    fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
+    pub(crate) fn quest_dungeon_entry(&mut self, hooks: &mut dyn QuestHooks, province: u16, mode: u16, index: u16, name: u16) -> Option<u16> {
         use crate::dungeon::{table::DUNGEON_ENTRIES, var::PICK_INDEX};
         let here = self.mem.r8(DS, HERE_PROVINCE);
         hooks.province_load(self, province as u8);

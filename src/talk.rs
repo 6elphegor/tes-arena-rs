@@ -145,9 +145,14 @@ pub trait TalkHooks: TextHooks {
         m.quest_item_taken(&mut crate::quest::NoQuestHooks).unwrap_or(true)
     }
     /// 1194:D593: the quest's person speaks.
-    fn quest_person(&mut self, _m: &mut Machine) {}
-    /// 1194:8F1E: the palace's ruler.
-    fn palace(&mut self, _m: &mut Machine) {}
+    fn quest_person(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quest_person_talk(files, &mut crate::quest::NoQuestHooks)
+    }
+    /// 1194:8F1E (from DCE1): the palace's quests, ended, offered and
+    /// taken (`Machine::quests_talk`).
+    fn palace(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.quests_talk(files, &mut crate::quest::NoQuestHooks)
+    }
     /// 1194:CD9A: a quest is offered. The carry: none
     /// (`quest::quest_offer`; none too where the original faults).
     fn quest_offer(&mut self, m: &mut Machine) -> bool {
@@ -169,7 +174,7 @@ pub trait TalkHooks: TextHooks {
             return m.temple(&mut crate::shops::NoShopHooks);
         }
         if kind == 4 {
-            return m.tavern_shop(&mut crate::tavern::NoTavernHooks);
+            return m.tavern_shop(files, &mut crate::tavern::NoTavernHooks);
         }
         if kind == 6 {
             return m.equipment_store(files, &mut crate::store::NoStoreHooks);
@@ -368,9 +373,9 @@ impl Machine {
                 && self.g8(0x80ECu16.wrapping_add(q)) == self.g8(0x0A46)
                 && self.names_equal(self.skip_strings(DS, 0x80F4, q), 0x0A22);
             if named {
-                hooks.quest_person(self);
+                hooks.quest_person(self, files)?;
             } else {
-                hooks.palace(self);
+                hooks.palace(self, files)?;
             }
             return Some(());
         }
@@ -387,7 +392,7 @@ impl Machine {
                     _ => false,
                 };
                 if quest_here && (self.g8(0x0F78) == 0 || self.g8(0x0F7B) == 0 || self.g8(0x0F79) == 0) {
-                    hooks.quest_person(self);
+                    hooks.quest_person(self, files)?;
                 }
             }
             self.mem.w16(DS, CLICKED, 0xFFFF);
@@ -646,7 +651,7 @@ impl Machine {
                 return Some(Flow::End);
             }
             if ax == self.g16(QUEST_ENTRY) {
-                hooks.quest_person(self);
+                hooks.quest_person(self, files)?;
                 return Some(Flow::Menu);
             }
             ax
