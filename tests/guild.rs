@@ -11,8 +11,6 @@ use arena::shops::ShopHooks;
 use common::blow::Stream;
 
 const FRAME: u16 = 0xA000;
-/// The segment EMS bank 18h holds at 9030 (see harness/gen_guild.py).
-const SRC: u16 = 0x7000;
 
 const COUNTS: [&[u8]; 10] = [b"1", b"3", b"10", b"0", b"", b"2x", b"255", b"300", b"7", b"12"];
 const CLICKS: [(u8, u16, u16); 18] = [
@@ -338,21 +336,6 @@ fn setup(m: &mut Machine, seed: u32, days: &[u16]) -> Script {
         }
         Some(f)
     };
-    for i in 0..0x100u16 {
-        let mut r = [0u8; 0x0B];
-        r[0] = s.byte() % 3;
-        r[1] = s.byte() % 6;
-        r[2] = s.byte() % 3;
-        r[3] = s.byte() % 8;
-        r[4] = s.byte() % 0x20;
-        let p = dword(s) % 0x10000;
-        r[5..9].copy_from_slice(&p.to_le_bytes());
-        r[9] = s.byte();
-        r[10] = s.byte();
-        for (k, &b) in r.iter().enumerate() {
-            m.mem.w8(SRC, i * 0x0B + k as u16, b);
-        }
-    }
     // Aimed at edges (see harness/gen_guild.py).
     if s.byte() < 0x20 {
         m.mem.w32(DS, 0x0A4C, 0xFFFF_FC18);
@@ -369,12 +352,6 @@ fn setup(m: &mut Machine, seed: u32, days: &[u16]) -> Script {
         let f = items[i as usize * 0x13 + 0x0E] | 2;
         m.mem.w8(DS, 0x0212 + i * 0x13 + 0x0E, f);
     }
-    // Bank 18h, not mapped: its word at 9030.
-    if m.ems.len() <= 0x18 {
-        m.ems.resize(0x19, vec![0; 0x10000]);
-    }
-    m.ems[0x18][0x9030] = SRC as u8;
-    m.ems[0x18][0x9031] = (SRC >> 8) as u8;
     Script { menus, lists, yes, counts, haggles, clicks, file, ..Default::default() }
 }
 

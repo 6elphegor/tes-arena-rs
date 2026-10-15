@@ -25,7 +25,8 @@ the scripted answer (the carry clear unless scripted):
   3 file exists (0:600C: CF; then reads, 0:6BEC, from the file's
     bytes, AX the bytes read, not logged: the port reads them itself)
   5 write (0:6DDC: CX, then the bytes' digest's low dword)
-  8 menu (020E: SI BX DI) AX          9 list (5734: DS SI CX) AX
+  8 menu (020E: SI BX DI) AX          9 list (5734: DS SI CX) AX,
+                                        DS and ES DGROUP after
   10 message box (59CC: SI)           11 message (4D31: SI)
   12 dialog (4E88: [13D3]; 1: AX, 2: the text at DS:DI)
   13 picture (4B8E: SI)   14 haggle (8020: EAX BX CX SI DH) EAX, CF
@@ -62,9 +63,6 @@ from gen_attack import stream
 
 FRAME = 0xA000
 DATA = 0x3276
-# The segment bank 18h holds at 9030 (1194:B4DB reads the bought item's
-# record from it with DS the frame), and its bytes.
-SRC = 0x7000
 
 COUNTS = (b'1', b'3', b'10', b'0', b'', b'2x', b'255', b'300', b'7', b'12')
 # The spell screen's clicks: (buttons, x, y): back, buy, exit, misses.
@@ -204,20 +202,6 @@ def setup(seed, holidays):
         if cut < 0x20:
             f = f[:byte() % (len(f) + 1)]
         file = bytes(f)
-    # 100h records there, as the stock's (kinds 0..2).
-    src = bytearray()
-    for _ in range(0x100):
-        r = bytearray(0x0B)
-        r[0] = byte() % 3
-        r[1] = byte() % 6
-        r[2] = byte() % 3
-        r[3] = byte() % 8
-        r[4] = byte() % 0x20
-        struct.pack_into('<I', r, 5, dword() % 0x10000)
-        r[9] = byte()
-        r[10] = byte()
-        src += r
-    src = bytes(src)
     # Aimed at edges: the place's seed + 1000 at 0 (made 1), the price a
     # potion's health takes at 50000, an item's value about 10 (a tenth
     # of it, or 1).
@@ -230,7 +214,7 @@ def setup(seed, holidays):
         i = byte() % n_items
         w.append((0x0212 + i * 0x13 + 0x0A, pd(9 + byte() % 3)))
         w.append((0x0212 + i * 0x13 + 0x0E, bytes([items[i * 0x13 + 0x0E] | 2])))
-    return w, dw, src, (menus, lists, yes, counts, haggles, clicks, file)
+    return w, dw, (menus, lists, yes, counts, haggles, clicks, file)
 
 
 def guild_holidays(a):
@@ -323,6 +307,9 @@ def main():
         v = take(1, 0xFFFF)
         cx = reg('cx')
         wreg('ax', v if v == 0xFFFF else v % max(cx, 1))
+        # 1194:5734 returns with DS and ES DGROUP.
+        wreg('ds', a.ds)
+        wreg('es', a.ds)
 
     def dialog():
         kind = bytes(mu.mem_read(a.lin(a.ds, 0x13D3), 1))[0]
@@ -399,6 +386,15 @@ def main():
             if addr not in seen:
                 seen[addr] = len(seen)
         mu.hook_add(UC_HOOK_BLOCK, blk)
+    if os.environ.get('PROBE'):
+        for spec in os.environ['PROBE'].split(','):
+            sg, of = (int(x, 16) for x in spec.split(':'))
+            lin = a.lin(LOAD_SEG + sg, of)
+
+            def probe(mu, addr, size, _, spec=spec):
+                print(f'PROBE {spec} ds {reg("ds"):04x} es {reg("es"):04x} ax {reg("ax"):04x} '
+                      f'eax {reg("eax"):08x} 13c9 {bytes(mu.mem_read(a.lin(a.ds, 0x13C9), 1))[0]:02x}', file=sys.stderr)
+            mu.hook_add(UC_HOOK_CODE, probe, None, lin, lin)
     if os.environ.get('WATCH'):
         from unicorn import UC_HOOK_MEM_WRITE
         for w in os.environ['WATCH'].split(','):
@@ -422,13 +418,9 @@ def main():
         if not mine(n, total):
             continue
         a.restore(snap)
-        writes, dwrites, src, answers = setup(seed, holidays)
+        writes, dwrites, answers = setup(seed, holidays)
         for off, data in writes:
             mu.mem_write(a.lin(a.ds, off), data)
-        mu.mem_write(a.lin(SRC, 0), src)
-        bank = bytearray(a.ems['banks'].get(0x18, bytes(0x10000)))
-        bank[0x9030:0x9032] = struct.pack('<H', SRC)
-        a.ems['banks'][0x18] = bytes(bank)
         for off, data in dwrites:
             mu.mem_write(a.lin(LOAD_SEG + DATA, off), data)
         menus, lists, yes, counts, haggles, clicks, file = answers

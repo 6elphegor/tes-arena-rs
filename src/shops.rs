@@ -130,19 +130,27 @@ impl Machine {
     /// None. Past day 344 (unsigned) the original reads a word through an
     /// unset SI; it only says no.
     pub fn holiday(&self, eax: u32) -> Option<u16> {
+        let (cx, found) = self.holiday_search(eax);
+        found.then_some(cx)
+    }
+
+    /// 2DA2:111C's CX and carry: the holiday's index and true, or where
+    /// the search stopped (the first holiday after the day; 0 past day
+    /// 158h) and false.
+    fn holiday_search(&self, eax: u32) -> (u16, bool) {
         let day = (eax % 0x7E900) / 0x5A0;
         if day > 0x158 {
-            return None;
+            return (0, false);
         }
         let mut si = HOLIDAYS;
         let mut cx = 0u16;
         loop {
             let d = self.mem.r16(DS, si) as i16;
             if d == day as i16 {
-                return Some(cx);
+                return (cx, true);
             }
             if d > day as i16 {
-                return None;
+                return (cx, false);
             }
             si = si.wrapping_add(2);
             cx = cx.wrapping_add(1);
@@ -158,9 +166,10 @@ impl Machine {
     /// 1194:4A6B: price `eax` on today's holiday for service `bx`: times
     /// the holiday's factor (byte `bx` of its entry) over four (the low
     /// dword), at least 1 when the factor isn't 0. Not a holiday: the
-    /// entry the search stopped at (0, as the original's CX).
+    /// entry the search stopped at (the first holiday after today; 0 past
+    /// day 158h), as the original's CX.
     pub(crate) fn holiday_price(&self, eax: u32, bx: u16) -> u32 {
-        let cx = self.holiday(self.mem.r32(DS, TIME)).unwrap_or(0);
+        let (cx, _) = self.holiday_search(self.mem.r32(DS, TIME));
         let f = self.mem.r8(DS, HOLIDAY_SHOPS.wrapping_add(cx.wrapping_mul(6)).wrapping_add(bx)) as u32;
         let p = eax.wrapping_mul(f) >> 2;
         if p == 0 && f != 0 { 1 } else { p }

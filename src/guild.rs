@@ -113,14 +113,6 @@ pub trait GuildHooks: ShopHooks {
     fn spellmaker(&mut self, _m: &mut Machine) {}
 }
 
-/// What follows a routine of the menu.
-enum Next {
-    Menu,
-    Exit,
-    /// The menu again, after a list of the stock left with DS the frame.
-    FrameDs,
-}
-
 /// `GuildHooks` that do nothing: every menu left at once, nothing typed
 /// (the count asked for is "0").
 pub struct NoGuildHooks;
@@ -242,7 +234,7 @@ impl Machine {
             let bank = self.map_bank(0x18, 0);
             self.mem.w16(DS, SAVED_BANK, bank);
             self.guild_enter(hooks)?;
-            'menu: loop {
+            loop {
                 self.map_bank(0x18, 0);
                 let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
                 let (bx, di) = if caster { (KEYS, ENTRIES) } else { (KEYS_PLAIN, ENTRIES_PLAIN) };
@@ -261,19 +253,8 @@ impl Machine {
                     }
                     ROUTINES_PLAIN
                 };
-                match self.guild_choice(files, hooks, table, pick)? {
-                    Next::Exit => break,
-                    Next::Menu => {}
-                    // 1194:B40B..A775 with DS the frame: the two bank maps
-                    // (0000:5C86) read the EMS flag there; 0000:8FC4 puts
-                    // DGROUP back. Not modelled where that flag isn't 0.
-                    Next::FrameDs => {
-                        let frame = self.mem.r16(DS, FRAME);
-                        if self.mem.r8(frame, 0x8FA6) != 0 {
-                            return None;
-                        }
-                        continue 'menu;
-                    }
+                if self.guild_choice(files, hooks, table, pick)? {
+                    break;
                 }
             }
         }
@@ -288,14 +269,11 @@ impl Machine {
     }
 
     /// The menu's routine for `pick`, by its address in the table at
-    /// `table`: what comes next (the carry, only a steal's guards set it,
-    /// leaves; a cancelled list of the stock comes back with DS the
-    /// frame).
-    fn guild_choice(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks, table: u16, pick: u16) -> Option<Next> {
-        let next = |cf: bool| if cf { Next::Exit } else { Next::Menu };
+    /// `table`. The carry it returns (only a steal's guards set it).
+    fn guild_choice(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks, table: u16, pick: u16) -> Option<bool> {
         match self.mem.r16(DS, table.wrapping_add(pick.wrapping_add(pick))) {
-            0xAA8C => self.guild_buy(files, hooks),
-            0xAB39 => self.guild_detect(hooks).map(|_| Next::Menu),
+            0xAA8C => self.guild_buy(files, hooks).map(|_| false),
+            0xAB39 => self.guild_detect(hooks).map(|_| false),
             0xA80D => {
                 // 1194:A80D: A902 bit 0 cleared around the spellmaker.
                 let f = self.mem.r16(DS, 0xA902) & !1;
@@ -303,9 +281,9 @@ impl Machine {
                 hooks.spellmaker(self);
                 let f = self.mem.r16(DS, 0xA902) & !1;
                 self.mem.w16(DS, 0xA902, f);
-                Some(Next::Menu)
+                Some(false)
             }
-            0xAC2A => self.guild_steal(hooks).map(next),
+            0xAC2A => self.guild_steal(hooks),
             _ => None,
         }
     }
@@ -601,7 +579,7 @@ impl Machine {
     }
 
     /// 1194:AA8C. The buy menu (see the module's notes).
-    fn guild_buy(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<Next> {
+    fn guild_buy(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         let stock = self.mem.r8(DS, STOCK) >= 1;
         let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
         let menu = match (stock, caster) {
@@ -614,16 +592,16 @@ impl Machine {
             Some((bx, di)) => {
                 let pick = hooks.menu(self, BUY_TITLE, bx, di);
                 if (pick as i16) < 0 {
-                    return Some(Next::Menu);
+                    return Some(());
                 }
                 pick
             }
             None => 0,
         };
         match self.mem.r16(DS, BUY_ROUTINES.wrapping_add(pick.wrapping_add(pick))) {
-            0xAFF9 => self.guild_potions(files, hooks).map(|_| Next::Menu),
+            0xAFF9 => self.guild_potions(files, hooks),
             0xB327 => self.guild_items(files, hooks),
-            0xB1EA => self.guild_spells(files, hooks).map(|_| Next::Menu),
+            0xB1EA => self.guild_spells(files, hooks),
             _ => None,
         }
     }
@@ -825,44 +803,35 @@ impl Machine {
     }
 
     /// 1194:B327. A magic item of the stock bought (see the module's
-    /// notes). The pick is stored with DS the frame (at frame:13C8), so
-    /// the record taken out of the stock is the one DGROUP's 13C8 still
-    /// names (the item bought is the pick's). Nothing picked, it returns
-    /// with DS the frame (the
-    /// original's bug: its list is shown with DS there): the bank put back
-    /// through the frame's EMS flag, `Next::FrameDs`.
-    fn guild_items(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<Next> {
+    /// notes). Its list is shown with DS the frame; 1194:5734 returns with
+    /// DS and ES DGROUP.
+    fn guild_items(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         if self.free_slot(DS, PLAYER).is_err() {
             self.guild_colour();
             hooks.message_box(self, text::FULL);
-            return Some(Next::Menu);
+            return Some(());
         }
         let old = self.map_bank(0x18, 0);
         let frame = self.mem.r16(DS, FRAME);
         let n = self.mem.r8(DS, STOCK) as u16;
         let pick = hooks.stock_list(self, frame, 0x7D0, n);
-        self.mem.w8(frame, PICK, pick as u8);
-        if (pick as i16) < 0 {
-            return Some(Next::FrameDs);
+        self.mem.w8(DS, PICK, pick as u8);
+        if (pick as i16) >= 0 {
+            self.guild_item_bought(files, hooks, pick)?;
         }
-        self.guild_item_bought(files, hooks, pick)?;
         self.map_bank(old, 0);
-        Some(Next::Menu)
+        Some(())
     }
 
-    /// 1194:B362..B419 after the pick. 1194:B4DB runs with DS still the
-    /// frame (the original's bug): its bank map reads the frame's EMS
-    /// flag (not modelled unless 0), and the record is copied from the
-    /// segment the frame holds at 9030, not from the frame.
+    /// 1194:B362..B419 after the pick: the record copied out (1194:B4DB),
+    /// named, haggled over, paid, made in a free slot and taken out of the
+    /// stock.
     fn guild_item_bought(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks, pick: u16) -> Option<()> {
         // 1194:B4DB
+        self.map_bank(0x18, 0);
         let frame = self.mem.r16(DS, FRAME);
-        if self.mem.r8(frame, 0x8FA6) != 0 {
-            return None;
-        }
-        let src = self.mem.r16(frame, FRAME);
         let rec = pick.wrapping_mul(0x0B);
-        self.memmove(src, rec, DS, TEMPLATE, 0x0B);
+        self.memmove(frame, rec, DS, TEMPLATE, 0x0B);
         self.stock_name()?;
         self.mem.w16(DS, NAME_PTR, ITEM_NAME);
         let p = self.mem.r32(DS, TEMPLATE + 5);
