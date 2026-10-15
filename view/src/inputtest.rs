@@ -1299,7 +1299,8 @@ fn a_save_loaded_from_the_title_as_in_play() {
     assert_eq!(b.m.mem.r16(DS, 0xBA76), 6, "the hook's offset kept, its segment cleared");
 }
 
-/// Shift+F5's save menu: slot 3's row clicked, a name typed, Enter: the
+/// The options screen's Save (Esc, then its box at 81h..C0h, 76h..92h):
+/// the save menu; slot 3's row clicked, a name typed, Enter: the
 /// game saved to a scratch folder (NAMES.DAT with the name, SAVEGAME.03);
 /// then a fresh program's main menu Load, slot 3's row clicked: the game
 /// loaded the title screen's way, where it was saved.
@@ -1312,10 +1313,9 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
-    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
-    d.key(&mut a, KeyCode::F5, None);
-    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
-    assert!(a.saveui.is_some(), "the save menu is up");
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0xA0, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Save), "the save menu is up");
     d.click(&mut a, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(a.saveui.as_ref().is_some_and(|u| u.typing.is_some()), "slot 3's name is typed");
     for c in "Ria".chars() {
@@ -1350,4 +1350,91 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     d.click(&mut b, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(b.saveui.is_none() && b.creation.is_none(), "loaded and playing");
     assert_eq!(at(&b.engine), saved, "where it was saved");
+}
+
+/// Esc in play: the options screen (2542:000A). Its arrows change the
+/// sound's and the music's volumes (D3B, D3A), its bar the detail (D37),
+/// each as the port's `options_screen` with the same clicks; Resume leaves
+/// with them; Load opens the load menu; Exit asks, No stays, Yes quits.
+#[test]
+fn the_options_screen_by_esc() {
+    use arena::mem::DS;
+    use arena::options::var::{DETAIL, MUSIC, SOUND};
+    let Some(dir) = game_dir() else { return };
+    let scratch = Scratch::new("options");
+    let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let before = Engine { m: a.engine.m.clone(), files: a.engine.files.clone() };
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.options.is_some() && !a.captured, "Esc opens the options screen, the mouse let go");
+    let mut shot = hud::Screen::new(a.assets.palette);
+    a.options.as_ref().unwrap().draw(&mut shot, &a.font);
+    if let Ok(p) = std::env::var("ARENA_SHOT_OPTIONS") {
+        let data: Vec<u8> = shot.px.iter().flat_map(|c| [c[0], c[1], c[2], 0xFF]).collect();
+        let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(p).unwrap()), hud::W as u32, hud::H as u32);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.write_header().unwrap().write_image_data(&data).unwrap();
+    }
+    // Esc on the screen: 564D's FFFFh, in no box: still up.
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.options.is_some(), "Esc doesn't leave the screen");
+    // The sound's down arrow twice, the music's once, the detail bar at
+    // its 9th step, then Resume.
+    let clicks = [(0x30, 0x6A), (0x3E, 0x6F), (0x80, 0x6A), (0xCB + 9 * 5, 0x5E), (0x120, 0x80)];
+    for &(x, y) in &clicks {
+        d.click(&mut a, x, y, MouseButton::Left);
+    }
+    assert!(a.options.is_none(), "Resume leaves");
+    let v = |m: &arena::machine::Machine| (m.mem.r8(DS, SOUND), m.mem.r8(DS, MUSIC), m.mem.r16(DS, DETAIL));
+    let (s0, m0, _) = v(&before.m);
+    assert_eq!(v(&a.engine.m), (s0.saturating_sub(2), m0.saturating_sub(1), 15), "the volumes and the detail as set");
+    // The same clicks through the port.
+    struct Clicks(Vec<(u16, u16)>);
+    impl arena::options::OptionsHooks for Clicks {
+        fn click(&mut self, m: &mut arena::machine::Machine) -> Option<(u16, u16)> {
+            let c = self.0.pop()?;
+            m.mem.w16(DS, arena::options::var::MOUSE_X, c.0);
+            m.mem.w16(DS, arena::options::var::MOUSE_Y, c.1);
+            Some(c)
+        }
+    }
+    let mut b = before;
+    let mut script = Clicks(clicks.iter().rev().map(|&(x, y)| (x as u16, y as u16)).collect());
+    assert_eq!(b.m.options_screen(&mut b.files, &mut script), Some(arena::options::OptionsEnd::Resume));
+    assert_eq!(v(&a.engine.m), v(&b.m), "as the port's screen with the same clicks");
+    // The sound's and the music's up arrows: up by one each.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x30, 0x50, MouseButton::Left);
+    d.click(&mut a, 0x80, 0x50, MouseButton::Left);
+    d.click(&mut a, 0x120, 0x80, MouseButton::Left);
+    assert_eq!(v(&a.engine.m), (s0.saturating_sub(1), m0, 15), "the up arrows");
+    // Load: the load menu.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x60, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Load), "Load: the load menu");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.saveui.is_none(), "the load menu left");
+    // Exit: "Are you sure ?"; No stays, Yes quits.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0xE0, 0x80, MouseButton::Left);
+    assert!(a.options.as_ref().is_some_and(|u| u.confirm.is_some()), "Exit asks");
+    d.key(&mut a, KeyCode::KeyN, Some("n"));
+    assert!(a.options.as_ref().is_some_and(|u| u.confirm.is_none()) && !a.quit, "No: the screen again");
+    d.click(&mut a, 0xE0, 0x80, MouseButton::Left);
+    d.key(&mut a, KeyCode::KeyY, Some("y"));
+    assert!(a.options.is_none() && a.quit, "Yes: the program ends");
+}
+
+/// The options screen's New: the main menu (5CA bit 8000h's outer loop).
+#[test]
+fn the_options_screens_new_goes_to_the_main_menu() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x20, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
 }
