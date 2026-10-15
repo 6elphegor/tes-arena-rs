@@ -146,6 +146,9 @@ impl Machine {
             self.mem.w16(DS, 0x67EA, 0x3F3B);
             self.mem.w16(DS, 0x67EC, 0);
         }
+        // 0000:3B47: the blow's sound (9) at the person's square.
+        let at = self.record_square(si);
+        self.sound_at(9, at)?;
         if arg == 0 {
             self.mem.w16(DS, svar::MESSAGE, svar::GOLD_TEXT);
             self.mem.w16(DS, svar::MESSAGE + 2, DS);
@@ -187,20 +190,23 @@ impl Machine {
         let def = Ptr::new(self.mem.r16(DS, var::CREATURE_SEG), self.mem.r16(DS, var::DEFENDER));
         let armor = self.armor_at(def.seg, def.off, location) as i16;
         let (hit, _) = self.roll_to_hit(att, def, location, &Gear { armor, ..Gear::default() })?;
+        // 2AA1:00BE: a miss, or a weapon that can't hurt, sounds 4.
         if !hit {
-            return Some(());
+            return self.sound_here(4);
         }
         let w = Ptr::new(DS, self.equipped_weapon(DS, PLAYER));
         let (cf, ax) = self.special_low(w);
         if !cf {
             if ax != 0xFFFF {
-                return Some(());
+                return self.sound_here(4);
             }
             let (cf, ax) = self.special_high(w);
             if !cf && ax != 0xFFFF {
-                return Some(());
+                return self.sound_here(4);
             }
         }
+        // 2AA1:0042: a hit sounds 9.
+        self.sound_here(9)?;
         // 2AA1:004E: blood.
         let mut sprite = 0x18;
         let ty = self.mem.r8(def.seg, def.off.wrapping_add(field::RACE)) as u16;

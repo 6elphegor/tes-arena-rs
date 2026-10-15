@@ -62,7 +62,9 @@ pub trait LootHooks {
     /// 0) or written to a buffer (2).
     fn text(&mut self, _m: &mut Machine, _mode: u16) {}
     /// 23BA:012B: the sound named at DS:`si`.
-    fn sound(&mut self, _m: &mut Machine, _si: u16) {}
+    fn sound(&mut self, m: &mut Machine, si: u16) {
+        m.sound_file(si);
+    }
     /// 1194:D363: whether the staff's text was shown already (the carry).
     fn piece_told(&mut self, _m: &mut Machine) -> bool {
         false

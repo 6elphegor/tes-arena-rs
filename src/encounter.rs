@@ -212,6 +212,8 @@ impl Machine {
         if hook != 0x3F0C && hook != 0x3F3B {
             return None;
         }
+        // 3F10 / 3F3F: STPTHIEF.VOC or HALT.VOC (23BA:012B).
+        self.sound_file(if hook == 0x3F0C { 0x1A97 } else { 0x1A8E });
         self.calm_everyone();
         self.guards_arrive(files, hooks)
     }

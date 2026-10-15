@@ -18,7 +18,7 @@ pub struct Machine {
     /// dropped), as the front end says; and the sounds played, for the
     /// front end to take (`sound`).
     pub sound_busy: bool,
-    pub sounds: Vec<crate::sound::Sound>,
+    pub sounds: Vec<crate::sound::Played>,
 }
 
 impl Machine {

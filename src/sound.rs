@@ -55,7 +55,26 @@ pub struct Sound {
     pub volume: u8,
 }
 
+/// What the front end is asked to play: a level's sound by number, or a
+/// file by name (23BA:012B: FANFARE1.VOC, HALT.VOC, ...; it stops a sound
+/// playing to play).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Played {
+    Number(Sound),
+    File(Vec<u8>),
+}
+
 impl Machine {
+    /// 23BA:012B. The sound file named at DS:`si` played (with sound on):
+    /// loaded into the driver's buffer and played over any playing.
+    pub fn sound_file(&mut self, si: u16) {
+        if self.mem.r16(DS, ENABLED) == 0 {
+            return;
+        }
+        let name = self.mem.cstr(DS, si).to_vec();
+        self.sounds.push(Played::File(name));
+    }
+
     /// 23BA:002A. Sound `ax` at square `cx`: nothing with sound off, for
     /// FFh, or for a footstep (0, 1) when they are muted; a footstep in
     /// water is the swimming sound. The square is kept (AT); a number
@@ -89,8 +108,14 @@ impl Machine {
         }
         self.mem.w8(DS, PRIORITY, priority);
         let volume = self.sound_volume()?;
-        self.sounds.push(Sound { number: ax, slot, priority, volume });
+        self.sounds.push(Played::Number(Sound { number: ax, slot, priority, volume }));
         Some(())
+    }
+
+    /// `sound_at` at the player's square (CB90), as most callers ask.
+    pub fn sound_here(&mut self, ax: u16) -> Option<()> {
+        let at = self.mem.r16(DS, PLAYER_AT);
+        self.sound_at(ax, at)
     }
 
     /// 23BA:00E8. The volume for the square at AT: 7Fh at the player's;
