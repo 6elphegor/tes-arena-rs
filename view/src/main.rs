@@ -368,6 +368,14 @@ impl EngineHooks for Front<'_> {
         use arena::click::var::{DOOR_AT, DOOR_COL, DOOR_ROW, DOOR_X0, DOOR_X1};
         use arena::mem::DS;
         use arena::movement::var::LEVEL_FLAGS;
+        // The projectiles' animations, which the original's drawing steps
+        // (0000:C23A): here every one in flight steps, seen or not.
+        for i in 0..arena::projectile::var::NSLOTS {
+            let si = arena::projectile::var::SLOTS + i * arena::projectile::var::SLOT_SIZE;
+            if m.mem.r8(DS, si + 0x11) != 0 {
+                m.drawn_step(si);
+            }
+        }
         // The click left for the actors (`view_click`, before the frame,
         // whose input step clears C39A bit 80h) stands while it is drawn,
         // as in the original, where the click comes in the input step: the

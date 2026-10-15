@@ -68,6 +68,12 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // it was dropped (0000:EC05, EF6E: an INF loaded outside the 3D
     // mode), and that bank is the one the loads unpack through.
     m.bsa_cache_dir(&mut files, 0x16);
+    // The effects' flats (explosions, missiles, blood, sparkles, dust, the
+    // arrow) as flats 0..1Bh in their banks (C8FA: 0Fh, 10h), as the
+    // program's start loads them (21EE:0134); the level's come after.
+    // (The banks free, as EMS's set-up leaves them: 0000:5CCA.)
+    m.ems_reset();
+    m.effect_flats(&mut files).expect("the effects' flats");
     let (seg, off) = m.heap_alloc_bytes(0x3E80).expect("heap");
     m.mem.w16(DS, 0xBA54, off);
     m.mem.w16(DS, 0xBA56, seg);
@@ -740,18 +746,19 @@ fn people_list(m: &Machine) -> Vec<String> {
     names
 }
 
-/// A billboard: the frame `rect` standing at (x, y) from `lo` up, a unit
-/// per pixel, facing a camera whose right is (rx, rz).
-fn billboard(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, (rx, rz): (f32, f32), mirror: bool) {
-    billboard_at(out, rect, x, y, lo, 0.0, (rx, rz), mirror)
+/// A billboard: the frame `rect` standing at (x, y) from `lo` up, `scale`
+/// units a pixel (see `size`), facing a camera whose right is (rx, rz).
+#[allow(clippy::too_many_arguments)]
+fn billboard(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, scale: f32, (rx, rz): (f32, f32), mirror: bool) {
+    billboard_at(out, rect, x, y, lo, 0.0, scale, (rx, rz), mirror)
 }
 
 /// `billboard`, its centre moved `shift` along the camera's right.
 #[allow(clippy::too_many_arguments)]
-fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shift: f32, (rx, rz): (f32, f32), mirror: bool) {
+fn billboard_at(out: &mut Vec<Vertex>, rect: Rect, x: f32, y: f32, lo: f32, shift: f32, scale: f32, (rx, rz): (f32, f32), mirror: bool) {
     let (x, y) = (x + rx * shift, y + rz * shift);
-    let hw = rect.w as f32 / 2.0;
-    let hi = lo + rect.h as f32;
+    let hw = rect.w as f32 * scale / 2.0;
+    let hi = lo + rect.h as f32 * scale;
     let p = [
         [x - rx * hw, lo, y - rz * hw],
         [x + rx * hw, lo, y + rz * hw],
@@ -804,6 +811,21 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
     let frame_of = |f: Frames, k: usize| sheet.rects[f.first + k % f.count];
     let flat = |n: usize| sheet.flats.get(n).copied().flatten();
     let lift = |n: usize| m.mem.r8(DS, arena::info::var::FLATS + n as u16 * 5) as i8 as f32;
+    // The units a pixel the original draws a flat at (0000:C0F1): it
+    // projects the image's size at a depth of its own, a quarter of the
+    // true one for a flat whose record (F:, +3) has bit 4 (C140, C347:
+    // the trees), half again for an actor's view (sprite C0h on) or an
+    // actor with flag 4 (C1A2, C17F, C351), so 2/3 the size.
+    let size = |sprite: u8, flags: u16| {
+        let mut s = 1.0;
+        if sprite < 0xC0 && m.mem.r8(DS, arena::info::var::FLATS + sprite as u16 * 5 + 3) & 4 != 0 {
+            s *= 4.0;
+        }
+        if sprite >= 0xC0 || flags & 4 != 0 {
+            s /= 1.5;
+        }
+        s
+    };
     for row in 0..d {
         for col in 0..w {
             let v = m.mem.r16(walls, (row << 8) | (col << 1));
@@ -814,7 +836,7 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
             if let Some(f) = flat(n) {
                 let (x, y) = (col as f32 * SQUARE + SQUARE / 2.0, row as f32 * SQUARE + SQUARE / 2.0);
                 let start = out.len();
-                billboard(&mut out, frame_of(f, tick), x, y, lift(n), right, false);
+                billboard(&mut out, frame_of(f, tick), x, y, lift(n), size(n as u8, 0), right, false);
                 tags.push((Target::Flat { col, row, n: n as u16 }, start..out.len()));
             }
         }
@@ -846,6 +868,7 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
         let sprite = m.mem.r8(DS, si + 0xC);
         let frame = m.mem.r8(DS, si + 0xD) as usize;
         let mirror = flags & 2 != 0;
+        let sc = size(sprite, flags);
         // A person in a fight (0000:1C9A): the walk, or from frame 6 the
         // attack with the weapon over it.
         // A townsperson (0000:1CAC): the file by +11h, the frame as it is.
@@ -857,7 +880,7 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
             };
             let name = file.replace('@', &(sprite - 0xC0 + 1).to_string()).to_ascii_uppercase();
             if let Some(&(f, _)) = sheet.people.get(&name) {
-                billboard(&mut out, frame_of(f, frame), x, y, -z, right, mirror);
+                billboard(&mut out, frame_of(f, frame), x, y, -z, sc, right, mirror);
             }
             continue;
         }
@@ -867,15 +890,16 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
             let file = |k: usize| list.get(k).and_then(|n| sheet.people.get(&n.replace('@', &view).to_ascii_uppercase())).copied();
             if frame < 6 {
                 if let Some((f, _)) = file(0) {
-                    billboard(&mut out, frame_of(f, frame), x, y, -z, right, mirror);
+                    billboard(&mut out, frame_of(f, frame), x, y, -z, sc, right, mirror);
                 }
             } else if let Some((f, a)) = file(1) {
-                billboard(&mut out, frame_of(f, frame - 6), x, y, 0.0, right, mirror);
+                billboard(&mut out, frame_of(f, frame - 6), x, y, 0.0, sc, right, mirror);
                 if m.mem.r16(seg, rec.wrapping_add(0x40D)) & 0x400 != 0 {
                     if let Some((wf, w)) = file(2) {
                         let z = (w[2] - a[2]) + (w[0] - a[0]) + 0xE;
                         let shift = ((w[1] - a[1]) + 4) as f32;
-                        billboard_at(&mut out, frame_of(wf, frame - 6), x, y, -z as f32, if mirror { -shift } else { shift }, right, mirror);
+                        let (z, shift) = (z as f32 * sc, shift * sc);
+                        billboard_at(&mut out, frame_of(wf, frame - 6), x, y, -z, if mirror { -shift } else { shift }, sc, right, mirror);
                     }
                 }
             }
@@ -888,11 +912,62 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
             flat(sprite as usize)
         };
         if let Some(f) = art {
-            billboard(&mut out, frame_of(f, if frame == 0xFF { f.count - 1 } else { frame }), x, y, -z, right, mirror);
+            billboard(&mut out, frame_of(f, if frame == 0xFF { f.count - 1 } else { frame }), x, y, -z, sc, right, mirror);
         }
     }
     close(&mut open, out.len());
+    // The projectiles (12 slots of 1Ch at 7DBC, +11h the frames to live,
+    // 0 free): spells in flight and their bursts, arrows; drawn as the
+    // actors are (0000:C0F1), their flat (+C, from the effects' flats
+    // 0..1Bh the program's start loads) at frame +D.
+    for i in 0..arena::projectile::var::NSLOTS {
+        let si = arena::projectile::var::SLOTS + i * arena::projectile::var::SLOT_SIZE;
+        if m.mem.r8(DS, si + 0x11) == 0 {
+            continue;
+        }
+        let (x, z, y) = (m.mem.r16(DS, si) as f32, m.mem.r16(DS, si + 2) as i16 as f32, m.mem.r16(DS, si + 4) as f32);
+        let sprite = m.mem.r8(DS, si + 0xC);
+        let frame = m.mem.r8(DS, si + 0xD) as usize;
+        let flags = m.mem.r16(DS, si + 0xF);
+        // A burst inside the wall it struck: the original draws a square's
+        // objects with the square, over its walls (the walk, back to
+        // front, 0000:C980), so it shows; here it is brought towards the
+        // player to just outside that square.
+        let (x, y) = out_of_wall(m, x, y);
+        if let Some(f) = flat(sprite as usize) {
+            billboard(&mut out, frame_of(f, if frame == 0xFF { f.count - 1 } else { frame }), x, y, -z, size(sprite, flags), right, flags & 2 != 0);
+        }
+    }
     (out, tags)
+}
+
+/// (x, y) moved along the line to the player until it leaves a solid
+/// square (a wall, not a square of flats), if it is in one, and 8 units
+/// on, clear of the face.
+fn out_of_wall(m: &Machine, x: f32, y: f32) -> (f32, f32) {
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let solid = |x: f32, y: f32| {
+        let (c, r) = ((x as i32) >> 7, (y as i32) >> 7);
+        if !(0..128).contains(&c) || !(0..128).contains(&r) {
+            return false;
+        }
+        let v = m.mem.r16(walls, ((r as u16) << 8) | ((c as u16) << 1));
+        v != 0 && v >> 12 != 8
+    };
+    if !solid(x, y) {
+        return (x, y);
+    }
+    let (px, py) = (m.mem.r16(DS, 0xC3D0) as f32, m.mem.r16(DS, 0xC3D4) as f32);
+    let (dx, dy) = (px - x, py - y);
+    let len = (dx * dx + dy * dy).sqrt().max(1.0);
+    let (ux, uy) = (dx / len, dy / len);
+    let mut t = 0.0;
+    while t < len && solid(x + ux * t, y + uy * t) {
+        t += 2.0;
+    }
+    // Clear of the face, not on it.
+    let t = (t + 8.0).min(len);
+    (x + ux * t, y + uy * t)
 }
 
 /// The renderer's hit test (0000:C4BB..C533) for a click in the centre of

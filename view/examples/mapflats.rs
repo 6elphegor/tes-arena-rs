@@ -20,6 +20,10 @@ fn main() {
     let base = m.mem.r16(DS, arena::info::var::FLAT_BASE);
     let (w, d) = (m.mem.r16(DS, 0xC357).min(128), m.mem.r16(DS, 0xC359).min(128));
     println!("player ({:#x}, {:#x}), flat base {base:#x}, keeper flat {:#x}", m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4), m.mem.r8(DS, 0xC943));
+    for n in 0..base {
+        let size = fl.get(n as usize).and_then(|f| f.as_ref()).map(|f| (f.w, f.h, f.frames.len()));
+        println!("effect flat {n:#x} kind {:#x} image {size:?}", m.mem.r8(DS, arena::info::var::FLAT_KINDS + n));
+    }
     for row in 0..d {
         for col in 0..w {
             let v = m.mem.r16(walls, (row << 8) | (col << 1));
