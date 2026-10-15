@@ -211,7 +211,7 @@ impl Machine {
         self.save_restore(files, hooks)?;
         self.load_or16(0x05CA, 0x4000);
         if self.mem.r32(DS, crate::transit::var::ENTERED_HOOK) != 0x468B {
-            return None;
+            return crate::giveup::not_ported("25FD:028D: the entered hook set to a routine not ported");
         }
         hooks.entered(self);
         Some(Loaded::Done)
@@ -278,13 +278,13 @@ impl Machine {
         if self.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
             self.area_entry(hooks);
         } else if self.mem.r16(DS, ENTRY_HOOK + 2) != 0 {
-            return None;
+            return crate::giveup::not_ported("25FD:0309: the entry hook set to a routine not ported");
         }
         self.view_window();
         if self.mem.r32(DS, PLACE_HOOK) == 0x45B2 {
             self.area_place(hooks);
         } else if self.mem.r16(DS, PLACE_HOOK + 2) != 0 {
-            return None;
+            return crate::giveup::not_ported("25FD:0309: the place hook set to a routine not ported");
         }
         hooks.sky_graphics(self, files);
         self.save_load_level(files)?;
@@ -305,7 +305,7 @@ impl Machine {
         hooks.view_update(self);
         hooks.sky_graphics(self, files);
         if self.mem.r32(DS, ENTERED_HOOK) != 0x468B {
-            return None;
+            return crate::giveup::not_ported("2294:0006: the entered hook set to a routine not ported");
         }
         hooks.entered(self);
         self.clip_back();

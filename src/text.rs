@@ -241,7 +241,7 @@ impl Machine {
             bl = bl.wrapping_add(1);
             n += 1;
             if n > SCAN {
-                return None;
+                return crate::giveup::original("1194:55F2: the text never ends: the original reads on for ever");
             }
         }
         let al = bl / 3;
@@ -251,7 +251,7 @@ impl Machine {
             cx = cx.wrapping_add(1);
             si = si.wrapping_add(1);
             if cx as u32 > SCAN {
-                return None;
+                return crate::giveup::original("1194:55F2: the text never ends: the original reads on for ever");
             }
         }
         Some(cx)
@@ -341,7 +341,7 @@ impl Machine {
                 k = k.wrapping_add(2);
                 n += 1;
                 if n > SCAN {
-                    return None;
+                    return crate::giveup::original("0000:7702: the text never ends: the original reads on for ever");
                 }
             }
             if self.t16(TEXT) > 4 {
@@ -370,7 +370,7 @@ impl Machine {
             si = si.wrapping_add(1);
             n += 1;
             if n > SCAN {
-                return None;
+                return crate::giveup::original("0000:7702: the text never ends: the original reads on for ever");
             }
         }
         self.mem.w8(frame, si.wrapping_add(1), 0);
@@ -531,7 +531,7 @@ impl Machine {
                 ax = ax.wrapping_add(1);
                 n += 1;
                 if n > SCAN {
-                    return None;
+                    return crate::giveup::original("1194:49FF: the wrap never ends: the original reads on for ever");
                 }
             }
         }
@@ -593,7 +593,7 @@ impl Machine {
                 }
                 steps += 1;
                 if steps > SUBSTITUTIONS {
-                    return None;
+                    return crate::giveup::original("2DA2:000A: the substitutions never end: the original loops for ever");
                 }
                 let (handler, rest) = self.text_code(bp, di);
                 let frame = self.t16(FRAME);
@@ -827,7 +827,7 @@ impl Machine {
             // rest of DGROUP, string after string.
             n += 1;
             if n > 0x100 {
-                return None;
+                return crate::giveup::original("2DA2:0421: the year never found: the original reads on for ever");
             }
         }
         self.mem.w8(DS, di.wrapping_sub(1), 0);
@@ -1283,7 +1283,7 @@ impl Machine {
                 if bx == 8 {
                     let Some(r) = self.rng.range(0, 8) else {
                         self.mem.w8(DS, NO_EXPAND, saved);
-                        return None;
+                        return crate::giveup::original("3276:465D: a range of 0: the original divides by zero");
                     };
                     bx = r;
                 }
@@ -1431,7 +1431,7 @@ impl Machine {
                 c.dx = c.dx.wrapping_sub(1);
                 Res::Str(DS, 0x8A44)
             }
-            _ => return None,
+            _ => return crate::giveup::not_ported("3276:91F6: a text code not ported"),
         })
     }
 

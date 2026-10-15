@@ -143,7 +143,7 @@ impl Machine {
             }
             cast = cast.wrapping_add(0x16);
         }
-        None
+        crate::giveup::original("29CF:01C4: no free cast record: the original searches on through memory")
     }
 
     /// 29CF:01D9. Whether the spell needs a target, and its prompt: a

@@ -59,7 +59,7 @@ impl Machine {
         self.mem.w16(DS, TOP, top);
         let paras = top.wrapping_sub(start).wrapping_sub(3);
         if self.mem.r16(DS, SHRINK) != 0 {
-            return None;
+            return crate::giveup::not_ported("0000:00CC: startup shrinking its DOS block: not ported");
         }
         let (seg, off) = self.heap_far(DS, FIRST);
         for i in 0..4 {
@@ -90,15 +90,15 @@ impl Machine {
         let found = loop {
             steps += 1;
             if steps > WALK_LIMIT {
-                return None;
+                return crate::giveup::original("0000:51F2: a broken heap chain: the original walks it for ever");
             }
             if bx > ds {
-                return None;
+                return crate::giveup::error("0000:51F2: the heap reports an error");
             }
             if self.mem.r8(ds, si.wrapping_add(FLAGS)) & 1 == 0 {
                 let size = self.mem.r16(ds, si.wrapping_add(SIZE));
                 if size >= 0xA000 {
-                    return None;
+                    return crate::giveup::error("0000:51F2: the heap reports an error");
                 }
                 if ax <= size {
                     break (ds, si);
@@ -107,13 +107,13 @@ impl Machine {
             (ds, si) = self.heap_far(ds, si.wrapping_add(NEXT));
             bx = ds | si;
             if bx == 0 {
-                return None;
+                return crate::giveup::error("0000:51F2: the heap reports an error");
             }
         };
         let (ds, si) = found;
         let size = self.mem.r16(ds, si.wrapping_add(SIZE));
         if size == 0 {
-            return None;
+            return crate::giveup::error("0000:51F2: the heap reports an error");
         }
         let taken = if ax == size {
             let f = self.mem.r8(ds, si.wrapping_add(FLAGS)) | 1;
@@ -169,7 +169,7 @@ impl Machine {
         let (mut ds, mut si) = self.heap_far(DS, FIRST);
         for steps in 0.. {
             if steps >= WALK_LIMIT {
-                return None;
+                return crate::giveup::original("0000:9CD6: a broken heap chain: the original walks it for ever");
             }
             if self.mem.r8(ds, si.wrapping_add(FLAGS)) & 1 == 0 && ax <= self.mem.r16(ds, si.wrapping_add(SIZE)) {
                 dx = ds;

@@ -225,7 +225,7 @@ impl Machine {
                     break w;
                 }
                 if cycle.cycled(&self.rng) {
-                    return None;
+                    return crate::giveup::original("0000:5160: no square for the noble's house: the original rolls for ever");
                 }
             };
             let bx = w & 0xFF00 | (w as u8).wrapping_add(w as u8) as u16;

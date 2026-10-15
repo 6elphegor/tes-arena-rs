@@ -270,7 +270,7 @@ impl Machine {
                         None => self.store_repair(files, hooks)?,
                     },
                     0xFCC6 => self.store_steal(hooks)?,
-                    _ => return None,
+                    _ => return crate::giveup::not_ported("1194:F48E: a store choice not in the table"),
                 };
                 if cf {
                     break;
@@ -625,7 +625,7 @@ impl Machine {
                 let p = (self.mem.r16(DS, si.wrapping_add(6)) as u64) * ebx as u64;
                 let d = self.mem.r16(DS, si.wrapping_add(8)) as u64;
                 if d == 0 || p / d > 0xFFFF_FFFF {
-                    return None;
+                    return crate::giveup::original("1194:F6BC: the price's divide overflows");
                 }
                 (p / d) as u32
             }
@@ -1068,7 +1068,7 @@ impl Machine {
                         ax = ax.wrapping_add(1);
                         steps += 1;
                         if steps > 0x10000 {
-                            return None;
+                            return crate::giveup::original("1194:49FF: the wrap never ends: the original loops for ever");
                         }
                     }
                 }
@@ -1197,7 +1197,7 @@ impl Machine {
                     self.mem.w8(DS, STATE, 0xFF);
                     false
                 }
-                _ => return None,
+                _ => return crate::giveup::not_ported("0000:9AE6: a repair reason not in the table"),
             };
             if cf {
                 continue;
@@ -1330,7 +1330,7 @@ impl Machine {
             si = si.wrapping_sub(1);
             steps += 1;
             if steps > 0x10000 {
-                return None;
+                return crate::giveup::original("1194:CCFD: the format never ends: the original loops for ever");
             }
         }
         // The last pushed is the first argument.

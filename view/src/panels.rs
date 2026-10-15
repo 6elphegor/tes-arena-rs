@@ -266,7 +266,7 @@ pub fn equip_line(m: &mut Machine, row: usize, said: &mut Said) {
     let slot = m.mem.r8(DS, FIRST_LINE) as u16 + row as u16;
     if let Some(l) = item_lines(m).into_iter().find(|l| l.slot == slot) {
         if m.equip_click(said, l.slot).is_none() {
-            eprintln!("equipping met something not ported");
+            eprintln!("equipping gave up: {}", arena::giveup::describe());
         }
     }
 }
@@ -304,7 +304,7 @@ pub fn usable_names(m: &Machine) -> Vec<String> {
 pub fn use_pick(m: &mut Machine, files: &mut arena::bsa::Files, pick: u16, said: &mut Said) {
     said.pick = Some(pick);
     if m.use_item(files, said).is_none() {
-        eprintln!("using the item met something not ported");
+        eprintln!("using the item gave up: {}", arena::giveup::describe());
     }
 }
 
@@ -325,7 +325,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
 pub fn cast(engine: &mut arena::engine::Engine, sel: usize, said: &mut Said) {
     if let Some(s) = spells(&engine.m).get(sel) {
         if engine.m.cast_spell(&mut engine.files, said, s.index).is_none() {
-            eprintln!("the cast met something not ported");
+            eprintln!("the cast gave up: {}", arena::giveup::describe());
         }
     }
 }

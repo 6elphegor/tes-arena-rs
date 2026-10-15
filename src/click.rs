@@ -501,12 +501,12 @@ impl Machine {
         let class = self.mem.r8(DS, p + 5) & 0x1F;
         let f = self.mem.r8(DS, 0x2A3E + class as u16) as u16;
         if f == 0 || ax / f > 0xFF {
-            return None;
+            return crate::giveup::original("1194:53F9: the lockpick's divide overflows");
         }
         let ax = (ax / f) & 0xFF;
         let ax = ax.wrapping_mul(self.mem.r8(DS, p + 6) as u16 + 1) as u32 * 100;
         if lock == 0 || ax / lock as u32 > 0xFFFF {
-            return None;
+            return crate::giveup::original("1194:53F9: the lockpick's divide overflows");
         }
         let chance = (ax / lock as u32) as u16;
         let roll = self.rng.next() % 100;
@@ -536,7 +536,7 @@ impl Machine {
         self.mem.w8(DS, 0x12CE, 0);
         let ax = (key as u16).wrapping_sub(1);
         if ax / 12 > 0xFF {
-            return None;
+            return crate::giveup::original("2433:0AA1: the key's divide overflows");
         }
         let name = self.skip_strings(DS, 0x342B, ax % 12);
         use crate::format::Arg;

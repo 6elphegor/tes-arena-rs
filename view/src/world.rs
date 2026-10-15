@@ -258,7 +258,7 @@ pub fn city_people(engine: &mut Engine) {
         return;
     }
     if m.spawn_actors(0xF, 0xA).is_none() {
-        eprintln!("the townspeople met code not ported");
+        eprintln!("the townspeople gave up: {}", arena::giveup::describe());
     }
 }
 
@@ -320,7 +320,7 @@ fn summon_rolls(engine: &mut Engine) {
         }
         let Engine { m, files, .. } = engine;
         if m.random_encounter(files, &mut arena::encounter::NoFightHooks).is_none() {
-            eprintln!("the encounter met code not ported");
+            eprintln!("the encounter gave up: {}", arena::giveup::describe());
             return;
         }
     }

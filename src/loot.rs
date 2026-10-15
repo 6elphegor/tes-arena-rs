@@ -176,7 +176,7 @@ impl Machine {
             (A_ENCH_MIN_LEVEL, A_ENCH_PRICE, A_ENCH_SPELL)
         };
         if !self.any_allowed(min_level, 14) {
-            return None;
+            return crate::giveup::original("1194:EE1D: no enchantment allowed: the original rolls for ever");
         }
         let e = loop {
             let e = self.rand(0, 14);
@@ -227,7 +227,7 @@ impl Machine {
         loop {
             if !forced_try {
                 if !self.any_allowed(W_MIN_LEVEL, 18) {
-                    return None;
+                    return crate::giveup::original("1194:EC02: no weapon allowed: the original rolls for ever");
                 }
                 self.setb(DEDUP_KEY, 10);
                 ty = self.rand(0, 18);
@@ -262,7 +262,7 @@ impl Machine {
         loop {
             if !forced_try {
                 if !self.any_allowed(A_MIN_LEVEL, 11) {
-                    return None;
+                    return crate::giveup::original("1194:ECED: no armour allowed: the original rolls for ever");
                 }
                 ty = self.rand(0, 11);
             }
@@ -502,7 +502,7 @@ impl Machine {
         loop {
             let ty = if self.b(FORCED_TYPE) == 0xFF {
                 if !self.any_allowed(W_MIN_LEVEL, 18) {
-                    return None;
+                    return crate::giveup::original("1194:E8B2: no weapon allowed: the original rolls for ever");
                 }
                 self.rand(0, 18)
             } else {
@@ -519,7 +519,7 @@ impl Machine {
             }
             if self.b(FORCED_TYPE) != 0xFF {
                 // The forced type is retried unchanged: the original hangs.
-                return None;
+                return crate::giveup::original("1194:E8B2: the forced type retried unchanged: the original hangs");
             }
         }
         let p = self.mem.r32(DS, TEMPLATE + t::PRICE);
