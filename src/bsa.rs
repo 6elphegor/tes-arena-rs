@@ -87,6 +87,48 @@ impl Files {
         self.written.get(&Self::base(name).to_ascii_uppercase()).map(|d| &d[..])
     }
 
+    /// The upper-case names of the files whose extension is `ext` (DOS's
+    /// find first/next on "*.EXT"), the directories' and the written ones,
+    /// sorted (DOS gives directory order).
+    pub fn with_ext(&self, ext: &[u8]) -> Vec<Vec<u8>> {
+        let ext = ext.to_ascii_uppercase();
+        let mut v: Vec<Vec<u8>> = self
+            .names
+            .keys()
+            .chain(self.written.keys())
+            .filter(|n| n.rsplit(|&c| c == b'.').next() == Some(&ext[..]) && n.contains(&b'.'))
+            .cloned()
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    /// The names of the files written (upper case, sorted).
+    pub fn written_names(&self) -> Vec<Vec<u8>> {
+        let mut v: Vec<Vec<u8>> = self.written.keys().cloned().collect();
+        v.sort();
+        v
+    }
+
+    /// A file's bytes by DOS name (written first, then the directories').
+    pub fn data(&self, name: &[u8]) -> Option<Rc<[u8]>> {
+        self.read_loose(name)
+    }
+
+    /// A file written (by DOS name) with `data`, replacing any.
+    pub fn store(&mut self, name: &[u8], data: Vec<u8>) {
+        self.written.insert(Self::base(name).to_ascii_uppercase(), Rc::from(data));
+    }
+
+    /// The file named `from` copied to `to` (by DOS name) as a written
+    /// file. False where `from` doesn't exist.
+    pub fn copy(&mut self, from: &[u8], to: &[u8]) -> bool {
+        let Some(data) = self.read_loose(from) else { return false };
+        self.written.insert(Self::base(to).to_ascii_uppercase(), data);
+        true
+    }
+
     fn base(name: &[u8]) -> &[u8] {
         name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name)
     }
@@ -296,6 +338,22 @@ impl Machine {
         let data: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
         files.written.insert(base, Rc::from(data));
+    }
+
+    /// Whether a file named at DS:`name` exists, loose or written (0000:600C,
+    /// DOS find first, as the save menu asks).
+    pub fn file_exists(&mut self, files: &mut Files, name: u16) -> bool {
+        files.read_loose(self.mem.cstr(DS, name)).is_some()
+    }
+
+    /// 25FD:056F: the file named at DS:`from` copied to DS:`to` (kept in
+    /// `Files` as a written file, as `file_write` does). Nothing is
+    /// copied when `from` is missing.
+    pub fn file_copy(&mut self, files: &mut Files, from: u16, to: u16) {
+        if let Some(data) = files.read_loose(self.mem.cstr(DS, from)) {
+            let base = Files::base(self.mem.cstr(DS, to)).to_ascii_uppercase();
+            files.written.insert(base, data);
+        }
     }
 
     /// 0000:67C4. Opens the file named at DS:`name`: a loose file if one

@@ -100,7 +100,8 @@ pub trait AreaHooks {
     fn townsfolk_graphics(&mut self, _m: &mut Machine) {}
     /// 2294:11F2, around a city's run.
     fn city_screen(&mut self, _m: &mut Machine) {}
-    /// 292B:095E: the level's automap kept.
+    /// 292B:095E: a main quest dungeon's level's locks and triggers kept
+    /// in STATES.nn (`Machine::states_keep`, which needs the files).
     fn automap(&mut self, _m: &mut Machine) {}
     /// 26F7:0000, asked on the way out of a dungeon: whether to leave
     /// (the view saved and put back around it, 0000:A611/A606/A5D1, and
@@ -129,7 +130,8 @@ pub trait AreaHooks {
     }
     /// 0000:8FC4: the mouse's buttons waited for (AFF9 clear).
     fn mouse_wait(&mut self, _m: &mut Machine) {}
-    /// 0000:3503: the view's border.
+    /// 0000:3503: the automap loaded (`Machine::automap_load`, which
+    /// needs the files).
     fn border(&mut self, _m: &mut Machine) {}
     /// 25FD:034B and 0000:16F7 (5C8 bit 4: a saved game's level).
     fn restore_level(&mut self, _m: &mut Machine) {}
@@ -319,11 +321,29 @@ impl Machine {
     /// 0000:0B15 (`exit` 4537h) and 0B4F (`exit` 44BDh): the level
     /// hooks: after the INF, 0000:2957 in a dungeon (5E6 3), else 0B0B
     /// (the level's lights from its flats); the way out; CD52 0000:0628.
-    fn level_hooks(&mut self, exit: u16) {
+    pub(crate) fn level_hooks(&mut self, exit: u16) {
         let inf = if self.mem.r8(DS, AREA) == 3 { 0x2957 } else { 0x0B0B };
         self.mem.w32(DS, INF_HOOK, inf);
         self.mem.w32(DS, EXIT_HOOK, exit as u32);
         self.mem.w32(DS, HOOK_CD52, 0x0628);
+    }
+
+    /// 0000:0997, the start dungeon's run after its level hooks (0993
+    /// sets 0B15's first; a new game's start, 0000:0C66, 0B4F's):
+    /// NORMAL.LGT, the indoor state, no INF, 427D FFh, 430E 0. Returns the
+    /// level's name (0A36).
+    pub fn start_run(&mut self, hooks: &mut dyn AreaHooks) -> u16 {
+        hooks.normal_lgt(self);
+        self.indoor_state();
+        self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
+        self.mem.w8(DS, 0x427D, 0xFF);
+        self.mem.w8(DS, 0x430E, 0);
+        0x0A36
+    }
+
+    /// 0000:0B4F: the level hooks with the way out 44BDh.
+    pub(crate) fn start_level_hooks(&mut self) {
+        self.level_hooks(0x44BD);
     }
 
     /// The state an indoor run sets (0000:0939.., 099A.., 09FD..): no fog,
@@ -366,12 +386,7 @@ impl Machine {
             }
             Run::Start => {
                 self.level_hooks(0x4537);
-                hooks.normal_lgt(self);
-                self.indoor_state();
-                self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
-                self.mem.w8(DS, 0x427D, 0xFF);
-                self.mem.w8(DS, 0x430E, 0);
-                0x0A36
+                self.start_run(hooks)
             }
             Run::Dungeon => {
                 hooks.normal_lgt(self);

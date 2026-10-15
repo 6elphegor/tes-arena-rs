@@ -59,6 +59,8 @@ impl ClockHooks for Hooks {
 }
 
 impl FrameHooks for Hooks {
+    /// The generator's 0000:3491 is a RET.
+    fn automap_mark(&mut self, _m: &mut Machine) {}
     fn message_box(&mut self, m: &mut Machine, _text: u16) {
         count(m, 0xFFE8);
     }

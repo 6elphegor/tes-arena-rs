@@ -66,6 +66,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn actor_click(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.actor_click(files, &mut crate::talk::NoTalkHooks)
     }
+    /// 0000:3491: the squares around the player seen on the automap
+    /// (`automap::automap_mark`, by default).
+    fn automap_mark(&mut self, m: &mut Machine) {
+        m.automap_mark();
+    }
     /// 0000:3C4C's loading of the hands' graphic for weapon class [1012].
     fn weapon_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
@@ -248,6 +253,8 @@ impl Machine {
             self.player_dies();
         }
         hooks.actor_click(self, files)?;
+        // 0000:49D6.
+        hooks.automap_mark(self);
         // A holiday's message, once, in a town by day.
         if self.mem.r16(DS, 0xCCBC) > 3 {
             if let Some(n) = holiday(self, self.mem.r32(DS, 0x05CC)) {
