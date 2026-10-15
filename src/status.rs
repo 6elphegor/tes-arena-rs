@@ -112,6 +112,15 @@ impl Machine {
         )
     }
 
+    /// 2542:04B1..0515: the status box's text, `status_text`, then the
+    /// player's conditions after it (`status_conditions` at its NUL; the
+    /// font calls 0000:9AE6/9AF8 between them are the front end's).
+    /// Returns the offset of the NUL.
+    pub fn status_box(&mut self) -> u16 {
+        let end = self.status_text();
+        self.status_conditions(end)
+    }
+
     /// 2686:005E. The player's conditions appended at DS:`di` (2542:0515
     /// passes the status text's NUL), each line through 2686:0235: "You
     /// are %s.\r" with the condition's name from the list at CONDITIONS,

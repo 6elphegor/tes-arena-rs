@@ -890,6 +890,19 @@ fn each_bar_button_as_the_original_wires_it() {
     let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
     let first = want.split(['\r', '\n']).find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
     assert!(!first.is_empty() && got.contains(&first), "the status box: {got:?} / {want:?}");
+    // 3 with a condition: poisoned (+40Dh bit 2) is listed after the
+    // text (2686:005E), the same text status_box makes.
+    let (mut a, mut d) = fresh();
+    let f = a.engine.m.mem.r16(DS, 0x01A4 + 0x40D) | 2;
+    a.engine.m.mem.w16(DS, 0x01A4 + 0x40D, f);
+    click(&mut a, &mut d, 3);
+    let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
+    assert!(got.contains("You are poisoned."), "the status box's condition: {got:?}");
+    let (mut b, _) = fresh();
+    b.engine.m.mem.w16(DS, 0x01A4 + 0x40D, f);
+    b.engine.m.status_box();
+    let want = String::from_utf8_lossy(b.engine.m.mem.cstr(DS, arena::status::var::STATUS_TEXT)).into_owned();
+    assert!(want.contains("You are poisoned.\r"), "status_box: {want:?}");
     // 4, the star: the spellbook.
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 4);
