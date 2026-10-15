@@ -1,0 +1,747 @@
+//! The window's input, tested without a window: an `App` made as `main`
+//! makes it (`make_app`), fed the inputs winit would give it (`App::input`)
+//! and the time (`App::tick`), and checked against the same actions done
+//! through the scripted path (`--picks`, `create::parse_script`, the
+//! panels' functions) where there is one: the engines' memory equal.
+//!
+//! The game's files are found as the engine's tests find them: the
+//! directory of ARENA_EXE, else ../../ESarena beside the crate; without
+//! them the tests say so and pass.
+
+use crate::*;
+use std::path::Path;
+use std::time::{Duration, Instant};
+use winit::event::MouseButton;
+use winit::keyboard::KeyCode;
+
+fn game_dir() -> Option<PathBuf> {
+    let dir = match std::env::var("ARENA_EXE") {
+        Ok(exe) => PathBuf::from(exe).parent()?.to_path_buf(),
+        Err(_) => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ESarena"),
+    };
+    if dir.join("GLOBAL.BSA").exists() {
+        Some(dir)
+    } else {
+        eprintln!("skipping: no game files at {}", dir.display());
+        None
+    }
+}
+
+/// A start as main's: the area (a city spec, or a level), the hour, a
+/// square and heading, the answers given first, the save directory.
+struct Start<'a> {
+    level: &'a str,
+    hour: Option<u32>,
+    at: Option<(u16, u16, u16)>,
+    picks: &'a str,
+    new_game: Option<&'a str>,
+    save_dir: Option<PathBuf>,
+    /// A saved game loaded at the start (`--load`): its folder and slot.
+    load: Option<(PathBuf, u8)>,
+}
+
+impl Default for Start<'_> {
+    fn default() -> Self {
+        Start { level: "CITY:8:0", hour: Some(12), at: None, picks: "", new_game: None, save_dir: None, load: None }
+    }
+}
+
+fn app(dir: &Path, s: &Start) -> App {
+    let mut engine = world::load(dir, s.level);
+    let mut run = match s.new_game {
+        Some(spec) => {
+            newgame::start(&mut engine, spec);
+            arena::transit::Run::Start
+        }
+        None => areas::start(&mut engine, s.level.starts_with("CITY:")),
+    };
+    interface::start(&mut engine.m);
+    if let Some((save, slot)) = &s.load {
+        run = areas::load_game(&mut engine, dir, save, *slot).expect("the save loads");
+    }
+    if let Some(h) = s.hour {
+        set_hour(&mut engine, h);
+    }
+    if s.load.is_none() {
+        world::city_people(&mut engine);
+    }
+    if let Some((col, row, heading)) = s.at {
+        use arena::movement::var::{HEADING, X, Y};
+        engine.m.mem.w16(arena::mem::DS, X, col << 7 | 64);
+        engine.m.mem.w16(arena::mem::DS, Y, row << 7 | 64);
+        engine.m.mem.w16(arena::mem::DS, HEADING, heading);
+        engine.world_loop_start();
+    }
+    make_app(dir.to_path_buf(), engine, run, None, dialog::parse_answers(s.picks), s.save_dir.clone(), 0, false)
+}
+
+/// The inputs and the time, as the window gives them: a 960 x 600 window,
+/// three of its pixels a pixel of the 320 x 200 screen.
+struct Driver {
+    now: Instant,
+}
+
+impl Driver {
+    fn new(app: &mut App) -> Driver {
+        let now = Instant::now();
+        app.input(In::Resized(960.0, 600.0));
+        app.next = now;
+        app.movie_at = now;
+        Driver { now }
+    }
+
+    /// A game frame's time on (a second: the frame's due).
+    fn frame(&mut self, app: &mut App) {
+        self.now += Duration::from_secs(1);
+        app.tick(self.now);
+    }
+
+    fn frames(&mut self, app: &mut App, n: usize) {
+        for _ in 0..n {
+            self.frame(app);
+        }
+    }
+
+    /// `ms` of time on, no frame due beyond the one it brings.
+    fn wait(&mut self, app: &mut App, ms: u64) {
+        self.now += Duration::from_millis(ms);
+        app.tick(self.now);
+    }
+
+    fn key(&mut self, app: &mut App, code: KeyCode, text: Option<&str>) {
+        app.input(In::Key { code, down: true, text: text.map(str::to_string) });
+        app.input(In::Key { code, down: false, text: None });
+    }
+
+    /// A click at (x, y) of the 320 x 200 screen.
+    fn click(&mut self, app: &mut App, x: i32, y: i32, button: MouseButton) {
+        app.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
+        app.input(In::Button { button, down: true });
+        app.input(In::Button { button, down: false });
+    }
+}
+
+/// Where two engines' memories differ (the first 1 MiB, by 4 KiB
+/// segment), for the messages.
+fn differs(a: &Engine, b: &Engine) -> Vec<u16> {
+    (0..0x10u16)
+        .map(|i| i << 12)
+        .filter(|&seg| a.m.mem.segment(seg) != b.m.mem.segment(seg))
+        .collect()
+}
+
+fn same(a: &App, b: &App, what: &str) {
+    let d = differs(&a.engine, &b.engine);
+    if !d.is_empty() {
+        let ds = arena::mem::DS as usize * 16;
+        let bytes: Vec<String> = a
+            .engine
+            .m
+            .mem
+            .diff(&b.engine.m.mem, 0..0x10_0000)
+            .iter()
+            .take(24)
+            .map(|&(i, v)| {
+                let other = b.engine.m.mem.segment((i >> 4) as u16)[i & 15];
+                if (ds..ds + 0x10000).contains(&i) { format!("DS:{:04X} {v:02x}/{other:02x}", i - ds) } else { format!("{i:05x} {v:02x}/{other:02x}") }
+            })
+            .collect();
+        panic!("{what}: the engines differ: {}", bytes.join(", "));
+    }
+    assert_eq!(a.engine.m.ems.len(), b.engine.m.ems.len(), "{what}: EMS banks");
+    for (i, (x, y)) in a.engine.m.ems.iter().zip(&b.engine.m.ems).enumerate() {
+        assert!(x[..] == y[..], "{what}: EMS bank {i} differs");
+    }
+}
+
+fn text(spans: &[Vec<hud::Span>]) -> String {
+    spans.iter().map(|l| l.iter().map(|s| s.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n")
+}
+
+/// The menu the game waits on, if it does.
+fn menu(app: &App) -> Option<&hud::Menu> {
+    match app.pending.as_ref().map(|p| &p.need) {
+        Some(dialog::Need::Menu(m)) => Some(m),
+        _ => None,
+    }
+}
+
+/// The engine's frame count (CCBC).
+fn frame_no(app: &App) -> u16 {
+    app.engine.m.mem.r16(arena::mem::DS, 0xCCBC)
+}
+
+/// The scripted twin run as far as `a`: while `a` waits on a question
+/// (its engine back before the turn that asked), until `b` asks too;
+/// else to `a`'s frame count.
+fn as_far_as(b: &mut App, a: &App) {
+    let mut d = Driver::new(b);
+    for _ in 0..8 {
+        let there = if a.pending.is_some() { b.pending.is_some() } else { frame_no(b) >= frame_no(a) };
+        if there {
+            break;
+        }
+        d.frame(b);
+    }
+}
+
+/// Frames until the game asks (at most `n`).
+fn until_asked(d: &mut Driver, app: &mut App, n: usize) -> bool {
+    for _ in 0..n {
+        if app.pending.is_some() {
+            return true;
+        }
+        d.frame(app);
+    }
+    app.pending.is_some()
+}
+
+/// The townsperson two squares ahead in the Imperial City at noon
+/// (`--at 59 8 0`), clicked in the view's centre with the mouse free: the
+/// talk's menu asked.
+fn talk_start(dir: &Path, picks: &str) -> (App, Driver) {
+    let mut a = app(dir, &Start { at: Some((59, 8, 0)), picks, ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.click(&mut a, 164, 74, MouseButton::Left);
+    assert!(a.click && a.click_point == Some((164, 74)), "the click in the view is kept for the next frame");
+    d.frame(&mut a);
+    (a, d)
+}
+
+#[test]
+fn talk_menu_by_arrows_and_enter_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3), "clicking the townsperson asks");
+    let m = menu(&a).expect("a menu");
+    assert!(text(&m.title).contains("ASK ABOUT"), "the talk's menu: {:?}", text(&m.title));
+    // Down to "Where is...", up again, Enter: the greeting (entry 0).
+    d.key(&mut a, KeyCode::ArrowDown, None);
+    assert_eq!(a.selected, 1);
+    d.key(&mut a, KeyCode::ArrowUp, None);
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(!a.boxes.is_empty(), "the townsperson answers in a box");
+    let (mut b, _) = talk_start(&dir, "0");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "the greeting answered by Enter and by --picks 0");
+    assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), b.boxes.iter().map(|x| text(x)).collect::<Vec<_>>());
+}
+
+#[test]
+fn talk_menu_by_letter_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    let m = menu(&a).expect("a menu").clone();
+    // Entry 1's key ("Where is..."), typed.
+    let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
+    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    let (mut b, _) = talk_start(&dir, "1");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "entry 1 by its letter and by --picks 1");
+    assert_eq!(menu(&a).map(|m| text(&m.title)), menu(&b).map(|m| text(&m.title)));
+}
+
+#[test]
+fn esc_leaves_the_talk_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.pending.is_none(), "Esc leaves the menu");
+    let (mut b, _) = talk_start(&dir, "-1");
+    as_far_as(&mut b, &a);
+    assert!(b.pending.is_none());
+    same(&a, &b, "Esc and --picks -1");
+    // The game goes on afterwards.
+    d.frames(&mut a, 3);
+    assert!(a.pending.is_none() && a.boxes.is_empty());
+}
+
+#[test]
+fn a_click_on_a_menu_entry_picks_it() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    // Entry 0 clicked where the HUD draws it.
+    let hud = a.hud();
+    let m = hud.menu.as_ref().expect("the menu shown");
+    let (x, y, lh, w) = hud::menu_layout(&a.font, m);
+    let _ = (lh, w);
+    let (mut px, mut py) = (x, y);
+    let mut found = None;
+    'search: for yy in (y - 40).max(0)..(y + 80).min(200) {
+        for xx in (x - 10).max(0)..(x + 60).min(320) {
+            if hud::menu_pick(&a.font, &hud, xx, yy) == Some(0) {
+                found = Some((xx, yy));
+                break 'search;
+            }
+        }
+    }
+    if let Some((fx, fy)) = found {
+        px = fx;
+        py = fy;
+    }
+    assert!(found.is_some(), "entry 0 can be clicked somewhere near ({x}, {y})");
+    d.click(&mut a, px, py, MouseButton::Left);
+    let (mut b, _) = talk_start(&dir, "0");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "entry 0 clicked and --picks 0");
+}
+
+/// A turn running a shop of building kind `kind`, as `--do shop:KIND`
+/// does, from the window's own turn (`App::turn`).
+fn shop_turn(app: &mut App, kind: u8) {
+    let before = copy(&app.engine);
+    let input = TurnIn {
+        intent: Default::default(),
+        clicked: false,
+        camp: false,
+        shop: Some(kind),
+        key: false,
+        tick: 0,
+        right: false,
+        drag: (0, 0),
+        aspect: 1.6,
+    };
+    app.turn(before, input, Vec::new(), true);
+}
+
+#[test]
+fn a_store_purchase_answered_by_keys_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    // The store's menu: Buy (0); the weapons list: its first line; the
+    // haggle: Accept (0). The keys give each in turn; the script all.
+    let gold = |app: &mut App| app.engine.m.mem.w32(arena::mem::DS, 0x05C2, 5000);
+    let mut a = app(&dir, &Start::default());
+    gold(&mut a);
+    let mut d = Driver::new(&mut a);
+    shop_turn(&mut a, 6);
+    let mut asked = Vec::new();
+    for _ in 0..12 {
+        if !a.boxes.is_empty() {
+            d.key(&mut a, KeyCode::Enter, None);
+            continue;
+        }
+        let Some(m) = menu(&a) else { break };
+        asked.push(text(&m.title));
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    assert!(asked.len() >= 2, "the store asked: {asked:?}");
+    let picks = vec!["0"; asked.len()].join(",");
+    let mut b = app(&dir, &Start { picks: &picks, ..Default::default() });
+    gold(&mut b);
+    Driver::new(&mut b);
+    shop_turn(&mut b, 6);
+    while !b.boxes.is_empty() {
+        b.boxes.pop_front();
+    }
+    same(&a, &b, &format!("the store answered by Enter and by --picks {picks} ({asked:?})"));
+    let after = |app: &App| app.engine.m.mem.r32(arena::mem::DS, 0x05C2);
+    eprintln!("store: asked {asked:?}, gold 5000 -> {}", after(&a));
+}
+
+#[test]
+fn camping_with_typed_hours_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let start = |picks| Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), picks, ..Default::default() };
+    let mut a = app(&dir, &start(""));
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyR, None);
+    assert!(until_asked(&mut d, &mut a, 3), "R asks how to rest");
+    let m = menu(&a).expect("the camp's menu").clone();
+    eprintln!("camp menu: {:?}", text(&m.title));
+    // "For a while" (entry 0), then the hours typed.
+    d.key(&mut a, KeyCode::Enter, None);
+    match a.pending.as_ref().map(|p| &p.need) {
+        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        other => panic!("the hours asked for, not {:?}", other.map(|_| "something else")),
+    }
+    d.key(&mut a, KeyCode::Digit2, Some("2"));
+    assert_eq!(a.typed, "2");
+    d.key(&mut a, KeyCode::Backspace, None);
+    d.key(&mut a, KeyCode::Digit2, Some("2"));
+    d.key(&mut a, KeyCode::Enter, None);
+    let mut b = app(&dir, &start("0,t2"));
+    let mut db = Driver::new(&mut b);
+    db.frame(&mut b);
+    db.key(&mut b, KeyCode::KeyR, None);
+    db.frame(&mut b);
+    same(&a, &b, "camping for 2 hours by keys and by --picks 0,t2");
+    // The rest runs on in the frames that follow, alike.
+    d.frames(&mut a, 30);
+    db.frames(&mut b, 30);
+    same(&a, &b, "the rest's frames");
+}
+
+#[test]
+fn f5_saves_and_f9_loads_back() {
+    let Some(dir) = game_dir() else { return };
+    let saves = std::env::temp_dir().join(format!("arena-inputtest-{}", std::process::id()));
+    std::fs::create_dir_all(&saves).unwrap();
+    let mut a = app(&dir, &Start { save_dir: Some(saves.clone()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frames(&mut a, 2);
+    let at = |app: &App| {
+        let v = app.engine.view();
+        (v.x, v.y, v.heading)
+    };
+    d.key(&mut a, KeyCode::F5, None);
+    let saved = at(&a);
+    assert!(a.boxes.iter().any(|b| !text(b).is_empty()), "a message after saving");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // Walk away, then load.
+    a.input(In::Key { code: KeyCode::KeyW, down: true, text: None });
+    d.frames(&mut a, 20);
+    a.input(In::Key { code: KeyCode::KeyW, down: false, text: None });
+    assert_ne!(at(&a), saved, "the walk moved the player");
+    d.key(&mut a, KeyCode::F9, None);
+    assert_eq!(at(&a), saved, "F9 brings the player back where F5 saved");
+    let _ = std::fs::remove_dir_all(&saves);
+}
+
+#[test]
+fn inventory_by_i_and_a_click_equips_as_panels_do() {
+    let Some(dir) = game_dir() else { return };
+    let setup = |app: &mut App| panels::give(&mut app.engine.m, 6);
+    let mut a = app(&dir, &Start::default());
+    setup(&mut a);
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyI, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "I opens the inventory");
+    // The first line, as the screen lays it out (`panels::line_at`).
+    let (x, y) = (0..200)
+        .flat_map(|y| (0..320).map(move |x| (x, y)))
+        .find(|&(x, y)| panels::line_at(x, y) == Some(0))
+        .expect("line 0 somewhere");
+    d.click(&mut a, x, y, MouseButton::Left);
+    let mut b = app(&dir, &Start::default());
+    setup(&mut b);
+    Driver::new(&mut b);
+    b.panel = Some(panels::open_inventory(&mut b.engine.m));
+    let mut said = panels::Said::default();
+    panels::equip_line(&mut b.engine.m, 0, &mut said);
+    same(&a, &b, "line 0 clicked and panels::equip_line(0)");
+    assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), said.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), "the same boxes said");
+    // A box up takes the next key (it is read); then I closes the panel.
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    d.key(&mut a, KeyCode::KeyI, None);
+    assert!(a.panel.is_none(), "I closes it");
+}
+
+#[test]
+fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
+    let Some(dir) = game_dir() else { return };
+    let setup = |app: &mut App| {
+        panels::learn(&mut app.engine.m, 0);
+        app.engine.m.mem.w16(arena::mem::DS, 0x020A, 500);
+        app.engine.m.mem.w16(arena::mem::DS, 0x020C, 500);
+    };
+    let mut a = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
+    setup(&mut a);
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyC, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Spellbook(_))), "C opens the spellbook");
+    let spells = panels::spells(&a.engine.m);
+    assert!(!spells.is_empty(), "a spell in the book");
+    let (bx, by, lh, _, _) = panels::book_layout(&a.font);
+    d.click(&mut a, bx + 2, by + lh / 2, MouseButton::Left);
+    assert!(a.panel.is_none(), "a click on the entry casts and closes the book");
+    let mut b = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
+    setup(&mut b);
+    let mut db = Driver::new(&mut b);
+    db.frame(&mut b);
+    let mut said = panels::Said::default();
+    panels::cast(&mut b.engine, 0, &mut said);
+    same(&a, &b, "spell 0 clicked and panels::cast(0)");
+    // Its target clicked in the view: the same click as the script's.
+    d.click(&mut a, 164, 74, MouseButton::Left);
+    d.frames(&mut a, 2);
+    db.click(&mut b, 164, 74, MouseButton::Left);
+    db.frames(&mut b, 2);
+    same(&a, &b, "the target clicked");
+}
+
+#[test]
+fn a_captured_click_and_swing_and_look() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    // A click on the bar (below the view) captures the mouse.
+    d.click(&mut a, 160, 170, MouseButton::Left);
+    assert!(a.captured, "the mouse captured");
+    // Looking: about a quarter turn for 400 mickeys.
+    let h0 = a.engine.view().heading;
+    a.input(In::Motion(400.0, 0.0));
+    d.frame(&mut a);
+    let turned = a.engine.view().heading.wrapping_sub(h0) & 0x1FF;
+    assert!((100..=156).contains(&turned), "a quarter turn: {turned:#x}");
+    // Q readies the weapon; the right button held and dragged swings.
+    d.key(&mut a, KeyCode::KeyQ, None);
+    d.frames(&mut a, 3);
+    a.input(In::Button { button: MouseButton::Right, down: true });
+    a.input(In::Motion(0.0, 100.0));
+    d.frame(&mut a);
+    a.input(In::Button { button: MouseButton::Right, down: false });
+    let mut frames = Vec::new();
+    for _ in 0..4 {
+        frames.push(a.engine.view().hand_frame);
+        d.frame(&mut a);
+    }
+    assert!(frames.windows(2).any(|w| w[0] != w[1]), "the swing animates: {frames:?}");
+    // Esc lets the mouse go.
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(!a.captured);
+}
+
+#[test]
+fn creation_by_keys_and_clicks_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let make = || {
+        let mut engine = world::load(&dir, "START.MIF");
+        let archive = Rc::new(archive::Archive::open(&dir));
+        let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
+        (engine, c)
+    };
+    let made = |(engine, c): (Engine, create::Creation)| make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), None, 0, false);
+    let mut a = made(make());
+    let mut d = Driver::new(&mut a);
+    // The scripted twin: the same App, given the script's inputs as
+    // `--create` gives them (`Creation::input`).
+    let mut b = made(make());
+    Driver::new(&mut b);
+    // The intro skipped, the title, Start; the opening story skipped;
+    // "Select" the class; the list's first class; the name; the gender.
+    let script = "enter,enter,S,esc,S,enter,type:Ria,enter,F";
+    for (i, inp) in create::parse_script(script).into_iter().enumerate() {
+        match inp {
+            create::Input::Enter => d.key(&mut a, KeyCode::Enter, None),
+            create::Input::Esc => d.key(&mut a, KeyCode::Escape, None),
+            create::Input::Back => d.key(&mut a, KeyCode::Backspace, None),
+            create::Input::Up => d.key(&mut a, KeyCode::ArrowUp, None),
+            create::Input::Down => d.key(&mut a, KeyCode::ArrowDown, None),
+            create::Input::Char(c) => {
+                let t = (c as char).to_string();
+                d.key(&mut a, KeyCode::KeyA, Some(&t));
+            }
+            create::Input::Click(x, y) => d.click(&mut a, x, y, MouseButton::Left),
+            create::Input::Wait(ms) => d.wait(&mut a, ms as u64),
+        }
+        b.creation_input(inp);
+        let (Some(ca), Some(cb)) = (a.creation.as_ref(), b.creation.as_ref()) else { panic!("creation ended early at step {i}") };
+        let mut sa = hud::Screen::new(a.assets.palette);
+        let mut sb = hud::Screen::new(a.assets.palette);
+        ca.draw(&mut sa, &a.engine.m);
+        cb.draw(&mut sb, &b.engine.m);
+        assert!(sa.px == sb.px, "step {i} ({inp:?}): the screens differ");
+        same(&a, &b, &format!("step {i} ({inp:?})"));
+    }
+}
+
+#[test]
+fn a_level_gained_spent_on_the_attribute_screen() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let level = |app: &App| app.engine.m.mem.r8(arena::mem::DS, arena::character::PLAYER + arena::character::field::LEVEL);
+    let before = level(&a);
+    // Experience gained (as `--do xp:N`): the next minute checks the level.
+    let at = arena::character::PLAYER + 0x409;
+    let xp = a.engine.m.mem.r32(arena::mem::DS, at).wrapping_add(100_000);
+    a.engine.m.mem.w32(arena::mem::DS, at, xp);
+    let f = a.engine.m.mem.r16(arena::mem::DS, 0x05CA) | 0x100;
+    a.engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+    for _ in 0..600 {
+        if a.creation.is_some() {
+            break;
+        }
+        // The level's notice read as it comes.
+        while !a.boxes.is_empty() {
+            d.key(&mut a, KeyCode::Enter, None);
+        }
+        d.frame(&mut a);
+    }
+    assert!(a.creation.is_some(), "the attribute screen up for the level's points");
+    assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))));
+    let points = |app: &App| app.creation_engine.as_ref().expect("the screen's engine").m.mem.r8(arena::mem::DS, arena::newgame::var::POINTS);
+    let start = points(&a);
+    assert!(start > 0, "points to spend");
+    // Done refused while points are left: a box.
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.creation.is_some() && a.pending.is_some(), "not left with points to spend");
+    d.key(&mut a, KeyCode::Enter, None);
+    // Each line picked by its letter (the regions at DATA:5312, as
+    // create.rs reads them), its points raised with Up until it stops (an
+    // attribute's cap) or none are left.
+    for line in 1..=8u16 {
+        let letter = a.creation_engine.as_ref().unwrap().m.mem.r8(arena::mem::DATA, 0x5312 + line * 0x62 + 0x59);
+        d.key(&mut a, KeyCode::KeyA, Some(&(letter as char).to_ascii_lowercase().to_string()));
+        for _ in 0..200 {
+            let left = points(&a);
+            if left == 0 {
+                break;
+            }
+            d.key(&mut a, KeyCode::ArrowUp, None);
+            if points(&a) == left {
+                break;
+            }
+        }
+    }
+    assert_eq!(points(&a), 0, "all {start} points spent");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.creation.is_none(), "the screen left once the points are spent");
+    assert!(!matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))), "the turn replayed with the clicks");
+    assert!(level(&a) > before, "the level gained: {before} -> {}", level(&a));
+}
+
+#[test]
+fn any_key_ends_a_rest() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), picks: "0,t8", ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyR, None);
+    d.frames(&mut a, 2);
+    let resting = |app: &App| app.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0;
+    assert!(resting(&a), "resting for 8 hours");
+    d.key(&mut a, KeyCode::Space, Some(" "));
+    d.frames(&mut a, 3);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    assert!(!resting(&a), "a key ended the rest");
+}
+
+#[test]
+fn a_movie_takes_keys_and_holds_the_game() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let line = |t: &str| vec![hud::Span { colour: 0x0F, text: t.to_string() }];
+    let lines = (0..7).map(|i| line(&format!("line {i}"))).collect();
+    let mv = flc::Movie::new(&a.assets.archive, "VISION.FLC", lines).expect("VISION.FLC");
+    a.movies.push_back(mv);
+    let frame0 = frame_no(&a);
+    d.frames(&mut a, 3);
+    assert_eq!(frame_no(&a), frame0, "no game frame while a movie is up");
+    for _ in 0..10 {
+        if a.movies.is_empty() {
+            break;
+        }
+        d.key(&mut a, KeyCode::Space, Some(" "));
+    }
+    assert!(a.movies.is_empty(), "keys page through the movie's lines to its end");
+    d.frames(&mut a, 2);
+    assert!(frame_no(&a) > frame0, "the game goes on after it");
+}
+
+/// The user's save (ARENA_SAVE), copied to a scratch folder so nothing
+/// can write to it.
+fn save_copy() -> Option<PathBuf> {
+    let save = PathBuf::from(std::env::var("ARENA_SAVE").ok()?);
+    let to = std::env::temp_dir().join(format!("arena-inputtest-save-{}", std::process::id()));
+    std::fs::create_dir_all(&to).ok()?;
+    for e in std::fs::read_dir(&save).ok()? {
+        let e = e.ok()?;
+        if e.file_type().ok()?.is_file() {
+            std::fs::copy(e.path(), to.join(e.file_name())).ok()?;
+        }
+    }
+    Some(to)
+}
+
+#[test]
+fn the_spellmaker_clicked_live_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    // Drakain before Daggerfall's guild master: the menu's Spellmaker (2),
+    // then the screen's click at (35, 75) (an effect's list), entries 0.
+    let start = |picks| Start { hour: None, picks, load: Some((save.clone(), 1)), ..Default::default() };
+    let mut a = app(&dir, &start(""));
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.click(&mut a, 164, 74, MouseButton::Left);
+    d.frame(&mut a);
+    assert!(until_asked(&mut d, &mut a, 3), "the guild master asks");
+    d.key(&mut a, KeyCode::Digit3, Some("3"));
+    assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker waits for a click");
+    d.click(&mut a, 35, 75, MouseButton::Left);
+    d.key(&mut a, KeyCode::Enter, None);
+    d.key(&mut a, KeyCode::Enter, None);
+    let mut b = app(&dir, &start("2,c35:75,0,0"));
+    let mut db = Driver::new(&mut b);
+    db.frame(&mut b);
+    db.click(&mut b, 164, 74, MouseButton::Left);
+    db.frame(&mut b);
+    as_far_as(&mut b, &a);
+    same(&a, &b, "the spellmaker by key, click and Enter, and by --picks 2,c35:75,0,0");
+    let maker = |app: &App| app.pending.as_ref().and_then(|p| p.maker.as_ref()).map(|(_, form)| *form);
+    assert_eq!(maker(&a), maker(&b), "the same form open");
+    assert!(maker(&a).flatten().is_some(), "a form open after the clicks");
+    let _ = std::fs::remove_dir_all(&save);
+}
+
+/// Where entry `i` of the question shown can be clicked (`hud::menu_pick`
+/// over the screen), if anywhere.
+fn entry_at(app: &App, i: usize) -> Option<(i32, i32)> {
+    let hud = app.hud();
+    (0..200).flat_map(|y| (0..320).map(move |x| (x, y))).find(|&(x, y)| hud::menu_pick(&app.font, &hud, x, y) == Some(i))
+}
+
+#[test]
+fn a_store_list_line_clicked_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let gold = |app: &mut App| app.engine.m.mem.w32(arena::mem::DS, 0x05C2, 5000);
+    let mut a = app(&dir, &Start::default());
+    gold(&mut a);
+    let mut d = Driver::new(&mut a);
+    shop_turn(&mut a, 6);
+    // The store's menu (Buy) and its list (weapons) by clicks; the weapons
+    // list's second line clicked.
+    let mut picks = Vec::new();
+    for (step, want) in [0usize, 0, 1].into_iter().enumerate() {
+        let m = menu(&a).unwrap_or_else(|| panic!("asked at step {step}"));
+        let list = m.list;
+        let (x, y) = entry_at(&a, want).unwrap_or_else(|| panic!("entry {want} clickable at step {step} (list {list})"));
+        d.click(&mut a, x, y, MouseButton::Left);
+        picks.push(want.to_string());
+        while !a.boxes.is_empty() {
+            d.key(&mut a, KeyCode::Enter, None);
+        }
+    }
+    let picks = picks.join(",");
+    let mut b = app(&dir, &Start { picks: &picks, ..Default::default() });
+    gold(&mut b);
+    Driver::new(&mut b);
+    shop_turn(&mut b, 6);
+    while !b.boxes.is_empty() {
+        b.boxes.pop_front();
+    }
+    same(&a, &b, &format!("the store's entries clicked and --picks {picks}"));
+    assert_eq!(menu(&a).map(|m| text(&m.title)), menu(&b).map(|m| text(&m.title)));
+}
+
+#[test]
+fn the_wheel_moves_a_menus_entry() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    a.input(In::Wheel(-1.0));
+    assert_eq!(a.selected, 1, "down a line");
+    a.input(In::Wheel(1.0));
+    a.input(In::Wheel(1.0));
+    let n = menu(&a).unwrap().entries.len();
+    assert_eq!(a.selected, n - 1, "up past the first wraps to the last");
+}
