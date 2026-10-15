@@ -74,6 +74,13 @@ fn odd(engine: &Engine) -> Option<String> {
     if !(-200..=2000).contains(&h) {
         return Some(format!("height {h}"));
     }
+    // DGROUP's constant file names stay as the image has them: the text
+    // system's POINTER1.DAT (197F) and TEMPLATE.DAT (6E57).
+    for (at, name) in [(0x197Fu16, &b"pointer1.dat"[..]), (0x6E57, b"template.dat")] {
+        if engine.m.mem.cstr(DS, at) != name {
+            return Some(format!("DGROUP {at:04X} overwritten: {:?}", String::from_utf8_lossy(engine.m.mem.cstr(DS, at))));
+        }
+    }
     None
 }
 
