@@ -144,6 +144,13 @@ pub trait QuestHooks {
     }
     /// 1194:4D31: a message with the text at DS:`si`.
     fn notice(&mut self, _m: &mut Machine, _si: u16) {}
+    /// The Emperor's audience's screens (0000:41B6..4216): `part` 0 the
+    /// speech (1194:DAF0, 2294:0895, 1194:D459 with text 5A7h and the
+    /// picture at 884Ch, 55B2, 55D5), 1 its end (1194:DB26), 2 the view
+    /// cleared (0000:9A98 over 140h x C8h, 55D5).
+    fn audience(&mut self, _m: &mut Machine, _files: &mut Files, _part: u8) -> Option<()> {
+        Some(())
+    }
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
     fn npc_name(&mut self, m: &mut Machine, files: &mut Files, ax: u16, seed: u32, di: u16) -> Option<()> {

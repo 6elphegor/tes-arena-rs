@@ -89,8 +89,8 @@ pub trait TriggerHooks {
     /// 0000:41A4..4247: the Imperial palace with the main quest at its
     /// stage 8 (F77): the audience with the Emperor, then the palace
     /// (IMPPAL.MIF) entered.
-    fn palace_audience(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    fn palace_audience(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.emperor_audience(files, &mut crate::quest::NoQuestHooks)
     }
     /// 1194:A36C (AX 0): at stage 9 the audience that starts the quest
     /// for the artifact (137A 5DDh).
