@@ -29,7 +29,7 @@
 //! texts (A374 again). Those that depend on routines not ported (the
 //! province's loading 1194:2E18, the places 1194:3EB1, 1194:CFF7,
 //! 25CA:0323, 1194:0A44) or on registers the original leaves over (%qf's
-//! EBX) give None, as do %en (outside a building of kind 6 its routine
+//! EBX) give None, as do %en outside a building of kind 6 (its routine
 //! returns into the text: it leaves DS pushed) and the loops where the
 //! original never ends (a key not in the index, a copy over its own
 //! source, codes coming back without end).
@@ -983,10 +983,34 @@ impl Machine {
                 }
                 Res::Buf(d)
             }
-            // %en: a place's name. In a building of kind 6 (D48) by 3EB1,
-            // not ported; otherwise the original leaves DS pushed (it pops
-            // it only on that path) and its RET returns into the text.
-            0x05DC => return None,
+            // %en: an equipment store's name. In a building of kind 6
+            // (D48) the place's entry (`place_lookup`, 3EB1: FD2 with its
+            // low byte halved, among [138B] at [1008]); its first two
+            // bytes (its key) go to 8A52 and 8A54 of the entry's segment
+            // (DS is still the list's there), and its third byte picks the
+            // name's first word (the list at 3276:3F71), its fourth the
+            // second word (3276:403E), a space between. (No entry found:
+            // the entry is read at offset 0.)
+            // Otherwise the original leaves DS pushed (it pops it only on
+            // that path) and its RET returns into the text.
+            0x05DC => {
+                if self.t8(0x0D48) != 6 {
+                    return None;
+                }
+                let key = self.t16(0x0FD2);
+                let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+                let (off, seg) = (self.t16(0x1008), self.t16(0x100A));
+                let si = self.place_lookup(seg, off, key, self.t16(0x138B));
+                self.mem.w16(seg, 0x8A52, self.mem.r8(seg, si) as u16);
+                self.mem.w16(seg, 0x8A54, self.mem.r8(seg, si.wrapping_add(1)) as u16);
+                let (dl, dh) = (self.mem.r8(seg, si.wrapping_add(2)), self.mem.r8(seg, si.wrapping_add(3)));
+                let si = self.skip_strings(DATA, 0x3F71, dl as u16);
+                let (_, di) = self.text_copy(DATA, si, c.es, c.di)?;
+                self.mem.w8(c.es, di.wrapping_sub(1), 0x20);
+                let si = self.skip_strings(DATA, 0x403E, dh as u16);
+                let (_, di) = self.text_copy(DATA, si, c.es, di)?;
+                Res::Buf(di)
+            }
             // %fn: the person's first name.
             0x066E => {
                 let r = self.t16(self.t16(0xCB5E).wrapping_add(0x12)) & 0x7FFF;

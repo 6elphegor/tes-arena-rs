@@ -44,6 +44,12 @@ pub trait FightHooks {
     }
     /// 23BA:01C7: the fight's music (`MUSIC`).
     fn fight_music(&mut self, _m: &mut Machine, _music: u8) {}
+    /// 1194:D45D: JAGAR.FLC with text `text` (colour 9288 F5h), Jagar's
+    /// words before a main quest's encounter.
+    fn jagar(&mut self, _m: &mut Machine, _text: u16) {}
+    /// 0000:A611 and A6B5: the view saved and put back around it.
+    fn view_saved(&mut self, _m: &mut Machine) {}
+    fn view_restored(&mut self, _m: &mut Machine) {}
 }
 
 /// `FightHooks` that do nothing.
@@ -423,9 +429,14 @@ impl Machine {
     /// are made (`encounter_spawn`), named (`encounter_text`), and placed.
     fn encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, row: u16) -> Option<()> {
         self.mem.w16(DS, 0x12AC, 0);
-        let level = self.mem.r8(DS, 0x01AA) as u16;
-        if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 {
-            return None;
+        let mut level = self.mem.r8(DS, 0x01AA) as u16;
+        if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 && self.jagar_words(hooks) {
+            // 89F9..8A0A: the main quest's encounter: 12AC set, 5C8 bit
+            // 8000h used up, its level the player's plus F77 (8 bits).
+            self.mem.w16(DS, 0x12AC, 1);
+            let f = self.mem.r16(DS, 0x05C8) & 0x7FFF;
+            self.mem.w16(DS, 0x05C8, f);
+            level = self.mem.r8(DS, 0x0F77).wrapping_add(self.mem.r8(DS, 0x01AA)) as u16;
         }
         let si = self.encounter_entry(level, row)?;
         let data = crate::mem::DATA;
@@ -434,6 +445,29 @@ impl Machine {
             return Some(());
         }
         self.encounter_bring(files, hooks, ty, si)
+    }
+
+    /// 1194:D91C. Jagar's words before a main quest's encounter: none
+    /// without F77 (the carry clear); otherwise, with the view's clip
+    /// (A91A) at C7h meanwhile and the view saved and put back around it,
+    /// JAGAR.FLC with text 570h + F77 - 1 (its low byte added in 8 bits),
+    /// A902 bit 200h set and 100h cleared, colour 9288 F5h.
+    fn jagar_words(&mut self, hooks: &mut dyn FightHooks) -> bool {
+        let f77 = self.mem.r8(DS, 0x0F77);
+        if f77 == 0 {
+            return false;
+        }
+        let clip = self.mem.r16(DS, 0xA91A);
+        self.mem.w16(DS, 0xA91A, 0xC7);
+        hooks.view_saved(self);
+        let text = (0x0500 | 0x70u8.wrapping_add(f77) as u16).wrapping_sub(1);
+        let f = self.mem.r16(DS, 0xA902) & !0x100 | 0x200;
+        self.mem.w16(DS, 0xA902, f);
+        self.mem.w8(DS, 0x9288, 0xF5);
+        hooks.jagar(self, text);
+        hooks.view_restored(self);
+        self.mem.w16(DS, 0xA91A, clip);
+        true
     }
 
     /// 1194:8AF0. The first creature's type: a monster's (+4), a person's
@@ -480,8 +514,9 @@ impl Machine {
     /// table at 3276:40B8 (55h entries a row, each a level): a level near
     /// it (`dice`-rolled, folded back below it), whose first two entries
     /// in the row (A836, A838; as they were if fewer) are chosen between
-    /// at random. Returns the entry's offset in the list at 3276:455E (3
-    /// bytes: count, type, class).
+    /// at random; for a main quest's encounter (12AC) a level below the
+    /// player's level byte becomes it less a d3. Returns the entry's
+    /// offset in the list at 3276:455E (3 bytes: count, type, class).
     fn encounter_entry(&mut self, level: u16, row: u16) -> Option<u16> {
         let data = crate::mem::DATA;
         let lv = (level + 1).min(0x14);
@@ -504,6 +539,12 @@ impl Machine {
         }
         if self.mem.r8(DS, 0x01AA) == 0 && ax >= 2 {
             ax = crate::dice::roll(&mut self.rng, 3)?;
+        }
+        // 8A97..8AAD: a main quest's encounter (12AC) below the player's
+        // level byte is brought up to it less a d3 (AL only counts).
+        if self.mem.r16(DS, 0x12AC) != 0 && (ax as u8) < self.mem.r8(DS, 0x01AA) {
+            let r = crate::dice::roll(&mut self.rng, 3)?;
+            ax = (r.wrapping_neg() & 0xFF00) | self.mem.r8(DS, 0x01AA).wrapping_sub(r as u8) as u16;
         }
         let mut found = 0;
         for k in 0..0x55u16 {

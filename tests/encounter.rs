@@ -31,6 +31,16 @@ impl FightHooks for Hooks {
         count(m, if people { 0xFFE0 } else { 0xFFE2 });
         Some(())
     }
+    fn jagar(&mut self, m: &mut Machine, text: u16) {
+        m.mem.w16(DS, 0xFFEC, text);
+        count(m, 0xFFE6);
+    }
+    fn view_saved(&mut self, m: &mut Machine) {
+        count(m, 0xFFE8);
+    }
+    fn view_restored(&mut self, m: &mut Machine) {
+        count(m, 0xFFEA);
+    }
     fn fight_music(&mut self, m: &mut Machine, _music: u8) {
         count(m, 0xFFE4);
     }
@@ -122,6 +132,13 @@ fn setup(m: &mut Machine, seed: u32) {
     m.mem.w16(CSEG, 0x40D, v);
     let b: Vec<u8> = (0..4).map(|_| s.byte()).collect();
     put(m, DS, 0x91F6, &b);
+    if s.byte() < 0x40 {
+        m.mem.w16(DS, 0x05C8, 0x8000);
+        let v = if s.byte() < 0x40 { 0 } else { s.byte() % 9 };
+        m.mem.w8(DS, 0x0F77, v);
+        let v = s.word();
+        m.mem.w16(DS, 0xA902, v);
+    }
 }
 
 #[test]

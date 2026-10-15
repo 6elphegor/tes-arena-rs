@@ -3,6 +3,7 @@
 //! (harness/gen_tavern.py).
 mod common;
 
+use arena::bsa::Files;
 use arena::machine::Machine;
 use arena::mem::DS;
 use arena::shops::ShopHooks;
@@ -107,13 +108,14 @@ impl TavernHooks for Script {
     fn picture(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([13, si as u32]);
     }
-    fn haggle(&mut self, m: &mut Machine) -> (u32, bool) {
+    fn haggle(&mut self, m: &mut Machine, _files: &mut Files) -> Option<(u32, bool)> {
         self.log.extend([14, m.mem.r16(DS, 0x1391) as u32, m.mem.r16(DS, 0x1393) as u32]);
         let (cf, eax) = take(&self.haggles, &mut self.n[4], (true, 0));
-        (eax, cf)
+        Some((eax, cf))
     }
-    fn rumours(&mut self, _m: &mut Machine) {
+    fn rumours(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<bool> {
         self.log.push(15);
+        Some(true)
     }
 }
 

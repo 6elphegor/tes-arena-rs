@@ -249,6 +249,13 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
     engine.m.mem.w8(DS, arena::transit::var::ENTERED, area);
     // The area's automap (0000:3503), as entering the world loads it.
     engine.m.automap_load(&mut engine.files);
+    // A town entered (0000:468B's 46B2, as `Areas::entered` runs it for
+    // the areas after): its buildings listed (1008 the equipment stores,
+    // ...) and its quests made. A store's greeting names it from that
+    // list (%en).
+    if city && engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
+        eprintln!("the town's quests met something not ported");
+    }
     if city { Run::City } else { Run::Interior(0xC37F) }
 }
 
