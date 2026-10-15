@@ -13,13 +13,21 @@ have their codes substituted by 2DA2:000A: stubbed, counting its calls
 in DGROUP FFE0 (src/haggle.rs `HaggleIo::expand`; the text port is
 verified on its own).
 
-Lines: haggle | price per quality mood mode dl seed gold fe6 fdd pre | menus |
+Lines: haggle | price per quality mood mode dl seed gold fe6 fdd pre ems bank dbank k c | menus |
        offers | result: "deal EAX" or "none", the inputs used (menus offers
        keys), FNV-1a of DGROUP 1044..1047, 1391..1394, 13CA..13CB,
        6598..65BB (but 65A8, the saved stack pointer), the RNG seed, the
        gold (05C2), 0FE6, 0FEE..0FEF, 9288 and FFE0..FFE1, then FNV-1a of
        the lines' buffers (929E.., 987A.., 200h each), their colour
-       (137E) and the input asked for (13D3); or "fault"/"hang" (the script ran out).
+       (137E) and the input asked for (13D3), then FNV-1a of the banks:
+       A88E, 8FA8 and, with EMS on, banks `bank` and `dbank` as the
+       program sees them; or "fault"/"hang" (the script ran out).
+
+Half the cases have EMS on (dos.py `enable_ems`, the frame at 7000)
+with bank `bank` mapped and filled with (i * k + c) & FFh (a shop's data;
+25h made 26h),
+and the dialogue's bank (1032) `dbank`: 1194:8665 maps it, and the way out
+maps the bank before back.
 
 `pre` is written as a dword at 929A, just before the line: 1194:84F1
 scans the line back from its end to the first zero byte, past its start
@@ -126,6 +134,19 @@ for case in range(int(os.environ.get('N', 2500))):
     a.mu.mem_write(a.lin(a.ds, 0x0FE6), bytes([fe6]))
     a.mu.mem_write(a.lin(a.ds, 0x0FDD), bytes([fdd]))
     a.w32(0x929A, pre)
+    ems = rng.getrandbits(1)
+    bank = rng.randrange(0x20)
+    dbank = rng.choice([rng.randrange(0x20), bank, 0x1F])
+    k = rng.getrandbits(8) | 1
+    c = rng.getrandbits(8)
+    if ems:
+        a.enable_ems(0x7000)
+        a.ems['cur'] = bank
+        a.w16(0x8FA8, bank * 4)
+        # (No byte 25h, a "%": a line read past the file meets it, and the
+        # formatter's unknown conversions (0000:8D6E) aren't ported.)
+        a.mu.mem_write(a.lin(0x7000, 0), bytes(((i * k + c) & 0xFF) + (((i * k + c) & 0xFF) == 0x25) for i in range(0x10000)))
+    a.w16(0x1032, dbank)
     try:
         a._setup([0xFFF0], {'eax': price, 'esi': per, 'ebx': quality, 'ecx': mood,
                             'edx': mode << 8 | dl, 'edi': 0x1A4C})
@@ -139,11 +160,12 @@ for case in range(int(os.environ.get('N', 2500))):
                  + d[0xFFE0:0xFFE2])
         result = 'none' if cf else f'deal {eax:x}'
         shown = d[0x929E:0x949E] + d[0x987A:0x9A7A] + d[0x137E:0x137F] + d[0x13D3:0x13D4]
-        res = f'{result} {" ".join(map(str, a.used))} {fnv(state):x} {fnv(shown):x}'
+        banks = d[0xA88E:0xA890] + d[0x8FA8:0x8FAA] + (a.ems_bank(bank) + a.ems_bank(dbank) if ems else b'')
+        res = f'{result} {" ".join(map(str, a.used))} {fnv(state):x} {fnv(shown):x} {fnv(banks):x}'
     except Fault as e:
         res = 'hang' if a.fault == 'script' else 'fault'
     except AssertionError:
         res = 'hang'
-    out.write(f'haggle | {price:x} {per:x} {quality:x} {mood:x} {mode:x} {dl:x} {seed:x} {gold:x} {fe6:x} {fdd:x} {pre:x} | '
+    out.write(f'haggle | {price:x} {per:x} {quality:x} {mood:x} {mode:x} {dl:x} {seed:x} {gold:x} {fe6:x} {fdd:x} {pre:x} {ems} {bank:x} {dbank:x} {k:x} {c:x} | '
               f'{" ".join(map(str, menus))} | {",".join(o.decode() for o in offers)} | {res}\n')
 out.close()

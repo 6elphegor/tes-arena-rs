@@ -32,6 +32,10 @@
 //! Every counter-offer's menu (8575) sets 0FE6 bit 0, and every message
 //! (862E) the text colour 9288 to 3Ch, in all modes.
 //!
+//! The dialogue is loaded into the EMS frame with its bank (1032) mapped
+//! (8665), and the bank mapped before is mapped back on every way out:
+//! a shop's data in that bank is kept.
+//!
 //! Bugs kept: selling never reaches its acceptance roll (`and ax,ax`
 //! clears carry before a carry test); accepting the first price returns
 //! DGROUP 65B8 as left by an earlier haggle; an asking price equal to the
@@ -78,6 +82,10 @@ pub mod var {
     pub const QUEST_PRICE: u16 = 0x0FEE;
     pub const QUEST_STEP: u16 = 0x0FDD;
     pub const COLOUR: u16 = 0x9288;
+    /// The dialogue's EMS bank, and the bank mapped before it (put back
+    /// on the way out).
+    pub const DIALOGUE_BANK: u16 = 0x1032;
+    pub const OLD_BANK: u16 = 0xA88E;
     /// The line read (and, for the informant, substituted), the line
     /// shown, and its colour.
     pub const LINE: u16 = 0x929E;
@@ -109,8 +117,10 @@ pub trait HaggleIo {
         m.expand(files, &mut crate::text::NoTextHooks, DS, di).map(|_| ())
     }
     /// 1194:49FF: the line at DS:`si` (SHOWN, in colour 137E) shown, before
-    /// the menu, offer or key it goes with.
-    fn say(&mut self, _m: &mut Machine, _si: u16) {}
+    /// the menu, offer or key it goes with; `kind` the line's (0 the
+    /// asking price, 1 the confirmation, 2 a refusal, 3 the last word, 4
+    /// a counter-offer).
+    fn say(&mut self, _m: &mut Machine, _si: u16, _kind: u8) {}
 }
 
 /// A player who walks away: the menus left (2), no offer typed, keys
@@ -176,9 +186,25 @@ impl Machine {
         self.mem.w16(DS, NAME, di);
         self.mem.w8(DS, DL, dl);
         self.mem.w8(DS, MODE, mode);
-        // 1194:8665: the mode's dialogue file into the buffer segment.
+        // 1194:8665: the dialogue's EMS bank (1032) mapped, the one mapped
+        // before kept at OLD_BANK (with EMS off AX as left there: SI, the
+        // personality, 8061), and the mode's dialogue file loaded into the
+        // buffer segment.
+        let old = self.map_bank(self.mem.r16(DS, DIALOGUE_BANK), per);
+        self.mem.w16(DS, OLD_BANK, old);
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         self.file_load(files, DIALOGUE[mode as usize - 1], buf, 0);
+        let r = self.haggle_rounds(files, io, per, quality, mood, mode);
+        // Every way out maps OLD_BANK back (82CF, 8330, 8382, 83C2, 83D1).
+        if r.is_some() {
+            let old = self.mem.r16(DS, OLD_BANK);
+            self.map_bank(old, 0);
+        }
+        r
+    }
+
+    /// 1194:8084..83E3: the haggle's rounds, its dialogue loaded.
+    fn haggle_rounds(&mut self, files: &mut Files, io: &mut impl HaggleIo, per: u16, quality: u8, mood: u8, mode: u8) -> Option<Haggle> {
         self.mem.w8(DS, ROUNDS_LEFT, 8 - quality / 0x34);
         let p = self.mem.r16(DS, PRICE);
         let f = ((0x100 - quality as u16) >> 1).wrapping_add(0x19).wrapping_add((per as u8 as u16) >> 1) >> 1;
@@ -520,7 +546,7 @@ impl Machine {
         }
         args.reverse();
         self.sprintf((DS, SHOWN), (DS, LINE), &args);
-        self.haggle_show(io);
+        self.haggle_show(io, kind);
         Some(())
     }
 
@@ -539,7 +565,7 @@ impl Machine {
 
     /// 1194:84C3: SHOWN's line breaks (CR, LF) made spaces, the colour
     /// 3Ch, and the line shown (1194:49FF).
-    fn haggle_show(&mut self, io: &mut impl HaggleIo) {
+    fn haggle_show(&mut self, io: &mut impl HaggleIo, kind: u8) {
         let mut si = SHOWN;
         loop {
             let c = self.mem.r8(DS, si);
@@ -552,7 +578,7 @@ impl Machine {
             si = si.wrapping_add(1);
         }
         self.mem.w8(DS, SHOWN_COLOUR, 0x3C);
-        io.say(self, SHOWN);
+        io.say(self, SHOWN, kind);
     }
 
     /// 1194:83FD..8467 and 84AA for the informant (modes 5, 6): line
@@ -580,7 +606,7 @@ impl Machine {
         }
         io.expand(self, files, LINE)?;
         self.haggle_copy(DS, LINE, SHOWN);
-        self.haggle_show(io);
+        self.haggle_show(io, kind);
         Some(())
     }
 }

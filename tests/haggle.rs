@@ -80,6 +80,24 @@ fn matches_original() {
         m.mem.w8(DS, 0x0FE6, p[8] as u8);
         m.mem.w8(DS, 0x0FDD, p[9] as u8);
         m.mem.w32(DS, 0x929A, p[10]);
+        let (ems, bank, dbank, k, c) = (p[11] != 0, p[12] as u16, p[13] as u16, p[14], p[15]);
+        if ems {
+            // EMS on (harness/dos.py `enable_ems`): 20h banks, `bank` mapped
+            // into the frame at 7000 and filled with (i * k + c) & FFh (25h
+            // made 26h).
+            m.mem.w8(DS, 0x8FA6, 1);
+            m.mem.w16(DS, 0x9032, 0x20);
+            m.mem.w16(DS, 0x8FA8, bank * 4);
+            for b in 0..0x20u16 {
+                m.mem.w16(DS, 0x9036 + 4 * b, b * 2);
+                m.mem.w16(DS, 0x9038 + 4 * b, 0x0600);
+            }
+            for i in 0..=0xFFFFu32 {
+                let b = (i.wrapping_mul(k).wrapping_add(c) & 0xFF) as u8;
+                m.mem.w8(0x7000, i as u16, if b == 0x25 { 0x26 } else { b });
+            }
+        }
+        m.mem.w16(DS, 0x1032, dbank);
         m.load_rng();
         let got = m.haggle(&mut fs, &mut io, p[0], p[1] as u16, p[2] as u8, p[3] as u8, p[5] as u8, p[4] as u8, 0x1A4C);
         let got = match got {
@@ -112,7 +130,12 @@ fn matches_original() {
                     Haggle::NoDeal => "none".into(),
                 };
                 let shown: Vec<u8> =(0x929Eu16..0x949E).chain(0x987A..0x9A7A).chain(0x137E..0x137F).chain(0x13D3..0x13D4).map(|o| m.mem.r8(DS, o)).collect();
-                format!("{result} {} {} {} {:x} {:x}", io.used[0], io.used[1], io.used[2], fnv(state), fnv(shown))
+                let mut banks: Vec<u8> = (0xA88Eu16..0xA890).chain(0x8FA8..0x8FAA).map(|o| m.mem.r8(DS, o)).collect();
+                if ems {
+                    banks.extend(m.ems_bank(bank));
+                    banks.extend(m.ems_bank(dbank));
+                }
+                format!("{result} {} {} {} {:x} {:x} {:x}", io.used[0], io.used[1], io.used[2], fnv(state), fnv(shown), fnv(banks))
             }
         };
         assert_eq!(f[4], got, "{line}");
