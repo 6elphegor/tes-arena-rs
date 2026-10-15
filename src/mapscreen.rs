@@ -326,7 +326,7 @@ impl Machine {
         hooks.type_name(self);
         let c = self.ms8(NAMES) & 0xDF;
         let mut found = None;
-        if (b'A'..=b'Z').contains(&c) {
+        if c.is_ascii_uppercase() {
             let mut si = crate::travelmap::CITIES;
             for i in 0..0x20u16 {
                 if self.sq_streq(si, NAMES).is_some() {

@@ -151,7 +151,8 @@ impl Machine {
     /// A missing INF leaves the buffer's old text, which is parsed. None
     /// where the flats don't fit in their banks (the original stops at
     /// an INT 3), a hook is set to a routine not ported (end CD2E, but
-    /// the 3D mode's 0000:4531, `inf_done_hook`; sounds CD4A), a scan runs on
+    /// the 3D mode's 0000:4531, `inf_done_hook`; sounds CD4A, but the 3D
+    /// mode's 23BA:0217 with no sound, which returns), a scan runs on
     /// without end (the original hangs), or a *TOP line has no number
     /// (its value is then whatever AX held).
     pub fn info_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
@@ -929,9 +930,12 @@ impl Machine {
             if *di >= end || c == b'@' {
                 // The files 23BA:0217 (at SOUND_HOOK) would load into the
                 // sound slots, in order: the sound driver's, kept for the
-                // front end (`Machine::sound_names`).
+                // front end (`Machine::sound_names`). With no sound (8F64
+                // 0) it returns at once.
                 self.sound_names = self.sound_list();
-                if self.hook_set(SOUND_HOOK) {
+                let hook = self.mem.r32(DS, SOUND_HOOK);
+                let quiet = hook == 0x23BA_0217 && self.mem.r16(DS, crate::sound::var::ENABLED) == 0;
+                if hook != 0 && !quiet {
                     return None;
                 }
                 return Some(*di >= end);

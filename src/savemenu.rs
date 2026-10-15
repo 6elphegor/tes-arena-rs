@@ -184,7 +184,7 @@ impl Machine {
             if (ax as i16) < 0 {
                 return None;
             }
-            if ax < 5 || ax > 0x13A || by < 4 {
+            if !(5..=0x13A).contains(&ax) || by < 4 {
                 continue;
             }
             let row = (by - 4) / 0x0E;
