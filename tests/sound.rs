@@ -83,7 +83,7 @@ fn matches_original() {
         let got = m.sound_at(ax, cx).map(|_| {
             // The driver's stubs: the volume kept and counted, the play
             // and 0D58 counted.
-            if let Some(s) = m.sounds.last().copied() {
+            if let Some(arena::sound::Played::Number(s)) = m.sounds.last().cloned() {
                 m.mem.w16(DS, 0xFFE4, s.volume as u16);
                 let c = m.mem.r16(DS, 0xFFE6).wrapping_add(1);
                 m.mem.w16(DS, 0xFFE6, c);

@@ -81,6 +81,16 @@
 //! comma-separated: a character, `enter`, `esc`, `back`, `up`, `down`,
 //! `type:TEXT`, `click:X:Y` (on the 320 x 200 screen); with --shot the
 //! screen they reach is the picture (the game's, once creation is over).
+//! The menu's Start plays the opening story first (SCROLL.FLC, then
+//! INTRO01..09.IMG, 5 s each); a key ends it and is spent doing so, so a
+//! script gives one (e.g. `esc`) after `S`.
+//!
+//! Sound (`audio`): the game's sounds play through PulseAudio (opened at
+//! run time; nothing without it); --mute plays none, --sound-log prints
+//! each the game plays (shots play none, and with --sound-log print
+//! them). The animations the game plays (the dream, the Emperor's
+//! audience, the quest's end) show over it, a key their next lines or
+//! their end; `--do movie:NAME[:TEXT]` queues one (a debugging aid).
 
 mod archive;
 mod areas;
