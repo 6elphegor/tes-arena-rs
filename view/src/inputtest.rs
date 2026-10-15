@@ -1242,7 +1242,13 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.click(&mut a, 62, 180, MouseButton::Left);
-    d.frame(&mut a);
+    // The horse runs a frame a day (1194:30F1), then the screen ends.
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.frame(&mut a);
+    }
     assert!(a.travel.is_none(), "travelled");
     let mut welcome = String::new();
     for _ in 0..20 {
