@@ -1336,6 +1336,36 @@ fn message_line(engine: &Engine) -> Option<Vec<Vec<hud::Span>>> {
     engine.view().message.map(|(seg, off)| hud::lines(engine.m.mem.cstr(seg, off), 0x0F))
 }
 
+/// The main quest's state for `--do mq` (a debugging aid): its block at
+/// 0FDD (the step, the pieces' places, flags, the steps done at 0FE7,
+/// the chest's square), the dream's bytes (F76, F77, F7A), the place
+/// (the location record at 0A22: its name, id, province), the area (5E6)
+/// and the day (the clock 5CC in days).
+fn main_quest_state(m: &arena::machine::Machine) -> String {
+    use arena::mem::DS;
+    let block: Vec<String> = (0..0x13u16).map(|i| format!("{:02x}", m.mem.r8(DS, 0x0FDD + i))).collect();
+    format!(
+        "main quest: step {:02x}, block [{}], done {:04x}, dream {} count {} shown {}; at {} (id {:02x}, province {}), area {}, level byte {}, xp {}, 5CA {:04x} FFB {:04x} 1013 {:02x}, minute {}, day {}",
+        m.mem.r8(DS, 0x0FDD),
+        block.join(" "),
+        m.mem.r16(DS, 0x0FE7),
+        m.mem.r8(DS, 0x0F76),
+        m.mem.r8(DS, 0x0F77),
+        m.mem.r8(DS, 0x0F7A),
+        String::from_utf8_lossy(m.mem.cstr(DS, 0x0A22)),
+        m.mem.r8(DS, 0x0A22 + 0x2A),
+        m.mem.r8(DS, 0x0A22 + 0x24),
+        m.mem.r8(DS, 0x05E6),
+        m.mem.r8(DS, 0x01AA),
+        m.mem.r32(DS, 0x05AD),
+        m.mem.r16(DS, 0x05CA),
+        m.mem.r16(DS, 0x0FFB),
+        m.mem.r8(DS, 0x1013),
+        m.mem.r32(DS, 0x05CC),
+        m.mem.r32(DS, 0x05CC) / 1440,
+    )
+}
+
 /// The message line printed when a new one comes up.
 fn print_message(engine: &Engine, last: &mut Option<(u16, u16)>) {
     let msg = engine.view().message;
@@ -1609,6 +1639,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
             "compass" => interface::toggle_compass(&mut engine.m),
+            "mq" => println!("{}", main_quest_state(&engine.m)),
             "storm" => {
                 // Frames until the sky's hook flashes (the window draws the
                 // sky every frame; a shot only at its end).

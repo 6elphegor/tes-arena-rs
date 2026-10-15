@@ -396,9 +396,9 @@ impl Machine {
     /// location the player comes from (its province and a place in it),
     /// whose record is built (1194:3AE8, the Imperial City for province
     /// 8, `city_build_location`).
-    pub fn province_chosen(&mut self, province: u8) -> Option<()> {
+    pub fn province_chosen(&mut self, files: &mut Files, province: u8) -> Option<()> {
         self.province_clicked(province)?;
-        self.province_accepted()
+        self.province_accepted(files)
     }
 
     /// 1194:28F6 and 289B: a province clicked on the map: the race, and
@@ -410,13 +410,15 @@ impl Machine {
     }
 
     /// 1194:28E1: the province accepted: the location the portrait byte
-    /// names built (1194:3AE8; the Imperial City for province 8).
-    pub fn province_accepted(&mut self) -> Option<()> {
+    /// names built (1194:3AE8; the Imperial City for province 8), by 3B84
+    /// in full (`city_location`: its province's data loaded, 3C0D, and the
+    /// climate read from the terrain map, 3D91).
+    pub fn province_accepted(&mut self, files: &mut Files) -> Option<()> {
         let mut id = self.ng8(PLAYER + rec::PORTRAIT) as u16;
         if self.ng8(0x0A22 + 0x24) == 8 {
             id = 0x100;
         }
-        self.city_build_location(DS, 0x0A22, id, 0)
+        self.city_location(files, DS, 0x0A22, id)
     }
 
     /// 1194:2AC7. The attributes rolled: 9686 the points to give (19h),
@@ -626,7 +628,7 @@ impl Machine {
         };
         self.class_chosen(class)?;
         self.name_and_sex(&ch.name, ch.sex);
-        self.province_chosen(ch.province)?;
+        self.province_chosen(files, ch.province)?;
         for _ in 0..=ch.rerolls {
             self.creation_roll(hooks)?;
         }

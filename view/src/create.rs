@@ -790,7 +790,7 @@ impl Creation {
     /// The province accepted (28E1), what the player is told (2902), then
     /// the attributes (2A69).
     fn province_accepted(&mut self, engine: &mut Engine, p: u8) -> Stage {
-        if engine.m.province_accepted().is_none() {
+        if engine.m.province_accepted(&mut engine.files).is_none() {
             eprintln!("the place could not be built");
         }
         let m = &mut engine.m;

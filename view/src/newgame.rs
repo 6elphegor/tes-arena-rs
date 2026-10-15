@@ -65,4 +65,5 @@ pub fn play(engine: &mut Engine) {
     }
     m.game_start();
     m.start_run(&mut arena::transit::NoAreaHooks);
+    crate::areas::new_game_started();
 }

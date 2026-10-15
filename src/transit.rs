@@ -241,6 +241,27 @@ impl Machine {
                 }
             }
         }
+        self.area_next_tail(hooks)
+    }
+
+    /// 0000:0C98..0CA9: after a new game's start dungeon (run straight
+    /// from 0000:0C95, not through 0ED5's switch): with 5E4 bit 0 (set by
+    /// `game_start`) the bit cleared and the next area a city (5E6 0),
+    /// then 0CAD (`area_next`'s tail). The start dungeon's way out (44BD)
+    /// only leaves; this is where its run ends in the town of the
+    /// player's province.
+    pub fn new_game_next(&mut self, hooks: &mut dyn AreaHooks) -> Run {
+        if self.mem.r8(DS, 0x05E4) & 1 != 0 {
+            let v = self.mem.r8(DS, 0x05E4) & 0xFE;
+            self.mem.w8(DS, 0x05E4, v);
+            self.mem.w8(DS, AREA, 0);
+        }
+        self.area_next_tail(hooks)
+    }
+
+    /// 0000:0CAD, the outer loop's common part after an area: see
+    /// `area_next`.
+    fn area_next_tail(&mut self, hooks: &mut dyn AreaHooks) -> Run {
         self.mem.w8(DS, 0x0AB2, 0xFF);
         self.mem.w16(DS, 0xBC8C, 0);
         self.and16(0x05CA, 0xFDFF);
