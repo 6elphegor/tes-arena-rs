@@ -13,8 +13,10 @@ carry of the touch cast. Every routine the check hands over to is a stub
 that logs itself: 2542:000A (options), 056A (spellbook), 037C (status),
 034D (use), 03BF (world map), 045A (automap), 02A3 (logbook), 01E6
 (camp), 29CF:0000 (the touch cast: AX, SI and the drawn carry), 1194:0CF8
-(the sheet) and the drawing around it (0000:9A98, 1194:5F13, 0000:A611,
-A6B5, 2433:0A39, unlogged), 2F26:04E2 (AL) and 03ED.
+(the sheet) and the drawing around it (0000:9A98, 0000:A611, A6B5,
+2433:0A39, unlogged), 2F26:04E2 (AL) and 03ED. 1194:5F13 before the sheet
+runs, the planes it reads ([D806], [CCD0]) at the zeroed segments 7000h
+and 8000h.
 
   menukeys | seed | result
 
@@ -58,6 +60,8 @@ def setup(seed):
         dl = [1] * (1 + byte() % 3)
     dl.append(0)
     carry = byte() < 0x80
+    w.append((0xD806, pk(0x7000)))
+    w.append((0xCCD0, pk(0x8000)))
     return w, masks, dl, carry
 
 
@@ -66,7 +70,7 @@ STUBS = [
     ('options', 0x2542, 0x000A, False), ('spellbook', 0x2542, 0x056A, False), ('status', 0x2542, 0x037C, False),
     ('use', 0x2542, 0x034D, False), ('worldmap', 0x2542, 0x03BF, False), ('automap', 0x2542, 0x045A, False),
     ('log', 0x2542, 0x02A3, False), ('camp', 0x2542, 0x01E6, False), ('cast', 0x29CF, 0x0000, True),
-    ('sheet', 0x1194, 0x0CF8, True), ('fill', 0, 0x9A98, True), ('draw', 0x1194, 0x5F13, True),
+    ('sheet', 0x1194, 0x0CF8, True), ('fill', 0, 0x9A98, True),
     ('a611', 0, 0xA611, True), ('a6b5', 0, 0xA6B5, True), ('a39', 0x2433, 0x0A39, True),
     ('cyber', 0x2F26, 0x04E2, True), ('buttons', 0x2F26, 0x03ED, True),
 ]

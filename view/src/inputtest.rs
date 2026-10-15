@@ -423,6 +423,54 @@ fn f5_saves_and_f9_loads_back() {
 }
 
 #[test]
+fn the_drop_button_asks_and_refuses_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    panels::give(&mut a.engine.m, 6);
+    let mut d = Driver::new(&mut a);
+    let asking = |app: &App| match &app.panel {
+        Some(panels::Panel::Inventory(inv)) => inv.asking.as_ref().map(|(t, _)| String::from_utf8_lossy(t).into_owned()),
+        _ => None,
+    };
+    let items = |app: &App| panels::item_lines(&app.engine.m).len();
+    d.key(&mut a, KeyCode::KeyI, None);
+    // I checks where the player stands as the portrait does (1194:5F13):
+    // the start's square has room and keeps what is dropped.
+    assert_eq!(a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x20, 0, "room here");
+    // Nothing selected: "Drop what?".
+    d.key(&mut a, KeyCode::KeyD, None);
+    assert!(a.boxes.iter().any(|b| text(b).contains("Drop what?")), "nothing selected");
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    // The first item selected: D asks by its name; N keeps it.
+    panels::select_line(&mut a.engine.m, 0);
+    let n = items(&a);
+    d.key(&mut a, KeyCode::KeyD, None);
+    let q = asking(&a).expect("D asks");
+    assert!(q.starts_with("Do you wish to drop"), "{q:?}");
+    d.key(&mut a, KeyCode::KeyN, None);
+    assert!(asking(&a).is_none() && items(&a) == n, "no keeps it");
+    // Y drops it.
+    d.key(&mut a, KeyCode::KeyD, None);
+    d.key(&mut a, KeyCode::KeyY, None);
+    assert_eq!(items(&a), n - 1, "yes drops it");
+    // Where it would be lost (12D0), the question says so.
+    panels::select_line(&mut a.engine.m, 0);
+    a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 1);
+    d.key(&mut a, KeyCode::KeyD, None);
+    assert!(asking(&a).expect("asks").starts_with("This item will be lost here."), "lost");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert_eq!(items(&a), n - 1, "Esc answers no");
+    // No room (5E0 bit 20h): refused.
+    let f = a.engine.m.mem.r16(arena::mem::DS, 0x05E0) | 0x20;
+    a.engine.m.mem.w16(arena::mem::DS, 0x05E0, f);
+    d.key(&mut a, KeyCode::KeyD, None);
+    assert!(a.boxes.iter().any(|b| text(b).contains("There is no room to drop this here.")), "no room");
+    assert_eq!(items(&a), n - 1);
+}
+
+#[test]
 fn inventory_by_i_and_a_click_equips_as_panels_do() {
     let Some(dir) = game_dir() else { return };
     let setup = |app: &mut App| panels::give(&mut app.engine.m, 6);

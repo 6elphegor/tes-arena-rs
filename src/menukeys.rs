@@ -177,11 +177,16 @@ impl Machine {
 
     /// 2542:00BE (F1, the bar's portrait): a touch spell waiting is cast
     /// on the player; with none, the character sheet if the player has a
-    /// name.
+    /// name, where the player stands checked first for its equipment
+    /// page's drop button (00E5: 1194:5F13, `drop_place`).
     pub fn portrait(&mut self, files: &mut Files, hooks: &mut dyn MenuKeyHooks) -> Option<MenuKey> {
         if hooks.touch_cast(self, files)? {
             return Some(MenuKey::TouchCast);
         }
-        Some(if self.mem.r8(DS, var::NAME) != 0 { MenuKey::Sheet } else { MenuKey::None })
+        if self.mem.r8(DS, var::NAME) == 0 {
+            return Some(MenuKey::None);
+        }
+        self.drop_place();
+        Some(MenuKey::Sheet)
     }
 }
