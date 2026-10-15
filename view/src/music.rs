@@ -265,10 +265,11 @@ impl Fm {
     }
 
     /// A song started as the game starts one (2F9F:001F), at the music
-    /// volume (D3A), the one before stopped and released.
+    /// volume (D3A). The game stops a song first (2F9F:0438) but for an
+    /// interior's on a load; one still playing is overwritten in the
+    /// driver's one state block, which both handles then serve (the new
+    /// song at twice its speed), as the original does.
     pub fn play(&mut self, xmi: Vec<u8>, volume: u8) {
-        self.driver.stop_sequence();
-        self.driver.release_sequence();
         self.driver.play(xmi, &self.gtl, volume);
         self.flush();
     }
@@ -502,11 +503,14 @@ fn open(archive: &Archive) -> (Option<Sender<Cmd>>, Arc<AtomicU8>) {
     }
 }
 
+/// A song to start after a fade: its file and the music volume.
+type Next = (Vec<u8>, u8);
+
 fn run(pulse: crate::audio::Pulse, mut fm: Fm, rx: Receiver<Cmd>, status: Arc<AtomicU8>) {
     const CHUNK: usize = 512;
     let mut frac = 0u32;
     // The fade's samples left (800 ms at the stop), and the song after it.
-    let mut fade: Option<(usize, Option<(Vec<u8>, u8)>)> = None;
+    let mut fade: Option<(usize, Option<Next>)> = None;
     const FADE: usize = (RATE as usize) * 8 / 10;
     let mut buf = vec![0i16; CHUNK * 2];
     loop {

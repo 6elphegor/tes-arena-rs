@@ -8,9 +8,11 @@
 //! the timbre cache's directory), and that state starts as the file has
 //! it, so `Driver` holds the driver file's image (read from the game's
 //! directory, never shipped) and the routines below address it as the
-//! original does (the constants are its offsets). The sequence's state,
-//! which the original keeps in the game's memory, is `Seq`. Addresses in
-//! comments are the driver file's (its code segment's) offsets.
+//! original does (the constants are its offsets). A sequence's state,
+//! which the original keeps in the game's memory, is a `Seq`, in one of
+//! the driver's eight handles; the game works on the last it registered.
+//! Addresses in comments are the driver file's (its code segment's)
+//! offsets.
 //!
 //! The writes are the card's: a register written to both chips (left at
 //! 220h/221h, right at 222h/223h) with the same value, except the
@@ -24,7 +26,10 @@
 //! registered, the timbres it lists installed from SAMPLE.AD, controller
 //! 7 at 127 on channels 1..16, the sequence started and its volume set to
 //! the music volume (D3A). Stopping (2F9F:0438) ramps the volume to 0 over
-//! 800 ms, then stops and releases the sequence (`Driver::stop`).
+//! 800 ms, then stops and releases the sequence (`set_volume`,
+//! `stop_sequence`, `release_sequence`). The timbres stay in the cache
+//! from song to song (Arena's 33 songs use 54, well within it: the
+//! eviction, ported, never runs).
 //!
 //! Not ported: the beat and bar counters (AIL's queries only; the tempo
 //! meta event and the time signature feed nothing else), the trigger
@@ -325,12 +330,20 @@ pub fn gtl_timbre(gtl: &[u8], bank: u8, patch: u8) -> Option<Vec<u8>> {
     }
 }
 
-/// The driver: its image (state), the timbre cache, the sequence, and the
-/// writes not yet taken.
+/// Sequence handles (the driver's table at 24D9).
+const HANDLES: usize = 8;
+
+/// The driver: its image (state), the timbre cache, the sequence state
+/// block (the game has one, EB85, which every song it registers uses),
+/// the handles registered on it, the one being served (24FB), the game's
+/// (EB00: the last registered), and the writes not yet taken.
 pub struct Driver {
     m: Vec<u8>,
     cache: Vec<u8>,
     seq: Option<Seq>,
+    handles: [bool; HANDLES],
+    cur: usize,
+    game: Option<usize>,
     pub writes: Vec<Write>,
 }
 
@@ -351,6 +364,20 @@ impl Driver {
         self.seq.as_mut().unwrap()
     }
 
+    /// The game's handle made the current one; false when it has none
+    /// (a registration failed: the game's calls then do nothing). A
+    /// released handle still names the state block, as the game's calls
+    /// after a release read it.
+    fn game_seq(&mut self) -> bool {
+        match self.game {
+            Some(h) if self.seq.is_some() => {
+                self.cur = h;
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// The driver loaded and initialised (AIL's load, then 31D2): the
     /// chips' registers written from its table, its tables cleared, the
     /// controllers, bends and programs of channels 1..9 set to its
@@ -359,7 +386,7 @@ impl Driver {
         if image.len() < 0x3B00 {
             return None;
         }
-        let mut d = Driver { m: image.to_vec(), cache: vec![0; CACHE], seq: None, writes: Vec::new() };
+        let mut d = Driver { m: image.to_vec(), cache: vec![0; CACHE], seq: None, handles: [false; HANDLES], cur: 0, game: None, writes: Vec::new() };
         d.m[0x2505..0x2505 + 0xC0].fill(0xFF);
         d.m[CTRL_ROW..CTRL_ROW + 0x100].fill(0xFF);
         d.m[0x25D5..0x25E5].fill(0);
@@ -652,7 +679,7 @@ impl Driver {
             count += 1;
             let ch = (self.b(S_CH + s) & 0xF) as usize;
             let p = if (self.b(C_PRIORITY + ch) as i8) >= 0x40 { 0xFFFF } else { self.w(S_PRIORITY + 2 * s) };
-            let p = p.checked_sub(self.b(C_VOICES + ch) as u16).unwrap_or(0);
+            let p = p.saturating_sub(self.b(C_VOICES + ch) as u16);
             self.sw(S_RANK + 2 * s, p);
         }
         let (mut waiting, mut lowest) = (0, 0);
@@ -884,7 +911,7 @@ impl Driver {
     /// The first timbre the sequence lists that isn't installed, as
     /// bank << 8 | patch, FFFFh none (159A).
     pub fn timbre_request(&self) -> u16 {
-        let Some(q) = &self.seq else { return 0xFFFF };
+        let Some(q) = self.game.and(self.seq.as_ref()) else { return 0xFFFF };
         let Some(t) = q.timb else { return 0xFFFF };
         let n = u16::from_le_bytes([q.byte(t + 8), q.byte(t + 9)]) as usize;
         for k in 0..n {
@@ -1005,11 +1032,21 @@ impl Driver {
 
     // The XMIDI layer.
 
-    /// A sequence registered (33F0): the file's `n`th sequence, its TIMB
-    /// and EVNT chunks found. False when the file holds none.
+    /// A sequence registered (33F0) in the first free handle, the game's
+    /// from now on: the file's `n`th sequence, its TIMB and EVNT chunks
+    /// found, in the state block (whatever it held: a song still playing
+    /// there is overwritten, its queued notes never ended, and its handle
+    /// serves the new song too). False when the file holds none or no
+    /// handle is free (the game's handle is then FFFFh: none).
     pub fn register(&mut self, xmi: Vec<u8>, n: usize) -> bool {
+        self.game = None;
+        let Some(h) = self.handles.iter().position(|&r| !r) else { return false };
         let Some(form) = find_sequence(&xmi, n) else { return false };
-        let mut q = Seq::new(xmi);
+        // The fields 33F0 and 2711 don't set (the ramps') carry over.
+        let mut q = match self.seq.take() {
+            Some(old) => Seq { xmi, timb: None, ..old },
+            None => Seq::new(xmi),
+        };
         let mut at = form;
         let mut len = 12;
         let evnt = loop {
@@ -1026,19 +1063,26 @@ impl Driver {
             }
         };
         q.evnt = evnt;
+        q.state = 0;
+        q.started = false;
+        q.release = false;
         q.reset();
         self.seq = Some(q);
+        self.handles[h] = true;
+        self.game = Some(h);
+        self.cur = h;
         true
     }
 
-    /// The sequence's state: 0 stopped, 1 playing, 2 done (36AE).
+    /// The game's sequence's state: 0 stopped (or none), 1 playing, 2
+    /// done (36AE).
     pub fn status(&self) -> u16 {
-        self.seq.as_ref().map_or(0, |q| q.state)
+        self.game.and(self.seq.as_ref()).map_or(0, |q| q.state)
     }
 
-    /// Played from the start (357A).
+    /// The game's sequence played from the start (357A).
     pub fn start(&mut self) {
-        if self.seq.is_none() {
+        if !self.game_seq() {
             return;
         }
         if self.q().state == 1 {
@@ -1051,9 +1095,10 @@ impl Driver {
         q.started = true;
     }
 
-    /// Stopped (360F): its queued notes ended, its locks and holds undone.
+    /// The game's sequence stopped (360F): its queued notes ended, its
+    /// locks and holds undone.
     pub fn stop_sequence(&mut self) {
-        if self.seq.as_ref().is_none_or(|q| q.state != 1) {
+        if !self.game_seq() || !self.handles[self.cur] || self.q().state != 1 {
             return;
         }
         for i in 0..32 {
@@ -1072,17 +1117,25 @@ impl Driver {
         self.q().state = 0;
     }
 
-    /// Released (3536): gone, or at its end when it's playing.
+    /// The game's sequence released (3536): its handle freed, or at its
+    /// end when it's playing.
     pub fn release_sequence(&mut self) {
-        match &mut self.seq {
-            Some(q) if q.state == 1 => q.release = true,
-            _ => self.seq = None,
+        if !self.game_seq() {
+            return;
+        }
+        if !self.handles[self.cur] {
+            return;
+        }
+        if self.q().state == 1 {
+            self.q().release = true;
+        } else {
+            self.handles[self.cur] = false;
         }
     }
 
-    /// The sequence's volume (38ED): at once, or ramped over `ms`.
+    /// The game's sequence's volume (38ED): at once, or ramped over `ms`.
     pub fn set_volume(&mut self, volume: u16, ms: u16) {
-        if self.seq.is_none() {
+        if !self.game_seq() {
             return;
         }
         let q = self.q();
@@ -1103,7 +1156,7 @@ impl Driver {
 
     /// A controller set through AIL (39AD), channel 1..16.
     pub fn set_controller(&mut self, ch: u8, c: u8, v: u8) {
-        if self.seq.is_some() {
+        if self.game_seq() {
             self.controller(ch.wrapping_sub(1), c, v);
         }
     }
@@ -1149,11 +1202,17 @@ impl Driver {
         }
     }
 
-    /// 27BB: the channel's queued notes ended now.
+    /// 27BB: the channel's queued notes ended now, in every registered
+    /// sequence (all the one state block).
     fn flush_channel(&mut self, ch: u8) {
-        if self.q().pending == 0 {
-            return;
+        for h in 0..HANDLES {
+            if self.handles[h] && self.q().pending != 0 {
+                self.flush_queue(ch);
+            }
         }
+    }
+
+    fn flush_queue(&mut self, ch: u8) {
         for i in 0..32 {
             if self.q().q_ch[i] != ch {
                 continue;
@@ -1310,9 +1369,15 @@ impl Driver {
     /// ticks due run (each ending the queued notes whose time is up, then
     /// reading the events due), then the tempo and volume ramps step.
     pub fn serve(&mut self) {
-        if self.seq.as_ref().is_none_or(|q| q.state != 1) {
-            return;
+        for h in 0..HANDLES {
+            if self.handles[h] && self.seq.as_ref().is_some_and(|q| q.state == 1) {
+                self.cur = h;
+                self.serve_sequence();
+            }
         }
+    }
+
+    fn serve_sequence(&mut self) {
         let q = self.q();
         q.tempo_acc = q.tempo_acc.wrapping_add(q.tempo);
         loop {
@@ -1328,8 +1393,8 @@ impl Driver {
             q.delta = q.delta.wrapping_sub(1);
             if q.delta <= 0 && !self.events() {
                 // Ended: released now if that was asked while it played.
-                if self.seq.as_ref().is_some_and(|q| q.release) {
-                    self.seq = None;
+                if self.q().release {
+                    self.handles[self.cur] = false;
                 }
                 return;
             }
@@ -1549,10 +1614,11 @@ fn step(cur: u16, to: u16, n: u16) -> u16 {
 
 /// A change of song in `opl_stream`: the next song's file, the service
 /// the fade starts after and the one the stop and the next start come
-/// after.
+/// after; without a fade the next starts with the first playing on.
+#[cfg(test)]
 pub struct Then<'a> {
     pub xmi: &'a [u8],
-    pub fade: u32,
+    pub fade: Option<u32>,
     pub stop: u32,
 }
 
@@ -1562,6 +1628,7 @@ pub struct Then<'a> {
 /// With `then`, the song changes as the game changes songs (2F9F:0438:
 /// the volume ramped to 0 over 800 ms, the sequence stopped and
 /// released; then 001F).
+#[cfg(test)]
 pub fn opl_stream(image: &[u8], gtl: &[u8], xmi: &[u8], volume: u8, services: u32, then: Option<Then>) -> Vec<(u32, Write)> {
     let Some(mut d) = Driver::new(image) else { return Vec::new() };
     d.take();
@@ -1569,12 +1636,14 @@ pub fn opl_stream(image: &[u8], gtl: &[u8], xmi: &[u8], volume: u8, services: u3
     d.play(xmi.to_vec(), gtl, volume);
     for s in 0..services {
         if let Some(t) = &then {
-            if s == t.fade {
+            if Some(s) == t.fade {
                 d.set_volume(0, 800);
             }
             if s == t.stop {
-                d.stop_sequence();
-                d.release_sequence();
+                if t.fade.is_some() {
+                    d.stop_sequence();
+                    d.release_sequence();
+                }
                 d.play(t.xmi.to_vec(), gtl, volume);
             }
         }
@@ -1620,7 +1689,7 @@ mod tests {
             let xmi = a.read(song).unwrap_or_else(|| panic!("{song}"));
             let next: Vec<&str> = f[5].split('@').collect();
             let next_xmi = (next.len() == 3).then(|| a.read(next[0]).unwrap_or_else(|| panic!("{}", next[0])));
-            let then = next_xmi.as_deref().map(|x| Then { xmi: x, fade: next[1].parse().unwrap(), stop: next[2].parse().unwrap() });
+            let then = next_xmi.as_deref().map(|x| Then { xmi: x, fade: next[1].parse().ok(), stop: next[2].parse().unwrap() });
             let stream = opl_stream(&image, &gtl, &xmi, volume, services, then);
             if let Ok(d) = std::env::var("FMDRV_DUMP") {
                 let text: String = stream.iter().map(|&(s, (c, r, v))| format!("{s} {c} {r:02x} {v:02x}\n")).collect();

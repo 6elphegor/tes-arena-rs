@@ -18,6 +18,9 @@ A case may change songs as the game does (2F9F:0438, then 001F): at
 service FADE the volume ramps to 0 over 800 ms (AIL 0FFD:0DE8), at STOP
 the sequence is stopped (0DCA) and released (0D94) and the next song
 started; the driver (its timbre cache, voices and channels) carries on.
+Without FADE ("-") the next song is started at STOP with the first
+still playing (001F alone, as on loading into an interior): the driver
+then plays both.
 
 Every write to the Sound Blaster Pro's FM ports is recorded with the
 number of driver services so far (0 for the writes made while the
@@ -31,7 +34,7 @@ only digests (FNV-1a) of the stream, one per window of WINDOW services,
 so the test can name the first window that differs.
 
 Lines: song volume services window count then | digest digest ...
-with `then` "-" or NEXT@FADE@STOP.
+with `then` "-" or NEXT@FADE@STOP (FADE "-" for none).
 DUMP_DIR, if given, receives each case's whole stream as text
 (service chip reg value, hex) for debugging; never commit those.
 """
@@ -62,6 +65,7 @@ CASES = [(f'{s}.XFM', 100, 1200, None) for s in SONGS] + [
     ('DUNGEON2.XFM', 90, 12000, None), ('CREDITS.XFM', 100, 12000, None), ('EVIL.XFM', 100, 12000, None),
     ('CITY.XFM', 100, 2400, ('NIGHT.XFM', 300, 400)), ('COMBAT.XFM', 80, 2400, ('DUNGEON3.XFM', 900, 1000)),
     ('TAVERN.XFM', 100, 3000, ('EQUIPMNT.XFM', 1100, 1140)), ('SNEAKING.XFM', 127, 2400, ('SNEAKING.XFM', 500, 600)),
+    ('PALACE.XFM', 100, 2400, ('TEMPLE.XFM', None, 300)), ('CITY.XFM', 100, 1800, ('CITY.XFM', None, 200)),
 ]
 CHIP = {0x220: 0, 0x221: 0, 0x222: 1, 0x223: 1, 0x228: 2, 0x229: 2, 0x388: 3, 0x389: 3}
 NAME = 0x8000  # a free paragraph for the far file names
@@ -139,13 +143,15 @@ def play(song, volume, services, then):
     def served(uc, addr, size, ud):
         card.service += 1
     a.mu.hook_add(UC_HOOK_CODE, served, None, SERVE, SERVE)
+    faded = then and then[1] is None
     while card.service < services:
-        if then and card.service == then[1]:
+        if then and not faded and card.service == then[1]:
             ail(a, 0x0DE8, 0, 800)  # the volume to 0 over 800 ms
-            then = (then[0], None, then[2])
+            faded = True
         if then and card.service == then[2]:
-            ail(a, 0x0DCA)  # stopped
-            ail(a, 0x0D94)  # released
+            if then[1] is not None:
+                ail(a, 0x0DCA)  # stopped
+                ail(a, 0x0D94)  # released
             start(a, then[0])
             then = None
         a._setup([0, STUB_SEG, 0x202], {})  # IRET frame: ip, cs, flags
@@ -168,7 +174,7 @@ def main():
         if not mine(n, total):
             continue
         writes = play(song, volume, services, then)
-        after = '%s@%d@%d' % then if then else '-'
+        after = '%s@%s@%d' % (then[0], '-' if then[1] is None else then[1], then[2]) if then else '-'
         if DUMP:
             with open(os.path.join(DUMP, f'{song}.{volume}.{services}.{after}.txt'), 'w') as d:
                 for w in writes:
