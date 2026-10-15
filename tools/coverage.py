@@ -130,8 +130,10 @@ DATA = 0x3276
 def load_triage():
     """tools/triage.tsv: `SEG:OFF<TAB>kind<TAB>what it is`, the routines read
     by hand. Kinds: trivial (nothing to port: an empty routine, a bare
-    return), presentation, driver, hardware, I/O, input (the front end's),
-    game (state still to port, or ported inline: the note says where)."""
+    return) and inline (ported inside its caller's port, which the note
+    names), both counted as ported; presentation, driver, hardware, I/O,
+    input (the front end's); artefact (bytes the graph decoded as a
+    routine that is not one); game (state still to port)."""
     out = {}
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'triage.tsv')
     if not os.path.exists(path):
@@ -625,7 +627,12 @@ def main():
     # Hand verdicts (tools/triage.tsv): a routine read and found trivial
     # (counted as ported: there is nothing to port) or the front end's.
     for e, (kind, _) in TRIAGE.items():
-        if e in g.entries and e not in status and kind == 'trivial':
+        if e in g.entries and e not in status and kind in ('trivial', 'inline'):
+            status[e] = 'ported'
+    # NOTES' hand verdicts "[game ...; ported inline: ...]" count likewise.
+    for k, v in NOTES.items():
+        e = tuple(int(x, 16) for x in k.split(':'))
+        if e in g.entries and e not in status and 'ported inline' in v:
             status[e] = 'ported'
 
     size = {e: sum(i.size for i in g.bodies[e].values()) for e in g.entries}
@@ -640,6 +647,14 @@ def main():
         kind = TRIAGE.get(e, (None,))[0]
         if kind in ('presentation', 'driver', 'hardware', 'I/O', 'input'):
             cls[e] = [kind + ' (read)']
+        elif kind == 'artefact':
+            cls[e] = ['decode artefact']
+        else:
+            # NOTES' tags other than game ones ([UI], [drawing], ...).
+            v = NOTES.get(f'{e[0]:04X}:{e[1]:04X}', '')
+            m = re.search(r'\[([^\]]+)\]$', v) or (re.fullmatch(r'renderer.*', v) and re.match(r'(renderer)', v))
+            if v and m and not m.group(1).startswith('game'):
+                cls[e] = [m.group(1).rstrip('?') + ' (read)']
     for e in rest:
         # A thunk to front-end code is front-end code.
         t = thunks.get(e)

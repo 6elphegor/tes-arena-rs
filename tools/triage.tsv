@@ -1,0 +1,290 @@
+# Hand verdicts for tools/coverage.py: SEG:OFF<TAB>kind<TAB>what it is.
+# Kinds: trivial, presentation, driver, hardware, I/O, input, game.
+0FFD:03FD	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0452	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0480	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:053C	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0574	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0690	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:06D5	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:06DF	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:06F4	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:06FE	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0821	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:087B	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0886	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0924	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:092F	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:095C	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0967	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:097B	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0985	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:09A2	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0A11	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0A5B	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0A66	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0A9C	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0AF7	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0B8E	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0C1D	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0C43	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0C49	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0CF0	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0CFB	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D46	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D4C	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D52	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D58	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D5E	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D70	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D88	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D8E	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D94	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0D9A	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DA0	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DA6	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DAC	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DC4	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DCA	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DD6	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0DE8	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+0FFD:0E0C	driver	the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls)
+2F26:0026	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:003E	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:006F	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:008D	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:01BB	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:01C9	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:03ED	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+2F26:04E2	hardware	the Logitech CyberMan 3D controller's driver (segment 2F26)
+0000:0B89	I/O	the light table's file (NORMAL.LGT, si 1A6D) loaded to 3AAC:0240 (LightHooks::lgt)
+0000:0BFF	inline	the sort's compare-and-exchange step (talk.rs sort, 0000:0B9C/0BC6)
+0000:0C17	inline	the sort's exchange of two entries and their index bytes at 1044 (talk.rs sort, 0000:0B9C)
+0000:0C36	inline	the sort's set-up: the index bytes at 1044 and the string offsets (talk.rs sort, 0000:0B9C)
+0000:1393	presentation	an image loaded and drawn full screen, then shown
+0000:13ED	input	the key buffer emptied, then a wait for the keys to be released
+0000:1600	inline	the clock's call of a changed field's handler, registers kept (clock.rs, 0000:1570)
+0000:248C	inline	a helper of 0000:2373: a square's offset in the floor plane (D806)
+0000:2542	inline	the game's distance (larger axis plus a quarter of the smaller) against a quarter of the reach (0000:24BE)
+0000:31F3	inline	the automap's seen byte for a square (automap.rs, 0000:303C)
+0000:3F3B	inline	the guards' arrival: their sound, message and spawn (weapon.rs guards countdown, 0000:3EFA)
+0000:3FC5	inline	a step of 0000:3F7E (its caller's port)
+0000:3FD6	inline	a step of 0000:3F7E (its caller's port)
+0000:418C	inline	the music stopped (2F9F:0438) as 0000:4118 does (trigger.rs)
+0000:4D2F	presentation	the keys held drawn on the bar (key icons from the image at [43D4])
+0000:4DD5	trivial	a bare return
+0000:51D3	I/O	a far C-style wrapper of the heap allocator 0000:51EC
+0000:52F6	inline	the signed decimal parse of 0000:52BA/52F2 (info.rs info_atoi)
+0000:5368	presentation	a text centred (its width 66F6, drawn 9E0A)
+0000:5656	presentation	a frame of a DFA/CIF image found
+0000:5998	presentation	a far entry of the window blit 0000:59A4
+0000:599C	presentation	a far entry of the window blit 0000:59A4
+0000:59A4	presentation	a rectangle blitted to the screen buffer (A900)
+0000:59B5	presentation	a rectangle blitted to the screen buffer (A900)
+0000:5B04	presentation	a far entry of the transparent blit 0000:5B08
+0000:5B08	presentation	an image blitted with colour 0 transparent (A900)
+0000:5B3C	presentation	a far entry of the run-length blit 0000:5B65
+0000:5B65	presentation	a run-length coded image drawn
+0000:6ABA	inline	GLOBAL.BSA's directory cache marked stale (9192 FFFFh) by the INF loader (info.rs)
+0000:6B98	presentation	a delay of CX timer steps, far C-style (music driver's)
+0000:6BE2	presentation	a delay loop of timer steps
+0000:6D76	inline	the formatter's fraction digits (format.rs, 0000:8D6E %f)
+0000:6EEE	inline	a roll in a range: 6EA8's random number reduced (random.rs)
+0000:7086	inline	the formatter's hexadecimal digits (format.rs, 0000:8D6E %x)
+0000:7112	input	the keyboard buffer emptied
+0000:7138	input	a far entry of the keyboard read 0000:713C
+0000:713C	input	a key read from the buffer if one is waiting
+0000:7306	input	a key read from the keyboard buffer (AC4A..ACB0)
+0000:7412	I/O	a far C-style wrapper of the file loader 0000:742C (the music driver's)
+0000:7504	I/O	a far entry of 0000:7508
+0000:7508	I/O	a resource file loaded into a free handle slot of the table at 91AC
+0000:75F6	inline	the formatter's signed long (format.rs, 0000:8D6E %ld)
+0000:77CC	presentation	a byte fill (the screen cleared, a colour run)
+0000:78A0	presentation	the renderer's drawing routine patched (self-modifying jump at 789E)
+0000:8755	presentation	the renderer's polygon clipped against the view (AF74..AF7A)
+0000:8839	presentation	the renderer's polygon clip: an edge's intersection
+0000:8950	presentation	the renderer's outcode of a point against the view
+0000:89CE	presentation	the renderer's polygon fill: the left edge walk
+0000:8A60	presentation	the renderer's polygon fill: the right edge walk
+0000:8AF2	presentation	the renderer's polygon fill
+0000:930A	I/O	a far entry of 0000:930E
+0000:930E	I/O	a resource's handle slot (table 91AC) freed with its block
+0000:932A	I/O	a resource slot freed (count 91BC)
+0000:933C	presentation	a far entry of 0000:9340
+0000:9340	presentation	a window's saved background put back
+0000:9370	presentation	a far entry of 0000:9374
+0000:9374	presentation	a text drawn right-aligned
+0000:942A	presentation	the screen buffer cleared
+0000:953E	presentation	the renderer's drawing routine patched (self-modifying jump at 789E)
+0000:9B4E	presentation	a far entry of the palette setter 0000:9B56
+0000:9BBA	driver	a far C-style wrapper of a string copy (the music driver's)
+0000:9C8C	driver	a far C-style wrapper of a string routine (the music driver's)
+0000:9CC6	driver	a far C-style wrapper (the music driver's)
+0000:9D64	hardware	the BIOS timer read (0:046C), Machine::bios_ticks in the port
+0000:9D88	presentation	an image's colours remapped in a square of the screen buffer
+0000:A561	presentation	the renderer's buffers allocated (CD86, CD82, CD7E) and its tables made
+0000:A7A0	I/O	a screen image loaded into the screen buffer (A8FE)
+0000:AA5D	trivial	a bare return
+0000:AB2A	presentation	the renderer's light table (CCC2) freed
+0000:B15B	presentation	a texture copied, turned, for the renderer
+0000:B2A7	presentation	the renderer's object list: an entry filed
+0000:B327	presentation	the renderer's object list's pool stepped
+0000:B5A5	presentation	the renderer's quads' outcodes against the view
+0000:B7A9	presentation	the renderer's lights behind the wall drawn (the view's shader does it)
+0000:B8CB	artefact	the inside of a renderer's span loop, decoded from the middle
+0000:C032	presentation	the renderer's objects in a column filed
+0000:C0CE	presentation	the renderer's object list searched
+0000:C3AA	artefact	data in the hooks' table decoded as code
+0000:CBFF	presentation	an object's corners for the renderer's lists
+0000:CD2C	artefact	the renderer's code decoded from the middle of an instruction
+0000:CD30	presentation	the renderer: a square's flats placed (CF96)
+0000:CD44	artefact	the renderer's code decoded from the middle of an instruction
+0000:CD50	artefact	the renderer's wall walk decoded from the middle of an instruction
+0000:CD54	artefact	the renderer's wall walk decoded from the middle of an instruction
+0000:CD6C	presentation	the renderer's wall walk (door walls, CCF8 sides)
+0000:CF96	presentation	the renderer: a square's map flat placed (CFBA)
+0000:D27A	presentation	the renderer: a wall's span set up
+0000:D344	presentation	the renderer: a door's opening turned (93BC)
+0000:DD85	presentation	the renderer: sprite light rows from the lights
+0000:DDAA	presentation	the renderer: a light's row at a point
+0000:DE1F	presentation	the renderer's code tables generated
+0000:E1A2	presentation	the rain's drops drawn
+0000:F21B	inline	an INF line's number read (info.rs, the INF loader 0000:ED0D)
+0000:F259	inline	an INF line's name copied (info.rs, the INF loader)
+0000:FB21	inline	the physics' height step clamp (movement.rs, 0000:F9C4)
+0000:FED2	inline	the EMS bank table copied to 8FAA (skyobj.rs, 0000:FECE)
+1194:0000	artefact	the bytes before the segment's first routine, decoded from a near call to 0
+1194:00EA	hardware	the CyberMan's buttons read
+1194:0142	hardware	the CyberMan's motion read
+1194:01CB	hardware	the CyberMan's motion scaled
+1194:01E9	hardware	the CyberMan's state read
+1194:0282	presentation	the menu window's frame drawn
+1194:09CB	inline	a person's name's parts picked (names.rs npc_name, 1194:080B)
+1194:121C	inline	the level-up's gains (10A8) added to the attributes (levelup.rs, 1194:1034)
+1194:122F	presentation	the creation screen's window
+1194:12BE	presentation	the character sheet's picture drawn
+1194:12E6	presentation	a value drawn on the character sheet
+1194:12F5	presentation	the character sheet's page drawn
+1194:149D	presentation	the character sheet's picture put back
+1194:1528	presentation	the character sheet's values redrawn
+1194:157E	presentation	the character sheet's values shown
+1194:1988	presentation	the inventory list's lines drawn
+1194:1A4A	presentation	the inventory list scrolled down
+1194:1A94	presentation	the inventory list scrolled up
+1194:1AC6	presentation	the inventory screen's click on the list
+1194:1BCE	presentation	an item's name copied to 1044 for the list
+1194:1C5E	presentation	the inventory list's line under the cursor
+1194:1F56	presentation	the inventory list's count with the quest items
+1194:21C2	presentation	the inventory list's area put back
+1194:2315	presentation	the selected inventory line's slot
+1194:2365	presentation	the inventory and the other list toggled
+1194:28EC	presentation	the window library's state for the creation screen
+1194:2A69	presentation	the creation's attribute screen loop (the rolls and checks are ported: 2AC7, 2CD0, 2D28)
+1194:2A9D	presentation	the creation's attribute screen's picture
+1194:2CC0	presentation	a window closed
+1194:315E	inline	a scaled division of 1194:3332 (its caller's port)
+1194:3280	inline	a step of 1194:31CA (its caller's port)
+1194:3A50	trivial	a bare far return
+1194:423B	inline	a location record's name formatted (city.rs, 1194:3B84)
+1194:48C9	inline	a step of 1194:4892 (its caller's port)
+1194:48DF	presentation	a far entry of 1194:48E9
+1194:4D91	I/O	a far entry of 1194:4F89
+1194:4F89	I/O	a file deleted if it exists
+1194:5557	inline	a roll for 1194:3965 and 53F9 (their ports)
+1194:5634	presentation	a number drawn
+1194:5CD9	presentation	an image drawn from EMS bank [1030]
+1194:5D4F	presentation	the window library's key dispatch
+1194:5D75	presentation	the window library's key case folding
+1194:5D8D	presentation	the window library's click test
+1194:5DE2	input	the window library's input loop
+1194:5E21	input	waiting for the mouse buttons to be released
+1194:5E63	I/O	the screen saved to a file
+1194:5E77	I/O	the screen and its palette loaded from a file
+1194:5F8C	presentation	a window's background saved
+1194:5FC0	presentation	a window drawn and waited on
+1194:6001	input	waiting for a key or a click
+1194:68CB	artefact	data decoded as code (no callers)
+1194:722B	inline	a step of 1194:71F9 (its caller's port)
+1194:736F	inline	a step of 1194:731A (its caller's port)
+1194:7CBA	presentation	an item's description window
+1194:7CF8	presentation	an item's description: its condition and value lines
+1194:7D79	presentation	an item's description: a weapon's lines
+1194:7DE1	presentation	an item's description: an armour's lines
+1194:7E44	presentation	an item's description: its magic
+1194:7EAF	presentation	an item's description: weight and hands
+1194:7F2E	presentation	an item's description: its ratings
+1194:8575	inline	a haggle step: 0FE6 bit 0 and the counter-offer (haggle.rs, 1194:8084)
+1194:8581	inline	a haggle step: the counter-offer (haggle.rs, 1194:8084)
+1194:85CF	inline	a haggle step: the deal (haggle.rs, 1194:8084)
+1194:85D6	inline	a haggle step: the refusal (haggle.rs, 1194:8084)
+1194:8BD8	inline	a step of 1194:8B8D (its caller's port)
+1194:8F7B	inline	a step of the talk's quests (quest.rs, 1194:8F1E)
+1194:943B	inline	a step of the side-quest generator (sidequest.rs, 1194:941F)
+1194:94D2	inline	a step of the side-quest generator (sidequest.rs)
+1194:9683	inline	a step of the side-quest generator (sidequest.rs)
+1194:9815	inline	a roll of the side-quest generator (sidequest.rs)
+1194:98A9	inline	a quest's reward from its level (sidequest.rs)
+1194:98CD	inline	a big quest made (sidequest.rs, 1194:9462)
+1194:9E7F	inline	a roll of the quest generator (sidequest.rs, 1194:9DCF)
+1194:9EAB	inline	a town errand made (sidequest.rs, 1194:9D64)
+1194:9F5C	inline	a quest item's search (quest.rs, 1194:9F04)
+1194:A206	presentation	the inventory list's quest items' names
+1194:A30F	presentation	a quest item's name for the inventory list
+1194:A357	presentation	a quest item's name capitalised for the list
+1194:AA73	inline	a step of 1194:AA07 (its caller's port)
+1194:B7AD	inline	a shop item's material roll (shop.rs, 1194:B848)
+1194:B7C4	inline	a shop item's roll (shop.rs)
+1194:B7D8	inline	a shop item's roll (shop.rs)
+1194:BC8B	inline	the tavern's room: its window, file and haggle (tavern.rs, 1194:B93C)
+1194:BD4C	inline	the tavern's rumours (tavern.rs, 1194:E3F7)
+1194:BFF5	inline	a step of 1194:BEED (tavern.rs)
+1194:C149	inline	a step of 1194:BD51 (tavern.rs)
+1194:C6A3	inline	a step of the store's repairs (store.rs, 1194:C36E)
+1194:C6A7	inline	a step of the store's repairs (store.rs, 1194:C36E)
+1194:CEC8	inline	a step of the main quest's offer (quest.rs, 1194:CE01)
+1194:D2F3	inline	the informant's days left (quest.rs, 1194:D019)
+1194:F0F9	inline	a step of the guild (guild.rs, 1194:F426)
+1194:FB61	inline	a step of the spellmaker's cost (spellmaker.rs, 1194:FB14)
+1194:FB9A	inline	a step of the spellmaker (spellmaker.rs)
+1194:FBDA	inline	the spellmaker's spells file checked (spellmaker.rs, 1194:FA03)
+217B:0248	inline	the wilderness's block copy (wild.rs, 217B:0189)
+222C:001D	trivial	a bare return
+222C:00D2	inline	the class quiz's answer count (newgame.rs, 222C:005B)
+222C:0149	presentation	the class quiz's palette set
+222C:016E	presentation	the class quiz's screen set up (font, sound)
+222C:025A	presentation	the class quiz's scroll screen
+222C:02C0	presentation	the class quiz's screen freed
+222C:034C	presentation	the class quiz's question drawn
+222C:040B	presentation	the class quiz's scroll moved down
+222C:045D	presentation	the class quiz's scroll moved up
+222C:04BC	presentation	the class quiz's scroll redrawn
+222C:04E5	presentation	the class quiz's answers drawn
+222C:0611	presentation	the class quiz's scroll button (down)
+222C:0640	presentation	the class quiz's scroll button (up)
+222C:066F	presentation	a window closed
+23BA:014A	driver	the sound driver's voices set up
+23BA:0183	driver	a sound file loaded for the driver
+23BA:01A4	driver	the sound driver's voices freed
+2433:03D5	inline	a pile's roll (piles.rs, 2433:0000)
+2433:03E1	inline	a pile's roll (piles.rs)
+2433:03ED	inline	a pile's step (piles.rs)
+2433:0555	inline	a pile's gold amount (piles.rs)
+2433:0561	inline	a pile's roll squared (piles.rs)
+2433:0577	inline	a pile's roll (piles.rs, 2433:029F)
+2433:083D	presentation	the inventory list's quest items counted and named
+24FA:0473	inline	a step of people's equipment (loot.rs, 24FA:03AA)
+2686:06D3	inline	a step of the status box (status.rs, 2686:0676)
+26F7:0ABC	inline	the travel map's search by name (mapscreen.rs, 26F7:03A4)
+26F7:0B1B	inline	the search's name copied (mapscreen.rs)
+26F7:0B2E	inline	the search's name compared (mapscreen.rs)
+2826:0DA1	inline	a step of 2826:0D85 (controls.rs)
+292B:0530	presentation	the sky's image drawn
+29CF:0654	inline	a step of the spell's cost (cast.rs, 29CF:060B)
+2AA1:078E	inline	a step of the kill (strike.rs, 2AA1:06F6)
+2B39:17B8	presentation	the rain and snow screen effect
+2CDD:02D5	inline	an effect's damage, the player's death on 0 (spell.rs, 2CDD:029B)
+2CDD:0635	inline	an effect's drain (spell.rs, 2CDD:0604)
+2CDD:0706	inline	the clamp of 2CDD:0658..06CC (spell.rs, 2CDD:0604)
+2CDD:094D	inline	a step of 2CDD:08D9 (spell.rs)
+2EBD:0518	inline	an effect's kill (effects.rs, 2AA1:06A0)
+2F9F:000D	driver	the music driver's call
