@@ -318,7 +318,7 @@ impl Machine {
         self.r_g8(0x05E6) == 4 && self.r_g8(0x0D48) == 4
     }
 
-    /// 1194:4659 (`passed` false) / 452F (true): the hours (HOURS, `%u`)
+    /// 1194:4659 (`passed` false) / 1194:452F (true): the hours (HOURS, `%u`)
     /// formatted with the text `si` into TEXT and drawn. 452F picks the
     /// text itself, "hours passed".
     fn rest_hours_text(&mut self, hooks: &mut dyn RestHooks, si: u16) {

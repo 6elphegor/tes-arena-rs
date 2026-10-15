@@ -190,13 +190,20 @@ impl Machine {
                 self.set_flag(0xC398, 0x80, 0);
                 hooks.leave_interior(self, files)
             }
+            // 0000:4322
             (CITY, 0) => self.building(files, hooks, dl, Some((1, 4)), EQUIPMENT_XMI, 6),
             (CITY, 1) | (WILD, 3) => self.tavern(files, hooks, dl),
+            // 0000:4341
             (CITY, 2) => self.building(files, hooks, dl, Some((1, 1)), MAGIC_XMI, 7),
+            // 0000:4303
             (CITY, 3) | (WILD, 4) => self.building(files, hooks, dl, Some((1, 3)), TEMPLE_XMI, 5),
+            // 0000:42B4
             (CITY, 4..=6) | (WILD, 2) => self.building(files, hooks, dl, None, SNEAKING_XMI, 2),
+            // 0000:42C3
             (CITY, 9) => self.building(files, hooks, dl, None, SNEAKING_XMI, 3),
+            // 0000:4360
             (WILD, 1) => self.building(files, hooks, dl, Some((0, 0xFFFF)), DUNGEON_XMI, 8),
+            // 0000:4374
             (WILD, 5) => self.building(files, hooks, dl, Some((0, 0xFFFF)), DUNGEON_XMI, 0xB),
             (CITY, 7 | 8) => {
                 // 0000:43A0
@@ -213,7 +220,7 @@ impl Machine {
                 Some(())
             }
             (WILD, 8 | 9) => {
-                // 0000:08EC
+                // 0000:4388, calling 0000:08EC
                 hooks.enter_dungeon(self, files)?;
                 self.set_flag(0x05C8, 0x80, 0);
                 self.set_flag(0xC398, 0x80, 0);
@@ -222,6 +229,7 @@ impl Machine {
                 Some(())
             }
             (CITY, 11..=13) => self.palace(files, hooks),
+            // 0000:439F: a bare retf.
             _ => Some(()),
         }
     }

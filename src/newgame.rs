@@ -277,7 +277,7 @@ impl Machine {
         }
     }
 
-    /// 222C:02D4..02DE with 05C9. The question at `es`:`di`: past its
+    /// 222C:02D4..02DE with 222C:05C9. The question at `es`:`di`: past its
     /// colon, its three answers each marked "(Nk)": the kind after the
     /// digit, `v` 0, `l` 2, any other 1, into KINDS; the "(Nk" blanked
     /// (from the parenthesis on, four bytes). The byte five past the
@@ -550,7 +550,7 @@ impl Machine {
         self.quiz_end(files)
     }
 
-    /// `class_quiz`'s start (222C:0000..0008, 0185): the seed kept at
+    /// `class_quiz`'s start (222C:0000..0008, 222C:0185): the seed kept at
     /// 12A8, the counts cleared, QUESTION.TXT loaded into bank 4 (the
     /// frame with EMS off), its far pointer at QUESTIONS.
     pub fn quiz_begin(&mut self, files: &mut Files) -> Option<()> {

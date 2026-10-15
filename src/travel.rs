@@ -84,7 +84,7 @@ impl Machine {
         let (hx, hy) = self.travel_global(files, HERE_X, HERE_Y, HERE_PROVINCE)?;
         let heading = travel_heading(hx, hy, dx, dy);
         self.mem.w16(DS, HEADING, heading);
-        // 2F94: max + min / 4, * 20.
+        // 1194:2F94: max + min / 4, * 20.
         let ax = hx.wrapping_sub(dx);
         let ax = if (ax as i16) < 0 { ax.wrapping_neg() } else { ax };
         let bx = hy.wrapping_sub(dy);
