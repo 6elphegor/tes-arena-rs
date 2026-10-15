@@ -652,6 +652,8 @@ impl Machine {
     fn show_list(&mut self, hooks: &mut dyn TalkHooks, si: u16, cx: u16) -> Option<u16> {
         self.window_free();
         let list = self.g16(LIST);
+        // AX 9h: the list's kind (1194:5734).
+        self.list_kind = 0x9;
         let ax = hooks.list(self, si, cx);
         self.mem.w16(DS, LIST, list);
         self.window_alloc()?;

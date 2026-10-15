@@ -85,6 +85,9 @@ pub struct Talk {
     /// click was asked, and the form open then (DATA:form). Kept when the
     /// turn stops inside the spellmaker.
     pub maker: Option<(Snapshot, Option<u16>)>,
+    /// The text asked for edited in place (0000:9EE9 with the automap's
+    /// notes): the field's screen point and the text there at the start.
+    pub text_at: Option<(i32, i32, String)>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -107,7 +110,7 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
         entries.push(l.swap_remove(0));
     }
     let keys = m.mem.cstr(DS, bx).to_vec();
-    Menu { title, entries, keys, selected: 0, list: false }
+    Menu { title, entries, keys, selected: 0, list: false, kind: 0 }
 }
 
 impl Talk {
@@ -169,7 +172,7 @@ impl Talk {
             entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
-        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true };
+        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
         self.ask(menu)
     }
 

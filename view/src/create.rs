@@ -389,6 +389,15 @@ impl Creation {
         c
     }
 
+    /// The main menu, as the program's outer loop comes back to it after
+    /// the options screen's New (0000:109B with 5CA bit 8000h): no intro.
+    pub fn main_menu(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
+        let mut c = Creation::new(engine, archive, dir, game);
+        c.movie = None;
+        c.stage = Stage::MainMenu;
+        c
+    }
+
     /// A level gained (1194:1034): the attribute screen (1194:122C) over
     /// the state `m` (the attributes in percent), its clicks kept.
     pub fn level_up(m: &mut Machine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {

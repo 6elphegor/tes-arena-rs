@@ -33,10 +33,12 @@
 //! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
 //! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
 //! as the game loads in play (src/load.rs), into whatever area it was
-//! saved in; --load loads it at the start. Shift+F5 and Shift+F9 open the
-//! game's save and load menus on --save-dir (`saveui`: a slot clicked, a
-//! name typed, Enter; Esc or the right button leaves), and the main
-//! menu's Load opens the load menu, loading the title screen's way. While the game waits for an
+//! saved in; --load loads it at the start. Esc opens the game's options
+//! screen (`options`: the volumes, the detail, New, Exit), whose Save and
+//! Load open the game's save and load menus on --save-dir (`saveui`: a
+//! slot clicked, a name typed, Enter; Esc or the right button leaves), and
+//! the main menu's Load opens the load menu, loading the title screen's
+//! way. While the game waits for an
 //! answer no time passes.
 //!
 //! The player's interface is drawn from the game's own graphics as the
@@ -135,6 +137,7 @@ mod playtest;
 mod prof;
 mod questui;
 mod render;
+mod options;
 mod saveui;
 mod sheets;
 mod shopui;
@@ -316,11 +319,17 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
     }
 }
 /// The automap's notes: the text typed through the dialog (into 1044,
-/// at most the place's room), the rest drawn by the screen's own pass.
+/// at most the place's room), edited in place on the map (`Talk::text_at`,
+/// `automap::draw_field`), the rest drawn by the screen's own pass.
 impl arena::mapnotes::NoteHooks for Front<'_> {
-    fn type_text(&mut self, m: &mut arena::machine::Machine, _x: u16, _y: u16, _cursor: u16, max: u16) {
+    fn type_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, _cursor: u16, max: u16) {
         if let Some(t) = self.talk.as_deref_mut() {
+            let asked = t.need.is_some();
             t.typed(m, arena::mapnotes::var::TEXT, max as usize, "Your note:");
+            if !asked && t.need.is_some() {
+                let text = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::mapnotes::var::TEXT)).into_owned();
+                t.text_at = Some((x as i16 as i32, y as i16 as i32, text));
+            }
         }
     }
 }
@@ -358,9 +367,15 @@ impl arena::text::TextHooks for Front<'_> {
         Front::menu(self, m, si, bx, di)
     }
 }
-/// Clicking on people and things: the way told is a note; the lists are
-/// left at once.
+/// Clicking on people and things: the way told is a note; the lists
+/// ("Where is", kind 9) asked through `dialog`.
 impl arena::talk::TalkHooks for Front<'_> {
+    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
+        match self.talk.as_deref_mut() {
+            Some(t) => t.list(m, si, cx, ""),
+            None => 0xFFFF,
+        }
+    }
     fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
         let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
         self.note(&s);
@@ -430,7 +445,7 @@ impl arena::rest::RestHooks for Front<'_> {
     }
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim().to_string();
+            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim_start().to_string();
             t.typed(m, arena::rest::var::TYPED, 3, &prompt);
         }
     }
@@ -1231,6 +1246,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         panel: None,
         travel: None,
         saveui: None,
+        options: None,
+        quit: false,
         equip: None,
         map: false,
         creation,
@@ -1609,6 +1626,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 if let Some(t) = &mut st.travel {
                     t.key(&mut engine, code, text);
                 }
+            }
+            if let Some(t) = &mut st.travel {
+                t.skip_journey();
             }
             let mut boxes = Vec::new();
             travel::after(&mut st.travel, &mut engine, &mut boxes);
@@ -2218,6 +2238,9 @@ struct Pending {
     /// The spellmaker's screen behind the question, when the turn stopped
     /// inside it (`Talk::maker`).
     maker: Option<(dialog::Snapshot, Option<u16>)>,
+    /// The text asked for edited in place at this screen point
+    /// (`Talk::text_at`).
+    at: Option<(i32, i32)>,
 }
 
 struct App {
@@ -2287,9 +2310,13 @@ struct App {
     panel: Option<panels::Panel>,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
-    /// The save or load menu up (`saveui`: Shift+F5, Shift+F9, the main
-    /// menu's Load).
+    /// The save or load menu up (`saveui`: the options screen's Save and
+    /// Load, the main menu's Load).
     saveui: Option<saveui::SaveUi>,
+    /// The options screen up (`options`: Esc in play).
+    options: Option<options::OptionsUi>,
+    /// The options screen's Exit confirmed: the program ends.
+    quit: bool,
     equip: Option<Option<interface::Image>>,
     /// Character creation under way (`--create`): its screens instead of
     /// the game, which starts when it ends. Also the main menu after a
@@ -2394,7 +2421,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() {
+        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some() {
             return;
         }
         let k = &self.keys;
@@ -2495,7 +2522,11 @@ impl App {
                 self.creation_engine = Some(e);
             }
             let maker = talk.maker.take();
-            self.pending = Some(Pending { before, input, given, need, maker });
+            let at = talk.text_at.take().map(|(x, y, text)| {
+                self.typed = text;
+                (x, y)
+            });
+            self.pending = Some(Pending { before, input, given, need, maker, at });
             if self.captured {
                 self.release();
             }
@@ -2552,6 +2583,11 @@ impl App {
         } else if let Some(ui) = &self.saveui {
             self.screen.set_palette(self.assets.palette);
             ui.draw(&mut self.screen);
+        } else if let Some(ui) = &self.options {
+            // OP.IMG over what was on the screen (the interface below it).
+            self.screen.set_palette(self.assets.palette);
+            self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+            ui.draw(&mut self.screen, &self.font);
         } else if let Some(c) = &self.creation {
             c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
         } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
@@ -2576,6 +2612,9 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
+                if let Some((x, y)) = self.pending.as_ref().and_then(|p| p.at) {
+                    automap::draw_field(&mut self.screen, x, y, &self.typed);
+                }
             }
         }
         if prof::on() {
@@ -2666,6 +2705,37 @@ impl App {
             }
         }
         self.saveui = None;
+    }
+
+    /// Esc: the options screen opened on the engine (`options`).
+    fn open_options(&mut self) {
+        let (ui, e) = options::OptionsUi::open(&self.engine, &self.assets.archive);
+        self.options = Some(ui);
+        self.options_ended(e);
+    }
+
+    /// What the options screen's last input ended in: still open, or left
+    /// with the engine after it (the volumes and the detail as set); then
+    /// Save and Load open the game's menus, New goes to the main menu (5CA
+    /// bit 8000h: the program's outer loop, 0000:109B, as a game's end
+    /// without its vision), Exit ends the program.
+    fn options_ended(&mut self, e: options::Ended) {
+        let options::Ended::Left(engine, end) = e else { return };
+        self.options = None;
+        self.engine = engine;
+        match end {
+            arena::options::OptionsEnd::Resume => {}
+            arena::options::OptionsEnd::Save => self.open_saveui(saveui::Kind::Save),
+            arena::options::OptionsEnd::Load => self.open_saveui(saveui::Kind::Load),
+            arena::options::OptionsEnd::NewGame => {
+                let archive = self.assets.archive.clone();
+                let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
+                self.engine = world::load(&self.dir, "START.MIF");
+                self.creation = Some(c);
+                self.movie_at = Instant::now();
+            }
+            arena::options::OptionsEnd::Quit => self.quit = true,
+        }
     }
 
     /// F9: the slot's game loaded back (`load_from`).
@@ -2971,6 +3041,7 @@ impl App {
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
                     h.menu = Some(m);
                 }
+                Some(dialog::Need::Text(_)) if self.pending.as_ref().is_some_and(|p| p.at.is_some()) => {}
                 Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).
@@ -3132,6 +3203,22 @@ impl App {
                     }
                 }
             }
+            // The options screen up: its clicks (the left button's) and
+            // "Are you sure ?"'s keys (`options`).
+            In::Button { down: true, button: MouseButton::Left } if self.options.is_some() && self.saveui.is_none() => {
+                let (x, y) = self.screen_point();
+                if let Some(ui) = &mut self.options {
+                    let e = ui.click(x, y, &self.font);
+                    self.options_ended(e);
+                }
+            }
+            In::Key { code, down: true, .. } if self.options.is_some() && self.saveui.is_none() => {
+                if let Some(ui) = &mut self.options {
+                    let e = ui.key(code);
+                    self.options_ended(e);
+                }
+            }
+            In::Button { .. } | In::Key { .. } if self.options.is_some() && self.saveui.is_none() => {}
             // The save or load menu up: its clicks and keys (`saveui`).
             In::Button { down: true, button } if self.saveui.is_some() => {
                 let (x, y) = self.screen_point();
@@ -3273,16 +3360,17 @@ impl App {
                     // The game's debug keys (scan codes 3Ch, 3Dh).
                     KeyCode::F2 => self.engine.m.set_key(0x3C, down),
                     KeyCode::F3 => self.engine.m.set_key(0x3D, down),
-                    // Shift: the game's save and load menus (the original
-                    // reaches them through its Esc screen's buttons,
-                    // 2542:0617 and 061E, not ported); alone the quick
-                    // save and load of slot --slot.
-                    KeyCode::F5 if down && k.run => self.open_saveui(saveui::Kind::Save),
-                    KeyCode::F9 if down && k.run => self.open_saveui(saveui::Kind::Load),
+                    // The view's quick save and load of slot --slot (the
+                    // game's menus are the options screen's Save and Load).
                     KeyCode::F5 if down => self.save(),
                     KeyCode::F9 if down => self.load(),
                     KeyCode::ShiftLeft | KeyCode::ShiftRight => k.run = down,
-                    KeyCode::Escape if down => self.release(),
+                    // The options screen (2542:0100: key 1, Esc), the
+                    // mouse let go for it.
+                    KeyCode::Escape if down => {
+                        self.release();
+                        self.open_options();
+                    }
                     _ => {}
                 }
             }
@@ -3323,8 +3411,15 @@ impl App {
             self.creation_outcome();
         }
         self.creation_music();
+        // The travel map's passes and journey (the game's turns from the
+        // next tick after it ends).
+        let travelling = self.travel.is_some();
+        if let Some(t) = &mut self.travel {
+            t.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            self.travel_after();
+        }
         self.movie_at = now;
-        if now >= self.next {
+        if now >= self.next && !travelling {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;
             self.next = now + Duration::from_secs_f64(ticks / 18.2);
@@ -3430,6 +3525,10 @@ impl winit::application::ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, el: &winit::event_loop::ActiveEventLoop) {
+        if self.quit {
+            el.exit();
+            return;
+        }
         self.tick(Instant::now());
         if let Some(g) = &self.gpu {
             g.window.request_redraw();

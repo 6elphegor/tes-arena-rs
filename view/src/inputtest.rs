@@ -244,6 +244,24 @@ fn talk_menu_by_letter_as_by_script() {
 }
 
 #[test]
+fn where_is_shows_its_list_and_tells_the_way_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    let m = menu(&a).expect("a menu").clone();
+    let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
+    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    // "Where is": 1194:5734 with AX 9 (POPUP11.IMG, the record at 5105).
+    let l = menu(&a).expect("the places' list").clone();
+    assert!(l.list && l.kind == 9, "a list of kind 9: {} {}", l.list, l.kind);
+    assert!(!l.entries.is_empty());
+    d.key(&mut a, KeyCode::Enter, None);
+    let (mut b, _) = talk_start(&dir, "1,0");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "a place picked by Enter and by --picks 1,0");
+}
+
+#[test]
 fn esc_leaves_the_talk_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
@@ -357,7 +375,8 @@ fn camping_with_typed_hours_as_by_script() {
     // "For a while" (entry 0), then the hours typed.
     d.key(&mut a, KeyCode::Enter, None);
     match a.pending.as_ref().map(|p| &p.need) {
-        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        // The prompt's trailing spaces kept: the field's room in its box.
+        Some(dialog::Need::Text(prompt)) => assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}"),
         other => panic!("the hours asked for, not {:?}", other.map(|_| "something else")),
     }
     d.key(&mut a, KeyCode::Digit2, Some("2"));
@@ -669,10 +688,19 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     let mut t = Some(travel::Travel::open(&mut b.engine, &archive).ok().expect("it opens"));
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
-    // Travel: the journey made, the screen ended, the area left.
+    // Travel: the journey made, its horse running a frame a day
+    // (1194:30F1), then the screen ended, the area left.
     d.click(&mut a, 62, 180, MouseButton::Left);
+    assert!(a.travel.as_ref().is_some_and(|t| t.journeying()), "the journey's frames play");
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
     assert!(a.travel.is_none(), "the screen ends after the journey");
     t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
+    t.as_mut().unwrap().skip_journey();
     travel::after(&mut t, &mut b.engine, &mut Vec::new());
     assert!(t.is_none());
     same(&a, &b, "Travel clicked, and Travel::click");
@@ -1043,9 +1071,15 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
         Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
         _ => panic!("a click on the map asks for the note's text"),
     }
+    // Typed in place where clicked (0000:9EE9), not in a box.
+    assert_eq!(a.pending.as_ref().and_then(|p| p.at), Some((100, 100)), "the note edited where clicked");
     for (k, c) in [(KeyCode::KeyH, "H"), (KeyCode::KeyI, "i")] {
         d.key(&mut a, k, Some(c));
     }
+    a.compose();
+    let field = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..6).flat_map(|r| (0..12).map(move |c| (100 + r) * hud::W + 100 + c)).map(|i| px[i]).collect() };
+    assert_ne!(field(&a.screen.px), field(&bare), "the text typed drawn on the map");
+    shot(&mut a, "automap_note_typed");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(a.pending.is_none(), "Enter answers");
     assert!(a.map, "the automap stays up");
@@ -1067,6 +1101,7 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     // Clicked again: the note's text asked for again, now edited.
     d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
     assert!(a.pending.is_some(), "a click on the note edits it");
+    assert_eq!(a.typed, "Hi", "the note's text to edit");
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::KeyX, Some("X"));
@@ -1207,6 +1242,13 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.click(&mut a, 62, 180, MouseButton::Left);
+    // The horse runs a frame a day (1194:30F1), then the screen ends.
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.frame(&mut a);
+    }
     assert!(a.travel.is_none(), "travelled");
     let mut welcome = String::new();
     for _ in 0..20 {
@@ -1263,7 +1305,8 @@ fn a_save_loaded_from_the_title_as_in_play() {
     assert_eq!(b.m.mem.r16(DS, 0xBA76), 6, "the hook's offset kept, its segment cleared");
 }
 
-/// Shift+F5's save menu: slot 3's row clicked, a name typed, Enter: the
+/// The options screen's Save (Esc, then its box at 81h..C0h, 76h..92h):
+/// the save menu; slot 3's row clicked, a name typed, Enter: the
 /// game saved to a scratch folder (NAMES.DAT with the name, SAVEGAME.03);
 /// then a fresh program's main menu Load, slot 3's row clicked: the game
 /// loaded the title screen's way, where it was saved.
@@ -1276,10 +1319,9 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
-    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
-    d.key(&mut a, KeyCode::F5, None);
-    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
-    assert!(a.saveui.is_some(), "the save menu is up");
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0xA0, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Save), "the save menu is up");
     d.click(&mut a, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(a.saveui.as_ref().is_some_and(|u| u.typing.is_some()), "slot 3's name is typed");
     for c in "Ria".chars() {
@@ -1314,4 +1356,91 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     d.click(&mut b, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(b.saveui.is_none() && b.creation.is_none(), "loaded and playing");
     assert_eq!(at(&b.engine), saved, "where it was saved");
+}
+
+/// Esc in play: the options screen (2542:000A). Its arrows change the
+/// sound's and the music's volumes (D3B, D3A), its bar the detail (D37),
+/// each as the port's `options_screen` with the same clicks; Resume leaves
+/// with them; Load opens the load menu; Exit asks, No stays, Yes quits.
+#[test]
+fn the_options_screen_by_esc() {
+    use arena::mem::DS;
+    use arena::options::var::{DETAIL, MUSIC, SOUND};
+    let Some(dir) = game_dir() else { return };
+    let scratch = Scratch::new("options");
+    let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let before = Engine { m: a.engine.m.clone(), files: a.engine.files.clone() };
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.options.is_some() && !a.captured, "Esc opens the options screen, the mouse let go");
+    let mut shot = hud::Screen::new(a.assets.palette);
+    a.options.as_ref().unwrap().draw(&mut shot, &a.font);
+    if let Ok(p) = std::env::var("ARENA_SHOT_OPTIONS") {
+        let data: Vec<u8> = shot.px.iter().flat_map(|c| [c[0], c[1], c[2], 0xFF]).collect();
+        let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(p).unwrap()), hud::W as u32, hud::H as u32);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.write_header().unwrap().write_image_data(&data).unwrap();
+    }
+    // Esc on the screen: 564D's FFFFh, in no box: still up.
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.options.is_some(), "Esc doesn't leave the screen");
+    // The sound's down arrow twice, the music's once, the detail bar at
+    // its 9th step, then Resume.
+    let clicks = [(0x30, 0x6A), (0x3E, 0x6F), (0x80, 0x6A), (0xCB + 9 * 5, 0x5E), (0x120, 0x80)];
+    for &(x, y) in &clicks {
+        d.click(&mut a, x, y, MouseButton::Left);
+    }
+    assert!(a.options.is_none(), "Resume leaves");
+    let v = |m: &arena::machine::Machine| (m.mem.r8(DS, SOUND), m.mem.r8(DS, MUSIC), m.mem.r16(DS, DETAIL));
+    let (s0, m0, _) = v(&before.m);
+    assert_eq!(v(&a.engine.m), (s0.saturating_sub(2), m0.saturating_sub(1), 15), "the volumes and the detail as set");
+    // The same clicks through the port.
+    struct Clicks(Vec<(u16, u16)>);
+    impl arena::options::OptionsHooks for Clicks {
+        fn click(&mut self, m: &mut arena::machine::Machine) -> Option<(u16, u16)> {
+            let c = self.0.pop()?;
+            m.mem.w16(DS, arena::options::var::MOUSE_X, c.0);
+            m.mem.w16(DS, arena::options::var::MOUSE_Y, c.1);
+            Some(c)
+        }
+    }
+    let mut b = before;
+    let mut script = Clicks(clicks.iter().rev().map(|&(x, y)| (x as u16, y as u16)).collect());
+    assert_eq!(b.m.options_screen(&mut b.files, &mut script), Some(arena::options::OptionsEnd::Resume));
+    assert_eq!(v(&a.engine.m), v(&b.m), "as the port's screen with the same clicks");
+    // The sound's and the music's up arrows: up by one each.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x30, 0x50, MouseButton::Left);
+    d.click(&mut a, 0x80, 0x50, MouseButton::Left);
+    d.click(&mut a, 0x120, 0x80, MouseButton::Left);
+    assert_eq!(v(&a.engine.m), (s0.saturating_sub(1), m0, 15), "the up arrows");
+    // Load: the load menu.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x60, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Load), "Load: the load menu");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.saveui.is_none(), "the load menu left");
+    // Exit: "Are you sure ?"; No stays, Yes quits.
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0xE0, 0x80, MouseButton::Left);
+    assert!(a.options.as_ref().is_some_and(|u| u.confirm.is_some()), "Exit asks");
+    d.key(&mut a, KeyCode::KeyN, Some("n"));
+    assert!(a.options.as_ref().is_some_and(|u| u.confirm.is_none()) && !a.quit, "No: the screen again");
+    d.click(&mut a, 0xE0, 0x80, MouseButton::Left);
+    d.key(&mut a, KeyCode::KeyY, Some("y"));
+    assert!(a.options.is_none() && a.quit, "Yes: the program ends");
+}
+
+/// The options screen's New: the main menu (5CA bit 8000h's outer loop).
+#[test]
+fn the_options_screens_new_goes_to_the_main_menu() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::Escape, None);
+    d.click(&mut a, 0x20, 0x80, MouseButton::Left);
+    assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
 }

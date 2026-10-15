@@ -359,6 +359,8 @@ impl Machine {
                     }
                     si = si.wrapping_add(0x19);
                 }
+                // AX 8h (26F7:0AFB): the list's kind (1194:5734).
+                self.list_kind = 0x8;
                 let ax = hooks.list(self, NAMES, 0x20);
                 if (ax as i16) < 0 {
                     return Some(());

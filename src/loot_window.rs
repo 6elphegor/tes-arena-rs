@@ -543,6 +543,8 @@ impl Machine {
             return Some(true);
         }
         self.mem.w8(DS, ITEMS_LEFT, bx as u8);
+        // AX Bh (2433:06CC): the list's kind (1194:5734).
+        self.list_kind = 0xB;
         let pick = hooks.list(self, 0x1044, bx);
         if (pick as i16) < 0 {
             return Some(true);
@@ -747,6 +749,8 @@ impl Machine {
                 return Some(());
             }
             self.mem.w8(DS, PILES_LEFT, bx as u8);
+            // AX Bh (2433:0B6C): the list's kind (1194:5734).
+            self.list_kind = 0xB;
             let pick = hooks.list(self, 0x9302, bx);
             if (pick as i16) < 0 {
                 return Some(());

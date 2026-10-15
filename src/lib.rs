@@ -44,6 +44,7 @@ pub mod mapdraw;
 pub mod mapnotes;
 pub mod mif;
 pub mod newgame;
+pub mod options;
 pub mod outfit;
 pub mod projectile;
 pub mod quest;

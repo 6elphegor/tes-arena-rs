@@ -131,19 +131,26 @@ pub fn column(s: &Span) -> Option<i32> {
     (t.len() == 3 && t.bytes().all(|c| c.is_ascii_digit())).then(|| t.parse().unwrap())
 }
 
-/// The layer: RGBA, (0, 0, 0, 0) where nothing is drawn.
+/// The layer: RGBA, (0, 0, 0, 0) where nothing is drawn, and the palette
+/// colour each drawn pixel has (`NONE` where nothing is), for recolouring
+/// through a table as the original's 0000:9D84 recolours the screen.
 pub struct Screen {
     pub px: Vec<[u8; 4]>,
+    idx: Vec<u16>,
     palette: [[u8; 4]; 256],
 }
 
+/// No palette colour: nothing drawn there.
+const NONE: u16 = 0x100;
+
 impl Screen {
     pub fn new(palette: [[u8; 4]; 256]) -> Screen {
-        Screen { px: vec![[0; 4]; W * H], palette }
+        Screen { px: vec![[0; 4]; W * H], idx: vec![NONE; W * H], palette }
     }
 
     pub fn clear(&mut self) {
         self.px.fill([0; 4]);
+        self.idx.fill(NONE);
     }
 
     /// The colours from now on (the character sheet's screens have their
@@ -158,19 +165,40 @@ impl Screen {
         for yy in y.max(0)..(y + h).min(H as i32) {
             for xx in x.max(0)..(x + w).min(W as i32) {
                 self.px[yy as usize * W + xx as usize] = [p[0], p[1], p[2], alpha];
+                self.idx[yy as usize * W + xx as usize] = c as u16;
             }
         }
     }
 
-    /// The pixels drawn in a rectangle darkened (the list's picked line,
-    /// which the original recolours through a table, 3159:0BE4).
-    pub fn darken(&mut self, x: i32, y: i32, w: i32, h: i32) {
+    /// A rectangle's colours XORed with `c` (0000:A0D9's cursor: the
+    /// block drawn and undrawn by the same XOR).
+    pub fn xor(&mut self, x: i32, y: i32, w: i32, h: i32, c: u8) {
         for yy in y.max(0)..(y + h).min(H as i32) {
             for xx in x.max(0)..(x + w).min(W as i32) {
-                let p = &mut self.px[yy as usize * W + xx as usize];
-                for c in &mut p[..3] {
-                    *c = (*c as u16 * 3 / 5) as u8;
+                let at = yy as usize * W + xx as usize;
+                let n = if self.idx[at] == NONE { c } else { self.idx[at] as u8 ^ c };
+                let p = self.palette[n as usize];
+                self.px[at] = [p[0], p[1], p[2], 0xFF];
+                self.idx[at] = n as u16;
+            }
+        }
+    }
+
+    /// The pixels drawn in a rectangle recoloured through `table` (0000:9D84:
+    /// each pixel's colour replaced by the table's entry for it).
+    pub fn remap(&mut self, x: i32, y: i32, w: i32, h: i32, table: &[u8; 256]) {
+        for yy in y.max(0)..(y + h).min(H as i32) {
+            for xx in x.max(0)..(x + w).min(W as i32) {
+                let at = yy as usize * W + xx as usize;
+                let c = self.idx[at];
+                if c == NONE || table[c as usize] as u16 == c {
+                    continue;
                 }
+                let n = table[c as usize];
+                let p = self.palette[n as usize];
+                let a = self.px[at][3];
+                self.px[at] = [p[0], p[1], p[2], a];
+                self.idx[at] = n as u16;
             }
         }
     }
@@ -192,6 +220,7 @@ impl Screen {
                 if v != 0 {
                     let p = self.palette[v as usize];
                     self.px[yy as usize * W + xx as usize] = [p[0], p[1], p[2], 0xFF];
+                    self.idx[yy as usize * W + xx as usize] = v as u16;
                 }
             }
         }
@@ -232,6 +261,7 @@ impl Screen {
                         let (xx, yy) = (x + i, y + r as i32);
                         if (0..W as i32).contains(&xx) && (0..H as i32).contains(&yy) {
                             self.px[yy as usize * W + xx as usize] = [p[0], p[1], p[2], 0xFF];
+                            self.idx[yy as usize * W + xx as usize] = c as u16;
                         }
                     }
                 }
@@ -368,6 +398,9 @@ pub struct Menu {
     /// A list (1194:5734: a panel with a scrolling text area), not a menu
     /// (1194:020E: a column of boxes).
     pub list: bool,
+    /// A list's kind (5734's AX, `Machine::list_kind`): its panel, record
+    /// and colour.
+    pub kind: u16,
 }
 
 /// Where a menu's entries are drawn: (x, y of the first, line height,
@@ -417,11 +450,9 @@ pub struct Style {
     list_font: Font,
     /// MARBLE.CIF, 3 x 3 tiles ([1036], 21EE:00BC).
     tiles: Tiles,
-    /// The lists' panels: the store's (kinds 1 and 2) and the others'
-    /// (kind 11: the tavern, the guild, the loot window).
-    wide: ListKind,
-    armour: ListKind,
-    narrow: ListKind,
+    /// The lists' kinds 0..11 as 1194:5734 sets them up (any other kind
+    /// is kind 1's).
+    kinds: Vec<ListKind>,
 }
 
 /// A kind of list as 1194:5734 sets it up: its panel (where its header
@@ -435,12 +466,42 @@ struct ListKind {
     /// area's x plus one, 5364 centred on its middle with 1000h, 9370
     /// ending at its right edge with 2000h).
     last: Align,
+    /// The lines' colour (BL, the record's +28h).
+    colour: u8,
+    /// A title 5734 draws itself (kinds 6 and 10: 0000:5364 centred on
+    /// x A0h at this row, in this colour), from the caller's DI.
+    title: Option<(i32, u8)>,
 }
 
 #[derive(Clone, Copy)]
 enum Align {
     Left,
+    Centre,
     Right,
+}
+
+/// The records 1194:5734 gives 3159:06A0 (DGROUP 5006, 505B, 50B0, 5105,
+/// 515A): the text area (+18h: x, y, w, h), the scroll track (+10h) and
+/// the flags (+20h).
+const RECORD_5006: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_505B: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_50B0: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
+const RECORD_5105: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
+const RECORD_515A: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
+
+/// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
+/// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
+/// 3992 that 3159:0EE2 makes it from (21EE's set-up): FDh to FCh, FEh to
+/// FFh, 65h to FDh, EEh to 01h.
+fn picked_table() -> [u8; 256] {
+    let mut t = [0u8; 256];
+    for (i, v) in t.iter_mut().enumerate() {
+        *v = i as u8;
+    }
+    for w in [0xFCFDu16, 0xFFFE, 0xFD65, 0x01EE] {
+        t[(w & 0xFF) as usize] = (w >> 8) as u8;
+    }
+    t
 }
 
 static STYLE: std::sync::OnceLock<Style> = std::sync::OnceLock::new();
@@ -453,31 +514,35 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     else {
         return;
     };
-    // Kind 1 (the store's weapons, 1194:F7E9; its armour, kind 2, has
-    // POPUP4.IMG on the same record): POPUP3.IMG, the record at 50B0: the
-    // text from 1Ch, 1Bh, 109h x 4Ch, the track 0Dh, 14h, 6 x 52h. Kind 11
-    // (1194:A9F9, BB9E, the loot window's): NEWPOP.IMG, the record at
-    // 5006: the text from 54h, 21h, 96h x 3Ch, the track 44h, 1Eh, 6 x 3Ch.
-    let (area, track) = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52));
-    // The record at 50B0 has flags 6000h: its lines end at the right.
-    let wide = ListKind { panel: crate::panels::load_image(archive, m, "POPUP3.IMG"), area, track, last: Align::Right };
-    let armour = ListKind { panel: crate::panels::load_image(archive, m, "POPUP4.IMG"), area, track, last: Align::Right };
-    // 5006: 4000h, its lines from the left.
-    let narrow = ListKind { panel: crate::panels::load_image(archive, m, "NEWPOP.IMG"), area: (0x54, 0x21, 0x96, 0x3C), track: (0x44, 0x1E, 6, 0x3C), last: Align::Left };
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, wide, armour, narrow });
+    // 1194:5734 by AX: the panel (its name's offset), the record and BL
+    // (the lines' colour); kinds 3 and 5 set the record's 4000h (it has
+    // it), kinds 6 and 10 draw the caller's title.
+    let kind = |name: &str, rec: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16), colour: u8, title: Option<(i32, u8)>| {
+        let (area, track, flags) = rec;
+        let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
+        ListKind { panel: crate::panels::load_image(archive, m, name), area, track, last, colour, title }
+    };
+    let kinds = vec![
+        kind("POPUP.IMG", RECORD_5006, 0xFD, None),
+        kind("POPUP3.IMG", RECORD_50B0, 0xFD, None),
+        kind("POPUP4.IMG", RECORD_50B0, 0xFD, None),
+        kind("POPUP.IMG", RECORD_5006, 0xD5, None),
+        kind("POPUP5.IMG", RECORD_5006, 0xFD, None),
+        kind("LOADSAVE.IMG", RECORD_5006, 0xFD, None),
+        kind("POPUP2.IMG", RECORD_515A, 0xFD, Some((0x20, 0x01))),
+        kind("POPUP7.IMG", RECORD_50B0, 0xFD, None),
+        kind("POPUP8.IMG", RECORD_5006, 0xEE, None),
+        kind("POPUP11.IMG", RECORD_5105, 0x65, None),
+        kind("NEWPOP.IMG", RECORD_505B, 0xFD, Some((0x1F, 0x60))),
+        kind("NEWPOP.IMG", RECORD_5006, 0xFD, None),
+    ];
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds });
 }
 
-/// The kind a list is shown as: the hooks don't pass 1194:5734's AX, so
-/// the store's lines (by their first column: the weapons' format at
-/// 86BD from x 31, kind 1; armour's at 86DD from x 29, kind 2) choose
-/// those, any other list is kind 11's (the tavern's, BB9E; the guild's,
-/// A9F9; the loot window's).
+/// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
+/// port's `list_kind`); any kind past 11 is kind 1's, as 5734's default.
 fn list_kind<'a>(st: &'a Style, menu: &Menu) -> &'a ListKind {
-    match menu.entries.first().and_then(|e| e.iter().find_map(column)) {
-        Some(29) => &st.armour,
-        Some(31) => &st.wide,
-        _ => &st.narrow,
-    }
+    st.kinds.get(menu.kind as usize).unwrap_or(&st.kinds[1])
 }
 
 /// The margin of the message boxes and the menus' boxes (DX 5 at
@@ -489,14 +554,19 @@ const MARGIN: i32 = 5;
 /// the margin round them, then rounded up to whole tiles, half the extra
 /// moving the text. (width, height, the text's x and y in the box.)
 fn box_size(st: &Style, font: &Font, lines: &[Vec<Span>]) -> (i32, i32, i32, i32) {
+    box_size_margin(st, font, lines, MARGIN)
+}
+
+/// `box_size` with 965A's margin (DX) `margin`.
+fn box_size_margin(st: &Style, font: &Font, lines: &[Vec<Span>], margin: i32) -> (i32, i32, i32, i32) {
     let (tw, th) = (st.tiles.w as i32, st.tiles.h as i32);
     let text_w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0);
-    let (mut w, mut h) = (text_w + 2 * MARGIN, lines.len() as i32 * (font.h as i32 + 1) + 2 * MARGIN);
+    let (mut w, mut h) = (text_w + 2 * margin, lines.len() as i32 * (font.h as i32 + 1) + 2 * margin);
     let rw = (tw - w % tw) % tw;
     let rh = (th - h % th) % th;
     w += rw;
     h += rh;
-    (w, h, MARGIN + rw / 2, MARGIN + (rh + 1) / 2)
+    (w, h, margin + rw / 2, margin + (rh + 1) / 2)
 }
 
 /// The box 965A draws for the text `text` with CX 7 (the town's welcome,
@@ -700,10 +770,52 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         }
     }
     if let Some((prompt, typed)) = &hud.typing {
-        let lines = vec![vec![Span { colour: 0x0F, text: prompt.clone() }], vec![Span { colour: 0x0F, text: format!("{typed}_") }]];
-        let (w, h, _, _) = box_size(st, &st.box_font, &lines);
-        draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2, w, h), &lines, 0x0F);
+        draw_typing(screen, st, c, prompt, typed);
     }
+}
+
+/// A typed prompt as the original draws it: the prompt in a box by 965A
+/// with CX 7 (centred in the clip) and a margin of 0Ah; then 0000:9EE9's
+/// field in the boxes' font ([102C]): the text typed (A0AE, by 9E0A) and
+/// the cursor (A0D9), a block the width of the character under it (at
+/// the end a space's, plus one) by the font's height, XORed with the
+/// text's colour. Two callers: 1194:4800 (the rest's hours, the
+/// repair's), whose prompt ends in spaces, the field's room on its line;
+/// 1194:5C30 (the travel map's search, the names), whose prompt is
+/// formatted "%s\r" and 17 spaces, the field's line under it.
+/// Approximate: the callers place the field themselves (the rest's at
+/// FCh,44h, the search's x 55h at y 64h), the view puts it after the
+/// last line's words, a space on (5C30's at its line's start); the
+/// text's colour (9288) is taken as the boxes' 0Fh; the cursor's
+/// 8-frame blink is not drawn (it stays on).
+pub fn typed_prompt(screen: &mut Screen, prompt: &str, typed: &str) {
+    if let Some(st) = STYLE.get() {
+        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, typed);
+    }
+}
+
+/// `typed_prompt` centred in the clip `c`.
+fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, typed: &str) {
+    let font = &st.box_font;
+    let mut text = lines(prompt.as_bytes(), 0x0F);
+    if !prompt.ends_with(' ') {
+        text.push(vec![Span { colour: 0x0F, text: " ".repeat(17) }]);
+    }
+    let last = text.len() - 1;
+    let words = font.width(plain(&text[last]).trim_end()) as i32;
+    let (w, h, tx, ty) = box_size_margin(st, font, &text, 10);
+    let (x, y) = ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2);
+    screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
+    let lh = font.h as i32 + 1;
+    for (i, l) in text.iter().enumerate() {
+        let lw = font.width(&plain(l)) as i32;
+        let lx = if i < last { x + w / 2 - lw / 2 } else { x + tx };
+        screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, 0x0F);
+    }
+    let fx = x + tx + if words > 0 { words + font.width(" ") as i32 } else { 0 };
+    let fy = y + ty + last as i32 * lh;
+    screen.text_raw(font, fx, fy, typed, 0x0F);
+    screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
 }
 
 /// A list's line as 2F26:2DF6 draws it: each part but the last (ended by
@@ -734,22 +846,23 @@ fn list_line(screen: &mut Screen, font: &Font, kind: &ListKind, y: i32, line: &[
         } else {
             match kind.last {
                 Align::Left => area.0 + 1,
+                Align::Centre => area.0 + area.2 / 2 - w / 2,
                 Align::Right => area.0 + area.2 - w,
             }
         };
-        screen.spans_game(font, x, y, &spans, false, 0xFD);
+        screen.spans_game(font, x, y, &spans, false, kind.colour);
     }
 }
 
 /// A list as 1194:5734 shows it: its kind's panel where its header puts
 /// it; the lines in the text area from its top plus one, a font's height
-/// apart, in colour FDh (the record's +28h), from the area's x plus one
-/// and a line's parts at their columns (2F26:2E12); the line picked
-/// recoloured (3159:0BE4 maps it through the table at BA0E; darkened
-/// here); the scroll track's thumb in F5h with its edges F9h and F2h
-/// (3159:0CFF), as high as the part shown, at least 3. A title (the
-/// lists have none of their own; the view's callers may give one) above
-/// the area, centred.
+/// apart, in the kind's colour (the record's +28h), from the area's x
+/// plus one and a line's parts at their columns (2F26:2E12); then the
+/// line picked recoloured through the table at BA0E (3159:0BE4); the
+/// scroll track's thumb in F5h with its edges F9h and F2h (3159:0CFF), as
+/// high as the part shown, at least 3. Kinds 6 and 10 draw the caller's
+/// title where 5734 does; other kinds have none of their own (the view's
+/// callers may give one: above the area, centred).
 fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
     let kind = list_kind(st, menu);
     if let Some(p) = &kind.panel {
@@ -761,14 +874,21 @@ fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
     let (top, rows) = list_rows(st, menu);
     for (i, l) in menu.title.iter().enumerate() {
         let w = font.width(&plain(l)) as i32;
-        screen.spans_game(font, 0xA0 - w / 2, area.1 - fh - 4 + i as i32 * (fh + 1), l, false, 0x60);
+        let (y, c) = match kind.title {
+            Some((y, c)) => (y + i as i32 * (fh + 1), c),
+            None => (area.1 - fh - 4 + i as i32 * (fh + 1), 0x60),
+        };
+        screen.spans_game(font, 0xA0 - w / 2, y, l, false, c);
     }
     for (k, e) in menu.entries.iter().enumerate().skip(top).take(rows) {
         let y = area.1 + 1 + (k - top) as i32 * fh;
-        if k == menu.selected {
-            screen.darken(area.0, y, area.2, fh);
-        }
         list_line(screen, font, kind, y, e);
+    }
+    // 3159:0BE4, after the lines: the picked line's row of the area
+    // recoloured through BA0E's table.
+    if (top..top + rows).contains(&menu.selected) {
+        let y = area.1 + 1 + (menu.selected - top) as i32 * fh;
+        screen.remap(area.0, y, area.2, fh, &picked_table());
     }
     let n = menu.entries.len();
     if n > rows {

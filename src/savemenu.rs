@@ -314,7 +314,14 @@ impl Machine {
     pub fn delete_matching(&mut self, files: &mut Files, si: u16) {
         self.save_path(si);
         let pattern = self.mem.cstr(DS, si).to_ascii_uppercase();
-        let Some(star) = pattern.iter().position(|&c| c == b'*') else { return };
+        let Some(star) = pattern.iter().position(|&c| c == b'*') else {
+            // No wildcard: find first finds the file itself, if it's there.
+            if files.exists(&pattern) {
+                self.save_path(si);
+                files.delete(&pattern);
+            }
+            return;
+        };
         let (prefix, rest) = (&pattern[..star], &pattern[star + 1..]);
         let ext = rest.strip_prefix(b".").unwrap_or(rest);
         for name in files.with_ext(ext) {
