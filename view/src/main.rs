@@ -1616,6 +1616,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     t.key(&mut engine, code, text);
                 }
             }
+            if let Some(t) = &mut st.travel {
+                t.skip_journey();
+            }
             let mut boxes = Vec::new();
             travel::after(&mut st.travel, &mut engine, &mut boxes);
             if !boxes.is_empty() {
@@ -3329,8 +3332,15 @@ impl App {
             self.creation_outcome();
         }
         self.creation_music();
+        // The travel map's passes and journey (the game's turns from the
+        // next tick after it ends).
+        let travelling = self.travel.is_some();
+        if let Some(t) = &mut self.travel {
+            t.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            self.travel_after();
+        }
         self.movie_at = now;
-        if now >= self.next {
+        if now >= self.next && !travelling {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;
             self.next = now + Duration::from_secs_f64(ticks / 18.2);

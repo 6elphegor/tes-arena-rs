@@ -688,10 +688,19 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     let mut t = Some(travel::Travel::open(&mut b.engine, &archive).ok().expect("it opens"));
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
-    // Travel: the journey made, the screen ended, the area left.
+    // Travel: the journey made, its horse running a frame a day
+    // (1194:30F1), then the screen ended, the area left.
     d.click(&mut a, 62, 180, MouseButton::Left);
+    assert!(a.travel.as_ref().is_some_and(|t| t.journeying()), "the journey's frames play");
+    for _ in 0..10 {
+        if a.travel.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
     assert!(a.travel.is_none(), "the screen ends after the journey");
     t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
+    t.as_mut().unwrap().skip_journey();
     travel::after(&mut t, &mut b.engine, &mut Vec::new());
     assert!(t.is_none());
     same(&a, &b, "Travel clicked, and Travel::click");
@@ -1226,6 +1235,7 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.click(&mut a, 62, 180, MouseButton::Left);
+    d.frame(&mut a);
     assert!(a.travel.is_none(), "travelled");
     let mut welcome = String::new();
     for _ in 0..20 {

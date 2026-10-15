@@ -29,8 +29,20 @@
 //! goes on to the next area (5E6) as any leaving does; the town's welcome
 //! then shows the arrival's text (0000:4ACD).
 //!
-//! Not shown: the travel animation (1194:2F69's frames) and the chosen
-//! destination's blink (MAPBLINK.CIF).
+//! - The markers (26F7:071F, from 0625): the current place's frame of
+//!   MAPOUT.CIF (by its kind) when its province is shown, before the
+//!   label; the destination's frame of MAPBLINK.CIF after it, when one is
+//!   chosen and its province shown, three passes in four (A8C4 & 3). A
+//!   dungeon picked as 20h (mod 40h) is marked by colour instead: a 22 x
+//!   17 rectangle from (x - 8, y - 10) remapped (0000:9D84) with DCh made
+//!   C2h (the current place) or DFh.
+//! - The journey (1194:2F69/30F1): HORSE.DFA (named at 4096) drawn over
+//!   the screen at its own place, frame by frame, a frame each day
+//!   (0..0Ah round), the screen ending after the last.
+//!
+//! Approximate: the original's passes and days go as fast as its loop
+//! runs; the view counts a pass, and plays a day's frame, each game tick
+//! (1/18.2 s). The scripted shots skip the journey's frames.
 
 use crate::hud::{self, Font, Screen, Span};
 use crate::interface::Image;
@@ -109,7 +121,21 @@ pub struct Travel {
     boxes: Vec<Lines>,
     /// Ended: the carry (the area left).
     pub done: Option<bool>,
+    mapout: Vec<Image>,
+    mapblink: Vec<Image>,
+    /// HORSE.DFA's frames, at its header's place.
+    horse: Vec<Image>,
+    /// The journey's frames still to play (one a day), and the time since
+    /// they began (ms).
+    journey: Vec<u8>,
+    journey_ms: u32,
+    /// The time the screen has been up (ms): its passes (A8C4's blink).
+    up_ms: u32,
 }
+
+/// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
+/// frame of the journey.
+const TICK_MS: u32 = 55;
 
 /// A .CIF's frames, each by its coding (type 8 through the port's
 /// decompressor).
@@ -125,6 +151,14 @@ fn cif(m: &Machine, d: &[u8]) -> Vec<Image> {
     out
 }
 
+/// A .DFA's frames, each at its header's place.
+fn dfa(archive: &crate::archive::Archive, name: &str) -> Vec<Image> {
+    let Some(d) = archive.read(name) else { return Vec::new() };
+    let le = |at: usize| u16::from_le_bytes([*d.get(at).unwrap_or(&0), *d.get(at + 1).unwrap_or(&0)]) as i16 as i32;
+    let Some(f) = crate::flats::decode(1, &d) else { return Vec::new() };
+    f.frames.into_iter().map(|px| Image { x: le(2), y: le(4), w: f.w, h: f.h, px }).collect()
+}
+
 /// The hooks the screen's routines run with: boxes kept, the destination's
 /// record built (1194:3AE8 in full, `Machine::city_location`; a
 /// dungeon's, 3B0C, with its climate), the search's name and list pick.
@@ -135,6 +169,8 @@ struct Hooks<'a> {
     pick: u16,
     listed: Option<Vec<String>>,
     failed: bool,
+    /// The journey's frames drawn (1194:30F1, one a day).
+    frames: Vec<u8>,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
@@ -158,6 +194,9 @@ impl TravelHooks for Hooks<'_> {
         if m.city_location(&mut self.files, DS, 0x0A22, ax).is_none() {
             self.failed = true;
         }
+    }
+    fn animation_frame(&mut self, _m: &mut Machine, frame: u8) {
+        self.frames.push(frame);
     }
     fn dungeon_location(&mut self, m: &mut Machine, id: u16, _bx: u16) {
         let (x, y) = (m.mem.r16(DS, 0x193E), m.mem.r16(DS, 0x1940));
@@ -195,19 +234,19 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
         }
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false };
+        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
         let mut t = Travel {
@@ -222,6 +261,12 @@ impl Travel {
             asking: None,
             boxes,
             done: None,
+            mapout: archive.read("MAPOUT.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
+            mapblink: archive.read("MAPBLINK.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
+            horse: dfa(archive, "HORSE.DFA"),
+            journey: Vec::new(),
+            journey_ms: 0,
+            up_ms: 0,
         };
         let p = m.mem.r8(DS, 0x0A46);
         t.show_province(engine, archive, p);
@@ -234,7 +279,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false }
+        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded, `travel_province`).
@@ -316,11 +361,49 @@ impl Travel {
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         let ok = engine.m.travel_go(&mut engine.files, &mut h);
         let failed = h.failed;
+        self.journey = std::mem::take(&mut h.frames);
+        self.journey_ms = 0;
         if ok.is_none() || failed {
             eprintln!("the journey met code not ported");
         }
         if engine.m.mem.r16(DS, 0x12A2) != 0 {
             self.end(engine);
+        }
+    }
+
+    /// `ms` of time on: the passes counted, the journey's frames played.
+    pub fn advance(&mut self, ms: u32) {
+        self.up_ms = self.up_ms.wrapping_add(ms);
+        if !self.journey.is_empty() {
+            self.journey_ms += ms;
+            if (self.journey_ms / TICK_MS) as usize >= self.journey.len() {
+                self.journey.clear();
+            }
+        }
+    }
+
+    /// The journey's frames left unplayed (the scripted shots).
+    pub fn skip_journey(&mut self) {
+        self.journey.clear();
+    }
+
+    /// The journey's frames playing.
+    pub fn journeying(&self) -> bool {
+        !self.journey.is_empty()
+    }
+
+    /// 26F7:071F: the marker of kind `kind` (frame `kind` of `pics`) centred
+    /// on (x, y), or for a dungeon picked as 20h the colour remapped.
+    fn marker(&self, screen: &mut Screen, pics: &[Image], kind: u16, pick: u16, here: bool, x: i32, y: i32) {
+        if kind == 3 && pick % 0x40 == 0x20 {
+            let mut table = [0u8; 256];
+            for (i, t) in table.iter_mut().enumerate() {
+                *t = i as u8;
+            }
+            table[0xDC] = if here { 0xC2 } else { 0xDF };
+            screen.remap(x - 8, y - 10, 0x16, 0x11, &table);
+        } else if let Some(i) = pics.get(kind as usize) {
+            screen.blit(x - (i.w / 2) as i32, y - (i.h / 2) as i32, i.w, i.h, &i.px, 199);
         }
     }
 
@@ -455,6 +538,18 @@ impl Travel {
             }
             None => {}
         }
+        // 26F7:064A: the current place's marker.
+        let r8 = |a: u16| m.mem.r8(DS, a);
+        let r16 = |a: u16| m.mem.r16(DS, a) as i32;
+        if r8(0x0A46) == p {
+            self.marker(screen, &self.mapout, r8(0x0A47) as u16, r8(0x0A4C) as u16, true, r16(0x0A48), r16(0x0A4A));
+        }
+        // 26F7:06F0: the destination's, three passes in four.
+        let pass = (self.up_ms / TICK_MS).wrapping_add(1);
+        let dest = (r8(0x6C28) != 0 && pass & 3 != 0 && r8(0x193D) == p).then(|| {
+            let pick = m.mem.r16(DS, 0xA8AE);
+            (r8(0x1943) as u16, pick, pick == r8(0x0A4C) as u16 && p == r8(0x0A46), r16(0x193E), r16(0x1940))
+        });
         // 26F7:0625's label: the location nearest the cursor named
         // (shadow CEh, text DFh), on the map above the buttons.
         // The search's state is put back after: the label is the window's,
@@ -474,6 +569,13 @@ impl Travel {
             screen.text_plain(font, tx + 1, ty + 1, &name, 0xCE);
             screen.text_plain(font, tx, ty, &name, 0xDF);
         }
+        if let Some((kind, pick, here, x, y)) = dest {
+            self.marker(screen, &self.mapblink, kind, pick, here, x, y);
+        }
+        // 1194:30F1: the day's frame of the journey.
+        if let Some(f) = self.journey.get((self.journey_ms / TICK_MS) as usize).and_then(|&f| self.horse.get(f as usize)) {
+            screen.blit(f.x, f.y, f.w, f.h, &f.px, 199);
+        }
     }
 }
 
@@ -489,12 +591,12 @@ fn list_at(names: &[String], x: i32, y: i32) -> Option<usize> {
     })
 }
 
-/// After an input to the travel map: its boxes to `boxes`; ended, it goes
-/// (with the carry, the area left: `Machine::map_button_done`, 2542:0411).
+/// After an input to the travel map (or a frame): its boxes to `boxes`;
+/// ended and the journey's frames played, it goes (with the carry, the area left: `Machine::map_button_done`, 2542:0411).
 pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<Lines>) {
     let Some(t) = travel else { return };
     boxes.extend(t.take_boxes());
-    if let Some(carry) = t.done {
+    if let Some(carry) = t.done.filter(|_| !t.journeying()) {
         engine.m.map_button_done(carry);
         *travel = None;
     }
