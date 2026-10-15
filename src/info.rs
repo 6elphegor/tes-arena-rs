@@ -151,7 +151,8 @@ impl Machine {
     /// A missing INF leaves the buffer's old text, which is parsed. None
     /// where the flats don't fit in their banks (the original stops at
     /// an INT 3), a hook is set to a routine not ported (end CD2E, but
-    /// the 3D mode's 0000:4531, `inf_done_hook`; sounds CD4A), a scan runs on
+    /// the 3D mode's 0000:4531, `inf_done_hook`; sounds CD4A, but the 3D
+    /// mode's 23BA:0217 with no sound, which returns), a scan runs on
     /// without end (the original hangs), or a *TOP line has no number
     /// (its value is then whatever AX held).
     pub fn info_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
@@ -197,16 +198,16 @@ impl Machine {
         self.ems_map(first);
         let (off, seg) = (self.mem.r16(DS, BUFFER), self.mem.r16(DS, BUFFER + 2));
         if off >= 0xFFFD {
-            return None;
+            return crate::giveup::not_ported("0000:EC03: a buffer to allocate: not followed");
         }
         // A failed load (no such file, 64 KiB or more, nothing read) is
         // ignored: the text left in the buffer is parsed, up to the last
         // size stored at OPEN_SIZE.
         if self.hook_set(crate::bsa::var::OPEN_HOOK) {
-            return None;
+            return crate::giveup::not_ported("0000:EC03: the open hook set to a routine not ported");
         }
         if self.file_load(files, name, seg, off).is_none() && self.mem.r32(DS, crate::bsa::var::ERROR_HOOK) != 0 {
-            return None;
+            return crate::giveup::error("0000:EC03: an INF missing, the error hook set");
         }
         let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
         self.mem.w16(DS, END, size);
@@ -217,7 +218,7 @@ impl Machine {
         match self.mem.r32(DS, DONE_HOOK) {
             0 => {}
             crate::hooks::value::INF_DONE => self.inf_done_hook(),
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:EC03: the INF's end hook set to a routine not ported"),
         }
         self.mem.w16(DS, INFO_PTR, 0);
         if self.mem.r16(DS, FLAGS) & 0x400 == 0 {
@@ -592,7 +593,7 @@ impl Machine {
                 let (v, _) = self.info_number(es, &mut di)?;
                 self.mem.w16(DS, TOP, v);
             }
-            _ => return None,
+            _ => return crate::giveup::not_ported("0000:EF7A: an INF keyword not ported"),
         }
         Some(())
     }
@@ -929,10 +930,13 @@ impl Machine {
             if *di >= end || c == b'@' {
                 // The files 23BA:0217 (at SOUND_HOOK) would load into the
                 // sound slots, in order: the sound driver's, kept for the
-                // front end (`Machine::sound_names`).
+                // front end (`Machine::sound_names`). With no sound (8F64
+                // 0) it returns at once.
                 self.sound_names = self.sound_list();
-                if self.hook_set(SOUND_HOOK) {
-                    return None;
+                let hook = self.mem.r32(DS, SOUND_HOOK);
+                let quiet = hook == 0x23BA_0217 && self.mem.r16(DS, crate::sound::var::ENABLED) == 0;
+                if hook != 0 && !quiet {
+                    return crate::giveup::not_ported("23BA:0217: the sounds hook set to a routine not ported");
                 }
                 return Some(*di >= end);
             }

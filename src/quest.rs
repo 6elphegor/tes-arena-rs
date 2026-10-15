@@ -816,7 +816,7 @@ impl Machine {
         // With no usable candidate at all the original rolls forever:
         // known at once, instead of waiting for the RNG to cycle.
         if !(0..count).any(|r| self.quest_usable(CANDIDATES + 2 * r)) {
-            return None;
+            return crate::giveup::original("1194:A0FC: no usable quest: the original rolls for ever");
         }
         let saved = self.rng.seed;
         self.rng.seed = seed;

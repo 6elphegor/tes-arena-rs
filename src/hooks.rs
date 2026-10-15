@@ -58,6 +58,11 @@ pub trait StairsHooks {
     /// 0000:368E: the automap kept (23F1:013C, `Machine::automap_keep`),
     /// then loaded (0000:3503, `Machine::automap_load`).
     fn level_screen(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// 26F7:0000, asked on the stairs out of a dungeon's first level
+    /// (the way out 0000:4537): whether to leave. The default stays.
+    fn ask_leave(&mut self, _m: &mut Machine) -> bool {
+        false
+    }
 }
 
 /// `StairsHooks` that do nothing.
@@ -220,7 +225,7 @@ impl Machine {
                     break w;
                 }
                 if cycle.cycled(&self.rng) {
-                    return None;
+                    return crate::giveup::original("0000:5160: no square for the noble's house: the original rolls for ever");
                 }
             };
             let bx = w & 0xFF00 | (w as u8).wrapping_add(w as u8) as u16;

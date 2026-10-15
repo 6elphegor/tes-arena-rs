@@ -111,7 +111,7 @@ impl Machine {
             // built at 0:0, in low memory: not followed.
             let seg = self.heap_alloc_high(0x38)?;
             if seg == 0 {
-                return None;
+                return crate::giveup::not_ported("0000:9CD2: a record block at 0:0, in low memory: not followed");
             }
             *block = Some(seg);
             self.city_location(files, seg, 0, ax)?;
@@ -277,7 +277,7 @@ impl Machine {
                         si = si.wrapping_sub(1);
                         rolls += 1;
                         if rolls > ROLL_LIMIT {
-                            return None;
+                            return crate::giveup::original("1194:40CF: the list's places never fit: the original rolls for ever");
                         }
                         continue;
                     }
@@ -390,7 +390,7 @@ impl Machine {
             if cx == 0 {
                 // Every offset of the frame is water: the original
                 // searches forever.
-                return None;
+                return crate::giveup::original("1194:3DF2: every offset is water: the original searches for ever");
             }
         };
         let t = self.terrain_of(found);

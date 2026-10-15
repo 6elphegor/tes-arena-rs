@@ -141,13 +141,23 @@ impl Machine {
     /// record the first city's, the blink counter 0, SHOWN `p`, the
     /// province's data loaded (1194:2E14) and the palette's buffer
     /// cleared (1194:55B2). Its pictures, icons and window are the front
-    /// end's. (Not compared with the original's vectors.)
+    /// end's, but for the state their drawing (26F7:01CA, 0268) leaves:
+    /// the markers' half sizes (A8BE, A8C0: the last drawn, the villages'
+    /// 4 x 4, or in the Imperial province the dungeons' 7 x 4), the
+    /// picture's pointer 8F9A clear, and the word 1294 clear, which the
+    /// nearest's search (26F7:0BC9) then takes as "every place", not
+    /// only the known ones. (Not compared with the original's vectors.)
     pub fn travel_map_province(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks, p: u8) -> Option<()> {
         self.mem.w16(DS, 0xA8BA, crate::travelmap::CITIES);
         self.mem.w8(DS, 0xA8C4, 0);
         self.mem.w8(DS, SHOWN, p);
         hooks.province(self, files, p)?;
         self.travel_screen_clear(hooks);
+        let (w, h) = if p == 8 { (7, 4) } else { (4, 4) };
+        self.mem.w16(DS, 0xA8BE, w);
+        self.mem.w16(DS, 0xA8C0, h);
+        self.mem.w32(DS, 0x8F9A, 0);
+        self.mem.w16(DS, crate::travelmap::var::KNOWN_ONLY, 0);
         Some(())
     }
 
@@ -326,7 +336,7 @@ impl Machine {
         hooks.type_name(self);
         let c = self.ms8(NAMES) & 0xDF;
         let mut found = None;
-        if (b'A'..=b'Z').contains(&c) {
+        if c.is_ascii_uppercase() {
             let mut si = crate::travelmap::CITIES;
             for i in 0..0x20u16 {
                 if self.sq_streq(si, NAMES).is_some() {

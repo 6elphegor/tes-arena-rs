@@ -306,7 +306,7 @@ impl Machine {
         self.mouse_clamp();
         self.arrow_keys(files, hooks)?;
         if self.mem.r8(DS, CYBERMAN) != 0 {
-            return None;
+            return crate::giveup::not_ported("the CyberMan's input (segment 2F26) not ported");
         }
         if self.pick_region(files, hooks)? {
             // The cursor is on the interface bar: the handler is
@@ -704,7 +704,7 @@ impl Machine {
     /// fault).
     fn fraction(ax: u16, cx: u16) -> Option<u16> {
         if cx == 0 {
-            return None;
+            return crate::giveup::original("a divide by zero");
         }
         Some((ax << 8) / cx)
     }

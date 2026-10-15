@@ -143,7 +143,7 @@ impl Machine {
         }
         let q = self.text_width(si) / 3;
         if q > 0xFF {
-            return None;
+            return crate::giveup::original("0000:343C: the note's divide overflows");
         }
         Some(col >= x.wrapping_sub(q) as i16)
     }

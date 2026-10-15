@@ -243,7 +243,7 @@ impl Machine {
                 }
             }
             if check.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("2433:02F8: no spot left: the original rolls for ever");
             }
         }
     }
@@ -312,7 +312,7 @@ impl Machine {
             }
             // The level routines, read past the table (the wild).
             0x03D5 => (self.rng.range(1, 6)?, false),
-            _ => return None,
+            _ => return crate::giveup::original("2433:0358: a level past the table: the original jumps into a string"),
         };
         self.mem.w16(DS, GOLD, ax);
         Some((ax, cf))
@@ -344,7 +344,7 @@ impl Machine {
             0x03E1 => (self.rng.range(2, 0xB)? as u8, 9),
             0x0405 => ((self.mem.r8(DS, LEVEL) as u16 + 1).wrapping_mul(5) as u8, 5),
             0x0411 => ((self.mem.r8(DS, LEVEL) as u16).wrapping_mul(3) as u8, 3),
-            _ => return None,
+            _ => return crate::giveup::original("a level past the table: the original jumps into a string"),
         })
     }
 
@@ -402,7 +402,7 @@ impl Machine {
         let q = share * self.mem.r16(DS, ITEM + 8) as u32 / 0x64;
         if q > 0xFFFF {
             // DIV's quotient overflows: the original faults.
-            return None;
+            return crate::giveup::original("2433:041C: the share's divide overflows");
         }
         let q = if q == 0 { 1 } else { q as u16 };
         self.mem.w16(DS, ITEM + 6, q);

@@ -94,7 +94,7 @@ impl Machine {
     /// the port gives up as the original can't go on (see `gave_up`).
     pub fn original_fault<T>(&mut self, why: &'static str) -> Option<T> {
         self.gave_up = Some(why);
-        None
+        crate::giveup::original(why)
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.

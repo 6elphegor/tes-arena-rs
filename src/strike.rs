@@ -477,7 +477,7 @@ impl Machine {
                 break v;
             }
             if tries.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:3829: no quest item: the original rolls for ever");
             }
         };
         let free = (0..9).find(|&i| self.mem.r8(DS, svar::QUEST_ITEMS + i) == 0xFF).unwrap_or(9);

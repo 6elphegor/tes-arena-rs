@@ -8,27 +8,25 @@
 //! (`Machine::songs`). This is the driver's side:
 //!
 //! - the song's file (.xfm with this driver, `Machine::fm_song_file`) is
-//!   read from the game's files and its XMIDI events parsed (`Xmi`): a
-//!   delay is a run of bytes below 80h counted in 120 Hz ticks, a note-on
-//!   carries its own duration, FOR/NEXT loops are controllers 116 and 117
-//!   (a count, 0 for ever), 114 selects the timbre bank;
-//! - the timbres are AIL's Global Timbre Library SAMPLE.AD (`Bank`): (patch,
-//!   bank, offset) entries up to bank FFh, each timbre a size word and 12
-//!   bytes: a transpose and the OPL2 registers of the modulator (20h, 40h,
-//!   60h, 80h, E0h), the feedback/connection (C0h) and the carrier's; bank
-//!   127 holds the drums by key, their transpose the note they sound;
-//! - the voices are an OPL3 (`nuked-opl3`, Nuked-OPL3's emulation) in
-//!   two-operator mode: 18 voices (the Pro's two OPL2s), each note on a
-//!   free voice or the oldest's, its pitch from the key, the timbre's
-//!   transpose and the channel's bend (2 semitones), its loudness the
-//!   timbre's output level scaled by the velocity and the channel's volume
-//!   (controller 7), its side by the pan (controller 10), held by the
-//!   sustain pedal (64).
+//!   read from the game's files and given, with the music volume (D3A),
+//!   to the original's own driver (`fmdrv`: SBP1FM.ADV, the Miles AIL
+//!   XMIDI driver, ported routine by routine and run on its own image from
+//!   the game's directory), as the game gives it (2F9F:001F): its
+//!   sequencer, MIDI interpreter, voice allocation, volume and pitch
+//!   arithmetic and register writes are the original's, write for write
+//!   (tests/vectors/fmdrv.txt, from the original under the emulator);
+//! - the timbres are AIL's Global Timbre Library SAMPLE.AD, installed in
+//!   the driver's cache as the game installs them;
+//! - the writes go to the Sound Blaster Pro's two OPL2s (`Fm`), each an
+//!   OPL3 of Nuked-OPL3's (`nuked-opl3`) in its OPL2 mode: the left chip
+//!   heard on the left, the right on the right (the driver writes both
+//!   alike but for the operators' levels, which carry the pan); the
+//!   driver's timer is served at 120 Hz as AIL's interrupt serves it.
 //!
-//! What follows the original's driver only approximately: its voice
-//! allocation and priorities, its velocity and volume curves, its vibrato
-//! and its use of the two chips (here a voice sounds on both sides unless
-//! panned). The sequence's status (AIL's 1 playing, 2 done) goes back to
+//! `Xmi` parses a song's events for the tests and for the status without
+//! a stream (shots), which counts the song's ticks.
+//!
+//! The sequence's status (AIL's 1 playing, 2 done) goes back to
 //! the engine (`Machine::music_status`), which waits for a town's song to
 //! end before the weather's.
 //!
@@ -47,6 +45,7 @@ use arena::machine::Machine;
 use arena::music::Song;
 
 use crate::archive::Archive;
+use crate::fmdrv;
 
 /// The output rate.
 pub const RATE: u32 = 22050;
@@ -201,6 +200,7 @@ impl Xmi {
 /// A timbre of AIL's FM driver: a transpose and the OPL registers
 /// (modulator 20h, 40h, 60h, 80h, E0h; C0h; carrier 20h, 40h, 60h, 80h,
 /// E0h).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Timbre {
     pub transpose: u8,
@@ -208,9 +208,11 @@ pub struct Timbre {
 }
 
 /// A Global Timbre Library (SAMPLE.AD) by (patch, bank).
+#[cfg(test)]
 #[derive(Clone, Debug, Default)]
 pub struct Bank(pub HashMap<(u8, u8), Timbre>);
 
+#[cfg(test)]
 impl Bank {
     pub fn parse(d: &[u8]) -> Option<Bank> {
         let mut bank = HashMap::new();
@@ -234,337 +236,86 @@ impl Bank {
     }
 }
 
-/// The operators' register offsets of the nine channels of a register set.
-const OPS: [u16; 9] = [0, 1, 2, 8, 9, 10, 16, 17, 18];
-const VOICES: usize = 18;
-const PERCUSSION: u8 = 9;
 
-#[derive(Clone, Copy, Debug, Default)]
-struct Voice {
-    on: bool,
-    /// Held by the sustain pedal after its note-off.
-    held: bool,
-    ch: u8,
-    /// The key the note was asked with.
-    key: u8,
-    age: u64,
-    timbre: Option<(u8, u8)>,
+/// The card: the original's driver (`fmdrv`, SBP1FM.ADV from the game's
+/// directory) and the Sound Blaster Pro's two OPL2s, each an OPL3 of
+/// Nuked-OPL3's in its OPL2 mode, the left chip heard on the left and the
+/// right on the right.
+pub struct Fm {
+    driver: fmdrv::Driver,
+    gtl: Vec<u8>,
+    chips: [nuked_opl3::Opl3Chip; 2],
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Chan {
-    program: u8,
-    bank: u8,
-    volume: u8,
-    pan: u8,
-    bend: u16,
-    sustain: bool,
-}
-
-impl Default for Chan {
-    fn default() -> Chan {
-        Chan { program: 0, bank: 0, volume: 0x7F, pan: 64, bend: 0x2000, sustain: false }
-    }
-}
-
-/// The FM driver: the chip, its voices, the MIDI channels' state.
-pub struct Synth {
-    chip: nuked_opl3::Opl3Chip,
-    bank: Bank,
-    voices: [Voice; VOICES],
-    chans: [Chan; 16],
-    /// Each voice's velocity, for volume changes.
-    vel: [u8; VOICES],
-    age: u64,
-    /// The music's volume in percent (D3A, the options screen's; 0FFD:0DE8
-    /// gives it to the driver as its relative volume): the channels'
-    /// volumes scaled by it.
-    percent: u8,
-}
-
-/// (block, f-number) of a key (fractional, MIDI numbering).
-fn fnum(key: f32) -> (u8, u16) {
-    let f = 440.0 * 2f32.powf((key - 69.0) / 12.0);
-    for block in 0..8u8 {
-        let n = f * (1u32 << (20 - block)) as f32 / 49716.0;
-        if n < 1024.0 {
-            return (block, n.round().min(1023.0) as u16);
-        }
-    }
-    (7, 1023)
-}
-
-impl Synth {
-    pub fn new(bank: Bank) -> Synth {
-        let mut s = Synth { chip: nuked_opl3::Opl3Chip::new(RATE), bank, voices: [Voice::default(); VOICES], chans: [Chan::default(); 16], vel: [0; VOICES], age: 0, percent: 100 };
-        // OPL3 mode (105h), waveforms on (01h), no four-operator pairs.
-        s.chip.write_register(0x105, 1);
-        s.chip.write_register(0x104, 0);
-        s.chip.write_register(0x001, 0x20);
-        s.chip.write_register(0x0BD, 0);
-        s
+impl Fm {
+    /// The driver loaded from its image, with the timbre library
+    /// (SAMPLE.AD). None for an image that isn't the driver.
+    pub fn new(image: &[u8], gtl: Vec<u8>) -> Option<Fm> {
+        let driver = fmdrv::Driver::new(image)?;
+        let mut fm = Fm { driver, gtl, chips: [nuked_opl3::Opl3Chip::new(RATE), nuked_opl3::Opl3Chip::new(RATE)] };
+        fm.flush();
+        Some(fm)
     }
 
-    fn base(v: usize) -> (u16, u16) {
-        ((v / 9) as u16 * 0x100, (v % 9) as u16)
-    }
-
-    fn timbre_of(&self, ch: u8, key: u8) -> Option<((u8, u8), Timbre)> {
-        let id = if ch == PERCUSSION { (key, 127) } else { (self.chans[ch as usize].program, self.chans[ch as usize].bank) };
-        let t = self.bank.0.get(&id).or_else(|| self.bank.0.get(&(id.0, 0)))?;
-        Some((id, *t))
-    }
-
-    /// The voice's output levels for its velocity and channel volume.
-    fn levels(&mut self, v: usize) {
-        let voice = self.voices[v];
-        let Some(t) = voice.timbre.and_then(|id| self.bank.0.get(&id)).copied() else { return };
-        let (bank, c) = Synth::base(v);
-        let vol = self.vel[v] as u32 * self.chans[voice.ch as usize].volume as u32 * self.percent as u32 / (0x7F * 100);
-        let scale = |reg: u8| -> u8 {
-            let tl = (reg & 0x3F) as u32;
-            let att = 63 - (63 - tl) * vol / 0x7F;
-            (reg & 0xC0) | att as u8
-        };
-        let (m, k) = (OPS[c as usize], OPS[c as usize] + 3);
-        self.chip.write_register(bank + 0x40 + k, scale(t.regs[7]));
-        if t.regs[5] & 1 != 0 {
-            self.chip.write_register(bank + 0x40 + m, scale(t.regs[1]));
-        } else {
-            self.chip.write_register(bank + 0x40 + m, t.regs[1]);
+    /// The driver's writes to the chips.
+    fn flush(&mut self) {
+        for (chip, reg, v) in self.driver.take() {
+            self.chips[chip as usize & 1].write_register(reg as u16, v);
         }
     }
 
-    fn pitch(&mut self, v: usize, on: bool) {
-        let voice = self.voices[v];
-        let Some((_, t)) = self.timbre_of(voice.ch, voice.key) else { return };
-        let key = if voice.ch == PERCUSSION {
-            if t.transpose != 0 { t.transpose as f32 } else { voice.key as f32 }
-        } else {
-            voice.key as f32 + t.transpose as i8 as f32
-        };
-        let bend = (self.chans[voice.ch as usize].bend as f32 - 8192.0) / 8192.0 * 2.0;
-        let (block, f) = fnum(key + bend);
-        let (bank, c) = Synth::base(v);
-        self.chip.write_register(bank + 0xA0 + c, f as u8);
-        self.chip.write_register(bank + 0xB0 + c, (f >> 8) as u8 | block << 2 | if on { 0x20 } else { 0 });
+    /// A song started as the game starts one (2F9F:001F), at the music
+    /// volume (D3A). The game stops a song first (2F9F:0438) but for an
+    /// interior's on a load; one still playing is overwritten in the
+    /// driver's one state block, which both handles then serve (the new
+    /// song at twice its speed), as the original does.
+    pub fn play(&mut self, xmi: Vec<u8>, volume: u8) {
+        self.driver.play(xmi, &self.gtl, volume);
+        self.flush();
     }
 
-    fn pan_bits(&self, ch: u8) -> u8 {
-        match self.chans[ch as usize].pan {
-            0..=47 => 0x10,
-            80.. => 0x20,
-            _ => 0x30,
-        }
+    /// The fade of a stop (2F9F:0438: the volume to 0 over 800 ms).
+    pub fn fade(&mut self) {
+        self.driver.set_volume(0, 800);
     }
 
-    pub fn note_on(&mut self, ch: u8, key: u8, vel: u8) {
-        if vel == 0 {
-            self.note_off(ch, key);
-            return;
-        }
-        let Some((id, t)) = self.timbre_of(ch, key) else { return };
-        // A free voice, else the oldest (held ones first).
-        let v = (0..VOICES)
-            .find(|&v| !self.voices[v].on && !self.voices[v].held)
-            .or_else(|| (0..VOICES).filter(|&v| self.voices[v].held).min_by_key(|&v| self.voices[v].age))
-            .unwrap_or_else(|| (0..VOICES).min_by_key(|&v| self.voices[v].age).unwrap());
-        let (bank, c) = Synth::base(v);
-        // Off first, so the envelope restarts.
-        self.chip.write_register(bank + 0xB0 + c, 0);
-        if self.voices[v].timbre != Some(id) {
-            let (m, k) = (OPS[c as usize], OPS[c as usize] + 3);
-            let r = t.regs;
-            for (off, (a, b)) in [(0x20, (r[0], r[6])), (0x60, (r[2], r[8])), (0x80, (r[3], r[9])), (0xE0, (r[4], r[10]))] {
-                self.chip.write_register(bank + off + m, a);
-                self.chip.write_register(bank + off + k, b);
-            }
-        }
-        self.chip.write_register(bank + 0xC0 + c, (t.regs[5] & 0x0F) | self.pan_bits(ch));
-        self.age += 1;
-        self.voices[v] = Voice { on: true, held: false, ch, key, age: self.age, timbre: Some(id) };
-        self.vel[v] = vel;
-        self.levels(v);
-        self.pitch(v, true);
+    /// The music volume changed.
+    pub fn volume(&mut self, volume: u8) {
+        self.driver.set_volume(volume as u16, 0);
+        self.flush();
     }
 
-    pub fn note_off(&mut self, ch: u8, key: u8) {
-        for v in 0..VOICES {
-            let voice = self.voices[v];
-            if voice.on && voice.ch == ch && voice.key == key {
-                if self.chans[ch as usize].sustain {
-                    self.voices[v].held = true;
-                    self.voices[v].on = false;
-                } else {
-                    self.voices[v].on = false;
-                    self.pitch(v, false);
-                }
-            }
-        }
+    /// Stopped and released (2F9F:0438 after the fade).
+    pub fn stop(&mut self) {
+        self.driver.stop_sequence();
+        self.driver.release_sequence();
+        self.flush();
     }
 
-    pub fn control(&mut self, ch: u8, c: u8, val: u8) {
-        let chan = &mut self.chans[ch as usize];
-        match c {
-            7 => {
-                chan.volume = val;
-                for v in 0..VOICES {
-                    if (self.voices[v].on || self.voices[v].held) && self.voices[v].ch == ch {
-                        self.levels(v);
-                    }
-                }
-            }
-            10 => chan.pan = val,
-            64 => {
-                chan.sustain = val >= 64;
-                if !chan.sustain {
-                    for v in 0..VOICES {
-                        if self.voices[v].held && self.voices[v].ch == ch {
-                            self.voices[v].held = false;
-                            self.pitch(v, false);
-                        }
-                    }
-                }
-            }
-            114 => chan.bank = val,
-            121 => {
-                chan.bend = 0x2000;
-                chan.sustain = false;
-            }
-            123 => {
-                for v in 0..VOICES {
-                    if self.voices[v].ch == ch && (self.voices[v].on || self.voices[v].held) {
-                        self.voices[v].on = false;
-                        self.voices[v].held = false;
-                        self.pitch(v, false);
-                    }
-                }
-            }
-            _ => {}
-        }
+    /// One service of the driver's 120 Hz timer.
+    pub fn serve(&mut self) {
+        self.driver.serve();
+        self.flush();
     }
 
-    /// The relative volume set (percent, at most 100).
-    pub fn set_percent(&mut self, p: u8) {
-        self.percent = p.min(100);
-        for v in 0..VOICES {
-            if self.voices[v].on || self.voices[v].held {
-                self.levels(v);
-            }
-        }
+    /// The sequence's status: 0 none or stopped, 1 playing, 2 done.
+    pub fn status(&self) -> u8 {
+        self.driver.status() as u8
     }
 
-    pub fn program(&mut self, ch: u8, p: u8) {
-        self.chans[ch as usize].program = p;
-    }
-
-    pub fn bend(&mut self, ch: u8, b: u16) {
-        self.chans[ch as usize].bend = b;
-        for v in 0..VOICES {
-            if self.voices[v].on && self.voices[v].ch == ch {
-                self.pitch(v, true);
-            }
-        }
-    }
-
-    /// Every voice off, the channels as at a song's start (2F9F:001F sets
-    /// every channel's volume to 7Fh).
-    pub fn reset(&mut self) {
-        for v in 0..VOICES {
-            self.voices[v].on = false;
-            self.voices[v].held = false;
-            let (bank, c) = Synth::base(v);
-            self.chip.write_register(bank + 0xB0 + c, 0);
-        }
-        self.chans = [Chan::default(); 16];
-    }
-
-    /// One stereo sample.
     fn sample(&mut self) -> [i16; 2] {
-        let mut s = [0i16; 2];
-        let _ = self.chip.generate_resampled(&mut s);
-        s
-    }
-}
-
-/// A song being played: where it is, its notes to end, its loops.
-pub struct Player {
-    song: Xmi,
-    at: usize,
-    wait: u32,
-    now: u64,
-    offs: Vec<(u64, u8, u8)>,
-    loops: Vec<(usize, u8)>,
-    pub done: bool,
-}
-
-impl Player {
-    pub fn new(song: Xmi) -> Player {
-        let wait = song.events.first().map_or(0, |e| e.0);
-        Player { song, at: 0, wait, now: 0, offs: Vec::new(), loops: Vec::new(), done: false }
-    }
-
-    /// One 120 Hz tick: the notes ending now, then the events due.
-    pub fn tick(&mut self, synth: &mut Synth) {
-        let now = self.now;
-        self.offs.retain(|&(t, ch, key)| {
-            if t <= now {
-                synth.note_off(ch, key);
-                false
-            } else {
-                true
-            }
-        });
-        while !self.done && self.wait == 0 {
-            let Some(&(_, ev)) = self.song.events.get(self.at) else {
-                self.done = true;
-                break;
-            };
-            self.at += 1;
-            match ev {
-                Ev::Note { ch, key, vel, dur } => {
-                    synth.note_on(ch, key, vel);
-                    self.offs.push((now + dur.max(1) as u64, ch, key));
-                }
-                Ev::Ctrl { c: 116, v, .. } => self.loops.push((self.at, v)),
-                Ev::Ctrl { c: 117, v, .. } => {
-                    if let Some(&(start, count)) = self.loops.last() {
-                        if v < 64 {
-                            self.loops.pop();
-                        } else if count == 0 {
-                            self.at = start;
-                        } else if count > 1 {
-                            self.loops.last_mut().unwrap().1 = count - 1;
-                            self.at = start;
-                        } else {
-                            self.loops.pop();
-                        }
-                    }
-                }
-                Ev::Ctrl { ch, c, v } => synth.control(ch, c, v),
-                Ev::Program { ch, p } => synth.program(ch, p),
-                Ev::Bend { ch, v } => synth.bend(ch, v),
-                Ev::End => {
-                    self.done = true;
-                    for &(_, ch, key) in &self.offs {
-                        synth.note_off(ch, key);
-                    }
-                    self.offs.clear();
-                }
-            }
-            self.wait = self.song.events.get(self.at).map_or(0, |e| e.0);
-        }
-        self.wait = self.wait.saturating_sub(1);
-        self.now += 1;
+        let (mut l, mut r) = ([0i16; 2], [0i16; 2]);
+        let _ = self.chips[0].generate_resampled(&mut l);
+        let _ = self.chips[1].generate_resampled(&mut r);
+        [l[0], r[1]]
     }
 }
 
 /// Renders a song's first `seconds` to stereo samples at RATE (the
 /// tests').
 #[cfg(test)]
-pub fn render(song: &Xmi, bank: &Bank, seconds: f32) -> Vec<i16> {
-    let mut synth = Synth::new(bank.clone());
-    let mut player = Player::new(song.clone());
+pub fn render(fm: &mut Fm, xmi: &[u8], seconds: f32) -> Vec<i16> {
+    fm.play(xmi.to_vec(), 100);
     let n = (seconds * RATE as f32) as usize;
     let mut out = Vec::with_capacity(n * 2);
     let mut frac = 0u32;
@@ -572,9 +323,9 @@ pub fn render(song: &Xmi, bank: &Bank, seconds: f32) -> Vec<i16> {
         frac += TICKS;
         while frac >= RATE {
             frac -= RATE;
-            player.tick(&mut synth);
+            fm.serve();
         }
-        out.extend(synth.sample());
+        out.extend(fm.sample());
     }
     out
 }
@@ -582,10 +333,16 @@ pub fn render(song: &Xmi, bank: &Bank, seconds: f32) -> Vec<i16> {
 enum Cmd {
     /// Fade out over 800 ms and stop (2F9F:0438).
     Stop,
-    Play(Xmi),
-    /// The relative volume (D3A) changed.
+    /// A song's file, at the music volume.
+    Play(Vec<u8>, u8),
+    /// The music volume changed (the options screen's arrows: 0FFD:0DE8
+    /// at once).
     Volume(u8),
 }
+
+/// The music volume (D3A, 0..64h), which the game gives the driver with
+/// each song (2F9F:01A3) and the options screen as it changes.
+use arena::options::var::MUSIC as MUSIC_VOLUME;
 
 /// The music driver: the songs asked for, played on a thread of its own
 /// (its own PulseAudio stream), or only logged.
@@ -594,12 +351,12 @@ pub struct Music {
     log: bool,
     tx: Option<Sender<Cmd>>,
     status: Arc<AtomicU8>,
-    songs: HashMap<Vec<u8>, Option<Xmi>>,
+    songs: HashMap<Vec<u8>, Option<(Vec<u8>, Xmi)>>,
     /// Without a thread (shots): the song asked for last and the game's
     /// ticks it has played, for its status.
     headless: Option<(u32, u32)>,
-    /// The volume last given to the thread.
-    percent: u8,
+    /// The music volume last given the driver.
+    volume: Option<u8>,
 }
 
 impl Music {
@@ -607,7 +364,7 @@ impl Music {
     /// stream are there), `log` printing each song asked for.
     pub fn new(archive: Rc<Archive>, play: bool, log: bool) -> Music {
         let (tx, status) = if play { open(&archive) } else { (None, Arc::new(AtomicU8::new(0))) };
-        Music { archive, log, tx, status, songs: HashMap::new(), headless: None, percent: 100 }
+        Music { archive, log, tx, status, songs: HashMap::new(), headless: None, volume: None }
     }
 
     /// Whether a driver is loaded (it plays or logs).
@@ -615,13 +372,20 @@ impl Music {
         self.tx.is_some() || self.log
     }
 
-    /// Before a frame: the driver loaded (`load_driver`) and the song's
-    /// status.
+    /// Before a frame: the driver loaded (`load_driver`), the song's
+    /// status, and a change of the music volume passed on.
     pub fn before(&mut self, m: &mut Machine) {
         if !self.on() {
             return;
         }
         load_driver(m);
+        let v = m.mem.r8(arena::mem::DS, MUSIC_VOLUME);
+        if self.volume.is_some_and(|old| old != v) {
+            if let Some(tx) = &self.tx {
+                let _ = tx.send(Cmd::Volume(v));
+            }
+        }
+        self.volume = Some(v);
         m.music_status = match (&self.tx, self.headless) {
             (Some(_), _) => self.status.load(Ordering::Relaxed),
             (None, Some((len, played))) => {
@@ -641,13 +405,6 @@ impl Music {
         if let Some((_, played)) = &mut self.headless {
             *played += ticks * TICKS / 18;
         }
-        let percent = m.mem.r8(arena::mem::DS, arena::options::var::MUSIC);
-        if percent != self.percent {
-            self.percent = percent;
-            if let Some(tx) = &self.tx {
-                let _ = tx.send(Cmd::Volume(percent));
-            }
-        }
         for s in std::mem::take(&mut m.songs) {
             if !self.on() {
                 continue;
@@ -665,20 +422,25 @@ impl Music {
                     if self.log {
                         println!("music: {}", String::from_utf8_lossy(&file));
                     }
-                    let Some(xmi) = self.song(&file) else { continue };
+                    let Some((data, xmi)) = self.song(&file) else { continue };
                     self.headless = Some((if xmi.events.iter().any(|e| matches!(e.1, Ev::Ctrl { c: 116, v: 0, .. })) { u32::MAX } else { xmi.length() }, 0));
+                    let v = m.mem.r8(arena::mem::DS, MUSIC_VOLUME);
+                    self.volume = Some(v);
                     if let Some(tx) = &self.tx {
-                        let _ = tx.send(Cmd::Play(xmi));
+                        let _ = tx.send(Cmd::Play(data, v));
                     }
                 }
             }
         }
     }
 
-    fn song(&mut self, name: &[u8]) -> Option<Xmi> {
+    fn song(&mut self, name: &[u8]) -> Option<(Vec<u8>, Xmi)> {
         let key = name.to_ascii_uppercase();
         let archive = self.archive.clone();
-        self.songs.entry(key.clone()).or_insert_with(|| archive.read(&String::from_utf8_lossy(&key)).and_then(|d| Xmi::parse(&d))).clone()
+        self.songs
+            .entry(key.clone())
+            .or_insert_with(|| archive.read(&String::from_utf8_lossy(&key)).and_then(|d| Some((d.clone(), Xmi::parse(&d)?))))
+            .clone()
     }
 }
 
@@ -710,12 +472,16 @@ pub fn movie_song(name: &str) -> Option<u16> {
     }
 }
 
-/// The thread: SAMPLE.AD loaded, a stereo PulseAudio stream, the songs
-/// played as asked. None where either is missing.
+/// The thread: SAMPLE.AD and the driver loaded, a stereo PulseAudio
+/// stream, the songs played as asked. None where any is missing.
 fn open(archive: &Archive) -> (Option<Sender<Cmd>>, Arc<AtomicU8>) {
     let status = Arc::new(AtomicU8::new(0));
-    let Some(bank) = archive.read("SAMPLE.AD").and_then(|d| Bank::parse(&d)) else {
+    let Some(gtl) = archive.read("SAMPLE.AD") else {
         eprintln!("no music: SAMPLE.AD missing");
+        return (None, status);
+    };
+    let Some(fm) = archive.read("SBP1FM.ADV").and_then(|d| Fm::new(&d, gtl)) else {
+        eprintln!("no music: SBP1FM.ADV missing");
         return (None, status);
     };
     let (tx, rx) = std::sync::mpsc::channel();
@@ -724,7 +490,7 @@ fn open(archive: &Archive) -> (Option<Sender<Cmd>>, Arc<AtomicU8>) {
     std::thread::spawn(move || match crate::audio::Pulse::open_stream(2, c"music") {
         Some(p) => {
             let _ = ok_tx.send(true);
-            run(p, Synth::new(bank), rx, st);
+            run(p, fm, rx, st);
         }
         None => {
             let _ = ok_tx.send(false);
@@ -738,16 +504,18 @@ fn open(archive: &Archive) -> (Option<Sender<Cmd>>, Arc<AtomicU8>) {
     }
 }
 
-fn run(pulse: crate::audio::Pulse, mut synth: Synth, rx: Receiver<Cmd>, status: Arc<AtomicU8>) {
+/// A song to start after a fade: its file and the music volume.
+type Next = (Vec<u8>, u8);
+
+fn run(pulse: crate::audio::Pulse, mut fm: Fm, rx: Receiver<Cmd>, status: Arc<AtomicU8>) {
     const CHUNK: usize = 512;
-    let mut player: Option<Player> = None;
     let mut frac = 0u32;
     // The fade's samples left (800 ms at the stop), and the song after it.
-    let mut fade: Option<(usize, Option<Xmi>)> = None;
+    let mut fade: Option<(usize, Option<Next>)> = None;
     const FADE: usize = (RATE as usize) * 8 / 10;
     let mut buf = vec![0i16; CHUNK * 2];
     loop {
-        let playing = player.as_ref().is_some_and(|p| !p.done) || fade.is_some();
+        let playing = fm.status() == 1 || fade.is_some();
         let cmd = if playing {
             rx.try_recv().ok()
         } else {
@@ -758,56 +526,43 @@ fn run(pulse: crate::audio::Pulse, mut synth: Synth, rx: Receiver<Cmd>, status: 
         };
         match cmd {
             Some(Cmd::Stop) => {
-                if player.as_ref().is_some_and(|p| !p.done) && fade.is_none() {
+                if fm.status() == 1 && fade.is_none() {
+                    fm.fade();
                     fade = Some((FADE, None));
                 }
             }
-            Some(Cmd::Play(x)) => match &mut fade {
-                Some((_, next)) => *next = Some(x),
-                None => {
-                    synth.reset();
-                    player = Some(Player::new(x));
-                    status.store(1, Ordering::Relaxed);
-                }
+            Some(Cmd::Play(x, v)) => match &mut fade {
+                Some((_, next)) => *next = Some((x, v)),
+                None => fm.play(x, v),
             },
-            Some(Cmd::Volume(p)) => synth.set_percent(p),
+            Some(Cmd::Volume(v)) => fm.volume(v),
             None => {}
         }
-        if player.is_none() && fade.is_none() {
-            continue;
-        }
+        // Released voices still sound their release: the chips run on
+        // until the next song, as the card's did.
         for i in 0..CHUNK {
             frac += TICKS;
             while frac >= RATE {
                 frac -= RATE;
-                if let Some(p) = &mut player {
-                    if !p.done {
-                        p.tick(&mut synth);
-                        if p.done {
-                            status.store(2, Ordering::Relaxed);
-                        }
-                    }
-                }
+                fm.serve();
             }
-            let mut s = synth.sample();
+            let s = fm.sample();
             if let Some((left, _)) = &mut fade {
-                let g = *left as i32;
-                s = [(s[0] as i32 * g / FADE as i32) as i16, (s[1] as i32 * g / FADE as i32) as i16];
                 *left = left.saturating_sub(1);
             }
             buf[2 * i] = s[0];
             buf[2 * i + 1] = s[1];
         }
+        status.store(fm.status(), Ordering::Relaxed);
         pulse.write(&buf);
         if let Some((0, next)) = &mut fade {
             let next = next.take();
             fade = None;
-            synth.reset();
-            status.store(0, Ordering::Relaxed);
-            player = next.map(|x| {
-                status.store(1, Ordering::Relaxed);
-                Player::new(x)
-            });
+            fm.stop();
+            if let Some((x, v)) = next {
+                fm.play(x, v);
+            }
+            status.store(fm.status(), Ordering::Relaxed);
         }
     }
 }
@@ -874,22 +629,23 @@ mod tests {
         }
     }
 
-    /// Ten seconds of a song: not silent, not clipping. With MUSIC_WAV=DIR
-    /// the renders are written there.
+    /// Ten seconds of a song through the original's driver and the two
+    /// chips: not silent, not clipping, both sides sounding. With
+    /// MUSIC_WAV=DIR the renders are written there.
     #[test]
     fn renders() {
         let Some(a) = game() else { return };
-        let bank = Bank::parse(&a.read("SAMPLE.AD").unwrap()).unwrap();
+        let mut fm = Fm::new(&a.read("SBP1FM.ADV").unwrap(), a.read("SAMPLE.AD").unwrap()).unwrap();
         for s in ["CITY", "SUNNYDAY", "DUNGEON1", "TAVERN"] {
-            let x = Xmi::parse(&a.read(&format!("{s}.XFM")).unwrap()).unwrap();
-            let pcm = render(&x, &bank, 10.0);
+            let pcm = render(&mut fm, &a.read(&format!("{s}.XFM")).unwrap(), 10.0);
             let peak = pcm.iter().map(|&v| (v as i32).abs()).max().unwrap();
-            let rms = (pcm.iter().map(|&v| (v as f64).powi(2)).sum::<f64>() / pcm.len() as f64).sqrt();
-            assert!(rms > 20.0 && peak > 1000, "{s}: rms {rms}, peak {peak}");
+            let rms = |side: usize| (pcm.iter().skip(side).step_by(2).map(|&v| (v as f64).powi(2)).sum::<f64>() / (pcm.len() / 2) as f64).sqrt();
+            let (l, r) = (rms(0), rms(1));
+            assert!(l > 20.0 && r > 20.0 && peak > 1000, "{s}: rms {l} {r}, peak {peak}");
             assert!(peak < 32767, "{s}: clipped");
             if let Ok(dir) = std::env::var("MUSIC_WAV") {
                 write_wav(&std::path::Path::new(&dir).join(format!("{s}.wav")), &pcm);
-                eprintln!("{s}: rms {rms:.0}, peak {peak}");
+                eprintln!("{s}: rms {l:.0} {r:.0}, peak {peak}");
             }
         }
     }
@@ -913,25 +669,5 @@ mod tests {
             d.extend_from_slice(&v.to_le_bytes());
         }
         std::fs::write(path, d).unwrap();
-    }
-
-    /// A FOR/NEXT loop of 2 plays its body twice.
-    #[test]
-    fn loops() {
-        let note = Ev::Note { ch: 0, key: 60, vel: 100, dur: 1 };
-        let x = Xmi {
-            events: vec![(0, Ev::Ctrl { ch: 0, c: 116, v: 2 }), (1, note), (1, Ev::Ctrl { ch: 0, c: 117, v: 127 }), (1, Ev::End)],
-            timbres: vec![],
-        };
-        let mut synth = Synth::new(Bank::default());
-        let mut p = Player::new(x);
-        let mut ticks = 0;
-        while !p.done && ticks < 100 {
-            p.tick(&mut synth);
-            ticks += 1;
-        }
-        // The FOR at 0, the note at 1, the NEXT at 2; the note again at 3,
-        // the NEXT at 4, the end at 5: six ticks run.
-        assert_eq!(ticks, 6);
     }
 }

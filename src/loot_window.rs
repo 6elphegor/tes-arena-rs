@@ -65,9 +65,10 @@ pub trait LootHooks {
     fn sound(&mut self, m: &mut Machine, si: u16) {
         m.sound_file(si);
     }
-    /// 1194:D363: whether the staff's text was shown already (the carry).
-    fn piece_told(&mut self, _m: &mut Machine) -> bool {
-        false
+    /// 1194:D363: the piece completed (`Machine::complete_staff_piece`);
+    /// the carry, true where none was ready (then no text).
+    fn piece_told(&mut self, m: &mut Machine) -> bool {
+        !m.complete_staff_piece()
     }
     /// 1194:D986: the eighth piece: the quest's end begins.
     fn last_piece(&mut self, _m: &mut Machine) {}
@@ -158,6 +159,24 @@ impl Machine {
         old >> 2
     }
 
+    /// 2433:0199, leaving an interior or a dungeon: with piles in use
+    /// (FF2), bank 6 mapped (the bank before saved at 4D77; AX `ax` with
+    /// EMS off), the piles' table cleared (15E0h bytes at the frame's
+    /// A000h), none in use, the bank put back.
+    pub fn piles_forget(&mut self, ax: u16) {
+        if self.mem.r8(DS, PILE_COUNT) == 0 {
+            return;
+        }
+        let old = self.map_bank(BANK_PILES, ax);
+        self.mem.w16(DS, BANK, old);
+        let frame = self.mem.r16(DS, FRAME_SEG);
+        for i in 0..0x15E0 {
+            self.mem.w8(frame, TABLE + i, 0);
+        }
+        self.mem.w8(DS, PILE_COUNT, 0);
+        self.map_bank(old, old & 0xFF00);
+    }
+
     /// 0000:9CA0: the string at seg:si copied to es:di with its NUL; DI
     /// after the NUL.
     fn copy_str(&mut self, seg: u16, mut si: u16, es: u16, mut di: u16) -> u16 {
@@ -212,7 +231,7 @@ impl Machine {
     fn of_100_to_256(ax: u16) -> Option<u16> {
         let p = (ax as i16 as i32) * 256;
         let (q, r) = (p / 100, p % 100);
-        let q = i16::try_from(q).ok()? as u16;
+        let q = i16::try_from(q).ok().or_else(|| crate::giveup::original("1194:5B34: the divide by 100 overflows"))? as u16;
         if r.unsigned_abs() >= 0x32 {
             return Some(if (ax as i16) < 0 { q.wrapping_sub(1) } else { q.wrapping_add(1) });
         }
@@ -264,7 +283,7 @@ impl Machine {
             hooks.message_box(self, 0x4B33);
             return Some(true);
         }
-        let q = (ax.wrapping_sub(bx) << 8).checked_div(bx >> 1)?;
+        let q = (ax.wrapping_sub(bx) << 8).checked_div(bx >> 1).or_else(|| crate::giveup::original("1194:4D99: the weight limit's divide by zero"))?;
         let load = Self::of_100_to_256(q)?;
         self.mem.w8(DS, LOAD, load as u8);
         Some(false)
@@ -364,7 +383,7 @@ impl Machine {
             // the port takes it as hanging.
             steps += 1;
             if steps > 0x80000 {
-                return None;
+                return crate::giveup::original("2433:0883: no pile found: the original searches for ever");
             }
             if !at_level {
                 if self.mem.r16(frame, si.wrapping_add(2)) == sq {
@@ -596,7 +615,7 @@ impl Machine {
         self.mem.w8(DS, 0x12CE, ah);
         let ax = (al as u16).wrapping_sub(1);
         if ax / 12 > 0xFF {
-            return None;
+            return crate::giveup::original("2433:0AA1: the key's divide overflows");
         }
         let k = ax % 12;
         let name = self.skip_strings(DS, 0x342B, k);
@@ -671,7 +690,7 @@ impl Machine {
                 at = at.wrapping_add(1);
                 n += 1;
                 if n > 0xFFFF {
-                    return None;
+                    return crate::giveup::original("2433:0328: the list has no end: the original reads on for ever");
                 }
             }
             self.mem.w8(DS, at, al);

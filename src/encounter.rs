@@ -232,7 +232,7 @@ impl Machine {
     /// calms down, and the guards arrive. None for another hook.
     pub fn guards_hook(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, hook: u32) -> Option<()> {
         if hook != 0x3F0C && hook != 0x3F3B {
-            return None;
+            return crate::giveup::not_ported("0000:3F0C: a guards hook not ported");
         }
         // 3F10 / 3F3F: STPTHIEF.VOC or HALT.VOC (23BA:012B).
         self.sound_file(if hook == 0x3F0C { 0x1A97 } else { 0x1A8E });
@@ -801,7 +801,7 @@ impl Machine {
             // all come out as type 0.
             tries += 1;
             if tries > 0x10000 {
-                return None;
+                return crate::giveup::original("24FA:0313: no equipment found: the original rolls for ever");
             }
             let (ax, w, next) = self.npc_weapon(bx, di)?;
             if w == 0 && ax != 0 {
@@ -897,7 +897,7 @@ impl Machine {
         while self.mem.r8(data, si.wrapping_add(n)) != 0xFF {
             n = n.wrapping_add(1);
             if n == 0 {
-                return None;
+                return crate::giveup::original("24FA:0434: the list has no end: the original reads on for ever");
             }
         }
         if n == 0 {
@@ -934,7 +934,7 @@ impl Machine {
                 }
             }
             if spread & 0xFF == 0 {
-                return None;
+                return crate::giveup::original("0000:1B19: no free square near the player: the original keeps trying");
             }
             spread = (spread & 0xFF00) | ((spread as u8) >> 1) as u16;
         }

@@ -166,7 +166,7 @@ impl Machine {
             cast = cast.wrapping_add(0x16);
         }
         if self.mem.r16(DS, cast.wrapping_add(0xA)) & 1 != 0 {
-            return None;
+            return crate::giveup::original("29CF:01C4: no free cast record: the original searches on through memory");
         }
         self.mem.w16(DS, cast.wrapping_add(0xA), 1);
         let level = self.mem.r8(seg, rec.wrapping_add(field::LEVEL)) as u16 + 1;
@@ -292,7 +292,7 @@ impl Machine {
             0x0822 => self.sp_timed_pair(x, 0x400, 0x28, false),
             0x0841 => self.sp_timed_pair(x, 0x800, 0x2C, true),
             0x0863 => self.sp_timed_pair(x, 0x1000, 0x30, true),
-            _ => None,
+            _ => crate::giveup::not_ported("the table at 83E2: a spell kind not in the table"),
         }
     }
 
@@ -304,7 +304,7 @@ impl Machine {
     fn sp_sub_leaky(&mut self, h: u16, x: Fx) -> Option<()> {
         let (_, at_target) = self.sp_sub(h, x)?;
         if at_target && x.fs != DS {
-            return None;
+            return crate::giveup::not_ported("29CF:0941: DS left at the target's segment: not followed");
         }
         Some(())
     }
@@ -409,7 +409,7 @@ impl Machine {
                 Some((self.sp_transfer(Fx { bp, ..x })?, true))
             }
             0x0604 => Some((self.sp_transfer(x)?, true)),
-            _ => None,
+            _ => crate::giveup::not_ported("2EBD:0102: a spell routine not in the table"),
         }
     }
 
@@ -441,7 +441,7 @@ impl Machine {
     /// 2CDD:089A. Caster level + 1 over the spell's +18 (None: divide by 0).
     fn h089a(&self, x: &Fx) -> Option<u16> {
         let d = self.sw(x, 0x18);
-        (d != 0).then(|| self.mem.r16(DS, svar::CASTER_LEVEL) / d)
+        (d != 0).then(|| self.mem.r16(DS, svar::CASTER_LEVEL) / d).or_else(|| crate::giveup::original("2CDD:089A: a spell's per-level divisor (+18) of 0: the divide by zero"))
     }
 
     /// 2CDD:08B7. `h089a` × +6 (the low word).
@@ -453,7 +453,7 @@ impl Machine {
     fn h08c3(&self, x: &Fx) -> Option<u16> {
         let d = self.sw(x, 0xC);
         if d == 0 {
-            return None;
+            return crate::giveup::original("2CDD:08C3: a divide by zero");
         }
         let e = self.sw(x, 0x1E);
         Some((self.mem.r16(DS, svar::CASTER_LEVEL) / d).wrapping_mul(e).wrapping_add(e))
@@ -746,7 +746,7 @@ impl Machine {
         if x.fs != DS {
             // DS is left at the target's segment: the message and every
             // table read after it go through the wrong segment.
-            return None;
+            return crate::giveup::not_ported("2CDD:03C1: DS left at the target's segment: not followed");
         }
         self.msg(SUCCEEDED);
         Some(())
@@ -778,7 +778,7 @@ impl Machine {
         let strength = self.h08b7(&x)?.wrapping_add(self.sw(&x, 0));
         let d = self.sw(&x, 0xC);
         if d == 0 {
-            return None;
+            return crate::giveup::original("2CDD:0447: a divide by zero");
         }
         let lvl = self.mem.r8(DS, PLAYER + field::LEVEL) as u16 + 1;
         let timer = (lvl / d).wrapping_mul(self.sw(&x, 0x1E));
@@ -823,7 +823,7 @@ impl Machine {
         let (b, _) = self.range_0bb4(&x)?;
         let v = b.wrapping_add(a) as i16 as i32 as u32;
         let q = (v << 8) / 100;
-        let q = u16::try_from(q).ok()?;
+        let q = u16::try_from(q).ok().or_else(|| crate::giveup::original("2CDD:050F: the fatigue's divide by 100 overflows"))?;
         let fat = x.dx.wrapping_add(field::FATIGUE);
         let ax = (q << 6).wrapping_add(self.mem.r16(x.fs, fat));
         let cap = (self.mem.r8(x.fs, x.dx.wrapping_add(0x29)) as u16 + self.mem.r8(x.fs, x.dx.wrapping_add(0x2E)) as u16) << 6;

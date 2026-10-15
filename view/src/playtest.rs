@@ -14,10 +14,11 @@
 //! its height out of range). The run stops at the first None or panic,
 //! the state then being the port's guess. The last line sums it up:
 //! `PLAYTEST seed .. frames .. result ..`. A None that a port routine
-//! marks as the original's own fault (`Machine::gave_up`, set by
-//! `original_fault`) prints `ORIGFAULT frame ..: why` instead; with
-//! `--save-dir` and the targeted acts on, the run then reloads its save
-//! and goes on.
+//! marks as the original's own fault (`arena::giveup::original`, or
+//! `Machine::original_fault`) prints `ORIGFAULT frame ..: why` instead;
+//! with `--save-dir` and the targeted acts on, the run then reloads its
+//! save and goes on. One marked as not ported or as an error prints
+//! `NOTPORTED` or `ERROR` with its why and stops; an unmarked one `NONE`.
 //!
 //! The targeted acts (`PT_TOURS` percent of turns) also use the game's
 //! save and load menus (a slot clicked, a name typed, Enter; then the
@@ -295,8 +296,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         crate::save_to(&mut engine, sdir, slot, st.assets.palette);
     }
     // A sub-step that gives up (None) is reported and the run goes on.
-    let report_none = |what: &str, n: usize, engine: &Engine, run: &arena::transit::Run| match engine.m.gave_up {
-        Some(why) => println!("ORIGFAULT frame {n} ({what}): {why}; {}", place(engine, run)),
+    let report_none = |what: &str, n: usize, engine: &Engine, run: &arena::transit::Run| match arena::giveup::peek() {
+        Some(g) => println!("{} frame {n} ({what}): {}; {}", g.kind.marker(), g.why, place(engine, run)),
         None => println!("NONE frame {n} ({what}): {}", place(engine, run)),
     };
     // An original fault met in a turn: the game reloaded from the save, as
@@ -314,6 +315,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             eprintln!("TRACE frame {n} ({what}) {}", place(engine, run));
         }
         engine.m.gave_up = None;
+        arena::giveup::take();
         let r = catch_unwind(AssertUnwindSafe(|| shot_frame(dir, engine, run, st, &intent)));
         let ms = t.elapsed().as_millis();
         if ms > 1000 {
@@ -322,15 +324,19 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         match r {
             Ok(Some(())) => {}
             Ok(None) => {
-                if let Some(why) = engine.m.gave_up {
-                    println!("ORIGFAULT frame {n} ({what}): {why}; {}", place(engine, run));
+                let gave_up = arena::giveup::peek();
+                if let Some(g) = gave_up.filter(|g| g.kind == arena::giveup::Kind::Original) {
+                    println!("ORIGFAULT frame {n} ({what}): {}; {}", g.why, place(engine, run));
                     if tours && saves.is_some() {
                         fault.set(true);
                         return true;
                     }
                     return false;
                 }
-                println!("NONE frame {n} ({what}): {}", place(engine, run));
+                match gave_up {
+                    Some(g) => println!("{} frame {n} ({what}): {}; {}", g.kind.marker(), g.why, place(engine, run)),
+                    None => println!("NONE frame {n} ({what}): {}", place(engine, run)),
+                }
                 return false;
             }
             Err(e) => {
@@ -391,23 +397,24 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             match (tours, saves) {
                 // As the window does after the game's end (`game_over`): the
                 // main menu's Load on a fresh engine, the start dungeon loaded.
-                (true, Some((sdir, slot))) => match {
+                (true, Some((sdir, slot))) => {
                     engine = crate::world::load(dir, "START.MIF");
-                    crate::load_from(&mut engine, dir, sdir, slot)
-                } {
-                    Ok((_, r)) => {
-                        *run = r;
-                        st.assets = Assets::new(dir, &mut engine);
-                        st.over = false;
-                        st.ui = None;
-                        no_heal = 0;
-                        *counts.entry("reloaded").or_default() += 1;
+                    let loaded = crate::load_from(&mut engine, dir, sdir, slot);
+                    match loaded {
+                        Ok((_, r)) => {
+                            *run = r;
+                            st.assets = Assets::new(dir, &mut engine);
+                            st.over = false;
+                            st.ui = None;
+                            no_heal = 0;
+                            *counts.entry("reloaded").or_default() += 1;
+                        }
+                        Err(e) => {
+                            println!("SAVELOAD frame {n}: reload after the end failed: {e}");
+                            break;
+                        }
                     }
-                    Err(e) => {
-                        println!("SAVELOAD frame {n}: reload after the end failed: {e}");
-                        break;
-                    }
-                },
+                }
                 _ => break,
             }
         }

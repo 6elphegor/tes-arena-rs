@@ -99,7 +99,7 @@ impl AreaHooks for Areas<'_> {
             }
         } else if let Some(files) = self.files.as_deref_mut() {
             if m.city_entered(files, &mut arena::quest::NoQuestHooks).is_none() {
-                eprintln!("the town's quests met something not ported");
+                eprintln!("the town's quests gave up: {}", arena::giveup::describe());
             }
         }
     }
@@ -174,7 +174,7 @@ impl AreaHooks for Areas<'_> {
 
     fn spawn(&mut self, m: &mut Machine, n: u16) {
         if m.spawn_actors(n, 0xA).is_none() {
-            eprintln!("the townspeople met code not ported");
+            eprintln!("the townspeople gave up: {}", arena::giveup::describe());
         }
     }
 }
@@ -260,7 +260,7 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
     match r {
         Some(arena::load::Loaded::Done) if !failed => {}
         Some(arena::load::Loaded::Missing) => return Err(format!("Slot {slot} is empty in {}.", save.display())),
-        _ => return Err(format!("Slot {slot} met code not ported while loading.")),
+        _ => return Err(format!("Slot {slot} gave up while loading: {}.", arena::giveup::describe())),
     }
     e.m.mem.w32(DS, 0xCD4A, 0);
     let run = run_of(&e.m);
@@ -308,7 +308,7 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
     // ...) and its quests made. A store's greeting names it from that
     // list (%en).
     if city && engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
-        eprintln!("the town's quests met something not ported");
+        eprintln!("the town's quests gave up: {}", arena::giveup::describe());
     }
     // A level begun as an interior: its level hooks (0000:0B15, as an
     // interior's run sets them: the way out, the INF's hook, CD52 the
@@ -397,7 +397,7 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let next = r?;
     let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
     if engine.world_enter(h).is_none() || h.failed {
-        eprintln!("entering the area met code not ported");
+        eprintln!("entering the area gave up: {}", arena::giveup::describe());
         return None;
     }
     let name = String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)).into_owned();

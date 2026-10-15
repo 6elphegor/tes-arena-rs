@@ -66,7 +66,7 @@ impl Machine {
         // such exit.
         let Some(handle) = self.file_open_handle(files, FILE_NAME) else {
             self.rng.seed = saved;
-            return None;
+            return crate::giveup::error("1194:080B: the names file missing");
         };
         self.mem.w16(DS, HANDLE, handle);
         let mut o = Out { seg, di: off, al: 0 };
