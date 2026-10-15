@@ -474,8 +474,9 @@ fn a_captured_click_and_swing_and_look() {
     let Some(dir) = game_dir() else { return };
     let mut a = app(&dir, &Start::default());
     let mut d = Driver::new(&mut a);
-    // A click on the bar (below the view) captures the mouse.
-    d.click(&mut a, 160, 170, MouseButton::Left);
+    // A click on the bar (below the view) off its buttons captures the
+    // mouse.
+    d.click(&mut a, 240, 170, MouseButton::Left);
     assert!(a.captured, "the mouse captured");
     // Looking: about a quarter turn for 400 mickeys.
     let h0 = a.engine.view().heading;
@@ -744,4 +745,170 @@ fn the_wheel_moves_a_menus_entry() {
     a.input(In::Wheel(1.0));
     let n = menu(&a).unwrap().entries.len();
     assert_eq!(a.selected, n - 1, "up past the first wraps to the last");
+}
+
+/// The character sheet by K and by the portrait; its page turned to the
+/// equipment by N and by its button, whose exit comes back to it; Esc and
+/// its Done button leave.
+#[test]
+fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyK, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "K opens the sheet");
+    d.key(&mut a, KeyCode::KeyN, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, .. }))), "N turns to the equipment page");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "its exit comes back to the sheet");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.panel.is_none(), "Esc leaves the sheet");
+    // By the mouse: the portrait, the next page's button, the equipment's
+    // Exit, the sheet's Done.
+    let (x, y) = sheets::bar_centre(8);
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the portrait opens the sheet");
+    d.click(&mut a, 0x6A + 0x1A, 0xB2 + 7, MouseButton::Left);
+    assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "the button turns the page");
+    let (ex, ey) = (0..200)
+        .flat_map(|y| (0..320).map(move |x| (x, y)))
+        .find(|&(x, y)| panels::button_at(x, y) == Some(panels::Button::Exit))
+        .expect("the equipment's exit somewhere");
+    d.click(&mut a, ex, ey, MouseButton::Left);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the equipment's exit comes back");
+    d.click(&mut a, 10, 0xAA + 8, MouseButton::Left);
+    assert!(a.panel.is_none(), "Done leaves");
+    assert!(!a.captured, "no click on the sheet captured the mouse");
+}
+
+/// The logbook by L and by the scroll; a click turns its page, Exit leaves.
+#[test]
+fn the_logbook_by_l_and_the_scroll() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyL, None);
+    let Some(panels::Panel::Log(log)) = &a.panel else { panic!("L opens the logbook") };
+    let want = sheets::open_log(&a.engine.m, &a.engine.files);
+    assert_eq!((log.missing, log.pages.len()), (want.missing, want.pages.len()), "the slot's log, as sheets::open_log reads it");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.panel.is_none(), "Esc leaves");
+    let (x, y) = sheets::bar_centre(5);
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "the scroll opens the logbook");
+    // A page of the logbook turned by a click (when there is one more).
+    if let Some(panels::Panel::Log(log)) = a.panel.as_mut() {
+        log.pages = vec![vec![(false, "a".into())]; 2];
+        log.missing = false;
+    }
+    d.click(&mut a, 160, 100, MouseButton::Left);
+    assert!(matches!(&a.panel, Some(panels::Panel::Log(l)) if l.page == 1), "a click turns the page");
+    d.click(&mut a, 0x110, 0xB8, MouseButton::Left);
+    assert!(a.panel.is_none(), "Exit leaves");
+}
+
+/// The automap by M and by the map's button, centred on the player as
+/// `automap_view_open`; its arrows and buttons move it as the game's
+/// handlers; Exit and Esc leave; the game's keys don't move the player.
+#[test]
+fn the_automap_by_m_and_the_map_button() {
+    let Some(dir) = game_dir() else { return };
+    use arena::automap::var::{MAP_X, MAP_Y};
+    use arena::mem::DS;
+    let mut a = app(&dir, &Start::default());
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyM, None);
+    assert!(a.map, "M opens the automap");
+    let mut b = a.engine.m.clone();
+    b.automap_view_open();
+    let at = |m: &arena::machine::Machine| (m.mem.r16(DS, MAP_X), m.mem.r16(DS, MAP_Y));
+    assert_eq!(at(&a.engine.m), at(&b), "centred as automap_view_open");
+    let place = a.engine.view();
+    // Up, the game's forward key: the screen's up button instead.
+    d.key(&mut a, KeyCode::ArrowUp, None);
+    d.frame(&mut a);
+    b.automap_view_button(0);
+    b.automap_origin();
+    assert_eq!(at(&a.engine.m), at(&b), "Up as the up button");
+    assert_eq!((a.engine.view().x, a.engine.view().y), (place.x, place.y), "the player stays");
+    // The left button clicked.
+    d.click(&mut a, 250, 48, MouseButton::Left);
+    b.automap_view_button(3);
+    b.automap_origin();
+    assert_eq!(at(&a.engine.m), at(&b), "the left button");
+    d.click(&mut a, 260, 175, MouseButton::Left);
+    assert!(!a.map, "Exit leaves");
+    let (x, y) = sheets::bar_centre(1);
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert!(a.map, "the map's button opens it");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(!a.map, "Esc leaves");
+    // The right button is the world map's (not this screen's).
+    d.click(&mut a, x, y, MouseButton::Right);
+    assert!(!a.map && !a.captured, "the right button opens no automap");
+}
+
+/// Each of the bar's buttons clicked does what its handler does.
+#[test]
+fn each_bar_button_as_the_original_wires_it() {
+    let Some(dir) = game_dir() else { return };
+    use arena::mem::DS;
+    let fresh = || {
+        let mut a = app(&dir, &Start::default());
+        let d = Driver::new(&mut a);
+        (a, d)
+    };
+    let click = |a: &mut App, d: &mut Driver, i: usize| {
+        let (x, y) = sheets::bar_centre(i);
+        d.click(a, x, y, MouseButton::Left);
+        assert!(!a.captured, "button {i} doesn't capture the mouse");
+    };
+    // 0, the crossed swords: the weapon readied, as Q.
+    let (mut a, mut d) = fresh();
+    let (mut b, mut db) = fresh();
+    click(&mut a, &mut d, 0);
+    db.key(&mut b, KeyCode::KeyQ, None);
+    same(&a, &b, "the swords and Q");
+    assert!(a.engine.m.mem.r16(DS, 0x05E0) & 0x10 != 0, "readied");
+    // 1, the map: the automap.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 1);
+    assert!(a.map, "the map");
+    // 2, the hand: picking armed.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 2);
+    let (mut b, _) = fresh();
+    b.engine.m.pilfer_arm();
+    same(&a, &b, "the hand and pilfer_arm");
+    // 3, the status: its box, status_text's text.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 3);
+    let (mut b, _) = fresh();
+    b.engine.m.status_text();
+    let want = String::from_utf8_lossy(b.engine.m.mem.cstr(DS, arena::status::var::STATUS_TEXT)).into_owned();
+    let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
+    let first = want.split(['\r', '\n']).find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
+    assert!(!first.is_empty() && got.contains(&first), "the status box: {got:?} / {want:?}");
+    // 4, the star: the spellbook.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 4);
+    assert!(matches!(a.panel, Some(panels::Panel::Spellbook(_))), "the spellbook");
+    // 5, the scroll: the logbook.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 5);
+    assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "the logbook");
+    // 6, the fist: the items with an effect, when there are any.
+    let (mut a, mut d) = fresh();
+    let any = !panels::usable_names(&a.engine.m).is_empty();
+    click(&mut a, &mut d, 6);
+    assert_eq!(matches!(&a.panel, Some(panels::Panel::Inventory(i)) if i.using.is_some()), any, "the use list");
+    // 7, the campfire: camping asked, as R.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 7);
+    assert!(a.camp, "camp");
+    // 8, the portrait: the sheet.
+    let (mut a, mut d) = fresh();
+    click(&mut a, &mut d, 8);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the sheet");
 }

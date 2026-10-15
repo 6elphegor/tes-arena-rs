@@ -29,6 +29,12 @@ use crate::trigger::var::AREA;
 
 /// DGROUP variables.
 pub mod var {
+    /// The automap screen's centre (map units; also the talk's flat kind
+    /// and its neighbour when no map is up) and its top left square.
+    pub const MAP_X: u16 = 0x126C;
+    pub const MAP_Y: u16 = 0x126E;
+    pub const MAP_LEFT: u16 = 0xA880;
+    pub const MAP_TOP: u16 = 0xA882;
     /// "automap.00", its digits at +8.
     pub const NAME: u16 = 0x663B;
     /// The record's key as read or written (dword), its position in the
@@ -400,5 +406,75 @@ impl Machine {
             pos += n;
         }
         files.store(&name, data);
+    }
+
+    /// 0000:3796. The automap screen's centre (MAP_X, MAP_Y, in map units)
+    /// kept inside the level when it is at least 60 x 42 squares: x from
+    /// F00h (signed) to under (width << 7) - E80h, where it is put 80h less
+    /// than that bound; y from A7Fh to under (depth << 7) - A00h, likewise.
+    pub fn automap_centre(&mut self) {
+        let w = self.mem.r16(DS, 0xC357);
+        let d = self.mem.r16(DS, 0xC359);
+        if (w as i16) < 0x3C || (d as i16) < 0x2A {
+            return;
+        }
+        if (self.mem.r16(DS, MAP_X) as i16) < 0xF00 {
+            self.mem.w16(DS, MAP_X, 0xF00);
+        }
+        if (self.mem.r16(DS, MAP_Y) as i16) < 0xA7F {
+            self.mem.w16(DS, MAP_Y, 0xA7F);
+        }
+        let ax = (w << 7).wrapping_sub(0xE80);
+        if (self.mem.r16(DS, MAP_X) as i16) >= ax as i16 {
+            self.mem.w16(DS, MAP_X, ax.wrapping_sub(0x80));
+        }
+        let ay = (d << 7).wrapping_sub(0xA00);
+        if (self.mem.r16(DS, MAP_Y) as i16) >= ay as i16 {
+            self.mem.w16(DS, MAP_Y, ay.wrapping_sub(0x80));
+        }
+    }
+
+    /// 0000:377D. The automap screen's top left square from its centre:
+    /// (x >> 7) - 1Eh, (y >> 7) - 15h (MAP_LEFT, MAP_TOP).
+    pub fn automap_origin(&mut self) {
+        let x = (self.mem.r16(DS, MAP_X) >> 7).wrapping_sub(0x1E);
+        let y = (self.mem.r16(DS, MAP_Y) >> 7).wrapping_sub(0x15);
+        self.mem.w16(DS, MAP_LEFT, x);
+        self.mem.w16(DS, MAP_TOP, y);
+    }
+
+    /// 0000:2D1F..2D2E. The automap screen opened: its centre on the
+    /// player, kept inside the level, and its top left square.
+    pub fn automap_view_open(&mut self) {
+        let (x, y) = (self.mem.r16(DS, 0xC3D0), self.mem.r16(DS, 0xC3D4));
+        self.mem.w16(DS, MAP_X, x);
+        self.mem.w16(DS, MAP_Y, y);
+        self.automap_centre();
+        self.automap_origin();
+    }
+
+    /// The automap screen's buttons (the table at 66CA, handlers at 66F2):
+    /// 0 up (0000:37ED, y less 80h), 1 down (37F7), 2 the right arrow
+    /// (3801, x less 80h: the map is drawn with x falling to the right),
+    /// 3 the left arrow (380B), 4 the centre (3815, back on the player);
+    /// each then kept inside the level (3796). The screen's loop makes the
+    /// top left square again after (377D, `automap_origin`, 0000:2E75).
+    pub fn automap_view_button(&mut self, b: u16) {
+        let add = |m: &mut Machine, at: u16, v: u16| {
+            let x = m.mem.r16(DS, at).wrapping_add(v);
+            m.mem.w16(DS, at, x);
+        };
+        match b {
+            0 => add(self, MAP_Y, 0xFF80),
+            1 => add(self, MAP_Y, 0x80),
+            2 => add(self, MAP_X, 0xFF80),
+            3 => add(self, MAP_X, 0x80),
+            _ => {
+                let (x, y) = (self.mem.r16(DS, 0xC3D0), self.mem.r16(DS, 0xC3D4));
+                self.mem.w16(DS, MAP_X, x);
+                self.mem.w16(DS, MAP_Y, y);
+            }
+        }
+        self.automap_centre();
     }
 }
