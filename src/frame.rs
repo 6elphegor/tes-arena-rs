@@ -71,6 +71,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn automap_mark(&mut self, m: &mut Machine) {
         m.automap_mark();
     }
+    /// 2294:04F5: the frame's song picked (`music::area_music`, by
+    /// default; the songs asked for are on `Machine::songs`).
+    fn area_music(&mut self, m: &mut Machine) {
+        m.area_music();
+    }
     /// 0000:3C4C's loading of the hands' graphic for weapon class [1012].
     fn weapon_graphics(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
@@ -197,6 +202,8 @@ impl Machine {
             light = (self.mem.r16(seg, off.wrapping_add(0x22)) << 8).wrapping_add(0x200);
         }
         self.mem.w16(DS, LIGHT, light);
+        // 0000:48FE: the song (2294:04F5).
+        hooks.area_music(self);
         // 0000:4903: a pending message box.
         if self.mem.r8(DS, 0x191F) != 0 {
             self.mem.w16(DS, 0xCB5E, 0xFFFF);

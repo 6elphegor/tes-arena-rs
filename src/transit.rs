@@ -76,8 +76,11 @@ pub enum Run {
 
 /// What the area changes leave to the front end and to code not ported.
 pub trait AreaHooks {
-    /// 2F9F:0438.
-    fn sync(&mut self, _m: &mut Machine) {}
+    /// 2F9F:0438: the song playing faded out and stopped (the AIL call;
+    /// by default `Song::Stop` on `Machine::songs`).
+    fn sync(&mut self, m: &mut Machine) {
+        m.music_stop();
+    }
     /// 1194:D459: the ending, its text set (AX, SI, DI) and the view
     /// cleared to the colour at 9288.
     fn ending(&mut self, _m: &mut Machine, _ax: u16, _si: u16, _di: u16) {}

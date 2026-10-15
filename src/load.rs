@@ -114,8 +114,12 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     fn automap_area(&mut self, m: &mut Machine, files: &mut Files) {
         m.automap_load(files);
     }
-    /// 25FD:051F: in an interior, 2F9F:001F with the text at DS:[FF0].
-    fn interior_text(&mut self, _m: &mut Machine) {}
+    /// 25FD:051F: in an interior, 2F9F:001F with the building's song at
+    /// DS:[FF0] (by default `Machine::music_start`).
+    fn interior_song(&mut self, m: &mut Machine) {
+        let si = m.mem.r16(DS, crate::music::var::BUILDING_SONG);
+        m.music_start(si);
+    }
     /// 2294:0006, the 3D mode in play: true where the hook did it (the
     /// vectors stub it); by default not, and `Machine::mode_3d` runs.
     fn mode_3d(&mut self, _m: &mut Machine) -> bool {
@@ -311,7 +315,7 @@ impl Machine {
     /// - outdoors 5C8 bit 800h clear again; indoors the level hooks, the
     ///   wilderness dungeon's (0000:0B4F) for the start dungeon with 5E4
     ///   bit 1 or with 5C8 bit 80h, else 0B15;
-    /// - the slot back to the working slot, an interior's text (25FD:051F),
+    /// - the slot back to the working slot, an interior's song (25FD:051F),
     ///   6636 0, the automap (0000:3503), 5E0 bit 200h clear, 1404 0Ah, 191D
     ///   5E0 bit 80h.
     ///
@@ -383,7 +387,7 @@ impl Machine {
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w8(DS, SLOT, w);
         if self.mem.r8(DS, AREA) == 4 {
-            hooks.interior_text(self);
+            hooks.interior_song(self);
         }
         self.mem.w8(DS, 0x6636, 0);
         hooks.automap_area(self, files);
