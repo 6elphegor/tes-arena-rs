@@ -236,7 +236,21 @@ impl arena::trigger::TriggerHooks for Front<'_> {
 }
 /// Exhaustion's boxes, and the level-up screen with its notice and
 /// refusal in boxes (its points spent in turn: no attribute screen yet).
+/// A fight's hooks through the front end: Jagar's words before a main
+/// quest's encounter (1194:D91C) played as the original plays them.
+struct FightFront<'a, 'b>(&'a mut Front<'b>);
+
+impl arena::encounter::FightHooks for FightFront<'_, '_> {
+    fn jagar(&mut self, _m: &mut arena::machine::Machine, text: u16) {
+        self.0.movie("JAGAR.FLC", Some(text), 0xF5);
+    }
+}
+
 impl arena::clock::ClockHooks for Front<'_> {
+    /// 1194:887A with the fight's hooks the front end's (`FightFront`).
+    fn encounter(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.random_encounter(files, &mut FightFront(self))
+    }
     fn exhaustion_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         Front::message_box(self, m, si);
     }
