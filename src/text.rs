@@ -801,7 +801,7 @@ impl Machine {
         }
     }
 
-    /// The seed of the wild's square (0000:2DA2:092B): the position's
+    /// The seed of the wild's square (2DA2:092B): the position's
     /// chunk numbers from 608/60A, carried past 2000h of `cx`, `dx`.
     fn text_wild_seed(&self, cx: u16, dx: u16) -> u32 {
         let hi = self.t16(0x060A).wrapping_add((dx >= 0x2000) as u16);

@@ -127,6 +127,29 @@ NOTES = {
 DATA = 0x3276
 
 
+def load_triage():
+    """tools/triage.tsv: `SEG:OFF<TAB>kind<TAB>what it is`, the routines read
+    by hand. Kinds: trivial (nothing to port: an empty routine, a bare
+    return) and inline (ported inside its caller's port, which the note
+    names), both counted as ported; presentation, driver, hardware, I/O,
+    input (the front end's); artefact (bytes the graph decoded as a
+    routine that is not one); game (state still to port)."""
+    out = {}
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'triage.tsv')
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding='utf-8'):
+        if not line.strip() or line.startswith('#'):
+            continue
+        a, kind, what = (line.rstrip('\n').split('\t') + ['', ''])[:3]
+        e = tuple(int(x, 16) for x in a.split(':'))
+        out[e] = (kind, what)
+    return out
+
+
+TRIAGE = load_triage()
+
+
 def load(path):
     b = open(path, 'rb').read()
     h = struct.unpack('<14H', b[:28])
@@ -577,6 +600,41 @@ def main():
                     cur = k
         status[r] = cur
 
+    # Far thunks (`call X` then `retf`, or a lone `jmp X`): the far entry of
+    # a near routine X; they share X's status.
+    def thunk_target(e):
+        ins = [i for _, i in sorted(g.bodies[e].items())]
+        if not ins or not re.fullmatch(r'0x[0-9a-f]+', ins[0].op_str):
+            return None
+        t = (e[0], int(ins[0].op_str, 16) & 0xFFFF)
+        if len(ins) == 2 and ins[0].mnemonic == 'call' and ins[1].mnemonic == 'retf':
+            return t
+        if len(ins) == 1 and ins[0].mnemonic == 'jmp':
+            return t
+        return None
+    thunks = {}
+    for e in g.entries:
+        t = thunk_target(e)
+        if t is not None and t in g.entries:
+            thunks[e] = t
+    changed = True
+    while changed:
+        changed = False
+        for e, t in thunks.items():
+            if e not in status and t in status:
+                status[e] = status[t]
+                changed = True
+    # Hand verdicts (tools/triage.tsv): a routine read and found trivial
+    # (counted as ported: there is nothing to port) or the front end's.
+    for e, (kind, _) in TRIAGE.items():
+        if e in g.entries and e not in status and kind in ('trivial', 'inline'):
+            status[e] = 'ported'
+    # NOTES' hand verdicts "[game ...; ported inline: ...]" count likewise.
+    for k, v in NOTES.items():
+        e = tuple(int(x, 16) for x in k.split(':'))
+        if e in g.entries and e not in status and 'ported inline' in v:
+            status[e] = 'ported'
+
     size = {e: sum(i.size for i in g.bodies[e].values()) for e in g.entries}
     total = len(g.entries)
     covered = [e for e in g.entries if status.get(e) == 'ported']
@@ -585,6 +643,23 @@ def main():
     rest = [e for e in g.entries if e not in status]
     rest_set = set(rest)
     cls = {e: classify(g, e) for e in rest}
+    for e in rest:
+        kind = TRIAGE.get(e, (None,))[0]
+        if kind in ('presentation', 'driver', 'hardware', 'I/O', 'input'):
+            cls[e] = [kind + ' (read)']
+        elif kind == 'artefact':
+            cls[e] = ['decode artefact']
+        else:
+            # NOTES' tags other than game ones ([UI], [drawing], ...).
+            v = NOTES.get(f'{e[0]:04X}:{e[1]:04X}', '')
+            m = re.search(r'\[([^\]]+)\]$', v) or (re.fullmatch(r'renderer.*', v) and re.match(r'(renderer)', v))
+            if v and m and not m.group(1).startswith('game'):
+                cls[e] = [m.group(1).rstrip('?') + ' (read)']
+    for e in rest:
+        # A thunk to front-end code is front-end code.
+        t = thunks.get(e)
+        if t is not None and not cls[e] and (cls.get(t) or status.get(t) in ('hook', 'view')):
+            cls[e] = ['thunk to front end']
     # Reached only through code the port leaves to the front end (a hook's
     # or the view's routine, or presentation below them): the front end's.
     front = {e for e in g.entries if status.get(e) in ('hook', 'view')} | {e for e in rest if cls[e]}
@@ -638,7 +713,10 @@ def main():
         return ', '.join(sorted(files)[:3])
 
     def note(e):
-        return NOTES.get(fmt(e), '')
+        if fmt(e) in NOTES:
+            return NOTES[fmt(e)]
+        t = TRIAGE.get(e)
+        return f'{t[1]} [{t[0]}]' if t else ''
 
     # Likely ported inline: an uncovered routine whose distinctive
     # constants (immediates and addresses >= 100h, not segments) show as
