@@ -1704,8 +1704,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
             "map" => {
                 sheets::pics(&st.assets.archive, &engine.m);
-                engine.m.automap_view_open();
-                automap::select_font(&mut engine.m, &st.assets.archive);
+                automap::open(&mut engine, &st.assets.archive);
                 st.map = !st.map;
             }
             // The automap screen's button N (0 up, 1 down, 2 right, 3 left,
@@ -1738,7 +1737,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 let (x, y) = sheets::bar_centre(n as usize);
                 match sheets::bar_click(&mut engine.m, x, y, false) {
                     Some(sheets::BarAction::Automap) => {
-                        automap::select_font(&mut engine.m, &st.assets.archive);
+                        automap::open(&mut engine, &st.assets.archive);
                         st.map = true;
                     }
                     Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
@@ -1881,7 +1880,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         }
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
-            automap::draw(&mut screen, &engine.m);
+            automap::draw(&mut screen, &mut engine.m);
             automap::draw_notes(&mut screen, &engine);
         }
         // An animation the turns played: its first frame and lines.
@@ -2438,7 +2437,7 @@ impl App {
             }
             hud::compose_over(&mut self.screen, &self.font, &hud);
             if self.map {
-                automap::draw(&mut self.screen, &self.engine.m);
+                automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
             }
         }
@@ -2663,7 +2662,7 @@ impl App {
         match a {
             sheets::BarAction::None | sheets::BarAction::WorldMap => {}
             sheets::BarAction::Automap => {
-                automap::select_font(&mut self.engine.m, &self.assets.archive);
+                automap::open(&mut self.engine, &self.assets.archive);
                 self.map = true;
             }
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
@@ -2689,8 +2688,7 @@ impl App {
     /// the current one.
     fn open_automap(&mut self) {
         sheets::pics(&self.assets.archive, &self.engine.m);
-        self.engine.m.automap_view_open();
-        automap::select_font(&mut self.engine.m, &self.assets.archive);
+        automap::open(&mut self.engine, &self.assets.archive);
         self.map = true;
     }
 
@@ -2938,7 +2936,7 @@ impl App {
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
                     self.engine.m.automap_origin();
-                } else {
+                } else if automap::notes_here(&self.engine.m) {
                     self.note_turn(x, y);
                 }
             }

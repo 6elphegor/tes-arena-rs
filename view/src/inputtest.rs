@@ -899,6 +899,7 @@ fn each_bar_button_as_the_original_wires_it() {
     click(&mut a, &mut d, 3);
     let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
     assert!(got.contains("You are poisoned."), "the status box's condition: {got:?}");
+    shot(&mut a, "status_poisoned");
     let (mut b, _) = fresh();
     b.engine.m.mem.w16(DS, 0x01A4 + 0x40D, f);
     b.engine.m.status_box();
@@ -925,6 +926,16 @@ fn each_bar_button_as_the_original_wires_it() {
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 8);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the sheet");
+}
+
+/// The screen as drawn now, written to $SHOT_DIR/NAME.png when SHOT_DIR
+/// is set (for looking at; no check).
+fn shot(app: &mut App, name: &str) {
+    if let Some(dir) = std::env::var_os("SHOT_DIR") {
+        app.compose();
+        let p = std::path::Path::new(&dir).join(format!("{name}.png"));
+        crate::create::Creation::save_png(&app.screen, &p.to_string_lossy());
+    }
 }
 
 /// The notes the automap screen draws (0000:32FE), on a copy.
@@ -982,6 +993,7 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
         (0..6).flat_map(|r| (0..10).map(move |c| (note.1 as usize + r) * hud::W + note.0 as usize + c)).map(|i| px[i]).collect()
     };
     assert_ne!(near(&a.screen.px), near(&bare), "the note drawn on the screen");
+    shot(&mut a, "automap_note");
     // Clicked again: the note's text asked for again, now edited.
     d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
     assert!(a.pending.is_some(), "a click on the note edits it");
