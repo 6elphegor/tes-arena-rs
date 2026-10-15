@@ -51,6 +51,12 @@ pub fn load_image(archive: &crate::archive::Archive, m: &Machine, name: &str) ->
     if let Some((img, _)) = crate::interface::image(&d) {
         return Some(img);
     }
+    image_type8(m, &d)
+}
+
+/// An image of coding type 8 (its 12-byte header, then the data the
+/// port's LZHUF unpacks), decoded on a copy of the machine.
+pub fn image_type8(m: &Machine, d: &[u8]) -> Option<Image> {
     let le = |at: usize| u16::from_le_bytes([*d.get(at).unwrap_or(&0), *d.get(at + 1).unwrap_or(&0)]);
     let (x, y, w, h, flags, size) = (le(0), le(2), le(4) as usize, le(6) as usize, le(8), le(10) as usize);
     if flags & 0xFF != 8 || w == 0 || h == 0 || w > 320 || h > 200 {

@@ -45,11 +45,19 @@ pub fn start(engine: &mut Engine, spec: &str) {
         eprintln!("the character could not be made");
         return;
     };
+    play(engine);
+    let name = String::from_utf8_lossy(engine.m.mem.cstr(arena::mem::DS, 0x01AD)).into_owned();
+    eprintln!("new game: {name}, class {class:#x}, province {}", ch.province);
+}
+
+/// The made character's game started: the first date and the zones'
+/// weather (of 21EE:016C; its allocations the view's own), then the start
+/// dungeon (0000:0C66, its run 0997).
+pub fn play(engine: &mut Engine) {
+    let m = &mut engine.m;
     if m.game_date().is_none() || m.weather_roll().is_none() {
         eprintln!("the game's date or weather could not be set");
     }
     m.game_start();
     m.start_run(&mut arena::transit::NoAreaHooks);
-    let name = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, 0x01AD)).into_owned();
-    eprintln!("new game: {name}, class {class:#x}, province {}", ch.province);
 }
