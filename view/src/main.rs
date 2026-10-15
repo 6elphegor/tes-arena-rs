@@ -1493,6 +1493,8 @@ struct Shot {
     need: Option<dialog::Need>,
     /// The spellmaker's screen when the turn stopped inside it.
     maker_screen: Option<(dialog::Snapshot, Option<u16>)>,
+    /// The shop's screen behind the question asked (`Talk::backdrop`).
+    backdrop: Option<shopui::Backdrop>,
     status: Option<String>,
     /// A panel up at the end (`inv`, `spells`).
     panel: Option<panels::Panel>,
@@ -1550,6 +1552,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     // Kept as the question is (`need`): set by the turn that asked.
     if talk.need.is_some() {
         st.maker_screen = talk.maker.take();
+        st.backdrop = talk.backdrop.take();
     }
     if let Some(need) = talk.need {
         if let (dialog::Need::Spend(snap), None) = (&need, &st.ui) {
@@ -1599,7 +1602,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, backdrop: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -2042,6 +2045,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             spellmaker::draw_state(&mut screen, &font, &st.assets.archive, &engine.files, &snap.0, *form);
             hud::compose_over(&mut screen, &font, &hud);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+        } else if let Some(b) = st.backdrop.as_ref().filter(|_| st.need.is_some()) {
+            b.draw(&mut screen, &st.assets.archive, &engine.m);
+            hud::compose_over(&mut screen, &font, &hud);
+            hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else {
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
@@ -2273,6 +2280,8 @@ struct Pending {
     /// The text asked for edited in place at this screen point
     /// (`Talk::text_at`).
     at: Option<(i32, i32)>,
+    /// The shop's screen behind the question (`Talk::backdrop`).
+    backdrop: Option<shopui::Backdrop>,
 }
 
 struct App {
@@ -2564,7 +2573,8 @@ impl App {
                 self.typed = text;
                 (x, y)
             });
-            self.pending = Some(Pending { before, input, given, need, maker, at });
+            let backdrop = talk.backdrop.take();
+            self.pending = Some(Pending { before, input, given, need, maker, at, backdrop });
             if self.captured {
                 self.release();
             }
@@ -2632,6 +2642,11 @@ impl App {
             // Inside the guild's spellmaker: its screen, the question asked
             // (a list, the name) over it.
             spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
+            hud::compose_over(&mut self.screen, &self.font, &hud);
+        } else if let Some(b) = self.pending.as_ref().and_then(|p| p.backdrop.as_ref()) {
+            // Inside a shop: its screen and banner, the question over it.
+            self.screen.set_palette(self.assets.palette);
+            b.draw(&mut self.screen, &self.assets.archive, &self.engine.m);
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else if let Some(t) = &self.travel {
             let (x, y) = self.screen_point();

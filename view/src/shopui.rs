@@ -50,6 +50,53 @@ pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> 
     r
 }
 
+/// A shop's screen as the original draws it on entering (1194:4B60,
+/// 4BFF) and the picture shown last on it (1194:4B8E).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Backdrop {
+    /// The shop's name on the banner.
+    pub title: Vec<u8>,
+    /// The picture's file, drawn at (59h, 7Fh).
+    pub picture: Option<String>,
+}
+
+impl Backdrop {
+    /// The screen over the view: MENUSCRN.IMG (4B60: at its own place), then the
+    /// banner (4BFF): the name's width in FONT_C.DAT (0000:66F6), or in
+    /// ARENAFNT.DAT past 118h; MENU_CTR.IMG's tiles, 16 wide, enough for
+    /// it, from x A0h less half their width at row 0, MENU_LFT.IMG 5
+    /// left of them, MENU_RT.IMG after them; the name in colour 70h
+    /// centred on x A0h (0000:5364, no shadow) at row 3 (4 in ARENAFNT).
+    /// Then the picture shown last (4B8E: at 59h, 7Fh).
+    pub fn draw(&self, screen: &mut hud::Screen, archive: &crate::archive::Archive, m: &Machine) {
+        let img = |name: &str| crate::panels::load_image(archive, m, name);
+        if let Some(i) = img("MENUSCRN.IMG") {
+            screen.blit(i.x, i.y, i.w, i.h, &i.px, 199);
+        }
+        let title = String::from_utf8_lossy(&self.title).into_owned();
+        let (Some(c), Some(a)) = (hud::Font::load(archive, "FONT_C.DAT"), hud::Font::load(archive, "ARENAFNT.DAT")) else { return };
+        let (font, row) = if c.width(&title) > 0x118 { (&a, 4) } else { (&c, 3) };
+        let w = font.width(&title) as i32;
+        let n = (w + 15) >> 4;
+        let x0 = 0xA0 - (n * 16 >> 1);
+        if let Some(t) = img("MENU_CTR.IMG") {
+            for i in 0..n {
+                screen.blit(x0 + i * 16, 0, t.w, t.h, &t.px, 199);
+            }
+        }
+        if let Some(t) = img("MENU_LFT.IMG") {
+            screen.blit(x0 - 5, 0, t.w, t.h, &t.px, 199);
+        }
+        if let Some(t) = img("MENU_RT.IMG") {
+            screen.blit(0xA0 + (n * 16 >> 1), 0, t.w, t.h, &t.px, 199);
+        }
+        screen.text_plain(font, 0xA0 - (w >> 1), row, &title, 0x70);
+        if let Some(t) = self.picture.as_deref().and_then(img) {
+            screen.blit(0x59, 0x7F, t.w, t.h, &t.px, 199);
+        }
+    }
+}
+
 /// The front end's side of a shop. `files` is a copy the hooks without
 /// files use (the haggle's dialogue, the greeting's substitutions).
 struct ShopFront<'a, 'b> {
@@ -88,6 +135,23 @@ impl ShopFront<'_, '_> {
         self.front.talk.as_deref_mut()
     }
 
+    /// The shop's screen and name (1194:4B60, 4BFF), behind what follows.
+    fn show_banner(&mut self, m: &Machine, si: u16) {
+        let title = m.mem.cstr(DS, si).to_vec();
+        if let Some(t) = self.talk() {
+            t.backdrop = Some(Backdrop { title, picture: None });
+        }
+    }
+
+    /// A picture (1194:4B8E, its name at DS:`si`) on the shop's screen.
+    fn show_picture(&mut self, m: &Machine, si: u16) {
+        self.picture = si;
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
+        if let Some(b) = self.talk().and_then(|t| t.backdrop.as_mut()) {
+            b.picture = Some(name);
+        }
+    }
+
     /// A question the front end makes: the pick, or FFFFh (none, or left).
     fn ask(&mut self, title: Vec<Vec<Span>>, entries: &[&str]) -> u16 {
         let menu = Menu {
@@ -108,6 +172,9 @@ impl ShopFront<'_, '_> {
 impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn message(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
+    }
+    fn banner(&mut self, m: &mut Machine, si: u16) {
+        self.show_banner(m, si);
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.front.menu(m, si, bx, di)
@@ -182,12 +249,9 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
 }
 
 impl arena::store::StoreHooks for ShopFront<'_, '_> {
-    /// The greeting, unless its substitution couldn't be made ("%en ": the
-    /// text port gives none for it).
+    /// The store's name ("%en " made) on its banner.
     fn greeting(&mut self, m: &mut Machine, si: u16) {
-        if !m.mem.cstr(DS, si).contains(&b'%') {
-            self.front.message_box(m, si);
-        }
+        self.show_banner(m, si);
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
@@ -210,8 +274,8 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
         self.lines = Some(frame_lines(m, 0x2710, m.mem.r8(DS, 0x12CF) as usize));
         Some(())
     }
-    fn picture(&mut self, _m: &mut Machine, si: u16) {
-        self.picture = si;
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        self.show_picture(m, si);
     }
 }
 
@@ -241,6 +305,10 @@ fn row(raw: &[u8]) -> Vec<Span> {
 /// its bottom, clicked at y B8h up: x 5..69h, 78h..BEh, 11Dh..136h) asked
 /// as a question whose answer is a click inside the button picked.
 impl arena::guild::GuildHooks for ShopFront<'_, '_> {
+    /// 1194:AD39: the screen and "Mages Guild" (6F11) on its banner.
+    fn screen(&mut self, m: &mut Machine) {
+        self.show_banner(m, 0x6F11);
+    }
     fn stock_file(&mut self, m: &mut Machine, name: u16) -> Option<Vec<u8>> {
         let name = m.mem.cstr(DS, name).to_vec();
         if let Some((_, b)) = self.written.iter().rev().find(|(n, _)| n.eq_ignore_ascii_case(&name)) {
@@ -256,8 +324,8 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
     }
-    fn picture(&mut self, _m: &mut Machine, si: u16) {
-        self.picture = si;
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        self.show_picture(m, si);
     }
     fn stock_list(&mut self, m: &mut Machine, seg: u16, si: u16, cx: u16) -> u16 {
         let mut entries = Vec::new();
@@ -351,11 +419,19 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
 }
 
 impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
+    /// 1194:C12A: "%nt " made at 929E (2DA2:000A), the tavern's name, on
+    /// its banner (4BFF).
+    fn greeting(&mut self, m: &mut Machine) {
+        m.mem.w32(DS, 0x929E, 0x2074_6E25);
+        m.mem.w16(DS, 0x92A2, 0);
+        arena::shops::ShopHooks::expand(self, m, 0x929E);
+        self.show_banner(m, 0x929E);
+    }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
     }
-    fn picture(&mut self, _m: &mut Machine, si: u16) {
-        self.picture = si;
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        self.show_picture(m, si);
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {

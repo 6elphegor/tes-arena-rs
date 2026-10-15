@@ -285,9 +285,6 @@ At the time of writing:
     ported; the view saves to and loads from a fixed slot.
   - The Emperor's audience (stage 8) hasn't been reached in a walkthrough;
     the test save is past it.
-  - Text 5DDh (the last text in TEMPLATE.DAT, with nothing after it) has
-    failed after a long session while it reads right from a fresh start;
-    being investigated.
 - **Bounds where the original never ends:** a respawn with no free square
   gives up after 65536 tries; collapsing from exhaustion inside the hour it
   costs gives up after 200 nested collapses.
@@ -300,20 +297,18 @@ At the time of writing:
     modelled; a spell's burst is nudged in front of the wall it hits.
   - The sun and the helmet's head recolour are ported but not yet seen on
     screen.
-  - The travel animation and the chosen place's blink (MAPBLINK.CIF) are
-    not drawn; the travel map's texts take the province picture's palette.
-  - List kinds 3, 9 and 10 ("Where is", the spellmaker's, the temple's)
-    use a stand-in panel; the selection is a frame rather than the
-    original's recolour; the typed-text prompt isn't traced; automap notes
-    are typed in a dialog, not inline (0000:9EE9).
-  - Fonts are fixed per element rather than following the game's selected
-    font (B036).
-- **Sound:** the FM voice driver (voice allocation, volume curves, vibrato,
-  the Pro's two chips) is approximate and has not been listened to; there
-  is no SoundFont fallback, and the music volume setting isn't applied.
-- **Vectors:** `gen_level.py`'s last 169 of 852 cases were not regenerated
-  after the harness's register fix (resume with `gen_level.py EXE GAME_DIR
-  OUT 683`).
+  - The travel map's texts take the province picture's palette; its
+    passes and the journey's days go a game tick each, not as fast as the
+    original's loop.
+  - Fonts are each screen's own as its routine selects them (B036 set
+    through 0000:9AE6); no text in the game's files switches font inline
+    (0Ch), so that path isn't drawn.
+  - The shops' screen (MENUSCRN.IMG and the name's banner, 1194:4B60,
+    4BFF) is drawn behind their questions; the temple's and the haggles'
+    pictures (4B8E) other than the store's, guild's and tavern's aren't.
+- **Sound:** the music runs the game's own FM driver ported (its register
+  writes the original's); it has not been listened to by a person, and
+  there is no SoundFont fallback.
 
 ## Third-party code
 

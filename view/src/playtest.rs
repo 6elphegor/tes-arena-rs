@@ -277,6 +277,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         boxes: Vec::new(),
         need: None,
         maker_screen: None,
+        backdrop: None,
         status: None,
         panel: None,
         map: false,

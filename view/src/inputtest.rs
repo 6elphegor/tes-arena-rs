@@ -1588,3 +1588,26 @@ fn the_stairs_out_show_the_travel_map() {
     }
     assert_ne!(here(&a), before, "the dungeon left for the place travelled to");
 }
+
+/// A shop's screen behind its questions (1194:4B60, 4BFF): the tavern's
+/// name made from "%nt " on the banner; gone once the shop is left.
+#[test]
+fn a_shops_banner_is_drawn_behind_its_menu() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { level: "TAVERN1.MIF", ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    shop_turn(&mut a, 4);
+    let b = a.pending.as_ref().and_then(|p| p.backdrop.clone()).expect("the shop's screen behind its menu");
+    let title = String::from_utf8_lossy(&b.title).into_owned();
+    assert!(!title.is_empty() && !title.contains('%'), "the tavern's name made: {title:?}");
+    a.compose();
+    let banner = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..14).flat_map(|r| (100..220).map(move |c| r * hud::W + c)).map(|i| px[i]).collect() };
+    let up = banner(&a.screen.px);
+    shot(&mut a, "shop_banner");
+    while a.pending.is_some() || !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Escape, None);
+    }
+    a.compose();
+    assert_ne!(banner(&a.screen.px), up, "the banner gone with the shop");
+}

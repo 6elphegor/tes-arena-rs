@@ -114,6 +114,9 @@ pub struct Talk {
     /// The text asked for edited in place (0000:9EE9 with the automap's
     /// notes): the field's screen point and the text there at the start.
     pub text_at: Option<(i32, i32, String)>,
+    /// The shop's screen the turn is inside (`crate::shopui::Backdrop`):
+    /// drawn behind its questions.
+    pub backdrop: Option<crate::shopui::Backdrop>,
 }
 
 /// The game's text at DS:`at`, as lines.
