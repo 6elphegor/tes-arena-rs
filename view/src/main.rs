@@ -296,6 +296,15 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
         }
     }
 }
+/// The automap's notes: the text typed through the dialog (into 1044,
+/// at most the place's room), the rest drawn by the screen's own pass.
+impl arena::mapnotes::NoteHooks for Front<'_> {
+    fn type_text(&mut self, m: &mut arena::machine::Machine, _x: u16, _y: u16, _cursor: u16, max: u16) {
+        if let Some(t) = self.talk.as_deref_mut() {
+            t.typed(m, arena::mapnotes::var::TEXT, max as usize, "Your note:");
+        }
+    }
+}
 impl arena::frame::FrameHooks for Front<'_> {
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
     /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box.
@@ -1232,6 +1241,9 @@ struct TurnIn {
     drag: (i16, i16),
     /// The window's width over its height (the click's line).
     aspect: f32,
+    /// A click on the automap screen's map at this point (0000:31FE): the
+    /// note there edited or one begun, its text asked for; no frame runs.
+    note: Option<(u16, u16)>,
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -1246,6 +1258,16 @@ struct TurnOut {
 /// answering the game's questions.
 fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut dialog::Talk) -> TurnOut {
     use arena::mem::DS;
+    if let Some((x, y)) = input.note {
+        // The automap screen is up: the world waits (no frame).
+        engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
+        engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect };
+        if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
+            eprintln!("the note met a fault of the original's");
+        }
+        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false };
+    }
     let t = engine.frame_ticks();
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
@@ -1438,6 +1460,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         right: std::mem::take(&mut st.right),
         drag: std::mem::take(&mut st.drag),
         aspect: 1.6,
+        note: None,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     st.audio.before(&mut engine.m);
@@ -1761,7 +1784,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
             "map" => {
                 sheets::pics(&st.assets.archive, &engine.m);
-                engine.m.automap_view_open();
+                automap::open(&mut engine, &st.assets.archive);
                 st.map = !st.map;
             }
             // The automap screen's button N (0 up, 1 down, 2 right, 3 left,
@@ -1793,7 +1816,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 sheets::pics(&st.assets.archive, &engine.m);
                 let (x, y) = sheets::bar_centre(n as usize);
                 match sheets::bar_click(&mut engine.m, x, y, false) {
-                    Some(sheets::BarAction::Automap) => st.map = true,
+                    Some(sheets::BarAction::Automap) => {
+                        automap::open(&mut engine, &st.assets.archive);
+                        st.map = true;
+                    }
                     Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
                     Some(sheets::BarAction::Spells) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
                     Some(sheets::BarAction::Log) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
@@ -1947,7 +1973,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         }
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
-            automap::draw(&mut screen, &engine.m);
+            automap::draw(&mut screen, &mut engine.m);
+            automap::draw_notes(&mut screen, &engine);
         }
         // An animation the turns played: its first frame and lines.
         if let Some(mv) = st.movies.first() {
@@ -2369,6 +2396,7 @@ impl App {
             right: self.keys.swing,
             drag: (drag.0.round() as i16, drag.1.round() as i16),
             aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
+            note: None,
         };
         // The engine before the turn, for a question to run it again: into
         // the last standing turn's copy, its allocations reused.
@@ -2518,7 +2546,8 @@ impl App {
             }
             hud::compose_over(&mut self.screen, &self.font, &hud);
             if self.map {
-                automap::draw(&mut self.screen, &self.engine.m);
+                automap::draw(&mut self.screen, &mut self.engine.m);
+                automap::draw_notes(&mut self.screen, &self.engine);
             }
         }
         if prof::on() {
@@ -2772,7 +2801,10 @@ impl App {
         match a {
             sheets::BarAction::None => {}
             sheets::BarAction::WorldMap => self.open_travel(),
-            sheets::BarAction::Automap => self.map = true,
+            sheets::BarAction::Automap => {
+                automap::open(&mut self.engine, &self.assets.archive);
+                self.map = true;
+            }
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
             sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
             sheets::BarAction::Log => self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files))),
@@ -2792,11 +2824,32 @@ impl App {
         true
     }
 
-    /// The automap screen (M, the map's button), on the player.
+    /// The automap screen (M, the map's button), on the player, its font
+    /// the current one.
     fn open_automap(&mut self) {
         sheets::pics(&self.assets.archive, &self.engine.m);
-        self.engine.m.automap_view_open();
+        automap::open(&mut self.engine, &self.assets.archive);
         self.map = true;
+    }
+
+    /// A click at (x, y) on the automap screen's map: a turn adding or
+    /// editing the note there (0000:31FE), its text asked for as other
+    /// typed answers are; outside the map nothing (0000:346B).
+    fn note_turn(&mut self, x: i32, y: i32) {
+        let before = copy(&self.engine);
+        let input = TurnIn {
+            intent: Default::default(),
+            clicked: false,
+            camp: false,
+            shop: None,
+            key: false,
+            tick: 0,
+            right: false,
+            drag: (0, 0),
+            aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
+            note: Some((x as u16, y as u16)),
+        };
+        self.turn(before, input, Vec::new(), true);
     }
 
     /// The character sheet (K, the portrait).
@@ -3031,6 +3084,8 @@ impl App {
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
                     self.engine.m.automap_origin();
+                } else if automap::notes_here(&self.engine.m) {
+                    self.note_turn(x, y);
                 }
             }
             In::Button { .. } if self.map => {}

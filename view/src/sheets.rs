@@ -41,6 +41,8 @@ pub struct Pics {
     pub arena: Option<Font>,
     pub teeny: Option<Font>,
     pub font_a: Option<Font>,
+    /// FONT_S.DAT, the automap's (its notes).
+    pub small: Option<Font>,
 }
 
 thread_local! {
@@ -77,6 +79,7 @@ pub fn pics(archive: &Archive, m: &Machine) -> Rc<Pics> {
                     arena: Font::load(archive, "ARENAFNT.DAT"),
                     teeny: Font::load(archive, "TEENYFNT.DAT"),
                     font_a: Font::load(archive, "FONT_A.DAT"),
+                    small: Font::load(archive, "FONT_S.DAT"),
                 })
             })
             .clone()
@@ -356,7 +359,8 @@ pub fn bar_click(m: &mut Machine, x: i32, y: i32, right: bool) -> Option<BarActi
             BarAction::None
         }
         3 => {
-            m.status_text();
+            // 2542:04B1..0515: the text and the player's conditions.
+            m.status_box();
             let c = m.mem.r8(DS, 0x9288);
             BarAction::Status(crate::hud::lines(m.mem.cstr(DS, arena::status::var::STATUS_TEXT), c))
         }
