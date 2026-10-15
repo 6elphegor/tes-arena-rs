@@ -1393,6 +1393,214 @@ impl Machine {
         Some(())
     }
 
+    /// 1194:D593. The main quest's person in a town: the stage's (0F77)
+    /// province (80ECh), town (the stage-th string at 80F4h, against the
+    /// place's name at A22) and building (8223h: 0 the palace, 7 a mages'
+    /// guild, 5 a temple whose name, "%tem", is the stage-th at 822Bh).
+    /// Not the town: away from buildings (5E6 not 4) text 519h. The town
+    /// but not the person: away from buildings a d100 against (level +
+    /// 1) x 10 (at most 90, D8B7) gives a hint (51Bh + stage) or not
+    /// (519h). The person: `quest_person_met` (D67F). None where a hook
+    /// fails.
+    pub fn quest_person_talk(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        let stage = self.sq8(0x0F77) as u16;
+        let away = self.sq8(AREA) != 4;
+        if self.sq8(PROVINCE) != self.sq8(0x80EC + stage) {
+            if away {
+                self.quest_say(files, hooks, 0x519)?;
+            }
+            return Some(());
+        }
+        let town = self.skip_strings(DS, 0x80F4, stage);
+        if self.sq_streq(town, 0x0A22).is_none() {
+            if away {
+                let text = if self.quest_chance()? { 0x51A } else { 0x519 };
+                self.quest_say(files, hooks, text)?;
+            }
+            return Some(());
+        }
+        let met = if self.sq16(0xC398) & 4 != 0 {
+            false
+        } else {
+            match self.sq8(0x8223 + stage) {
+                0 => self.sq8(BUILDING) == 1,
+                7 => self.sq8(BUILDING) == 7,
+                _ if self.sq8(BUILDING) == 5 => {
+                    self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%tem"));
+                    self.mem.w8(DS, 0x92A2, 0);
+                    hooks.substitute(self, files, 0x929E)?;
+                    let temple = self.skip_strings(DS, 0x822B, stage);
+                    self.sq_streq(temple, 0x929E).is_some()
+                }
+                _ => false,
+            }
+        };
+        if met {
+            return self.quest_person_met(files, hooks);
+        }
+        if away {
+            let text = if self.quest_chance()? { stage + 0x51B } else { 0x519 };
+            self.quest_say(files, hooks, text)?;
+        }
+        Some(())
+    }
+
+    /// 0000:9C2C. The strings at DS:`si` and DS:`di` equal, ignoring the
+    /// case of a..z: Some(SI past the NUL) when equal.
+    fn sq_streq(&self, mut si: u16, mut di: u16) -> Option<u16> {
+        let up = |b: u8| if b.is_ascii_lowercase() { b - 0x20 } else { b };
+        loop {
+            let (a, b) = (up(self.sq8(si)), up(self.sq8(di)));
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+            if a != b {
+                return None;
+            }
+            if a == 0 {
+                return Some(si);
+            }
+        }
+    }
+
+    /// 1194:D8B7. A d100 (1..100) at or under (level + 1) x 10 (8 bits),
+    /// at most 90.
+    fn quest_chance(&mut self) -> Option<bool> {
+        let limit = (self.sq8(LEVEL).wrapping_add(1) as u16 * 10).min(0x5A);
+        let r = self.rng.range(1, 0x65)?;
+        Some(r <= limit)
+    }
+
+    /// 1194:D80B. Text `text` shown (A374, mode 0).
+    fn quest_say(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, text: u16) -> Option<()> {
+        use crate::quest::var::{TEXT, TEXT_FLAG, TEXT_FLAG2};
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        self.mem.w16(DS, TEXT, text);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        hooks.text_at(self, files, 0, 0).map(|_| ())
+    }
+
+    /// 1194:D66F. The stage's texts begin at 523h + stage x 6.
+    fn quest_texts(&self) -> u16 {
+        (self.sq8(0x0F77) as u16).wrapping_mul(6).wrapping_add(0x523)
+    }
+
+    /// 1194:D67F. The main quest's person met (the fonts set, colour
+    /// 60h), by the flags of the stage: 0F7D (the person is the one the
+    /// quest names), 0F7B (spoken to), 0F79 (asked), 0F7C. A named person
+    /// first met gives the stage's place (26F7:0C0A mode 2), says text
+    /// +4, logs 20Dh + stage (in 8 bits); then in a temple or guild
+    /// nothing, elsewhere 80C9h's message. Otherwise the question (+0, or
+    /// +3 once spoken to) is asked over pages (D863) and answered: yes
+    /// logs 217h + stage, sets 0F79 and 0F78, says +1 and takes the
+    /// stage's dungeon (mode 3); no clears 0F79 and says +2. Once asked
+    /// (0F79): with 0F7C +5, else as for a named person met. 26F7:0C0A
+    /// records its caller's CX and SI (1296, 12A0), left by the text
+    /// routine here: 0 in the port.
+    fn quest_person_met(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
+        use crate::quest::var::{TEXT, TEXT_COLOUR, TEXT_FLAG, TEXT_FLAG2};
+        let ax = self.sq16(0x1036);
+        hooks.font(self, 1, ax);
+        self.mem.w8(DS, TEXT_COLOUR, 0x60);
+        let ax = self.sq16(0x102E);
+        hooks.font(self, 0, ax);
+        let province = |m: &Machine| m.sq8(0x80EC + m.sq8(0x0F77) as u16) as u16;
+        let done_here = |m: &mut Machine, hooks: &mut dyn QuestHooks| {
+            if !matches!(m.sq8(BUILDING), 7 | 5) {
+                hooks.message_box(m, 0x80C9);
+            }
+        };
+        if self.sq8(0x0F7D) != 0 {
+            if self.sq8(0x0F7B) != 0 {
+                done_here(self, hooks);
+                return Some(());
+            }
+            self.quest_dungeon_entry(hooks, province(self), 2, 0, 0)?;
+            self.mem.w8(DS, 0x0F7B, 1);
+            self.mem.w8(DS, 0x0F7F, 0);
+            self.quest_say(files, hooks, self.quest_texts() + 4)?;
+            let t = 0x200 | (0x0D_u8.wrapping_add(self.sq8(0x0F77))) as u16;
+            self.mem.w16(DS, TEXT, t);
+            self.mem.w8(DS, TEXT_FLAG2, 0);
+            self.mem.w8(DS, TEXT_FLAG, 0);
+            hooks.text_at(self, files, 2, 0x1044)?;
+            hooks.log_entry(self, 0x1044);
+            return Some(());
+        }
+        let question = if self.sq8(0x0F7B) != 0 {
+            if self.sq8(0x0F79) != 0 {
+                if self.sq8(0x0F7C) == 0 {
+                    done_here(self, hooks);
+                } else {
+                    self.quest_say(files, hooks, self.quest_texts() + 5)?;
+                }
+                return Some(());
+            }
+            self.quest_texts() + 3
+        } else {
+            self.quest_texts()
+        };
+        self.mem.w16(DS, TEXT, question);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        hooks.text_at(self, files, 2, 0x9622)?;
+        self.mem.w8(DS, TEXT_FLAG, 0xA);
+        let yes = self.quest_pages(hooks) == 0;
+        self.mem.w8(DS, 0x0F7B, 1);
+        if !yes {
+            self.mem.w8(DS, 0x0F79, 0);
+            return self.quest_say(files, hooks, self.quest_texts() + 2);
+        }
+        let t = 0x200 | (0x17_u8.wrapping_add(self.sq8(0x0F77))) as u16;
+        self.mem.w16(DS, TEXT, t);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        hooks.text_at(self, files, 2, 0x1044)?;
+        hooks.log_entry(self, 0x1044);
+        self.mem.w8(DS, 0x0F79, 1);
+        self.mem.w8(DS, 0x0F78, 1);
+        self.quest_say(files, hooks, self.quest_texts() + 1)?;
+        self.quest_dungeon_entry(hooks, province(self), 3, 0, 0)?;
+        Some(())
+    }
+
+    /// 1194:D863. The text at 9622 shown in pages: split (D8DE, 0Ah
+    /// lines a page, each page's last line feed or return a NUL), the
+    /// fonts set, colour 60h, each page but the last in a message box,
+    /// the last offered with its yes and no (020E, the keys at 8256h, the
+    /// entries at 8259h). The pick.
+    fn quest_pages(&mut self, hooks: &mut dyn QuestHooks) -> u16 {
+        use crate::quest::var::{TEXT_COLOUR, TEXT_FLAG};
+        self.mem.w8(DS, TEXT_FLAG, 0xA);
+        let mark = self.sq8(TEXT_FLAG);
+        let (mut si, mut pages, mut dl) = (0x9622_u16, 1u16, 0u8);
+        while self.sq8(si) != 0 {
+            if matches!(self.sq8(si), 0x0D | 0x0A) {
+                dl = dl.wrapping_add(1);
+                if dl == mark {
+                    pages = pages.wrapping_add(1);
+                    self.mem.w8(DS, si, 0);
+                    dl = 0;
+                }
+            }
+            si = si.wrapping_add(1);
+        }
+        let ax = self.sq16(0x102E);
+        hooks.font(self, 0, ax);
+        let ax = self.sq16(0x1036);
+        hooks.font(self, 1, ax);
+        self.mem.w8(DS, TEXT_COLOUR, 0x60);
+        let mut si = 0x9622_u16;
+        for _ in 1..pages {
+            hooks.message_box(self, si);
+            // `repne scasb` over at most BB8h bytes: past the NUL, or
+            // BB8h on.
+            si = match (0..0xBB8u16).find(|&k| self.sq8(si.wrapping_add(k)) == 0) {
+                Some(k) => si.wrapping_add(k + 1),
+                None => si.wrapping_add(0xBB8),
+            };
+        }
+        hooks.menu(self, si, 0x8256, 0x8259)
+    }
+
     /// `f` run with the player put at the place's square (9D51: A48, A4A
     /// in squares to C3D0, C3D4), then put back.
     fn sq_at_place<T>(&mut self, f: impl FnOnce(&mut Machine) -> Option<T>) -> Option<T> {

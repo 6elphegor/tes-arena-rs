@@ -90,8 +90,9 @@ impl TalkHooks for Script {
         self.log.extend([10, si]);
         self.cf()
     }
-    fn quest_person(&mut self, _m: &mut Machine) {
+    fn quest_person(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(11);
+        Some(())
     }
     fn palace(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(12);
