@@ -54,8 +54,9 @@ impl ShopHooks for Script {
         self.log.extend([2, di as u32]);
         di
     }
-    fn quests(&mut self, _m: &mut Machine) {
+    fn quests(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(3);
+        Some(())
     }
 }
 

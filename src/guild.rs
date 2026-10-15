@@ -233,7 +233,7 @@ impl Machine {
             self.mem.w8(DS, SHOP, 7);
             let bank = self.map_bank(0x18, 0);
             self.mem.w16(DS, SAVED_BANK, bank);
-            self.guild_enter(hooks)?;
+            self.guild_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
                 let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
@@ -289,10 +289,10 @@ impl Machine {
     }
 
     /// 1194:AD39: the state set up on entering.
-    fn guild_enter(&mut self, hooks: &mut dyn GuildHooks) -> Option<()> {
+    fn guild_enter(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         hooks.screen(self);
         hooks.quest_check(self);
-        hooks.quests(self);
+        hooks.quests(self, files)?;
         self.map_bank(0x18, 0);
         self.mem.w8(DS, HOLIDAY, 0xFF);
         if self.shop_holiday() {

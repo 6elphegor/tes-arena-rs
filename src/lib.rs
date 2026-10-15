@@ -8,6 +8,7 @@ pub mod bsa;
 pub mod cast;
 pub mod character;
 pub mod city;
+pub mod cityinfo;
 pub mod click;
 pub mod clock;
 pub mod combat;

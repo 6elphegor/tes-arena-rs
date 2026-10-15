@@ -33,7 +33,7 @@ const NEW_OLD: u16 = 0x1346;
 pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
     let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0 };
     match kind {
-        5 => m.temple(&mut ui),
+        5 => m.temple(files, &mut ui),
         4 => m.tavern_shop(files, &mut ui),
         6 => m.equipment_store(files, &mut ui),
         _ => Some(()),

@@ -88,8 +88,9 @@ impl ShopHooks for Script {
     fn quest_check(&mut self, _m: &mut Machine) {
         self.log.push(1);
     }
-    fn quests(&mut self, _m: &mut Machine) {
+    fn quests(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(2);
+        Some(())
     }
 }
 

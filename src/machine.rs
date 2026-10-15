@@ -14,6 +14,11 @@ pub struct Machine {
     /// The mouse driver's motion counters (mickeys, x and y) since they
     /// were last read (INT 33h function 0Bh; see `weapon`).
     pub mouse_motion: (u16, u16),
+    /// The PC's timer: the BIOS's tick count at 0:046C (18.2 a second
+    /// since midnight), which 0000:9D60 reads. The port keeps the image at
+    /// segment 0, so it lives here: `Engine::tick` advances it with the
+    /// game's ticks, and a front end may set it from the wall clock.
+    pub bios_ticks: u32,
     /// The sound driver: playing a sound (its status 2: a new one is
     /// dropped), as the front end says; and the sounds played, for the
     /// front end to take (`sound`).
@@ -28,7 +33,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), sound_busy: false, sounds: Vec::new(), sound_names: Vec::new() }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new() }
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.

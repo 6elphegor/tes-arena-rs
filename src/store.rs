@@ -290,7 +290,7 @@ impl Machine {
         self.mem.w8(DS, text::GREETING + 4, 0);
         hooks.expand(self, text::GREETING);
         hooks.greeting(self, text::GREETING);
-        hooks.quests(self);
+        hooks.quests(self, files)?;
         self.map_bank(0x18, 0);
         self.mem.w8(DS, HOLIDAY, 0xFF);
         if self.shop_holiday() {

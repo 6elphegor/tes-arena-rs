@@ -99,6 +99,7 @@ impl Engine {
     pub fn tick(&mut self, n: u16) {
         let t = self.m.mem.r16(DS, crate::frame::var::TICKS).wrapping_add(n);
         self.m.mem.w16(DS, crate::frame::var::TICKS, t);
+        self.m.bios_ticks = self.m.bios_ticks.wrapping_add(n as u32);
     }
 
     /// How many timer ticks the original gives a frame: two (about 9
