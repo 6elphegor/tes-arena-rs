@@ -106,7 +106,7 @@ fn item(s: &mut Stream, special: bool) -> [u8; 0x13] {
     let mut rec = [0u8; 0x13];
     let cat = s.byte() % 4;
     let ty = if special {
-        0x80 | s.byte() % 0x10
+        0x80 | (s.byte() % 0x10)
     } else {
         match cat {
             1 => s.byte() % 18,
@@ -260,7 +260,7 @@ fn setup(m: &mut Machine, seed: u32) -> (Vec<(u16, Vec<u8>)>, Vec<u16>) {
     for _ in 0..6 {
         lists.push(if s.byte() < 0x30 { 0xFFFF } else { s.byte() as u16 });
     }
-    (dialogs.into_iter().map(|(a, t)| (a, t)).collect(), lists)
+    (dialogs.into_iter().collect(), lists)
 }
 
 #[test]

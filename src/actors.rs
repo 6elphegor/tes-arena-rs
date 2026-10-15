@@ -669,8 +669,8 @@ impl Machine {
         true
     }
 
-    /// 0000:1FA2. A person with flag 0x20 at +5 and at least 200 / (level
-    /// + 1) SP picks one of the 16 spells listed at DGROUP 6259 at
+    /// 0000:1FA2. A person with flag 0x20 at +5 and at least 200 / (level + 1)
+    /// SP picks one of the 16 spells listed at DGROUP 6259 at
     /// random until it can pay for one (cost / (level + 1)); returns the
     /// spell and that price. None where the original never finds one.
     fn actor_pick_spell(&mut self, si: u16) -> Option<Option<(u8, u16)>> {

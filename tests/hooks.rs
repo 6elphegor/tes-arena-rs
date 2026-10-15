@@ -128,7 +128,7 @@ fn setup_walk(m: &mut Machine, seed: u32) -> (u16, u16) {
             }
             2 => {
                 let r = (s.byte() % 4) as u16;
-                r << 8 | (s.byte() % 2) as u16 * 2
+                (r << 8) | ((s.byte() % 2) as u16 * 2)
             }
             3 => {
                 if s.byte() < 0x80 {

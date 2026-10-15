@@ -649,10 +649,10 @@ impl Machine {
     }
 
     /// 0000:F9C4. The player's height settles towards the floor under
-    /// them: the top of a raised square (3Ch above it, or the wall's top
-    /// + 3Ch when standing on it), the ground (3Ch), or for a floor
-    /// below FLOOR_SOLID's kind the depth of water or a pit (-80, or -25,
-    /// -10, -50 and -1 by the level's flags, bobbing on the way). Falling
+    /// them: the top of a raised square (3Ch above it, or the wall's top + 3Ch
+    /// when standing on it), the ground (3Ch), or for a floor
+    /// below FLOOR_SOLID's kind the depth of water or a pit (-80, or -25, -10,
+    /// -50 and -1 by the level's flags, bobbing on the way). Falling
     /// moves down by E8BE, doubling every other frame, not while
     /// levitating (C398 bit 0x200), climbing or with level flag 0x8000;
     /// landing low pulls the player off the square's edges. The view

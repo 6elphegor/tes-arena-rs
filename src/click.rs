@@ -503,7 +503,7 @@ impl Machine {
         if f == 0 || ax / f > 0xFF {
             return None;
         }
-        let ax = ax / f & 0xFF;
+        let ax = (ax / f) & 0xFF;
         let ax = ax.wrapping_mul(self.mem.r8(DS, p + 6) as u16 + 1) as u32 * 100;
         if lock == 0 || ax / lock as u32 > 0xFFFF {
             return None;

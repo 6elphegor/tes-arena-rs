@@ -617,8 +617,8 @@ impl Machine {
     }
 
     /// 1194:96B2. The reward (+18h): a roll from (amount + 1) x 100 to
-    /// that plus (amount + 2) x 25 (amounts in 8 bits), times the level
-    /// + 1 in 16 bits, times 140h (E6h, C0h for A47 1, other), over 256.
+    /// that plus (amount + 2) x 25 (amounts in 8 bits), times the level + 1
+    /// in 16 bits, times 140h (E6h, C0h for A47 1, other), over 256.
     fn quest_reward(&mut self, si: u16) -> Option<()> {
         let amount = self.sq16(si + 6);
         let lo = (amount.wrapping_add(1) as u8 as u16).wrapping_mul(100);
@@ -1263,8 +1263,8 @@ impl Machine {
     }
 
     /// 1194:D105, then the line made ready (D0E3..D0F9): the informant's
-    /// line from the file in the EMS frame, the (step x 15 + `row` x 3
-    /// + a d3, unless row 1, rolled with the frame's bytes as the RNG's)-th
+    /// line from the file in the EMS frame, the (step x 15 + `row` x 3 + a
+    /// d3, unless row 1, rolled with the frame's bytes as the RNG's)-th
     /// of its strings, copied to 929E, its
     /// substitutions made, its line feeds and returns made spaces and
     /// its lines wrapped at 3Ch (D2F3, 49FF), then split at 3 lines a
@@ -1313,8 +1313,8 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:49FF. The text at `si` wrapped at 137E characters (3Ch when
-    /// 0): from each line's end back to a space, made a line feed. None
+    /// 1194:49FF. The text at `si` wrapped at 137E characters (3Ch when 0):
+    /// from each line's end back to a space, made a line feed. None
     /// where no space is found going back (the original reads on through
     /// memory).
     fn sq_wrap(&mut self, si: u16) -> Option<()> {
@@ -1375,8 +1375,8 @@ impl Machine {
 
     /// 1194:CFAF. The informant tells: text 1F6h logged (CF93: written
     /// to 1044, then 27E3), "%amn" made the next dungeon's name at 929E,
-    /// a random dungeon of its province (0FE3) given it (26F7:0C0A mode
-    /// 1), its index to 0FE2, 0FE6 bit 4, then taken (mode 4).
+    /// a random dungeon of its province (0FE3) given it (26F7:0C0A mode 1),
+    /// its index to 0FE2, 0FE6 bit 4, then taken (mode 4).
     fn informant_next(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         use crate::quest::var::{TEXT, TEXT_FLAG, TEXT_FLAG2};
         self.mem.w16(DS, TEXT, 0x1F6);
@@ -1402,8 +1402,8 @@ impl Machine {
     /// place's name at A22) and building (8223h: 0 the palace, 7 a mages'
     /// guild, 5 a temple whose name, "%tem", is the stage-th at 822Bh).
     /// Not the town: away from buildings (5E6 not 4) text 519h. The town
-    /// but not the person: away from buildings a d100 against (level +
-    /// 1) x 10 (at most 90, D8B7) gives a hint (51Bh + stage) or not
+    /// but not the person: away from buildings a d100 against (level + 1)
+    /// x 10 (at most 90, D8B7) gives a hint (51Bh + stage) or not
     /// (519h). The person: `quest_person_met` (D67F). None where a hook
     /// fails.
     pub fn quest_person_talk(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {

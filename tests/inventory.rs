@@ -35,7 +35,7 @@ fn fill_slots(seed: u32) -> Vec<u8> {
         let (ty, cat) = match kind {
             0..=2 => ((next() % 18) as u8, 1),
             3..=4 => ((next() % 11) as u8, 0),
-            5 => ((0x80 | next() % 0x10) as u8, (next() % 4) as u8),
+            5 => ((0x80 | (next() % 0x10)) as u8, (next() % 4) as u8),
             6 => (b[0], (next() % 4) as u8),
             _ => ((next() % 4) as u8, 2),
         };

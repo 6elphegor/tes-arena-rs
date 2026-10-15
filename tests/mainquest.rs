@@ -36,7 +36,7 @@ fn setup(m: &mut Machine, seed: u32, step_8e: u8) -> u8 {
     m.mem.w16(DS, RECORD, x);
     let y = row << 7 | (s.byte() & 0x7F) as u16;
     m.mem.w16(DS, RECORD + 4, y);
-    let square = row << 8 | (col * 2 & 0xFF);
+    let square = row << 8 | ((col * 2) & 0xFF);
     let mut block = [0u8; 0x13];
     for b in block.iter_mut() {
         *b = s.byte();
