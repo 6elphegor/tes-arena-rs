@@ -4,12 +4,13 @@
 //! `carried_weight` in loot_window.rs), and the hand's pickpocketing
 //! armed (2542:0279).
 //!
-//! The box itself (0000:965A), the wait for a key around it, and the
-//! conditions 2686:005E appends to the text (poison, disease, low health,
-//! the spells on the player) are the front end's.
+//! The conditions 2686:005E appends to the text (`status_conditions`:
+//! disease, poison, low health, drunkenness, the spells on the player,
+//! fortified attributes). The box itself (0000:965A) and the wait for a
+//! key around it are the front end's.
 
 use crate::machine::Machine;
-use crate::mem::DS;
+use crate::mem::{DATA, DS};
 
 /// DGROUP: the status box's text, its format, the time's two formats
 /// ("%d:%d %s", "%d:0%d %s") and the place's name.
@@ -24,6 +25,20 @@ pub mod var {
     pub const TIME_TEXT: u16 = 0x1144;
     /// "Select target for pilfering..." (2542:0279's message).
     pub const PILFER_TEXT: u16 = 0x5B5C;
+    /// 2686:005E's lines counted, and its formats and lists: "You are
+    /// %s.\r", "You have %s.\r", "Your %s is fortified.\r", the
+    /// conditions' names (healthy, diseased, poisoned, ...), the
+    /// diseases' names (DATA) and the attributes' names.
+    pub const LINES: u16 = 0x12B2;
+    pub const ARE_FORMAT: u16 = 0x6855;
+    pub const HAVE_FORMAT: u16 = 0x6847;
+    pub const FORTIFIED_FORMAT: u16 = 0x6830;
+    pub const CONDITIONS: u16 = 0x6862;
+    pub const DISEASES: u16 = 0x4878;
+    pub const ATTRIBUTE_NAMES: u16 = 0x2B00;
+    /// The effect slots (10h of 3Ch bytes: +6..+0Dh the attributes
+    /// raised, +28h the far target, +3Ah the kind, +3Bh FFh free).
+    pub const EFFECT_SLOTS: u16 = 0x0660;
 }
 use var::*;
 
@@ -95,6 +110,168 @@ impl Machine {
             (DS, STATUS_FORMAT),
             &[Arg::Str(DS, PLACE_NAME), Arg::Str(DS, TIME_TEXT), Arg::Str(DS, DATE_TEXT), Arg::Int(carried), Arg::Int(most)],
         )
+    }
+
+    /// 2686:005E. The player's conditions appended at DS:`di` (2542:0515
+    /// passes the status text's NUL), each line through 2686:0235: "You
+    /// are %s.\r" with the condition's name from the list at CONDITIONS,
+    /// a line counted at LINES (12B2, cleared first). In order:
+    /// - diseased (+40Dh bit 1): the disease's own name instead, "You have
+    ///   %s.\r" (2686:0158): the first of 11h effect slots (one past the
+    ///   table's 10h, as the original walks) on the player whose kind
+    ///   (+3Ah) is 0Ah or more names it from DATA:4878 (its kind less
+    ///   0Ah); found, the line isn't counted and CX is left 1, else CX 0;
+    /// - poisoned (bit 2), drunk (20h), paralyzed (40h), cursed (4),
+    ///   drained (200h), each with CX its index;
+    /// - in critical condition when the health (+59h) is at most a tenth
+    ///   of its maximum (+5Bh);
+    /// - when 2686:0270 finds a spell on the player (an effect slot whose
+    ///   target's offset is the player's, alive (+3Bh not FFh), with none
+    ///   of +40Dh bits 1, 20h, 2; or the spell bits +41Ah or +41Ch set):
+    ///   each set bit of +41Ah from bit 0 names condition 5 on (the
+    ///   empty 0Dh skipped), +41Ch "shielded", +40Dh bit 80h
+    ///   "regenerating" (2686:010F; CX kept);
+    /// - "healthy" when CX is still 0;
+    /// - with 5B1 bit 10h, each attribute an effect slot of kind 4 on the
+    ///   player fortifies (+6..+0Dh non-zero): "Your %s is fortified.\r"
+    ///   with its name from 2B00 (2686:01C3, not counted); the original
+    ///   keeps the player's pointer in EAX, which the first line printed
+    ///   clobbers, so only the first such slot is listed.
+    ///
+    /// The text ends with a NUL; more than 10 lines counted set D39 bit
+    /// 80h. Returns DI, at that NUL.
+    pub fn status_conditions(&mut self, di: u16) -> u16 {
+        const P: u16 = 0x01A4;
+        let mut di = di;
+        self.mem.w16(DS, LINES, 0);
+        let mut cx = 0u16;
+        let ax = self.mem.r16(DS, P + 0x40D);
+        if ax & 1 != 0 {
+            let (d, c) = self.disease_line(di);
+            di = d;
+            cx = c;
+        }
+        for (bit, c) in [(2u16, 2u16), (0x20, 4), (0x40, 0x14), (4, 0x15), (0x200, 0x16)] {
+            if ax & bit != 0 {
+                cx = c;
+                di = self.condition_line(di, cx);
+            }
+        }
+        if self.mem.r16(DS, P + 0x59) <= self.mem.r16(DS, P + 0x5B) / 10 {
+            cx = 3;
+            di = self.condition_line(di, cx);
+        }
+        if self.spell_on_player() {
+            di = self.spell_lines(di);
+        }
+        if cx == 0 {
+            di = self.condition_line(di, cx);
+        }
+        if self.mem.r16(DS, 0x05B1) & 0x10 != 0 {
+            di = self.fortified_lines(di);
+        }
+        self.mem.w8(DS, di, 0);
+        if self.mem.r16(DS, LINES) > 10 {
+            let b = self.mem.r8(DS, 0x0D39) | 0x80;
+            self.mem.w8(DS, 0x0D39, b);
+        }
+        di
+    }
+
+    /// 2686:0235. "You are %s.\r" at DS:`di` with condition `cx`, a line
+    /// counted; DI at its NUL.
+    fn condition_line(&mut self, di: u16, cx: u16) -> u16 {
+        let name = self.skip_strings(DS, CONDITIONS, cx);
+        use crate::format::Arg;
+        let end = self.sprintf((DS, di), (DS, ARE_FORMAT), &[Arg::Str(DS, name)]);
+        let n = self.mem.r16(DS, LINES).wrapping_add(1);
+        self.mem.w16(DS, LINES, n);
+        end
+    }
+
+    /// Whether the effect slot at `slot` is alive and on the player (its
+    /// far target at +28h).
+    fn slot_on_player(&self, slot: u16) -> bool {
+        self.mem.r8(DS, slot + 0x3B) != 0xFF && self.mem.r16(DS, slot + 0x28) == 0x01A4 && self.mem.r16(DS, slot + 0x2A) == DS
+    }
+
+    /// 2686:0158. The disease's line; (DI, CX).
+    fn disease_line(&mut self, di: u16) -> (u16, u16) {
+        for i in 0..0x11u16 {
+            let slot = EFFECT_SLOTS + i * 0x3C;
+            let kind = self.mem.r8(DS, slot + 0x3A);
+            if self.slot_on_player(slot) && kind >= 0x0A {
+                let name = self.skip_strings(DATA, DISEASES, kind as u16 - 0x0A);
+                use crate::format::Arg;
+                let end = self.sprintf((DS, di), (DS, HAVE_FORMAT), &[Arg::Str(DATA, name)]);
+                return (end, 1);
+            }
+        }
+        (di, 0)
+    }
+
+    /// 2686:0270. A spell on the player: a slot on it (by its target's
+    /// offset alone) while +40Dh has none of bits 1, 20h and 2, else the
+    /// spell bits +41Ah or +41Ch.
+    fn spell_on_player(&self) -> bool {
+        const P: u16 = 0x01A4;
+        let flags = self.mem.r16(DS, P + 0x40D);
+        for i in 0..0x10u16 {
+            let slot = EFFECT_SLOTS + i * 0x3C;
+            if self.mem.r16(DS, slot + 0x28) != P || self.mem.r8(DS, slot + 0x3B) == 0xFF {
+                continue;
+            }
+            if flags & 1 != 0 || flags & 0x20 != 0 || flags & 2 != 0 {
+                continue;
+            }
+            return true;
+        }
+        self.mem.r16(DS, P + 0x41A) != 0 || self.mem.r16(DS, P + 0x41C) != 0
+    }
+
+    /// 2686:010F. The spells' lines.
+    fn spell_lines(&mut self, mut di: u16) -> u16 {
+        const P: u16 = 0x01A4;
+        let bits = self.mem.r16(DS, P + 0x41A);
+        if bits != 0 {
+            for k in 0..0x0Du16 {
+                let bx = 5 + k;
+                if bits & (1 << k) != 0 && bx != 0x0D {
+                    di = self.condition_line(di, bx);
+                }
+            }
+        }
+        if self.mem.r16(DS, P + 0x41C) != 0 {
+            di = self.condition_line(di, 0x12);
+        }
+        if self.mem.r16(DS, P + 0x40D) & 0x80 != 0 {
+            di = self.condition_line(di, 0x13);
+        }
+        di
+    }
+
+    /// 2686:01C3. "Your %s is fortified.\r" for each attribute a kind-4
+    /// effect slot on the player raises.
+    fn fortified_lines(&mut self, mut di: u16) -> u16 {
+        // EAX holds the player's far pointer for the comparison; a line
+        // printed leaves AX as the formatter does (AL 0, the format's
+        // NUL), so no slot after one that printed is the player's.
+        let mut printed = false;
+        for i in 0..0x10u16 {
+            let slot = EFFECT_SLOTS + i * 0x3C;
+            if printed || !self.slot_on_player(slot) || self.mem.r8(DS, slot + 0x3A) != 4 {
+                continue;
+            }
+            for bx in 0..8u16 {
+                if self.mem.r8(DS, slot + 6 + bx) != 0 {
+                    printed = true;
+                    let name = self.skip_strings(DS, ATTRIBUTE_NAMES, bx);
+                    use crate::format::Arg;
+                    di = self.sprintf((DS, di), (DS, FORTIFIED_FORMAT), &[Arg::Str(DS, name)]);
+                }
+            }
+        }
+        di
     }
 
     /// 2542:0279. The hand's button: pickpocketing armed (5CA bit 0) with
