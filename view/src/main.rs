@@ -445,24 +445,39 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
             None => 0xFFFF,
         }
     }
-    /// 1194:D986: the eighth piece, the quest's end: WALK.FLC and
-    /// AFLC2.FLC, NUJAGDTH.FLC with text 57Ch in 64h, STAFF.FLC and
-    /// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h, then the house
-    /// (1194:DA38..DAC2: HOUSE.IMG in its own colours, text 579h in 5Ch).
-    /// (What comes after, 1194:DAC4 on, isn't ported.)
-    fn last_piece(&mut self, _m: &mut arena::machine::Machine) {
-        for (name, text, colour) in [
-            ("WALK.FLC", None, 0),
-            ("AFLC2.FLC", None, 0),
-            ("NUJAGDTH.FLC", Some(0x57C), 0x64),
-            ("STAFF.FLC", None, 0),
-            ("KING.FLC", None, 0),
-            ("NUKING.FLC", Some(0x57D), 0x99),
-            ("NUKING.FLC", Some(0x57F), 0x99),
-            ("HOUSE.IMG", Some(0x579), 0x5C),
-        ] {
-            self.0.movie(name, text, colour);
+    /// 1194:D986: the eighth piece, the staff made whole
+    /// (`Machine::staff_end`): its scenes through `EndFront`.
+    fn last_piece(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.staff_end(files, &mut EndFront(self.0))
+    }
+}
+/// The staff made whole's scenes (`arena::staffend`): WALK.FLC and
+/// AFLC2.FLC, NUJAGDTH.FLC with text 57Ch in 64h, STAFF.FLC and
+/// KING.FLC, NUKING.FLC with 57Dh and then 57Fh in 99h, then the house
+/// (HOUSE.IMG in its own colours, text 579h in 5Ch), as movies.
+struct EndFront<'a, 'b>(&'a mut Front<'b>);
+
+impl EndFront<'_, '_> {
+    /// The movie named at DS:`si`, as the view's names are kept.
+    fn named(m: &arena::machine::Machine, si: u16) -> Option<&'static str> {
+        let name = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).to_ascii_uppercase();
+        ["WALK.FLC", "AFLC2.FLC", "NUJAGDTH.FLC", "STAFF.FLC", "KING.FLC", "NUKING.FLC"].into_iter().find(|n| *n == name)
+    }
+}
+
+impl arena::staffend::EndHooks for EndFront<'_, '_> {
+    fn movie(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, si: u16) {
+        if let Some(name) = Self::named(m, si) {
+            self.0.movie(name, None, 0);
         }
+    }
+    fn speech(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, ax: u16, _si: u16, di: u16) {
+        if let Some(name) = Self::named(m, di) {
+            self.0.movie(name, Some(ax), m.mem.r8(arena::mem::DS, 0x9288));
+        }
+    }
+    fn house(&mut self, _m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) {
+        self.0.movie("HOUSE.IMG", Some(0x579), 0x5C);
     }
 }
 /// Resting (src/rest.rs): its menu and the hours typed through `dialog`,

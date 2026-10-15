@@ -588,25 +588,21 @@ fn rest(engine: &mut Engine, n: &str) {
     println!("   rested: {}; {}", dream(m), state(m));
 }
 
-/// The stairs taken down to the last level (0000:51B8, the level reloaded
-/// (0000:EBB5), the hook C3B8: 0000:44D7), then the chest at the piece's
-/// square (FEE) clicked (292B:06DC, whose chest runs 2294:0F33).
+/// The stairs taken down to the last level as `staff::change_level`
+/// takes them (the stairs' hook, the level reloaded, 0000:EBB5, its INF
+/// loaded where one was named, the hook C3B8: 0000:44D7, where 2294:0E90
+/// puts the chest), then the chest at the piece's square (FEE) clicked
+/// (292B:06DC, whose chest runs 2294:0F33).
 fn descend_and_open(engine: &mut Engine, n: &str) -> Option<()> {
-    use arena::movement::var::{LEVEL, LEVELS, LEVEL_HOOK, X, Y};
-    let m = &mut engine.m;
-    while m.mem.r8(DS, LEVEL) + 1 < m.mem.r8(DS, LEVELS) {
-        m.stairs_hook(&mut engine.files, &mut arena::hooks::NoStairsHooks);
-        let l = m.mem.r8(DS, LEVEL) + 1;
-        m.mem.w8(DS, LEVEL, l);
-        if m.level_change(&mut engine.files).is_none() {
-            println!("{n}. level {l}: the level's change met something not ported");
-            return None;
-        }
-        if m.mem.r32(DS, LEVEL_HOOK) == arena::hooks::value::LEVEL_ENTERED && m.level_entered(&mut engine.files, &mut arena::hooks::NoStairsHooks).is_none() {
-            println!("{n}. level {l}: its entry met something not ported");
+    use arena::movement::var::{LEVEL, LEVELS, X, Y};
+    while engine.m.mem.r8(DS, LEVEL) + 1 < engine.m.mem.r8(DS, LEVELS) {
+        let l = engine.m.mem.r8(DS, LEVEL) + 1;
+        if staff::change_level(engine, l).is_none() {
+            println!("{n}. level {l}: the level's change gave up: {}", arena::giveup::describe());
             return None;
         }
     }
+    let m = &mut engine.m;
     let sq = m.mem.r16(DS, 0x0FEE);
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     println!("{n}. the last level ({}): the piece's square {sq:04x} holds {:04x} (the chest flat C93B {:02x})", m.mem.r8(DS, LEVEL), m.mem.r16(walls, sq), m.mem.r8(DS, 0xC93B));

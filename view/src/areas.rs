@@ -42,6 +42,12 @@ impl AreaHooks for Areas<'_> {
         self.ending = Some(ax);
     }
 
+    /// 292B:095E: the main quest dungeon's level's locks and triggers
+    /// kept in STATES.nn on the way out, as the stairs keep them (`Kept`).
+    fn automap(&mut self, m: &mut Machine, files: &mut Files) {
+        m.states_keep(files);
+    }
+
     fn normal_lgt(&mut self, m: &mut Machine) {
         world::lgt(m, self.dir, arena::weather::NORMAL_LGT);
     }

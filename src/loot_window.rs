@@ -12,8 +12,8 @@
 //! - AH 0Fh with AL the staff's flat (C941): the keys are taken away, the
 //!   piece's sound plays, and either the pieces count (F77) moves on and
 //!   its text is shown (2433:0BF4) with the flat taken from the map, or,
-//!   holding all eight, the quest's end (1194:D986) begins and the area
-//!   is left;
+//!   holding all eight, the staff made whole (1194:D986, `staffend`)
+//!   and the area left;
 //! - AH 0 or 1, a corpse (creature or person, the record at FS:SI): its
 //!   gold (+407h) goes to the player's (5C2), then a list of its items
 //!   (the occupied slots up to the first empty one) is shown until the
@@ -70,8 +70,11 @@ pub trait LootHooks {
     fn piece_told(&mut self, m: &mut Machine) -> bool {
         !m.complete_staff_piece()
     }
-    /// 1194:D986: the eighth piece: the quest's end begins.
-    fn last_piece(&mut self, _m: &mut Machine) {}
+    /// 1194:D986: the eighth piece: the staff made whole, its scenes
+    /// (`Machine::staff_end`, its screens none by default).
+    fn last_piece(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.staff_end(files, &mut crate::staffend::NoEndHooks)
+    }
     /// 2433:0000: the piles of treasure made (`Machine::piles`).
     fn piles(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         m.piles()
@@ -702,7 +705,7 @@ impl Machine {
             hooks.sound(self, 0x4C63);
             if self.mem.r8(DS, PIECES) == 8 {
                 self.mem.w8(DS, PIECES, 9);
-                hooks.last_piece(self);
+                hooks.last_piece(self, files)?;
                 let f = self.mem.r16(DS, MAP_FLAGS) | 0x80;
                 self.mem.w16(DS, MAP_FLAGS, f);
                 self.mem.w8(DS, 0x0F76, 0);

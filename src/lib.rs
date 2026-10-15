@@ -76,6 +76,7 @@ pub mod spell;
 pub mod spellmaker;
 pub mod status;
 pub mod squares;
+pub mod staffend;
 pub mod steps;
 pub mod store;
 pub mod strike;
