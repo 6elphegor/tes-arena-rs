@@ -66,7 +66,7 @@ use crate::travel::var::{DAYS, DEST_X, DEST_Y};
 use var::*;
 
 /// The lists of a province's locations.
-const CITIES: u16 = 0x1445;
+pub const CITIES: u16 = 0x1445;
 const TOWNS: u16 = 0x150D;
 const VILLAGES: u16 = 0x15D5;
 const DUNGEONS: u16 = 0x1765;
@@ -132,6 +132,16 @@ pub trait TravelHooks: ClockHooks {
     /// file named at DS:`si`.
     fn arrival_write(&mut self, m: &mut Machine, files: &mut Files, si: u16, di: u16, cx: u16) {
         m.file_write(files, si, DS, di, cx);
+    }
+    /// A test's stand-in for the pick (26F7:03C4) a click or the search
+    /// makes: Some(AX) instead of `Machine::travel_pick` (with AX in).
+    fn pick_stub(&mut self, _m: &mut Machine, _ax: u16) -> Option<u16> {
+        None
+    }
+    /// A test's stand-in for the journey shown (26F7:0483) after a pick:
+    /// true instead of `Machine::travel_journey`.
+    fn journey_stub(&mut self, _m: &mut Machine) -> bool {
+        false
     }
     /// 3159:0006: the map's window closed.
     fn close(&mut self, _m: &mut Machine) {}
@@ -220,6 +230,8 @@ impl Machine {
         let mut ax = ax;
         let (si, bx): (u16, u16);
         if pick < 0x20 {
+            // 03E0: a place's own index (the caller's AX is a dungeon's).
+            ax = pick;
             let cx = ((p as u16) << 5).wrapping_add(pick);
             if cx as u8 == self.tm8(HERE_ID) && self.tm8(HERE_KIND) != 3 {
                 self.mem.w8(DS, HERE_CLICKED, 1);
@@ -376,7 +388,7 @@ impl Machine {
 
     /// 1194:55B6's state: the palette buffer (300h bytes at 929E) cleared;
     /// the fade itself is the front end's.
-    fn travel_screen_clear(&mut self, hooks: &mut dyn TravelHooks) {
+    pub(crate) fn travel_screen_clear(&mut self, hooks: &mut dyn TravelHooks) {
         for i in 0..0x300u16 {
             self.mem.w8(DS, 0x929E + i, 0);
         }

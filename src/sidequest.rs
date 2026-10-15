@@ -1451,7 +1451,7 @@ impl Machine {
 
     /// 0000:9C2C. The strings at DS:`si` and DS:`di` equal, ignoring the
     /// case of a..z: Some(SI past the NUL) when equal.
-    fn sq_streq(&self, mut si: u16, mut di: u16) -> Option<u16> {
+    pub(crate) fn sq_streq(&self, mut si: u16, mut di: u16) -> Option<u16> {
         let up = |b: u8| if b.is_ascii_lowercase() { b - 0x20 } else { b };
         loop {
             let (a, b) = (up(self.sq8(si)), up(self.sq8(di)));
