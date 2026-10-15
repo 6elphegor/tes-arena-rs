@@ -801,7 +801,7 @@ impl Machine {
         }
     }
 
-    /// The seed of the wild's square (0000:2DA2:092B): the position's
+    /// The seed of the wild's square (2DA2:092B): the position's
     /// chunk numbers from 608/60A, carried past 2000h of `cx`, `dx`.
     fn text_wild_seed(&self, cx: u16, dx: u16) -> u32 {
         let hi = self.t16(0x060A).wrapping_add((dx >= 0x2000) as u16);
@@ -1054,7 +1054,7 @@ impl Machine {
             // that path) and its RET returns into the text.
             0x05DC => {
                 if self.t8(0x0D48) != 6 {
-                    return None;
+                    return self.original_fault("%en outside an equipment store (2DA2:05DC returns into the text)");
                 }
                 let key = self.t16(0x0FD2);
                 let key = (key & 0xFF00) | ((key & 0xFF) >> 1);

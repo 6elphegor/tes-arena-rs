@@ -276,6 +276,10 @@ pub struct Synth {
     /// Each voice's velocity, for volume changes.
     vel: [u8; VOICES],
     age: u64,
+    /// The music's volume in percent (D3A, the options screen's; 0FFD:0DE8
+    /// gives it to the driver as its relative volume): the channels'
+    /// volumes scaled by it.
+    percent: u8,
 }
 
 /// (block, f-number) of a key (fractional, MIDI numbering).
@@ -292,7 +296,7 @@ fn fnum(key: f32) -> (u8, u16) {
 
 impl Synth {
     pub fn new(bank: Bank) -> Synth {
-        let mut s = Synth { chip: nuked_opl3::Opl3Chip::new(RATE), bank, voices: [Voice::default(); VOICES], chans: [Chan::default(); 16], vel: [0; VOICES], age: 0 };
+        let mut s = Synth { chip: nuked_opl3::Opl3Chip::new(RATE), bank, voices: [Voice::default(); VOICES], chans: [Chan::default(); 16], vel: [0; VOICES], age: 0, percent: 100 };
         // OPL3 mode (105h), waveforms on (01h), no four-operator pairs.
         s.chip.write_register(0x105, 1);
         s.chip.write_register(0x104, 0);
@@ -316,7 +320,7 @@ impl Synth {
         let voice = self.voices[v];
         let Some(t) = voice.timbre.and_then(|id| self.bank.0.get(&id)).copied() else { return };
         let (bank, c) = Synth::base(v);
-        let vol = self.vel[v] as u32 * self.chans[voice.ch as usize].volume as u32 / 0x7F;
+        let vol = self.vel[v] as u32 * self.chans[voice.ch as usize].volume as u32 * self.percent as u32 / (0x7F * 100);
         let scale = |reg: u8| -> u8 {
             let tl = (reg & 0x3F) as u32;
             let att = 63 - (63 - tl) * vol / 0x7F;
@@ -437,6 +441,16 @@ impl Synth {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// The relative volume set (percent, at most 100).
+    pub fn set_percent(&mut self, p: u8) {
+        self.percent = p.min(100);
+        for v in 0..VOICES {
+            if self.voices[v].on || self.voices[v].held {
+                self.levels(v);
+            }
         }
     }
 
@@ -569,6 +583,8 @@ enum Cmd {
     /// Fade out over 800 ms and stop (2F9F:0438).
     Stop,
     Play(Xmi),
+    /// The relative volume (D3A) changed.
+    Volume(u8),
 }
 
 /// The music driver: the songs asked for, played on a thread of its own
@@ -582,6 +598,8 @@ pub struct Music {
     /// Without a thread (shots): the song asked for last and the game's
     /// ticks it has played, for its status.
     headless: Option<(u32, u32)>,
+    /// The volume last given to the thread.
+    percent: u8,
 }
 
 impl Music {
@@ -589,7 +607,7 @@ impl Music {
     /// stream are there), `log` printing each song asked for.
     pub fn new(archive: Rc<Archive>, play: bool, log: bool) -> Music {
         let (tx, status) = if play { open(&archive) } else { (None, Arc::new(AtomicU8::new(0))) };
-        Music { archive, log, tx, status, songs: HashMap::new(), headless: None }
+        Music { archive, log, tx, status, songs: HashMap::new(), headless: None, percent: 100 }
     }
 
     /// Whether a driver is loaded (it plays or logs).
@@ -622,6 +640,13 @@ impl Music {
     pub fn after(&mut self, m: &mut Machine, ticks: u32) {
         if let Some((_, played)) = &mut self.headless {
             *played += ticks * TICKS / 18;
+        }
+        let percent = m.mem.r8(arena::mem::DS, arena::options::var::MUSIC);
+        if percent != self.percent {
+            self.percent = percent;
+            if let Some(tx) = &self.tx {
+                let _ = tx.send(Cmd::Volume(percent));
+            }
         }
         for s in std::mem::take(&mut m.songs) {
             if !self.on() {
@@ -745,6 +770,7 @@ fn run(pulse: crate::audio::Pulse, mut synth: Synth, rx: Receiver<Cmd>, status: 
                     status.store(1, Ordering::Relaxed);
                 }
             },
+            Some(Cmd::Volume(p)) => synth.set_percent(p),
             None => {}
         }
         if player.is_none() && fade.is_none() {

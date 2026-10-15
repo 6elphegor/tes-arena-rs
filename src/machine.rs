@@ -33,11 +33,16 @@ pub struct Machine {
     /// (AIL's sequence status: 0 stopped, 1 playing, 2 done).
     pub songs: Vec<crate::music::Song>,
     pub music_status: u8,
+    /// Why the last None was the original's own doing (it faults or hangs
+    /// there), where a port routine knows (`original_fault`); None for a
+    /// give-up the port can't say that of (something not ported). For
+    /// reports only: nothing in the game reads it.
+    pub gave_up: Option<&'static str>,
 }
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status } = self;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -49,6 +54,7 @@ impl Clone for Machine {
             sound_names: sound_names.clone(),
             songs: songs.clone(),
             music_status: *music_status,
+            gave_up: *gave_up,
         }
     }
 
@@ -56,7 +62,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status } = source;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -67,6 +73,7 @@ impl Clone for Machine {
         self.sound_names.clone_from(sound_names);
         self.songs.clone_from(songs);
         self.music_status = *music_status;
+        self.gave_up = *gave_up;
     }
 }
 
@@ -74,7 +81,14 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0 }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None }
+    }
+
+    /// None, noting `why`: where the original itself faults or hangs, so
+    /// the port gives up as the original can't go on (see `gave_up`).
+    pub fn original_fault<T>(&mut self, why: &'static str) -> Option<T> {
+        self.gave_up = Some(why);
+        None
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.
