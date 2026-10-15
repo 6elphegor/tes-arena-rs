@@ -164,7 +164,12 @@ impl Machine {
                 break;
             }
             self.file_read(files, DS, TEXT, 0x3C);
-            if self.note_hit(self.mem.r16(DS, NOTE_X), self.mem.r16(DS, NOTE_Y), TEXT)? {
+            let hit = self.note_hit(self.mem.r16(DS, NOTE_X), self.mem.r16(DS, NOTE_Y), TEXT);
+            let hit = match hit {
+                Some(h) => h,
+                None => return self.original_fault("a note's hit test divides past FFh (0000:343C's div cl)"),
+            };
+            if hit {
                 let pos = self.file_seek(files, 1, 0xFFFF_FFC0);
                 self.mem.w32(DS, NOTE_POS, pos);
                 found = true;
