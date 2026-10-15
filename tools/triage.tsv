@@ -422,3 +422,6 @@
 2DA2:10ED	inline	text code helper: the 4 bytes at DATA:7308 copied (text.rs text_sub)
 2DA2:1109	inline	text code helper: a random number mod 100 (text.rs text_sub)
 3065:0009	inline	MIF decoding: a byte out (mif.rs OUT_PTR)
+2542:037C	trivial	near wrapper of 2542:04B1, the status box (status.rs status_text)
+0000:5D4E	driver	EMS handle freed at the program's end (int 67h 45h), thunk of 5D52
+0000:5D52	driver	EMS handle freed at the program's end (int 67h 45h)

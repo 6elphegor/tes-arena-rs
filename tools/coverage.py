@@ -220,6 +220,7 @@ DISPATCH = {
     ('tavern.rs', 'tavern_choice'): 0x1194,
     ('shops.rs', 'cure_handler'): 0x1194,
     ('shops.rs', 'temple_body'): 0x1194,
+    ('options.rs', 'options_screen'): 0x2542,
 }
 ARM = re.compile(r'\b0x([0-9A-F]{4})\s*(?:=>|\|)')
 
@@ -998,8 +999,12 @@ def main():
     w('The port\'s claims are the SEG:OFF addresses in its')
     w('sources: in a `...Hooks` trait\'s docs a hook (left to the front end),')
     w('elsewhere in `src/` ported, in `view/src/` the front end\'s own version.')
+    w('In the port functions that match on the original\'s handler offsets')
+    w('(`DISPATCH` in the tool: the text codes, spell effects, INF keywords,')
+    w('menus\' and screens\' handlers) each `0xNNNN =>` arm is a ported claim.')
     w('A routine counts as ported when a ported address falls on its entry or')
-    w('inside its instructions.')
+    w('inside its instructions (a byte of one included; an address under')
+    w('another segment naming the same bytes counts for the routine there).')
     w('')
     w('Limits, honestly: indirect calls neither resolved nor traced are')
     w(f'not followed ({g.unresolved} sites; {g.tables} table sites resolved), so')
