@@ -2816,7 +2816,7 @@ impl App {
     fn options_ended(&mut self, e: options::Ended) {
         let options::Ended::Left(engine, end) = e else { return };
         self.options = None;
-        self.engine = engine;
+        self.engine = *engine;
         // The keys let go while the screen was up went to the engine it
         // replaced: the game's key state and latches let go here.
         for scan in 1..0x60u8 {

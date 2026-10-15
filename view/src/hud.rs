@@ -483,11 +483,12 @@ enum Align {
 /// The records 1194:5734 gives 3159:06A0 (DGROUP 5006, 505B, 50B0, 5105,
 /// 515A): the text area (+18h: x, y, w, h), the scroll track (+10h) and
 /// the flags (+20h).
-const RECORD_5006: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_505B: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_50B0: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
-const RECORD_5105: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
-const RECORD_515A: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16) = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
+type ListRecord = ((i32, i32, i32, i32), (i32, i32, i32, i32), u16);
+const RECORD_5006: ListRecord = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
+const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
+const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
+const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
 
 /// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
 /// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
@@ -517,7 +518,7 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     // 1194:5734 by AX: the panel (its name's offset), the record and BL
     // (the lines' colour); kinds 3 and 5 set the record's 4000h (it has
     // it), kinds 6 and 10 draw the caller's title.
-    let kind = |name: &str, rec: ((i32, i32, i32, i32), (i32, i32, i32, i32), u16), colour: u8, title: Option<(i32, u8)>| {
+    let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
         let (area, track, flags) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
         ListKind { panel: crate::panels::load_image(archive, m, name), area, track, last, colour, title }

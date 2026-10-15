@@ -78,7 +78,7 @@ impl Backdrop {
         let (font, row) = if c.width(&title) > 0x118 { (&a, 4) } else { (&c, 3) };
         let w = font.width(&title) as i32;
         let n = (w + 15) >> 4;
-        let x0 = 0xA0 - (n * 16 >> 1);
+        let x0 = 0xA0 - ((n * 16) >> 1);
         if let Some(t) = img("MENU_CTR.IMG") {
             for i in 0..n {
                 screen.blit(x0 + i * 16, 0, t.w, t.h, &t.px, 199);
@@ -88,7 +88,7 @@ impl Backdrop {
             screen.blit(x0 - 5, 0, t.w, t.h, &t.px, 199);
         }
         if let Some(t) = img("MENU_RT.IMG") {
-            screen.blit(0xA0 + (n * 16 >> 1), 0, t.w, t.h, &t.px, 199);
+            screen.blit(0xA0 + ((n * 16) >> 1), 0, t.w, t.h, &t.px, 199);
         }
         screen.text_plain(font, 0xA0 - (w >> 1), row, &title, 0x70);
         if let Some(t) = self.picture.as_deref().and_then(img) {
