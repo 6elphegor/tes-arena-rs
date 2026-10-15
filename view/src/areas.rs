@@ -282,17 +282,21 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             }
             Run::End => {
                 // The game is over: the ending's text (TEXT 137A, through
-                // 1194:A374 into a buffer) on the message line, shown
-                // while its countdown runs (061A, 061E).
+                // 1194:A374) on the message line, shown while its
+                // countdown runs (061A, 061E). Written where the original's
+                // 1194:D459 writes it, a heap block of BB8h bytes (0:9CD2):
+                // the farewell is longer than any DGROUP buffer (one at
+                // 19DE ran over the slot bytes 1A6C and 1A80).
                 if let (Some(ax), Some(files)) = (h.ending, h.files.as_deref_mut()) {
-                    const BUF: u16 = 0x19DE;
-                    m.mem.w16(DS, arena::text::var::TEXT, ax);
-                    if m.text(files, &mut arena::text::NoTextHooks, 2, DS, BUF).is_some() {
-                        let text = String::from_utf8_lossy(m.mem.cstr(DS, BUF)).replace('\r', "\n");
-                        println!("{text}");
-                        m.mem.w16(DS, 0x061A, BUF);
-                        m.mem.w16(DS, 0x061C, DS);
-                        m.mem.w16(DS, 0x061E, 0x7FFF);
+                    if let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) {
+                        m.mem.w16(DS, arena::text::var::TEXT, ax);
+                        if m.text(files, &mut arena::text::NoTextHooks, 2, seg, off).is_some() {
+                            let text = String::from_utf8_lossy(m.mem.cstr(seg, off)).replace('\r', "\n");
+                            println!("{text}");
+                            m.mem.w16(DS, 0x061A, off);
+                            m.mem.w16(DS, 0x061C, seg);
+                            m.mem.w16(DS, 0x061E, 0x7FFF);
+                        }
                     }
                 }
                 eprintln!("the game has ended");

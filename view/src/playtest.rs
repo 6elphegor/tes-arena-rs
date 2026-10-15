@@ -43,14 +43,15 @@ impl Dice {
 fn place(engine: &Engine, run: &arena::transit::Run) -> String {
     let r = |at| engine.m.mem.r16(DS, at);
     format!(
-        "{run:?} {} at ({:#x}, {:#x}) square ({}, {}) heading {:#x} height {}",
+        "{run:?} {} at ({:#x}, {:#x}) square ({}, {}) heading {:#x} height {} slot {}",
         String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)),
         r(X),
         r(Y),
         r(X) >> 7,
         r(Y) >> 7,
         r(HEADING),
-        r(HEIGHT) as i16
+        r(HEIGHT) as i16,
+        engine.m.mem.r8(DS, arena::save::var::SLOT)
     )
 }
 
@@ -255,7 +256,12 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if st.over {
             // Dead (or the game won): with a save, loaded back.
             match (tours, saves) {
-                (true, Some((sdir, slot))) => match crate::load_from(&mut engine, dir, sdir, slot) {
+                // As the window does after the game's end (`game_over`): the
+                // main menu's Load on a fresh engine, the start dungeon loaded.
+                (true, Some((sdir, slot))) => match {
+                    engine = crate::world::load(dir, "START.MIF");
+                    crate::load_from(&mut engine, dir, sdir, slot)
+                } {
                     Ok((_, r)) => {
                         *run = r;
                         st.assets = Assets::new(dir, &mut engine);
