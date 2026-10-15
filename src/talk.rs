@@ -164,11 +164,11 @@ pub trait TalkHooks: TextHooks {
         m.quest_chest(&mut crate::quest::NoQuestHooks, si).unwrap_or(false)
     }
     /// The far routine of the building kind `kind` (D48: 4 a tavern, 5 a
-    /// temple, 6 an equipment store, 7 a mages' guild; the table at
-    /// 869F: B93C, C258, F48E, A73E). The temple (`shops::temple`), the
-    /// tavern (`tavern::tavern_shop`) and the equipment store
-    /// (`store::equipment_store`) run without their windows; the guild
-    /// isn't ported.
+    /// temple, 6 an equipment store, 7 a mages' guild; the kinds at 869B,
+    /// the routines at 869F: B93C, C258, F48E, A73E). The temple
+    /// (`shops::temple`), the tavern (`tavern::tavern_shop`), the equipment
+    /// store (`store::equipment_store`) and the guild (`guild::mages_guild`)
+    /// run without their windows.
     fn shop(&mut self, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
         if kind == 5 {
             return m.temple(&mut crate::shops::NoShopHooks);
@@ -178,6 +178,9 @@ pub trait TalkHooks: TextHooks {
         }
         if kind == 6 {
             return m.equipment_store(files, &mut crate::store::NoStoreHooks);
+        }
+        if kind == 7 {
+            return m.mages_guild(files, &mut crate::guild::NoGuildHooks);
         }
         Some(())
     }
