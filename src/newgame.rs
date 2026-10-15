@@ -397,8 +397,21 @@ impl Machine {
     /// whose record is built (1194:3AE8, the Imperial City for province
     /// 8, `city_build_location`).
     pub fn province_chosen(&mut self, province: u8) -> Option<()> {
+        self.province_clicked(province)?;
+        self.province_accepted()
+    }
+
+    /// 1194:28F6 and 289B: a province clicked on the map: the race, and
+    /// the portrait rolled, before the player is asked to accept it (each
+    /// click rolls again).
+    pub fn province_clicked(&mut self, province: u8) -> Option<()> {
         self.mem.w8(DS, PLAYER + rec::RACE, province);
-        self.cr_portrait(DS, PLAYER)?;
+        self.cr_portrait(DS, PLAYER)
+    }
+
+    /// 1194:28E1: the province accepted: the location the portrait byte
+    /// names built (1194:3AE8; the Imperial City for province 8).
+    pub fn province_accepted(&mut self) -> Option<()> {
         let mut id = self.ng8(PLAYER + rec::PORTRAIT) as u16;
         if self.ng8(0x0A22 + 0x24) == 8 {
             id = 0x100;
@@ -529,6 +542,18 @@ impl Machine {
     /// (222C:0241) and the answer counted (`quiz_count`); then the class
     /// (`quiz_class`, through bank 5, the bank mapped before restored).
     pub fn class_quiz(&mut self, files: &mut Files, answers: &[u8; 10]) -> Option<u8> {
+        self.quiz_begin(files)?;
+        for &a in answers {
+            self.quiz_question()?;
+            self.quiz_answer(a);
+        }
+        self.quiz_end(files)
+    }
+
+    /// `class_quiz`'s start (222C:0000..0008, 0185): the seed kept at
+    /// 12A8, the counts cleared, QUESTION.TXT loaded into bank 4 (the
+    /// frame with EMS off), its far pointer at QUESTIONS.
+    pub fn quiz_begin(&mut self, files: &mut Files) -> Option<()> {
         self.store_rng();
         let seed = self.mem.r32(DS, crate::random::SEED);
         self.mem.w32(DS, 0x12A8, seed);
@@ -540,26 +565,46 @@ impl Machine {
         self.mem.w16(DS, QUESTIONS, 0);
         self.mem.w16(DS, QUESTIONS + 2, frame);
         self.file_load(files, QUESTION_TXT, frame, 0)?;
-        for &a in answers {
-            let q = self.quiz_pick()?;
-            self.ems_map(4);
-            let di = self.quiz_find(q as u16)?;
-            self.mem.w16(DS, SHOWN, di);
-            self.mem.w16(DS, SHOWN + 2, frame);
-            self.quiz_answers(frame, di);
-            let mut p = di;
-            for _ in 0..0xFDE8u32 {
-                let b = self.mem.r8(frame, p);
-                p = p.wrapping_add(1);
-                if b == 0 {
-                    break;
-                }
+        Some(())
+    }
+
+    /// `class_quiz`'s next question (222C:00EA..00F6, 02D4): picked
+    /// (`quiz_pick`), found in bank 4 (`quiz_find`), its position kept at
+    /// SHOWN, its answers parsed (`quiz_answers`). Returns where its text
+    /// is shown from (the frame's segment and the offset past its number),
+    /// to the NUL the parse cut.
+    pub fn quiz_question(&mut self) -> Option<(u16, u16)> {
+        let q = self.quiz_pick()?;
+        self.ems_map(4);
+        let frame = self.ng16(0x9030);
+        let di = self.quiz_find(q as u16)?;
+        self.mem.w16(DS, SHOWN, di);
+        self.mem.w16(DS, SHOWN + 2, frame);
+        self.quiz_answers(frame, di);
+        Some((frame, di))
+    }
+
+    /// The question's answer `a` (0..2, `A`..`C`) given (222C:0240..0258,
+    /// 010B): the byte the parse cut put back, the answer counted.
+    pub fn quiz_answer(&mut self, a: u8) {
+        let (di, frame) = (self.ng16(SHOWN), self.ng16(SHOWN + 2));
+        let mut p = di;
+        for _ in 0..0xFDE8u32 {
+            let b = self.mem.r8(frame, p);
+            p = p.wrapping_add(1);
+            if b == 0 {
+                break;
             }
-            let cut = self.ng8(CUT);
-            self.mem.w8(frame, p.wrapping_sub(1), cut);
-            self.mem.w16(DS, ANSWER, a.min(2) as u16);
-            self.quiz_count(a.min(2) as u16);
         }
+        let cut = self.ng8(CUT);
+        self.mem.w8(frame, p.wrapping_sub(1), cut);
+        self.mem.w16(DS, ANSWER, a.min(2) as u16);
+        self.quiz_count(a.min(2) as u16);
+    }
+
+    /// `class_quiz`'s end: the class (`quiz_class`, through bank 5, the
+    /// bank mapped before restored).
+    pub fn quiz_end(&mut self, files: &mut Files) -> Option<u8> {
         let prev = self.ng16(0x8FA8) >> 2;
         self.ems_map(5);
         let class = self.quiz_class(files);
