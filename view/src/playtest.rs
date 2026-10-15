@@ -2,8 +2,9 @@
 //! command line starts it, SETUP's steps (`at:COL:ROW:HEADING`, `click`,
 //! `wait:N`, comma-separated), then FRAMES turns of a seeded random
 //! policy: walking, turning, strafing, clicking in the centre, swinging,
-//! camping, a fight summoned now and then, and with `--save-dir` a save
-//! and a load back. Each turn runs as the scripted shots run theirs
+//! camping, a fight summoned now and then, a jump to a random free
+//! square, the player healed below a third, the game's questions
+//! answered at random, and with `--save-dir` a save and a load back. Each turn runs as the scripted shots run theirs
 //! (`shot_frame`: the view's hooks, its dialogs left as Esc leaves them,
 //! the areas followed).
 //!
@@ -209,6 +210,16 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             *counts.entry("healed").or_default() += 1;
         }
         *counts.entry(name).or_default() += 1;
+        // The game's questions answered at random (talk menus, shops,
+        // haggles, rests): menu entries 0..5, now and then a number typed.
+        while st.answers.len() < 3 {
+            let a = if dice.below(7) == 0 {
+                crate::dialog::Answer::Text(dice.below(120).to_string())
+            } else {
+                crate::dialog::Answer::Pick(dice.below(6) as u16)
+            };
+            st.answers.push_back(a);
+        }
         let mut intent = Intent::default();
         match act {
             Act::Walk(f, s, look) => {
