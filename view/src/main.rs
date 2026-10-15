@@ -93,6 +93,7 @@ mod interface;
 mod newgame;
 mod panels;
 mod render;
+mod spellmaker;
 mod world;
 
 use arena::controls::{ControlHooks, Intent};
@@ -685,6 +686,12 @@ fn main() {
         steps = args[i + 1].clone();
         args.drain(i..i + 2);
     }
+    // The spellmaker's script for `--do spellmaker` (view/src/spellmaker.rs).
+    let mut maker_script = String::new();
+    if let Some(i) = args.iter().position(|a| a == "--spellmaker") {
+        maker_script = args[i + 1].clone();
+        args.drain(i..i + 2);
+    }
     let mut new_game = None;
     if let Some(i) = args.iter().position(|a| a == "--new-game") {
         new_game = Some(args.get(i + 1).cloned().unwrap_or_default());
@@ -788,7 +795,7 @@ fn main() {
         }
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
-        shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)));
+        shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)), &maker_script);
         return;
     }
     let event_loop = winit::event_loop::EventLoop::new().expect("event loop");
@@ -1003,7 +1010,8 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
 /// walking forward, then `steps` (see `--do`), with the HUD: the message
 /// line, the last boxes, and the question left unanswered, if any.
 #[allow(clippy::too_many_arguments)]
-fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>) {
+fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run, out: &str, click: bool, wait: usize, frames: usize, turn: i16, steps: &str, answers: std::collections::VecDeque<dialog::Answer>, saves: Option<(&std::path::Path, u8)>, maker_script: &str) {
+    let mut maker: Option<spellmaker::Maker> = None;
     let run = &mut run;
     let st = &mut Shot { assets: Assets::new(dir, &mut engine), right: false, drag: (0, 0), clicked: false, camp: false, answers, message: None, frames: 0, boxes: Vec::new(), need: None, status: None, panel: None, map: false, over: false };
     // One frame turning (or not) before the walk: the actors pick their
@@ -1068,6 +1076,21 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
             "compass" => interface::toggle_compass(&mut engine.m),
+            "spellmaker" => {
+                // The guild's spellmaker (1194:6064) run from --spellmaker's
+                // script; its last screen is the shot.
+                let mut mk = spellmaker::Maker::new(maker_script);
+                if let Some(g) = mk.gold {
+                    engine.m.mem.w32(arena::mem::DS, 0x05C2, g);
+                }
+                if engine.m.spellmaker(&mut engine.files, &mut mk, 0x01A4).is_none() {
+                    eprintln!("the spellmaker met something not ported");
+                }
+                for t in &mk.messages {
+                    println!("{t}");
+                }
+                maker = Some(mk);
+            }
             // The inventory (I) and the spellbook (C), up until `close`;
             // their actions as the window's keys and clicks make them.
             "inv" => st.panel = Some(panels::open_inventory(&mut engine.m)),
@@ -1197,6 +1220,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             None => {}
         }
         let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
+        if let Some(mk) = &maker {
+            spellmaker::draw(&mut screen, &font, &st.assets.archive, &engine.files, mk);
+            hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+        } else {
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
@@ -1207,6 +1234,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             automap::draw(&mut screen, &engine.m);
         }
         hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
+        }
     }
     let buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
