@@ -182,6 +182,16 @@ impl arena::load::LoadHooks for Areas<'_> {
     fn renderer(&mut self, m: &mut Machine) {
         world::light_table(m);
     }
+    /// 25FD:06A1: the slot's files copied to the working ones, in the
+    /// engine's files and in the copy these hooks read (`files`, taken
+    /// before the load): the area's entry (`entered`: a town's
+    /// buildings, from CITYDATA) runs inside the load and reads the copy.
+    fn slot_files(&mut self, m: &mut Machine, files: &mut Files) {
+        m.slot_files_in(files);
+        if let Some(copy) = self.files.as_deref_mut() {
+            m.slot_files_in(copy);
+        }
+    }
 }
 
 /// The run of the area the game is in, by 5E6 (an interior's level named
