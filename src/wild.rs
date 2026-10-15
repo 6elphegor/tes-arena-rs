@@ -146,7 +146,7 @@ impl Machine {
         let n = self.mem.r8(DS, list);
         let k = self.rng.next() as u8;
         if n == 0 {
-            return None;
+            return crate::giveup::original("217B:0506: an empty list: the original divides by zero");
         }
         Some(self.mem.r8(DS, list.wrapping_add(1 + (k % n) as u16)))
     }

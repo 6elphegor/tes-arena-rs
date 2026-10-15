@@ -266,7 +266,7 @@ impl Machine {
                 }
                 Some(false)
             }
-            _ => None,
+            _ => crate::giveup::not_ported("a tavern choice not in the table"),
         }
     }
 
@@ -411,7 +411,7 @@ impl Machine {
                     break k;
                 }
                 if check.cycled(&self.rng) {
-                    return None;
+                    return crate::giveup::original("1194:BEED: no drink left: the original rolls for ever");
                 }
             };
             let di = self.mem.r16(DS, 0x12C2);

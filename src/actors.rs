@@ -469,7 +469,7 @@ impl Machine {
             self.set_act16(si, f::HEADING, r & 0x180);
             return Some(());
         }
-        None
+        crate::giveup::original("0000:2054: no free square near the player: the original searches for ever")
     }
 
     /// 0000:26DC. A wall, or a floor at or above FLOOR_SOLID.
@@ -691,7 +691,7 @@ impl Machine {
                 return Some(Some((index, cost)));
             }
             if tries.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("0000:1FA2: no spell it can pay for: the original rolls for ever");
             }
         }
     }

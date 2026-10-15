@@ -291,7 +291,7 @@ impl Machine {
                     break;
                 }
                 if cycle.cycled(&self.rng) {
-                    return None;
+                    return crate::giveup::original("0000:28BC: the stair cells never differ: the original rolls for ever");
                 }
             }
             self.mem.w8(DS, di, cell);
@@ -408,7 +408,7 @@ impl Machine {
     fn dun_plan_seeded(&mut self, level: u8) -> Option<Vec<Chunk>> {
         let rows = self.mem.r16(DS, HEIGHT) >> 5;
         if rows == 0 || self.mem.r16(DS, WIDTH) >> 5 == 0 {
-            return None;
+            return crate::giveup::original("a dungeon of no chunks: the original divides by zero");
         }
         let map = self.mem.r16(DS, MAP_SEG);
         for i in 0..0x4000u16 {
@@ -424,7 +424,7 @@ impl Machine {
             // The column count is read again for every row.
             let cols = self.mem.r16(DS, WIDTH) >> 5;
             if cols == 0 {
-                return None;
+                return crate::giveup::original("a dungeon of no chunks: the original divides by zero");
             }
             let mut off = row_off;
             for _ in 0..cols {
@@ -489,7 +489,7 @@ impl Machine {
                 b"LOCK" => {
                     let q = len / 3;
                     if q > 0xFF {
-                        return None;
+                        return crate::giveup::original("0000:2A73: the LOCK chunk's divide overflows");
                     }
                     let n = self.mem.r8(DS, LOCK_COUNT);
                     let at = n.wrapping_mul(3) as u16;
@@ -608,7 +608,7 @@ impl Machine {
                 break r;
             }
             if cycle.cycled(&self.rng) {
-                return None;
+                return crate::giveup::original("1194:CE1B: no quest province found: the original rolls for ever");
             }
         };
         self.mem.w8(DS, QUEST2_PROVINCE, other);
@@ -668,7 +668,7 @@ impl Machine {
                         break;
                     }
                     if cycle.cycled(&self.rng) {
-                        return None;
+                        return crate::giveup::original("26F7:0C0A: no entry found: the original rolls for ever");
                     }
                 }
             }
