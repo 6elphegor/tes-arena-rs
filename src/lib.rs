@@ -6,6 +6,7 @@ pub mod attack;
 pub mod automap;
 pub mod bsa;
 pub mod cast;
+pub mod celestial;
 pub mod character;
 pub mod city;
 pub mod cityinfo;
