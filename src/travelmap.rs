@@ -449,8 +449,8 @@ impl Machine {
     /// formatted at 9C62), or in the Imperial province (SHOWN 8) "the
     /// Imperial City. "; "The date is\r" and the date (0000:1508); " It
     /// took %d days to reach your goal. " with the days (1927, at least
-    /// 1); and the place's text copied (1194:A36C, AX 2): 258h + province
-    /// * 8 + index for a city, 58Eh for a town, 58Fh for a village. The
+    /// 1); and the place's text copied (1194:A36C, AX 2): 258h + 8 times
+    /// the province + index for a city, 58Eh for a town, 58Fh for a village. The
     /// text's LFs and CRs made spaces, wrapped at 32h (1194:49FF), the
     /// wraps made CRs, a CR and a NUL put after it, and the text (its
     /// length then + 2) written to entercty.$$$ (130C), which the town's

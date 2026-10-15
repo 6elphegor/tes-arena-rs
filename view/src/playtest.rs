@@ -344,23 +344,24 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             match (tours, saves) {
                 // As the window does after the game's end (`game_over`): the
                 // main menu's Load on a fresh engine, the start dungeon loaded.
-                (true, Some((sdir, slot))) => match {
+                (true, Some((sdir, slot))) => {
                     engine = crate::world::load(dir, "START.MIF");
-                    crate::load_from(&mut engine, dir, sdir, slot)
-                } {
-                    Ok((_, r)) => {
-                        *run = r;
-                        st.assets = Assets::new(dir, &mut engine);
-                        st.over = false;
-                        st.ui = None;
-                        no_heal = 0;
-                        *counts.entry("reloaded").or_default() += 1;
+                    let loaded = crate::load_from(&mut engine, dir, sdir, slot);
+                    match loaded {
+                        Ok((_, r)) => {
+                            *run = r;
+                            st.assets = Assets::new(dir, &mut engine);
+                            st.over = false;
+                            st.ui = None;
+                            no_heal = 0;
+                            *counts.entry("reloaded").or_default() += 1;
+                        }
+                        Err(e) => {
+                            println!("SAVELOAD frame {n}: reload after the end failed: {e}");
+                            break;
+                        }
                     }
-                    Err(e) => {
-                        println!("SAVELOAD frame {n}: reload after the end failed: {e}");
-                        break;
-                    }
-                },
+                }
                 _ => break,
             }
         }

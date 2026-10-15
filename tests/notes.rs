@@ -88,7 +88,9 @@ fn setup(m: &mut Machine, fs: &mut Files, seed: u32) -> (u8, u16, u16, Vec<u8>) 
         let key = lo | (s.word() as u32) << 16;
         f[i * 0x2004..i * 0x2004 + 4].copy_from_slice(&key.to_le_bytes());
     }
-    let mut notes: Vec<(Option<(u16, u16)>, Vec<u8>)> = Vec::new();
+    // A note: its square (x, y), if placed, and its text.
+    type Note = (Option<(u16, u16)>, Vec<u8>);
+    let mut notes: Vec<Note> = Vec::new();
     for _ in 0..0x40 {
         let k = s.byte() % 4;
         let xy = match k {
