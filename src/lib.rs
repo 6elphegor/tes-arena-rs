@@ -56,6 +56,7 @@ pub mod random;
 pub mod rest;
 pub mod save;
 pub mod save_write;
+pub mod savemenu;
 pub mod travel;
 pub mod travelmap;
 pub mod weather;

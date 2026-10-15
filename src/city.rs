@@ -431,6 +431,69 @@ impl Machine {
         Some(self.mem.r8(DS, PROVINCE_DATA))
     }
 
+    /// 242A:000E. CITYDATA checked: provinces 0..7 loaded in turn
+    /// (`city_load_province`), each checked (242A:0031), then the
+    /// province here (A46) loaded again. Returns whether every check
+    /// passed. A failed check shows "WARNING: City data file corrupted!"
+    /// (4A1E, colour 1 at 9288; `message`) and the loop goes on. None
+    /// where a load fails (CITYDATA.nn missing).
+    pub fn citydata_check(&mut self, files: &mut crate::bsa::Files, message: &mut dyn FnMut(&mut Machine, u16)) -> Option<bool> {
+        let mut ok = true;
+        for p in 0..8u8 {
+            self.city_load_province(files, p)?;
+            ok &= self.citydata_check_here(message);
+        }
+        let here = self.mem.r8(DS, 0x0A46);
+        self.city_load_province(files, here)?;
+        Some(ok)
+    }
+
+    /// 242A:0031. The province's block at 1429 checked: its name (whose
+    /// verdict the original drops: the carry of 0061 isn't tested), then
+    /// its 20h locations from 1445 (19h bytes each): x (+14h) at most
+    /// 140h and y (+16h) at most C8h (0000:007D), then the name. The first
+    /// failure shows the message and ends the check.
+    fn citydata_check_here(&mut self, message: &mut dyn FnMut(&mut Machine, u16)) -> bool {
+        let _ = self.citydata_name_ok(PROVINCE_DATA);
+        let mut si = 0x1445u16;
+        for _ in 0..0x20 {
+            let fits = self.mem.r16(DS, si + 0x14) <= 0x140 && self.mem.r16(DS, si + 0x16) <= 0xC8;
+            if !fits || !self.citydata_name_ok(si) {
+                self.mem.w8(DS, 0x9288, 1);
+                message(self, 0x4A1E);
+                return false;
+            }
+            si += 0x19;
+        }
+        true
+    }
+
+    /// 242A:0061. A name at DS:`si` ends (NUL) within 14h letters
+    /// ('A'..'z', 41h..7Ah); spaces between don't count against the 14h
+    /// (they jump back past the `loop`). Anything else fails, as does a
+    /// 14h-th letter without the NUL after it.
+    fn citydata_name_ok(&self, si: u16) -> bool {
+        let mut cx = 0x14u16;
+        let mut si = si;
+        loop {
+            let al = self.mem.r8(DS, si);
+            si = si.wrapping_add(1);
+            if al == 0 {
+                return true;
+            }
+            if (0x41..=0x7A).contains(&al) {
+                cx -= 1;
+                if cx == 0 {
+                    return false;
+                }
+                continue;
+            }
+            if al != 0x20 {
+                return false;
+            }
+        }
+    }
+
     /// The current slot's CITYDATA.nn opened as 26F7:0C99..0CB1 and
     /// 0CF4..0D0B open it: the slot's digits (1A6C) at 1367, its path
     /// (25FD:0844), then 0000:67C4. None where it is missing.
