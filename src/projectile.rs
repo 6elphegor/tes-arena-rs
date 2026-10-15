@@ -302,6 +302,33 @@ impl Machine {
         si
     }
 
+    /// 0000:C23A..C26C: an object (an actor or a projectile, at `si`)
+    /// drawn steps its animation, as the renderer's drawing of it does
+    /// (0000:C0F1). Unless its flags (+F) have 2004h, its frame (+D)
+    /// goes on; past its frame count (+E, the low 7 bits) it is back to
+    /// 0, the object first made inactive (flags 4000h) and its light
+    /// (+6, unless 0) freed when its flags have 100h. The original steps
+    /// only what it draws, so it is the front end's to call.
+    pub fn drawn_step(&mut self, si: u16) {
+        let flags = self.mem.r16(DS, si + f::FLAGS);
+        if flags & 0x2004 != 0 {
+            return;
+        }
+        let frame = self.mem.r8(DS, si + f::FRAME).wrapping_add(1);
+        self.mem.w8(DS, si + f::FRAME, frame);
+        if frame <= self.mem.r8(DS, si + f::FLAT_FLAGS) & 0x7F {
+            return;
+        }
+        if flags & 0x100 != 0 {
+            self.mem.w16(DS, si + f::FLAGS, 0x4000);
+            let light = self.mem.r16(DS, si + f::LIGHT);
+            if light != 0 {
+                self.light_free(light);
+            }
+        }
+        self.mem.w8(DS, si + f::FRAME, 0);
+    }
+
     /// 0000:E0F5. Frees the light at `si`; the count stops at 0.
     fn light_free(&mut self, si: u16) {
         let n = self.mem.r16(DS, LIGHT_COUNT).wrapping_sub(1);

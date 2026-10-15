@@ -102,6 +102,10 @@ pub mod var {
     pub const FLAT_KINDS: u16 = 0xCA97;
     pub const FLAT_KIND_PTR: u16 = 0xCCC0;
     pub const SAVED_FREE: u16 = 0xE2CC;
+    /// The effects' flats' names (21EE:0134) and their EMS banks (the
+    /// first and how many).
+    pub const EFFECT_LIST: u16 = 0x3B08;
+    pub const EFFECT_BANKS: u16 = 0xC8FA;
     /// Hooks: the end of the load, the sounds.
     pub const DONE_HOOK: u16 = 0xCD2E;
     pub const SOUND_HOOK: u16 = 0xCD4A;
@@ -751,7 +755,7 @@ impl Machine {
                 bx = bx.wrapping_add(2);
             }
             self.mem.w16(DS, FLAT_NUMBER, base);
-            self.info_load_flats(files)?;
+            self.info_load_flats(files, LIST)?;
             for bx in (0..0x40).step_by(2) {
                 if outside(bx) {
                     let w = self.mem.r16(DS, SAVED_FREE + bx);
@@ -763,14 +767,54 @@ impl Machine {
         None
     }
 
-    /// 0000:BED8. Loads the flats named in the list at LIST (names
-    /// separated by a NUL, ended by an empty one; with flag 0x400, names
-    /// starting `-` are skipped): each file is read whole into EMS
-    /// (`ems_alloc`), its far pointer stored at FLAT_DATA, and a byte
-    /// from its header in the kinds table. The extension is the
-    /// character after the first `.` in the first 13.
-    fn info_load_flats(&mut self, files: &mut Files) -> Option<()> {
-        let mut si = LIST;
+    /// 21EE:0134, the program's start: the effects' flats (the list at
+    /// EFFECT_LIST: explosions, missiles, blood, sparkles, dust, the
+    /// arrow; 1Ch of them) loaded as flats 0.. into their own EMS banks
+    /// (EFFECT_BANKS: the first and how many). The bank table is kept at
+    /// LIST and every other bank marked full (0000:FEF4); the flats are
+    /// reset (0000:BFA5: none, the kinds from FLAT_KINDS on, 9Eh of them
+    /// cleared) and loaded (0000:BED4, `info_load_flats`); the other
+    /// banks' entries are put back (0000:FECE). The level's flats then
+    /// come after them: FLAT_BASE is their count.
+    pub fn effect_flats(&mut self, files: &mut Files) -> Option<()> {
+        STEPS.with(|s| s.set(LOAD_LIMIT));
+        let first = self.mem.r8(DS, EFFECT_BANKS) as u16;
+        let n = self.mem.r8(DS, EFFECT_BANKS + 1) as u16;
+        let (lo, hi) = (first.wrapping_add(first), first.wrapping_add(first).wrapping_add(n.wrapping_add(n)));
+        for i in 0..0x20u16 {
+            let w = self.mem.r16(DS, BANK_FREE + 2 * i);
+            self.mem.w16(DS, LIST + 2 * i, w);
+        }
+        for bx in (0..0x40u16).step_by(2) {
+            if bx < lo || bx >= hi {
+                self.mem.w16(DS, BANK_FREE + bx, 0);
+            }
+        }
+        self.mem.w16(DS, FLAT_NUMBER, 0);
+        self.mem.w16(DS, FLAT_KIND_PTR, FLAT_KINDS);
+        for i in 0..0x9Eu16 {
+            self.mem.w8(DS, FLAT_KINDS + i, 0);
+        }
+        self.info_load_flats(files, EFFECT_LIST)?;
+        for bx in (0..0x40u16).step_by(2) {
+            if bx < lo || bx >= hi {
+                let w = self.mem.r16(DS, LIST + bx);
+                self.mem.w16(DS, BANK_FREE + bx, w);
+            }
+        }
+        let n = self.mem.r16(DS, FLAT_NUMBER);
+        self.mem.w16(DS, FLAT_BASE, n);
+        Some(())
+    }
+
+    /// 0000:BED8 (0000:BED4 far). Loads the flats named in the list at
+    /// `si` (LIST for a level's: names separated by a NUL, ended by an
+    /// empty one; with flag 0x400, names starting `-` are skipped): each
+    /// file is read whole into EMS (`ems_alloc`), its far pointer stored
+    /// at FLAT_DATA, and a byte from its header in the kinds table. The
+    /// extension is the character after the first `.` in the first 13.
+    fn info_load_flats(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        let mut si = si;
         for _ in 0..PARSE_LIMIT {
             tick()?;
             if self.mem.r8(DS, si) == 0 {

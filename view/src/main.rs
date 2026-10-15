@@ -47,6 +47,9 @@
 //! (64) or more, 0000:3C9F, so `swing:0:60` does nothing) and `cast:N`
 //! (spell N of the spellbook cast). E.g. `--sound-log --do
 //! ready,wait:2,swing:0:100,wait:3` logs the swing's swish.voc.
+//! `storm:N` runs up to N frames, the sky drawn after each as the
+//! window draws it, until the lightning flashes (outdoors, raining at
+//! night, with thunder: e.g. CITY:8:0:1:2 --hour 22), for a shot of it.
 //!
 //! I opens the inventory (`panels`: the original's equipment screen):
 //! a left click on an item puts it on or takes it off, a right click
@@ -106,6 +109,7 @@ mod audio;
 mod automap;
 mod create;
 mod dialog;
+mod doll;
 mod flats;
 mod flc;
 mod hud;
@@ -396,6 +400,14 @@ impl EngineHooks for Front<'_> {
         use arena::click::var::{DOOR_AT, DOOR_COL, DOOR_ROW, DOOR_X0, DOOR_X1};
         use arena::mem::DS;
         use arena::movement::var::LEVEL_FLAGS;
+        // The projectiles' animations, which the original's drawing steps
+        // (0000:C23A): here every one in flight steps, seen or not.
+        for i in 0..arena::projectile::var::NSLOTS {
+            let si = arena::projectile::var::SLOTS + i * arena::projectile::var::SLOT_SIZE;
+            if m.mem.r8(DS, si + 0x11) != 0 {
+                m.drawn_step(si);
+            }
+        }
         // The click left for the actors (`view_click`, before the frame,
         // whose input step clears C39A bit 80h) stands while it is drawn,
         // as in the original, where the click comes in the input step: the
@@ -456,6 +468,9 @@ fn camera(engine: &Engine) -> Camera {
 
 /// What drawing a level needs, read once from the engine after loading.
 struct Assets {
+    /// The lightning's flash colour of the last `sprites` (the sky's hook
+    /// drawing it), for the sky.
+    flash: std::cell::Cell<Option<u8>>,
     palette: [[u8; 4]; 256],
     /// CHARSHT.COL: the colours the character sheet's screens (the
     /// equipment screen, the spellbook) are shown in; 1194:1695 loads it
@@ -527,6 +542,9 @@ struct SkyDraw<'a> {
     focal: f32,
     fog: bool,
     out: Vec<world::Vertex>,
+    /// The lightning's flash: the colour the sky above the horizon is
+    /// filled with (2294:05A6, its colour at 9288).
+    flash: Option<u8>,
 }
 
 impl SkyDraw<'_> {
@@ -550,6 +568,21 @@ impl arena::skyobj::SkyHooks for SkyDraw<'_> {
     }
     fn draw_dfa(&mut self, m: &mut arena::machine::Machine, _seg: u16, _off: u16, frame: u16, x: u16, y: u16) {
         self.quad(m, Some(&"VOLCANO2.DFA".to_string()), frame as usize, x, y);
+    }
+    /// The flash: the whole sky above the horizon (the view fills the sky
+    /// with it, as fog does).
+    fn fill(&mut self, m: &mut arena::machine::Machine, _x0: u16, _y0: u16, _x1: u16, _y1: u16) {
+        self.flash = Some(m.mem.r8(arena::mem::DS, arena::skyobj::var::FILL));
+    }
+    /// A bolt (0000:78A8): which of the six is told by its offset in the
+    /// sky's bank (the table at D8AE, `sky_images`), drawn at its header's
+    /// place (+6, +8, set by the lightning).
+    fn bolt(&mut self, m: &mut arena::machine::Machine, seg: u16, off: u16, frame: u16) {
+        let i = (0..6u16).find(|&i| m.mem.r16(arena::mem::DS, arena::skyobj::var::BOLTS + 4 * i) == off);
+        if let Some(i) = i {
+            let name = format!("LGLIT0{}.CFA", i + 1);
+            self.quad(m, Some(&name), frame as usize, m.mem.r16(seg, off + 6), m.mem.r16(seg, off + 8));
+        }
     }
 }
 
@@ -620,6 +653,12 @@ impl Assets {
         let archive = Rc::new(archive::Archive::open(dir));
         let sheet = world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m));
         interface::enter(&mut engine.m);
+        // Outdoors, the sky's images (the sun, the moons, the lightning's
+        // bolts, the stars) into the sky's bank, as entering the area does
+        // (0000:A4E9 calls 0000:E5C9).
+        if engine.m.sky_images(&mut engine.files).is_none() {
+            eprintln!("the sky's images did not load");
+        }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         engine.m.area_sky(&mut sky);
         Assets {
@@ -638,6 +677,7 @@ impl Assets {
             archive,
             colours: None,
             light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
+            flash: std::cell::Cell::new(None),
         }
     }
 
@@ -739,11 +779,12 @@ impl Assets {
     fn sprites(&self, engine: &mut Engine, cam: Camera, ticks: usize, aspect: f32) -> Vec<world::Vertex> {
         let mut v = world::sprites(&engine.m, &self.sheet, cam.heading, ticks / ANIMATE);
         v.extend(world::doors(&engine.m));
-        let focal = (30f32).to_radians().tan() * aspect;
-        let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new() };
+        let focal = world::TAN_HALF * aspect;
+        let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
         if engine.m.sky_draw(&mut draw).is_some() {
             v.extend(draw.out);
         }
+        self.flash.set(draw.flash);
         v
     }
 }
@@ -1281,6 +1322,18 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
             }
             "compass" => interface::toggle_compass(&mut engine.m),
+            "storm" => {
+                // Frames until the sky's hook flashes (the window draws the
+                // sky every frame; a shot only at its end).
+                for _ in 0..n {
+                    shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
+                    let cam = camera(&engine);
+                    st.assets.sprites(&mut engine, cam, 0, 1.6);
+                    if st.assets.flash.get().is_some() {
+                        break;
+                    }
+                }
+            }
             "spellmaker" => {
                 // The guild's spellmaker (1194:6064) run from --spellmaker's
                 // script; its last screen is the shot.
@@ -1457,7 +1510,12 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None)).expect("device");
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut r = st.assets.renderer(&device, &queue, format);
-    let (sky, lights) = st.assets.light_frame(&mut engine.m);
+    let (mut sky, lights) = st.assets.light_frame(&mut engine.m);
+    let cam = camera(&engine);
+    let sprites = st.assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
+    if let Some(c) = st.assets.flash.get() {
+        sky.fog = Some(c);
+    }
     r.set_sky(sky);
     r.set_lights(lights);
     r.set_window(interface::window(&engine.m));
@@ -1471,8 +1529,6 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
-    let cam = camera(&engine);
-    let sprites = st.assets.sprites(&mut engine, cam, (wait + frames) * 4, w as f32 / h as f32);
     let view = target.create_view(&Default::default());
     r.draw(&device, &queue, &view, w, h, cam, &sprites);
     if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
@@ -1499,7 +1555,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
-            panels::draw(&mut screen, &font, equip.as_ref(), panel, &engine.m);
+            let doll = doll::images(&st.assets.archive, &engine.m);
+            panels::draw(&mut screen, &font, equip.as_ref(), &doll, panel, &engine.m);
         }
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
@@ -2428,7 +2485,8 @@ impl winit::application::ApplicationHandler for App {
                     if self.panel.is_some() {
                         self.equip_image();
                         let equip = self.equip.as_ref().and_then(|e| e.as_ref());
-                        panels::draw(&mut self.screen, &self.font, equip, self.panel.as_ref().unwrap(), &self.engine.m);
+                        let doll = doll::images(&self.assets.archive, &self.engine.m);
+                        panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
                     }
                     hud::compose_over(&mut self.screen, &self.font, &hud);
                     if self.map {
@@ -2442,9 +2500,12 @@ impl winit::application::ApplicationHandler for App {
                     };
                     let view = frame.texture.create_view(&Default::default());
                     let ticks = (self.start.elapsed().as_secs_f64() * 18.2) as usize;
-                    let (sky, lights) = self.assets.light_frame(&mut self.engine.m);
+                    let (mut sky, lights) = self.assets.light_frame(&mut self.engine.m);
                     let aspect = g.config.width as f32 / g.config.height.max(1) as f32;
                     let sprites = self.assets.sprites(&mut self.engine, cam, ticks, aspect);
+                    if let Some(c) = self.assets.flash.get() {
+                        sky.fog = Some(c);
+                    }
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
                     g.renderer.set_window(interface::window(&self.engine.m));

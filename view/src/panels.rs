@@ -369,10 +369,15 @@ pub fn book_layout(font: &Font) -> (i32, i32, i32, i32, usize) {
 }
 
 /// The panel drawn over the layer (`pics`: EQUIP.IMG).
-pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, panel: &Panel, m: &Machine) {
+pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Image], panel: &Panel, m: &Machine) {
     match panel {
         Panel::Inventory(inv) => {
             screen.fill(0, 0, crate::hud::W as i32, crate::hud::H as i32, 0, 0xFF);
+            // The page with the body and what is worn on it (`doll`), the
+            // list's panel over its left side.
+            for img in doll {
+                screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
+            }
             if let Some(img) = equip {
                 screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
             }
