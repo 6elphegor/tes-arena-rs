@@ -192,3 +192,40 @@ fn matches_original() {
     // give up more often shows here).
     assert_eq!((skipped, stuck), (2, 480), "not ported, stuck in both");
 }
+
+/// A substitution the port gives up on (%qf, which seeds a name with EBX
+/// the original never sets) must leave the nesting and the mapped bank as
+/// 2DA2's exit does: playtest round 2 saw the level left raised, so the
+/// next text skipped its substitutions and mapped a stale bank, and a
+/// quest giver's greeting (56h) ran on into DGROUP from 1044.
+#[test]
+fn a_substitution_given_up_leaves_the_nesting() {
+    use arena::text::var::{BANK, SUB_LEVEL};
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut m = Machine::new(&img);
+    m.heap_init(HEAP.0, HEAP.1).unwrap();
+    assert!(m.bsa_open(&mut files));
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w8(DS, 0x8FA6, 1);
+    m.mem.w16(DS, 0x9032, 0x20);
+    m.mem.w16(DS, BANK, 0x1F);
+    m.ems_map(0x11);
+    m.mem.w8(DATA, SUB_LEVEL, 0);
+    for (i, &b) in b"Ask %qf here\0".iter().enumerate() {
+        m.mem.w8(OUT_SEG, i as u16, b);
+    }
+    let seed = m.rng.seed;
+    assert_eq!(m.expand(&mut files, &mut Count, OUT_SEG, 0), None);
+    assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0, "the nesting back");
+    assert_eq!(m.mem.r16(DS, 0x8FA8), 0x11 << 2, "the bank mapped before back");
+    assert_eq!(m.rng.seed, seed, "the seed back");
+    // The next text is substituted from the outer level again.
+    for (i, &b) in b"plain\0".iter().enumerate() {
+        m.mem.w8(OUT_SEG, i as u16, b);
+    }
+    assert!(m.expand(&mut files, &mut Count, OUT_SEG, 0).is_some());
+    assert_eq!(m.mem.r8(DATA, SUB_LEVEL), 0);
+    assert_eq!(m.mem.r16(DS, 0x8FA8), 0x11 << 2);
+}
