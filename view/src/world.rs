@@ -34,6 +34,9 @@ pub const SCREEN: u32 = 16;
 /// where the sky under it is dark.
 pub const BODY: u32 = 32;
 pub const DARK_SKY: u32 = 64;
+/// Vertex flag: a wall face whose texels 0 are left unpainted (a door's
+/// moved texture: 0000:BAC3 skips them).
+pub const SEE_THROUGH: u32 = 128;
 
 /// Vertex flags: a wall face's side as the original numbers it (CCF8),
 /// plus one, shifted by WALL_SHIFT: 0 its normal -y (north), 1 +x, 2 +y,
@@ -383,6 +386,20 @@ fn texture_banks(m: &Machine) -> (u16, u16) {
 /// All the level's textures, row-major 64 x 64 bytes each, numbered from
 /// 1 (texture t is element t - 1): 15 to a bank, stored transposed.
 pub fn textures(m: &Machine) -> Vec<[u8; 4096]> {
+    let mut out = level_textures(m);
+    let doors = door_layers(m, &out);
+    out.extend(doors);
+    out
+}
+
+/// How many of `textures` are the level's own (before `door_layers`).
+pub fn texture_count(m: &Machine) -> u32 {
+    let (_, count) = texture_banks(m);
+    (count as u32 * 15).max(1)
+}
+
+/// The level's own textures (`textures` without the doors' layers).
+fn level_textures(m: &Machine) -> Vec<[u8; 4096]> {
     let (first, count) = texture_banks(m);
     let mut out = Vec::new();
     for b in 0..count {
@@ -523,17 +540,29 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
     out
 }
 
-/// The doors (wall kind 0Bh) as they stand this frame: shut, a panel on
-/// each side not against a full wall; opening (high byte bits 1-3, 0..7, as `Machine::
-/// door_drawn` steps them), each panel swung into the square about its
-/// left edge (as seen from outside) by 90 degrees fully open. How the
-/// original's renderer drew a door ajar (by CCC4) isn't ported; this is
-/// a stand-in.
+/// The doors (wall kind 0Bh) as they stand this frame, drawn as the
+/// original's renderer draws them (src/doordraw.rs): a face on each edge
+/// the door shares with a square that isn't a full wall, as that
+/// square's face (0000:D0A1 draws a wall's faces from the open squares
+/// beside it). Open (high byte bits 1-3, 0..7, as `Machine::door_drawn`
+/// steps them), a door of kind 0 (low byte bits 6-7) swings its face out
+/// into that square about the face's first corner by (open + 1) * 16 of
+/// 512 to a turn (0000:D344, `doordraw::swing_end`); kinds 1..3 keep the
+/// face where it is and draw the texture moved over, the uncovered
+/// texels clear (0000:BAF3, `door_layers`).
+///
+/// Left out: the original swings only the first face drawn after the
+/// door was met (C398 bit 1000h, cleared by that face), and the frame a
+/// closing door shuts it still draws at 16 (the bit set by the step
+/// before, CCC4 0).
 pub fn doors(m: &Machine) -> Vec<Vertex> {
+    use arena::doordraw::{swing_end, FACES};
     let w = m.mem.r16(DS, 0xC357).min(128);
     let d = m.mem.r16(DS, 0xC359).min(128);
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     let ceiling = m.mem.r16(DS, arena::movement::var::CEILING) as f32;
+    let base = texture_count(m);
+    let moved = moved_doors(m);
     let mut out = Vec::new();
     for row in 0..d {
         for col in 0..w {
@@ -541,34 +570,84 @@ pub fn doors(m: &Machine) -> Vec<Vertex> {
             if v >> 12 != 0xB {
                 continue;
             }
-            let layer = ((v & 0x3F) as u32).saturating_sub(1);
-            let angle = ((v >> 9) & 7) as f32 / 7.0 * std::f32::consts::FRAC_PI_2;
-            let (x0, z0) = (col as f32 * SQUARE, row as f32 * SQUARE);
-            let (x1, z1) = (x0 + SQUARE, z0 + SQUARE);
-            // Each side: the neighbour it faces, its hinge, its far edge,
-            // the way into the square, and its light.
-            let sides = [
-                ((0, -1), (x1, z0), (x0, z0), (0.0, 1.0), 0.85),
-                ((0, 1), (x0, z1), (x1, z1), (0.0, -1.0), 0.85),
-                ((-1, 0), (x0, z0), (x0, z1), (1.0, 0.0), 1.0),
-                ((1, 0), (x1, z1), (x1, z0), (-1.0, 0.0), 1.0),
-            ];
-            for ((dc, dr), (hx, hz), (ex, ez), (nx, nz), light) in sides {
-                // None against a full wall.
+            let tex = ((v & 0x3F) as u32).saturating_sub(1);
+            let kind = ((v & 0xFF) >> 6) as u8;
+            let open = (v >> 9) & 7;
+            let layer = match moved.iter().position(|&k| k == (tex, kind)) {
+                Some(i) if open != 0 => base + i as u32 * 7 + open as u32 - 1,
+                _ => tex,
+            };
+            // Each neighbour, and the side of it the shared edge is.
+            for ((dc, dr), side) in [((-1, 0), 1usize), ((1, 0), 3), ((0, -1), 2), ((0, 1), 0)] {
                 let (c, r) = (col as i32 + dc, row as i32 + dr);
                 let n = if c < 0 || r < 0 || c >= w as i32 || r >= d as i32 { 0xFFFF } else { m.mem.r16(walls, (r << 8 | c << 1) as u16) };
                 if n == 0xFFFF || (n != 0 && n & 0x8000 == 0 && n as u8 == (n >> 8) as u8) {
                     continue;
                 }
-                let (c, s) = (angle.cos(), angle.sin());
-                let (fx, fz) = (hx + (ex - hx) * c + nx * SQUARE * s, hz + (ez - hz) * c + nz * SQUARE * s);
+                let (ox, oy) = ((c << 7) as u16, (r << 7) as u16);
+                let ((hx, hy), (fx, fy)) = FACES[side];
+                let hinge = (ox.wrapping_add(hx), oy.wrapping_add(hy));
+                let mut far = (ox.wrapping_add(fx), oy.wrapping_add(fy));
+                if kind == 0 && open != 0 {
+                    far = swing_end(m, hinge, far, open);
+                }
+                let (hx, hz) = (hinge.0 as i16 as f32, hinge.1 as i16 as f32);
+                let (fx, fz) = (far.0 as i16 as f32, far.1 as i16 as f32);
+                // The texture's first column at the face's first corner.
                 let p = [[hx, 0.0, hz], [fx, 0.0, fz], [fx, ceiling, fz], [hx, ceiling, hz]];
-                let th = 64.0;
-                let uv = [[0.0, th], [64.0, th], [64.0, 0.0], [0.0, 0.0]];
+                let uv = [[0.0, 64.0], [64.0, 64.0], [64.0, 0.0], [0.0, 0.0]];
                 for i in [0, 1, 2, 0, 2, 3] {
-                    out.push(Vertex { pos: p[i], uv: uv[i], layer, light, flags: 0 });
+                    out.push(Vertex { pos: p[i], uv: uv[i], layer, light: if side % 2 == 0 { 0.85 } else { 1.0 }, flags: SEE_THROUGH });
                 }
             }
+        }
+    }
+    out
+}
+
+/// The textures (from 0, as `textures` numbers them) and kinds (1..3) of
+/// the level's doors that draw their texture moved over as they open,
+/// in order: `door_layers` holds seven layers for each, open 1..7.
+fn moved_doors(m: &Machine) -> Vec<(u32, u8)> {
+    let w = m.mem.r16(DS, 0xC357).min(128);
+    let d = m.mem.r16(DS, 0xC359).min(128);
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let mut set = std::collections::BTreeSet::new();
+    for row in 0..d {
+        for col in 0..w {
+            let v = m.mem.r16(walls, (row << 8) | (col << 1));
+            let kind = ((v & 0xFF) >> 6) as u8;
+            if v >> 12 == 0xB && kind != 0 {
+                set.insert((((v & 0x3F) as u32).saturating_sub(1), kind));
+            }
+        }
+    }
+    set.into_iter().collect()
+}
+
+/// The layers after the level's textures: for each of `moved_doors`, its
+/// texture moved over as 0000:BAF3 moves it, open 1..7 (row-major, as
+/// `textures`).
+pub fn door_layers(m: &Machine, textures: &[[u8; 4096]]) -> Vec<[u8; 4096]> {
+    let mut out = Vec::new();
+    for (tex, kind) in moved_doors(m) {
+        let t = textures.get(tex as usize).copied().unwrap_or([0; 4096]);
+        // Back to the banks' column-major order.
+        let mut cols = [0u8; 4096];
+        for u in 0..64 {
+            for v in 0..64 {
+                cols[u * 64 + v] = t[v * 64 + u];
+            }
+        }
+        for open in 1..=7 {
+            let moved = arena::doordraw::door_texture(&cols, 0, kind, open);
+            let mut layer = [0u8; 4096];
+            for u in 0..64 {
+                for v in 0..64 {
+                    layer[v * 64 + u] = moved[u * 64 + v];
+                }
+            }
+            out.push(layer);
         }
     }
     out

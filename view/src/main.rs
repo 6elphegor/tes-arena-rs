@@ -157,6 +157,8 @@ mod hud;
 mod inputtest;
 #[cfg(test)]
 mod hooktest;
+#[cfg(test)]
+mod doortest;
 mod interface;
 mod music;
 mod newgame;

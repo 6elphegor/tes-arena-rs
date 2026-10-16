@@ -77,6 +77,10 @@ fn fs_main(i: VsOut) -> @location(0) vec4<f32> {
     } else {
         let t = vec2<i32>(floor(i.uv)) & vec2<i32>(63, 63);
         index = textureLoad(textures, t, i32(i.layer), 0).r;
+        // A door's moved texture: its texels 0 unpainted (0000:BAC3).
+        if (i.flags & 128u) != 0u && index == 0u {
+            discard;
+        }
     }
     if (i.flags & 64u) != 0u {
         // A star: drawn only where the sky under it is dark, each of the

@@ -16,6 +16,7 @@ pub mod combat;
 pub mod controls;
 pub mod creature;
 pub mod dice;
+pub mod doordraw;
 pub mod dungeon;
 pub mod effects;
 pub mod encounter;
