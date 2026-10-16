@@ -735,6 +735,25 @@ fn a_whole_item_to_repair_as_the_original_draws_it() {
     screen("storerepairitem", |a, d| repair_pick(a, d, false), layer);
 }
 
+/// The store's Steal with a slot free, the seed set: the lockpicking roll
+/// fails, "You are unsuccessful...".
+#[test]
+fn a_theft_failed_as_the_original_draws_it() {
+    screen(
+        "storesteal",
+        |a, d| {
+            into(a, 0x1008);
+            room(a);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x8B, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 #[test]
 fn a_repairs_price_as_the_original_draws_it() {
     screen("storerepairworn", |a, d| repair_pick(a, d, true), layer);

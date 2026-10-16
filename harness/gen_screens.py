@@ -112,6 +112,9 @@ SCREENS = {
     # repair's price asked.
     'storerepairitem': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
     'storerepairworn': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
+    # Its Steal (the box at 83h..9Ah), with a slot free: the lockpicking
+    # roll from SEED fails, "You are unsuccessful...".
+    'storesteal': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x8B)]),
     # The Buy with a slot free (`room`: the save's inventory is full).
     'storebuyroom': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     # Its Weapon and Armor (boxes 18h high under BUY OPTIONS): the lists;
@@ -249,7 +252,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -445,7 +448,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
-          'storerepairworn': lambda a: (worn(a), seeded(a))}
+          'storerepairworn': lambda a: (worn(a), seeded(a)),
+          'storesteal': lambda a: (room(a), seeded(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:
