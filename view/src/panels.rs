@@ -233,6 +233,150 @@ pub struct Inventory {
     /// An item's description up over the list's foot (1194:1988): its
     /// lines and their colours, until a click.
     pub info: Option<Vec<(String, u8)>>,
+    /// A spell's page up (1194:1B3C, from the spells' page).
+    pub page: Option<SpellPage>,
+    /// Left by a spell's page's Exit (1194:53B5): the screen put back as
+    /// SPELBOOK.$$$ kept it with EQUIP.IMG over its left side, the list
+    /// drawn on it (1DC8), but not the name, the level or the spells'
+    /// page's pictures (SPELLBK.IMG, EQUIPB.IMG), until the screen is
+    /// drawn again.
+    pub bare: bool,
+}
+
+/// An answer given to the spell's page.
+#[derive(Clone, Debug)]
+pub enum PageAnswer {
+    Click(u16, u16),
+    Confirm(u16),
+}
+
+/// A spell's page up (`Machine::spell_page`, 1194:51D1): the game as the
+/// click that opened it found it, the answers given since (the page run
+/// again from there with them, as the dialogs are), the page as its last
+/// question found it (1001 FFh, the screen 68D7 drew) and the Delete
+/// question when that is what waits (its text, the answer highlighted).
+#[derive(Clone, Debug)]
+pub struct SpellPage {
+    start: crate::dialog::Snapshot,
+    answers: Vec<PageAnswer>,
+    pub shown: crate::dialog::Snapshot,
+    pub asking: Option<(Vec<u8>, usize)>,
+    /// The pages drawn on the way (68D7, each setting its colours).
+    pub pages: usize,
+}
+
+/// The page's questions answered from `answers`; the first one without
+/// its answer is kept (`shown`, `asking`) and the page left as Exit and
+/// No leave it.
+struct Replay {
+    answers: std::collections::VecDeque<PageAnswer>,
+    waiting: bool,
+    shown: Option<Machine>,
+    asking: Option<Vec<u8>>,
+    pages: usize,
+}
+
+impl Replay {
+    fn wait(&mut self, m: &Machine) {
+        self.waiting = true;
+        let mut s = m.clone();
+        s.mem.w8(DS, arena::spellpage::var::OWN, 0xFF);
+        self.shown = Some(s);
+    }
+}
+
+impl arena::spellpage::SpellPageHooks for Replay {
+    fn page(&mut self, _m: &mut Machine) {
+        if !self.waiting {
+            self.pages += 1;
+        }
+    }
+    fn click(&mut self, m: &mut Machine) -> (u8, u16, u16) {
+        if !self.waiting {
+            match self.answers.pop_front() {
+                Some(PageAnswer::Click(x, y)) => return (1, x, y),
+                _ => self.wait(m),
+            }
+        }
+        (1, 0x120, 0xC0)
+    }
+    fn confirm(&mut self, m: &mut Machine, si: u16) -> u16 {
+        if !self.waiting {
+            match self.answers.pop_front() {
+                Some(PageAnswer::Confirm(a)) => return a,
+                _ => {
+                    self.wait(m);
+                    self.asking = Some(m.mem.cstr(DS, si).to_vec());
+                }
+            }
+        }
+        1
+    }
+}
+
+impl SpellPage {
+    /// The page run from its start with the answers; None once it has
+    /// been left (the game then `m`'s, the files `files`').
+    fn run(start: &Machine, files: &mut arena::bsa::Files, answers: &[PageAnswer], m: &mut Machine) -> Option<SpellPage> {
+        let mut game = start.clone();
+        let mut fs = files.clone();
+        let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0 };
+        if game.spell_page(&mut fs, &mut r).is_none() {
+            eprintln!("the spell's page gave up: {}", arena::giveup::describe());
+        }
+        match r.shown {
+            Some(shown) if r.waiting => Some(SpellPage {
+                start: crate::dialog::Snapshot(Box::new(start.clone())),
+                answers: answers.to_vec(),
+                shown: crate::dialog::Snapshot(Box::new(shown)),
+                asking: r.asking.map(|t| (t, 0)),
+                pages: r.pages,
+            }),
+            _ => {
+                *m = game;
+                *files = fs;
+                None
+            }
+        }
+    }
+
+    /// The Delete question's yes-or-no menu (1194:48E9: 020E with the
+    /// keys at 4B60 and the entries at 4B63) as it was asked.
+    pub fn menu(&self) -> crate::hud::Menu {
+        let mut menu = crate::dialog::menu_at(&self.shown.0, 0x1044, 0x4B60, 0x4B63);
+        menu.selected = self.asking.as_ref().map_or(0, |a| a.1);
+        menu
+    }
+
+    /// The Delete question's boxes' tiles: spparts.rci's 3 x 3 (52DB
+    /// registers it, 0000:756C with AX 3, BX 3, and makes it B038's).
+    pub fn tiles(archive: &crate::archive::Archive) -> Option<crate::hud::Tiles> {
+        crate::hud::Tiles::load(archive, "SPPARTS.RCI", 3, 3)
+    }
+
+    /// The Delete question's entry under (x, y): its boxes as 0F2A lays
+    /// them out in those tiles and ARENAFNT ([102C]).
+    pub fn menu_pick(&self, archive: &crate::archive::Archive, x: i32, y: i32) -> Option<usize> {
+        let pics = crate::sheets::loaded()?;
+        let f = pics.arena.as_ref()?;
+        let tiles = SpellPage::tiles(archive)?;
+        let menu = self.menu();
+        let (_, es) = crate::hud::custom::menu_rects(&tiles, f, &menu.title, &menu.entries);
+        es.iter().position(|&(rx, ry, rw, rh)| x >= rx && x < rx + rw && y >= ry && y < ry + rh)
+    }
+
+    /// 1194:1B3C: the marked spell's page opened.
+    pub fn open(m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
+        let start = m.clone();
+        SpellPage::run(&start, files, &[], m)
+    }
+
+    /// An answer given: the page as it now stands, None once left.
+    pub fn answer(self, a: PageAnswer, m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
+        let mut answers = self.answers;
+        answers.push(a);
+        SpellPage::run(&self.start.0, files, &answers, m)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -308,6 +452,18 @@ pub struct Said {
 impl Said {
     fn text(&mut self, bytes: &[u8]) {
         self.boxes.push(crate::hud::lines(bytes, 0x0F));
+    }
+}
+
+/// A special item's description box (1194:7E44's 59CC, its text in a
+/// heap block), in the colour its caller left (9288).
+impl arena::text::TextHooks for Said {
+    fn message_box(&mut self, m: &mut Machine, si: u16) {
+        self.message_box_far(m, DS, si);
+    }
+    fn message_box_far(&mut self, m: &mut Machine, seg: u16, si: u16) {
+        let t = m.mem.cstr(seg, si).to_vec();
+        self.boxes.push(crate::hud::lines(&t, m.mem.r8(DS, 0x9288)));
     }
 }
 
@@ -401,6 +557,15 @@ fn mark_at(m: &mut Machine, y: i32) -> u8 {
     mark
 }
 
+/// Whether a click at row `y` (`right`: the right button) opens the
+/// marked spell's page: a left click on the spells' page's line already
+/// marked (1194:1AD6 -> 1B3C).
+pub fn opens_page(m: &Machine, y: i32, right: bool) -> bool {
+    let old = m.mem.r8(DS, SELECTED);
+    let mark = mark_at(&mut m.clone(), y);
+    !right && m.mem.r8(DS, OWN_ITEMS) == 0 && mark != 0xFF && mark == old
+}
+
 /// Inventory line `row` (on screen) put on or taken off, as a left click
 /// on it marked does (for scripts).
 pub fn equip_line(m: &mut Machine, row: usize, said: &mut Said) {
@@ -421,17 +586,24 @@ pub fn select_line(m: &mut Machine, row: usize) {
 }
 
 /// 1194:1988: the marked item described (`Machine::item_info`, with
-/// 12B0 3 and 12B2 0 first), its first [12B0] lines (the CRs made NULs,
-/// 1194:223A): the first in 55h when 12B2 is left 0, else FEh as the
-/// rest. None with no item there, or where the description gives up.
-fn item_info(m: &mut Machine) -> Option<Vec<(String, u8)>> {
+/// 12B0 3 and 12B2 0 first, 9288 FEh), its first [12B0] lines (the CRs
+/// made NULs, 1194:223A): the first in 55h when 12B2 is left 0, else FEh
+/// as the rest. None with no item there, where the description gives
+/// up, or for a special item, whose description is a message box of its
+/// own (7E44, in `said`) and the carry skips the drawing.
+fn item_info(m: &mut Machine, files: &mut arena::bsa::Files, said: &mut Said) -> Option<Vec<(String, u8)>> {
     use arena::use_item::info;
     m.mem.w16(DS, info::ARGS, 0);
     m.mem.w16(DS, info::LINES, 3);
+    m.mem.w8(DS, 0x9288, 0xFE);
     let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
-    if m.item_info(it).is_none() {
-        eprintln!("the description gave up: {}", arena::giveup::describe());
-        return None;
+    match m.item_info(files, said, it) {
+        None => {
+            eprintln!("the description gave up: {}", arena::giveup::describe());
+            return None;
+        }
+        Some(true) => return None,
+        Some(false) => {}
     }
     let first = if m.mem.r16(DS, info::ARGS) == 0 { 0x55 } else { 0xFE };
     let mut si = info::TEXT;
@@ -455,17 +627,21 @@ fn item_info(m: &mut Machine) -> Option<Vec<(String, u8)>> {
 /// 1194:1AD6: a click on the list (`right`: the right button). The line
 /// under it is marked (`mark_at`); a left click on the line already
 /// marked puts its item on or takes it off (1AFB).
-pub fn line_click(m: &mut Machine, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
+pub fn line_click(m: &mut Machine, files: &mut arena::bsa::Files, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
     let old = m.mem.r8(DS, SELECTED);
     let mark = mark_at(m, y);
     // 1194:1CE5: a right click on the player's own items describes the
     // line marked.
     if right && mark != 0xFF && m.mem.r8(DS, OWN_ITEMS) != 0 {
-        inv.info = item_info(m);
+        inv.info = item_info(m, files, said);
     }
-    // On the spells' page the line marked again is cast (1194:1B3C), which
-    // the view doesn't do.
-    if mark == 0xFF || mark != old || right || m.mem.r8(DS, OWN_ITEMS) == 0 {
+    if mark == 0xFF || mark != old || right {
+        return;
+    }
+    // On the spells' page the line marked again shows its spell's page
+    // (1194:1B3C).
+    if m.mem.r8(DS, OWN_ITEMS) == 0 {
+        inv.page = SpellPage::open(m, files);
         return;
     }
     if m.equip_click(said, mark as u16).is_none() {
@@ -644,7 +820,7 @@ pub fn button_at(x: i32, y: i32) -> Option<Button> {
 }
 
 /// The panel drawn over the layer (`pics`: EQUIP.IMG).
-pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Image], panel: &Panel, m: &Machine) {
+pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Image], panel: &Panel, m: &Machine, archive: Option<(&crate::archive::Archive, &arena::bsa::Files)>) {
     match panel {
         Panel::Sheet => crate::sheets::draw_sheet(screen, m, doll),
         Panel::Log(log) => crate::sheets::draw_log(screen, log),
@@ -662,7 +838,7 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             // 1194:22F5: the name, race and class (0E19) and the level
             // (+6, from 0) + 1 at (80h, 17h), in ARENAFNT (the sheet's
             // [102C], still selected), colour FEh.
-            if let Some(f) = pics.as_ref().and_then(|p| p.arena.as_ref()) {
+            if let Some(f) = pics.as_ref().and_then(|p| p.arena.as_ref()).filter(|_| !inv.bare) {
                 crate::sheets::name_texts(screen, f, m);
                 let level = m.mem.r8(DS, 0x01A4 + 6) as u16 + 1;
                 screen.text_plain(f, 0x80, 0x17, &level.to_string(), 0xFE);
@@ -685,7 +861,7 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                 // over EQUIP.IMG; 1D5C: the book's spells in its order
                 // from FIRST_LINE, seven at most, in 53h, the marked one
                 // framed.
-                for img in pics.iter().flat_map(|p| [p.spellbk.as_ref(), p.equipb.as_ref()]).flatten() {
+                for img in pics.iter().filter(|_| !inv.bare).flat_map(|p| [p.spellbk.as_ref(), p.equipb.as_ref()]).flatten() {
                     screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
                 }
                 for (i, name) in book_names(m).iter().enumerate().skip(first as usize).take(LIST_LINES) {
@@ -740,6 +916,17 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             if let Some((text, sel)) = &inv.asking {
                 let hud = crate::hud::Hud { menu: Some(drop_menu(text, *sel)), ..Default::default() };
                 crate::hud::compose_over(screen, font, &hud);
+            }
+            if let Some(p) = &inv.page {
+                if let Some(archive) = archive {
+                    crate::spellmaker::draw_state(screen, font, archive.0, archive.1, &p.shown.0, None);
+                }
+                if let (true, Some((archive, _)), Some(f)) = (p.asking.is_some(), archive, pics.as_ref().and_then(|p| p.arena.as_ref())) {
+                    if let Some(tiles) = SpellPage::tiles(archive) {
+                        let menu = p.menu();
+                        crate::hud::custom::draw_menu(screen, &tiles, f, &menu.title, &menu.entries, 0xFE);
+                    }
+                }
             }
         }
         // In the bar's corner: the HUD's list (`Panel::bar_list`).

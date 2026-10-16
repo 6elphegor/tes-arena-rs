@@ -2221,7 +2221,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
             let doll = doll::images(&st.assets.archive, &engine.m);
-            panels::draw(&mut screen, &font, equip.as_ref(), &doll, panel, &engine.m);
+            panels::draw(&mut screen, &font, equip.as_ref(), &doll, panel, &engine.m, Some((&st.assets.archive, &engine.files)));
         }
         hud::compose_over(&mut screen, &font, &hud);
         if st.map {
@@ -2910,7 +2910,7 @@ impl App {
                 self.equip_image();
                 let equip = self.equip.as_ref().and_then(|e| e.as_ref());
                 let doll = doll::images(&self.assets.archive, &self.engine.m);
-                panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m);
+                panels::draw(&mut self.screen, &self.font, equip, &doll, self.panel.as_ref().unwrap(), &self.engine.m, Some((&self.assets.archive, &self.engine.files)));
             }
             hud::compose_over(&mut self.screen, &self.font, &hud);
             if self.map {
@@ -3297,6 +3297,33 @@ impl App {
         let mut cast = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
+                // A spell's page up (1194:51D1): the click its question
+                // waits for, or the Delete question's yes or no.
+                if let Some(page) = inv.page.clone() {
+                    let answer = match &page.asking {
+                        Some(_) => page.menu_pick(&self.assets.archive, x, y).map(|i| panels::PageAnswer::Confirm(i as u16)),
+                        None if !right => Some(panels::PageAnswer::Click(x as u16, y as u16)),
+                        None => None,
+                    };
+                    let Some(a) = answer else { return };
+                    // A page shown sets its colours (1194:68D7, 9B56's
+                    // parts); Exit fades to black in 8 (1194:55B2) and the
+                    // equipment screen's colours are set again.
+                    let after = page.clone().answer(a.clone(), &mut self.engine.m.clone(), &mut self.engine.files.clone());
+                    let drawn = page.pages;
+                    let set = |s: &mut Self| {
+                        if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
+                            inv.page = page.answer(a, &mut s.engine.m, &mut s.engine.files);
+                            inv.bare |= inv.page.is_none();
+                        }
+                    };
+                    match after {
+                        None => self.fade_open(8, 1, set),
+                        Some(p) if p.pages > drawn => self.fade_open(0, 1, set),
+                        Some(_) => set(self),
+                    }
+                    return;
+                }
                 // An item's description waits for a click (1194:5536),
                 // which does nothing more.
                 if inv.info.take().is_some() {
@@ -3324,13 +3351,26 @@ impl App {
                             let back = inv.from_sheet;
                             self.panel = back.then_some(panels::Panel::Sheet)
                         },
-                        panels::Button::Spellbook => panels::spells_button(&mut self.engine.m, &mut said),
+                        panels::Button::Spellbook => {
+                            inv.bare = false;
+                            panels::spells_button(&mut self.engine.m, &mut said)
+                        }
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
                 } else if let Some(d) = panels::arrow_at(x, y) {
                     panels::arrow(&mut self.engine.m, d);
                 } else if panels::line_at(x, y).is_some() {
-                    panels::line_click(&mut self.engine.m, inv, y, right, &mut said);
+                    if panels::opens_page(&self.engine.m, y, right) {
+                        // The spell's page sets its colours (68D7).
+                        self.fade_open(0, 1, move |s| {
+                            let mut said = panels::Said::default();
+                            if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
+                                panels::line_click(&mut s.engine.m, &mut s.engine.files, inv, y, right, &mut said);
+                            }
+                        });
+                        return;
+                    }
+                    panels::line_click(&mut self.engine.m, &mut self.engine.files, inv, y, right, &mut said);
                 }
             }
             // A line of the list in the bar's corner clicked (2542:06F8):

@@ -1435,7 +1435,7 @@ impl Machine {
     /// 0000:756C: a resource registered (91BE: the first free of 6-byte
     /// slots, AX and BX kept, its file loaded on the heap, 742C with DI
     /// FFFFh); returns its slot's offset (0 with the table full).
-    fn resource_add(&mut self, files: &mut Files, si: u16, ax: u16, bx: u16) -> Option<u16> {
+    pub(crate) fn resource_add(&mut self, files: &mut Files, si: u16, ax: u16, bx: u16) -> Option<u16> {
         if self.sg16(RESOURCES) == 8 {
             return Some(0);
         }
@@ -1458,7 +1458,7 @@ impl Machine {
     }
 
     /// 0000:9326: a resource dropped (its slot freed, its segment too).
-    fn resource_drop(&mut self, bx: u16) {
+    pub(crate) fn resource_drop(&mut self, bx: u16) {
         self.mem.w16(DS, bx, 0);
         let seg = self.sg16(bx.wrapping_add(4));
         self.heap_free(seg);

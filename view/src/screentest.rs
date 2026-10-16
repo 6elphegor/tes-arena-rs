@@ -279,6 +279,68 @@ fn the_sheets_spellbook_as_the_original_draws_it() {
     );
 }
 
+/// On the spells' page a line clicked twice: its spell's page (1194:1B3C
+/// -> 51D1), then its bottom row's buttons (`and`: a click more).
+fn spell_page(name: &str, and: Option<(i32, i32)>) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            if let Some((x, y)) = and {
+                d.click(a, x, y, MouseButton::Left);
+            }
+        },
+        layer,
+    );
+}
+
+#[test]
+fn a_spells_page_as_the_original_draws_it() {
+    spell_page("equipmentspellpage", None);
+}
+
+#[test]
+fn a_spells_page_turned_on_as_the_original_draws_it() {
+    spell_page("equipmentspellnext", Some((30, 190)));
+}
+
+#[test]
+fn a_spells_page_turned_back_as_the_original_draws_it() {
+    spell_page("equipmentspellprev", Some((0x80, 190)));
+}
+
+#[test]
+fn a_spells_delete_asked_as_the_original_draws_it() {
+    spell_page("equipmentspelldelete", Some((0xE0, 190)));
+}
+
+/// Delete's Yes: the next spell's page.
+#[test]
+fn a_spell_deleted_as_the_original_draws_it() {
+    screen(
+        "equipmentspelldeleted",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0xE0, 190, MouseButton::Left);
+            d.click(a, 160, 112, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+#[test]
+fn a_spells_page_left_as_the_original_draws_it() {
+    spell_page("equipmentspellexit", Some((0x120, 190)));
+}
+
 /// S: the status box (2542:037C, 04B1).
 #[test]
 fn the_status_box_as_the_original_draws_it() {

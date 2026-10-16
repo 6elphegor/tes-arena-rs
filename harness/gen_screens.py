@@ -64,6 +64,23 @@ SCREENS = {
     'equipmentinfo': (0x00BE, [('click', 0x80, 0xB8), ('rclick', 60, 62)]),
     # The marked line clicked again: its item (worn) taken off (1194:1AFB).
     'equipmentoff': (0x00BE, [('click', 0x80, 0xB8), ('click', 60, 62), ('click', 60, 62)]),
+    # On its spells' page (the Spellbook button) a line clicked twice: its
+    # spell's page (1194:1B3C -> 51D1, CHARSPEL.IMG); then its bottom
+    # row's buttons: the next spell (x to 3Ch), the one before (62h..A5h),
+    # Delete's question (CEh..103h), Exit (118h on: the spells' page
+    # again, its list from the top).
+    'equipmentspellpage': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62)]),
+    'equipmentspellnext': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                    ('click', 30, 190)]),
+    'equipmentspellprev': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                    ('click', 0x80, 190)]),
+    'equipmentspelldelete': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                      ('click', 0xE0, 190)]),
+    # Delete's Yes: the spell off the list, the next one's page.
+    'equipmentspelldeleted': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                       ('click', 0xE0, 190), ('click', 160, 112)]),
+    'equipmentspellexit': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                    ('click', 0x120, 190)]),
     # S: the status box (037C: 04B1).
     'status': (0x037C, []),
     # L: the logbook (02A3: 27E3:0088), its first page.
