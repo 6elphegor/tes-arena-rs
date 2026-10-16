@@ -285,7 +285,7 @@ impl Interface {
 
     /// 0000:396E: the boat's prow (BOATPROL.IMG, `Machine::board_boat`) as
     /// loaded at offset [902E] of EMS bank [C8F4], at its header's place.
-    fn boat_prow(&mut self, screen: &mut Screen, m: &Machine) {
+    pub(crate) fn boat_prow(&mut self, screen: &mut Screen, m: &Machine) {
         let bank = m.ems_bank(m.mem.r8(DS, 0xC8F4) as u16);
         let at = m.mem.r16(DS, 0x902E) as usize;
         if let Some((img, _)) = bank.get(at..).and_then(image) {
