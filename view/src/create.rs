@@ -11,11 +11,12 @@
 //!   TEENYFNT, answered with A, B or C (the region keys at 3276:5F60; the
 //!   scroll's top and bottom move it), and the class they give offered
 //!   (3276:3651, a yes/no menu); refused, the list;
-//! - the class list (1194:2678): eighteen names in the order of 2AEE, six
-//!   rows (FONT_C);
+//! - the class list (1194:2678): eighteen names in the order of 2AEE, a
+//!   list of kind 6 (5734: POPUP2.IMG, its title in FONT_C, the lines in
+//!   FONT_A);
 //! - the name typed (2711, 3276:35F8) and the gender (2791: M, F);
 //! - the province on TAMRIEL.MNU (27C2: NOEXIT.IMG over its exit, the
-//!   first frame of TOP.DFA, the question 3276:362A, the eight regions at
+//!   question 3276:362A, the eight regions at
 //!   3276:5B80), each click rolling the portrait, then accepted (369F);
 //! - what the player is told (2902: 36EC, the province's text 581h + the
 //!   province from TEMPLATE.DAT after "Know ye this also:", 3742, 3780);
@@ -39,10 +40,14 @@
 //! menu again. On a level gained (`Creation::level_up`) the attribute
 //! screen alone, its clicks kept for the turn to replay (1194:122C).
 //!
-//! Approximate: the boxes and menus are PARCH.CIF's nine tiles around the
-//! text, centred (the original's sizes and the keys' highlights aren't
-//! traced); the scroll doesn't roll; the fades and the music are left
-//! out.
+//! The boxes (0000:965A from 1194:59CC and 5C34), the menus (1194:020E:
+//! 3159:0F2A's boxes, the keys' letters in the entries' own colours) and
+//! the list are drawn as the original draws them, in PARCH.CIF's 20 x 20
+//! tiles until the attributes and MARBLE2.CIF's after; the screens are
+//! checked against the original's (`createtest`). Left out: the map's
+//! scroll unrolling (TOP.DFA, 1194:5B58: it ends off the screen), the
+//! questions' scroll rolling by the pixel (here by the line), the glow of
+//! the class's figure at the last answer, the fades.
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -165,6 +170,9 @@ struct Ask {
     /// The rows shown (0: all).
     rows: usize,
     font: FontId,
+    /// Whether the arrows have moved the pick (the view then marks it;
+    /// the original picks by key or click and marks nothing).
+    moved: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -219,12 +227,17 @@ struct Pics {
     start: Option<(Image, [[u8; 4]; 256])>,
     map: Option<(Image, [[u8; 4]; 256])>,
     noexit: Option<Image>,
-    top: Option<Image>,
     scroll: Option<Image>,
     charstat: Option<Image>,
     bonus: Option<Image>,
     updown: Vec<u8>,
-    parch: Vec<Vec<u8>>,
+    /// The boxes' tiles: PARCH.CIF's 20 x 20 (1194:2520, [1038]) until
+    /// the attributes, MARBLE2.CIF's 3 x 3 ([103A], 2562) from them.
+    parch: Option<hud::Tiles>,
+    /// The shirt drawn over each face (1194:2486: 3E42 as the doll's
+    /// chest left it, [M|F][S|R]SHIRT.IMG, 1194:1D30).
+    shirt: Option<Image>,
+    marble2: Option<hud::Tiles>,
     charsheet: [[u8; 4]; 256],
     game: [[u8; 4]; 256],
     faces: Vec<Image>,
@@ -264,6 +277,11 @@ pub struct Creation {
     menu_pic: Option<(Image, [[u8; 4]; 256])>,
     /// On a level gained: the clicks so far.
     level_up: Option<Vec<Click>>,
+    /// The attribute page as last drawn (palette indices), which the
+    /// faces are drawn over.
+    face_back: Option<Vec<u16>>,
+    /// The last question's lines and its roll, under the class offered.
+    quiz_shown: Option<(Vec<String>, usize)>,
     outcome: Option<Outcome>,
 }
 
@@ -351,19 +369,20 @@ impl Creation {
             start: mnu(&archive, "STARTGAM.MNU"),
             map: mnu(&archive, "TAMRIEL.MNU"),
             noexit: crate::panels::load_image(&archive, m, "NOEXIT.IMG"),
-            top: dfa_first(&archive, "TOP.DFA"),
             scroll: dfa_first(&archive, "SCROLL01.DFA"),
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
-            parch: archive.read("PARCH.CIF").map(|d| d.chunks(400).map(<[u8]>::to_vec).collect()).unwrap_or_default(),
+            parch: hud::Tiles::load(&archive, "PARCH.CIF", 20, 20),
+            shirt: None,
+            marble2: hud::Tiles::load(&archive, "MARBLE2.CIF", 3, 3),
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, outcome: None };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -410,17 +429,18 @@ impl Creation {
             start: None,
             map: None,
             noexit: None,
-            top: None,
             scroll: None,
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
-            parch: archive.read("PARCH.CIF").map(|d| d.chunks(400).map(<[u8]>::to_vec).collect()).unwrap_or_default(),
+            parch: hud::Tiles::load(&archive, "PARCH.CIF", 20, 20),
+            shirt: None,
+            marble2: hud::Tiles::load(&archive, "MARBLE2.CIF", 3, 3),
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), outcome: None }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None }
     }
 
     /// Back on the main menu (a load that failed).
@@ -523,7 +543,7 @@ impl Creation {
         let title = self.say(m, fmt, args);
         let raw = crate::dialog::menu_at(m, BUF, keys, table);
         let entries = raw.entries.iter().map(|l| l.iter().map(|s| Span { colour: if s.colour == 0x0F { self.colour } else { s.colour }, text: s.text.clone(), font: Default::default(), code: None }).collect()).collect();
-        Ask { title, entries, keys: raw.keys, sel: 0, top: 0, rows: 0, font }
+        Ask { title, entries, keys: raw.keys, sel: 0, top: 0, rows: 0, font, moved: false }
     }
 
     fn method(&self, m: &mut Machine) -> Ask {
@@ -640,6 +660,7 @@ impl Creation {
                     if asked + 1 < 10 {
                         self.next_question(engine, asked + 1)
                     } else {
+                        self.quiz_shown = Some((lines, top));
                         self.quiz_done(engine)
                     }
                 }
@@ -648,7 +669,7 @@ impl Creation {
                     Stage::Quiz { asked, lines, top }
                 }
                 Input::Down | Input::Click(_, 183..=199) => {
-                    if top + 6 < lines.len() {
+                    if top + 5 < lines.len() {
                         top += 1;
                     }
                     Stage::Quiz { asked, lines, top }
@@ -722,6 +743,25 @@ impl Creation {
                         self.push_box(l, FontId::Arena, Back::Stats);
                         Stage::Stats
                     } else {
+                        // The page as the attributes leave it, for the faces.
+                        let mut page = Screen::new(self.pics.charsheet);
+                        page.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+                        self.stats_page(&mut page, &engine.m, true, true);
+                        let mut back = page.indices().to_vec();
+                        // The head's corner as 2A9D kept it before the doll
+                        // was drawn (the race's background alone, 161A),
+                        // put back under each face (2C96).
+                        let mut bare = Screen::new(self.pics.charsheet);
+                        bare.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+                        if let Some(i) = crate::doll::images(&self.archive, &engine.m).first() {
+                            bare.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                        }
+                        for y in 0..0x37 {
+                            for x in 0xDA..0xDA + 0x4A {
+                                back[y * W + x] = bare.indices()[y * W + x];
+                            }
+                        }
+                        self.face_back = Some(back);
                         engine.m.creation_finish();
                         self.face_screen(engine)
                     }
@@ -743,11 +783,12 @@ impl Creation {
             .map(|i| {
                 let c = m.mem.r8(DS, LIST_ORDER + i);
                 let (s, o) = Self::class_of(m, c);
-                vec![Span { colour: self.colour, text: String::from_utf8_lossy(m.mem.cstr(s, o)).into_owned(), font: Default::default(), code: None }]
+                // In the list's own colours (5734's BL, FDh; the title 01h).
+                vec![Span { colour: 0x0F, text: String::from_utf8_lossy(m.mem.cstr(s, o)).into_owned(), font: Default::default(), code: None }]
             })
             .collect();
-        let title = hud::lines(m.mem.cstr(DS, 0x3F56), self.colour);
-        Stage::List(Ask { title, entries, keys: Vec::new(), sel: 0, top: 0, rows: 6, font: FontId::C })
+        let title = hud::lines(m.mem.cstr(DS, 0x3F56), 0x0F);
+        Stage::List(Ask { title, entries, keys: Vec::new(), sel: 0, top: 0, rows: 6, font: FontId::C, moved: false })
     }
 
     /// The next question (number `asked` from 0), its text's lines.
@@ -781,7 +822,24 @@ impl Creation {
             eprintln!("the class's weapon could not be made");
         }
         let (cs, co) = Self::class_of(&engine.m, class);
-        let prompt = self.say(&mut engine.m, (DATA, 0x35F8), &[Arg::Str(cs, co)]);
+        let m = &mut engine.m;
+        m.sprintf((DS, BUF), (DATA, 0x35F8), &[Arg::Str(cs, co)]);
+        // 2731..2776: the text's last character (its CR) made room, two
+        // for each letter the class's name is short of ten, less four,
+        // then the CR again; then 5C34's box text (4FBC: the field's
+        // line of room under it).
+        let mut text = m.mem.cstr(DS, BUF).to_vec();
+        let short = 10 - m.mem.cstr(cs, co).len() as i32;
+        let pad = if short == 0 { 0 } else { (2 * short - 4).max(0) as usize };
+        if pad != 0 {
+            text.pop();
+            text.extend(std::iter::repeat_n(b' ', pad));
+            text.push(b'\r');
+        }
+        for (i, &b) in text.iter().chain(&[0]).enumerate() {
+            m.mem.w8(DS, BUF + i as u16, b);
+        }
+        let prompt = hud::lines(crate::field::prompt_5c30(m, DS, BUF).as_bytes(), self.colour);
         Stage::Name(prompt, self.name_field(engine))
     }
 
@@ -856,7 +914,12 @@ impl Creation {
         m.mem.w8(DS, 0x101C, 1);
         let mut known = b"Know ye this also:\r".to_vec();
         match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, DS, BUF) {
-            Some(_) => known.extend_from_slice(engine.m.mem.cstr(DS, BUF)),
+            Some(_) => {
+                known.extend_from_slice(engine.m.mem.cstr(DS, BUF));
+                // 2A51..2A5F: the text ended by a CR (its last line
+                // centred too).
+                known.push(b'\r');
+            }
             None => eprintln!("the province's text could not be made"),
         }
         self.push_box(hud::lines(&known, colour), FontId::Arena, Back::Map);
@@ -958,6 +1021,9 @@ impl Creation {
         self.push_box(l, FontId::Arena, Back::Stats);
         let name = format!("{}1{}.CIF", if m.mem.r8(DS, SEX) != 0 { "FACESF" } else { "FACES" }, m.mem.r8(DS, RACE));
         self.pics.faces = self.archive.read(&name).map(|d| cif(m, &d)).unwrap_or_default();
+        let robe = if m.mem.r8(DS, CLASS) & 0x20 != 0 { 'R' } else { 'S' };
+        let shirt = format!("{}{robe}SHIRT.IMG", if m.mem.r8(DS, SEX) != 0 { 'F' } else { 'M' });
+        self.pics.shirt = crate::panels::load_image(&self.archive, m, &shirt);
         m.mem.w16(DS, arena::newgame::var::FACE_PICKED, 0);
         Stage::Face
     }
@@ -1021,8 +1087,14 @@ impl Creation {
         let n = ask.entries.len();
         let rows = if ask.rows == 0 { n } else { ask.rows.min(n) };
         match inp {
-            Input::Up => ask.sel = ask.sel.saturating_sub(1),
-            Input::Down => ask.sel = (ask.sel + 1).min(n.saturating_sub(1)),
+            Input::Up => {
+                ask.sel = ask.sel.saturating_sub(1);
+                ask.moved = true;
+            }
+            Input::Down => {
+                ask.sel = (ask.sel + 1).min(n.saturating_sub(1));
+                ask.moved = true;
+            }
             Input::Enter => return Some(ask.sel as u16),
             Input::Esc => return Some(0xFFFF),
             Input::Char(c) => {
@@ -1032,13 +1104,13 @@ impl Creation {
                 }
             }
             Input::Click(x, y) => {
-                let l = self.layout(ask);
-                for row in 0..rows {
-                    let ey = l.entries_y + row as i32 * l.lh;
-                    if (l.x..l.x + l.w).contains(&x) && (ey..ey + l.lh).contains(&y) {
-                        return Some((ask.top + row) as u16);
-                    }
+                let f = self.fonts.get(ask.font);
+                if ask.rows != 0 {
+                    return hud::custom::list_pick(&self.fonts.a, &self.list_menu(ask), x, y).map(|i| i as u16);
                 }
+                let tiles = self.tiles(Back::Start)?;
+                let (_, rects) = hud::custom::menu_rects(tiles, f, &ask.title, &ask.entries);
+                return rects.iter().position(|r| (r.0..r.0 + r.2).contains(&x) && (r.1..r.1 + r.3).contains(&y)).map(|i| i as u16);
             }
             Input::Back | Input::Wait(_) | Input::Key(..) => {}
         }
@@ -1050,17 +1122,18 @@ impl Creation {
         None
     }
 
-    /// Where a menu's box and entries go.
-    fn layout(&self, ask: &Ask) -> Layout {
-        let f = self.fonts.get(ask.font);
-        let n = ask.entries.len();
-        let rows = if ask.rows == 0 { n } else { ask.rows.min(n) };
-        let lines: Vec<&Vec<Span>> = ask.title.iter().chain(ask.entries.iter()).collect();
-        let tw = lines.iter().map(|l| f.width(&hud::plain(l)) as i32).max().unwrap_or(0);
-        let lh = f.h as i32 + 2;
-        let th = (ask.title.len() + rows) as i32 * lh;
-        let b = boxed(tw, th + if ask.title.is_empty() { 0 } else { 4 });
-        Layout { b, x: b.x + MARGIN, w: b.w - 2 * MARGIN, lh, title_y: b.y + (b.h - th) / 2, entries_y: b.y + (b.h - th) / 2 + ask.title.len() as i32 * lh + 4 }
+    /// The tiles boxes are drawn with on the screen `back`.
+    fn tiles(&self, back: Back) -> Option<&hud::Tiles> {
+        match back {
+            Back::Stats => self.pics.marble2.as_ref(),
+            _ => self.pics.parch.as_ref(),
+        }
+    }
+
+    /// The list `ask` as 1194:5734 shows the classes' (2678: kind 6,
+    /// POPUP2.IMG, its title drawn by 5734).
+    fn list_menu(&self, ask: &Ask) -> hud::Menu {
+        hud::Menu { title: ask.title.clone(), entries: ask.entries.clone(), keys: Vec::new(), selected: ask.sel, list: true, kind: 6 }
     }
 
     /// The layer drawn: the screen behind, the stage, a box waiting.
@@ -1091,28 +1164,57 @@ impl Creation {
         }
         self.draw_back(screen, m, back);
         if let Some(b) = self.boxes.front() {
-            self.draw_box(screen, &b.lines, b.font, None);
+            self.draw_box(screen, &b.lines, b.font, back, 5);
             return;
         }
         match &self.stage {
-            Stage::Method(a) | Stage::ClassYes(a, _) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) => self.draw_ask(screen, a),
-            Stage::Quiz { lines, top, .. } => {
-                if let Some(s) = &self.pics.scroll {
-                    screen.blit(s.x, s.y, s.w, s.h, &s.px, H as i32);
+            Stage::ClassYes(a, _) => {
+                // Over the questions as the last answer left them.
+                if let Some((lines, top)) = &self.quiz_shown {
+                    self.draw_quiz(screen, m, lines, *top);
                 }
-                for (i, l) in lines.iter().skip(*top).take(6).enumerate() {
-                    screen.text_plain(&self.fonts.teeny, 0x14, 136 + 8 * i as i32, l, COLOUR_A);
-                }
+                self.draw_ask(screen, a, back);
             }
+            Stage::Method(a) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) => self.draw_ask(screen, a, back),
+            Stage::Quiz { lines, top, .. } => self.draw_quiz(screen, m, lines, *top),
             Stage::Name(prompt, live) => {
                 // The prompt's box with its line of room (5C34's "%s\r"
                 // and spaces), the field over it where 5C34 puts it.
-                let mut lines = prompt.clone();
-                lines.push(vec![Span { colour: self.colour, text: " ".repeat(37), font: Default::default(), code: None }]);
-                self.draw_box(screen, &lines, FontId::A, None);
+                self.draw_box(screen, prompt, FontId::A, back, 10);
                 live.draw(screen, false);
             }
             _ => {}
+        }
+    }
+
+    /// The questions' scroll (SCROLL01.DFA) with the text's bitmap
+    /// (222C:04E5: a line every 8 rows from its second, x 14h, in EEh)
+    /// shown through rows 136..183 (03E9), `top` lines rolled up, over the
+    /// figures as lit.
+    fn draw_quiz(&self, screen: &mut Screen, m: &Machine, lines: &[String], top: usize) {
+        self.quiz_figures(screen, m);
+        if let Some(s) = &self.pics.scroll {
+            screen.blit(s.x, s.y, s.w, s.h, &s.px, H as i32);
+        }
+        for (k, l) in lines.iter().enumerate() {
+            let y = 136 + 8 * (k as i32 + 1 - top as i32);
+            if (136..184).contains(&y) {
+                screen.text_plain(&self.fonts.teeny, 0x14, y, l, COLOUR_A);
+            }
+        }
+    }
+
+    /// The figures behind the questions lit as the answers go (222C:0149:
+    /// each kind's colour, 40E4, the blue of its count, 40DA).
+    fn quiz_figures(&self, screen: &mut Screen, m: &Machine) {
+        use arena::newgame::var::COUNTS;
+        for kind in 0..3u16 {
+            let n = m.mem.r8(DS, COUNTS + kind);
+            if n == 0 {
+                continue;
+            }
+            let blue = m.mem.r8(DS, 0x40DA + (n - 1) as u16) & 0x3F;
+            screen.set_colour(m.mem.r8(DS, 0x40E4 + kind), [0, 0, blue << 2 | blue >> 4, 0xFF]);
         }
     }
 
@@ -1137,7 +1239,7 @@ impl Creation {
                 if let Some((i, _)) = &self.pics.map {
                     blit(screen, i);
                 }
-                for i in [&self.pics.noexit, &self.pics.top].into_iter().flatten() {
+                for i in [&self.pics.noexit].into_iter().flatten() {
                     blit(screen, i);
                 }
             }
@@ -1148,105 +1250,84 @@ impl Creation {
 
     /// The attribute screen (1194:0DE1's texts, in ARENAFNT, colour FEh).
     fn draw_stats(&self, screen: &mut Screen, m: &Machine) {
+        if let (Stage::Face, Some(back)) = (&self.stage, &self.face_back) {
+            // The faces' screen (2BC5) draws on the page the attributes
+            // left (their last values, the points and the arrows: 2D28's
+            // changes aren't drawn), each face over the doll's head.
+            let px: Vec<u8> = back.iter().map(|&i| i as u8).collect();
+            screen.blit(0, 0, W, H, &px, H as i32);
+            if self.boxes.is_empty() {
+                let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
+                if let Some(i) = self.pics.faces.get(k) {
+                    screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                }
+                // Then the shirt again, over the face's neck (2486).
+                if let Some(i) = &self.pics.shirt {
+                    screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                }
+            }
+            return;
+        }
+        let creating = m.mem.r16(DS, 0x05C8) & 0x10 != 0 || self.level_up.is_some();
+        self.stats_page(screen, m, matches!(self.stage, Stage::Stats | Stage::Choose(_)), creating);
+    }
+
+    /// The attribute page as 0DC7 draws it (from 2B58 and 122F's redraw
+    /// 12AE): the doll (16AA: the body and what is worn, 1194:23E5),
+    /// CHARSTAT.IMG over it, 0DE1's texts (the derived numbers, 0F08,
+    /// among them; while `creating`, 5C8 bit 10h, the attributes as they
+    /// are, else on the 100 scale, 1194:5B07) and, with `points`, the
+    /// bonus points and the arrows.
+    fn stats_page(&self, screen: &mut Screen, m: &Machine, points: bool, creating: bool) {
         let f = &self.fonts.arena;
         let c = COLOUR_B;
-        // The page as 0DC7 draws it (from 2B58 and 122F's redraw 12AE):
-        // the doll (16AA: the body and what is worn, 1194:23E5), then
-        // CHARSTAT.IMG over it.
         for i in crate::doll::images(&self.archive, m) {
             screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
         }
         if let Some(i) = &self.pics.charstat {
             screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
         }
-        let s = |screen: &mut Screen, x: i32, y: i32, t: &str| screen.text_plain(f, x, y, t, c);
-        // While creating (5C8 bit 10h) the attributes as they are, else on
-        // the 100 scale (1194:5B07). On the faces' screen the original
-        // doesn't draw them again: they stay as they were before they were
-        // kept on the 256 scale (2D28), which the 100 scale gives back.
-        // The texts are 0DE1's, the derived numbers (0F08) among them.
-        let creating = (m.mem.r16(DS, 0x05C8) & 0x10 != 0 && !matches!(self.stage, Stage::Face)) || self.level_up.is_some();
         crate::sheets::sheet_texts(screen, f, m, creating);
-        if matches!(self.stage, Stage::Stats | Stage::Choose(_)) {
+        if points {
             if let Some(i) = &self.pics.bonus {
                 screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
             }
-            s(screen, 0x5C, 0x71, &m.mem.r8(DS, arena::newgame::var::POINTS).to_string());
+            screen.text_plain(f, 0x5C, 0x71, &m.mem.r8(DS, arena::newgame::var::POINTS).to_string(), c);
             // The arrows where the line picked put them (region 9's y).
             let ay = m.mem.r16(DATA, STAT_REGIONS + 9 * REGION + 2) as i32;
             if self.pics.updown.len() >= 128 {
                 screen.blit(38, ay, 8, 16, &self.pics.updown[..128], H as i32);
             }
         }
-        if matches!(self.stage, Stage::Face) && self.boxes.is_empty() {
-            let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
-            if let Some(i) = self.pics.faces.get(k) {
-                screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
-            }
+    }
+
+    /// A box with `lines` as 965A draws it with margin `margin` (5 for
+    /// 1194:59CC's, 0Ah for 5C34's prompt), centred, in the tiles of
+    /// the screen `back`.
+    fn draw_box(&self, screen: &mut Screen, lines: &[Vec<Span>], font: FontId, back: Back, margin: i32) {
+        if let Some(t) = self.tiles(back) {
+            hud::custom::draw_box(screen, t, self.fonts.get(font), lines, margin, self.colour);
         }
     }
 
-    fn spans(&self, screen: &mut Screen, f: &Font, mut x: i32, y: i32, line: &[Span]) {
-        for s in line {
-            screen.text_plain(f, x, y, &s.text, s.colour);
-            x += f.width(&s.text) as i32;
-        }
-    }
-
-    /// The parchment (PARCH.CIF's nine 20 x 20 tiles: corners, edges and
-    /// middle) over `b`.
-    fn parchment(&self, screen: &mut Screen, b: Rect) {
-        if self.pics.parch.len() < 9 {
-            screen.panel(b.x, b.y, b.w, b.h, 0x0F);
-            return;
-        }
-        let (cols, rows) = (b.w / TILE, b.h / TILE);
-        for r in 0..rows {
-            for c in 0..cols {
-                let tr = if r == 0 { 0 } else if r == rows - 1 { 2 } else { 1 };
-                let tc = if c == 0 { 0 } else if c == cols - 1 { 2 } else { 1 };
-                let t = &self.pics.parch[tr * 3 + tc];
-                screen.blit(b.x + c * TILE, b.y + r * TILE, TILE as usize, TILE as usize, t, H as i32);
-            }
-        }
-    }
-
-    /// A box with `lines` centred, on the parchment.
-    fn draw_box(&self, screen: &mut Screen, lines: &[Vec<Span>], font: FontId, _sel: Option<usize>) {
-        let f = self.fonts.get(font);
-        let lh = f.h as i32 + 2;
-        let tw = lines.iter().map(|l| f.width(&hud::plain(l)) as i32).max().unwrap_or(0);
-        let th = lines.len() as i32 * lh;
-        let b = boxed(tw, th);
-        self.parchment(screen, b);
-        let y0 = b.y + (b.h - th) / 2;
-        for (i, l) in lines.iter().enumerate() {
-            let w = f.width(&hud::plain(l)) as i32;
-            self.spans(screen, f, b.x + (b.w - w) / 2, y0 + i as i32 * lh, l);
-        }
-    }
-
-    /// A menu or list: its title, its entries (the one highlighted marked
-    /// by a darker band), on the parchment.
-    fn draw_ask(&self, screen: &mut Screen, ask: &Ask) {
+    /// A menu (1194:020E: its title's box and a box for each entry, as
+    /// 3159:0F2A lays them out) or a list (5734); the entry the arrows
+    /// moved to marked (a view's addition).
+    fn draw_ask(&self, screen: &mut Screen, ask: &Ask, back: Back) {
         let f = self.fonts.get(ask.font);
-        let l = self.layout(ask);
-        self.parchment(screen, l.b);
-        for (i, t) in ask.title.iter().enumerate() {
-            let w = f.width(&hud::plain(t)) as i32;
-            self.spans(screen, f, l.b.x + (l.b.w - w) / 2, l.title_y + i as i32 * l.lh, t);
+        if ask.rows != 0 {
+            // The title in FONT_C, the lines in FONT_A (1194:5914).
+            return hud::custom::draw_list(screen, &self.fonts.a, f, &self.list_menu(ask));
         }
-        let rows = if ask.rows == 0 { ask.entries.len() } else { ask.rows.min(ask.entries.len()) };
-        let band = self.pics.parch.get(1).and_then(|t| t.get(20 * 2 + 10).copied()).unwrap_or(0x0F);
-        for row in 0..rows {
-            let k = ask.top + row;
-            let Some(e) = ask.entries.get(k) else { break };
-            let y = l.entries_y + row as i32 * l.lh;
-            if k == ask.sel {
-                screen.fill(l.x - 2, y - 1, l.w + 4, l.lh, band, 0xFF);
+        let Some(t) = self.tiles(back) else { return };
+        hud::custom::draw_menu(screen, t, f, &ask.title, &ask.entries, self.colour);
+        if ask.moved {
+            let (_, rects) = hud::custom::menu_rects(t, f, &ask.title, &ask.entries);
+            if let Some(&(x, y, w, h)) = rects.get(ask.sel) {
+                for (fx, fy, fw, fh) in [(x + 2, y + 2, w - 4, 1), (x + 2, y + h - 3, w - 4, 1), (x + 2, y + 2, 1, h - 4), (x + w - 3, y + 2, 1, h - 4)] {
+                    screen.fill(fx, fy, fw, fh, self.colour, 0xFF);
+                }
             }
-            let w = f.width(&hud::plain(e)) as i32;
-            self.spans(screen, f, l.b.x + (l.b.w - w) / 2, y, e);
         }
     }
 
@@ -1266,34 +1347,6 @@ impl Creation {
         enc.set_depth(png::BitDepth::Eight);
         enc.write_header().expect("png").write_image_data(&data).expect("png");
     }
-}
-
-const TILE: i32 = 20;
-const MARGIN: i32 = 12;
-
-#[derive(Clone, Copy, Debug)]
-struct Rect {
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-}
-
-struct Layout {
-    b: Rect,
-    x: i32,
-    w: i32,
-    lh: i32,
-    title_y: i32,
-    entries_y: i32,
-}
-
-/// The box for text `tw` x `th`: whole tiles, a margin around, centred.
-fn boxed(tw: i32, th: i32) -> Rect {
-    let cols = ((tw + 2 * MARGIN + TILE - 1) / TILE).clamp(2, W as i32 / TILE);
-    let rows = ((th + 2 * MARGIN - 4 + TILE - 1) / TILE).clamp(2, H as i32 / TILE);
-    let (w, h) = (cols * TILE, rows * TILE);
-    Rect { x: (W as i32 - w) / 2, y: (H as i32 - h) / 2, w, h }
 }
 
 /// INTROnn.IMG (`n` 1..9; the digit at 4DD7 counted up, 0000:137B),

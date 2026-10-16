@@ -246,6 +246,17 @@ impl Screen {
         self.palette = palette;
     }
 
+    /// Palette entry `c` changed, the pixels drawn in it with it (the
+    /// DAC's colour set over what is on the screen).
+    pub fn set_colour(&mut self, c: u8, rgb: [u8; 4]) {
+        self.palette[c as usize] = rgb;
+        for (p, &i) in self.px.iter_mut().zip(&self.idx) {
+            if i == c as u16 {
+                *p = [rgb[0], rgb[1], rgb[2], p[3]];
+            }
+        }
+    }
+
     /// A rectangle in palette colour `c`, `alpha` opaque.
     pub fn fill(&mut self, x: i32, y: i32, w: i32, h: i32, c: u8, alpha: u8) {
         let p = self.palette[c as usize];
@@ -519,7 +530,7 @@ pub struct Tiles {
 }
 
 impl Tiles {
-    fn load(archive: &crate::archive::Archive, name: &str, w: usize, h: usize) -> Option<Tiles> {
+    pub fn load(archive: &crate::archive::Archive, name: &str, w: usize, h: usize) -> Option<Tiles> {
         let px = archive.read(name)?;
         (px.len() >= 9 * w * h).then_some(Tiles { w, h, px })
     }
@@ -682,7 +693,12 @@ fn box_size(st: &Style, font: &Font, lines: &[Vec<Span>]) -> (i32, i32, i32, i32
 
 /// `box_size` with 965A's margin (DX) `margin`.
 fn box_size_margin(st: &Style, font: &Font, lines: &[Vec<Span>], margin: i32) -> (i32, i32, i32, i32) {
-    let (tw, th) = (st.tiles.w as i32, st.tiles.h as i32);
+    box_size_in(&st.tiles, font, lines, margin)
+}
+
+/// `box_size_margin` with the tiles `tiles`.
+fn box_size_in(tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32) -> (i32, i32, i32, i32) {
+    let (tw, th) = (tiles.w as i32, tiles.h as i32);
     let text_w = lines.iter().map(|l| measured(font, l)).max().unwrap_or(0);
     let (mut w, mut h) = (text_w + 2 * margin, lines.len() as i32 * (font.h as i32 + 1) + 2 * margin);
     let rw = (tw - w % tw) % tw;
@@ -716,15 +732,83 @@ pub fn centred_box(m: &arena::machine::Machine, text: &[u8]) -> Option<(u16, u16
 /// a line ended by a CR (`lines` leaves an empty span at its end) centred
 /// on the box, a last one without from the text's x.
 #[allow(clippy::too_many_arguments)]
-fn draw_box(screen: &mut Screen, st: &Style, font: &Font, (x, y, w, h): (i32, i32, i32, i32), lines: &[Vec<Span>], colour: u8) {
-    screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
-    let (_, _, tx, ty) = box_size(st, font, lines);
+fn draw_box(screen: &mut Screen, st: &Style, font: &Font, rect: (i32, i32, i32, i32), lines: &[Vec<Span>], colour: u8) {
+    draw_box_in(screen, &st.tiles, font, rect, lines, MARGIN, colour);
+}
+
+/// `draw_box` with the tiles `tiles` and 965A's margin `margin`.
+fn draw_box_in(screen: &mut Screen, tiles: &Tiles, font: &Font, (x, y, w, h): (i32, i32, i32, i32), lines: &[Vec<Span>], margin: i32, colour: u8) {
+    screen.tiles(tiles, x, y, w / tiles.w as i32, h / tiles.h as i32);
+    let (_, _, tx, ty) = box_size_in(tiles, font, lines, margin);
     for (i, l) in lines.iter().enumerate() {
         let lw = measured(font, l);
         let ended = i + 1 < lines.len() || l.last().is_some_and(|s| s.text.is_empty());
         let lx = if ended { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * (font.h as i32 + 1), l, false, colour);
     }
+}
+
+/// Boxes, menus and lists drawn with other tiles and fonts than play's
+/// (character creation's: PARCH.CIF's 20 x 20 tiles, 1194:2520, and
+/// the font each question selects), as 965A, 3159:0F2A and 1194:5734
+/// draw them on the whole screen.
+pub mod custom {
+    use super::*;
+
+    const SCREEN: (i32, i32, i32, i32) = (0, 0, W as i32 - 1, H as i32 - 1);
+
+    /// A box for `lines` as 965A sizes it with margin `margin`, centred
+    /// on the screen (CX 4007h, 7): (x, y, w, h).
+    pub fn box_rect(tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32) -> (i32, i32, i32, i32) {
+        let (w, h, _, _) = box_size_in(tiles, font, lines, margin);
+        ((SCREEN.0 + SCREEN.2) / 2 - w / 2, (SCREEN.1 + SCREEN.3) / 2 - h / 2, w, h)
+    }
+
+    /// That box drawn, its text in `colour` where a span has none.
+    pub fn draw_box(screen: &mut Screen, tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32, colour: u8) {
+        let r = box_rect(tiles, font, lines, margin);
+        draw_box_in(screen, tiles, font, r, lines, margin, colour);
+    }
+
+    /// A menu's boxes as 0F2A lays them out (1194:020E: margin 5, CX
+    /// 4006h): the title's and the entries'.
+    #[allow(clippy::type_complexity)]
+    pub fn menu_rects(tiles: &Tiles, font: &Font, title: &[Vec<Span>], entries: &[Vec<Span>]) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
+        menu_boxes_in(tiles, font, title, entries, SCREEN, None)
+    }
+
+    /// That menu drawn.
+    pub fn draw_menu(screen: &mut Screen, tiles: &Tiles, font: &Font, title: &[Vec<Span>], entries: &[Vec<Span>], colour: u8) {
+        let (t, es) = menu_rects(tiles, font, title, entries);
+        if let Some(r) = t {
+            draw_box_in(screen, tiles, font, r, title, MARGIN, colour);
+        }
+        for (r, e) in es.iter().zip(entries) {
+            draw_box_in(screen, tiles, font, *r, std::slice::from_ref(e), MARGIN, colour);
+        }
+    }
+
+    /// A list (5734 of `menu.kind`), its lines in the font `font`, the
+    /// title it draws in `title_font`; nothing before the game's style
+    /// is loaded (`init_style`).
+    pub fn draw_list(screen: &mut Screen, font: &Font, title_font: &Font, menu: &Menu) {
+        if let Some(st) = STYLE.get() {
+            draw_list_in(screen, st, menu, font, title_font);
+        }
+    }
+
+    /// The list's line under (x, y) (the area's lines shown).
+    pub fn list_pick(font: &Font, menu: &Menu, x: i32, y: i32) -> Option<usize> {
+        let st = STYLE.get()?;
+        let (top, rows) = list_rows_in(st, menu, font);
+        let a = list_kind(st, menu).area;
+        if !(x >= a.0 && x < a.0 + a.2 && y >= a.1 && y < a.1 + a.3) {
+            return None;
+        }
+        let i = top + ((y - a.1 - 1).max(0) / font.h as i32) as usize;
+        (i < menu.entries.len() && i < top + rows).then_some(i)
+    }
+
 }
 
 /// The window boxes are centred in; the whole screen when unset.
@@ -773,19 +857,24 @@ fn menu_height(st: &Style, menu: &Menu) -> i32 {
 /// and the entries'.
 #[allow(clippy::type_complexity)]
 fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
-    let font = &st.menu_font;
-    let title_lines = menu_title(st, menu);
-    let title = (!title_lines.is_empty()).then(|| box_size(st, font, &title_lines));
-    let sizes: Vec<_> = menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e))).collect();
+    let below = boxed_rect(st, hud).map(|b| b.1 + b.3 + 2);
+    menu_boxes_in(&st.tiles, &st.menu_font, &menu_title(st, menu), &menu.entries, clip(hud), below)
+}
+
+/// `menu_boxes` with the tiles `tiles` and the font `font`, the title's
+/// lines `title`, in the clip `c`, from y `below` at least.
+#[allow(clippy::type_complexity)]
+fn menu_boxes_in(tiles: &Tiles, font: &Font, title_lines: &[Vec<Span>], entries: &[Vec<Span>], c: (i32, i32, i32, i32), below: Option<i32>) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
+    let title = (!title_lines.is_empty()).then(|| box_size_in(tiles, font, title_lines, MARGIN));
+    let sizes: Vec<_> = entries.iter().map(|e| box_size_in(tiles, font, std::slice::from_ref(e), MARGIN)).collect();
     let w = sizes.iter().chain(title.iter()).map(|b| b.0).max().unwrap_or(0);
     let unrounded = |lines: &[Vec<Span>]| lines.len() as i32 * (font.h as i32 + 1) + 2 * MARGIN;
-    let title_h = if title_lines.is_empty() { 0 } else { unrounded(&title_lines) };
-    let total = title_h + menu.entries.iter().map(|e| unrounded(std::slice::from_ref(e))).sum::<i32>();
+    let title_h = if title_lines.is_empty() { 0 } else { unrounded(title_lines) };
+    let total = title_h + entries.iter().map(|e| unrounded(std::slice::from_ref(e))).sum::<i32>();
     let mut y = 0x64 - total / 2;
-    if let Some(b) = boxed_rect(st, hud) {
-        y = y.max(b.1 + b.3 + 2);
+    if let Some(b) = below {
+        y = y.max(b);
     }
-    let c = clip(hud);
     let x = (c.0 + c.2) / 2 - w / 2;
     let mut next = |h: i32| {
         let r = (x, y, w, h);
@@ -831,7 +920,12 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
 /// A list's first line shown and how many fit (3159:0778: the area's
 /// height over the font's, B7F4).
 fn list_rows(st: &Style, menu: &Menu) -> (usize, usize) {
-    let rows = (list_kind(st, menu).area.3 / st.list_font.h as i32).max(1) as usize;
+    list_rows_in(st, menu, &st.list_font)
+}
+
+/// `list_rows` in the font `font`.
+fn list_rows_in(st: &Style, menu: &Menu, font: &Font) -> (usize, usize) {
+    let rows = (list_kind(st, menu).area.3 / font.h as i32).max(1) as usize;
     let top = (menu.selected + 1).saturating_sub(rows).min(menu.entries.len().saturating_sub(rows));
     (top, rows)
 }
@@ -1001,21 +1095,27 @@ fn list_line(screen: &mut Screen, font: &Font, kind: &ListKind, y: i32, line: &[
 /// title where 5734 does; other kinds have none of their own (the view's
 /// callers may give one: above the area, centred).
 fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
+    draw_list_in(screen, st, menu, &st.list_font, &st.list_font);
+}
+
+/// `draw_list` with its lines in the font `font` and the title 5734
+/// draws in `title_font` (the one selected before it: kind 6 then
+/// selects FONT_A for the lines, 1194:5914).
+fn draw_list_in(screen: &mut Screen, st: &Style, menu: &Menu, font: &Font, title_font: &Font) {
     let kind = list_kind(st, menu);
     if let Some(p) = &kind.panel {
         screen.blit(p.x, p.y, p.w, p.h, &p.px, H as i32);
     }
     let area = kind.area;
-    let font = &st.list_font;
     let fh = font.h as i32;
-    let (top, rows) = list_rows(st, menu);
+    let (top, rows) = list_rows_in(st, menu, font);
     for (i, l) in menu.title.iter().enumerate() {
-        let w = font.width(&plain(l)) as i32;
+        let w = title_font.width(&plain(l)) as i32;
         let (y, c) = match kind.title {
-            Some((y, c)) => (y + i as i32 * (fh + 1), c),
+            Some((y, c)) => (y + i as i32 * (title_font.h as i32 + 1), c),
             None => (area.1 - fh - 4 + i as i32 * (fh + 1), 0x60),
         };
-        screen.spans_game(font, 0xA0 - w / 2, y, l, false, c);
+        screen.spans_game(title_font, 0xA0 - w / 2, y, l, false, c);
     }
     for (k, e) in menu.entries.iter().enumerate().skip(top).take(rows) {
         let y = area.1 + 1 + (k - top) as i32 * fh;

@@ -1954,6 +1954,9 @@ fn the_frames_keys_from_the_key_state() {
 #[path = "screentest.rs"]
 mod screentest;
 
+#[path = "createtest.rs"]
+mod createtest;
+
 /// 0000:0B9C's order (`panels::book_order`): ascending by byte, a name
 /// after one it begins with, bytes 80h or more apart backwards (9C0A's
 /// signed test); one name is left unsorted.
