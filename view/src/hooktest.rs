@@ -127,3 +127,16 @@ fn a_quests_deadline_passing_shows_its_text() {
     assert!(!s.trim().is_empty(), "its text shown");
     eprintln!("{s}");
 }
+
+/// Loading an empty slot (25FD:028D's check, 1194:59C8): the game's own
+/// words, not the view's.
+#[test]
+fn an_empty_slot_says_the_games_words() {
+    let Some(mut e) = engine() else { return };
+    let empty = std::env::temp_dir().join(format!("arena-hooktest-empty-{}", std::process::id()));
+    std::fs::create_dir_all(&empty).unwrap();
+    let dir = PathBuf::from(std::env::var("ARENA_EXE").map(|x| PathBuf::from(x).parent().unwrap().to_path_buf()).unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ESarena")));
+    let r = areas::load_game(&mut e, &dir, &empty, 7);
+    let _ = std::fs::remove_dir_all(&empty);
+    assert_eq!(r.err().as_deref(), Some("No game saved here...."));
+}

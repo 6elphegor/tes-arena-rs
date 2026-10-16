@@ -3074,8 +3074,15 @@ impl App {
             saveui::Ended::Open => return,
             saveui::Ended::Save(engine, slot) => {
                 self.engine = engine;
+                // The game's menu says nothing once the game is saved (only
+                // its wait, 25FD:0803, while the disk is used); a failure
+                // the original wouldn't have is told.
                 let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette);
-                self.say(&msg);
+                if msg.starts_with("Saved to slot") {
+                    println!("{msg}");
+                } else {
+                    self.say(&msg);
+                }
             }
             saveui::Ended::Load(mut engine, slot) => {
                 let game = self.dir.clone();
@@ -3088,7 +3095,8 @@ impl App {
                         self.assets = Assets::new(&self.dir, &mut self.engine);
                         self.remake_renderer();
                         self.last = Some(arena::engine::Frame::Running);
-                        self.say(&format!("Loaded slot {slot}."));
+                        // As the game's menu: play goes on without a word.
+                        println!("Loaded slot {slot}.");
                     }
                     Err(msg) => {
                         eprintln!("{msg}");
