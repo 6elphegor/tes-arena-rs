@@ -62,6 +62,10 @@ SCREENS = {
     'spellbook': (0x026D, []),
     # A line of it clicked (the second): marked, as the use list's.
     'spellpick': (0x026D, [('click', 0xF0, 164)]),
+    # Its fourth line (Arc Lightning, an area's spell) clicked twice: cast,
+    # "Release spell in your area..." put on the message line, drawn as
+    # after the use (`AFTER`).
+    'spellarea': (0x026D, [('click', 0xF0, 182), ('click', 0xF0, 182)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
     # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
@@ -455,7 +459,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511)}
+AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511), 'spellarea': lambda a: a.call_near(0, 0x0511)}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

@@ -77,3 +77,4 @@ screen | worldsearchgo | fff77d6bc2419477 db15945b94271757
 screen | storerepairitem | b75308f798a15bb8 a97a4bafd992e4ed fa8c11efc16b9367
 screen | storerepairworn | 9ed8f15e23b94185 a97a4bafd992e4ed fa8c11efc16b9367
 screen | storesteal | b67cd9557337e427 a97a4bafd992e4ed 78ffaeb5d23baf67
+screen | spellarea | a0986d0efced3d77 a97a4bafd992e4ed 9f6c60fd01131905

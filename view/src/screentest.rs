@@ -245,6 +245,24 @@ fn the_spellbook_with_a_line_picked_as_the_original_draws_it() {
     );
 }
 
+/// C, then its fourth line (Arc Lightning) clicked twice: the spell
+/// cast, "Release spell in your area..." on the message line the next
+/// frame draws.
+#[test]
+fn an_area_spell_cast_as_the_original_draws_it() {
+    screen(
+        "spellarea",
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, 182, MouseButton::Left);
+            d.click(a, 0xF0, 182, MouseButton::Left);
+            assert!(a.engine.m.mem.r16(DS, 0x061E) != 0, "a message to show");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
 /// U, then its fourth line clicked once (Ring of Shielding): the line
 /// marked (a second click would use it).
 #[test]
