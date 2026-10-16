@@ -583,6 +583,52 @@ fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
     (idx, dac)
 }
 
+/// In the street (`area_left`, the guild left from SEED as gen_screens.py's
+/// `place` leaves it for these: the arrival's townspeople placed alike),
+/// the first townsperson (actor slot 0AB3) clicked from their own square:
+/// the player there (the real position, BA62, which each frame starts
+/// from, and the eye's), CLICKED their slot, as `beside` has the
+/// original; then a turn, whose frame's click (1194:DB6C) talks.
+fn talked_to(a: &mut App, d: &mut Driver) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    area_left(a);
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    for (at, v) in [(arena::movement::var::X, x), (arena::movement::var::Y, y), (0xBA62, x), (0xBA66, y)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    // The turn's tick (`Engine::tick`) moves the timer to gen_screens.py's
+    // TALK_TICKS as the talk starts (what is said of oneself is rolled from
+    // it, 1194:E273).
+    d.frame(a);
+    assert!(a.pending.is_some(), "the townsperson's menu");
+}
+
+/// A townsperson clicked: what to ask about.
+#[test]
+fn a_townspersons_talk_as_the_original_draws_it() {
+    screen("talk", talked_to, over);
+}
+
+/// Its entries clicked (boxes 18h high from 41h): who they are, the
+/// places asked after, the rumours.
+#[test]
+fn a_townspersons_name_as_the_original_draws_it() {
+    screen("talkwho", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x4D, MouseButton::Left); }, over);
+}
+
+#[test]
+fn a_townspersons_where_is_as_the_original_draws_it() {
+    screen("talkwhere", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x65, MouseButton::Left); }, over);
+}
+
+#[test]
+fn a_townspersons_rumours_as_the_original_draws_them() {
+    screen("talkrumor", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x7D, MouseButton::Left); }, over);
+}
+
 /// The store's Sell, its first item (equipped) picked: whether to sell
 /// it still (1194:F6BC).
 #[test]

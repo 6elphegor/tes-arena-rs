@@ -35,3 +35,7 @@ screen | tavernroomprice | 420e70b46a151263 a97a4bafd992e4ed 75874994b31de8a7
 screen | tavernroomtaken | 881fe166559e6f12 a97a4bafd992e4ed 646a7e6e89122ae3
 screen | tavernrest | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
 screen | tavernresthours | a49d4fcfe50df249 a97a4bafd992e4ed 62f31076cdb4225
+screen | talk | 2d6cc85b167a275c 2376632b30141d5 94b169f8bd039695
+screen | talkwho | 16c03c774590faac 2376632b30141d5 49abe92dd11fdc61
+screen | talkwhere | b93b56d556d33525 2376632b30141d5 c6a37492dc336725
+screen | talkrumor | f63e3002eb00e58c 2376632b30141d5 23fdda4c6bf5f25

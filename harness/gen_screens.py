@@ -132,9 +132,10 @@ WAIT = (0, 0x8FC4)
 # town's list of their kind (its far pointer, its count), its door entered
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
-PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
+PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
+          'people': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
-         'talk': 'street', 'talkwho': 'street', 'talkwhere': 'street', 'talkrumor': 'street'}
+         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
@@ -146,6 +147,11 @@ def place(a, base, where, cache={}):
     """The snapshot of the game in the building `where` (PLACES)."""
     if where not in cache:
         a.restore(base)
+        if where == 'people':
+            # The street with the guild left from SEED (`seeded`): the
+            # townspeople its arrival places (0000:45B2, 1793) the same
+            # on both sides, whatever the view's frames rolled before.
+            seeded(a)
         assert a.area_ended() == ('world',), 'the guild not left'
         if PLACES[where] is not None:
             at, count = PLACES[where]
@@ -196,6 +202,10 @@ def clocked(clock, ticks):
 # The townsperson talked to: the first actor slot (0AB3), placed by the
 # street's arrival (0000:45B2: fifteen by day).
 PERSON = 0x0AB3
+# The timer (0151) as the talk starts: what they say of themselves is
+# rolled from it (1194:E273). The view's turn into the talk moves it on
+# by its tick (`Engine::tick`) from the street's 0.
+TALK_TICKS = 1
 
 
 def beside(a):
@@ -205,6 +215,7 @@ def beside(a):
     a.w16(0xC3D0, a.r16(PERSON))
     a.w16(0xC3D4, a.r16(PERSON + 4))
     a.w16(0xCB5E, PERSON)
+    a.w16(0x0151, TALK_TICKS)
 
 
 def rented(a):
