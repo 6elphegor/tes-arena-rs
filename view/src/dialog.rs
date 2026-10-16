@@ -97,8 +97,11 @@ pub enum Need {
 /// What a typed field's caller shows around it.
 #[derive(Clone, Debug)]
 pub enum Prompt {
-    /// A box with the prompt, centred (965A: 1194:4800's, 5C30's).
-    Boxed(String),
+    /// A box with the prompt, centred (965A: 1194:4800's, 5C30's), in
+    /// the colour its caller left (9288) and its clip as it asked (A914..
+    /// A91A: the rest's bottom 92h, 1194:4252; the turn has put it back
+    /// by the time the box is drawn).
+    Boxed(String, u8, (i32, i32, i32, i32)),
     /// The dialog's lines (1194:4E88's, at 20h, 91h on, 9 apart, in
     /// TEENYFNT.DAT, colour C0h), the field under them.
     Lines(Vec<Vec<Span>>),

@@ -112,12 +112,14 @@ pub trait RestHooks: ClockHooks {
     }
     /// 1194:C04C: the rented room's file read (ROOM_HOURS, ROOM_END).
     /// The carry: no room.
-    fn room_load(&mut self, _m: &mut Machine) -> bool {
-        true
+    fn room_load(&mut self, m: &mut Machine, files: &mut Files) -> bool {
+        m.room_read(files)
     }
     /// 1194:BA91: the room's file written with ROOM_HOURS and ROOM_END
     /// (deleted once no hours are left).
-    fn room_file(&mut self, _m: &mut Machine) {}
+    fn room_file(&mut self, m: &mut Machine, files: &mut Files) {
+        m.room_write(files)
+    }
     /// The screen redrawn after the rest (1194:55B2, 0000:4EFD, 2294:10EC,
     /// 2542:0446, 0000:9426, 9466) or a wait (0000:6BDE).
     fn screen(&mut self, _m: &mut Machine) {}
@@ -347,7 +349,7 @@ impl Machine {
     /// (C39A bit 200h) it is allowed, and inside (5E6 4) in buildings of
     /// kind 0Bh and 8, a rented room (D48 4, `room_camp`), or when
     /// 191D is set.
-    pub fn camp_check(&mut self, hooks: &mut dyn RestHooks) -> bool {
+    pub fn camp_check(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> bool {
         let refuse = |m: &mut Machine, hooks: &mut dyn RestHooks, si: u16| {
             m.rest_colours();
             m.rest_message(hooks, si);
@@ -370,7 +372,7 @@ impl Machine {
         }
         match self.r_g8(0x0D48) {
             0x0B | 8 => false,
-            4 => self.room_camp(hooks),
+            4 => self.room_camp(files, hooks),
             _ if self.r_g8(0x191D) != 0 => false,
             _ => refuse(self, hooks, text::NOT_HERE),
         }
@@ -378,8 +380,8 @@ impl Machine {
 
     /// 1194:B9E4. A tavern's room: allowed (no carry) while its file is
     /// read and hours are left on it; otherwise "no room" refuses.
-    fn room_camp(&mut self, hooks: &mut dyn RestHooks) -> bool {
-        if !hooks.room_load(self) && self.r_g16(ROOM_HOURS) != 0 {
+    fn room_camp(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> bool {
+        if !hooks.room_load(self, files) && self.r_g16(ROOM_HOURS) != 0 {
             return false;
         }
         self.mem.w8(DS, COLOUR, 0x60);
@@ -389,7 +391,7 @@ impl Machine {
 
     /// 2433:12D6. Camping: the check, then the rest.
     pub fn camp(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> Option<()> {
-        if self.camp_check(hooks) {
+        if self.camp_check(files, hooks) {
             return Some(());
         }
         self.rest_start(files, hooks)
@@ -401,8 +403,18 @@ impl Machine {
     /// healed (HOURS 1, COUNTDOWN 0): "You don't need to rest." when
     /// rested already; otherwise no enemies and no actors, and in a
     /// rented room the hours pass at once (`room_rest`), elsewhere the
-    /// first step is taken.
+    /// first step is taken. Throughout, the clip's bottom (A91A) is 92h,
+    /// the view's (4252), the boxes centred above the bar; it is put back
+    /// on every way out (42B0, 4274).
     pub fn rest_start(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> Option<()> {
+        let bottom = self.mem.r16(DS, 0xA91A);
+        self.mem.w16(DS, 0xA91A, 0x92);
+        let r = self.rest_start_body(files, hooks);
+        self.mem.w16(DS, 0xA91A, bottom);
+        r
+    }
+
+    fn rest_start_body(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> Option<()> {
         let limit = self.rest_fatigue_limit();
         self.mem.w16(DS, FATIGUE_LIMIT, limit);
         self.mem.w16(DS, HOURS, 0);
@@ -645,7 +657,7 @@ impl Machine {
                 break;
             }
         }
-        self.room_save(hooks);
+        self.room_save(files, hooks);
         if self.r_g16(ENEMIES) == 0 && !self.dream_check() {
             hooks.screen(self);
             self.mem.w8(DS, 0xC994, 1);
@@ -699,7 +711,7 @@ impl Machine {
             self.mem.w8(DS, RESTING, 1);
             self.mem.w8(DS, COUNTDOWN, 1);
         }
-        self.room_save(hooks);
+        self.room_save(files, hooks);
         self.r_or8(0x0D39, 0x80);
         hooks.screen(self);
         Some(())
@@ -707,8 +719,8 @@ impl Machine {
 
     /// 1194:BA91 (the file is the hooks'; nothing when no hours are
     /// left but its deletion).
-    fn room_save(&mut self, hooks: &mut dyn RestHooks) {
-        hooks.room_file(self);
+    fn room_save(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) {
+        hooks.room_file(self, files);
     }
 
     /// 1194:BE84. The hours to rest in the room: when counting down

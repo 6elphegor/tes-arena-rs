@@ -1159,7 +1159,10 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         }
     }
     match &hud.typing {
-        Some(crate::dialog::Prompt::Boxed(prompt)) => draw_typing(screen, st, c, prompt),
+        Some(crate::dialog::Prompt::Boxed(prompt, colour, asked)) => {
+            let c = clip(&Hud { clip: *asked, ..Default::default() });
+            draw_typing(screen, st, c, prompt, *colour)
+        }
         Some(crate::dialog::Prompt::Lines(lines)) => draw_dialog_lines(screen, st, lines),
         _ => {}
     }
@@ -1174,14 +1177,14 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
 /// where the caller puts it, drawn over the box (`field::Live::draw`).
 pub fn typed_prompt(screen: &mut Screen, prompt: &str) {
     if let Some(st) = STYLE.get() {
-        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt);
+        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, 0x0F);
     }
 }
 
-/// `typed_prompt` centred in the clip `c`.
-fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str) {
+/// `typed_prompt` centred in the clip `c`, in `colour`.
+fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, colour: u8) {
     let font = &st.box_font;
-    let text = lines(prompt.as_bytes(), 0x0F);
+    let text = lines(prompt.as_bytes(), colour);
     let last = text.len().saturating_sub(1);
     let (w, h, tx, ty) = box_size_margin(st, font, &text, 10);
     let (x, y) = ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2);
@@ -1190,7 +1193,7 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
     for (i, l) in text.iter().enumerate() {
         let lw = font.width(&plain(l)) as i32;
         let lx = if i < last { x + w / 2 - lw / 2 } else { x + tx };
-        screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, 0x0F);
+        screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, colour);
     }
 }
 
@@ -1368,7 +1371,7 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
             screen.spans(font, ex, ly, l);
         }
     }
-    if let Some(crate::dialog::Prompt::Boxed(prompt)) = &hud.typing {
+    if let Some(crate::dialog::Prompt::Boxed(prompt, _, _)) = &hud.typing {
         let w = (font.width(prompt) as i32 + 16).clamp(80, W as i32 - 8);
         let x = (W as i32 - w) / 2;
         let y = H as i32 / 2 - lh;

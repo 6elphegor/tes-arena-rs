@@ -79,6 +79,17 @@ SCREENS = {
     # A day typed (the keys' scan codes: 1, Enter): the room's price.
     'tavernroomprice': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31),
                                                ('keys', [0x02, 0x1C])]),
+    # The price accepted (the haggle's Yes, 1194:6001's first button at
+    # 59h..88h, 7Fh..8Bh) and the deal confirmed (Yes again): the room
+    # taken, the tavern's menu again without its rooms.
+    'tavernroomtaken': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31),
+                                               ('keys', [0x02, 0x1C]), ('click', 0x70, 0x85),
+                                               ('click', 0x70, 0x85)]),
+    # R in the tavern with the room taken (`rented`): the hours to rest
+    # asked (01E6: 1194:424E), its typed field.
+    'tavernrest': (0x01E6, []),
+    # Its Camp for a while (the box at 59h..70h): the hours asked.
+    'tavernresthours': (0x01E6, [('click', 0xA0, 0x64)]),
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
     # strip (1194:4E88, three lines to a page, "...More" between them).
@@ -92,6 +103,14 @@ SCREENS = {
     # 26F7's travel map).
     'streetcamp': (0x01E6, []),
     'worldmap': (0x03BF, []),
+    # A townsperson clicked in the street (`beside`: the first person's
+    # slot, CLICKED CB5E, the player on their square, within talking's two
+    # squares), as the frame runs the click (1194:DB6C): what to ask
+    # about, and each of its entries (boxes 18h high from 41h).
+    'talk': ((0x1194, 0xDB6C, {}), []),
+    'talkwho': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x4D)]),
+    'talkwhere': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x65)]),
+    'talkrumor': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x7D)]),
     # Its Buy (the box at 3Ah..51h): the spells for sale.
     'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
     # Its Detect Magic (52h..69h): the items to look at.
@@ -113,18 +132,26 @@ WAIT = (0, 0x8FC4)
 # town's list of their kind (its far pointer, its count), its door entered
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
-PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
-WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
+PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
+          'people': None}
+WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
+         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
-               'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice')})
+               'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
+               'tavernrest', 'tavernresthours')})
 
 
 def place(a, base, where, cache={}):
     """The snapshot of the game in the building `where` (PLACES)."""
     if where not in cache:
         a.restore(base)
+        if where == 'people':
+            # The street with the guild left from SEED (`seeded`): the
+            # townspeople its arrival places (0000:45B2, 1793) the same
+            # on both sides, whatever the view's frames rolled before.
+            seeded(a)
         assert a.area_ended() == ('world',), 'the guild not left'
         if PLACES[where] is not None:
             at, count = PLACES[where]
@@ -172,9 +199,44 @@ def clocked(clock, ticks):
     return at
 
 
+# The townsperson talked to: the first actor slot (0AB3), placed by the
+# street's arrival (0000:45B2: fifteen by day).
+PERSON = 0x0AB3
+# The timer (0151) as the talk starts: what they say of themselves is
+# rolled from it (1194:E273). The view's turn into the talk moves it on
+# by its tick (`Engine::tick`) from the street's 0.
+TALK_TICKS = 1
+
+
+def beside(a):
+    """The player on the person's square (C3D0, C3D4 their x and y) and
+    the person clicked (CLICKED CB5E their slot), as the hit test leaves
+    it for the frame's click."""
+    a.w16(0xC3D0, a.r16(PERSON))
+    a.w16(0xC3D4, a.r16(PERSON + 4))
+    a.w16(0xCB5E, PERSON)
+    a.w16(0x0151, TALK_TICKS)
+
+
+def rented(a):
+    """A room taken as `tavernroomtaken` takes it, then the menu's Exit
+    (its third box, at 7Bh..92h): the tavern left with the room the
+    player's."""
+    seeded(a)
+    a.waits = {WAIT}
+    a.script = SCREENS['tavernroomtaken'][1] + [('click', 0xA0, 0x87)]
+    a.clicks = []
+    a.mouse = (160, 100)
+    a.buttons = 0
+    assert a.run_screen(0x1194, 0xB93C, regs={}) is None, 'the tavern not left'
+    assert not a.script
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
-          'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded}
+          'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
+          'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
+          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

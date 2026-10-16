@@ -38,6 +38,11 @@ HEAP_LOW, VGA, HEAP_HIGH, HEAP_TOP = 0x5C00, 0xA000, 0xB000, 0xF000
 EMS_FRAME = 0xF000
 
 
+# The mouse asked for (8FC4) by a loop waiting for the buttons to be let go
+# (1194:5E21: its return address), not for input.
+RELEASE_WAITS = {(0x1194, 0x5E26)}
+
+
 class Waiting(Exception):
     """The screen's routine asked for input: what it asked by."""
 
@@ -443,6 +448,11 @@ class ScreenArena(DosArena):
                 # third time: a loop waiting (not a read on the way).
                 ss, sp = mu.reg_read(UC_X86_REG_SS), mu.reg_read(UC_X86_REG_SP)
                 caller = (w, self.r16(sp, seg=ss), self.r16(sp + 2, seg=ss))
+                if (caller[2] - LOAD_SEG, caller[1]) in RELEASE_WAITS:
+                    # A wait for the buttons' release returns at its first
+                    # poll with none down: called again and again, it
+                    # isn't a wait for input.
+                    return
                 polls[caller] = polls.get(caller, 0) + 1
                 if polls[caller] < 3:
                     return

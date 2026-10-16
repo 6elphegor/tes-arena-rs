@@ -195,18 +195,38 @@ struct Front<'a> {
 }
 
 impl Front<'_> {
-    fn message_box(&mut self, m: &arena::machine::Machine, si: u16) {
+    /// A message box with the text at DS:`si`; 965A's drawing (0000:98xx)
+    /// leaves its colour and font codes in the game's state
+    /// (`hud::text_codes`).
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         match self.talk.as_deref_mut() {
             Some(t) => t.message_box(m, si),
             None => println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n")),
         }
+        let text = m.mem.cstr(arena::mem::DS, si).to_vec();
+        hud::text_codes(m, &text);
     }
 
-    fn menu(&mut self, m: &arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
-        match self.talk.as_deref_mut() {
+    /// A menu (1194:020E): 3159:0F2A draws its title (DS:`si`) and its
+    /// entries (the words at DS:`di`, to a 0), leaving their codes in the
+    /// game's state as `message_box` does.
+    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
+        let pick = match self.talk.as_deref_mut() {
             Some(t) => t.menu(m, si, bx, di),
             None => 0xFFFF,
+        };
+        let mut texts = vec![m.mem.cstr(arena::mem::DS, si).to_vec()];
+        for i in 0..32u16 {
+            let p = m.mem.r16(arena::mem::DS, di.wrapping_add(2 * i));
+            if p == 0 {
+                break;
+            }
+            texts.push(m.mem.cstr(arena::mem::DS, p).to_vec());
         }
+        for t in texts {
+            hud::text_codes(m, &t);
+        }
+        pick
     }
 
     fn note(&mut self, s: &str) {
@@ -496,7 +516,7 @@ impl arena::rest::RestHooks for Front<'_> {
         if let Some(t) = self.talk.as_deref_mut() {
             let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).to_string();
             let look = field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
-            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt));
+            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(arena::mem::DS, 0x9288), game_clip(m)));
         }
     }
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {

@@ -85,7 +85,8 @@ pub trait TriggerHooks {
     }
     /// 1194:C048: the tavern's room (looked for on disk: a room rented
     /// still, 1019, 12BC, 12CA).
-    fn tavern_room(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+    fn tavern_room(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.room_read(files);
         Some(())
     }
     /// 0000:41A4..4247: the Imperial palace with the main quest at its
