@@ -253,7 +253,6 @@ fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
 /// The guild's Buy: what kind of item (1194:A73E's next menu) over the
 /// gold left.
 #[test]
-#[ignore = "not yet the original's: the gold line under the menu (1194:545C) isn't drawn"]
 fn the_guilds_buy_as_the_original_draws_it() {
     screen("guildbuy", |a, d| guild_pick(a, d, KeyCode::Digit1, "1"), layer);
 }
