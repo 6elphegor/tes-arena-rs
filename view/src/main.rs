@@ -313,6 +313,13 @@ impl arena::trigger::TriggerHooks for Front<'_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
         Front::message_box(self, m, text);
     }
+    /// 1194:55B2: the colours faded to black in 8 (the window plays it
+    /// as the area changes, `App::area_fade`).
+    fn blackout(&mut self, _m: &mut arena::machine::Machine) {
+        if let Some(t) = self.talk.as_deref_mut() {
+            t.blackout = true;
+        }
+    }
     /// 0000:41A4..4247: the audience, its screens as animations.
     fn palace_audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.emperor_audience(files, &mut Audience(self))
@@ -1362,6 +1369,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         fade: Default::default(),
         fade_ms: 0,
         fade_old: None,
+        ending: false,
+        blackout: false,
     }
 }
 
@@ -2533,6 +2542,12 @@ struct App {
     fade: std::collections::VecDeque<(film::Dac, bool)>,
     fade_ms: u32,
     fade_old: Option<hud::Screen>,
+    /// The game over: its farewell (`game_over`) once the world has faded
+    /// out.
+    ending: bool,
+    /// The screen faded to black by the turn (`Talk::blackout`), for the
+    /// area's change (`area_fade`).
+    blackout: bool,
 }
 
 impl App {
@@ -2611,9 +2626,25 @@ impl App {
     /// The game over (5B1 bit 100h): the farewell's vision, then the main
     /// menu, on a fresh engine (the start dungeon loaded, as a new game
     /// or a load begins from the program's own state).
+    /// The game over (0000:0CE9..0D3E): the world's colours, as last
+    /// shown, faded to black in 8 steps over it (1194:55B2, the window's
+    /// fade tinting the world), then the farewell (`game_over`).
+    fn game_ending(&mut self) {
+        let (queued, from, before) = self.fade_from();
+        self.fade = queued;
+        let mut film = film::Film::new(Vec::new(), from);
+        film.fade(&[[0, 0, 0, 0xFF]; 256], 8);
+        self.fade.extend(film.frames.into_iter().map(|(_, dac)| (dac, true)));
+        self.fade_old = Some(before);
+        self.ending = true;
+    }
+
+    /// The farewell after the fade (`game_ending`): the screen cleared,
+    /// the vision played, then the main menu.
     fn game_over(&mut self) {
         let archive = self.assets.archive.clone();
-        let c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette, None);
+        let mut c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette, None);
+        c.faded();
         self.engine = world::load(&self.dir, "START.MIF");
         self.creation = Some(c);
         self.movie_at = Instant::now();
@@ -2694,6 +2725,8 @@ impl App {
         self.music.before(&mut self.engine.m);
         let ticks = self.engine.frame_ticks() as u32;
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
+        // (A turn stopped at a question runs again: the rerun's.)
+        self.blackout |= talk.blackout && talk.need.is_none();
         // A turn stopped at a question is run again once answered: its
         // sounds and songs are the rerun's.
         if talk.need.is_none() {
@@ -2773,23 +2806,17 @@ impl App {
             match frame {
                 Some(arena::engine::Frame::Running) => {}
                 Some(arena::engine::Frame::Left) => {
-                    // On to the next area, whose assets are made afresh:
-                    // the screen faded out in 12 steps after the world loop
-                    // (0000:0AEA..0AFC), the new area's first frame faded
-                    // in in 12 (A6FA..A702) unless C994 is set.
+                    // On to the next area, whose assets are made afresh,
+                    // its colours faded (`area_fade`).
                     let was = self.fade_from();
-                    if let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) {
-                        self.run = run;
-                        self.assets = Assets::new(&self.dir, &mut self.engine);
-                        self.remake_renderer();
-                        self.last = Some(arena::engine::Frame::Running);
-                        let fade_in = if self.engine.m.mem.r8(arena::mem::DS, 0xC994) != 0 { 0 } else { 12 };
-                        self.fade_to(was, 12, fade_in);
+                    let blackout = std::mem::take(&mut self.blackout);
+                    if self.area_next() {
+                        self.area_fade(was, blackout);
                         return;
                     }
                     self.fade = was.0;
                     if self.engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
-                        self.game_over();
+                        self.game_ending();
                         return;
                     }
                 }
@@ -2831,7 +2858,7 @@ impl App {
             self.screen.set_palette(self.assets.dac());
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
             ui.draw(&mut self.screen, &self.font);
-        } else if let Some(c) = &self.creation {
+        } else if let Some(c) = self.creation.as_ref().filter(|_| !self.level_notice()) {
             c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
         } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
             // Inside the guild's spellmaker: its screen, the question asked
@@ -3402,7 +3429,7 @@ impl App {
         let mut from = *self.screen.palette();
         // The world seen outdoors: its sky's colours in entries 1..8 and the
         // lamps' in 71h, as the game sets them in the DAC (`set_sky`).
-        let world = self.panel.as_ref().is_none_or(|p| p.over_play()) && !self.map && self.travel.is_none() && self.creation.is_none() && self.movies.is_empty();
+        let world = self.panel.as_ref().is_none_or(|p| p.over_play()) && !self.map && self.travel.is_none() && (self.creation.is_none() || self.level_notice()) && self.movies.is_empty();
         // (The frame's view as last drawn: drawing one runs the game's view
         // routines, which a screen opening mustn't.)
         if let Some((sky, _, _)) = self.assets.frame_view.as_ref().filter(|_| world) {
@@ -3416,6 +3443,42 @@ impl App {
             }
         }
         (queued, from, self.screen.clone())
+    }
+
+    /// On to the next area (`areas::next`), its assets made afresh;
+    /// whether there is one.
+    fn area_next(&mut self) -> bool {
+        let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) else { return false };
+        self.run = run;
+        self.assets = Assets::new(&self.dir, &mut self.engine);
+        self.remake_renderer();
+        self.last = Some(arena::engine::Frame::Running);
+        true
+    }
+
+    /// An area's change as the original shows it (checked against
+    /// tests/vectors/areafade.txt): on the way into a building the screen
+    /// faded to black in 8 first (1194:55B2, `blackout`); after the world
+    /// loop the colours faded to black in 12 (0000:0AEA..0AFC, from black
+    /// after a blackout: nothing seen); the next area's colours then set
+    /// in its 9B56's three parts before its first frame. (The world's own
+    /// way back from a screen, 0000:A6B5, fades in in 12 unless C994 is
+    /// set: not an area's change.)
+    fn area_fade(&mut self, was: (std::collections::VecDeque<(film::Dac, bool)>, film::Dac, hud::Screen), blackout: bool) {
+        let (queued, from, before) = was;
+        self.compose();
+        let to = *self.screen.palette();
+        self.fade = queued;
+        let black = [[0, 0, 0, 0xFF]; 256];
+        let mut film = film::Film::new(Vec::new(), from);
+        if blackout {
+            film.fade(&black, 8);
+        }
+        film.fade(&black, 12);
+        let out = film.frames.len();
+        film.colours(&to);
+        self.fade.extend(film.frames.into_iter().enumerate().map(|(i, (_, dac))| (dac, i < out)));
+        self.fade_old = Some(before);
     }
 
     /// The change from `was` (`fade_from`) to the screen now played
@@ -3584,6 +3647,13 @@ impl App {
     /// A box read. The last before a level's attribute screen (its notice)
     /// gives way to it as 2686:02D8 does: the screen faded out in 8
     /// steps, the screen's colours set.
+    /// A level gained: its notice up over play (1194:122C's message box,
+    /// drawn over the world as the original draws it), the attribute
+    /// screen only after it's read (`box_read`).
+    fn level_notice(&self) -> bool {
+        !self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_)))
+    }
+
     fn box_read(&mut self) {
         self.boxes.pop_front();
         if self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))) {
@@ -3923,6 +3993,9 @@ impl App {
             if self.fade.is_empty() {
                 self.fade_ms = 0;
                 self.fade_old = None;
+                if std::mem::take(&mut self.ending) {
+                    self.game_over();
+                }
             }
         }
         if let Some(mv) = self.movies.front_mut() {
