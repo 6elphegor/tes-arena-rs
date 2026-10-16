@@ -296,6 +296,10 @@ pub struct Creation {
     /// The last question's lines and its roll, under the class offered.
     quiz_shown: Option<(Vec<String>, usize)>,
     outcome: Option<Outcome>,
+    /// The screen changes playing (1194:4FF7), the first now.
+    dissolves: VecDeque<Dissolve>,
+    /// Milliseconds into the dissolve's frame.
+    dissolve_ms: u32,
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -350,6 +354,56 @@ fn dfa_first(archive: &Archive, name: &str) -> Option<Image> {
     let le = |at: usize| u16::from_le_bytes([*d.get(at).unwrap_or(&0), *d.get(at + 1).unwrap_or(&0)]) as i16 as i32;
     let f = crate::flats::decode(1, &d)?;
     Some(Image { x: le(2), y: le(4), w: f.w, h: f.h, px: f.frames.into_iter().next()? })
+}
+
+/// The dissolve's generator (1194:5065: x 5E5h + 29h, 16 bits).
+const DISSOLVE_SEED: u16 = 0x4B8E;
+/// 4FF7's pixels (FA00h, whatever the rectangle), a wait where the
+/// count left is a multiple of 400h (after the 201h-th, 601h-th, ...):
+/// 62 frames.
+const DISSOLVE_STEPS: u32 = 0xFA00;
+const DISSOLVE_FRAMES: u32 = 62;
+/// A retrace, in milliseconds (70 Hz).
+const RETRACE_MS: u32 = 14;
+const FULL: (usize, usize, usize, usize) = (0, 0, W, H);
+
+fn dissolve_next(r: u16) -> u16 {
+    r.wrapping_mul(0x5E5).wrapping_add(0x29)
+}
+
+/// A screen change as 1194:4FF7 shows it: FA00h times the generator's
+/// next value, its remainder by the rectangle's size, a pixel there (row,
+/// column) copied from the page to the screen; the screen shown at its
+/// waits. Pixels it never lands on
+/// stay as they were until 9466 shows the page whole.
+struct Dissolve {
+    from: Vec<u16>,
+    to: Vec<u16>,
+    rect: (usize, usize, usize, usize),
+    seed: u16,
+    frame: u32,
+}
+
+impl Dissolve {
+    /// The screen at wait `k` (0..62).
+    fn at(&self, k: u32) -> Vec<u16> {
+        let (x0, y0, w, h) = self.rect;
+        let size = (w * h) as u32;
+        let mut out = self.from.clone();
+        let mut r = self.seed;
+        for _ in 0..(0x201 + 0x400 * k).min(DISSOLVE_STEPS) {
+            r = dissolve_next(r);
+            if size == 0 {
+                continue;
+            }
+            let off = (r as u32 % size) as usize;
+            let i = (y0 + off / w) * W + x0 + off % w;
+            if let (Some(o), Some(&t)) = (out.get_mut(i), self.to.get(i)) {
+                *o = t;
+            }
+        }
+        out
+    }
 }
 
 /// The bank 2DAF loads the faces into (5C86 with BX 17h).
@@ -438,7 +492,7 @@ impl Creation {
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -500,7 +554,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 }
     }
 
     /// Back on the main menu (a load that failed).
@@ -530,6 +584,21 @@ impl Creation {
     /// Time passing (milliseconds) for the movie playing: its frames; at
     /// its end (no text: once through) the next screen.
     pub fn advance(&mut self, ms: u32) {
+        // A dissolve's frames, one a retrace (70 a second).
+        self.dissolve_ms += ms;
+        while let Some(d) = self.dissolves.front_mut() {
+            if self.dissolve_ms < RETRACE_MS {
+                break;
+            }
+            self.dissolve_ms -= RETRACE_MS;
+            d.frame += 1;
+            if d.frame >= DISSOLVE_FRAMES {
+                self.dissolves.pop_front();
+            }
+        }
+        if self.dissolves.is_empty() {
+            self.dissolve_ms = 0;
+        }
         if let Some(mv) = &mut self.movie {
             mv.advance(ms);
         }
@@ -628,11 +697,90 @@ impl Creation {
         self.boxes.push_back(Boxed { lines, font, back });
     }
 
-    /// A key or click.
+    /// A key or click, and the screen's change dissolved in as the
+    /// original shows it (1194:4FF7):
+    /// - the next question on the scroll's rows (222C:02A5..02B0: 0, 77h,
+    ///   140h x 50h);
+    /// - a box shown (59CC at 5A1A, 5C34 at 5C9F: the whole screen);
+    /// - a box taken away, the page as it was under it (5A41, 5CBD), then
+    ///   the next box if there is one.
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
         if let Input::Wait(ms) = inp {
             return self.advance(ms);
         }
+        self.dissolves.clear();
+        self.dissolve_ms = 0;
+        let quiz = matches!(self.stage, Stage::Quiz { .. });
+        let was = std::mem::discriminant(&self.stage);
+        let (asked, named) = (self.asking(), matches!(self.stage, Stage::Name(..)));
+        let had = self.boxes.len();
+        let before = self.page(&engine.m);
+        self.input_inner(engine, inp);
+        if self.movie.is_some() {
+            return;
+        }
+        let after = self.page(&engine.m);
+        let now = self.boxes.len();
+        let moved = std::mem::discriminant(&self.stage) != was;
+        if quiz && had == 0 && matches!(self.stage, Stage::Quiz { .. }) {
+            self.dissolve(&mut engine.m, before, after, (0, 0x77, 0x140, 0x50));
+        } else if had == 0 && now == 0 && named && moved {
+            // The prompt's box taken away (5CBD).
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had == 0 && now == 0 && (moved || !asked && !named) && (self.asking() || matches!(self.stage, Stage::Name(..))) {
+            // A menu shown (020E's at 0269) or the prompt's box (5C9F).
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had == 0 && now > 0 {
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had > 0 && (now < had || now > 0 && before != after) {
+            let shown = std::mem::take(&mut self.boxes);
+            let under = self.page(&engine.m);
+            self.boxes = shown;
+            let boxed = now > 0;
+            self.dissolve(&mut engine.m, before, under.clone(), FULL);
+            if boxed {
+                self.dissolve(&mut engine.m, under, after, FULL);
+            }
+        }
+    }
+
+    /// Whether a menu (1194:020E) is up.
+    fn asking(&self) -> bool {
+        self.boxes.is_empty() && matches!(self.stage, Stage::Method(_) | Stage::List(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_) | Stage::ClassYes(..))
+    }
+
+    /// The screen as `draw_page` draws it, its indices.
+    fn page(&self, m: &Machine) -> Vec<u16> {
+        let mut s = Screen::new(self.pics.game);
+        self.draw_page(&mut s, m);
+        s.indices().to_vec()
+    }
+
+    /// A change from `from` to `to` in `rect` queued, the dissolve's
+    /// generator (DGROUP 4B8E) taken on past it as 4FF7 takes it.
+    fn dissolve(&mut self, m: &mut Machine, from: Vec<u16>, to: Vec<u16>, rect: (usize, usize, usize, usize)) {
+        let seed = m.mem.r16(DS, DISSOLVE_SEED);
+        let mut r = seed;
+        for _ in 0..DISSOLVE_STEPS {
+            r = dissolve_next(r);
+        }
+        m.mem.w16(DS, DISSOLVE_SEED, r);
+        self.dissolves.push_back(Dissolve { from, to, rect, seed, frame: 0 });
+    }
+
+    /// The dissolves playing passed: the screen as it settles.
+    pub fn settle(&mut self) {
+        self.dissolves.clear();
+        self.dissolve_ms = 0;
+    }
+
+    /// Every frame the dissolves queued will show, in turn (each the
+    /// screen at one of 4FF7's waits).
+    pub fn dissolve_frames(&self) -> Vec<Vec<u16>> {
+        self.dissolves.iter().flat_map(|d| (0..DISSOLVE_FRAMES).map(move |k| d.at(k))).collect()
+    }
+
+    fn input_inner(&mut self, engine: &mut Engine, inp: Input) {
         if !self.boxes.is_empty() {
             if matches!(inp, Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..)) {
                 self.boxes.pop_front();
@@ -1274,6 +1422,17 @@ impl Creation {
 
     /// The layer drawn: the screen behind, the stage, a box waiting.
     pub fn draw(&self, screen: &mut Screen, m: &Machine) {
+        self.draw_page(screen, m);
+        if let Some(d) = self.dissolves.front() {
+            let f = d.at(d.frame);
+            screen.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+            let px: Vec<u8> = f.iter().map(|&i| i as u8).collect();
+            screen.blit(0, 0, W, H, &px, H as i32);
+        }
+    }
+
+    /// The screen as it settles (the page 9466 shows).
+    pub fn draw_page(&self, screen: &mut Screen, m: &Machine) {
         let back = match (&self.boxes.front(), &self.stage) {
             (Some(b), _) => b.back,
             (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,

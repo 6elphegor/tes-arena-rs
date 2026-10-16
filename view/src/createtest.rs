@@ -24,6 +24,8 @@ use super::*;
 const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/createshot.txt");
 /// The seed the generator starts creation from (DGROUP 91F6).
 const SEED: u32 = 0x1234_5678;
+/// The dissolve's generator (DGROUP 4B8E) at creation's start there.
+const DISSOLVE_SEED: u16 = 0x1235;
 
 fn fnv(b: impl IntoIterator<Item = u8>) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64;
@@ -82,10 +84,13 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
     }
     engine.m.mem.w32(arena::mem::DS, arena::random::SEED, SEED);
     engine.m.load_rng();
+    // The dissolve's generator as the generator's start leaves it.
+    engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
     // Start, the opening story passed.
     for inp in create::parse_script("S,esc") {
         c.input(&mut engine, inp);
     }
+    c.settle();
     (engine, c)
 }
 
@@ -129,8 +134,121 @@ fn creation_draws_as_the_original() {
             }
             if let Some(&inp) = inputs.get(at) {
                 c.input(&mut engine, inp);
+                c.settle();
             }
         }
     }
     assert!(wrong.is_empty(), "{} of {checked} screens differ from the original's: {}", wrong.len(), wrong.join(", "));
+}
+
+const FRAMES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/createframes.txt");
+
+/// What the original shows between two screens answered (gen_createshot's
+/// FRAMES): by script and step, the count of states and their digest.
+fn frames() -> std::collections::HashMap<String, (usize, u64)> {
+    let text = std::fs::read_to_string(FRAMES).expect("tests/vectors/createframes.txt");
+    text.lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split(" | ").collect();
+            (f.len() == 5 && f[0] == "createframes").then(|| (format!("{}-{}", f[1], f[2]), (f[3].parse().expect("a count"), u64::from_str_radix(f[4], 16).expect("a digest"))))
+        })
+        .collect()
+}
+
+/// Transitions known not to play as the original's yet: (script-step,
+/// why). Step 0 is the start's own (before the first question).
+const KNOWN_FRAMES: &[(&str, &str)] = &[
+    ("generate-0", "the start"),
+    ("select-0", "the start"),
+    // A menu's pick marked on the screen before it dissolves (the
+    // original's first state is the screen with the pick), and the
+    // instructions' box after the method's menu.
+    ("generate-1", "a menu's pick marked first; two dissolves"),
+    ("generate-2", "a menu's pick marked first; two dissolves"),
+    ("select-1", "a menu's pick marked first"),
+    ("select-2", "the list's pick marked first"),
+    // Each answer's figure (WARRIOR/ROGUE/MAGE.CEL) plays frame by frame
+    // before the scroll's rows dissolve.
+    ("generate-3", "the answer's figure playing"),
+    ("generate-4", "the answer's figure playing"),
+    ("generate-5", "the answer's figure playing"),
+    ("generate-6", "the answer's figure playing"),
+    ("generate-7", "the answer's figure playing"),
+    ("generate-8", "the answer's figure playing"),
+    ("generate-9", "the answer's figure playing"),
+    ("generate-10", "the answer's figure playing"),
+    ("generate-11", "the answer's figure playing"),
+    ("generate-12", "the last figure; the class's offer shown without a dissolve"),
+    ("generate-13", "after the offer: the generator's value behind"),
+    ("generate-14", "after the offer: the generator's value behind"),
+    // The prompt taken away and the gender's menu; the map's colours
+    // faded in (9B52's waits) between dissolves.
+    ("select-6", "the prompt's dissolve out, the menu after"),
+    ("select-7", "the map's colours faded in, two dissolves"),
+    ("select-9", "the province's question"),
+    ("select-10", "the generator's value behind since the map"),
+    ("select-11", "the generator's value behind since the map"),
+    ("select-12", "the generator's value behind since the map"),
+    ("select-13", "the generator's value behind since the map"),
+    ("select-14", "the attributes' colours faded in"),
+    ("select-32", "the save's menu"),
+    ("select-33", "the faces' note: two dissolves"),
+];
+
+/// The screens between: each input's dissolves frame by frame, as the
+/// generator samples the original's (each state different from the one
+/// before, the first not the screen answered, the last not the next).
+#[test]
+fn creation_animates_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let want = frames();
+    let palette = world::palette(&dir);
+    let mut wrong = Vec::new();
+    let mut checked = 0;
+    for s in scripts() {
+        let (mut engine, mut c) = at_first_question(&dir);
+        let inputs = create::parse_script(&s.inputs);
+        let mut before: Option<(Vec<u16>, Vec<u8>)> = None;
+        let mut states: Vec<(Vec<u16>, Vec<u8>)> = Vec::new();
+        for (step, _, _) in &s.shots {
+            let at = if step.as_str() == "end" { inputs.len() } else { step.parse().expect("a step") };
+            let now = drawn(&c, &engine.m, palette);
+            let name = format!("{}-{step}", s.name);
+            if let (Some(&(n, digest)), Some(b)) = (want.get(&name), &before) {
+                let mut seen: Vec<&(Vec<u16>, Vec<u8>)> = Vec::new();
+                for st in &states {
+                    if seen.last().is_none_or(|l| *l != st) {
+                        seen.push(st);
+                    }
+                }
+                if seen.first().is_some_and(|f| *f == b) {
+                    seen.remove(0);
+                }
+                if seen.last().is_some_and(|l| **l == now) {
+                    seen.pop();
+                }
+                let got = fnv(seen.iter().flat_map(|(idx, dac)| {
+                    let a = fnv(idx.iter().map(|&i| i as u8)).to_le_bytes();
+                    let b = fnv(dac.iter().copied()).to_le_bytes();
+                    a.into_iter().chain(b)
+                }));
+                if let Ok(d) = std::env::var("ARENA_CREATESHOTS") {
+                    let raw: Vec<u8> = seen.iter().flat_map(|(idx, dac)| idx.iter().map(|&i| i as u8).chain(dac.iter().copied()).collect::<Vec<u8>>()).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("{name}.vframes")), raw).ok();
+                }
+                checked += 1;
+                if (seen.len(), got) != (n, digest) && !KNOWN_FRAMES.iter().any(|k| k.0 == name) {
+                    wrong.push(format!("{name} ({} states, want {n})", seen.len()));
+                }
+            }
+            before = Some(now.clone());
+            if let Some(&inp) = inputs.get(at) {
+                c.input(&mut engine, inp);
+                let dac = drawn(&c, &engine.m, palette).1;
+                states = c.dissolve_frames().into_iter().map(|f| (f, dac.clone())).collect();
+                c.settle();
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{} of {checked} transitions differ from the original's: {}", wrong.len(), wrong.join(", "));
 }
