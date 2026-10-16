@@ -51,9 +51,11 @@ def usage(src):
     if not m:
         return ['ACD_unpacked.EXE', 'OUT']
     # A parenthesised note after the arguments (`(SHARD=k/K: par.py)`)
-    # isn't one of them.
+    # isn't one of them, nor the optional ones (`[--dump DIR]`).
     line = m.group(1).split('(')[0]
-    return [t for t in line.split() if not t.startswith('[')]
+    while re.search(r'\[[^][]*\]', line):
+        line = re.sub(r'\[[^][]*\]', '', line)
+    return line.split()
 
 
 def plan(name, env):
