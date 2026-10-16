@@ -100,8 +100,8 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     }
     /// 0000:4D00 (1194:9F8A, quests): its carry, which holds back the
     /// quest message of 5CA bit 200h.
-    fn quest_carry(&mut self, _m: &mut Machine) -> bool {
-        false
+    fn quest_carry(&mut self, m: &mut Machine) -> bool {
+        m.quest_carry()
     }
     /// 0000:4B02..4B2B: the town's welcome (ENTERCTY.$$$ loaded to
     /// 1044), its box, and the wait for a key (1194:5532). The box saves

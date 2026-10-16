@@ -68,7 +68,8 @@
 //! bar, the bar with the portrait, the condition, the name and the three
 //! bars, the compass (F8 hides it), the weapon in hand and the casting
 //! hands. Q readies or puts away the weapon (the original's A); holding
-//! the right button (captured) and dragging swings it. --do gains
+//! the right button (captured) and dragging swings it; let go without a
+//! drag, it looks (`look_centre`, 2826:0C15). --do gains
 //! `ready`, `compass`, `swing:DX:DY` (the right button down with a drag
 //! of DX, DY mickeys for a turn: a swing starts only from a drag of 40h
 //! (64) or more, 0000:3C9F, so `swing:0:60` does nothing) and `cast:N`
@@ -228,13 +229,6 @@ impl Front<'_> {
             hud::text_codes(m, &t);
         }
         pick
-    }
-
-    fn note(&mut self, s: &str) {
-        match self.talk.as_deref_mut() {
-            Some(t) => t.note(s),
-            None => println!("{s}"),
-        }
     }
 
     /// An animation played (with a text's number, as a vision).
@@ -464,9 +458,12 @@ impl arena::talk::TalkHooks for Front<'_> {
             None => 0xFFFF,
         }
     }
-    fn way(&mut self, m: &mut arena::machine::Machine, si: u16, x: u16, y: u16) {
-        let s = format!("The way to {} ({x}, {y})", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)));
-        self.note(&s);
+    /// 23F1:00A3: the place's name noted on the automap at its square,
+    /// as the original notes the way told (and a place looked at).
+    fn way(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16, x: u16, y: u16) {
+        if m.note_add(files, x, y, si).is_none() {
+            eprintln!("the note gave up: {}", arena::giveup::describe());
+        }
     }
     /// The loot window (2433:0583) with its boxes and lists answered
     /// through `dialog`.
@@ -1349,6 +1346,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         click: false,
         clicked: false,
         click_point: None,
+        look_click: false,
+        right_drag: 0.0,
         camp: false,
         key: false,
         message: None,
@@ -2282,6 +2281,24 @@ fn centre_click(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>) -> bo
     click_at(engine, boxes, (164, 74))
 }
 
+/// A right click in the centre of the view (2826:0C15, `Machine::look`):
+/// the square the drawing would leave under it (as for a left click,
+/// within the drawn distance C394) named on the message line, and in a
+/// town noted on the automap.
+fn look_centre(engine: &mut Engine) {
+    use arena::mem::DS;
+    let Some(sq) = world::pick(&engine.m, engine.m.mem.r16(DS, 0xC394)) else { return };
+    engine.m.mem.w16(DS, arena::controls::var::PICKED, sq);
+    if (sq as i16) <= 0 {
+        return;
+    }
+    let mut talk = dialog::Talk::default();
+    let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
+    if engine.m.look(&mut engine.files, &mut hooks, sq & 0xFF00 | (sq as u8 >> 1) as u16).is_none() {
+        eprintln!("looking gave up: {}", arena::giveup::describe());
+    }
+}
+
 /// A left click at (x, y) of the 320 x 200 screen in the view: the mouse
 /// put 4 up and left of it, as the click (CB60, 2826:0A52) is the cursor
 /// + 4; else as `centre_click`.
@@ -2492,6 +2509,11 @@ struct App {
     /// Where the waiting click is on the 320 x 200 screen (None: the
     /// centre, as with the mouse captured).
     click_point: Option<(i32, i32)>,
+    /// A right click in the view (the button let go with less of a drag
+    /// than a swing needs, 0000:3C9F's 40h): looking at the square under
+    /// the centre (2826:0C15) after the next frame; the drag so far.
+    look_click: bool,
+    right_drag: f64,
     /// Camping asked for (R), and a key pressed (it ends a rest).
     camp: bool,
     key: bool,
@@ -2729,6 +2751,9 @@ impl App {
                 None => centre_click(&mut self.engine, &mut boxes),
             };
             self.boxes.extend(boxes);
+        }
+        if !self.waiting() && std::mem::take(&mut self.look_click) {
+            look_centre(&mut self.engine);
         }
     }
 
@@ -3884,6 +3909,7 @@ impl App {
                         // A mickey a pixel.
                         self.drag.0 += dx;
                         self.drag.1 += dy;
+                        self.right_drag += dx.abs() + dy.abs();
                     } else {
                         // About a quarter turn for 400 pixels.
                         self.look += dx * 128.0 / 400.0;
@@ -4026,7 +4052,16 @@ impl App {
                 }
             }
             // The right button held: dragging swings the weapon (0000:3C9F).
-            In::Button { down, button: MouseButton::Right } if self.captured => self.keys.swing = down,
+            // Let go with no more than a swing's least drag, a right click:
+            // looking (2826:0C15).
+            In::Button { down, button: MouseButton::Right } if self.captured => {
+                if down {
+                    self.right_drag = 0.0;
+                } else if self.keys.swing && self.right_drag < 64.0 {
+                    self.look_click = true;
+                }
+                self.keys.swing = down;
+            }
             // Uncaptured, a left click in the view clicks where it is (a
             // corpse on the floor); another button captures the mouse.
             In::Button { down: true, button: MouseButton::Left } if !self.captured && self.screen_point().1 < 147 => {

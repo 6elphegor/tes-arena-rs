@@ -115,9 +115,9 @@ pub trait TalkHooks: TextHooks {
     fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
         0xFFFF
     }
-    /// 23F1:00A3: the way to square (`x`, `y`) told, the place's name at
-    /// `si`.
-    fn way(&mut self, _m: &mut Machine, _si: u16, _x: u16, _y: u16) {}
+    /// 23F1:00A3: the way to square (`x`, `y`) told: the place's name at
+    /// `si` noted there on the automap (`Machine::note_add`).
+    fn way(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16, _x: u16, _y: u16) {}
     /// 1194:7B16: the loot window: AH 0 a creature's loot (AL its type),
     /// 1 a person's (AL its level), 3 an item (AL its number), 0Fh the
     /// level's item flat AL; the record at `seg`:`si`, the square `bx`
@@ -1083,7 +1083,7 @@ impl Machine {
             self.mem.w8(DS, list.wrapping_add(i), c);
         }
         let si = self.skip_strings(DS, self.g16(LIST), cx);
-        hooks.way(self, si, self.g16(WAY), self.g16(WAY + 2));
+        hooks.way(self, files, si, self.g16(WAY), self.g16(WAY + 2));
         Some(())
     }
 
