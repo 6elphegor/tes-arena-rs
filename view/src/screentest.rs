@@ -506,6 +506,26 @@ fn the_taverns_days_asked_as_the_original_draws_them() {
     );
 }
 
+/// The tavern's Get a Room, the Single, a day typed (1, Enter): the
+/// room's price haggled over (1194:C14E), the seed as gen_screens.py's.
+fn room_priced(a: &mut App, d: &mut Driver) {
+    into(a, 0x1AB5);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 4);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x5B, MouseButton::Left);
+    d.click(a, 0x80, 0x31, MouseButton::Left);
+    d.key(a, KeyCode::Digit1, Some("1"));
+    d.key(a, KeyCode::Enter, None);
+}
+
+/// The room's price: its line (by the seed) over the haggle's buttons.
+#[test]
+fn the_taverns_room_price_as_the_original_draws_it() {
+    screen("tavernroomprice", room_priced, layer);
+}
+
 /// The store's Sell, its first item (equipped) picked: whether to sell
 /// it still (1194:F6BC).
 #[test]

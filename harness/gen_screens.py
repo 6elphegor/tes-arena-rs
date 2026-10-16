@@ -33,7 +33,8 @@ from screens import ScreenArena, PAGE_SEG_FIELD
 # The menu keys' handlers in play (2542:0100's), run as a key runs them
 # (near calls), each until it waits for input: the mouse asked for a
 # third time from one place (0000:8FC4, which every input loop calls, or
-# the screen's own wait). A script's clicks answer the waits before the
+# the screen's own wait). A script's clicks and keys (scan codes given to
+# the key interrupt, `ScreenArena.press`) answer the waits before the
 # last.
 MENU = 0x2542
 SCREENS = {
@@ -75,6 +76,9 @@ SCREENS = {
     # A line of those lists clicked: the days asked for the room (its
     # typed field), the haggle over the item sold.
     'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
+    # A day typed (the keys' scan codes: 1, Enter): the room's price.
+    'tavernroomprice': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31),
+                                               ('keys', [0x02, 0x1C])]),
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
     # strip (1194:4E88, three lines to a page, "...More" between them).
@@ -114,7 +118,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
-               'tavernrumorgeneral', 'tavernrumorheard')})
+               'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice')})
 
 
 def place(a, base, where, cache={}):
@@ -170,7 +174,7 @@ def clocked(clock, ticks):
 
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
-          'tavernrumorheard': clocked(*RUMOURS[1])}
+          'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
@@ -182,6 +186,10 @@ def draw(a, base, name, handler, script, fill, waits=None):
     a.waits = waits or {WAIT}
     a.script = list(script)
     a.clicks = []
+    # The mouse where the start left it (not in a snapshot: an earlier
+    # screen's clicks moved it, and the automap draws its pen there).
+    a.mouse = (160, 100)
+    a.buttons = 0
     if isinstance(handler, tuple):
         seg, off, regs = handler
         a.run_screen(seg, off, regs=regs)

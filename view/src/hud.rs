@@ -142,11 +142,31 @@ pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
     Some((x, y, step, &lines[1..]))
 }
 
-/// Draws a box made by `placed`: each line's text with no shadow.
+/// 1194:4E88's "...More" (DGROUP 4B1B) under a page of the dialog's lines
+/// with more to come: at 11Dh, A9h in colour 4Bh, in the lines' font
+/// (TEENYFNT, [102E]), drawn by 9E06 as they are. A line of a `placed`
+/// box with a place of its own (its first span a marker as `placed`'s,
+/// "x,y").
+pub fn more_line() -> Vec<Span> {
+    vec![
+        Span { colour: 0x4B, text: format!("{},{}", 0x11D, 0xA9), font: GameFont::Teeny, code: Some(0) },
+        Span { colour: 0x4B, text: "...More".into(), font: GameFont::Teeny, code: None },
+    ]
+}
+
+/// Draws a box made by `placed`: each line's text with no shadow (a line
+/// with a place of its own, `more_line`, there).
 fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, i32, &[Vec<Span>])) {
     for (i, l) in lines.iter().enumerate() {
-        if let Some(t) = l.first() {
-            screen.text_plain(st.font(t.font), x, y + step * i as i32, &t.text, t.colour);
+        match l.as_slice() {
+            [m, t, ..] if m.code == Some(0) => {
+                let mut f = m.text.split(',').filter_map(|v| v.parse::<i32>().ok());
+                if let (Some(px), Some(py)) = (f.next(), f.next()) {
+                    screen.text_plain(st.font(t.font), px, py, &t.text, t.colour);
+                }
+            }
+            [t, ..] => screen.text_plain(st.font(t.font), x, y + step * i as i32, &t.text, t.colour),
+            [] => {}
         }
     }
 }
@@ -1497,6 +1517,33 @@ mod tests {
         assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into(), font: Default::default(), code: Some(0xC0) }, Span { colour: 0xC0, text: String::new(), font: Default::default(), code: None }]);
         assert_eq!(plain(&l[1]), "Camp");
         assert_eq!(l[1][1].colour, 0xD4);
+    }
+
+    /// Only a CR's line is centred (0000:98E0): a LF's has no marker.
+    #[test]
+    fn a_lf_line_is_not_centred() {
+        let l = lines(b"one\ntwo\rthree", 0x0F);
+        assert_eq!(l.len(), 3);
+        assert!(l[0].last().is_some_and(|s| !s.text.is_empty()), "a LF's line ends with its text");
+        assert!(l[1].last().is_some_and(|s| s.text.is_empty() && s.code.is_none()), "a CR's line ends with the marker");
+    }
+
+    /// 1194:4E88's pages: three lines each, "...More" under each with
+    /// lines left (4EA0), none under the last.
+    #[test]
+    fn a_dialogs_pages_end_with_more_but_the_last() {
+        let lines: Vec<Vec<u8>> = (0..7).map(|i| format!("line {i}").into_bytes()).collect();
+        let mut t = crate::dialog::Talk::default();
+        t.dialog_lines(&lines);
+        assert_eq!(t.boxes.len(), 3);
+        for (i, b) in t.boxes.iter().enumerate() {
+            let more = b.last() == Some(&more_line());
+            assert_eq!(more, i < 2, "page {i}");
+        }
+        let mut t = crate::dialog::Talk::default();
+        t.dialog_lines(&lines[..3]);
+        assert_eq!(t.boxes.len(), 1);
+        assert_ne!(t.boxes[0].last(), Some(&more_line()));
     }
 
     /// 98A0 keeps a code's colour byte in the line 66F6 measures: '`'
