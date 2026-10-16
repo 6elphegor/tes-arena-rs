@@ -412,6 +412,9 @@ impl Machine {
             return Some(());
         }
         if (0..8).any(|k| self.g8(SAYING_FLATS + k) == bl) {
+            // DD01: ARENAFNT and the tiles at 1036.
+            self.select_font(0x102C);
+            self.select_tiles(0x1036);
             self.mem.w8(DS, TEXT_COLOUR, 0xD4);
             self.mem.w16(DS, TEXT, 0x596);
             self.mem.w8(DS, TEXT_FLAG2, 1);
