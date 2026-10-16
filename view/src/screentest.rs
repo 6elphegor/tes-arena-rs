@@ -490,15 +490,23 @@ fn the_stores_equipped_sale_as_the_original_draws_it() {
     );
 }
 
+/// gen_screens.py's SEED: the game's random numbers started there as the
+/// shop's routine starts, where what is drawn depends on them.
+const SEED: u32 = 0x2F6E_1A35;
+
 /// Its Yes: the haggle over the item (1194:09FC, 8020 in mode 4), its
-/// buttons (NEGOTBUT.IMG) over the dialog's lines.
+/// line (one of three, by the seed) in the strip, NEGOTBUT.IMG's buttons.
 #[test]
-#[ignore = "the haggle's screen (its lines in the strip, NEGOTBUT.IMG's buttons) not yet the original's"]
 fn the_stores_haggle_as_the_original_draws_it() {
     screen(
         "storesellhaggle",
         |a, d| {
-            shop_pick(a, d, 0x1008, 6, 0x5B);
+            into(a, 0x1008);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x5B, MouseButton::Left);
             d.click(a, 0x80, 0x25, MouseButton::Left);
             d.click(a, 0xA0, 0x69, MouseButton::Left);
         },
