@@ -44,10 +44,12 @@
 //! 3159:0F2A's boxes, the keys' letters in the entries' own colours) and
 //! the list are drawn as the original draws them, in PARCH.CIF's 20 x 20
 //! tiles until the attributes and MARBLE2.CIF's after; the screens are
-//! checked against the original's (`createtest`). Left out: the map's
-//! scroll unrolling (TOP.DFA, 1194:5B58: it ends off the screen), the
-//! questions' scroll rolling by the pixel (here by the line), the glow of
-//! the class's figure at the last answer, the fades.
+//! checked against the original's (`createtest`). Each answer plays its
+//! kind's figure (WARRIOR.CEL, ROGUE.CEL, MAGE.CEL, 222C:011A); the next
+//! question's screen covers it, and the class offered after the last is
+//! drawn over what it left. Left out: the map's scroll unrolling (TOP.DFA,
+//! 1194:5B58: it ends off the screen), the questions' scroll rolling by
+//! the pixel (here by the line), the fades.
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -247,6 +249,9 @@ struct Pics {
     shirt_now: Option<Image>,
     /// The shirt's file (1194:2486 loads it again for each face).
     shirt_file: Vec<u8>,
+    /// The last answer's kind's figure as its animation (222C:011A..012B)
+    /// left it: the last frame, where the file centres it.
+    cel: Option<Image>,
 }
 
 struct Fonts {
@@ -429,6 +434,7 @@ impl Creation {
             face_now: None,
             shirt_now: None,
             shirt_file: Vec::new(),
+            cel: None,
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
@@ -492,6 +498,7 @@ impl Creation {
             face_now: None,
             shirt_now: None,
             shirt_file: Vec::new(),
+            cel: None,
         };
         Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None }
     }
@@ -709,7 +716,14 @@ impl Creation {
             },
             Stage::Quiz { asked, lines, mut top } => match inp {
                 Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()) => {
-                    engine.m.quiz_answer(c.to_ascii_uppercase() - b'A');
+                    let a = c.to_ascii_uppercase() - b'A';
+                    engine.m.quiz_answer(a);
+                    // 222C:010B..012B: the answer's kind counted, its
+                    // figure played (2294:0895). The next question's
+                    // screen covers it; the class offered after the last
+                    // is drawn over it.
+                    let kind = engine.m.mem.r8(DS, arena::newgame::var::KINDS + a.min(2) as u16);
+                    self.pics.cel = self.class_cel(&engine.m, kind);
                     if asked + 1 < 10 {
                         self.next_question(engine, asked + 1)
                     } else {
@@ -852,6 +866,36 @@ impl Creation {
         let text = engine.m.mem.cstr(seg, di).to_vec();
         let lines = text.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
         Stage::Quiz { asked, lines, top: 0 }
+    }
+
+    /// The figure of answers of `kind` (222C:011A: the name at
+    /// [4142 + 2 kind]: WARRIOR.CEL, ROGUE.CEL, MAGE.CEL) as 0000:6546
+    /// leaves it: every frame played, the last kept; placed by the file's
+    /// CEL_DATA (0000:6102..612D: an F100 chunk first whose first part is
+    /// of type 3: its centre less half the size).
+    fn class_cel(&self, m: &Machine, kind: u8) -> Option<Image> {
+        let at = m.mem.r16(DS, 0x4142 + 2 * kind as u16);
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, at)).to_ascii_uppercase();
+        let d = self.archive.read(&name)?;
+        let le = |i: usize| u16::from_le_bytes([*d.get(i).unwrap_or(&0), *d.get(i + 1).unwrap_or(&0)]);
+        let mut f = crate::flc::Flc::open(&self.archive, &name)?;
+        // Each frame drawn over the page with its 0s see-through (A902
+        // bit 400h): what a frame drew stays where later ones have 0.
+        let mut px = f.px.clone();
+        while (f.shown as usize) < le(6) as usize {
+            f.step();
+            for (p, &v) in px.iter_mut().zip(&f.px) {
+                if v != 0 {
+                    *p = v;
+                }
+            }
+        }
+        let (mut x, mut y) = (0i32, 0i32);
+        if le(132) == 0xF100 && le(138) == 3 {
+            x = le(142).wrapping_sub((f.w >> 1) as u16) as i16 as i32;
+            y = le(144).wrapping_sub((f.h >> 1) as u16) as i16 as i32;
+        }
+        Some(Image { x, y, w: f.w, h: f.h, px })
     }
 
     /// The ten answered: the class they give, offered (1194:261F..264E;
@@ -1264,6 +1308,9 @@ impl Creation {
                 // Over the questions as the last answer left them.
                 if let Some((lines, top)) = &self.quiz_shown {
                     self.draw_quiz(screen, m, lines, *top);
+                }
+                if let Some(i) = &self.pics.cel {
+                    screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
                 self.draw_ask(screen, a, back);
             }

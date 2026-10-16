@@ -92,9 +92,6 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
 /// Screens known not to be exact yet: (script-step, the most pixels that
 /// may differ, why). Their colours must still be the original's.
 const KNOWN: &[(&str, usize, &str)] = &[
-    // The class offered over the questions: the figures' glow the last
-    // answer starts (222C:012B, 2294:0895) isn't drawn.
-    ("generate-12", 712, "the figures' glow"),
 ];
 
 #[test]
