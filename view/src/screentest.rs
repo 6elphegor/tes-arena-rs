@@ -1239,7 +1239,7 @@ fn the_maps_search_list_as_the_original_draws_it() {
     );
 }
 
-/// Its second line (Daggerfall) clicked: the journey there.
+/// Its second line (Daggerfall) clicked: marked.
 #[test]
 fn a_searched_place_picked_as_the_original_draws_it() {
     screen(
@@ -1247,6 +1247,21 @@ fn a_searched_place_picked_as_the_original_draws_it() {
         |a, d| {
             searched(a, d, "z");
             d.key(a, KeyCode::Enter, None);
+            d.click(a, 110, 46, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The marked line clicked again: the journey there asked.
+#[test]
+fn a_searched_place_chosen_as_the_original_draws_it() {
+    screen(
+        "worldsearchgo",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+            d.click(a, 110, 46, MouseButton::Left);
             d.click(a, 110, 46, MouseButton::Left);
         },
         layer,

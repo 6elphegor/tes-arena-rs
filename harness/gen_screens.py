@@ -164,12 +164,15 @@ SCREENS = {
     # The province's Exit (the button at 72, 167): the world map again.
     'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
     # The search's name typed (d, a, g: a key a wait); a name none starts
-    # (z, Enter): the province's places listed; its second line
-    # (Daggerfall) clicked: the journey there.
+    # (z, Enter): the province's places listed (1194:5734, kind 8); its
+    # second line (Daggerfall) clicked: marked.
     'worldsearchtyped': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x20, 0x1E, 0x22)]),
     'worldsearchlist': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]),
     'worldsearchpick': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]
                         + [('click', 110, 46)]),
+    # The marked line clicked again: the journey there asked.
+    'worldsearchgo': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]
+                      + [('click', 110, 46), ('click', 110, 46)]),
     # A townsperson clicked in the street (`beside`: the first person's
     # slot, CLICKED CB5E, the player on their square, within talking's two
     # squares), as the frame runs the click (1194:DB6C): what to ask
@@ -237,7 +240,7 @@ PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x10
           'people': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
-         'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchlist': 'street',
+         'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',

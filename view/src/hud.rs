@@ -550,8 +550,11 @@ impl Screen {
 
     /// A box of the game's tiles (0000:9727): the nine tiles, corners once,
     /// edges and the middle repeated, `cols` x `rows` of them from (x, y);
-    /// colour 0 see-through (9A34).
+    /// colour 0 see-through (9A34). A box one tile high still gets its
+    /// top row and its bottom row under it (9751: the middle rows' count,
+    /// less two, skipped at or under zero), two tiles high.
     fn tiles(&mut self, t: &Tiles, x: i32, y: i32, cols: i32, rows: i32) {
+        let rows = if rows == 1 { 2 } else { rows };
         for r in 0..rows {
             let tr = if r == 0 { 0 } else if r == rows - 1 { 2 } else { 1 };
             for c in 0..cols {
@@ -1003,6 +1006,19 @@ pub mod custom {
         (i < menu.entries.len() && i < top + rows).then_some(i)
     }
 
+    /// A list in its own font (`list_menu`'s, as the window's lists
+    /// draw), for a screen that draws it itself.
+    pub fn draw_game_list(screen: &mut Screen, menu: &Menu) {
+        if let Some(st) = STYLE.get() {
+            super::draw_list(screen, st, menu);
+        }
+    }
+
+    /// `list_pick` in the list's own font.
+    pub fn game_list_pick(menu: &Menu, x: i32, y: i32) -> Option<usize> {
+        let st = STYLE.get()?;
+        list_pick(list_font(st, menu), menu, x, y)
+    }
 }
 
 /// The window boxes are centred in; the whole screen when unset.
