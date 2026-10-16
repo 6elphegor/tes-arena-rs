@@ -411,11 +411,82 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
                 out[at..at + 3].copy_from_slice(&c[..3]);
             }
         }
+        let bad: Vec<String> = (0..200)
+            .filter_map(|y| {
+                let k = (0..320).filter(|&x| mask[y * 320 + x] == 0 && full[y * 320 + x] != page[y * 320 + x]).count();
+                (k > 0).then(|| format!("{y}:{k}"))
+            })
+            .collect();
+        eprintln!("{name}: rows differing {}", bad.join(" "));
+        let _ = std::fs::write(dump.join(format!("{name}.soft")), &page);
+        if let Ok(r) = std::env::var("ARENA_ROW") {
+            let y: usize = r.parse().unwrap();
+            let hx = |v: &[u8]| v.iter().map(|b| format!("{b:02x}")).collect::<String>();
+            eprintln!("{name}: row {y} original {}", hx(&full[y * 320..y * 320 + 320]));
+            eprintln!("{name}: row {y} engine   {}", hx(&page[y * 320..y * 320 + 320]));
+        }
         eprintln!("{name}: {same} of {n} 3D pixels the original's ({:.2}%); not ported: {:?}", 100.0 * same as f64 / n.max(1) as f64, a.engine.page_gaps);
         let file = std::fs::File::create(dump.join(format!("{name}-soft.png"))).expect("create");
         let mut enc = png::Encoder::new(std::io::BufWriter::new(file), 960, 200);
         enc.set_color(png::ColorType::Rgb);
         enc.set_depth(png::BitDepth::Eight);
         enc.write_header().expect("png").write_image_data(&out).expect("png");
+    }
+}
+
+/// The engine's drawing of the case's 3D view (`render::draw` each frame,
+/// the level's lights as the original has them: see below) and the 3D
+/// pixels of it (where the view's own layer draws nothing): their digest
+/// against the original's (`view3d`), and the share of them alike where
+/// ARENA_SCREENS has the original's page.
+fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
+    let (place, setup, play) = case(name)?;
+    let (mut a, _) = played(
+        place,
+        |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            // The original makes the level's lights (0000:478F, through
+            // 4767) only when 5CA bit 4000h is clear, which entering these
+            // from the save it isn't: none. The view makes them (13 in the
+            // dungeon), so here they are taken away as the original has
+            // them.
+            a.engine.m.mem.w16(DS, 0xBC8E, 0);
+            a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
+            setup(a)
+        },
+        play,
+    )?;
+    let page = a.engine.page.take().unwrap();
+    let (idx, _) = layer(&mut a);
+    let three: Vec<u8> = page.iter().zip(&idx).map(|(&c, &i)| if i >= 0x100 { c } else { 0 }).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "view3d" && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
+    let same = std::env::var("ARENA_SCREENS").ok().and_then(|d| {
+        let full = std::fs::read(PathBuf::from(&d).join(format!("{name}.full"))).ok()?;
+        let n = idx.iter().filter(|&&i| i >= 0x100).count();
+        let k = (0..64000).filter(|&i| idx[i] >= 0x100 && full[i] == page[i]).count();
+        Some(100.0 * k as f64 / n.max(1) as f64)
+    });
+    Some((want == Some(fnv(three.iter().copied())), same))
+}
+
+/// The dungeon's first frames' 3D view, every pixel as the original's
+/// renderer draws it.
+#[test]
+fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view("playdungeon") else { return };
+    assert!(ok, "the 3D view differs from the original's ({same:?}% alike)");
+}
+
+/// The other cases measured (not yet exact: the crypt's farthest ceiling
+/// row reads past the row table, where the original finds what an
+/// earlier area left in its heap; a few rows of its ceiling and a flat
+/// below the stairs differ).
+#[test]
+fn the_other_3d_views_measured() {
+    for name in ["playdown", "playcrypt"] {
+        if let Some((ok, same)) = soft_view(name) {
+            eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
+        }
     }
 }

@@ -1,7 +1,7 @@
 //! arena-view: walk a level of Arena, drawn with wgpu, with the port's
 //! engine running the game.
 //!
-//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]
+//! Usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--gpu-world] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--shot OUT.png [FRAMES [TURN]]]
 //!
 //! Keys are the original's. Its menu keys (2542:0100, in this order, the
 //! first pressed taken: `arena::menukeys`, run on the engine at the
@@ -35,6 +35,8 @@
 //! player in a square's centre, facing HEADING, a debugging aid; --hour
 //! sets the clock to that hour. --fight brings a random encounter at the
 //! start (F does in the window); --people (Shift+F) rolls until people come.
+//! The 3D view is the original's renderer's (`arena::render`); --gpu-world
+//! draws it with the view's own polygons instead.
 //! --do runs STEPS before the shot, comma-separated: `click`, `turn:N`,
 //! `walk:N` (frames), `wait:N`, `at:COL:ROW:HEADING` (as --at, then a
 //! frame), `camp` (R), `save` (F5), `load` (F9), `key:N` (the key with scan
@@ -1165,13 +1167,17 @@ static MUTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(
 static SOUND_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// `--no-music`: the sounds without the music (`music`).
 static NO_MUSIC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// --gpu-world: the 3D view drawn by the view's renderer, not the
+/// original's (`Engine::page`).
+static GPU_WORLD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
     MUTE.store(args.iter().any(|a| a == "--mute"), std::sync::atomic::Ordering::Relaxed);
     SOUND_LOG.store(args.iter().any(|a| a == "--sound-log"), std::sync::atomic::Ordering::Relaxed);
     NO_MUSIC.store(args.iter().any(|a| a == "--no-music"), std::sync::atomic::Ordering::Relaxed);
-    args.retain(|a| a != "--mute" && a != "--sound-log" && a != "--no-music");
+    GPU_WORLD.store(args.iter().any(|a| a == "--gpu-world"), std::sync::atomic::Ordering::Relaxed);
+    args.retain(|a| a != "--mute" && a != "--sound-log" && a != "--no-music" && a != "--gpu-world");
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
@@ -1344,6 +1350,12 @@ fn main() {
         return;
     }
     let play = !MUTE.load(std::sync::atomic::Ordering::Relaxed);
+    // The 3D view drawn by the original's renderer (`arena::render`), or
+    // with --gpu-world by the view's own polygons, for comparison.
+    let mut engine = engine;
+    if !GPU_WORLD.load(std::sync::atomic::Ordering::Relaxed) {
+        engine.page = Some(vec![0; 64000]);
+    }
     let mut app = make_app(dir, engine, run, creation, answers, save_dir, slot, play);
     if let Some((turns, setup)) = bench {
         bench::run(&mut app, turns, &setup, started);
@@ -2997,6 +3009,11 @@ impl App {
         } else {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
             self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
+            // The original's 3D view (the engine's page) under the
+            // interface, over the view's own world.
+            if let (false, Some(page)) = (sheet, &self.engine.page) {
+                self.screen.underlay(page);
+            }
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
             if self.panel.is_some() {
                 self.equip_image();
