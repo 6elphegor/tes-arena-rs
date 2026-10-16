@@ -76,7 +76,7 @@ fn setup(m: &mut Machine, seed: u32) -> Vec<u8> {
         let t = s.byte() % 4;
         m.mem.w16(DS, 0xC624 + 3 * i, sq);
         m.mem.w8(DS, 0xC626 + 3 * i, t);
-        let off = (sq & 0xFF00) | ((sq & 0xFF) * 2 & 0xFF);
+        let off = (sq & 0xFF00) | (((sq & 0xFF) * 2) & 0xFF);
         let w = s.word();
         m.mem.w16(WALLS, off, w);
     }
