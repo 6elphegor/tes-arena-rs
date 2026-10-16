@@ -149,3 +149,26 @@ fn the_loot_window_in_a_dungeon_after_a_take_as_the_original_draws_it() {
         over,
     );
 }
+
+/// The first level's up stairs taken: the player turned to them (they
+/// are the square north of the start, 0000:F76F's facing test; heading
+/// 100h) and walked on with the forward key until the way out (0000:4537)
+/// asks whether to leave by the travel map (26F7:0000, 1A81 set).
+fn upstairs(a: &mut App, d: &mut Driver) {
+    a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
+    a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+    for _ in 0..10 {
+        d.frame(a);
+        if a.pending.is_some() {
+            break;
+        }
+    }
+    a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+    assert!(a.pending.is_some(), "the way out not asked");
+    assert_eq!(a.engine.m.mem.r8(DS, arena::movement::var::LEVEL), 0xFF, "not the way out");
+}
+
+#[test]
+fn leaving_a_dungeon_by_its_stairs_as_the_original_draws_it() {
+    dungeon_screen("dungeonleave", upstairs, layer);
+}

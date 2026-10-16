@@ -2783,22 +2783,29 @@ impl App {
                 dialog::Need::Text(a) => field::Live::open(&a.game.0, a.field, a.look),
                 _ => None,
             };
+            let mut forced = None;
             if let dialog::Need::Travel(w) = &need {
                 // The travel map from the game as the way out showed it.
                 self.engine.m.clone_from(&w.0 .0);
                 self.engine.files.clone_from(&w.0 .1);
-                self.travel = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
+                forced = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
             }
             // The spellmaker's screen with its colours set (1194:6064,
-            // 0000:57DD). (A level's attribute screen fades in after its
-            // notice, `box_read`.)
+            // 0000:57DD); the travel map as 26F7:0000 opens it, the screen
+            // faded out in 8 steps, its colours in in 6 (as `open_travel`).
+            // (A level's attribute screen fades in after its notice,
+            // `box_read`.)
             let fade = match &need {
-                dialog::Need::Spellmaker => Some(0),
+                dialog::Need::Spellmaker => Some((0, 0)),
+                dialog::Need::Travel(_) => Some((8, 6)),
                 _ => None,
             };
             let maker = talk.maker.take();
             let backdrop = talk.backdrop.take();
             let take = move |a: &mut App| {
+                if forced.is_some() {
+                    a.travel = forced;
+                }
                 if let dialog::Need::Spend(snap) = &need {
                     let mut e = Engine::new((*snap.0).clone(), a.engine.files.clone());
                     let c = create::Creation::level_up(&mut e.m, a.assets.archive.clone(), &a.dir, a.assets.palette);
@@ -2808,7 +2815,7 @@ impl App {
                 a.pending = Some(Pending { before, input, given, need, maker, backdrop });
             };
             match fade {
-                Some(steps) => self.fade_open(steps, 0, take),
+                Some((steps, fade_in)) => self.fade_open(steps, fade_in, take),
                 None => take(self),
             }
             if self.captured {

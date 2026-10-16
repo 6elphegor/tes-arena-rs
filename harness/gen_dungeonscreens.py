@@ -57,6 +57,10 @@ SCREENS = {
     # gen_screens.py's LOOT_SEED; its first line clicked: taken.
     'dungeonloot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': None, 'esi': 0}), []),
     'dungeonloottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': None, 'esi': 0}), [('click', 0x60, 0x27)]),
+    # The up stairs of the first level taken (`upstairs`): the way out
+    # (CD4E, 0000:4537) asks whether to leave by the travel map (26F7:0000,
+    # 1A81 set: from anywhere).
+    'dungeonleave': ((0, 0x4537, {}), []),
 }
 
 def seen(a):
@@ -74,7 +78,14 @@ def marked(a):
     a.call_near(0, 0x3491)
 
 
-BEFORE = {'dungeonautomap': marked, 'dungeonmap': seen, 'dungeonloot': gs.loot_seeded,
+def upstairs(a):
+    """The level as 0000:F76F leaves it for the way out when the first
+    level's up stairs are taken (BB0A one less: FFh)."""
+    assert a.r16(0xCD4E) == 0x4537, "the dungeon's way out not set"
+    a.mu.mem_write(a.lin(a.ds, 0xBB0A), b'\xff')
+
+
+BEFORE = {'dungeonleave': upstairs, 'dungeonautomap': marked, 'dungeonmap': seen, 'dungeonloot': gs.loot_seeded,
           'dungeonloottake': gs.loot_seeded}
 
 
