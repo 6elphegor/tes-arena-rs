@@ -30,7 +30,8 @@ the player answered:
 the screen and colours their FNV-1a digests; "end" the screen after the
 last input, where creation asks for another. With DUMP_DIR each screen
 is written there too (SCRIPT-STEP.raw: the 64000 bytes, the 768 colours).
-TRACE (the last polls), PROF (the hottest blocks), DEBUGAT=SEG:OFF,...
+A typed field's cursor (0000:A0D9) is kept from blinking on (A84C
+held at 1 at each pass): its phase is time's. TRACE (the last polls), PROF (the hottest blocks), DEBUGAT=SEG:OFF,...
 (registers there) and COUNT (the instruction budget) help debugging.
 """
 import os
@@ -181,6 +182,11 @@ class Run:
     def key(self, mu, addr, size, ud):
         a = self.a
         k = 0
+        # A typed field's cursor (0000:A0D9, XORed on every eighth pass of
+        # its loop, A84C) kept from blinking on: its phase is the time's,
+        # and the view draws it by its own frames.
+        if self.caller() == '0000:A195':
+            a.w16(0xA84C, 1)
         if self.typed is not None:
             k, self.typed = self.typed, None
             if self.release == a.lin(a.ds, BUFFERED):

@@ -13,13 +13,13 @@ createshot | generate | 10 | key:43@3159:0047 | c2b01ff0a9847143 | 9c8b9096cfca1
 createshot | generate | 11 | key:41@3159:0047 | 8adc4c945c6555cd | 501818803ba8dc76
 createshot | generate | 12 | key:4e@3159:10E2 | ef83a2fb5a3ef319 | ace6365ac509861
 createshot | generate | 13 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
-createshot | generate | 14 | end@0000:A195 | a4a6e2b0d5accad7 | e7a843e801b942b4
+createshot | generate | 14 | end@0000:A177 | 66558afe4b33e97b | e7a843e801b942b4
 createshot | select | script | S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175
 createshot | select | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | select | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
-createshot | select | 2 | key:52@0000:A195 | a4a6e2b0d5accad7 | e7a843e801b942b4
+createshot | select | 2 | key:52@0000:A195 | 66558afe4b33e97b | e7a843e801b942b4
 createshot | select | 3 | key:69@0000:A195 | d1acfb618828bb57 | e7a843e801b942b4
-createshot | select | 4 | key:61@0000:A195 | fb8d470ce59fafb2 | e7a843e801b942b4
+createshot | select | 4 | key:61@0000:A195 | c9e465dba5080e0e | e7a843e801b942b4
 createshot | select | 5 | key:0d@0000:A195 | c7c3ceb55cdb9b8b | e7a843e801b942b4
 createshot | select | 6 | key:46@3159:10E2 | d2c3c68b9d606068 | e7a843e801b942b4
 createshot | select | 7 | buffered:0d@1194:5545 | 386dbbcfb1f4188b | 6c1d8428b606b30f
