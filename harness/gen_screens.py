@@ -61,6 +61,11 @@ SCREENS = {
     'tavern': ((0x1194, 0xB93C, {}), []),
     'temple': ((0x1194, 0xC258, {}), []),
     'store': ((0x1194, 0xF48E, {}), []),
+    # In the street outside the guild (WHERE): R, camping (01E6), refused
+    # in a town (over the street's colours); Shift+M, the world map (03BF:
+    # 26F7's travel map).
+    'streetcamp': (0x01E6, []),
+    'worldmap': (0x03BF, []),
     # Its Buy (the box at 3Ah..51h): the spells for sale.
     'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
     # Its Detect Magic (52h..69h): the items to look at.
@@ -82,8 +87,8 @@ WAIT = (0, 0x8FC4)
 # town's list of their kind (its far pointer, its count), its door entered
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
-PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B)}
-WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store'}
+PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
+WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
 
 
 def place(a, base, where, cache={}):
@@ -91,13 +96,14 @@ def place(a, base, where, cache={}):
     if where not in cache:
         a.restore(base)
         assert a.area_ended() == ('world',), 'the guild not left'
-        at, count = PLACES[where]
-        assert a.r16(count), f'no {where} in the town'
-        # An entry's square is row << 8 | column (1194:40CF); the map's
-        # offset doubles the column.
-        sq = a.r16(a.r16(at), seg=a.r16(at + 2))
-        door = (sq & 0xFF00) | ((sq & 0xFF) << 1)
-        assert a.enter(door) == ('world',), f'the {where} not entered'
+        if PLACES[where] is not None:
+            at, count = PLACES[where]
+            assert a.r16(count), f'no {where} in the town'
+            # An entry's square is row << 8 | column (1194:40CF); the
+            # map's offset doubles the column.
+            sq = a.r16(a.r16(at), seg=a.r16(at + 2))
+            door = (sq & 0xFF00) | ((sq & 0xFF) << 1)
+            assert a.enter(door) == ('world',), f'the {where} not entered'
         cache[where] = a.snapshot()
     return cache[where]
 

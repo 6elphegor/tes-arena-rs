@@ -9,6 +9,8 @@ screen | guild | ab9373c09721411 a97a4bafd992e4ed a2bb0df299dfaf5b
 screen | tavern | 91f232a0fa7b43c a97a4bafd992e4ed f278b29d6123829b
 screen | temple | fc0e8a3f54ddb265 a97a4bafd992e4ed 65259bf793414fff
 screen | store | c118e367d22aa709 a97a4bafd992e4ed 777d7af86f712d5b
+screen | streetcamp | 114983588e87d6c9 2376632b30141d5 3849c331458828b5
+screen | worldmap | 4c16ae6cc47301f 6c1d8428b606b30f
 screen | guildbuy | 6690ef7fd318272 a97a4bafd992e4ed cbbe02ff41da1aa8
 screen | guilddetect | fd65d3d236ac552e a97a4bafd992e4ed 11959e55b4dc6a85
 screen | camp | 114983588e87d6c9 a97a4bafd992e4ed 3849c331458828b5

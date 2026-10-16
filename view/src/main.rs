@@ -834,6 +834,25 @@ impl arena::light::LightHooks for LightState {
 }
 
 impl Assets {
+    /// The colours on the screen as the original's DAC holds them: PAL.COL
+    /// but, after a frame outdoors, entries 1..8 the sky's colours for the
+    /// time of day (2294:0341) and, once the game has set it, 71h the
+    /// lamps' (0000:9B5B): anything drawn in those colours shows them.
+    fn dac(&self) -> [[u8; 4]; 256] {
+        let mut p = self.palette;
+        if let Some((sky, _, _)) = &self.frame_view {
+            if sky.outdoors {
+                for (i, c) in sky.colours.iter().enumerate() {
+                    p[1 + i] = [c[0], c[1], c[2], 255];
+                }
+            }
+            if let Some(l) = sky.lamp {
+                p[0x71] = [l[0], l[1], l[2], 255];
+            }
+        }
+        p
+    }
+
     /// Also enters the area's sky (0000:464A: its objects made).
     fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
         prof::time("assets.new", || Self::make(dir, engine))
@@ -1173,7 +1192,8 @@ fn main() {
     interface::start(&mut engine.m);
     if load_at_start {
         let save = save_dir.as_deref().expect("--load needs --save-dir");
-        match areas::load_game(&mut engine, &dir, save, slot) {
+        // A save loaded as the program starts is the title's Load (0000:117E).
+        match areas::load_game_title(&mut engine, &dir, save, slot) {
             Ok(r) => {
                 run = r;
                 eprintln!("loaded slot {slot}: {r:?} ({})", String::from_utf8_lossy(engine.m.mem.cstr(arena::mem::DS, arena::transit::var::LEVEL_NAME)));
@@ -2717,11 +2737,11 @@ impl App {
         if let Some(mv) = self.movies.front() {
             mv.draw(&mut self.screen, &self.font);
         } else if let Some(ui) = &self.saveui {
-            self.screen.set_palette(self.assets.palette);
+            self.screen.set_palette(self.assets.dac());
             ui.draw(&mut self.screen);
         } else if let Some(ui) = &self.options {
             // OP.IMG over what was on the screen (the interface below it).
-            self.screen.set_palette(self.assets.palette);
+            self.screen.set_palette(self.assets.dac());
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
             ui.draw(&mut self.screen, &self.font);
         } else if let Some(c) = &self.creation {
@@ -2733,7 +2753,7 @@ impl App {
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else if let Some(b) = self.pending.as_ref().and_then(|p| p.backdrop.as_ref()) {
             // Inside a shop: its screen and banner, the question over it.
-            self.screen.set_palette(self.assets.palette);
+            self.screen.set_palette(self.assets.dac());
             b.draw(&mut self.screen, &self.assets.archive, &self.engine.m);
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else if let Some(t) = &self.travel {
@@ -2742,7 +2762,7 @@ impl App {
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
-            self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.palette });
+            self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
             if self.panel.is_some() {
                 self.equip_image();

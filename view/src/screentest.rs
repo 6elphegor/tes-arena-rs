@@ -87,6 +87,7 @@ fn check(name: &str, idx: &[u16], dac: &[u8]) -> bool {
             diff_png(&d.join(format!("{name}-diff.png")), &orig, orig_mask.as_deref(), &odac, idx, dac);
         }
         std::fs::write(d.join(format!("{name}.view")), &view_page).ok();
+        std::fs::write(d.join(format!("{name}.viewdac")), dac).ok();
     }
     if !pal_ok {
         eprintln!("{name}: the palette differs");
@@ -130,7 +131,7 @@ fn diff_png(to: &Path, orig: &[u8], mask: Option<&[u8]>, odac: &[u8], idx: &[u16
 fn over(a: &mut App) -> (Vec<u16>, Vec<u8>) {
     a.compose();
     let hud = a.hud();
-    let mut s = hud::Screen::new(a.assets.palette);
+    let mut s = hud::Screen::new(a.assets.dac());
     hud::compose_over(&mut s, &a.font, &hud);
     let idx = s.indices().to_vec();
     let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
@@ -364,6 +365,35 @@ fn the_stores_menu_as_the_original_draws_it() {
         |a, _| {
             into(a, 0x1008);
             super::shop_turn(a, 6);
+        },
+        layer,
+    );
+}
+
+/// R in the street outside the guild (`area_left`): camping refused in a
+/// town, its box over the street's colours.
+#[test]
+fn camping_refused_in_the_street_as_the_original_draws_it() {
+    screen(
+        "streetcamp",
+        |a, d| {
+            area_left(a);
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// Shift+M in the street: the travel map (2542:03BF, 26F7).
+#[test]
+#[ignore = "not yet the original's: from this state the original's 03BF waits first on the world map (TAMRIEL.MNU), where the view's Travel::begin opens on the province's (26F7:0176)"]
+fn the_world_map_as_the_original_draws_it() {
+    screen(
+        "worldmap",
+        |a, d| {
+            area_left(a);
+            super::press(d, a, KeyCode::KeyM, true);
         },
         layer,
     );
