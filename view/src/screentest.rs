@@ -263,6 +263,32 @@ fn an_area_spell_cast_as_the_original_draws_it() {
     );
 }
 
+/// C, then a spell of the caster's own clicked twice (its first line,
+/// Absorb Spell; its fifth, Area Light VIII): cast, nothing drawn over
+/// play by the cast or the next frame's message line.
+fn self_cast(name: &str, y: i32) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, y, MouseButton::Left);
+            d.click(a, 0xF0, y, MouseButton::Left);
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+#[test]
+fn a_spell_on_oneself_cast_as_the_original_shows_it() {
+    self_cast("spellself", 155);
+}
+
+#[test]
+fn a_light_cast_as_the_original_shows_it() {
+    self_cast("spelllight", 191);
+}
+
 /// U, then its fourth line clicked once (Ring of Shielding): the line
 /// marked (a second click would use it).
 #[test]
@@ -898,6 +924,58 @@ fn no_need_to_rest_as_the_original_draws_it() {
             d.key(a, KeyCode::KeyR, Some("r"));
             d.frame(a);
             d.click(a, 0xA0, 0x7C, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// Resting as 1194:424E leaves it (gen_screens.py's `resting`): 1013 set,
+/// the fatigue's limit, HOURS, COUNTDOWN and the hour's STEP, the seed
+/// fixed; then a frame, whose body runs the rest's (1194:4635).
+fn rest_frame(a: &mut App, d: &mut Driver, countdown: u8, hours: u16, step: u8) {
+    use arena::rest::var;
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, var::RESTING, 1);
+    let limit = m.rest_fatigue_limit();
+    m.mem.w16(DS, var::FATIGUE_LIMIT, limit);
+    m.mem.w16(DS, var::HOURS, hours);
+    m.mem.w8(DS, var::COUNTDOWN, countdown);
+    m.mem.w8(DS, var::STEP, step);
+    m.mem.w32(DS, arena::random::SEED, SEED);
+    m.rng.seed = SEED;
+    d.frame(a);
+}
+
+/// A frame of rest counting down 5 hours typed: "5 hours remaining..."
+/// drawn at the top (1194:4659).
+#[test]
+fn the_rests_hours_left_as_the_original_draws_them() {
+    screen("restleft", |a, d| rest_frame(a, d, 1, 5, 0), over);
+}
+
+/// Resting until healed, the player hurt: "2 hours passed...".
+#[test]
+fn the_rests_hours_passed_as_the_original_draws_them() {
+    screen(
+        "restpassed",
+        |a, d| {
+            let hp = a.engine.m.mem.r16(DS, 0x01FF) / 2;
+            a.engine.m.mem.w16(DS, 0x01FD, hp);
+            rest_frame(a, d, 0, 2, 0);
+        },
+        over,
+    );
+}
+
+/// The hour's last step with the player rested: its hours, then "You are
+/// healed..." in a box over them.
+#[test]
+fn the_rest_ended_rested_as_the_original_draws_it() {
+    screen(
+        "restrested",
+        |a, d| {
+            healed(a);
+            rest_frame(a, d, 0, 1, 2);
         },
         over,
     );

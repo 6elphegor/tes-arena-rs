@@ -79,3 +79,8 @@ screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
 screen | riddle | 58bb15e08459635 a97a4bafd992e4ed d501f9c4db50e7d0
 screen | riddletyped | bdbcb51de4bb8aa5 a97a4bafd992e4ed 6749c17629c32bf
 screen | storestolen | 568ee6facef5ecde a97a4bafd992e4ed 88ea0e1980b0f80b
+screen | restleft | bc021f0916da2825 a97a4bafd992e4ed 159eb09b2a81b32b
+screen | restpassed | 89f410fe5ddbe3a5 a97a4bafd992e4ed 862a30dbb9d0529
+screen | restrested | c558d06aeb17d a97a4bafd992e4ed cd8070325fb6f535
+screen | spellself | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
+screen | spelllight | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25

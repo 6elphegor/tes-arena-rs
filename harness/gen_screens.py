@@ -66,6 +66,11 @@ SCREENS = {
     # "Release spell in your area..." put on the message line, drawn as
     # after the use (`AFTER`).
     'spellarea': (0x026D, [('click', 0xF0, 182), ('click', 0xF0, 182)]),
+    # Its first and fifth lines (Absorb Spell, Area Light VIII: the
+    # caster's own) clicked twice: cast, nothing drawn over play, nor on
+    # the message line the next frame draws (`AFTER`).
+    'spellself': (0x026D, [('click', 0xF0, 155), ('click', 0xF0, 155)]),
+    'spelllight': (0x026D, [('click', 0xF0, 191), ('click', 0xF0, 191)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
     # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
@@ -154,6 +159,15 @@ SCREENS = {
     # the rest shows inside it besides its menu and prompt; the rest's
     # other messages come in its frames, 1194:4635, after it is put back).
     'tavernrestneed': (0x01E6, [('click', 0xA0, 0x7C)]),
+    # A frame of rest (1194:4635, as the frame body calls it at 0000:48C9
+    # while 1013 is set: `resting`): the hours drawn (1194:4659, 0000:5364:
+    # centred at A0h, 14h in [1026]'s font, colour 3Eh) and 20 minutes
+    # passed. Counting down the hours typed (5 left); until healed (2
+    # passed); its last step with the player then rested (`healed`): "You
+    # are healed..." in its box over the hours (1194:4430).
+    'restleft': ((0x1194, 0x4635, {}), []),
+    'restpassed': ((0x1194, 0x4635, {}), []),
+    'restrested': ((0x1194, 0x4635, {}), []),
 
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
@@ -424,6 +438,25 @@ def riddled(a):
     a.mu.mem_write(a.lin(a.ds, 0x3C82), bytes([0x28]))
 
 
+def resting(countdown, hours, step=0):
+    """Resting as 1194:424E leaves it (1013 1, the fatigue's limit at
+    1014) with HOURS (1016), COUNTDOWN (1018) and the hour's STEP (49E6),
+    the seed fixed (`seeded`: the clock's 20 minutes roll encounters)."""
+    def at(a):
+        a.mu.mem_write(a.lin(a.ds, 0x1013), bytes([1]))
+        a.w16(0x1014, (a.mu.mem_read(a.lin(a.ds, 0x01CD), 1)[0] + a.mu.mem_read(a.lin(a.ds, 0x01D2), 1)[0]) << 6)
+        a.w16(0x1016, hours)
+        a.mu.mem_write(a.lin(a.ds, 0x1018), bytes([countdown]))
+        a.mu.mem_write(a.lin(a.ds, 0x49E6), bytes([step]))
+        seeded(a)
+    return at
+
+
+def hurt(a):
+    """The player's health (01FD) at half its maximum (01FF): not rested."""
+    a.w16(0x01FD, a.r16(0x01FF) // 2)
+
+
 def room(a):
     """A slot of the player's free (the last of 40, DGROUP 0212h on,
     13h each: its flags at +0Eh, 40h taken), as 1194:5EB5 looks for one."""
@@ -456,6 +489,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'levelup': leveled, 'levelupstats': leveled,
           'campenemies': hunted,
+          'restleft': resting(1, 5), 'restpassed': lambda a: (resting(0, 2)(a), hurt(a)),
+          'restrested': lambda a: (resting(0, 1, 2)(a), healed(a)),
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
@@ -467,7 +502,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511), 'spellarea': lambda a: a.call_near(0, 0x0511)}
+AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'spellarea', 'spellself', 'spelllight')}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
