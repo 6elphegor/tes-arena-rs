@@ -148,6 +148,7 @@ mod dialog;
 mod doll;
 mod flats;
 mod flc;
+mod field;
 mod fmdrv;
 mod hud;
 #[cfg(test)]
@@ -350,18 +351,17 @@ impl arena::levelup::LevelUpHooks for Front<'_> {
         }
     }
 }
-/// The automap's notes: the text typed through the dialog (into 1044,
-/// at most the place's room), edited in place on the map (`Talk::text_at`,
-/// `automap::draw_field`), the rest drawn by the screen's own pass.
+/// The automap's notes: the text at 1044 edited in place on the map by
+/// the game's editor (0000:32A5, `arena::lineedit::fields::note`; the
+/// window's `field::Live` while it is typed), in FONT_S.DAT (which the
+/// view loads for the screen) and colour 6, the rest drawn by the
+/// screen's own pass.
 impl arena::mapnotes::NoteHooks for Front<'_> {
-    fn type_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, _cursor: u16, max: u16) {
+    fn type_text(&mut self, m: &mut arena::machine::Machine, x: u16, y: u16, cursor: u16, max: u16) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let asked = t.need.is_some();
-            t.typed(m, arena::mapnotes::var::TEXT, max as usize, "Your note:");
-            if !asked && t.need.is_some() {
-                let text = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::mapnotes::var::TEXT)).into_owned();
-                t.text_at = Some((x as i16 as i32, y as i16 as i32, text));
-            }
+            let field = arena::lineedit::fields::note(m, x, y, cursor, max);
+            let look = field::Look { font: "FONT_S.DAT", colour: 6, put_font: false };
+            t.edit(m, field, look, dialog::Prompt::Bare);
         }
     }
 }
@@ -490,10 +490,13 @@ impl arena::rest::RestHooks for Front<'_> {
     fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
         Front::menu(self, m, si, bx, di)
     }
+    /// 1194:46BF's 4800: the prompt's box, the field at FCh, 44h in
+    /// ARENAFNT.DAT ([102C]) and colour 60h.
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).trim_start().to_string();
-            t.typed(m, arena::rest::var::TYPED, 3, &prompt);
+            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).to_string();
+            let look = field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
+            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt));
         }
     }
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {
@@ -1281,7 +1284,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         pending: None,
         boxes: Default::default(),
         selected: 0,
-        typed: String::new(),
+        live: None,
         status: None,
         font,
         screen,
@@ -2083,11 +2086,22 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
+        // A typed field asked: the game's editor opened on the game as it
+        // asked, its text and cursor drawn over the rest.
+        let mut live = None;
         match st.need.clone() {
             Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
-            Some(dialog::Need::Text(p)) => hud.typing = Some((p, String::new())),
+            Some(dialog::Need::Text(a)) => {
+                hud.typing = Some(a.prompt.clone());
+                live = field::Live::open(&a.game.0, a.field, a.look);
+            }
             Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
         }
+        let draw_live = |screen: &mut hud::Screen| {
+            if let Some(l) = &live {
+                l.draw(screen, true);
+            }
+        };
         let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
         if let Some(mk) = &maker {
             spellmaker::draw(&mut screen, &font, &st.assets.archive, &engine.files, mk);
@@ -2097,10 +2111,12 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // with the question asked over it.
             spellmaker::draw_state(&mut screen, &font, &st.assets.archive, &engine.files, &snap.0, *form);
             hud::compose_over(&mut screen, &font, &hud);
+            draw_live(&mut screen);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else if let Some(b) = st.backdrop.as_ref().filter(|_| st.need.is_some()) {
             b.draw(&mut screen, &st.assets.archive, &engine.m);
             hud::compose_over(&mut screen, &font, &hud);
+            draw_live(&mut screen);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else {
         st.assets.interface.draw(&mut screen, &font, &engine.m);
@@ -2114,6 +2130,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             automap::draw(&mut screen, &mut engine.m);
             automap::draw_notes(&mut screen, &engine);
         }
+        draw_live(&mut screen);
         // An animation the turns played: its first frame and lines.
         if let Some(mv) = st.movies.first() {
             println!("animations played: {}", st.movies.len());
@@ -2333,9 +2350,6 @@ struct Pending {
     /// The spellmaker's screen behind the question, when the turn stopped
     /// inside it (`Talk::maker`).
     maker: Option<(dialog::Snapshot, Option<u16>)>,
-    /// The text asked for edited in place at this screen point
-    /// (`Talk::text_at`).
-    at: Option<(i32, i32)>,
     /// The shop's screen behind the question (`Talk::backdrop`).
     backdrop: Option<shopui::Backdrop>,
 }
@@ -2386,11 +2400,12 @@ struct App {
     /// Answers given before asking (`--picks`).
     script: std::collections::VecDeque<dialog::Answer>,
     /// A question waiting; boxes to read (the game waits for both); the
-    /// menu's entry highlighted; the hours typed so far; the rest's hours.
+    /// menu's entry highlighted; the typed field asked, as typed so far
+    /// (`field::Live`); the rest's hours.
     pending: Option<Pending>,
     boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
     selected: usize,
-    typed: String,
+    live: Option<field::Live>,
     status: Option<String>,
     font: hud::Font,
     screen: hud::Screen,
@@ -2612,7 +2627,12 @@ impl App {
         if let Some(need) = talk.need {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
-            self.typed.clear();
+            // A typed field: the game's editor opened on a copy of the
+            // game as it asked.
+            self.live = match &need {
+                dialog::Need::Text(a) => field::Live::open(&a.game.0, a.field, a.look),
+                _ => None,
+            };
             if let dialog::Need::Travel(w) = &need {
                 // The travel map from the game as the way out showed it.
                 self.engine.m.clone_from(&w.0 .0);
@@ -2626,12 +2646,8 @@ impl App {
                 self.creation_engine = Some(e);
             }
             let maker = talk.maker.take();
-            let at = talk.text_at.take().map(|(x, y, text)| {
-                self.typed = text;
-                (x, y)
-            });
             let backdrop = talk.backdrop.take();
-            self.pending = Some(Pending { before, input, given, need, maker, at, backdrop });
+            self.pending = Some(Pending { before, input, given, need, maker, backdrop });
             if self.captured {
                 self.release();
             }
@@ -2722,9 +2738,13 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
-                if let Some((x, y)) = self.pending.as_ref().and_then(|p| p.at) {
-                    automap::draw_field(&mut self.screen, x, y, &self.typed);
-                }
+            }
+        }
+        // The typed field asked, over what its caller shows (its prompt's
+        // box or lines are the HUD's; boxes to read cover it).
+        if self.movies.is_empty() && self.boxes.is_empty() {
+            if let Some(l) = &self.live {
+                l.draw(&mut self.screen, false);
             }
         }
         if prof::on() {
@@ -3208,8 +3228,7 @@ impl App {
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
                     h.menu = Some(m);
                 }
-                Some(dialog::Need::Text(_)) if self.pending.as_ref().is_some_and(|p| p.at.is_some()) => {}
-                Some(dialog::Need::Text(prompt)) => h.typing = Some((prompt.clone(), self.typed.clone())),
+                Some(dialog::Need::Text(a)) => h.typing = Some(a.prompt.clone()),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).
                 Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
@@ -3267,25 +3286,44 @@ impl App {
                     }
                 }
             }
-            dialog::Need::Text(_) => match code {
-                KeyCode::Enter | KeyCode::NumpadEnter => {
-                    let t = std::mem::take(&mut self.typed);
-                    self.answer(dialog::Answer::Text(t));
-                }
-                KeyCode::Escape => self.answer(dialog::Answer::Text(String::new())),
-                KeyCode::Backspace => {
-                    self.typed.pop();
-                }
-                _ => {
-                    if let Some(t) = text {
-                        for c in t.chars().filter(|c| c.is_ascii_graphic()) {
-                            if self.typed.len() < 3 {
-                                self.typed.push(c);
-                            }
-                        }
-                    }
-                }
-            },
+            // The typed field takes the keys, pressed and let go
+            // (`field_key`).
+            dialog::Need::Text(_) => {}
+        }
+    }
+
+    /// A key pressed or let go while a typed field is asked: through the
+    /// game's key interrupt to its editor (`field::Live`); the field
+    /// ended, its passes' inputs are the answer.
+    fn field_key(&mut self, code: winit::keyboard::KeyCode, down: bool) {
+        let Some(l) = &mut self.live else { return };
+        if let Some(scan) = interface::scan_code(code) {
+            l.key(scan, down);
+        }
+        self.field_ended();
+    }
+
+    /// The typed field's end: its inputs answer the question.
+    fn field_ended(&mut self) {
+        if let Some(keys) = self.live.as_ref().filter(|l| l.ended()).map(|l| l.keys().to_vec()) {
+            self.live = None;
+            self.answer(dialog::Answer::Keys(keys));
+        }
+    }
+
+    /// A frame of the window: the typed field's (a held arrow, the
+    /// cursor's blink).
+    fn field_frame(&mut self) {
+        if let Some(l) = &mut self.live {
+            l.frame();
+        }
+        self.field_ended();
+        if let Some(ui) = self.saveui.as_mut().filter(|u| u.typing.is_some()) {
+            let e = ui.frame();
+            self.saveui_ended(e);
+        }
+        if let Some(c) = &mut self.creation {
+            c.field_frame();
         }
     }
 
@@ -3405,6 +3443,14 @@ impl App {
                     self.saveui_ended(e);
                 }
             }
+            // A save's name typed: its keys, pressed and let go, to the
+            // game's editor.
+            In::Key { code, down, .. } if self.saveui.as_ref().is_some_and(|u| u.typing.is_some()) => {
+                if let (Some(scan), Some(ui)) = (interface::scan_code(code), &mut self.saveui) {
+                    let e = ui.field_key(scan, down);
+                    self.saveui_ended(e);
+                }
+            }
             In::Key { code, down: true, text } if self.saveui.is_some() => {
                 if let Some(ui) = &mut self.saveui {
                     let e = ui.key(code, text.as_deref());
@@ -3419,6 +3465,14 @@ impl App {
                 }
             }
             In::Key { code, down, text } if self.creation.is_some() => {
+                // The name typed: the keys, pressed and let go, to the
+                // game's editor.
+                if self.creation.as_ref().is_some_and(|c| c.typing()) {
+                    if let Some(scan) = interface::scan_code(code) {
+                        self.creation_input(create::Input::Key(scan, down));
+                    }
+                    return;
+                }
                 if !down {
                     return;
                 }
@@ -3434,6 +3488,16 @@ impl App {
                     self.creation_input(inp);
                 }
             }
+            // A typed field asked (the boxes before it read first): its
+            // keys, pressed and let go, through the game's key interrupt
+            // (`field_key`); the right button ends it (A172).
+            In::Key { code, down, .. } if self.live.is_some() && self.boxes.is_empty() => self.field_key(code, down),
+            In::Button { down: true, button: MouseButton::Right } if self.live.is_some() && self.boxes.is_empty() => {
+                if let Some(l) = &mut self.live {
+                    l.button();
+                }
+                self.field_ended();
+            }
             // The travel map up (a box over it read first): its clicks and
             // keys (`travel`); it may be a turn's question (the way out of
             // a dungeon).
@@ -3443,6 +3507,13 @@ impl App {
             }
             In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
             In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
+            // The search's name typed on the map: its keys, pressed and
+            // let go, to the game's editor.
+            In::Key { code, down, .. } if self.travel.as_ref().is_some_and(|t| t.typing()) && self.boxes.is_empty() => {
+                if let Some(scan) = interface::scan_code(code) {
+                    self.travel_input(|t, e, _| t.field_key(e, scan, down));
+                }
+            }
             In::Key { code, down: true, text } if self.travel.is_some() && self.boxes.is_empty() => {
                 self.travel_input(|t, e, _| t.key(e, code, text.as_deref()));
             }
@@ -3675,6 +3746,7 @@ impl winit::application::ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 hud::blink_frame();
+                self.field_frame();
                 let cam = self.compose();
                 if let Some(g) = &mut self.gpu {
                     let Ok(frame) = g.surface.get_current_texture() else {

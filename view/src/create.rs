@@ -93,6 +93,9 @@ pub enum Input {
     Click(i32, i32),
     /// Time passing, in milliseconds (a movie's frames).
     Wait(u32),
+    /// A key (its scan code) pressed or let go, while the name is typed
+    /// (the game's editor takes both).
+    Key(u8, bool),
 }
 
 /// `--create`'s steps: a character (`G`), `enter`, `esc`, `back`, `up`,
@@ -170,7 +173,9 @@ enum Stage {
     Quiz { asked: u8, lines: Vec<String>, top: usize },
     ClassYes(Ask, u8),
     List(Ask),
-    Name(Vec<Vec<Span>>, String),
+    /// The name asked (1194:2711): the prompt, the game's editor on the
+    /// name (`field::Live`).
+    Name(Vec<Vec<Span>>, Box<crate::field::Live>),
     Gender(Ask),
     Map,
     ProvinceYes(Ask, u8),
@@ -662,23 +667,30 @@ impl Creation {
                 }
                 _ => Stage::List(ask),
             },
-            Stage::Name(prompt, mut typed) => match inp {
-                Input::Char(c) if (0x20..0x7F).contains(&c) && typed.len() < 0x12 => {
-                    typed.push(c as char);
-                    Stage::Name(prompt, typed)
+            Stage::Name(prompt, mut live) => {
+                // The keys to the game's editor (a script's characters and
+                // keys as the keys that make them).
+                match inp {
+                    Input::Key(scan, down) => live.key(scan, down),
+                    Input::Char(c) => live.type_char(c),
+                    Input::Back => live.tap(0x0E),
+                    Input::Enter => live.tap(0x1C),
+                    Input::Esc => live.tap(0x01),
+                    _ => {}
                 }
-                Input::Back => {
-                    typed.pop();
-                    Stage::Name(prompt, typed)
+                if !live.ended() {
+                    return self.stage = Stage::Name(prompt, live);
                 }
-                // 1194:2789: an empty name asks again.
-                Input::Enter if !typed.trim().is_empty() => {
-                    self.name = typed;
+                // 1194:2789: nothing typed (01AD 0) asks again.
+                let text = live.text();
+                if text.is_empty() {
+                    Stage::Name(prompt, self.name_field(engine))
+                } else {
+                    self.name = String::from_utf8_lossy(&text).into_owned();
                     let ask = self.menu(&mut engine.m, (DATA, 0x3614), &[], 0x3F85, 0x3F88, FontId::A);
                     Stage::Gender(ask)
                 }
-                _ => Stage::Name(prompt, typed),
-            },
+            }
             Stage::Gender(mut ask) => match self.ask_input(&mut ask, inp) {
                 Some(s) if s < 2 => {
                     let name = self.name.clone();
@@ -770,7 +782,30 @@ impl Creation {
         }
         let (cs, co) = Self::class_of(&engine.m, class);
         let prompt = self.say(&mut engine.m, (DATA, 0x35F8), &[Arg::Str(cs, co)]);
-        Stage::Name(prompt, String::new())
+        Stage::Name(prompt, self.name_field(engine))
+    }
+
+    /// 1194:2786: 5C34 with AX 3Ch, CX 12h, DI 01AD: the name's field
+    /// (`lineedit::fields::creation_name`), the game's editor opened on a
+    /// copy of the game, in FONT_A.DAT ([1026], 271D) and the screen's
+    /// colour.
+    fn name_field(&self, engine: &Engine) -> Box<crate::field::Live> {
+        let look = crate::field::Look { font: "FONT_A.DAT", colour: self.colour, put_font: true };
+        let field = arena::lineedit::fields::creation_name();
+        Box::new(crate::field::Live::open(&engine.m, field, look).expect("the name's field opens"))
+    }
+
+    /// Whether the name is being typed (the keys, pressed and let go,
+    /// go to it as `Input::Key`).
+    pub fn typing(&self) -> bool {
+        self.boxes.is_empty() && matches!(self.stage, Stage::Name(..))
+    }
+
+    /// A frame of the window: the name's field's (`Live::frame`).
+    pub fn field_frame(&mut self) {
+        if let Stage::Name(_, live) = &mut self.stage {
+            live.frame();
+        }
     }
 
     /// The map and its question (1194:27C2..2868).
@@ -1005,7 +1040,7 @@ impl Creation {
                     }
                 }
             }
-            Input::Back | Input::Wait(_) => {}
+            Input::Back | Input::Wait(_) | Input::Key(..) => {}
         }
         if ask.sel < ask.top {
             ask.top = ask.sel;
@@ -1069,10 +1104,13 @@ impl Creation {
                     screen.text_plain(&self.fonts.teeny, 0x14, 136 + 8 * i as i32, l, COLOUR_A);
                 }
             }
-            Stage::Name(prompt, typed) => {
+            Stage::Name(prompt, live) => {
+                // The prompt's box with its line of room (5C34's "%s\r"
+                // and spaces), the field over it where 5C34 puts it.
                 let mut lines = prompt.clone();
-                lines.push(vec![Span { colour: self.colour, text: format!("{typed}_") }]);
+                lines.push(vec![Span { colour: self.colour, text: " ".repeat(37) }]);
                 self.draw_box(screen, &lines, FontId::A, None);
+                live.draw(screen, false);
             }
             _ => {}
         }

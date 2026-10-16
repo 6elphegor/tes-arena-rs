@@ -77,9 +77,29 @@ impl HaggleIo for HaggleTalk<'_> {
         })
     }
     fn text(&mut self) -> Option<Vec<u8>> {
-        let prompt = self.prompt.clone();
-        let Some(t) = self.talk.as_deref_mut() else { return Some(Vec::new()) };
-        Some(t.typed_text(&prompt).unwrap_or_default().into_bytes())
+        Some(Vec::new())
+    }
+    /// 1194:80F7..810D: the prompt (65CA) split into its lines (4E54,
+    /// 137E 3; counted on a copy: the port leaves the drawing's split
+    /// out), the field under them (4E88's, 6 characters into 6599) in
+    /// TEENYFNT.DAT and colour C0h.
+    fn type_offer(&mut self, m: &mut Machine) -> Option<()> {
+        let Some(t) = self.talk.as_deref_mut() else { return Some(()) };
+        let mut split = m.clone();
+        split.mem.w8(DS, 0x137E, 3);
+        split.split_lines(OFFER_PROMPT);
+        let lines = split.mem.r16(DS, arena::shops::var::LINES);
+        let field = arena::lineedit::fields::dialog_at(lines, 6, arena::haggle::var::TYPED);
+        let look = crate::field::Look { font: "TEENYFNT.DAT", colour: 0xC0, put_font: true };
+        let mut shown = Vec::new();
+        let mut at = OFFER_PROMPT;
+        for _ in 0..lines.min(16) {
+            let s = split.mem.cstr(DS, at);
+            shown.push(line(&String::from_utf8_lossy(s)));
+            at = at.wrapping_add(s.len() as u16 + 1);
+        }
+        t.edit(m, field, look, crate::dialog::Prompt::Lines(shown));
+        Some(())
     }
     fn key(&mut self) -> Option<()> {
         if let Some(t) = self.talk.as_deref_mut() {
