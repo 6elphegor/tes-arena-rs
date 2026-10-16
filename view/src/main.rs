@@ -2296,9 +2296,14 @@ fn look_centre(engine: &mut Engine) {
     if (sq as i16) <= 0 {
         return;
     }
+    look_at(engine, sq & 0xFF00 | (sq as u8 >> 1) as u16);
+}
+
+/// 2826:0C15 on the square `ax` (its row in AH, its column in AL).
+fn look_at(engine: &mut Engine, ax: u16) {
     let mut talk = dialog::Talk::default();
     let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
-    if engine.m.look(&mut engine.files, &mut hooks, sq & 0xFF00 | (sq as u8 >> 1) as u16).is_none() {
+    if engine.m.look(&mut engine.files, &mut hooks, ax).is_none() {
         eprintln!("looking gave up: {}", arena::giveup::describe());
     }
 }

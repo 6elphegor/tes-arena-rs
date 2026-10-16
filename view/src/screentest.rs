@@ -1555,6 +1555,23 @@ fn the_message_line_after_a_use_as_the_original_draws_it() {
     );
 }
 
+/// In the street, a right click looking at the town's first tavern's
+/// square (2826:0C15 with AX 086Ch, its entry in the list at 1AB5): its
+/// name on the message line (061A) as the next frame draws it (0000:0511).
+#[test]
+fn a_taverns_name_looked_at_as_the_original_draws_it() {
+    screen(
+        "looktavern",
+        |a, d| {
+            area_left(a);
+            super::super::look_at(&mut a.engine, 0x086C);
+            assert!(a.engine.m.mem.r16(DS, 0x061E) != 0, "a message to show");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
 /// gen_screens.py's `leveled`: the player's XP (05AD) the least past the
 /// next level's threshold (2686:0333's: from the class's first, DATA:47AE,
 /// each times 30/16 up to the ninth level's, 24/16 on) and the level's

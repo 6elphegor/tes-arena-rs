@@ -349,6 +349,11 @@ SCREENS = {
     'palaceaccept': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0x90)]),
     'palacedecline': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0xA8)]),
     'palacenone': ((0x1194, 0xDB6C, {}), []),
+    # In the street, a right click looking at the town's first tavern's
+    # square (2826:0C15 with AX its entry in the list at 1AB5: row 8,
+    # column 6Ch): its name on the message line (061A), drawn as the next
+    # frame draws it (`AFTER`).
+    'looktavern': ((0x2826, 0x0C15, {'eax': 0x086C}, 'near'), []),
 }
 WAIT = (0, 0x8FC4)
 
@@ -363,7 +368,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
          'tavernwelcome': 'tavern', 'templewelcome': 'temple', 'storewelcome': 'store', 'guildwelcome': 'guild',
-         'holiday': 'street', 'questmessage': 'street',
+         'holiday': 'street', 'questmessage': 'street', 'looktavern': 'street',
          'palacewelcome': 'palace', 'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
@@ -708,7 +713,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight')}
+AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight', 'looktavern')}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
