@@ -34,7 +34,12 @@ fn fnv(b: impl IntoIterator<Item = u8>) -> u64 {
 /// The vectors: per screen, the page's digest, the palette's, the mask's
 /// (None: the whole page).
 fn vectors() -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
-    let text = std::fs::read_to_string(VECTORS).expect("tests/vectors/screens.txt");
+    vectors_in(VECTORS)
+}
+
+/// `vectors` from another file of them (dungeontest's).
+fn vectors_in(path: &str) -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
+    let text = std::fs::read_to_string(path).expect(path);
     let mut out = std::collections::HashMap::new();
     for line in text.lines() {
         let f: Vec<&str> = line.split(" | ").collect();
@@ -68,7 +73,12 @@ fn layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
 /// The view's pixels and palette against the vector `name`; with
 /// ARENA_SCREENS, a diff image for a mismatch. Whether they match.
 fn check(name: &str, idx: &[u16], dac: &[u8]) -> bool {
-    let v = vectors();
+    check_in(VECTORS, name, idx, dac)
+}
+
+/// `check` against the vectors at `path`.
+fn check_in(path: &str, name: &str, idx: &[u16], dac: &[u8]) -> bool {
+    let v = vectors_in(path);
     let Some(&(page, pal, mask)) = v.get(name) else { panic!("no vector for {name}") };
     let dump = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from);
     let orig_mask = dump.as_ref().and_then(|d| std::fs::read(d.join(format!("{name}.mask"))).ok());
@@ -187,6 +197,9 @@ fn check_fade_in(file: &str, name: &str, a: &mut App) {
         None => assert!(seen.len() <= 1, "{name}: a fade the original doesn't show ({} colours)", seen.len()),
     }
 }
+
+#[path = "dungeontest.rs"]
+mod dungeontest;
 
 /// F1: the character sheet (2542:00BE, 1194:0CF8), its first page.
 #[test]
