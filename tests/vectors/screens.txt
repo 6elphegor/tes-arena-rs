@@ -4,6 +4,7 @@ screen | status | 2e5d327360c1d20b a97a4bafd992e4ed b68093bd54873ad5
 screen | logbook | b08c75f1db4b5e6d 491d016160c27c96
 screen | spellbook | 1cfe870509453798 a97a4bafd992e4ed 39965ff8a01bf6aa
 screen | spellpick | 6c4c6ea1cbb8a63 a97a4bafd992e4ed 39965ff8a01bf6aa
+screen | spellarea | a0986d0efced3d77 a97a4bafd992e4ed 9f6c60fd01131905
 screen | use | 5a16eb49c041f989 a97a4bafd992e4ed 229a72001062a3f8
 screen | usepick | e3d8812335f75465 a97a4bafd992e4ed 229a72001062a3f8
 screen | usemessage | 8943c45e4fe83b15 a97a4bafd992e4ed d5506857f776fe12
@@ -21,9 +22,19 @@ screen | tavernrumor | 4c6813e7eb208cb1 a97a4bafd992e4ed 8f49be5aaeec74a7
 screen | templebless | 822b15a3341441de a97a4bafd992e4ed caa5da2321b03e7
 screen | templecure | 9a014cd89f9311f6 a97a4bafd992e4ed caa5da2321b03e7
 screen | templeheal | d4d33e8d6d25b4a7 a97a4bafd992e4ed caa5da2321b03e7
+screen | taverndrink | aac912512a414187 a97a4bafd992e4ed 95b8a4e3ff53aa83
+screen | templedonate | 697ddf78daf3973b a97a4bafd992e4ed caa5da2321b03e7
 screen | storebuy | 464a9fea5d7c16be a97a4bafd992e4ed 70e240293936a97
 screen | storesell | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
 screen | storerepair | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
+screen | storerepairitem | b75308f798a15bb8 a97a4bafd992e4ed fa8c11efc16b9367
+screen | storerepairworn | 9ed8f15e23b94185 a97a4bafd992e4ed fa8c11efc16b9367
+screen | storesteal | b67cd9557337e427 a97a4bafd992e4ed 78ffaeb5d23baf67
+screen | storebuyroom | 5b279e70dfc48e83 a97a4bafd992e4ed 72e3ddcc63c23f67
+screen | storeweapons | 7ba0e376aee60d6d a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storearmor | f613ac59d96e4e18 a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storeweapon | fc71e36105c78fa0 a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storebuyhaggle | 3d171823a6e8c912 a97a4bafd992e4ed fa8c11efc16b9367
 screen | tavernroomdays | 2d4a474cc7708d3c a97a4bafd992e4ed 75874994b31de8a7
 screen | tavernroomprice | 420e70b46a151263 a97a4bafd992e4ed 75874994b31de8a7
 screen | tavernroomtaken | 881fe166559e6f12 a97a4bafd992e4ed 646a7e6e89122ae3
@@ -36,13 +47,28 @@ screen | tavernrumorheard | dd9ae1cf7069b61d a97a4bafd992e4ed d864b21378b5a6e3
 screen | storesellhaggle | 4a43e8adc9d6be54 a97a4bafd992e4ed fa8c11efc16b9367
 screen | streetcamp | 114983588e87d6c9 2376632b30141d5 3849c331458828b5
 screen | worldmap | 4c16ae6cc47301f 6c1d8428b606b30f
+screen | worldprovince | f3f78560a3108ebb db15945b94271757
+screen | worldtrip | 258358a48621ee11 db15945b94271757
+screen | worldsearch | 933f15b614404805 db15945b94271757
+screen | worldback | 4c16ae6cc47301f 6c1d8428b606b30f
+screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
+screen | worldsearchlist | ac50fdeceb5ce67d db15945b94271757
+screen | worldsearchpick | 39358c3a4fd10544 db15945b94271757
+screen | worldsearchgo | fff77d6bc2419477 db15945b94271757
 screen | talk | 2d6cc85b167a275c 2376632b30141d5 94b169f8bd039695
 screen | talkwho | 16c03c774590faac 2376632b30141d5 49abe92dd11fdc61
 screen | talkwhere | b93b56d556d33525 2376632b30141d5 c6a37492dc336725
 screen | talkrumor | f63e3002eb00e58c 2376632b30141d5 23fdda4c6bf5f25
 screen | guildbuy | 6690ef7fd318272 a97a4bafd992e4ed cbbe02ff41da1aa8
+screen | guildpotions | c74b7c3615bac0ad a97a4bafd992e4ed 11959e55b4dc6a85
+screen | guildmagic | ab1e93fea9be4b4 a97a4bafd992e4ed acc2283e56e904c4
+screen | guildspells | 438c9d1c03dad5f8 a97a4bafd992e4ed 11959e55b4dc6a85
+screen | guildmagicroom | 17c6523b9c13da5a a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | guildpotionpick | 3c5cafbde6c2502a a97a4bafd992e4ed 25c9a4e9ebda1567
+screen | guildspellpick | 238608a7d03982a4 7b9dbd5285f32ad5
 screen | guilddetect | fd65d3d236ac552e a97a4bafd992e4ed 11959e55b4dc6a85
 screen | camp | 114983588e87d6c9 a97a4bafd992e4ed 3849c331458828b5
+screen | campenemies | 1960b2f57c74c4a1 a97a4bafd992e4ed 5587eea3e0c07725
 screen | automap | 54404551bdb10785 58ab90d7887e02ed
 screen | travelmap | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
 screen | loot | 8bb23df894a08117 a97a4bafd992e4ed 77aee268a5bf4f45
@@ -52,29 +78,3 @@ screen | levelupstats | bacc1a605a4f4c4e ef6ad023fa2b8c2b
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
 screen | riddle | 58bb15e08459635 a97a4bafd992e4ed d501f9c4db50e7d0
 screen | riddletyped | bdbcb51de4bb8aa5 a97a4bafd992e4ed 6749c17629c32bf
-screen | worldprovince | f3f78560a3108ebb db15945b94271757
-screen | worldtrip | 258358a48621ee11 db15945b94271757
-screen | worldsearch | 933f15b614404805 db15945b94271757
-screen | worldback | 4c16ae6cc47301f 6c1d8428b606b30f
-screen | guildpotions | c74b7c3615bac0ad a97a4bafd992e4ed 11959e55b4dc6a85
-screen | guildmagic | ab1e93fea9be4b4 a97a4bafd992e4ed acc2283e56e904c4
-screen | guildspells | 438c9d1c03dad5f8 a97a4bafd992e4ed 11959e55b4dc6a85
-screen | templedonate | 697ddf78daf3973b a97a4bafd992e4ed caa5da2321b03e7
-screen | guildpotionpick | 3c5cafbde6c2502a a97a4bafd992e4ed 25c9a4e9ebda1567
-screen | guildspellpick | 238608a7d03982a4 7b9dbd5285f32ad5
-screen | taverndrink | aac912512a414187 a97a4bafd992e4ed 95b8a4e3ff53aa83
-screen | storebuyroom | 5b279e70dfc48e83 a97a4bafd992e4ed 72e3ddcc63c23f67
-screen | guildmagicroom | 17c6523b9c13da5a a97a4bafd992e4ed cfe06bc4fb04a9c1
-screen | storeweapons | 7ba0e376aee60d6d a97a4bafd992e4ed cfe06bc4fb04a9c1
-screen | storearmor | f613ac59d96e4e18 a97a4bafd992e4ed cfe06bc4fb04a9c1
-screen | storeweapon | fc71e36105c78fa0 a97a4bafd992e4ed cfe06bc4fb04a9c1
-screen | worldsearchpick | 39358c3a4fd10544 db15945b94271757
-screen | storebuyhaggle | 3d171823a6e8c912 a97a4bafd992e4ed fa8c11efc16b9367
-screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
-screen | worldsearchlist | ac50fdeceb5ce67d db15945b94271757
-screen | campenemies | 1960b2f57c74c4a1 a97a4bafd992e4ed 5587eea3e0c07725
-screen | worldsearchgo | fff77d6bc2419477 db15945b94271757
-screen | storerepairitem | b75308f798a15bb8 a97a4bafd992e4ed fa8c11efc16b9367
-screen | storerepairworn | 9ed8f15e23b94185 a97a4bafd992e4ed fa8c11efc16b9367
-screen | storesteal | b67cd9557337e427 a97a4bafd992e4ed 78ffaeb5d23baf67
-screen | spellarea | a0986d0efced3d77 a97a4bafd992e4ed 9f6c60fd01131905
