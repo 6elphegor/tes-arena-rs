@@ -1785,3 +1785,97 @@ fn the_guilds_magic_items_with_room_as_the_original_draws_them() {
         layer,
     );
 }
+
+/// Into the town's palace, as gen_screens.py's `place` has the original:
+/// out of the guild into the street, the first square of the map whose
+/// wall's trigger is one of the palace's (C917's 11..13, 0000:4192)
+/// clicked from its corner, then in.
+fn into_palace(a: &mut App) {
+    area_left(a);
+    let m = &mut a.engine.m;
+    let palace: Vec<u8> = (11..14).map(|i| m.mem.r8(DS, arena::movement::var::TRIGGERS + i)).collect();
+    let seg = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let door = (0..0x8000u16)
+        .step_by(2)
+        .find(|&o| {
+            let w = m.mem.r16(seg, o);
+            (w & 0x8000 != 0 || w >> 8 == w & 0xFF) && palace.contains(&((w & 0x3F) as u8))
+        })
+        .expect("a palace in the town");
+    m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
+    m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
+    m.mem.w16(DS, arena::controls::var::PICKED, door);
+    m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
+    assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
+    area_left(a);
+    assert_eq!(a.engine.m.mem.r8(DS, 0x0D48), 1, "in the palace");
+}
+
+/// The palace's ruler clicked, as gen_screens.py's `ruler` has the
+/// original: a map flat of the palace's first kind (+0Ch the flat base
+/// C38E) copied to the clicked record (3D96, 2294:047B), out of a thing's
+/// reach; then a turn, whose frame's click (1194:DB6C) runs the palace's
+/// quests (8F1E).
+fn ruler(a: &mut App, d: &mut Driver) {
+    into_palace(a);
+    // The palace's first frame: its pending box (0000:4903, 191F) shown,
+    // then read.
+    d.frame(a);
+    clear(d, a);
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, arena::movement::var::X), m.mem.r16(DS, arena::movement::var::Y));
+    let rec = arena::talk::var::RECORD;
+    m.mem.w16(DS, rec, x.wrapping_add(0x200));
+    m.mem.w16(DS, rec + 4, y);
+    let base = m.mem.r16(DS, 0xC38E) as u8;
+    m.mem.w8(DS, rec + 0xC, base);
+    m.mem.w16(DS, arena::talk::var::CLICKED, rec);
+    m.mem.w32(DS, arena::random::SEED, SEED);
+    m.rng.seed = SEED;
+    d.frame(a);
+    assert!(a.pending.is_some() || !a.boxes.is_empty(), "the ruler's words");
+}
+
+/// The ruler clicked: the save's quest on offer asked about.
+#[test]
+fn the_palaces_question_as_the_original_draws_it() {
+    screen("palace", ruler, over);
+}
+
+/// Its No (the menu's second entry: 3159:0F2A picks by the row alone,
+/// from 127 on): text Fh.
+#[test]
+fn the_palace_refused_as_the_original_draws_it() {
+    screen("palaceno", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x88, MouseButton::Left); }, over);
+}
+
+/// Its Yes: the offer itself.
+#[test]
+fn the_palaces_offer_as_the_original_draws_it() {
+    screen("palaceyes", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); }, over);
+}
+
+/// The offer taken (its Yes, 136..157) and refused (its No, from 157).
+#[test]
+fn the_palaces_offer_taken_as_the_original_draws_it() {
+    screen("palaceaccept", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); d.click(a, 0xA0, 0x90, MouseButton::Left); }, over);
+}
+
+#[test]
+fn the_palaces_offer_refused_as_the_original_draws_it() {
+    screen("palacedecline", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); d.click(a, 0xA0, 0xA8, MouseButton::Left); }, over);
+}
+
+/// With none on offer (the save's freed: kind 0): text Dh.
+#[test]
+fn the_palace_with_nothing_on_offer_as_the_original_draws_it() {
+    screen(
+        "palacenone",
+        |a, d| {
+            let v = a.engine.m.mem.r16(DS, 0x0E6E + 4) & 0xFF3F;
+            a.engine.m.mem.w16(DS, 0x0E6E + 4, v);
+            ruler(a, d);
+        },
+        over,
+    );
+}

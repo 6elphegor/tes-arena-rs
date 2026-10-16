@@ -99,3 +99,9 @@ screen | levelupstats | bacc1a605a4f4c4e ef6ad023fa2b8c2b
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
 screen | riddle | 58bb15e08459635 a97a4bafd992e4ed d501f9c4db50e7d0
 screen | riddletyped | bdbcb51de4bb8aa5 a97a4bafd992e4ed 6749c17629c32bf
+screen | palace | 4792fd07c7a702a2 a97a4bafd992e4ed 277dc496d3feb8d9
+screen | palaceno | 921aa4fcff38fac1 a97a4bafd992e4ed f7d24c0f58633c25
+screen | palaceyes | b7153fdf9a4a1374 a97a4bafd992e4ed 81eb9708c8c5c92d
+screen | palaceaccept | 9f5777e2778c4673 a97a4bafd992e4ed b4ee2e592ebb225
+screen | palacedecline | c53dd1e740f17cf4 a97a4bafd992e4ed 84778cba60dcaa0e
+screen | palacenone | b0ce105eb5a635e3 a97a4bafd992e4ed e5cc6fd39d770635

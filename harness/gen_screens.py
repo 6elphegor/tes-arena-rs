@@ -294,6 +294,21 @@ SCREENS = {
     # takes one a pass).
     'riddle': ((0, 0x0550, {}), []),
     'riddletyped': ((0, 0x0550, {}), [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13)]),
+    # In the town's palace (WHERE), its ruler clicked (`ruler`: a map
+    # flat of the palace's first kind as the hit test copies it, 2294:047B)
+    # as the frame runs the click (1194:DB6C -> 8F1E): the save's quest on
+    # offer asked about (1194:9CD8, text Eh, Yes and No). The menu (3159:
+    # 0F2A) picks by the click's row alone, from the tops it keeps of its
+    # entries (here 106 and 127, 21 high; for the offer 136 and 157),
+    # not where it drew them. No: text Fh; Yes: the offer itself asked
+    # (its text, 1194:9162..9321), then taken or refused; with none on
+    # offer (`unoffered`), text Dh.
+    'palace': ((0x1194, 0xDB6C, {}), []),
+    'palaceno': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x88)]),
+    'palaceyes': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E)]),
+    'palaceaccept': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0x90)]),
+    'palacedecline': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0xA8)]),
+    'palacenone': ((0x1194, 0xDB6C, {}), []),
 }
 WAIT = (0, 0x8FC4)
 
@@ -302,11 +317,12 @@ WAIT = (0, 0x8FC4)
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
-          'people': None}
+          'people': None, 'palace': 'triggers'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
-         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
+         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
+         'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
                'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'storestolen', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
@@ -324,7 +340,9 @@ def place(a, base, where, cache={}):
             # on both sides, whatever the view's frames rolled before.
             seeded(a)
         assert a.area_ended() == ('world',), 'the guild not left'
-        if PLACES[where] is not None:
+        if PLACES[where] == 'triggers':
+            assert a.enter(palace_door(a)) == ('world',), 'the palace not entered'
+        elif PLACES[where] is not None:
             at, count = PLACES[where]
             assert a.r16(count), f'no {where} in the town'
             # An entry's square is row << 8 | column (1194:40CF); the
@@ -334,6 +352,47 @@ def place(a, base, where, cache={}):
             assert a.enter(door) == ('world',), f'the {where} not entered'
         cache[where] = a.snapshot()
     return cache[where]
+
+
+def palace_door(a):
+    """The first square (row << 8 | column << 1) of the city's map (D806)
+    whose wall's trigger (its low 6 bits, the high byte its low or bit 15
+    set: 0000:43B1) is one of the palace's, the triggers' 11..13 (C917's;
+    0000:4192)."""
+    palace = set(a.mu.mem_read(a.lin(a.ds, 0xC917 + 11), 3))
+    seg = a.r16(0xD806)
+    for off in range(0, 0x8000, 2):
+        w = a.r16(off, seg=seg)
+        if (w & 0x8000 or w >> 8 == w & 0xFF) and w & 0x3F in palace:
+            return off
+    raise AssertionError('no palace in the town')
+
+
+# The record a map flat clicked is copied to (2294:047B), CLICKED's then.
+RECORD = 0x3D96
+
+
+def ruler(a):
+    """A map flat of the palace's first kind (+0Ch the flat base C38E: 0,
+    the ruler's) clicked, as the hit test leaves it: copied to RECORD, the
+    record CLICKED (CB5E); out of a thing's reach (292B:06DC's E6h), so
+    taken by the palace's ruler. The palace's first frame has shown its
+    pending box (0000:4903: 191F, 101C and 137E cleared after)."""
+    for at in (0x191F, 0x101C, 0x137E):
+        a.mu.mem_write(a.lin(a.ds, at), bytes([0]))
+    # The words' variants (and the offer's names) rolled from SEED on both
+    # sides, whatever the view's frames rolled before.
+    seeded(a)
+    a.w16(RECORD, a.r16(0xC3D0) + 0x200)
+    a.w16(RECORD + 4, a.r16(0xC3D4))
+    a.mu.mem_write(a.lin(a.ds, RECORD + 0xC), bytes([a.r16(0xC38E) & 0xFF]))
+    a.w16(0xCB5E, RECORD)
+
+
+def unoffered(a):
+    """The save's quest on offer (QUESTS 0E6E's first, kind 2 in +4's
+    bits 6-7) freed: none on offer."""
+    a.w16(0x0E6E + 4, a.r16(0x0E6E + 4) & 0xFF3F)
 
 
 def square(a):
@@ -533,7 +592,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
           'storerepairworn': lambda a: (worn(a), seeded(a)),
           'storesteal': lambda a: (room(a), seeded(a)),
-          'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED))}
+          'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
+          'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:
