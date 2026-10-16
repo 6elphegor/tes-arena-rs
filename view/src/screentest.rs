@@ -713,3 +713,39 @@ fn the_loot_window_after_a_take_as_the_original_draws_it() {
         over,
     );
 }
+
+/// "Who are you?" with the timer (0151) at 456h as the talk runs: the
+/// greeting's text (64h) takes the template with %en, which outside an
+/// equipment store returns into 2DA2 at the text's offset (2DA2:05DC). The
+/// original at these timers (every third: 450h, 453h, 456h, ...) runs on
+/// into a box 1320h pixels wide (0000:9727 tiling it, past 20 million
+/// steps without asking for input: the harness's probe); the port gives
+/// up there as the original's fault, and the view shows nothing.
+#[test]
+fn who_are_you_at_a_timer_of_456h_gives_up_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let (mut a, mut d) = loaded(&dir, &save);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    area_left(&mut a);
+    let ft = a.engine.frame_ticks();
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    for (at, v) in [(arena::movement::var::X, x), (arena::movement::var::Y, y), (0xBA62, x), (0xBA66, y)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    // The turn's tick comes before the talk: the timer 456h as it runs
+    // (and again as the answer's turn runs again from before it).
+    m.mem.w16(DS, arena::frame::var::TICKS, 0x456u16.wrapping_sub(ft));
+    d.frame(&mut a);
+    assert!(a.pending.is_some(), "the townsperson's menu");
+    d.click(&mut a, 0xA0, 0x4D, MouseButton::Left);
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "nothing said");
+    let why = a.engine.m.gave_up.expect("the port gave up");
+    assert!(why.starts_with("2DA2:05DC"), "gave up at %en: {why}");
+}
