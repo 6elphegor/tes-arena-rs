@@ -17,6 +17,8 @@ A check's case (`check_setup`, mirrored too) fills the main quest's flag
 (80ECh) and the province (A46); the person's talk (1194:D593) is a stub.
 
   questcheck | seed | carry ran
+
+The two runs' cases are in turn in one file, so the cases aren't sharded.
 """
 import os
 import random
@@ -25,7 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EFLAGS
-from emu import Arena, LOAD_SEG, mine
+from emu import Arena, LOAD_SEG
 from gen_attack import stream
 
 
@@ -63,10 +65,8 @@ def main():
     a = Arena(EXE)
     rng = random.Random(0x1994_4D00)
     total = int(os.environ.get('N', 3000))
-    for n in range(total):
+    for _ in range(total):
         seed = rng.getrandbits(32)
-        if not mine(n, total):
-            continue
         words, bytes_ = setup(seed)
         for off, v in words:
             a.w16(off, v)
@@ -79,10 +79,8 @@ def main():
     lin = a.lin(LOAD_SEG + 0x1194, 0xD593)
     a.mu.hook_add(UC_HOOK_CODE, lambda mu, addr, size, _: ran.append(1), None, lin, lin)
     rng = random.Random(0x1994_D961)
-    for n in range(total):
+    for _ in range(total):
         seed = rng.getrandbits(32)
-        if not mine(n, total):
-            continue
         for off, v in check_setup(seed):
             a.mu.mem_write(a.lin(a.ds, off), bytes([v]))
         ran.clear()

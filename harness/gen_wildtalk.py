@@ -24,6 +24,8 @@ SI) are stubs that log.
   boat | seed | result
   wildway | seed | result
 
+The two runs' cases are in turn in one file, so the cases aren't sharded.
+
 Results: "stuck", or the FNV-1a digests of the changed DGROUP bytes
 (offset, value), FSEG's and MSEG's 64 KB and the log.
 """
@@ -36,7 +38,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_AX, UC_X86_REG_SI
 from emu import Fault, LOAD_SEG, DGROUP
-from emu import changes, fnv, mine
+from emu import changes, fnv
 from dos import DosArena
 from gen_attack import stream
 
@@ -136,10 +138,8 @@ def main():
     total = int(os.environ.get('N', 1500))
     for name, setup, rseed in (('boat', boat_setup, 0x1994_0DD0), ('wildway', way_setup, 0x1994_0682)):
         rng = random.Random(rseed)
-        for n in range(total):
+        for _ in range(total):
             seed = rng.getrandbits(32)
-            if not mine(n, total):
-                continue
             a.restore(snap)
             mu.mem_write(a.lin(MSEG, 0), zeros)
             mu.mem_write(a.lin(FSEG, 0), zeros)
