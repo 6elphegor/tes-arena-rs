@@ -183,14 +183,12 @@ fn the_logbook_as_the_original_draws_it() {
 
 /// C: the spellbook (2542:026D, 056A).
 #[test]
-#[ignore = "not yet the original's: the view shows this list its own way, not as 3159:06A0's over the bar"]
 fn the_spellbook_as_the_original_draws_it() {
     screen("spellbook", |a, d| d.key(a, KeyCode::KeyC, Some("c")), over);
 }
 
 /// U: the items to use (2542:034D).
 #[test]
-#[ignore = "not yet the original's: the view shows this list its own way, not as 3159:06A0's over the bar"]
 fn the_use_list_as_the_original_draws_it() {
     screen("use", |a, d| d.key(a, KeyCode::KeyU, Some("u")), over);
 }

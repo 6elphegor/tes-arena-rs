@@ -569,8 +569,9 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     assert!(matches!(a.panel, Some(panels::Panel::Spellbook(_))), "C opens the spellbook");
     let spells = panels::spells(&a.engine.m);
     assert!(!spells.is_empty(), "a spell in the book");
-    let (bx, by, lh, _, _) = panels::book_layout(&a.font);
-    d.click(&mut a, bx + 2, by + lh / 2, MouseButton::Left);
+    // Its first line, in the bar's corner (the record at 5AF4's text
+    // area from DEh, 99h).
+    d.click(&mut a, 0xDE + 4, 0x99 + 3, MouseButton::Left);
     assert!(a.panel.is_none(), "a click on the entry casts and closes the book");
     let mut b = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
     setup(&mut b);
@@ -1171,7 +1172,7 @@ fn each_bar_button_as_the_original_wires_it() {
     let (mut a, mut d) = fresh();
     let any = !panels::usable_names(&a.engine.m).is_empty();
     click(&mut a, &mut d, 6);
-    assert_eq!(matches!(&a.panel, Some(panels::Panel::Inventory(i)) if i.using.is_some()), any, "the use list");
+    assert_eq!(matches!(&a.panel, Some(panels::Panel::Use(..))), any, "the use list");
     // 7, the campfire: camping asked, as R.
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 7);
@@ -1863,7 +1864,7 @@ fn each_original_menu_key_as_its_handler() {
     let (mut b, mut db) = fresh();
     press(&mut d, &mut a, KeyCode::KeyU, false);
     bar(&mut b, &mut db, 6, false);
-    let using = |x: &App| matches!(&x.panel, Some(panels::Panel::Inventory(i)) if i.using.is_some());
+    let using = |x: &App| matches!(&x.panel, Some(panels::Panel::Use(..)));
     assert_eq!(using(&a), using(&b), "U and the fist");
     // M: the automap (045A); Shift+M the world map (03BF), as the map's
     // right button.
@@ -1951,3 +1952,16 @@ fn the_frames_keys_from_the_key_state() {
 
 #[path = "screentest.rs"]
 mod screentest;
+
+/// 0000:0B9C's order (`panels::book_order`): ascending by byte, a name
+/// after one it begins with, bytes 80h or more apart backwards (9C0A's
+/// signed test); one name is left unsorted.
+#[test]
+fn the_spellbooks_names_sort_as_0b9c() {
+    let order = |names: &[&str]| panels::book_order(&names.iter().map(|n| n.as_bytes().to_vec()).collect::<Vec<_>>());
+    assert_eq!(order(&["Light Heal", "Dam. Fire Dart", "Absorb Spell +5"]), Some(vec![2, 1, 0]));
+    assert_eq!(order(&["Shield +50", "Shield"]), Some(vec![1, 0]));
+    assert_eq!(order(&["Open"]), None);
+    // 01h against 90h: 01h - 90h is 71h, positive: the first sorts after.
+    assert_eq!(panels::book_order(&[vec![0x01u8], vec![0x90u8]]), Some(vec![1, 0]));
+}

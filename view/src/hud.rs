@@ -468,7 +468,15 @@ pub struct Style {
     /// The lists' kinds 0..11 as 1194:5734 sets them up (any other kind
     /// is kind 1's).
     kinds: Vec<ListKind>,
+    /// The list in the bar's corner (`BAR_LIST`).
+    bar: ListKind,
 }
+
+/// `Menu::kind` of the list 2542:06F8 shows in the bar's bottom right
+/// corner (the spellbook's, 29CF:060B with 8036 9; the items to use,
+/// 2542:066A) rather than through 1194:5734: the record at DGROUP 5AF4,
+/// no panel (the bar under it stays), the lines in FDh.
+pub const BAR_LIST: u16 = 0xFFFF;
 
 /// A kind of list as 1194:5734 sets it up: its panel (where its header
 /// puts it) and its record's text area and scroll track (x, y, w, h).
@@ -504,6 +512,7 @@ const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C)
 const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
 const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
 const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
+const RECORD_5AF4: ListRecord = ((0xDE, 0x99, 0x54, 0x2A), (0xD1, 0xA1, 7, 0x1A), 0x4000);
 
 /// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
 /// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
@@ -537,7 +546,7 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
         let (area, track, flags) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
-        ListKind { panel: crate::panels::load_image(archive, m, name), area, track, last, colour, title }
+        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, last, colour, title }
     };
     let kinds = vec![
         kind("POPUP.IMG", RECORD_5006, 0xFD, None),
@@ -553,12 +562,16 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
         kind("NEWPOP.IMG", RECORD_505B, 0xFD, Some((0x1F, 0x60))),
         kind("NEWPOP.IMG", RECORD_5006, 0xFD, None),
     ];
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds });
+    let bar = kind("", RECORD_5AF4, 0xFD, None);
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds, bar });
 }
 
 /// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
 /// port's `list_kind`); any kind past 11 is kind 1's, as 5734's default.
 fn list_kind<'a>(st: &'a Style, menu: &Menu) -> &'a ListKind {
+    if menu.kind == BAR_LIST {
+        return &st.bar;
+    }
     st.kinds.get(menu.kind as usize).unwrap_or(&st.kinds[1])
 }
 
@@ -911,17 +924,19 @@ fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
         let y = area.1 + 1 + (menu.selected - top) as i32 * fh;
         screen.remap(area.0, y, area.2, fh, &picked_table());
     }
+    // The thumb (3159:0C93 sizes it: the whole track while every line
+    // fits, else its share, at least 3; 0CFF draws it): filled in F5h,
+    // then by 0000:7334's lines the left edge and the bottom in F9h, the
+    // right edge and the top in F2h.
     let n = menu.entries.len();
-    if n > rows {
-        let (tx, ty, tw, th) = kind.track;
-        let h = (th * rows as i32 / n as i32).max(3);
-        let y = ty + (th - h) * top as i32 / (n - rows).max(1) as i32;
-        screen.fill(tx, y, tw, h, 0xF5, 0xFF);
-        screen.fill(tx, y, tw, 1, 0xF9, 0xFF);
-        screen.fill(tx, y, 1, h, 0xF9, 0xFF);
-        screen.fill(tx, y + h - 1, tw, 1, 0xF2, 0xFF);
-        screen.fill(tx + tw - 1, y, 1, h, 0xF2, 0xFF);
-    }
+    let (tx, ty, tw, th) = kind.track;
+    let h = if n > rows { (th * rows as i32 / n as i32).max(3) } else { th };
+    let y = if n > rows { ty + (th - h) * top as i32 / (n - rows) as i32 } else { ty };
+    screen.fill(tx, y, tw, h, 0xF5, 0xFF);
+    screen.fill(tx, y, 1, h, 0xF9, 0xFF);
+    screen.fill(tx, y + h - 1, tw, 1, 0xF9, 0xFF);
+    screen.fill(tx + tw - 1, y, 1, h - 1, 0xF2, 0xFF);
+    screen.fill(tx, y, tw, 1, 0xF2, 0xFF);
 }
 
 /// `hud`'s texts drawn over what the layer has (the interface, drawn
