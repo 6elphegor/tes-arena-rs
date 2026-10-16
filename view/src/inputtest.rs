@@ -543,8 +543,18 @@ fn inventory_by_i_and_a_click_equips_as_panels_do() {
     panels::equip_line(&mut b.engine.m, 0, &mut said);
     same(&a, &b, "line 0 clicked and panels::equip_line(0)");
     assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), said.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), "the same boxes said");
-    // A box up takes the next key (it is read); then I closes the panel.
+    // A refusal is drawn in the list's panel (1194:223A), not boxed.
+    let shown = match &a.panel {
+        Some(panels::Panel::Inventory(inv)) => inv.info.as_ref().map(|l| l[0].0.clone()),
+        _ => None,
+    };
+    assert_eq!(shown, said.panel, "the same refusal in the panel");
+    // A box up takes the next key (it is read), as a refusal in the
+    // panel does (1194:5536); then I closes the panel.
     while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    if shown.is_some() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.key(&mut a, KeyCode::KeyI, None);
