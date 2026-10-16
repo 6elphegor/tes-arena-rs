@@ -2854,7 +2854,12 @@ impl App {
         } else if let Some(t) = &self.travel {
             let (x, y) = self.screen_point();
             t.draw(&mut self.screen, &self.font, &mut self.engine.m, x, y);
-            hud::compose_over(&mut self.screen, &self.font, &hud);
+            // Its boxes in its own tiles (`Travel::draw_box`).
+            let boxed = hud.boxed.clone();
+            hud::compose_over(&mut self.screen, &self.font, &hud::Hud { boxed: None, ..hud });
+            if let Some(lines) = boxed {
+                t.draw_box(&mut self.screen, &self.font, &lines);
+            }
         } else {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
             self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
@@ -3065,8 +3070,26 @@ impl App {
     /// An input to the travel map, then its boxes shown and its end
     /// followed (`travel::after`).
     fn travel_input(&mut self, f: impl FnOnce(&mut travel::Travel, &mut Engine, &archive::Archive)) {
+        let Some(shown) = self.travel.as_ref().map(|t| t.shown()) else { return self.travel_after() };
+        let was = self.fade_from();
         if let Some(t) = &mut self.travel {
             f(t, &mut self.engine, &self.assets.archive);
+        }
+        match (shown, self.travel.as_ref().and_then(|t| t.shown_now())) {
+            // 26F7:0176: a province's map opened, the world map faded out
+            // in 8 steps (1194:55B2) and the map's colours set, twice (its
+            // picture's two loads, 0000:56C8 with BX 84h, then 4: 9B56 again,
+            // whose first wait shows them whole).
+            (None, Some(Some(_))) => {
+                self.fade_to(was, 8, 0);
+                let to = *self.screen.palette();
+                self.fade.push_back((to, false));
+            }
+            // Its Exit (26F7:0231..0251): the screen cleared (9426) and the
+            // world map's window shown again (3159:0494 on DATA:6C56),
+            // faded out in 6 steps and its colours in in 6.
+            (Some(_), Some(None)) => self.fade_to(was, 6, 6),
+            _ => self.fade = was.0,
         }
         self.travel_after();
     }

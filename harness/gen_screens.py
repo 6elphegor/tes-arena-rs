@@ -139,6 +139,15 @@ SCREENS = {
     # 26F7's travel map).
     'streetcamp': (0x01E6, []),
     'worldmap': (0x03BF, []),
+    # Its first province's region (DATA:6D90's first: High Rock) clicked:
+    # the province's map, the name of the place nearest the mouse (left
+    # where it clicked) over it; a place clicked: the journey's length
+    # asked; its Search (the button at 34, 167): a name asked.
+    'worldprovince': (0x03BF, [('click', 70, 45)]),
+    'worldtrip': (0x03BF, [('click', 70, 45), ('click', 200, 100)]),
+    'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
+    # The province's Exit (the button at 72, 167): the world map again.
+    'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
     # A townsperson clicked in the street (`beside`: the first person's
     # slot, CLICKED CB5E, the player on their square, within talking's two
     # squares), as the frame runs the click (1194:DB6C): what to ask
@@ -192,6 +201,7 @@ WAIT = (0, 0x8FC4)
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
           'people': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
+         'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',

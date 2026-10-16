@@ -1058,3 +1058,50 @@ fn a_riddles_answer_typed_as_the_original_draws_it() {
         over_typed,
     );
 }
+
+/// In the street, Shift+M, then the world map's clicks at each (x, y):
+/// as gen_screens.py's script clicks them (the mouse left at the last).
+fn world_clicks(a: &mut App, d: &mut Driver, at: &[(i32, i32)]) {
+    area_left(a);
+    a.assets.drawn(&mut a.engine, 1.6);
+    super::press(d, a, KeyCode::KeyM, true);
+    for &(x, y) in at {
+        d.click(a, x, y, MouseButton::Left);
+    }
+}
+
+/// The world map's first province (High Rock) clicked: its map, the
+/// name of the place nearest the mouse over it.
+#[test]
+fn a_provinces_map_as_the_original_draws_it() {
+    screen("worldprovince", |a, d| world_clicks(a, d, &[(70, 45)]), layer);
+}
+
+/// A place on it clicked: the journey's length asked.
+#[test]
+fn a_journeys_length_as_the_original_draws_it() {
+    screen("worldtrip", |a, d| world_clicks(a, d, &[(70, 45), (200, 100)]), layer);
+}
+
+/// Its Search: a name asked, after the editor's two passes before its
+/// wait (0000:A0D9's blink: from C7h, what the prompt's box leaves, the
+/// cursor toggled on at C8h).
+#[test]
+fn the_maps_search_as_the_original_draws_it() {
+    screen(
+        "worldsearch",
+        |a, d| {
+            world_clicks(a, d, &[(70, 45), (43, 175)]);
+            for _ in 0..2 {
+                a.travel.as_mut().expect("the travel map").advance(0);
+            }
+        },
+        layer,
+    );
+}
+
+/// The province's Exit: the world map again.
+#[test]
+fn the_world_map_again_as_the_original_draws_it() {
+    screen("worldback", |a, d| world_clicks(a, d, &[(70, 45), (80, 180)]), layer);
+}

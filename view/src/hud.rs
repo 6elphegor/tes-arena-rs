@@ -1225,19 +1225,13 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
 }
 
 /// A typed field's prompt box as the original draws it: the prompt in a
-/// box by 965A with CX 7 (centred in the clip) and a margin of 0Ah. Two
-/// callers: 1194:4800 (the rest's hours), whose prompt ends in spaces,
-/// the field's room on its line; 1194:5C30 (the travel map's search,
-/// creation's name), whose prompt is formatted "%s\r" and 17 spaces
-/// (4FBC), the field's line under it. The field itself (0000:9EE9) is
-/// where the caller puts it, drawn over the box (`field::Live::draw`).
-pub fn typed_prompt(screen: &mut Screen, prompt: &str) {
-    if let Some(st) = STYLE.get() {
-        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, 0x0F);
-    }
-}
-
-/// `typed_prompt` centred in the clip `c`, in `colour`.
+/// box by 965A with CX 7 (centred in the clip `c`) and a margin of 0Ah,
+/// in `colour`. Its callers: 1194:4800 (the rest's hours), whose prompt
+/// ends in spaces, the field's room on its line; 1194:5C30 (the travel
+/// map's search, in the map's own tiles: `travel`), whose prompt is
+/// formatted "%s\r" and 17 spaces (4FBC), the field's line under it. The
+/// field itself (0000:9EE9) is where the caller puts it, drawn over the
+/// box (`field::Live::draw`).
 fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, colour: u8) {
     let font = &st.box_font;
     let text = lines(prompt.as_bytes(), colour);
