@@ -815,7 +815,7 @@ impl Creation {
             Up::Menu => {
                 film.dissolve(m, &bare_before, FULL);
                 match now {
-                    Up::Box => self.into_box(&mut film, m, was_back, &after, after_dac),
+                    Up::Box => self.box_in(&mut film, m, was_back, &after, after_dac),
                     Up::List => {
                         film.wait();
                         film.colours(&after_dac);
@@ -841,7 +841,7 @@ impl Creation {
                 }
                 film.dissolve(m, &under, FULL);
                 match now {
-                    Up::Box => self.into_box(&mut film, m, was_back, &after, after_dac),
+                    Up::Box => self.box_in(&mut film, m, was_back, &after, after_dac),
                     Up::Quiz => {
                         film.wait();
                         film.dissolve(m, &after, (0, 0x77, 0x140, 0x50));
@@ -862,7 +862,7 @@ impl Creation {
     /// A box shown (dissolved in), over a new background if the back
     /// changed: the old faded out, the screen cleared, the new picture's
     /// colours set, the picture shown.
-    fn into_box(&mut self, film: &mut Film, m: &mut Machine, was_back: Back, after: &[u8], after_dac: Dac) {
+    fn box_in(&mut self, film: &mut Film, m: &mut Machine, was_back: Back, after: &[u8], after_dac: Dac) {
         let back = self.back();
         if back != was_back {
             film.wait();
@@ -934,6 +934,7 @@ impl Creation {
 
     /// Every frame the change will show, in turn: the screen's indices
     /// and the colours (6-bit), at each wait for the retrace.
+    #[cfg(test)]
     pub fn film_frames(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
         self.film.iter().map(|(px, dac)| (px.clone(), dac.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect())).collect()
     }
