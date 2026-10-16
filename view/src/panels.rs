@@ -488,14 +488,24 @@ impl Said {
 }
 
 /// A special item's description box (1194:7E44's 59CC, its text in a
-/// heap block), in the colour its caller left (9288).
+/// heap block), in the colour its caller left (9288), the font selected
+/// (B036: the list's TEENYFNT) and MARBLE2.CIF's tiles.
 impl arena::text::TextHooks for Said {
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.message_box_far(m, DS, si);
     }
     fn message_box_far(&mut self, m: &mut Machine, seg: u16, si: u16) {
         let t = m.mem.cstr(seg, si).to_vec();
-        self.boxes.push(crate::hud::lines(&t, m.mem.r8(DS, 0x9288)));
+        let font = crate::hud::GameFont::selected(m);
+        let mut lines = crate::hud::lines(&t, m.mem.r8(DS, 0x9288));
+        for s in lines.iter_mut().flatten() {
+            s.font = font;
+        }
+        // 7E44 makes [103A] B038's (0000:9AF8) before its box: MARBLE2's
+        // tiles (the view keeps no tile records to compare B038 with).
+        let r = |at| m.mem.r16(DS, at) as i32;
+        lines = crate::hud::in_marble2(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
+        self.boxes.push(lines);
     }
 }
 
@@ -645,6 +655,11 @@ fn item_info(m: &mut Machine, files: &mut arena::bsa::Files, said: &mut Said) ->
     m.mem.w16(DS, info::ARGS, 0);
     m.mem.w16(DS, info::LINES, 3);
     m.mem.w8(DS, 0x9288, 0xFE);
+    // The font the list's drawing (1194:1EB8, its lines through 0000:9AE6)
+    // leaves selected: [102E], TEENYFNT, which a special item's box is
+    // drawn in.
+    let teeny = m.mem.r16(DS, 0x102E);
+    m.mem.w16(DS, 0xB036, teeny);
     let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
     match m.item_info(files, said, it) {
         None => {

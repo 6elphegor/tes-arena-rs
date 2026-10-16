@@ -67,6 +67,11 @@ SCREENS = {
     # "can't be equipped" (1AFB -> 1BE0).
     'equipmentquests': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40),
     'equipmentquestinfo': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 122)]),
+    # The line before the quests' (the save's last slot: King Orgnum's
+    # Coffer, a special item, type 8Dh) right-clicked: its box (7E44); with
+    # an identified potion in that slot (`potion`), its text (7CF8).
+    'equipmentspecial': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
+    'equipmentpotion': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
     'equipmentquestequip': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('click', 60, 111), ('click', 60, 111)]),
     # A line right-clicked: marked, its item described (1194:1988).
     'equipmentinfo': (0x00BE, [('click', 0x80, 0xB8), ('rclick', 60, 62)]),
@@ -565,6 +570,29 @@ def hunted(a):
     a.w16(0x0FFB, 1)
 
 
+# The potion `potion` puts in the player's last slot: its type (the
+# fifteen the guild sells, 28CD's names), and its +4 (the seed its text's
+# variant is rolled from, 1194:7CF8).
+POTION = (3, 0x1234)
+
+
+def potion(a):
+    """An identified potion (flags +0Eh: taken 40h, a stack 0Ch, 1, and
+    identified 2) in the last of the player's slots, as 1194:B158 makes
+    one bought (its spell from 2A11, +12h FFh, condition 32h) then
+    identified (1194:AB39's bit 2)."""
+    ty, seed = POTION
+    b = bytearray(0x13)
+    b[0] = ty
+    b[4:6] = seed.to_bytes(2, 'little')
+    b[6:8] = b[8:10] = (0x32).to_bytes(2, 'little')
+    b[0x0E] = 0x40 | 0x0C | 1 | 2
+    b[0x0F] = 0xFF
+    b[0x11] = a.mu.mem_read(a.lin(a.ds, 0x2A11 + ty), 1)[0]
+    b[0x12] = 0xFF
+    a.mu.mem_write(a.lin(a.ds, 0x0212 + 39 * 0x13), bytes(b))
+
+
 def worn(a):
     """Each of the player's items (40 slots of 13h bytes from DGROUP 0212h,
     taken: +0Eh bit 40h) worn to half its condition: +6 of its maximum +8,
@@ -593,6 +621,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storerepairworn': lambda a: (worn(a), seeded(a)),
           'storesteal': lambda a: (room(a), seeded(a)),
           'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
+          'equipmentpotion': potion,
           'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
