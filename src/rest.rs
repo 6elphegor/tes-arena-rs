@@ -735,7 +735,8 @@ impl Machine {
         let gone = |m: &mut Machine, hooks: &mut dyn RestHooks| {
             m.mem.w8(DS, ROOM_FLAG, 0);
             m.mem.w8(DS, ROOM_FLAG_2, 0);
-            m.rest_colours();
+            // 1194:C222: ARENAFNT ([102C]) through 42EE.
+            m.message_fonts(0x102C);
             m.rest_message(hooks, text::ROOM_GONE);
             m.mem.w16(DS, ROOM_HOURS, 0);
             None
@@ -753,6 +754,7 @@ impl Machine {
         let ax = ax as u16;
         if asked > ax {
             let cx = if ax < self.r_g16(ROOM_HOURS) { ax } else { self.r_g16(ROOM_HOURS) };
+            // 1194:C1E3: 42EE with FONT_A ([1026]).
             self.rest_colours();
             self.sprintf((DS, TEXT), (DS, text::ONLY), &[Arg::Int(cx)]);
             self.mem.w8(DS, COLOUR, 0x60);
@@ -767,7 +769,9 @@ impl Machine {
             return Some(ax);
         }
         let n = self.r_g16(ROOM_HOURS);
+        // 1194:BEC5: the text, then FONT_A ([1026]) selected (BED6).
         self.sprintf((DS, TEXT), (DS, text::ONLY), &[Arg::Int(n)]);
+        self.select_font(0x1026);
         let (bx, di) = text::ONLY_MENU;
         if hooks.menu(self, TEXT, bx, di) != 0 {
             return None;

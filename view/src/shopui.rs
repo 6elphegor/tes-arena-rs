@@ -256,10 +256,13 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
                 // The lines in the strip, the picture's buttons picked
                 // (1194:6001).
                 let entries: &[&str] = if self.picture == NEW_OLD { &["New job", "Old job"] } else { &["Yes", "No"] };
-                let raw: Vec<&[u8]> = raw.iter().map(|l| l.as_slice()).collect();
-                let menu = crate::hud::dialog_buttons(&raw, entries);
                 let pick = match self.talk() {
-                    Some(t) => t.ask_menu(menu),
+                    Some(t) => {
+                        // The pages before the last read first (4E88's
+                        // "...More").
+                        let last: Vec<&[u8]> = t.dialog_pages(&raw).iter().map(|l| l.as_slice()).collect();
+                        t.ask_menu(crate::hud::dialog_buttons(&last, entries))
+                    }
                     None => 0xFFFF,
                 };
                 match pick {
@@ -275,6 +278,8 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
                 let look = crate::field::Look { font: "TEENYFNT.DAT", colour: 0xC0, put_font: true };
                 match self.talk() {
                     Some(t) => {
+                        let last = t.dialog_pages(&raw).len();
+                        let lines = lines[lines.len() - last.min(lines.len())..].to_vec();
                         t.edit(m, field, look, crate::dialog::Prompt::Lines(lines));
                         // Not answered yet: "0", which every shop takes as
                         // leaving (the tavern's days are asked again until

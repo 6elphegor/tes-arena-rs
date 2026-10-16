@@ -426,6 +426,36 @@ fn the_taverns_rumour_kinds_as_the_original_draws_them() {
     screen("tavernrumor", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x8B), layer);
 }
 
+/// gen_screens.py's RUMOURS: the game's clock (05CC) and timer (0151) as
+/// the rumours start, which pick what is heard (1194:E3F7): by the first
+/// nothing, by the second what is heard of the quest told (four lines).
+const RUMOURS: [(u32, u16); 2] = [(0x0001_2345, 0x0456), (0x0001_2385, 0x043F)];
+
+/// The tavern's rumours, General picked, the clock and timer at `at`.
+fn rumour(a: &mut App, d: &mut Driver, at: (u32, u16)) {
+    into(a, 0x1AB5);
+    a.engine.m.mem.w32(DS, 0x05CC, at.0);
+    // The turn's ticks (`Engine::tick`) come before the shop.
+    let t = a.engine.frame_ticks();
+    a.engine.m.mem.w16(DS, arena::frame::var::TICKS, at.1.wrapping_sub(t));
+    super::shop_turn(a, 4);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x8B, MouseButton::Left);
+    d.click(a, 0xA0, 0x65, MouseButton::Left);
+}
+
+/// The rumours' General picked: nothing heard, in its box.
+#[test]
+fn a_taverns_rumour_as_the_original_draws_it() {
+    screen("tavernrumorgeneral", |a, d| rumour(a, d, RUMOURS[0]), layer);
+}
+
+/// The rumours' General picked: what is heard, in its box.
+#[test]
+fn a_taverns_rumour_heard_as_the_original_draws_it() {
+    screen("tavernrumorheard", |a, d| rumour(a, d, RUMOURS[1]), layer);
+}
+
 /// The temple's Bless: the donation asked.
 #[test]
 fn the_temples_blessing_as_the_original_draws_it() {
@@ -474,6 +504,26 @@ fn the_taverns_days_asked_as_the_original_draws_them() {
         },
         layer,
     );
+}
+
+/// The tavern's Get a Room, the Single, a day typed (1, Enter): the
+/// room's price haggled over (1194:C14E), the seed as gen_screens.py's.
+fn room_priced(a: &mut App, d: &mut Driver) {
+    into(a, 0x1AB5);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 4);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x5B, MouseButton::Left);
+    d.click(a, 0x80, 0x31, MouseButton::Left);
+    d.key(a, KeyCode::Digit1, Some("1"));
+    d.key(a, KeyCode::Enter, None);
+}
+
+/// The room's price: its line (by the seed) over the haggle's buttons.
+#[test]
+fn the_taverns_room_price_as_the_original_draws_it() {
+    screen("tavernroomprice", room_priced, layer);
 }
 
 /// The store's Sell, its first item (equipped) picked: whether to sell
