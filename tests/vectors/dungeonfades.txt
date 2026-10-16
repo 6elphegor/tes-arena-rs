@@ -1,3 +1,5 @@
 screenfade | dungeonautomap | 72 | 2c86ca8f17bddf19
 screenfade | dungeonmap | 72 | 2c86ca8f17bddf19
 screenfade | dungeonleave | 42 | d1776a7dcc43aff4
+screenfade | questpic0 | 36 | ab7d63b35beba4f
+screenfade | questpic3 | 36 | 59f9359a75101487

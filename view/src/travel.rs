@@ -128,6 +128,12 @@ const SEARCH_LOOK: crate::field::Look = crate::field::Look { font: "ARENAFNT.DAT
 
 pub struct Travel {
     start: MapStart,
+    /// A main quest's dungeon reached: its picture up until its button is
+    /// clicked (292B:0362).
+    picture: Option<Picture>,
+    /// The fonts the picture's lines may be in (B036 as 0000:5364 draws
+    /// them).
+    fonts: Vec<(hud::GameFont, Font)>,
     /// The province's map shown; None: the world map.
     shown: Option<u8>,
     world: Option<(Image, Palette)>,
@@ -202,6 +208,9 @@ struct Hooks<'a> {
     failed: bool,
     /// The journey's frames drawn (1194:30F1, one a day).
     frames: Vec<u8>,
+    /// The province whose main quest's dungeon was reached (292B:0362's
+    /// AX, `MapHooks::quest_dungeon`): its picture to show.
+    quest: Option<u16>,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
@@ -240,6 +249,12 @@ impl TravelHooks for Hooks<'_> {
 }
 
 impl MapHooks for Hooks<'_> {
+    /// Kept: the picture is shown after the screen's end (`Picture`), the
+    /// game's state the same either way (292B:0362 reads and writes none
+    /// of what 26F7:00CE goes on to).
+    fn quest_dungeon(&mut self, _m: &mut Machine, ax: u16) {
+        self.quest = Some(ax);
+    }
     /// The name's typing given to the game's editor (`field::replay`).
     fn type_name(&mut self, m: &mut Machine) {
         if crate::field::replay(m, &arena::lineedit::fields::search(), &SEARCH_LOOK, &self.typed) != Some(true) {
@@ -266,14 +281,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -291,14 +306,20 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
+        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
         // The window it runs (3159:000C on DATA:6C56) is the world map's:
         // TAMRIEL.MNU, its provinces' regions at 6D90, the current one
         // outlined (26F7:013E). A province's map is a region's click away.
+        let fonts = [(hud::GameFont::A, "FONT_A.DAT"), (hud::GameFont::B, "FONT_B.DAT"), (hud::GameFont::Arena, "ARENAFNT.DAT"), (hud::GameFont::Teeny, "TEENYFNT.DAT")]
+            .into_iter()
+            .filter_map(|(g, n)| Font::load(archive, n).map(|f| (g, f)))
+            .collect();
         Travel {
             start,
+            picture: None,
+            fonts,
             shown: None,
             world: crate::create::mnu(archive, "TAMRIEL.MNU"),
             province: None,
@@ -327,7 +348,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() }
+        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded, `travel_province`).
@@ -344,11 +365,44 @@ impl Travel {
     fn end(&mut self, engine: &mut Engine) {
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         let carry = engine.m.travel_map_end(&mut h, self.start);
+        let quest = h.quest;
         self.done = Some(carry);
+        self.picture = quest.map(|ax| Picture::drawn(engine, ax));
+    }
+
+    /// The picture of province `ax`'s main quest dungeon put up as the
+    /// screen's end puts it up (the tests': no journey made).
+    #[cfg(test)]
+    pub fn show_picture(&mut self, engine: &Engine, ax: u16) {
+        self.picture = Some(Picture::drawn(engine, ax));
+    }
+
+    /// Whether a main quest's dungeon's picture is up.
+    pub fn picture_up(&self) -> bool {
+        self.picture.is_some()
+    }
+
+    /// A click on the picture: in its button (110h..13Ah, B7h..C3h, as
+    /// 292B:042B tests the mouse), 292B:0362 run on the game with it, the
+    /// picture gone; elsewhere nothing.
+    fn picture_click(&mut self, engine: &mut Engine, x: i32, y: i32) {
+        let Some(p) = &self.picture else { return };
+        if !((0x110..=0x13A).contains(&x) && (0xB7..=0xC3).contains(&y)) {
+            return;
+        }
+        let mut h = PictureHooks { click: Some((x as u16, y as u16)), ..Default::default() };
+        if engine.m.dungeon_picture(&mut engine.files, &mut h, p.ax).is_none() {
+            eprintln!("the dungeon's picture gave up: {}", arena::giveup::describe());
+        }
+        self.picture = None;
     }
 
     /// A click at (x, y) of the screen (a button down: `right` the right).
     pub fn click(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, x: i32, y: i32, right: bool) {
+        if self.picture.is_some() {
+            self.picture_click(engine, x, y);
+            return;
+        }
         if self.done.is_some() {
             return;
         }
@@ -590,6 +644,10 @@ impl Travel {
     /// The screen, the cursor at (x, y): its palette set.
     pub fn draw(&self, screen: &mut Screen, font: &Font, m: &mut Machine, x: i32, y: i32) {
         let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
+        if let Some(p) = &self.picture {
+            p.draw(screen, &self.fonts);
+            return;
+        }
         let Some(p) = self.shown else {
             if let Some((img, pal)) = &self.world {
                 screen.set_palette(*pal);
@@ -723,10 +781,86 @@ impl Travel {
 pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<Lines>, button: bool) -> Option<bool> {
     let t = travel.as_mut()?;
     boxes.extend(t.take_boxes());
-    let carry = t.done.filter(|_| !t.journeying())?;
+    let carry = t.done.filter(|_| !t.journeying() && t.picture.is_none())?;
     if button {
         engine.m.map_button_done(carry);
     }
     *travel = None;
     Some(carry)
+}
+
+/// A main quest's dungeon's picture as 292B:0362 draws it (`Machine::
+/// dungeon_picture` run on a copy of the game, its button never clicked):
+/// the picture at its own place with the colours it fades in to, the
+/// dungeon's lines centred on x A0h (0000:5364) in the font and colour
+/// selected.
+struct Picture {
+    ax: u16,
+    img: Option<Image>,
+    palette: Palette,
+    lines: Vec<(String, i32, i32, hud::GameFont, u8)>,
+}
+
+/// The picture's drawing collected, and its button's click.
+#[derive(Default)]
+struct PictureHooks {
+    img: Option<Image>,
+    palette: Option<Palette>,
+    lines: Vec<(String, i32, i32, hud::GameFont, u8)>,
+    click: Option<(u16, u16)>,
+}
+
+impl arena::dungeonpic::DungeonPicHooks for PictureHooks {
+    /// 0000:5828: the file 7428 left at [9030]:[902E] (its size at A90C).
+    fn picture(&mut self, m: &mut Machine) {
+        let (off, seg, n) = (m.mem.r16(DS, 0x902E), m.mem.r16(DS, 0x9030), m.mem.r16(DS, 0xA90C));
+        let d: Vec<u8> = (0..n).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+        self.img = crate::interface::image(&d).map(|(i, _)| i).or_else(|| crate::panels::image_type8(m, &d));
+    }
+    fn line(&mut self, m: &mut Machine, si: u16, ax: u16, bx: u16) {
+        let text = String::from_utf8_lossy(m.mem.cstr(DS, si)).into_owned();
+        self.lines.push((text, ax as i32, bx as i32, hud::GameFont::selected(m), m.mem.r8(DS, 0x9288)));
+    }
+    /// 5E3E's colours (6 bits each, 300h bytes at `seg`:`off`).
+    fn shown(&mut self, m: &mut Machine, seg: u16, off: u16) {
+        let mut pal = [[0u8; 4]; 256];
+        for (i, c) in pal.iter_mut().enumerate() {
+            let v = |k: u16| {
+                let x = m.mem.r8(seg, off.wrapping_add(3 * i as u16 + k)) & 0x3F;
+                x << 2 | x >> 4
+            };
+            *c = [v(0), v(1), v(2), 0xFF];
+        }
+        self.palette = Some(pal);
+    }
+    fn click(&mut self, m: &mut Machine) -> Option<()> {
+        let (x, y) = self.click.take()?;
+        m.mem.w16(DS, 0x8F92, x);
+        m.mem.w16(DS, 0x8F94, y);
+        Some(())
+    }
+}
+
+impl Picture {
+    fn drawn(engine: &Engine, ax: u16) -> Picture {
+        let mut m = engine.m.clone();
+        let mut h = PictureHooks::default();
+        if m.dungeon_picture(&mut engine.files.clone(), &mut h, ax).is_none() {
+            eprintln!("the dungeon's picture gave up: {}", arena::giveup::describe());
+        }
+        Picture { ax, img: h.img, palette: h.palette.unwrap_or([[0, 0, 0, 0xFF]; 256]), lines: h.lines }
+    }
+
+    fn draw(&self, screen: &mut Screen, fonts: &[(hud::GameFont, Font)]) {
+        screen.set_palette(self.palette);
+        screen.fill(0, 0, 320, 200, 0, 0xFF);
+        if let Some(i) = &self.img {
+            screen.blit(i.x, i.y, i.w, i.h, &i.px, 199);
+        }
+        for (text, x, y, g, colour) in &self.lines {
+            if let Some((_, f)) = fonts.iter().find(|(k, _)| k == g) {
+                screen.text_plain(f, x - (f.width(text) as i32 >> 1), *y, text, *colour);
+            }
+        }
+    }
 }
