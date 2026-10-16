@@ -72,10 +72,11 @@ impl<'a> HaggleTalk<'a> {
     }
 
     /// 4E88 with 13D3 1 (1194:858C, 85DE): the line said in the strip,
-    /// the picture's buttons picked (1194:6001).
+    /// its pages but the last read first ("...More"), the picture's
+    /// buttons picked (1194:6001).
     fn ask(&mut self, entries: &[&str]) -> u16 {
         let Some(t) = self.talk.as_deref_mut() else { return 0xFFFF };
-        let said: Vec<&[u8]> = self.said.iter().map(|l| l.as_slice()).collect();
+        let said: Vec<&[u8]> = t.dialog_pages(&self.said).iter().map(|l| l.as_slice()).collect();
         t.ask_menu(hud::dialog_buttons(&said, entries))
     }
 }

@@ -10,3 +10,6 @@ screenfade | worldtrip | 70 | 40f6a41e18287ddc
 screenfade | worldsearch | 70 | 40f6a41e18287ddc
 screenfade | worldback | 105 | ad34c8f6e802007
 screenfade | guildspellpick | 3 | e5b889bfc934ea49
+screenfade | worldsearchpick | 70 | 40f6a41e18287ddc
+screenfade | worldsearchtyped | 70 | 40f6a41e18287ddc
+screenfade | worldsearchlist | 70 | 40f6a41e18287ddc

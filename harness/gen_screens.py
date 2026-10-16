@@ -114,6 +114,9 @@ SCREENS = {
     'storeweapons': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65)]),
     'storearmor': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x7D)]),
     'storeweapon': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26)]),
+    # The marked weapon clicked again: its price haggled.
+    'storebuyhaggle': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26),
+                                              ('click', 0x70, 0x26)]),
     # A line of those lists clicked: the days asked for the room (its
     # typed field), the haggle over the item sold.
     'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
@@ -160,6 +163,13 @@ SCREENS = {
     'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
     # The province's Exit (the button at 72, 167): the world map again.
     'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
+    # The search's name typed (d, a, g: a key a wait); a name none starts
+    # (z, Enter): the province's places listed; its second line
+    # (Daggerfall) clicked: the journey there.
+    'worldsearchtyped': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x20, 0x1E, 0x22)]),
+    'worldsearchlist': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]),
+    'worldsearchpick': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]
+                        + [('click', 110, 46)]),
     # A townsperson clicked in the street (`beside`: the first person's
     # slot, CLICKED CB5E, the player on their square, within talking's two
     # squares), as the frame runs the click (1194:DB6C): what to ask
@@ -185,6 +195,8 @@ SCREENS = {
     'guilddetect': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x5E)]),
     # R: camping (01E6: 1194:424E), refused in the guild: its box.
     'camp': (0x01E6, []),
+    # With enemies near (`hunted`): "enemies near".
+    'campenemies': (0x01E6, []),
     # M: the automap (045A: 0000:2CFE), whose loop asks the mouse by the
     # near entry (2DB8: 8FC8) rather than 8FC4.
     'automap': (0x045A, [], {(0, 0x8FC8)}),
@@ -225,10 +237,11 @@ PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x10
           'people': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
+         'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -396,6 +409,11 @@ def room(a):
     a.mu.mem_write(a.lin(a.ds, at), bytes([a.mu.mem_read(a.lin(a.ds, at), 1)[0] & ~0x40 & 0xFF]))
 
 
+def hunted(a):
+    """Enemies near as the frame's scan of the actors leaves it (0FFB)."""
+    a.w16(0x0FFB, 1)
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
@@ -403,9 +421,10 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'levelup': leveled, 'levelupstats': leveled,
+          'campenemies': hunted,
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
-          'storeweapon': lambda a: (room(a), seeded(a))}
+          'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:

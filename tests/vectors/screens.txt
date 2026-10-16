@@ -68,3 +68,8 @@ screen | guildmagicroom | 17c6523b9c13da5a a97a4bafd992e4ed cfe06bc4fb04a9c1
 screen | storeweapons | 7ba0e376aee60d6d a97a4bafd992e4ed cfe06bc4fb04a9c1
 screen | storearmor | f613ac59d96e4e18 a97a4bafd992e4ed cfe06bc4fb04a9c1
 screen | storeweapon | fc71e36105c78fa0 a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | worldsearchpick | 39358c3a4fd10544 db15945b94271757
+screen | storebuyhaggle | 3d171823a6e8c912 a97a4bafd992e4ed fa8c11efc16b9367
+screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
+screen | worldsearchlist | ac50fdeceb5ce67d db15945b94271757
+screen | campenemies | 1960b2f57c74c4a1 a97a4bafd992e4ed 5587eea3e0c07725

@@ -379,6 +379,21 @@ fn camping_refused_as_the_original_draws_it() {
     );
 }
 
+/// R with enemies near (0FFB, as the frame's scan of the actors leaves
+/// it): "You can't camp, Enemies are nearby!!!".
+#[test]
+fn camping_refused_with_enemies_near_as_the_original_draws_it() {
+    screen(
+        "campenemies",
+        |a, d| {
+            a.engine.m.mem.w16(DS, 0x0FFB, 1);
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
 /// Shift+M: the world map (2542:03BF), refused inside: its box.
 #[test]
 fn the_world_map_refused_as_the_original_draws_it() {
@@ -1195,6 +1210,49 @@ fn the_maps_search_as_the_original_draws_it() {
     );
 }
 
+/// The map's Search with `name` typed into it after the editor's two
+/// passes before its first wait, as gen_screens.py's keys type it.
+fn searched(a: &mut App, d: &mut Driver, name: &str) {
+    world_clicks(a, d, &[(70, 45), (43, 175)]);
+    for _ in 0..2 {
+        a.travel.as_mut().expect("the travel map").advance(0);
+    }
+    super::type_text(d, a, name);
+}
+
+/// The search's name typed (dag): the field's text.
+#[test]
+fn the_maps_search_typed_as_the_original_draws_it() {
+    screen("worldsearchtyped", |a, d| searched(a, d, "dag"), layer);
+}
+
+/// A name none starts (z) and Enter: the province's places listed.
+#[test]
+fn the_maps_search_list_as_the_original_draws_it() {
+    screen(
+        "worldsearchlist",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+        },
+        layer,
+    );
+}
+
+/// Its second line (Daggerfall) clicked: the journey there.
+#[test]
+fn a_searched_place_picked_as_the_original_draws_it() {
+    screen(
+        "worldsearchpick",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+            d.click(a, 110, 46, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// The province's Exit: the world map again.
 #[test]
 fn the_world_map_again_as_the_original_draws_it() {
@@ -1321,6 +1379,12 @@ fn the_stores_armor_as_the_original_draws_it() {
 #[test]
 fn a_stores_weapon_picked_as_the_original_draws_it() {
     screen("storeweapon", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26)]), layer);
+}
+
+/// The marked weapon clicked again: its price haggled.
+#[test]
+fn a_stores_weapon_haggled_as_the_original_draws_it() {
+    screen("storebuyhaggle", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26), (0x70, 0x26)]), layer);
 }
 
 /// The guild's magic items with a slot free: their list.
