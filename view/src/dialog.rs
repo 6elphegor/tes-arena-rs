@@ -202,18 +202,39 @@ impl Talk {
     /// shop's menu (20h, 91h on, 9 apart, TEENYFNT, C0h), three to a page,
     /// each page read with a click.
     pub fn dialog_lines(&mut self, lines: &[Vec<u8>]) {
+        if lines.is_empty() {
+            return;
+        }
+        let last = self.dialog_pages(lines);
+        self.dialog_page(last, false);
+    }
+
+    /// 1194:4E88's pages of `lines` (1194:4E54's split: as many pages as
+    /// full threes and one) but the last, each read with a click, "...More"
+    /// under it (`hud::more_line`: a page full with lines left, 4EA0); the
+    /// last page's lines, which its kind (13D3) shows with its question.
+    pub fn dialog_pages<'a>(&mut self, lines: &'a [Vec<u8>]) -> &'a [Vec<u8>] {
+        let n = lines.len().saturating_sub(1) / 3 * 3;
+        for page in lines[..n].chunks(3) {
+            self.dialog_page(page, true);
+        }
+        &lines[n..]
+    }
+
+    fn dialog_page(&mut self, page: &[Vec<u8>], more: bool) {
         if self.need.is_some() {
             return;
         }
-        for page in lines.chunks(3) {
-            let page: Vec<&[u8]> = page.iter().map(|l| l.as_slice()).collect();
-            for l in &page {
-                println!("{}", String::from_utf8_lossy(l));
-            }
-            let b = hud::placed_lines(0x20, 0x91, 9, &page, 0xC0, hud::GameFont::Teeny);
-            self.boxes.push(b.clone());
-            self.since_answer.push(b);
+        let page: Vec<&[u8]> = page.iter().map(|l| l.as_slice()).collect();
+        for l in &page {
+            println!("{}", String::from_utf8_lossy(l));
         }
+        let mut b = hud::placed_lines(0x20, 0x91, 9, &page, 0xC0, hud::GameFont::Teeny);
+        if more {
+            b.push(hud::more_line());
+        }
+        self.boxes.push(b.clone());
+        self.since_answer.push(b);
     }
 
     /// Plain text in a box (the way told, a dream).

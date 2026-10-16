@@ -15,7 +15,8 @@ toggle at each read. Interrupt vectors asked for (int 21h AH 35h) are
 
 The first wait for input stops the run (`Waiting`): a mouse button's
 state asked for (int 33h AX 3, 5, 6), a key's (int 16h), or a routine
-named in `waits`.
+named in `waits`. Keys are pressed as the hardware would: each scan code
+and its release given to the game's key interrupt (`press`).
 """
 import os
 import struct
@@ -448,8 +449,15 @@ class ScreenArena(DosArena):
                 polls.clear()
                 if self.script:
                     act = self.script.pop(0)
+                    if os.environ.get('SCREENS_DEBUG'):
+                        print('act', act, 'at', caller, file=sys.stderr)
                     if act[0] == 'click':
                         self.clicks.append(act[1:])
+                    elif act[0] == 'keys':
+                        # Keys pressed and let go: the key interrupt run for
+                        # each (`press`) from the wait, then on.
+                        self.pressed = act[1]
+                        mu.emu_stop()
                     return
                 self.waiting = ('call', w)
                 mu.emu_stop()
@@ -457,8 +465,17 @@ class ScreenArena(DosArena):
             hooks.append(mu.hook_add(UC_HOOK_CODE, stop, (wseg, woff), lin, lin))
         # Code translated before the hooks were added doesn't see them.
         mu.ctl_flush_tb()
+        start = self.lin(LOAD_SEG + seg, off)
+        self.pressed = None
         try:
-            mu.emu_start(self.lin(LOAD_SEG + seg, off), self.lin(*end), count=count)
+            while True:
+                mu.emu_start(start, self.lin(*end), count=count)
+                if self.pressed is None:
+                    break
+                keys, self.pressed = self.pressed, None
+                cs, ip = mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)
+                self.press(keys)
+                start = self.lin(cs, ip)
         finally:
             for h in hooks:
                 mu.hook_del(h)
@@ -469,6 +486,30 @@ class ScreenArena(DosArena):
         at = (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
         assert at == end, f'stopped at {at[0] - LOAD_SEG:04X}:{at[1]:04X}'
         return None
+
+    # The registers a key's interrupt leaves as it found them.
+    KEPT = ('ax', 'bx', 'cx', 'dx', 'si', 'di', 'bp', 'sp', 'ss', 'ds', 'es', 'fs', 'gs', 'eflags', 'cs', 'ip')
+
+    def press(self, scans):
+        """Each scan code given to the key interrupt (0000:718A from its
+        port's read, 71BB, to 72B2: the PIC's end left out, as
+        gen_lineedit.py runs it) pressed and then let go, on the stack
+        under the game's, the game's registers kept round it."""
+        mu = self.mu
+        kept = {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in self.KEPT}
+        for scan in scans:
+            for code in (scan, scan | 0x80):
+                sp = (kept['sp'] - 0x200) & 0xFFFF
+                mu.mem_write(self.lin(kept['ss'], sp), struct.pack('<H', code | code << 8))
+                for r, v in dict(ss=kept['ss'], sp=sp, ds=self.ds, es=self.ds).items():
+                    mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
+                mu.reg_write(UC_X86_REG_CS, LOAD_SEG)
+                mu.reg_write(UC_X86_REG_IP, 0x71BB)
+                mu.emu_start(self.lin(LOAD_SEG, 0x71BB), self.lin(LOAD_SEG, 0x72B2), count=100_000)
+                at = (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
+                assert at == (LOAD_SEG, 0x72B2), f'the key interrupt stopped at {at}'
+        for r, v in kept.items():
+            mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v)
 
     def page(self):
         """The 320 x 200 page the game draws into (A900)."""

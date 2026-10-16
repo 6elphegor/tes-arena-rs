@@ -488,6 +488,8 @@ impl Machine {
     /// a wanted player (5C8 bit 4000h); with picking armed, a theft.
     fn talk_flat(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, saved: (u32, u16)) -> Option<()> {
         if self.g16(0x05C8) & 0x4000 != 0 {
+            // DE58: ARENAFNT.
+            self.select_font(0x102C);
             hooks.message_box(self, 0x84B0);
             return self.talk_end(saved);
         }
@@ -505,6 +507,8 @@ impl Machine {
     fn talk_end(&mut self, saved: (u32, u16)) -> Option<()> {
         self.mem.w16(DS, 0x1030, saved.1);
         self.rng.seed = saved.0;
+        // E3CC (and DED4, goodbye's): ARENAFNT.
+        self.select_font(0x102C);
         Some(())
     }
 
@@ -537,6 +541,8 @@ impl Machine {
                 self.window_free();
                 let ax = hooks.menu(self, 0x8523, 0x8532, 0x8536);
                 self.window_alloc()?;
+                // DEAE: ARENAFNT.
+                self.select_font(0x102C);
                 ax
             };
             if ax == 3 {
@@ -560,6 +566,8 @@ impl Machine {
             if let Flow::End = flow {
                 return self.talk_end(saved);
             }
+            // E3B8: FONT_A, back to the menu.
+            self.select_font(0x1026);
         }
     }
 
@@ -580,6 +588,8 @@ impl Machine {
         self.mem.w8(DS, TEXT_FLAG, 0);
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.talk_text(files, hooks, 2)?;
+        // E398: the tiles at 1036.
+        self.select_tiles(0x1036);
         self.mem.w8(DS, TEXT_COLOUR, 0x60);
         hooks.message_box(self, BUFFER);
         for i in 0..0x34 {
@@ -591,6 +601,8 @@ impl Machine {
     /// 1194:E4E3. Text `ax` said in a window.
     fn say_box(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, ax: u16) -> Option<()> {
         self.mem.w16(DS, TEXT, ax);
+        // E4E6: the tiles at 1036.
+        self.select_tiles(0x1036);
         self.mem.w8(DS, TEXT_FLAG, 0);
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.talk_text(files, hooks, 2)?;
@@ -1076,10 +1088,14 @@ impl Machine {
     /// (level + 1) x 2 (at most 20) for a quest's offer; "Where" a
     /// quest's target is (+F bit 8) by its distance.
     fn rumours(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks) -> Option<Flow> {
+        // E26B: FONT_A.
+        self.select_font(0x1026);
         self.rng.seed = self.g16(0x0151) as u32;
         self.window_free();
         let ax = hooks.menu(self, 0x857B, 0x8589, 0x858C);
         self.window_alloc()?;
+        // E297: ARENAFNT.
+        self.select_font(0x102C);
         let q = self.g16(QUEST + 4);
         if (q & 0xC0) >> 6 != 0 {
             let k = (q & 0xE00) >> 9;
@@ -1108,6 +1124,8 @@ impl Machine {
             }
             return self.say(files, hooks, 0x9F);
         }
+        // E315: work, ARENAFNT.
+        self.select_font(0x102C);
         let si = self.g16(CLICKED);
         if self.g16(si.wrapping_add(0xF)) & 8 == 0 {
             return self.say(files, hooks, 0xA0);
