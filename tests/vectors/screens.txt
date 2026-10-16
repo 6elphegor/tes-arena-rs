@@ -50,3 +50,5 @@ screen | loottake | 6f0976abcdd59b41 a97a4bafd992e4ed 77aee268a5bf4f45
 screen | levelup | 2b9163ee2aa1bd6d a97a4bafd992e4ed 6f95345e5c8f8e6f
 screen | levelupstats | bacc1a605a4f4c4e ef6ad023fa2b8c2b
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
+screen | riddle | 58bb15e08459635 a97a4bafd992e4ed d501f9c4db50e7d0
+screen | riddletyped | bdbcb51de4bb8aa5 a97a4bafd992e4ed 6749c17629c32bf

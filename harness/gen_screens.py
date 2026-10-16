@@ -175,6 +175,13 @@ SCREENS = {
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
+    # A riddle (`riddled`: the save has none within reach) as the frame
+    # shows the level's text (0000:0550): the text drawn, then its answer
+    # asked under it (292B:05A2's typed field); then an answer typed in it
+    # (the keys' scan codes: W, A, T, E, R), a key a wait (the editor
+    # takes one a pass).
+    'riddle': ((0, 0x0550, {}), []),
+    'riddletyped': ((0, 0x0550, {}), [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13)]),
 }
 WAIT = (0, 0x8FC4)
 
@@ -324,6 +331,31 @@ def leveled(a):
     seeded(a)
 
 
+# The riddle `riddled` sets: its text, the answers after `:` (to a CR or
+# NUL), the backquote's block after them, put at RIDDLE_AT in the level's
+# texts' bank (C8FE) as the EMS frame (9030) maps it.
+RIDDLE = b"What burns?\r:fire\r:flame\0`C\r"
+RIDDLE_AT = 0xFF00
+
+
+def riddled(a):
+    """A riddle on the player's square as the square's lookup leaves it
+    (0000:06BE): the text shown (3D42) and the riddle waiting (7C5E) the
+    same, its answers (7C62), the texts after a wrong answer (7C64, the
+    riddle again) and a right one (7C66, none), the triggers' numbers
+    (7C68, 7C6A), the text's time (3C82) and square (0DBC, the player's
+    CB90)."""
+    from emu import LOAD_SEG
+    bank = a.mu.mem_read(a.lin(a.ds, 0xC8FE), 1)[0]
+    a.call_near(0, 0x5C8A, bx=bank)
+    seg = a.r16(0x9030)
+    a.mu.mem_write(a.lin(seg, RIDDLE_AT), RIDDLE)
+    for at, v in ((0x3D42, RIDDLE_AT), (0x7C5E, RIDDLE_AT), (0x7C62, RIDDLE_AT + 12), (0x7C64, RIDDLE_AT),
+                  (0x7C66, 0), (0x7C68, 1), (0x7C6A, 2), (0x0DBC, a.r16(0xCB90))):
+        a.w16(at, v)
+    a.mu.mem_write(a.lin(a.ds, 0x3C82), bytes([0x28]))
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
@@ -331,7 +363,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'levelup': leveled, 'levelupstats': leveled,
-          'loot': loot_seeded, 'loottake': loot_seeded}
+          'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled}
 
 
 # What a screen's routine is followed by that the next frame would do:

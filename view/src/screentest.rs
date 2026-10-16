@@ -703,10 +703,23 @@ fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
     let hud = a.hud();
     let mut s = hud::Screen::new(a.assets.dac());
     hud::compose_over(&mut s, &a.font, &hud);
+    // The cursor XORed over what play shows (nothing of the layer's
+    // there): what is under it decides its colours, which the original's
+    // page filled with 00h and then FFh leaves out of what it drew.
+    let mut under = None;
     if let Some(l) = &a.live {
+        l.draw_text(&mut s);
+        under = Some(s.indices().to_vec());
         l.draw(&mut s, true);
     }
-    let idx = s.indices().to_vec();
+    let mut idx = s.indices().to_vec();
+    if let Some(under) = under {
+        for (c, u) in idx.iter_mut().zip(under) {
+            if u == 0x100 {
+                *c = 0x100;
+            }
+        }
+    }
     let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
     (idx, dac)
 }
@@ -992,4 +1005,56 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
         let first = seen.iter().zip(&want).position(|(v, o)| v != o);
         assert!(first.is_none() && seen.len() == want.len(), "F77 {f77}: the vision's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
     }
+}
+
+/// gen_screens.py's `riddled`: a riddle on the player's square as its
+/// lookup leaves it (0000:06BE): the text at FF00h in the level's texts'
+/// bank (C8FE), shown (3D42) and waiting as a riddle (7C5E), its answers
+/// after `:` (7C62), the texts after a wrong answer (the riddle again) and
+/// a right one (none), the triggers' numbers, the text's time and square
+/// (the player's).
+fn riddled(a: &mut App) {
+    use arena::squares::var as sq;
+    let m = &mut a.engine.m;
+    let bank = m.mem.r8(DS, sq::TEXT_BANK) as u16;
+    m.ems_map(bank);
+    let seg = m.mem.r16(DS, 0x9030);
+    for (i, &c) in b"What burns?\r:fire\r:flame\0`C\r".iter().enumerate() {
+        m.mem.w8(seg, 0xFF00 + i as u16, c);
+    }
+    let here = m.mem.r16(DS, 0xCB90);
+    for (at, v) in [(sq::SHOWN, 0xFF00), (sq::RIDDLE_AT, 0xFF00), (sq::ANSWERS_AT, 0xFF0C), (sq::WRONG_AT, 0xFF00), (sq::RIGHT_AT, 0), (sq::RIDDLE_A, 1), (sq::RIDDLE_B, 2), (sq::SHOWN_SQUARE, here)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w8(DS, sq::SHOWN_TIME, 0x28);
+}
+
+/// A riddle shown in the frame (0000:0550): its text, then its answer
+/// asked under it (292B:05A2's typed field, empty).
+#[test]
+fn a_riddle_asked_as_the_original_draws_it() {
+    screen(
+        "riddle",
+        |a, d| {
+            riddled(a);
+            d.frame(a);
+            assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+        },
+        over_typed,
+    );
+}
+
+/// The riddle's answer typed (water): the field's text under the riddle.
+#[test]
+fn a_riddles_answer_typed_as_the_original_draws_it() {
+    screen(
+        "riddletyped",
+        |a, d| {
+            riddled(a);
+            d.frame(a);
+            assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+            super::type_text(d, a, "water");
+        },
+        over_typed,
+    );
 }

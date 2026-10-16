@@ -261,14 +261,22 @@ impl Live {
     /// cursor where shown (XORed in the text's colour). A shot, never
     /// counting frames, shows the cursor at its place.
     pub fn draw(&self, screen: &mut Screen, still: bool) {
-        let Some(font) = draw_font(self.look.font) else { return };
-        let s = String::from_utf8_lossy(&self.text()).into_owned();
-        let (x, y) = (self.field.x as i16 as i32, self.field.y as i16 as i32);
-        screen.text_plain(font, x, y, &s, self.look.colour);
+        if draw_font(self.look.font).is_none() {
+            return;
+        }
+        self.draw_text(screen);
         let at = if still { self.cursor_place() } else if self.shown { self.at } else { None };
         if let Some((cx, cy, w, h)) = at {
             screen.xor(cx as i16 as i32, cy as i16 as i32, w.min(320) as i32, h.min(200) as i32, self.look.colour);
         }
+    }
+
+    /// The text alone at the field's place in its font and colour.
+    pub fn draw_text(&self, screen: &mut Screen) {
+        let Some(font) = draw_font(self.look.font) else { return };
+        let s = String::from_utf8_lossy(&self.text()).into_owned();
+        let (x, y) = (self.field.x as i16 as i32, self.field.y as i16 as i32);
+        screen.text_plain(font, x, y, &s, self.look.colour);
     }
 
     /// Where the cursor is drawn now (A0D9's place, its count left as it

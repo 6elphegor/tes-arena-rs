@@ -409,6 +409,14 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.rest_frame(files, self)
     }
+    /// 0000:05B5: the lines are drawn as the layer's (`hud::level_text`);
+    /// what the drawing leaves is the row of the last (9E0A's [ADB8]),
+    /// which the riddle's field is put under.
+    fn level_text_draw(&mut self, m: &mut arena::machine::Machine) {
+        if let Some(&(y, _)) = hud::level_text(m).last() {
+            m.mem.w16(arena::mem::DS, arena::riddle::var::TEXT_Y, y as u16);
+        }
+    }
     /// 292B:05A2: the answer typed under the riddle's text (1044 cleared,
     /// 0000:9EE5 at 32h, [ADB8] + 0Ah, in the frame's font [102C] and
     /// colour F0h), then looked for among the riddle's answers.
