@@ -413,7 +413,13 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     /// The page is drawn behind the click asked (`click`: the screen kept
     /// as the spellmaker's, `Talk::maker`, 68D7 drawing BUYSPELL.IMG for
     /// 101D FFh).
-    fn spell_screen(&mut self, _m: &mut Machine) {}
+    /// 1194:68A3's level the page divides by (A898, A89A: the player's
+    /// plus one), set before 68D7 draws it.
+    fn spell_screen(&mut self, m: &mut Machine) {
+        let level = (m.mem.r8(DS, 0x01AA) as u16).wrapping_add(1);
+        m.mem.w16(DS, 0xA89A, level);
+        m.mem.w16(DS, 0xA898, level);
+    }
     /// Each poll of the page: a click on it asked (as the spellmaker's,
     /// `Talk::spell_click`, the screen kept as 68D7 drew it: 101D FFh,
     /// which 1194:A933 clears after); unanswered, "exit", as leaving does.

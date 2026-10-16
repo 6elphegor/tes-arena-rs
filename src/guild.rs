@@ -1021,15 +1021,12 @@ impl Machine {
             }
             self.guild_colour_102c();
             self.mem.w8(DS, 0x101D, 0xFF);
-            // 1194:68A3: the record copied, the level the screen divides
-            // by (A898, A89A: the player's plus one), then its screen.
+            // 1194:68A3: the record copied, then its screen (the hook sets
+            // the level 68A3 divides by, A898 and A89A).
             for i in 0..0x55u16 {
                 let b = self.mem.r8(DATA, si.wrapping_add(i));
                 self.mem.w8(DS, SPELL_COPY + i, b);
             }
-            let level = (self.mem.r8(DS, 0x01AA) as u16).wrapping_add(1);
-            self.mem.w16(DS, 0xA89A, level);
-            self.mem.w16(DS, 0xA898, level);
             hooks.spell_screen(self);
             self.mem.w8(DS, 0x101D, 0);
             let restore = |m: &mut Self| {
