@@ -170,6 +170,7 @@ impl ShopFront<'_, '_> {
             selected: 0,
             list: false,
             kind: 0,
+            font: None,
         };
         match self.talk() {
             Some(t) => t.ask_menu(menu),

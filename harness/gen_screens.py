@@ -72,6 +72,13 @@ SCREENS = {
     'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
     'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
+    # A line of those lists clicked: the days asked for the room (its
+    # typed field), the haggle over the item sold.
+    'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
+    'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
+    # Its Yes: the haggle.
+    'storesellhaggle': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25),
+                                               ('click', 0xA0, 0x69)]),
     # In the street outside the guild (WHERE): R, camping (01E6), refused
     # in a town (over the street's colours); Shift+M, the world map (03BF:
     # 26F7's travel map).
@@ -102,7 +109,7 @@ PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x10
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
-               'storebuy', 'storesell', 'storerepair')})
+               'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle')})
 
 
 def place(a, base, where, cache={}):

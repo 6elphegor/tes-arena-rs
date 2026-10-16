@@ -512,6 +512,10 @@ pub struct Menu {
     /// A list's kind (5734's AX, `Machine::list_kind`): its panel, record
     /// and colour.
     pub kind: u16,
+    /// The font the game had selected when it asked (B036), which the
+    /// menu's or the list's lines are drawn in; None (the view's own
+    /// questions): FONT_A, a list TEENYFNT.
+    pub font: Option<GameFont>,
 }
 
 /// What drawing `text` through 0000:98xx (the boxes', the menus' lines)
@@ -543,16 +547,21 @@ pub fn text_codes(m: &mut arena::machine::Machine, text: &[u8]) {
 /// draws them in.
 pub fn list_menu(m: &arena::machine::Machine, title: Vec<Vec<Span>>, entries: Vec<Vec<Span>>) -> Menu {
     let font = GameFont::selected(m);
-    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind }
+    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind, font: Some(font) }
 }
 
 /// The font a list is drawn in: its lines' (`list_menu`); the bar's lists
 /// (2542:06F8) in TEENYFNT.
 fn list_font<'a>(st: &'a Style, menu: &Menu) -> &'a Font {
-    if menu.kind == BAR_LIST {
-        return &st.list_font;
+    match menu.font {
+        Some(f) if menu.kind != BAR_LIST => st.font(f),
+        _ => &st.list_font,
     }
-    st.font(menu.entries.iter().chain(&menu.title).flatten().next().map_or(GameFont::Teeny, |s| s.font))
+}
+
+/// The font a menu is drawn in (`Menu::font`; FONT_A by default).
+fn menu_font<'a>(st: &'a Style, menu: &Menu) -> &'a Font {
+    menu.font.map_or(&st.menu_font, |f| st.font(f))
 }
 
 /// Where a menu's entries are drawn: (x, y of the first, line height,
@@ -824,7 +833,7 @@ fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
 
 /// A menu's boxes' height together (`menu_boxes`).
 fn menu_height(st: &Style, menu: &Menu) -> i32 {
-    let font = &st.menu_font;
+    let font = menu_font(st, menu);
     let title = menu_title(st, menu);
     let t = if title.is_empty() { 0 } else { box_size(st, font, &title).1 };
     t + menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e)).1).sum::<i32>()
@@ -840,7 +849,7 @@ fn menu_height(st: &Style, menu: &Menu) -> i32 {
 /// and the entries'.
 #[allow(clippy::type_complexity)]
 fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
-    let font = &st.menu_font;
+    let font = menu_font(st, menu);
     let title_lines = menu_title(st, menu);
     let title = (!title_lines.is_empty()).then(|| box_size(st, font, &title_lines));
     let sizes: Vec<_> = menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e))).collect();
@@ -869,7 +878,7 @@ fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32
 /// come broken to fit, the view's were broken for ARENAFNT), the lines
 /// as one text broken again at spaces, in the first span's colour.
 fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
-    let font = &st.menu_font;
+    let font = menu_font(st, menu);
     let max = W as i32 - 8 - 2 * MARGIN - 2 * st.tiles.w as i32;
     if menu.title.iter().all(|l| font.width(&plain(l)) as i32 <= max) {
         return menu.title.clone();
@@ -958,10 +967,10 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         } else {
             let (title, entries) = menu_boxes(st, menu, hud);
             if let Some(t) = title {
-                draw_box(screen, st, &st.menu_font, t, &menu_title(st, menu), 0x60);
+                draw_box(screen, st, menu_font(st, menu), t, &menu_title(st, menu), 0x60);
             }
             for (i, (r, e)) in entries.iter().zip(&menu.entries).enumerate() {
-                draw_box(screen, st, &st.menu_font, *r, std::slice::from_ref(e), 0x60);
+                draw_box(screen, st, menu_font(st, menu), *r, std::slice::from_ref(e), 0x60);
                 // The original has no highlight (picks are clicks or the
                 // keys' letters); the view marks the entry the arrows are on.
                 if i == menu.selected {

@@ -26,3 +26,6 @@ screen | templeheal | d4d33e8d6d25b4a7 a97a4bafd992e4ed caa5da2321b03e7
 screen | storebuy | 464a9fea5d7c16be a97a4bafd992e4ed 70e240293936a97
 screen | storesell | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
 screen | storerepair | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
+screen | tavernroomdays | 2d4a474cc7708d3c a97a4bafd992e4ed 75874994b31de8a7
+screen | storesellequipped | d953b2a95cc5569e a97a4bafd992e4ed b6b838e09c8cd067
+screen | storesellhaggle | f52d82e5d726c737 a97a4bafd992e4ed fa8c11efc16b9367

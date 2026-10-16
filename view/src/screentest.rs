@@ -461,3 +461,47 @@ fn the_stores_sell_as_the_original_draws_it() {
 fn the_stores_repair_as_the_original_draws_it() {
     screen("storerepair", |a, d| shop_pick(a, d, 0x1008, 6, 0x73), layer);
 }
+
+/// The tavern's Get a Room, its first room (Single) picked: the days
+/// asked, the field under the dialog's lines.
+#[test]
+fn the_taverns_days_asked_as_the_original_draws_them() {
+    screen(
+        "tavernroomdays",
+        |a, d| {
+            shop_pick(a, d, 0x1AB5, 4, 0x5B);
+            d.click(a, 0x80, 0x31, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The store's Sell, its first item (equipped) picked: whether to sell
+/// it still (1194:F6BC).
+#[test]
+fn the_stores_equipped_sale_as_the_original_draws_it() {
+    screen(
+        "storesellequipped",
+        |a, d| {
+            shop_pick(a, d, 0x1008, 6, 0x5B);
+            d.click(a, 0x80, 0x25, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// Its Yes: the haggle over the item (1194:09FC, 8020 in mode 4), its
+/// buttons (NEGOTBUT.IMG) over the dialog's lines.
+#[test]
+#[ignore = "the haggle's screen (its lines in the strip, NEGOTBUT.IMG's buttons) not yet the original's"]
+fn the_stores_haggle_as_the_original_draws_it() {
+    screen(
+        "storesellhaggle",
+        |a, d| {
+            shop_pick(a, d, 0x1008, 6, 0x5B);
+            d.click(a, 0x80, 0x25, MouseButton::Left);
+            d.click(a, 0xA0, 0x69, MouseButton::Left);
+        },
+        layer,
+    );
+}
