@@ -99,12 +99,21 @@ SCREENS = {
     'templebless': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)]),
     'templecure': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x67)]),
     'templeheal': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x7F)]),
+    # The drinks' first line clicked: what the tavern says to it.
+    'taverndrink': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x43), ('click', 0x70, 0x26)]),
     # The blessing's donation typed (1, 0, 0 and Enter, a key a wait):
     # what the temple says to it.
     'templedonate': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)] + [('keys', [k]) for k in (0x02, 0x0B, 0x0B, 0x1C)]),
     'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
     'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
+    # The Buy with a slot free (`room`: the save's inventory is full).
+    'storebuyroom': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
+    # Its Weapon and Armor (boxes 18h high under BUY OPTIONS): the lists;
+    # a weapon picked: its price haggled.
+    'storeweapons': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65)]),
+    'storearmor': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x7D)]),
+    'storeweapon': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26)]),
     # A line of those lists clicked: the days asked for the room (its
     # typed field), the haggle over the item sold.
     'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
@@ -166,6 +175,8 @@ SCREENS = {
     'guildpotions': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x59)]),
     'guildmagic': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x71)]),
     'guildspells': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x88)]),
+    # The magic items with a slot free (`room`).
+    'guildmagicroom': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x71)]),
     # Their first lines clicked (the list's first row at 26h): what each
     # asks.
     'guildpotionpick': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26)]),
@@ -216,8 +227,8 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
-              ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+              ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -378,6 +389,13 @@ def riddled(a):
     a.mu.mem_write(a.lin(a.ds, 0x3C82), bytes([0x28]))
 
 
+def room(a):
+    """A slot of the player's free (the last of 40, DGROUP 0212h on,
+    13h each: its flags at +0Eh, 40h taken), as 1194:5EB5 looks for one."""
+    at = 0x0212 + 39 * 0x13 + 0x0E
+    a.mu.mem_write(a.lin(a.ds, at), bytes([a.mu.mem_read(a.lin(a.ds, at), 1)[0] & ~0x40 & 0xFF]))
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
@@ -385,7 +403,9 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'levelup': leveled, 'levelupstats': leveled,
-          'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled}
+          'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
+          'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
+          'storeweapon': lambda a: (room(a), seeded(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:

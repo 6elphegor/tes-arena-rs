@@ -3707,6 +3707,13 @@ impl App {
         }
         let hud = self.hud();
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
+            // A list (1194:5734) marks the line clicked; the line marked
+            // clicked is picked (its first marked as it comes up).
+            let list = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Menu(m)) if m.list);
+            if list && i != self.selected {
+                self.selected = i;
+                return;
+            }
             self.answer(dialog::Answer::Pick(i as u16));
         }
     }

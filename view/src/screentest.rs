@@ -1263,3 +1263,75 @@ fn a_temples_blessing_given_as_the_original_draws_it() {
         layer,
     );
 }
+
+/// The drinks' first line clicked: what the tavern says to it.
+#[test]
+fn a_taverns_drink_as_the_original_draws_it() {
+    screen(
+        "taverndrink",
+        |a, d| {
+            shop_pick(a, d, 0x1AB5, 4, 0x43);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// gen_screens.py's `room`: a slot of the player's free (the last of 40:
+/// its flags at 0212h + 27h x 13h + 0Eh lose 40h, taken), the save's
+/// inventory being full.
+fn room(a: &mut App) {
+    let at = 0x0212 + 39 * 0x13 + 0x0E;
+    let f = a.engine.m.mem.r8(DS, at) & !0x40;
+    a.engine.m.mem.w8(DS, at, f);
+}
+
+/// In the town's first store with a slot free, its Buy, then the clicks
+/// at each row `ys` (x A0h; a list's line at x 70h).
+fn store_buy(a: &mut App, d: &mut Driver, clicks: &[(i32, i32)]) {
+    into(a, 0x1008);
+    room(a);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 6);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x43, MouseButton::Left);
+    for &(x, y) in clicks {
+        d.click(a, x, y, MouseButton::Left);
+    }
+}
+
+/// The store's Buy with a slot free: what to buy.
+#[test]
+fn the_stores_buy_options_as_the_original_draws_them() {
+    screen("storebuyroom", |a, d| store_buy(a, d, &[]), layer);
+}
+
+#[test]
+fn the_stores_weapons_as_the_original_draws_them() {
+    screen("storeweapons", |a, d| store_buy(a, d, &[(0xA0, 0x65)]), layer);
+}
+
+#[test]
+fn the_stores_armor_as_the_original_draws_it() {
+    screen("storearmor", |a, d| store_buy(a, d, &[(0xA0, 0x7D)]), layer);
+}
+
+/// A weapon's line clicked once: marked.
+#[test]
+fn a_stores_weapon_picked_as_the_original_draws_it() {
+    screen("storeweapon", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26)]), layer);
+}
+
+/// The guild's magic items with a slot free: their list.
+#[test]
+fn the_guilds_magic_items_with_room_as_the_original_draws_them() {
+    screen(
+        "guildmagicroom",
+        |a, d| {
+            room(a);
+            guild_buy(a, d, 0x71);
+        },
+        layer,
+    );
+}

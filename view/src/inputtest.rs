@@ -922,13 +922,17 @@ fn a_store_list_line_clicked_as_by_script() {
     let mut d = Driver::new(&mut a);
     shop_turn(&mut a, 6);
     // The store's menu (Buy) and its list (weapons) by clicks; the weapons
-    // list's second line clicked.
+    // list's second line clicked (a list's line marked by a click, then
+    // picked by another).
     let mut picks = Vec::new();
     for (step, want) in [0usize, 0, 1].into_iter().enumerate() {
         let m = menu(&a).unwrap_or_else(|| panic!("asked at step {step}"));
         let list = m.list;
         let (x, y) = entry_at(&a, want).unwrap_or_else(|| panic!("entry {want} clickable at step {step} (list {list})"));
         d.click(&mut a, x, y, MouseButton::Left);
+        if list && want != 0 {
+            d.click(&mut a, x, y, MouseButton::Left);
+        }
         picks.push(want.to_string());
         while !a.boxes.is_empty() {
             d.key(&mut a, KeyCode::Enter, None);
