@@ -1974,3 +1974,67 @@ fn the_spellbooks_names_sort_as_0b9c() {
     // 01h against 90h: 01h - 90h is 71h, positive: the first sorts after.
     assert_eq!(panels::book_order(&[vec![0x01u8], vec![0x90u8]]), Some(vec![1, 0]));
 }
+
+/// A riddle shown in the start dungeon as its square leaves it (0000:06BE:
+/// the text, its answers after `:`, the riddle waiting at 7C5E) and the
+/// player standing on it: the frame asks the answer in a typed field
+/// (292B:05A2, `fields::riddle`); `answer` typed and Enter. What the game
+/// then shows (3D42) and the trigger's wall (a door at square 0101h,
+/// number 1, which the right answer opens).
+fn riddle_answered(answer: &str) -> Option<(u16, u16)> {
+    use arena::mem::DS;
+    use arena::squares::var as sq;
+    let dir = game_dir()?;
+    let mut a = app(&dir, &Start { level: "START.MIF", hour: None, new_game: Some("0:3:0:2:Talin"), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let m = &mut a.engine.m;
+    let bank = m.mem.r8(DS, sq::TEXT_BANK) as u16;
+    m.ems_map(bank);
+    let seg = m.mem.r16(DS, 0x9030);
+    let text = b"What burns?\r:fire\r:flame\0`C\r";
+    for (i, &c) in text.iter().enumerate() {
+        m.mem.w8(seg, 0xFF00 + i as u16, c);
+    }
+    m.mem.w16(DS, sq::SHOWN, 0xFF00);
+    m.mem.w16(DS, sq::RIDDLE_AT, 0xFF00);
+    m.mem.w16(DS, sq::ANSWERS_AT, 0xFF0C);
+    m.mem.w16(DS, sq::WRONG_AT, 0xFF00);
+    m.mem.w16(DS, sq::RIGHT_AT, 0);
+    m.mem.w16(DS, sq::RIDDLE_A, 1);
+    m.mem.w16(DS, sq::RIDDLE_B, 2);
+    m.mem.w8(DS, sq::SHOWN_TIME, 0x28);
+    let here = m.mem.r16(DS, 0xCB90);
+    m.mem.w16(DS, sq::SHOWN_SQUARE, here);
+    m.mem.w8(DS, arena::riddle::var::TRIGGER_COUNT, 1);
+    m.mem.w16(DS, arena::riddle::var::TRIGGERS, 0x0101);
+    m.mem.w8(DS, arena::riddle::var::TRIGGERS + 2, 1);
+    m.mem.w16(DS, sq::ENTRY, 0xF000);
+    let walls = m.mem.r16(DS, 0xD806);
+    m.mem.w16(walls, 0x0102, 0xB000);
+    d.frame(&mut a);
+    match a.pending.as_ref().map(|p| &p.need) {
+        Some(dialog::Need::Text(ask)) => assert_eq!((ask.field.x, ask.field.max), (0x32, 0x1A), "the riddle's field"),
+        _ => panic!("the riddle's answer asked"),
+    }
+    type_text(&mut d, &mut a, answer);
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.pending.is_none(), "answered");
+    let m = &a.engine.m;
+    assert_eq!(m.mem.r16(DS, sq::RIDDLE_AT), 0, "the riddle no longer waits");
+    Some((m.mem.r16(DS, sq::SHOWN), m.mem.r16(walls, 0x0102)))
+}
+
+#[test]
+fn a_riddle_answered_right_opens_its_door() {
+    let Some((shown, wall)) = riddle_answered("FLAME") else { return };
+    assert_eq!(shown, 0, "the right answer's text (none here)");
+    assert_eq!(wall, 0xB200, "the door opening");
+}
+
+#[test]
+fn a_riddle_answered_wrong_shows_its_text_again() {
+    let Some((shown, wall)) = riddle_answered("water") else { return };
+    assert_eq!(shown, 0xFF00, "the wrong answer's text");
+    assert_eq!(wall, 0xB000, "the door shut");
+}

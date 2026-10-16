@@ -1144,7 +1144,6 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
 /// `hud`'s texts in the game's style: its boxes (0000:965A), menus
 /// (3159:0F2A), lists (3159:06A0 with 2F26:2E12) and prompts.
 fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
-    let lh = font.h as i32 + 2;
     for (y, l) in &hud.level {
         let w = font.width(&plain(l)) as i32;
         screen.spans(font, 0xA0 - w / 2, *y, l);
