@@ -147,7 +147,7 @@ pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
 /// as it is drawn, while the turn has put the clip back by the time the
 /// view draws (the rest's bottom 92h, 1194:4252). A marker line first, its
 /// one span's code 1 and text "left,top,right,bottom" (`clip_of`).
-pub fn clipped(mut lines: Vec<Vec<Span>>, c: (i32, i32, i32, i32)) -> Vec<Vec<Span>> {
+pub fn clipped(mut lines: Vec<Vec<Span>>, c: Clip) -> Vec<Vec<Span>> {
     if c.2 > c.0 && c.3 > c.1 && c != (0, 0, W as i32 - 1, H as i32 - 1) {
         let text = format!("{},{},{},{}", c.0, c.1, c.2, c.3);
         lines.insert(0, vec![Span { colour: 0, text, font: Default::default(), code: Some(1) }]);
@@ -155,10 +155,13 @@ pub fn clipped(mut lines: Vec<Vec<Span>>, c: (i32, i32, i32, i32)) -> Vec<Vec<Sp
     lines
 }
 
+/// A clip's left, top, right and bottom (A914..A91A).
+pub type Clip = (i32, i32, i32, i32);
+
 /// The clip a box was asked in (`clipped`), if it carries one, and its
 /// lines without the marker.
-pub fn clip_of(lines: &[Vec<Span>]) -> (Option<(i32, i32, i32, i32)>, &[Vec<Span>]) {
-    let marked = |l: &Vec<Span>| -> Option<(i32, i32, i32, i32)> {
+pub fn clip_of(lines: &[Vec<Span>]) -> (Option<Clip>, &[Vec<Span>]) {
+    let marked = |l: &Vec<Span>| -> Option<Clip> {
         let [m] = l.as_slice() else { return None };
         if m.code != Some(1) {
             return None;
