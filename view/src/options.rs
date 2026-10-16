@@ -58,6 +58,12 @@ struct Script<'a> {
 }
 
 impl OptionsHooks for Script<'_> {
+    /// 0000:9AE6 (the font, B036) and 9AF8 (`text`: the boxes' tiles,
+    /// B038) made current: Exit's [1026] and [1036] before "Are you sure ?"
+    /// (2542:05DB), which is drawn in them.
+    fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
+        m.mem.w16(DS, if text { 0xB038 } else { 0xB036 }, ax);
+    }
     fn picture(&mut self, _m: &mut Machine, _files: &mut Files, _name: u16) {
         self.draws.clear();
     }
@@ -88,7 +94,11 @@ impl OptionsHooks for Script<'_> {
         }
         if !self.starved {
             self.starved = true;
-            self.confirm = Some(crate::dialog::menu_at(m, var::SURE, var::SURE + 0x10, var::SURE + 0x13));
+            let mut menu = crate::dialog::menu_at(m, var::SURE, var::SURE + 0x10, var::SURE + 0x13);
+            // No entry marked: it takes clicks and Y, N, Esc (the view
+            // marks a menu's entry only after the arrows move it).
+            menu.selected = usize::MAX;
+            self.confirm = Some(menu);
         }
         1
     }

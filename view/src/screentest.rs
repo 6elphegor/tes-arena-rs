@@ -49,7 +49,7 @@ fn vectors() -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
 
 /// The user's save loaded (ARENA_SAVE, slot 1), as the window would.
 fn loaded(dir: &Path, save: &Path) -> (App, Driver) {
-    let mut a = app(dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), ..Default::default() });
+    let mut a = app(dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
     clear(&mut d, &mut a);
@@ -195,20 +195,85 @@ fn the_use_list_as_the_original_draws_it() {
     screen("use", |a, d| d.key(a, KeyCode::KeyU, Some("u")), over);
 }
 
+/// C, then its second line clicked once (Air Foot): the line marked (a
+/// second click would cast it).
+#[test]
+fn the_spellbook_with_a_line_picked_as_the_original_draws_it() {
+    screen(
+        "spellpick",
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, 164, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// U, then its fourth line clicked once (Ring of Shielding): the line
+/// marked (a second click would use it).
+#[test]
+fn the_use_list_with_a_line_picked_as_the_original_draws_it() {
+    screen(
+        "usepick",
+        |a, d| {
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 181, MouseButton::Left);
+        },
+        over,
+    );
+}
+
 /// Esc: the options screen (2542:000A), drawn alone.
 #[test]
 fn the_options_screen_as_the_original_draws_it() {
-    screen(
-        "options",
-        |a, d| d.key(a, KeyCode::Escape, None),
-        |a| {
-            let mut s = hud::Screen::new(a.assets.palette);
-            a.options.as_ref().expect("the options screen").draw(&mut s, &a.font);
-            let idx = s.indices().to_vec();
-            let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
-            (idx, dac)
-        },
-    );
+    screen("options", |a, d| d.key(a, KeyCode::Escape, None), options_layer);
+}
+
+/// The options screen drawn alone, with what it asks over it.
+fn options_layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let mut s = hud::Screen::new(a.assets.palette);
+    a.options.as_ref().expect("the options screen").draw(&mut s, &a.font);
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// Esc, then the options screen's button at (x, y) clicked (the table at
+/// 5C2C), as gen_screens.py's script clicks it.
+fn options_click(a: &mut App, d: &mut Driver, x: i32, y: i32) {
+    d.key(a, KeyCode::Escape, None);
+    assert!(a.options.is_some(), "the options screen");
+    d.click(a, x, y, MouseButton::Left);
+}
+
+/// The options screen and the save menu over it, drawn alone: the menu's
+/// LOADSAVE.IMG (143 rows) over OP.IMG (147).
+fn options_menu_layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let mut s = hud::Screen::new(a.assets.palette);
+    a.saveui_under.as_ref().expect("the options screen under it").draw(&mut s, &a.font);
+    a.saveui.as_ref().expect("the save menu").draw(&mut s);
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// The options screen's Load (2542:061E): the save menu's slots (25FD:
+/// 0718), their names NAMES.DAT's (the game folder's: the save's has none).
+#[test]
+fn the_options_load_as_the_original_draws_it() {
+    screen("optionsload", |a, d| options_click(a, d, 96, 132), options_menu_layer);
+}
+
+/// Its Save (0617): the same slots.
+#[test]
+fn the_options_save_as_the_original_draws_it() {
+    screen("optionssave", |a, d| options_click(a, d, 160, 132), options_menu_layer);
+}
+
+/// Its Exit (05DB): "Are you sure ?" over the screen.
+#[test]
+fn the_options_exit_as_the_original_draws_it() {
+    screen("optionsexit", |a, d| options_click(a, d, 224, 132), options_layer);
 }
 
 /// The mages' guild's spellmaker (1194:6064): Drakain before Daggerfall's
@@ -526,6 +591,139 @@ fn the_taverns_room_price_as_the_original_draws_it() {
     screen("tavernroomprice", room_priced, layer);
 }
 
+/// The price accepted (the haggle's Yes, 1194:6001's first button) and
+/// the deal confirmed (Yes again): the room taken, the tavern's menu again
+/// without its rooms.
+fn room_taken(a: &mut App, d: &mut Driver) {
+    room_priced(a, d);
+    d.click(a, 0x70, 0x85, MouseButton::Left);
+    d.click(a, 0x70, 0x85, MouseButton::Left);
+}
+
+#[test]
+fn the_taverns_menu_with_the_room_taken_as_the_original_draws_it() {
+    screen("tavernroomtaken", room_taken, layer);
+}
+
+/// The room taken and the tavern's menu left by its Exit (third box), then
+/// R: camping (2542:01E6, 1194:424E), its options.
+fn rest_asked(a: &mut App, d: &mut Driver) {
+    room_taken(a, d);
+    d.click(a, 0xA0, 0x87, MouseButton::Left);
+    assert!(a.pending.is_none(), "the tavern left");
+    d.key(a, KeyCode::KeyR, Some("r"));
+    d.frame(a);
+}
+
+#[test]
+fn camping_in_the_rented_room_as_the_original_draws_it() {
+    screen("tavernrest", rest_asked, over);
+}
+
+/// Its Camp for a while: the hours to rest asked, the typed field.
+#[test]
+fn the_hours_to_rest_asked_as_the_original_draws_them() {
+    screen(
+        "tavernresthours",
+        |a, d| {
+            rest_asked(a, d);
+            d.click(a, 0xA0, 0x64, MouseButton::Left);
+        },
+        over_typed,
+    );
+}
+
+/// The player rested as 1194:4345 tests it (gen_screens.py's `healed`):
+/// health and spell points at their maximums, the fatigue well within its
+/// limit.
+fn healed(a: &mut App) {
+    let m = &mut a.engine.m;
+    let (hp, sp) = (m.mem.r16(DS, 0x01FF), m.mem.r16(DS, 0x020C));
+    m.mem.w16(DS, 0x01FD, hp);
+    m.mem.w16(DS, 0x020A, sp);
+    m.mem.w16(DS, 0x0201, 0x7FFF);
+}
+
+/// Rest until healed (the second entry) with the player rested: "You
+/// don't need to rest." in a box centred in the rest's clip (A91A 92h).
+#[test]
+fn no_need_to_rest_as_the_original_draws_it() {
+    screen(
+        "tavernrestneed",
+        |a, d| {
+            room_taken(a, d);
+            d.click(a, 0xA0, 0x87, MouseButton::Left);
+            assert!(a.pending.is_none(), "the tavern left");
+            healed(a);
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+            d.click(a, 0xA0, 0x7C, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// `over` with the typed field asked drawn over it (`App::compose`'s
+/// last step): a box's prompt and its field.
+fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    a.compose();
+    let hud = a.hud();
+    let mut s = hud::Screen::new(a.assets.dac());
+    hud::compose_over(&mut s, &a.font, &hud);
+    if let Some(l) = &a.live {
+        l.draw(&mut s, true);
+    }
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// In the street (`area_left`, the guild left from SEED as gen_screens.py's
+/// `place` leaves it for these: the arrival's townspeople placed alike),
+/// the first townsperson (actor slot 0AB3) clicked from their own square:
+/// the player there (the real position, BA62, which each frame starts
+/// from, and the eye's), CLICKED their slot, as `beside` has the
+/// original; then a turn, whose frame's click (1194:DB6C) talks.
+fn talked_to(a: &mut App, d: &mut Driver) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    area_left(a);
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    for (at, v) in [(arena::movement::var::X, x), (arena::movement::var::Y, y), (0xBA62, x), (0xBA66, y)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    // The turn's tick (`Engine::tick`) moves the timer to gen_screens.py's
+    // TALK_TICKS as the talk starts (what is said of oneself is rolled from
+    // it, 1194:E273).
+    d.frame(a);
+    assert!(a.pending.is_some(), "the townsperson's menu");
+}
+
+/// A townsperson clicked: what to ask about.
+#[test]
+fn a_townspersons_talk_as_the_original_draws_it() {
+    screen("talk", talked_to, over);
+}
+
+/// Its entries clicked (boxes 18h high from 41h): who they are, the
+/// places asked after, the rumours.
+#[test]
+fn a_townspersons_name_as_the_original_draws_it() {
+    screen("talkwho", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x4D, MouseButton::Left); }, over);
+}
+
+#[test]
+fn a_townspersons_where_is_as_the_original_draws_it() {
+    screen("talkwhere", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x65, MouseButton::Left); }, over);
+}
+
+#[test]
+fn a_townspersons_rumours_as_the_original_draws_them() {
+    screen("talkrumor", |a, d| { talked_to(a, d); d.click(a, 0xA0, 0x7D, MouseButton::Left); }, over);
+}
+
 /// The store's Sell, its first item (equipped) picked: whether to sell
 /// it still (1194:F6BC).
 #[test]
@@ -559,6 +757,157 @@ fn the_stores_haggle_as_the_original_draws_it() {
             d.click(a, 0xA0, 0x5B, MouseButton::Left);
             d.click(a, 0x80, 0x25, MouseButton::Left);
             d.click(a, 0xA0, 0x69, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// gen_screens.py's LOOT_SEED: the piles at the square made from it.
+const LOOT_SEED: u32 = 1;
+
+/// The loot window (1194:7B16, 2433:0583) as a click on a flat of treasure
+/// at the player's square in the guild (071Ah) runs it, AH 0Fh, AL 1 (not
+/// the staff's flat), the piles made there first from LOOT_SEED: a turn
+/// with the window asked before its frame, as `shop_turn` asks a shop.
+fn looted(a: &mut App, _d: &mut Driver) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, LOOT_SEED);
+    a.engine.m.rng.seed = LOOT_SEED;
+    let before = copy(&a.engine);
+    let input = TurnIn {
+        intent: Default::default(),
+        clicked: false,
+        camp: false,
+        shop: None,
+        loot: Some([0x0F01, 0, DS, 0x071A]),
+        key: false,
+        tick: 0,
+        right: false,
+        drag: (0, 0),
+        aspect: 1.6,
+        note: None,
+    };
+    a.turn(before, input, Vec::new(), true);
+    assert!(a.pending.is_some(), "the piles listed");
+}
+
+/// The piles made at the square and listed: a bag of gold and a staff.
+#[test]
+fn the_loot_window_as_the_original_draws_it() {
+    screen("loot", looted, over);
+}
+
+/// Its first line (the gold) clicked: taken, the staff listed again.
+#[test]
+fn the_loot_window_after_a_take_as_the_original_draws_it() {
+    screen(
+        "loottake",
+        |a, d| {
+            looted(a, d);
+            d.click(a, 0x60, 0x27, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// "Who are you?" with the timer (0151) at 456h as the talk runs: the
+/// greeting's text (64h) takes the template with %en, which outside an
+/// equipment store returns into 2DA2 at the text's offset (2DA2:05DC). The
+/// original at these timers (every third: 450h, 453h, 456h, ...) runs on
+/// into a box 1320h pixels wide (0000:9727 tiling it, past 20 million
+/// steps without asking for input: the harness's probe); the port gives
+/// up there as the original's fault, and the view shows nothing.
+#[test]
+fn who_are_you_at_a_timer_of_456h_gives_up_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let (mut a, mut d) = loaded(&dir, &save);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    area_left(&mut a);
+    let ft = a.engine.frame_ticks();
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    for (at, v) in [(arena::movement::var::X, x), (arena::movement::var::Y, y), (0xBA62, x), (0xBA66, y)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    // The turn's tick comes before the talk: the timer 456h as it runs
+    // (and again as the answer's turn runs again from before it).
+    m.mem.w16(DS, arena::frame::var::TICKS, 0x456u16.wrapping_sub(ft));
+    d.frame(&mut a);
+    assert!(a.pending.is_some(), "the townsperson's menu");
+    d.click(&mut a, 0xA0, 0x4D, MouseButton::Left);
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "nothing said");
+    let why = a.engine.m.gave_up.expect("the port gave up");
+    assert!(why.starts_with("2DA2:05DC"), "gave up at %en: {why}");
+}
+
+/// U, its fourth line (Ring of Shielding) clicked twice: marked, then
+/// used, the list gone; what it said on the message line (061A) as the
+/// next frame draws it (0000:0511).
+#[test]
+fn the_message_line_after_a_use_as_the_original_draws_it() {
+    screen(
+        "usemessage",
+        |a, d| {
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 181, MouseButton::Left);
+            d.click(a, 0xF0, 181, MouseButton::Left);
+            assert!(a.engine.m.mem.r16(DS, 0x061E) != 0, "a message to show");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// gen_screens.py's `leveled`: the player's XP (05AD) the least past the
+/// next level's threshold (2686:0333's: from the class's first, DATA:47AE,
+/// each times 30/16 up to the ninth level's, 24/16 on) and the level's
+/// check asked for (05CA bit 100h); then frames, each from SEED, until the
+/// minute tick runs 2686:02D8 (its notice in a box).
+fn leveled(a: &mut App, d: &mut Driver) {
+    use arena::mem::DATA;
+    let m = &mut a.engine.m;
+    let class = (m.mem.r8(DS, 0x01A9) & 0x1F) as u16;
+    let old = m.mem.r8(DS, 0x01AA) as u32;
+    let mut t = m.mem.r16(DATA, 0x47AE + class * 2) as u32;
+    for lv in 0..old {
+        t = t.wrapping_mul(if lv < 8 { 30 } else { 24 }) >> 4;
+    }
+    m.mem.w32(DS, 0x05AD, t);
+    let f = m.mem.r16(DS, 0x05CA) | 0x100;
+    m.mem.w16(DS, 0x05CA, f);
+    for _ in 0..600 {
+        a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+        a.engine.m.rng.seed = SEED;
+        d.frame(a);
+        if !a.boxes.is_empty() {
+            return;
+        }
+    }
+    panic!("no level gained");
+}
+
+/// A level gained (2686:02D8 from the minute tick): its notice (1194:5E33,
+/// 4F25 in a box).
+#[test]
+fn a_levels_notice_as_the_original_draws_it() {
+    screen("levelup", leveled, over);
+}
+
+/// The notice read: the attribute screen with the level's points to spend
+/// (1194:1034 on, 14C5).
+#[test]
+fn the_level_ups_attributes_as_the_original_draws_them() {
+    screen(
+        "levelupstats",
+        |a, d| {
+            leveled(a, d);
+            d.click(a, 0xA0, 0x64, MouseButton::Left);
+            assert!(a.creation.is_some(), "the attribute screen");
         },
         layer,
     );

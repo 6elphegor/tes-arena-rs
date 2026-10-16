@@ -48,10 +48,27 @@ SCREENS = {
     'logbook': (0x02A3, []),
     # C: the spellbook (026D: 056A).
     'spellbook': (0x026D, []),
+    # A line of it clicked (the second): marked, as the use list's.
+    'spellpick': (0x026D, [('click', 0xF0, 164)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
+    # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
+    # 9 apart from 9Bh in the bar's corner): the line picked marked (a
+    # second click uses it, the list gone).
+    'usepick': (0x034D, [('click', 0xF0, 181)]),
+    # Its marked line clicked again: the ring used (2542:034D's way on,
+    # the list gone) and what it said put on the message line (061A),
+    # which the next frame draws (`AFTER`).
+    'usemessage': (0x034D, [('click', 0xF0, 181), ('click', 0xF0, 181)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # Its bottom row's buttons (the table at 5C2C: y 118..146), each
+    # clicked: Load (65..128, 061E) and Save (129..192, 0617), the save
+    # menu's slots (25FD); Exit (193..256, 05DB), "Are you sure ?". (New,
+    # 0..64, closes the screen at once.)
+    'optionsload': (0x000A, [('click', 96, 132)]),
+    'optionssave': (0x000A, [('click', 160, 132)]),
+    'optionsexit': (0x000A, [('click', 224, 132)]),
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),
@@ -79,6 +96,24 @@ SCREENS = {
     # A day typed (the keys' scan codes: 1, Enter): the room's price.
     'tavernroomprice': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31),
                                                ('keys', [0x02, 0x1C])]),
+    # The price accepted (the haggle's Yes, 1194:6001's first button at
+    # 59h..88h, 7Fh..8Bh) and the deal confirmed (Yes again): the room
+    # taken, the tavern's menu again without its rooms.
+    'tavernroomtaken': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31),
+                                               ('keys', [0x02, 0x1C]), ('click', 0x70, 0x85),
+                                               ('click', 0x70, 0x85)]),
+    # R in the tavern with the room taken (`rented`): the hours to rest
+    # asked (01E6: 1194:424E), its typed field.
+    'tavernrest': (0x01E6, []),
+    # Its Camp for a while (the box at 59h..70h): the hours asked.
+    'tavernresthours': (0x01E6, [('click', 0xA0, 0x64)]),
+    # Its second entry (Rest until healed, the box at 71h..88h) with the
+    # player rested (`healed`): "You don't need to rest." (1194:4290) in a
+    # box centred in the rest's clip (A91A 92h from 1194:4252: the one box
+    # the rest shows inside it besides its menu and prompt; the rest's
+    # other messages come in its frames, 1194:4635, after it is put back).
+    'tavernrestneed': (0x01E6, [('click', 0xA0, 0x7C)]),
+
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
     # strip (1194:4E88, three lines to a page, "...More" between them).
@@ -92,6 +127,14 @@ SCREENS = {
     # 26F7's travel map).
     'streetcamp': (0x01E6, []),
     'worldmap': (0x03BF, []),
+    # A townsperson clicked in the street (`beside`: the first person's
+    # slot, CLICKED CB5E, the player on their square, within talking's two
+    # squares), as the frame runs the click (1194:DB6C): what to ask
+    # about, and each of its entries (boxes 18h high from 41h).
+    'talk': ((0x1194, 0xDB6C, {}), []),
+    'talkwho': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x4D)]),
+    'talkwhere': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x65)]),
+    'talkrumor': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x7D)]),
     # Its Buy (the box at 3Ah..51h): the spells for sale.
     'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
     # Its Detect Magic (52h..69h): the items to look at.
@@ -103,6 +146,20 @@ SCREENS = {
     'automap': (0x045A, [], {(0, 0x8FC8)}),
     # Shift+M: the world map (03BF: 26F7's travel map).
     'travelmap': (0x03BF, []),
+    # The loot window (1194:7B16, 2433:0583) as a click on a flat of
+    # treasure at the player's square (0x071A in the guild) runs it: AH 0Fh
+    # with a flat not the staff's (AL 1); with no pile there the piles are
+    # made first (2433:0000, from LOOT_SEED: a bag of gold and a staff),
+    # then listed (1194:5734). Its first line clicked: the gold taken, the
+    # rest listed again.
+    'loot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), []),
+    'loottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), [('click', 0x60, 0x27)]),
+    # A level gained (2686:02D8, as the minute tick calls it with 05CA
+    # bit 100h set, `leveled`): its notice (1194:1034's first box, 4F25),
+    # then, the box clicked away, the attribute screen with the level's
+    # points to spend (1194:14C5).
+    'levelup': ((0x2686, 0x02D8, {}), []),
+    'levelupstats': ((0x2686, 0x02D8, {}), [('click', 0xA0, 0x64)]),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
@@ -113,18 +170,26 @@ WAIT = (0, 0x8FC4)
 # town's list of their kind (its far pointer, its count), its door entered
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
-PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
-WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
+PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
+          'people': None}
+WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
+         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
-               'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice')})
+               'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
+               'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
 
 def place(a, base, where, cache={}):
     """The snapshot of the game in the building `where` (PLACES)."""
     if where not in cache:
         a.restore(base)
+        if where == 'people':
+            # The street with the guild left from SEED (`seeded`): the
+            # townspeople its arrival places (0000:45B2, 1793) the same
+            # on both sides, whatever the view's frames rolled before.
+            seeded(a)
         assert a.area_ended() == ('world',), 'the guild not left'
         if PLACES[where] is not None:
             at, count = PLACES[where]
@@ -156,6 +221,15 @@ def seeded(a):
     a.w16(0x91F8, SEED >> 16)
 
 
+# The seed the piles at the square are made from (2433:0000) in `loot`.
+LOOT_SEED = 1
+
+
+def loot_seeded(a):
+    a.w16(0x91F6, LOOT_SEED & 0xFFFF)
+    a.w16(0x91F8, LOOT_SEED >> 16)
+
+
 # The clock and the timer both sides start the rumours from (1194:E3F7:
 # the seed from the ticks at 0151, what is heard by the parity of the
 # clock's 05CC plus the player's x over 8), where the view's frames have
@@ -172,9 +246,86 @@ def clocked(clock, ticks):
     return at
 
 
+# The townsperson talked to: the first actor slot (0AB3), placed by the
+# street's arrival (0000:45B2: fifteen by day).
+PERSON = 0x0AB3
+# The timer (0151) as the talk starts: what they say of themselves is
+# rolled from it (1194:E273). The view's turn into the talk moves it on
+# by its tick (`Engine::tick`) from the street's 0.
+TALK_TICKS = 1
+
+
+def beside(a):
+    """The player on the person's square (C3D0, C3D4 their x and y) and
+    the person clicked (CLICKED CB5E their slot), as the hit test leaves
+    it for the frame's click."""
+    a.w16(0xC3D0, a.r16(PERSON))
+    a.w16(0xC3D4, a.r16(PERSON + 4))
+    a.w16(0xCB5E, PERSON)
+    a.w16(0x0151, TALK_TICKS)
+
+
+def rented(a):
+    """A room taken as `tavernroomtaken` takes it, then the menu's Exit
+    (its third box, at 7Bh..92h): the tavern left with the room the
+    player's."""
+    seeded(a)
+    a.waits = {WAIT}
+    a.script = SCREENS['tavernroomtaken'][1] + [('click', 0xA0, 0x87)]
+    a.clicks = []
+    a.mouse = (160, 100)
+    a.buttons = 0
+    assert a.run_screen(0x1194, 0xB93C, regs={}) is None, 'the tavern not left'
+    assert not a.script
+
+
+def healed(a):
+    """The player rested as 1194:4345 tests it (2433's 4320): health
+    (01FD) and spell points (020A) at their maximums (01FF, 020C), the
+    fatigue (0201) well within its limit."""
+    a.w16(0x01FD, a.r16(0x01FF))
+    a.w16(0x020A, a.r16(0x020C))
+    a.w16(0x0201, 0x7FFF)
+
+
+def leveled(a):
+    """The player's XP (05AD) the least past their next level's
+    threshold (2686:0333's: from the class's first, DATA:47AE, each
+    times 30/16 to the ninth level, 24/16 on), the level's check asked
+    for (05CA bit 100h) and the seed fixed (`seeded`: the hit die's and
+    the points' rolls)."""
+    data = 0x3276
+    from emu import LOAD_SEG
+    cls = a.mu.mem_read(a.lin(a.ds, 0x01A9), 1)[0] & 0x1F
+    base = a.r16(0x47AE + cls * 2, seg=LOAD_SEG + data)
+    old = a.mu.mem_read(a.lin(a.ds, 0x01AA), 1)[0]
+
+    # The thresholds as 2686:039E grows them: each the one before times
+    # 30/16 up to the ninth level's (where its count stops), then 24/16.
+    thresholds, t = [], base
+    for lv in range(old + 1):
+        thresholds.append(t)
+        t = (t * (30 if lv < 8 else 24) & 0xFFFF_FFFF) >> 4
+    lo = thresholds[old]
+    a.w32(0x05AD, lo)
+    a.w16(0x05CA, a.r16(0x05CA) | 0x100)
+    seeded(a)
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
-          'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded}
+          'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
+          'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
+          'tavernrestneed': lambda a: (rented(a), healed(a)),
+          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
+          'levelup': leveled, 'levelupstats': leveled,
+          'loot': loot_seeded, 'loottake': loot_seeded}
+
+
+# What a screen's routine is followed by that the next frame would do:
+# the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
+# y 14h, in colour 70h, then one pixel right in 9Fh).
+AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511)}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
@@ -195,6 +346,8 @@ def draw(a, base, name, handler, script, fill, waits=None):
         a.run_screen(seg, off, regs=regs)
     else:
         a.run_screen(MENU, handler, near=True)
+    if name in AFTER:
+        AFTER[name](a)
     return a.page(), bytes(a.dac)
 
 

@@ -9,9 +9,8 @@
 //! over their boxes, and while a name is typed its box and the game's
 //! editor on it (0000:9EE5, `field::Live`, 2Fh characters at most, in
 //! ARENAFNT.DAT ([102C]) and colour 0Fh; its passes' inputs the name's
-//! answer, given to the editor in the replay). The names are drawn in
-//! FONT_A.DAT: the view doesn't map the menu's font record ([102C]) to
-//! its file.
+//! answer, given to the editor in the replay). The names are drawn in the
+//! font selected as they are (B036: the picker's [102C], ARENAFNT.DAT).
 
 use std::path::{Path, PathBuf};
 
@@ -22,7 +21,7 @@ use arena::mem::DS;
 use arena::savemenu::{var, MenuHooks, SaveChoice};
 
 use crate::field::{Live, Look};
-use crate::hud::{Font, Screen};
+use crate::hud::{Font, GameFont, Screen};
 use arena::lineedit::EditKey;
 
 /// The name's field's look: ARENAFNT.DAT ([102C], 25FD:0039), colour 0Fh
@@ -43,7 +42,8 @@ pub enum Kind {
 #[derive(Clone)]
 enum Draw {
     Fill(i32, i32, i32, i32, u8),
-    Text(i32, i32, Vec<u8>, u8),
+    /// A text centred at x, at y, in its colour and the font selected.
+    Text(i32, i32, Vec<u8>, u8, GameFont),
 }
 
 /// How a replay of the menu ended.
@@ -69,7 +69,8 @@ pub struct SaveUi {
     pub typing: Option<Box<Live>>,
     draws: Vec<Draw>,
     picture: Option<Image>,
-    font: Option<Font>,
+    /// The four fonts the game selects among (`GameFont`).
+    fonts: Vec<(GameFont, Font)>,
 }
 
 struct Script<'a> {
@@ -85,12 +86,18 @@ struct Script<'a> {
 }
 
 impl MenuHooks for Script<'_> {
+    /// 0000:9AE6 (the font, B036) and 9AF8 (`text`: the boxes' tiles,
+    /// B038) made current.
+    fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
+        m.mem.w16(DS, if text { 0xB038 } else { 0xB036 }, ax);
+    }
     fn picture(&mut self, _m: &mut Machine, _files: &mut Files, _name: u16) {
         if !self.starved {
             self.draws.clear();
         }
     }
-    /// NAMES.DAT from the save folder; missing, NAMES is left.
+    /// NAMES.DAT from the save folder (the original's save path); missing,
+    /// NAMES is left.
     fn names(&mut self, m: &mut Machine, _files: &mut Files, _path: u16) {
         if let Some(d) = read_any_case(self.dir, "NAMES.DAT") {
             for (i, &b) in d.iter().take(0x1E0).enumerate() {
@@ -105,7 +112,7 @@ impl MenuHooks for Script<'_> {
     }
     fn centred(&mut self, m: &mut Machine, si: u16, ax: u16, bx: u16) {
         if !self.starved {
-            self.draws.push(Draw::Text(ax as i32, bx as i32, m.mem.cstr(DS, si).to_vec(), m.mem.r8(DS, 0x9288)));
+            self.draws.push(Draw::Text(ax as i32, bx as i32, m.mem.cstr(DS, si).to_vec(), m.mem.r8(DS, 0x9288), GameFont::selected(m)));
         }
     }
     fn click(&mut self, _m: &mut Machine) -> (u16, u16) {
@@ -150,8 +157,11 @@ impl SaveUi {
     pub fn open(kind: Kind, engine: &Engine, save_dir: &Path, archive: &crate::archive::Archive) -> (SaveUi, Ended) {
         let base = Engine { m: engine.m.clone(), files: engine.files.clone() };
         let picture = crate::panels::load_image(archive, &engine.m, "LOADSAVE.IMG");
-        let font = Font::load(archive, "FONT_A.DAT");
-        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, draws: Vec::new(), picture, font };
+        let fonts = [(GameFont::A, "FONT_A.DAT"), (GameFont::B, "FONT_B.DAT"), (GameFont::Arena, "ARENAFNT.DAT"), (GameFont::Teeny, "TEENYFNT.DAT")]
+            .into_iter()
+            .filter_map(|(g, name)| Font::load(archive, name).map(|f| (g, f)))
+            .collect();
+        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, draws: Vec::new(), picture, fonts };
         let e = ui.replay();
         (ui, e)
     }
@@ -239,11 +249,11 @@ impl SaveUi {
         if let Some(p) = &self.picture {
             screen.blit(p.x, p.y, p.w, p.h, &p.px, 199);
         }
-        let Some(font) = &self.font else { return };
         for d in &self.draws {
             match d {
                 Draw::Fill(x, y, w, h, c) => screen.fill(*x, *y, *w, *h, *c, 0xFF),
-                Draw::Text(x, y, t, c) => {
+                Draw::Text(x, y, t, c, g) => {
+                    let Some((_, font)) = self.fonts.iter().find(|(f, _)| f == g) else { continue };
                     let s = String::from_utf8_lossy(t);
                     screen.text_plain(font, x - font.width(&s) as i32 / 2, *y, &s, *c);
                 }

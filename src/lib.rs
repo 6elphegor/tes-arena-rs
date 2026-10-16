@@ -58,6 +58,7 @@ pub mod piles;
 pub mod progression;
 pub mod random;
 pub mod rest;
+pub mod riddle;
 pub mod save;
 pub mod save_write;
 pub mod savemenu;

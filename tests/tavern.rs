@@ -89,7 +89,7 @@ impl TavernHooks for Script {
         self.log.push(5);
         Some(())
     }
-    fn room_load(&mut self, m: &mut Machine) -> bool {
+    fn room_load(&mut self, m: &mut Machine, _files: &mut Files) -> bool {
         self.log.push(6);
         let (found, hours, end) = self.room;
         if found {
@@ -102,7 +102,7 @@ impl TavernHooks for Script {
             true
         }
     }
-    fn room_file(&mut self, m: &mut Machine) {
+    fn room_file(&mut self, m: &mut Machine, _files: &mut Files) {
         self.log.extend([7, m.mem.r16(DS, 0x1019) as u32, m.mem.r16(DS, 0x12CA) as u32, m.mem.r16(DS, 0x12CC) as u32]);
     }
     fn message_box(&mut self, _m: &mut Machine, si: u16) {

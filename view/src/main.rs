@@ -195,18 +195,38 @@ struct Front<'a> {
 }
 
 impl Front<'_> {
-    fn message_box(&mut self, m: &arena::machine::Machine, si: u16) {
+    /// A message box with the text at DS:`si`; 965A's drawing (0000:98xx)
+    /// leaves its colour and font codes in the game's state
+    /// (`hud::text_codes`).
+    fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         match self.talk.as_deref_mut() {
             Some(t) => t.message_box(m, si),
             None => println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n")),
         }
+        let text = m.mem.cstr(arena::mem::DS, si).to_vec();
+        hud::text_codes(m, &text);
     }
 
-    fn menu(&mut self, m: &arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
-        match self.talk.as_deref_mut() {
+    /// A menu (1194:020E): 3159:0F2A draws its title (DS:`si`) and its
+    /// entries (the words at DS:`di`, to a 0), leaving their codes in the
+    /// game's state as `message_box` does.
+    fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
+        let pick = match self.talk.as_deref_mut() {
             Some(t) => t.menu(m, si, bx, di),
             None => 0xFFFF,
+        };
+        let mut texts = vec![m.mem.cstr(arena::mem::DS, si).to_vec()];
+        for i in 0..32u16 {
+            let p = m.mem.r16(arena::mem::DS, di.wrapping_add(2 * i));
+            if p == 0 {
+                break;
+            }
+            texts.push(m.mem.cstr(arena::mem::DS, p).to_vec());
         }
+        for t in texts {
+            hud::text_codes(m, &t);
+        }
+        pick
     }
 
     fn note(&mut self, s: &str) {
@@ -388,6 +408,19 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.rest_frame(files, self)
     }
+    /// 292B:05A2: the answer typed under the riddle's text (1044 cleared,
+    /// 0000:9EE5 at 32h, [ADB8] + 0Ah, in the frame's font [102C] and
+    /// colour F0h), then looked for among the riddle's answers.
+    fn riddle(&mut self, m: &mut arena::machine::Machine) {
+        m.mem.w8(arena::mem::DS, arena::riddle::var::TYPED, 0);
+        if let Some(t) = self.talk.as_deref_mut() {
+            let look = field::Look { font: "ARENAFNT.DAT", colour: 0xF0, put_font: true };
+            t.edit(m, arena::lineedit::fields::riddle(m), look, dialog::Prompt::Bare);
+        }
+        if m.riddle_answered().is_none() {
+            eprintln!("the riddle gave up: {}", arena::giveup::describe());
+        }
+    }
 }
 /// The game's texts (1194:A374, made by the port) in their windows: the
 /// boxes and menus of `dialog`.
@@ -496,7 +529,7 @@ impl arena::rest::RestHooks for Front<'_> {
         if let Some(t) = self.talk.as_deref_mut() {
             let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).to_string();
             let look = field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
-            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt));
+            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(arena::mem::DS, 0x9288), game_clip(m)));
         }
     }
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {
@@ -1317,6 +1350,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         panel: None,
         travel: None,
         saveui: None,
+        saveui_under: None,
         options: None,
         quit: false,
         equip: None,
@@ -1350,6 +1384,10 @@ struct TurnIn {
     /// A shop of this building kind entered before the frame (`--do
     /// shop:KIND`).
     shop: Option<u8>,
+    /// The loot window (1194:7B16, 2433:0583) run before the frame with
+    /// AX, SI, its segment and BX as a click passes them (a debugging aid
+    /// and the screen check's way in, as `shop` is).
+    loot: Option<[u16; 4]>,
     key: bool,
     tick: usize,
     right: bool,
@@ -1394,6 +1432,12 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     if let Some(kind) = input.shop {
         if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
             eprintln!("the shop gave up: {}", arena::giveup::describe());
+        }
+    }
+    if let Some([ax, si, seg, bx]) = input.loot {
+        use arena::talk::TalkHooks;
+        if hooks.loot(&mut engine.m, &mut engine.files, ax, si, seg, bx).is_none() {
+            eprintln!("the loot window gave up: {}", arena::giveup::describe());
         }
     }
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
@@ -1589,6 +1633,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         clicked: std::mem::take(&mut st.clicked),
         camp: std::mem::take(&mut st.camp),
         shop: st.shop.take(),
+        loot: None,
         key: false,
         tick: st.frames * 4,
         right: std::mem::take(&mut st.right),
@@ -2459,6 +2504,10 @@ struct App {
     /// The save or load menu up (`saveui`: the options screen's Save and
     /// Load, the main menu's Load).
     saveui: Option<saveui::SaveUi>,
+    /// The options screen the save menu was opened from (its Load or
+    /// Save), drawn under it: LOADSAVE.IMG's 143 rows leave OP.IMG's last
+    /// four.
+    saveui_under: Option<options::OptionsUi>,
     /// The options screen up (`options`: Esc in play).
     options: Option<options::OptionsUi>,
     /// The options screen's Exit confirmed: the program ends.
@@ -2590,6 +2639,7 @@ impl App {
             clicked: std::mem::take(&mut self.clicked),
             camp: std::mem::take(&mut self.camp),
             shop: None,
+            loot: None,
             key: std::mem::take(&mut self.key),
             tick,
             right: self.keys.swing,
@@ -2738,6 +2788,13 @@ impl App {
             mv.draw(&mut self.screen, &self.font);
         } else if let Some(ui) = &self.saveui {
             self.screen.set_palette(self.assets.dac());
+            // From the options screen's Load or Save (2542:061E, 0617):
+            // LOADSAVE.IMG's 143 rows over OP.IMG's 147, the options
+            // screen's last rows left under it.
+            if let Some(o) = &self.saveui_under {
+                self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+                o.draw(&mut self.screen, &self.font);
+            }
             ui.draw(&mut self.screen);
         } else if let Some(ui) = &self.options {
             // OP.IMG over what was on the screen (the interface below it).
@@ -2817,6 +2874,7 @@ impl App {
 
     /// The save or load menu opened on the engine (`saveui`).
     fn open_saveui(&mut self, kind: saveui::Kind) {
+        self.saveui_under = None;
         let Some(dir) = self.save_dir.clone() else {
             self.say("No save directory (--save-dir).");
             return;
@@ -2889,7 +2947,7 @@ impl App {
     /// without its vision), Exit ends the program.
     fn options_ended(&mut self, e: options::Ended) {
         let options::Ended::Left(engine, end) = e else { return };
-        self.options = None;
+        let under = self.options.take();
         self.engine = *engine;
         // The keys let go while the screen was up went to the engine it
         // replaced: the game's key state and latches let go here.
@@ -2899,8 +2957,14 @@ impl App {
         }
         match end {
             arena::options::OptionsEnd::Resume => {}
-            arena::options::OptionsEnd::Save => self.open_saveui(saveui::Kind::Save),
-            arena::options::OptionsEnd::Load => self.open_saveui(saveui::Kind::Load),
+            arena::options::OptionsEnd::Save => {
+                self.open_saveui(saveui::Kind::Save);
+                self.saveui_under = under;
+            }
+            arena::options::OptionsEnd::Load => {
+                self.open_saveui(saveui::Kind::Load);
+                self.saveui_under = under;
+            }
             arena::options::OptionsEnd::NewGame => {
                 let archive = self.assets.archive.clone();
                 let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
@@ -3144,11 +3208,19 @@ impl App {
                     }
                 }
             }
-            // A line of the list in the bar's corner picked.
+            // A line of the list in the bar's corner clicked (2542:06F8):
+            // a line not marked is marked; the line marked is picked.
             Some(p @ (panels::Panel::Spellbook(_) | panels::Panel::Use(..))) => {
                 let hud = hud::Hud { menu: p.bar_list(&self.engine.m), ..Default::default() };
                 if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
-                    if matches!(p, panels::Panel::Spellbook(_)) {
+                    let marked = match p {
+                        panels::Panel::Spellbook(book) => &mut book.selected,
+                        panels::Panel::Use(_, sel) => sel,
+                        _ => unreachable!(),
+                    };
+                    if *marked != i {
+                        *marked = i;
+                    } else if matches!(p, panels::Panel::Spellbook(_)) {
                         cast = Some(i);
                     } else {
                         self.panel = None;
@@ -3239,6 +3311,7 @@ impl App {
             clicked: false,
             camp: false,
             shop: None,
+            loot: None,
             key: false,
             tick: 0,
             right: false,

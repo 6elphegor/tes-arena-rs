@@ -74,13 +74,14 @@ pub trait TavernHooks: ShopHooks {
     /// 1194:C04C: the room's file read: 12BC set (1) with ROOM_HOURS
     /// (1019) and ROOM_END (12CA) when there is one, else 12BC 0 and the
     /// carry (returned).
-    fn room_load(&mut self, m: &mut Machine) -> bool {
-        m.mem.w8(DS, 0x12BC, 0);
-        true
+    fn room_load(&mut self, m: &mut Machine, files: &mut Files) -> bool {
+        m.room_read(files)
     }
     /// 1194:BA91: the room's file written (deleted once no hours are
-    /// left).
-    fn room_file(&mut self, _m: &mut Machine) {}
+    /// left; `Machine::room_write`).
+    fn room_file(&mut self, m: &mut Machine, files: &mut Files) {
+        m.room_write(files)
+    }
     /// 1194:59CC: a message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:C14E: the room's price (1391) haggled over with the
@@ -142,6 +143,10 @@ pub mod var {
     pub const ROOM_RENTED: u16 = 0x12BE;
     pub const ROOM_HOURS: u16 = 0x1019;
     pub const ROOM_END: u16 = 0x12CA;
+    /// The room's file name (1194:BA44) and the extension it takes (".64"
+    /// and its NUL, as the store's).
+    pub const ROOM_NAME: u16 = 0x733A;
+    pub const ROOM_EXTENSION: u16 = 0x8B05;
     /// The days typed.
     pub const TYPED: u16 = 0x12C6;
     /// The drinks: the list's text, the drinks listed, those taken, the
@@ -225,7 +230,7 @@ impl Machine {
                 }
             }
         }
-        hooks.room_file(self);
+        hooks.room_file(self, files);
         self.mem.w8(DS, 0x137F, 0xFF);
         self.mem.w16(DS, 0xA91A, saved);
         Some(())
@@ -247,7 +252,7 @@ impl Machine {
         if !self.shop_holiday() {
             self.mem.w8(DS, HOLIDAY, 0);
         }
-        hooks.room_load(self);
+        hooks.room_load(self, files);
         Some(())
     }
 
@@ -260,10 +265,10 @@ impl Machine {
                 // 1194:BC8E: the gold left.
                 hooks.gold_left(self);
                 self.tavern_room(files, hooks)?;
-                hooks.room_file(self);
+                hooks.room_file(self, files);
                 Some(false)
             }
-            0xBC99 => self.tavern_sneak(hooks),
+            0xBC99 => self.tavern_sneak(files, hooks),
             0xBD4C => {
                 if !hooks.rumours(self, files)? {
                     self.tavern_rumours(files, hooks)?;
@@ -494,6 +499,104 @@ impl Machine {
         }
     }
 
+    /// 1194:BA44. The rented room's file name at ROOM_NAME: the digits of
+    /// the tavern's seed (1194:FBA2: its entry among the town's taverns,
+    /// 1AB5, for FD2's low byte halved, into 12E0) with the extension
+    /// (8B05), or with 5C8 bit 4000h the digits of the wild square's seed
+    /// (2DA2:092B) cut at eight bytes before the extension; its first two
+    /// bytes "in". Returns its path (25FD:0844).
+    pub fn room_file_name(&mut self) -> u16 {
+        if self.mem.r16(DS, 0x05C8) & 0x4000 == 0 {
+            let key = self.mem.r16(DS, 0x0FD2);
+            let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+            let (off, seg) = (self.mem.r16(DS, 0x1AB5), self.mem.r16(DS, 0x1AB7));
+            let si = self.place_lookup(seg, off, key, self.mem.r16(DS, 0x1387));
+            let seed = self.mem.r16(seg, si) as u32;
+            self.mem.w32(DS, 0x12E0, seed);
+            self.dun_ultoa(seed, 0x10A8);
+            let di = self.room_name_end(0x10A8, 0x64);
+            for i in 0..5 {
+                let c = self.mem.r8(DS, ROOM_EXTENSION.wrapping_add(i));
+                self.mem.w8(DS, di.wrapping_add(i), c);
+            }
+            self.tavern_strcpy(0x10A8, ROOM_NAME);
+        } else {
+            let (cx, dx) = (self.mem.r16(DS, 0x0610), self.mem.r16(DS, 0x0612));
+            let hi = self.mem.r16(DS, 0x060A).wrapping_add((dx >= 0x2000) as u16);
+            let lo = self.mem.r16(DS, 0x0608).wrapping_add((cx >= 0x2000) as u16);
+            self.dun_ultoa((hi as u32) << 16 | lo as u32, ROOM_NAME);
+            let di = self.room_name_end(ROOM_NAME, 8);
+            self.tavern_strcpy(ROOM_EXTENSION, di);
+        }
+        self.mem.w16(DS, ROOM_NAME, 0x6E69);
+        self.save_path(ROOM_NAME)
+    }
+
+    /// `repne scasb` for the NUL from `di`, at most `cx` bytes: the byte
+    /// before where it stopped.
+    fn room_name_end(&self, mut di: u16, cx: u16) -> u16 {
+        for _ in 0..cx {
+            let c = self.mem.r8(DS, di);
+            di = di.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+        }
+        di.wrapping_sub(1)
+    }
+
+    /// 1194:C04C (C048 far). The rented room's file read: with none, 12BC
+    /// 0 and the carry (true); else 12BC 1, ROOM_HOURS (2 bytes) and
+    /// ROOM_END (4) read from it, and both cleared again (ROOM_HOURS 0,
+    /// 12BC 0) when the room's end is past or within 3Ch minutes.
+    pub fn room_read(&mut self, files: &mut Files) -> bool {
+        self.room_file_name();
+        let path = self.save_path(ROOM_NAME);
+        if !self.file_find(files, path) {
+            self.mem.w8(DS, ROOM_FILED, 0);
+            return true;
+        }
+        self.mem.w8(DS, ROOM_FILED, 1);
+        let path = self.save_path(ROOM_NAME);
+        if self.file_open(files, path).is_none() {
+            // (Found a moment before: the open can't miss.)
+            self.mem.w8(DS, ROOM_FILED, 0);
+            return true;
+        }
+        self.file_read(files, DS, ROOM_HOURS, 2);
+        self.file_read(files, DS, ROOM_END, 4);
+        let left = self.mem.r32(DS, ROOM_END).wrapping_sub(self.mem.r32(DS, 0x05CC)) as i32;
+        if left <= 0x3C {
+            self.mem.w16(DS, ROOM_HOURS, 0);
+            self.mem.w8(DS, ROOM_FILED, 0);
+        }
+        self.file_close(files);
+        false
+    }
+
+    /// 1194:BA91. The rented room's file written: with no hours left
+    /// deleted (the name at ROOM_NAME as it stands: not made again, the
+    /// last one made); else made if missing (0000:677A) and ROOM_HOURS
+    /// (2 bytes) and ROOM_END (4) written over its start.
+    pub fn room_write(&mut self, files: &mut Files) {
+        if self.mem.r16(DS, ROOM_HOURS) == 0 {
+            let path = self.save_path(ROOM_NAME);
+            self.file_delete(files, path);
+            return;
+        }
+        let mut path = self.room_file_name();
+        if !self.file_find(files, path) {
+            path = self.save_path(ROOM_NAME);
+            self.file_create(files, path);
+        }
+        if self.file_open(files, path).is_none() {
+            return;
+        }
+        self.file_put(files, DS, ROOM_HOURS, 2);
+        self.file_put(files, DS, ROOM_END, 4);
+        self.file_close(files);
+    }
+
     /// 1194:BFB1. The player drunk: the effect 20h (period, pulses and
     /// phase B's period 60, or 120 with the player's +4 clear; phase B
     /// endless), its attribute deltas `ax` times the factors at 7349, then
@@ -587,7 +690,7 @@ impl Machine {
         self.mem.w8(DS, ROOM_RENTED, 1);
         let end = (self.mem.r8(DS, ROOM_DAYS) as u32 * 0x5A0).wrapping_add(self.mem.r32(DS, TIME));
         self.mem.w32(DS, ROOM_END, end);
-        hooks.room_file(self);
+        hooks.room_file(self, files);
         Some(())
     }
 
@@ -638,7 +741,7 @@ impl Machine {
 
     /// 1194:BC99. Sneaking into a room; see the module's notes. The carry
     /// (the tavern left): the guards called.
-    fn tavern_sneak(&mut self, hooks: &mut dyn TavernHooks) -> Option<bool> {
+    fn tavern_sneak(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<bool> {
         hooks.picture(self, text::SNEAK_PICTURE);
         self.mem.w8(DS, 0x137E, 3);
         self.split_lines(text::SNEAK);
@@ -648,7 +751,7 @@ impl Machine {
         }
         let (ok, chance) = self.lockpick()?;
         if ok {
-            self.sneak_room(hooks)?;
+            self.sneak_room(files, hooks)?;
             return Some(false);
         }
         // 1194:BCC1 (42EE with FONT_A).
@@ -666,7 +769,7 @@ impl Machine {
 
     /// 1194:BCEA. A room of a random kind (0..4) for a day; its hours
     /// are the end time's low word (the original's bug).
-    fn sneak_room(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
+    fn sneak_room(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         let kind = self.rng.range(0, 5)? as u8;
         self.mem.w8(DS, PICK, kind);
         self.mem.w8(DS, ROOM_RENTED, 1);
@@ -675,7 +778,7 @@ impl Machine {
         let end = ax.wrapping_add(self.mem.r32(DS, TIME));
         self.mem.w32(DS, ROOM_END, end);
         self.mem.w16(DS, ROOM_HOURS, end as u16);
-        hooks.room_file(self);
+        hooks.room_file(self, files);
         let name = self.skip_strings(DS, ROOM_NAMES, self.mem.r8(DS, PICK) as u16);
         self.sprintf((DS, NAME), (DS, text::SNEAK_ROOM), &[Arg::Str(DS, name)]);
         // 1194:BD3F (42EE with ARENAFNT).

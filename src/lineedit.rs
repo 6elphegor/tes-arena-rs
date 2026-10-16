@@ -607,4 +607,11 @@ pub mod fields {
         let y = m.mem.r16(DS, crate::savemenu::var::BOX_Y);
         Field { x, y, click: 0, max: 0x2F, seg: DS, off: crate::savemenu::var::TYPED, w: 0x135, h: 9 }
     }
+
+    /// 292B:05A2: a riddle's answer, 1Ah characters into 1044 (cleared
+    /// first) at x 32h, 0Ah under the riddle's text ([ADB8]), 78h by 0Ah.
+    pub fn riddle(m: &Machine) -> Field {
+        let y = m.mem.r16(DS, crate::riddle::var::TEXT_Y).wrapping_add(0x0A);
+        Field { x: 0x32, y, click: 0, max: 0x1A, seg: DS, off: crate::riddle::var::TYPED, w: 0x78, h: 0x0A }
+    }
 }

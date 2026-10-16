@@ -195,10 +195,10 @@ impl RestHooks for Stubs {
     fn sky(&mut self, m: &mut Machine) {
         inc(m, 0xFFEA);
     }
-    fn room_load(&mut self, m: &mut Machine) -> bool {
+    fn room_load(&mut self, m: &mut Machine, _files: &mut Files) -> bool {
         m.mem.r8(DS, 0xFFE8) & 1 != 0
     }
-    fn room_file(&mut self, m: &mut Machine) {
+    fn room_file(&mut self, m: &mut Machine, _files: &mut Files) {
         inc(m, 0xFFE6);
     }
     fn advance(&mut self, m: &mut Machine, _files: &mut Files, minutes: u32) -> Option<bool> {
@@ -226,7 +226,7 @@ fn matches_original() {
         let got = match op {
             0 => m.rest_heal(ax),
             1 => {
-                carry = m.camp_check(&mut Stubs) as u8;
+                carry = m.camp_check(&mut files, &mut Stubs) as u8;
                 Some(())
             }
             2 => m.rest_start(&mut files, &mut Stubs),

@@ -142,6 +142,40 @@ pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
     Some((x, y, step, &lines[1..]))
 }
 
+/// A message box's lines with the clip it was asked in (A914, A916, A918,
+/// A91A), where that isn't the whole screen: 965A centres the box in it
+/// as it is drawn, while the turn has put the clip back by the time the
+/// view draws (the rest's bottom 92h, 1194:4252). A marker line first, its
+/// one span's code 1 and text "left,top,right,bottom" (`clip_of`).
+pub fn clipped(mut lines: Vec<Vec<Span>>, c: Clip) -> Vec<Vec<Span>> {
+    if c.2 > c.0 && c.3 > c.1 && c != (0, 0, W as i32 - 1, H as i32 - 1) {
+        let text = format!("{},{},{},{}", c.0, c.1, c.2, c.3);
+        lines.insert(0, vec![Span { colour: 0, text, font: Default::default(), code: Some(1) }]);
+    }
+    lines
+}
+
+/// A clip's left, top, right and bottom (A914..A91A).
+pub type Clip = (i32, i32, i32, i32);
+
+/// The clip a box was asked in (`clipped`), if it carries one, and its
+/// lines without the marker.
+pub fn clip_of(lines: &[Vec<Span>]) -> (Option<Clip>, &[Vec<Span>]) {
+    let marked = |l: &Vec<Span>| -> Option<Clip> {
+        let [m] = l.as_slice() else { return None };
+        if m.code != Some(1) {
+            return None;
+        }
+        let v: Vec<i32> = m.text.split(',').map(|v| v.parse().ok()).collect::<Option<_>>()?;
+        let [a, b, c, d] = v[..] else { return None };
+        Some((a, b, c, d))
+    };
+    match lines.first().and_then(marked) {
+        Some(c) => (Some(c), &lines[1..]),
+        None => (None, lines),
+    }
+}
+
 /// 1194:4E88's "...More" (DGROUP 4B1B) under a page of the dialog's lines
 /// with more to come: at 11Dh, A9h in colour 4Bh, in the lines' font
 /// (TEENYFNT, [102E]), drawn by 9E06 as they are. A line of a `placed`
@@ -971,8 +1005,10 @@ fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     if placed_of(lines).is_some() {
         return None;
     }
+    // Centred in the clip it was asked in, where it carries one.
+    let (asked, lines) = clip_of(lines);
     let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
-    let c = clip(hud);
+    let c = asked.unwrap_or_else(|| clip(hud));
     let x = (c.0 + c.2) / 2 - w / 2;
     let y = match &hud.menu {
         // Both shown (a shot's last box with the question left; the
@@ -1108,18 +1144,20 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
 /// `hud`'s texts in the game's style: its boxes (0000:965A), menus
 /// (3159:0F2A), lists (3159:06A0 with 2F26:2E12) and prompts.
 fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
-    let lh = font.h as i32 + 2;
     for (y, l) in &hud.level {
         let w = font.width(&plain(l)) as i32;
         screen.spans(font, 0xA0 - w / 2, *y, l);
     }
     if let Some(lines) = &hud.message {
-        let mut y = 4;
-        for l in lines {
-            let w = font.width(&plain(l)) as i32;
-            screen.spans(font, (W as i32 - w) / 2, y, l);
-            y += lh;
-        }
+        // 0000:0511: the message in [102C]'s font (ARENAFNT), one line
+        // (9E0A passes over the bytes below 20h), centred at x A0h (0000:
+        // 5368: x less half its width, 66F6) at y 14h in colour 70h, then
+        // again one pixel right in 9Fh.
+        let text: String = lines.iter().flatten().map(|s| s.text.as_str()).collect();
+        let f = &st.box_font;
+        let x = 0xA0 - (f.width(&text) as i32 >> 1);
+        screen.text_plain(f, x, 0x14, &text, 0x70);
+        screen.text_plain(f, x + 1, 0x14, &text, 0x9F);
     }
     let c = clip(hud);
     if let Some(s) = &hud.status {
@@ -1131,6 +1169,7 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         draw_placed(screen, st, p);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
+        let lines = clip_of(lines).1;
         draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
@@ -1159,7 +1198,10 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         }
     }
     match &hud.typing {
-        Some(crate::dialog::Prompt::Boxed(prompt)) => draw_typing(screen, st, c, prompt),
+        Some(crate::dialog::Prompt::Boxed(prompt, colour, asked)) => {
+            let c = clip(&Hud { clip: *asked, ..Default::default() });
+            draw_typing(screen, st, c, prompt, *colour)
+        }
         Some(crate::dialog::Prompt::Lines(lines)) => draw_dialog_lines(screen, st, lines),
         _ => {}
     }
@@ -1174,14 +1216,14 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
 /// where the caller puts it, drawn over the box (`field::Live::draw`).
 pub fn typed_prompt(screen: &mut Screen, prompt: &str) {
     if let Some(st) = STYLE.get() {
-        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt);
+        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, 0x0F);
     }
 }
 
-/// `typed_prompt` centred in the clip `c`.
-fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str) {
+/// `typed_prompt` centred in the clip `c`, in `colour`.
+fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, colour: u8) {
     let font = &st.box_font;
-    let text = lines(prompt.as_bytes(), 0x0F);
+    let text = lines(prompt.as_bytes(), colour);
     let last = text.len().saturating_sub(1);
     let (w, h, tx, ty) = box_size_margin(st, font, &text, 10);
     let (x, y) = ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2);
@@ -1190,7 +1232,7 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
     for (i, l) in text.iter().enumerate() {
         let lw = font.width(&plain(l)) as i32;
         let lx = if i < last { x + w / 2 - lw / 2 } else { x + tx };
-        screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, 0x0F);
+        screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, colour);
     }
 }
 
@@ -1335,6 +1377,7 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
             screen.text_plain(font, x, y + step * i as i32, &plain(l), 0xC0);
         }
     } else if let Some(lines) = &hud.boxed {
+        let lines = clip_of(lines).1;
         let w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0) + 16;
         let w = w.clamp(60, W as i32 - 8);
         let h = lines.len() as i32 * lh + 10;
@@ -1368,7 +1411,7 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
             screen.spans(font, ex, ly, l);
         }
     }
-    if let Some(crate::dialog::Prompt::Boxed(prompt)) = &hud.typing {
+    if let Some(crate::dialog::Prompt::Boxed(prompt, _, _)) = &hud.typing {
         let w = (font.width(prompt) as i32 + 16).clamp(80, W as i32 - 8);
         let x = (W as i32 - w) / 2;
         let y = H as i32 / 2 - lh;
