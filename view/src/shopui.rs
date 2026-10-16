@@ -127,6 +127,20 @@ fn line(s: &str) -> Vec<Span> {
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a
 /// NUL.
+/// The lines 1194:4E54 split the text at DS:`si` into (LINES of them,
+/// each ending at a NUL), as bytes.
+fn split_raw(m: &Machine, si: u16) -> Vec<Vec<u8>> {
+    let n = m.mem.r16(DS, 0x0FF5).min(32);
+    let mut at = si;
+    let mut out = Vec::new();
+    for _ in 0..n {
+        let s = m.mem.cstr(DS, at).to_vec();
+        at = at.wrapping_add(s.len() as u16 + 1);
+        out.push(s);
+    }
+    out
+}
+
 fn split_text(m: &Machine, si: u16) -> Vec<Vec<Span>> {
     let n = m.mem.r16(DS, 0x0FF5).min(32);
     let mut at = si;
@@ -170,6 +184,7 @@ impl ShopFront<'_, '_> {
             selected: 0,
             list: false,
             kind: 0,
+            font: None,
         };
         match self.talk() {
             Some(t) => t.ask_menu(menu),
@@ -180,7 +195,13 @@ impl ShopFront<'_, '_> {
 
 impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn message(&mut self, m: &mut Machine, si: u16) {
-        self.front.message_box(m, si);
+        // 4D31 leaves its font ([102E]: B036) and colour selected.
+        let font = m.mem.r16(DS, 0x102E);
+        m.mem.w16(DS, 0xB036, font);
+        m.mem.w8(DS, 0x9288, 0xC0);
+        if let Some(t) = self.talk() {
+            t.strip_message(m, si);
+        }
     }
     fn banner(&mut self, m: &mut Machine, si: u16) {
         self.show_banner(m, si);
@@ -202,23 +223,46 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         }
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
-        self.front.menu(m, si, bx, di)
+        let pick = self.front.menu(m, si, bx, di);
+        // 3159:0F2A drew the title and the entries (0000:98xx): their
+        // colour and font codes left in the game's state.
+        let mut texts = vec![m.mem.cstr(DS, si).to_vec()];
+        for i in 0..32u16 {
+            let p = m.mem.r16(DS, di.wrapping_add(2 * i));
+            if p == 0 {
+                break;
+            }
+            texts.push(m.mem.cstr(DS, p).to_vec());
+        }
+        for t in texts {
+            crate::hud::text_codes(m, &t);
+        }
+        pick
     }
     fn dialog(&mut self, m: &mut Machine, kind: u8, di: u16) -> u16 {
         self.dialog_at(m, kind, 0, di)
     }
     fn dialog_at(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
         let lines = if si != 0 { split_text(m, si) } else { Vec::new() };
+        let raw = if si != 0 { split_raw(m, si) } else { Vec::new() };
         match kind {
             0 => {
                 if let Some(t) = self.talk() {
-                    t.lines_box(lines);
+                    t.dialog_lines(&raw);
                 }
                 0
             }
             1 => {
+                // The lines in the strip, the picture's buttons picked
+                // (1194:6001).
                 let entries: &[&str] = if self.picture == NEW_OLD { &["New job", "Old job"] } else { &["Yes", "No"] };
-                match self.ask(lines, entries) {
+                let raw: Vec<&[u8]> = raw.iter().map(|l| l.as_slice()).collect();
+                let menu = crate::hud::dialog_buttons(&raw, entries);
+                let pick = match self.talk() {
+                    Some(t) => t.ask_menu(menu),
+                    None => 0xFFFF,
+                };
+                match pick {
                     0 => 0,
                     1 => 1,
                     _ => 2,
@@ -253,7 +297,7 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         let title = if di != 0 && matches!(m.list_kind, 6 | 0xA) { String::from_utf8_lossy(m.mem.cstr(DS, di)).into_owned() } else { String::new() };
         if let Some(entries) = self.lines.take() {
             let title = if title.is_empty() { Vec::new() } else { crate::hud::lines(title.as_bytes(), 0x0F) };
-            let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
+            let menu = crate::hud::list_menu(m, title, entries);
             return match self.talk() {
                 Some(t) => t.ask_menu(menu),
                 None => 0xFFFF,
@@ -287,6 +331,9 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
+        // 965A drew it (0000:98xx): its codes left in the game's state.
+        let text = m.mem.cstr(DS, si).to_vec();
+        crate::hud::text_codes(m, &text);
     }
     fn haggle(&mut self, m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         let (quality, mood) = (m.mem.r8(DS, 0x13CA), m.mem.r8(DS, 0x13CB));
@@ -352,6 +399,9 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
+        // 965A drew it (0000:98xx): its codes left in the game's state.
+        let text = m.mem.cstr(DS, si).to_vec();
+        crate::hud::text_codes(m, &text);
     }
     fn stock_list(&mut self, m: &mut Machine, seg: u16, si: u16, cx: u16) -> u16 {
         let mut entries = Vec::new();
@@ -361,7 +411,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             at = at.wrapping_add(raw.len() as u16 + 1);
             entries.push(row(&raw));
         }
-        let menu = Menu { title: Vec::new(), entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
+        let menu = crate::hud::list_menu(m, Vec::new(), entries);
         match self.talk() {
             Some(t) => t.ask_menu(menu),
             None => 0xFFFF,
@@ -435,6 +485,9 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
+        // 965A drew it (0000:98xx): its codes left in the game's state.
+        let text = m.mem.cstr(DS, si).to_vec();
+        crate::hud::text_codes(m, &text);
     }
     /// 1194:65FD: the name at DS:`si` (581A) edited in place on the
     /// spellmaker's screen, in ARENAFNT.DAT ([102C]) and colour A0h.
@@ -457,6 +510,9 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
+        // 965A drew it (0000:98xx): its codes left in the game's state.
+        let text = m.mem.cstr(DS, si).to_vec();
+        crate::hud::text_codes(m, &text);
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {

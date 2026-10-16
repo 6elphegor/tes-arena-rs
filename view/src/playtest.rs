@@ -711,12 +711,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     match crate::travel::Travel::open(&mut engine, &archive) {
                         Ok(mut t) => {
                             *counts.entry("travel opened").or_default() += 1;
-                            if dice.below(3) == 0 {
-                                // The world map, and a province's region.
-                                t.key(&mut engine, KeyCode::Escape, None);
-                                let (x, y) = (dice.below(320) as i32, dice.below(200) as i32);
-                                t.click(&mut engine, &archive, x, y, false);
-                            }
+                            // On the world map: the current province's
+                            // region, or anywhere on it.
+                            let (x, y) = if dice.below(3) == 0 {
+                                (dice.below(320) as i32, dice.below(200) as i32)
+                            } else {
+                                crate::travel::province_point(engine.m.mem.r8(DS, 0x0A46))
+                            };
+                            t.click(&mut engine, &archive, x, y, false);
                             let (x, y) = (10 + dice.below(300) as i32, 5 + dice.below(155) as i32);
                             t.click(&mut engine, &archive, x, y, false);
                             t.click(&mut engine, &archive, 62, 180, false);

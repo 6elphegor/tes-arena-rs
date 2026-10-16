@@ -101,7 +101,38 @@ const GOLD_TEXT: u16 = 0x4B0E;
 /// Where 545C builds it (also the spell list's order, 0000:0B9C's).
 pub const GOLD_LINE: u16 = 0x1044;
 
+/// The fonts' records the screens select from (0000:9AE6 with AX one of
+/// these words): FONT_A.DAT, ARENAFNT.DAT, TEENYFNT.DAT.
+pub mod font {
+    pub const A: u16 = 0x1026;
+    pub const ARENA: u16 = 0x102C;
+    pub const TEENY: u16 = 0x102E;
+}
+
 impl Machine {
+    /// 0000:9AE6 with AX the word at DS:`at` (`font`): that font selected
+    /// for the text drawn after (B036). What is drawn is the front end's;
+    /// the selection is the game's state its boxes and lists read.
+    pub fn select_font(&mut self, at: u16) {
+        let v = self.mem.r16(DS, at);
+        self.mem.w16(DS, 0xB036, v);
+    }
+
+    /// 1194:42EE with AX the word at DS:`at` (`font`): before a message
+    /// box, the font selected, the tiles at 1036 and the colour 60h.
+    pub fn message_fonts(&mut self, at: u16) {
+        self.select_font(at);
+        self.select_tiles(0x1036);
+        self.mem.w8(DS, 0x9288, 0x60);
+    }
+
+    /// 0000:9AF8 with AX the word at DS:`at` (1034h or 1036h): the boxes'
+    /// tiles selected (B038).
+    pub fn select_tiles(&mut self, at: u16) {
+        let v = self.mem.r16(DS, at);
+        self.mem.w16(DS, 0xB038, v);
+    }
+
     /// 1194:545C, the state it leaves: the text colour 41h (9288), the
     /// font [1026] selected (0000:9AE6: B036), and at 1044 "Gold left : "
     /// (4B0E, 0000:9CA0) with a space over its NUL and the gold (5C2) in
@@ -440,6 +471,8 @@ impl Machine {
         if (pick as i16) < 0 {
             return Some(());
         }
+        // 1194:C41E: ARENAFNT selected.
+        self.select_font(font::ARENA);
         if count == 1 || pick as u8 != count.wrapping_sub(1) {
             // 1194:C48D: the afflictions present, in order, at PICKS.
             let mut di = PICKS;
@@ -620,6 +653,9 @@ impl Machine {
         let h = if self.shop_holiday() { 1 } else { 0xFF };
         self.mem.w8(DS, HOLIDAY, h);
         loop {
+            // 1194:C27D: FONT_A and the tiles at 1036 selected.
+            self.select_font(font::A);
+            self.select_tiles(0x1036);
             let pick = hooks.menu(self, 0x7554, 0x7565, 0x756A);
             if (pick as i16) < 0 || pick == 3 {
                 break;

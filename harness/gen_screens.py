@@ -61,6 +61,24 @@ SCREENS = {
     'tavern': ((0x1194, 0xB93C, {}), []),
     'temple': ((0x1194, 0xC258, {}), []),
     'store': ((0x1194, 0xF48E, {}), []),
+    # Their menus' entries clicked (each a box 18h high, the menu's
+    # first entry at 3Eh for five, 4Ah for three): what each asks next.
+    'taverndrinks': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x43)]),
+    'tavernroom': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B)]),
+    'tavernrumor': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x8B)]),
+    'templebless': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)]),
+    'templecure': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x67)]),
+    'templeheal': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x7F)]),
+    'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
+    'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
+    'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
+    # A line of those lists clicked: the days asked for the room (its
+    # typed field), the haggle over the item sold.
+    'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
+    'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
+    # Its Yes: the haggle.
+    'storesellhaggle': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25),
+                                               ('click', 0xA0, 0x69)]),
     # In the street outside the guild (WHERE): R, camping (01E6), refused
     # in a town (over the street's colours); Shift+M, the world map (03BF:
     # 26F7's travel map).
@@ -89,6 +107,9 @@ WAIT = (0, 0x8FC4)
 # `enter`).
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
+WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
+              ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
+               'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle')})
 
 
 def place(a, base, where, cache={}):
@@ -116,8 +137,18 @@ def square(a):
     a.w16(0xCCA6, a.r16(0xC3D4) >> 7)
 
 
+# A seed both sides start the screen's routine from, where what it draws
+# depends on the game's random numbers (the haggle's lines, 1194:83FD).
+SEED = 0x2F6E_1A35
+
+
+def seeded(a):
+    a.w16(0x91F6, SEED & 0xFFFF)
+    a.w16(0x91F8, SEED >> 16)
+
+
 # What a screen's state needs first that a frame would have done.
-BEFORE = {'automap': square}
+BEFORE = {'automap': square, 'storesellhaggle': seeded}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

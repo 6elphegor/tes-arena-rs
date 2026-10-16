@@ -163,7 +163,8 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
         entries.push(l.swap_remove(0));
     }
     let keys = m.mem.cstr(DS, bx).to_vec();
-    Menu { title, entries, keys, selected: 0, list: false, kind: 0 }
+    // 3159:0F2A draws it in the font selected as it is asked (B036).
+    Menu { title, entries, keys, selected: 0, list: false, kind: 0, font: Some(hud::GameFont::selected(m)) }
 }
 
 impl Talk {
@@ -172,13 +173,47 @@ impl Talk {
         if self.need.is_some() {
             return;
         }
-        // In the font the caller selected (B036), as 965A draws it.
-        let lines = hud::in_font(text_at(m, si, 0x0F), hud::GameFont::selected(m));
+        // In the font the caller selected (B036) and the colour it left
+        // (9288), as 965A draws it.
+        let lines = hud::in_font(text_at(m, si, m.mem.r8(DS, 0x9288)), hud::GameFont::selected(m));
         for l in &lines {
             println!("{}", hud::plain(l));
         }
         self.boxes.push(lines.clone());
         self.since_answer.push(lines);
+    }
+
+    /// 1194:4D31's message: the strip under the shop's menu saved (5F8C),
+    /// the text at DS:`si` in TEENYFNT.DAT ([102E], 0000:9AE6) and colour
+    /// C0h at (23h, 91h) (0000:9E06), read with a click, then the strip
+    /// put back (5FC0).
+    pub fn strip_message(&mut self, m: &Machine, si: u16) {
+        if self.need.is_some() {
+            return;
+        }
+        let text = m.mem.cstr(DS, si).to_vec();
+        println!("{}", String::from_utf8_lossy(&text));
+        let lines = hud::placed(0x23, 0x91, &text, 0xC0, hud::GameFont::Teeny);
+        self.boxes.push(lines.clone());
+        self.since_answer.push(lines);
+    }
+
+    /// 1194:4E88 with 13D3 0: the dialog's lines in the strip under the
+    /// shop's menu (20h, 91h on, 9 apart, TEENYFNT, C0h), three to a page,
+    /// each page read with a click.
+    pub fn dialog_lines(&mut self, lines: &[Vec<u8>]) {
+        if self.need.is_some() {
+            return;
+        }
+        for page in lines.chunks(3) {
+            let page: Vec<&[u8]> = page.iter().map(|l| l.as_slice()).collect();
+            for l in &page {
+                println!("{}", String::from_utf8_lossy(l));
+            }
+            let b = hud::placed_lines(0x20, 0x91, 9, &page, 0xC0, hud::GameFont::Teeny);
+            self.boxes.push(b.clone());
+            self.since_answer.push(b);
+        }
     }
 
     /// Plain text in a box (the way told, a dream).
@@ -226,7 +261,7 @@ impl Talk {
             entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
-        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
+        let menu = hud::list_menu(m, title, entries);
         self.ask(menu)
     }
 

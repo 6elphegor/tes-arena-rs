@@ -111,6 +111,79 @@ impl GameFont {
     }
 }
 
+/// A message drawn in place rather than in a box (1194:4D31's: 0000:9E06
+/// at (x, y), one line, no shadow, the bytes below 20h skipped): a box's
+/// lines whose first is a marker span (its colour code 0, which no text
+/// can hold) with the place, the second the text. Read like a box.
+pub fn placed(x: i32, y: i32, text: &[u8], colour: u8, font: GameFont) -> Vec<Vec<Span>> {
+    placed_lines(x, y, 0, &[text], colour, font)
+}
+
+/// `placed` with several lines, each `step` rows under the one before
+/// (1194:4E88's dialog lines: at 20h, 91h on, 9 apart).
+pub fn placed_lines(x: i32, y: i32, step: i32, lines: &[&[u8]], colour: u8, font: GameFont) -> Vec<Vec<Span>> {
+    let mut out = vec![vec![Span { colour, text: format!("{x},{y},{step}"), font, code: Some(0) }]];
+    for l in lines {
+        let text: String = l.iter().filter(|&&c| c >= 0x20).map(|&c| c as char).collect();
+        out.push(vec![Span { colour, text, font, code: None }]);
+    }
+    out
+}
+
+/// The place, the rows between lines and the lines of a box made by
+/// `placed` or `placed_lines`.
+pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
+    let [m] = lines.first()?.as_slice() else { return None };
+    if m.code != Some(0) {
+        return None;
+    }
+    let mut f = m.text.split(',').map(|v| v.parse::<i32>());
+    let (x, y, step) = (f.next()?.ok()?, f.next()?.ok()?, f.next()?.ok()?);
+    Some((x, y, step, &lines[1..]))
+}
+
+/// Draws a box made by `placed`: each line's text with no shadow.
+fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, i32, &[Vec<Span>])) {
+    for (i, l) in lines.iter().enumerate() {
+        if let Some(t) = l.first() {
+            screen.text_plain(st.font(t.font), x, y + step * i as i32, &t.text, t.colour);
+        }
+    }
+}
+
+/// `Menu::kind` of a question 1194:4E88 asks with a picture's buttons
+/// (13D3 1: a shop's YESNO.IMG, the haggle's NEGOTBUT.IMG, shown at 59h,
+/// 7Fh on the shop's screen): its title the dialog's lines, drawn in the
+/// strip (`placed_lines`: 20h, 91h on, 9 apart, TEENYFNT, C0h, three to a
+/// page), its entries the buttons, which the picture shows: picked by a
+/// click on them (1194:6001: x 59h..E1h, y 7Fh..8Bh; the button by x, to
+/// 88h, B5h, E2h).
+pub const DIALOG_BUTTONS: u16 = 0xFFFE;
+
+/// A `DIALOG_BUTTONS` question: `lines` (the text 4E54 split, at most
+/// three shown) and the buttons' names.
+pub fn dialog_buttons(lines: &[&[u8]], buttons: &[&str]) -> Menu {
+    let shown = &lines[..lines.len().min(3)];
+    Menu {
+        title: placed_lines(0x20, 0x91, 9, shown, 0xC0, GameFont::Teeny),
+        entries: buttons.iter().map(|b| vec![Span { colour: 0x0F, text: b.to_string(), font: Default::default(), code: None }]).collect(),
+        keys: buttons.iter().map(|b| b.as_bytes()[0]).collect(),
+        selected: 0,
+        list: false,
+        kind: DIALOG_BUTTONS,
+        font: None,
+    }
+}
+
+/// The button of a `DIALOG_BUTTONS` question at (x, y) (1194:6001).
+fn dialog_button_at(menu: &Menu, x: i32, y: i32) -> Option<usize> {
+    if !(0x59..=0xE1).contains(&x) || !(0x7F..=0x8B).contains(&y) {
+        return None;
+    }
+    let i = [0x88, 0xB5, 0xE2].iter().position(|&e| x <= e)?;
+    (i < menu.entries.len()).then_some(i)
+}
+
 /// `lines` with every span in `font`.
 pub fn in_font(mut lines: Vec<Vec<Span>>, font: GameFont) -> Vec<Vec<Span>> {
     for s in lines.iter_mut().flatten() {
@@ -500,6 +573,56 @@ pub struct Menu {
     /// A list's kind (5734's AX, `Machine::list_kind`): its panel, record
     /// and colour.
     pub kind: u16,
+    /// The font the game had selected when it asked (B036), which the
+    /// menu's or the list's lines are drawn in; None (the view's own
+    /// questions): FONT_A, a list TEENYFNT.
+    pub font: Option<GameFont>,
+}
+
+/// What drawing `text` through 0000:98xx (the boxes', the menus' lines)
+/// leaves in the game's state: each `\t` and the byte after it the
+/// colour (9288, 996C), each `0Ch` and a number n the font of the table
+/// at 91AC's n-th word (B036, 9987).
+pub fn text_codes(m: &mut arena::machine::Machine, text: &[u8]) {
+    use arena::mem::DS;
+    let mut i = 0;
+    while i + 1 < text.len() {
+        match text[i] {
+            9 => {
+                m.mem.w8(DS, 0x9288, text[i + 1]);
+                i += 2;
+            }
+            0x0C => {
+                let n = text[i + 1].wrapping_sub(1) as u16;
+                let f = m.mem.r16(DS, 0x91AC_u16.wrapping_add(n.wrapping_mul(2)));
+                m.mem.w16(DS, 0xB036, f);
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+}
+
+/// A list 1194:5734 asks (its kind `Machine::list_kind`): its title and
+/// lines kept in the font selected as it is asked (B036), which 3159:06A0
+/// draws them in.
+pub fn list_menu(m: &arena::machine::Machine, title: Vec<Vec<Span>>, entries: Vec<Vec<Span>>) -> Menu {
+    let font = GameFont::selected(m);
+    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind, font: Some(font) }
+}
+
+/// The font a list is drawn in: its lines' (`list_menu`); the bar's lists
+/// (2542:06F8) in TEENYFNT.
+fn list_font<'a>(st: &'a Style, menu: &Menu) -> &'a Font {
+    match menu.font {
+        Some(f) if menu.kind != BAR_LIST => st.font(f),
+        _ => &st.list_font,
+    }
+}
+
+/// The font a menu is drawn in (`Menu::font`; FONT_A by default).
+fn menu_font<'a>(st: &'a Style, menu: &Menu) -> &'a Font {
+    menu.font.map_or(&st.menu_font, |f| st.font(f))
 }
 
 /// Where a menu's entries are drawn: (x, y of the first, line height,
@@ -820,6 +943,9 @@ fn clip(hud: &Hud) -> (i32, i32, i32, i32) {
 /// or at the clip's top when a menu is up with it (the view shows both).
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     let lines = hud.boxed.as_ref()?;
+    if placed_of(lines).is_some() {
+        return None;
+    }
     let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
     let c = clip(hud);
     let x = (c.0 + c.2) / 2 - w / 2;
@@ -841,7 +967,7 @@ fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
 
 /// A menu's boxes' height together (`menu_boxes`).
 fn menu_height(st: &Style, menu: &Menu) -> i32 {
-    let font = &st.menu_font;
+    let font = menu_font(st, menu);
     let title = menu_title(st, menu);
     let t = if title.is_empty() { 0 } else { box_size(st, font, &title).1 };
     t + menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e)).1).sum::<i32>()
@@ -858,7 +984,7 @@ fn menu_height(st: &Style, menu: &Menu) -> i32 {
 #[allow(clippy::type_complexity)]
 fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
     let below = boxed_rect(st, hud).map(|b| b.1 + b.3 + 2);
-    menu_boxes_in(&st.tiles, &st.menu_font, &menu_title(st, menu), &menu.entries, clip(hud), below)
+    menu_boxes_in(&st.tiles, menu_font(st, menu), &menu_title(st, menu), &menu.entries, clip(hud), below)
 }
 
 /// `menu_boxes` with the tiles `tiles` and the font `font`, the title's
@@ -891,7 +1017,7 @@ fn menu_boxes_in(tiles: &Tiles, font: &Font, title_lines: &[Vec<Span>], entries:
 /// come broken to fit, the view's were broken for ARENAFNT), the lines
 /// as one text broken again at spaces, in the first span's colour.
 fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
-    let font = &st.menu_font;
+    let font = menu_font(st, menu);
     let max = W as i32 - 8 - 2 * MARGIN - 2 * st.tiles.w as i32;
     if menu.title.iter().all(|l| font.width(&plain(l)) as i32 <= max) {
         return menu.title.clone();
@@ -920,7 +1046,7 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
 /// A list's first line shown and how many fit (3159:0778: the area's
 /// height over the font's, B7F4).
 fn list_rows(st: &Style, menu: &Menu) -> (usize, usize) {
-    list_rows_in(st, menu, &st.list_font)
+    list_rows_in(st, menu, list_font(st, menu))
 }
 
 /// `list_rows` in the font `font`.
@@ -933,6 +1059,9 @@ fn list_rows_in(st: &Style, menu: &Menu, font: &Font) -> (usize, usize) {
 /// The entry under (x, y) of the 320 x 200 screen, laid out as drawn.
 pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
     let menu = hud.menu.as_ref()?;
+    if menu.kind == DIALOG_BUTTONS {
+        return dialog_button_at(menu, x, y);
+    }
     let inside = |r: (i32, i32, i32, i32)| x >= r.0 && x < r.0 + r.2 && y >= r.1 && y < r.1 + r.3;
     let Some(st) = STYLE.get() else {
         let (ex, ey, lh, ew) = menu_layout(font, menu);
@@ -945,7 +1074,7 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
         if !inside(area) {
             return None;
         }
-        let i = top + ((y - area.1 - 1).max(0) / st.list_font.h as i32) as usize;
+        let i = top + ((y - area.1 - 1).max(0) / list_font(st, menu).h as i32) as usize;
         return (i < menu.entries.len() && i < top + rows).then_some(i);
     }
     menu_boxes(st, menu, hud).1.iter().position(|&r| inside(r))
@@ -973,19 +1102,26 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         let (w, h, _, _) = box_size(st, &st.box_font, &lines);
         draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
     }
+    if let Some(p) = hud.boxed.as_deref().and_then(placed_of) {
+        draw_placed(screen, st, p);
+    }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
         draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
-        if menu.list {
+        if menu.kind == DIALOG_BUTTONS {
+            if let Some(p) = placed_of(&menu.title) {
+                draw_placed(screen, st, p);
+            }
+        } else if menu.list {
             draw_list(screen, st, menu);
         } else {
             let (title, entries) = menu_boxes(st, menu, hud);
             if let Some(t) = title {
-                draw_box(screen, st, &st.menu_font, t, &menu_title(st, menu), 0x60);
+                draw_box(screen, st, menu_font(st, menu), t, &menu_title(st, menu), 0x60);
             }
             for (i, (r, e)) in entries.iter().zip(&menu.entries).enumerate() {
-                draw_box(screen, st, &st.menu_font, *r, std::slice::from_ref(e), 0x60);
+                draw_box(screen, st, menu_font(st, menu), *r, std::slice::from_ref(e), 0x60);
                 // The original has no highlight (picks are clicks or the
                 // keys' letters); the view marks the entry the arrows are on.
                 if i == menu.selected {
@@ -1095,7 +1231,8 @@ fn list_line(screen: &mut Screen, font: &Font, kind: &ListKind, y: i32, line: &[
 /// title where 5734 does; other kinds have none of their own (the view's
 /// callers may give one: above the area, centred).
 fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
-    draw_list_in(screen, st, menu, &st.list_font, &st.list_font);
+    let font = list_font(st, menu);
+    draw_list_in(screen, st, menu, font, font);
 }
 
 /// `draw_list` with its lines in the font `font` and the title 5734
@@ -1168,7 +1305,11 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
         screen.text(font, (W as i32 - w) / 2, H as i32 - lh - 6, s, 0x0F);
     }
     let mut boxed_bottom = None;
-    if let Some(lines) = &hud.boxed {
+    if let Some((x, y, step, lines)) = hud.boxed.as_deref().and_then(placed_of) {
+        for (i, l) in lines.iter().enumerate() {
+            screen.text_plain(font, x, y + step * i as i32, &plain(l), 0xC0);
+        }
+    } else if let Some(lines) = &hud.boxed {
         let w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0) + 16;
         let w = w.clamp(60, W as i32 - 8);
         let h = lines.len() as i32 * lh + 10;

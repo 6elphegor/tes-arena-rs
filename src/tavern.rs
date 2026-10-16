@@ -48,6 +48,7 @@ use crate::bsa::Files;
 use crate::effects::Applied;
 use crate::format::Arg;
 use crate::machine::Machine;
+use crate::shops::font;
 use crate::mem::DS;
 use crate::random::CycleCheck;
 use crate::shops::ShopHooks;
@@ -204,6 +205,9 @@ impl Machine {
             hooks.files(self);
             self.tavern_enter(files, hooks)?;
             loop {
+                // 1194:B975: FONT_A and the tiles at 1036 selected.
+                self.select_font(font::A);
+                self.select_tiles(0x1036);
                 if self.mem.r8(DS, ROOM_RENTED) != 0 || self.mem.r8(DS, ROOM_FILED) != 0 {
                     let pick = hooks.menu(self, MENU_TITLE, KEYS_ROOM, ENTRIES_ROOM);
                     if (pick as i16) < 0 || pick == 2 {
@@ -341,8 +345,9 @@ impl Machine {
 
     /// 1194:BB83. A drink bought; see the module's notes.
     fn tavern_drinks(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
-        // 1194:BB86: the gold left.
+        // 1194:BB86: the gold left; ARENAFNT selected (BB89).
         hooks.gold_left(self);
+        self.select_font(font::ARENA);
         self.drinks_list()?;
         // AX Bh (1194:BB9E): the list's kind (1194:5734).
         self.list_kind = 0xB;
@@ -358,6 +363,8 @@ impl Machine {
         self.mem.w32(DS, PRICE, eax);
         let gold = self.mem.r32(DS, GOLD);
         if gold < eax {
+            // 1194:BC19: the tiles at 1034.
+            self.select_tiles(0x1034);
             hooks.message(self, text::NOT_ENOUGH);
             return Some(());
         }
@@ -365,6 +372,8 @@ impl Machine {
         let kind = self.mem.r8(DS, DRINKS.wrapping_add(self.mem.r8(DS, PICK) as u16));
         let name = self.skip_strings(DS, DRINK_NAMES, kind as u16);
         self.sprintf((DS, DRINKS_TEXT), (DS, text::DRINK), &[Arg::Str(DS, name)]);
+        // 1194:BC01: ARENAFNT (AX then [1036], with no call).
+        self.select_font(font::ARENA);
         self.mem.w8(DS, COLOUR, 0x60);
         hooks.message_box(self, DRINKS_TEXT);
         self.mem.w8(DS, TIMER, 0x3C);
@@ -386,6 +395,7 @@ impl Machine {
     /// never counted as taken, 1194:BFFF) rolled from the place's seed,
     /// each a line "%u gp\n%s" from 1045 on.
     fn drinks_list(&mut self) -> Option<()> {
+        self.select_font(font::ARENA);
         // Where the port gives up, the game's seed is put back as the
         // end puts it, not left at the one this rolled with. The
         // original has no such exit.
@@ -526,6 +536,8 @@ impl Machine {
             self.mem.w16(DS, ROOM_HOURS, 0x18);
         } else {
             loop {
+                // 1194:BD9D: the tiles at 1034.
+                self.select_tiles(0x1034);
                 self.mem.w32(DS, TYPED, 0);
                 self.mem.w8(DS, 0x137E, 3);
                 self.split_lines(text::HOW_MANY_DAYS);
@@ -553,7 +565,8 @@ impl Machine {
             }
         }
         if free {
-            self.mem.w8(DS, COLOUR, 0x60);
+            // 1194:BE18 (42EE with ARENAFNT).
+            self.message_fonts(font::ARENA);
             hooks.message_box(self, text::FREE_ROOM);
         } else {
             self.mem.w32(DS, PRICE, eax);
@@ -563,6 +576,8 @@ impl Machine {
             }
             eax = agreed;
             if self.mem.r32(DS, GOLD) < eax {
+                // 1194:BE38: the tiles at 1034.
+                self.select_tiles(0x1034);
                 hooks.message(self, text::NOT_ENOUGH);
                 return self.room_cancelled();
             }
@@ -636,7 +651,8 @@ impl Machine {
             self.sneak_room(hooks)?;
             return Some(false);
         }
-        self.mem.w8(DS, COLOUR, 0x60);
+        // 1194:BCC1 (42EE with FONT_A).
+        self.message_fonts(font::A);
         hooks.message_box(self, text::SNEAK_FAILED);
         let cx = 100u16.wrapping_sub(chance);
         if self.rng.next() % 100 >= cx {
@@ -662,7 +678,8 @@ impl Machine {
         hooks.room_file(self);
         let name = self.skip_strings(DS, ROOM_NAMES, self.mem.r8(DS, PICK) as u16);
         self.sprintf((DS, NAME), (DS, text::SNEAK_ROOM), &[Arg::Str(DS, name)]);
-        self.mem.w8(DS, COLOUR, 0x60);
+        // 1194:BD3F (42EE with ARENAFNT).
+        self.message_fonts(font::ARENA);
         hooks.message_box(self, NAME);
         Some(())
     }

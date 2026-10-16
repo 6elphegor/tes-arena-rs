@@ -266,6 +266,7 @@ impl Panel {
             selected,
             list: true,
             kind: crate::hud::BAR_LIST,
+            font: None,
         })
     }
 }
@@ -434,6 +435,7 @@ pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
         selected: sel,
         list: false,
         kind: 0,
+        font: None,
     }
 }
 
@@ -468,6 +470,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
         selected: sel,
         list: false,
         kind: 0,
+        font: None,
     }
 }
 

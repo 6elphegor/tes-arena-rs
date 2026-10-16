@@ -24,8 +24,33 @@ use arena::quest::QuestHooks;
 /// The haggle's offer prompt (DGROUP 65CA, 1194:80F7).
 const OFFER_PROMPT: u16 = 0x65CA;
 
-/// The characters to a line a haggle's line is wrapped at.
-const WRAP: usize = 44;
+/// The characters to a line 1194:49FF breaks a haggle's line at (137E,
+/// 3Ch as 862E leaves it).
+const WRAP: usize = 0x3C;
+
+/// 1194:49FF: past every WRAP characters, back to the space before and a
+/// line break there; the lines (4E54 splits at the breaks).
+fn wrap_49ff(text: &[u8]) -> Vec<Vec<u8>> {
+    let mut t = text.to_vec();
+    let (mut si, mut ax) = (0usize, t.len());
+    'wrap: while ax > WRAP {
+        si += WRAP;
+        ax -= WRAP;
+        loop {
+            match t.get(si) {
+                None | Some(0) => break 'wrap,
+                Some(b' ') => break,
+                _ => {
+                    si -= 1;
+                    ax += 1;
+                }
+            }
+        }
+        t[si] = b'\n';
+        si += 1;
+    }
+    t.split(|&c| c == b'\n').map(|l| l.to_vec()).collect()
+}
 
 fn line(s: &str) -> Vec<Span> {
     vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]
@@ -36,7 +61,7 @@ pub(crate) struct HaggleTalk<'a> {
     talk: Option<&'a mut Talk>,
     /// The line said last, and its kind (0 the asking price, 1 the
     /// confirmation, 2 and 3 refusals, 4 a counter-offer).
-    said: Vec<Vec<Span>>,
+    said: Vec<Vec<u8>>,
     kind: u8,
     prompt: String,
 }
@@ -46,17 +71,12 @@ impl<'a> HaggleTalk<'a> {
         HaggleTalk { talk, said: Vec::new(), kind: 0, prompt: "Your offer?".into() }
     }
 
+    /// 4E88 with 13D3 1 (1194:858C, 85DE): the line said in the strip,
+    /// the picture's buttons picked (1194:6001).
     fn ask(&mut self, entries: &[&str]) -> u16 {
         let Some(t) = self.talk.as_deref_mut() else { return 0xFFFF };
-        let menu = Menu {
-            title: self.said.clone(),
-            entries: entries.iter().map(|e| line(e)).collect(),
-            keys: entries.iter().map(|e| e.as_bytes()[0]).collect(),
-            selected: 0,
-            list: false,
-            kind: 0,
-        };
-        t.ask_menu(menu)
+        let said: Vec<&[u8]> = self.said.iter().map(|l| l.as_slice()).collect();
+        t.ask_menu(hud::dialog_buttons(&said, entries))
     }
 }
 
@@ -69,7 +89,7 @@ impl HaggleIo for HaggleTalk<'_> {
             // The confirmation: 0 yes.
             if self.ask(&["Yes", "No"]) == 0 { 0 } else { 1 }
         } else {
-            match self.ask(&["Accept", "Haggle", "Leave"]) {
+            match self.ask(&["Accept", "Counter", "Reject"]) {
                 0 => 0,
                 1 => 1,
                 _ => 2,
@@ -101,9 +121,11 @@ impl HaggleIo for HaggleTalk<'_> {
         t.edit(m, field, look, crate::dialog::Prompt::Lines(shown));
         Some(())
     }
+    /// 1194:862E's 4E88 with 13D3 0: the line said in the strip, read
+    /// with a click.
     fn key(&mut self) -> Option<()> {
         if let Some(t) = self.talk.as_deref_mut() {
-            t.lines_box(self.said.clone());
+            t.dialog_lines(&self.said);
         }
         Some(())
     }
@@ -116,23 +138,8 @@ impl HaggleIo for HaggleTalk<'_> {
         }
     }
     fn say(&mut self, m: &mut Machine, si: u16, kind: u8) {
-        // The original made its line breaks spaces (1194:84C3) and 49FF
-        // wraps it; here it is wrapped at spaces to fit the screen.
-        let text = String::from_utf8_lossy(m.mem.cstr(DS, si)).into_owned();
-        let mut wrapped = String::new();
-        let mut col = 0;
-        for word in text.split(' ').filter(|w| !w.is_empty()) {
-            if col > 0 && col + 1 + word.len() > WRAP {
-                wrapped.push('\r');
-                col = 0;
-            } else if col > 0 {
-                wrapped.push(' ');
-                col += 1;
-            }
-            wrapped.push_str(word);
-            col += word.len();
-        }
-        self.said = hud::lines(wrapped.as_bytes(), 0x0F);
+        // Its line breaks made spaces (1194:84C3), then broken by 49FF.
+        self.said = wrap_49ff(m.mem.cstr(DS, si));
         self.kind = kind;
         let p = String::from_utf8_lossy(m.mem.cstr(DS, OFFER_PROMPT)).trim().to_string();
         if !p.is_empty() {
@@ -198,7 +205,7 @@ impl QuestHooks for QuestFront<'_, '_> {
             t.lines_box(lines);
             return 0;
         }
-        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: 0 };
+        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: 0, font: None };
         if t.ask_menu(menu) == 0 { 0 } else { 1 }
     }
     fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {

@@ -160,6 +160,12 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     m.mem.w32(DS, 0x1AB5, hi | off as u32);
     m.mem.w32(DS, 0x1004, hi | 0x100);
     m.mem.w32(DS, 0x1008, hi | 0x180);
+    // The setup's A902 bit 10h (21EE:016C, before any play: the title's
+    // Load and a new game run it): the game's sprintf (0000:8D14) writes a
+    // line feed alone, not CR LF. With CR LF a haggle's line broken at
+    // its line feed (1194:84C3 makes both spaces) wrapped one space late.
+    let v = m.mem.r16(DS, 0xA902) | 0x10;
+    m.mem.w16(DS, 0xA902, v);
     // A player to walk around with: health 50 of 50, fatigue full
     // ((strength + endurance) x 64, 2901:00A8's maximum) — with less, the
     // first exhaustion's hour of rest (2901:0014) can't make up the hour's

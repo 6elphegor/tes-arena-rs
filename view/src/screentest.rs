@@ -387,13 +387,128 @@ fn camping_refused_in_the_street_as_the_original_draws_it() {
 
 /// Shift+M in the street: the travel map (2542:03BF, 26F7).
 #[test]
-#[ignore = "not yet the original's: from this state the original's 03BF waits first on the world map (TAMRIEL.MNU), where the view's Travel::begin opens on the province's (26F7:0176)"]
 fn the_world_map_as_the_original_draws_it() {
     screen(
         "worldmap",
         |a, d| {
             area_left(a);
             super::press(d, a, KeyCode::KeyM, true);
+        },
+        layer,
+    );
+}
+
+/// In the building first in the town's list at `list`, its services
+/// (`kind`, 869F's) asked, and the menu's entry at row `y` clicked (as
+/// gen_screens.py's script clicks it, x A0h): what it asks next.
+fn shop_pick(a: &mut App, d: &mut Driver, list: u16, kind: u8, y: i32) {
+    into(a, list);
+    super::shop_turn(a, kind);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, y, MouseButton::Left);
+}
+
+/// The tavern's Buy Drinks: the drinks listed over the gold left.
+#[test]
+fn the_taverns_drinks_as_the_original_draws_them() {
+    screen("taverndrinks", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x43), layer);
+}
+
+/// The tavern's Get a Room: the rooms available.
+#[test]
+fn the_taverns_rooms_as_the_original_draws_them() {
+    screen("tavernroom", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x5B), layer);
+}
+
+/// The tavern's Rumors: the kind of rumour asked.
+#[test]
+fn the_taverns_rumour_kinds_as_the_original_draws_them() {
+    screen("tavernrumor", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x8B), layer);
+}
+
+/// The temple's Bless: the donation asked.
+#[test]
+fn the_temples_blessing_as_the_original_draws_it() {
+    screen("templebless", |a, d| shop_pick(a, d, 0x1004, 5, 0x4F), layer);
+}
+
+/// The temple's Cure.
+#[test]
+fn the_temples_cure_as_the_original_draws_it() {
+    screen("templecure", |a, d| shop_pick(a, d, 0x1004, 5, 0x67), layer);
+}
+
+/// The temple's Heal.
+#[test]
+fn the_temples_healing_as_the_original_draws_it() {
+    screen("templeheal", |a, d| shop_pick(a, d, 0x1004, 5, 0x7F), layer);
+}
+
+/// The store's Buy: refused, the save's inventory full.
+#[test]
+fn the_stores_buy_as_the_original_draws_it() {
+    screen("storebuy", |a, d| shop_pick(a, d, 0x1008, 6, 0x43), layer);
+}
+
+/// The store's Sell: the items to sell, over the gold left.
+#[test]
+fn the_stores_sell_as_the_original_draws_it() {
+    screen("storesell", |a, d| shop_pick(a, d, 0x1008, 6, 0x5B), layer);
+}
+
+/// The store's Repair: the items to repair.
+#[test]
+fn the_stores_repair_as_the_original_draws_it() {
+    screen("storerepair", |a, d| shop_pick(a, d, 0x1008, 6, 0x73), layer);
+}
+
+/// The tavern's Get a Room, its first room (Single) picked: the days
+/// asked, the field under the dialog's lines.
+#[test]
+fn the_taverns_days_asked_as_the_original_draws_them() {
+    screen(
+        "tavernroomdays",
+        |a, d| {
+            shop_pick(a, d, 0x1AB5, 4, 0x5B);
+            d.click(a, 0x80, 0x31, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The store's Sell, its first item (equipped) picked: whether to sell
+/// it still (1194:F6BC).
+#[test]
+fn the_stores_equipped_sale_as_the_original_draws_it() {
+    screen(
+        "storesellequipped",
+        |a, d| {
+            shop_pick(a, d, 0x1008, 6, 0x5B);
+            d.click(a, 0x80, 0x25, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// gen_screens.py's SEED: the game's random numbers started there as the
+/// shop's routine starts, where what is drawn depends on them.
+const SEED: u32 = 0x2F6E_1A35;
+
+/// Its Yes: the haggle over the item (1194:09FC, 8020 in mode 4), its
+/// line (one of three, by the seed) in the strip, NEGOTBUT.IMG's buttons.
+#[test]
+fn the_stores_haggle_as_the_original_draws_it() {
+    screen(
+        "storesellhaggle",
+        |a, d| {
+            into(a, 0x1008);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x5B, MouseButton::Left);
+            d.click(a, 0x80, 0x25, MouseButton::Left);
+            d.click(a, 0xA0, 0x69, MouseButton::Left);
         },
         layer,
     );

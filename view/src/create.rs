@@ -1133,7 +1133,7 @@ impl Creation {
     /// The list `ask` as 1194:5734 shows the classes' (2678: kind 6,
     /// POPUP2.IMG, its title drawn by 5734).
     fn list_menu(&self, ask: &Ask) -> hud::Menu {
-        hud::Menu { title: ask.title.clone(), entries: ask.entries.clone(), keys: Vec::new(), selected: ask.sel, list: true, kind: 6 }
+        hud::Menu { title: ask.title.clone(), entries: ask.entries.clone(), keys: Vec::new(), selected: ask.sel, list: true, kind: 6, font: None }
     }
 
     /// The layer drawn: the screen behind, the stage, a box waiting.

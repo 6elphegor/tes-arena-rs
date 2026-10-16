@@ -70,6 +70,7 @@ use crate::bsa::Files;
 use crate::format::Arg;
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
+use crate::shops::font;
 use crate::shops::ShopHooks;
 
 /// What the guild leaves to the front end, besides `ShopHooks`.
@@ -190,7 +191,6 @@ const NAME_PTR: u16 = 0x1376;
 const GOLD: u16 = 0x05C2;
 const TIME: u16 = 0x05CC;
 const FRAME: u16 = 0x9030;
-const COLOUR: u16 = 0x9288;
 const MAKING: u16 = 0x7109;
 const SORT_I: u16 = 0x12BC;
 const PLAYER: u16 = 0x01A4;
@@ -260,6 +260,9 @@ impl Machine {
             self.guild_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
+                // 1194:A78E: FONT_A and the tiles at 1036 selected.
+                self.select_font(font::A);
+                self.select_tiles(0x1036);
                 let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
                 let (bx, di) = if caster { (KEYS, ENTRIES) } else { (KEYS_PLAIN, ENTRIES_PLAIN) };
                 let pick = hooks.menu(self, MENU_TITLE, bx, di);
@@ -412,6 +415,10 @@ impl Machine {
     /// to the stock (1194:AF3B); a failed one is tried again, up to 200
     /// failures. Then sorted and its texts made.
     fn stock_make(&mut self) -> Option<()> {
+        // 1194:AE91: TEENYFNT and the tiles at 1034 selected (AX left the
+        // tiles' word).
+        self.select_font(font::TEENY);
+        self.select_tiles(0x1034);
         let ax = self.mem.r16(DS, 0x1034);
         self.stock_clear(ax);
         self.mem.w8(DS, PICK, 0xFF);
@@ -604,8 +611,9 @@ impl Machine {
 
     /// 1194:AA8C. The buy menu (see the module's notes).
     fn guild_buy(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
-        // 1194:AA8F: the gold left.
+        // 1194:AA8F: the gold left; the tiles at 1036 selected (AA92).
         hooks.gold_left(self);
+        self.select_tiles(0x1036);
         let stock = self.mem.r8(DS, STOCK) >= 1;
         let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
         let menu = match (stock, caster) {
@@ -634,10 +642,10 @@ impl Machine {
         }
     }
 
-    /// The window colour of a message box (1194:42EE: the fonts set, the
-    /// front end's).
-    fn guild_colour(&mut self) {
-        self.mem.w8(DS, COLOUR, 0x60);
+    /// Before a message box, 1194:42EE with AX the font at DS:`at`: the
+    /// font and the tiles at 1036 selected, the colour 60h.
+    fn guild_colour(&mut self, at: u16) {
+        self.message_fonts(at);
     }
 
     /// 1194:AFF9. Potions bought (see the module's notes).
@@ -650,6 +658,8 @@ impl Machine {
             let end = self.sprintf((DS, di), (DS, text::PRICE_LINE), &[Arg::Int(ax), Arg::Str(DS, name)]);
             self.mem.w16(DS, TEXT, self.guild_scan(DS, di, end));
         }
+        // 1194:B05A: TEENYFNT selected.
+        self.select_font(font::TEENY);
         // AX Bh (1194:B06B): the list's kind (1194:5734).
         self.list_kind = 0xB;
         let pick = hooks.list(self, POTION_TEXTS, 0x0F, 0);
@@ -839,13 +849,15 @@ impl Machine {
     /// DS and ES DGROUP.
     fn guild_items(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         if self.free_slot(DS, PLAYER).is_err() {
-            self.guild_colour();
+            self.guild_colour(font::ARENA);
             hooks.message_box(self, text::FULL);
             return Some(());
         }
         let old = self.map_bank(0x18, 0);
         let frame = self.mem.r16(DS, FRAME);
         let n = self.mem.r8(DS, STOCK) as u16;
+        // 1194:B33A: ARENAFNT selected.
+        self.select_font(font::ARENA);
         // AX 7h (1194:B351): the list's kind (1194:5734).
         self.list_kind = 0x7;
         let pick = hooks.stock_list(self, frame, 0x7D0, n);
@@ -855,6 +867,8 @@ impl Machine {
         if (pick as i16) >= 0 {
             self.guild_item_bought(files, hooks, pick)?;
         }
+        // 1194:B40B: FONT_A selected.
+        self.select_font(font::A);
         self.map_bank(old, 0);
         Some(())
     }
@@ -1048,8 +1062,10 @@ impl Machine {
         }
     }
 
-    /// The text colours 102C set (0000:9AE6, the front end's).
-    fn guild_colour_102c(&mut self) {}
+    /// 1194:B242: ARENAFNT selected (0000:9AE6 with [102C]).
+    fn guild_colour_102c(&mut self) {
+        self.select_font(font::ARENA);
+    }
 
     /// 1194:A87E. The spells sold, sorted, listed and one picked; false
     /// (the carry) when none is.
@@ -1095,6 +1111,8 @@ impl Machine {
             let end = self.sprintf((DS, di), (DS, text::PRICE_LINE), &[Arg::Int(eax as u16), Arg::Str(DS, name)]);
             self.mem.w16(DS, TEXT, self.guild_scan(DS, di, end));
         }
+        // 1194:A9ED: TEENYFNT selected.
+        self.select_font(font::TEENY);
         // AX Bh (1194:A9F9): the list's kind (1194:5734).
         self.list_kind = 0xB;
         let pick = hooks.list(self, TEXTS, cx, 0);
@@ -1221,6 +1239,8 @@ impl Machine {
             hooks.message(self, text::NO_ITEMS);
             return Ok(None);
         }
+        // 1194:FE3E: TEENYFNT selected.
+        self.select_font(font::TEENY);
         // AX Bh (1194:FE4E): the list's kind (1194:5734).
         self.list_kind = 0xB;
         let pick = hooks.list(self, PICK_TEXTS, n, 0);
@@ -1245,7 +1265,7 @@ impl Machine {
         if self.mem.r8(DS, HOLIDAY) == 1 {
             eax = self.holiday_price(eax, 3);
             if eax == 0 {
-                self.guild_colour();
+                self.guild_colour(font::ARENA);
                 hooks.message_box(self, text::FREE);
                 pay = false;
             }
@@ -1269,7 +1289,7 @@ impl Machine {
             self.mem.w32(DS, GOLD, g);
         }
         // 1194:ABD0
-        self.guild_colour();
+        self.guild_colour(font::ARENA);
         hooks.message_box(self, text::IDENTIFIED);
         let si = self.mem.r16(DS, IDENTIFY_ITEM);
         let flag = |m: &mut Self, set: bool| {
@@ -1309,7 +1329,7 @@ impl Machine {
             self.steal_take(hooks)?;
             return Some(false);
         }
-        self.guild_colour();
+        self.guild_colour(font::A);
         hooks.message_box(self, text::STEAL_FAILED);
         let cx = 100u16.wrapping_sub(chance);
         if self.rng.next() % 100 >= cx {
@@ -1335,7 +1355,7 @@ impl Machine {
             let added = self.potions_add();
             self.mem.w8(DS, MAKING, 0);
             let Some(si) = added else {
-                self.guild_colour();
+                self.guild_colour(font::ARENA);
                 hooks.message_box(self, text::FULL);
                 return Some(());
             };
@@ -1354,7 +1374,7 @@ impl Machine {
         self.mem.w8(DS, MAKING, 0);
         self.stolen(hooks, ITEM)?;
         if !self.guild_take_item() {
-            self.guild_colour();
+            self.guild_colour(font::ARENA);
             hooks.message_box(self, text::FULL);
             return Some(());
         }
@@ -1374,7 +1394,7 @@ impl Machine {
     fn stolen(&mut self, hooks: &mut dyn GuildHooks, si: u16) -> Option<()> {
         let name = self.display_name(si)?;
         self.sprintf((DS, 0x1044), (DS, text::STOLEN), &[Arg::Str(DS, name)]);
-        self.guild_colour();
+        self.guild_colour(font::ARENA);
         hooks.message_box(self, 0x1044);
         self.map_bank(0x18, 0);
         Some(())

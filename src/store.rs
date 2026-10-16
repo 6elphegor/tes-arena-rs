@@ -97,6 +97,7 @@ use crate::format::Arg;
 use crate::loot::{ITEM, TEMPLATE, template as t};
 use crate::machine::Machine;
 use crate::mem::DS;
+use crate::shops::font;
 use crate::shops::ShopHooks;
 
 /// What the store leaves to the front end, besides `ShopHooks`.
@@ -256,6 +257,9 @@ impl Machine {
             self.store_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
+                // 1194:F4D5: FONT_A and the tiles at 1036 selected.
+                self.select_font(font::A);
+                self.select_tiles(0x1036);
                 let pick = hooks.menu(self, MENU_TITLE, MENU_KEYS, MENU_ENTRIES);
                 if (pick as i16) < 0 || pick == 4 {
                     break;
@@ -317,6 +321,8 @@ impl Machine {
         hooks.greeting(self, text::GREETING);
         hooks.quests(self, files)?;
         self.map_bank(0x18, 0);
+        // 1194:FA38: ARENAFNT selected.
+        self.select_font(font::ARENA);
         self.mem.w8(DS, HOLIDAY, 0xFF);
         if self.shop_holiday() {
             self.mem.w8(DS, HOLIDAY, 1);
@@ -476,6 +482,8 @@ impl Machine {
             hooks.armor_lines(self)?;
         }
         let n = self.mem.r8(DS, count) as u16;
+        // 1194:F7D7, F854: TEENYFNT selected.
+        self.select_font(font::TEENY);
         let lines = if weapons { 0x0FA0 } else { 0x2710 };
         // AX: 1 the weapons' list (1194:F7E9), 2 the armour's (F866).
         self.list_kind = if weapons { 1 } else { 2 };
@@ -620,6 +628,8 @@ impl Machine {
             // 1194:F6BC: an equipped item, only if confirmed.
             let name = self.any_item_name(si)?;
             self.sprintf((DS, SCRATCH), (DS, text::STILL_SELL), &[Arg::Str(DS, name)]);
+            // 1194:F6D2: ARENAFNT selected.
+            self.select_font(font::ARENA);
             if hooks.menu(self, SCRATCH, text::YES_NO, text::YES_NO_ENTRIES) != 0 {
                 return Some(false);
             }
@@ -699,6 +709,8 @@ impl Machine {
             hooks.message(self, text::INVENTORY_EMPTY);
             return Some(None);
         }
+        // 1194:FE3E: TEENYFNT selected.
+        self.select_font(font::TEENY);
         // DI: where 1194:FBE9 left it, past the last name.
         let di = self.mem.r16(DS, SELL_NEXT);
         // AX Bh (1194:FE4E): the list's kind (1194:5734).
@@ -796,13 +808,15 @@ impl Machine {
     /// were called (the store left).
     fn store_steal(&mut self, hooks: &mut dyn StoreHooks) -> Option<bool> {
         if self.free_slot(DS, PLAYER).is_err() {
-            self.mem.w8(DS, COLOUR, 0x60);
+            // 1194:FCFF (42EE with ARENAFNT).
+            self.message_fonts(font::ARENA);
             hooks.message_box(self, text::INVENTORY_FULL);
             return Some(false);
         }
         let (ok, chance) = self.lockpick()?;
         if !ok {
-            self.mem.w8(DS, COLOUR, 0x60);
+            // 1194:FCD7 (42EE with FONT_A).
+            self.message_fonts(font::A);
             hooks.message_box(self, text::UNSUCCESSFUL);
             let cx = 100u16.wrapping_sub(chance);
             if self.rng.next() % 100 >= cx {
@@ -831,7 +845,8 @@ impl Machine {
         let name = self.any_item_name(ITEM)?;
         // 1194:FDB6.
         self.sprintf((DS, SCRATCH), (DS, text::STOLE), &[Arg::Str(DS, name)]);
-        self.mem.w8(DS, COLOUR, 0x60);
+        // 1194:FDC8 (42EE with ARENAFNT).
+        self.message_fonts(font::ARENA);
         hooks.message_box(self, SCRATCH);
         self.map_bank(0x18, 0);
         let price = self.mem.r32(DS, TEMPLATE + t::PRICE);
@@ -1198,7 +1213,8 @@ impl Machine {
             self.mem.w8(DS, STATE, 0);
             // 1194:C874: the gold left.
             hooks.gold_left(self);
-            // 1194:CC94 (its font, 0000:9AE6, the screen's).
+            // 1194:CC94: ARENAFNT selected.
+            self.select_font(font::ARENA);
             // AX Bh (1194:CCA5): the list's kind (1194:5734).
             self.list_kind = 0xB;
             let ax = hooks.list(self, REASONS, 3, REASONS);
