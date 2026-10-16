@@ -700,6 +700,46 @@ fn the_stores_repair_as_the_original_draws_it() {
     screen("storerepair", |a, d| shop_pick(a, d, 0x1008, 6, 0x73), layer);
 }
 
+/// gen_screens.py's `worn`: each item taken worn to half its condition
+/// (+6 of its maximum +8, +3 of +8's low byte).
+fn worn(a: &mut App) {
+    let m = &mut a.engine.m;
+    for i in 0..40u16 {
+        let at = 0x0212 + i * 0x13;
+        if m.mem.r8(DS, at + 0x0E) & 0x40 != 0 {
+            let top = m.mem.r16(DS, at + 8);
+            m.mem.w16(DS, at + 6, top / 2);
+            m.mem.w8(DS, at + 3, (top & 0xFF) as u8 / 2);
+        }
+    }
+}
+
+/// The repair's first line clicked (marked as the list comes up, so
+/// picked), the seed set as the shop's routine starts: "does not need any
+/// repairing"; with the items `worn`, the repair's price asked.
+fn repair_pick(a: &mut App, d: &mut Driver, wear: bool) {
+    into(a, 0x1008);
+    if wear {
+        worn(a);
+    }
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 6);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x73, MouseButton::Left);
+    d.click(a, 0x70, 0x26, MouseButton::Left);
+}
+
+#[test]
+fn a_whole_item_to_repair_as_the_original_draws_it() {
+    screen("storerepairitem", |a, d| repair_pick(a, d, false), layer);
+}
+
+#[test]
+fn a_repairs_price_as_the_original_draws_it() {
+    screen("storerepairworn", |a, d| repair_pick(a, d, true), layer);
+}
+
 /// The tavern's Get a Room, its first room (Single) picked: the days
 /// asked, the field under the dialog's lines.
 #[test]

@@ -107,6 +107,11 @@ SCREENS = {
     'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
     'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
+    # Its first line clicked (marked as the list comes up, so picked):
+    # "does not need any repairing"; with the items worn (`worn`), the
+    # repair's price asked.
+    'storerepairitem': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
+    'storerepairworn': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
     # The Buy with a slot free (`room`: the save's inventory is full).
     'storebuyroom': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     # Its Weapon and Armor (boxes 18h high under BUY OPTIONS): the lists;
@@ -244,7 +249,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -417,6 +422,18 @@ def hunted(a):
     a.w16(0x0FFB, 1)
 
 
+def worn(a):
+    """Each of the player's items (40 slots of 13h bytes from DGROUP 0212h,
+    taken: +0Eh bit 40h) worn to half its condition: +6 of its maximum +8,
+    and +3 of +8's low byte (an armour's of kind 0, 1194:C7DB)."""
+    for i in range(40):
+        at = 0x0212 + i * 0x13
+        if a.mu.mem_read(a.lin(a.ds, at + 0x0E), 1)[0] & 0x40:
+            top = a.r16(at + 8)
+            a.w16(at + 6, top // 2)
+            a.mu.mem_write(a.lin(a.ds, at + 3), bytes([(top & 0xFF) // 2]))
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
@@ -427,7 +444,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'campenemies': hunted,
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
-          'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a))}
+          'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
+          'storerepairworn': lambda a: (worn(a), seeded(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:

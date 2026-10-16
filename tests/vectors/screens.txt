@@ -74,3 +74,5 @@ screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
 screen | worldsearchlist | ac50fdeceb5ce67d db15945b94271757
 screen | campenemies | 1960b2f57c74c4a1 a97a4bafd992e4ed 5587eea3e0c07725
 screen | worldsearchgo | fff77d6bc2419477 db15945b94271757
+screen | storerepairitem | b75308f798a15bb8 a97a4bafd992e4ed fa8c11efc16b9367
+screen | storerepairworn | 9ed8f15e23b94185 a97a4bafd992e4ed fa8c11efc16b9367

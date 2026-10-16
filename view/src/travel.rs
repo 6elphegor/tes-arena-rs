@@ -447,9 +447,15 @@ impl Travel {
 
     /// `ms` of time on: the passes counted, the journey's frames played.
     pub fn advance(&mut self, ms: u32) {
+        let before = self.up_ms / TICK_MS;
         self.up_ms = self.up_ms.wrapping_add(ms);
+        // The editor's pass (its blink, a held arrow) each of the map's
+        // passes, a tick each as the label's and the markers' (a call
+        // with no time, the scripted shots', one pass).
         if let Some(Asking::Name(live)) = &mut self.asking {
-            live.frame();
+            for _ in 0..(self.up_ms / TICK_MS).wrapping_sub(before).max((ms == 0) as u32) {
+                live.frame();
+            }
         }
         if !self.journey.is_empty() {
             self.journey_ms += ms;
