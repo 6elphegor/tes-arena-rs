@@ -64,6 +64,7 @@ SEED = 0x12345678
 SCRIPTS = [
     ('roll', 'G,enter,' + 'click:160:190,' * 12 + 'click:160:125,' * 10 + 'A'),
     ('generate', 'G,enter,A,B,C,A,B,C,A,B,C,A,N,enter'),
+    ('rename', 'S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:20:10,back,type:Bo,enter,click:20:10,esc,type:Al,enter'),
     ('select', 'S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,'
                'click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175'),
 ]

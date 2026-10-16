@@ -203,6 +203,9 @@ enum Stage {
     Map,
     ProvinceYes(Ask, u8),
     Stats,
+    /// The name typed over on the attribute page (1194:1528), the game's
+    /// editor on it.
+    SheetName(Box<crate::field::Live>),
     Choose(Ask),
     Face,
     /// The movies (`Creation::movie`): the intro, the vision after
@@ -939,7 +942,7 @@ impl Creation {
             (Some(b), _) => b.back,
             (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
             (None, Stage::Map | Stage::ProvinceYes(..)) => Back::Map,
-            (None, Stage::Stats | Stage::Choose(_) | Stage::Face) => Back::Stats,
+            (None, Stage::Stats | Stage::SheetName(_) | Stage::Choose(_) | Stage::Face) => Back::Stats,
             (None, _) => Back::Black,
         }
     }
@@ -1134,6 +1137,31 @@ impl Creation {
                 Some(_) => self.map_screen(engine),
             },
             Stage::Stats => self.stats_input(engine, inp),
+            Stage::SheetName(mut live) => {
+                match inp {
+                    Input::Key(scan, down) => live.key(scan, down),
+                    Input::Char(c) => live.type_char(c),
+                    Input::Back => live.tap(0x0E),
+                    Input::Enter => live.tap(0x1C),
+                    Input::Esc => live.tap(0x01),
+                    _ => {}
+                }
+                if !live.ended() {
+                    return self.stage = Stage::SheetName(live);
+                }
+                // Into 01AD, the page drawn again (1564..1578).
+                let mut name = [0u8; 0x15];
+                for (n, &b) in name.iter_mut().zip(live.text().iter().take(0x14)) {
+                    *n = b;
+                }
+                for (i, &b) in name.iter().enumerate() {
+                    engine.m.mem.w8(DS, 0x01AD + i as u16, b);
+                }
+                if let Some(v) = &mut self.level_up {
+                    v.push(Click::Name(name));
+                }
+                Stage::Stats
+            }
             Stage::Choose(mut ask) => match self.ask_input(&mut ask, inp) {
                 None => Stage::Choose(ask),
                 Some(0) => {
@@ -1379,15 +1407,23 @@ impl Creation {
         Box::new(crate::field::Live::open(&engine.m, field, look).expect("the name's field opens"))
     }
 
+    /// 1194:1528: the sheet's name, 9EE5 with AX 0Bh, BX 7, CX 0, DX 14h,
+    /// DI A0h, BP 0Ch, SI 01AD, in the page's font and colour (0DE1's).
+    fn sheet_name_field(&self, m: &Machine) -> Box<crate::field::Live> {
+        let look = crate::field::Look { font: "ARENAFNT.DAT", colour: COLOUR_B, put_font: true };
+        let field = arena::lineedit::Field { x: 0x0B, y: 7, click: 0, max: 0x14, seg: DS, off: 0x01AD, w: 0xA0, h: 0x0C };
+        Box::new(crate::field::Live::open(m, field, look).expect("the name's field opens"))
+    }
+
     /// Whether the name is being typed (the keys, pressed and let go,
     /// go to it as `Input::Key`).
     pub fn typing(&self) -> bool {
-        self.boxes.is_empty() && matches!(self.stage, Stage::Name(..))
+        self.boxes.is_empty() && matches!(self.stage, Stage::Name(..) | Stage::SheetName(..))
     }
 
     /// A frame of the window: the name's field's (`Live::frame`).
     pub fn field_frame(&mut self) {
-        if let Stage::Name(_, live) = &mut self.stage {
+        if let Stage::Name(_, live) | Stage::SheetName(live) = &mut self.stage {
             live.frame();
         }
     }
@@ -1535,6 +1571,8 @@ impl Creation {
                     record(self, Click::Arrow(y as u16));
                     Stage::Stats
                 }
+                // The name (3276:56E6: 0Bh, 7, 64h x 0Ah): typed over.
+                None if (0x0B..0x0B + 0x64).contains(&x) && (7..7 + 0x0A).contains(&y) => Stage::SheetName(self.sheet_name_field(m)),
                 _ => Stage::Stats,
             },
             _ => Stage::Stats,
@@ -1762,6 +1800,11 @@ impl Creation {
             }
             Stage::Method(a) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) if ui => self.draw_ask(screen, a, back),
             Stage::Quiz { roll, .. } => self.draw_quiz(screen, m, roll),
+            Stage::SheetName(live) if ui => {
+                // 1194:1531: the name's strip in FBh, the field over it.
+                screen.fill(0x0B, 7, 0x96, 9, 0xFB, 0xFF);
+                live.draw(screen, false);
+            }
             Stage::Name(prompt, live) if ui => {
                 // The prompt's box with its line of room (5C34's "%s\r"
                 // and spaces), the field over it where 5C34 puts it.
@@ -1851,7 +1894,7 @@ impl Creation {
             return;
         }
         let creating = m.mem.r16(DS, 0x05C8) & 0x10 != 0 || self.level_up.is_some();
-        self.stats_page(screen, m, matches!(self.stage, Stage::Stats | Stage::Choose(_)), creating);
+        self.stats_page(screen, m, matches!(self.stage, Stage::Stats | Stage::SheetName(_) | Stage::Choose(_)), creating);
     }
 
     /// The attribute page as 0DC7 draws it (from 2B58 and 122F's redraw
