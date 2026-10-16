@@ -113,3 +113,9 @@ screen | palaceyes | b7153fdf9a4a1374 a97a4bafd992e4ed 81eb9708c8c5c92d
 screen | palaceaccept | 9f5777e2778c4673 a97a4bafd992e4ed b4ee2e592ebb225
 screen | palacedecline | c53dd1e740f17cf4 a97a4bafd992e4ed 84778cba60dcaa0e
 screen | palacenone | b0ce105eb5a635e3 a97a4bafd992e4ed e5cc6fd39d770635
+screen | guildwelcome | 2456e1b403364ebe a97a4bafd992e4ed 885e3f905603925
+screen | holiday | 88dd944b7abc9744 2376632b30141d5 f05d3eefaf95c225
+screen | questmessage | 695bb197143463c9 2376632b30141d5 e1d5c15186287322
+screen | storewelcome | ed01c65951f87e4e a97a4bafd992e4ed 92419815461bf051
+screen | tavernwelcome | ed83ac3356fa1db5 a97a4bafd992e4ed 849d3333454fc25
+screen | templewelcome | 870300611079bc90 a97a4bafd992e4ed 2032971f07f36d45

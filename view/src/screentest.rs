@@ -891,10 +891,27 @@ fn leaving_the_automap_fades_as_the_original() {
 /// PICKED the square; an entry's square is row << 8 | column, 1194:40CF),
 /// then in.
 fn into(a: &mut App, list: u16) {
+    into_words(a, list);
+    // The building's words on the way in (191F, which the first frame
+    // shows, 0000:4903) taken as read: gen_screens.py runs its screens
+    // from the snapshot without that frame.
+    a.engine.m.mem.w8(DS, 0x191F, 0);
+}
+
+/// As `into`, the building's words on the way in (191F) left for its first
+/// frame to show.
+fn into_words(a: &mut App, list: u16) {
     area_left(a);
     let m = &mut a.engine.m;
     let (off, seg) = (m.mem.r16(DS, list), m.mem.r16(DS, list + 2));
     let sq = m.mem.r16(seg, off);
+    through(a, sq);
+}
+
+/// The door at the entry square `sq` (row << 8 | column) clicked from its
+/// square's corner, from the street, then in.
+fn through(a: &mut App, sq: u16) {
+    let m = &mut a.engine.m;
     let door = (sq & 0xFF00) | ((sq & 0xFF) << 1);
     m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
     m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
@@ -902,10 +919,6 @@ fn into(a: &mut App, list: u16) {
     m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
     assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
     area_left(a);
-    // The building's words on the way in (191F, which the first frame
-    // shows, 0000:4903) taken as read: gen_screens.py runs its screens
-    // from the snapshot without that frame.
-    a.engine.m.mem.w8(DS, 0x191F, 0);
 }
 
 /// The tavern's services (1194:B93C, the table at 869F's kind 4) in the
@@ -2044,6 +2057,96 @@ fn the_palace_with_nothing_on_offer_as_the_original_draws_it() {
             let v = a.engine.m.mem.r16(DS, 0x0E6E + 4) & 0xFF3F;
             a.engine.m.mem.w16(DS, 0x0E6E + 4, v);
             ruler(a, d);
+        },
+        over,
+    );
+}
+
+/// A building's first frame, its words on the way in (191F, text [137A]
+/// as its door left it) shown by 0000:4903, the frame's random numbers from
+/// SEED as gen_screens.py's.
+fn welcome(name: &str, enter: impl FnOnce(&mut App)) {
+    screen(
+        name,
+        |a, d| {
+            enter(a);
+            assert_eq!(a.engine.m.mem.r8(DS, 0x191F), 1, "the words pending");
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "{name}: the building's words");
+        },
+        over,
+    );
+}
+
+/// The town's first tavern's words on the way in (text 2).
+#[test]
+fn the_taverns_words_as_the_original_draws_them() {
+    welcome("tavernwelcome", |a| into_words(a, 0x1AB5));
+}
+
+/// The first temple's (text 3).
+#[test]
+fn the_temples_words_as_the_original_draws_them() {
+    welcome("templewelcome", |a| into_words(a, 0x1004));
+}
+
+/// The first store's (text 4).
+#[test]
+fn the_stores_words_as_the_original_draws_them() {
+    welcome("storewelcome", |a| into_words(a, 0x1008));
+}
+
+/// The mages' guild's (text 1), its door the square at 138D.
+#[test]
+fn the_guilds_words_as_the_original_draws_them() {
+    welcome("guildwelcome", |a| {
+        area_left(a);
+        let sq = a.engine.m.mem.r16(DS, 0x138D);
+        through(a, sq);
+    });
+}
+
+/// In the street on a holiday by day: the frame's message of it, once
+/// (0000:49D9: text 2Fh plus its number), as gen_screens.py's `holiday`
+/// sets the clock: noon on the year's day 14.
+#[test]
+fn a_holidays_message_as_the_original_draws_it() {
+    screen(
+        "holiday",
+        |a, d| {
+            area_left(a);
+            let m = &mut a.engine.m;
+            let now = m.mem.r32(DS, 0x05CC);
+            m.mem.w32(DS, 0x05CC, now / 518_400 * 518_400 + 14 * 1440 + 12 * 60);
+            m.mem.w16(DS, 0xCCBC, 4);
+            m.mem.w32(DS, arena::random::SEED, SEED);
+            m.rng.seed = SEED;
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the holiday's message");
+        },
+        over,
+    );
+}
+
+/// A quest's one-time message (0000:4B87: 5CA bit 200h, 5E0 bit 400h
+/// clear): text 5A6h.
+#[test]
+fn a_quests_message_as_the_original_draws_it() {
+    screen(
+        "questmessage",
+        |a, d| {
+            area_left(a);
+            let m = &mut a.engine.m;
+            let v = m.mem.r16(DS, 0x05CA) | 0x200;
+            m.mem.w16(DS, 0x05CA, v);
+            let v = m.mem.r16(DS, 0x05E0) & !0x400;
+            m.mem.w16(DS, 0x05E0, v);
+            m.mem.w32(DS, arena::random::SEED, SEED);
+            m.rng.seed = SEED;
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the quest's message");
         },
         over,
     );

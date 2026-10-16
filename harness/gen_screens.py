@@ -326,6 +326,19 @@ SCREENS = {
     # The palace's first frame (0000:4903): its pending box (191F, set on
     # the way in) taken, text [137A] (0) shown by 1194:A36C with AX 0.
     'palacewelcome': ((0x1194, 0xA36C, {'eax': 0}), []),
+    # The same first frame's box in the town's first tavern, temple and
+    # store, and in the mages' guild (the frame's own 0000:4903 run: 191F
+    # and 137A as their doors left them, 2, 3, 4 and 1).
+    'tavernwelcome': ((0, 0x4903, {}, 'near'), []),
+    'templewelcome': ((0, 0x4903, {}, 'near'), []),
+    'storewelcome': ((0, 0x4903, {}, 'near'), []),
+    'guildwelcome': ((0, 0x4903, {}, 'near'), []),
+    # In the street on a holiday by day (`holiday`): the frame's message
+    # of it, once (0000:49D9: text 2Fh plus the holiday's number, 2DA2:111C).
+    'holiday': ((0, 0x49D9, {}, 'near'), []),
+    # A quest's message, once (0000:4B87: 5CA bit 200h, the quest's carry
+    # 0000:4D00 not met, 5E0 bit 400h clear): text 5A6h (`questmessage`).
+    'questmessage': ((0, 0x4B87, {}, 'near'), []),
     'palace': ((0x1194, 0xDB6C, {}), []),
     'palaceno': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x88)]),
     'palaceyes': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E)]),
@@ -340,11 +353,13 @@ WAIT = (0, 0x8FC4)
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
-          'people': None, 'palace': 'triggers'}
+          'people': None, 'palace': 'triggers', 'guild': 'guild'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
+         'tavernwelcome': 'tavern', 'templewelcome': 'temple', 'storewelcome': 'store', 'guildwelcome': 'guild',
+         'holiday': 'street', 'questmessage': 'street',
          'palacewelcome': 'palace', 'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
@@ -365,6 +380,10 @@ def place(a, base, where, cache={}):
         assert a.area_ended() == ('world',), 'the guild not left'
         if PLACES[where] == 'triggers':
             assert a.enter(palace_door(a)) == ('world',), 'the palace not entered'
+        elif PLACES[where] == 'guild':
+            # The mages' guild's square (138D: row << 8 | column).
+            sq = a.r16(0x138D)
+            assert a.enter((sq & 0xFF00) | ((sq & 0xFF) << 1)) == ('world',), 'the guild not entered'
         elif PLACES[where] is not None:
             at, count = PLACES[where]
             assert a.r16(count), f'no {where} in the town'
@@ -419,6 +438,31 @@ def pending(a):
     for at in (0x191F, 0x101C, 0x137E):
         a.mu.mem_write(a.lin(a.ds, at), bytes([0]))
     # The text's variant rolled from SEED on both sides.
+    seeded(a)
+
+
+# The holiday `holiday` sets: the first after New Life (the table at
+# 33AD: day 14), at noon, in the save's year.
+HOLIDAY_DAY = 14
+
+
+def holiday(a):
+    """The clock (05CC: minutes, 518400 a year) at noon on HOLIDAY_DAY of
+    its year, the frame counter (CCBC) past 3: the frame's holiday message
+    due (its flag 5E0 bit 100h clear as the save has it)."""
+    now = a.r16(0x05CC) | a.r16(0x05CE) << 16
+    clock = now // 518400 * 518400 + HOLIDAY_DAY * 1440 + 12 * 60
+    a.w16(0x05CC, clock & 0xFFFF)
+    a.w16(0x05CE, clock >> 16)
+    a.w16(0xCCBC, 4)
+    seeded(a)
+
+
+def quest_message(a):
+    """A quest's one-time message due (5CA bit 200h, as the arrival at
+    its place sets it; 5E0 bit 400h clear)."""
+    a.w16(0x05CA, a.r16(0x05CA) | 0x200)
+    a.w16(0x05E0, a.r16(0x05E0) & ~0x400)
     seeded(a)
 
 
@@ -651,6 +695,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storesteal': lambda a: (room(a), seeded(a)),
           'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
           'equipmentpotion': potion, 'usepotions': potion, 'usepotion': potion,
+          'tavernwelcome': seeded, 'templewelcome': seeded, 'storewelcome': seeded, 'guildwelcome': seeded,
+          'holiday': holiday, 'questmessage': quest_message,
           'palacewelcome': pending, 'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
@@ -674,8 +720,8 @@ def draw(a, base, name, handler, script, fill, waits=None):
     a.mouse = (160, 100)
     a.buttons = 0
     if isinstance(handler, tuple):
-        seg, off, regs = handler
-        a.run_screen(seg, off, regs=regs)
+        seg, off, regs, *near = handler
+        a.run_screen(seg, off, regs=regs, near=bool(near))
     else:
         a.run_screen(MENU, handler, near=True)
     if name in AFTER:
