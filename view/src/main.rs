@@ -552,7 +552,7 @@ impl arena::rest::RestHooks for Front<'_> {
         Front::message_box(self, m, si);
     }
     fn hours_text(&mut self, m: &mut arena::machine::Machine) {
-        let s = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::rest::var::TEXT)).trim().to_string();
+        let s = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::rest::var::TEXT)).into_owned();
         match self.talk.as_deref_mut() {
             Some(t) => t.status = Some(s),
             None => println!("{s}"),
@@ -1357,6 +1357,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         arrowed: false,
         live: None,
         status: None,
+        status_held: false,
         font,
         screen,
         cursor: (0.0, 0.0),
@@ -2512,6 +2513,8 @@ struct App {
     arrowed: bool,
     live: Option<field::Live>,
     status: Option<String>,
+    /// `status` kept under the boxes of the turn that drew it last.
+    status_held: bool,
     font: hud::Font,
     screen: hud::Screen,
     /// The cursor in the window, and the window's size (pixels).
@@ -2763,6 +2766,9 @@ impl App {
         if !talk.since_answer.is_empty() {
             self.box_backdrop = talk.backdrop.take();
         }
+        // The rest's hours drawn in the turn whose boxes end it stay
+        // under them: the original's page keeps them while its box waits.
+        self.status_held = talk.status.is_some() && !talk.since_answer.is_empty();
         self.boxes.extend(talk.since_answer);
         if talk.status.is_some() {
             self.status = talk.status;
@@ -3291,6 +3297,11 @@ impl App {
         let mut cast = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
+                // An item's description waits for a click (1194:5536),
+                // which does nothing more.
+                if inv.info.take().is_some() {
+                    return;
+                }
                 if let Some((names, _)) = &inv.using {
                     let menu = panels::use_menu(names, 0);
                     let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
@@ -3313,15 +3324,13 @@ impl App {
                             let back = inv.from_sheet;
                             self.panel = back.then_some(panels::Panel::Sheet)
                         },
-                        panels::Button::Spellbook => self.panel = Some(panels::Panel::Spellbook(Default::default())),
+                        panels::Button::Spellbook => panels::spells_button(&mut self.engine.m, &mut said),
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
-                } else if let Some(row) = panels::line_at(x, y) {
-                    if right {
-                        panels::select_line(&mut self.engine.m, row);
-                    } else {
-                        panels::equip_line(&mut self.engine.m, row, &mut said);
-                    }
+                } else if let Some(d) = panels::arrow_at(x, y) {
+                    panels::arrow(&mut self.engine.m, d);
+                } else if panels::line_at(x, y).is_some() {
+                    panels::line_click(&mut self.engine.m, inv, y, right, &mut said);
                 }
             }
             // A line of the list in the bar's corner clicked (2542:06F8):
@@ -3562,7 +3571,7 @@ impl App {
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
         let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), level: hud::level_text(&self.engine.m), clip: game_clip(&self.engine.m), ..Default::default() };
-        if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
+        if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 || (self.status_held && !self.boxes.is_empty()) {
             h.status = self.status.clone();
         }
         if let Some(list) = self.panel.as_ref().and_then(|p| p.bar_list(&self.engine.m)) {

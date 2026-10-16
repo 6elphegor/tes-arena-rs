@@ -1192,11 +1192,11 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
         screen.text_plain(f, x, 0x14, &text, 0x70);
         screen.text_plain(f, x + 1, 0x14, &text, 0x9F);
     }
-    let c = clip(hud);
+    // 1194:4659: the rest's hours in [1026]'s font (FONT_A) centred at x
+    // A0h (0000:5364) at y 14h, in colour 3Eh.
     if let Some(s) = &hud.status {
-        let lines = vec![vec![Span { colour: 0x0F, text: s.clone(), font: Default::default(), code: None }]];
-        let (w, h, _, _) = box_size(st, &st.box_font, &lines);
-        draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
+        let f = &st.menu_font;
+        screen.text_plain(f, 0xA0 - (f.width(s) as i32 >> 1), 0x14, s, 0x3E);
     }
     if let Some(p) = hud.boxed.as_deref().and_then(placed_of) {
         draw_placed(screen, st, p);

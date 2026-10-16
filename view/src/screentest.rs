@@ -220,6 +220,78 @@ fn the_equipment_page_as_the_original_draws_it() {
     );
 }
 
+/// The equipment page's second line clicked: marked.
+#[test]
+fn the_equipment_page_with_a_line_marked_as_the_original_draws_it() {
+    screen(
+        "equipmentpick",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The list's arrow at its left foot: a line on.
+#[test]
+fn the_equipment_list_moved_on_as_the_original_draws_it() {
+    screen(
+        "equipmentdown",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 16, 131, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// A line right-clicked: marked, its item described over the list's foot
+/// (1194:1988).
+#[test]
+fn an_items_description_as_the_original_draws_it() {
+    screen(
+        "equipmentinfo",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Right);
+        },
+        layer,
+    );
+}
+
+/// The marked line clicked again: the boots taken off.
+#[test]
+fn an_item_taken_off_as_the_original_draws_it() {
+    screen(
+        "equipmentoff",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The equipment page's Spellbook button: the spells' page.
+#[test]
+fn the_sheets_spellbook_as_the_original_draws_it() {
+    screen(
+        "equipmentspells",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// S: the status box (2542:037C, 04B1).
 #[test]
 fn the_status_box_as_the_original_draws_it() {
@@ -230,6 +302,19 @@ fn the_status_box_as_the_original_draws_it() {
 #[test]
 fn the_logbook_as_the_original_draws_it() {
     screen("logbook", |a, d| d.key(a, KeyCode::KeyL, Some("l")), layer);
+}
+
+/// The logbook's More...: its next page.
+#[test]
+fn the_logbooks_next_page_as_the_original_draws_it() {
+    screen(
+        "logbookmore",
+        |a, d| {
+            d.key(a, KeyCode::KeyL, Some("l"));
+            d.click(a, 285, 172, MouseButton::Left);
+        },
+        layer,
+    );
 }
 
 /// C: the spellbook (2542:026D, 056A).
@@ -274,6 +359,32 @@ fn an_area_spell_cast_as_the_original_draws_it() {
         },
         over,
     );
+}
+
+/// C, then a spell of the caster's own clicked twice (its first line,
+/// Absorb Spell; its fifth, Area Light VIII): cast, nothing drawn over
+/// play by the cast or the next frame's message line.
+fn self_cast(name: &str, y: i32) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, y, MouseButton::Left);
+            d.click(a, 0xF0, y, MouseButton::Left);
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+#[test]
+fn a_spell_on_oneself_cast_as_the_original_shows_it() {
+    self_cast("spellself", 155);
+}
+
+#[test]
+fn a_light_cast_as_the_original_shows_it() {
+    self_cast("spelllight", 191);
 }
 
 /// U, then its fourth line clicked once (Ring of Shielding): the line
@@ -785,6 +896,26 @@ fn a_theft_failed_as_the_original_draws_it() {
     );
 }
 
+/// The Steal from gen_screens.py's STEAL_SEED: the roll succeeds, "You
+/// successfully stole a ...".
+#[test]
+fn a_theft_as_the_original_draws_it() {
+    screen(
+        "storestolen",
+        |a, d| {
+            into(a, 0x1008);
+            room(a);
+            let seed = 0x2F6E_1A36;
+            a.engine.m.mem.w32(DS, arena::random::SEED, seed);
+            a.engine.m.rng.seed = seed;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x8B, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 #[test]
 fn a_repairs_price_as_the_original_draws_it() {
     screen("storerepairworn", |a, d| repair_pick(a, d, true), layer);
@@ -891,6 +1022,58 @@ fn no_need_to_rest_as_the_original_draws_it() {
             d.key(a, KeyCode::KeyR, Some("r"));
             d.frame(a);
             d.click(a, 0xA0, 0x7C, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// Resting as 1194:424E leaves it (gen_screens.py's `resting`): 1013 set,
+/// the fatigue's limit, HOURS, COUNTDOWN and the hour's STEP, the seed
+/// fixed; then a frame, whose body runs the rest's (1194:4635).
+fn rest_frame(a: &mut App, d: &mut Driver, countdown: u8, hours: u16, step: u8) {
+    use arena::rest::var;
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, var::RESTING, 1);
+    let limit = m.rest_fatigue_limit();
+    m.mem.w16(DS, var::FATIGUE_LIMIT, limit);
+    m.mem.w16(DS, var::HOURS, hours);
+    m.mem.w8(DS, var::COUNTDOWN, countdown);
+    m.mem.w8(DS, var::STEP, step);
+    m.mem.w32(DS, arena::random::SEED, SEED);
+    m.rng.seed = SEED;
+    d.frame(a);
+}
+
+/// A frame of rest counting down 5 hours typed: "5 hours remaining..."
+/// drawn at the top (1194:4659).
+#[test]
+fn the_rests_hours_left_as_the_original_draws_them() {
+    screen("restleft", |a, d| rest_frame(a, d, 1, 5, 0), over);
+}
+
+/// Resting until healed, the player hurt: "2 hours passed...".
+#[test]
+fn the_rests_hours_passed_as_the_original_draws_them() {
+    screen(
+        "restpassed",
+        |a, d| {
+            let hp = a.engine.m.mem.r16(DS, 0x01FF) / 2;
+            a.engine.m.mem.w16(DS, 0x01FD, hp);
+            rest_frame(a, d, 0, 2, 0);
+        },
+        over,
+    );
+}
+
+/// The hour's last step with the player rested: its hours, then "You are
+/// healed..." in a box over them.
+#[test]
+fn the_rest_ended_rested_as_the_original_draws_it() {
+    screen(
+        "restrested",
+        |a, d| {
+            healed(a);
+            rest_frame(a, d, 0, 1, 2);
         },
         over,
     );
