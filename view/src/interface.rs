@@ -301,23 +301,23 @@ pub fn start(m: &mut Machine) {
 
 /// The interface's set-up for the 3D view (0000:4DD6, 4F1B): the view's
 /// window the 320 x 147 above the bar (the record at 883E: 0, 0, 13Fh,
-/// 92h, as C39C and the clip A914..A91A hold it), the eye line row 3Dh
-/// (C3D8), the centre column from it (as `world::load` makes it).
+/// 92h, into C39C; 4F1B leaves the clip A914..A91A, which A5D1 sets from
+/// C39C only while a frame draws), the eye line row 3Dh (C3D8), the
+/// centre column from it (as `world::load` makes it).
 pub fn enter(m: &mut Machine) {
     for (i, v) in [0u16, 0, 0x13F, 0x92].into_iter().enumerate() {
         m.mem.w16(DS, 0xC39C + 2 * i as u16, v);
-        m.mem.w16(DS, 0xA914 + 2 * i as u16, v);
     }
     m.mem.w16(DS, 0xC3D8, 0x3D);
     let centre = (m.mem.r16(DS, 0xA918) + m.mem.r16(DS, 0xA914)) / 2 + m.mem.r16(DS, 0xCB86);
     m.mem.w16(DS, 0xC3D6, centre);
 }
 
-/// The renderer's window for the machine's: the clip's rows (A91A + 1)
-/// of 200, the eye line (C3D8 + 1, moving as the player bobs in water)
-/// of those.
+/// The renderer's window for the machine's: the view's rows (C3A2 + 1,
+/// the clip while a frame draws, A5D1) of 200, the eye line (C3D8 + 1,
+/// moving as the player bobs in water) of those.
 pub fn window(m: &Machine) -> crate::render::Window {
-    let rows = (m.mem.r16(DS, 0xA91A) as i16 as f32 + 1.0).clamp(1.0, 200.0);
+    let rows = (m.mem.r16(DS, 0xC3A2) as i16 as f32 + 1.0).clamp(1.0, 200.0);
     let horizon = (m.mem.r16(DS, 0xC3D8) as i16 as f32 + 1.0) / rows;
     crate::render::Window { rows: rows / 200.0, horizon: horizon.clamp(0.0, 1.0) }
 }

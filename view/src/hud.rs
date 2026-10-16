@@ -95,6 +95,9 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
             }
             b'\r' | b'\n' => {
                 flush(&mut out, &mut cur, colour);
+                // A line its break ended: an empty span at its end (0000:965A
+                // centres such a line in its box).
+                out.last_mut().unwrap().push(Span { colour, text: String::new() });
                 out.push(Vec::new());
                 // \r\n is one break.
                 if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
@@ -106,7 +109,7 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
         i += 1;
     }
     flush(&mut out, &mut cur, colour);
-    while out.len() > 1 && out.last().is_some_and(|l| l.is_empty()) {
+    while out.len() > 1 && out.last().is_some_and(|l| l.iter().all(|s| s.text.is_empty())) {
         out.pop();
     }
     out
@@ -596,15 +599,16 @@ pub fn centred_box(m: &arena::machine::Machine, text: &[u8]) -> Option<(u16, u16
 }
 
 /// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them:
-/// a line ended by a CR (here all but the last) centred on the box, the
-/// last from the text's x.
+/// a line ended by a CR (`lines` leaves an empty span at its end) centred
+/// on the box, a last one without from the text's x.
 #[allow(clippy::too_many_arguments)]
 fn draw_box(screen: &mut Screen, st: &Style, font: &Font, (x, y, w, h): (i32, i32, i32, i32), lines: &[Vec<Span>], colour: u8) {
     screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
     let (_, _, tx, ty) = box_size(st, font, lines);
     for (i, l) in lines.iter().enumerate() {
         let lw = font.width(&plain(l)) as i32;
-        let lx = if i + 1 < lines.len() { x + w / 2 - lw / 2 } else { x + tx };
+        let ended = i + 1 < lines.len() || l.last().is_some_and(|s| s.text.is_empty());
+        let lx = if ended { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * (font.h as i32 + 1), l, false, colour);
     }
 }
@@ -1141,7 +1145,7 @@ mod tests {
     fn lines_split_colours_and_breaks() {
         let l = lines(b"\t\xc0 CAMP\r\t\xc0C\t\xd4amp\r", 0x0F);
         assert_eq!(l.len(), 2);
-        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into() }]);
+        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into() }, Span { colour: 0xC0, text: String::new() }]);
         assert_eq!(plain(&l[1]), "Camp");
         assert_eq!(l[1][1].colour, 0xD4);
     }

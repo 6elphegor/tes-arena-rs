@@ -126,23 +126,29 @@ pub fn draw_sheet(screen: &mut Screen, m: &Machine, doll: &[Image]) {
     }
 }
 
+/// 1194:0E19: the name, the race (the nth of 2B94) and the class
+/// (2686:0645) at (Bh, 7), (Bh, 10h), (Bh, 19h), in the sheet's colour.
+pub fn name_texts(screen: &mut Screen, f: &Font, m: &Machine) {
+    let cstr = |seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
+    let race = m.mem.r8(DS, PLAYER + 4) as u16;
+    screen.text_plain(f, 0xB, 7, &cstr(DS, PLAYER + 9), SHEET_COLOUR);
+    screen.text_plain(f, 0xB, 0x10, &cstr(DS, m.skip_strings(DS, RACE_NAMES, race)), SHEET_COLOUR);
+    let (cs, co) = m.class_name(DS, PLAYER);
+    screen.text_plain(f, 0xB, 0x19, &cstr(cs, co), SHEET_COLOUR);
+}
+
 /// 1194:0DE1..0FD7, for the sheet and for creation's attribute screen
 /// (1194:122F's redraws): `creating` is 5C8 bit 10h as the texts read it
 /// (the attributes and maxima as they are, not on the 100 scale).
 pub fn sheet_texts(screen: &mut Screen, f: &Font, m: &Machine, creating: bool) {
+    name_texts(screen, f, m);
     let c = SHEET_COLOUR;
     let mut s = |x: i32, y: i32, t: &str| screen.text_plain(f, x, y, t, c);
-    let cstr = |seg: u16, off: u16| String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
     let b = |o: u16| m.mem.r8(DS, PLAYER + o) as u16;
     let w = |o: u16| m.mem.r16(DS, PLAYER + o);
     let pct = |v: u16| arena::scale::to100(v as i16) as u16;
     // 0DEC: the gold (ltoa) at (2Dh, 90h).
     s(0x2D, 0x90, &m.mem.r32(DS, 0x05C2).to_string());
-    // 0E19: the name, the race (the nth of 2B94), the class (2686:0645).
-    s(0xB, 7, &cstr(DS, PLAYER + 9));
-    s(0xB, 0x10, &cstr(DS, m.skip_strings(DS, RACE_NAMES, b(4))));
-    let (cs, co) = m.class_name(DS, PLAYER);
-    s(0xB, 0x19, &cstr(cs, co));
     // 0E53: the attributes (+29..+30) on the 100 scale (5B07) unless
     // creating, from (1Ah, 34h), 8 rows apart, unsigned (7052).
     for i in 0..8u16 {
