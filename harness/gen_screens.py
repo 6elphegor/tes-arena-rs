@@ -90,6 +90,13 @@ SCREENS = {
     'tavernrest': (0x01E6, []),
     # Its Camp for a while (the box at 59h..70h): the hours asked.
     'tavernresthours': (0x01E6, [('click', 0xA0, 0x64)]),
+    # Its second entry (Rest until healed, the box at 71h..88h) with the
+    # player rested (`healed`): "You don't need to rest." (1194:4290) in a
+    # box centred in the rest's clip (A91A 92h from 1194:4252: the one box
+    # the rest shows inside it besides its menu and prompt; the rest's
+    # other messages come in its frames, 1194:4635, after it is put back).
+    'tavernrestneed': (0x01E6, [('click', 0xA0, 0x7C)]),
+
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
     # strip (1194:4E88, three lines to a page, "...More" between them).
@@ -148,7 +155,7 @@ WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
-               'tavernrest', 'tavernresthours')})
+               'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
 
 def place(a, base, where, cache={}):
@@ -249,10 +256,20 @@ def rented(a):
     assert not a.script
 
 
+def healed(a):
+    """The player rested as 1194:4345 tests it (2433's 4320): health
+    (01FD) and spell points (020A) at their maximums (01FF, 020C), the
+    fatigue (0201) well within its limit."""
+    a.w16(0x01FD, a.r16(0x01FF))
+    a.w16(0x020A, a.r16(0x020C))
+    a.w16(0x0201, 0x7FFF)
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
           'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
+          'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'loot': loot_seeded, 'loottake': loot_seeded}
 

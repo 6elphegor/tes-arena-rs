@@ -182,6 +182,9 @@ impl Talk {
         for l in &lines {
             println!("{}", hud::plain(l));
         }
+        // Centred in the clip as it is asked (A914..A91A).
+        let r = |at| m.mem.r16(DS, at) as i16 as i32;
+        let lines = hud::clipped(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
         self.boxes.push(lines.clone());
         self.since_answer.push(lines);
     }

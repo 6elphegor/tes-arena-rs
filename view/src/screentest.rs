@@ -568,6 +568,36 @@ fn the_hours_to_rest_asked_as_the_original_draws_them() {
     );
 }
 
+/// The player rested as 1194:4345 tests it (gen_screens.py's `healed`):
+/// health and spell points at their maximums, the fatigue well within its
+/// limit.
+fn healed(a: &mut App) {
+    let m = &mut a.engine.m;
+    let (hp, sp) = (m.mem.r16(DS, 0x01FF), m.mem.r16(DS, 0x020C));
+    m.mem.w16(DS, 0x01FD, hp);
+    m.mem.w16(DS, 0x020A, sp);
+    m.mem.w16(DS, 0x0201, 0x7FFF);
+}
+
+/// Rest until healed (the second entry) with the player rested: "You
+/// don't need to rest." in a box centred in the rest's clip (A91A 92h).
+#[test]
+fn no_need_to_rest_as_the_original_draws_it() {
+    screen(
+        "tavernrestneed",
+        |a, d| {
+            room_taken(a, d);
+            d.click(a, 0xA0, 0x87, MouseButton::Left);
+            assert!(a.pending.is_none(), "the tavern left");
+            healed(a);
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+            d.click(a, 0xA0, 0x7C, MouseButton::Left);
+        },
+        over,
+    );
+}
+
 /// `over` with the typed field asked drawn over it (`App::compose`'s
 /// last step): a box's prompt and its field.
 fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {

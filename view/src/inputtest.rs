@@ -192,7 +192,7 @@ fn typed(app: &App) -> String {
 }
 
 fn text(spans: &[Vec<hud::Span>]) -> String {
-    spans.iter().map(|l| l.iter().map(|s| s.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n")
+    hud::clip_of(spans).1.iter().map(|l| l.iter().map(|s| s.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n")
 }
 
 /// The menu the game waits on, if it does.

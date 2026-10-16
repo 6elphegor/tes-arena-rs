@@ -23,6 +23,7 @@ screen | tavernroomprice | 420e70b46a151263 a97a4bafd992e4ed 75874994b31de8a7
 screen | tavernroomtaken | 881fe166559e6f12 a97a4bafd992e4ed 646a7e6e89122ae3
 screen | tavernrest | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
 screen | tavernresthours | a49d4fcfe50df249 a97a4bafd992e4ed 62f31076cdb4225
+screen | tavernrestneed | 4da75097179456e1 a97a4bafd992e4ed c98ce845f072e255
 screen | storesellequipped | d953b2a95cc5569e a97a4bafd992e4ed b6b838e09c8cd067
 screen | tavernrumorgeneral | 6f86581d2ad78ef7 a97a4bafd992e4ed 89797cd50490b7f9
 screen | tavernrumorheard | dd9ae1cf7069b61d a97a4bafd992e4ed d864b21378b5a6e3
