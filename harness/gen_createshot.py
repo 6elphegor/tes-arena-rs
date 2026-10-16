@@ -325,7 +325,9 @@ def run(a, inputs, keep=False):
 
             def dbg(mu, addr, size, w):
                 regs = {n: '%04X' % mu.reg_read(globals()['UC_X86_REG_' + n]) for n in ('AX', 'BX', 'CX', 'DX', 'SI', 'DI', 'DS', 'ES', 'FLAGS')}
-                print('at', w, regs, file=sys.stderr)
+                ss, sp = mu.reg_read(UC_X86_REG_SS), mu.reg_read(UC_X86_REG_SP)
+                stack = struct.unpack('<6H', bytes(mu.mem_read(ss * 16 + sp, 12)))
+                print('at', w, regs, 'stack', ' '.join('%04X' % v for v in stack), file=sys.stderr)
             x = a.lin(LOAD_SEG + sg, of)
             hooks.append(mu.hook_add(UC_HOOK_CODE, dbg, w, x, x))
     # Code translated before the hooks were added doesn't see them.

@@ -155,49 +155,11 @@ fn frames() -> std::collections::HashMap<String, (usize, u64)> {
         .collect()
 }
 
-/// Transitions known not to play as the original's yet: (script-step,
-/// why). Step 0 is the start's own (before the first question).
-const KNOWN_FRAMES: &[(&str, &str)] = &[
-    ("generate-0", "the start"),
-    ("select-0", "the start"),
-    // A menu's pick marked on the screen before it dissolves (the
-    // original's first state is the screen with the pick), and the
-    // instructions' box after the method's menu.
-    ("generate-1", "a menu's pick marked first; two dissolves"),
-    ("generate-2", "a menu's pick marked first; two dissolves"),
-    ("select-1", "a menu's pick marked first"),
-    ("select-2", "the list's pick marked first"),
-    // Each answer's figure (WARRIOR/ROGUE/MAGE.CEL) plays frame by frame
-    // before the scroll's rows dissolve.
-    ("generate-3", "the answer's figure playing"),
-    ("generate-4", "the answer's figure playing"),
-    ("generate-5", "the answer's figure playing"),
-    ("generate-6", "the answer's figure playing"),
-    ("generate-7", "the answer's figure playing"),
-    ("generate-8", "the answer's figure playing"),
-    ("generate-9", "the answer's figure playing"),
-    ("generate-10", "the answer's figure playing"),
-    ("generate-11", "the answer's figure playing"),
-    ("generate-12", "the last figure; the class's offer shown without a dissolve"),
-    ("generate-13", "after the offer: the generator's value behind"),
-    ("generate-14", "after the offer: the generator's value behind"),
-    // The prompt taken away and the gender's menu; the map's colours
-    // faded in (9B52's waits) between dissolves.
-    ("select-6", "the prompt's dissolve out, the menu after"),
-    ("select-7", "the map's colours faded in, two dissolves"),
-    ("select-9", "the province's question"),
-    ("select-10", "the generator's value behind since the map"),
-    ("select-11", "the generator's value behind since the map"),
-    ("select-12", "the generator's value behind since the map"),
-    ("select-13", "the generator's value behind since the map"),
-    ("select-14", "the attributes' colours faded in"),
-    ("select-32", "the save's menu"),
-    ("select-33", "the faces' note: two dissolves"),
-];
-
-/// The screens between: each input's dissolves frame by frame, as the
-/// generator samples the original's (each state different from the one
-/// before, the first not the screen answered, the last not the next).
+/// The screens between: each input's change frame by frame (dissolves,
+/// fades, colours set, pictures shown), as the generator samples the
+/// original's (each state different from the one before, the first not
+/// the screen answered, the last not the next). Step 0, the start's own,
+/// has no screen answered before it and isn't compared.
 #[test]
 fn creation_animates_as_the_original() {
     let Some(dir) = game_dir() else { return };
@@ -237,15 +199,14 @@ fn creation_animates_as_the_original() {
                     std::fs::write(PathBuf::from(d).join(format!("{name}.vframes")), raw).ok();
                 }
                 checked += 1;
-                if (seen.len(), got) != (n, digest) && !KNOWN_FRAMES.iter().any(|k| k.0 == name) {
+                if (seen.len(), got) != (n, digest) {
                     wrong.push(format!("{name} ({} states, want {n})", seen.len()));
                 }
             }
             before = Some(now.clone());
             if let Some(&inp) = inputs.get(at) {
                 c.input(&mut engine, inp);
-                let dac = drawn(&c, &engine.m, palette).1;
-                states = c.dissolve_frames().into_iter().map(|f| (f, dac.clone())).collect();
+                states = c.film_frames().into_iter().map(|(f, dac)| (f.into_iter().map(u16::from).collect(), dac)).collect();
                 c.settle();
             }
         }
