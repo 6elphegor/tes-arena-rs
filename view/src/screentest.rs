@@ -245,6 +245,24 @@ fn the_spellbook_with_a_line_picked_as_the_original_draws_it() {
     );
 }
 
+/// C, then its fourth line (Arc Lightning) clicked twice: the spell
+/// cast, "Release spell in your area..." on the message line the next
+/// frame draws.
+#[test]
+fn an_area_spell_cast_as_the_original_draws_it() {
+    screen(
+        "spellarea",
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, 182, MouseButton::Left);
+            d.click(a, 0xF0, 182, MouseButton::Left);
+            assert!(a.engine.m.mem.r16(DS, 0x061E) != 0, "a message to show");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
 /// U, then its fourth line clicked once (Ring of Shielding): the line
 /// marked (a second click would use it).
 #[test]
@@ -372,6 +390,21 @@ fn camping_refused_as_the_original_draws_it() {
     screen(
         "camp",
         |a, d| {
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// R with enemies near (0FFB, as the frame's scan of the actors leaves
+/// it): "You can't camp, Enemies are nearby!!!".
+#[test]
+fn camping_refused_with_enemies_near_as_the_original_draws_it() {
+    screen(
+        "campenemies",
+        |a, d| {
+            a.engine.m.mem.w16(DS, 0x0FFB, 1);
             d.key(a, KeyCode::KeyR, Some("r"));
             d.frame(a);
         },
@@ -683,6 +716,65 @@ fn the_stores_sell_as_the_original_draws_it() {
 #[test]
 fn the_stores_repair_as_the_original_draws_it() {
     screen("storerepair", |a, d| shop_pick(a, d, 0x1008, 6, 0x73), layer);
+}
+
+/// gen_screens.py's `worn`: each item taken worn to half its condition
+/// (+6 of its maximum +8, +3 of +8's low byte).
+fn worn(a: &mut App) {
+    let m = &mut a.engine.m;
+    for i in 0..40u16 {
+        let at = 0x0212 + i * 0x13;
+        if m.mem.r8(DS, at + 0x0E) & 0x40 != 0 {
+            let top = m.mem.r16(DS, at + 8);
+            m.mem.w16(DS, at + 6, top / 2);
+            m.mem.w8(DS, at + 3, (top & 0xFF) as u8 / 2);
+        }
+    }
+}
+
+/// The repair's first line clicked (marked as the list comes up, so
+/// picked), the seed set as the shop's routine starts: "does not need any
+/// repairing"; with the items `worn`, the repair's price asked.
+fn repair_pick(a: &mut App, d: &mut Driver, wear: bool) {
+    into(a, 0x1008);
+    if wear {
+        worn(a);
+    }
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 6);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x73, MouseButton::Left);
+    d.click(a, 0x70, 0x26, MouseButton::Left);
+}
+
+#[test]
+fn a_whole_item_to_repair_as_the_original_draws_it() {
+    screen("storerepairitem", |a, d| repair_pick(a, d, false), layer);
+}
+
+/// The store's Steal with a slot free, the seed set: the lockpicking roll
+/// fails, "You are unsuccessful...".
+#[test]
+fn a_theft_failed_as_the_original_draws_it() {
+    screen(
+        "storesteal",
+        |a, d| {
+            into(a, 0x1008);
+            room(a);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x8B, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+#[test]
+fn a_repairs_price_as_the_original_draws_it() {
+    screen("storerepairworn", |a, d| repair_pick(a, d, true), layer);
 }
 
 /// The tavern's Get a Room, its first room (Single) picked: the days
@@ -1195,6 +1287,64 @@ fn the_maps_search_as_the_original_draws_it() {
     );
 }
 
+/// The map's Search with `name` typed into it after the editor's two
+/// passes before its first wait, as gen_screens.py's keys type it.
+fn searched(a: &mut App, d: &mut Driver, name: &str) {
+    world_clicks(a, d, &[(70, 45), (43, 175)]);
+    for _ in 0..2 {
+        a.travel.as_mut().expect("the travel map").advance(0);
+    }
+    super::type_text(d, a, name);
+}
+
+/// The search's name typed (dag): the field's text.
+#[test]
+fn the_maps_search_typed_as_the_original_draws_it() {
+    screen("worldsearchtyped", |a, d| searched(a, d, "dag"), layer);
+}
+
+/// A name none starts (z) and Enter: the province's places listed.
+#[test]
+fn the_maps_search_list_as_the_original_draws_it() {
+    screen(
+        "worldsearchlist",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+        },
+        layer,
+    );
+}
+
+/// Its second line (Daggerfall) clicked: marked.
+#[test]
+fn a_searched_place_picked_as_the_original_draws_it() {
+    screen(
+        "worldsearchpick",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+            d.click(a, 110, 46, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The marked line clicked again: the journey there asked.
+#[test]
+fn a_searched_place_chosen_as_the_original_draws_it() {
+    screen(
+        "worldsearchgo",
+        |a, d| {
+            searched(a, d, "z");
+            d.key(a, KeyCode::Enter, None);
+            d.click(a, 110, 46, MouseButton::Left);
+            d.click(a, 110, 46, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// The province's Exit: the world map again.
 #[test]
 fn the_world_map_again_as_the_original_draws_it() {
@@ -1321,6 +1471,12 @@ fn the_stores_armor_as_the_original_draws_it() {
 #[test]
 fn a_stores_weapon_picked_as_the_original_draws_it() {
     screen("storeweapon", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26)]), layer);
+}
+
+/// The marked weapon clicked again: its price haggled.
+#[test]
+fn a_stores_weapon_haggled_as_the_original_draws_it() {
+    screen("storebuyhaggle", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26), (0x70, 0x26)]), layer);
 }
 
 /// The guild's magic items with a slot free: their list.

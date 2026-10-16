@@ -1351,6 +1351,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         run,
         script: answers,
         pending: None,
+        box_backdrop: None,
         boxes: Default::default(),
         selected: 0,
         arrowed: false,
@@ -2500,6 +2501,10 @@ struct App {
     /// menu's entry highlighted; the typed field asked, as typed so far
     /// (`field::Live`); the rest's hours.
     pending: Option<Pending>,
+    /// The shop's screen behind the boxes a turn left after the shop ended
+    /// (`Talk::backdrop`): the original's box (42EE) waits over the screen
+    /// before the shop's way out (stealing, the guards called).
+    box_backdrop: Option<shopui::Backdrop>,
     boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
     selected: usize,
     /// The arrows or the wheel moved `selected` since the menu came up:
@@ -2755,6 +2760,9 @@ impl App {
                 None => break,
             }
         }
+        if !talk.since_answer.is_empty() {
+            self.box_backdrop = talk.backdrop.take();
+        }
         self.boxes.extend(talk.since_answer);
         if talk.status.is_some() {
             self.status = talk.status;
@@ -2873,8 +2881,9 @@ impl App {
             // (a list, the name) over it.
             spellmaker::draw_state(&mut self.screen, &self.font, &self.assets.archive, &self.engine.files, &snap.0, *form);
             hud::compose_over(&mut self.screen, &self.font, &hud);
-        } else if let Some(b) = self.pending.as_ref().and_then(|p| p.backdrop.as_ref()) {
-            // Inside a shop: its screen and banner, the question over it.
+        } else if let Some(b) = self.pending.as_ref().and_then(|p| p.backdrop.as_ref()).or(self.box_backdrop.as_ref().filter(|_| !self.boxes.is_empty())) {
+            // Inside a shop: its screen and banner, the question (or the
+            // boxes it left) over it.
             self.screen.set_palette(self.assets.dac());
             b.draw(&mut self.screen, &self.assets.archive, &self.engine.m);
             hud::compose_over(&mut self.screen, &self.font, &hud);
@@ -3687,6 +3696,9 @@ impl App {
 
     fn box_read(&mut self) {
         self.boxes.pop_front();
+        if self.boxes.is_empty() {
+            self.box_backdrop = None;
+        }
         if self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))) {
             let c = self.creation.take();
             self.fade_open(8, 0, |a| a.creation = c);

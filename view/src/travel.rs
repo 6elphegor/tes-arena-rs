@@ -115,8 +115,9 @@ enum Asking {
     /// A name typed for the search (the game's editor, `field::Live`).
     Name(Box<crate::field::Live>),
     /// The province's places listed (the name typed matched none): the
-    /// names, the name's typing.
-    List(Vec<String>, Vec<EditKey>),
+    /// list as 1194:5734 shows it (kind 8, `list_kind`: POPUP8.IMG, its
+    /// lines in EEh), the name's typing.
+    List(hud::Menu, Vec<EditKey>),
 }
 
 /// 26F7:0AD5's field: 1194:5C30 with the prompt at 6AD1, 14h characters
@@ -157,6 +158,10 @@ pub struct Travel {
     parch: Option<hud::Tiles>,
     /// Where the cursor last was over the map (the label's place).
     label_at: std::cell::Cell<Option<(i32, i32)>>,
+    /// The label kept where it was: the search's screen (5E1D's copy,
+    /// taken as its name is asked) put back after the list (0000:710E),
+    /// until the map's next click.
+    label_held: bool,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -307,6 +312,7 @@ impl Travel {
             mapout: archive.read("MAPOUT.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             parch: hud::Tiles::load(archive, "PARCH.CIF", 20, 20),
             label_at: std::cell::Cell::new(None),
+            label_held: false,
             mapblink: archive.read("MAPBLINK.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             horse: dfa(archive, "HORSE.DFA"),
             journey: Vec::new(),
@@ -346,13 +352,23 @@ impl Travel {
         if self.done.is_some() {
             return;
         }
-        if let Some(Asking::List(names, typed)) = &self.asking {
-            let (names, typed) = (names.clone(), typed.clone());
-            self.asking = None;
-            let pick = list_at(&names, x, y).map_or(0xFFFF, |i| i as u16);
-            if !right {
-                self.search(engine, typed, pick);
+        if let Some(Asking::List(menu, typed)) = &mut self.asking {
+            // The right button leaves the list (none picked); a line
+            // clicked is marked, the marked line clicked picked (5734).
+            if right {
+                let typed = typed.clone();
+                self.asking = None;
+                self.search(engine, typed, 0xFFFF);
+                return;
             }
+            let Some(i) = hud::custom::game_list_pick(menu, x, y) else { return };
+            if i != menu.selected {
+                menu.selected = i;
+                return;
+            }
+            let typed = typed.clone();
+            self.asking = None;
+            self.search(engine, typed, i as u16);
             return;
         }
         // The name's field: the right button ends it (A172).
@@ -363,6 +379,7 @@ impl Travel {
             }
             return;
         }
+        self.label_held = false;
         let Some(_) = self.shown else {
             match REGIONS.iter().position(|&r| inside(r, x, y)) {
                 Some(9) => self.end(engine),
@@ -430,9 +447,15 @@ impl Travel {
 
     /// `ms` of time on: the passes counted, the journey's frames played.
     pub fn advance(&mut self, ms: u32) {
+        let before = self.up_ms / TICK_MS;
         self.up_ms = self.up_ms.wrapping_add(ms);
+        // The editor's pass (its blink, a held arrow) each of the map's
+        // passes, a tick each as the label's and the markers' (a call
+        // with no time, the scripted shots', one pass).
         if let Some(Asking::Name(live)) = &mut self.asking {
-            live.frame();
+            for _ in 0..(self.up_ms / TICK_MS).wrapping_sub(before).max((ms == 0) as u32) {
+                live.frame();
+            }
         }
         if !self.journey.is_empty() {
             self.journey_ms += ms;
@@ -479,7 +502,8 @@ impl Travel {
         h.pick = 0xFFFF;
         let _ = copy.travel_search(&mut engine.files.clone(), &mut h);
         if let (Some(names), 0xFFFF) = (h.listed.take(), pick) {
-            self.asking = Some(Asking::List(names, typed));
+            let entries = names.iter().map(|n| hud::lines(n.as_bytes(), 0x0F).into_iter().flatten().collect()).collect();
+            self.asking = Some(Asking::List(hud::list_menu(&copy, Vec::new(), entries), typed));
             return;
         }
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
@@ -503,6 +527,7 @@ impl Travel {
         // the first line ended by a CR.
         m.mem.w16(DS, arena::lineedit::var::BLINK, 0x07 | 0x80 | 0x40);
         self.asking = crate::field::Live::open(&m, arena::lineedit::fields::search(), SEARCH_LOOK).map(|l| Asking::Name(Box::new(l)));
+        self.label_held = true;
     }
 
     /// Whether the search's name is being typed (the keys, pressed and
@@ -638,7 +663,7 @@ impl Travel {
         // drawn whenever, and the game's state follows the clicks only.
         // Over the buttons the pass isn't run (their regions' handlers
         // are): the label stays where the cursor last was over the map.
-        if y < 165 {
+        if y < 165 && !self.label_held && self.asking.is_none() {
             self.label_at.set(Some((x, y)));
         }
         if let Some((x, y)) = self.label_at.get() {
@@ -680,13 +705,7 @@ impl Travel {
                 }
                 live.draw(screen, false);
             }
-            Some(Asking::List(names, _)) => {
-                screen.panel(20, 10, 280, 150, 0xDF);
-                for (i, n) in names.iter().enumerate() {
-                    let (cx, cy) = list_cell(i);
-                    screen.text(font, cx, cy, n, 0xDF);
-                }
-            }
+            Some(Asking::List(menu, _)) => hud::custom::draw_game_list(screen, menu),
             None => {}
         }
         // 1194:30F1: the day's frame of the journey.
@@ -694,18 +713,6 @@ impl Travel {
             screen.blit(f.x, f.y, f.w, f.h, &f.px, 199);
         }
     }
-}
-
-/// The list's cell of entry `i` (two columns of 16).
-fn list_cell(i: usize) -> (i32, i32) {
-    (28 + (i / 16) as i32 * 136, 14 + (i % 16) as i32 * 9)
-}
-
-fn list_at(names: &[String], x: i32, y: i32) -> Option<usize> {
-    (0..names.len()).find(|&i| {
-        let (cx, cy) = list_cell(i);
-        x >= cx && x < cx + 130 && y >= cy && y < cy + 9
-    })
 }
 
 /// After an input to the travel map (or a frame): its boxes to `boxes`;

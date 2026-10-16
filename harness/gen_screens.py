@@ -62,6 +62,10 @@ SCREENS = {
     'spellbook': (0x026D, []),
     # A line of it clicked (the second): marked, as the use list's.
     'spellpick': (0x026D, [('click', 0xF0, 164)]),
+    # Its fourth line (Arc Lightning, an area's spell) clicked twice: cast,
+    # "Release spell in your area..." put on the message line, drawn as
+    # after the use (`AFTER`).
+    'spellarea': (0x026D, [('click', 0xF0, 182), ('click', 0xF0, 182)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
     # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
@@ -107,6 +111,14 @@ SCREENS = {
     'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
     'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
+    # Its first line clicked (marked as the list comes up, so picked):
+    # "does not need any repairing"; with the items worn (`worn`), the
+    # repair's price asked.
+    'storerepairitem': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
+    'storerepairworn': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73), ('click', 0x70, 0x26)]),
+    # Its Steal (the box at 83h..9Ah), with a slot free: the lockpicking
+    # roll from SEED fails, "You are unsuccessful...".
+    'storesteal': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x8B)]),
     # The Buy with a slot free (`room`: the save's inventory is full).
     'storebuyroom': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     # Its Weapon and Armor (boxes 18h high under BUY OPTIONS): the lists;
@@ -114,6 +126,9 @@ SCREENS = {
     'storeweapons': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65)]),
     'storearmor': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x7D)]),
     'storeweapon': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26)]),
+    # The marked weapon clicked again: its price haggled.
+    'storebuyhaggle': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26),
+                                              ('click', 0x70, 0x26)]),
     # A line of those lists clicked: the days asked for the room (its
     # typed field), the haggle over the item sold.
     'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
@@ -160,6 +175,16 @@ SCREENS = {
     'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
     # The province's Exit (the button at 72, 167): the world map again.
     'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
+    # The search's name typed (d, a, g: a key a wait); a name none starts
+    # (z, Enter): the province's places listed (1194:5734, kind 8); its
+    # second line (Daggerfall) clicked: marked.
+    'worldsearchtyped': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x20, 0x1E, 0x22)]),
+    'worldsearchlist': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]),
+    'worldsearchpick': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]
+                        + [('click', 110, 46)]),
+    # The marked line clicked again: the journey there asked.
+    'worldsearchgo': (0x03BF, [('click', 70, 45), ('click', 43, 175)] + [('keys', [k]) for k in (0x2C, 0x1C)]
+                      + [('click', 110, 46), ('click', 110, 46)]),
     # A townsperson clicked in the street (`beside`: the first person's
     # slot, CLICKED CB5E, the player on their square, within talking's two
     # squares), as the frame runs the click (1194:DB6C): what to ask
@@ -185,6 +210,8 @@ SCREENS = {
     'guilddetect': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x5E)]),
     # R: camping (01E6: 1194:424E), refused in the guild: its box.
     'camp': (0x01E6, []),
+    # With enemies near (`hunted`): "enemies near".
+    'campenemies': (0x01E6, []),
     # M: the automap (045A: 0000:2CFE), whose loop asks the mouse by the
     # near entry (2DB8: 8FC8) rather than 8FC4.
     'automap': (0x045A, [], {(0, 0x8FC8)}),
@@ -225,10 +252,11 @@ PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x10
           'people': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
+         'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -396,6 +424,23 @@ def room(a):
     a.mu.mem_write(a.lin(a.ds, at), bytes([a.mu.mem_read(a.lin(a.ds, at), 1)[0] & ~0x40 & 0xFF]))
 
 
+def hunted(a):
+    """Enemies near as the frame's scan of the actors leaves it (0FFB)."""
+    a.w16(0x0FFB, 1)
+
+
+def worn(a):
+    """Each of the player's items (40 slots of 13h bytes from DGROUP 0212h,
+    taken: +0Eh bit 40h) worn to half its condition: +6 of its maximum +8,
+    and +3 of +8's low byte (an armour's of kind 0, 1194:C7DB)."""
+    for i in range(40):
+        at = 0x0212 + i * 0x13
+        if a.mu.mem_read(a.lin(a.ds, at + 0x0E), 1)[0] & 0x40:
+            top = a.r16(at + 8)
+            a.w16(at + 6, top // 2)
+            a.mu.mem_write(a.lin(a.ds, at + 3), bytes([(top & 0xFF) // 2]))
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
@@ -403,15 +448,18 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
           'levelup': leveled, 'levelupstats': leveled,
+          'campenemies': hunted,
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
-          'storeweapon': lambda a: (room(a), seeded(a))}
+          'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
+          'storerepairworn': lambda a: (worn(a), seeded(a)),
+          'storesteal': lambda a: (room(a), seeded(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511)}
+AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511), 'spellarea': lambda a: a.call_near(0, 0x0511)}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
