@@ -177,13 +177,13 @@ pub struct Spellbook {
 }
 
 /// The equipment screen opened on the player's own items (1194:23C7's
-/// list; from the sheet 16F4 and 171F): nothing selected, from the first
-/// line, no other list.
+/// list; from the sheet 16F4 and 171F): the first line selected (1296
+/// 0, 1726) and shown first, no other list.
 pub fn open_inventory(m: &mut Machine) -> Panel {
     m.mem.w8(DS, OWN_ITEMS, 1);
     m.mem.w8(DS, OTHER_LIST, 0);
     m.mem.w16(DS, NOT_OWN, 0);
-    m.mem.w8(DS, SELECTED, 0xFF);
+    m.mem.w8(DS, SELECTED, 0);
     m.mem.w8(DS, FIRST_LINE, 0);
     m.mem.w16(DS, LINES, 0);
     Panel::Inventory(Inventory::default())
@@ -449,6 +449,19 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             if let Some(img) = equip {
                 screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
             }
+            let pics = crate::sheets::loaded();
+            // 1194:22F5: the name, race and class (0E19) and the level
+            // (+6, from 0) + 1 at (80h, 17h), in ARENAFNT (the sheet's
+            // [102C], still selected), colour FEh.
+            if let Some(f) = pics.as_ref().and_then(|p| p.arena.as_ref()) {
+                crate::sheets::name_texts(screen, f, m);
+                let level = m.mem.r8(DS, 0x01A4 + 6) as u16 + 1;
+                screen.text_plain(f, 0x80, 0x17, &level.to_string(), 0xFE);
+            }
+            // 1194:1DC8: the lines in TEENYFNT ([102E]); the selected one
+            // (1296) framed in A0h, 12 rows high from 2 above it, 146 wide
+            // from 2 left of the text (1194:1F27).
+            let teeny = pics.as_ref().and_then(|p| p.teeny.as_ref()).unwrap_or(font);
             let first = m.mem.r8(DS, FIRST_LINE) as u16;
             let selected = m.mem.r8(DS, SELECTED);
             for l in item_lines(m) {
@@ -457,9 +470,31 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                 }
                 let y = LIST_Y + (l.slot - first) as i32 * LINE_H;
                 if l.slot as u8 == selected {
-                    screen.fill(LIST_X - 3, y - 1, 150, LINE_H, 0x08, 0xC0);
+                    let (fx, fy, fw, fh) = (LIST_X - 2, y - 2, 146, 12);
+                    screen.fill(fx, fy, fw, 1, 0xA0, 0xFF);
+                    screen.fill(fx, fy + fh - 1, fw, 1, 0xA0, 0xFF);
+                    screen.fill(fx, fy, 1, fh, 0xA0, 0xFF);
+                    screen.fill(fx + fw - 1, fy, 1, fh, 0xA0, 0xFF);
                 }
-                screen.text_plain(font, LIST_X, y, &l.name, l.colour);
+                screen.text_plain(teeny, LIST_X, y, &l.name, l.colour);
+            }
+            // 1194:76B4: the armour class at each of the seven places
+            // (7719, into 942E), "+%d" or "%d", on the doll at the man's
+            // places (5D8D) or the woman's (5DA9): first in 8Ah, then one
+            // left in C3h over it.
+            if let Some(f) = pics.as_ref().and_then(|p| p.arena.as_ref()) {
+                let mut c = m.clone();
+                c.player_armor_class();
+                let places = if m.mem.r8(DS, 0x01A4 + 7) != 0 { 0x5DA9 } else { 0x5D8D };
+                for (colour, dx) in [(0x8A, 0), (0xC3, -1)] {
+                    for i in 0..7u16 {
+                        let ac = c.mem.r8(DS, 0x942E + i) as i8;
+                        let x = m.mem.r16(DS, places + 4 * i) as i16 as i32 + dx;
+                        let y = m.mem.r16(DS, places + 4 * i + 2) as i16 as i32;
+                        let t = if ac >= 0 { format!("+{ac}") } else { ac.to_string() };
+                        screen.text_plain(f, x, y, &t, colour);
+                    }
+                }
             }
             if let Some((names, sel)) = &inv.using {
                 let hud = crate::hud::Hud { menu: Some(use_menu(names, *sel)), ..Default::default() };

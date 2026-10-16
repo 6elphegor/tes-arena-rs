@@ -10,8 +10,8 @@
 //! The original runs the save and load menus from inside the screen
 //! (25FD:0002, 0242) and leaves after them; here the screen leaves first
 //! (A902 bit 0 cleared before the menu, not after) and the view then opens
-//! `saveui` on the engine it left. The numbers are drawn in FONT_A.DAT
-//! (the view doesn't map [102C] to its file, as `saveui`).
+//! `saveui` on the engine it left. The numbers are drawn in ARENAFNT.DAT,
+//! the font [102C] holds (2542:000A selects it first).
 
 use arena::bsa::Files;
 use arena::engine::Engine;
@@ -99,7 +99,7 @@ impl OptionsUi {
     pub fn open(engine: &Engine, archive: &crate::archive::Archive) -> (OptionsUi, Ended) {
         let base = Engine { m: engine.m.clone(), files: engine.files.clone() };
         let picture = crate::panels::load_image(archive, &engine.m, "OP.IMG");
-        let font = Font::load(archive, "FONT_A.DAT");
+        let font = Font::load(archive, "ARENAFNT.DAT");
         let mut ui = OptionsUi { base, clicks: Vec::new(), answers: Vec::new(), draws: Vec::new(), confirm: None, picture, font };
         let e = ui.replay();
         (ui, e)

@@ -9,7 +9,7 @@
 //!   FACES1r.CIF, FACESF1r.CIF for a woman, r the race (1194:2DAF: '1'
 //!   with the sheet up, 12BA), at the frame's place.
 //! - The pants (1194:2422: [M|F]PANTS.IMG by the sex, 1194:1D3B).
-//! - The chest (1194:2187): the cuirass worn, else the shirt,
+//! - The chest (1194:2187): the cuirass worn, if any, then the shirt,
 //!   [M|F][S|R]SHIRT.IMG (R for a class with bit 20h of +5, 1194:1D30).
 //! - Every other item worn (slot +E bit 80h; 1194:242D, 2451 leaving out
 //!   the cuirass): a frame of [0|1]EQUIP.CIF by the sex (1194:2463), by
@@ -94,13 +94,13 @@ pub fn images(archive: &crate::archive::Archive, m: &Machine) -> Vec<Image> {
             helmet_head(archive, m, si, doll);
         }
     };
-    match worn.iter().find(|&&si| cuirass(si)) {
-        Some(&si) => piece(si, &mut doll),
-        None => {
-            if let Some(img) = crate::panels::load_image(archive, m, &format!("{sex}{}SHIRT.IMG", if robe { 'R' } else { 'S' })) {
-                doll.blit(&img, None);
-            }
-        }
+    // 1194:2187: the cuirass worn, if any, then the shirt over it
+    // whether or not (21A4 runs on both ways out of 745A's search).
+    if let Some(&si) = worn.iter().find(|&&si| cuirass(si)) {
+        piece(si, &mut doll);
+    }
+    if let Some(img) = crate::panels::load_image(archive, m, &format!("{sex}{}SHIRT.IMG", if robe { 'R' } else { 'S' })) {
+        doll.blit(&img, None);
     }
     for &si in worn.iter().filter(|&&si| !cuirass(si)) {
         piece(si, &mut doll);

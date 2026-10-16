@@ -684,7 +684,7 @@ impl SkyDraw<'_> {
         let Some(f) = name.and_then(|n| self.sheet.sky.get(n)) else { return };
         let rect = self.sheet.rects[f.first + frame % f.count];
         let r = |at| m.mem.r16(DS, at) as i16;
-        world::sky_quad(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xA91A), self.focal);
+        world::sky_quad(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xC3A2), self.focal);
     }
 }
 
@@ -732,7 +732,7 @@ impl CelestialDraw<'_> {
     fn quad(&mut self, m: &arena::machine::Machine, rect: world::Rect, x: u16, y: u16, flags: u32) {
         use arena::mem::DS;
         let r = |at| m.mem.r16(DS, at) as i16;
-        world::sky_quad_flags(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xA91A), self.focal, flags);
+        world::sky_quad_flags(&mut self.out, rect, x as i16, y as i16, r(0xC3D6), r(0xC3D8), r(0xC3A2), self.focal, flags);
     }
 
     fn named(&mut self, m: &arena::machine::Machine, name: &str, frame: usize, x: u16, y: u16, flags: u32) {

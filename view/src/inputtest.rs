@@ -480,7 +480,10 @@ fn the_drop_button_asks_and_refuses_as_the_original() {
     assert_eq!(a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x20, 0, "room here");
     assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x12D0), 1, "the start's square loses it");
     a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 0);
-    // Nothing selected: "Drop what?".
+    // The page opens on its first line (1194:1726); with nothing selected
+    // (as after a drop, 1924): "Drop what?".
+    assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x1296), 0, "the first line selected");
+    a.engine.m.mem.w8(arena::mem::DS, 0x1296, 0xFF);
     d.key(&mut a, KeyCode::KeyD, None);
     assert!(a.boxes.iter().any(|b| text(b).contains("Drop what?")), "nothing selected");
     while !a.boxes.is_empty() {
@@ -1945,3 +1948,6 @@ fn the_frames_keys_from_the_key_state() {
     a.input(In::Key { code: KeyCode::F4, down: false, text: None });
     assert_eq!(a.engine.m.mem.r16(DS, 0x05CA) & 2, (was ^ 2) & 2, "F4 flips 5CA bit 2");
 }
+
+#[path = "screentest.rs"]
+mod screentest;
