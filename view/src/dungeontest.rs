@@ -202,3 +202,6 @@ fn a_main_quest_dungeons_picture_as_the_original_draws_it() {
 fn another_main_quest_dungeons_picture_as_the_original_draws_it() {
     quest_picture("questpic3", 3);
 }
+
+#[path = "worldtest.rs"]
+mod worldtest;

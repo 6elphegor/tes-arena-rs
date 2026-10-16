@@ -111,6 +111,11 @@ impl GameFont {
     }
 }
 
+/// The game's font `f` (the style's: None before it is loaded).
+pub fn game_font(f: GameFont) -> Option<&'static Font> {
+    STYLE.get().map(|st| st.font(f))
+}
+
 /// A message drawn in place rather than in a box (1194:4D31's: 0000:9E06
 /// at (x, y), one line, no shadow, the bytes below 20h skipped): a box's
 /// lines whose first is a marker span (its colour code 0, which no text

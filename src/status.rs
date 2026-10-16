@@ -222,7 +222,7 @@ impl Machine {
     /// 2686:0270. A spell on the player: a slot on it (by its target's
     /// offset alone) while +40Dh has none of bits 1, 20h and 2, else the
     /// spell bits +41Ah or +41Ch.
-    fn spell_on_player(&self) -> bool {
+    pub fn spell_on_player(&self) -> bool {
         const P: u16 = 0x01A4;
         let flags = self.mem.r16(DS, P + 0x40D);
         for i in 0..0x10u16 {

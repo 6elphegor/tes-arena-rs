@@ -447,7 +447,7 @@ class ScreenArena(DosArena):
         mu.reg_write(UC_X86_REG_IP, off)
         self.fault = None
         hooks = []
-        polls = {}
+        self.polls = polls = {}
         for wseg, woff in self.waits:
             def stop(mu, addr, size, w):
                 # A wait is the input asked for from the same place a
@@ -504,6 +504,74 @@ class ScreenArena(DosArena):
         at = (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
         assert at == end, f'stopped at {at[0] - LOAD_SEG:04X}:{at[1]:04X}'
         return None
+
+    # --- the world's frames -------------------------------------------------
+
+    # The world loop's waits for the timer (0000:A428, A43D: [0151] against
+    # the frame's start, BA60), each read of which here is a tick: nothing
+    # else advances it.
+    TICK_WAITS = (0xA428, 0xA43D)
+
+    def world_frames(self, n, until=None, count=2_000_000_000, each=None):
+        """The world loop run on from the top of its frame (0000:A2AC, on
+        the stack `start` or `area_ended` kept) for `n` frames, the timer
+        ticking at each of its reads in the frame's waits (TICK_WAITS), so
+        a frame takes the ticks it waits for (2, or 1 on a level with C39A
+        bit 400h). It stops at the top of a frame: after `n`, or the first
+        at which `until(self)` holds; or at a wait for input (`waits`,
+        `script` as `run_screen`'s); or at the world loop's end (0000:A45D:
+        the area left), ('ended',). `each(self)` is called at the top of
+        every frame (its first the start's). The frames run: the stack
+        then kept for the next run. Returns (why, frames)."""
+        ss, sp, words = self.world_stack
+        self.mu.mem_write(self.lin(ss, sp), words)
+        saved = self.stub(location=False)
+        done = [0]
+        def tick(mu, addr, size, _):
+            self.w16(0x0151, (self.r16(0x0151) + 1) & 0xFFFF)
+        def top(mu, addr, size, _):
+            if each is not None:
+                each(self)
+            # A wait is the input asked for from one place three times in a
+            # frame: each frame asks the mouse once (the controls' 8FC4).
+            getattr(self, 'polls', {}).clear()
+            if done[0] >= n or (done[0] and until is not None and until(self)):
+                self.world_stack = self.stack_kept()
+                self.waiting = ('frames',)
+                mu.emu_stop()
+                return
+            done[0] += 1
+        def ended(mu, addr, size, _):
+            self.waiting = ('ended',)
+            mu.emu_stop()
+        hooks = [self.mu.hook_add(UC_HOOK_CODE, tick, None, self.lin(LOAD_SEG, o), self.lin(LOAD_SEG, o))
+                 for o in self.TICK_WAITS]
+        hooks.append(self.mu.hook_add(UC_HOOK_CODE, top, None, self.lin(LOAD_SEG, 0xA2AC), self.lin(LOAD_SEG, 0xA2AC)))
+        hooks.append(self.mu.hook_add(UC_HOOK_CODE, ended, None, self.lin(LOAD_SEG, 0xA45D), self.lin(LOAD_SEG, 0xA45D)))
+        try:
+            r = self.run_screen(0, 0xA2AC, count=count, stack=(ss, sp))
+        finally:
+            for h in hooks:
+                self.mu.hook_del(h)
+            self.unstub(saved)
+        return r, done[0]
+
+    def keys_held(self, scans, down=True):
+        """Keys pressed (or with `down` false let go) and left so: each
+        make (or break) code given to the key interrupt alone, as `press`
+        gives it, on the stack under the world's."""
+        mu = self.mu
+        ss, sp, _ = self.world_stack
+        for scan in scans:
+            code = scan if down else scan | 0x80
+            at = (sp - 0x200) & 0xFFFF
+            mu.mem_write(self.lin(ss, at), struct.pack('<H', code | code << 8))
+            self._setup([], {})
+            mu.reg_write(UC_X86_REG_SS, ss)
+            mu.reg_write(UC_X86_REG_SP, at)
+            mu.emu_start(self.lin(LOAD_SEG, 0x71BB), self.lin(LOAD_SEG, 0x72B2), count=100_000)
+            where = (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
+            assert where == (LOAD_SEG, 0x72B2), f'the key interrupt stopped at {where}'
 
     # The registers a key's interrupt leaves as it found them.
     KEPT = ('ax', 'bx', 'cx', 'dx', 'si', 'di', 'bp', 'sp', 'ss', 'ds', 'es', 'fs', 'gs', 'eflags', 'cs', 'ip')
