@@ -28,7 +28,7 @@ const OFFER_PROMPT: u16 = 0x65CA;
 const WRAP: usize = 44;
 
 fn line(s: &str) -> Vec<Span> {
-    vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]
+    vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]
 }
 
 /// The haggle's moves asked through `Talk`; with no answer yet, leaving.

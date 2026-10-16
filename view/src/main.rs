@@ -1284,6 +1284,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         pending: None,
         boxes: Default::default(),
         selected: 0,
+        arrowed: false,
         live: None,
         status: None,
         font,
@@ -2017,7 +2018,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                 };
                 println!("{msg}");
-                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default() }]]];
+                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]]];
             }
             "key" => {
                 // A key (its scan code) down for a frame.
@@ -2093,7 +2094,12 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         // asked, its text and cursor drawn over the rest.
         let mut live = None;
         match st.need.clone() {
-            Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
+            Some(dialog::Need::Menu(mut m)) => {
+                if !m.list {
+                    m.selected = usize::MAX;
+                }
+                hud.menu = Some(m)
+            }
             Some(dialog::Need::Text(a)) => {
                 hud.typing = Some(a.prompt.clone());
                 live = field::Live::open(&a.game.0, a.field, a.look);
@@ -2410,6 +2416,9 @@ struct App {
     pending: Option<Pending>,
     boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
     selected: usize,
+    /// The arrows or the wheel moved `selected` since the menu came up:
+    /// only then is its entry marked (the original marks none).
+    arrowed: bool,
     live: Option<field::Live>,
     status: Option<String>,
     font: hud::Font,
@@ -2632,6 +2641,7 @@ impl App {
         if let Some(need) = talk.need {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
+            self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
             self.live = match &need {
@@ -3231,7 +3241,7 @@ impl App {
     /// A box of the view's own.
     fn say(&mut self, s: &str) {
         println!("{s}");
-        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]]);
+        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]]);
     }
 
     /// What the HUD shows now.
@@ -3248,6 +3258,10 @@ impl App {
                 Some(dialog::Need::Menu(m)) => {
                     let mut m = m.clone();
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
+                    // A menu's boxes mark no entry until the arrows move.
+                    if !m.list && !self.arrowed {
+                        m.selected = usize::MAX;
+                    }
                     h.menu = Some(m);
                 }
                 Some(dialog::Need::Text(a)) => h.typing = Some(a.prompt.clone()),
@@ -3275,8 +3289,14 @@ impl App {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
                 match code {
-                    KeyCode::ArrowUp => self.selected = (self.selected + n - 1) % n,
-                    KeyCode::ArrowDown => self.selected = (self.selected + 1) % n,
+                    KeyCode::ArrowUp => {
+                        self.selected = (self.selected + n - 1) % n;
+                        self.arrowed = true;
+                    }
+                    KeyCode::ArrowDown => {
+                        self.selected = (self.selected + 1) % n;
+                        self.arrowed = true;
+                    }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
                         let s = self.selected as u16;
                         self.answer(dialog::Answer::Pick(s));
@@ -3412,6 +3432,7 @@ impl App {
                     if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
                         let n = m.entries.len().max(1);
                         self.selected = if dy > 0.0 { (self.selected + n - 1) % n } else if dy < 0.0 { (self.selected + 1) % n } else { self.selected };
+                        self.arrowed = true;
                     }
                 }
             }

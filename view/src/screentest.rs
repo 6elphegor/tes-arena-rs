@@ -226,6 +226,21 @@ fn the_spellmaker_as_the_original_draws_it() {
     );
 }
 
+/// The mages' guild's menu (1194:A73E): its screen, banner and menu over
+/// the view, Drakain before Daggerfall's guild master.
+#[test]
+fn the_guilds_menu_as_the_original_draws_it() {
+    screen(
+        "guild",
+        |a, d| {
+            d.click(a, 164, 74, MouseButton::Left);
+            d.frame(a);
+            assert!(until_asked(d, a, 3), "the guild master asks");
+        },
+        layer,
+    );
+}
+
 /// R: camping (2542:01E6, 1194:424E), refused in the guild: its box.
 #[test]
 fn camping_refused_as_the_original_draws_it() {

@@ -187,7 +187,7 @@ impl Talk {
             return;
         }
         println!("{s}");
-        let lines = vec![vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]];
+        let lines = vec![vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]];
         self.boxes.push(lines.clone());
         self.since_answer.push(lines);
     }
@@ -219,7 +219,7 @@ impl Talk {
             let mut entry: Vec<Span> = Vec::new();
             for l in hud::lines(s, 0x0F) {
                 if !entry.is_empty() && !l.is_empty() {
-                    entry.push(Span { colour: 0x0F, text: "\t000".into(), font: Default::default() });
+                    entry.push(Span { colour: 0x0F, text: "\t000".into(), font: Default::default(), code: None });
                 }
                 entry.extend(l);
             }

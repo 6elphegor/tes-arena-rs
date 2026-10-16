@@ -48,6 +48,9 @@ SCREENS = {
     'use': (0x034D, []),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
+    # banner and menu), as the guild master's click runs it.
+    'guild': ((0x1194, 0xA73E, {}), []),
     # R: camping (01E6: 1194:424E), refused in the guild: its box.
     'camp': (0x01E6, []),
     # M: the automap (045A: 0000:2CFE), whose loop asks the mouse by the

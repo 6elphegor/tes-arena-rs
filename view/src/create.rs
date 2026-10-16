@@ -522,7 +522,7 @@ impl Creation {
     fn menu(&self, m: &mut Machine, fmt: (u16, u16), args: &[Arg], keys: u16, table: u16, font: FontId) -> Ask {
         let title = self.say(m, fmt, args);
         let raw = crate::dialog::menu_at(m, BUF, keys, table);
-        let entries = raw.entries.iter().map(|l| l.iter().map(|s| Span { colour: if s.colour == 0x0F { self.colour } else { s.colour }, text: s.text.clone(), font: Default::default() }).collect()).collect();
+        let entries = raw.entries.iter().map(|l| l.iter().map(|s| Span { colour: if s.colour == 0x0F { self.colour } else { s.colour }, text: s.text.clone(), font: Default::default(), code: None }).collect()).collect();
         Ask { title, entries, keys: raw.keys, sel: 0, top: 0, rows: 0, font }
     }
 
@@ -743,7 +743,7 @@ impl Creation {
             .map(|i| {
                 let c = m.mem.r8(DS, LIST_ORDER + i);
                 let (s, o) = Self::class_of(m, c);
-                vec![Span { colour: self.colour, text: String::from_utf8_lossy(m.mem.cstr(s, o)).into_owned(), font: Default::default() }]
+                vec![Span { colour: self.colour, text: String::from_utf8_lossy(m.mem.cstr(s, o)).into_owned(), font: Default::default(), code: None }]
             })
             .collect();
         let title = hud::lines(m.mem.cstr(DS, 0x3F56), self.colour);
@@ -1108,7 +1108,7 @@ impl Creation {
                 // The prompt's box with its line of room (5C34's "%s\r"
                 // and spaces), the field over it where 5C34 puts it.
                 let mut lines = prompt.clone();
-                lines.push(vec![Span { colour: self.colour, text: " ".repeat(37), font: Default::default() }]);
+                lines.push(vec![Span { colour: self.colour, text: " ".repeat(37), font: Default::default(), code: None }]);
                 self.draw_box(screen, &lines, FontId::A, None);
                 live.draw(screen, false);
             }
