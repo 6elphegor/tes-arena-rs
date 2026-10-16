@@ -158,7 +158,13 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
 /// (tests/vectors/screenfades.txt: their count and digest; a screen not
 /// there shows one at most); the fade then over.
 fn check_fade(name: &str, a: &mut App) {
-    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/screenfades.txt")).expect("tests/vectors/screenfades.txt");
+    check_fade_in("screenfades.txt", name, a);
+}
+
+/// `check_fade` against tests/vectors/`file`.
+fn check_fade_in(file: &str, name: &str, a: &mut App) {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/vectors").join(file);
+    let text = std::fs::read_to_string(&path).expect("the fades' vectors");
     let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[1] == name).map(|f| (f[2].parse::<usize>().unwrap(), u64::from_str_radix(f[3], 16).unwrap()));
     let mut seen: Vec<u64> = Vec::new();
     let mut raw: Vec<u8> = Vec::new();
@@ -402,6 +408,95 @@ fn area_left(a: &mut App) {
     a.assets = Assets::new(&a.dir, &mut a.engine);
     a.remake_renderer();
     a.last = Some(arena::engine::Frame::Running);
+}
+
+/// The trigger's hooks for a door: the way in's blackout (1194:55B2)
+/// noted, as the window's turn notes it (`Talk::blackout`).
+#[derive(Default)]
+struct DoorHooks {
+    blackout: bool,
+}
+
+impl arena::trigger::TriggerHooks for DoorHooks {
+    fn blackout(&mut self, _m: &mut arena::machine::Machine) {
+        self.blackout = true;
+    }
+}
+
+/// The street's first tavern's door clicked from its square's corner (as
+/// `into`), the street as the window last drew it; whether the way in
+/// faded the screen to black.
+fn tavern_door(a: &mut App) -> bool {
+    a.assets.drawn(&mut a.engine, 1.6);
+    let m = &mut a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0x1AB5), m.mem.r16(DS, 0x1AB7));
+    let sq = m.mem.r16(seg, off);
+    let door = (sq & 0xFF00) | ((sq & 0xFF) << 1);
+    m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
+    m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
+    m.mem.w16(DS, arena::controls::var::PICKED, door);
+    let mut hooks = DoorHooks::default();
+    m.wall_trigger(&mut a.engine.files, &mut hooks).expect("the door's trigger");
+    assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
+    hooks.blackout
+}
+
+/// The area left as the window leaves it (`App::area_next`,
+/// `area_fade`), its colours on the way against the original's
+/// (tests/vectors/areafade.txt, harness/gen_areafade.py).
+fn area_fade_check(name: &str, a: &mut App, blackout: bool) {
+    let was = a.fade_from();
+    assert!(a.area_next(), "{name}: no next area");
+    a.area_fade(was, blackout);
+    check_fade_in("areafade.txt", name, a);
+}
+
+/// From the street into the town's first tavern: the screen faded to
+/// black on the way in (8), then after the world loop (12: nothing more
+/// seen), the tavern's colours set.
+#[test]
+fn entering_a_building_fades_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else { return };
+    let (mut a, _d) = loaded(&dir, &save);
+    area_left(&mut a);
+    let blackout = tavern_door(&mut a);
+    assert!(blackout, "the way in faded nothing");
+    area_fade_check("tavern", &mut a, blackout);
+}
+
+/// Out of the tavern into the street: the colours faded to black in 12
+/// after the world loop, the street's colours set.
+#[test]
+fn leaving_a_building_fades_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else { return };
+    let (mut a, _d) = loaded(&dir, &save);
+    area_left(&mut a);
+    tavern_door(&mut a);
+    area_left(&mut a);
+    a.fade.clear();
+    let v = a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) | 0x80;
+    a.engine.m.mem.w16(DS, arena::movement::var::MAP_FLAGS, v);
+    area_fade_check("leavetavern", &mut a, false);
+}
+
+/// The automap (as `the_automap_as_the_original_draws_it` opens it) left
+/// by its exit (0000:2E30): faded out in 12, the world drawn and faded in
+/// in 12 (2EC8..2EF2).
+#[test]
+fn leaving_the_automap_fades_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else { return };
+    let (mut a, mut d) = loaded(&dir, &save);
+    a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+    d.key(&mut a, KeyCode::KeyM, Some("m"));
+    a.fade.clear();
+    a.fade_old = None;
+    assert!(a.map, "the automap not up");
+    d.click(&mut a, 0x100, 0xB0, MouseButton::Left);
+    assert!(!a.map, "the automap not left");
+    check_fade_in("areafade.txt", "automapclose", &mut a);
 }
 
 /// In the building first in the town's list at `list` (its far pointer:

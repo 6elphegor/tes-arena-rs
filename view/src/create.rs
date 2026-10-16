@@ -50,8 +50,8 @@
 //! drawn over what it left. The questions' scroll rolls a row at a time
 //! with its rollers turning (222C:040B, 045D). Between screens the
 //! original's dissolves, fades and colours set play frame by frame
-//! (`film::Film`). Left out: the map's scroll unrolling (TOP.DFA, 1194:5B58:
-//! it ends off the screen).
+//! (`film::Film`), the map's scroll unrolling strip by strip (TOP.DFA,
+//! 1194:5B58: its strips past the screen's top and bottom as it shows them).
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -375,6 +375,70 @@ fn dfa_frames(archive: &Archive, name: &str) -> Vec<Image> {
     f.frames.into_iter().map(|px| Image { x: le(2), y: le(4), w: f.w, h: f.h, px }).collect()
 }
 
+/// 1194:5B58: the map's scroll unrolling down the cleared screen (TOP.DFA,
+/// its 16 frames in turn, 5526: 0 see-through, cut at the screen's
+/// edges), the map uncovered a row above it as it goes. D6h times, its top
+/// (the header's y, DX) from -15 a row lower each time:
+/// - the frame drawn into the page at DX;
+/// - past the top (DX above 0: not 0, not below), the map's next row
+///   (from row 0 on) copied into the page's (7702), the count of rows to
+///   show the bank's number (BX left by 5C86 with [1030]) while DX is
+///   below B8h;
+/// - otherwise the count DX + 11h above the top, DX - C8h after; at 0
+///   that's -C8h;
+/// - 0000:94EE: from the row DX - 1 (the row table at A6A0, the words
+///   before it read for rows above the top) the count's rows (x 140h,
+///   16 bits; a quarter of it in dwords) copied from the page to the
+///   screen, the offsets wrapping at 64K (what goes past the screen's
+///   FA00h bytes isn't seen). It never waits for the retrace: each strip
+///   shown is a frame.
+fn unroll(film: &mut Film, m: &Machine, tops: &[Image], map: &[u8]) {
+    if tops.is_empty() {
+        return;
+    }
+    let mut page = vec![0u8; W * H];
+    let bank = m.mem.r16(DS, 0x1030);
+    let mut dx: i16 = -15;
+    let mut row = 0usize;
+    for n in 0..0xD6 {
+        let f = &tops[n % 16 % tops.len()];
+        for r in 0..f.h {
+            let y = dx as i32 + r as i32;
+            if !(0..H as i32).contains(&y) {
+                continue;
+            }
+            for c in 0..f.w {
+                let x = f.x + c as i32;
+                let v = f.px[r * f.w + c];
+                if v != 0 && (0..W as i32).contains(&x) {
+                    page[y as usize * W + x as usize] = v;
+                }
+            }
+        }
+        let count = if dx > 0 {
+            if row < H {
+                page[row * W..(row + 1) * W].copy_from_slice(&map[row * W..(row + 1) * W]);
+            }
+            row += 1;
+            if (dx as u16) < 0xB8 { bank } else { (dx as u16).wrapping_sub(0xC8) }
+        } else if dx < 0 {
+            (dx as u16).wrapping_add(0x11)
+        } else {
+            0u16.wrapping_sub(0xC8)
+        };
+        let start = m.mem.r16(DS, 0xA6A0u16.wrapping_add((dx as u16).wrapping_sub(1).wrapping_mul(2)));
+        let bytes = (count.wrapping_mul(0x140) >> 2) as u32 * 4;
+        for i in 0..bytes {
+            let at = start.wrapping_add(i as u16) as usize;
+            if at < W * H {
+                film.vga[at] = page[at];
+            }
+        }
+        film.wait();
+        dx += 1;
+    }
+}
+
 /// The questions' scroll as 222C keeps it: the text's strings (the
 /// buffer at 40F0: a LF, the question less its last byte, two LFs; each
 /// LF a string's end, 02D4), the bitmap they're drawn into (40F2: 8 lines
@@ -519,6 +583,16 @@ impl Creation {
             }
         }
         c
+    }
+
+    /// The ending's fade already played (by the window, over the world it
+    /// faded from): only the screen cleared left of its change.
+    pub fn faded(&mut self) {
+        if matches!(self.stage, Stage::Ending) {
+            let last = self.film.pop_back();
+            self.film.clear();
+            self.film.extend(last);
+        }
     }
 
     /// The main menu, as the program's outer loop comes back to it after
@@ -815,6 +889,9 @@ impl Creation {
             } else {
                 film.colours(&after_dac);
                 film.wait();
+                if back == Back::Map {
+                    unroll(film, m, &dfa_frames(&self.archive, "TOP.DFA"), &under);
+                }
                 film.whole(&under);
             }
         }

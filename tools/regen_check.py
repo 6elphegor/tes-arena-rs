@@ -5,7 +5,8 @@ Usage: python tools/regen_check.py [--jobs J] [--shards K] [--timeout S]
 
 Runs harness/gen_NAME.py for every generator (or only the NAMEs given)
 into a scratch directory and compares the result with tests/vectors/,
-printing one line per generator:
+printing one line per generator (a generator's files beside its OUT,
+BESIDE, are compared too):
 
   NAME  seconds  identical | DIFFERENT (first line L) | rc=N | timeout | skipped: why
 
@@ -42,6 +43,8 @@ VECTORS = os.path.join(ROOT, 'tests', 'vectors')
 
 # Generators whose vector file isn't tests/vectors/NAME.txt.
 VECTOR = {'move': 'movement', 'savew': 'save_write'}
+# Vector files a generator writes beside its OUT, checked with it.
+BESIDE = {'screens': ['screenfades.txt'], 'createshot': ['createframes.txt']}
 
 
 def usage(src):
@@ -103,15 +106,22 @@ def run(name, env, opts):
     log.close()
     if rc != 0:
         return name, dt, 'timeout' if rc == 'timeout' else f'rc={rc} (see {out}.log)'
-    new, old = open(out, 'rb').read(), open(vec, 'rb').read()
-    if new == old:
-        if not opts.keep:
-            os.remove(out)
-            os.remove(out + '.log')
-        return name, dt, 'identical'
-    a, b = new.split(b'\n'), old.split(b'\n')
-    first = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
-    return name, dt, f'DIFFERENT (first line {first + 1}; {len(a) - 1} lines vs {len(b) - 1})'
+    pairs = [(out, vec)] + [(os.path.join(opts.out, f), os.path.join(VECTORS, f))
+                            for f in BESIDE.get(name, [])]
+    for new, old in pairs:
+        if not os.path.exists(new):
+            return name, dt, f'DIFFERENT (no {os.path.basename(new)} written)'
+        a, b = open(new, 'rb').read(), open(old, 'rb').read()
+        if a != b:
+            a, b = a.split(b'\n'), b.split(b'\n')
+            first = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+            return name, dt, (f'DIFFERENT ({os.path.basename(old)} first line {first + 1}; '
+                              f'{len(a) - 1} lines vs {len(b) - 1})')
+    if not opts.keep:
+        for new, _ in pairs:
+            os.remove(new)
+        os.remove(out + '.log')
+    return name, dt, 'identical'
 
 
 def main():
