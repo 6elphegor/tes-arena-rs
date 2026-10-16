@@ -142,6 +142,40 @@ pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
     Some((x, y, step, &lines[1..]))
 }
 
+/// A message box's lines with the clip it was asked in (A914, A916, A918,
+/// A91A), where that isn't the whole screen: 965A centres the box in it
+/// as it is drawn, while the turn has put the clip back by the time the
+/// view draws (the rest's bottom 92h, 1194:4252). A marker line first, its
+/// one span's code 1 and text "left,top,right,bottom" (`clip_of`).
+pub fn clipped(mut lines: Vec<Vec<Span>>, c: Clip) -> Vec<Vec<Span>> {
+    if c.2 > c.0 && c.3 > c.1 && c != (0, 0, W as i32 - 1, H as i32 - 1) {
+        let text = format!("{},{},{},{}", c.0, c.1, c.2, c.3);
+        lines.insert(0, vec![Span { colour: 0, text, font: Default::default(), code: Some(1) }]);
+    }
+    lines
+}
+
+/// A clip's left, top, right and bottom (A914..A91A).
+pub type Clip = (i32, i32, i32, i32);
+
+/// The clip a box was asked in (`clipped`), if it carries one, and its
+/// lines without the marker.
+pub fn clip_of(lines: &[Vec<Span>]) -> (Option<Clip>, &[Vec<Span>]) {
+    let marked = |l: &Vec<Span>| -> Option<Clip> {
+        let [m] = l.as_slice() else { return None };
+        if m.code != Some(1) {
+            return None;
+        }
+        let v: Vec<i32> = m.text.split(',').map(|v| v.parse().ok()).collect::<Option<_>>()?;
+        let [a, b, c, d] = v[..] else { return None };
+        Some((a, b, c, d))
+    };
+    match lines.first().and_then(marked) {
+        Some(c) => (Some(c), &lines[1..]),
+        None => (None, lines),
+    }
+}
+
 /// 1194:4E88's "...More" (DGROUP 4B1B) under a page of the dialog's lines
 /// with more to come: at 11Dh, A9h in colour 4Bh, in the lines' font
 /// (TEENYFNT, [102E]), drawn by 9E06 as they are. A line of a `placed`
@@ -971,8 +1005,10 @@ fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     if placed_of(lines).is_some() {
         return None;
     }
+    // Centred in the clip it was asked in, where it carries one.
+    let (asked, lines) = clip_of(lines);
     let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
-    let c = clip(hud);
+    let c = asked.unwrap_or_else(|| clip(hud));
     let x = (c.0 + c.2) / 2 - w / 2;
     let y = match &hud.menu {
         // Both shown (a shot's last box with the question left; the
@@ -1131,6 +1167,7 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         draw_placed(screen, st, p);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
+        let lines = clip_of(lines).1;
         draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
@@ -1338,6 +1375,7 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
             screen.text_plain(font, x, y + step * i as i32, &plain(l), 0xC0);
         }
     } else if let Some(lines) = &hud.boxed {
+        let lines = clip_of(lines).1;
         let w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0) + 16;
         let w = w.clamp(60, W as i32 - 8);
         let h = lines.len() as i32 * lh + 10;

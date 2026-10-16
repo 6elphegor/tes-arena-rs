@@ -65,8 +65,13 @@ class ScreenArena(DosArena):
         self.clicks = []
         self.dta = (0x0040, 0x0100)
         # Files the game deleted: the game directory's copies no longer
-        # found (never touched on disk).
+        # found (never touched on disk). The save folder (the first of
+        # `more`) is the game's save path, as the view's --save-dir is:
+        # without a NAMES.DAT of its own, the game directory's (the
+        # install's, its slots "EMPTY") isn't the save path's.
         self.deleted = set()
+        if more and not any(n.upper() == 'NAMES.DAT' for n in os.listdir(more[0])):
+            self.deleted.add('NAMES.DAT')
         self.found = []
         # What to do at each arrival at a wait, in turn: ('click', x, y)
         # queues a click and goes on; with none left the run stops.

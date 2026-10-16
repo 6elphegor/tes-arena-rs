@@ -48,10 +48,23 @@ SCREENS = {
     'logbook': (0x02A3, []),
     # C: the spellbook (026D: 056A).
     'spellbook': (0x026D, []),
+    # A line of it clicked (the second): marked, as the use list's.
+    'spellpick': (0x026D, [('click', 0xF0, 164)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
+    # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
+    # 9 apart from 9Bh in the bar's corner): the line picked marked (a
+    # second click uses it, the list gone).
+    'usepick': (0x034D, [('click', 0xF0, 181)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # Its bottom row's buttons (the table at 5C2C: y 118..146), each
+    # clicked: Load (65..128, 061E) and Save (129..192, 0617), the save
+    # menu's slots (25FD); Exit (193..256, 05DB), "Are you sure ?". (New,
+    # 0..64, closes the screen at once.)
+    'optionsload': (0x000A, [('click', 96, 132)]),
+    'optionssave': (0x000A, [('click', 160, 132)]),
+    'optionsexit': (0x000A, [('click', 224, 132)]),
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),
@@ -90,6 +103,13 @@ SCREENS = {
     'tavernrest': (0x01E6, []),
     # Its Camp for a while (the box at 59h..70h): the hours asked.
     'tavernresthours': (0x01E6, [('click', 0xA0, 0x64)]),
+    # Its second entry (Rest until healed, the box at 71h..88h) with the
+    # player rested (`healed`): "You don't need to rest." (1194:4290) in a
+    # box centred in the rest's clip (A91A 92h from 1194:4252: the one box
+    # the rest shows inside it besides its menu and prompt; the rest's
+    # other messages come in its frames, 1194:4635, after it is put back).
+    'tavernrestneed': (0x01E6, [('click', 0xA0, 0x7C)]),
+
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
     # strip (1194:4E88, three lines to a page, "...More" between them).
@@ -122,6 +142,14 @@ SCREENS = {
     'automap': (0x045A, [], {(0, 0x8FC8)}),
     # Shift+M: the world map (03BF: 26F7's travel map).
     'travelmap': (0x03BF, []),
+    # The loot window (1194:7B16, 2433:0583) as a click on a flat of
+    # treasure at the player's square (0x071A in the guild) runs it: AH 0Fh
+    # with a flat not the staff's (AL 1); with no pile there the piles are
+    # made first (2433:0000, from LOOT_SEED: a bag of gold and a staff),
+    # then listed (1194:5734). Its first line clicked: the gold taken, the
+    # rest listed again.
+    'loot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), []),
+    'loottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), [('click', 0x60, 0x27)]),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
@@ -140,7 +168,7 @@ WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
-               'tavernrest', 'tavernresthours')})
+               'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
 
 def place(a, base, where, cache={}):
@@ -181,6 +209,15 @@ SEED = 0x2F6E_1A35
 def seeded(a):
     a.w16(0x91F6, SEED & 0xFFFF)
     a.w16(0x91F8, SEED >> 16)
+
+
+# The seed the piles at the square are made from (2433:0000) in `loot`.
+LOOT_SEED = 1
+
+
+def loot_seeded(a):
+    a.w16(0x91F6, LOOT_SEED & 0xFFFF)
+    a.w16(0x91F8, LOOT_SEED >> 16)
 
 
 # The clock and the timer both sides start the rumours from (1194:E3F7:
@@ -232,11 +269,22 @@ def rented(a):
     assert not a.script
 
 
+def healed(a):
+    """The player rested as 1194:4345 tests it (2433's 4320): health
+    (01FD) and spell points (020A) at their maximums (01FF, 020C), the
+    fatigue (0201) well within its limit."""
+    a.w16(0x01FD, a.r16(0x01FF))
+    a.w16(0x020A, a.r16(0x020C))
+    a.w16(0x0201, 0x7FFF)
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
           'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
-          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside}
+          'tavernrestneed': lambda a: (rented(a), healed(a)),
+          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
+          'loot': loot_seeded, 'loottake': loot_seeded}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
