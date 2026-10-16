@@ -45,6 +45,15 @@ pub trait ShopHooks {
     /// repairs NEWOLD.IMG and YESNO.IMG; the guild's and the tavern's
     /// theirs).
     fn picture(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:545C: the gold left shown under the shop's menu, after the
+    /// strip there is saved (1194:5F8C; the next 5FC0 puts it back):
+    /// `Machine::gold_left`'s text at 1044 drawn centred on x A0h at row
+    /// 9Ch (0000:5364) and shown (9466).
+    fn gold_left(&mut self, _m: &mut Machine) {}
+    /// 1194:5FC0: the strip under the menu (0Bh, 91h; 12Ah by 1Fh) put
+    /// back as 5F8C saved it (0000:599C from [9030]:7530) and shown: the
+    /// gold left's line gone. Called where it can follow `gold_left`.
+    fn strip_back(&mut self, _m: &mut Machine) {}
     /// 1194:020E: a menu, its title at `si`, its keys at `bx`, its
     /// entries' table at `di`. The pick (FFFFh: none).
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
@@ -86,6 +95,40 @@ pub trait ShopHooks {
 
 /// `ShopHooks` that do nothing (every menu left at once).
 pub struct NoShopHooks;
+
+/// 1194:545C's text: "Gold left : " (4B0E), with a space for its NUL.
+const GOLD_TEXT: u16 = 0x4B0E;
+/// Where 545C builds it (also the spell list's order, 0000:0B9C's).
+pub const GOLD_LINE: u16 = 0x1044;
+
+impl Machine {
+    /// 1194:545C, the state it leaves: the text colour 41h (9288), the
+    /// font [1026] selected (0000:9AE6: B036), and at 1044 "Gold left : "
+    /// (4B0E, 0000:9CA0) with a space over its NUL and the gold (5C2) in
+    /// decimal after it (0000:75B0). Its drawing is the front end's
+    /// (`ShopHooks::gold_left`). DI after the number's NUL.
+    pub fn gold_left(&mut self) -> u16 {
+        self.mem.w8(DS, 0x9288, 0x41);
+        let font = self.mem.r16(DS, 0x1026);
+        self.mem.w16(DS, 0xB036, font);
+        let mut di = GOLD_LINE;
+        let mut si = GOLD_TEXT;
+        loop {
+            let c = self.mem.r8(DS, si);
+            self.mem.w8(DS, di, c);
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+        }
+        self.mem.w8(DS, di.wrapping_sub(1), 0x20);
+        let gold = self.mem.r32(DS, GOLD);
+        self.dun_ultoa(gold, di);
+        let digits = if gold == 0 { 1 } else { gold.ilog10() as u16 + 1 };
+        di.wrapping_add(digits).wrapping_add(1)
+    }
+}
 
 impl ShopHooks for NoShopHooks {}
 

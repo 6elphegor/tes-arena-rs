@@ -19,6 +19,7 @@
 //! differ, side by side.
 
 use super::*;
+use arena::mem::DS;
 
 const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/screens.txt");
 
@@ -86,6 +87,7 @@ fn check(name: &str, idx: &[u16], dac: &[u8]) -> bool {
             diff_png(&d.join(format!("{name}-diff.png")), &orig, orig_mask.as_deref(), &odac, idx, dac);
         }
         std::fs::write(d.join(format!("{name}.view")), &view_page).ok();
+        std::fs::write(d.join(format!("{name}.viewdac")), dac).ok();
     }
     if !pal_ok {
         eprintln!("{name}: the palette differs");
@@ -129,7 +131,7 @@ fn diff_png(to: &Path, orig: &[u8], mask: Option<&[u8]>, odac: &[u8], idx: &[u16
 fn over(a: &mut App) -> (Vec<u16>, Vec<u8>) {
     a.compose();
     let hud = a.hud();
-    let mut s = hud::Screen::new(a.assets.palette);
+    let mut s = hud::Screen::new(a.assets.dac());
     hud::compose_over(&mut s, &a.font, &hud);
     let idx = s.indices().to_vec();
     let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
@@ -253,7 +255,6 @@ fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
 /// The guild's Buy: what kind of item (1194:A73E's next menu) over the
 /// gold left.
 #[test]
-#[ignore = "not yet the original's: the gold line under the menu (1194:545C) isn't drawn"]
 fn the_guilds_buy_as_the_original_draws_it() {
     screen("guildbuy", |a, d| guild_pick(a, d, KeyCode::Digit1, "1"), layer);
 }
@@ -292,6 +293,107 @@ fn the_automap_as_the_original_draws_it() {
         |a, d| {
             a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
             d.key(a, KeyCode::KeyM, Some("m"));
+        },
+        layer,
+    );
+}
+
+/// The area left (C398 bit 80h, as its way out sets it): the outer loop
+/// on to the next (`areas::next`), its assets made, as the window does.
+fn area_left(a: &mut App) {
+    let v = a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) | 0x80;
+    a.engine.m.mem.w16(DS, arena::movement::var::MAP_FLAGS, v);
+    a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the next area");
+    a.assets = Assets::new(&a.dir, &mut a.engine);
+    a.remake_renderer();
+    a.last = Some(arena::engine::Frame::Running);
+}
+
+/// In the building first in the town's list at `list` (its far pointer:
+/// 1AB5 the taverns, 1004 the temples, 1008 the stores), as
+/// gen_screens.py's `place` has the original: out of the guild into the
+/// street, the building's door clicked from its square's corner (0000:43B1,
+/// PICKED the square; an entry's square is row << 8 | column, 1194:40CF),
+/// then in.
+fn into(a: &mut App, list: u16) {
+    area_left(a);
+    let m = &mut a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, list), m.mem.r16(DS, list + 2));
+    let sq = m.mem.r16(seg, off);
+    let door = (sq & 0xFF00) | ((sq & 0xFF) << 1);
+    m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
+    m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
+    m.mem.w16(DS, arena::controls::var::PICKED, door);
+    m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
+    assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
+    area_left(a);
+}
+
+/// The tavern's services (1194:B93C, the table at 869F's kind 4) in the
+/// town's first tavern, as the keeper's click runs them: its screen,
+/// banner and menu.
+#[test]
+fn the_taverns_menu_as_the_original_draws_it() {
+    screen(
+        "tavern",
+        |a, _| {
+            into(a, 0x1AB5);
+            super::shop_turn(a, 4);
+        },
+        layer,
+    );
+}
+
+/// The temple's (C258, kind 5) in the town's first temple.
+#[test]
+fn the_temples_menu_as_the_original_draws_it() {
+    screen(
+        "temple",
+        |a, _| {
+            into(a, 0x1004);
+            super::shop_turn(a, 5);
+        },
+        layer,
+    );
+}
+
+/// The equipment store's (F48E, kind 6) in the town's first store.
+#[test]
+fn the_stores_menu_as_the_original_draws_it() {
+    screen(
+        "store",
+        |a, _| {
+            into(a, 0x1008);
+            super::shop_turn(a, 6);
+        },
+        layer,
+    );
+}
+
+/// R in the street outside the guild (`area_left`): camping refused in a
+/// town, its box over the street's colours.
+#[test]
+fn camping_refused_in_the_street_as_the_original_draws_it() {
+    screen(
+        "streetcamp",
+        |a, d| {
+            area_left(a);
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// Shift+M in the street: the travel map (2542:03BF, 26F7).
+#[test]
+#[ignore = "not yet the original's: from this state the original's 03BF waits first on the world map (TAMRIEL.MNU), where the view's Travel::begin opens on the province's (26F7:0176)"]
+fn the_world_map_as_the_original_draws_it() {
+    screen(
+        "worldmap",
+        |a, d| {
+            area_left(a);
+            super::press(d, a, KeyCode::KeyM, true);
         },
         layer,
     );
