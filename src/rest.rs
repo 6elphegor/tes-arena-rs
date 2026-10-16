@@ -418,6 +418,10 @@ impl Machine {
         let limit = self.rest_fatigue_limit();
         self.mem.w16(DS, FATIGUE_LIMIT, limit);
         self.mem.w16(DS, HOURS, 0);
+        // 1194:4317: FONT_A.DAT ([1026]) and the tiles [1036] selected
+        // (0000:9AE6, 9AF8), then the menu.
+        self.select_font(crate::shops::font::A);
+        self.select_tiles(0x1036);
         let (si, bx, di) = text::MENU;
         let pick = hooks.menu(self, si, bx, di);
         if (pick as i16) < 0 {

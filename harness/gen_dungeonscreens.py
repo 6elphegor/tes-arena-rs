@@ -42,7 +42,8 @@ DUNGEON_SEED = 0x2F6E_1A35
 SCREENS = {
     # S: the status box (037C).
     'dungeonstatus': (0x037C, []),
-    # M: the automap (045A), its loop asking the mouse by 8FC8.
+    # M: the automap (045A), its loop asking the mouse by 8FC8, after a
+    # frame has marked the squares around the player (`marked`).
     'dungeonautomap': (0x045A, [], {(0, 0x8FC8)}),
     # The same with the whole level seen (`seen`): its walls, doors and
     # stairs drawn.
@@ -61,7 +62,14 @@ def seen(a):
     a.mu.mem_write(a.lin(a.r16(0x9030), 0), b'\x15' * 0x4000)
 
 
-BEFORE = {'dungeonautomap': gs.square, 'dungeonmap': seen}
+def marked(a):
+    """The squares around the player marked as a frame marks them
+    (0000:3491, called first by the frame's 49D6), the player's square set as the renderer sets it."""
+    gs.square(a)
+    a.call_near(0, 0x3491)
+
+
+BEFORE = {'dungeonautomap': marked, 'dungeonmap': seen}
 
 
 def dungeon(a, base):

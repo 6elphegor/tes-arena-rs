@@ -1,5 +1,5 @@
 screen | dungeonstatus | 2e5d327360c1d20b a97a4bafd992e4ed b68093bd54873ad5
-screen | dungeonautomap | aef43dede4752deb 58ab90d7887e02ed
+screen | dungeonautomap | f06cdb1031c1207c 58ab90d7887e02ed
 screen | dungeonmap | e4af764381159d8a 58ab90d7887e02ed
 screen | dungeoncamp | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
 screen | dungeontravel | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
