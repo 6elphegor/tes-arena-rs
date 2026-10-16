@@ -76,6 +76,10 @@ SCREENS = {
     # typed field), the haggle over the item sold.
     'tavernroomdays': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x31)]),
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
+    # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
+    # strip (1194:4E88, three lines to a page, "...More" between them).
+    'tavernrumorgeneral': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x8B), ('click', 0xA0, 0x65)]),
+    'tavernrumorheard': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x8B), ('click', 0xA0, 0x65)]),
     # Its Yes: the haggle.
     'storesellhaggle': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25),
                                                ('click', 0xA0, 0x69)]),
@@ -109,7 +113,8 @@ PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x10
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
-               'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle')})
+               'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'tavernrumorgeneral', 'tavernrumorheard')})
 
 
 def place(a, base, where, cache={}):
@@ -147,8 +152,25 @@ def seeded(a):
     a.w16(0x91F8, SEED >> 16)
 
 
+# The clock and the timer both sides start the rumours from (1194:E3F7:
+# the seed from the ticks at 0151, what is heard by the parity of the
+# clock's 05CC plus the player's x over 8), where the view's frames have
+# moved them on: odd, "nothing"; even, what is heard of the quest told
+# (these ticks: four lines, wrapped).
+RUMOURS = ((0x0001_2345, 0x0456), (0x0001_2385, 0x043F))
+
+
+def clocked(clock, ticks):
+    def at(a):
+        a.w16(0x05CC, clock & 0xFFFF)
+        a.w16(0x05CE, clock >> 16)
+        a.w16(0x0151, ticks)
+    return at
+
+
 # What a screen's state needs first that a frame would have done.
-BEFORE = {'automap': square, 'storesellhaggle': seeded}
+BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
+          'tavernrumorheard': clocked(*RUMOURS[1])}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

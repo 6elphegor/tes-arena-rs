@@ -234,14 +234,19 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
             }
             b'\r' | b'\n' => {
                 flush(&mut out, &mut cur, colour, &mut codes);
-                // A line its break ended: an empty span at its end (0000:965A
-                // centres such a line in its box).
-                for &c in codes.iter().rev().skip(1).rev() {
+                // The codes before the break, each an empty span for its
+                // width.
+                for &c in codes.iter() {
                     out.last_mut().unwrap().push(Span { colour: c, text: String::new(), font: Default::default(), code: Some(c) });
                 }
-                let code = codes.pop();
                 codes.clear();
-                out.last_mut().unwrap().push(Span { colour, text: String::new(), font: Default::default(), code });
+                // A line a CR ended: an empty span with no code at its end
+                // (0000:98E0 sets A84C bit 40h for a CR alone, and 965A
+                // centres such a line in its box; a LF's starts at the
+                // text's x).
+                if bytes[i] == b'\r' {
+                    out.last_mut().unwrap().push(Span { colour, text: String::new(), font: Default::default(), code: None });
+                }
                 out.push(Vec::new());
                 // \r\n is one break.
                 if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
@@ -865,7 +870,7 @@ fn draw_box_in(screen: &mut Screen, tiles: &Tiles, font: &Font, (x, y, w, h): (i
     let (_, _, tx, ty) = box_size_in(tiles, font, lines, margin);
     for (i, l) in lines.iter().enumerate() {
         let lw = measured(font, l);
-        let ended = i + 1 < lines.len() || l.last().is_some_and(|s| s.text.is_empty());
+        let ended = l.last().is_some_and(|s| s.text.is_empty() && s.code.is_none());
         let lx = if ended { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * (font.h as i32 + 1), l, false, colour);
     }

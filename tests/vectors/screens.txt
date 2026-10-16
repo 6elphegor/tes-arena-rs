@@ -29,3 +29,5 @@ screen | storerepair | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
 screen | tavernroomdays | 2d4a474cc7708d3c a97a4bafd992e4ed 75874994b31de8a7
 screen | storesellequipped | d953b2a95cc5569e a97a4bafd992e4ed b6b838e09c8cd067
 screen | storesellhaggle | 4a43e8adc9d6be54 a97a4bafd992e4ed fa8c11efc16b9367
+screen | tavernrumorgeneral | 6f86581d2ad78ef7 a97a4bafd992e4ed 89797cd50490b7f9
+screen | tavernrumorheard | dd9ae1cf7069b61d a97a4bafd992e4ed d864b21378b5a6e3

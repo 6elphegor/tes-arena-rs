@@ -915,7 +915,9 @@ impl Creation {
         let mut known = b"Know ye this also:\r".to_vec();
         match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, DS, BUF) {
             Some(_) => {
-                known.extend_from_slice(engine.m.mem.cstr(DS, BUF));
+                // 1194:2A4E: each line break the wrap made (a LF) made a
+                // CR (49DF), so 965A centres every line.
+                known.extend(engine.m.mem.cstr(DS, BUF).iter().map(|&c| if c == 0x0A { 0x0D } else { c }));
                 // 2A51..2A5F: the text ended by a CR (its last line
                 // centred too).
                 known.push(b'\r');
