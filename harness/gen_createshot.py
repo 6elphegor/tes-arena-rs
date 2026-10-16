@@ -1,7 +1,7 @@
 """Emit the screens of a new game's character creation as the original
 draws them (view/src/create.rs is checked against them).
 
-Usage: gen_createshot.py ACD_unpacked.EXE GAME_DIR OUT [DUMP_DIR]
+Usage: gen_createshot.py ACD_unpacked.EXE GAME_DIR OUT [DUMP_DIR [FRAMES]]
 
 Runs creation, 1194:2498 (from 1194:24A6, after its song; the random
 seed 91F6 set to SEED), on the game as screens.py starts it (21EE:0000:
@@ -30,6 +30,20 @@ the player answered:
 the screen and colours their FNV-1a digests; "end" the screen after the
 last input, where creation asks for another. With DUMP_DIR each screen
 is written there too (SCRIPT-STEP.raw: the 64000 bytes, the 768 colours).
+What the player sees between two screens answered (a box dissolving in,
+1194:4FF7; the colours faded) is sampled at each wait for the retrace
+(0000:6BB8, 9B77: the VGA and the DAC as they are there), and written to
+FRAMES (by default OUT's directory's createframes.txt):
+
+  createframes | script | step | count | digest
+
+the states seen after the input before `step` up to `step`'s screen: each
+different from the one before, the first not the screen answered and the
+last not `step`'s; the digest the FNV-1a of each state's two digests
+(screen, colours: 8 bytes each, little-endian) in turn. With DUMP_DIR
+each step's states are written there too (SCRIPT-STEP.frames: each 64000
+bytes then 768).
+
 A typed field's cursor (0000:A0D9) is kept from blinking on (A84C
 held at 1 at each pass): its phase is time's. TRACE (the last polls), PROF (the hottest blocks), DEBUGAT=SEG:OFF,...
 (registers there) and COUNT (the instruction budget) help debugging.
@@ -106,8 +120,14 @@ class Run:
         # not during an animation); or at the 50th such poll.
         self.streak = {}
         self.answered = None
+        self.answered_state = None
         self.hooks = []
         self.typed = None
+        # The states seen at the retrace's waits since the last input:
+        # (screen digest, colours digest, bytes or None).
+        self.seen = []
+        self.frames = []
+        self.keep = False
 
     def arm(self):
         """The keyboard's memory watched where the script's keys are
@@ -157,8 +177,26 @@ class Run:
             return '%04X:%04X' % (cs - LOAD_SEG, ip)
         return '0000:%04X' % near
 
+    def retrace(self, mu, addr, size, ud):
+        """A wait for the retrace: the state seen, if not the last seen."""
+        shown = bytes(mu.mem_read(0xA0000, 64000))
+        pal = bytes(self.a.dac)
+        st = (fnv(shown), fnv(pal))
+        if not self.seen or self.seen[-1][:2] != st:
+            self.seen.append(st + ((shown + pal) if self.keep else None,))
+
     def shot(self, what):
         shown = bytes(self.a.mu.mem_read(0xA0000, 64000))
+        # The states between: not the screen answered before, not this one.
+        now = (fnv(shown), fnv(bytes(self.a.dac)))
+        seen = [s for i, s in enumerate(self.seen) if i == 0 or s[:2] != self.seen[i - 1][:2]]
+        if seen and self.answered_state is not None and seen[0][:2] == self.answered_state:
+            seen = seen[1:]
+        if seen and seen[-1][:2] == now:
+            seen = seen[:-1]
+        self.frames.append((self.step, seen))
+        self.seen = []
+        self.answered_state = now
         self.shots.append((self.step, what, shown, bytes(self.a.dac)))
         self.step += 1
         self.streak = {}
@@ -259,9 +297,10 @@ def machine(exe, game):
     return a
 
 
-def run(a, inputs):
+def run(a, inputs, keep=False):
     mu = a.mu
     r = Run(a, inputs)
+    r.keep = keep
     hooks = []
     r.arm()
     # The game's timer count (0151, the timer interrupt's): a tick each
@@ -271,7 +310,7 @@ def run(a, inputs):
     def tick(mu, access, addr, size, value, ud):
         a.w16(0x0151, a.r16(0x0151) + 1)
     hooks.append(mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t))
-    for off, f in ((0x713C, r.key), (0x8FC8, r.mouse)):
+    for off, f in ((0x713C, r.key), (0x8FC8, r.mouse), (0x6BB8, r.retrace), (0x9B77, r.retrace)):
         x = a.lin(LOAD_SEG, off)
         hooks.append(mu.hook_add(UC_HOOK_CODE, f, None, x, x))
     prof = {}
@@ -318,13 +357,20 @@ def run(a, inputs):
 def main():
     exe, game, out = sys.argv[1:4]
     dump = sys.argv[4] if len(sys.argv) > 4 else None
+    frames_out = sys.argv[5] if len(sys.argv) > 5 else os.path.join(os.path.dirname(os.path.abspath(out)), 'createframes.txt')
     f = open(out, 'w', buffering=1)
+    ff = open(frames_out, 'w', buffering=1)
     a = machine(exe, game)
     base = a.snapshot()
     for name, script in SCRIPTS:
         a.restore(base)
         f.write(f'createshot | {name} | script | {script}\n')
-        r, err = run(a, parse(script))
+        r, err = run(a, parse(script), keep=dump is not None)
+        for step, seen in r.frames:
+            digest = fnv(b''.join(struct.pack('<QQ', s[0], s[1]) for s in seen))
+            ff.write(f'createframes | {name} | {step} | {len(seen)} | {digest:x}\n')
+            if dump and seen:
+                open(os.path.join(dump, f'{name}-{step}.frames'), 'wb').write(b''.join(s[2] for s in seen))
         for step, what, buf, pal in r.shots:
             f.write(f'createshot | {name} | {step} | {what} | {fnv(buf):x} | {fnv(pal):x}\n')
             if dump:
@@ -333,6 +379,7 @@ def main():
             f.write(f'createshot | {name} | end | {err}\n')
             print(name, err, file=sys.stderr)
     f.close()
+    ff.close()
 
 
 if __name__ == '__main__':

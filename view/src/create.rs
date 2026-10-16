@@ -44,10 +44,12 @@
 //! 3159:0F2A's boxes, the keys' letters in the entries' own colours) and
 //! the list are drawn as the original draws them, in PARCH.CIF's 20 x 20
 //! tiles until the attributes and MARBLE2.CIF's after; the screens are
-//! checked against the original's (`createtest`). Left out: the map's
-//! scroll unrolling (TOP.DFA, 1194:5B58: it ends off the screen), the
-//! questions' scroll rolling by the pixel (here by the line), the glow of
-//! the class's figure at the last answer, the fades.
+//! checked against the original's (`createtest`). Each answer plays its
+//! kind's figure (WARRIOR.CEL, ROGUE.CEL, MAGE.CEL, 222C:011A); the next
+//! question's screen covers it, and the class offered after the last is
+//! drawn over what it left. Left out: the map's scroll unrolling (TOP.DFA,
+//! 1194:5B58: it ends off the screen), the questions' scroll rolling by
+//! the pixel (here by the line), the fades.
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -241,6 +243,15 @@ struct Pics {
     charsheet: [[u8; 4]; 256],
     game: [[u8; 4]; 256],
     faces: Vec<Image>,
+    /// The face shown and the shirt over it, as the loop at 1194:2C04
+    /// last decoded them (`show_face`).
+    face_now: Option<Image>,
+    shirt_now: Option<Image>,
+    /// The shirt's file (1194:2486 loads it again for each face).
+    shirt_file: Vec<u8>,
+    /// The last answer's kind's figure as its animation (222C:011A..012B)
+    /// left it: the last frame, where the file centres it.
+    cel: Option<Image>,
 }
 
 struct Fonts {
@@ -279,10 +290,16 @@ pub struct Creation {
     level_up: Option<Vec<Click>>,
     /// The attribute page as last drawn (palette indices), which the
     /// faces are drawn over.
-    face_back: Option<Vec<u16>>,
+    /// The faces' page (the attributes' last) and the head's corner
+    /// 2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
+    face_back: Option<(Vec<u16>, Vec<u16>)>,
     /// The last question's lines and its roll, under the class offered.
     quiz_shown: Option<(Vec<String>, usize)>,
     outcome: Option<Outcome>,
+    /// The screen changes playing (1194:4FF7), the first now.
+    dissolves: VecDeque<Dissolve>,
+    /// Milliseconds into the dissolve's frame.
+    dissolve_ms: u32,
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -339,6 +356,95 @@ fn dfa_first(archive: &Archive, name: &str) -> Option<Image> {
     Some(Image { x: le(2), y: le(4), w: f.w, h: f.h, px: f.frames.into_iter().next()? })
 }
 
+/// The dissolve's generator (1194:5065: x 5E5h + 29h, 16 bits).
+const DISSOLVE_SEED: u16 = 0x4B8E;
+/// 4FF7's pixels (FA00h, whatever the rectangle), a wait where the
+/// count left is a multiple of 400h (after the 201h-th, 601h-th, ...):
+/// 62 frames.
+const DISSOLVE_STEPS: u32 = 0xFA00;
+const DISSOLVE_FRAMES: u32 = 62;
+/// A retrace, in milliseconds (70 Hz).
+const RETRACE_MS: u32 = 14;
+const FULL: (usize, usize, usize, usize) = (0, 0, W, H);
+
+fn dissolve_next(r: u16) -> u16 {
+    r.wrapping_mul(0x5E5).wrapping_add(0x29)
+}
+
+/// A screen change as 1194:4FF7 shows it: FA00h times the generator's
+/// next value, its remainder by the rectangle's size, a pixel there (row,
+/// column) copied from the page to the screen; the screen shown at its
+/// waits. Pixels it never lands on
+/// stay as they were until 9466 shows the page whole.
+struct Dissolve {
+    from: Vec<u16>,
+    to: Vec<u16>,
+    rect: (usize, usize, usize, usize),
+    seed: u16,
+    frame: u32,
+}
+
+impl Dissolve {
+    /// The screen at wait `k` (0..62).
+    fn at(&self, k: u32) -> Vec<u16> {
+        let (x0, y0, w, h) = self.rect;
+        let size = (w * h) as u32;
+        let mut out = self.from.clone();
+        let mut r = self.seed;
+        for _ in 0..(0x201 + 0x400 * k).min(DISSOLVE_STEPS) {
+            r = dissolve_next(r);
+            if size == 0 {
+                continue;
+            }
+            let off = (r as u32 % size) as usize;
+            let i = (y0 + off / w) * W + x0 + off % w;
+            if let (Some(o), Some(&t)) = (out.get_mut(i), self.to.get(i)) {
+                *o = t;
+            }
+        }
+        out
+    }
+}
+
+/// The bank 2DAF loads the faces into (5C86 with BX 17h).
+const FACES_BANK: u16 = 0x17;
+
+/// `f` with EMS bank `bank` mapped into the frame (DS:9030; 5C86), the
+/// bank before mapped back after.
+fn with_bank<T>(m: &mut Machine, bank: u16, f: impl FnOnce(&mut Machine, u16) -> T) -> T {
+    let before = m.mem.r16(DS, 0x8FA8) >> 2;
+    m.ems_map(bank);
+    let frame = m.mem.r16(DS, 0x9030);
+    let out = f(m, frame);
+    m.ems_map(before);
+    out
+}
+
+/// 0000:5828's decoding of the image record at `seg`:`off` (a 12-byte
+/// header, then its data): coded ones (flags & 0Dh) into w x h bytes from
+/// the heap (51EC), LZHUF (8) through 3065:0D2D, LZSS (4) as 7608; the
+/// bytes then freed (6C36). None for others or where the heap fails.
+fn decode_5828(m: &mut Machine, seg: u16, off: u16) -> Option<Image> {
+    let r = |i: u16| m.mem.r16(seg, off.wrapping_add(i));
+    let (x, y, w, h, flags, size) = (r(0), r(2), r(4), r(6), r(8), r(10));
+    if flags & 0xD == 0 || w == 0 || h == 0 {
+        return None;
+    }
+    let bytes = w.checked_mul(h)?;
+    let (dseg, doff) = m.heap_alloc_bytes(bytes)?;
+    if flags & 8 != 0 {
+        m.mif_decompress(seg, off.wrapping_add(12), dseg, doff, size);
+    } else if flags & 4 != 0 {
+        let rec: Vec<u8> = (0..12u16.wrapping_add(size)).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+        for (i, &b) in crate::interface::image(&rec).map(|(img, _)| img.px).unwrap_or_default().iter().enumerate() {
+            m.mem.w8(dseg, doff.wrapping_add(i as u16), b);
+        }
+    }
+    let px = (0..bytes).map(|i| m.mem.r8(dseg, doff.wrapping_add(i))).collect();
+    m.heap_free(dseg);
+    Some(Image { x: x as i16 as i32, y: y as i16 as i32, w: w as usize, h: h as usize, px })
+}
+
 /// A .CIF's images (12-byte headers), each decoded as `interface::image`
 /// does or, coded with type 8, through the port's LZHUF.
 fn cif(m: &Machine, d: &[u8]) -> Vec<Image> {
@@ -379,10 +485,14 @@ impl Creation {
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
+            face_now: None,
+            shirt_now: None,
+            shirt_file: Vec::new(),
+            cel: None,
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -439,8 +549,12 @@ impl Creation {
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
+            face_now: None,
+            shirt_now: None,
+            shirt_file: Vec::new(),
+            cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 }
     }
 
     /// Back on the main menu (a load that failed).
@@ -470,6 +584,21 @@ impl Creation {
     /// Time passing (milliseconds) for the movie playing: its frames; at
     /// its end (no text: once through) the next screen.
     pub fn advance(&mut self, ms: u32) {
+        // A dissolve's frames, one a retrace (70 a second).
+        self.dissolve_ms += ms;
+        while let Some(d) = self.dissolves.front_mut() {
+            if self.dissolve_ms < RETRACE_MS {
+                break;
+            }
+            self.dissolve_ms -= RETRACE_MS;
+            d.frame += 1;
+            if d.frame >= DISSOLVE_FRAMES {
+                self.dissolves.pop_front();
+            }
+        }
+        if self.dissolves.is_empty() {
+            self.dissolve_ms = 0;
+        }
         if let Some(mv) = &mut self.movie {
             mv.advance(ms);
         }
@@ -568,11 +697,90 @@ impl Creation {
         self.boxes.push_back(Boxed { lines, font, back });
     }
 
-    /// A key or click.
+    /// A key or click, and the screen's change dissolved in as the
+    /// original shows it (1194:4FF7):
+    /// - the next question on the scroll's rows (222C:02A5..02B0: 0, 77h,
+    ///   140h x 50h);
+    /// - a box shown (59CC at 5A1A, 5C34 at 5C9F: the whole screen);
+    /// - a box taken away, the page as it was under it (5A41, 5CBD), then
+    ///   the next box if there is one.
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
         if let Input::Wait(ms) = inp {
             return self.advance(ms);
         }
+        self.dissolves.clear();
+        self.dissolve_ms = 0;
+        let quiz = matches!(self.stage, Stage::Quiz { .. });
+        let was = std::mem::discriminant(&self.stage);
+        let (asked, named) = (self.asking(), matches!(self.stage, Stage::Name(..)));
+        let had = self.boxes.len();
+        let before = self.page(&engine.m);
+        self.input_inner(engine, inp);
+        if self.movie.is_some() {
+            return;
+        }
+        let after = self.page(&engine.m);
+        let now = self.boxes.len();
+        let moved = std::mem::discriminant(&self.stage) != was;
+        if quiz && had == 0 && matches!(self.stage, Stage::Quiz { .. }) {
+            self.dissolve(&mut engine.m, before, after, (0, 0x77, 0x140, 0x50));
+        } else if had == 0 && now == 0 && named && moved {
+            // The prompt's box taken away (5CBD).
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had == 0 && now == 0 && (moved || !asked && !named) && (self.asking() || matches!(self.stage, Stage::Name(..))) {
+            // A menu shown (020E's at 0269) or the prompt's box (5C9F).
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had == 0 && now > 0 {
+            self.dissolve(&mut engine.m, before, after, FULL);
+        } else if had > 0 && (now < had || now > 0 && before != after) {
+            let shown = std::mem::take(&mut self.boxes);
+            let under = self.page(&engine.m);
+            self.boxes = shown;
+            let boxed = now > 0;
+            self.dissolve(&mut engine.m, before, under.clone(), FULL);
+            if boxed {
+                self.dissolve(&mut engine.m, under, after, FULL);
+            }
+        }
+    }
+
+    /// Whether a menu (1194:020E) is up.
+    fn asking(&self) -> bool {
+        self.boxes.is_empty() && matches!(self.stage, Stage::Method(_) | Stage::List(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_) | Stage::ClassYes(..))
+    }
+
+    /// The screen as `draw_page` draws it, its indices.
+    fn page(&self, m: &Machine) -> Vec<u16> {
+        let mut s = Screen::new(self.pics.game);
+        self.draw_page(&mut s, m);
+        s.indices().to_vec()
+    }
+
+    /// A change from `from` to `to` in `rect` queued, the dissolve's
+    /// generator (DGROUP 4B8E) taken on past it as 4FF7 takes it.
+    fn dissolve(&mut self, m: &mut Machine, from: Vec<u16>, to: Vec<u16>, rect: (usize, usize, usize, usize)) {
+        let seed = m.mem.r16(DS, DISSOLVE_SEED);
+        let mut r = seed;
+        for _ in 0..DISSOLVE_STEPS {
+            r = dissolve_next(r);
+        }
+        m.mem.w16(DS, DISSOLVE_SEED, r);
+        self.dissolves.push_back(Dissolve { from, to, rect, seed, frame: 0 });
+    }
+
+    /// The dissolves playing passed: the screen as it settles.
+    pub fn settle(&mut self) {
+        self.dissolves.clear();
+        self.dissolve_ms = 0;
+    }
+
+    /// Every frame the dissolves queued will show, in turn (each the
+    /// screen at one of 4FF7's waits).
+    pub fn dissolve_frames(&self) -> Vec<Vec<u16>> {
+        self.dissolves.iter().flat_map(|d| (0..DISSOLVE_FRAMES).map(move |k| d.at(k))).collect()
+    }
+
+    fn input_inner(&mut self, engine: &mut Engine, inp: Input) {
         if !self.boxes.is_empty() {
             if matches!(inp, Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..)) {
                 self.boxes.pop_front();
@@ -656,7 +864,14 @@ impl Creation {
             },
             Stage::Quiz { asked, lines, mut top } => match inp {
                 Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()) => {
-                    engine.m.quiz_answer(c.to_ascii_uppercase() - b'A');
+                    let a = c.to_ascii_uppercase() - b'A';
+                    engine.m.quiz_answer(a);
+                    // 222C:010B..012B: the answer's kind counted, its
+                    // figure played (2294:0895). The next question's
+                    // screen covers it; the class offered after the last
+                    // is drawn over it.
+                    let kind = engine.m.mem.r8(DS, arena::newgame::var::KINDS + a.min(2) as u16);
+                    self.pics.cel = self.class_cel(&engine.m, kind);
                     if asked + 1 < 10 {
                         self.next_question(engine, asked + 1)
                     } else {
@@ -747,21 +962,20 @@ impl Creation {
                         let mut page = Screen::new(self.pics.charsheet);
                         page.fill(0, 0, W as i32, H as i32, 0, 0xFF);
                         self.stats_page(&mut page, &engine.m, true, true);
-                        let mut back = page.indices().to_vec();
+                        let back = page.indices().to_vec();
                         // The head's corner as 2A9D kept it before the doll
                         // was drawn (the race's background alone, 161A),
                         // put back under each face (2C96).
                         let mut bare = Screen::new(self.pics.charsheet);
                         bare.fill(0, 0, W as i32, H as i32, 0, 0xFF);
-                        if let Some(i) = crate::doll::images(&self.archive, &engine.m).first() {
+                        let m = &engine.m;
+                        let bg = if m.mem.r8(DS, arena::character::PLAYER + 7) != 0 { "CHRBKF" } else { "CHARBK" };
+                        let bg = format!("{bg}{:02}.IMG", m.mem.r8(DS, arena::character::PLAYER + 4));
+                        if let Some(i) = crate::panels::load_image(&self.archive, m, &bg) {
                             bare.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                         }
-                        for y in 0..0x37 {
-                            for x in 0xDA..0xDA + 0x4A {
-                                back[y * W + x] = bare.indices()[y * W + x];
-                            }
-                        }
-                        self.face_back = Some(back);
+                        let corner = (0..0x37).flat_map(|y| (0xDA..0xDA + 0x4A).map(move |x| y * W + x)).map(|i| bare.indices()[i]).collect();
+                        self.face_back = Some((back, corner));
                         engine.m.creation_finish();
                         self.face_screen(engine)
                     }
@@ -800,6 +1014,36 @@ impl Creation {
         let text = engine.m.mem.cstr(seg, di).to_vec();
         let lines = text.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
         Stage::Quiz { asked, lines, top: 0 }
+    }
+
+    /// The figure of answers of `kind` (222C:011A: the name at
+    /// [4142 + 2 kind]: WARRIOR.CEL, ROGUE.CEL, MAGE.CEL) as 0000:6546
+    /// leaves it: every frame played, the last kept; placed by the file's
+    /// CEL_DATA (0000:6102..612D: an F100 chunk first whose first part is
+    /// of type 3: its centre less half the size).
+    fn class_cel(&self, m: &Machine, kind: u8) -> Option<Image> {
+        let at = m.mem.r16(DS, 0x4142 + 2 * kind as u16);
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, at)).to_ascii_uppercase();
+        let d = self.archive.read(&name)?;
+        let le = |i: usize| u16::from_le_bytes([*d.get(i).unwrap_or(&0), *d.get(i + 1).unwrap_or(&0)]);
+        let mut f = crate::flc::Flc::open(&self.archive, &name)?;
+        // Each frame drawn over the page with its 0s see-through (A902
+        // bit 400h): what a frame drew stays where later ones have 0.
+        let mut px = f.px.clone();
+        while (f.shown as usize) < le(6) as usize {
+            f.step();
+            for (p, &v) in px.iter_mut().zip(&f.px) {
+                if v != 0 {
+                    *p = v;
+                }
+            }
+        }
+        let (mut x, mut y) = (0i32, 0i32);
+        if le(132) == 0xF100 && le(138) == 3 {
+            x = le(142).wrapping_sub((f.w >> 1) as u16) as i16 as i32;
+            y = le(144).wrapping_sub((f.h >> 1) as u16) as i16 as i32;
+        }
+        Some(Image { x, y, w: f.w, h: f.h, px })
     }
 
     /// The ten answered: the class they give, offered (1194:261F..264E;
@@ -1026,8 +1270,47 @@ impl Creation {
         let robe = if m.mem.r8(DS, CLASS) & 0x20 != 0 { 'R' } else { 'S' };
         let shirt = format!("{}{robe}SHIRT.IMG", if m.mem.r8(DS, SEX) != 0 { 'F' } else { 'M' });
         self.pics.shirt = crate::panels::load_image(&self.archive, m, &shirt);
+        self.pics.shirt_file = self.archive.read(&shirt).unwrap_or_default();
         m.mem.w16(DS, arena::newgame::var::FACE_PICKED, 0);
+        // 2DAF: the faces' file into bank 17h's first bytes.
+        if let Some(d) = self.archive.read(&name) {
+            with_bank(m, FACES_BANK, |m, frame| {
+                for (i, &b) in d.iter().enumerate().take(0x10000) {
+                    m.mem.w8(frame, i as u16, b);
+                }
+            });
+        }
+        self.show_face(m);
         Stage::Face
+    }
+
+    /// One pass of the faces' loop (1194:2C04..2C1F): the face picked
+    /// drawn from bank 17h by 5828, then the shirt (2486: its file loaded
+    /// again into bank [1030], 56C8, and drawn). 5828 decodes a coded
+    /// image into w x h bytes from the heap (51EC; the faces' coding,
+    /// 3065:0D2D, takes its tables from the heap after them) and frees
+    /// them (6C36), so the decoder's ring holds what the decodes before
+    /// left there: a face after the first can take pixels from them.
+    fn show_face(&mut self, m: &mut Machine) {
+        let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
+        self.pics.face_now = with_bank(m, FACES_BANK, |m, frame| {
+            let mut at = 0u16;
+            for _ in 0..k {
+                at = at.wrapping_add(m.mem.r16(frame, at.wrapping_add(10))).wrapping_add(12);
+            }
+            decode_5828(m, frame, at)
+        })
+        .or_else(|| self.pics.faces.get(k).cloned());
+        let bank = m.mem.r16(DS, 0x1030);
+        let file = std::mem::take(&mut self.pics.shirt_file);
+        self.pics.shirt_now = with_bank(m, bank, |m, frame| {
+            for (i, &b) in file.iter().enumerate().take(0x10000) {
+                m.mem.w8(frame, i as u16, b);
+            }
+            decode_5828(m, frame, 0)
+        })
+        .or_else(|| self.pics.shirt.clone());
+        self.pics.shirt_file = file;
     }
 
     /// The faces' regions (3276:5E90): 0 the face (the next one, after the
@@ -1047,6 +1330,7 @@ impl Creation {
         match region {
             Some(0) => {
                 next(m);
+                self.show_face(m);
                 Stage::Face
             }
             Some(1) => self.finish(engine),
@@ -1140,6 +1424,17 @@ impl Creation {
 
     /// The layer drawn: the screen behind, the stage, a box waiting.
     pub fn draw(&self, screen: &mut Screen, m: &Machine) {
+        self.draw_page(screen, m);
+        if let Some(d) = self.dissolves.front() {
+            let f = d.at(d.frame);
+            screen.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+            let px: Vec<u8> = f.iter().map(|&i| i as u8).collect();
+            screen.blit(0, 0, W, H, &px, H as i32);
+        }
+    }
+
+    /// The screen as it settles (the page 9466 shows).
+    pub fn draw_page(&self, screen: &mut Screen, m: &Machine) {
         let back = match (&self.boxes.front(), &self.stage) {
             (Some(b), _) => b.back,
             (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
@@ -1174,6 +1469,9 @@ impl Creation {
                 // Over the questions as the last answer left them.
                 if let Some((lines, top)) = &self.quiz_shown {
                     self.draw_quiz(screen, m, lines, *top);
+                }
+                if let Some(i) = &self.pics.cel {
+                    screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
                 self.draw_ask(screen, a, back);
             }
@@ -1252,19 +1550,23 @@ impl Creation {
 
     /// The attribute screen (1194:0DE1's texts, in ARENAFNT, colour FEh).
     fn draw_stats(&self, screen: &mut Screen, m: &Machine) {
-        if let (Stage::Face, Some(back)) = (&self.stage, &self.face_back) {
+        if let (Stage::Face, Some((back, corner))) = (&self.stage, &self.face_back) {
             // The faces' screen (2BC5) draws on the page the attributes
             // left (their last values, the points and the arrows: 2D28's
             // changes aren't drawn), each face over the doll's head.
             let px: Vec<u8> = back.iter().map(|&i| i as u8).collect();
             screen.blit(0, 0, W, H, &px, H as i32);
             if self.boxes.is_empty() {
-                let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
-                if let Some(i) = self.pics.faces.get(k) {
+                // The loop's pass (2C04): the corner put back, the face.
+                // (599C copies it whole: its 0s too.)
+                let px: Vec<u8> = corner.iter().map(|&i| i as u8).collect();
+                screen.fill(0xDA, 0, 0x4A, 0x37, 0, 0xFF);
+                screen.blit(0xDA, 0, 0x4A, 0x37, &px, H as i32);
+                if let Some(i) = &self.pics.face_now {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
                 // Then the shirt again, over the face's neck (2486).
-                if let Some(i) = &self.pics.shirt {
+                if let Some(i) = &self.pics.shirt_now {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
             }

@@ -663,8 +663,9 @@ fn creation_by_keys_and_clicks_as_by_script() {
         let (Some(ca), Some(cb)) = (a.creation.as_ref(), b.creation.as_ref()) else { panic!("creation ended early at step {i}") };
         let mut sa = hud::Screen::new(a.assets.palette);
         let mut sb = hud::Screen::new(a.assets.palette);
-        ca.draw(&mut sa, &a.engine.m);
-        cb.draw(&mut sb, &b.engine.m);
+        // As they settle (one has had time pass in a dissolve).
+        ca.draw_page(&mut sa, &a.engine.m);
+        cb.draw_page(&mut sb, &b.engine.m);
         assert!(sa.px == sb.px, "step {i} ({inp:?}): the screens differ");
         same(&a, &b, &format!("step {i} ({inp:?})"));
     }
