@@ -379,7 +379,8 @@ fn printf_s(fmt: &[u8], s: &[u8]) -> Vec<u8> {
 /// text (3276:5AD7) said.
 pub fn spells_button(m: &mut Machine, said: &mut Said) {
     if m.mem.r8(DS, 0x01A9) & 0x20 == 0 {
-        said.text(&m.mem.cstr(DATA, 0x5AD7).to_vec());
+        let t = m.mem.cstr(DATA, 0x5AD7).to_vec();
+        said.text(&t);
         return;
     }
     let own = m.mem.r8(DS, OWN_ITEMS) ^ 1;
