@@ -282,7 +282,10 @@ impl Travel {
         let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
-        let t = Travel {
+        // The window it runs (3159:000C on DATA:6C56) is the world map's:
+        // TAMRIEL.MNU, its provinces' regions at 6D90, the current one
+        // outlined (26F7:013E). A province's map is a region's click away.
+        Travel {
             start,
             shown: None,
             world: crate::create::mnu(archive, "TAMRIEL.MNU"),
@@ -300,11 +303,7 @@ impl Travel {
             journey: Vec::new(),
             journey_ms: 0,
             up_ms: 0,
-        };
-        // The window it runs (3159:000C on DATA:6C56) is the world map's:
-        // TAMRIEL.MNU, its provinces' regions at 6D90, the current one
-        // outlined (26F7:013E). A province's map is a region's click away.
-        t
+        }
     }
 
     /// The boxes shown since last asked.
