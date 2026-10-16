@@ -241,6 +241,12 @@ struct Pics {
     charsheet: [[u8; 4]; 256],
     game: [[u8; 4]; 256],
     faces: Vec<Image>,
+    /// The face shown and the shirt over it, as the loop at 1194:2C04
+    /// last decoded them (`show_face`).
+    face_now: Option<Image>,
+    shirt_now: Option<Image>,
+    /// The shirt's file (1194:2486 loads it again for each face).
+    shirt_file: Vec<u8>,
 }
 
 struct Fonts {
@@ -279,7 +285,9 @@ pub struct Creation {
     level_up: Option<Vec<Click>>,
     /// The attribute page as last drawn (palette indices), which the
     /// faces are drawn over.
-    face_back: Option<Vec<u16>>,
+    /// The faces' page (the attributes' last) and the head's corner
+    /// 2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
+    face_back: Option<(Vec<u16>, Vec<u16>)>,
     /// The last question's lines and its roll, under the class offered.
     quiz_shown: Option<(Vec<String>, usize)>,
     outcome: Option<Outcome>,
@@ -339,6 +347,45 @@ fn dfa_first(archive: &Archive, name: &str) -> Option<Image> {
     Some(Image { x: le(2), y: le(4), w: f.w, h: f.h, px: f.frames.into_iter().next()? })
 }
 
+/// The bank 2DAF loads the faces into (5C86 with BX 17h).
+const FACES_BANK: u16 = 0x17;
+
+/// `f` with EMS bank `bank` mapped into the frame (DS:9030; 5C86), the
+/// bank before mapped back after.
+fn with_bank<T>(m: &mut Machine, bank: u16, f: impl FnOnce(&mut Machine, u16) -> T) -> T {
+    let before = m.mem.r16(DS, 0x8FA8) >> 2;
+    m.ems_map(bank);
+    let frame = m.mem.r16(DS, 0x9030);
+    let out = f(m, frame);
+    m.ems_map(before);
+    out
+}
+
+/// 0000:5828's decoding of the image record at `seg`:`off` (a 12-byte
+/// header, then its data): coded ones (flags & 0Dh) into w x h bytes from
+/// the heap (51EC), LZHUF (8) through 3065:0D2D, LZSS (4) as 7608; the
+/// bytes then freed (6C36). None for others or where the heap fails.
+fn decode_5828(m: &mut Machine, seg: u16, off: u16) -> Option<Image> {
+    let r = |i: u16| m.mem.r16(seg, off.wrapping_add(i));
+    let (x, y, w, h, flags, size) = (r(0), r(2), r(4), r(6), r(8), r(10));
+    if flags & 0xD == 0 || w == 0 || h == 0 {
+        return None;
+    }
+    let bytes = w.checked_mul(h)?;
+    let (dseg, doff) = m.heap_alloc_bytes(bytes)?;
+    if flags & 8 != 0 {
+        m.mif_decompress(seg, off.wrapping_add(12), dseg, doff, size);
+    } else if flags & 4 != 0 {
+        let rec: Vec<u8> = (0..12u16.wrapping_add(size)).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+        for (i, &b) in crate::interface::image(&rec).map(|(img, _)| img.px).unwrap_or_default().iter().enumerate() {
+            m.mem.w8(dseg, doff.wrapping_add(i as u16), b);
+        }
+    }
+    let px = (0..bytes).map(|i| m.mem.r8(dseg, doff.wrapping_add(i))).collect();
+    m.heap_free(dseg);
+    Some(Image { x: x as i16 as i32, y: y as i16 as i32, w: w as usize, h: h as usize, px })
+}
+
 /// A .CIF's images (12-byte headers), each decoded as `interface::image`
 /// does or, coded with type 8, through the port's LZHUF.
 fn cif(m: &Machine, d: &[u8]) -> Vec<Image> {
@@ -379,6 +426,9 @@ impl Creation {
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
+            face_now: None,
+            shirt_now: None,
+            shirt_file: Vec::new(),
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
@@ -439,6 +489,9 @@ impl Creation {
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
+            face_now: None,
+            shirt_now: None,
+            shirt_file: Vec::new(),
         };
         Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None }
     }
@@ -747,21 +800,20 @@ impl Creation {
                         let mut page = Screen::new(self.pics.charsheet);
                         page.fill(0, 0, W as i32, H as i32, 0, 0xFF);
                         self.stats_page(&mut page, &engine.m, true, true);
-                        let mut back = page.indices().to_vec();
+                        let back = page.indices().to_vec();
                         // The head's corner as 2A9D kept it before the doll
                         // was drawn (the race's background alone, 161A),
                         // put back under each face (2C96).
                         let mut bare = Screen::new(self.pics.charsheet);
                         bare.fill(0, 0, W as i32, H as i32, 0, 0xFF);
-                        if let Some(i) = crate::doll::images(&self.archive, &engine.m).first() {
+                        let m = &engine.m;
+                        let bg = if m.mem.r8(DS, arena::character::PLAYER + 7) != 0 { "CHRBKF" } else { "CHARBK" };
+                        let bg = format!("{bg}{:02}.IMG", m.mem.r8(DS, arena::character::PLAYER + 4));
+                        if let Some(i) = crate::panels::load_image(&self.archive, m, &bg) {
                             bare.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                         }
-                        for y in 0..0x37 {
-                            for x in 0xDA..0xDA + 0x4A {
-                                back[y * W + x] = bare.indices()[y * W + x];
-                            }
-                        }
-                        self.face_back = Some(back);
+                        let corner = (0..0x37).flat_map(|y| (0xDA..0xDA + 0x4A).map(move |x| y * W + x)).map(|i| bare.indices()[i]).collect();
+                        self.face_back = Some((back, corner));
                         engine.m.creation_finish();
                         self.face_screen(engine)
                     }
@@ -1024,8 +1076,47 @@ impl Creation {
         let robe = if m.mem.r8(DS, CLASS) & 0x20 != 0 { 'R' } else { 'S' };
         let shirt = format!("{}{robe}SHIRT.IMG", if m.mem.r8(DS, SEX) != 0 { 'F' } else { 'M' });
         self.pics.shirt = crate::panels::load_image(&self.archive, m, &shirt);
+        self.pics.shirt_file = self.archive.read(&shirt).unwrap_or_default();
         m.mem.w16(DS, arena::newgame::var::FACE_PICKED, 0);
+        // 2DAF: the faces' file into bank 17h's first bytes.
+        if let Some(d) = self.archive.read(&name) {
+            with_bank(m, FACES_BANK, |m, frame| {
+                for (i, &b) in d.iter().enumerate().take(0x10000) {
+                    m.mem.w8(frame, i as u16, b);
+                }
+            });
+        }
+        self.show_face(m);
         Stage::Face
+    }
+
+    /// One pass of the faces' loop (1194:2C04..2C1F): the face picked
+    /// drawn from bank 17h by 5828, then the shirt (2486: its file loaded
+    /// again into bank [1030], 56C8, and drawn). 5828 decodes a coded
+    /// image into w x h bytes from the heap (51EC; the faces' coding,
+    /// 3065:0D2D, takes its tables from the heap after them) and frees
+    /// them (6C36), so the decoder's ring holds what the decodes before
+    /// left there: a face after the first can take pixels from them.
+    fn show_face(&mut self, m: &mut Machine) {
+        let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
+        self.pics.face_now = with_bank(m, FACES_BANK, |m, frame| {
+            let mut at = 0u16;
+            for _ in 0..k {
+                at = at.wrapping_add(m.mem.r16(frame, at.wrapping_add(10))).wrapping_add(12);
+            }
+            decode_5828(m, frame, at)
+        })
+        .or_else(|| self.pics.faces.get(k).cloned());
+        let bank = m.mem.r16(DS, 0x1030);
+        let file = std::mem::take(&mut self.pics.shirt_file);
+        self.pics.shirt_now = with_bank(m, bank, |m, frame| {
+            for (i, &b) in file.iter().enumerate().take(0x10000) {
+                m.mem.w8(frame, i as u16, b);
+            }
+            decode_5828(m, frame, 0)
+        })
+        .or_else(|| self.pics.shirt.clone());
+        self.pics.shirt_file = file;
     }
 
     /// The faces' regions (3276:5E90): 0 the face (the next one, after the
@@ -1045,6 +1136,7 @@ impl Creation {
         match region {
             Some(0) => {
                 next(m);
+                self.show_face(m);
                 Stage::Face
             }
             Some(1) => self.finish(engine),
@@ -1250,19 +1342,23 @@ impl Creation {
 
     /// The attribute screen (1194:0DE1's texts, in ARENAFNT, colour FEh).
     fn draw_stats(&self, screen: &mut Screen, m: &Machine) {
-        if let (Stage::Face, Some(back)) = (&self.stage, &self.face_back) {
+        if let (Stage::Face, Some((back, corner))) = (&self.stage, &self.face_back) {
             // The faces' screen (2BC5) draws on the page the attributes
             // left (their last values, the points and the arrows: 2D28's
             // changes aren't drawn), each face over the doll's head.
             let px: Vec<u8> = back.iter().map(|&i| i as u8).collect();
             screen.blit(0, 0, W, H, &px, H as i32);
             if self.boxes.is_empty() {
-                let k = m.mem.r8(DS, arena::newgame::var::FACE_PICKED) as usize;
-                if let Some(i) = self.pics.faces.get(k) {
+                // The loop's pass (2C04): the corner put back, the face.
+                // (599C copies it whole: its 0s too.)
+                let px: Vec<u8> = corner.iter().map(|&i| i as u8).collect();
+                screen.fill(0xDA, 0, 0x4A, 0x37, 0, 0xFF);
+                screen.blit(0xDA, 0, 0x4A, 0x37, &px, H as i32);
+                if let Some(i) = &self.pics.face_now {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
                 // Then the shirt again, over the face's neck (2486).
-                if let Some(i) = &self.pics.shirt {
+                if let Some(i) = &self.pics.shirt_now {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
             }

@@ -95,9 +95,6 @@ const KNOWN: &[(&str, usize, &str)] = &[
     // The class offered over the questions: the figures' glow the last
     // answer starts (222C:012B, 2294:0895) isn't drawn.
     ("generate-12", 712, "the figures' glow"),
-    // The faces after the first: a few of the hair's edge pixels.
-    ("select-35", 70, "a face's edge"),
-    ("select-36", 26, "a face's edge"),
 ];
 
 #[test]
