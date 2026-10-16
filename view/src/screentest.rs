@@ -1312,6 +1312,24 @@ fn the_rest_ended_rested_as_the_original_draws_it() {
     );
 }
 
+/// Resting with a creature near (one of type 0 at level 1 brought by a
+/// quest's encounter, 1194:89A7, placed near the player): the frame's
+/// scan of the actors counts it (0FFB, 0000:1854) before the rest's frame,
+/// which ends the rest: "There are enemies nearby..." (1194:4697).
+#[test]
+fn a_rest_ended_by_enemies_as_the_original_draws_it() {
+    screen(
+        "restenemies",
+        |a, d| {
+            let e = &mut a.engine;
+            e.m.quest_encounter(&mut e.files, &mut arena::encounter::NoFightHooks, 1, 0, 1).expect("a creature brought");
+            rest_frame(a, d, 1, 5, 0);
+            assert_eq!(a.engine.m.mem.r8(DS, arena::rest::var::RESTING), 0, "the rest ended");
+        },
+        over,
+    );
+}
+
 /// `over` with the typed field asked drawn over it (`App::compose`'s
 /// last step): a box's prompt and its field.
 fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {

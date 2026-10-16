@@ -111,3 +111,4 @@ screen | usepotions | e61896922d0c226 a97a4bafd992e4ed 4eaa9849dbc2a3f
 screen | usepotion | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
 screen | equipmentspellname | 496be2cb6483ce08 7b9dbd5285f32ad5
 screen | equipmentspellrenamed | 7f70b80662484f5c 7b9dbd5285f32ad5
+screen | restenemies | 5cc87df312916227 a97a4bafd992e4ed 91f4bf28c6363725

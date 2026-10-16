@@ -222,6 +222,9 @@ SCREENS = {
     'restleft': ((0x1194, 0x4635, {}), []),
     'restpassed': ((0x1194, 0x4635, {}), []),
     'restrested': ((0x1194, 0x4635, {}), []),
+    # With enemies near (`hunted`, as the frame's scan of the actors leaves
+    # 0FFB): "Enemies are nearby" (1194:4697), the rest ended.
+    'restenemies': ((0x1194, 0x4635, {}), []),
 
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
@@ -627,6 +630,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'campenemies': hunted,
           'restleft': resting(1, 5), 'restpassed': lambda a: (resting(0, 2)(a), hurt(a)),
           'restrested': lambda a: (resting(0, 1, 2)(a), healed(a)),
+          'restenemies': lambda a: (resting(1, 5)(a), hunted(a)),
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
