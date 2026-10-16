@@ -84,7 +84,7 @@ impl Machine {
         self.mem.r8(seg, off.wrapping_add(f))
     }
 
-    fn inv_flags(&self, seg: u16, it: u16) -> u8 {
+    pub(crate) fn inv_flags(&self, seg: u16, it: u16) -> u8 {
         self.inv_b(seg, it, item::FLAGS)
     }
 

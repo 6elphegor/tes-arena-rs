@@ -8,10 +8,10 @@
 //! seven lines from FIRST_LINE (1297) at x 0Eh, from row 32h, 0Bh apart
 //! (1194:1DC8), coloured as the original colours them: 58h an item the
 //! class can use (1194:7772), 55h one worn, A0h one it can't, 68h/65h an
-//! identified magic item (flags 1 and 2), worn or not. A left click on a
-//! line puts the item on or takes it off (1194:1AFB, `equip_click`); a
-//! right click selects it (1296), which D drops (1194:18F6,
-//! `drop_item`); U lists the items with an effect and uses the one picked
+//! identified magic item (flags 1 and 2), worn or not. A click on a line
+//! marks it (1296, 1194:1C5E), which D drops (1194:18F6, `drop_item`); a
+//! left click on the line marked puts the item on or takes it off
+//! (1194:1AFB, `equip_click`); U lists the items with an effect and uses the one picked
 //! (24FA:07CD, `use_item`). The paper doll on the right (1194:23E5,
 //! `doll`) is drawn first, EQUIP.IMG (the list's panel and the buttons)
 //! over it.
@@ -230,6 +230,9 @@ pub struct Inventory {
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,
+    /// An item's description up over the list's foot (1194:1988): its
+    /// lines and their colours, until a click.
+    pub info: Option<Vec<(String, u8)>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -370,22 +373,104 @@ fn printf_s(fmt: &[u8], s: &[u8]) -> Vec<u8> {
     out
 }
 
-/// A left click on inventory line `row` (on screen): the item there put
-/// on or taken off.
+/// 1194:2365: the Spellbook button (the Equipment button on the spells'
+/// page): for a class with spells (bit 20h) the page turns (OWN_ITEMS
+/// toggled), its first line marked and shown first; for another, its
+/// text (3276:5AD7) said.
+pub fn spells_button(m: &mut Machine, said: &mut Said) {
+    if m.mem.r8(DS, 0x01A9) & 0x20 == 0 {
+        let t = m.mem.cstr(DATA, 0x5AD7).to_vec();
+        said.text(&t);
+        return;
+    }
+    let own = m.mem.r8(DS, OWN_ITEMS) ^ 1;
+    m.mem.w8(DS, OWN_ITEMS, own);
+    m.mem.w8(DS, SELECTED, 0);
+    m.mem.w8(DS, FIRST_LINE, 0);
+}
+
+/// 1194:1C5E: the line a click at row `y` marks (1296), by the row
+/// alone: the first line's ends at 3Dh, each next 0Bh lower, over the
+/// lines shown (the items or the book's spells, at most seven); below
+/// them none (FFh).
+fn mark_at(m: &mut Machine, y: i32) -> u8 {
+    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as usize } else { item_lines(m).len() };
+    let shown = n.min(LIST_LINES);
+    let mark = (0..shown).find(|&i| y <= 0x3D + 0x0B * i as i32).map_or(0xFF, |i| m.mem.r8(DS, FIRST_LINE).wrapping_add(i as u8));
+    m.mem.w8(DS, SELECTED, mark);
+    mark
+}
+
+/// Inventory line `row` (on screen) put on or taken off, as a left click
+/// on it marked does (for scripts).
 pub fn equip_line(m: &mut Machine, row: usize, said: &mut Said) {
     let slot = m.mem.r8(DS, FIRST_LINE) as u16 + row as u16;
     if let Some(l) = item_lines(m).into_iter().find(|l| l.slot == slot) {
+        m.mem.w8(DS, SELECTED, l.slot as u8);
         if m.equip_click(said, l.slot).is_none() {
             eprintln!("equipping gave up: {}", arena::giveup::describe());
         }
     }
 }
 
-/// A right click on line `row`: its item selected (1296), or nothing.
+/// Line `row` marked (1296), or none (for scripts).
 pub fn select_line(m: &mut Machine, row: usize) {
     let slot = m.mem.r8(DS, FIRST_LINE) as u16 + row as u16;
     let occupied = item_lines(m).iter().any(|l| l.slot == slot);
     m.mem.w8(DS, SELECTED, if occupied { slot as u8 } else { 0xFF });
+}
+
+/// 1194:1988: the marked item described (`Machine::item_info`, with
+/// 12B0 3 and 12B2 0 first), its first [12B0] lines (the CRs made NULs,
+/// 1194:223A): the first in 55h when 12B2 is left 0, else FEh as the
+/// rest. None with no item there, or where the description gives up.
+fn item_info(m: &mut Machine) -> Option<Vec<(String, u8)>> {
+    use arena::use_item::info;
+    m.mem.w16(DS, info::ARGS, 0);
+    m.mem.w16(DS, info::LINES, 3);
+    let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
+    if m.item_info(it).is_none() {
+        eprintln!("the description gave up: {}", arena::giveup::describe());
+        return None;
+    }
+    let first = if m.mem.r16(DS, info::ARGS) == 0 { 0x55 } else { 0xFE };
+    let mut si = info::TEXT;
+    let mut out = Vec::new();
+    for i in 0..m.mem.r16(DS, info::LINES) {
+        let start = si;
+        for _ in 0..500 {
+            let c = m.mem.r8(DS, si);
+            si = si.wrapping_add(1);
+            if c == 0x0D {
+                m.mem.w8(DS, si.wrapping_sub(1), 0);
+                break;
+            }
+        }
+        let text = String::from_utf8_lossy(m.mem.cstr(DS, start)).into_owned();
+        out.push((text, if i == 0 { first } else { 0xFE }));
+    }
+    Some(out)
+}
+
+/// 1194:1AD6: a click on the list (`right`: the right button). The line
+/// under it is marked (`mark_at`); a left click on the line already
+/// marked puts its item on or takes it off (1AFB).
+pub fn line_click(m: &mut Machine, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
+    let old = m.mem.r8(DS, SELECTED);
+    let mark = mark_at(m, y);
+    // 1194:1CE5: a right click on the player's own items describes the
+    // line marked.
+    if right && mark != 0xFF && m.mem.r8(DS, OWN_ITEMS) != 0 {
+        inv.info = item_info(m);
+    }
+    // On the spells' page the line marked again is cast (1194:1B3C), which
+    // the view doesn't do.
+    if mark == 0xFF || mark != old || right || m.mem.r8(DS, OWN_ITEMS) == 0 {
+        return;
+    }
+    if m.equip_click(said, mark as u16).is_none() {
+        eprintln!("equipping gave up: {}", arena::giveup::describe());
+    }
 }
 
 /// D and the drop button (1194:17D8, `drop_button`): run on a copy
@@ -491,13 +576,47 @@ pub fn scroll(m: &mut Machine, d: i32) {
     m.mem.w8(DS, FIRST_LINE, first as u8);
 }
 
-/// The inventory line under (x, y) on the 320 x 200 screen.
+/// The inventory line under (x, y) on the 320 x 200 screen, within the
+/// list's click record (the first of 1194:2325's five at 3276:57D8: 0Eh,
+/// 32h, 8Eh x 4Dh, to 1194:1AC6),
+/// as the lines are drawn (the click marks by 1C5E's rows, `mark_at`).
 pub fn line_at(x: i32, y: i32) -> Option<usize> {
-    if !(LIST_X - 4..171).contains(&x) || y < LIST_Y - 2 {
+    if !(0x0E..0x0E + 0x8E).contains(&x) || !(0x32..0x32 + 0x4D).contains(&y) {
         return None;
     }
     let row = ((y - LIST_Y + 2) / LINE_H) as usize;
-    (row < LIST_LINES).then_some(row)
+    Some(row.min(LIST_LINES - 1))
+}
+
+/// The list's arrows (their click records after the list's: 8 x 8 at
+/// 0Ch, 80h, key '+', 1194:1A4A; at 95h, 80h, key '-', 1A94): the
+/// lines moved on (+1) or back (-1).
+pub fn arrow_at(x: i32, y: i32) -> Option<i32> {
+    if !(0x80..0x88).contains(&y) {
+        return None;
+    }
+    match x {
+        0x0C..0x14 => Some(1),
+        0x95..0x9D => Some(-1),
+        _ => None,
+    }
+}
+
+/// 1194:1A4A / 1A94: the first line shown one on, while seven or more
+/// lines (the items, or the book's spells) leave lines below; or one
+/// back, unless at the first.
+pub fn arrow(m: &mut Machine, d: i32) {
+    let first = m.mem.r8(DS, FIRST_LINE);
+    if d < 0 {
+        if first != 0 {
+            m.mem.w8(DS, FIRST_LINE, first - 1);
+        }
+        return;
+    }
+    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as u16 } else { item_lines(m).len() as u16 };
+    if n >= 7 && first as u16 != n - 7 {
+        m.mem.w8(DS, FIRST_LINE, first.wrapping_add(1));
+    }
 }
 
 /// The equipment screen's buttons along its bottom.
@@ -554,19 +673,39 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             let teeny = pics.as_ref().and_then(|p| p.teeny.as_ref()).unwrap_or(font);
             let first = m.mem.r8(DS, FIRST_LINE) as u16;
             let selected = m.mem.r8(DS, SELECTED);
-            for l in item_lines(m) {
-                if l.slot < first || l.slot >= first + LIST_LINES as u16 {
-                    continue;
+            let frame = |screen: &mut Screen, y: i32| {
+                let (fx, fy, fw, fh) = (LIST_X - 2, y - 2, 146, 12);
+                screen.fill(fx, fy, fw, 1, 0xA0, 0xFF);
+                screen.fill(fx, fy + fh - 1, fw, 1, 0xA0, 0xFF);
+                screen.fill(fx, fy, 1, fh, 0xA0, 0xFF);
+                screen.fill(fx + fw - 1, fy, 1, fh, 0xA0, 0xFF);
+            };
+            if m.mem.r8(DS, OWN_ITEMS) == 0 {
+                // 1194:2229: the spells' page, SPELLBK.IMG and EQUIPB.IMG
+                // over EQUIP.IMG; 1D5C: the book's spells in its order
+                // from FIRST_LINE, seven at most, in 53h, the marked one
+                // framed.
+                for img in pics.iter().flat_map(|p| [p.spellbk.as_ref(), p.equipb.as_ref()]).flatten() {
+                    screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
                 }
-                let y = LIST_Y + (l.slot - first) as i32 * LINE_H;
-                if l.slot as u8 == selected {
-                    let (fx, fy, fw, fh) = (LIST_X - 2, y - 2, 146, 12);
-                    screen.fill(fx, fy, fw, 1, 0xA0, 0xFF);
-                    screen.fill(fx, fy + fh - 1, fw, 1, 0xA0, 0xFF);
-                    screen.fill(fx, fy, 1, fh, 0xA0, 0xFF);
-                    screen.fill(fx + fw - 1, fy, 1, fh, 0xA0, 0xFF);
+                for (i, name) in book_names(m).iter().enumerate().skip(first as usize).take(LIST_LINES) {
+                    let y = LIST_Y + (i as i32 - first as i32) * LINE_H;
+                    if i == selected as usize {
+                        frame(screen, y);
+                    }
+                    screen.text_plain(teeny, LIST_X, y, &String::from_utf8_lossy(name), 0x53);
                 }
-                screen.text_plain(teeny, LIST_X, y, &l.name, l.colour);
+            } else {
+                for l in item_lines(m) {
+                    if l.slot < first || l.slot >= first + LIST_LINES as u16 {
+                        continue;
+                    }
+                    let y = LIST_Y + (l.slot - first) as i32 * LINE_H;
+                    if l.slot as u8 == selected {
+                        frame(screen, y);
+                    }
+                    screen.text_plain(teeny, LIST_X, y, &l.name, l.colour);
+                }
             }
             // 1194:76B4: the armour class at each of the seven places
             // (7719, into 942E), "+%d" or "%d", on the doll at the man's
@@ -584,6 +723,14 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                         let t = if ac >= 0 { format!("+{ac}") } else { ac.to_string() };
                         screen.text_plain(f, x, y, &t, colour);
                     }
+                }
+            }
+            // 1194:223A: the description's lines in ARENAFNT ([102C])
+            // centred at x 55h, from y 90h (95h unless four), 0Bh apart.
+            if let (Some(lines), Some(f)) = (&inv.info, pics.as_ref().and_then(|p| p.arena.as_ref())) {
+                let y0 = if lines.len() == 4 { 0x90 } else { 0x95 };
+                for (i, (t, c)) in lines.iter().enumerate() {
+                    screen.text_plain(f, 0x55 - (f.width(t) as i32 >> 1), y0 + 0x0B * i as i32, t, *c);
                 }
             }
             if let Some((names, sel)) = &inv.using {

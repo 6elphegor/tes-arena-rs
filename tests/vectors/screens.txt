@@ -1,10 +1,18 @@
 screen | sheet | 214a9960191e81cc ef6ad023fa2b8c2b
 screen | equipment | 6603b8fbca859b58 ef6ad023fa2b8c2b
+screen | equipmentpick | 17c99c6fbd96a826 ef6ad023fa2b8c2b
+screen | equipmentspells | 7f7eccde5c640741 ef6ad023fa2b8c2b
+screen | equipmentdown | f7048bd0f09df083 ef6ad023fa2b8c2b
+screen | equipmentinfo | a7cf26d6550a0eb5 ef6ad023fa2b8c2b
+screen | equipmentoff | 8e8691788f7b16b3 ef6ad023fa2b8c2b
 screen | status | 2e5d327360c1d20b a97a4bafd992e4ed b68093bd54873ad5
 screen | logbook | b08c75f1db4b5e6d 491d016160c27c96
+screen | logbookmore | 2f73e56cb1922472 491d016160c27c96
 screen | spellbook | 1cfe870509453798 a97a4bafd992e4ed 39965ff8a01bf6aa
 screen | spellpick | 6c4c6ea1cbb8a63 a97a4bafd992e4ed 39965ff8a01bf6aa
 screen | spellarea | a0986d0efced3d77 a97a4bafd992e4ed 9f6c60fd01131905
+screen | spellself | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
+screen | spelllight | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
 screen | use | 5a16eb49c041f989 a97a4bafd992e4ed 229a72001062a3f8
 screen | usepick | e3d8812335f75465 a97a4bafd992e4ed 229a72001062a3f8
 screen | usemessage | 8943c45e4fe83b15 a97a4bafd992e4ed d5506857f776fe12
@@ -30,6 +38,7 @@ screen | storerepair | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
 screen | storerepairitem | b75308f798a15bb8 a97a4bafd992e4ed fa8c11efc16b9367
 screen | storerepairworn | 9ed8f15e23b94185 a97a4bafd992e4ed fa8c11efc16b9367
 screen | storesteal | b67cd9557337e427 a97a4bafd992e4ed 78ffaeb5d23baf67
+screen | storestolen | 568ee6facef5ecde a97a4bafd992e4ed 88ea0e1980b0f80b
 screen | storebuyroom | 5b279e70dfc48e83 a97a4bafd992e4ed 72e3ddcc63c23f67
 screen | storeweapons | 7ba0e376aee60d6d a97a4bafd992e4ed cfe06bc4fb04a9c1
 screen | storearmor | f613ac59d96e4e18 a97a4bafd992e4ed cfe06bc4fb04a9c1
@@ -41,6 +50,9 @@ screen | tavernroomtaken | 881fe166559e6f12 a97a4bafd992e4ed 646a7e6e89122ae3
 screen | tavernrest | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
 screen | tavernresthours | a49d4fcfe50df249 a97a4bafd992e4ed 62f31076cdb4225
 screen | tavernrestneed | 4da75097179456e1 a97a4bafd992e4ed c98ce845f072e255
+screen | restleft | bc021f0916da2825 a97a4bafd992e4ed 159eb09b2a81b32b
+screen | restpassed | 89f410fe5ddbe3a5 a97a4bafd992e4ed 862a30dbb9d0529
+screen | restrested | c558d06aeb17d a97a4bafd992e4ed cd8070325fb6f535
 screen | storesellequipped | d953b2a95cc5569e a97a4bafd992e4ed b6b838e09c8cd067
 screen | tavernrumorgeneral | 6f86581d2ad78ef7 a97a4bafd992e4ed 89797cd50490b7f9
 screen | tavernrumorheard | dd9ae1cf7069b61d a97a4bafd992e4ed d864b21378b5a6e3

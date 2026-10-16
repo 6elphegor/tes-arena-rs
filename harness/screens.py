@@ -254,9 +254,10 @@ class ScreenArena(DosArena):
                 # A click (`clicks`): down at its place at one read, up
                 # at the next.
                 if self.clicks:
-                    x, y = self.clicks[0]
+                    # (x, y) the left button; (x, y, 2) the right.
+                    x, y, *button = self.clicks[0]
                     self.mouse = (x, y)
-                    self.buttons ^= 1
+                    self.buttons ^= button[0] if button else 1
                     if not self.buttons:
                         self.clicks.pop(0)
                 self._wreg('bx', self.buttons)
@@ -468,6 +469,8 @@ class ScreenArena(DosArena):
                         print('act', act, 'at', caller, file=sys.stderr)
                     if act[0] == 'click':
                         self.clicks.append(act[1:])
+                    elif act[0] == 'rclick':
+                        self.clicks.append((*act[1:], 2))
                     elif act[0] == 'keys':
                         # Keys pressed and let go: the key interrupt run for
                         # each (`press`) from the wait, then on.
