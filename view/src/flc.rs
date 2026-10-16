@@ -4,8 +4,10 @@
 //! to the second.
 //!
 //! The chunks the game's files use: 4 (256-colour palette), 15 (the first
-//! frame, run-length), 7 (later frames, word deltas), 18 (a thumbnail,
-//! skipped). 11, 12, 13 and 16 (the older FLI's) are read too.
+//! frame, run-length), 7 (later frames, word deltas, with 0000:63B4's
+//! quirks), 18 (a thumbnail, skipped). 11, 12, 13 and 16 (the older FLI's)
+//! are read too. A .CEL (the quiz's figures) is the same with a smaller
+//! frame, placed by its CEL_DATA chunk.
 //!
 //! Where the original plays them:
 //! - INTRO.FLC at the main menu's start (0000:125C, through 2294:0895),
@@ -41,6 +43,10 @@ pub struct Flc {
     pub looped: bool,
     pub px: Vec<u8>,
     pub palette: [[u8; 4]; 256],
+    /// The frame's size: the file's (a .CEL's is smaller than the
+    /// screen; the game's .FLCs are all 320 x 200).
+    pub w: usize,
+    pub h: usize,
 }
 
 fn le16(d: &[u8], at: usize) -> u16 {
@@ -69,7 +75,11 @@ impl Flc {
             // FLI: the speed in 1/70 s, frames from 128.
             ((le16(&data, 16) as u32 * 1000 / 70).max(1), 128, 0)
         };
-        let mut f = Flc { data, frames, speed, first, second, at: first, shown: 0, looped: false, px: vec![0; W * H], palette: [[0, 0, 0, 0xFF]; 256] };
+        let (w, h) = match (le16(&data, 8) as usize, le16(&data, 10) as usize) {
+            (w @ 1..=W, h @ 1..=H) if magic == 0xAF12 => (w, h),
+            _ => (W, H),
+        };
+        let mut f = Flc { data, frames, speed, first, second, at: first, shown: 0, looped: false, px: vec![0; w * h], palette: [[0, 0, 0, 0xFF]; 256], w, h };
         f.step();
         if f.second == 0 {
             f.second = f.at;
@@ -148,25 +158,26 @@ impl Flc {
             // BYTE_RUN: each line its count byte, then runs.
             15 => {
                 let mut p = 0;
-                for y in 0..H {
+                let (w, h) = (self.w, self.h);
+                for y in 0..h {
                     p += 1;
                     let mut x = 0;
-                    while x < W && p < d.len() {
+                    while x < w && p < d.len() {
                         let n = d[p] as i8;
                         p += 1;
                         if n >= 0 {
                             let v = *d.get(p).unwrap_or(&0);
                             p += 1;
                             for _ in 0..n {
-                                if x < W {
-                                    self.px[y * W + x] = v;
+                                if x < w {
+                                    self.px[y * w + x] = v;
                                 }
                                 x += 1;
                             }
                         } else {
                             for _ in 0..(-(n as i32)) {
-                                if x < W {
-                                    self.px[y * W + x] = *d.get(p).unwrap_or(&0);
+                                if x < w {
+                                    self.px[y * w + x] = *d.get(p).unwrap_or(&0);
                                 }
                                 x += 1;
                                 p += 1;
@@ -177,7 +188,7 @@ impl Flc {
             }
             // FLI_COPY: the frame as it is.
             16 => {
-                let n = d.len().min(W * H);
+                let n = d.len().min(self.w * self.h);
                 self.px[..n].copy_from_slice(&d[..n]);
             }
             // DELTA_FLI (LC): byte runs on a range of lines.
@@ -211,7 +222,11 @@ impl Flc {
                     y += 1;
                 }
             }
-            // DELTA_FLC (SS2): word runs, lines skipped by negative words.
+            // DELTA_FLC (SS2): word runs, lines skipped by negative words;
+            // as 0000:63B4 reads it: the "last byte" word (8000h) puts its
+            // byte before the line's start (DEC DI, STOSB: the line
+            // before's last), and a count of 0 packets is passed over
+            // for the next word, the line not done.
             7 => {
                 let lines = le16(d, 0);
                 let mut p = 2;
@@ -226,7 +241,12 @@ impl Flc {
                         }
                         match w >> 14 {
                             3 => y += (w as i16).unsigned_abs() as usize,
-                            2 => self.put(W - 1, y, w as u8),
+                            2 => {
+                                if let Some(i) = (y * self.w).checked_sub(1) {
+                                    self.put_at(i, w as u8);
+                                }
+                            }
+                            _ if w == 0 => {}
                             _ => {
                                 packets = w;
                                 break;
@@ -248,11 +268,9 @@ impl Flc {
                         } else {
                             let (a, b) = (*d.get(p).unwrap_or(&0), *d.get(p + 1).unwrap_or(&0));
                             p += 2;
-                            for _ in 0..(-(n as i32)) {
-                                self.put(x, y, a);
-                                self.put(x + 1, y, b);
-                                x += 2;
-                            }
+                            let n = 2 * (-(n as i32)) as usize;
+                            self.fill_77ce(y * self.w + x, n, a, b);
+                            x += n;
                         }
                     }
                     y += 1;
@@ -262,9 +280,38 @@ impl Flc {
         }
     }
 
+    /// 0000:77CE: `n` bytes from buffer offset `i` filled with the word
+    /// `a`, `b` (AX) as a byte fill widened: at an odd offset first AL,
+    /// then dwords of AX:AX (a b a b), then what is left (0..3 bytes)
+    /// AL alone. (A word repeated once at an even offset is a, a.) The
+    /// buffer is taken to start at an even address.
+    fn fill_77ce(&mut self, mut i: usize, mut n: usize, a: u8, b: u8) {
+        if n == 0 {
+            return;
+        }
+        if i & 1 != 0 {
+            self.put_at(i, a);
+            i += 1;
+            n -= 1;
+        }
+        for k in 0..(n >> 2) * 4 {
+            self.put_at(i + k, if k & 1 == 0 { a } else { b });
+        }
+        let done = (n >> 2) * 4;
+        for k in done..n {
+            self.put_at(i + k, a);
+        }
+    }
+
+    fn put_at(&mut self, i: usize, v: u8) {
+        if let Some(p) = self.px.get_mut(i) {
+            *p = v;
+        }
+    }
+
     fn put(&mut self, x: usize, y: usize, v: u8) {
-        if x < W && y < H {
-            self.px[y * W + x] = v;
+        if x < self.w && y < self.h {
+            self.px[y * self.w + x] = v;
         }
     }
 
@@ -303,7 +350,7 @@ impl Flc {
     /// A picture of one frame, 320 x 200 indices in `palette`, that never
     /// steps.
     pub fn still(px: Vec<u8>, palette: [[u8; 4]; 256]) -> Flc {
-        Flc { data: Vec::new(), frames: 1, speed: u32::MAX, first: 0, second: 0, at: 0, shown: 1, looped: false, px, palette }
+        Flc { data: Vec::new(), frames: 1, speed: u32::MAX, first: 0, second: 0, at: 0, shown: 1, looped: false, px, palette, w: W, h: H }
     }
 }
 
