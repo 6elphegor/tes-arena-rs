@@ -38,8 +38,10 @@ pub mod var {
     pub const TEXT_AT: u16 = 0x7C60;
     pub const RIDDLE_AT: u16 = 0x7C5E;
     pub const ANSWERS_AT: u16 = 0x7C62;
-    pub const RIGHT_AT: u16 = 0x7C64;
-    pub const WRONG_AT: u16 = 0x7C66;
+    /// The texts after a wrong answer and after the right one (the `C
+    /// block's: 292B:05A2 shows it on a match).
+    pub const WRONG_AT: u16 = 0x7C64;
+    pub const RIGHT_AT: u16 = 0x7C66;
     pub const RIDDLE_A: u16 = 0x7C68;
     pub const RIDDLE_B: u16 = 0x7C6A;
     /// `level_text`: the entry, the text shown, its height in pixels, its
@@ -293,7 +295,7 @@ impl Machine {
                         continue;
                     }
                     self.mem.w8(seg, di.wrapping_sub(1), 0);
-                    let to = if at(self, di.wrapping_add(1)) == b'C' { WRONG_AT } else { RIGHT_AT };
+                    let to = if at(self, di.wrapping_add(1)) == b'C' { RIGHT_AT } else { WRONG_AT };
                     while at(self, di) != 0x0D {
                         di = di.wrapping_add(1);
                         steps += 1;

@@ -60,7 +60,9 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// (x A0h) from the view's bottom (C3A2) less its height (3D40), 0Ah
     /// apart, in the font at 102C and colour F0h.
     fn level_text_draw(&mut self, _m: &mut Machine) {}
-    /// 292B:05A2: the riddle's answer asked (typed under the text).
+    /// 292B:05A2: the riddle's answer asked (typed under the text: 1044
+    /// cleared, `lineedit::fields::riddle`) and looked for
+    /// (`Machine::riddle_answered`); by default not asked.
     fn riddle(&mut self, _m: &mut Machine) {}
     /// The routine at GUARDS_HOOK (0000:3F0C or 3F3B): the guards arrive
     /// (`encounter::guards_hook`, with the fight's graphics, music and

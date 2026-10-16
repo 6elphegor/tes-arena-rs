@@ -408,6 +408,19 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.rest_frame(files, self)
     }
+    /// 292B:05A2: the answer typed under the riddle's text (1044 cleared,
+    /// 0000:9EE5 at 32h, [ADB8] + 0Ah, in the frame's font [102C] and
+    /// colour F0h), then looked for among the riddle's answers.
+    fn riddle(&mut self, m: &mut arena::machine::Machine) {
+        m.mem.w8(arena::mem::DS, arena::riddle::var::TYPED, 0);
+        if let Some(t) = self.talk.as_deref_mut() {
+            let look = field::Look { font: "ARENAFNT.DAT", colour: 0xF0, put_font: true };
+            t.edit(m, arena::lineedit::fields::riddle(m), look, dialog::Prompt::Bare);
+        }
+        if m.riddle_answered().is_none() {
+            eprintln!("the riddle gave up: {}", arena::giveup::describe());
+        }
+    }
 }
 /// The game's texts (1194:A374, made by the port) in their windows: the
 /// boxes and menus of `dialog`.

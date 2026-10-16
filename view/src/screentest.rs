@@ -844,3 +844,71 @@ fn who_are_you_at_a_timer_of_456h_gives_up_as_the_original() {
     let why = a.engine.m.gave_up.expect("the port gave up");
     assert!(why.starts_with("2DA2:05DC"), "gave up at %en: {why}");
 }
+
+/// U, its fourth line (Ring of Shielding) clicked twice: marked, then
+/// used, the list gone; what it said on the message line (061A) as the
+/// next frame draws it (0000:0511).
+#[test]
+fn the_message_line_after_a_use_as_the_original_draws_it() {
+    screen(
+        "usemessage",
+        |a, d| {
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 181, MouseButton::Left);
+            d.click(a, 0xF0, 181, MouseButton::Left);
+            assert!(a.engine.m.mem.r16(DS, 0x061E) != 0, "a message to show");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// gen_screens.py's `leveled`: the player's XP (05AD) the least past the
+/// next level's threshold (2686:0333's: from the class's first, DATA:47AE,
+/// each times 30/16 up to the ninth level's, 24/16 on) and the level's
+/// check asked for (05CA bit 100h); then frames, each from SEED, until the
+/// minute tick runs 2686:02D8 (its notice in a box).
+fn leveled(a: &mut App, d: &mut Driver) {
+    use arena::mem::DATA;
+    let m = &mut a.engine.m;
+    let class = (m.mem.r8(DS, 0x01A9) & 0x1F) as u16;
+    let old = m.mem.r8(DS, 0x01AA) as u32;
+    let mut t = m.mem.r16(DATA, 0x47AE + class * 2) as u32;
+    for lv in 0..old {
+        t = t.wrapping_mul(if lv < 8 { 30 } else { 24 }) >> 4;
+    }
+    m.mem.w32(DS, 0x05AD, t);
+    let f = m.mem.r16(DS, 0x05CA) | 0x100;
+    m.mem.w16(DS, 0x05CA, f);
+    for _ in 0..600 {
+        a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+        a.engine.m.rng.seed = SEED;
+        d.frame(a);
+        if !a.boxes.is_empty() {
+            return;
+        }
+    }
+    panic!("no level gained");
+}
+
+/// A level gained (2686:02D8 from the minute tick): its notice (1194:5E33,
+/// 4F25 in a box).
+#[test]
+fn a_levels_notice_as_the_original_draws_it() {
+    screen("levelup", leveled, over);
+}
+
+/// The notice read: the attribute screen with the level's points to spend
+/// (1194:1034 on, 14C5).
+#[test]
+fn the_level_ups_attributes_as_the_original_draws_them() {
+    screen(
+        "levelupstats",
+        |a, d| {
+            leveled(a, d);
+            d.click(a, 0xA0, 0x64, MouseButton::Left);
+            assert!(a.creation.is_some(), "the attribute screen");
+        },
+        layer,
+    );
+}

@@ -56,6 +56,10 @@ SCREENS = {
     # 9 apart from 9Bh in the bar's corner): the line picked marked (a
     # second click uses it, the list gone).
     'usepick': (0x034D, [('click', 0xF0, 181)]),
+    # Its marked line clicked again: the ring used (2542:034D's way on,
+    # the list gone) and what it said put on the message line (061A),
+    # which the next frame draws (`AFTER`).
+    'usemessage': (0x034D, [('click', 0xF0, 181), ('click', 0xF0, 181)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
     # Its bottom row's buttons (the table at 5C2C: y 118..146), each
@@ -150,6 +154,12 @@ SCREENS = {
     # rest listed again.
     'loot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), []),
     'loottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), [('click', 0x60, 0x27)]),
+    # A level gained (2686:02D8, as the minute tick calls it with 05CA
+    # bit 100h set, `leveled`): its notice (1194:1034's first box, 4F25),
+    # then, the box clicked away, the attribute screen with the level's
+    # points to spend (1194:14C5).
+    'levelup': ((0x2686, 0x02D8, {}), []),
+    'levelupstats': ((0x2686, 0x02D8, {}), [('click', 0xA0, 0x64)]),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
@@ -278,13 +288,44 @@ def healed(a):
     a.w16(0x0201, 0x7FFF)
 
 
+def leveled(a):
+    """The player's XP (05AD) the least past their next level's
+    threshold (2686:0333's: from the class's first, DATA:47AE, each
+    times 30/16 to the ninth level, 24/16 on), the level's check asked
+    for (05CA bit 100h) and the seed fixed (`seeded`: the hit die's and
+    the points' rolls)."""
+    data = 0x3276
+    from emu import LOAD_SEG
+    cls = a.mu.mem_read(a.lin(a.ds, 0x01A9), 1)[0] & 0x1F
+    base = a.r16(0x47AE + cls * 2, seg=LOAD_SEG + data)
+    old = a.mu.mem_read(a.lin(a.ds, 0x01AA), 1)[0]
+
+    # The thresholds as 2686:039E grows them: each the one before times
+    # 30/16 up to the ninth level's (where its count stops), then 24/16.
+    thresholds, t = [], base
+    for lv in range(old + 1):
+        thresholds.append(t)
+        t = (t * (30 if lv < 8 else 24) & 0xFFFF_FFFF) >> 4
+    lo = thresholds[old]
+    a.w32(0x05AD, lo)
+    a.w16(0x05CA, a.r16(0x05CA) | 0x100)
+    seeded(a)
+
+
 # What a screen's state needs first that a frame would have done.
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
           'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
+          'levelup': leveled, 'levelupstats': leveled,
           'loot': loot_seeded, 'loottake': loot_seeded}
+
+
+# What a screen's routine is followed by that the next frame would do:
+# the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
+# y 14h, in colour 70h, then one pixel right in 9Fh).
+AFTER = {'usemessage': lambda a: a.call_near(0, 0x0511)}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
@@ -305,6 +346,8 @@ def draw(a, base, name, handler, script, fill, waits=None):
         a.run_screen(seg, off, regs=regs)
     else:
         a.run_screen(MENU, handler, near=True)
+    if name in AFTER:
+        AFTER[name](a)
     return a.page(), bytes(a.dac)
 
 
