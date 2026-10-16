@@ -181,6 +181,21 @@ impl Talk {
         self.since_answer.push(lines);
     }
 
+    /// 1194:4D31's message: the strip under the shop's menu saved (5F8C),
+    /// the text at DS:`si` in TEENYFNT.DAT ([102E], 0000:9AE6) and colour
+    /// C0h at (23h, 91h) (0000:9E06), read with a click, then the strip
+    /// put back (5FC0).
+    pub fn strip_message(&mut self, m: &Machine, si: u16) {
+        if self.need.is_some() {
+            return;
+        }
+        let text = m.mem.cstr(DS, si).to_vec();
+        println!("{}", String::from_utf8_lossy(&text));
+        let lines = hud::placed(0x23, 0x91, &text, 0xC0, hud::GameFont::Teeny);
+        self.boxes.push(lines.clone());
+        self.since_answer.push(lines);
+    }
+
     /// Plain text in a box (the way told, a dream).
     pub fn note(&mut self, s: &str) {
         if self.need.is_some() {

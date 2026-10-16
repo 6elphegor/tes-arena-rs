@@ -180,7 +180,13 @@ impl ShopFront<'_, '_> {
 
 impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn message(&mut self, m: &mut Machine, si: u16) {
-        self.front.message_box(m, si);
+        // 4D31 leaves its font ([102E]: B036) and colour selected.
+        let font = m.mem.r16(DS, 0x102E);
+        m.mem.w16(DS, 0xB036, font);
+        m.mem.w8(DS, 0x9288, 0xC0);
+        if let Some(t) = self.talk() {
+            t.strip_message(m, si);
+        }
     }
     fn banner(&mut self, m: &mut Machine, si: u16) {
         self.show_banner(m, si);

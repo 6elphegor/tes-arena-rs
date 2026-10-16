@@ -111,6 +111,29 @@ impl GameFont {
     }
 }
 
+/// A message drawn in place rather than in a box (1194:4D31's: 0000:9E06
+/// at (x, y), one line, no shadow, the bytes below 20h skipped): a box's
+/// lines whose first is a marker span (its colour code 0, which no text
+/// can hold) with the place, the second the text. Read like a box.
+pub fn placed(x: i32, y: i32, text: &[u8], colour: u8, font: GameFont) -> Vec<Vec<Span>> {
+    let text: String = text.iter().filter(|&&c| c >= 0x20).map(|&c| c as char).collect();
+    vec![
+        vec![Span { colour, text: format!("{x},{y}"), font, code: Some(0) }],
+        vec![Span { colour, text, font, code: None }],
+    ]
+}
+
+/// The place and the text of a box made by `placed`.
+pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, &Span)> {
+    let [m] = lines.first()?.as_slice() else { return None };
+    if m.code != Some(0) {
+        return None;
+    }
+    let (x, y) = m.text.split_once(',')?;
+    let text = lines.get(1)?.first()?;
+    Some((x.parse().ok()?, y.parse().ok()?, text))
+}
+
 /// `lines` with every span in `font`.
 pub fn in_font(mut lines: Vec<Vec<Span>>, font: GameFont) -> Vec<Vec<Span>> {
     for s in lines.iter_mut().flatten() {
@@ -736,6 +759,9 @@ fn clip(hud: &Hud) -> (i32, i32, i32, i32) {
 /// or at the clip's top when a menu is up with it (the view shows both).
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     let lines = hud.boxed.as_ref()?;
+    if placed_of(lines).is_some() {
+        return None;
+    }
     let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
     let c = clip(hud);
     let x = (c.0 + c.2) / 2 - w / 2;
@@ -878,6 +904,9 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         let lines = vec![vec![Span { colour: 0x0F, text: s.clone(), font: Default::default(), code: None }]];
         let (w, h, _, _) = box_size(st, &st.box_font, &lines);
         draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
+    }
+    if let Some((x, y, t)) = hud.boxed.as_deref().and_then(placed_of) {
+        screen.text_plain(st.font(t.font), x, y, &t.text, t.colour);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
         draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
@@ -1068,7 +1097,9 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
         screen.text(font, (W as i32 - w) / 2, H as i32 - lh - 6, s, 0x0F);
     }
     let mut boxed_bottom = None;
-    if let Some(lines) = &hud.boxed {
+    if let Some((x, y, t)) = hud.boxed.as_deref().and_then(placed_of) {
+        screen.text_plain(font, x, y, &t.text, t.colour);
+    } else if let Some(lines) = &hud.boxed {
         let w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0) + 16;
         let w = w.clamp(60, W as i32 - 8);
         let h = lines.len() as i32 * lh + 10;

@@ -61,6 +61,17 @@ SCREENS = {
     'tavern': ((0x1194, 0xB93C, {}), []),
     'temple': ((0x1194, 0xC258, {}), []),
     'store': ((0x1194, 0xF48E, {}), []),
+    # Their menus' entries clicked (each a box 18h high, the menu's
+    # first entry at 3Eh for five, 4Ah for three): what each asks next.
+    'taverndrinks': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x43)]),
+    'tavernroom': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x5B)]),
+    'tavernrumor': ((0x1194, 0xB93C, {}), [('click', 0xA0, 0x8B)]),
+    'templebless': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)]),
+    'templecure': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x67)]),
+    'templeheal': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x7F)]),
+    'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
+    'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
+    'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
     # In the street outside the guild (WHERE): R, camping (01E6), refused
     # in a town (over the street's colours); Shift+M, the world map (03BF:
     # 26F7's travel map).
@@ -89,6 +100,9 @@ WAIT = (0, 0x8FC4)
 # `enter`).
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street'}
+WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
+              ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
+               'storebuy', 'storesell', 'storerepair')})
 
 
 def place(a, base, where, cache={}):

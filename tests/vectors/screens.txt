@@ -17,3 +17,12 @@ screen | camp | 114983588e87d6c9 a97a4bafd992e4ed 3849c331458828b5
 screen | automap | 54404551bdb10785 58ab90d7887e02ed
 screen | travelmap | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
+screen | taverndrinks | 1ab89cf77c5bb0d7 a97a4bafd992e4ed 9fcf1e9064035a85
+screen | tavernroom | a02a3bfecd4bf3ce a97a4bafd992e4ed 9fcf1e9064035a85
+screen | tavernrumor | 4c6813e7eb208cb1 a97a4bafd992e4ed 8f49be5aaeec74a7
+screen | templebless | 822b15a3341441de a97a4bafd992e4ed caa5da2321b03e7
+screen | templecure | 9a014cd89f9311f6 a97a4bafd992e4ed caa5da2321b03e7
+screen | templeheal | d4d33e8d6d25b4a7 a97a4bafd992e4ed caa5da2321b03e7
+screen | storebuy | 464a9fea5d7c16be a97a4bafd992e4ed 70e240293936a97
+screen | storesell | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
+screen | storerepair | bd52a6e552eefd17 a97a4bafd992e4ed b0d377c320d1f0b7
