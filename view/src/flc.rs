@@ -333,7 +333,7 @@ pub struct Movie {
     pub flc: Flc,
     /// The text's lines, and the first shown (1194:D459 through
     /// 2294:076C: three lines at once, centred at x A0h from row AAh, ten
-    /// apart, the picture above row A7h; a key the next three, and the
+    /// apart, the picture to row A7h (the clip A91A); a key the next three, and the
     /// last key ends it).
     pub lines: Vec<Vec<Span>>,
     pub top: usize,
@@ -412,7 +412,7 @@ impl Movie {
             self.flc.draw(screen, H);
             return;
         }
-        self.flc.draw(screen, 0xA7);
+        self.flc.draw(screen, 0xA8);
         for (i, l) in self.lines.iter().skip(self.top).take(VISION_LINES).enumerate() {
             let w = font.width(&hud::plain(l)) as i32;
             let mut x = 0xA0 - w / 2;

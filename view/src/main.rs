@@ -1684,7 +1684,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
             // vision and the main menu come up.
             st.over = true;
             print_message(engine, &mut st.message);
-            let c = create::Creation::ending(engine, st.assets.archive.clone(), dir, st.assets.palette);
+            let c = create::Creation::ending(engine, st.assets.archive.clone(), dir, st.assets.palette, None);
             st.ui = Some((c, world::load(dir, "START.MIF")));
             return Some(());
         }
@@ -2604,7 +2604,7 @@ impl App {
     /// or a load begins from the program's own state).
     fn game_over(&mut self) {
         let archive = self.assets.archive.clone();
-        let c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette);
+        let c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette, None);
         self.engine = world::load(&self.dir, "START.MIF");
         self.creation = Some(c);
         self.movie_at = Instant::now();

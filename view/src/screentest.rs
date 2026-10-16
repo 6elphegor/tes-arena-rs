@@ -912,3 +912,51 @@ fn the_level_ups_attributes_as_the_original_draws_them() {
         layer,
     );
 }
+
+/// The game over (5B1 bit 100h) from the loaded save: the farewell's
+/// vision (`Creation::ending`) frame by frame against the original's
+/// (harness/gen_vision.py, tests/vectors/vision.txt: from a cleared
+/// screen, the fade to black in 8 steps, the screen cleared, the movie's
+/// frames with its text), for each staff stage the generator ran.
+#[test]
+fn the_vision_at_the_end_as_the_original_shows_it() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/vision.txt")).expect("tests/vectors/vision.txt");
+    let mut runs: Vec<(u8, Vec<(u64, u64)>)> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["vision", "script", f77, _] => runs.push((f77.parse().unwrap(), Vec::new())),
+            ["vision", _, _, s, p] => runs.last_mut().unwrap().1.push((u64::from_str_radix(s, 16).unwrap(), u64::from_str_radix(p, 16).unwrap())),
+            _ => {}
+        }
+    }
+    assert!(!runs.is_empty());
+    for (f77, want) in runs {
+        let (mut a, _d) = loaded(&dir, &save);
+        a.engine.m.mem.w8(DS, 0x0F77, f77);
+        let mut c = create::Creation::ending(&mut a.engine, a.assets.archive.clone(), &a.dir, a.assets.palette, None);
+        let mut seen: Vec<(u64, u64)> = Vec::new();
+        let mut ms = 0;
+        while seen.len() < want.len() && ms < 60_000 {
+            let mut s = hud::Screen::new(a.assets.palette);
+            c.draw(&mut s, &a.engine.m);
+            let st = (fnv(s.indices().iter().map(|&i| i as u8)), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+            if seen.last() != Some(&st) {
+                if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                    let raw: Vec<u8> = s.indices().iter().map(|&i| i as u8).chain(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("vision{f77}-{}.view", seen.len())), raw).unwrap();
+                }
+                seen.push(st);
+            }
+            c.advance(1);
+            ms += 1;
+        }
+        let first = seen.iter().zip(&want).position(|(v, o)| v != o);
+        assert!(first.is_none() && seen.len() == want.len(), "F77 {f77}: the vision's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
+    }
+}

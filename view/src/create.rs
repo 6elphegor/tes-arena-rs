@@ -493,8 +493,11 @@ impl Creation {
 
     /// A game over (5B1 bit 100h): the farewell's vision (0000:0CE9..0D3E:
     /// text 57Bh on JAGAR.FLC in colour F5h while F77 is set, else 57Ah on
-    /// VISION.FLC in 2Fh; none when F77 is 9), then the main menu.
-    pub fn ending(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
+    /// VISION.FLC in 2Fh; none when F77 is 9), then the main menu. The
+    /// vision (1194:D459) first fades the screen as the game left it
+    /// (`shown`, in the game's colours; none: a cleared one) to black in
+    /// 8 steps (55B6) and clears it (55D9), then plays the movie.
+    pub fn ending(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256], shown: Option<&[u8]>) -> Creation {
         // The text made from the game as it ended (the player's name in
         // it), before creation's set-up clears the state.
         let f77 = engine.m.mem.r8(DS, 0x0F77);
@@ -507,6 +510,12 @@ impl Creation {
             c.movie = Movie::new(&c.archive, flc, lines);
             if c.movie.is_some() {
                 c.stage = Stage::Ending;
+                let black = [[0, 0, 0, 0xFF]; 256];
+                let mut film = Film::new(shown.map_or_else(|| vec![0; W * H], <[u8]>::to_vec), game);
+                film.fade(&black, 8);
+                film.whole(&[0; W * H]);
+                film.wait();
+                c.film = film.frames.into();
             }
         }
         c
@@ -584,7 +593,8 @@ impl Creation {
         if self.film.is_empty() {
             self.film_ms = 0;
         }
-        if let Some(mv) = &mut self.movie {
+        // The movie after the change (the vision's fade, 1194:D4E1).
+        if let (Some(mv), true) = (&mut self.movie, self.film.is_empty()) {
             mv.advance(ms);
         }
         self.movie_over();
