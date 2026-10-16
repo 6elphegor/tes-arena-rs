@@ -6,11 +6,13 @@ player goes, frame by frame, under keys held.
 Usage: gen_worldframes.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [NAME...]
 
 The game is loaded from the title and taken into the dungeon made from
-gen_dungeonscreens.py's seed as that does (`dungeon`). Its world loop is
+gen_dungeonscreens.py's seed as that does (`dungeon`), or into the main
+quest's Crypt of Hearts (`crypt`). Its world loop is
 then run on frame by frame (harness/screens.py `world_frames`: the timer
 ticking at each of the loop's reads of it, nothing else advancing it),
 the keys of each case of CASES held through the key interrupt
-(`keys_held`) as a player holds them.
+(`keys_held`) as a player holds them. The arrow cursor the mouse's
+regions show isn't drawn (CURSOR_DRAW).
 
 For each case, at the top of each frame run, the player's state:
 
@@ -21,8 +23,7 @@ which the frame moves back along the heading after them). Then the page
 as the frame after the case's last leaves it, without what the 3D
 drawing put there: a pixel is the 3D view's when the last write to it in
 that frame was made in the frame's drawing stages (BA4B 3..9: the floor
-and ceiling, the sky, the walls, the flats), or by the arrow cursor's
-drawing (CURSOR_DRAW). The rest (the interface, the
+and ceiling, the sky, the walls, the flats). The rest (the interface, the
 compass, the bars, the message line) the 2D drawing left:
 
   screen | NAME | <page digest> <palette digest> <mask digest>
@@ -44,17 +45,17 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, fnv
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
-from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_IP
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 
 UP = 0x48
 # The world loop's stages (BA4B) that draw the 3D view.
 DRAWING = range(3, 10)
-# The arrow cursor's drawing (0000:5A6A's loop, which the frame body calls
-# at 4CB3 with the cursor 7A48.. the controls set): the original's mouse
-# regions, which the view's own controls (the mouse captured) don't show.
-CURSOR_DRAW = (0x5AE6, 0x5AFF)
+# Where the frame body draws the arrow cursor (0000:4C8B: 5A66 with the
+# cursor 7A48.. the controls set, unless 7A48 is FFFFh): the original's
+# mouse regions, which the view's own controls (the mouse captured) don't
+# show. Here it is taken as not shown.
+CURSOR_DRAW = 0x4C8B
 
 
 def at_square(row, col, heading):
@@ -68,21 +69,55 @@ def at_square(row, col, heading):
     return put
 
 
+def facing(heading):
+    def put(a):
+        a.w16(0xC3DA, heading)
+    return put
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
 
-# name: (set-up, [(keys held, keys let go, frames, until)...])
+def text_shown(a):
+    """A level's text up (0000:0628 set its time, 3C82)."""
+    return a.mu.mem_read(a.lin(a.ds, 0x3C82), 1)[0] != 0
+
+
+# The main quest's Crypt of Hearts: its .MIF (whose INFO names
+# crypt1.inf).
+CRYPT = b'41649375.MIF'
+
+# name: (where, set-up, [(keys held, keys let go, frames, until)...])
 CASES = {
     # The dungeon's first frames, nothing held: the interface and the
     # compass as play draws them.
-    'playdungeon': (None, [((), (), 3, None)]),
+    'playdungeon': ('dungeon', None, [((), (), 3, None)]),
     # The first level's down stairs (row 10, column 10 of its map: bytes
     # 1Ch) walked into from the square south of them, facing north (100h):
     # the up arrow held until the level changes (0000:F76F), then let go
     # for two frames on the second level.
-    'playdown': (at_square(11, 10, 0x100), [((UP,), (), 20, level_changed), ((), (UP,), 2, None)]),
+    'playdown': ('dungeon', at_square(11, 10, 0x100), [((UP,), (), 20, level_changed), ((), (UP,), 2, None)]),
+    # The Crypt of Hearts entered (`crypt`), turned north and walked on
+    # with the up arrow into the square in front of its start (row 4,
+    # column 2), whose trigger shows the INF's first text (0000:0628);
+    # let go, a frame more: the text over the view (0000:0605).
+    'playcrypt': ('crypt', facing(0x100), [((UP,), (), 20, text_shown), ((), (UP,), 1, None)]),
 }
+
+
+def crypt(a, base):
+    """The snapshot of the game just inside the Crypt of Hearts, the way
+    the outer loop enters a named level (0000:0993, `Run::Start`): the
+    guild left for the street, then the street left with the next area 2
+    (5E6), no interior (D58) and the level's name at 0A36."""
+    a.restore(base)
+    assert a.area_ended() == ('world',), 'the guild not left'
+    a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x02')
+    a.w16(0x0D58, 0)
+    a.mu.mem_write(a.lin(a.ds, 0x0A36), CRYPT + b'\0')
+    assert a.area_ended() == ('world',), 'the crypt not entered'
+    return a.snapshot()
 
 
 def track_line(a, name, frame):
@@ -100,6 +135,16 @@ def run_case(a, at, name, setup, steps, tracks):
     a.buttons = 0
     if setup:
         setup(a)
+    def no_cursor(*_):
+        a.w16(0x7A48, 0xFFFF)
+    cursor = a.mu.hook_add(UC_HOOK_CODE, no_cursor, None, a.lin(LOAD_SEG, CURSOR_DRAW), a.lin(LOAD_SEG, CURSOR_DRAW))
+    try:
+        return play(a, name, steps, tracks)
+    finally:
+        a.mu.hook_del(cursor)
+
+
+def play(a, name, steps, tracks):
     frame = [0]
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
@@ -119,12 +164,10 @@ def run_case(a, at, name, setup, steps, tracks):
     last = bytearray(64000)
     def wrote(mu, access, addr, size, value, _):
         st = a.mu.mem_read(a.lin(a.ds, 0xBA4B), 1)[0]
-        ip = mu.reg_read(UC_X86_REG_IP)
-        cursor = mu.reg_read(UC_X86_REG_CS) == LOAD_SEG and CURSOR_DRAW[0] <= ip < CURSOR_DRAW[1]
         for k in range(size):
             o = addr - base + k
             if 0 <= o < 64000:
-                last[o] = 1 if st in DRAWING or cursor else 2
+                last[o] = 1 if st in DRAWING else 2
     h = a.mu.hook_add(UC_HOOK_MEM_WRITE, wrote, None, base, base + 64000 - 1)
     try:
         why, _ = a.world_frames(1, each=each)
@@ -143,12 +186,16 @@ def main():
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     a = ScreenArena(EXE, GAME, SAVE)
     a.start()
-    at = gd.dungeon(a, a.snapshot())
+    base = a.snapshot()
+    places = {}
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     out = open(OUT, 'w', buffering=1)
-    for name, (setup, steps) in CASES.items():
+    for name, (where, setup, steps) in CASES.items():
         if only and name not in only:
             continue
+        if where not in places:
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt}[where](a, base)
+        at = places[where]
         print(name, file=sys.stderr)
         seen = []
 

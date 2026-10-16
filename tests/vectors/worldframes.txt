@@ -11,3 +11,13 @@ track | playdown | 4 1 540 3c 5a8 0
 track | playdown | 5 1 540 3c 5a8 0
 track | playdown | 6 1 540 3c 5a8 0
 screen | playdown | 3e7ebf78489330ab a97a4bafd992e4ed df87cca47c2f5ed6
+track | playcrypt | 0 0 140 3c 2c0 100
+track | playcrypt | 1 0 140 3c 2bc 100
+track | playcrypt | 2 0 140 3c 2b4 100
+track | playcrypt | 3 0 140 3c 2a8 100
+track | playcrypt | 4 0 140 3c 298 100
+track | playcrypt | 5 0 140 3c 284 100
+track | playcrypt | 6 0 140 3c 26c 100
+track | playcrypt | 7 0 140 3c 250 100
+track | playcrypt | 8 0 140 3c 250 100
+screen | playcrypt | 1f4c2a75da1d90ea a97a4bafd992e4ed 6c32ab33561d7ae0

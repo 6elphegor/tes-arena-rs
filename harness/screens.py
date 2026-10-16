@@ -311,6 +311,10 @@ class ScreenArena(DosArena):
         stubs, taken out again after)."""
         self.init_memory()
         assert self.run_screen(0x21EE, 0) is None, 'the start waited'
+        # The texts' far pointer's segment the EMS frame's, as the program's
+        # main sets it after the start (0000:108B): an INF's @TEXT is copied
+        # there (and a level's triggers read their texts from it).
+        self.w16(0xCB8A, self.r16(0x9030))
         saved = self.stub()
         # The working slot as the start leaves it with no ARENA variable in
         # the environment (1194:3A72: 40h).

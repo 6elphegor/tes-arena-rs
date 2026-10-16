@@ -38,16 +38,41 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
 }
 
-/// Into the dungeon, `setup` run, then `play` driving frames and
+/// Where a case is played: the dungeon `into_dungeon` makes, or the main
+/// quest's Crypt of Hearts (`into_crypt`).
+#[derive(Clone, Copy)]
+enum Place {
+    Dungeon,
+    Crypt,
+}
+
+/// From the guild to the street, then into the Crypt of Hearts the way
+/// the outer loop enters a named level (0000:0993): the next area 2, no
+/// interior, its .MIF named at 0A36.
+fn into_crypt(a: &mut App) {
+    area_left(a);
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, arena::trigger::var::AREA, 2);
+    m.mem.w16(DS, arena::transit::var::INTERIOR, 0);
+    for (i, &c) in b"41649375.MIF\0".iter().enumerate() {
+        m.mem.w8(DS, 0x0A36 + i as u16, c);
+    }
+    area_left(a);
+}
+
+/// Into the place, `setup` run, then `play` driving frames and
 /// collecting the track; both against the original's.
-fn world_case(name: &str, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
+fn world_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
     let Some(dir) = game_dir() else { return };
     let Some(save) = save_copy() else {
         eprintln!("skipping: no ARENA_SAVE");
         return;
     };
     let (mut a, mut d) = loaded(&dir, &save);
-    into_dungeon(&mut a);
+    match place {
+        Place::Dungeon => into_dungeon(&mut a),
+        Place::Crypt => into_crypt(&mut a),
+    }
     a.fade.clear();
     a.fade_old = None;
     setup(&mut a);
@@ -73,7 +98,7 @@ fn frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, until
 /// The dungeon's first frames, nothing held.
 #[test]
 fn play_in_a_dungeon_as_the_original_draws_it() {
-    world_case("playdungeon", |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+    world_case("playdungeon", Place::Dungeon, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
 }
 
 /// The first level's down stairs walked into with the up arrow held from
@@ -82,12 +107,31 @@ fn play_in_a_dungeon_as_the_original_draws_it() {
 fn down_a_dungeons_stairs_as_the_original_goes() {
     world_case(
         "playdown",
+        Place::Dungeon,
         |a| at_square(a, 11, 10, 0x100),
         |a, d, seen| {
             a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
             frames(a, d, seen, 20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0);
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 2, |_| false);
+        },
+    );
+}
+
+/// The Crypt of Hearts entered, turned north and walked on into the square
+/// in front of its start, whose trigger shows the INF's first text; let
+/// go, a frame more: the text over the view.
+#[test]
+fn the_crypt_of_hearts_first_text_as_the_original_draws_it() {
+    world_case(
+        "playcrypt",
+        Place::Crypt,
+        |a| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100),
+        |a, d, seen| {
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 1, |_| false);
         },
     );
 }
