@@ -127,6 +127,20 @@ fn line(s: &str) -> Vec<Span> {
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a
 /// NUL.
+/// The lines 1194:4E54 split the text at DS:`si` into (LINES of them,
+/// each ending at a NUL), as bytes.
+fn split_raw(m: &Machine, si: u16) -> Vec<Vec<u8>> {
+    let n = m.mem.r16(DS, 0x0FF5).min(32);
+    let mut at = si;
+    let mut out = Vec::new();
+    for _ in 0..n {
+        let s = m.mem.cstr(DS, at).to_vec();
+        at = at.wrapping_add(s.len() as u16 + 1);
+        out.push(s);
+    }
+    out
+}
+
 fn split_text(m: &Machine, si: u16) -> Vec<Vec<Span>> {
     let n = m.mem.r16(DS, 0x0FF5).min(32);
     let mut at = si;
@@ -230,16 +244,25 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     }
     fn dialog_at(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
         let lines = if si != 0 { split_text(m, si) } else { Vec::new() };
+        let raw = if si != 0 { split_raw(m, si) } else { Vec::new() };
         match kind {
             0 => {
                 if let Some(t) = self.talk() {
-                    t.lines_box(lines);
+                    t.dialog_lines(&raw);
                 }
                 0
             }
             1 => {
+                // The lines in the strip, the picture's buttons picked
+                // (1194:6001).
                 let entries: &[&str] = if self.picture == NEW_OLD { &["New job", "Old job"] } else { &["Yes", "No"] };
-                match self.ask(lines, entries) {
+                let raw: Vec<&[u8]> = raw.iter().map(|l| l.as_slice()).collect();
+                let menu = crate::hud::dialog_buttons(&raw, entries);
+                let pick = match self.talk() {
+                    Some(t) => t.ask_menu(menu),
+                    None => 0xFFFF,
+                };
+                match pick {
                     0 => 0,
                     1 => 1,
                     _ => 2,

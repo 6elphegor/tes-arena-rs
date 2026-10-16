@@ -137,8 +137,18 @@ def square(a):
     a.w16(0xCCA6, a.r16(0xC3D4) >> 7)
 
 
+# A seed both sides start the screen's routine from, where what it draws
+# depends on the game's random numbers (the haggle's lines, 1194:83FD).
+SEED = 0x2F6E_1A35
+
+
+def seeded(a):
+    a.w16(0x91F6, SEED & 0xFFFF)
+    a.w16(0x91F8, SEED >> 16)
+
+
 # What a screen's state needs first that a frame would have done.
-BEFORE = {'automap': square}
+BEFORE = {'automap': square, 'storesellhaggle': seeded}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

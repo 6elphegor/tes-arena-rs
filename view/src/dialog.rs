@@ -198,6 +198,24 @@ impl Talk {
         self.since_answer.push(lines);
     }
 
+    /// 1194:4E88 with 13D3 0: the dialog's lines in the strip under the
+    /// shop's menu (20h, 91h on, 9 apart, TEENYFNT, C0h), three to a page,
+    /// each page read with a click.
+    pub fn dialog_lines(&mut self, lines: &[Vec<u8>]) {
+        if self.need.is_some() {
+            return;
+        }
+        for page in lines.chunks(3) {
+            let page: Vec<&[u8]> = page.iter().map(|l| l.as_slice()).collect();
+            for l in &page {
+                println!("{}", String::from_utf8_lossy(l));
+            }
+            let b = hud::placed_lines(0x20, 0x91, 9, &page, 0xC0, hud::GameFont::Teeny);
+            self.boxes.push(b.clone());
+            self.since_answer.push(b);
+        }
+    }
+
     /// Plain text in a box (the way told, a dream).
     pub fn note(&mut self, s: &str) {
         if self.need.is_some() {

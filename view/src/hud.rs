@@ -116,22 +116,72 @@ impl GameFont {
 /// lines whose first is a marker span (its colour code 0, which no text
 /// can hold) with the place, the second the text. Read like a box.
 pub fn placed(x: i32, y: i32, text: &[u8], colour: u8, font: GameFont) -> Vec<Vec<Span>> {
-    let text: String = text.iter().filter(|&&c| c >= 0x20).map(|&c| c as char).collect();
-    vec![
-        vec![Span { colour, text: format!("{x},{y}"), font, code: Some(0) }],
-        vec![Span { colour, text, font, code: None }],
-    ]
+    placed_lines(x, y, 0, &[text], colour, font)
 }
 
-/// The place and the text of a box made by `placed`.
-pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, &Span)> {
+/// `placed` with several lines, each `step` rows under the one before
+/// (1194:4E88's dialog lines: at 20h, 91h on, 9 apart).
+pub fn placed_lines(x: i32, y: i32, step: i32, lines: &[&[u8]], colour: u8, font: GameFont) -> Vec<Vec<Span>> {
+    let mut out = vec![vec![Span { colour, text: format!("{x},{y},{step}"), font, code: Some(0) }]];
+    for l in lines {
+        let text: String = l.iter().filter(|&&c| c >= 0x20).map(|&c| c as char).collect();
+        out.push(vec![Span { colour, text, font, code: None }]);
+    }
+    out
+}
+
+/// The place, the rows between lines and the lines of a box made by
+/// `placed` or `placed_lines`.
+pub fn placed_of(lines: &[Vec<Span>]) -> Option<(i32, i32, i32, &[Vec<Span>])> {
     let [m] = lines.first()?.as_slice() else { return None };
     if m.code != Some(0) {
         return None;
     }
-    let (x, y) = m.text.split_once(',')?;
-    let text = lines.get(1)?.first()?;
-    Some((x.parse().ok()?, y.parse().ok()?, text))
+    let mut f = m.text.split(',').map(|v| v.parse::<i32>());
+    let (x, y, step) = (f.next()?.ok()?, f.next()?.ok()?, f.next()?.ok()?);
+    Some((x, y, step, &lines[1..]))
+}
+
+/// Draws a box made by `placed`: each line's text with no shadow.
+fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, i32, &[Vec<Span>])) {
+    for (i, l) in lines.iter().enumerate() {
+        if let Some(t) = l.first() {
+            screen.text_plain(st.font(t.font), x, y + step * i as i32, &t.text, t.colour);
+        }
+    }
+}
+
+/// `Menu::kind` of a question 1194:4E88 asks with a picture's buttons
+/// (13D3 1: a shop's YESNO.IMG, the haggle's NEGOTBUT.IMG, shown at 59h,
+/// 7Fh on the shop's screen): its title the dialog's lines, drawn in the
+/// strip (`placed_lines`: 20h, 91h on, 9 apart, TEENYFNT, C0h, three to a
+/// page), its entries the buttons, which the picture shows: picked by a
+/// click on them (1194:6001: x 59h..E1h, y 7Fh..8Bh; the button by x, to
+/// 88h, B5h, E2h).
+pub const DIALOG_BUTTONS: u16 = 0xFFFE;
+
+/// A `DIALOG_BUTTONS` question: `lines` (the text 4E54 split, at most
+/// three shown) and the buttons' names.
+pub fn dialog_buttons(lines: &[&[u8]], buttons: &[&str]) -> Menu {
+    let shown = &lines[..lines.len().min(3)];
+    Menu {
+        title: placed_lines(0x20, 0x91, 9, shown, 0xC0, GameFont::Teeny),
+        entries: buttons.iter().map(|b| vec![Span { colour: 0x0F, text: b.to_string(), font: Default::default(), code: None }]).collect(),
+        keys: buttons.iter().map(|b| b.as_bytes()[0]).collect(),
+        selected: 0,
+        list: false,
+        kind: DIALOG_BUTTONS,
+        font: None,
+    }
+}
+
+/// The button of a `DIALOG_BUTTONS` question at (x, y) (1194:6001).
+fn dialog_button_at(menu: &Menu, x: i32, y: i32) -> Option<usize> {
+    if !(0x59..=0xE1).contains(&x) || !(0x7F..=0x8B).contains(&y) {
+        return None;
+    }
+    let i = [0x88, 0xB5, 0xE2].iter().position(|&e| x <= e)?;
+    (i < menu.entries.len()).then_some(i)
 }
 
 /// `lines` with every span in `font`.
@@ -915,6 +965,9 @@ fn list_rows(st: &Style, menu: &Menu) -> (usize, usize) {
 /// The entry under (x, y) of the 320 x 200 screen, laid out as drawn.
 pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
     let menu = hud.menu.as_ref()?;
+    if menu.kind == DIALOG_BUTTONS {
+        return dialog_button_at(menu, x, y);
+    }
     let inside = |r: (i32, i32, i32, i32)| x >= r.0 && x < r.0 + r.2 && y >= r.1 && y < r.1 + r.3;
     let Some(st) = STYLE.get() else {
         let (ex, ey, lh, ew) = menu_layout(font, menu);
@@ -955,14 +1008,18 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
         let (w, h, _, _) = box_size(st, &st.box_font, &lines);
         draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
     }
-    if let Some((x, y, t)) = hud.boxed.as_deref().and_then(placed_of) {
-        screen.text_plain(st.font(t.font), x, y, &t.text, t.colour);
+    if let Some(p) = hud.boxed.as_deref().and_then(placed_of) {
+        draw_placed(screen, st, p);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
         draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
-        if menu.list {
+        if menu.kind == DIALOG_BUTTONS {
+            if let Some(p) = placed_of(&menu.title) {
+                draw_placed(screen, st, p);
+            }
+        } else if menu.list {
             draw_list(screen, st, menu);
         } else {
             let (title, entries) = menu_boxes(st, menu, hud);
@@ -1147,8 +1204,10 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
         screen.text(font, (W as i32 - w) / 2, H as i32 - lh - 6, s, 0x0F);
     }
     let mut boxed_bottom = None;
-    if let Some((x, y, t)) = hud.boxed.as_deref().and_then(placed_of) {
-        screen.text_plain(font, x, y, &t.text, t.colour);
+    if let Some((x, y, step, lines)) = hud.boxed.as_deref().and_then(placed_of) {
+        for (i, l) in lines.iter().enumerate() {
+            screen.text_plain(font, x, y + step * i as i32, &plain(l), 0xC0);
+        }
     } else if let Some(lines) = &hud.boxed {
         let w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0) + 16;
         let w = w.clamp(60, W as i32 - 8);
