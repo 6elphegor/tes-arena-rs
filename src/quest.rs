@@ -94,7 +94,9 @@ pub trait QuestHooks {
     fn log_entry(&mut self, m: &mut Machine, si: u16) {
         m.log_entry(si);
     }
-    /// 1194:1034 when the main quest ends (0FDD 8Eh).
+    /// 1194:1034 when the main quest ends (0FDD 8Eh), CX left by the
+    /// text's box: the mouse's column (0000:9012 halves INT 33h's CX), so
+    /// `Machine::level_up_screen(MOUSE_X)`.
     fn finale(&mut self, _m: &mut Machine) {}
     /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
     /// written to 19DE, before its message box.

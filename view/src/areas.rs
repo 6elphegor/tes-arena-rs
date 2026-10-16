@@ -265,7 +265,8 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
     match r {
         Some(arena::load::Loaded::Done) if !failed => {}
-        Some(arena::load::Loaded::Missing) => return Err(format!("Slot {slot} is empty in {}.", save.display())),
+        // 1194:59C8: the game's own words for an empty slot (5F0F).
+        Some(arena::load::Loaded::Missing) => return Err(String::from_utf8_lossy(e.m.mem.cstr(DS, arena::load::var::NO_SAVE)).into_owned()),
         _ => return Err(format!("Slot {slot} gave up while loading: {}.", arena::giveup::describe())),
     }
     let run = run_of(&e.m);
