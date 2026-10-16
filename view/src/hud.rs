@@ -514,6 +514,47 @@ pub struct Menu {
     pub kind: u16,
 }
 
+/// What drawing `text` through 0000:98xx (the boxes', the menus' lines)
+/// leaves in the game's state: each `\t` and the byte after it the
+/// colour (9288, 996C), each `0Ch` and a number n the font of the table
+/// at 91AC's n-th word (B036, 9987).
+pub fn text_codes(m: &mut arena::machine::Machine, text: &[u8]) {
+    use arena::mem::DS;
+    let mut i = 0;
+    while i + 1 < text.len() {
+        match text[i] {
+            9 => {
+                m.mem.w8(DS, 0x9288, text[i + 1]);
+                i += 2;
+            }
+            0x0C => {
+                let n = text[i + 1].wrapping_sub(1) as u16;
+                let f = m.mem.r16(DS, 0x91AC_u16.wrapping_add(n.wrapping_mul(2)));
+                m.mem.w16(DS, 0xB036, f);
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+}
+
+/// A list 1194:5734 asks (its kind `Machine::list_kind`): its title and
+/// lines kept in the font selected as it is asked (B036), which 3159:06A0
+/// draws them in.
+pub fn list_menu(m: &arena::machine::Machine, title: Vec<Vec<Span>>, entries: Vec<Vec<Span>>) -> Menu {
+    let font = GameFont::selected(m);
+    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind }
+}
+
+/// The font a list is drawn in: its lines' (`list_menu`); the bar's lists
+/// (2542:06F8) in TEENYFNT.
+fn list_font<'a>(st: &'a Style, menu: &Menu) -> &'a Font {
+    if menu.kind == BAR_LIST {
+        return &st.list_font;
+    }
+    st.font(menu.entries.iter().chain(&menu.title).flatten().next().map_or(GameFont::Teeny, |s| s.font))
+}
+
 /// Where a menu's entries are drawn: (x, y of the first, line height,
 /// width), for the mouse to pick them.
 pub fn menu_layout(font: &Font, menu: &Menu) -> (i32, i32, i32, i32) {
@@ -857,7 +898,7 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
 /// A list's first line shown and how many fit (3159:0778: the area's
 /// height over the font's, B7F4).
 fn list_rows(st: &Style, menu: &Menu) -> (usize, usize) {
-    let rows = (list_kind(st, menu).area.3 / st.list_font.h as i32).max(1) as usize;
+    let rows = (list_kind(st, menu).area.3 / list_font(st, menu).h as i32).max(1) as usize;
     let top = (menu.selected + 1).saturating_sub(rows).min(menu.entries.len().saturating_sub(rows));
     (top, rows)
 }
@@ -877,7 +918,7 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
         if !inside(area) {
             return None;
         }
-        let i = top + ((y - area.1 - 1).max(0) / st.list_font.h as i32) as usize;
+        let i = top + ((y - area.1 - 1).max(0) / list_font(st, menu).h as i32) as usize;
         return (i < menu.entries.len() && i < top + rows).then_some(i);
     }
     menu_boxes(st, menu, hud).1.iter().position(|&r| inside(r))
@@ -1035,7 +1076,7 @@ fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
         screen.blit(p.x, p.y, p.w, p.h, &p.px, H as i32);
     }
     let area = kind.area;
-    let font = &st.list_font;
+    let font = list_font(st, menu);
     let fh = font.h as i32;
     let (top, rows) = list_rows(st, menu);
     for (i, l) in menu.title.iter().enumerate() {

@@ -172,8 +172,9 @@ impl Talk {
         if self.need.is_some() {
             return;
         }
-        // In the font the caller selected (B036), as 965A draws it.
-        let lines = hud::in_font(text_at(m, si, 0x0F), hud::GameFont::selected(m));
+        // In the font the caller selected (B036) and the colour it left
+        // (9288), as 965A draws it.
+        let lines = hud::in_font(text_at(m, si, m.mem.r8(DS, 0x9288)), hud::GameFont::selected(m));
         for l in &lines {
             println!("{}", hud::plain(l));
         }
@@ -241,7 +242,7 @@ impl Talk {
             entries.push(entry);
         }
         let title = if title.is_empty() { Vec::new() } else { hud::lines(title.as_bytes(), 0x0F) };
-        let menu = Menu { title, entries, keys: Vec::new(), selected: 0, list: true, kind: m.list_kind };
+        let menu = hud::list_menu(m, title, entries);
         self.ask(menu)
     }
 

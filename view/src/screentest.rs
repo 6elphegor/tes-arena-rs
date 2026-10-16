@@ -410,14 +410,12 @@ fn shop_pick(a: &mut App, d: &mut Driver, list: u16, kind: u8, y: i32) {
 
 /// The tavern's Buy Drinks: the drinks listed over the gold left.
 #[test]
-#[ignore = "the list's font and lines not yet the original's"]
 fn the_taverns_drinks_as_the_original_draws_them() {
     screen("taverndrinks", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x43), layer);
 }
 
 /// The tavern's Get a Room: the rooms available.
 #[test]
-#[ignore = "the list's font and lines not yet the original's"]
 fn the_taverns_rooms_as_the_original_draws_them() {
     screen("tavernroom", |a, d| shop_pick(a, d, 0x1AB5, 4, 0x5B), layer);
 }
@@ -448,7 +446,6 @@ fn the_temples_healing_as_the_original_draws_it() {
 
 /// The store's Buy: refused, the save's inventory full.
 #[test]
-#[ignore = "the box's font: the store's font selects (1194:F4D5) not ported"]
 fn the_stores_buy_as_the_original_draws_it() {
     screen("storebuy", |a, d| shop_pick(a, d, 0x1008, 6, 0x43), layer);
 }
