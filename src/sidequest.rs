@@ -1687,6 +1687,25 @@ impl Machine {
         (self.quest_stage(si) != 6).then_some(si)
     }
 
+    /// 1194:D961, on entering a temple or a mages' guild: with the main
+    /// quest on (0F76), the stage's (0F77) building (8223h) not the
+    /// palace's (0) and its province (80ECh) this one (A46), its person
+    /// (`quest_person_talk`, D593). Whether it ran (the carry, which the
+    /// callers drop).
+    pub fn main_quest_check(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
+        if !self.main_quest_due() {
+            return Some(false);
+        }
+        self.quest_person_talk(files, hooks)?;
+        Some(true)
+    }
+
+    /// 1194:D961's test: whether the stage's person is to be met here.
+    pub fn main_quest_due(&self) -> bool {
+        let stage = self.sq8(0x0F77) as u16;
+        self.sq8(0x0F76) != 0 && self.sq8(0x8223 + stage) != 0 && self.sq8(0x80EC + stage) == self.sq8(0x0A46)
+    }
+
     /// 0000:4D00. Whether the quest under way (9F8A) is at stage 4 with
     /// the place [5E38] among the first 17h of the 40h at C954 (REPNE
     /// SCASB's index plus one under 18h): what holds back the frame's

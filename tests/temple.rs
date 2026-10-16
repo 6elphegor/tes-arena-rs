@@ -61,8 +61,9 @@ impl ShopHooks for Script {
         }
         di
     }
-    fn quest_check(&mut self, _m: &mut Machine) {
+    fn quest_check(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(6);
+        Some(())
     }
     fn quests(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         self.log.push(7);

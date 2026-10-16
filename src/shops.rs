@@ -83,9 +83,11 @@ pub trait ShopHooks {
         }
         di
     }
-    /// 1194:D961: the quest's person, when the quest's place is this
-    /// (1194:D593).
-    fn quest_check(&mut self, _m: &mut Machine) {}
+    /// 1194:D961: the main quest's person, when the stage's province is
+    /// this one (`Machine::main_quest_check`, 1194:D593).
+    fn quest_check(&mut self, _m: &mut Machine, _files: &mut crate::bsa::Files) -> Option<()> {
+        Some(())
+    }
     /// 1194:8F1E: the quests the talk ends or offers on entering
     /// (`Machine::quests_talk`).
     fn quests(&mut self, m: &mut Machine, files: &mut crate::bsa::Files) -> Option<()> {
@@ -648,7 +650,7 @@ impl Machine {
         self.mem.w16(DS, 0x92A2, 0);
         hooks.expand(self, 0x929E);
         hooks.banner(self, 0x929E);
-        hooks.quest_check(self);
+        hooks.quest_check(self, files)?;
         hooks.quests(self, files)?;
         let h = if self.shop_holiday() { 1 } else { 0xFF };
         self.mem.w8(DS, HOLIDAY, h);

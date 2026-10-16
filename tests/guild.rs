@@ -88,8 +88,9 @@ impl ShopHooks for Script {
         let v = take(&self.lists, &mut self.n[1], 0xFFFF);
         if v == 0xFFFF { v } else { v % cx.max(1) }
     }
-    fn quest_check(&mut self, _m: &mut Machine) {
+    fn quest_check(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(1);
+        Some(())
     }
     fn quests(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(2);
