@@ -7,5 +7,5 @@ screen | use | 5a16eb49c041f989 a97a4bafd992e4ed 229a72001062a3f8
 screen | options | 80e2d3c26ca04973 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
 screen | camp | 114983588e87d6c9 a97a4bafd992e4ed 3849c331458828b5
-screen | automap | fd4000a0a652d4b8 58ab90d7887e02ed
+screen | automap | 54404551bdb10785 58ab90d7887e02ed
 screen | travelmap | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95

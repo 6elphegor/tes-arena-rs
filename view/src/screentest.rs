@@ -245,9 +245,16 @@ fn the_world_map_refused_as_the_original_draws_it() {
     screen("travelmap", |a, d| super::press(d, a, KeyCode::KeyM, true), over);
 }
 
-/// M: the automap (2542:045A, 0000:2CFE).
+/// M: the automap (2542:045A, 0000:2CFE), its pen at the mouse where the
+/// original's is (A0h, 64h).
 #[test]
-#[ignore = "not yet the original's"]
 fn the_automap_as_the_original_draws_it() {
-    screen("automap", |a, d| d.key(a, KeyCode::KeyM, Some("m")), layer);
+    screen(
+        "automap",
+        |a, d| {
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::KeyM, Some("m"));
+        },
+        layer,
+    );
 }

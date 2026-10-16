@@ -2133,6 +2133,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if st.map {
             automap::draw(&mut screen, &mut engine.m);
             automap::draw_notes(&mut screen, &engine);
+            automap::draw_pointer(&mut screen, st.cursor.0, st.cursor.1);
         }
         draw_live(&mut screen);
         // An animation the turns played: its first frame and lines.
@@ -2743,6 +2744,8 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
+                let (x, y) = self.screen_point();
+                automap::draw_pointer(&mut self.screen, x, y);
             }
         }
         // The typed field asked, over what its caller shows (its prompt's

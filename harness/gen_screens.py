@@ -62,8 +62,22 @@ SCREENS = {
 WAIT = (0, 0x8FC4)
 
 
-def draw(a, base, handler, script, fill, waits=None):
+def square(a):
+    """The player's column and row as the renderer sets them each frame
+    (0000:C941..C958: C3D0, C3D4 shifted down 7, into CCA4, CCA6), which
+    the automap marks: the state here is the load's, before any frame."""
+    a.w16(0xCCA4, a.r16(0xC3D0) >> 7)
+    a.w16(0xCCA6, a.r16(0xC3D4) >> 7)
+
+
+# What a screen's state needs first that a frame would have done.
+BEFORE = {'automap': square}
+
+
+def draw(a, base, name, handler, script, fill, waits=None):
     a.restore(base)
+    if name in BEFORE:
+        BEFORE[name](a)
     a.mu.mem_write(a.lin(a.r16(PAGE_SEG_FIELD), 0), bytes([fill]) * 64000)
     a.mu.mem_write(0xA0000, bytes([fill]) * 64000)
     a.waits = waits or {WAIT}
@@ -89,8 +103,8 @@ def main():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
-        p0, dac = draw(a, base, handler, script, 0x00, *waits)
-        p1, _ = draw(a, base, handler, script, 0xFF, *waits)
+        p0, dac = draw(a, base, name, handler, script, 0x00, *waits)
+        p1, _ = draw(a, base, name, handler, script, 0xFF, *waits)
         mask = bytes(int(x == y) for x, y in zip(p0, p1))
         page = bytes(x if k else 0 for x, k in zip(p0, mask))
         digests = [fnv(page), fnv(dac)] + ([fnv(mask)] if 0 in mask else [])
