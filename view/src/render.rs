@@ -90,6 +90,8 @@ pub struct Renderer {
     count: u32,
     sprites: Option<(wgpu::Buffer, u64)>,
     palette: [[f32; 4]; 256],
+    /// A fade's colours over the palette (`set_fade`).
+    fade: Option<[[f32; 4]; 256]>,
     depth: Option<(wgpu::TextureView, u32, u32)>,
     window: Window,
 }
@@ -346,6 +348,7 @@ impl Renderer {
             count: l.count,
             sprites: None,
             palette: l.palette,
+            fade: None,
             depth: None,
             window: Window::default(),
             atlas: Some(l.atlas),
@@ -375,6 +378,11 @@ impl Renderer {
     /// The lights from now on.
     pub fn set_lights(&mut self, lights: Lights) {
         self.lights = lights;
+    }
+
+    /// The colours a fade shows the world in (`App::fade`), or its own.
+    pub fn set_fade(&mut self, dac: Option<&[[u8; 4]; 256]>) {
+        self.fade = dac.map(|d| d.map(|c| [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0]));
     }
 
     /// The sky from now on: palette entries 1..8 become its colours.
@@ -452,7 +460,7 @@ impl Renderer {
                 }
                 a
             },
-            palette: self.palette,
+            palette: self.fade.unwrap_or(self.palette),
         };
         queue.write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
         let mut enc = device.create_command_encoder(&Default::default());

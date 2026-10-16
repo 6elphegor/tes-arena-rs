@@ -148,8 +148,38 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
     };
     let (mut a, mut d) = loaded(&dir, &save);
     open(&mut a, &mut d);
+    check_fade(name, &mut a);
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
+}
+
+/// The colours the screen's opening showed (`App::fade`, each different
+/// from the one before) against the original's on its way to the screen
+/// (tests/vectors/screenfades.txt: their count and digest; a screen not
+/// there shows one at most); the fade then over.
+fn check_fade(name: &str, a: &mut App) {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/screenfades.txt")).expect("tests/vectors/screenfades.txt");
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[1] == name).map(|f| (f[2].parse::<usize>().unwrap(), u64::from_str_radix(f[3], 16).unwrap()));
+    let mut seen: Vec<u64> = Vec::new();
+    let mut raw: Vec<u8> = Vec::new();
+    for (dac, _) in a.fade.drain(..) {
+        let six: Vec<u8> = dac.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+        let d = fnv(six.iter().copied());
+        if seen.last() != Some(&d) {
+            seen.push(d);
+            raw.extend(six);
+        }
+    }
+    // With ARENA_SCREENS, the view's colours beside the original's
+    // (NAME.fade there).
+    if let Ok(dir) = std::env::var("ARENA_SCREENS") {
+        let _ = std::fs::write(PathBuf::from(dir).join(format!("{name}.viewfade")), &raw);
+    }
+    a.fade_old = None;
+    match want {
+        Some((n, digest)) => assert_eq!((seen.len(), fnv(seen.iter().flat_map(|d| d.to_le_bytes()))), (n, digest), "{name}: its fade differs from the original's"),
+        None => assert!(seen.len() <= 1, "{name}: a fade the original doesn't show ({} colours)", seen.len()),
+    }
 }
 
 /// F1: the character sheet (2542:00BE, 1194:0CF8), its first page.
@@ -457,6 +487,9 @@ fn the_world_map_as_the_original_draws_it() {
         "worldmap",
         |a, d| {
             area_left(a);
+            // The street drawn, as the window draws it before a key (its
+            // sky's colours in the DAC the fade starts from).
+            a.assets.drawn(&mut a.engine, 1.6);
             super::press(d, a, KeyCode::KeyM, true);
         },
         layer,
@@ -911,4 +944,52 @@ fn the_level_ups_attributes_as_the_original_draws_them() {
         },
         layer,
     );
+}
+
+/// The game over (5B1 bit 100h) from the loaded save: the farewell's
+/// vision (`Creation::ending`) frame by frame against the original's
+/// (harness/gen_vision.py, tests/vectors/vision.txt: from a cleared
+/// screen, the fade to black in 8 steps, the screen cleared, the movie's
+/// frames with its text), for each staff stage the generator ran.
+#[test]
+fn the_vision_at_the_end_as_the_original_shows_it() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/vision.txt")).expect("tests/vectors/vision.txt");
+    let mut runs: Vec<(u8, Vec<(u64, u64)>)> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["vision", "script", f77, _] => runs.push((f77.parse().unwrap(), Vec::new())),
+            ["vision", _, _, s, p] => runs.last_mut().unwrap().1.push((u64::from_str_radix(s, 16).unwrap(), u64::from_str_radix(p, 16).unwrap())),
+            _ => {}
+        }
+    }
+    assert!(!runs.is_empty());
+    for (f77, want) in runs {
+        let (mut a, _d) = loaded(&dir, &save);
+        a.engine.m.mem.w8(DS, 0x0F77, f77);
+        let mut c = create::Creation::ending(&mut a.engine, a.assets.archive.clone(), &a.dir, a.assets.palette, None);
+        let mut seen: Vec<(u64, u64)> = Vec::new();
+        let mut ms = 0;
+        while seen.len() < want.len() && ms < 60_000 {
+            let mut s = hud::Screen::new(a.assets.palette);
+            c.draw(&mut s, &a.engine.m);
+            let st = (fnv(s.indices().iter().map(|&i| i as u8)), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+            if seen.last() != Some(&st) {
+                if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                    let raw: Vec<u8> = s.indices().iter().map(|&i| i as u8).chain(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("vision{f77}-{}.view", seen.len())), raw).unwrap();
+                }
+                seen.push(st);
+            }
+            c.advance(1);
+            ms += 1;
+        }
+        let first = seen.iter().zip(&want).position(|(v, o)| v != o);
+        assert!(first.is_none() && seen.len() == want.len(), "F77 {f77}: the vision's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
+    }
 }
