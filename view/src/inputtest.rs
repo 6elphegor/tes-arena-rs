@@ -1901,3 +1901,6 @@ fn the_frames_keys_from_the_key_state() {
     a.input(In::Key { code: KeyCode::F4, down: false, text: None });
     assert_eq!(a.engine.m.mem.r16(DS, 0x05CA) & 2, (was ^ 2) & 2, "F4 flips 5CA bit 2");
 }
+
+#[path = "screentest.rs"]
+mod screentest;

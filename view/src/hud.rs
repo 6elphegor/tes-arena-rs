@@ -153,6 +153,17 @@ impl Screen {
         self.idx.fill(NONE);
     }
 
+    /// Each pixel's palette colour, row by row; 100h where nothing is
+    /// drawn.
+    pub fn indices(&self) -> &[u16] {
+        &self.idx
+    }
+
+    /// The colours drawn with.
+    pub fn palette(&self) -> &[[u8; 4]; 256] {
+        &self.palette
+    }
+
     /// The colours from now on (the character sheet's screens have their
     /// own, CHARSHT.COL).
     pub fn set_palette(&mut self, palette: [[u8; 4]; 256]) {
