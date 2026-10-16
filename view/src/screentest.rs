@@ -19,6 +19,7 @@
 //! differ, side by side.
 
 use super::*;
+use arena::mem::DS;
 
 const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/screens.txt");
 
@@ -291,6 +292,78 @@ fn the_automap_as_the_original_draws_it() {
         |a, d| {
             a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
             d.key(a, KeyCode::KeyM, Some("m"));
+        },
+        layer,
+    );
+}
+
+/// The area left (C398 bit 80h, as its way out sets it): the outer loop
+/// on to the next (`areas::next`), its assets made, as the window does.
+fn area_left(a: &mut App) {
+    let v = a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) | 0x80;
+    a.engine.m.mem.w16(DS, arena::movement::var::MAP_FLAGS, v);
+    a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the next area");
+    a.assets = Assets::new(&a.dir, &mut a.engine);
+    a.remake_renderer();
+    a.last = Some(arena::engine::Frame::Running);
+}
+
+/// In the building first in the town's list at `list` (its far pointer:
+/// 1AB5 the taverns, 1004 the temples, 1008 the stores), as
+/// gen_screens.py's `place` has the original: out of the guild into the
+/// street, the building's door clicked from its square's corner (0000:43B1,
+/// PICKED the square; an entry's square is row << 8 | column, 1194:40CF),
+/// then in.
+fn into(a: &mut App, list: u16) {
+    area_left(a);
+    let m = &mut a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, list), m.mem.r16(DS, list + 2));
+    let sq = m.mem.r16(seg, off);
+    let door = (sq & 0xFF00) | ((sq & 0xFF) << 1);
+    m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
+    m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
+    m.mem.w16(DS, arena::controls::var::PICKED, door);
+    m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
+    assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
+    area_left(a);
+}
+
+/// The tavern's services (1194:B93C, the table at 869F's kind 4) in the
+/// town's first tavern, as the keeper's click runs them: its screen,
+/// banner and menu.
+#[test]
+fn the_taverns_menu_as_the_original_draws_it() {
+    screen(
+        "tavern",
+        |a, _| {
+            into(a, 0x1AB5);
+            super::shop_turn(a, 4);
+        },
+        layer,
+    );
+}
+
+/// The temple's (C258, kind 5) in the town's first temple.
+#[test]
+fn the_temples_menu_as_the_original_draws_it() {
+    screen(
+        "temple",
+        |a, _| {
+            into(a, 0x1004);
+            super::shop_turn(a, 5);
+        },
+        layer,
+    );
+}
+
+/// The equipment store's (F48E, kind 6) in the town's first store.
+#[test]
+fn the_stores_menu_as_the_original_draws_it() {
+    screen(
+        "store",
+        |a, _| {
+            into(a, 0x1008);
+            super::shop_turn(a, 6);
         },
         layer,
     );

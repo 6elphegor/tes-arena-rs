@@ -7,7 +7,10 @@ SAVE_DIR holds the saved game in slot 1 (the user's: only read). The
 game is started and the save loaded from the title under unicorn
 (harness/screens.py: 21EE:0000, then 25FD:0309 into the world loop),
 then each screen of SCREENS opened by its own routine from that state
-and run until it first waits for input (`waits`). It is run twice, the
+(or, for those in WHERE, from inside another building the original's own
+outer loop has walked to: out of the guild into the street, in at the
+door of the town's first tavern, temple or store) and run until it first
+waits for input (`waits`). It is run twice, the
 page (DGROUP A900) and the VGA's memory filled first with 00h and then
 with FFh: the pixels the same in both are the ones the screen drew.
 
@@ -51,6 +54,13 @@ SCREENS = {
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),
+    # The other buildings' services, each in its own building (WHERE),
+    # run as the keeper's click runs them (the table at 869F): the tavern
+    # (B93C), the temple (C258), the equipment store (F48E), each its
+    # screen, banner and menu.
+    'tavern': ((0x1194, 0xB93C, {}), []),
+    'temple': ((0x1194, 0xC258, {}), []),
+    'store': ((0x1194, 0xF48E, {}), []),
     # Its Buy (the box at 3Ah..51h): the spells for sale.
     'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
     # Its Detect Magic (52h..69h): the items to look at.
@@ -67,6 +77,29 @@ SCREENS = {
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
 }
 WAIT = (0, 0x8FC4)
+
+# The buildings the screens not in the guild are in: the first of the
+# town's list of their kind (its far pointer, its count), its door entered
+# from the street (`ScreenArena.area_ended` out of the guild, then
+# `enter`).
+PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B)}
+WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store'}
+
+
+def place(a, base, where, cache={}):
+    """The snapshot of the game in the building `where` (PLACES)."""
+    if where not in cache:
+        a.restore(base)
+        assert a.area_ended() == ('world',), 'the guild not left'
+        at, count = PLACES[where]
+        assert a.r16(count), f'no {where} in the town'
+        # An entry's square is row << 8 | column (1194:40CF); the map's
+        # offset doubles the column.
+        sq = a.r16(a.r16(at), seg=a.r16(at + 2))
+        door = (sq & 0xFF00) | ((sq & 0xFF) << 1)
+        assert a.enter(door) == ('world',), f'the {where} not entered'
+        cache[where] = a.snapshot()
+    return cache[where]
 
 
 def square(a):
@@ -110,8 +143,9 @@ def main():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
-        p0, dac = draw(a, base, name, handler, script, 0x00, *waits)
-        p1, _ = draw(a, base, name, handler, script, 0xFF, *waits)
+        at = place(a, base, WHERE[name]) if name in WHERE else base
+        p0, dac = draw(a, at, name, handler, script, 0x00, *waits)
+        p1, _ = draw(a, at, name, handler, script, 0xFF, *waits)
         mask = bytes(int(x == y) for x, y in zip(p0, p1))
         page = bytes(x if k else 0 for x, k in zip(p0, mask))
         digests = [fnv(page), fnv(dac)] + ([fnv(mask)] if 0 in mask else [])
