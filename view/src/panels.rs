@@ -230,6 +230,9 @@ pub struct Inventory {
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,
+    /// An item's description up over the list's foot (1194:1988): its
+    /// lines and their colours, until a click.
+    pub info: Option<Vec<(String, u8)>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -416,12 +419,49 @@ pub fn select_line(m: &mut Machine, row: usize) {
     m.mem.w8(DS, SELECTED, if occupied { slot as u8 } else { 0xFF });
 }
 
+/// 1194:1988: the marked item described (`Machine::item_info`, with
+/// 12B0 3 and 12B2 0 first), its first [12B0] lines (the CRs made NULs,
+/// 1194:223A): the first in 55h when 12B2 is left 0, else FEh as the
+/// rest. None with no item there, or where the description gives up.
+fn item_info(m: &mut Machine) -> Option<Vec<(String, u8)>> {
+    use arena::use_item::info;
+    m.mem.w16(DS, info::ARGS, 0);
+    m.mem.w16(DS, info::LINES, 3);
+    let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
+    if m.item_info(it).is_none() {
+        eprintln!("the description gave up: {}", arena::giveup::describe());
+        return None;
+    }
+    let first = if m.mem.r16(DS, info::ARGS) == 0 { 0x55 } else { 0xFE };
+    let mut si = info::TEXT;
+    let mut out = Vec::new();
+    for i in 0..m.mem.r16(DS, info::LINES) {
+        let start = si;
+        for _ in 0..500 {
+            let c = m.mem.r8(DS, si);
+            si = si.wrapping_add(1);
+            if c == 0x0D {
+                m.mem.w8(DS, si.wrapping_sub(1), 0);
+                break;
+            }
+        }
+        let text = String::from_utf8_lossy(m.mem.cstr(DS, start)).into_owned();
+        out.push((text, if i == 0 { first } else { 0xFE }));
+    }
+    Some(out)
+}
+
 /// 1194:1AD6: a click on the list (`right`: the right button). The line
 /// under it is marked (`mark_at`); a left click on the line already
 /// marked puts its item on or takes it off (1AFB).
-pub fn line_click(m: &mut Machine, y: i32, right: bool, said: &mut Said) {
+pub fn line_click(m: &mut Machine, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
     let old = m.mem.r8(DS, SELECTED);
     let mark = mark_at(m, y);
+    // 1194:1CE5: a right click on the player's own items describes the
+    // line marked.
+    if right && mark != 0xFF && m.mem.r8(DS, OWN_ITEMS) != 0 {
+        inv.info = item_info(m);
+    }
     // On the spells' page the line marked again is cast (1194:1B3C), which
     // the view doesn't do.
     if mark == 0xFF || mark != old || right || m.mem.r8(DS, OWN_ITEMS) == 0 {
@@ -648,6 +688,14 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                         let t = if ac >= 0 { format!("+{ac}") } else { ac.to_string() };
                         screen.text_plain(f, x, y, &t, colour);
                     }
+                }
+            }
+            // 1194:223A: the description's lines in ARENAFNT ([102C])
+            // centred at x 55h, from y 90h (95h unless four), 0Bh apart.
+            if let (Some(lines), Some(f)) = (&inv.info, pics.as_ref().and_then(|p| p.arena.as_ref())) {
+                let y0 = if lines.len() == 4 { 0x90 } else { 0x95 };
+                for (i, (t, c)) in lines.iter().enumerate() {
+                    screen.text_plain(f, 0x55 - (f.width(t) as i32 >> 1), y0 + 0x0B * i as i32, t, *c);
                 }
             }
             if let Some((names, sel)) = &inv.using {

@@ -3297,6 +3297,11 @@ impl App {
         let mut cast = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
+                // An item's description waits for a click (1194:5536),
+                // which does nothing more.
+                if inv.info.take().is_some() {
+                    return;
+                }
                 if let Some((names, _)) = &inv.using {
                     let menu = panels::use_menu(names, 0);
                     let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
@@ -3323,7 +3328,7 @@ impl App {
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
                 } else if panels::line_at(x, y).is_some() {
-                    panels::line_click(&mut self.engine.m, y, right, &mut said);
+                    panels::line_click(&mut self.engine.m, inv, y, right, &mut said);
                 }
             }
             // A line of the list in the bar's corner clicked (2542:06F8):

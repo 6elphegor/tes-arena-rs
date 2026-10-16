@@ -58,6 +58,8 @@ SCREENS = {
     # and its Spellbook button (the sheet's spells).
     'equipmentpick': (0x00BE, [('click', 0x80, 0xB8), ('click', 60, 62)]),
     'equipmentspells': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194)]),
+    # A line right-clicked: marked, its item described (1194:1988).
+    'equipmentinfo': (0x00BE, [('click', 0x80, 0xB8), ('rclick', 60, 62)]),
     # The marked line clicked again: its item (worn) taken off (1194:1AFB).
     'equipmentoff': (0x00BE, [('click', 0x80, 0xB8), ('click', 60, 62), ('click', 60, 62)]),
     # S: the status box (037C: 04B1).

@@ -221,6 +221,21 @@ fn the_equipment_page_with_a_line_marked_as_the_original_draws_it() {
     );
 }
 
+/// A line right-clicked: marked, its item described over the list's foot
+/// (1194:1988).
+#[test]
+fn an_items_description_as_the_original_draws_it() {
+    screen(
+        "equipmentinfo",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Right);
+        },
+        layer,
+    );
+}
+
 /// The marked line clicked again: the boots taken off.
 #[test]
 fn an_item_taken_off_as_the_original_draws_it() {

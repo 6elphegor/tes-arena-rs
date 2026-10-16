@@ -18,3 +18,4 @@ screenfade | equipmentpick | 28 | c63880118b2d904d
 screenfade | equipmentspells | 28 | c63880118b2d904d
 screenfade | logbookmore | 27 | 6e85f83479df0314
 screenfade | equipmentoff | 28 | c63880118b2d904d
+screenfade | equipmentinfo | 28 | c63880118b2d904d

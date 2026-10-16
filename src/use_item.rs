@@ -777,3 +777,196 @@ impl Machine {
         }
     }
 }
+
+/// The item description's DGROUP variables (1194:1988, 7CBA).
+pub mod info {
+    /// The text built (lines ended by CR).
+    pub const TEXT: u16 = 0x1044;
+    /// What `sprintf` writes before it is appended.
+    pub const SCRATCH: u16 = 0x929E;
+    /// The lines to draw (1988 sets 3), and the word 1988 clears that the
+    /// formatting reuses for its arguments' size (0 leaves the first line
+    /// in 55h).
+    pub const LINES: u16 = 0x12B0;
+    pub const ARGS: u16 = 0x12B2;
+    /// The weight's format ("%d kgs", segment 3276), whose conversion
+    /// letter 7EAF rewrites ('d' or 's').
+    pub const WEIGHT: u16 = 0x6CC3;
+}
+
+impl Machine {
+    /// 0000:9BD0: the string at `seg`:`si` appended to DS:TEXT; the
+    /// offset after its NUL.
+    fn info_append(&mut self, seg: u16, mut si: u16) -> u16 {
+        let mut di = info::TEXT;
+        for _ in 0..0x10000u32 {
+            if self.mem.r8(DS, di) == 0 {
+                break;
+            }
+            di = di.wrapping_add(1);
+        }
+        loop {
+            let c = self.mem.r8(seg, si);
+            self.mem.w8(DS, di, c);
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+            if c == 0 {
+                return di;
+            }
+        }
+    }
+
+    /// `sprintf` into DS:SCRATCH, appended to the text.
+    fn info_line(&mut self, fmt: u16, args: &[Arg]) -> u16 {
+        self.sprintf((DS, info::SCRATCH), (DATA, fmt), args);
+        self.info_append(DS, info::SCRATCH)
+    }
+
+    /// 1194:7CBA. The description of the item at DGROUP `it` that a right
+    /// click on the equipment list shows (1194:1988), as CR-ended lines at
+    /// TEXT: its name, then by its kind (1194:748E) its use (7D79, 7DE1,
+    /// 7CF8), its weight and condition, its enchantment; LINES counts an
+    /// enchantment's line. None where the original goes on to what isn't
+    /// ported: an identified stack's text (7CF8: 1194:A36C) and a special
+    /// item's message box (type bit 80h, 7E44); or loops for ever (a
+    /// weight under 100h found nowhere in DGROUP, 1194:F2FC).
+    pub fn item_info(&mut self, it: u16) -> Option<()> {
+        let name = self.display_name(it)?;
+        // 0000:9CA0, then its NUL made a CR.
+        let mut di = info::TEXT;
+        let mut si = name;
+        loop {
+            let c = self.mem.r8(DS, si);
+            self.mem.w8(DS, di, c);
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+        }
+        self.mem.w8(DS, di.wrapping_sub(1), 0x0D);
+        self.mem.w8(DS, di, 0);
+        match self.item_category(DS, it) {
+            category::ACCESSORY => self.info_accessory(it)?,
+            category::STACK => {
+                if self.inv_flags(DS, it) & 2 != 0 {
+                    return crate::giveup::not_ported("1194:7CF8: an identified stack's text (1194:A36C)");
+                }
+                self.info_append(DATA, 0x6D53);
+            }
+            _ => self.info_gear(it)?,
+        }
+        if self.mem.r8(DS, it) & 0x80 != 0 {
+            return crate::giveup::not_ported("1194:7E44: a special item's message box");
+        }
+        Some(())
+    }
+
+    /// 1194:7D79. A weapon's damage (+4, +5) or armour's protection (+4
+    /// over 5), then the weight (7EAF), the condition (7BE7) and the
+    /// enchantment (7F2E), which counts a line.
+    fn info_gear(&mut self, it: u16) -> Option<()> {
+        let b = |m: &Self, f: u16| m.mem.r8(DS, it.wrapping_add(f)) as u16;
+        if self.item_category(DS, it) == 1 {
+            self.mem.w16(DS, info::ARGS, 0x0C);
+            let (lo, hi) = (b(self, 4), b(self, 5));
+            self.info_line(0x6CDA, &[Arg::Int(lo), Arg::Int(hi)]);
+        } else {
+            self.mem.w16(DS, info::ARGS, 0x0A);
+            let v = b(self, 4) / 5;
+            self.info_line(0x6CF4, &[Arg::Int(v)]);
+        }
+        self.info_weight(it)?;
+        let cond = self.condition_name(DS, it);
+        self.info_line(0x6CCB, &[Arg::Str(DS, cond)]);
+        if self.info_enchantment(it) {
+            let n = self.mem.r16(DS, info::LINES).wrapping_add(1);
+            self.mem.w16(DS, info::LINES, n);
+        }
+        Some(())
+    }
+
+    /// 1194:7EAF. "%d kgs" for a weight (+1) of 100h and up (its bytes
+    /// swapped), else "%s kgs" with its quarter's string (1194:F2FC: the
+    /// words from 2413 searched for it, its index the string's past 2419);
+    /// the format's letter written as chosen.
+    fn info_weight(&mut self, it: u16) -> Option<()> {
+        let w = self.mem.r16(DS, it.wrapping_add(1));
+        let arg = if w >= 0x100 {
+            self.mem.w16(DS, info::ARGS, 0x0A);
+            self.mem.w8(DATA, info::WEIGHT + 1, b'd');
+            Arg::Int(w.swap_bytes())
+        } else {
+            let mut si = 0x2413u16;
+            let mut i = 0u16;
+            let mut found = false;
+            for _ in 0..0x10000u32 {
+                if self.mem.r16(DS, si) == w {
+                    found = true;
+                    break;
+                }
+                si = si.wrapping_add(2);
+                i = i.wrapping_add(1);
+            }
+            if !found {
+                return crate::giveup::original("1194:F2FC: a weight found nowhere loops for ever");
+            }
+            self.mem.w16(DS, info::ARGS, 0x0C);
+            self.mem.w8(DATA, info::WEIGHT + 1, b's');
+            Arg::Str(DS, self.skip_strings(DS, 0x2419, i))
+        };
+        self.info_line(info::WEIGHT, &[arg]);
+        Some(())
+    }
+
+    /// 1194:7DE1. An accessory: of armour kind 0 its charges (+3) unless
+    /// special; of kind 2 its protection; another its enchantment (7F2E,
+    /// its line not counted).
+    fn info_accessory(&mut self, it: u16) -> Option<()> {
+        match self.armor_kind(DS, it) {
+            0 => {
+                if self.mem.r8(DS, it) & 0x80 == 0 {
+                    let n = self.mem.r8(DS, it.wrapping_add(3)) as u16;
+                    self.info_line(0x6D09, &[Arg::Int(n)]);
+                }
+            }
+            2 => {
+                let v = self.mem.r8(DS, it.wrapping_add(4)) as u16 / 5;
+                self.info_line(0x6D27, &[Arg::Int(v)]);
+            }
+            _ => {
+                self.info_enchantment(it);
+            }
+        }
+        Some(())
+    }
+
+    /// 1194:7F2E. An identified enchanted item's line (the carry): "+%d to
+    /// %s" with its attribute's name (+12h among the strings at 2B00) and
+    /// 0Ah (an accessory's type times 5 more), a CR more after it; with no
+    /// attribute (+12h FFh) its uses left (+6 over 15), not for a special
+    /// item. None for an item not identified (+0Eh bit 1), with no
+    /// enchantment (+0Fh FFh), or for gear with bit 2.
+    fn info_enchantment(&mut self, it: u16) -> bool {
+        let cat = self.item_category(DS, it);
+        let flags = self.inv_flags(DS, it);
+        let b = |m: &Self, f: u16| m.mem.r8(DS, it.wrapping_add(f));
+        if (cat != category::ACCESSORY && flags & 2 != 0) || flags & 1 == 0 || b(self, 0x0F) == 0xFF {
+            return false;
+        }
+        if b(self, 0x12) != 0xFF {
+            let v = if cat == category::ACCESSORY { (b(self, 0) as u16).wrapping_mul(5).wrapping_add(0x0A) } else { 0x0A };
+            let s = self.skip_strings(DS, 0x2B00, b(self, 0x12) as u16);
+            let di = self.info_line(0x6D1C, &[Arg::Int(v), Arg::Str(DS, s)]);
+            self.mem.w8(DS, di.wrapping_sub(1), 0x0D);
+            self.mem.w8(DS, di, 0);
+            return true;
+        }
+        if b(self, 0) & 0x80 != 0 {
+            return false;
+        }
+        let n = self.mem.r16(DS, it.wrapping_add(6)) / 0x0F;
+        self.info_line(0x6D40, &[Arg::Int(n)]);
+        true
+    }
+}
