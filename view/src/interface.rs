@@ -9,7 +9,8 @@
 //!   at most a tenth of its maximum; at its header's place, 14, 166), the
 //!   face over it (1194:2D5C: FACES0r.CIF, FACESF0r.CIF for a woman, r the
 //!   race, image +6Bh, put at 14, 166) and the name's first word (1194:4BC8:
-//!   colour F0h at 17, 154);
+//!   colour F0h at 17, 154, in TEENYFNT: 4DD6 selects [102E] round it);
+//! - the row under the view (C3A2) black, as each frame clears it;
 //! - the three bars (2901:00A8, 00E4): 4 x 26 from row 168 at x 57
 //!   (health 1FD / 1FF, colour 1Ah), 67 (fatigue 201 / (strength +
 //!   endurance) x 64, 9Fh) and 77 (spell points 20A / 20C, 3Eh), filled
@@ -227,6 +228,12 @@ impl Interface {
                 }
             }
         }
+        // The row under the view (C3A2) cleared, as each frame clears it
+        // (0000:4CC0..4CDA).
+        let below = m.mem.r16(DS, 0xC3A2) as i32;
+        if (0..crate::hud::H as i32).contains(&below) {
+            screen.fill(0, below, 320, 1, 0, 0xFF);
+        }
         // The bar from row 147.
         if let Some(bar) = &self.bar {
             screen.blit(0, 147, 320, 53, bar, 199);
@@ -235,7 +242,7 @@ impl Interface {
         let p = arena::character::PLAYER;
         let r16 = |o: u16| m.mem.r16(DS, p + o);
         let fx = r16(0x40D);
-        let mut cond = 0;
+        let mut cond = if m.spell_on_player() { 4 } else { 0 };
         if fx & 1 != 0 {
             cond = 1;
         }
@@ -258,7 +265,9 @@ impl Interface {
         // The name's first word (1194:4BC8).
         let full = String::from_utf8_lossy(m.mem.cstr(DS, p + 9)).into_owned();
         let first = full.split(' ').next().unwrap_or("");
-        screen.text_plain(font, 17, 154, first, 0xF0);
+        // In TEENYFNT (4E41: [102E] selected round it), at (0Eh + 3, 9Ah).
+        let teeny = crate::hud::game_font(crate::hud::GameFont::Teeny);
+        screen.text_plain(teeny.unwrap_or(font), 17, 154, first, 0xF0);
         // The bars (2901:00A8).
         let fatigue_max = (m.mem.r8(DS, 0x01CD) as u16 + m.mem.r8(DS, 0x01D2) as u16) << 6;
         for (x, v, max, c) in [(0x39, m.mem.r16(DS, 0x01FD), m.mem.r16(DS, 0x01FF), 0x1A), (0x43, m.mem.r16(DS, 0x0201), fatigue_max, 0x9F), (0x4D, m.mem.r16(DS, 0x020A), m.mem.r16(DS, 0x020C), 0x3E)] {
