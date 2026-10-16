@@ -64,8 +64,11 @@ impl DungeonPicHooks for Log {
     }
 }
 
+/// A case: AX, the DGROUP words set and the clicks.
+type Case = (u16, Vec<(u16, u16)>, Vec<(u16, u16)>);
+
 /// Mirrors harness/gen_dungeonpic.py `setup`.
-fn setup(seed: u32) -> (u16, Vec<(u16, u16)>, Vec<(u16, u16)>) {
+fn setup(seed: u32) -> Case {
     let mut s = Stream(seed);
     let k = s.byte();
     let ax = if k < 0xC0 { (s.byte() % 9) as u16 } else if k < 0xF0 { s.byte() as u16 } else { s.word() };
