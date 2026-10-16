@@ -120,7 +120,10 @@ map, the portrait is F1's).
 
 The view's extras, on keys the game leaves alone: the mouse turns (click to
 capture, Esc releases), Space jumps too, E or a captured click clicks the
-view's centre, Q readies the weapon as A does, I the inventory (a click
+view's centre, a captured right click (no drag) looks at it as the
+original's right click does (a building named on the message line and
+noted on the automap, 2826:0C15), the right button dragged swings the
+weapon, Q readies the weapon as A does, I the inventory (a click
 equips, a right click selects, D drops, U uses), K the character sheet
 (without F1's touch cast), F5 quick-saves (not with Alt) and F9 loads the
 --slot, F a random encounter, Shift+F people. Menus take arrows and Enter,

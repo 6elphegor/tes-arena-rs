@@ -33,8 +33,9 @@
 //! the size at +0Ah is the coded data's. Colour 0 is see-through.
 //!
 //! What's drawn when follows the weapon's frame's paths: nothing while
-//! casting (then the hands), with [620], or in water but levitating
-//! (C39A bit 10h without 4000h); sheathed (5E0 bit 10h clear) only while
+//! casting (then the hands), with [620], or in water out of the boat
+//! (C39A bit 10h without 4000h); in the boat out of the water (5CA bit
+//! 10h) its prow (BOATPROL.IMG as boarding loaded it); sheathed (5E0 bit 10h clear) only while
 //! the frame is still 1Eh or more. The original draws before the frame
 //! counts on, the view after: a frame later.
 
@@ -202,6 +203,9 @@ impl Interface {
         // The hands: casting, the bow, or the weapon (3B8E).
         if casting {
             self.cast_hands(screen, m);
+        } else if m.mem.r16(DS, 0x0620) == 0 && level & 0x10 == 0 && m.mem.r8(DS, SHOWN) != 6 && m.mem.r16(DS, 0x05CA) & 0x10 != 0 {
+            // In the boat (0000:395E): its prow, as boarding loaded it.
+            self.boat_prow(screen, m);
         } else if m.mem.r16(DS, 0x0620) == 0 && (level & 0x10 == 0 || level & 0x4000 != 0) && m.mem.r16(DS, 0x05CA) & 0x10 == 0 && (m.mem.r8(DS, CLASS) as i8) >= 0 {
             let shown = m.mem.r8(DS, SHOWN);
             let mut frame = m.mem.r16(DS, FRAME);
@@ -276,6 +280,16 @@ impl Interface {
             if let Some(img) = &self.compass {
                 screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
             }
+        }
+    }
+
+    /// 0000:396E: the boat's prow (BOATPROL.IMG, `Machine::board_boat`) as
+    /// loaded at offset [902E] of EMS bank [C8F4], at its header's place.
+    fn boat_prow(&mut self, screen: &mut Screen, m: &Machine) {
+        let bank = m.ems_bank(m.mem.r8(DS, 0xC8F4) as u16);
+        let at = m.mem.r16(DS, 0x902E) as usize;
+        if let Some((img, _)) = bank.get(at..).and_then(image) {
+            screen.blit(img.x, img.y, img.w, img.h, &img.px, 0x93);
         }
     }
 

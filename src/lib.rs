@@ -37,6 +37,7 @@ pub mod load;
 pub mod light;
 pub mod lineedit;
 pub mod log;
+pub mod look;
 pub mod loot;
 pub mod loot_window;
 pub mod machine;

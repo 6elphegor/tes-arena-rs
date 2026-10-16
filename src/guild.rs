@@ -318,7 +318,7 @@ impl Machine {
     /// 1194:AD39: the state set up on entering.
     fn guild_enter(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
         hooks.screen(self);
-        hooks.quest_check(self);
+        hooks.quest_check(self, files)?;
         hooks.quests(self, files)?;
         self.map_bank(0x18, 0);
         self.mem.w8(DS, HOLIDAY, 0xFF);

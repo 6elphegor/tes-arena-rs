@@ -290,6 +290,11 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             None => 0xFFFF,
         }
     }
+    /// 1194:D961 on entering: the main quest's person, if the stage's is
+    /// in this province.
+    fn quest_check(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.main_quest_check(files, &mut QuestFront(&mut *self.front, files.clone())).map(|_| ())
+    }
     /// 1194:8F1E on entering: the quests ended or offered.
     fn quests(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.quests_talk(files, &mut QuestFront(&mut *self.front, files.clone()))

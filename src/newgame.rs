@@ -193,11 +193,18 @@ impl Machine {
         self.ng_fill(0x0F76, 0xB, 0);
         let di = self.ng_fill(0x0E6E, 0xA4, 0);
         self.ng_fill(di, 0xD0, 0);
+        self.main_quest_reset();
+        self.ng_fill(FACES, 0xA, 0xFF);
+        self.ng_fill(0x0652, 0xC, 0xC5);
+    }
+
+    /// 1194:D327: the main quest's state started over: AB2 FFh, its 13h
+    /// bytes from FDD zeroed, FE4 FFh. (Also the frame's debug keys Alt+F5,
+    /// ACED and ACF4, which then say "Artifact Quest now possible.")
+    pub fn main_quest_reset(&mut self) {
         self.mem.w8(DS, 0x0AB2, 0xFF);
         self.ng_fill(0x0FDD, 0x13, 0);
         self.mem.w8(DS, 0x0FE4, 0xFF);
-        self.ng_fill(FACES, 0xA, 0xFF);
-        self.ng_fill(0x0652, 0xC, 0xC5);
     }
 
     /// 222C:057F. The next question: a number 1..40 (the RNG's next

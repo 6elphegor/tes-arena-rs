@@ -597,11 +597,36 @@ pub struct Hud {
     pub typing: Option<crate::dialog::Prompt>,
     /// A status line at the bottom (the rest's hours).
     pub status: Option<String>,
+    /// The wall and floor spells' counters (`spell_counters`).
+    pub counters: Option<String>,
     /// The level's text shown (`level_text`): each line with its row.
     pub level: Vec<(i32, Vec<Span>)>,
     /// The window the game centres its boxes in (A914, A916, A918, A91A:
     /// left, top, right, bottom); all zero: the whole screen.
     pub clip: (i32, i32, i32, i32),
+}
+
+/// 2826:0BB2, each frame of the controls: the counter of a wall spell
+/// (0DC0: + walls to make, - to unmake) or else of a floor spell (0DC2),
+/// as 0000:8D14 prints it into 1044 with its text (7A7E "Create walls :
+/// %d", 7A90 "Destroy walls", 7AA3 "Create floors", 7AB6 "Destroy
+/// floors"), the count negated for the second of each.
+pub fn spell_counters(m: &arena::machine::Machine) -> Option<String> {
+    use arena::mem::DS;
+    let (mut ax, mut si) = (m.mem.r16(DS, 0x0DC0), 0x7A7E);
+    if ax == 0 {
+        (ax, si) = (m.mem.r16(DS, 0x0DC2), 0x7AA3);
+        if ax == 0 {
+            return None;
+        }
+        if (ax as i16) < 0 {
+            (ax, si) = (ax.wrapping_neg(), 0x7AB6);
+        }
+    } else if (ax as i16) < 0 {
+        (ax, si) = (ax.wrapping_neg(), 0x7A90);
+    }
+    let format = String::from_utf8_lossy(m.mem.cstr(DS, si)).into_owned();
+    Some(format.replacen("%d", &(ax as i16).to_string(), 1))
 }
 
 /// The level's text while it is shown (0000:0550, through 05B5): the text
@@ -1219,6 +1244,13 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
         let x = 0xA0 - (f.width(&text) as i32 >> 1);
         screen.text_plain(f, x, 0x14, &text, 0x70);
         screen.text_plain(f, x + 1, 0x14, &text, 0x9F);
+    }
+    // 2826:0BB2: the spells' counters in [102C]'s font at (BEh, 2) in
+    // colour 70h, then one pixel left in 9Fh (9E06).
+    if let Some(s) = &hud.counters {
+        let f = &st.box_font;
+        screen.text_plain(f, 0xBE, 2, s, 0x70);
+        screen.text_plain(f, 0xBD, 2, s, 0x9F);
     }
     // 1194:4659: the rest's hours in [1026]'s font (FONT_A) centred at x
     // A0h (0000:5364) at y 14h, in colour 3Eh.

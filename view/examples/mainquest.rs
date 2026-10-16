@@ -99,7 +99,7 @@ impl arena::text::TextHooks for Talk {
 }
 
 impl arena::talk::TalkHooks for Talk {
-    fn way(&mut self, m: &mut Machine, si: u16, x: u16, y: u16) {
+    fn way(&mut self, m: &mut Machine, _files: &mut Files, si: u16, x: u16, y: u16) {
         println!("    [the way to {} at ({x}, {y})]", show(m, si));
     }
 }

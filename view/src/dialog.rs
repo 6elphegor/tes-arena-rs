@@ -252,16 +252,6 @@ impl Talk {
         self.since_answer.push(b);
     }
 
-    /// Plain text in a box (the way told, a dream).
-    pub fn note(&mut self, s: &str) {
-        if self.need.is_some() {
-            return;
-        }
-        println!("{s}");
-        let lines = vec![vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]];
-        self.boxes.push(lines.clone());
-        self.since_answer.push(lines);
-    }
 
     /// A menu: the next answer, or the question left (FFFFh).
     pub fn menu(&mut self, m: &Machine, si: u16, bx: u16, di: u16) -> u16 {
