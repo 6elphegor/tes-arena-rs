@@ -52,6 +52,13 @@ SCREENS = {
     'use': (0x034D, []),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # Its bottom row's buttons (the table at 5C2C: y 118..146), each
+    # clicked: Load (65..128, 061E) and Save (129..192, 0617), the save
+    # menu's slots (25FD); Exit (193..256, 05DB), "Are you sure ?". (New,
+    # 0..64, closes the screen at once.)
+    'optionsload': (0x000A, [('click', 96, 132)]),
+    'optionssave': (0x000A, [('click', 160, 132)]),
+    'optionsexit': (0x000A, [('click', 224, 132)]),
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),

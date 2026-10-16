@@ -155,14 +155,17 @@ pub fn text_at(m: &Machine, at: u16, colour: u8) -> Vec<Vec<Span>> {
 /// entry) at DS:`bx`, its entries' table (a word each, 0 ending it) at
 /// DS:`di`.
 pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
-    let title = text_at(m, si, 0x0F);
+    // 3159:0F2A draws its boxes through 965A, in the colour its caller
+    // left (9288) as a message box is.
+    let colour = m.mem.r8(DS, 0x9288);
+    let title = text_at(m, si, colour);
     let mut entries = Vec::new();
     for i in 0..32u16 {
         let p = m.mem.r16(DS, di.wrapping_add(2 * i));
         if p == 0 {
             break;
         }
-        let mut l = text_at(m, p, 0x0F);
+        let mut l = text_at(m, p, colour);
         entries.push(l.swap_remove(0));
     }
     let keys = m.mem.cstr(DS, bx).to_vec();

@@ -1337,6 +1337,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         panel: None,
         travel: None,
         saveui: None,
+        saveui_under: None,
         options: None,
         quit: false,
         equip: None,
@@ -2490,6 +2491,10 @@ struct App {
     /// The save or load menu up (`saveui`: the options screen's Save and
     /// Load, the main menu's Load).
     saveui: Option<saveui::SaveUi>,
+    /// The options screen the save menu was opened from (its Load or
+    /// Save), drawn under it: LOADSAVE.IMG's 143 rows leave OP.IMG's last
+    /// four.
+    saveui_under: Option<options::OptionsUi>,
     /// The options screen up (`options`: Esc in play).
     options: Option<options::OptionsUi>,
     /// The options screen's Exit confirmed: the program ends.
@@ -2770,6 +2775,13 @@ impl App {
             mv.draw(&mut self.screen, &self.font);
         } else if let Some(ui) = &self.saveui {
             self.screen.set_palette(self.assets.dac());
+            // From the options screen's Load or Save (2542:061E, 0617):
+            // LOADSAVE.IMG's 143 rows over OP.IMG's 147, the options
+            // screen's last rows left under it.
+            if let Some(o) = &self.saveui_under {
+                self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
+                o.draw(&mut self.screen, &self.font);
+            }
             ui.draw(&mut self.screen);
         } else if let Some(ui) = &self.options {
             // OP.IMG over what was on the screen (the interface below it).
@@ -2849,6 +2861,7 @@ impl App {
 
     /// The save or load menu opened on the engine (`saveui`).
     fn open_saveui(&mut self, kind: saveui::Kind) {
+        self.saveui_under = None;
         let Some(dir) = self.save_dir.clone() else {
             self.say("No save directory (--save-dir).");
             return;
@@ -2921,7 +2934,7 @@ impl App {
     /// without its vision), Exit ends the program.
     fn options_ended(&mut self, e: options::Ended) {
         let options::Ended::Left(engine, end) = e else { return };
-        self.options = None;
+        let under = self.options.take();
         self.engine = *engine;
         // The keys let go while the screen was up went to the engine it
         // replaced: the game's key state and latches let go here.
@@ -2931,8 +2944,14 @@ impl App {
         }
         match end {
             arena::options::OptionsEnd::Resume => {}
-            arena::options::OptionsEnd::Save => self.open_saveui(saveui::Kind::Save),
-            arena::options::OptionsEnd::Load => self.open_saveui(saveui::Kind::Load),
+            arena::options::OptionsEnd::Save => {
+                self.open_saveui(saveui::Kind::Save);
+                self.saveui_under = under;
+            }
+            arena::options::OptionsEnd::Load => {
+                self.open_saveui(saveui::Kind::Load);
+                self.saveui_under = under;
+            }
             arena::options::OptionsEnd::NewGame => {
                 let archive = self.assets.archive.clone();
                 let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);

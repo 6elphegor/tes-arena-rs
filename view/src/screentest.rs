@@ -49,7 +49,7 @@ fn vectors() -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
 
 /// The user's save loaded (ARENA_SAVE, slot 1), as the window would.
 fn loaded(dir: &Path, save: &Path) -> (App, Driver) {
-    let mut a = app(dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), ..Default::default() });
+    let mut a = app(dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
     clear(&mut d, &mut a);
@@ -198,17 +198,54 @@ fn the_use_list_as_the_original_draws_it() {
 /// Esc: the options screen (2542:000A), drawn alone.
 #[test]
 fn the_options_screen_as_the_original_draws_it() {
-    screen(
-        "options",
-        |a, d| d.key(a, KeyCode::Escape, None),
-        |a| {
-            let mut s = hud::Screen::new(a.assets.palette);
-            a.options.as_ref().expect("the options screen").draw(&mut s, &a.font);
-            let idx = s.indices().to_vec();
-            let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
-            (idx, dac)
-        },
-    );
+    screen("options", |a, d| d.key(a, KeyCode::Escape, None), options_layer);
+}
+
+/// The options screen drawn alone, with what it asks over it.
+fn options_layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let mut s = hud::Screen::new(a.assets.palette);
+    a.options.as_ref().expect("the options screen").draw(&mut s, &a.font);
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// Esc, then the options screen's button at (x, y) clicked (the table at
+/// 5C2C), as gen_screens.py's script clicks it.
+fn options_click(a: &mut App, d: &mut Driver, x: i32, y: i32) {
+    d.key(a, KeyCode::Escape, None);
+    assert!(a.options.is_some(), "the options screen");
+    d.click(a, x, y, MouseButton::Left);
+}
+
+/// The options screen and the save menu over it, drawn alone: the menu's
+/// LOADSAVE.IMG (143 rows) over OP.IMG (147).
+fn options_menu_layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let mut s = hud::Screen::new(a.assets.palette);
+    a.saveui_under.as_ref().expect("the options screen under it").draw(&mut s, &a.font);
+    a.saveui.as_ref().expect("the save menu").draw(&mut s);
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// The options screen's Load (2542:061E): the save menu's slots (25FD:
+/// 0718), their names NAMES.DAT's (the game folder's: the save's has none).
+#[test]
+fn the_options_load_as_the_original_draws_it() {
+    screen("optionsload", |a, d| options_click(a, d, 96, 132), options_menu_layer);
+}
+
+/// Its Save (0617): the same slots.
+#[test]
+fn the_options_save_as_the_original_draws_it() {
+    screen("optionssave", |a, d| options_click(a, d, 160, 132), options_menu_layer);
+}
+
+/// Its Exit (05DB): "Are you sure ?" over the screen.
+#[test]
+fn the_options_exit_as_the_original_draws_it() {
+    screen("optionsexit", |a, d| options_click(a, d, 224, 132), options_layer);
 }
 
 /// The mages' guild's spellmaker (1194:6064): Drakain before Daggerfall's
