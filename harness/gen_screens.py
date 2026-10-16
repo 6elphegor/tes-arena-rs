@@ -47,6 +47,9 @@ SCREENS = {
     'use': (0x034D, []),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # The mages' guild's spellmaker (1194:6064, SI the player, as the
+    # guild's menu calls it: the save is in Daggerfall's guild).
+    'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
 }
 WAIT = (0, 0x8FC4)
 
@@ -58,7 +61,11 @@ def draw(a, base, handler, script, fill):
     a.waits = {WAIT}
     a.script = list(script)
     a.clicks = []
-    a.run_screen(MENU, handler, near=True)
+    if isinstance(handler, tuple):
+        seg, off, regs = handler
+        a.run_screen(seg, off, regs=regs)
+    else:
+        a.run_screen(MENU, handler, near=True)
     return a.page(), bytes(a.dac)
 
 

@@ -208,3 +208,20 @@ fn the_options_screen_as_the_original_draws_it() {
         },
     );
 }
+
+/// The mages' guild's spellmaker (1194:6064): Drakain before Daggerfall's
+/// guild master, the menu's Spellmaker.
+#[test]
+fn the_spellmaker_as_the_original_draws_it() {
+    screen(
+        "spellmaker",
+        |a, d| {
+            d.click(a, 164, 74, MouseButton::Left);
+            d.frame(a);
+            assert!(until_asked(d, a, 3), "the guild master asks");
+            d.key(a, KeyCode::Digit3, Some("3"));
+            assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker is up");
+        },
+        layer,
+    );
+}

@@ -5,3 +5,4 @@ screen | logbook | b08c75f1db4b5e6d 491d016160c27c96
 screen | spellbook | 1cfe870509453798 a97a4bafd992e4ed 39965ff8a01bf6aa
 screen | use | 5a16eb49c041f989 a97a4bafd992e4ed 229a72001062a3f8
 screen | options | 80e2d3c26ca04973 a97a4bafd992e4ed e9dd241a64a6dae5
+screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3

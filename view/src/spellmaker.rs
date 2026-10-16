@@ -164,6 +164,9 @@ pub fn draw_state(screen: &mut Screen, font: &Font, archive: &Archive, files: &F
     if let Some(p) = palette(&d, used) {
         screen.set_palette(p);
     }
+    // The picture copied whole (1194:6064's 56C8): its colour 0 round
+    // the parchment's ragged edges is drawn, black, not see-through.
+    screen.fill(0, 0, crate::hud::W as i32, crate::hud::H as i32, 0, 0xFF);
     screen.blit(0, 0, img.w, img.h, &img.px, 200);
     let c = 0xA0u8;
     let mut mm = m.clone();
