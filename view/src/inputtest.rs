@@ -775,11 +775,14 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     let start = Start { level: "CITY:0:0", ..Default::default() };
     let mut a = app(&dir, &start);
     let mut d = Driver::new(&mut a);
-    // Shift+M opens it on the current province's map (2542:0193).
+    // Shift+M opens it on the world map (2542:03BF, 26F7:0000); the
+    // current province's region opens its map (26F7:0176).
     a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
     d.key(&mut a, KeyCode::KeyM, Some("M"));
     a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
     assert!(a.travel.is_some(), "Shift+M opens the travel map");
+    let (px, py) = travel::province_point(a.engine.m.mem.r8(arena::mem::DS, 0x0A46));
+    d.click(&mut a, px, py, MouseButton::Left);
     // A click on the map picks the nearest place: the journey's box.
     d.click(&mut a, 135, 58, MouseButton::Left);
     let journey = a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>().join("\n");
@@ -792,6 +795,7 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     Driver::new(&mut b);
     let archive = b.assets.archive.clone();
     let mut t = Some(travel::Travel::open(&mut b.engine, &archive).unwrap_or_else(|_| panic!("it opens")));
+    t.as_mut().unwrap().click(&mut b.engine, &archive, px, py, false);
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
     // Travel: the journey made, its horse running a frame a day
@@ -1386,14 +1390,13 @@ fn the_palace_at_stage_9_shows_the_artifacts_audience() {
     while !a.boxes.is_empty() {
         d.key(&mut a, KeyCode::Enter, None);
     }
-    // Shift+M; Esc to the world map; the Imperial Province (its region
-    // at DATA:6D90 + 8 x 62h: 103, 72, 131 x 84); the Imperial City at
+    // Shift+M: the world map; the Imperial Province (its region at
+    // DATA:6D90 + 8 x 62h: 103, 72, 131 x 84); the Imperial City at
     // (180, 65); the journey's box read; Travel.
     a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
     d.key(&mut a, KeyCode::KeyM, Some("M"));
     a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
     assert!(a.travel.is_some(), "the travel map");
-    d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 160, 100, MouseButton::Left);
     d.click(&mut a, 180, 65, MouseButton::Left);
     let journey = a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>().join("\n");
@@ -1707,15 +1710,13 @@ fn the_stairs_out_show_the_travel_map() {
     };
     walk(&mut a, &mut d);
     assert!(a.travel.is_some(), "the stairs show the travel map");
-    // Esc: the world map; Esc again: the screen ends, no journey made.
-    // The move's candidates (0000:F76F for each) each meet the stairs, so
-    // the frame asks again until all are answered, as the original's.
+    // It opens on the world map; Esc ends it, no journey made. The
+    // move's candidates (0000:F76F for each) each meet the stairs, so the
+    // frame asks again until all are answered, as the original's.
     let mut asked = 0;
     while a.travel.is_some() && asked < 8 {
         asked += 1;
         assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_))), "a turn's question");
-        d.key(&mut a, KeyCode::Escape, None);
-        assert!(a.travel.is_some(), "the world map");
         d.key(&mut a, KeyCode::Escape, None);
     }
     assert!(a.travel.is_none() && a.pending.is_none(), "the screen ended, the turn answered after {asked}");
@@ -1725,6 +1726,8 @@ fn the_stairs_out_show_the_travel_map() {
     // Again, and a journey made: the dungeon left for the place.
     walk(&mut a, &mut d);
     assert!(a.travel.is_some(), "asked again on the stairs");
+    let (px, py) = travel::province_point(a.engine.m.mem.r8(DS, 0x0A46));
+    d.click(&mut a, px, py, MouseButton::Left);
     d.click(&mut a, 135, 58, MouseButton::Left);
     assert!(!a.boxes.is_empty(), "the journey's box");
     while !a.boxes.is_empty() {

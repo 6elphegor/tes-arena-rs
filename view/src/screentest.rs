@@ -387,7 +387,6 @@ fn camping_refused_in_the_street_as_the_original_draws_it() {
 
 /// Shift+M in the street: the travel map (2542:03BF, 26F7).
 #[test]
-#[ignore = "not yet the original's: from this state the original's 03BF waits first on the world map (TAMRIEL.MNU), where the view's Travel::begin opens on the province's (26F7:0176)"]
 fn the_world_map_as_the_original_draws_it() {
     screen(
         "worldmap",

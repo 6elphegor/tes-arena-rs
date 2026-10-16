@@ -4,7 +4,8 @@
 //! `Machine::map_from_here`), from a boat or with monsters near
 //! (`Machine::map_button`).
 //!
-//! - It starts on the current province's map (26F7:0176): its picture
+//! - It starts on the world map (the window at DATA:6C56, below); a
+//!   province's region opens the province's map (26F7:0176): its picture
 //!   (HIGHROCK.IMG .. IMPERIAL.IMG by the province, its own palette),
 //!   MAPBTNS.MNU's buttons over it (search at 34, travel at 53, exit at
 //!   72, all at row 167: the window's regions at DATA:7164), the
@@ -95,6 +96,18 @@ const SCAN: [u16; 4] = [0xA8BC, NEAREST_REC, 0xA8B6, 0x1294];
 
 fn inside(r: (i32, i32, i32, i32), x: i32, y: i32) -> bool {
     x >= r.0 && x <= r.0 + r.2 && y >= r.1 && y <= r.1 + r.3
+}
+
+/// A point of the world map whose click opens province `p`'s map: inside
+/// its region (DATA:6D90) and no earlier one's, as the regions are tried
+/// in order.
+pub fn province_point(p: u8) -> (i32, i32) {
+    let r = REGIONS[p as usize];
+    (r.1..=r.1 + r.3)
+        .flat_map(|y| (r.0..=r.0 + r.2).map(move |x| (x + r.2 / 2 - r.0, y)))
+        .map(|(dx, y)| (r.0 + dx % (r.2 + 1), y))
+        .find(|&(x, y)| REGIONS.iter().position(|&q| inside(q, x, y)) == Some(p as usize))
+        .expect("a point of the province's own")
 }
 
 /// What the screen asks between clicks.
@@ -236,7 +249,7 @@ impl MapHooks for Hooks<'_> {
 
 impl Travel {
     /// The map button pressed (2542:03DC): refused, its box; else the
-    /// screen's start (26F7:0000) on the current province's map.
+    /// screen's start (26F7:0000) on the world map.
     pub fn open(engine: &mut Engine, archive: &crate::archive::Archive) -> Result<Travel, Lines> {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
@@ -263,13 +276,13 @@ impl Travel {
         Travel::begin(engine, archive, Vec::new())
     }
 
-    /// 26F7:0000's start, on the current province's map.
+    /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
         let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new() };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
-        let mut t = Travel {
+        let t = Travel {
             start,
             shown: None,
             world: crate::create::mnu(archive, "TAMRIEL.MNU"),
@@ -288,8 +301,9 @@ impl Travel {
             journey_ms: 0,
             up_ms: 0,
         };
-        let p = m.mem.r8(DS, 0x0A46);
-        t.show_province(engine, archive, p);
+        // The window it runs (3159:000C on DATA:6C56) is the world map's:
+        // TAMRIEL.MNU, its provinces' regions at 6D90, the current one
+        // outlined (26F7:013E). A province's map is a region's click away.
         t
     }
 
