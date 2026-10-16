@@ -1,0 +1,3 @@
+areafade | tavern | 27 | 4440fc09bfeab4e
+areafade | leavetavern | 39 | 594a1fb93a020c56
+areafade | automapclose | 72 | d4fcab04ed90d5ab

@@ -32,7 +32,9 @@ last input, where creation asks for another. With DUMP_DIR each screen
 is written there too (SCRIPT-STEP.raw: the 64000 bytes, the 768 colours).
 What the player sees between two screens answered (a box dissolving in,
 1194:4FF7; the colours faded) is sampled at each wait for the retrace
-(0000:6BB8, 9B77: the VGA and the DAC as they are there), and written to
+(0000:6BB8, 9B77: the VGA and the DAC as they are there; and where the
+map's scroll unrolls, 1194:5B58, which never waits, as each strip is
+shown, 0000:94EE from 5BF1), and written to
 FRAMES (by default OUT's directory's createframes.txt):
 
   createframes | script | step | count | digest
@@ -312,8 +314,9 @@ def run(a, inputs, keep=False):
     def tick(mu, access, addr, size, value, ud):
         a.w16(0x0151, a.r16(0x0151) + 1)
     hooks.append(mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t))
-    for off, f in ((0x713C, r.key), (0x8FC8, r.mouse), (0x6BB8, r.retrace), (0x9B77, r.retrace)):
-        x = a.lin(LOAD_SEG, off)
+    for seg, off, f in ((0, 0x713C, r.key), (0, 0x8FC8, r.mouse), (0, 0x6BB8, r.retrace), (0, 0x9B77, r.retrace),
+                        (0x1194, 0x5BF6, r.retrace)):
+        x = a.lin(LOAD_SEG + seg, off)
         hooks.append(mu.hook_add(UC_HOOK_CODE, f, None, x, x))
     prof = {}
     if os.environ.get('PROF'):

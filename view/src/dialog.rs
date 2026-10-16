@@ -147,6 +147,9 @@ pub struct Talk {
     /// The shop's screen the turn is inside (`crate::shopui::Backdrop`):
     /// drawn behind its questions.
     pub backdrop: Option<crate::shopui::Backdrop>,
+    /// The screen faded to black on the way into a building (1194:55B2,
+    /// the trigger's way in 0000:4118): the area's change starts black.
+    pub blackout: bool,
 }
 
 /// The game's text at DS:`at`, as lines.
