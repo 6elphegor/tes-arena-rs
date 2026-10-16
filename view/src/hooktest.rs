@@ -135,7 +135,7 @@ fn an_empty_slot_says_the_games_words() {
     let Some(mut e) = engine() else { return };
     let empty = std::env::temp_dir().join(format!("arena-hooktest-empty-{}", std::process::id()));
     std::fs::create_dir_all(&empty).unwrap();
-    let dir = PathBuf::from(std::env::var("ARENA_EXE").map(|x| PathBuf::from(x).parent().unwrap().to_path_buf()).unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ESarena")));
+    let dir = std::env::var("ARENA_EXE").map(|x| PathBuf::from(x).parent().unwrap().to_path_buf()).unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ESarena"));
     let r = areas::load_game(&mut e, &dir, &empty, 7);
     let _ = std::fs::remove_dir_all(&empty);
     assert_eq!(r.err().as_deref(), Some("No game saved here...."));
