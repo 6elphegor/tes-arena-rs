@@ -157,6 +157,8 @@ mod hud;
 mod inputtest;
 #[cfg(test)]
 mod hooktest;
+#[cfg(test)]
+mod doortest;
 mod interface;
 mod music;
 mod newgame;
@@ -3102,6 +3104,15 @@ impl App {
                         self.last = Some(arena::engine::Frame::Running);
                         // As the game's menu: play goes on without a word.
                         println!("Loaded slot {slot}.");
+                    }
+                    // An empty slot: the game's message box over the
+                    // menu, then its picker again (25FD:028D, 026B).
+                    Err(msg) if msg.as_bytes() == engine.m.mem.cstr(arena::mem::DS, arena::load::var::NO_SAVE) => {
+                        println!("{msg}");
+                        if let Some(ui) = &mut self.saveui {
+                            ui.empty_slot(&engine.m);
+                        }
+                        return;
                     }
                     Err(msg) => {
                         eprintln!("{msg}");

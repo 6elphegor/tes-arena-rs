@@ -55,8 +55,10 @@ use crate::shops::ShopHooks;
 
 /// What the tavern leaves to the front end, besides `ShopHooks`.
 pub trait TavernHooks: ShopHooks {
-    /// 1194:C0B1: the rooms' files (old ones deleted).
-    fn files(&mut self, _m: &mut Machine) {}
+    /// 1194:C0B1: the rooms' files whose time is up deleted
+    /// (`Machine::room_files_expire`; by default left, as the vectors
+    /// stub it).
+    fn files(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:C12A: the innkeeper's greeting (2DA2's %nt).
     fn greeting(&mut self, _m: &mut Machine) {}
     /// 1194:CED7: the main quest's informant (`Machine::quest_informant`).
@@ -207,7 +209,7 @@ impl Machine {
         let saved = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, 0x137F, 4);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
-            hooks.files(self);
+            hooks.files(self, files);
             self.tavern_enter(files, hooks)?;
             loop {
                 // 1194:B975: FONT_A and the tiles at 1036 selected.
@@ -530,6 +532,46 @@ impl Machine {
         }
         self.mem.w16(DS, ROOM_NAME, 0x6E69);
         self.save_path(ROOM_NAME)
+    }
+
+    /// 1194:C0B1. The slot's rented rooms' files ("in*.%d", 754C, by the
+    /// slot 1A6C, made at ROOM_NAME and its path, 25FD:0844) found one by
+    /// one (DOS find first and next, 0000:600C, 6028): each loaded whole
+    /// to 929E (0000:7428, its size at A90C), and deleted (0000:9DC2)
+    /// unless the end it holds (the dword at +2, 92A0) is past the time
+    /// (5CC, signed). Here the files are found through `Files` in name
+    /// order, and each one's path made from ROOM_NAME as it stands (as
+    /// `delete_matching` does): the path buffers' toggle ends as the
+    /// original's, not their contents. Without it nothing in play
+    /// differs (`room_read` takes a room whose time is up as none), but
+    /// the files would stay in the save's folder.
+    pub fn room_files_expire(&mut self, files: &mut Files) {
+        let slot = self.mem.r8(DS, 0x1A6C) as u16;
+        self.sprintf((DS, ROOM_NAME), (DS, 0x754C), &[Arg::Int(slot)]);
+        self.save_path(ROOM_NAME);
+        let pattern = self.mem.cstr(DS, ROOM_NAME).to_ascii_uppercase();
+        let Some(star) = pattern.iter().position(|&c| c == b'*') else { return };
+        let (prefix, rest) = (pattern[..star].to_vec(), &pattern[star + 1..]);
+        let ext = rest.strip_prefix(b".").unwrap_or(rest).to_vec();
+        for name in files.with_ext_where(|e| e == &ext[..]) {
+            if !name.starts_with(&prefix) {
+                continue;
+            }
+            self.save_path(ROOM_NAME);
+            let Some(data) = files.data(&name) else { continue };
+            if data.is_empty() || data.len() > 0xFFFF {
+                // 7428 fails (an empty file, or 64 KiB): the original goes
+                // on to the next with the buffer as it was.
+            } else {
+                self.mem.w16(DS, crate::bsa::var::OPEN_SIZE, data.len() as u16);
+                for (i, &b) in data.iter().enumerate() {
+                    self.mem.w8(DS, 0x929E_u16.wrapping_add(i as u16), b);
+                }
+            }
+            if self.mem.r32(DS, 0x92A0) as i32 <= self.mem.r32(DS, 0x05CC) as i32 {
+                files.delete(&name);
+            }
+        }
     }
 
     /// `repne scasb` for the NUL from `di`, at most `cx` bytes: the byte

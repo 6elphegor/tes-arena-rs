@@ -35,6 +35,7 @@ screen | options | 80e2d3c26ca04973 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionsload | 29528d995137f284 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionssave | 29528d995137f284 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionsexit | b4c41413148569c5 a97a4bafd992e4ed e9dd241a64a6dae5
+screen | optionsloadempty | 8c9fae80fab97d9f a97a4bafd992e4ed e9dd241a64a6dae5
 screen | guild | ab9373c09721411 a97a4bafd992e4ed a2bb0df299dfaf5b
 screen | tavern | 91f232a0fa7b43c a97a4bafd992e4ed f278b29d6123829b
 screen | temple | fc0e8a3f54ddb265 a97a4bafd992e4ed 65259bf793414fff

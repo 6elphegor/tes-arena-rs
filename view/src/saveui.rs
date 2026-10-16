@@ -71,6 +71,9 @@ pub struct SaveUi {
     picture: Option<Image>,
     /// The four fonts the game selects among (`GameFont`).
     fonts: Vec<(GameFont, Font)>,
+    /// A message box over the menu, read with a click or a key: an empty
+    /// slot's (1194:59C8), before the picker again (25FD:026B).
+    pub notice: Option<Vec<Vec<crate::hud::Span>>>,
 }
 
 struct Script<'a> {
@@ -161,7 +164,7 @@ impl SaveUi {
             .into_iter()
             .filter_map(|(g, name)| Font::load(archive, name).map(|f| (g, f)))
             .collect();
-        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, draws: Vec::new(), picture, fonts };
+        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, draws: Vec::new(), picture, fonts, notice: None };
         let e = ui.replay();
         (ui, e)
     }
@@ -193,9 +196,26 @@ impl SaveUi {
         }
     }
 
+    /// The slot picked had no game (25FD:028D): `m`, the game as the menu
+    /// left it, says so in a message box (1194:59C8, the text at 5F0F in
+    /// the font and colour selected, centred in the clip as 59CC centres
+    /// it), then the picker is up again (025FD:026B), the click on the
+    /// empty slot forgotten.
+    pub fn empty_slot(&mut self, m: &Machine) {
+        use crate::hud;
+        let lines = hud::in_font(crate::dialog::text_at(m, arena::load::var::NO_SAVE, m.mem.r8(DS, 0x9288)), GameFont::selected(m));
+        let r = |at| m.mem.r16(DS, at) as i16 as i32;
+        self.notice = Some(hud::clipped(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A))));
+        self.clicks.pop();
+        self.replay();
+    }
+
     /// A click at (x, y) of the screen (the right button cancels, as a
     /// negative x does).
     pub fn click(&mut self, x: i32, y: i32, right: bool) -> Ended {
+        if self.notice.take().is_some() {
+            return Ended::Open;
+        }
         if let Some(l) = &mut self.typing {
             // The right button ends the name's field (A172).
             if right {
@@ -209,6 +229,9 @@ impl SaveUi {
 
     /// A key pressed: with no name typed, Esc leaves.
     pub fn key(&mut self, code: winit::keyboard::KeyCode, _text: Option<&str>) -> Ended {
+        if self.notice.take().is_some() {
+            return Ended::Open;
+        }
         if self.typing.is_none() && code == winit::keyboard::KeyCode::Escape {
             self.clicks.push((0xFFFF, 0));
             return self.replay();
@@ -264,6 +287,9 @@ impl SaveUi {
         if let Some(l) = &self.typing {
             screen.fill(l.field.x as i32 - 0x0A, l.field.y as i32, 0x135, 9, 0, 0xFF);
             l.draw(screen, false);
+        }
+        if let (Some(lines), Some((_, font))) = (&self.notice, self.fonts.iter().find(|(f, _)| *f == GameFont::Arena)) {
+            crate::hud::compose_over(screen, font, &crate::hud::Hud { boxed: Some(lines.clone()), ..Default::default() });
         }
     }
 }

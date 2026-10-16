@@ -71,7 +71,7 @@ impl ShopHooks for Script {
 }
 
 impl TavernHooks for Script {
-    fn files(&mut self, _m: &mut Machine) {
+    fn files(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {
         self.log.push(1);
     }
     fn greeting(&mut self, _m: &mut Machine) {
@@ -317,4 +317,30 @@ fn matches_original() {
     if only.is_none() {
         assert!(n > 3000, "{n} compared");
     }
+}
+
+/// 1194:C0B1 (`room_files_expire`): of the slot's rooms' files ("in*.%d"
+/// by 1A6C), those whose end (the dword at +2) isn't past the time (5CC)
+/// deleted; another slot's, and one still let, kept.
+#[test]
+fn rooms_whose_time_is_up_are_deleted() {
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    let dir = std::env::temp_dir().join(format!("arena-rooms-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut files = Files::new(&dir).expect("files");
+    let _ = std::fs::remove_dir_all(&dir);
+    let room = |end: u32| [&[24u8, 0][..], &end.to_le_bytes()].concat();
+    files.put(b"IN1234.3", &room(1000));
+    files.put(b"IN5678.3", &room(5000));
+    files.put(b"IN9999.4", &room(1000));
+    files.put(b"IN4321.3", &room(2000));
+    m.mem.w8(DS, 0x1A6C, 3);
+    m.mem.w32(DS, 0x05CC, 2000);
+    m.room_files_expire(&mut files);
+    assert!(files.was_deleted(b"IN1234.3"), "past");
+    assert!(files.was_deleted(b"IN4321.3"), "the time itself");
+    assert!(files.exists(b"IN5678.3"), "still let");
+    assert!(files.exists(b"IN9999.4"), "another slot's");
+    assert_eq!(m.mem.cstr(DS, 0x733A), b"in*.3");
 }
