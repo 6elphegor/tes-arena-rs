@@ -13,7 +13,7 @@
 //!   made a line break (27E3:0147), split at its line feeds (1194:4E54),
 //!   shown 13 lines a page from (1Eh, 1Eh), 8 rows apart, in TEENYFNT
 //!   ([102E]): a line with '&' in its first three bytes is a date in
-//!   colour 10h, after the '&', with 8 rows more before and after it; the
+//!   colour 10h, after the '&', 8 rows lower, the line after it 16 on; the
 //!   others in 49h. "More..." at (10Eh, AAh) in 0Fh while pages remain.
 //!   No file: "Your logbook is empty." centred on (A0h, 64h) in FONT_A,
 //!   61h. Its buttons (27E3:01FC, rows B4h..C3h): Print (x 25h..4Ch, not
@@ -265,8 +265,10 @@ pub fn draw_log(screen: &mut Screen, log: &LogBook) {
     if let Some(page) = log.pages.get(log.page) {
         for (date, line) in page {
             if *date {
-                y += 8;
-                screen.text_plain(f, 0x1E, y, line, 0x10);
+                // 27E3:035E moves the date 8 rows down, but the row is
+                // popped back after it (036E) before the 8 and the date's
+                // 8 more (036F, 037A): the next line 16 rows on.
+                screen.text_plain(f, 0x1E, y + 8, line, 0x10);
                 y += 16;
             } else {
                 screen.text_plain(f, 0x1E, y, line, 0x49);
