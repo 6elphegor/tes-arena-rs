@@ -146,6 +146,7 @@ mod bench;
 mod create;
 mod dialog;
 mod doll;
+mod film;
 mod flats;
 mod flc;
 mod field;
