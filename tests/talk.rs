@@ -119,15 +119,17 @@ impl TalkHooks for Script {
         self.log.extend([15, kind as u16]);
         Some(())
     }
-    fn wild_flat(&mut self, _m: &mut Machine, si: u16) {
+    fn wild_flat(&mut self, _m: &mut Machine, _files: &mut Files, si: u16) -> Option<()> {
         self.log.extend([16, si]);
+        Some(())
     }
     fn dungeon_entrance(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.log.push(17);
         Some(())
     }
-    fn wild_way(&mut self, _m: &mut Machine, kind: u16) {
+    fn wild_way(&mut self, _m: &mut Machine, _files: &mut Files, kind: u16) -> Option<()> {
         self.log.extend([18, kind]);
+        Some(())
     }
     fn square_text(&mut self, _m: &mut Machine, ax: u16) -> Option<(u16, u16)> {
         self.log.extend([19, ax]);

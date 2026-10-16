@@ -186,15 +186,21 @@ pub trait TalkHooks: TextHooks {
         }
         Some(())
     }
-    /// 2294:0DD0: a flat of kind WILD_FLAT (or the next) in the wild.
-    fn wild_flat(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 2294:0DD0: a flat of kind WILD_FLAT (or the next) in the wild: the
+    /// boat boarded (`Machine::board_boat`).
+    fn wild_flat(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<()> {
+        m.board_boat(files, si)
+    }
     /// 0000:4EFD then 0000:08EC: a dungeon's entrance in the wild.
     fn dungeon_entrance(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
     /// 217B:0682: the way in the wild (`kind` 1 the nearest inn, 2
-    /// temple, 0 dungeon).
-    fn wild_way(&mut self, _m: &mut Machine, _kind: u16) {}
+    /// temple, 0 dungeon), the front end's (`Machine::wild_way` with its
+    /// hooks); by default nothing.
+    fn wild_way(&mut self, _m: &mut Machine, _files: &mut Files, _kind: u16) -> Option<()> {
+        Some(())
+    }
     /// 0000:06BE through 292B:0942: the level's text or item at map
     /// square `ax` (row high, column low; BX the row, as 0942 leaves it).
     /// Some((its record, BX)): CF clear (`Machine::square_lookup`). None
@@ -367,7 +373,7 @@ impl Machine {
                 return Some(());
             }
             if bl == bh || bl == bh.wrapping_add(1) {
-                hooks.wild_flat(self, si);
+                hooks.wild_flat(self, files, si)?;
             }
             return Some(());
         }
@@ -480,7 +486,8 @@ impl Machine {
         if wild && self.g16(0x05BE) & 0x80 == 0 {
             let bh = self.g8(WILD_FLAT);
             if bl == bh || bl == bh.wrapping_add(1) {
-                hooks.wild_flat(self, si);
+                let r = hooks.wild_flat(self, files, si);
+                self.talk_given_up(saved, r)?;
                 return self.talk_end(saved);
             }
         }
@@ -758,7 +765,7 @@ impl Machine {
                         7 => 2,
                         _ => 0,
                     };
-                    hooks.wild_way(self, kind);
+                    hooks.wild_way(self, files, kind)?;
                     return Some(Flow::Menu);
                 }
                 self.names_a(pick as u8);
@@ -1397,6 +1404,113 @@ impl Machine {
     /// 292B:0456 / 0469. "Failure..." or "Success..." for 15 frames.
     fn pick_outcome(&mut self, ok: bool) {
         self.timed_message(if ok { 0x7C05 } else { 0x7BFA });
+    }
+
+    /// 2294:0DD0. The boat in the wild (the record at `si`, a flat of kind
+    /// WILD_FLAT) boarded: its place kept (43CA, 43CC), its square of the
+    /// map cleared, in the boat (C39A bit 4000h, 5CA bit 10h), its prow
+    /// (BOATPROL.IMG, 420F) loaded into the hands' bank (C8F4) at [902E],
+    /// 1012 FFh, the weapon's frame 0, and "Hit 'J' to exit boat." (41B0)
+    /// on the message line for 15 frames. (J leaves it: `jump`.) None
+    /// where the picture isn't loaded.
+    pub fn board_boat(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        let y = self.g16(si.wrapping_add(4));
+        self.mem.w16(DS, 0x43CC, y);
+        let x = self.g16(si);
+        self.mem.w16(DS, 0x43CA, x);
+        let sq = (y >> 7) << 8 | (((x >> 7) as u8).wrapping_add((x >> 7) as u8)) as u16;
+        self.mem.w16(self.g16(MAP), sq, 0);
+        let f = self.g16(LEVEL_FLAGS) | 0x4000;
+        self.mem.w16(DS, LEVEL_FLAGS, f);
+        let f = self.g16(0x05CA) | 0x10;
+        self.mem.w16(DS, 0x05CA, f);
+        self.ems_map(self.g8(0xC8F4) as u16);
+        self.mem.w8(DS, crate::weapon::var::SHOWN, 0xFF);
+        let (off, seg) = (self.g16(0x902E), self.g16(0x9030));
+        self.file_load(files, 0x420F, seg, off)?;
+        self.mem.w16(DS, MESSAGE_TIME, 0xF);
+        self.mem.w16(DS, MESSAGE, 0x41B0);
+        self.mem.w16(DS, MESSAGE + 2, DS);
+        self.mem.w16(DS, crate::weapon::var::FRAME, 0);
+        Some(())
+    }
+
+    /// 217B:0682. The way in the wild to the nearest place of `kind` (1
+    /// an inn, 2 a temple, 0 a dungeon): the wild's nearest block of the
+    /// kind (217B:05C2), told from the player's block (text 104h with the
+    /// player put at the block's corner meanwhile); none, the map's
+    /// first square of the kind's wall (A840) here; none, "I have no
+    /// clue..." (3870). None where the text gives up.
+    pub fn wild_way(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, kind: u16) -> Option<()> {
+        let saved = (self.g16(PX), self.g16(PY));
+        if self.wild_nearest(kind as u8) {
+            self.mem.w16(DS, PX, self.g16(0xA838) << 7);
+            self.mem.w16(DS, PY, self.g16(0xA83A) << 7);
+            self.mem.w16(DS, WAY, self.g16(0xA83C));
+            self.mem.w16(DS, WAY + 2, self.g16(0xA83E));
+        } else {
+            let (seg, ax) = (self.g16(MAP), self.g16(0xA840));
+            let Some(di) = (0..0x4000u16).map(|i| i * 2).find(|&o| self.mem.r16(seg, o) == ax) else {
+                self.mem.w8(DS, TEXT_COLOUR, 0x60);
+                hooks.message_box(self, 0x3870);
+                return Some(());
+            };
+            self.mem.w8(DS, WAY + 2, (di >> 8) as u8);
+            self.mem.w8(DS, WAY, (di as u8) >> 1);
+        }
+        self.mem.w16(DS, TEXT, 0x104);
+        self.mem.w8(DS, TEXT_FLAG, 0);
+        self.mem.w8(DS, TEXT_FLAG2, 0);
+        let r = self.talk_text(files, hooks, 0);
+        self.mem.w16(DS, PY, saved.1);
+        self.mem.w16(DS, PX, saved.0);
+        r
+    }
+
+    /// 217B:05C2. The kind's wall (A840: an inn's or a temple's trigger
+    /// both bytes, C91A or C91B; a dungeon's flat C943 over 80h) and the
+    /// nearest block of the wild's 64 x 64 (bank 11h at [9030]:F000) in
+    /// the kind's list (396B: a count, the block numbers): its place at
+    /// A83C, A83E, the player's block at A838, A83A (the window's 608, 60A
+    /// plus C3D0, C3D4 over 2000h), by the larger distance plus a quarter
+    /// of the smaller under 3E8h. Whether one was found (the carry clear).
+    /// (A list of none leaves the flags of what came before; the game's
+    /// lists all have some.)
+    fn wild_nearest(&mut self, kind: u8) -> bool {
+        let bx = match kind {
+            1 => u16::from_le_bytes([self.g8(0xC91A); 2]),
+            2 => u16::from_le_bytes([self.g8(0xC91B); 2]),
+            _ => 0x8000 | self.g8(0xC943) as u16,
+        };
+        self.mem.w16(DS, 0xA840, bx);
+        let list = self.g16(0x396B + 2 * kind as u16);
+        self.ems_map(0x11);
+        let fs = self.g16(0x9030);
+        let mut bp = 0x3E8u16;
+        let count = self.g8(list) as u16;
+        for at in 0xF000..=0xFFFFu16 {
+            let al = self.mem.r8(fs, at);
+            if !(0..count).any(|i| self.g8(list.wrapping_add(1 + i)) == al) {
+                continue;
+            }
+            let cx = (self.g16(PX) >> 13).wrapping_add(self.g16(0x0608));
+            self.mem.w16(DS, 0xA838, cx);
+            let dx = (self.g16(PY) >> 13).wrapping_add(self.g16(0x060A));
+            self.mem.w16(DS, 0xA83A, dx);
+            let (ax, bx) = ((at - 0xF000) & 0x3F, (at - 0xF000) >> 6);
+            let abs = |v: u16| if (v as i16) < 0 { v.wrapping_neg() } else { v };
+            let (mut a, mut b) = (abs(cx.wrapping_sub(ax)), abs(dx.wrapping_sub(bx)));
+            if a > b {
+                std::mem::swap(&mut a, &mut b);
+            }
+            let d = (a >> 2).wrapping_add(b);
+            if d < bp {
+                self.mem.w16(DS, 0xA83C, ax);
+                self.mem.w16(DS, 0xA83E, bx);
+                bp = d;
+            }
+        }
+        bp != 0x3E8
     }
 }
 

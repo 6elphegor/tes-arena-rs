@@ -460,6 +460,10 @@ impl arena::talk::TalkHooks for Front<'_> {
     }
     /// 23F1:00A3: the place's name noted on the automap at its square,
     /// as the original notes the way told (and a place looked at).
+    /// 217B:0682: the way in the wild, told in the game's box.
+    fn wild_way(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u16) -> Option<()> {
+        m.wild_way(files, self, kind)
+    }
     fn way(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16, x: u16, y: u16) {
         if m.note_add(files, x, y, si).is_none() {
             eprintln!("the note gave up: {}", arena::giveup::describe());
