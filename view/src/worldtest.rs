@@ -135,3 +135,35 @@ fn the_crypt_of_hearts_first_text_as_the_original_draws_it() {
         },
     );
 }
+
+/// South of the crypt's door at row 14, column 4, facing it, the door
+/// given a lock of level 5; clicked in the middle of the view two frames
+/// on: not armed, the lock's words on the message line.
+#[test]
+fn a_locked_door_clicked_as_the_original_answers_it() {
+    world_case(
+        "playlock",
+        Place::Crypt,
+        |a| {
+            at_square(a, 13, 4, 0);
+            let m = &mut a.engine.m;
+            let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+            let rec = arena::movement::var::LOCKS + 3 * n as u16;
+            m.mem.w16(DS, rec, 0x0E04);
+            m.mem.w8(DS, rec + 2, 5);
+            m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+        },
+        |a, d, seen| {
+            frames(a, d, seen, 2, |_| false);
+            // Down for the frame whose controls read it, then up, as the
+            // original's mouse reads give it (its controls act on the
+            // next frame's).
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+            frames(a, d, seen, 1, |_| false);
+        },
+    );
+}

@@ -21,3 +21,10 @@ track | playcrypt | 6 0 140 3c 26c 100
 track | playcrypt | 7 0 140 3c 250 100
 track | playcrypt | 8 0 140 3c 250 100
 screen | playcrypt | 1f4c2a75da1d90ea a97a4bafd992e4ed 6c32ab33561d7ae0
+track | playlock | 0 0 240 3c 6c0 0
+track | playlock | 1 0 240 3c 6c0 0
+track | playlock | 2 0 240 3c 6c0 0
+track | playlock | 3 0 240 3c 6c0 0
+track | playlock | 4 0 240 3c 6c0 0
+track | playlock | 5 0 240 3c 6c0 0
+screen | playlock | e26476349d157b28 a97a4bafd992e4ed f611d32e67f715ba

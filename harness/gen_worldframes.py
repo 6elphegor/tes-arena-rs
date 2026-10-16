@@ -84,11 +84,28 @@ def text_shown(a):
     return a.mu.mem_read(a.lin(a.ds, 0x3C82), 1)[0] != 0
 
 
+def locked_door(a):
+    """South of the door at row 14, column 4 of the crypt's first level
+    (B052h: a kind 1, sliding), facing it (heading 0), the door given a
+    lock of level 5 (a record added to LOCKS, C624, 3 bytes: the square
+    row << 8 | column, the level)."""
+    at_square(13, 4, 0)(a)
+    n = a.mu.mem_read(a.lin(a.ds, 0xC6E4), 1)[0]
+    a.mu.mem_write(a.lin(a.ds, 0xC624 + 3 * n), struct.pack('<HB', 0x0E04, 5))
+    a.mu.mem_write(a.lin(a.ds, 0xC6E4), bytes([n + 1]))
+
+
+def message_up(a):
+    """The message line's time set (061E)."""
+    return a.r16(0x061E) != 0
+
+
 # The main quest's Crypt of Hearts: its .MIF (whose INFO names
 # crypt1.inf).
 CRYPT = b'41649375.MIF'
 
-# name: (where, set-up, [(keys held, keys let go, frames, until)...])
+# name: (where, set-up, [(keys held, keys let go, frames, until[, clicks])...]):
+# the clicks (x, y) are queued for the mouse's reads before the frames.
 CASES = {
     # The dungeon's first frames, nothing held: the interface and the
     # compass as play draws them.
@@ -103,6 +120,11 @@ CASES = {
     # column 2), whose trigger shows the INF's first text (0000:0628);
     # let go, a frame more: the text over the view (0000:0605).
     'playcrypt': ('crypt', facing(0x100), [((UP,), (), 20, text_shown), ((), (UP,), 1, None)]),
+    # A locked door (`locked_door`) clicked in the middle of the view two
+    # frames on: not armed (5CA bit 0 clear), not picked, the lock's words
+    # by the player's chance put on the message line (2826:09AC, 0B1A),
+    # which the next frames draw.
+    'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
 
@@ -149,7 +171,8 @@ def play(a, name, steps, tracks):
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
         frame[0] += 1
-    for held, let_go, n, until in steps:
+    for held, let_go, n, until, *clicks in steps:
+        a.clicks.extend(clicks[0] if clicks else [])
         if held:
             a.keys_held(held)
         if let_go:
