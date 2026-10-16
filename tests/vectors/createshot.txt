@@ -1,3 +1,30 @@
+createshot | roll | script | G,enter,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,A
+createshot | roll | 0 | key:47@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
+createshot | roll | 1 | buffered:0d@1194:5545 | f77a84787555d629 | e7a843e801b942b4
+createshot | roll | 2 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 3 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 4 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 5 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 6 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 7 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 8 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 9 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 10 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 11 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 12 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 13 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 14 | click:160:125@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 15 | click:160:125@3159:00B9 | 565b9001a57c26fb | e7a843e801b942b4
+createshot | roll | 16 | click:160:125@3159:00B9 | 293ead92f5ef3868 | e7a843e801b942b4
+createshot | roll | 17 | click:160:125@3159:00B9 | c2f234fd9cf99820 | e7a843e801b942b4
+createshot | roll | 18 | click:160:125@3159:00B9 | 98fd52f1cdf3257b | e7a843e801b942b4
+createshot | roll | 19 | click:160:125@3159:00B9 | 3d795cfa26688be2 | e7a843e801b942b4
+createshot | roll | 20 | click:160:125@3159:00B9 | 1c37c033e7966852 | e7a843e801b942b4
+createshot | roll | 21 | click:160:125@3159:00B9 | 9e0ba3902bf3275f | e7a843e801b942b4
+createshot | roll | 22 | click:160:125@3159:00B9 | 6d84682a08fb8aba | e7a843e801b942b4
+createshot | roll | 23 | click:160:125@3159:00B9 | 381f705e92cc75a0 | e7a843e801b942b4
+createshot | roll | 24 | key:41@3159:0047 | b7098b01e5753cb3 | e7a843e801b942b4
+createshot | roll | 25 | end@3159:0047 | 3539c4388e710d97 | ea6c609d1b1524f0
 createshot | generate | script | G,enter,A,B,C,A,B,C,A,B,C,A,N,enter
 createshot | generate | 0 | key:47@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | generate | 1 | buffered:0d@1194:5545 | f77a84787555d629 | e7a843e801b942b4

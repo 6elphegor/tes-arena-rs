@@ -47,9 +47,11 @@
 //! checked against the original's (`createtest`). Each answer plays its
 //! kind's figure (WARRIOR.CEL, ROGUE.CEL, MAGE.CEL, 222C:011A); the next
 //! question's screen covers it, and the class offered after the last is
-//! drawn over what it left. Left out: the map's scroll unrolling (TOP.DFA,
-//! 1194:5B58: it ends off the screen), the questions' scroll rolling by
-//! the pixel (here by the line), the fades.
+//! drawn over what it left. The questions' scroll rolls a row at a time
+//! with its rollers turning (222C:040B, 045D). Between screens the
+//! original's dissolves, fades and colours set play frame by frame
+//! (`Film`). Left out: the map's scroll unrolling (TOP.DFA, 1194:5B58:
+//! it ends off the screen).
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -191,7 +193,7 @@ struct Ask {
 #[derive(Clone, Debug)]
 enum Stage {
     Method(Ask),
-    Quiz { asked: u8, lines: Vec<String>, top: usize },
+    Quiz { asked: u8, roll: Roll },
     ClassYes(Ask, u8),
     List(Ask),
     /// The name asked (1194:2711): the prompt, the game's editor on the
@@ -240,7 +242,9 @@ struct Pics {
     start: Option<(Image, [[u8; 4]; 256])>,
     map: Option<(Image, [[u8; 4]; 256])>,
     noexit: Option<Image>,
-    scroll: Option<Image>,
+    /// The scroll's 16 rollers' frames (SCROLL01.DFA's then SCROLL02's:
+    /// 222C:03B1 by 129C).
+    rollers: Vec<Image>,
     charstat: Option<Image>,
     bonus: Option<Image>,
     updown: Vec<u8>,
@@ -305,7 +309,7 @@ pub struct Creation {
     /// 2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
     face_back: Option<(Vec<u16>, Vec<u16>)>,
     /// The last question's lines and its roll, under the class offered.
-    quiz_shown: Option<(Vec<String>, usize)>,
+    quiz_shown: Option<Roll>,
     outcome: Option<Outcome>,
     /// The frames of the screen's change playing (`Film`), the first now.
     film: VecDeque<(Vec<u8>, Dac)>,
@@ -359,13 +363,35 @@ pub(crate) fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256
     Some((img, pal))
 }
 
-/// A .DFA's first frame, at its header's place.
-fn dfa_first(archive: &Archive, name: &str) -> Option<Image> {
-    let d = archive.read(name)?;
+/// A .DFA's frames, each at its header's place.
+fn dfa_frames(archive: &Archive, name: &str) -> Vec<Image> {
+    let Some(d) = archive.read(name) else { return Vec::new() };
     let le = |at: usize| u16::from_le_bytes([*d.get(at).unwrap_or(&0), *d.get(at + 1).unwrap_or(&0)]) as i16 as i32;
-    let f = crate::flats::decode(1, &d)?;
-    Some(Image { x: le(2), y: le(4), w: f.w, h: f.h, px: f.frames.into_iter().next()? })
+    let Some(f) = crate::flats::decode(1, &d) else { return Vec::new() };
+    f.frames.into_iter().map(|px| Image { x: le(2), y: le(4), w: f.w, h: f.h, px }).collect()
 }
+
+/// The questions' scroll as 222C keeps it: the text's strings (the
+/// buffer at 40F0: a LF, the question less its last byte, two LFs; each
+/// LF a string's end, 02D4), the bitmap they're drawn into (40F2: 8 lines
+/// of 8 rows, a line from x 14h in EEh, 04E5), the top line (1298), the
+/// rows rolled past it (129A / 140h), the rollers' frame (129C) and the
+/// last top line the scroll goes to (1296: the strings' count, at most 8).
+#[derive(Clone, Debug)]
+struct Roll {
+    strings: Vec<String>,
+    bitmap: Vec<u8>,
+    line: usize,
+    off: usize,
+    frame: usize,
+    last: usize,
+    /// The rollers as drawn so far: each frame over the last, its 0s
+    /// see-through (5526), what earlier ones drew left where it has 0.
+    rollers: Vec<u8>,
+}
+
+/// The bitmap's rows (0..64; 0x4600 bytes are shifted, 0x3C00 shown).
+const ROLL_ROWS: usize = 64;
 
 /// The dissolve's generator (1194:5065: x 5E5h + 29h, 16 bits).
 const DISSOLVE_SEED: u16 = 0x4B8E;
@@ -547,7 +573,7 @@ impl Creation {
             start: mnu(&archive, "STARTGAM.MNU"),
             map: mnu(&archive, "TAMRIEL.MNU"),
             noexit: crate::panels::load_image(&archive, m, "NOEXIT.IMG"),
-            scroll: dfa_first(&archive, "SCROLL01.DFA"),
+            rollers: dfa_frames(&archive, "SCROLL01.DFA").into_iter().chain(dfa_frames(&archive, "SCROLL02.DFA")).collect(),
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
@@ -611,7 +637,7 @@ impl Creation {
             start: None,
             map: None,
             noexit: None,
-            scroll: None,
+            rollers: Vec::new(),
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
@@ -1021,7 +1047,7 @@ impl Creation {
                 // S, or Esc (FFFFh, not 0): the list.
                 Some(_) => self.list(engine),
             },
-            Stage::Quiz { asked, lines, mut top } => match inp {
+            Stage::Quiz { asked, mut roll } => match inp {
                 Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()) => {
                     let a = c.to_ascii_uppercase() - b'A';
                     engine.m.quiz_answer(a);
@@ -1034,21 +1060,21 @@ impl Creation {
                     if asked + 1 < 10 {
                         self.next_question(engine, asked + 1)
                     } else {
-                        self.quiz_shown = Some((lines, top));
+                        self.quiz_shown = Some(roll);
                         self.quiz_done(engine)
                     }
                 }
-                Input::Up | Input::Click(_, 119..=136) => {
-                    top = top.saturating_sub(1);
-                    Stage::Quiz { asked, lines, top }
+                // The top roller rolls on (222C:0641), the bottom back
+                // (0612): a row each.
+                Input::Down | Input::Click(_, 119..=136) => {
+                    self.roll_on(&mut roll);
+                    Stage::Quiz { asked, roll }
                 }
-                Input::Down | Input::Click(_, 183..=199) => {
-                    if top + 5 < lines.len() {
-                        top += 1;
-                    }
-                    Stage::Quiz { asked, lines, top }
+                Input::Up | Input::Click(_, 183..=199) => {
+                    self.roll_back(&mut roll);
+                    Stage::Quiz { asked, roll }
                 }
-                _ => Stage::Quiz { asked, lines, top },
+                _ => Stage::Quiz { asked, roll },
             },
             Stage::ClassYes(mut ask, class) => match self.ask_input(&mut ask, inp) {
                 None => Stage::ClassYes(ask, class),
@@ -1171,8 +1197,105 @@ impl Creation {
             return self.list(engine);
         };
         let text = engine.m.mem.cstr(seg, di).to_vec();
-        let lines = text.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
-        Stage::Quiz { asked, lines, top: 0 }
+        Stage::Quiz { asked, roll: self.roll_new(&text) }
+    }
+
+    /// The scroll for question `text` (222C:02D4, 034C): the strings, the
+    /// first `last` drawn from the bitmap's top.
+    fn roll_new(&self, text: &[u8]) -> Roll {
+        let mut buf = vec![b'\n'];
+        buf.extend_from_slice(&text[..text.len().saturating_sub(1)]);
+        buf.extend_from_slice(b"\n\n");
+        let count = buf.iter().filter(|&&b| b == b'\n').count();
+        let strings = buf.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
+        let mut roll = Roll { strings, bitmap: vec![0; W * ROLL_ROWS], line: 0, off: 0, frame: 0, last: count.min(8), rollers: vec![0; W * H] };
+        self.roll_frame(&mut roll);
+        let last = roll.last;
+        self.roll_draw(&mut roll, 0, 0, last);
+        roll
+    }
+
+    /// 0000:9E06 into the bitmap: `n` strings from `first`, a line every
+    /// 8 rows from row `y` (past the bitmap: not kept).
+    fn roll_draw(&self, roll: &mut Roll, first: usize, y: usize, n: usize) {
+        let mut s = Screen::new(self.pics.game);
+        s.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+        s.blit(0, 0, W, ROLL_ROWS, &roll.bitmap, H as i32);
+        for j in 0..n {
+            let row = y + 8 * j;
+            if row >= ROLL_ROWS {
+                break;
+            }
+            // Past the strings the original reads on into the heap.
+            if let Some(t) = roll.strings.get(first + j) {
+                s.text_plain(&self.fonts.teeny, 0x14, row as i32, t, COLOUR_A);
+            }
+        }
+        for (b, &i) in roll.bitmap.iter_mut().zip(s.indices()) {
+            *b = i as u8;
+        }
+    }
+
+    /// The rollers' frame now drawn over those before (03B1).
+    fn roll_frame(&self, roll: &mut Roll) {
+        if let Some(i) = self.pics.rollers.get(roll.frame) {
+            for r in 0..i.h {
+                for c in 0..i.w {
+                    let (x, y) = (i.x + c as i32, i.y + r as i32);
+                    let v = i.px[r * i.w + c];
+                    if v != 0 && (0..W as i32).contains(&x) && (0..H as i32).contains(&y) {
+                        roll.rollers[y as usize * W + x as usize] = v;
+                    }
+                }
+            }
+        }
+    }
+
+    /// 222C:045D: a row on; past the bitmap's first line, the lines
+    /// shifted up (04BC) and the next drawn into the last (04E5 at 38h),
+    /// unless the top is now the last.
+    fn roll_on(&self, roll: &mut Roll) {
+        if roll.line > roll.last {
+            return;
+        }
+        if roll.off != 7 {
+            roll.off += 1;
+            roll.frame = (roll.frame + 1) & 15;
+            return self.roll_frame(roll);
+        }
+        roll.off = 0;
+        roll.bitmap.copy_within(8 * W..ROLL_ROWS * W, 0);
+        roll.line += 1;
+        if roll.line == roll.last {
+            return;
+        }
+        roll.frame = (roll.frame + 1) & 15;
+        self.roll_frame(roll);
+        roll.bitmap[56 * W..].fill(0);
+        let first = roll.line + 7;
+        self.roll_draw(roll, first, 56, 0x140);
+    }
+
+    /// 222C:040B: a row back; at the bitmap's top, the lines shifted down
+    /// and the one before drawn into the first (04E5 at 0, the strings
+    /// after it over the rest).
+    fn roll_back(&self, roll: &mut Roll) {
+        if roll.off != 0 {
+            roll.off -= 1;
+            roll.frame = (roll.frame + 15) & 15;
+            return self.roll_frame(roll);
+        }
+        if roll.line == 0 {
+            return;
+        }
+        roll.off = 7;
+        roll.frame = (roll.frame + 15) & 15;
+        self.roll_frame(roll);
+        roll.bitmap.copy_within(0..56 * W, 8 * W);
+        roll.line -= 1;
+        roll.bitmap[..8 * W].fill(0);
+        let first = roll.line;
+        self.roll_draw(roll, first, 0, 0x140);
     }
 
     /// The figure of answers of `kind` (222C:011A: the name at
@@ -1627,8 +1750,8 @@ impl Creation {
         match &self.stage {
             Stage::ClassYes(a, _) => {
                 // Over the questions as the last answer left them.
-                if let Some((lines, top)) = &self.quiz_shown {
-                    self.draw_quiz(screen, m, lines, *top);
+                if let Some(roll) = &self.quiz_shown {
+                    self.draw_quiz(screen, m, roll);
                 }
                 if let Some(i) = &self.pics.cel {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
@@ -1638,7 +1761,7 @@ impl Creation {
                 }
             }
             Stage::Method(a) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) if ui => self.draw_ask(screen, a, back),
-            Stage::Quiz { lines, top, .. } => self.draw_quiz(screen, m, lines, *top),
+            Stage::Quiz { roll, .. } => self.draw_quiz(screen, m, roll),
             Stage::Name(prompt, live) if ui => {
                 // The prompt's box with its line of room (5C34's "%s\r"
                 // and spaces), the field over it where 5C34 puts it.
@@ -1649,21 +1772,14 @@ impl Creation {
         }
     }
 
-    /// The questions' scroll (SCROLL01.DFA) with the text's bitmap
-    /// (222C:04E5: a line every 8 rows from its second, x 14h, in EEh)
-    /// shown through rows 136..183 (03E9), `top` lines rolled up, over the
-    /// figures as lit.
-    fn draw_quiz(&self, screen: &mut Screen, m: &Machine, lines: &[String], top: usize) {
+    /// The questions' scroll (its rollers' frame, 222C:03B1) with the
+    /// text's bitmap from the rows rolled past its top line, 48 rows into
+    /// rows 136..183, its 0s see-through (03E9), over the figures as lit.
+    fn draw_quiz(&self, screen: &mut Screen, m: &Machine, roll: &Roll) {
         self.quiz_figures(screen, m);
-        if let Some(s) = &self.pics.scroll {
-            screen.blit(s.x, s.y, s.w, s.h, &s.px, H as i32);
-        }
-        for (k, l) in lines.iter().enumerate() {
-            let y = 136 + 8 * (k as i32 + 1 - top as i32);
-            if (136..184).contains(&y) {
-                screen.text_plain(&self.fonts.teeny, 0x14, y, l, COLOUR_A);
-            }
-        }
+        screen.blit(0, 0, W, H, &roll.rollers, H as i32);
+        let at = roll.off * W;
+        screen.blit(0, 136, W, 48, &roll.bitmap[at..at + 48 * W], H as i32);
     }
 
     /// The figures behind the questions lit as the answers go (222C:0149:
