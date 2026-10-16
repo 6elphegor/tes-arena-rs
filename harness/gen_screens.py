@@ -54,10 +54,18 @@ SCREENS = {
     'sheet': (0x00BE, []),
     # Its "Next Page" button (6Ah..9Dh, B2h..C0h): the equipment page.
     'equipment': (0x00BE, [('click', 0x80, 0xB8)]),
+    # A line of the equipment page's list clicked (its second: marked),
+    # and its Spellbook button (the sheet's spells).
+    'equipmentpick': (0x00BE, [('click', 0x80, 0xB8), ('click', 60, 62)]),
+    'equipmentspells': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194)]),
+    # The marked line clicked again: its item (worn) taken off (1194:1AFB).
+    'equipmentoff': (0x00BE, [('click', 0x80, 0xB8), ('click', 60, 62), ('click', 60, 62)]),
     # S: the status box (037C: 04B1).
     'status': (0x037C, []),
     # L: the logbook (02A3: 27E3:0088), its first page.
     'logbook': (0x02A3, []),
+    # Its More... (27E3's): the next page.
+    'logbookmore': (0x02A3, [('click', 285, 172)]),
     # C: the spellbook (026D: 056A).
     'spellbook': (0x026D, []),
     # A line of it clicked (the second): marked, as the use list's.

@@ -3319,15 +3319,11 @@ impl App {
                             let back = inv.from_sheet;
                             self.panel = back.then_some(panels::Panel::Sheet)
                         },
-                        panels::Button::Spellbook => self.panel = Some(panels::Panel::Spellbook(Default::default())),
+                        panels::Button::Spellbook => panels::spells_button(&mut self.engine.m, &mut said),
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
-                } else if let Some(row) = panels::line_at(x, y) {
-                    if right {
-                        panels::select_line(&mut self.engine.m, row);
-                    } else {
-                        panels::equip_line(&mut self.engine.m, row, &mut said);
-                    }
+                } else if panels::line_at(x, y).is_some() {
+                    panels::line_click(&mut self.engine.m, y, right, &mut said);
                 }
             }
             // A line of the list in the bar's corner clicked (2542:06F8):

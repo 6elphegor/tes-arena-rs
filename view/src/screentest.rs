@@ -207,6 +207,49 @@ fn the_equipment_page_as_the_original_draws_it() {
     );
 }
 
+/// The equipment page's second line clicked: marked.
+#[test]
+fn the_equipment_page_with_a_line_marked_as_the_original_draws_it() {
+    screen(
+        "equipmentpick",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The marked line clicked again: the boots taken off.
+#[test]
+fn an_item_taken_off_as_the_original_draws_it() {
+    screen(
+        "equipmentoff",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The equipment page's Spellbook button: the spells' page.
+#[test]
+fn the_sheets_spellbook_as_the_original_draws_it() {
+    screen(
+        "equipmentspells",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// S: the status box (2542:037C, 04B1).
 #[test]
 fn the_status_box_as_the_original_draws_it() {
@@ -217,6 +260,19 @@ fn the_status_box_as_the_original_draws_it() {
 #[test]
 fn the_logbook_as_the_original_draws_it() {
     screen("logbook", |a, d| d.key(a, KeyCode::KeyL, Some("l")), layer);
+}
+
+/// The logbook's More...: its next page.
+#[test]
+fn the_logbooks_next_page_as_the_original_draws_it() {
+    screen(
+        "logbookmore",
+        |a, d| {
+            d.key(a, KeyCode::KeyL, Some("l"));
+            d.click(a, 285, 172, MouseButton::Left);
+        },
+        layer,
+    );
 }
 
 /// C: the spellbook (2542:026D, 056A).

@@ -46,6 +46,10 @@ pub struct Pics {
     pub small: Option<Font>,
     /// POINTER.IMG, the automap's pen at the mouse (0000:2D8A).
     pub pointer: Option<Image>,
+    /// The equipment screen's spells page (1194:2229): its title and the
+    /// button back to the items.
+    pub spellbk: Option<Image>,
+    pub equipb: Option<Image>,
 }
 
 thread_local! {
@@ -84,6 +88,8 @@ pub fn pics(archive: &Archive, m: &Machine) -> Rc<Pics> {
                     font_a: Font::load(archive, "FONT_A.DAT"),
                     small: Font::load(archive, "FONT_S.DAT"),
                     pointer: crate::panels::load_image(archive, m, "POINTER.IMG"),
+                    spellbk: crate::panels::load_image(archive, m, "SPELLBK.IMG"),
+                    equipb: crate::panels::load_image(archive, m, "EQUIPB.IMG"),
                 })
             })
             .clone()

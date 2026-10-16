@@ -84,3 +84,7 @@ screen | restpassed | 89f410fe5ddbe3a5 a97a4bafd992e4ed 862a30dbb9d0529
 screen | restrested | c558d06aeb17d a97a4bafd992e4ed cd8070325fb6f535
 screen | spellself | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
 screen | spelllight | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25
+screen | equipmentpick | 17c99c6fbd96a826 ef6ad023fa2b8c2b
+screen | equipmentspells | 7f7eccde5c640741 ef6ad023fa2b8c2b
+screen | logbookmore | 2f73e56cb1922472 491d016160c27c96
+screen | equipmentoff | 8e8691788f7b16b3 ef6ad023fa2b8c2b
