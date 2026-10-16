@@ -338,8 +338,6 @@ impl arena::trigger::TriggerHooks for Front<'_> {
         Some(())
     }
 }
-/// Exhaustion's boxes, and the level-up screen with its notice and
-/// refusal in boxes (its points spent in turn: no attribute screen yet).
 /// A fight's hooks through the front end: Jagar's words before a main
 /// quest's encounter (1194:D91C) played as the original plays them.
 struct FightFront<'a, 'b>(&'a mut Front<'b>);
@@ -350,6 +348,9 @@ impl arena::encounter::FightHooks for FightFront<'_, '_> {
     }
 }
 
+/// The clock's: exhaustion's boxes, the level-up screen (its points spent
+/// on the attribute screen, `LevelUpHooks`), the quests' deadlines and
+/// ambushes with their texts.
 impl arena::clock::ClockHooks for Front<'_> {
     /// 1194:887A with the fight's hooks the front end's (`FightFront`).
     fn encounter(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -360,6 +361,23 @@ impl arena::clock::ClockHooks for Front<'_> {
     }
     fn level_up_screen(&mut self, m: &mut arena::machine::Machine, levels: u16) -> Option<()> {
         arena::levelup::level_up_around(m, levels, self)
+    }
+    /// 1194:99F8: the quests' deadlines by the day, their texts in boxes
+    /// (`questui::QuestFront`).
+    fn quests_daily(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.quests_daily(&mut questui::QuestFront(self, files.clone()));
+        Some(())
+    }
+    /// 1194:98E8: the quests' deadlines by the hour, likewise.
+    fn quests_hourly(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.quests_hourly(files, &mut questui::QuestFront(self, files.clone()));
+        Some(())
+    }
+    /// 1194:86F2: a quest's ambush, its text shown (the fight's
+    /// graphics and music are the view's own, as for `NoFightHooks`).
+    fn encounter_minute(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        let fs = files.clone();
+        m.quest_ambush(files, &mut arena::encounter::NoFightHooks, &mut questui::QuestFront(self, fs))
     }
 }
 impl arena::levelup::LevelUpHooks for Front<'_> {

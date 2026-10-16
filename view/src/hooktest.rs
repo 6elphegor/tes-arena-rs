@@ -103,3 +103,27 @@ fn drowning_shows_its_box() {
     assert!(!s.trim().is_empty());
     eprintln!("{s}");
 }
+
+/// A quest past its deadline at the day's turn (1194:99F8): its stage's
+/// text in a box (9C96), through the clock's hook.
+#[test]
+fn a_quests_deadline_passing_shows_its_text() {
+    let Some(mut e) = engine() else { return };
+    let m = &mut e.m;
+    let others = arena::quest::var::OTHERS;
+    for i in 0..4 {
+        m.mem.w16(DS, others + i * 0x29 + 4, 0);
+    }
+    m.mem.w16(DS, others + 4, 1 << 6);
+    m.mem.w32(DS, others + 0xC, 0);
+    m.mem.w32(DS, arena::quest::var::TIME, 100);
+    m.mem.w8(DS, 0x1013, 0);
+    let mut talk = dialog::Talk::default();
+    let mut front = Front { talk: Some(&mut talk), ..Default::default() };
+    let mut fs = e.files.clone();
+    arena::clock::ClockHooks::quests_daily(&mut front, m, &mut fs).unwrap();
+    assert_eq!(m.mem.r16(DS, others + 4), 0, "the quest cleared");
+    let s = said(&talk);
+    assert!(!s.trim().is_empty(), "its text shown");
+    eprintln!("{s}");
+}

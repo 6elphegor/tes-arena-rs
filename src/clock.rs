@@ -51,7 +51,7 @@ pub trait ClockHooks {
     /// 1194:99F8, daily: the deadlines of the records at 0DCA
     /// (`quest::quests_daily`, its texts and files left out; override to
     /// show them).
-    fn quests_daily(&mut self, m: &mut Machine) -> Option<()> {
+    fn quests_daily(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         m.quests_daily(&mut crate::quest::NoQuestHooks);
         Some(())
     }
@@ -159,7 +159,7 @@ impl Machine {
             old != v
         };
         if changed(self, var::DAY, day) {
-            self.day_passes(hooks)?;
+            self.day_passes(files, hooks)?;
         }
         if changed(self, var::HOUR, (rem / 60) as u16) {
             self.hour_passes(files, hooks)?;
@@ -183,8 +183,8 @@ impl Machine {
 
     /// 0000:1607. A new day: quest deadlines, flag 5E0 bit 0x100 cleared,
     /// the weather, and a Knight (class byte 11h) repairs their gear.
-    fn day_passes(&mut self, hooks: &mut dyn ClockHooks) -> Option<()> {
-        hooks.quests_daily(self)?;
+    fn day_passes(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
+        hooks.quests_daily(self, files)?;
         let f = self.mem.r16(DS, 0x05E0) & !0x100;
         self.mem.w16(DS, 0x05E0, f);
         self.weather_roll()?;
@@ -349,7 +349,7 @@ impl ClockHooks for NoClockHooks {
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
+    fn quests_daily(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
     fn quests_hourly(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {

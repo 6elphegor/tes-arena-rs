@@ -53,7 +53,7 @@ impl ClockHooks for Stubs {
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    fn quests_daily(&mut self, _m: &mut Machine) -> Option<()> {
+    fn quests_daily(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         Some(())
     }
     fn quests_hourly(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
