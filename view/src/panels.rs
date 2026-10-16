@@ -109,6 +109,27 @@ pub fn item_lines(m: &Machine) -> Vec<Line> {
     out
 }
 
+/// The quests' lines after the items (1194:1EB8: 1194:A206 then
+/// 2433:083D into 1044, `Machine::quest_item_names`), on a copy.
+pub fn quest_lines(m: &Machine, files: &arena::bsa::Files) -> Vec<String> {
+    let mut c = m.clone();
+    let mut fs = files.clone();
+    c.mem.w16(DS, arena::questitems::var::COUNT, 0);
+    let Some(more) = c.quest_item_names(&mut fs, 0x1044) else {
+        eprintln!("the quests' lines gave up: {}", arena::giveup::describe());
+        return Vec::new();
+    };
+    let n = c.mem.r16(DS, arena::questitems::var::COUNT).wrapping_add(more);
+    let mut at = 0x1044u16;
+    (0..n.min(64))
+        .map(|_| {
+            let t = c.mem.cstr(DS, at).to_vec();
+            at = at.wrapping_add(t.len() as u16 + 1);
+            String::from_utf8_lossy(&t).into_owned()
+        })
+        .collect()
+}
+
 /// A spell of the player's book: its index, name and cost at the
 /// player's level (29CF:071F: +32h / (level + 1)).
 #[derive(Clone, Debug)]
@@ -233,6 +254,9 @@ pub struct Inventory {
     /// An item's description up over the list's foot (1194:1988): its
     /// lines and their colours, until a click.
     pub info: Option<Vec<(String, u8)>>,
+    /// Where those lines start when not where 1988 puts them (1BE0's
+    /// "can't be equipped" at A0h).
+    pub info_y: Option<i32>,
     /// A spell's page up (1194:1B3C, from the spells' page).
     pub page: Option<SpellPage>,
     /// Left by a spell's page's Exit (1194:53B5): the screen put back as
@@ -447,11 +471,19 @@ pub fn equipment_page(m: &mut Machine) -> Panel {
 pub struct Said {
     pub boxes: Vec<Vec<Vec<Span>>>,
     pub pick: Option<u16>,
+    /// A refusal the equipment screen draws in its list's panel (1194:
+    /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
+    /// not in a box.
+    pub panel: Option<String>,
 }
 
 impl Said {
     fn text(&mut self, bytes: &[u8]) {
         self.boxes.push(crate::hud::lines(bytes, 0x0F));
+    }
+    fn in_panel(&mut self, bytes: &[u8]) {
+        let t = bytes.split(|&c| c == b'\r').next().unwrap_or_default();
+        self.panel = Some(String::from_utf8_lossy(t).into_owned());
     }
 }
 
@@ -478,11 +510,11 @@ impl arena::use_item::UseHooks for Said {
     /// 1194:1BE0: "This item can't be equipped." with another list up, for
     /// an accessory or a stack, or an item of type word 0 (+6); otherwise
     /// "%ss cannot equip this item." with the class's name (the thief's
-    /// own plural for class 0Ah).
+    /// own plural for class 0Ah); in the list's panel (223A).
     fn cant_use(&mut self, m: &mut Machine, si: u16, cat: u16) {
         if m.mem.r16(DS, NOT_OWN) != 0 || cat >= 2 || m.mem.r16(DS, si + 6) == 0 {
             let t = m.mem.cstr(DATA, CANT_EQUIP).to_vec();
-            self.text(&t);
+            self.in_panel(&t);
             return;
         }
         let class = m.mem.r8(DS, arena::character::PLAYER + arena::character::field::CLASS) & 0x1F;
@@ -493,16 +525,17 @@ impl arena::use_item::UseHooks for Said {
             m.mem.cstr(seg, off).to_vec()
         };
         let fmt = m.mem.cstr(DATA, CLASS_CANT).to_vec();
-        self.text(&printf_s(&fmt, &name));
+        self.in_panel(&printf_s(&fmt, &name));
     }
     /// 1194:1B78: "You can only equip one %s." with the kind's name (the
-    /// rings' list at 1DD1, or the bracelets' at 2028 with 12A0 set).
+    /// rings' list at 1DD1, or the bracelets' at 2028 with 12A0 set), in
+    /// the list's panel (223A).
     fn clash(&mut self, m: &mut Machine, _si: u16, base: u16) {
         let list = if m.mem.r16(DS, 0x12A0) != 0 { 0x2028 } else { 0x1DD1 };
         let at = m.skip_strings(DS, list, base);
         let name = m.mem.cstr(DS, at).to_vec();
         let fmt = m.mem.cstr(DATA, ONLY_ONE).to_vec();
-        self.text(&printf_s(&fmt, &name));
+        self.in_panel(&printf_s(&fmt, &name));
     }
 }
 
@@ -549,12 +582,28 @@ pub fn spells_button(m: &mut Machine, said: &mut Said) {
 /// alone: the first line's ends at 3Dh, each next 0Bh lower, over the
 /// lines shown (the items or the book's spells, at most seven); below
 /// them none (FFh).
-fn mark_at(m: &mut Machine, y: i32) -> u8 {
-    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as usize } else { item_lines(m).len() };
+fn mark_at(m: &mut Machine, y: i32, quests: usize) -> u8 {
+    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as usize } else { item_lines(m).len() + quests };
     let shown = n.min(LIST_LINES);
     let mark = (0..shown).find(|&i| y <= 0x3D + 0x0B * i as i32).map_or(0xFF, |i| m.mem.r8(DS, FIRST_LINE).wrapping_add(i as u8));
     m.mem.w8(DS, SELECTED, mark);
     mark
+}
+
+/// 1194:1988 for a quest's line (1270): "This item is needed to complete
+/// your quest..." (DATA:5AF3), or for the last of `lines` with staff
+/// pieces held (1F56: 1272) "You currently have %d piece(s) of the Staff
+/// of Chaos." (5B36 with F77); three lines, all in FEh (12B2 1).
+fn quest_info(m: &mut Machine, lines: usize) -> Vec<(String, u8)> {
+    let pieces = m.mem.r8(DS, arena::questitems::var::PIECES);
+    let staff = pieces != 0 && m.mem.r8(DS, SELECTED) as usize + 1 == lines;
+    let text = if staff {
+        m.sprintf((DS, 0x1044), (DATA, 0x5B36), &[arena::format::Arg::Int(pieces as u16)]);
+        m.mem.cstr(DS, 0x1044).to_vec()
+    } else {
+        m.mem.cstr(DATA, 0x5AF3).to_vec()
+    };
+    text.split(|&c| c == b'\r').take(3).map(|l| (String::from_utf8_lossy(l).into_owned(), 0xFE)).collect()
 }
 
 /// Whether a click at row `y` (`right`: the right button) opens the
@@ -562,7 +611,7 @@ fn mark_at(m: &mut Machine, y: i32) -> u8 {
 /// marked (1194:1AD6 -> 1B3C).
 pub fn opens_page(m: &Machine, y: i32, right: bool) -> bool {
     let old = m.mem.r8(DS, SELECTED);
-    let mark = mark_at(&mut m.clone(), y);
+    let mark = mark_at(&mut m.clone(), y, 0);
     !right && m.mem.r8(DS, OWN_ITEMS) == 0 && mark != 0xFF && mark == old
 }
 
@@ -629,11 +678,29 @@ fn item_info(m: &mut Machine, files: &mut arena::bsa::Files, said: &mut Said) ->
 /// marked puts its item on or takes it off (1AFB).
 pub fn line_click(m: &mut Machine, files: &mut arena::bsa::Files, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
     let old = m.mem.r8(DS, SELECTED);
-    let mark = mark_at(m, y);
+    // 1C5E: the items (129D) and the quests' lines (126C, as the list
+    // last drew them).
+    let quests = if m.mem.r8(DS, OWN_ITEMS) != 0 { quest_lines(m, files) } else { Vec::new() };
+    let items = item_lines(m).len();
+    let mark = mark_at(m, y, quests.len());
+    // A quest's line (1CBF: the mark past the items, 1270): a right click
+    // describes it (1988), a left click on it marked again can't equip it
+    // (1AFB -> 1BE0).
+    if mark != 0xFF && mark as usize >= items && m.mem.r8(DS, OWN_ITEMS) != 0 {
+        if right {
+            inv.info = Some(quest_info(m, items + quests.len()));
+        } else if mark == old {
+            let t = String::from_utf8_lossy(m.mem.cstr(DATA, CANT_EQUIP)).trim_end_matches('\r').to_string();
+            inv.info = Some(vec![(t, 0xA0)]);
+            inv.info_y = Some(0xA0);
+        }
+        return;
+    }
     // 1194:1CE5: a right click on the player's own items describes the
     // line marked.
     if right && mark != 0xFF && m.mem.r8(DS, OWN_ITEMS) != 0 {
         inv.info = item_info(m, files, said);
+        inv.info_y = None;
     }
     if mark == 0xFF || mark != old || right {
         return;
@@ -646,6 +713,10 @@ pub fn line_click(m: &mut Machine, files: &mut arena::bsa::Files, inv: &mut Inve
     }
     if m.equip_click(said, mark as u16).is_none() {
         eprintln!("equipping gave up: {}", arena::giveup::describe());
+    }
+    if let Some(t) = said.panel.take() {
+        inv.info = Some(vec![(t, 0xA0)]);
+        inv.info_y = Some(0xA0);
     }
 }
 
@@ -781,7 +852,7 @@ pub fn arrow_at(x: i32, y: i32) -> Option<i32> {
 /// 1194:1A4A / 1A94: the first line shown one on, while seven or more
 /// lines (the items, or the book's spells) leave lines below; or one
 /// back, unless at the first.
-pub fn arrow(m: &mut Machine, d: i32) {
+pub fn arrow(m: &mut Machine, files: &arena::bsa::Files, d: i32) {
     let first = m.mem.r8(DS, FIRST_LINE);
     if d < 0 {
         if first != 0 {
@@ -789,7 +860,8 @@ pub fn arrow(m: &mut Machine, d: i32) {
         }
         return;
     }
-    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as u16 } else { item_lines(m).len() as u16 };
+    // 1A4A: the items (129D) and the quests' lines (126C), or the book's.
+    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as u16 } else { (item_lines(m).len() + quest_lines(m, files).len()) as u16 };
     if n >= 7 && first as u16 != n - 7 {
         m.mem.w8(DS, FIRST_LINE, first.wrapping_add(1));
     }
@@ -872,15 +944,36 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                     screen.text_plain(teeny, LIST_X, y, &String::from_utf8_lossy(name), 0x53);
                 }
             } else {
+                // 1DE9: seven slots from the top (to 28h), the taken ones
+                // drawn (126E counting them).
+                let shown = (LIST_LINES as u16).min(0x28u16.saturating_sub(first));
+                let mut taken = 0;
                 for l in item_lines(m) {
-                    if l.slot < first || l.slot >= first + LIST_LINES as u16 {
+                    if l.slot < first || l.slot >= first + shown {
                         continue;
                     }
+                    taken += 1;
                     let y = LIST_Y + (l.slot - first) as i32 * LINE_H;
                     if l.slot as u8 == selected {
                         frame(screen, y);
                     }
                     screen.text_plain(teeny, LIST_X, y, &l.name, l.colour);
+                }
+                // 1EB1: with rows left, the quests' lines in A0h, from the
+                // first of them whatever the top (the original's), from
+                // the row after the items' at 33h (a pixel below theirs),
+                // the one at 126E + the top framed if marked.
+                if taken < LIST_LINES {
+                    if let Some((_, files)) = archive {
+                        for (i, t) in quest_lines(m, files).iter().take(LIST_LINES - taken).enumerate() {
+                            let row = taken + i;
+                            let y = 0x33 + row as i32 * LINE_H;
+                            if (row as u8).wrapping_add(first as u8) == selected {
+                                frame(screen, y);
+                            }
+                            screen.text_plain(teeny, LIST_X, y, t, 0xA0);
+                        }
+                    }
                 }
             }
             // 1194:76B4: the armour class at each of the seven places
@@ -904,7 +997,7 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             // 1194:223A: the description's lines in ARENAFNT ([102C])
             // centred at x 55h, from y 90h (95h unless four), 0Bh apart.
             if let (Some(lines), Some(f)) = (&inv.info, pics.as_ref().and_then(|p| p.arena.as_ref())) {
-                let y0 = if lines.len() == 4 { 0x90 } else { 0x95 };
+                let y0 = inv.info_y.unwrap_or(if lines.len() == 4 { 0x90 } else { 0x95 });
                 for (i, (t, c)) in lines.iter().enumerate() {
                     screen.text_plain(f, 0x55 - (f.width(t) as i32 >> 1), y0 + 0x0B * i as i32, t, *c);
                 }

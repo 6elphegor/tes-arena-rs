@@ -279,6 +279,42 @@ fn the_sheets_spellbook_as_the_original_draws_it() {
     );
 }
 
+/// The equipment list moved to its end (its arrow forty times), then
+/// the clicks `and`: the quests' lines after the items (1194:1EB8).
+fn quest_lines(name: &str, and: &[(i32, i32, MouseButton)]) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            for _ in 0..40 {
+                d.click(a, 16, 131, MouseButton::Left);
+            }
+            for &(x, y, b) in and {
+                d.click(a, x, y, b);
+            }
+        },
+        layer,
+    );
+}
+
+#[test]
+fn the_quests_lines_as_the_original_draws_them() {
+    quest_lines("equipmentquests", &[]);
+}
+
+/// The last (the staff's pieces) right-clicked: described.
+#[test]
+fn a_quests_line_described_as_the_original_draws_it() {
+    quest_lines("equipmentquestinfo", &[(60, 122, MouseButton::Right)]);
+}
+
+/// The one before it clicked twice: "can't be equipped".
+#[test]
+fn a_quests_line_equipped_as_the_original_draws_it() {
+    quest_lines("equipmentquestequip", &[(60, 111, MouseButton::Left), (60, 111, MouseButton::Left)]);
+}
+
 /// On the spells' page a line clicked twice: its spell's page (1194:1B3C
 /// -> 51D1), then its bottom row's buttons (`and`: a click more).
 fn spell_page(name: &str, and: Option<(i32, i32)>) {

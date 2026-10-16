@@ -3201,6 +3201,7 @@ impl App {
                 // An item's description waits for a key or a click
                 // (1194:5536: ACB0 or AFF9), which does nothing more.
                 if inv.info.take().is_some() {
+                    inv.info_y = None;
                     return;
                 }
                 if let Some((names, sel)) = inv.using.as_mut() {
@@ -3349,6 +3350,7 @@ impl App {
                 // An item's description waits for a click (1194:5536),
                 // which does nothing more.
                 if inv.info.take().is_some() {
+                    inv.info_y = None;
                     return;
                 }
                 if let Some((names, _)) = &inv.using {
@@ -3380,7 +3382,7 @@ impl App {
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
                 } else if let Some(d) = panels::arrow_at(x, y) {
-                    panels::arrow(&mut self.engine.m, d);
+                    panels::arrow(&mut self.engine.m, &self.engine.files, d);
                 } else if panels::line_at(x, y).is_some() {
                     if panels::opens_page(&self.engine.m, y, right) {
                         // The spell's page sets its colours (68D7).

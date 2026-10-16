@@ -3,6 +3,9 @@ screenfade | equipment | 28 | c63880118b2d904d
 screenfade | equipmentpick | 28 | c63880118b2d904d
 screenfade | equipmentspells | 28 | c63880118b2d904d
 screenfade | equipmentdown | 28 | c63880118b2d904d
+screenfade | equipmentquests | 28 | c63880118b2d904d
+screenfade | equipmentquestinfo | 28 | c63880118b2d904d
+screenfade | equipmentquestequip | 28 | c63880118b2d904d
 screenfade | equipmentinfo | 28 | c63880118b2d904d
 screenfade | equipmentoff | 28 | c63880118b2d904d
 screenfade | equipmentspellpage | 30 | 60223a0222993c8b
