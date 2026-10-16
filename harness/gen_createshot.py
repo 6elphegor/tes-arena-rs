@@ -62,7 +62,9 @@ SEED = 0x12345678
 
 # The scripts: each from the first question (how the class is chosen).
 SCRIPTS = [
+    ('roll', 'G,enter,' + 'click:160:190,' * 12 + 'click:160:125,' * 10 + 'A'),
     ('generate', 'G,enter,A,B,C,A,B,C,A,B,C,A,N,enter'),
+    ('rename', 'S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:20:10,back,type:Bo,enter,click:20:10,esc,type:Al,enter'),
     ('select', 'S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,'
                'click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175'),
 ]
@@ -325,7 +327,9 @@ def run(a, inputs, keep=False):
 
             def dbg(mu, addr, size, w):
                 regs = {n: '%04X' % mu.reg_read(globals()['UC_X86_REG_' + n]) for n in ('AX', 'BX', 'CX', 'DX', 'SI', 'DI', 'DS', 'ES', 'FLAGS')}
-                print('at', w, regs, file=sys.stderr)
+                ss, sp = mu.reg_read(UC_X86_REG_SS), mu.reg_read(UC_X86_REG_SP)
+                stack = struct.unpack('<6H', bytes(mu.mem_read(ss * 16 + sp, 12)))
+                print('at', w, regs, 'stack', ' '.join('%04X' % v for v in stack), file=sys.stderr)
             x = a.lin(LOAD_SEG + sg, of)
             hooks.append(mu.hook_add(UC_HOOK_CODE, dbg, w, x, x))
     # Code translated before the hooks were added doesn't see them.

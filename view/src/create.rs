@@ -47,9 +47,11 @@
 //! checked against the original's (`createtest`). Each answer plays its
 //! kind's figure (WARRIOR.CEL, ROGUE.CEL, MAGE.CEL, 222C:011A); the next
 //! question's screen covers it, and the class offered after the last is
-//! drawn over what it left. Left out: the map's scroll unrolling (TOP.DFA,
-//! 1194:5B58: it ends off the screen), the questions' scroll rolling by
-//! the pixel (here by the line), the fades.
+//! drawn over what it left. The questions' scroll rolls a row at a time
+//! with its rollers turning (222C:040B, 045D). Between screens the
+//! original's dissolves, fades and colours set play frame by frame
+//! (`Film`). Left out: the map's scroll unrolling (TOP.DFA, 1194:5B58:
+//! it ends off the screen).
 
 use crate::archive::Archive;
 use crate::dialog::Click;
@@ -152,6 +154,17 @@ enum Back {
     Black,
 }
 
+/// What is up on the screen (`Creation::up`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Up {
+    Box,
+    Menu,
+    List,
+    Prompt,
+    Quiz,
+    Other,
+}
+
 /// A text box waiting to be read, the screen it came up on.
 #[derive(Clone, Debug)]
 struct Boxed {
@@ -180,7 +193,7 @@ struct Ask {
 #[derive(Clone, Debug)]
 enum Stage {
     Method(Ask),
-    Quiz { asked: u8, lines: Vec<String>, top: usize },
+    Quiz { asked: u8, roll: Roll },
     ClassYes(Ask, u8),
     List(Ask),
     /// The name asked (1194:2711): the prompt, the game's editor on the
@@ -190,6 +203,9 @@ enum Stage {
     Map,
     ProvinceYes(Ask, u8),
     Stats,
+    /// The name typed over on the attribute page (1194:1528), the game's
+    /// editor on it.
+    SheetName(Box<crate::field::Live>),
     Choose(Ask),
     Face,
     /// The movies (`Creation::movie`): the intro, the vision after
@@ -229,7 +245,9 @@ struct Pics {
     start: Option<(Image, [[u8; 4]; 256])>,
     map: Option<(Image, [[u8; 4]; 256])>,
     noexit: Option<Image>,
-    scroll: Option<Image>,
+    /// The scroll's 16 rollers' frames (SCROLL01.DFA's then SCROLL02's:
+    /// 222C:03B1 by 129C).
+    rollers: Vec<Image>,
     charstat: Option<Image>,
     bonus: Option<Image>,
     updown: Vec<u8>,
@@ -294,12 +312,12 @@ pub struct Creation {
     /// 2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
     face_back: Option<(Vec<u16>, Vec<u16>)>,
     /// The last question's lines and its roll, under the class offered.
-    quiz_shown: Option<(Vec<String>, usize)>,
+    quiz_shown: Option<Roll>,
     outcome: Option<Outcome>,
-    /// The screen changes playing (1194:4FF7), the first now.
-    dissolves: VecDeque<Dissolve>,
-    /// Milliseconds into the dissolve's frame.
-    dissolve_ms: u32,
+    /// The frames of the screen's change playing (`Film`), the first now.
+    film: VecDeque<(Vec<u8>, Dac)>,
+    /// Milliseconds into the film's frame.
+    film_ms: u32,
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -348,21 +366,40 @@ pub(crate) fn mnu(archive: &Archive, name: &str) -> Option<(Image, [[u8; 4]; 256
     Some((img, pal))
 }
 
-/// A .DFA's first frame, at its header's place.
-fn dfa_first(archive: &Archive, name: &str) -> Option<Image> {
-    let d = archive.read(name)?;
+/// A .DFA's frames, each at its header's place.
+fn dfa_frames(archive: &Archive, name: &str) -> Vec<Image> {
+    let Some(d) = archive.read(name) else { return Vec::new() };
     let le = |at: usize| u16::from_le_bytes([*d.get(at).unwrap_or(&0), *d.get(at + 1).unwrap_or(&0)]) as i16 as i32;
-    let f = crate::flats::decode(1, &d)?;
-    Some(Image { x: le(2), y: le(4), w: f.w, h: f.h, px: f.frames.into_iter().next()? })
+    let Some(f) = crate::flats::decode(1, &d) else { return Vec::new() };
+    f.frames.into_iter().map(|px| Image { x: le(2), y: le(4), w: f.w, h: f.h, px }).collect()
 }
+
+/// The questions' scroll as 222C keeps it: the text's strings (the
+/// buffer at 40F0: a LF, the question less its last byte, two LFs; each
+/// LF a string's end, 02D4), the bitmap they're drawn into (40F2: 8 lines
+/// of 8 rows, a line from x 14h in EEh, 04E5), the top line (1298), the
+/// rows rolled past it (129A / 140h), the rollers' frame (129C) and the
+/// last top line the scroll goes to (1296: the strings' count, at most 8).
+#[derive(Clone, Debug)]
+struct Roll {
+    strings: Vec<String>,
+    bitmap: Vec<u8>,
+    line: usize,
+    off: usize,
+    frame: usize,
+    last: usize,
+    /// The rollers as drawn so far: each frame over the last, its 0s
+    /// see-through (5526), what earlier ones drew left where it has 0.
+    rollers: Vec<u8>,
+}
+
+/// The bitmap's rows (0..64; 0x4600 bytes are shifted, 0x3C00 shown).
+const ROLL_ROWS: usize = 64;
 
 /// The dissolve's generator (1194:5065: x 5E5h + 29h, 16 bits).
 const DISSOLVE_SEED: u16 = 0x4B8E;
-/// 4FF7's pixels (FA00h, whatever the rectangle), a wait where the
-/// count left is a multiple of 400h (after the 201h-th, 601h-th, ...):
-/// 62 frames.
+/// 4FF7's pixels (FA00h, whatever the rectangle).
 const DISSOLVE_STEPS: u32 = 0xFA00;
-const DISSOLVE_FRAMES: u32 = 62;
 /// A retrace, in milliseconds (70 Hz).
 const RETRACE_MS: u32 = 14;
 const FULL: (usize, usize, usize, usize) = (0, 0, W, H);
@@ -371,38 +408,102 @@ fn dissolve_next(r: u16) -> u16 {
     r.wrapping_mul(0x5E5).wrapping_add(0x29)
 }
 
-/// A screen change as 1194:4FF7 shows it: FA00h times the generator's
-/// next value, its remainder by the rectangle's size, a pixel there (row,
-/// column) copied from the page to the screen; the screen shown at its
-/// waits. Pixels it never lands on
-/// stay as they were until 9466 shows the page whole.
-struct Dissolve {
-    from: Vec<u16>,
-    to: Vec<u16>,
-    rect: (usize, usize, usize, usize),
-    seed: u16,
-    frame: u32,
+/// The colours as the DAC holds them (8-bit, as `Screen` keeps them).
+type Dac = [[u8; 4]; 256];
+
+/// A colour of the DAC (6-bit) as `Screen` keeps it.
+fn dac8(v: u8) -> u8 {
+    let v = v & 0x3F;
+    v << 2 | v >> 4
 }
 
-impl Dissolve {
-    /// The screen at wait `k` (0..62).
-    fn at(&self, k: u32) -> Vec<u16> {
-        let (x0, y0, w, h) = self.rect;
+/// What the original shows between two screens settled, frame by frame:
+/// the screen (the VGA's memory) and the colours (the DAC) at each wait
+/// for the retrace. Built from the routines' own steps, each on the
+/// screen and colours the last left.
+struct Film {
+    vga: Vec<u8>,
+    dac: Dac,
+    frames: Vec<(Vec<u8>, Dac)>,
+}
+
+impl Film {
+    fn new(vga: Vec<u8>, dac: Dac) -> Film {
+        Film { vga, dac, frames: Vec::new() }
+    }
+
+    /// A wait for the retrace: the screen shown as it is.
+    fn wait(&mut self) {
+        self.frames.push((self.vga.clone(), self.dac));
+    }
+
+    /// The screen drawn at once (9466: the page shown whole, or drawn
+    /// straight to the screen).
+    fn whole(&mut self, page: &[u8]) {
+        self.vga.copy_from_slice(page);
+    }
+
+    /// 1194:4FF7: FA00h times the generator's next value (DGROUP 4B8E,
+    /// 1194:5065: x 5E5h + 29h), its remainder by the rectangle's size, a
+    /// pixel there (row, column) copied from the page to the screen; a
+    /// wait after the 201h-th and every 400h after (62); then the page
+    /// shown whole (9466).
+    fn dissolve(&mut self, m: &mut Machine, page: &[u8], rect: (usize, usize, usize, usize)) {
+        let (x0, y0, w, h) = rect;
         let size = (w * h) as u32;
-        let mut out = self.from.clone();
-        let mut r = self.seed;
-        for _ in 0..(0x201 + 0x400 * k).min(DISSOLVE_STEPS) {
+        let mut r = m.mem.r16(DS, DISSOLVE_SEED);
+        for n in 1..=DISSOLVE_STEPS {
             r = dissolve_next(r);
-            if size == 0 {
-                continue;
+            if size != 0 {
+                let off = (r as u32 % size) as usize;
+                let i = (y0 + off / w) * W + x0 + off % w;
+                if let (Some(o), Some(&t)) = (self.vga.get_mut(i), page.get(i)) {
+                    *o = t;
+                }
             }
-            let off = (r as u32 % size) as usize;
-            let i = (y0 + off / w) * W + x0 + off % w;
-            if let (Some(o), Some(&t)) = (out.get_mut(i), self.to.get(i)) {
-                *o = t;
+            if n >= 0x201 && (n - 0x201) % 0x400 == 0 {
+                self.wait();
             }
         }
-        out
+        m.mem.w16(DS, DISSOLVE_SEED, r);
+        self.whole(page);
+    }
+
+    /// 0000:9B56: the colours set, from entry 0 on, a wait before the
+    /// first, the 55h-th and the ABh-th.
+    fn colours(&mut self, to: &Dac) {
+        for (lo, hi) in [(0, 0x55), (0x55, 0xAB), (0xAB, 0x100)] {
+            self.wait();
+            self.dac[lo..hi].copy_from_slice(&to[lo..hi]);
+        }
+    }
+
+    /// 0000:5E50: the colours taken to `to` in `steps` (1 or less: set at
+    /// once). Each component as 8.8 (the DAC's 6 bits), the step its
+    /// difference over `steps` (idiv), added `steps` - 1 times (below 0:
+    /// 0), each set (9B56); then `to` set.
+    fn fade(&mut self, to: &Dac, steps: i16) {
+        if steps > 1 {
+            let mut acc = [0i16; 0x300];
+            let mut step = [0i16; 0x300];
+            for i in 0..0x300 {
+                let (from, want) = ((self.dac[i / 3][i % 3] >> 2) as i16, (to[i / 3][i % 3] >> 2) as i16);
+                acc[i] = from << 8;
+                step[i] = ((want << 8) - (from << 8)) / steps;
+            }
+            for _ in 1..steps {
+                let mut d = self.dac;
+                for i in 0..0x300 {
+                    acc[i] = acc[i].wrapping_add(step[i]);
+                    if acc[i] < 0 {
+                        acc[i] = 0;
+                    }
+                    d[i / 3][i % 3] = dac8((acc[i] as u16 >> 8) as u8);
+                }
+                self.colours(&d);
+            }
+        }
+        self.colours(to);
     }
 }
 
@@ -475,7 +576,7 @@ impl Creation {
             start: mnu(&archive, "STARTGAM.MNU"),
             map: mnu(&archive, "TAMRIEL.MNU"),
             noexit: crate::panels::load_image(&archive, m, "NOEXIT.IMG"),
-            scroll: dfa_first(&archive, "SCROLL01.DFA"),
+            rollers: dfa_frames(&archive, "SCROLL01.DFA").into_iter().chain(dfa_frames(&archive, "SCROLL02.DFA")).collect(),
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
@@ -492,7 +593,7 @@ impl Creation {
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -539,7 +640,7 @@ impl Creation {
             start: None,
             map: None,
             noexit: None,
-            scroll: None,
+            rollers: Vec::new(),
             charstat: crate::panels::load_image(&archive, m, "CHARSTAT.IMG"),
             bonus: crate::panels::load_image(&archive, m, "BONUS.IMG"),
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
@@ -554,7 +655,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, dissolves: VecDeque::new(), dissolve_ms: 0 }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
     }
 
     /// Back on the main menu (a load that failed).
@@ -584,20 +685,14 @@ impl Creation {
     /// Time passing (milliseconds) for the movie playing: its frames; at
     /// its end (no text: once through) the next screen.
     pub fn advance(&mut self, ms: u32) {
-        // A dissolve's frames, one a retrace (70 a second).
-        self.dissolve_ms += ms;
-        while let Some(d) = self.dissolves.front_mut() {
-            if self.dissolve_ms < RETRACE_MS {
-                break;
-            }
-            self.dissolve_ms -= RETRACE_MS;
-            d.frame += 1;
-            if d.frame >= DISSOLVE_FRAMES {
-                self.dissolves.pop_front();
-            }
+        // The change's frames, one a retrace (70 a second).
+        self.film_ms += ms;
+        while !self.film.is_empty() && self.film_ms >= RETRACE_MS {
+            self.film_ms -= RETRACE_MS;
+            self.film.pop_front();
         }
-        if self.dissolves.is_empty() {
-            self.dissolve_ms = 0;
+        if self.film.is_empty() {
+            self.film_ms = 0;
         }
         if let Some(mv) = &mut self.movie {
             mv.advance(ms);
@@ -697,87 +792,180 @@ impl Creation {
         self.boxes.push_back(Boxed { lines, font, back });
     }
 
-    /// A key or click, and the screen's change dissolved in as the
-    /// original shows it (1194:4FF7):
-    /// - the next question on the scroll's rows (222C:02A5..02B0: 0, 77h,
-    ///   140h x 50h);
-    /// - a box shown (59CC at 5A1A, 5C34 at 5C9F: the whole screen);
-    /// - a box taken away, the page as it was under it (5A41, 5CBD), then
-    ///   the next box if there is one.
+    /// A key or click, and the screen's change played as the original
+    /// shows it (`Film`):
+    /// - a menu answered (1194:020E): it was drawn on the screen alone,
+    ///   and dissolves out to the page (4FF7 at 0269, the whole screen);
+    /// - a list answered (5734): put back at once from what it was drawn
+    ///   over;
+    /// - a box shown (59CC at 5A1A, 5C34 at 5C9F) dissolves in; taken
+    ///   away (5A41, 5CBD), the page as it was under it dissolves in;
+    /// - a question answered: its kind's figure played over the screen
+    ///   (222C:011A), the figures lit, the next question dissolved in on
+    ///   the scroll's rows (222C:02A5..02B0: 0, 77h, 140h x 50h);
+    /// - a new background (the map, the attributes): the colours faded
+    ///   out (1194:55B6), the screen cleared (55D9), the picture's colours
+    ///   set (0000:57DD).
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
         if let Input::Wait(ms) = inp {
             return self.advance(ms);
         }
-        self.dissolves.clear();
-        self.dissolve_ms = 0;
+        self.settle();
+        let was = self.up();
+        let was_back = self.back();
+        let (before, before_dac) = self.shot(&engine.m, true);
+        let (bare_before, _) = self.shot(&engine.m, false);
         let quiz = matches!(self.stage, Stage::Quiz { .. });
-        let was = std::mem::discriminant(&self.stage);
-        let (asked, named) = (self.asking(), matches!(self.stage, Stage::Name(..)));
-        let had = self.boxes.len();
-        let before = self.page(&engine.m);
+        let answer = matches!(inp, Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()));
         self.input_inner(engine, inp);
         if self.movie.is_some() {
             return;
         }
-        let after = self.page(&engine.m);
-        let now = self.boxes.len();
-        let moved = std::mem::discriminant(&self.stage) != was;
-        if quiz && had == 0 && matches!(self.stage, Stage::Quiz { .. }) {
-            self.dissolve(&mut engine.m, before, after, (0, 0x77, 0x140, 0x50));
-        } else if had == 0 && now == 0 && named && moved {
-            // The prompt's box taken away (5CBD).
-            self.dissolve(&mut engine.m, before, after, FULL);
-        } else if had == 0 && now == 0 && (moved || !asked && !named) && (self.asking() || matches!(self.stage, Stage::Name(..))) {
-            // A menu shown (020E's at 0269) or the prompt's box (5C9F).
-            self.dissolve(&mut engine.m, before, after, FULL);
-        } else if had == 0 && now > 0 {
-            self.dissolve(&mut engine.m, before, after, FULL);
-        } else if had > 0 && (now < had || now > 0 && before != after) {
+        let now = self.up();
+        let (after, after_dac) = self.shot(&engine.m, true);
+        let m = &mut engine.m;
+        let mut film = Film::new(before.clone(), before_dac);
+        match was {
+            Up::Quiz if quiz && answer => {
+                // The figure played over the screen, the figures lit.
+                if let Some(i) = &self.pics.cel {
+                    let mut s = Screen::new(before_dac);
+                    let px: Vec<u8> = before.clone();
+                    s.blit(0, 0, W, H, &px, H as i32);
+                    s.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                    film.whole(&s.indices().iter().map(|&v| v as u8).collect::<Vec<u8>>());
+                }
+                film.dac = after_dac;
+                film.wait();
+                if now == Up::Quiz {
+                    film.dissolve(m, &after, (0, 0x77, 0x140, 0x50));
+                }
+            }
+            Up::Menu => {
+                film.dissolve(m, &bare_before, FULL);
+                match now {
+                    Up::Box => self.box_in(&mut film, m, was_back, &after, after_dac),
+                    Up::List => {
+                        film.wait();
+                        film.colours(&after_dac);
+                    }
+                    _ => {}
+                }
+            }
+            Up::List => {
+                let (under, _) = self.shot(m, false);
+                film.whole(&under);
+                if now != Up::List {
+                    film.dissolve(m, &after, FULL);
+                }
+            }
+            Up::Box => {
+                // Under it: the page now, or, when a box over a new
+                // background follows, the old background.
+                let shown = std::mem::take(&mut self.boxes);
+                let (mut under, _) = self.shot(m, true);
+                self.boxes = shown;
+                if matches!(now, Up::Box | Up::Quiz) {
+                    under = bare_before.clone();
+                }
+                film.dissolve(m, &under, FULL);
+                match now {
+                    Up::Box => self.box_in(&mut film, m, was_back, &after, after_dac),
+                    Up::Quiz => {
+                        film.wait();
+                        film.dissolve(m, &after, (0, 0x77, 0x140, 0x50));
+                    }
+                    _ => {}
+                }
+            }
+            Up::Prompt if now != Up::Prompt => {
+                let (under, _) = self.shot(m, false);
+                film.dissolve(m, &under, FULL);
+            }
+            _ => {}
+        }
+        self.film = film.frames.into();
+        let _ = after;
+    }
+
+    /// A box shown (dissolved in), over a new background if the back
+    /// changed: the old faded out, the screen cleared, the new picture's
+    /// colours set, the picture shown.
+    fn box_in(&mut self, film: &mut Film, m: &mut Machine, was_back: Back, after: &[u8], after_dac: Dac) {
+        let back = self.back();
+        if back != was_back {
+            film.wait();
+            film.fade(&[[0, 0, 0, 0xFF]; 256], 8);
+            film.vga.fill(0);
             let shown = std::mem::take(&mut self.boxes);
-            let under = self.page(&engine.m);
+            let (under, _) = self.shot(m, true);
             self.boxes = shown;
-            let boxed = now > 0;
-            self.dissolve(&mut engine.m, before, under.clone(), FULL);
-            if boxed {
-                self.dissolve(&mut engine.m, under, after, FULL);
+            if back == Back::Stats {
+                // The race's picture first (2B58), then the
+                // page whole; the colours set after.
+                let mut s = Screen::new(after_dac);
+                s.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+                if let Some(i) = crate::doll::backdrop(&self.archive, m) {
+                    s.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
+                }
+                film.whole(&s.indices().iter().map(|&v| v as u8).collect::<Vec<u8>>());
+                film.wait();
+                film.whole(&under);
+                film.colours(&after_dac);
+            } else {
+                film.colours(&after_dac);
+                film.wait();
+                film.whole(&under);
             }
         }
+        film.dissolve(m, after, FULL);
     }
 
-    /// Whether a menu (1194:020E) is up.
-    fn asking(&self) -> bool {
-        self.boxes.is_empty() && matches!(self.stage, Stage::Method(_) | Stage::List(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_) | Stage::ClassYes(..))
-    }
-
-    /// The screen as `draw_page` draws it, its indices.
-    fn page(&self, m: &Machine) -> Vec<u16> {
-        let mut s = Screen::new(self.pics.game);
-        self.draw_page(&mut s, m);
-        s.indices().to_vec()
-    }
-
-    /// A change from `from` to `to` in `rect` queued, the dissolve's
-    /// generator (DGROUP 4B8E) taken on past it as 4FF7 takes it.
-    fn dissolve(&mut self, m: &mut Machine, from: Vec<u16>, to: Vec<u16>, rect: (usize, usize, usize, usize)) {
-        let seed = m.mem.r16(DS, DISSOLVE_SEED);
-        let mut r = seed;
-        for _ in 0..DISSOLVE_STEPS {
-            r = dissolve_next(r);
+    /// What is up on the screen, as the routines put it there and take it
+    /// away.
+    fn up(&self) -> Up {
+        if !self.boxes.is_empty() {
+            return Up::Box;
         }
-        m.mem.w16(DS, DISSOLVE_SEED, r);
-        self.dissolves.push_back(Dissolve { from, to, rect, seed, frame: 0 });
+        match self.stage {
+            Stage::Method(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_) | Stage::ClassYes(..) => Up::Menu,
+            Stage::List(_) => Up::List,
+            Stage::Name(..) => Up::Prompt,
+            Stage::Quiz { .. } => Up::Quiz,
+            _ => Up::Other,
+        }
     }
 
-    /// The dissolves playing passed: the screen as it settles.
+    /// The background the screen is drawn on now.
+    fn back(&self) -> Back {
+        match (&self.boxes.front(), &self.stage) {
+            (Some(b), _) => b.back,
+            (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
+            (None, Stage::Map | Stage::ProvinceYes(..)) => Back::Map,
+            (None, Stage::Stats | Stage::SheetName(_) | Stage::Choose(_) | Stage::Face) => Back::Stats,
+            (None, _) => Back::Black,
+        }
+    }
+
+    /// The screen as `draw_page` draws it (with the menu, list or prompt
+    /// up, or without: the page under them), its indices and colours.
+    fn shot(&self, m: &Machine, ui: bool) -> (Vec<u8>, Dac) {
+        let mut s = Screen::new(self.pics.game);
+        self.draw_page_with(&mut s, m, ui);
+        (s.indices().iter().map(|&i| i as u8).collect(), *s.palette())
+    }
+
+    /// The change playing passed: the screen as it settles.
     pub fn settle(&mut self) {
-        self.dissolves.clear();
-        self.dissolve_ms = 0;
+        self.film.clear();
+        self.film_ms = 0;
     }
 
-    /// Every frame the dissolves queued will show, in turn (each the
-    /// screen at one of 4FF7's waits).
-    pub fn dissolve_frames(&self) -> Vec<Vec<u16>> {
-        self.dissolves.iter().flat_map(|d| (0..DISSOLVE_FRAMES).map(move |k| d.at(k))).collect()
+    /// Every frame the change will show, in turn: the screen's indices
+    /// and the colours (6-bit), at each wait for the retrace.
+    #[cfg(test)]
+    pub fn film_frames(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
+        self.film.iter().map(|(px, dac)| (px.clone(), dac.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect())).collect()
     }
 
     fn input_inner(&mut self, engine: &mut Engine, inp: Input) {
@@ -862,7 +1050,7 @@ impl Creation {
                 // S, or Esc (FFFFh, not 0): the list.
                 Some(_) => self.list(engine),
             },
-            Stage::Quiz { asked, lines, mut top } => match inp {
+            Stage::Quiz { asked, mut roll } => match inp {
                 Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()) => {
                     let a = c.to_ascii_uppercase() - b'A';
                     engine.m.quiz_answer(a);
@@ -875,21 +1063,21 @@ impl Creation {
                     if asked + 1 < 10 {
                         self.next_question(engine, asked + 1)
                     } else {
-                        self.quiz_shown = Some((lines, top));
+                        self.quiz_shown = Some(roll);
                         self.quiz_done(engine)
                     }
                 }
-                Input::Up | Input::Click(_, 119..=136) => {
-                    top = top.saturating_sub(1);
-                    Stage::Quiz { asked, lines, top }
+                // The top roller rolls on (222C:0641), the bottom back
+                // (0612): a row each.
+                Input::Down | Input::Click(_, 119..=136) => {
+                    self.roll_on(&mut roll);
+                    Stage::Quiz { asked, roll }
                 }
-                Input::Down | Input::Click(_, 183..=199) => {
-                    if top + 5 < lines.len() {
-                        top += 1;
-                    }
-                    Stage::Quiz { asked, lines, top }
+                Input::Up | Input::Click(_, 183..=199) => {
+                    self.roll_back(&mut roll);
+                    Stage::Quiz { asked, roll }
                 }
-                _ => Stage::Quiz { asked, lines, top },
+                _ => Stage::Quiz { asked, roll },
             },
             Stage::ClassYes(mut ask, class) => match self.ask_input(&mut ask, inp) {
                 None => Stage::ClassYes(ask, class),
@@ -949,6 +1137,31 @@ impl Creation {
                 Some(_) => self.map_screen(engine),
             },
             Stage::Stats => self.stats_input(engine, inp),
+            Stage::SheetName(mut live) => {
+                match inp {
+                    Input::Key(scan, down) => live.key(scan, down),
+                    Input::Char(c) => live.type_char(c),
+                    Input::Back => live.tap(0x0E),
+                    Input::Enter => live.tap(0x1C),
+                    Input::Esc => live.tap(0x01),
+                    _ => {}
+                }
+                if !live.ended() {
+                    return self.stage = Stage::SheetName(live);
+                }
+                // Into 01AD, the page drawn again (1564..1578).
+                let mut name = [0u8; 0x15];
+                for (n, &b) in name.iter_mut().zip(live.text().iter().take(0x14)) {
+                    *n = b;
+                }
+                for (i, &b) in name.iter().enumerate() {
+                    engine.m.mem.w8(DS, 0x01AD + i as u16, b);
+                }
+                if let Some(v) = &mut self.level_up {
+                    v.push(Click::Name(name));
+                }
+                Stage::Stats
+            }
             Stage::Choose(mut ask) => match self.ask_input(&mut ask, inp) {
                 None => Stage::Choose(ask),
                 Some(0) => {
@@ -1012,8 +1225,105 @@ impl Creation {
             return self.list(engine);
         };
         let text = engine.m.mem.cstr(seg, di).to_vec();
-        let lines = text.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
-        Stage::Quiz { asked, lines, top: 0 }
+        Stage::Quiz { asked, roll: self.roll_new(&text) }
+    }
+
+    /// The scroll for question `text` (222C:02D4, 034C): the strings, the
+    /// first `last` drawn from the bitmap's top.
+    fn roll_new(&self, text: &[u8]) -> Roll {
+        let mut buf = vec![b'\n'];
+        buf.extend_from_slice(&text[..text.len().saturating_sub(1)]);
+        buf.extend_from_slice(b"\n\n");
+        let count = buf.iter().filter(|&&b| b == b'\n').count();
+        let strings = buf.split(|&b| b == b'\n').map(|l| String::from_utf8_lossy(l).trim_end_matches('\r').to_string()).collect();
+        let mut roll = Roll { strings, bitmap: vec![0; W * ROLL_ROWS], line: 0, off: 0, frame: 0, last: count.min(8), rollers: vec![0; W * H] };
+        self.roll_frame(&mut roll);
+        let last = roll.last;
+        self.roll_draw(&mut roll, 0, 0, last);
+        roll
+    }
+
+    /// 0000:9E06 into the bitmap: `n` strings from `first`, a line every
+    /// 8 rows from row `y` (past the bitmap: not kept).
+    fn roll_draw(&self, roll: &mut Roll, first: usize, y: usize, n: usize) {
+        let mut s = Screen::new(self.pics.game);
+        s.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+        s.blit(0, 0, W, ROLL_ROWS, &roll.bitmap, H as i32);
+        for j in 0..n {
+            let row = y + 8 * j;
+            if row >= ROLL_ROWS {
+                break;
+            }
+            // Past the strings the original reads on into the heap.
+            if let Some(t) = roll.strings.get(first + j) {
+                s.text_plain(&self.fonts.teeny, 0x14, row as i32, t, COLOUR_A);
+            }
+        }
+        for (b, &i) in roll.bitmap.iter_mut().zip(s.indices()) {
+            *b = i as u8;
+        }
+    }
+
+    /// The rollers' frame now drawn over those before (03B1).
+    fn roll_frame(&self, roll: &mut Roll) {
+        if let Some(i) = self.pics.rollers.get(roll.frame) {
+            for r in 0..i.h {
+                for c in 0..i.w {
+                    let (x, y) = (i.x + c as i32, i.y + r as i32);
+                    let v = i.px[r * i.w + c];
+                    if v != 0 && (0..W as i32).contains(&x) && (0..H as i32).contains(&y) {
+                        roll.rollers[y as usize * W + x as usize] = v;
+                    }
+                }
+            }
+        }
+    }
+
+    /// 222C:045D: a row on; past the bitmap's first line, the lines
+    /// shifted up (04BC) and the next drawn into the last (04E5 at 38h),
+    /// unless the top is now the last.
+    fn roll_on(&self, roll: &mut Roll) {
+        if roll.line > roll.last {
+            return;
+        }
+        if roll.off != 7 {
+            roll.off += 1;
+            roll.frame = (roll.frame + 1) & 15;
+            return self.roll_frame(roll);
+        }
+        roll.off = 0;
+        roll.bitmap.copy_within(8 * W..ROLL_ROWS * W, 0);
+        roll.line += 1;
+        if roll.line == roll.last {
+            return;
+        }
+        roll.frame = (roll.frame + 1) & 15;
+        self.roll_frame(roll);
+        roll.bitmap[56 * W..].fill(0);
+        let first = roll.line + 7;
+        self.roll_draw(roll, first, 56, 0x140);
+    }
+
+    /// 222C:040B: a row back; at the bitmap's top, the lines shifted down
+    /// and the one before drawn into the first (04E5 at 0, the strings
+    /// after it over the rest).
+    fn roll_back(&self, roll: &mut Roll) {
+        if roll.off != 0 {
+            roll.off -= 1;
+            roll.frame = (roll.frame + 15) & 15;
+            return self.roll_frame(roll);
+        }
+        if roll.line == 0 {
+            return;
+        }
+        roll.off = 7;
+        roll.frame = (roll.frame + 15) & 15;
+        self.roll_frame(roll);
+        roll.bitmap.copy_within(0..56 * W, 8 * W);
+        roll.line -= 1;
+        roll.bitmap[..8 * W].fill(0);
+        let first = roll.line;
+        self.roll_draw(roll, first, 0, 0x140);
     }
 
     /// The figure of answers of `kind` (222C:011A: the name at
@@ -1097,15 +1407,23 @@ impl Creation {
         Box::new(crate::field::Live::open(&engine.m, field, look).expect("the name's field opens"))
     }
 
+    /// 1194:1528: the sheet's name, 9EE5 with AX 0Bh, BX 7, CX 0, DX 14h,
+    /// DI A0h, BP 0Ch, SI 01AD, in the page's font and colour (0DE1's).
+    fn sheet_name_field(&self, m: &Machine) -> Box<crate::field::Live> {
+        let look = crate::field::Look { font: "ARENAFNT.DAT", colour: COLOUR_B, put_font: true };
+        let field = arena::lineedit::Field { x: 0x0B, y: 7, click: 0, max: 0x14, seg: DS, off: 0x01AD, w: 0xA0, h: 0x0C };
+        Box::new(crate::field::Live::open(m, field, look).expect("the name's field opens"))
+    }
+
     /// Whether the name is being typed (the keys, pressed and let go,
     /// go to it as `Input::Key`).
     pub fn typing(&self) -> bool {
-        self.boxes.is_empty() && matches!(self.stage, Stage::Name(..))
+        self.boxes.is_empty() && matches!(self.stage, Stage::Name(..) | Stage::SheetName(..))
     }
 
     /// A frame of the window: the name's field's (`Live::frame`).
     pub fn field_frame(&mut self) {
-        if let Stage::Name(_, live) = &mut self.stage {
+        if let Stage::Name(_, live) | Stage::SheetName(live) = &mut self.stage {
             live.frame();
         }
     }
@@ -1253,6 +1571,8 @@ impl Creation {
                     record(self, Click::Arrow(y as u16));
                     Stage::Stats
                 }
+                // The name (3276:56E6: 0Bh, 7, 64h x 0Ah): typed over.
+                None if (0x0B..0x0B + 0x64).contains(&x) && (7..7 + 0x0A).contains(&y) => Stage::SheetName(self.sheet_name_field(m)),
                 _ => Stage::Stats,
             },
             _ => Stage::Stats,
@@ -1425,23 +1745,22 @@ impl Creation {
     /// The layer drawn: the screen behind, the stage, a box waiting.
     pub fn draw(&self, screen: &mut Screen, m: &Machine) {
         self.draw_page(screen, m);
-        if let Some(d) = self.dissolves.front() {
-            let f = d.at(d.frame);
+        if let Some((px, dac)) = self.film.front() {
+            screen.set_palette(*dac);
             screen.fill(0, 0, W as i32, H as i32, 0, 0xFF);
-            let px: Vec<u8> = f.iter().map(|&i| i as u8).collect();
-            screen.blit(0, 0, W, H, &px, H as i32);
+            screen.blit(0, 0, W, H, px, H as i32);
         }
     }
 
     /// The screen as it settles (the page 9466 shows).
     pub fn draw_page(&self, screen: &mut Screen, m: &Machine) {
-        let back = match (&self.boxes.front(), &self.stage) {
-            (Some(b), _) => b.back,
-            (None, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Name(..) | Stage::Gender(_)) => Back::Start,
-            (None, Stage::Map | Stage::ProvinceYes(..)) => Back::Map,
-            (None, Stage::Stats | Stage::Choose(_) | Stage::Face) => Back::Stats,
-            (None, Stage::Vision | Stage::Done | Stage::Intro | Stage::Ending | Stage::Title | Stage::MainMenu | Stage::Story { .. }) => Back::Black,
-        };
+        self.draw_page_with(screen, m, true)
+    }
+
+    /// The screen, with its box, menu, list or prompt (`ui`) or without
+    /// them (the page they're put over).
+    fn draw_page_with(&self, screen: &mut Screen, m: &Machine, ui: bool) {
+        let back = self.back();
         if let (Some(mv), None) = (&self.movie, self.boxes.front()) {
             return mv.draw(screen, &self.fonts.arena);
         }
@@ -1461,23 +1780,32 @@ impl Creation {
         }
         self.draw_back(screen, m, back);
         if let Some(b) = self.boxes.front() {
-            self.draw_box(screen, &b.lines, b.font, back, 5);
+            if ui {
+                self.draw_box(screen, &b.lines, b.font, back, 5);
+            }
             return;
         }
         match &self.stage {
             Stage::ClassYes(a, _) => {
                 // Over the questions as the last answer left them.
-                if let Some((lines, top)) = &self.quiz_shown {
-                    self.draw_quiz(screen, m, lines, *top);
+                if let Some(roll) = &self.quiz_shown {
+                    self.draw_quiz(screen, m, roll);
                 }
                 if let Some(i) = &self.pics.cel {
                     screen.blit(i.x, i.y, i.w, i.h, &i.px, H as i32);
                 }
-                self.draw_ask(screen, a, back);
+                if ui {
+                    self.draw_ask(screen, a, back);
+                }
             }
-            Stage::Method(a) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) => self.draw_ask(screen, a, back),
-            Stage::Quiz { lines, top, .. } => self.draw_quiz(screen, m, lines, *top),
-            Stage::Name(prompt, live) => {
+            Stage::Method(a) | Stage::List(a) | Stage::Gender(a) | Stage::ProvinceYes(a, _) | Stage::Choose(a) if ui => self.draw_ask(screen, a, back),
+            Stage::Quiz { roll, .. } => self.draw_quiz(screen, m, roll),
+            Stage::SheetName(live) if ui => {
+                // 1194:1531: the name's strip in FBh, the field over it.
+                screen.fill(0x0B, 7, 0x96, 9, 0xFB, 0xFF);
+                live.draw(screen, false);
+            }
+            Stage::Name(prompt, live) if ui => {
                 // The prompt's box with its line of room (5C34's "%s\r"
                 // and spaces), the field over it where 5C34 puts it.
                 self.draw_box(screen, prompt, FontId::A, back, 10);
@@ -1487,21 +1815,14 @@ impl Creation {
         }
     }
 
-    /// The questions' scroll (SCROLL01.DFA) with the text's bitmap
-    /// (222C:04E5: a line every 8 rows from its second, x 14h, in EEh)
-    /// shown through rows 136..183 (03E9), `top` lines rolled up, over the
-    /// figures as lit.
-    fn draw_quiz(&self, screen: &mut Screen, m: &Machine, lines: &[String], top: usize) {
+    /// The questions' scroll (its rollers' frame, 222C:03B1) with the
+    /// text's bitmap from the rows rolled past its top line, 48 rows into
+    /// rows 136..183, its 0s see-through (03E9), over the figures as lit.
+    fn draw_quiz(&self, screen: &mut Screen, m: &Machine, roll: &Roll) {
         self.quiz_figures(screen, m);
-        if let Some(s) = &self.pics.scroll {
-            screen.blit(s.x, s.y, s.w, s.h, &s.px, H as i32);
-        }
-        for (k, l) in lines.iter().enumerate() {
-            let y = 136 + 8 * (k as i32 + 1 - top as i32);
-            if (136..184).contains(&y) {
-                screen.text_plain(&self.fonts.teeny, 0x14, y, l, COLOUR_A);
-            }
-        }
+        screen.blit(0, 0, W, H, &roll.rollers, H as i32);
+        let at = roll.off * W;
+        screen.blit(0, 136, W, 48, &roll.bitmap[at..at + 48 * W], H as i32);
     }
 
     /// The figures behind the questions lit as the answers go (222C:0149:
@@ -1573,7 +1894,7 @@ impl Creation {
             return;
         }
         let creating = m.mem.r16(DS, 0x05C8) & 0x10 != 0 || self.level_up.is_some();
-        self.stats_page(screen, m, matches!(self.stage, Stage::Stats | Stage::Choose(_)), creating);
+        self.stats_page(screen, m, matches!(self.stage, Stage::Stats | Stage::SheetName(_) | Stage::Choose(_)), creating);
     }
 
     /// The attribute page as 0DC7 draws it (from 2B58 and 122F's redraw

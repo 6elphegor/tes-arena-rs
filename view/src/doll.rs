@@ -48,6 +48,14 @@ const MATERIAL_BASE: u16 = 0x3EA0;
 const HEAD_COLOURS: u16 = 0x5750;
 const RACE_HEADS: u16 = 0x576E;
 
+/// The race's picture the doll stands on (CHRBKFnn / CHARBKnn).
+pub fn backdrop(archive: &crate::archive::Archive, m: &Machine) -> Option<Image> {
+    let woman = m.mem.r8(DS, PLAYER + 7) != 0;
+    let race = m.mem.r8(DS, PLAYER + 4);
+    let page = if woman { format!("CHRBKF{race:02}.IMG") } else { format!("CHARBK{race:02}.IMG") };
+    crate::panels::load_image(archive, m, &page)
+}
+
 /// The doll's images, bottom first.
 pub fn images(archive: &crate::archive::Archive, m: &Machine) -> Vec<Image> {
     let woman = m.mem.r8(DS, PLAYER + 7) != 0;
@@ -55,8 +63,7 @@ pub fn images(archive: &crate::archive::Archive, m: &Machine) -> Vec<Image> {
     let robe = m.mem.r8(DS, PLAYER + 5) & 0x20 != 0;
     let sex = if woman { 'F' } else { 'M' };
     let mut out = Vec::new();
-    let page = if woman { format!("CHRBKF{race:02}.IMG") } else { format!("CHARBK{race:02}.IMG") };
-    out.extend(crate::panels::load_image(archive, m, &page));
+    out.extend(backdrop(archive, m));
     let faces = if woman { format!("FACESF1{race}.CIF") } else { format!("FACES1{race}.CIF") };
     let face = m.mem.r8(DS, PLAYER + 0x6B) as usize;
     if let Some(img) = archive.read(&faces).and_then(|d| cif_frame(m, &d, face)) {

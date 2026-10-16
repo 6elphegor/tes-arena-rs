@@ -26,6 +26,9 @@ use std::collections::VecDeque;
 pub enum Click {
     Select(u16),
     Arrow(u16),
+    /// The name typed over the sheet's (1194:1528: into 01AD, 14h
+    /// characters at most, its 0 after).
+    Name([u8; 0x15]),
 }
 
 /// An answer given.
@@ -381,6 +384,11 @@ impl Talk {
                     match c {
                         Click::Select(r) => m.creation_select(r),
                         Click::Arrow(y) => m.creation_arrow(y),
+                        Click::Name(n) => {
+                            for (i, &b) in n.iter().enumerate() {
+                                m.mem.w8(DS, 0x01AD + i as u16, b);
+                            }
+                        }
                     }
                 }
                 println!("[points spent]");

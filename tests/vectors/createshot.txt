@@ -1,3 +1,30 @@
+createshot | roll | script | G,enter,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:190,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,click:160:125,A
+createshot | roll | 0 | key:47@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
+createshot | roll | 1 | buffered:0d@1194:5545 | f77a84787555d629 | e7a843e801b942b4
+createshot | roll | 2 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 3 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 4 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 5 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 6 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 7 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 8 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 9 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 10 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 11 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 12 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 13 | click:160:190@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 14 | click:160:125@3159:00B9 | a8dafba8d382f1e9 | e7a843e801b942b4
+createshot | roll | 15 | click:160:125@3159:00B9 | 565b9001a57c26fb | e7a843e801b942b4
+createshot | roll | 16 | click:160:125@3159:00B9 | 293ead92f5ef3868 | e7a843e801b942b4
+createshot | roll | 17 | click:160:125@3159:00B9 | c2f234fd9cf99820 | e7a843e801b942b4
+createshot | roll | 18 | click:160:125@3159:00B9 | 98fd52f1cdf3257b | e7a843e801b942b4
+createshot | roll | 19 | click:160:125@3159:00B9 | 3d795cfa26688be2 | e7a843e801b942b4
+createshot | roll | 20 | click:160:125@3159:00B9 | 1c37c033e7966852 | e7a843e801b942b4
+createshot | roll | 21 | click:160:125@3159:00B9 | 9e0ba3902bf3275f | e7a843e801b942b4
+createshot | roll | 22 | click:160:125@3159:00B9 | 6d84682a08fb8aba | e7a843e801b942b4
+createshot | roll | 23 | click:160:125@3159:00B9 | 381f705e92cc75a0 | e7a843e801b942b4
+createshot | roll | 24 | key:41@3159:0047 | b7098b01e5753cb3 | e7a843e801b942b4
+createshot | roll | 25 | end@3159:0047 | 3539c4388e710d97 | ea6c609d1b1524f0
 createshot | generate | script | G,enter,A,B,C,A,B,C,A,B,C,A,N,enter
 createshot | generate | 0 | key:47@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | generate | 1 | buffered:0d@1194:5545 | f77a84787555d629 | e7a843e801b942b4
@@ -14,6 +41,33 @@ createshot | generate | 11 | key:41@3159:0047 | 8adc4c945c6555cd | 501818803ba8d
 createshot | generate | 12 | key:4e@3159:10E2 | ef83a2fb5a3ef319 | ace6365ac509861
 createshot | generate | 13 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
 createshot | generate | 14 | end@0000:A177 | 66558afe4b33e97b | e7a843e801b942b4
+createshot | rename | script | S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:20:10,back,type:Bo,enter,click:20:10,esc,type:Al,enter
+createshot | rename | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
+createshot | rename | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
+createshot | rename | 2 | key:52@0000:A195 | 66558afe4b33e97b | e7a843e801b942b4
+createshot | rename | 3 | key:69@0000:A195 | d1acfb618828bb57 | e7a843e801b942b4
+createshot | rename | 4 | key:61@0000:A195 | c9e465dba5080e0e | e7a843e801b942b4
+createshot | rename | 5 | key:0d@0000:A195 | c7c3ceb55cdb9b8b | e7a843e801b942b4
+createshot | rename | 6 | key:46@3159:10E2 | d2c3c68b9d606068 | e7a843e801b942b4
+createshot | rename | 7 | buffered:0d@1194:5545 | 386dbbcfb1f4188b | 6c1d8428b606b30f
+createshot | rename | 8 | click:240:80@3159:00B9 | 48bb7a3f1d578e9d | 6c1d8428b606b30f
+createshot | rename | 9 | key:59@3159:10E2 | 3906a677376f693b | 6c1d8428b606b30f
+createshot | rename | 10 | buffered:0d@1194:5545 | 5268a225f9d302ff | 6c1d8428b606b30f
+createshot | rename | 11 | buffered:0d@1194:5545 | ceba4d646938277b | 6c1d8428b606b30f
+createshot | rename | 12 | buffered:0d@1194:5545 | 7e8fdb5ff7db6b9 | 6c1d8428b606b30f
+createshot | rename | 13 | buffered:0d@1194:5545 | 18a0ba9ee6d25ea5 | 6c1d8428b606b30f
+createshot | rename | 14 | buffered:0d@1194:5545 | ed42edac821a0de9 | ef6ad023fa2b8c2b
+createshot | rename | 15 | click:20:10@1194:5DF6 | 668a25009e85d500 | ef6ad023fa2b8c2b
+createshot | rename | 16 | key:08@0000:A195 | c80b557d6da4da36 | ef6ad023fa2b8c2b
+createshot | rename | 17 | key:42@0000:A195 | c80b557d6da4da36 | ef6ad023fa2b8c2b
+createshot | rename | 18 | key:6f@0000:A195 | ce3ab4e00578855b | ef6ad023fa2b8c2b
+createshot | rename | 19 | key:0d@0000:A195 | 2011659620779614 | ef6ad023fa2b8c2b
+createshot | rename | 20 | click:20:10@1194:5DF6 | 26435cdbf412aefe | ef6ad023fa2b8c2b
+createshot | rename | 21 | key:1b@0000:A195 | 2011659620779614 | ef6ad023fa2b8c2b
+createshot | rename | 22 | key:41@0000:A195 | 48504e8e5a06b76c | ef6ad023fa2b8c2b
+createshot | rename | 23 | key:6c@0000:A195 | 8d68ae7783f5720f | ef6ad023fa2b8c2b
+createshot | rename | 24 | key:0d@0000:A195 | d08b448c8ff70774 | ef6ad023fa2b8c2b
+createshot | rename | 25 | end@1194:5DF6 | 37fe6036ad8a5a0 | ef6ad023fa2b8c2b
 createshot | select | script | S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175
 createshot | select | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | select | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
