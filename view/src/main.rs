@@ -2773,14 +2773,21 @@ impl App {
             match frame {
                 Some(arena::engine::Frame::Running) => {}
                 Some(arena::engine::Frame::Left) => {
-                    // On to the next area, whose assets are made afresh.
+                    // On to the next area, whose assets are made afresh:
+                    // the screen faded out in 12 steps after the world loop
+                    // (0000:0AEA..0AFC), the new area's first frame faded
+                    // in in 12 (A6FA..A702) unless C994 is set.
+                    let was = self.fade_from();
                     if let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) {
                         self.run = run;
                         self.assets = Assets::new(&self.dir, &mut self.engine);
                         self.remake_renderer();
                         self.last = Some(arena::engine::Frame::Running);
+                        let fade_in = if self.engine.m.mem.r8(arena::mem::DS, 0xC994) != 0 { 0 } else { 12 };
+                        self.fade_to(was, 12, fade_in);
                         return;
                     }
+                    self.fade = was.0;
                     if self.engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
                         self.game_over();
                         return;
@@ -3382,7 +3389,14 @@ impl App {
     /// screen's colours faded in in `fade_in` steps (0, 1: set at once,
     /// 9B56's three parts), each wait for the retrace a frame (`fade`).
     fn fade_open(&mut self, steps: i16, fade_in: i16, open: impl FnOnce(&mut Self)) {
-        // From where a fade under way ends.
+        let was = self.fade_from();
+        open(self);
+        self.fade_to(was, steps, fade_in);
+    }
+
+    /// Where a screen's change starts: the fade under way (taken: the
+    /// change starts where it ends), the colours shown and the screen.
+    fn fade_from(&mut self) -> (std::collections::VecDeque<(film::Dac, bool)>, film::Dac, hud::Screen) {
         let queued = std::mem::take(&mut self.fade);
         self.compose();
         let mut from = *self.screen.palette();
@@ -3401,8 +3415,13 @@ impl App {
                 }
             }
         }
-        let before = self.screen.clone();
-        open(self);
+        (queued, from, self.screen.clone())
+    }
+
+    /// The change from `was` (`fade_from`) to the screen now played
+    /// (`fade_open`).
+    fn fade_to(&mut self, was: (std::collections::VecDeque<(film::Dac, bool)>, film::Dac, hud::Screen), steps: i16, fade_in: i16) {
+        let (queued, from, before) = was;
         self.compose();
         let to = *self.screen.palette();
         self.fade = queued;
