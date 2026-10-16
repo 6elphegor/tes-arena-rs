@@ -272,6 +272,8 @@ pub struct Inventory {
 pub enum PageAnswer {
     Click(u16, u16),
     Confirm(u16),
+    /// The name's field's passes' inputs (`field::Live`), as typed.
+    Keys(Vec<arena::lineedit::EditKey>),
 }
 
 /// A spell's page up (`Machine::spell_page`, 1194:51D1): the game as the
@@ -287,6 +289,9 @@ pub struct SpellPage {
     pub asking: Option<(Vec<u8>, usize)>,
     /// The pages drawn on the way (68D7, each setting its colours).
     pub pages: usize,
+    /// The name's field asked (1194:65FD), when that is what waits: the
+    /// field, its look and the game as it asked it.
+    pub typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
 }
 
 /// The page's questions answered from `answers`; the first one without
@@ -298,6 +303,7 @@ struct Replay {
     shown: Option<Machine>,
     asking: Option<Vec<u8>>,
     pages: usize,
+    typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
 }
 
 impl Replay {
@@ -324,6 +330,27 @@ impl arena::spellpage::SpellPageHooks for Replay {
         }
         (1, 0x120, 0xC0)
     }
+    /// 1194:65FD: the name at 581A typed over in place on the page
+    /// (1194:661B's field: 45h, 30h, the cursor at the click's x less
+    /// 45h), in ARENAFNT.DAT ([102C]) and colour A0h, as the spellmaker's.
+    fn type_name(&mut self, m: &mut Machine) {
+        if self.waiting {
+            return;
+        }
+        let field = arena::lineedit::fields::spell_name(m, arena::spellmaker::var::NAME);
+        let look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0xA0, put_font: true };
+        match self.answers.pop_front() {
+            Some(PageAnswer::Keys(keys)) => {
+                if crate::field::replay(m, &field, &look, &keys) != Some(true) {
+                    eprintln!("the spell's name gave up: {}", arena::giveup::describe());
+                }
+            }
+            _ => {
+                self.wait(m);
+                self.typing = Some((field, look, crate::dialog::Snapshot(Box::new(m.clone()))));
+            }
+        }
+    }
     fn confirm(&mut self, m: &mut Machine, si: u16) -> u16 {
         if !self.waiting {
             match self.answers.pop_front() {
@@ -344,7 +371,7 @@ impl SpellPage {
     fn run(start: &Machine, files: &mut arena::bsa::Files, answers: &[PageAnswer], m: &mut Machine) -> Option<SpellPage> {
         let mut game = start.clone();
         let mut fs = files.clone();
-        let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0 };
+        let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0, typing: None };
         if game.spell_page(&mut fs, &mut r).is_none() {
             eprintln!("the spell's page gave up: {}", arena::giveup::describe());
         }
@@ -355,6 +382,7 @@ impl SpellPage {
                 shown: crate::dialog::Snapshot(Box::new(shown)),
                 asking: r.asking.map(|t| (t, 0)),
                 pages: r.pages,
+                typing: r.typing,
             }),
             _ => {
                 *m = game;
@@ -488,14 +516,24 @@ impl Said {
 }
 
 /// A special item's description box (1194:7E44's 59CC, its text in a
-/// heap block), in the colour its caller left (9288).
+/// heap block), in the colour its caller left (9288), the font selected
+/// (B036: the list's TEENYFNT) and MARBLE2.CIF's tiles.
 impl arena::text::TextHooks for Said {
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.message_box_far(m, DS, si);
     }
     fn message_box_far(&mut self, m: &mut Machine, seg: u16, si: u16) {
         let t = m.mem.cstr(seg, si).to_vec();
-        self.boxes.push(crate::hud::lines(&t, m.mem.r8(DS, 0x9288)));
+        let font = crate::hud::GameFont::selected(m);
+        let mut lines = crate::hud::lines(&t, m.mem.r8(DS, 0x9288));
+        for s in lines.iter_mut().flatten() {
+            s.font = font;
+        }
+        // 7E44 makes [103A] B038's (0000:9AF8) before its box: MARBLE2's
+        // tiles (the view keeps no tile records to compare B038 with).
+        let r = |at| m.mem.r16(DS, at) as i32;
+        lines = crate::hud::in_marble2(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
+        self.boxes.push(lines);
     }
 }
 
@@ -645,6 +683,11 @@ fn item_info(m: &mut Machine, files: &mut arena::bsa::Files, said: &mut Said) ->
     m.mem.w16(DS, info::ARGS, 0);
     m.mem.w16(DS, info::LINES, 3);
     m.mem.w8(DS, 0x9288, 0xFE);
+    // The font the list's drawing (1194:1EB8, its lines through 0000:9AE6)
+    // leaves selected: [102E], TEENYFNT, which a special item's box is
+    // drawn in.
+    let teeny = m.mem.r16(DS, 0x102E);
+    m.mem.w16(DS, 0xB036, teeny);
     let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
     match m.item_info(files, said, it) {
         None => {

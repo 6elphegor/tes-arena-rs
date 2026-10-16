@@ -31,13 +31,8 @@ fn fnv(b: impl IntoIterator<Item = u8>) -> u64 {
     h
 }
 
-/// The vectors: per screen, the page's digest, the palette's, the mask's
-/// (None: the whole page).
-fn vectors() -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
-    vectors_in(VECTORS)
-}
-
-/// `vectors` from another file of them (dungeontest's).
+/// The vectors in the file at `path`: per screen, the page's digest, the
+/// palette's, the mask's (None: the whole page).
 fn vectors_in(path: &str) -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
     let text = std::fs::read_to_string(path).expect(path);
     let mut out = std::collections::HashMap::new();
@@ -328,6 +323,87 @@ fn a_quests_line_equipped_as_the_original_draws_it() {
     quest_lines("equipmentquestequip", &[(60, 111, MouseButton::Left), (60, 111, MouseButton::Left)]);
 }
 
+/// The line before the quests' (the save's last slot: King Orgnum's
+/// Coffer, type 8Dh) right-clicked: a special item's box (7E44).
+#[test]
+fn a_special_items_description_as_the_original_draws_it() {
+    quest_lines("equipmentspecial", &[(60, 111, MouseButton::Right)]);
+}
+
+/// gen_screens.py's `potion`: an identified potion of type 3 (its +4,
+/// the seed its text's variant is rolled from, 1234h) in the player's last
+/// slot, as 1194:B158 makes one bought (its spell from 2A11, +12h FFh,
+/// condition 32h) and AB39 identifies it.
+fn potion(a: &mut App) {
+    let (ty, seed) = (3u8, 0x1234u16);
+    let m = &mut a.engine.m;
+    let at = 0x0212 + 39 * 0x13;
+    let mut b = [0u8; 0x13];
+    b[0] = ty;
+    b[4..6].copy_from_slice(&seed.to_le_bytes());
+    b[6..8].copy_from_slice(&0x32u16.to_le_bytes());
+    b[8..10].copy_from_slice(&0x32u16.to_le_bytes());
+    b[0x0E] = 0x40 | 0x0C | 1 | 2;
+    b[0x0F] = 0xFF;
+    b[0x11] = m.mem.r8(DS, 0x2A11 + ty as u16);
+    b[0x12] = 0xFF;
+    for (i, v) in b.into_iter().enumerate() {
+        m.mem.w8(DS, at + i as u16, v);
+    }
+}
+
+/// With the potion in that slot: its text (7CF8), its variant rolled from
+/// its +4.
+#[test]
+fn a_potions_description_as_the_original_draws_it() {
+    screen(
+        "equipmentpotion",
+        |a, d| {
+            potion(a);
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            for _ in 0..40 {
+                d.click(a, 16, 131, MouseButton::Left);
+            }
+            d.click(a, 60, 111, MouseButton::Right);
+        },
+        layer,
+    );
+}
+
+/// U with the potion: the items to use, it the fifth.
+#[test]
+fn the_use_list_with_a_potion_as_the_original_draws_it() {
+    screen(
+        "usepotions",
+        |a, d| {
+            potion(a);
+            d.key(a, KeyCode::KeyU, Some("u"));
+        },
+        over,
+    );
+}
+
+/// Its line clicked twice: drunk (29CF:0869, its spell cast on the
+/// player), the list gone, nothing drawn over play nor on the message
+/// line the next frame draws.
+#[test]
+fn a_potion_drunk_as_the_original_shows_it() {
+    screen(
+        "usepotion",
+        |a, d| {
+            potion(a);
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 190, MouseButton::Left);
+            d.click(a, 0xF0, 190, MouseButton::Left);
+            let stacks = (0..40u16).filter(|i| a.engine.m.mem.r8(DS, 0x0212 + i * 0x13 + 0x0E) & 0x4C == 0x4C).count();
+            assert_eq!(stacks, 0, "the potion drunk");
+            d.frame(a);
+        },
+        over,
+    );
+}
+
 /// On the spells' page a line clicked twice: its spell's page (1194:1B3C
 /// -> 51D1), then its bottom row's buttons (`and`: a click more).
 fn spell_page(name: &str, and: Option<(i32, i32)>) {
@@ -350,6 +426,60 @@ fn spell_page(name: &str, and: Option<(i32, i32)>) {
 #[test]
 fn a_spells_page_as_the_original_draws_it() {
     spell_page("equipmentspellpage", None);
+}
+
+/// `layer` with the typed field's cursor shown at its place, as the
+/// original's first pass shows it (a shot counts no frames of its blink).
+fn layer_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let live = a.live.take();
+    a.compose();
+    if let Some(l) = &live {
+        l.draw(&mut a.screen, true);
+    }
+    a.live = live;
+    let idx = a.screen.indices().to_vec();
+    let dac = a.screen.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// Its name (45h..83h, 30h..39h) clicked: typed over (1194:65FD, the
+/// cursor where it was clicked).
+#[test]
+fn a_spells_name_asked_as_the_original_draws_it() {
+    screen(
+        "equipmentspellname",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0x60, 0x34, MouseButton::Left);
+            assert!(a.live.is_some(), "the name's field");
+        },
+        layer_typed,
+    );
+}
+
+/// X and Enter typed: the spell renamed ("Lightx Heal"), its page again.
+#[test]
+fn a_spell_renamed_as_the_original_draws_it() {
+    screen(
+        "equipmentspellrenamed",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0x60, 0x34, MouseButton::Left);
+            assert!(a.live.is_some(), "the name's field");
+            d.key(a, KeyCode::KeyX, Some("x"));
+            d.key(a, KeyCode::Enter, None);
+            assert!(a.live.is_none(), "the name's field ended");
+        },
+        layer,
+    );
 }
 
 #[test]
@@ -772,6 +902,10 @@ fn into(a: &mut App, list: u16) {
     m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
     assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
     area_left(a);
+    // The building's words on the way in (191F, which the first frame
+    // shows, 0000:4903) taken as read: gen_screens.py runs its screens
+    // from the snapshot without that frame.
+    a.engine.m.mem.w8(DS, 0x191F, 0);
 }
 
 /// The tavern's services (1194:B93C, the table at 869F's kind 4) in the
@@ -1172,6 +1306,24 @@ fn the_rest_ended_rested_as_the_original_draws_it() {
         |a, d| {
             healed(a);
             rest_frame(a, d, 0, 1, 2);
+        },
+        over,
+    );
+}
+
+/// Resting with a creature near (one of type 0 at level 1 brought by a
+/// quest's encounter, 1194:89A7, placed near the player): the frame's
+/// scan of the actors counts it (0FFB, 0000:1854) before the rest's frame,
+/// which ends the rest: "There are enemies nearby..." (1194:4697).
+#[test]
+fn a_rest_ended_by_enemies_as_the_original_draws_it() {
+    screen(
+        "restenemies",
+        |a, d| {
+            let e = &mut a.engine;
+            e.m.quest_encounter(&mut e.files, &mut arena::encounter::NoFightHooks, 1, 0, 1).expect("a creature brought");
+            rest_frame(a, d, 1, 5, 0);
+            assert_eq!(a.engine.m.mem.r8(DS, arena::rest::var::RESTING), 0, "the rest ended");
         },
         over,
     );
@@ -1783,5 +1935,116 @@ fn the_guilds_magic_items_with_room_as_the_original_draws_them() {
             guild_buy(a, d, 0x71);
         },
         layer,
+    );
+}
+
+/// Into the town's palace, as gen_screens.py's `place` has the original:
+/// out of the guild into the street, the first square of the map whose
+/// wall's trigger is one of the palace's (C917's 11..13, 0000:4192)
+/// clicked from its corner, then in.
+fn into_palace(a: &mut App) {
+    area_left(a);
+    let m = &mut a.engine.m;
+    let palace: Vec<u8> = (11..14).map(|i| m.mem.r8(DS, arena::movement::var::TRIGGERS + i)).collect();
+    let seg = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let door = (0..0x8000u16)
+        .step_by(2)
+        .find(|&o| {
+            let w = m.mem.r16(seg, o);
+            (w & 0x8000 != 0 || w >> 8 == w & 0xFF) && palace.contains(&((w & 0x3F) as u8))
+        })
+        .expect("a palace in the town");
+    m.mem.w16(DS, arena::movement::var::X, (((door & 0xFF) >> 1) << 7) + 0x40);
+    m.mem.w16(DS, arena::movement::var::Y, ((door >> 8) << 7) + 0x40);
+    m.mem.w16(DS, arena::controls::var::PICKED, door);
+    m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
+    assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
+    area_left(a);
+    assert_eq!(a.engine.m.mem.r8(DS, 0x0D48), 1, "in the palace");
+}
+
+/// The palace's ruler clicked, as gen_screens.py's `ruler` has the
+/// original: a map flat of the palace's first kind (+0Ch the flat base
+/// C38E) copied to the clicked record (3D96, 2294:047B), out of a thing's
+/// reach; then a turn, whose frame's click (1194:DB6C) runs the palace's
+/// quests (8F1E).
+fn ruler(a: &mut App, d: &mut Driver) {
+    into_palace(a);
+    // The palace's first frame: its pending box (0000:4903, 191F) shown,
+    // then read.
+    d.frame(a);
+    clear(d, a);
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, arena::movement::var::X), m.mem.r16(DS, arena::movement::var::Y));
+    let rec = arena::talk::var::RECORD;
+    m.mem.w16(DS, rec, x.wrapping_add(0x200));
+    m.mem.w16(DS, rec + 4, y);
+    let base = m.mem.r16(DS, 0xC38E) as u8;
+    m.mem.w8(DS, rec + 0xC, base);
+    m.mem.w16(DS, arena::talk::var::CLICKED, rec);
+    m.mem.w32(DS, arena::random::SEED, SEED);
+    m.rng.seed = SEED;
+    d.frame(a);
+    assert!(a.pending.is_some() || !a.boxes.is_empty(), "the ruler's words");
+}
+
+/// In the palace, its first frame: the box its way in left pending (191F,
+/// text [137A] 0), shown by 0000:4903 through 1194:A36C.
+#[test]
+fn the_palaces_audience_chamber_as_the_original_draws_it() {
+    screen(
+        "palacewelcome",
+        |a, d| {
+            into_palace(a);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the palace's words");
+        },
+        over,
+    );
+}
+
+/// The ruler clicked: the save's quest on offer asked about.
+#[test]
+fn the_palaces_question_as_the_original_draws_it() {
+    screen("palace", ruler, over);
+}
+
+/// Its No (the menu's second entry: 3159:0F2A picks by the row alone,
+/// from 127 on): text Fh.
+#[test]
+fn the_palace_refused_as_the_original_draws_it() {
+    screen("palaceno", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x88, MouseButton::Left); }, over);
+}
+
+/// Its Yes: the offer itself.
+#[test]
+fn the_palaces_offer_as_the_original_draws_it() {
+    screen("palaceyes", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); }, over);
+}
+
+/// The offer taken (its Yes, 136..157) and refused (its No, from 157).
+#[test]
+fn the_palaces_offer_taken_as_the_original_draws_it() {
+    screen("palaceaccept", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); d.click(a, 0xA0, 0x90, MouseButton::Left); }, over);
+}
+
+#[test]
+fn the_palaces_offer_refused_as_the_original_draws_it() {
+    screen("palacedecline", |a, d| { ruler(a, d); d.click(a, 0xA0, 0x6E, MouseButton::Left); d.click(a, 0xA0, 0xA8, MouseButton::Left); }, over);
+}
+
+/// With none on offer (the save's freed: kind 0): text Dh.
+#[test]
+fn the_palace_with_nothing_on_offer_as_the_original_draws_it() {
+    screen(
+        "palacenone",
+        |a, d| {
+            let v = a.engine.m.mem.r16(DS, 0x0E6E + 4) & 0xFF3F;
+            a.engine.m.mem.w16(DS, 0x0E6E + 4, v);
+            ruler(a, d);
+        },
+        over,
     );
 }

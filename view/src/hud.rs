@@ -155,6 +155,21 @@ pub fn clipped(mut lines: Vec<Vec<Span>>, c: Clip) -> Vec<Vec<Span>> {
     lines
 }
 
+/// A message box's lines drawn with MARBLE2.CIF's tiles ([103A] made
+/// B038's, 0000:9AF8, as a special item's box has them, 1194:7E44) rather
+/// than play's MARBLE.CIF: `clipped`'s marker with a fifth field, 2.
+pub fn in_marble2(mut lines: Vec<Vec<Span>>, c: Clip) -> Vec<Vec<Span>> {
+    let c = if c.2 > c.0 && c.3 > c.1 { c } else { (0, 0, W as i32 - 1, H as i32 - 1) };
+    let text = format!("{},{},{},{},2", c.0, c.1, c.2, c.3);
+    lines.insert(0, vec![Span { colour: 0, text, font: Default::default(), code: Some(1) }]);
+    lines
+}
+
+/// Whether a box's lines are drawn with MARBLE2.CIF's tiles (`in_marble2`).
+fn marble2_of(lines: &[Vec<Span>]) -> bool {
+    lines.first().is_some_and(|l| matches!(l.as_slice(), [m] if m.code == Some(1) && m.text.split(',').nth(4) == Some("2")))
+}
+
 /// A clip's left, top, right and bottom (A914..A91A).
 pub type Clip = (i32, i32, i32, i32);
 
@@ -166,7 +181,7 @@ pub fn clip_of(lines: &[Vec<Span>]) -> (Option<Clip>, &[Vec<Span>]) {
         if m.code != Some(1) {
             return None;
         }
-        let v: Vec<i32> = m.text.split(',').map(|v| v.parse().ok()).collect::<Option<_>>()?;
+        let v: Vec<i32> = m.text.split(',').take(4).map(|v| v.parse().ok()).collect::<Option<_>>()?;
         let [a, b, c, d] = v[..] else { return None };
         Some((a, b, c, d))
     };
@@ -746,6 +761,8 @@ pub struct Style {
     list_font: Font,
     /// MARBLE.CIF, 3 x 3 tiles ([1036], 21EE:00BC).
     tiles: Tiles,
+    /// MARBLE2.CIF, 3 x 3 tiles ([103A]), for the boxes made B038's.
+    tiles2: Option<Tiles>,
     /// The lists' kinds 0..11 as 1194:5734 sets them up (any other kind
     /// is kind 1's).
     kinds: Vec<ListKind>,
@@ -864,7 +881,8 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     ];
     let bar = kind("", RECORD_5AF4, 0xFD, None);
     let font_b = Font::load(archive, "FONT_B.DAT");
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds, bar, font_b });
+    let tiles2 = Tiles::load(archive, "MARBLE2.CIF", 3, 3);
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, tiles2, kinds, bar, font_b });
 }
 
 /// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
@@ -1028,14 +1046,24 @@ fn clip(hud: &Hud) -> (i32, i32, i32, i32) {
 
 /// Where a message box goes (965A with CX 4007h: centred in the clip),
 /// or at the clip's top when a menu is up with it (the view shows both).
+/// The tiles a box's lines are drawn with: MARBLE2.CIF's where they
+/// carry `in_marble2`'s marker, play's MARBLE.CIF's otherwise.
+fn box_tiles<'a>(st: &'a Style, lines: &[Vec<Span>]) -> &'a Tiles {
+    match (&st.tiles2, marble2_of(lines)) {
+        (Some(t), true) => t,
+        _ => &st.tiles,
+    }
+}
+
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     let lines = hud.boxed.as_ref()?;
     if placed_of(lines).is_some() {
         return None;
     }
     // Centred in the clip it was asked in, where it carries one.
+    let tiles = box_tiles(st, lines);
     let (asked, lines) = clip_of(lines);
-    let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
+    let (w, h, _, _) = box_size_in(tiles, st.box_font_of(lines), lines, MARGIN);
     let c = asked.unwrap_or_else(|| clip(hud));
     let x = (c.0 + c.2) / 2 - w / 2;
     let y = match &hud.menu {
@@ -1202,8 +1230,9 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
         draw_placed(screen, st, p);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
+        let tiles = box_tiles(st, lines);
         let lines = clip_of(lines).1;
-        draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
+        draw_box_in(screen, tiles, st.box_font_of(lines), r, lines, MARGIN, 0x60);
     }
     if let Some(menu) = &hud.menu {
         if menu.kind == DIALOG_BUTTONS {

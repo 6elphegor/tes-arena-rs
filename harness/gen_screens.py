@@ -67,6 +67,11 @@ SCREENS = {
     # "can't be equipped" (1AFB -> 1BE0).
     'equipmentquests': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40),
     'equipmentquestinfo': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 122)]),
+    # The line before the quests' (the save's last slot: King Orgnum's
+    # Coffer, a special item, type 8Dh) right-clicked: its box (7E44); with
+    # an identified potion in that slot (`potion`), its text (7CF8).
+    'equipmentspecial': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
+    'equipmentpotion': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
     'equipmentquestequip': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('click', 60, 111), ('click', 60, 111)]),
     # A line right-clicked: marked, its item described (1194:1988).
     'equipmentinfo': (0x00BE, [('click', 0x80, 0xB8), ('rclick', 60, 62)]),
@@ -87,6 +92,13 @@ SCREENS = {
     # Delete's Yes: the spell off the list, the next one's page.
     'equipmentspelldeleted': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
                                        ('click', 0xE0, 190), ('click', 160, 112)]),
+    # The page's name (45h..83h, 30h..39h) clicked: typed over (1194:65FD,
+    # the editor at 45h, 30h, the cursor at the click's x less 45h); then
+    # X and Enter typed (a key a wait): the spell renamed, its page again.
+    'equipmentspellname': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                    ('click', 0x60, 0x34)]),
+    'equipmentspellrenamed': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                       ('click', 0x60, 0x34)] + [('keys', [k]) for k in (0x2D, 0x1C)]),
     'equipmentspellexit': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
                                     ('click', 0x120, 190)]),
     # S: the status box (037C: 04B1).
@@ -118,6 +130,11 @@ SCREENS = {
     # the list gone) and what it said put on the message line (061A),
     # which the next frame draws (`AFTER`).
     'usemessage': (0x034D, [('click', 0xF0, 181), ('click', 0xF0, 181)]),
+    # The items to use with the potion (`potion`) among them.
+    'usepotions': (0x034D, []),
+    # Its line (the fifth, 190) clicked twice: the potion drunk, what it
+    # said on the message line (`AFTER`).
+    'usepotion': (0x034D, [('click', 0xF0, 190), ('click', 0xF0, 190)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
     # Its bottom row's buttons (the table at 5C2C: y 118..146), each
@@ -205,6 +222,9 @@ SCREENS = {
     'restleft': ((0x1194, 0x4635, {}), []),
     'restpassed': ((0x1194, 0x4635, {}), []),
     'restrested': ((0x1194, 0x4635, {}), []),
+    # With enemies near (`hunted`, as the frame's scan of the actors leaves
+    # 0FFB): "Enemies are nearby" (1194:4697), the rest ended.
+    'restenemies': ((0x1194, 0x4635, {}), []),
 
     'storesellequipped': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B), ('click', 0x80, 0x25)]),
     # The rumours' General (the box at 5Ch..6Eh): a rumour said in the
@@ -294,6 +314,24 @@ SCREENS = {
     # takes one a pass).
     'riddle': ((0, 0x0550, {}), []),
     'riddletyped': ((0, 0x0550, {}), [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13)]),
+    # In the town's palace (WHERE), its ruler clicked (`ruler`: a map
+    # flat of the palace's first kind as the hit test copies it, 2294:047B)
+    # as the frame runs the click (1194:DB6C -> 8F1E): the save's quest on
+    # offer asked about (1194:9CD8, text Eh, Yes and No). The menu (3159:
+    # 0F2A) picks by the click's row alone, from the tops it keeps of its
+    # entries (here 106 and 127, 21 high; for the offer 136 and 157),
+    # not where it drew them. No: text Fh; Yes: the offer itself asked
+    # (its text, 1194:9162..9321), then taken or refused; with none on
+    # offer (`unoffered`), text Dh.
+    # The palace's first frame (0000:4903): its pending box (191F, set on
+    # the way in) taken, text [137A] (0) shown by 1194:A36C with AX 0.
+    'palacewelcome': ((0x1194, 0xA36C, {'eax': 0}), []),
+    'palace': ((0x1194, 0xDB6C, {}), []),
+    'palaceno': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x88)]),
+    'palaceyes': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E)]),
+    'palaceaccept': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0x90)]),
+    'palacedecline': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E), ('click', 0xA0, 0xA8)]),
+    'palacenone': ((0x1194, 0xDB6C, {}), []),
 }
 WAIT = (0, 0x8FC4)
 
@@ -302,11 +340,12 @@ WAIT = (0, 0x8FC4)
 # from the street (`ScreenArena.area_ended` out of the guild, then
 # `enter`).
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
-          'people': None}
+          'people': None, 'palace': 'triggers'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
-         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
+         'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
+         'palacewelcome': 'palace', 'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
                'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'storestolen', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
@@ -324,7 +363,9 @@ def place(a, base, where, cache={}):
             # on both sides, whatever the view's frames rolled before.
             seeded(a)
         assert a.area_ended() == ('world',), 'the guild not left'
-        if PLACES[where] is not None:
+        if PLACES[where] == 'triggers':
+            assert a.enter(palace_door(a)) == ('world',), 'the palace not entered'
+        elif PLACES[where] is not None:
             at, count = PLACES[where]
             assert a.r16(count), f'no {where} in the town'
             # An entry's square is row << 8 | column (1194:40CF); the
@@ -334,6 +375,57 @@ def place(a, base, where, cache={}):
             assert a.enter(door) == ('world',), f'the {where} not entered'
         cache[where] = a.snapshot()
     return cache[where]
+
+
+def palace_door(a):
+    """The first square (row << 8 | column << 1) of the city's map (D806)
+    whose wall's trigger (its low 6 bits, the high byte its low or bit 15
+    set: 0000:43B1) is one of the palace's, the triggers' 11..13 (C917's;
+    0000:4192)."""
+    palace = set(a.mu.mem_read(a.lin(a.ds, 0xC917 + 11), 3))
+    seg = a.r16(0xD806)
+    for off in range(0, 0x8000, 2):
+        w = a.r16(off, seg=seg)
+        if (w & 0x8000 or w >> 8 == w & 0xFF) and w & 0x3F in palace:
+            return off
+    raise AssertionError('no palace in the town')
+
+
+# The record a map flat clicked is copied to (2294:047B), CLICKED's then.
+RECORD = 0x3D96
+
+
+def ruler(a):
+    """A map flat of the palace's first kind (+0Ch the flat base C38E: 0,
+    the ruler's) clicked, as the hit test leaves it: copied to RECORD, the
+    record CLICKED (CB5E); out of a thing's reach (292B:06DC's E6h), so
+    taken by the palace's ruler. The palace's first frame has shown its
+    pending box (0000:4903: 191F, 101C and 137E cleared after)."""
+    for at in (0x191F, 0x101C, 0x137E):
+        a.mu.mem_write(a.lin(a.ds, at), bytes([0]))
+    # The words' variants (and the offer's names) rolled from SEED on both
+    # sides, whatever the view's frames rolled before.
+    seeded(a)
+    a.w16(RECORD, a.r16(0xC3D0) + 0x200)
+    a.w16(RECORD + 4, a.r16(0xC3D4))
+    a.mu.mem_write(a.lin(a.ds, RECORD + 0xC), bytes([a.r16(0xC38E) & 0xFF]))
+    a.w16(0xCB5E, RECORD)
+
+
+def pending(a):
+    """The frame's pending box taken as 0000:4903 takes it: CB5E FFFFh,
+    191F, 101C and 137E cleared."""
+    a.w16(0xCB5E, 0xFFFF)
+    for at in (0x191F, 0x101C, 0x137E):
+        a.mu.mem_write(a.lin(a.ds, at), bytes([0]))
+    # The text's variant rolled from SEED on both sides.
+    seeded(a)
+
+
+def unoffered(a):
+    """The save's quest on offer (QUESTS 0E6E's first, kind 2 in +4's
+    bits 6-7) freed: none on offer."""
+    a.w16(0x0E6E + 4, a.r16(0x0E6E + 4) & 0xFF3F)
 
 
 def square(a):
@@ -506,6 +598,29 @@ def hunted(a):
     a.w16(0x0FFB, 1)
 
 
+# The potion `potion` puts in the player's last slot: its type (the
+# fifteen the guild sells, 28CD's names), and its +4 (the seed its text's
+# variant is rolled from, 1194:7CF8).
+POTION = (3, 0x1234)
+
+
+def potion(a):
+    """An identified potion (flags +0Eh: taken 40h, a stack 0Ch, 1, and
+    identified 2) in the last of the player's slots, as 1194:B158 makes
+    one bought (its spell from 2A11, +12h FFh, condition 32h) then
+    identified (1194:AB39's bit 2)."""
+    ty, seed = POTION
+    b = bytearray(0x13)
+    b[0] = ty
+    b[4:6] = seed.to_bytes(2, 'little')
+    b[6:8] = b[8:10] = (0x32).to_bytes(2, 'little')
+    b[0x0E] = 0x40 | 0x0C | 1 | 2
+    b[0x0F] = 0xFF
+    b[0x11] = a.mu.mem_read(a.lin(a.ds, 0x2A11 + ty), 1)[0]
+    b[0x12] = 0xFF
+    a.mu.mem_write(a.lin(a.ds, 0x0212 + 39 * 0x13), bytes(b))
+
+
 def worn(a):
     """Each of the player's items (40 slots of 13h bytes from DGROUP 0212h,
     taken: +0Eh bit 40h) worn to half its condition: +6 of its maximum +8,
@@ -528,18 +643,21 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'campenemies': hunted,
           'restleft': resting(1, 5), 'restpassed': lambda a: (resting(0, 2)(a), hurt(a)),
           'restrested': lambda a: (resting(0, 1, 2)(a), healed(a)),
+          'restenemies': lambda a: (resting(1, 5)(a), hunted(a)),
           'loot': loot_seeded, 'loottake': loot_seeded, 'riddle': riddled, 'riddletyped': riddled,
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
           'storerepairworn': lambda a: (worn(a), seeded(a)),
           'storesteal': lambda a: (room(a), seeded(a)),
-          'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED))}
+          'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
+          'equipmentpotion': potion, 'usepotions': potion, 'usepotion': potion,
+          'palacewelcome': pending, 'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'spellarea', 'spellself', 'spelllight')}
+AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight')}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

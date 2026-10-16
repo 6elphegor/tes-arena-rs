@@ -5,6 +5,8 @@ screenfade | equipmentspells | 28 | c63880118b2d904d
 screenfade | equipmentdown | 28 | c63880118b2d904d
 screenfade | equipmentquests | 28 | c63880118b2d904d
 screenfade | equipmentquestinfo | 28 | c63880118b2d904d
+screenfade | equipmentspecial | 28 | c63880118b2d904d
+screenfade | equipmentpotion | 28 | c63880118b2d904d
 screenfade | equipmentquestequip | 28 | c63880118b2d904d
 screenfade | equipmentinfo | 28 | c63880118b2d904d
 screenfade | equipmentoff | 28 | c63880118b2d904d
@@ -13,6 +15,8 @@ screenfade | equipmentspellnext | 31 | bbc8aa575ea027a1
 screenfade | equipmentspellprev | 31 | bbc8aa575ea027a1
 screenfade | equipmentspelldelete | 30 | 60223a0222993c8b
 screenfade | equipmentspelldeleted | 31 | bbc8aa575ea027a1
+screenfade | equipmentspellname | 30 | 60223a0222993c8b
+screenfade | equipmentspellrenamed | 30 | 60223a0222993c8b
 screenfade | equipmentspellexit | 57 | 3845aa8d6b1e4965
 screenfade | logbook | 27 | 6e85f83479df0314
 screenfade | logbookmore | 27 | 6e85f83479df0314
