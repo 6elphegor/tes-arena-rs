@@ -2151,3 +2151,22 @@ fn a_quests_message_as_the_original_draws_it() {
         over,
     );
 }
+
+/// A wall spell's counter (2826:0BB2): three walls to make (0DC0).
+#[test]
+fn a_wall_spells_counter_as_the_original_draws_it() {
+    screen("spellwalls", |a, _| a.engine.m.mem.w16(DS, 0x0DC0, 3), over);
+}
+
+/// A floor spell's: two floors to unmake (0DC2 -2).
+#[test]
+fn a_floor_spells_counter_as_the_original_draws_it() {
+    screen(
+        "spellfloors",
+        |a, _| {
+            a.engine.m.mem.w16(DS, 0x0DC0, 0);
+            a.engine.m.mem.w16(DS, 0x0DC2, 0xFFFE);
+        },
+        over,
+    );
+}

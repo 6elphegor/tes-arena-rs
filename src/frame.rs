@@ -108,8 +108,10 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// what it covers into the frame (ES:DI [9030]:0, CX 7), bank [1030]
     /// mapped: `Machine::box_background` with the front end's screen.
     fn town_welcome(&mut self, _m: &mut Machine, _files: &mut Files) {}
-    /// 1194:D327 (keys ACED and ACF4).
-    fn key_d327(&mut self, _m: &mut Machine) {}
+    /// 1194:D327 (keys ACED and ACF4: Alt+F5), `Machine::main_quest_reset`.
+    fn key_d327(&mut self, m: &mut Machine) {
+        m.main_quest_reset();
+    }
     /// 1194:4635: a frame of rest, while resting (`rest::rest_frame`,
     /// with the front end's `RestHooks`: its texts and menus, and its
     /// `ClockHooks` for the hours passing). Nothing by default: a front

@@ -339,6 +339,10 @@ SCREENS = {
     # A quest's message, once (0000:4B87: 5CA bit 200h, the quest's carry
     # 0000:4D00 not met, 5E0 bit 400h clear): text 5A6h (`questmessage`).
     'questmessage': ((0, 0x4B87, {}, 'near'), []),
+    # A wall spell's counter (2826:0BB2, run by the controls each frame):
+    # three walls to make (0DC0), and two floors to unmake (0DC2 -2).
+    'spellwalls': ((0x2826, 0x0BB2, {}, 'near'), []),
+    'spellfloors': ((0x2826, 0x0BB2, {}, 'near'), []),
     'palace': ((0x1194, 0xDB6C, {}), []),
     'palaceno': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x88)]),
     'palaceyes': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E)]),
@@ -697,6 +701,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'equipmentpotion': potion, 'usepotions': potion, 'usepotion': potion,
           'tavernwelcome': seeded, 'templewelcome': seeded, 'storewelcome': seeded, 'guildwelcome': seeded,
           'holiday': holiday, 'questmessage': quest_message,
+          'spellwalls': lambda a: a.w16(0x0DC0, 3), 'spellfloors': lambda a: (a.w16(0x0DC0, 0), a.w16(0x0DC2, 0xFFFE)),
           'palacewelcome': pending, 'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 

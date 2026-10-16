@@ -119,3 +119,5 @@ screen | questmessage | 695bb197143463c9 2376632b30141d5 e1d5c15186287322
 screen | storewelcome | ed01c65951f87e4e a97a4bafd992e4ed 92419815461bf051
 screen | tavernwelcome | ed83ac3356fa1db5 a97a4bafd992e4ed 849d3333454fc25
 screen | templewelcome | 870300611079bc90 a97a4bafd992e4ed 2032971f07f36d45
+screen | spellwalls | 42bc94ba768b3e01 a97a4bafd992e4ed 7d7d0d0dc1bf7883
+screen | spellfloors | 1682abec999c2d5d a97a4bafd992e4ed 6e08f9ea1dd87b15
