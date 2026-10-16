@@ -413,7 +413,7 @@ fn camping_with_typed_hours_as_by_script() {
     d.key(&mut a, KeyCode::Enter, None);
     match a.pending.as_ref().map(|p| &p.need) {
         // The prompt's trailing spaces kept: the field's room in its box.
-        Some(dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(prompt), field, .. })) => {
+        Some(dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(prompt, _, _), field, .. })) => {
             assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}");
             // 1194:46BF: the field at FCh, 44h, 3 characters.
             assert_eq!((field.x, field.y, field.max), (0xFC, 0x44, 3));

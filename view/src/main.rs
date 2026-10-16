@@ -496,7 +496,7 @@ impl arena::rest::RestHooks for Front<'_> {
         if let Some(t) = self.talk.as_deref_mut() {
             let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).to_string();
             let look = field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
-            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt));
+            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(arena::mem::DS, 0x9288), game_clip(m)));
         }
     }
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {

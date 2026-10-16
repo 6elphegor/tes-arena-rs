@@ -526,6 +526,63 @@ fn the_taverns_room_price_as_the_original_draws_it() {
     screen("tavernroomprice", room_priced, layer);
 }
 
+/// The price accepted (the haggle's Yes, 1194:6001's first button) and
+/// the deal confirmed (Yes again): the room taken, the tavern's menu again
+/// without its rooms.
+fn room_taken(a: &mut App, d: &mut Driver) {
+    room_priced(a, d);
+    d.click(a, 0x70, 0x85, MouseButton::Left);
+    d.click(a, 0x70, 0x85, MouseButton::Left);
+}
+
+#[test]
+fn the_taverns_menu_with_the_room_taken_as_the_original_draws_it() {
+    screen("tavernroomtaken", room_taken, layer);
+}
+
+/// The room taken and the tavern's menu left by its Exit (third box), then
+/// R: camping (2542:01E6, 1194:424E), its options.
+fn rest_asked(a: &mut App, d: &mut Driver) {
+    room_taken(a, d);
+    d.click(a, 0xA0, 0x87, MouseButton::Left);
+    assert!(a.pending.is_none(), "the tavern left");
+    d.key(a, KeyCode::KeyR, Some("r"));
+    d.frame(a);
+}
+
+#[test]
+fn camping_in_the_rented_room_as_the_original_draws_it() {
+    screen("tavernrest", rest_asked, over);
+}
+
+/// Its Camp for a while: the hours to rest asked, the typed field.
+#[test]
+fn the_hours_to_rest_asked_as_the_original_draws_them() {
+    screen(
+        "tavernresthours",
+        |a, d| {
+            rest_asked(a, d);
+            d.click(a, 0xA0, 0x64, MouseButton::Left);
+        },
+        over_typed,
+    );
+}
+
+/// `over` with the typed field asked drawn over it (`App::compose`'s
+/// last step): a box's prompt and its field.
+fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    a.compose();
+    let hud = a.hud();
+    let mut s = hud::Screen::new(a.assets.dac());
+    hud::compose_over(&mut s, &a.font, &hud);
+    if let Some(l) = &a.live {
+        l.draw(&mut s, true);
+    }
+    let idx = s.indices().to_vec();
+    let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
 /// The store's Sell, its first item (equipped) picked: whether to sell
 /// it still (1194:F6BC).
 #[test]
