@@ -253,6 +253,8 @@ impl Machine {
         match self.mem.r16(DS, table.wrapping_add(pick.wrapping_add(pick))) {
             0xBB83 => self.tavern_drinks(hooks).map(|_| false),
             0xBC8B => {
+                // 1194:BC8E: the gold left.
+                hooks.gold_left(self);
                 self.tavern_room(files, hooks)?;
                 hooks.room_file(self);
                 Some(false)
@@ -339,10 +341,14 @@ impl Machine {
 
     /// 1194:BB83. A drink bought; see the module's notes.
     fn tavern_drinks(&mut self, hooks: &mut dyn TavernHooks) -> Option<()> {
+        // 1194:BB86: the gold left.
+        hooks.gold_left(self);
         self.drinks_list()?;
         // AX Bh (1194:BB9E): the list's kind (1194:5734).
         self.list_kind = 0xB;
         let pick = hooks.list(self, DRINKS_TEXT + 1, 10, 0);
+        // 1194:BBA5
+        hooks.strip_back(self);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
             return Some(());
@@ -506,6 +512,8 @@ impl Machine {
         // AX Ah (1194:BD66): the list's kind (1194:5734).
         self.list_kind = 0xA;
         let pick = hooks.list(self, ROOM_NAMES, 5, text::ROOMS);
+        // 1194:BD6D
+        hooks.strip_back(self);
         self.mem.w8(DS, PICK, pick as u8);
         if (pick as i16) < 0 {
             return Some(());

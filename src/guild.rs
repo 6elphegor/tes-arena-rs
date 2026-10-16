@@ -604,6 +604,8 @@ impl Machine {
 
     /// 1194:AA8C. The buy menu (see the module's notes).
     fn guild_buy(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
+        // 1194:AA8F: the gold left.
+        hooks.gold_left(self);
         let stock = self.mem.r8(DS, STOCK) >= 1;
         let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
         let menu = match (stock, caster) {
@@ -616,6 +618,8 @@ impl Machine {
             Some((bx, di)) => {
                 let pick = hooks.menu(self, BUY_TITLE, bx, di);
                 if (pick as i16) < 0 {
+                    // 1194:AADD
+                    hooks.strip_back(self);
                     return Some(());
                 }
                 pick
@@ -650,6 +654,8 @@ impl Machine {
         self.list_kind = 0xB;
         let pick = hooks.list(self, POTION_TEXTS, 0x0F, 0);
         self.mem.w8(DS, PICK, pick as u8);
+        // 1194:B072
+        hooks.strip_back(self);
         if (pick as i16) < 0 {
             return Some(());
         }
@@ -844,6 +850,8 @@ impl Machine {
         self.list_kind = 0x7;
         let pick = hooks.stock_list(self, frame, 0x7D0, n);
         self.mem.w8(DS, PICK, pick as u8);
+        // 1194:B358
+        hooks.strip_back(self);
         if (pick as i16) >= 0 {
             self.guild_item_bought(files, hooks, pick)?;
         }
@@ -976,8 +984,14 @@ impl Machine {
 
     /// 1194:B1EA. A spell bought (see the module's notes).
     fn guild_spells(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<()> {
+        hooks.strip_back(self);
         'list: loop {
-            if !self.spell_list(hooks) {
+            // 1194:B1F4 (the loop's B1ED): the gold left.
+            hooks.gold_left(self);
+            let picked = self.spell_list(hooks);
+            // 1194:B1FE, or B31F when none was picked.
+            hooks.strip_back(self);
+            if !picked {
                 return Some(());
             }
             // 1194:A933

@@ -78,7 +78,8 @@
 //! The screen's routines are the front end's (nothing in the port; the
 //! generator makes them return at once: 0000:8FC4, 77EC, 9466, 541E,
 //! 9AE6, 9AF8, 1194:5496, 54B3, 4B60, 5F8C, 545C, 5FC0, 5E21), as are the
-//! menus, lists, dialogs and messages (`ShopHooks`) and the greeting,
+//! menus, lists, dialogs, messages and the gold left (545C, called where
+//! the original calls it) (`ShopHooks`) and the greeting,
 //! the message boxes, the haggle, the lists' lines, the repairs'
 //! pictures and texts (`StoreHooks`). The files are the port's
 //! (`Files`: kept in memory).
@@ -452,6 +453,8 @@ impl Machine {
             hooks.message_box(self, text::INVENTORY_FULL);
             return Some(false);
         }
+        // 1194:F7AE: the gold left.
+        hooks.gold_left(self);
         let weapons = if self.mem.r8(DS, ARMOR) == 0 {
             true
         } else if self.mem.r8(DS, WEAPONS) == 0 {
@@ -459,6 +462,8 @@ impl Machine {
         } else {
             let pick = hooks.menu(self, BUY_TITLE, BUY_KEYS, BUY_ENTRIES);
             if (pick as i16) < 0 {
+                // 1194:F954
+                hooks.strip_back(self);
                 return Some(false);
             }
             pick == 0
@@ -476,6 +481,8 @@ impl Machine {
         self.list_kind = if weapons { 1 } else { 2 };
         let pick = hooks.list(self, lines, n, 0);
         if (pick as i16) < 0 {
+            // 1194:F954
+            hooks.strip_back(self);
             return Some(false);
         }
         self.mem.w8(DS, PICK, pick as u8);
@@ -488,6 +495,8 @@ impl Machine {
         let price = if self.mem.r8(DS, HOLIDAY) == 1 { self.holiday_price(price, service) } else { price };
         self.mem.w32(DS, PRICE, price);
         self.store_template_name()?;
+        // 1194:F8C3
+        hooks.strip_back(self);
         let name = self.shopkeeper_name(files, BUY_NAME)?;
         self.mem.w16(DS, NAME_AT, NAME);
         let per = self.store_personality();
@@ -592,7 +601,12 @@ impl Machine {
 
     /// 1194:F5DB. Selling; see the module's notes. The carry (never set).
     fn store_sell(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<bool> {
-        let Some(si) = self.store_pick_item(hooks)? else {
+        // 1194:F5DE: the gold left.
+        hooks.gold_left(self);
+        let picked = self.store_pick_item(hooks)?;
+        // 1194:F5E9, or F6B7 when none was picked.
+        hooks.strip_back(self);
+        let Some(si) = picked else {
             return Some(false);
         };
         let name = self.any_item_name(si)?;
@@ -1096,11 +1110,18 @@ impl Machine {
     /// (CA68) and taken out of the inventory.
     fn repair_new(&mut self, files: &mut Files, hooks: &mut dyn StoreHooks) -> Option<bool> {
         use repair::*;
+        // 1194:C7B2: the gold left.
+        hooks.gold_left(self);
         if self.repair_free().is_none() {
+            // 1194:C82B
+            hooks.strip_back(self);
             hooks.message(self, FULL);
             return Some(false);
         }
-        let Some(si) = self.store_pick_item(hooks)? else {
+        let picked = self.store_pick_item(hooks)?;
+        // 1194:C7BF, or C836 when none was picked.
+        hooks.strip_back(self);
+        let Some(si) = picked else {
             return Some(false);
         };
         let whole = if self.item_category(DS, si) == 2 && self.armor_kind(DS, si) == 0 {
@@ -1175,10 +1196,14 @@ impl Machine {
         }
         loop {
             self.mem.w8(DS, STATE, 0);
+            // 1194:C874: the gold left.
+            hooks.gold_left(self);
             // 1194:CC94 (its font, 0000:9AE6, the screen's).
             // AX Bh (1194:CCA5): the list's kind (1194:5734).
             self.list_kind = 0xB;
             let ax = hooks.list(self, REASONS, 3, REASONS);
+            // 1194:C87E
+            hooks.strip_back(self);
             if (ax as i16) < 0 {
                 return Some(None);
             }

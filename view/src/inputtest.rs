@@ -57,7 +57,8 @@ fn app(dir: &Path, s: &Start) -> App {
     };
     interface::start(&mut engine.m);
     if let Some((save, slot)) = &s.load {
-        run = areas::load_game(&mut engine, dir, save, *slot).expect("the save loads");
+        // As the window's --load: the title's Load.
+        run = areas::load_game_title(&mut engine, dir, save, *slot).expect("the save loads");
     }
     if let Some(h) = s.hour {
         set_hour(&mut engine, h);

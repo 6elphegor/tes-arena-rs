@@ -58,6 +58,9 @@ pub struct Backdrop {
     pub title: Vec<u8>,
     /// The picture's file, drawn at (59h, 7Fh).
     pub picture: Option<String>,
+    /// The gold left's line (1194:545C's text at 1044), until the strip
+    /// under it is put back (5FC0).
+    pub gold: Option<Vec<u8>>,
 }
 
 impl Backdrop {
@@ -93,6 +96,12 @@ impl Backdrop {
         screen.text_plain(font, 0xA0 - (w >> 1), row, &title, 0x70);
         if let Some(t) = self.picture.as_deref().and_then(img) {
             screen.blit(0x59, 0x7F, t.w, t.h, &t.px, 199);
+        }
+        // 1194:545C: in the font [1026] (FONT_A.DAT) and colour 41h,
+        // centred on x A0h (0000:5364, no shadow) at row 9Ch.
+        if let (Some(gold), Some(f)) = (&self.gold, hud::Font::load(archive, "FONT_A.DAT")) {
+            let text = String::from_utf8_lossy(gold).into_owned();
+            screen.text_plain(&f, 0xA0 - (f.width(&text) as i32 >> 1), 0x9C, &text, 0x41);
         }
     }
 }
@@ -139,7 +148,7 @@ impl ShopFront<'_, '_> {
     fn show_banner(&mut self, m: &Machine, si: u16) {
         let title = m.mem.cstr(DS, si).to_vec();
         if let Some(t) = self.talk() {
-            t.backdrop = Some(Backdrop { title, picture: None });
+            t.backdrop = Some(Backdrop { title, picture: None, gold: None });
         }
     }
 
@@ -178,6 +187,19 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     }
     fn picture(&mut self, m: &mut Machine, si: u16) {
         self.show_picture(m, si);
+    }
+    fn gold_left(&mut self, m: &mut Machine) {
+        m.gold_left();
+        let text = m.mem.cstr(DS, arena::shops::GOLD_LINE).to_vec();
+        // Once a question is left unanswered the turn is shown as it was.
+        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
+            b.gold = Some(text);
+        }
+    }
+    fn strip_back(&mut self, _m: &mut Machine) {
+        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
+            b.gold = None;
+        }
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.front.menu(m, si, bx, di)

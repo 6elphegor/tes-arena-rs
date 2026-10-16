@@ -1,7 +1,9 @@
 """The original's screens drawn under unicorn, for gen_screens.py: a DOS
 machine enough for the game's start (0000:6F02, 21EE:0000), a saved game
 loaded from the title (25FD:0309), and a screen's routine run until it
-first waits for input, when the page it drew into is read.
+first waits for input, when the page it drew into is read. From the
+loaded game the original's own outer loop can take the player out of the
+building (`area_ended`) and in at another's door (`enter`).
 
 The machine: the BIOS video calls are taken and do nothing (mode 13h is
 the screen; AH 0Fh says mode 3 before it); the mouse driver is present
@@ -26,9 +28,8 @@ from unicorn import UC_HOOK_INSN, UC_HOOK_CODE
 from unicorn.x86_const import *
 
 PAGE_SEG_FIELD = 0xA900
-# Memory below the image: the creature records (DGROUP 1042), the EMS
-# page maps, the far pointer 1020's 80h bytes, the stack.
-CSEG = 0x0500
+# Memory below the image: the EMS page maps, the far pointer 1020's 80h
+# bytes, the stack.
 MAPS = 0x0780
 EXTRA = (0x0900, 0x0010)
 STACK = (0x0A00, 0x5FF0)
@@ -96,6 +97,10 @@ class ScreenArena(DosArena):
         header(HEAP_HIGH, 0, VGA - 1, high, 0)
         self.w16(0x8F6E, low + high)
         self.enable_ems(EMS_FRAME, maps_seg=MAPS)
+        # Every bank free, as the start's EMS set-up leaves them (0000:5DA0:
+        # 8FAA's words FFFFh).
+        for b in range(self.r16(0x9032)):
+            self.w16(0x8FAA + 2 * b, 0xFFFF)
 
     # --- ports --------------------------------------------------------------
 
@@ -294,21 +299,15 @@ class ScreenArena(DosArena):
         stubs, taken out again after)."""
         self.init_memory()
         assert self.run_screen(0x21EE, 0) is None, 'the start waited'
-        from gen_frame import counter
-        music = b'\xff\x06\xf8\xff\x31\xc0\xcb'  # inc word [FFF8]; xor ax, ax; retf
-        # Only the sounds and the music are left out (no driver).
-        stubs = [(0x23BA, 0x01C7, counter(0xFFE4, True)), (0x1194, 0x3AE8, counter(0xFFEE, True)),
-                 (0x2F9F, 0x001F, counter(0xFFF2, True)), (0x25CA, 0x01E6, music)]
-        saved = []
-        for seg, off, code in stubs:
-            lin = self.lin(LOAD_SEG + seg, off)
-            saved.append((lin, bytes(self.mu.mem_read(lin, len(code)))))
-            self.mu.mem_write(lin, code)
+        saved = self.stub()
         # The working slot as the start leaves it with no ARENA variable in
         # the environment (1194:3A72: 40h).
         self.mu.mem_write(self.lin(self.ds, 0x1A80), b'\x40')
         self.mu.mem_write(self.lin(self.ds, 0x1A6C), b'\x40')
-        self.w16(0x1042, CSEG)
+        # The title's Load (0000:117E): the game set up (21EE:016C: the
+        # towns' lists at 1AB5, 1004, 1008, the people's records at 1042,
+        # ...) before the load menu.
+        assert self.run_screen(0x21EE, 0x016C) is None, 'the setup waited'
         self.w16(0x1020, EXTRA[1])
         self.w16(0x1022, EXTRA[0])
         self.w16(0x05C8, self.r16(0x05C8) | 4)
@@ -323,8 +322,10 @@ class ScreenArena(DosArena):
         # (0309), into the world loop's entry.
         self._setup([], {'eax': 1})
         self._run(0x25FD, 0x028D, LOAD_SEG, 0xA2AC)
-        for lin, b in saved:
-            self.mu.mem_write(lin, b)
+        # The stack the world loop runs on: the interior's run (0000:0936,
+        # called at 0E7A) and the outer loop under it.
+        self.world_stack = self.stack_kept()
+        self.unstub(saved)
         for at in range(0xFFE0, 0x10000, 2):
             self.w16(at, 0)
         self.mu.mem_write(self.lin(self.ds, 0xC995), b'\x00')
@@ -337,14 +338,93 @@ class ScreenArena(DosArena):
         self.call_far(0, 0x7530, esi=0x1304, edi=0x929E)
         self.call_far(0, 0x9B4E, esi=0x929E)
 
+    def stub(self, location=True):
+        """The sounds and the music left out (no driver), and with
+        `location` the location record's build (1194:3AE8, as
+        gen_titleload.py's load has it): what was there."""
+        from gen_frame import counter
+        music = b'\xff\x06\xf8\xff\x31\xc0\xcb'  # inc word [FFF8]; xor ax, ax; retf
+        stubs = [(0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2F9F, 0x001F, counter(0xFFF2, True)),
+                 (0x25CA, 0x01E6, music)]
+        if location:
+            stubs.append((0x1194, 0x3AE8, counter(0xFFEE, True)))
+        saved = []
+        for seg, off, code in stubs:
+            lin = self.lin(LOAD_SEG + seg, off)
+            saved.append((lin, bytes(self.mu.mem_read(lin, len(code)))))
+            self.mu.mem_write(lin, code)
+        return saved
+
+    def unstub(self, saved):
+        for lin, b in saved:
+            self.mu.mem_write(lin, b)
+
+    # --- moving between areas ---------------------------------------------------
+
+    def area_ended(self, count=2_000_000_000):
+        """The area left (C398 bit 80h, as its way out sets it): the world
+        loop's end (0000:A45D) on the world's stack, then the outer loop
+        (0000:0E7D on) into the next area, until its world loop is about
+        to run its first frame (0000:A2AC; the frames pace on the timer's
+        ticks, 0151, which nothing here advances). That world's stack is
+        kept for the next."""
+        self.w16(0xC398, self.r16(0xC398) | 0x80)
+        ss, sp, words = self.world_stack
+        self.mu.mem_write(self.lin(ss, sp), words)
+        saved = self.stub(location=False)
+        # Where the next world loop starts its frames: its stack then.
+        at = self.lin(LOAD_SEG, 0xA2AC)
+        def kept(mu, addr, size, _):
+            self.world_stack = self.stack_kept()
+            self.waiting = ('world',)
+            mu.emu_stop()
+        h = self.mu.hook_add(UC_HOOK_CODE, kept, None, at, at)
+        try:
+            r = self.run_screen(0, 0xA45D, count=count, stack=(ss, sp))
+        finally:
+            self.mu.hook_del(h)
+            self.unstub(saved)
+        return r
+
+    def enter(self, square, count=2_000_000_000):
+        """A building's door (its map square, row << 8 | column << 1)
+        clicked from the corner of its square: the wall's trigger
+        (0000:43B1, PICKED CB92 the square, the player's place C3D0, C3D4
+        40h past the corner), then the area left for the building
+        (`area_ended`)."""
+        col, row = (square & 0xFF) >> 1, square >> 8
+        self.w16(0xC3D0, (col << 7) + 0x40)
+        self.w16(0xC3D4, (row << 7) + 0x40)
+        self.w16(0xCB92, square)
+        saved = self.stub(location=False)
+        try:
+            assert self.run_screen(0, 0x43B1, count=count) is None, 'the door waited'
+        finally:
+            self.unstub(saved)
+        assert self.r16(0xC398) & 0x80, 'the door led nowhere'
+        return self.area_ended(count=count)
+
+    def stack_kept(self):
+        """SS, SP and the stack's words above SP (to STACK's top): what
+        the screens' runs, on the same stack, write over."""
+        ss, sp = self.mu.reg_read(UC_X86_REG_SS), self.mu.reg_read(UC_X86_REG_SP)
+        top = STACK[1] if ss == STACK[0] else sp + 0x200
+        return ss, sp, bytes(self.mu.mem_read(self.lin(ss, sp), top - sp))
+
     # --- running a screen -----------------------------------------------------
 
-    def run_screen(self, seg, off, regs=None, count=200_000_000, near=False):
+    def run_screen(self, seg, off, regs=None, count=200_000_000, near=False, stack=None):
         """Far-call (or near-call) seg:off (image-relative) until it waits
         for input with nothing left in `script` (the wait returned) or
         returns (None)."""
         self.waiting = None
-        if near:
+        if stack is not None:
+            # Going on from inside the game, on its own stack: no return.
+            self._setup([], regs or {})
+            self.mu.reg_write(UC_X86_REG_SS, stack[0])
+            self.mu.reg_write(UC_X86_REG_SP, stack[1])
+            end = (STUB_SEG, 0)
+        elif near:
             self._setup([0xFFF0], regs or {})
             end = (LOAD_SEG + seg, 0xFFF0)
         else:
