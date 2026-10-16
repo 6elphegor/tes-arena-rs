@@ -772,6 +772,26 @@ fn a_theft_failed_as_the_original_draws_it() {
     );
 }
 
+/// The Steal from gen_screens.py's STEAL_SEED: the roll succeeds, "You
+/// successfully stole a ...".
+#[test]
+fn a_theft_as_the_original_draws_it() {
+    screen(
+        "storestolen",
+        |a, d| {
+            into(a, 0x1008);
+            room(a);
+            let seed = 0x2F6E_1A36;
+            a.engine.m.mem.w32(DS, arena::random::SEED, seed);
+            a.engine.m.rng.seed = seed;
+            super::shop_turn(a, 6);
+            assert!(a.pending.is_some(), "the shop's menu");
+            d.click(a, 0xA0, 0x8B, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 #[test]
 fn a_repairs_price_as_the_original_draws_it() {
     screen("storerepairworn", |a, d| repair_pick(a, d, true), layer);

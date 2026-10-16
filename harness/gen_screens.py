@@ -119,6 +119,8 @@ SCREENS = {
     # Its Steal (the box at 83h..9Ah), with a slot free: the lockpicking
     # roll from SEED fails, "You are unsuccessful...".
     'storesteal': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x8B)]),
+    # From STEAL_SEED the roll succeeds: "You successfully stole a ...".
+    'storestolen': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x8B)]),
     # The Buy with a slot free (`room`: the save's inventory is full).
     'storebuyroom': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     # Its Weapon and Armor (boxes 18h high under BUY OPTIONS): the lists;
@@ -256,7 +258,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
-               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
+               'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'storestolen', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})
 
@@ -296,9 +298,14 @@ def square(a):
 SEED = 0x2F6E_1A35
 
 
-def seeded(a):
-    a.w16(0x91F6, SEED & 0xFFFF)
-    a.w16(0x91F8, SEED >> 16)
+def seeded(a, seed=None):
+    seed = SEED if seed is None else seed
+    a.w16(0x91F6, seed & 0xFFFF)
+    a.w16(0x91F8, seed >> 16)
+
+
+# A seed the store's lockpicking roll (1194:FCC6) succeeds from.
+STEAL_SEED = 0x2F6E_1A36
 
 
 # The seed the piles at the square are made from (2433:0000) in `loot`.
@@ -453,7 +460,8 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storebuyroom': room, 'guildmagicroom': room, 'storeweapons': room, 'storearmor': room,
           'storeweapon': lambda a: (room(a), seeded(a)), 'storebuyhaggle': lambda a: (room(a), seeded(a)), 'storerepairitem': seeded,
           'storerepairworn': lambda a: (worn(a), seeded(a)),
-          'storesteal': lambda a: (room(a), seeded(a))}
+          'storesteal': lambda a: (room(a), seeded(a)),
+          'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED))}
 
 
 # What a screen's routine is followed by that the next frame would do:
