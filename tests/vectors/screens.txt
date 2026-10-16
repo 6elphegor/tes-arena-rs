@@ -50,3 +50,21 @@ screen | loottake | 6f0976abcdd59b41 a97a4bafd992e4ed 77aee268a5bf4f45
 screen | levelup | 2b9163ee2aa1bd6d a97a4bafd992e4ed 6f95345e5c8f8e6f
 screen | levelupstats | bacc1a605a4f4c4e ef6ad023fa2b8c2b
 screen | spellmaker | 565adceb34f0061e 6234ce5ea47ec1e3
+screen | riddle | 58bb15e08459635 a97a4bafd992e4ed d501f9c4db50e7d0
+screen | riddletyped | bdbcb51de4bb8aa5 a97a4bafd992e4ed 6749c17629c32bf
+screen | worldprovince | f3f78560a3108ebb db15945b94271757
+screen | worldtrip | 258358a48621ee11 db15945b94271757
+screen | worldsearch | 933f15b614404805 db15945b94271757
+screen | worldback | 4c16ae6cc47301f 6c1d8428b606b30f
+screen | guildpotions | c74b7c3615bac0ad a97a4bafd992e4ed 11959e55b4dc6a85
+screen | guildmagic | ab1e93fea9be4b4 a97a4bafd992e4ed acc2283e56e904c4
+screen | guildspells | 438c9d1c03dad5f8 a97a4bafd992e4ed 11959e55b4dc6a85
+screen | templedonate | 697ddf78daf3973b a97a4bafd992e4ed caa5da2321b03e7
+screen | guildpotionpick | 3c5cafbde6c2502a a97a4bafd992e4ed 25c9a4e9ebda1567
+screen | guildspellpick | 238608a7d03982a4 7b9dbd5285f32ad5
+screen | taverndrink | aac912512a414187 a97a4bafd992e4ed 95b8a4e3ff53aa83
+screen | storebuyroom | 5b279e70dfc48e83 a97a4bafd992e4ed 72e3ddcc63c23f67
+screen | guildmagicroom | 17c6523b9c13da5a a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storeweapons | 7ba0e376aee60d6d a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storearmor | f613ac59d96e4e18 a97a4bafd992e4ed cfe06bc4fb04a9c1
+screen | storeweapon | fc71e36105c78fa0 a97a4bafd992e4ed cfe06bc4fb04a9c1

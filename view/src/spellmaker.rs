@@ -159,7 +159,12 @@ pub fn draw(screen: &mut Screen, font: &Font, archive: &Archive, files: &Files, 
 /// Draws the screen as the game `m` has it, and the form whose record is
 /// at DATA:`form` over it when one is open.
 pub fn draw_state(screen: &mut Screen, font: &Font, archive: &Archive, files: &Files, m: &Machine, form: Option<u16>) {
-    let Some(d) = archive.read("SPELLMKR.IMG") else { return };
+    // 1194:68D7's picture: the guild's spell for sale with 101D FFh
+    // (BUYSPELL.IMG, 5785), else the player's own with 1001 FFh
+    // (CHARSPEL.IMG, 5792), else SPELLMKR.IMG (5778).
+    let (buying, own) = (m.mem.r8(DS, 0x101D) == 0xFF, m.mem.r8(DS, 0x1001) == 0xFF);
+    let picture = if buying { 0x5785 } else if own { 0x5792 } else { 0x5778 };
+    let Some(d) = archive.read(&text(m, DS, picture).to_ascii_uppercase()) else { return };
     let Some((img, used)) = image(&d) else { return };
     if let Some(p) = palette(&d, used) {
         screen.set_palette(p);
@@ -170,8 +175,16 @@ pub fn draw_state(screen: &mut Screen, font: &Font, archive: &Archive, files: &F
     screen.blit(0, 0, img.w, img.h, &img.px, 200);
     let c = 0xA0u8;
     let mut mm = m.clone();
-    let (cost, per) = mm.made_spell_cost();
-    screen.text_plain(font, 0x45, 0x2F, &text(m, DS, 0x581A), c);
+    // The cost: a spell's own (5818) and that over the level (A898) for
+    // one bought or the player's (69AA), else the spell being made's.
+    let (cost, per) = if buying || own {
+        let ax = m.mem.r16(DS, 0x5818);
+        (ax, ax / m.mem.r16(DS, 0xA898).max(1))
+    } else {
+        mm.made_spell_cost()
+    };
+    // The name a row lower with 1001 FFh (6946).
+    screen.text_plain(font, 0x45, if own { 0x30 } else { 0x2F }, &text(m, DS, 0x581A), c);
     screen.text_plain(font, 0xF4, 0x30, &nth(m, 0x566F, m.mem.r8(DS, 0x580C) as u16), c);
     screen.text_plain(font, 0xF0, 0x17, &m.mem.r32(DS, 0x05C2).to_string(), c);
     screen.text_plain(font, 0x2D, 0x17, &text(m, DS, 0x01AD), c);

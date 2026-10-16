@@ -798,10 +798,23 @@ fn over_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
     let hud = a.hud();
     let mut s = hud::Screen::new(a.assets.dac());
     hud::compose_over(&mut s, &a.font, &hud);
+    // The cursor XORed over what play shows (nothing of the layer's
+    // there): what is under it decides its colours, which the original's
+    // page filled with 00h and then FFh leaves out of what it drew.
+    let mut under = None;
     if let Some(l) = &a.live {
+        l.draw_text(&mut s);
+        under = Some(s.indices().to_vec());
         l.draw(&mut s, true);
     }
-    let idx = s.indices().to_vec();
+    let mut idx = s.indices().to_vec();
+    if let Some(under) = under {
+        for (c, u) in idx.iter_mut().zip(under) {
+            if u == 0x100 {
+                *c = 0x100;
+            }
+        }
+    }
     let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
     (idx, dac)
 }
@@ -1087,4 +1100,238 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
         let first = seen.iter().zip(&want).position(|(v, o)| v != o);
         assert!(first.is_none() && seen.len() == want.len(), "F77 {f77}: the vision's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
     }
+}
+
+/// gen_screens.py's `riddled`: a riddle on the player's square as its
+/// lookup leaves it (0000:06BE): the text at FF00h in the level's texts'
+/// bank (C8FE), shown (3D42) and waiting as a riddle (7C5E), its answers
+/// after `:` (7C62), the texts after a wrong answer (the riddle again) and
+/// a right one (none), the triggers' numbers, the text's time and square
+/// (the player's).
+fn riddled(a: &mut App) {
+    use arena::squares::var as sq;
+    let m = &mut a.engine.m;
+    let bank = m.mem.r8(DS, sq::TEXT_BANK) as u16;
+    m.ems_map(bank);
+    let seg = m.mem.r16(DS, 0x9030);
+    for (i, &c) in b"What burns?\r:fire\r:flame\0`C\r".iter().enumerate() {
+        m.mem.w8(seg, 0xFF00 + i as u16, c);
+    }
+    let here = m.mem.r16(DS, 0xCB90);
+    for (at, v) in [(sq::SHOWN, 0xFF00), (sq::RIDDLE_AT, 0xFF00), (sq::ANSWERS_AT, 0xFF0C), (sq::WRONG_AT, 0xFF00), (sq::RIGHT_AT, 0), (sq::RIDDLE_A, 1), (sq::RIDDLE_B, 2), (sq::SHOWN_SQUARE, here)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w8(DS, sq::SHOWN_TIME, 0x28);
+}
+
+/// A riddle shown in the frame (0000:0550): its text, then its answer
+/// asked under it (292B:05A2's typed field, empty).
+#[test]
+fn a_riddle_asked_as_the_original_draws_it() {
+    screen(
+        "riddle",
+        |a, d| {
+            riddled(a);
+            d.frame(a);
+            assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+        },
+        over_typed,
+    );
+}
+
+/// The riddle's answer typed (water): the field's text under the riddle.
+#[test]
+fn a_riddles_answer_typed_as_the_original_draws_it() {
+    screen(
+        "riddletyped",
+        |a, d| {
+            riddled(a);
+            d.frame(a);
+            assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+            super::type_text(d, a, "water");
+        },
+        over_typed,
+    );
+}
+
+/// In the street, Shift+M, then the world map's clicks at each (x, y):
+/// as gen_screens.py's script clicks them (the mouse left at the last).
+fn world_clicks(a: &mut App, d: &mut Driver, at: &[(i32, i32)]) {
+    area_left(a);
+    a.assets.drawn(&mut a.engine, 1.6);
+    super::press(d, a, KeyCode::KeyM, true);
+    for &(x, y) in at {
+        d.click(a, x, y, MouseButton::Left);
+    }
+}
+
+/// The world map's first province (High Rock) clicked: its map, the
+/// name of the place nearest the mouse over it.
+#[test]
+fn a_provinces_map_as_the_original_draws_it() {
+    screen("worldprovince", |a, d| world_clicks(a, d, &[(70, 45)]), layer);
+}
+
+/// A place on it clicked: the journey's length asked.
+#[test]
+fn a_journeys_length_as_the_original_draws_it() {
+    screen("worldtrip", |a, d| world_clicks(a, d, &[(70, 45), (200, 100)]), layer);
+}
+
+/// Its Search: a name asked, after the editor's two passes before its
+/// wait (0000:A0D9's blink: from C7h, what the prompt's box leaves, the
+/// cursor toggled on at C8h).
+#[test]
+fn the_maps_search_as_the_original_draws_it() {
+    screen(
+        "worldsearch",
+        |a, d| {
+            world_clicks(a, d, &[(70, 45), (43, 175)]);
+            for _ in 0..2 {
+                a.travel.as_mut().expect("the travel map").advance(0);
+            }
+        },
+        layer,
+    );
+}
+
+/// The province's Exit: the world map again.
+#[test]
+fn the_world_map_again_as_the_original_draws_it() {
+    screen("worldback", |a, d| world_clicks(a, d, &[(70, 45), (80, 180)]), layer);
+}
+
+/// The guild's Buy, then its kind clicked at row `y` (as gen_screens.py's
+/// script clicks it, x A0h): the potions, the magic items, the spells.
+fn guild_buy(a: &mut App, d: &mut Driver, y: i32) {
+    guild_pick(a, d, KeyCode::Digit1, "1");
+    d.click(a, 0xA0, y, MouseButton::Left);
+}
+
+#[test]
+fn the_guilds_potions_as_the_original_draws_them() {
+    screen("guildpotions", |a, d| guild_buy(a, d, 0x59), layer);
+}
+
+/// The magic items: the inventory full (the save's), a box.
+#[test]
+fn the_guilds_magic_items_as_the_original_draws_them() {
+    screen("guildmagic", |a, d| guild_buy(a, d, 0x71), layer);
+}
+
+#[test]
+fn the_guilds_spells_as_the_original_draws_them() {
+    screen("guildspells", |a, d| guild_buy(a, d, 0x88), layer);
+}
+
+/// The potions' first line clicked: how many asked.
+#[test]
+fn a_guild_potion_picked_as_the_original_draws_it() {
+    screen(
+        "guildpotionpick",
+        |a, d| {
+            guild_buy(a, d, 0x59);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The spells' first line clicked: the spell's page.
+#[test]
+fn a_guild_spell_picked_as_the_original_draws_it() {
+    screen(
+        "guildspellpick",
+        |a, d| {
+            guild_buy(a, d, 0x88);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The blessing's donation typed (100, Enter): what the temple says.
+#[test]
+fn a_temples_blessing_given_as_the_original_draws_it() {
+    screen(
+        "templedonate",
+        |a, d| {
+            shop_pick(a, d, 0x1004, 5, 0x4F);
+            super::type_text(d, a, "100");
+            d.key(a, KeyCode::Enter, None);
+        },
+        layer,
+    );
+}
+
+/// The drinks' first line clicked: what the tavern says to it.
+#[test]
+fn a_taverns_drink_as_the_original_draws_it() {
+    screen(
+        "taverndrink",
+        |a, d| {
+            shop_pick(a, d, 0x1AB5, 4, 0x43);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// gen_screens.py's `room`: a slot of the player's free (the last of 40:
+/// its flags at 0212h + 27h x 13h + 0Eh lose 40h, taken), the save's
+/// inventory being full.
+fn room(a: &mut App) {
+    let at = 0x0212 + 39 * 0x13 + 0x0E;
+    let f = a.engine.m.mem.r8(DS, at) & !0x40;
+    a.engine.m.mem.w8(DS, at, f);
+}
+
+/// In the town's first store with a slot free, its Buy, then the clicks
+/// at each row `ys` (x A0h; a list's line at x 70h).
+fn store_buy(a: &mut App, d: &mut Driver, clicks: &[(i32, i32)]) {
+    into(a, 0x1008);
+    room(a);
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+    super::shop_turn(a, 6);
+    assert!(a.pending.is_some(), "the shop's menu");
+    d.click(a, 0xA0, 0x43, MouseButton::Left);
+    for &(x, y) in clicks {
+        d.click(a, x, y, MouseButton::Left);
+    }
+}
+
+/// The store's Buy with a slot free: what to buy.
+#[test]
+fn the_stores_buy_options_as_the_original_draws_them() {
+    screen("storebuyroom", |a, d| store_buy(a, d, &[]), layer);
+}
+
+#[test]
+fn the_stores_weapons_as_the_original_draws_them() {
+    screen("storeweapons", |a, d| store_buy(a, d, &[(0xA0, 0x65)]), layer);
+}
+
+#[test]
+fn the_stores_armor_as_the_original_draws_it() {
+    screen("storearmor", |a, d| store_buy(a, d, &[(0xA0, 0x7D)]), layer);
+}
+
+/// A weapon's line clicked once: marked.
+#[test]
+fn a_stores_weapon_picked_as_the_original_draws_it() {
+    screen("storeweapon", |a, d| store_buy(a, d, &[(0xA0, 0x65), (0x70, 0x26)]), layer);
+}
+
+/// The guild's magic items with a slot free: their list.
+#[test]
+fn the_guilds_magic_items_with_room_as_the_original_draws_them() {
+    screen(
+        "guildmagicroom",
+        |a, d| {
+            room(a);
+            guild_buy(a, d, 0x71);
+        },
+        layer,
+    );
 }

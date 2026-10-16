@@ -121,8 +121,9 @@ enum Asking {
 
 /// 26F7:0AD5's field: 1194:5C30 with the prompt at 6AD1, 14h characters
 /// into 9C62 (cleared before, 77C8, 1F4h bytes), in ARENAFNT.DAT
-/// ([102C], the map's) and the map's colour 60h (2542:03CF).
-const SEARCH_LOOK: crate::field::Look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
+/// ([102C], the map's) and the map's colour EEh (26F7:0091's [9288],
+/// over the 60h 2542:03CF set before it).
+const SEARCH_LOOK: crate::field::Look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0xEE, put_font: true };
 
 pub struct Travel {
     start: MapStart,
@@ -150,6 +151,12 @@ pub struct Travel {
     journey_ms: u32,
     /// The time the screen has been up (ms): its passes (A8C4's blink).
     up_ms: u32,
+    /// The boxes' tiles while it is up: PARCH.CIF's 20 x 20, which 26F7:
+    /// 0050 loads (0000:756C, the name at 3AE0) and selects ([1038],
+    /// 9AF8) for 965A.
+    parch: Option<hud::Tiles>,
+    /// Where the cursor last was over the map (the label's place).
+    label_at: std::cell::Cell<Option<(i32, i32)>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -298,6 +305,8 @@ impl Travel {
             boxes,
             done: None,
             mapout: archive.read("MAPOUT.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
+            parch: hud::Tiles::load(archive, "PARCH.CIF", 20, 20),
+            label_at: std::cell::Cell::new(None),
             mapblink: archive.read("MAPBLINK.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             horse: dfa(archive, "HORSE.DFA"),
             journey: Vec::new(),
@@ -382,6 +391,16 @@ impl Travel {
             }
             m.mem.w8(DS, BUTTONS, b);
         }
+    }
+
+    /// The province whose map is shown; None: the world map.
+    pub fn shown(&self) -> Option<u8> {
+        self.shown
+    }
+
+    /// `shown` while the screen is still up (not ended).
+    pub fn shown_now(&self) -> Option<Option<u8>> {
+        self.done.is_none().then_some(self.shown)
     }
 
     /// Exit: the province's map to the world map; the world map ends the
@@ -478,6 +497,11 @@ impl Travel {
         for i in 0..0x1F4 {
             m.mem.w8(DS, 0x9C62 + i, 0);
         }
+        // What 5C34's box (0000:965A with CX 7) leaves at A84C, the
+        // editor's blink count after: CX, 80h once drawn (970F), 40h as
+        // its last pass over the text (98A0, from the text's start) finds
+        // the first line ended by a CR.
+        m.mem.w16(DS, arena::lineedit::var::BLINK, 0x07 | 0x80 | 0x40);
         self.asking = crate::field::Live::open(&m, arena::lineedit::fields::search(), SEARCH_LOOK).map(|l| Asking::Name(Box::new(l)));
     }
 
@@ -526,6 +550,15 @@ impl Travel {
                 KeyCode::KeyS if self.shown.is_some() => self.ask_name(engine),
                 _ => {}
             },
+        }
+    }
+
+    /// A message box over the map (1194:59C8: 965A with margin 5, centred
+    /// on the screen) in its tiles (`parch`) and its text in EEh, the
+    /// colour 26F7:0091 sets ([9288]).
+    pub fn draw_box(&self, screen: &mut Screen, font: &Font, lines: &[Vec<hud::Span>]) {
+        if let Some(t) = &self.parch {
+            hud::custom::draw_box(screen, t, font, lines, 5, 0xEE);
         }
     }
 
@@ -581,24 +614,6 @@ impl Travel {
                 icon(screen, 2, VILLAGES + i * RECORD);
             }
         }
-        match &self.asking {
-            Some(Asking::Name(live)) => {
-                // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1, its box,
-                // then the field.
-                hud::typed_prompt(screen, &crate::field::prompt_5c30(m, DS, 0x6AD1));
-                live.draw(screen, false);
-                return;
-            }
-            Some(Asking::List(names, _)) => {
-                screen.panel(20, 10, 280, 150, 0xDF);
-                for (i, n) in names.iter().enumerate() {
-                    let (cx, cy) = list_cell(i);
-                    screen.text(font, cx, cy, n, 0xDF);
-                }
-                return;
-            }
-            None => {}
-        }
         // 26F7:064A: the current place's marker.
         let r8 = |a: u16| m.mem.r8(DS, a);
         let r16 = |a: u16| m.mem.r16(DS, a) as i32;
@@ -611,27 +626,68 @@ impl Travel {
             let pick = m.mem.r16(DS, 0xA8AE);
             (r8(0x1943) as u16, pick, pick == r8(0x0A4C) as u16 && p == r8(0x0A46), r16(0x193E), r16(0x1940))
         });
-        // 26F7:0625's label: the location nearest the cursor named
-        // (shadow CEh, text DFh), on the map above the buttons.
+        // 26F7:0625's label: the location nearest the cursor named, on the
+        // map above the buttons. Its row the place's less the kind's
+        // height (DATA:6AA0 by 0B7A's BX: a town, city, village or
+        // dungeon), 2 if that is above the screen; centred on the place
+        // (less half its width), 2 if that is left of the screen, and
+        // moved in from the right (13Eh less the width, its lowest bit
+        // dropped) where it would reach 140h; drawn one pixel right in CEh,
+        // then in DFh (9E06).
         // The search's state is put back after: the label is the window's,
         // drawn whenever, and the game's state follows the clicks only.
+        // Over the buttons the pass isn't run (their regions' handlers
+        // are): the label stays where the cursor last was over the map.
         if y < 165 {
+            self.label_at.set(Some((x, y)));
+        }
+        if let Some((x, y)) = self.label_at.get() {
             let kept: Vec<u16> = SCAN.iter().map(|&a| m.mem.r16(DS, a)).collect();
-            m.travel_nearest(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+            let kind = m.travel_nearest(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
             let rec = if p == 8 { CITIES } else { m.mem.r16(DS, NEAREST_REC) };
             for (&a, &v) in SCAN.iter().zip(&kept) {
                 m.mem.w16(DS, a, v);
             }
             let name = String::from_utf8_lossy(m.mem.cstr(DS, rec)).into_owned();
-            let (lx, ly) = (m.mem.r16(DS, rec + 0x14) as i32, m.mem.r16(DS, rec + 0x16) as i32);
-            let w = font.width(&name) as i32;
-            let tx = (lx - w / 2).clamp(2, 318 - w);
-            let ty = (ly - 16).max(2);
-            screen.text_plain(font, tx + 1, ty + 1, &name, 0xCE);
+            let (lx, ly) = (m.mem.r16(DS, rec + 0x14), m.mem.r16(DS, rec + 0x16));
+            let ty = ly.wrapping_sub(m.mem.r8(DS, 0x6AA0 + kind) as u16);
+            let ty = if (ty as i16) < 0 { 2 } else { ty };
+            let half = font.width(&name) as u16 >> 1;
+            let tx = lx.wrapping_sub(half);
+            let tx = if (tx as i16) < 0 {
+                2
+            } else if tx.wrapping_add(half << 1) >= 0x140 {
+                0x13E - (half << 1)
+            } else {
+                tx
+            };
+            let (tx, ty) = (tx as i16 as i32, ty as i16 as i32);
+            screen.text_plain(font, tx + 1, ty, &name, 0xCE);
             screen.text_plain(font, tx, ty, &name, 0xDF);
         }
         if let Some((kind, pick, here, x, y)) = dest {
             self.marker(screen, &self.mapblink, kind, pick, here, x, y);
+        }
+        // What the screen asks, over the map as its last pass left it.
+        match &self.asking {
+            Some(Asking::Name(live)) => {
+                // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1, its box
+                // (965A with margin 0Ah, in the map's tiles and colour, as
+                // `draw_box`), then the field.
+                if let Some(t) = &self.parch {
+                    let prompt = crate::field::prompt_5c30(m, DS, 0x6AD1);
+                    hud::custom::draw_box(screen, t, font, &hud::lines(prompt.as_bytes(), 0x0F), 0x0A, 0xEE);
+                }
+                live.draw(screen, false);
+            }
+            Some(Asking::List(names, _)) => {
+                screen.panel(20, 10, 280, 150, 0xDF);
+                for (i, n) in names.iter().enumerate() {
+                    let (cx, cy) = list_cell(i);
+                    screen.text(font, cx, cy, n, 0xDF);
+                }
+            }
+            None => {}
         }
         // 1194:30F1: the day's frame of the journey.
         if let Some(f) = self.journey.get((self.journey_ms / TICK_MS) as usize).and_then(|&f| self.horse.get(f as usize)) {

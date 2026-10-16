@@ -5,3 +5,8 @@ screenfade | worldmap | 42 | 9eb220110e8f5f09
 screenfade | automap | 72 | 2c86ca8f17bddf19
 screenfade | levelupstats | 27 | 67fd4d5ec45a4717
 screenfade | spellmaker | 3 | 3fba6b030819c2f6
+screenfade | worldprovince | 70 | 40f6a41e18287ddc
+screenfade | worldtrip | 70 | 40f6a41e18287ddc
+screenfade | worldsearch | 70 | 40f6a41e18287ddc
+screenfade | worldback | 105 | ad34c8f6e802007
+screenfade | guildspellpick | 3 | e5b889bfc934ea49
