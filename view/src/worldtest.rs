@@ -234,7 +234,8 @@ fn rendered(a: &mut App) -> Option<Vec<[u8; 3]>> {
 fn the_3d_view_measured_against_the_originals() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     type Play = Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>;
-    let cases: Vec<(&str, Place, Box<dyn FnOnce(&mut App)>, Play)> = vec![
+    type Case = (&'static str, Place, Box<dyn FnOnce(&mut App)>, Play);
+    let cases: Vec<Case> = vec![
         ("playdungeon", Place::Dungeon, Box::new(|_| {}), Box::new(|a, d, seen| frames(a, d, seen, 3, |_| false))),
         (
             "playdown",
