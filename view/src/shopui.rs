@@ -495,6 +495,10 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
 }
 
 impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
+    /// 1194:C0B1: the slot's rooms' files whose time is up deleted.
+    fn files(&mut self, m: &mut Machine, files: &mut arena::bsa::Files) {
+        m.room_files_expire(files);
+    }
     /// 1194:C12A: "%nt " made at 929E (2DA2:000A), the tavern's name, on
     /// its banner (4BFF).
     fn greeting(&mut self, m: &mut Machine) {
