@@ -666,3 +666,50 @@ fn the_stores_haggle_as_the_original_draws_it() {
         layer,
     );
 }
+
+/// gen_screens.py's LOOT_SEED: the piles at the square made from it.
+const LOOT_SEED: u32 = 1;
+
+/// The loot window (1194:7B16, 2433:0583) as a click on a flat of treasure
+/// at the player's square in the guild (071Ah) runs it, AH 0Fh, AL 1 (not
+/// the staff's flat), the piles made there first from LOOT_SEED: a turn
+/// with the window asked before its frame, as `shop_turn` asks a shop.
+fn looted(a: &mut App, _d: &mut Driver) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, LOOT_SEED);
+    a.engine.m.rng.seed = LOOT_SEED;
+    let before = copy(&a.engine);
+    let input = TurnIn {
+        intent: Default::default(),
+        clicked: false,
+        camp: false,
+        shop: None,
+        loot: Some([0x0F01, 0, DS, 0x071A]),
+        key: false,
+        tick: 0,
+        right: false,
+        drag: (0, 0),
+        aspect: 1.6,
+        note: None,
+    };
+    a.turn(before, input, Vec::new(), true);
+    assert!(a.pending.is_some(), "the piles listed");
+}
+
+/// The piles made at the square and listed: a bag of gold and a staff.
+#[test]
+fn the_loot_window_as_the_original_draws_it() {
+    screen("loot", looted, over);
+}
+
+/// Its first line (the gold) clicked: taken, the staff listed again.
+#[test]
+fn the_loot_window_after_a_take_as_the_original_draws_it() {
+    screen(
+        "loottake",
+        |a, d| {
+            looted(a, d);
+            d.click(a, 0x60, 0x27, MouseButton::Left);
+        },
+        over,
+    );
+}

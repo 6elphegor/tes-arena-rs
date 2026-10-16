@@ -354,6 +354,7 @@ fn shop_turn(app: &mut App, kind: u8) {
         clicked: false,
         camp: false,
         shop: Some(kind),
+        loot: None,
         key: false,
         tick: 0,
         right: false,

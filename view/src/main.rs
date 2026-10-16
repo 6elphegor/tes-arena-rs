@@ -1370,6 +1370,10 @@ struct TurnIn {
     /// A shop of this building kind entered before the frame (`--do
     /// shop:KIND`).
     shop: Option<u8>,
+    /// The loot window (1194:7B16, 2433:0583) run before the frame with
+    /// AX, SI, its segment and BX as a click passes them (a debugging aid
+    /// and the screen check's way in, as `shop` is).
+    loot: Option<[u16; 4]>,
     key: bool,
     tick: usize,
     right: bool,
@@ -1414,6 +1418,12 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     if let Some(kind) = input.shop {
         if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
             eprintln!("the shop gave up: {}", arena::giveup::describe());
+        }
+    }
+    if let Some([ax, si, seg, bx]) = input.loot {
+        use arena::talk::TalkHooks;
+        if hooks.loot(&mut engine.m, &mut engine.files, ax, si, seg, bx).is_none() {
+            eprintln!("the loot window gave up: {}", arena::giveup::describe());
         }
     }
     if engine.m.mem.r8(DS, arena::rest::var::RESTING) != 0 {
@@ -1609,6 +1619,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         clicked: std::mem::take(&mut st.clicked),
         camp: std::mem::take(&mut st.camp),
         shop: st.shop.take(),
+        loot: None,
         key: false,
         tick: st.frames * 4,
         right: std::mem::take(&mut st.right),
@@ -2610,6 +2621,7 @@ impl App {
             clicked: std::mem::take(&mut self.clicked),
             camp: std::mem::take(&mut self.camp),
             shop: None,
+            loot: None,
             key: std::mem::take(&mut self.key),
             tick,
             right: self.keys.swing,
@@ -3259,6 +3271,7 @@ impl App {
             clicked: false,
             camp: false,
             shop: None,
+            loot: None,
             key: false,
             tick: 0,
             right: false,

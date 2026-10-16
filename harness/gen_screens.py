@@ -122,6 +122,14 @@ SCREENS = {
     'automap': (0x045A, [], {(0, 0x8FC8)}),
     # Shift+M: the world map (03BF: 26F7's travel map).
     'travelmap': (0x03BF, []),
+    # The loot window (1194:7B16, 2433:0583) as a click on a flat of
+    # treasure at the player's square (0x071A in the guild) runs it: AH 0Fh
+    # with a flat not the staff's (AL 1); with no pile there the piles are
+    # made first (2433:0000, from LOOT_SEED: a bag of gold and a staff),
+    # then listed (1194:5734). Its first line clicked: the gold taken, the
+    # rest listed again.
+    'loot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), []),
+    'loottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': 0x071A, 'esi': 0}), [('click', 0x60, 0x27)]),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
@@ -183,6 +191,15 @@ def seeded(a):
     a.w16(0x91F8, SEED >> 16)
 
 
+# The seed the piles at the square are made from (2433:0000) in `loot`.
+LOOT_SEED = 1
+
+
+def loot_seeded(a):
+    a.w16(0x91F6, LOOT_SEED & 0xFFFF)
+    a.w16(0x91F8, LOOT_SEED >> 16)
+
+
 # The clock and the timer both sides start the rumours from (1194:E3F7:
 # the seed from the ticks at 0151, what is heard by the parity of the
 # clock's 05CC plus the player's x over 8), where the view's frames have
@@ -236,7 +253,8 @@ def rented(a):
 BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': clocked(*RUMOURS[0]),
           'tavernrumorheard': clocked(*RUMOURS[1]), 'tavernroomprice': seeded,
           'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
-          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside}
+          'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
+          'loot': loot_seeded, 'loottake': loot_seeded}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

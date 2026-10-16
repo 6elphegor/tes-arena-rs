@@ -439,6 +439,10 @@ impl Machine {
             self.mem.w32(DS, GOLD, g);
             return Some(false);
         }
+        // 2433:08FE: the font [102C] and the tiles [1036] selected (0000:
+        // 9AE6, 9AF8) for the boxes the item may bring.
+        self.select_font(0x102C);
+        self.select_tiles(0x1036);
         let si = self.pile_item();
         if self.item_category(DS, si) == category::STACK {
             let ty = self.mem.r8(DS, si) as u16;
@@ -565,7 +569,9 @@ impl Machine {
             return Some(true);
         }
         self.mem.w8(DS, ITEMS_LEFT, bx as u8);
-        // AX Bh (2433:06CC): the list's kind (1194:5734).
+        // 2433:0B5E: the font [102E] selected (0000:9AE6); AX Bh (0B69):
+        // the list's kind (1194:5734).
+        self.select_font(0x102E);
         self.list_kind = 0xB;
         let pick = hooks.list(self, 0x1044, bx);
         if (pick as i16) < 0 {
@@ -661,6 +667,8 @@ impl Machine {
             ax = ax.wrapping_sub(1);
         }
         self.mem.w16(DS, 0x137A, ax.wrapping_add(cx));
+        // 2433:0C58: the font [102C] selected (0000:9AE6).
+        self.select_font(0x102C);
         self.mem.w8(DS, 0x137E, 0);
         self.mem.w8(DS, 0x101C, 0);
         hooks.text(self, 0);
@@ -771,7 +779,9 @@ impl Machine {
                 return Some(());
             }
             self.mem.w8(DS, PILES_LEFT, bx as u8);
-            // AX Bh (2433:0B6C): the list's kind (1194:5734).
+            // 2433:06BC: the font [102E] selected (0000:9AE6); AX Bh
+            // (06C4): the list's kind (1194:5734).
+            self.select_font(0x102E);
             self.list_kind = 0xB;
             let pick = hooks.list(self, 0x9302, bx);
             if (pick as i16) < 0 {
