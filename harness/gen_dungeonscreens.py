@@ -52,6 +52,11 @@ SCREENS = {
     'dungeoncamp': (0x01E6, []),
     # Shift+M: the world map (03BF).
     'dungeontravel': (0x03BF, []),
+    # The loot window (1194:7B16) as a click on a flat of treasure at the
+    # player's square (SQUARE) runs it, the piles made there first from
+    # gen_screens.py's LOOT_SEED; its first line clicked: taken.
+    'dungeonloot': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': None, 'esi': 0}), []),
+    'dungeonloottake': ((0x1194, 0x7B16, {'eax': 0x0F01, 'ebx': None, 'esi': 0}), [('click', 0x60, 0x27)]),
 }
 
 def seen(a):
@@ -69,7 +74,13 @@ def marked(a):
     a.call_near(0, 0x3491)
 
 
-BEFORE = {'dungeonautomap': marked, 'dungeonmap': seen}
+BEFORE = {'dungeonautomap': marked, 'dungeonmap': seen, 'dungeonloot': gs.loot_seeded,
+          'dungeonloottake': gs.loot_seeded}
+
+
+def square_of(a):
+    """The player's map square as a click's (row << 8 | column << 1)."""
+    return (a.r16(0xC3D4) >> 7) << 8 | ((a.r16(0xC3D0) >> 7) << 1) & 0xFF
 
 
 def dungeon(a, base):
@@ -97,6 +108,9 @@ def main():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
+        if isinstance(handler, tuple) and handler[2].get('ebx', 0) is None:
+            a.restore(at)
+            handler = (handler[0], handler[1], dict(handler[2], ebx=square_of(a)))
         seen = []
 
         def sample(*_):

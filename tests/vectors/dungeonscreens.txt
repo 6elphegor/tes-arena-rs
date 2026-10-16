@@ -3,3 +3,5 @@ screen | dungeonautomap | f06cdb1031c1207c 58ab90d7887e02ed
 screen | dungeonmap | e4af764381159d8a 58ab90d7887e02ed
 screen | dungeoncamp | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
 screen | dungeontravel | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
+screen | dungeonloot | e905729cb65f5838 a97a4bafd992e4ed 77aee268a5bf4f45
+screen | dungeonloottake | e04d9311d37b0e6 a97a4bafd992e4ed 77aee268a5bf4f45

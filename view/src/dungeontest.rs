@@ -102,3 +102,50 @@ fn camping_in_a_dungeon_as_the_original_draws_it() {
 fn the_world_map_refused_in_a_dungeon_as_the_original_draws_it() {
     dungeon_screen("dungeontravel", |a, d| super::super::press(d, a, KeyCode::KeyM, true), over);
 }
+
+/// The loot window as a click on a flat of treasure at the player's
+/// square runs it (as screentest's `looted`, at the dungeon's square:
+/// row << 8 | column << 1), the piles made there from LOOT_SEED.
+fn looted_here(a: &mut App, _d: &mut Driver) {
+    let m = &a.engine.m;
+    let col = m.mem.r16(DS, arena::movement::var::X) >> 7;
+    let row = m.mem.r16(DS, arena::movement::var::Y) >> 7;
+    let square = (row << 8) | ((col << 1) & 0xFF);
+    a.engine.m.mem.w32(DS, arena::random::SEED, LOOT_SEED);
+    a.engine.m.rng.seed = LOOT_SEED;
+    let before = copy(&a.engine);
+    let input = TurnIn {
+        intent: Default::default(),
+        clicked: false,
+        camp: false,
+        shop: None,
+        loot: Some([0x0F01, 0, DS, square]),
+        key: false,
+        tick: 0,
+        right: false,
+        drag: (0, 0),
+        aspect: 1.6,
+        note: None,
+    };
+    a.turn(before, input, Vec::new(), true);
+    assert!(a.pending.is_some(), "the piles listed");
+}
+
+/// The piles made at the player's square in the dungeon, listed.
+#[test]
+fn the_loot_window_in_a_dungeon_as_the_original_draws_it() {
+    dungeon_screen("dungeonloot", looted_here, over);
+}
+
+/// Its first line clicked: taken, the rest listed again.
+#[test]
+fn the_loot_window_in_a_dungeon_after_a_take_as_the_original_draws_it() {
+    dungeon_screen(
+        "dungeonloottake",
+        |a, d| {
+            looted_here(a, d);
+            d.click(a, 0x60, 0x27, MouseButton::Left);
+        },
+        over,
+    );
+}
