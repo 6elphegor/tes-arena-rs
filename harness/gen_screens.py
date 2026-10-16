@@ -29,8 +29,9 @@ from screens import ScreenArena, PAGE_SEG_FIELD
 
 # The menu keys' handlers in play (2542:0100's), run as a key runs them
 # (near calls), each until it waits for input: the mouse asked for a
-# third time from one place (0000:8FC4, which every input loop calls).
-# A script's clicks answer the waits before the last.
+# third time from one place (0000:8FC4, which every input loop calls, or
+# the screen's own wait). A script's clicks answer the waits before the
+# last.
 MENU = 0x2542
 SCREENS = {
     # F1: the character sheet (00BE: 1194:0CF8), its first page.
@@ -47,6 +48,20 @@ SCREENS = {
     'use': (0x034D, []),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
+    # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
+    # banner and menu), as the guild master's click runs it.
+    'guild': ((0x1194, 0xA73E, {}), []),
+    # Its Buy (the box at 3Ah..51h): the spells for sale.
+    'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
+    # Its Detect Magic (52h..69h): the items to look at.
+    'guilddetect': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x5E)]),
+    # R: camping (01E6: 1194:424E), refused in the guild: its box.
+    'camp': (0x01E6, []),
+    # M: the automap (045A: 0000:2CFE), whose loop asks the mouse by the
+    # near entry (2DB8: 8FC8) rather than 8FC4.
+    'automap': (0x045A, [], {(0, 0x8FC8)}),
+    # Shift+M: the world map (03BF: 26F7's travel map).
+    'travelmap': (0x03BF, []),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
@@ -54,11 +69,25 @@ SCREENS = {
 WAIT = (0, 0x8FC4)
 
 
-def draw(a, base, handler, script, fill):
+def square(a):
+    """The player's column and row as the renderer sets them each frame
+    (0000:C941..C958: C3D0, C3D4 shifted down 7, into CCA4, CCA6), which
+    the automap marks: the state here is the load's, before any frame."""
+    a.w16(0xCCA4, a.r16(0xC3D0) >> 7)
+    a.w16(0xCCA6, a.r16(0xC3D4) >> 7)
+
+
+# What a screen's state needs first that a frame would have done.
+BEFORE = {'automap': square}
+
+
+def draw(a, base, name, handler, script, fill, waits=None):
     a.restore(base)
+    if name in BEFORE:
+        BEFORE[name](a)
     a.mu.mem_write(a.lin(a.r16(PAGE_SEG_FIELD), 0), bytes([fill]) * 64000)
     a.mu.mem_write(0xA0000, bytes([fill]) * 64000)
-    a.waits = {WAIT}
+    a.waits = waits or {WAIT}
     a.script = list(script)
     a.clicks = []
     if isinstance(handler, tuple):
@@ -77,12 +106,12 @@ def main():
     base = a.snapshot()
     out = open(OUT, 'w', buffering=1)
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
-    for name, (handler, script) in SCREENS.items():
+    for name, (handler, script, *waits) in SCREENS.items():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
-        p0, dac = draw(a, base, handler, script, 0x00)
-        p1, _ = draw(a, base, handler, script, 0xFF)
+        p0, dac = draw(a, base, name, handler, script, 0x00, *waits)
+        p1, _ = draw(a, base, name, handler, script, 0xFF, *waits)
         mask = bytes(int(x == y) for x, y in zip(p0, p1))
         page = bytes(x if k else 0 for x, k in zip(p0, mask))
         digests = [fnv(page), fnv(dac)] + ([fnv(mask)] if 0 in mask else [])

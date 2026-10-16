@@ -61,6 +61,62 @@ impl Font {
 pub struct Span {
     pub colour: u8,
     pub text: String,
+    /// The font the game had selected when it drew the text (B036), for
+    /// the boxes: a box is drawn in its first span's.
+    pub font: GameFont,
+    /// The colour byte of the `\t` code before the span: 0000:98A0 keeps
+    /// it in the line it measures, and 66F6 counts it as a glyph.
+    pub code: Option<u8>,
+}
+
+impl Span {
+    /// 66F6's width of the colour byte before the span: a space's ('!'
+    /// plus one) for 20h, none below it or from 80h, else the glyph's.
+    fn code_width(&self, font: &Font) -> i32 {
+        match self.code {
+            Some(c @ 0x20..=0x7E) => font.glyph(c).0 as i32,
+            _ => 0,
+        }
+    }
+}
+
+/// A line's width as 0000:98A0 measures it in a box (66F6): its text and
+/// the colour bytes of its `\t` codes.
+fn measured(font: &Font, line: &[Span]) -> i32 {
+    line.iter().map(|s| font.width(&s.text) as i32 + s.code_width(font)).sum()
+}
+
+/// The fonts the program's start loads and the routines select by
+/// copying their word to B036 (`world::fonts_load`): FONT_A.DAT ([1026]),
+/// FONT_B.DAT ([1028]), ARENAFNT.DAT ([102C]), TEENYFNT.DAT ([102E]).
+/// ARENAFNT where B036 holds none of them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GameFont {
+    A,
+    B,
+    #[default]
+    Arena,
+    Teeny,
+}
+
+impl GameFont {
+    /// The font B036 selects.
+    pub fn selected(m: &arena::machine::Machine) -> GameFont {
+        let r = |at| m.mem.r16(arena::mem::DS, at);
+        let b036 = r(0xB036);
+        [(0x1026, GameFont::A), (0x1028, GameFont::B), (0x102C, GameFont::Arena), (0x102E, GameFont::Teeny)]
+            .into_iter()
+            .find(|&(at, _)| r(at) != 0 && r(at) == b036)
+            .map_or(GameFont::Arena, |(_, f)| f)
+    }
+}
+
+/// `lines` with every span in `font`.
+pub fn in_font(mut lines: Vec<Vec<Span>>, font: GameFont) -> Vec<Vec<Span>> {
+    for s in lines.iter_mut().flatten() {
+        s.font = font;
+    }
+    lines
 }
 
 /// The game's text at DS:`at` split into lines of coloured spans: `\t`
@@ -72,32 +128,47 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
     let mut out = vec![Vec::new()];
     let mut colour = colour;
     let mut cur = String::new();
-    let flush = |out: &mut Vec<Vec<Span>>, cur: &mut String, colour: u8| {
+    // The colour bytes of the codes since the last span (`Span::code`).
+    let mut codes: Vec<u8> = Vec::new();
+    let flush = |out: &mut Vec<Vec<Span>>, cur: &mut String, colour: u8, codes: &mut Vec<u8>| {
         if !cur.is_empty() {
-            out.last_mut().unwrap().push(Span { colour, text: std::mem::take(cur) });
+            let code = codes.pop();
+            // Codes one after another: each but the last as an empty span
+            // of its own, for its width.
+            for &c in codes.iter() {
+                out.last_mut().unwrap().push(Span { colour: c, text: String::new(), font: Default::default(), code: Some(c) });
+            }
+            codes.clear();
+            out.last_mut().unwrap().push(Span { colour, text: std::mem::take(cur), font: Default::default(), code });
         }
     };
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
             b'\t' if bytes.get(i + 1..i + 4).is_some_and(|d| d.iter().all(u8::is_ascii_digit)) => {
-                flush(&mut out, &mut cur, colour);
+                flush(&mut out, &mut cur, colour, &mut codes);
                 let col = String::from_utf8_lossy(&bytes[i..i + 4]).into_owned();
-                out.last_mut().unwrap().push(Span { colour, text: col });
+                out.last_mut().unwrap().push(Span { colour, text: col, font: Default::default(), code: None });
                 i += 3;
             }
             b'\t' => {
-                flush(&mut out, &mut cur, colour);
+                flush(&mut out, &mut cur, colour, &mut codes);
                 if let Some(&c) = bytes.get(i + 1) {
                     colour = c;
+                    codes.push(c);
                 }
                 i += 1;
             }
             b'\r' | b'\n' => {
-                flush(&mut out, &mut cur, colour);
+                flush(&mut out, &mut cur, colour, &mut codes);
                 // A line its break ended: an empty span at its end (0000:965A
                 // centres such a line in its box).
-                out.last_mut().unwrap().push(Span { colour, text: String::new() });
+                for &c in codes.iter().rev().skip(1).rev() {
+                    out.last_mut().unwrap().push(Span { colour: c, text: String::new(), font: Default::default(), code: Some(c) });
+                }
+                let code = codes.pop();
+                codes.clear();
+                out.last_mut().unwrap().push(Span { colour, text: String::new(), font: Default::default(), code });
                 out.push(Vec::new());
                 // \r\n is one break.
                 if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
@@ -108,7 +179,7 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
         }
         i += 1;
     }
-    flush(&mut out, &mut cur, colour);
+    flush(&mut out, &mut cur, colour, &mut codes);
     while out.len() > 1 && out.last().is_some_and(|l| l.iter().all(|s| s.text.is_empty())) {
         out.pop();
     }
@@ -157,12 +228,14 @@ impl Screen {
     }
 
     /// Each pixel's palette colour, row by row; 100h where nothing is
-    /// drawn.
+    /// drawn (for the screen check).
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn indices(&self) -> &[u16] {
         &self.idx
     }
 
-    /// The colours drawn with.
+    /// The colours drawn with (for the screen check).
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn palette(&self) -> &[[u8; 4]; 256] {
         &self.palette
     }
@@ -468,7 +541,34 @@ pub struct Style {
     /// The lists' kinds 0..11 as 1194:5734 sets them up (any other kind
     /// is kind 1's).
     kinds: Vec<ListKind>,
+    /// The list in the bar's corner (`BAR_LIST`).
+    bar: ListKind,
+    /// FONT_B.DAT ([1028]), for a box drawn in it.
+    font_b: Option<Font>,
 }
+
+impl Style {
+    /// The font a box's text selected (`Span::font`).
+    fn font(&self, f: GameFont) -> &Font {
+        match f {
+            GameFont::A => &self.menu_font,
+            GameFont::B => self.font_b.as_ref().unwrap_or(&self.box_font),
+            GameFont::Arena => &self.box_font,
+            GameFont::Teeny => &self.list_font,
+        }
+    }
+
+    /// The font a box with `lines` is drawn in: its first span's.
+    fn box_font_of(&self, lines: &[Vec<Span>]) -> &Font {
+        self.font(lines.iter().flatten().next().map_or(GameFont::Arena, |s| s.font))
+    }
+}
+
+/// `Menu::kind` of the list 2542:06F8 shows in the bar's bottom right
+/// corner (the spellbook's, 29CF:060B with 8036 9; the items to use,
+/// 2542:066A) rather than through 1194:5734: the record at DGROUP 5AF4,
+/// no panel (the bar under it stays), the lines in FDh.
+pub const BAR_LIST: u16 = 0xFFFF;
 
 /// A kind of list as 1194:5734 sets it up: its panel (where its header
 /// puts it) and its record's text area and scroll track (x, y, w, h).
@@ -504,6 +604,7 @@ const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C)
 const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
 const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
 const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
+const RECORD_5AF4: ListRecord = ((0xDE, 0x99, 0x54, 0x2A), (0xD1, 0xA1, 7, 0x1A), 0x4000);
 
 /// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
 /// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
@@ -537,7 +638,7 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
         let (area, track, flags) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
-        ListKind { panel: crate::panels::load_image(archive, m, name), area, track, last, colour, title }
+        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, last, colour, title }
     };
     let kinds = vec![
         kind("POPUP.IMG", RECORD_5006, 0xFD, None),
@@ -553,12 +654,17 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
         kind("NEWPOP.IMG", RECORD_505B, 0xFD, Some((0x1F, 0x60))),
         kind("NEWPOP.IMG", RECORD_5006, 0xFD, None),
     ];
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds });
+    let bar = kind("", RECORD_5AF4, 0xFD, None);
+    let font_b = Font::load(archive, "FONT_B.DAT");
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds, bar, font_b });
 }
 
 /// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
 /// port's `list_kind`); any kind past 11 is kind 1's, as 5734's default.
 fn list_kind<'a>(st: &'a Style, menu: &Menu) -> &'a ListKind {
+    if menu.kind == BAR_LIST {
+        return &st.bar;
+    }
     st.kinds.get(menu.kind as usize).unwrap_or(&st.kinds[1])
 }
 
@@ -577,13 +683,19 @@ fn box_size(st: &Style, font: &Font, lines: &[Vec<Span>]) -> (i32, i32, i32, i32
 /// `box_size` with 965A's margin (DX) `margin`.
 fn box_size_margin(st: &Style, font: &Font, lines: &[Vec<Span>], margin: i32) -> (i32, i32, i32, i32) {
     let (tw, th) = (st.tiles.w as i32, st.tiles.h as i32);
-    let text_w = lines.iter().map(|l| font.width(&plain(l)) as i32).max().unwrap_or(0);
+    let text_w = lines.iter().map(|l| measured(font, l)).max().unwrap_or(0);
     let (mut w, mut h) = (text_w + 2 * margin, lines.len() as i32 * (font.h as i32 + 1) + 2 * margin);
     let rw = (tw - w % tw) % tw;
     let rh = (th - h % th) % th;
+    // The text's x (A84E) is the margin plus the box's left edge centred
+    // on the width before it is rounded up to whole tiles (96F1), then
+    // half the rounding (9798); the box's edge is centred on the rounded
+    // width (97EE). Its y (A850) has half the rounding, up, then the
+    // box's top added after (9817).
+    let tx = (w + rw) / 2 - w / 2 + margin + rw / 2;
     w += rw;
     h += rh;
-    (w, h, margin + rw / 2, margin + (rh + 1) / 2)
+    (w, h, tx, margin + (rh + 1) / 2)
 }
 
 /// The box 965A draws for the text `text` with CX 7 (the town's welcome,
@@ -608,7 +720,7 @@ fn draw_box(screen: &mut Screen, st: &Style, font: &Font, (x, y, w, h): (i32, i3
     screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
     let (_, _, tx, ty) = box_size(st, font, lines);
     for (i, l) in lines.iter().enumerate() {
-        let lw = font.width(&plain(l)) as i32;
+        let lw = measured(font, l);
         let ended = i + 1 < lines.len() || l.last().is_some_and(|s| s.text.is_empty());
         let lx = if ended { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * (font.h as i32 + 1), l, false, colour);
@@ -624,7 +736,7 @@ fn clip(hud: &Hud) -> (i32, i32, i32, i32) {
 /// or at the clip's top when a menu is up with it (the view shows both).
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     let lines = hud.boxed.as_ref()?;
-    let (w, h, _, _) = box_size(st, &st.box_font, lines);
+    let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
     let c = clip(hud);
     let x = (c.0 + c.2) / 2 - w / 2;
     let y = match &hud.menu {
@@ -653,10 +765,12 @@ fn menu_height(st: &Style, menu: &Menu) -> i32 {
 
 /// A menu's boxes as 3159:0F2A lays them out: one for the title (all its
 /// lines) and one for each entry, all as wide as the widest (its flag 8:
-/// FS), each as high as its own lines, stacked down from y 64h less half
-/// their height, centred across the clip (965A's flag 2). Below a
-/// message box shown with it. The title's box (None without one) and the
-/// entries'.
+/// FS), each as high as its own lines, centred across the clip (965A's
+/// flag 2). The first's top is y 64h less half their heights as 0000:9A08
+/// measures them, before 965A rounds each up to whole tiles (0F6F..0FAC);
+/// each next box goes under the one drawn, by its rounded height (1087).
+/// Below a message box shown with it. The title's box (None without one)
+/// and the entries'.
 #[allow(clippy::type_complexity)]
 fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>) {
     let font = &st.menu_font;
@@ -664,7 +778,9 @@ fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32
     let title = (!title_lines.is_empty()).then(|| box_size(st, font, &title_lines));
     let sizes: Vec<_> = menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e))).collect();
     let w = sizes.iter().chain(title.iter()).map(|b| b.0).max().unwrap_or(0);
-    let total = title.map_or(0, |t| t.1) + sizes.iter().map(|b| b.1).sum::<i32>();
+    let unrounded = |lines: &[Vec<Span>]| lines.len() as i32 * (font.h as i32 + 1) + 2 * MARGIN;
+    let title_h = if title_lines.is_empty() { 0 } else { unrounded(&title_lines) };
+    let total = title_h + menu.entries.iter().map(|e| unrounded(std::slice::from_ref(e))).sum::<i32>();
     let mut y = 0x64 - total / 2;
     if let Some(b) = boxed_rect(st, hud) {
         y = y.max(b.1 + b.3 + 2);
@@ -699,14 +815,14 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
         for word in text.split_whitespace() {
             let next = if cur.is_empty() { word.to_string() } else { format!("{cur} {word}") };
             if font.width(&next) as i32 > max && !cur.is_empty() {
-                out.push(vec![Span { colour, text: std::mem::take(&mut cur) }]);
+                out.push(vec![Span { colour, text: std::mem::take(&mut cur), font: Default::default(), code: None }]);
                 cur = word.to_string();
             } else {
                 cur = next;
             }
         }
         if !cur.is_empty() {
-            out.push(vec![Span { colour, text: cur }]);
+            out.push(vec![Span { colour, text: cur, font: Default::default(), code: None }]);
         }
     }
     out
@@ -759,12 +875,12 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
     }
     let c = clip(hud);
     if let Some(s) = &hud.status {
-        let lines = vec![vec![Span { colour: 0x0F, text: s.clone() }]];
+        let lines = vec![vec![Span { colour: 0x0F, text: s.clone(), font: Default::default(), code: None }]];
         let (w, h, _, _) = box_size(st, &st.box_font, &lines);
         draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
-        draw_box(screen, st, &st.box_font, r, lines, 0x60);
+        draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
         if menu.list {
@@ -911,17 +1027,19 @@ fn draw_list(screen: &mut Screen, st: &Style, menu: &Menu) {
         let y = area.1 + 1 + (menu.selected - top) as i32 * fh;
         screen.remap(area.0, y, area.2, fh, &picked_table());
     }
+    // The thumb (3159:0C93 sizes it: the whole track while every line
+    // fits, else its share, at least 3; 0CFF draws it): filled in F5h,
+    // then by 0000:7334's lines the left edge and the bottom in F9h, the
+    // right edge and the top in F2h.
     let n = menu.entries.len();
-    if n > rows {
-        let (tx, ty, tw, th) = kind.track;
-        let h = (th * rows as i32 / n as i32).max(3);
-        let y = ty + (th - h) * top as i32 / (n - rows).max(1) as i32;
-        screen.fill(tx, y, tw, h, 0xF5, 0xFF);
-        screen.fill(tx, y, tw, 1, 0xF9, 0xFF);
-        screen.fill(tx, y, 1, h, 0xF9, 0xFF);
-        screen.fill(tx, y + h - 1, tw, 1, 0xF2, 0xFF);
-        screen.fill(tx + tw - 1, y, 1, h, 0xF2, 0xFF);
-    }
+    let (tx, ty, tw, th) = kind.track;
+    let h = if n > rows { (th * rows as i32 / n as i32).max(3) } else { th };
+    let y = if n > rows { ty + (th - h) * top as i32 / (n - rows) as i32 } else { ty };
+    screen.fill(tx, y, tw, h, 0xF5, 0xFF);
+    screen.fill(tx, y, 1, h, 0xF9, 0xFF);
+    screen.fill(tx, y + h - 1, tw, 1, 0xF9, 0xFF);
+    screen.fill(tx + tw - 1, y, 1, h - 1, 0xF2, 0xFF);
+    screen.fill(tx, y, tw, 1, 0xF2, 0xFF);
 }
 
 /// `hud`'s texts drawn over what the layer has (the interface, drawn
@@ -1130,8 +1248,19 @@ mod tests {
     fn lines_split_colours_and_breaks() {
         let l = lines(b"\t\xc0 CAMP\r\t\xc0C\t\xd4amp\r", 0x0F);
         assert_eq!(l.len(), 2);
-        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into() }, Span { colour: 0xC0, text: String::new() }]);
+        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into(), font: Default::default(), code: Some(0xC0) }, Span { colour: 0xC0, text: String::new(), font: Default::default(), code: None }]);
         assert_eq!(plain(&l[1]), "Camp");
         assert_eq!(l[1][1].colour, 0xD4);
+    }
+
+    /// 98A0 keeps a code's colour byte in the line 66F6 measures: '`'
+    /// (60h) counts as its glyph, C0h and a byte under 20h as nothing.
+    #[test]
+    fn a_codes_colour_byte_is_measured() {
+        let l = lines(b"\t`AB\t\xc0C\r", 0x0F);
+        assert_eq!(l[0].iter().map(|s| s.code).collect::<Vec<_>>(), vec![Some(0x60), Some(0xC0), None]);
+        let font = Font { h: 1, widths: std::array::from_fn(|i| i as u8 % 7 + 1), rows: Vec::new() };
+        let glyphs = font.width("ABC") as i32;
+        assert_eq!(measured(&font, &l[0]), glyphs + font.glyph(b'`').0 as i32);
     }
 }

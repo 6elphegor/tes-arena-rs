@@ -1284,6 +1284,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         pending: None,
         boxes: Default::default(),
         selected: 0,
+        arrowed: false,
         live: None,
         status: None,
         font,
@@ -2017,7 +2018,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                 };
                 println!("{msg}");
-                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg }]]];
+                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]]];
             }
             "key" => {
                 // A key (its scan code) down for a frame.
@@ -2086,11 +2087,19 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
+        if let Some(list) = st.panel.as_ref().and_then(|p| p.bar_list(&engine.m)) {
+            hud.menu = Some(list);
+        }
         // A typed field asked: the game's editor opened on the game as it
         // asked, its text and cursor drawn over the rest.
         let mut live = None;
         match st.need.clone() {
-            Some(dialog::Need::Menu(m)) => hud.menu = Some(m),
+            Some(dialog::Need::Menu(mut m)) => {
+                if !m.list {
+                    m.selected = usize::MAX;
+                }
+                hud.menu = Some(m)
+            }
             Some(dialog::Need::Text(a)) => {
                 hud.typing = Some(a.prompt.clone());
                 live = field::Live::open(&a.game.0, a.field, a.look);
@@ -2102,7 +2111,8 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 l.draw(screen, true);
             }
         };
-        let mut screen = hud::Screen::new(if st.panel.is_some() { st.assets.charsheet } else { st.assets.palette });
+        let sheet = st.panel.as_ref().is_some_and(|p| !p.over_play());
+        let mut screen = hud::Screen::new(if sheet { st.assets.charsheet } else { st.assets.palette });
         if let Some(mk) = &maker {
             spellmaker::draw(&mut screen, &font, &st.assets.archive, &engine.files, mk);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
@@ -2129,6 +2139,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if st.map {
             automap::draw(&mut screen, &mut engine.m);
             automap::draw_notes(&mut screen, &engine);
+            automap::draw_pointer(&mut screen, st.cursor.0, st.cursor.1);
         }
         draw_live(&mut screen);
         // An animation the turns played: its first frame and lines.
@@ -2405,6 +2416,9 @@ struct App {
     pending: Option<Pending>,
     boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
     selected: usize,
+    /// The arrows or the wheel moved `selected` since the menu came up:
+    /// only then is its entry marked (the original marks none).
+    arrowed: bool,
     live: Option<field::Live>,
     status: Option<String>,
     font: hud::Font,
@@ -2627,6 +2641,7 @@ impl App {
         if let Some(need) = talk.need {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
+            self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
             self.live = match &need {
@@ -2726,7 +2741,8 @@ impl App {
             t.draw(&mut self.screen, &self.font, &mut self.engine.m, x, y);
             hud::compose_over(&mut self.screen, &self.font, &hud);
         } else {
-            self.screen.set_palette(if self.panel.is_some() { self.assets.charsheet } else { self.assets.palette });
+            let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
+            self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.palette });
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);
             if self.panel.is_some() {
                 self.equip_image();
@@ -2738,6 +2754,8 @@ impl App {
             if self.map {
                 automap::draw(&mut self.screen, &mut self.engine.m);
                 automap::draw_notes(&mut self.screen, &self.engine);
+                let (x, y) = self.screen_point();
+                automap::draw_pointer(&mut self.screen, x, y);
             }
         }
         // The typed field asked, over what its caller shows (its prompt's
@@ -2967,7 +2985,6 @@ impl App {
     fn panel_key(&mut self, code: winit::keyboard::KeyCode) {
         use winit::keyboard::KeyCode;
         let mut said = panels::Said::default();
-        let shown = panels::book_layout(&self.font).4;
         let m = &mut self.engine.m;
         let mut cast = None;
         match self.panel.as_mut() {
@@ -3029,8 +3046,19 @@ impl App {
                     KeyCode::Enter | KeyCode::NumpadEnter => cast = Some(book.selected),
                     _ => {}
                 }
-                if let Some(panels::Panel::Spellbook(book)) = self.panel.as_mut() {
-                    book.first = book.first.min(book.selected).max((book.selected + 1).saturating_sub(shown));
+            }
+            Some(panels::Panel::Use(names, sel)) => {
+                let n = names.len().max(1);
+                match code {
+                    KeyCode::Escape | KeyCode::KeyU => self.panel = None,
+                    KeyCode::ArrowUp => *sel = (*sel + n - 1) % n,
+                    KeyCode::ArrowDown => *sel = (*sel + 1) % n,
+                    KeyCode::Enter | KeyCode::NumpadEnter => {
+                        let pick = *sel as u16;
+                        self.panel = None;
+                        panels::use_pick(m, &mut self.engine.files, pick, &mut said);
+                    }
+                    _ => {}
                 }
             }
             Some(panels::Panel::Sheet) => match code {
@@ -3046,8 +3074,9 @@ impl App {
             },
             None => {}
         }
-        if let Some(sel) = cast {
+        if let Some(line) = cast {
             self.panel = None;
+            let sel = panels::book_pick(&mut self.engine.m, line);
             panels::cast(&mut self.engine, sel, &mut said);
         }
         self.boxes.extend(said.boxes);
@@ -3095,13 +3124,15 @@ impl App {
                     }
                 }
             }
-            Some(panels::Panel::Spellbook(book)) => {
-                let (bx, by, lh, bw, shown) = panels::book_layout(&self.font);
-                let i = ((y - by) / lh.max(1)) as usize;
-                if x >= bx - 3 && x < bx + bw + 3 && y >= by && i < shown {
-                    let sel = book.first + i;
-                    if sel < panels::spells(&self.engine.m).len() {
-                        cast = Some(sel);
+            // A line of the list in the bar's corner picked.
+            Some(p @ (panels::Panel::Spellbook(_) | panels::Panel::Use(..))) => {
+                let hud = hud::Hud { menu: p.bar_list(&self.engine.m), ..Default::default() };
+                if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
+                    if matches!(p, panels::Panel::Spellbook(_)) {
+                        cast = Some(i);
+                    } else {
+                        self.panel = None;
+                        panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
                     }
                 }
             }
@@ -3117,8 +3148,9 @@ impl App {
             },
             None => {}
         }
-        if let Some(sel) = cast {
+        if let Some(line) = cast {
             self.panel = None;
+            let sel = panels::book_pick(&mut self.engine.m, line);
             panels::cast(&mut self.engine, sel, &mut said);
         }
         self.boxes.extend(said.boxes);
@@ -3165,14 +3197,11 @@ impl App {
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
             sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
             sheets::BarAction::Log => self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files))),
+            // 2542:066A: no list without an item to use (127C 0).
             sheets::BarAction::Use => {
                 let names = panels::usable_names(&self.engine.m);
                 if !names.is_empty() {
-                    let mut p = panels::open_inventory(&mut self.engine.m);
-                    if let panels::Panel::Inventory(inv) = &mut p {
-                        inv.using = Some((names, 0));
-                    }
-                    self.panel = Some(p);
+                    self.panel = Some(panels::Panel::Use(names, 0));
                 }
             }
             sheets::BarAction::Camp => self.camp = true,
@@ -3212,7 +3241,7 @@ impl App {
     /// A box of the view's own.
     fn say(&mut self, s: &str) {
         println!("{s}");
-        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string() }]]);
+        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]]);
     }
 
     /// What the HUD shows now.
@@ -3221,11 +3250,18 @@ impl App {
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             h.status = self.status.clone();
         }
+        if let Some(list) = self.panel.as_ref().and_then(|p| p.bar_list(&self.engine.m)) {
+            h.menu = Some(list);
+        }
         if self.boxes.is_empty() {
             match self.pending.as_ref().map(|p| &p.need) {
                 Some(dialog::Need::Menu(m)) => {
                     let mut m = m.clone();
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
+                    // A menu's boxes mark no entry until the arrows move.
+                    if !m.list && !self.arrowed {
+                        m.selected = usize::MAX;
+                    }
                     h.menu = Some(m);
                 }
                 Some(dialog::Need::Text(a)) => h.typing = Some(a.prompt.clone()),
@@ -3253,8 +3289,14 @@ impl App {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
                 match code {
-                    KeyCode::ArrowUp => self.selected = (self.selected + n - 1) % n,
-                    KeyCode::ArrowDown => self.selected = (self.selected + 1) % n,
+                    KeyCode::ArrowUp => {
+                        self.selected = (self.selected + n - 1) % n;
+                        self.arrowed = true;
+                    }
+                    KeyCode::ArrowDown => {
+                        self.selected = (self.selected + 1) % n;
+                        self.arrowed = true;
+                    }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
                         let s = self.selected as u16;
                         self.answer(dialog::Answer::Pick(s));
@@ -3390,6 +3432,7 @@ impl App {
                     if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
                         let n = m.entries.len().max(1);
                         self.selected = if dy > 0.0 { (self.selected + n - 1) % n } else if dy < 0.0 { (self.selected + 1) % n } else { self.selected };
+                        self.arrowed = true;
                     }
                 }
             }

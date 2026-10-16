@@ -44,6 +44,8 @@ pub struct Pics {
     pub font_a: Option<Font>,
     /// FONT_S.DAT, the automap's (its notes).
     pub small: Option<Font>,
+    /// POINTER.IMG, the automap's pen at the mouse (0000:2D8A).
+    pub pointer: Option<Image>,
 }
 
 thread_local! {
@@ -81,6 +83,7 @@ pub fn pics(archive: &Archive, m: &Machine) -> Rc<Pics> {
                     teeny: Font::load(archive, "TEENYFNT.DAT"),
                     font_a: Font::load(archive, "FONT_A.DAT"),
                     small: Font::load(archive, "FONT_S.DAT"),
+                    pointer: crate::panels::load_image(archive, m, "POINTER.IMG"),
                 })
             })
             .clone()

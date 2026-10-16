@@ -64,6 +64,17 @@ pub fn draw(screen: &mut hud::Screen, m: &mut Machine) {
     }
 }
 
+/// The automap's pen (POINTER.IMG) as 0000:36B6 draws it at the mouse
+/// (x, y): its bottom left there (y less its height), colour 0 see-through
+/// (5A6A). (36B6 pulls a copy of that place back inside the clip, A918,
+/// A91A, only for the background it saves, 8F2A; the pen is drawn where
+/// it was, 371E.)
+pub fn draw_pointer(screen: &mut hud::Screen, x: i32, y: i32) {
+    let Some(pics) = crate::sheets::loaded() else { return };
+    let Some(p) = &pics.pointer else { return };
+    screen.blit(x, y - p.h as i32, p.w, p.h, &p.px, hud::H as i32 - 1);
+}
+
 /// The table of the files loaded whole as fonts (0000:7508 puts each
 /// one's segment in its first free word, 930E frees only one found
 /// there): eight words.

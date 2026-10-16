@@ -137,6 +137,65 @@ pub fn spells(m: &Machine) -> Vec<Spell> {
         .collect()
 }
 
+/// 0000:0B9C over the spellbook's names (29CF:060B, CX of them): its
+/// order table (DGROUP 1044: for each line shown, the book's entry), the
+/// names exchange-sorted, each pair (i, j > i) swapped when 9C0A finds
+/// them out of order: `repe cmpsb` of the first's bytes against the
+/// second's, over the second's length and its NUL, and the last byte's
+/// difference taken as signed (its `js`), so a name sorts after one it
+/// begins with and bytes 80h apart or more compare backwards. With fewer
+/// than two names nothing is sorted and the table is left as it was
+/// (None).
+pub fn book_order(names: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let n = names.len();
+    if n <= 1 {
+        return None;
+    }
+    let mut ptr: Vec<usize> = (0..n).collect();
+    let mut order: Vec<u8> = (0..n as u8).collect();
+    let after = |a: &[u8], b: &[u8]| {
+        // 9C0A with SI a, DI b: [si] - [es:di] over len(b) + 1 bytes.
+        for k in 0..=b.len() {
+            let (x, y) = (a.get(k).copied().unwrap_or(0), b.get(k).copied().unwrap_or(0));
+            if x != y || k == b.len() {
+                let d = x.wrapping_sub(y);
+                return d != 0 && d & 0x80 == 0;
+            }
+        }
+        false
+    };
+    for i in 0..n - 1 {
+        for j in i + 1..n {
+            if after(&names[ptr[i]], &names[ptr[j]]) {
+                ptr.swap(i, j);
+                order.swap(i, j);
+            }
+        }
+    }
+    Some(order)
+}
+
+/// The spellbook's names in the book's order, as 29CF:0654 copies them.
+fn book_names(m: &Machine) -> Vec<Vec<u8>> {
+    (0..m.mem.r8(DS, BOOK_COUNT) as u16)
+        .map(|k| {
+            let (seg, off) = m.spell_record(m.mem.r8(DS, BOOK + k));
+            m.mem.cstr(seg, off + arena::save::spell::NAME).to_vec()
+        })
+        .collect()
+}
+
+/// The book's entry for the spellbook's line `line` picked (29CF:0642):
+/// the order table written as 0B9C writes it, then read at the line.
+pub fn book_pick(m: &mut Machine, line: usize) -> usize {
+    if let Some(order) = book_order(&book_names(m)) {
+        for (k, &o) in order.iter().enumerate() {
+            m.mem.w8(DS, 0x1044 + k as u16, o);
+        }
+    }
+    m.mem.r8(DS, 0x1044 + line as u16) as usize
+}
+
 /// `--do learn:N`: spell N of the spell files put in the player's book,
 /// for trying the spellbook (not how the game teaches spells: the mages'
 /// guild sells them).
@@ -155,6 +214,9 @@ pub enum Panel {
     Sheet,
     /// The logbook (`sheets`).
     Log(crate::sheets::LogBook),
+    /// The bar's use button (2542:034D): the items with an effect, a list
+    /// in the bar's corner (2542:066A) and the line picked.
+    Use(Vec<String>, usize),
 }
 
 /// The inventory: the use list when it is up (the names, the line
@@ -172,8 +234,40 @@ pub struct Inventory {
 
 #[derive(Clone, Debug, Default)]
 pub struct Spellbook {
-    pub first: usize,
+    /// The line picked (3159:06A0's, from the first).
     pub selected: usize,
+}
+
+impl Panel {
+    /// The spellbook and the use list are lists in the bar's corner
+    /// (2542:06F8) over play, in its palette: the HUD's (`bar_list`), not
+    /// a screen of their own.
+    pub fn over_play(&self) -> bool {
+        matches!(self, Panel::Spellbook(_) | Panel::Use(..))
+    }
+
+    /// The list such a panel shows (`hud::BAR_LIST`): the spellbook's
+    /// spell names (29CF:060B, each the record's name as 0654 copies it)
+    /// or the items' (066A, 13h at most), the line picked.
+    pub fn bar_list(&self, m: &Machine) -> Option<crate::hud::Menu> {
+        let (names, selected) = match self {
+            Panel::Spellbook(book) => {
+                let names = book_names(m);
+                let order = book_order(&names).unwrap_or_else(|| (0..names.len() as u8).collect());
+                (order.iter().map(|&o| String::from_utf8_lossy(&names[o as usize]).into_owned()).collect(), book.selected)
+            }
+            Panel::Use(names, sel) => (names.clone(), *sel),
+            _ => return None,
+        };
+        Some(crate::hud::Menu {
+            title: Vec::new(),
+            entries: names.into_iter().map(|n| vec![Span { colour: 0xFD, text: n, font: Default::default(), code: None }]).collect(),
+            keys: Vec::new(),
+            selected,
+            list: true,
+            kind: crate::hud::BAR_LIST,
+        })
+    }
 }
 
 /// The equipment screen opened on the player's own items (1194:23C7's
@@ -332,7 +426,7 @@ fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
 /// The drop's question as the original's yes-or-no menu (1194:48E9 ->
 /// 020E), entry `sel` highlighted.
 pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
-    let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string() }];
+    let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }];
     crate::hud::Menu {
         title: crate::hud::lines(text, 0x0F),
         entries: vec![line("Yes"), line("No")],
@@ -369,7 +463,7 @@ pub fn use_pick(m: &mut Machine, files: &mut arena::bsa::Files, pick: u16, said:
 pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
     crate::hud::Menu {
         title: crate::hud::lines(b"Use which item?", 0x0F),
-        entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone() }]).collect(),
+        entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone(), font: Default::default(), code: None }]).collect(),
         keys: Vec::new(),
         selected: sel,
         list: false,
@@ -425,13 +519,6 @@ pub fn button_at(x: i32, y: i32) -> Option<Button> {
         120..=170 => Some(Button::Drop),
         _ => None,
     }
-}
-
-/// The spellbook's layout: (x, y of the first entry, line height, width,
-/// lines shown).
-pub fn book_layout(font: &Font) -> (i32, i32, i32, i32, usize) {
-    let lh = font.h as i32 + 2;
-    (40, 30 + lh + 4, lh, 240, 10)
 }
 
 /// The panel drawn over the layer (`pics`: EQUIP.IMG).
@@ -505,27 +592,8 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                 crate::hud::compose_over(screen, font, &hud);
             }
         }
-        Panel::Spellbook(book) => {
-            let list = spells(m);
-            let (x, y, lh, w, shown) = book_layout(font);
-            let h = lh * (shown as i32 + 1) + 14;
-            screen.panel(x - 8, y - lh - 9, w + 16, h, 0x0F);
-            let sp = m.mem.r16(DS, 0x020A);
-            screen.text(font, x, y - lh - 4, &format!("Spellbook ({sp} spell points)"), 0x0F);
-            if list.is_empty() {
-                screen.text(font, x, y, "No spells.", 0x0F);
-            }
-            for (i, s) in list.iter().enumerate().skip(book.first).take(shown) {
-                let ly = y + (i - book.first) as i32 * lh;
-                if i == book.selected {
-                    screen.fill(x - 3, ly - 1, w + 6, lh, 0x08, 0xC0);
-                }
-                let c = if s.cost > sp { 0xA0 } else { 0x0F };
-                screen.text(font, x, ly, &s.name, c);
-                let cost = s.cost.to_string();
-                screen.text(font, x + w - font.width(&cost) as i32, ly, &cost, c);
-            }
-        }
+        // In the bar's corner: the HUD's list (`Panel::bar_list`).
+        Panel::Spellbook(_) | Panel::Use(..) => {}
     }
 }
 

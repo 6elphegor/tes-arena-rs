@@ -183,14 +183,12 @@ fn the_logbook_as_the_original_draws_it() {
 
 /// C: the spellbook (2542:026D, 056A).
 #[test]
-#[ignore = "not yet the original's: the view shows this list its own way, not as 3159:06A0's over the bar"]
 fn the_spellbook_as_the_original_draws_it() {
     screen("spellbook", |a, d| d.key(a, KeyCode::KeyC, Some("c")), over);
 }
 
 /// U: the items to use (2542:034D).
 #[test]
-#[ignore = "not yet the original's: the view shows this list its own way, not as 3159:06A0's over the bar"]
 fn the_use_list_as_the_original_draws_it() {
     screen("use", |a, d| d.key(a, KeyCode::KeyU, Some("u")), over);
 }
@@ -223,6 +221,77 @@ fn the_spellmaker_as_the_original_draws_it() {
             assert!(until_asked(d, a, 3), "the guild master asks");
             d.key(a, KeyCode::Digit3, Some("3"));
             assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker is up");
+        },
+        layer,
+    );
+}
+
+/// The mages' guild's menu (1194:A73E): its screen, banner and menu over
+/// the view, Drakain before Daggerfall's guild master.
+#[test]
+fn the_guilds_menu_as_the_original_draws_it() {
+    screen(
+        "guild",
+        |a, d| {
+            d.click(a, 164, 74, MouseButton::Left);
+            d.frame(a);
+            assert!(until_asked(d, a, 3), "the guild master asks");
+        },
+        layer,
+    );
+}
+
+/// The guild's menu up, its entry `key` picked: the screen it asks next.
+fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
+    d.click(a, 164, 74, MouseButton::Left);
+    d.frame(a);
+    assert!(until_asked(d, a, 3), "the guild master asks");
+    d.key(a, key, Some(text));
+    assert!(a.pending.is_some(), "the guild asks again");
+}
+
+/// The guild's Buy: what kind of item (1194:A73E's next menu) over the
+/// gold left.
+#[test]
+#[ignore = "not yet the original's: the gold line under the menu (1194:545C) isn't drawn"]
+fn the_guilds_buy_as_the_original_draws_it() {
+    screen("guildbuy", |a, d| guild_pick(a, d, KeyCode::Digit1, "1"), layer);
+}
+
+/// The guild's Detect Magic: the items to look at, a list.
+#[test]
+fn the_guilds_detect_magic_as_the_original_draws_it() {
+    screen("guilddetect", |a, d| guild_pick(a, d, KeyCode::Digit2, "2"), layer);
+}
+
+/// R: camping (2542:01E6, 1194:424E), refused in the guild: its box.
+#[test]
+fn camping_refused_as_the_original_draws_it() {
+    screen(
+        "camp",
+        |a, d| {
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// Shift+M: the world map (2542:03BF), refused inside: its box.
+#[test]
+fn the_world_map_refused_as_the_original_draws_it() {
+    screen("travelmap", |a, d| super::press(d, a, KeyCode::KeyM, true), over);
+}
+
+/// M: the automap (2542:045A, 0000:2CFE), its pen at the mouse where the
+/// original's is (A0h, 64h).
+#[test]
+fn the_automap_as_the_original_draws_it() {
+    screen(
+        "automap",
+        |a, d| {
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::KeyM, Some("m"));
         },
         layer,
     );
