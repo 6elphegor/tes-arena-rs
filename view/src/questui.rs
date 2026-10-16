@@ -170,6 +170,24 @@ impl QuestHooks for QuestFront<'_, '_> {
     fn text_shown(&mut self, m: &mut Machine) {
         let _ = m.text(&mut self.1, &mut *self.0, 0, DS, 0x1044);
     }
+    /// 1194:4B8E: the picture named at DS:`si` shown (the informant's,
+    /// 132F), behind the turn as the shops' pictures are.
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
+        if let Some(b) = self.0.talk.as_deref_mut().and_then(|t| t.backdrop.as_mut()) {
+            b.picture = Some(name);
+        }
+    }
+    /// 1194:1034 at the main quest's end (2294:0FB4). CX is what the
+    /// text's box left: its last wait for the buttons' release polls the
+    /// mouse (0000:9012, INT 33h AX 3, CX halved), so the screen rolls
+    /// the cursor's column (8F92) times before 0FDD 8Eh sets 32h points.
+    fn finale(&mut self, m: &mut Machine) {
+        let levels = m.mem.r16(DS, arena::controls::var::MOUSE_X);
+        if m.level_up_screen(levels, &mut *self.0).is_none() {
+            eprintln!("the finale's level-up gave up: {}", arena::giveup::describe());
+        }
+    }
     /// 2DA2:000A: the text at DS:`di` has its substitutions made.
     fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) {
         let _ = m.expand(files, &mut *self.0, DS, di);

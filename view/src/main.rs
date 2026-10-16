@@ -155,6 +155,8 @@ mod fmdrv;
 mod hud;
 #[cfg(test)]
 mod inputtest;
+#[cfg(test)]
+mod hooktest;
 mod interface;
 mod music;
 mod newgame;
@@ -388,6 +390,11 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 1194:59C8: the text at DGROUP `text` in a box (drowning in the
+    /// wild, 7927).
+    fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        Front::message_box(self, m, text);
+    }
     /// 1194:A36C with AX 0: text number [137A] shown in its box (a
     /// building's words on the way in, 0000:4903; a holiday's; a quest's).
     fn message_box_number(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
@@ -472,7 +479,7 @@ impl arena::talk::TalkHooks for Front<'_> {
     /// The loot window (2433:0583) with its boxes and lists answered
     /// through `dialog`.
     fn loot(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, seg: u16, bx: u16) -> Option<()> {
-        m.loot_window(files, &mut LootFront(self), ax, si, seg, bx)
+        m.loot_window(files, &mut LootFront(self, files.clone()), ax, si, seg, bx)
     }
     /// 1194:D593: the quest's person speaks (`questui::QuestFront`).
     fn quest_person(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -481,6 +488,16 @@ impl arena::talk::TalkHooks for Front<'_> {
     /// 1194:8F1E (from DCE1): the palace's quests.
     fn palace(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.quests_talk(files, &mut questui::QuestFront(self, files.clone()))
+    }
+    /// 1194:9F04: a level's quest item taken, its texts shown
+    /// (`questui::QuestFront`).
+    fn quest_item(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, _si: u16) -> bool {
+        m.quest_item_taken(files, &mut questui::QuestFront(self, files.clone())).unwrap_or(true)
+    }
+    /// 2294:0F33: the main quest's chest, its texts shown and, at the
+    /// last piece, the finale's level-up screen.
+    fn quest_chest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16) -> bool {
+        m.quest_chest(files, &mut questui::QuestFront(self, files.clone()), si).unwrap_or(false)
     }
     /// A shop entered: its questions through `dialog` (`shopui`).
     fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
@@ -493,12 +510,19 @@ impl arena::talk::TalkHooks for Front<'_> {
     }
 }
 /// The loot window's boxes and lists (1194:59CC, 5734), through the
-/// front end's `dialog`.
-struct LootFront<'a, 'b>(&'a mut Front<'b>);
+/// front end's `dialog`; `Files` a copy for its texts.
+struct LootFront<'a, 'b>(&'a mut Front<'b>, arena::bsa::Files);
 
 impl arena::loot_window::LootHooks for LootFront<'_, '_> {
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         self.0.message_box(m, si);
+    }
+    /// 1194:A36C: text number [137A] shown (a staff piece's words, 2433:0C58)
+    /// or written (mode 2) to 1044.
+    fn text(&mut self, m: &mut arena::machine::Machine, mode: u16) {
+        if m.text(&mut self.1, &mut *self.0, mode, arena::mem::DS, 0x1044).is_none() {
+            eprintln!("the text gave up: {}", arena::giveup::describe());
+        }
     }
     fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
         match self.0.talk.as_deref_mut() {
