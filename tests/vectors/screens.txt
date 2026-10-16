@@ -107,3 +107,5 @@ screen | palacedecline | c53dd1e740f17cf4 a97a4bafd992e4ed 84778cba60dcaa0e
 screen | palacenone | b0ce105eb5a635e3 a97a4bafd992e4ed e5cc6fd39d770635
 screen | equipmentspecial | 36dd796a0fe9e144 ef6ad023fa2b8c2b
 screen | equipmentpotion | 707d1563e7ab7aaf ef6ad023fa2b8c2b
+screen | usepotions | e61896922d0c226 a97a4bafd992e4ed 4eaa9849dbc2a3f
+screen | usepotion | dd14fcc6528cab25 a97a4bafd992e4ed dd14fcc6528cab25

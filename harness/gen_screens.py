@@ -123,6 +123,11 @@ SCREENS = {
     # the list gone) and what it said put on the message line (061A),
     # which the next frame draws (`AFTER`).
     'usemessage': (0x034D, [('click', 0xF0, 181), ('click', 0xF0, 181)]),
+    # The items to use with the potion (`potion`) among them.
+    'usepotions': (0x034D, []),
+    # Its line (the fifth, 190) clicked twice: the potion drunk, what it
+    # said on the message line (`AFTER`).
+    'usepotion': (0x034D, [('click', 0xF0, 190), ('click', 0xF0, 190)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
     # Its bottom row's buttons (the table at 5C2C: y 118..146), each
@@ -621,14 +626,14 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storerepairworn': lambda a: (worn(a), seeded(a)),
           'storesteal': lambda a: (room(a), seeded(a)),
           'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
-          'equipmentpotion': potion,
+          'equipmentpotion': potion, 'usepotions': potion, 'usepotion': potion,
           'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
-AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'spellarea', 'spellself', 'spelllight')}
+AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight')}
 
 
 def draw(a, base, name, handler, script, fill, waits=None):

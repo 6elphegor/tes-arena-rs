@@ -335,31 +335,36 @@ fn a_special_items_description_as_the_original_draws_it() {
     quest_lines("equipmentspecial", &[(60, 111, MouseButton::Right)]);
 }
 
-/// With an identified potion in that slot (gen_screens.py's `potion`):
-/// its text (7CF8), its variant rolled from its +4.
+/// gen_screens.py's `potion`: an identified potion of type 3 (its +4,
+/// the seed its text's variant is rolled from, 1234h) in the player's last
+/// slot, as 1194:B158 makes one bought (its spell from 2A11, +12h FFh,
+/// condition 32h) and AB39 identifies it.
+fn potion(a: &mut App) {
+    let (ty, seed) = (3u8, 0x1234u16);
+    let m = &mut a.engine.m;
+    let at = 0x0212 + 39 * 0x13;
+    let mut b = [0u8; 0x13];
+    b[0] = ty;
+    b[4..6].copy_from_slice(&seed.to_le_bytes());
+    b[6..8].copy_from_slice(&0x32u16.to_le_bytes());
+    b[8..10].copy_from_slice(&0x32u16.to_le_bytes());
+    b[0x0E] = 0x40 | 0x0C | 1 | 2;
+    b[0x0F] = 0xFF;
+    b[0x11] = m.mem.r8(DS, 0x2A11 + ty as u16);
+    b[0x12] = 0xFF;
+    for (i, v) in b.into_iter().enumerate() {
+        m.mem.w8(DS, at + i as u16, v);
+    }
+}
+
+/// With the potion in that slot: its text (7CF8), its variant rolled from
+/// its +4.
 #[test]
 fn a_potions_description_as_the_original_draws_it() {
-    let (ty, seed) = (3u8, 0x1234u16);
-    let m_potion = move |a: &mut App| {
-        let m = &mut a.engine.m;
-        let at = 0x0212 + 39 * 0x13;
-        let mut b = [0u8; 0x13];
-        b[0] = ty;
-        b[4..6].copy_from_slice(&seed.to_le_bytes());
-        b[6..8].copy_from_slice(&0x32u16.to_le_bytes());
-        b[8..10].copy_from_slice(&0x32u16.to_le_bytes());
-        b[0x0E] = 0x40 | 0x0C | 1 | 2;
-        b[0x0F] = 0xFF;
-        b[0x11] = m.mem.r8(DS, 0x2A11 + ty as u16);
-        b[0x12] = 0xFF;
-        for (i, v) in b.into_iter().enumerate() {
-            m.mem.w8(DS, at + i as u16, v);
-        }
-    };
     screen(
         "equipmentpotion",
         |a, d| {
-            m_potion(a);
+            potion(a);
             d.key(a, KeyCode::F1, None);
             d.click(a, 0x80, 0xB8, MouseButton::Left);
             for _ in 0..40 {
@@ -368,6 +373,39 @@ fn a_potions_description_as_the_original_draws_it() {
             d.click(a, 60, 111, MouseButton::Right);
         },
         layer,
+    );
+}
+
+/// U with the potion: the items to use, it the fifth.
+#[test]
+fn the_use_list_with_a_potion_as_the_original_draws_it() {
+    screen(
+        "usepotions",
+        |a, d| {
+            potion(a);
+            d.key(a, KeyCode::KeyU, Some("u"));
+        },
+        over,
+    );
+}
+
+/// Its line clicked twice: drunk (29CF:0869, its spell cast on the
+/// player), the list gone, nothing drawn over play nor on the message
+/// line the next frame draws.
+#[test]
+fn a_potion_drunk_as_the_original_shows_it() {
+    screen(
+        "usepotion",
+        |a, d| {
+            potion(a);
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 190, MouseButton::Left);
+            d.click(a, 0xF0, 190, MouseButton::Left);
+            let stacks = (0..40u16).filter(|i| a.engine.m.mem.r8(DS, 0x0212 + i * 0x13 + 0x0E) & 0x4C == 0x4C).count();
+            assert_eq!(stacks, 0, "the potion drunk");
+            d.frame(a);
+        },
+        over,
     );
 }
 
