@@ -41,6 +41,14 @@ use crate::mem::{DATA, DS};
 pub trait TextHooks {
     /// 1194:59CC: a message box with the text at DS:`si` (colour 9288).
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:59CC with DS `seg` (a special item's description, 1194:7E44,
+    /// shows a heap block's text): by default the box at DS:`si` when
+    /// `seg` is DGROUP, else nothing.
+    fn message_box_far(&mut self, m: &mut Machine, seg: u16, si: u16) {
+        if seg == crate::mem::DS {
+            self.message_box(m, si);
+        }
+    }
     /// 1194:020E: a menu, its title at DS:`si`, its keys at `bx`, its
     /// entries' table at `di`. The pick (FFFFh: none).
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {

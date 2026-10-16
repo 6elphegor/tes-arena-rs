@@ -3,8 +3,17 @@ screen | equipment | 6603b8fbca859b58 ef6ad023fa2b8c2b
 screen | equipmentpick | 17c99c6fbd96a826 ef6ad023fa2b8c2b
 screen | equipmentspells | 7f7eccde5c640741 ef6ad023fa2b8c2b
 screen | equipmentdown | f7048bd0f09df083 ef6ad023fa2b8c2b
+screen | equipmentquests | b22b6dc934106345 ef6ad023fa2b8c2b
+screen | equipmentquestinfo | d1ab9b97293aaa5b ef6ad023fa2b8c2b
+screen | equipmentquestequip | cdcecf4fdac6fbf ef6ad023fa2b8c2b
 screen | equipmentinfo | a7cf26d6550a0eb5 ef6ad023fa2b8c2b
 screen | equipmentoff | 8e8691788f7b16b3 ef6ad023fa2b8c2b
+screen | equipmentspellpage | e8d24b276c1fdb48 7b9dbd5285f32ad5
+screen | equipmentspellnext | 97f5470f4b3ac24c 7b9dbd5285f32ad5
+screen | equipmentspellprev | affaf3cbdbdc9e35 7b9dbd5285f32ad5
+screen | equipmentspelldelete | 4e5aef2c2884796 7b9dbd5285f32ad5
+screen | equipmentspelldeleted | 97f5470f4b3ac24c 7b9dbd5285f32ad5
+screen | equipmentspellexit | cbda293961cee9a1 ef6ad023fa2b8c2b
 screen | status | 2e5d327360c1d20b a97a4bafd992e4ed b68093bd54873ad5
 screen | logbook | b08c75f1db4b5e6d 491d016160c27c96
 screen | logbookmore | 2f73e56cb1922472 491d016160c27c96

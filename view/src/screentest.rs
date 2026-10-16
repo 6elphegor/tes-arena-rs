@@ -292,6 +292,104 @@ fn the_sheets_spellbook_as_the_original_draws_it() {
     );
 }
 
+/// The equipment list moved to its end (its arrow forty times), then
+/// the clicks `and`: the quests' lines after the items (1194:1EB8).
+fn quest_lines(name: &str, and: &[(i32, i32, MouseButton)]) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            for _ in 0..40 {
+                d.click(a, 16, 131, MouseButton::Left);
+            }
+            for &(x, y, b) in and {
+                d.click(a, x, y, b);
+            }
+        },
+        layer,
+    );
+}
+
+#[test]
+fn the_quests_lines_as_the_original_draws_them() {
+    quest_lines("equipmentquests", &[]);
+}
+
+/// The last (the staff's pieces) right-clicked: described.
+#[test]
+fn a_quests_line_described_as_the_original_draws_it() {
+    quest_lines("equipmentquestinfo", &[(60, 122, MouseButton::Right)]);
+}
+
+/// The one before it clicked twice: "can't be equipped".
+#[test]
+fn a_quests_line_equipped_as_the_original_draws_it() {
+    quest_lines("equipmentquestequip", &[(60, 111, MouseButton::Left), (60, 111, MouseButton::Left)]);
+}
+
+/// On the spells' page a line clicked twice: its spell's page (1194:1B3C
+/// -> 51D1), then its bottom row's buttons (`and`: a click more).
+fn spell_page(name: &str, and: Option<(i32, i32)>) {
+    screen(
+        name,
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            if let Some((x, y)) = and {
+                d.click(a, x, y, MouseButton::Left);
+            }
+        },
+        layer,
+    );
+}
+
+#[test]
+fn a_spells_page_as_the_original_draws_it() {
+    spell_page("equipmentspellpage", None);
+}
+
+#[test]
+fn a_spells_page_turned_on_as_the_original_draws_it() {
+    spell_page("equipmentspellnext", Some((30, 190)));
+}
+
+#[test]
+fn a_spells_page_turned_back_as_the_original_draws_it() {
+    spell_page("equipmentspellprev", Some((0x80, 190)));
+}
+
+#[test]
+fn a_spells_delete_asked_as_the_original_draws_it() {
+    spell_page("equipmentspelldelete", Some((0xE0, 190)));
+}
+
+/// Delete's Yes: the next spell's page.
+#[test]
+fn a_spell_deleted_as_the_original_draws_it() {
+    screen(
+        "equipmentspelldeleted",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0xE0, 190, MouseButton::Left);
+            d.click(a, 160, 112, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+#[test]
+fn a_spells_page_left_as_the_original_draws_it() {
+    spell_page("equipmentspellexit", Some((0x120, 190)));
+}
+
 /// S: the status box (2542:037C, 04B1).
 #[test]
 fn the_status_box_as_the_original_draws_it() {

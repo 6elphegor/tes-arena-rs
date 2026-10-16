@@ -35,6 +35,7 @@ use crate::format::Arg;
 use crate::inventory::{category, item, LAST_COUNT, PLAYER_SLOTS, SLOT_SIZE};
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
+use crate::text::TextHooks;
 
 /// DGROUP variables.
 pub mod var {
@@ -826,11 +827,12 @@ impl Machine {
     /// click on the equipment list shows (1194:1988), as CR-ended lines at
     /// TEXT: its name, then by its kind (1194:748E) its use (7D79, 7DE1,
     /// 7CF8), its weight and condition, its enchantment; LINES counts an
-    /// enchantment's line. None where the original goes on to what isn't
-    /// ported: an identified stack's text (7CF8: 1194:A36C) and a special
-    /// item's message box (type bit 80h, 7E44); or loops for ever (a
-    /// weight under 100h found nowhere in DGROUP, 1194:F2FC).
-    pub fn item_info(&mut self, it: u16) -> Option<()> {
+    /// enchantment's line. A special item's (type bit 80h) is then shown
+    /// in a message box of its own (7E44), and the carry (true) tells
+    /// 1988 to draw nothing more. None where the original loops for ever
+    /// (a weight under 100h found nowhere in DGROUP, 1194:F2FC; a text's
+    /// key not in the index) or the text gives up.
+    pub fn item_info(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, it: u16) -> Option<bool> {
         let name = self.display_name(it)?;
         // 0000:9CA0, then its NUL made a CR.
         let mut di = info::TEXT;
@@ -850,15 +852,109 @@ impl Machine {
             category::ACCESSORY => self.info_accessory(it)?,
             category::STACK => {
                 if self.inv_flags(DS, it) & 2 != 0 {
-                    return crate::giveup::not_ported("1194:7CF8: an identified stack's text (1194:A36C)");
+                    self.info_potion(files, hooks, it)?;
+                } else {
+                    self.info_append(DATA, 0x6D53);
                 }
-                self.info_append(DATA, 0x6D53);
             }
             _ => self.info_gear(it)?,
         }
         if self.mem.r8(DS, it) & 0x80 != 0 {
-            return crate::giveup::not_ported("1194:7E44: a special item's message box");
+            self.info_special(files, hooks, it)?;
+            return Some(true);
         }
+        Some(false)
+    }
+
+    /// 1194:7CF8 for an identified stack: its text (597h past its type,
+    /// 1194:A36C mode 2, wrapped at 21h, with 91F6 its +4 for the
+    /// substitutions and the random seed) in place of the name: TEXT cleared for C8h bytes
+    /// first, its line feeds made CRs (1194:49DF) and its NUL a CR; the
+    /// first line in FEh (ARGS 1) and one line more.
+    fn info_potion(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, it: u16) -> Option<()> {
+        self.mem.w16(DS, info::ARGS, 1);
+        let n = self.mem.r16(DS, info::LINES).wrapping_add(1);
+        self.mem.w16(DS, info::LINES, n);
+        for i in 0..0xC8u16 {
+            self.mem.w8(DS, info::TEXT + i, 0);
+        }
+        // The random seed (91F6) the item's +4 while the text is made, so
+        // that its variant is the item's own; the game's put back after.
+        self.store_rng();
+        let saved = self.mem.r32(DS, 0x91F6);
+        let amount = self.mem.r16(DS, it.wrapping_add(4)) as i16 as i32 as u32;
+        self.mem.w32(DS, 0x91F6, amount);
+        self.load_rng();
+        let t = (self.mem.r8(DS, it) as u16).wrapping_add(0x597);
+        self.mem.w16(DS, crate::text::var::TEXT, t);
+        self.mem.w8(DS, crate::text::var::WIDTH, 0x21);
+        let made = self.text(files, hooks, 2, DS, info::TEXT);
+        self.mem.w32(DS, 0x91F6, saved);
+        self.load_rng();
+        made?;
+        // 0000:9AF8.
+        let font = self.mem.r16(DS, 0x103A);
+        self.mem.w16(DS, 0xB038, font);
+        // 1194:49DF over the text's length (0000:9CAC), stopping at a NUL.
+        let mut si = info::TEXT;
+        let len = self.mem.cstr(DS, si).len();
+        for _ in 0..len {
+            match self.mem.r8(DS, si) {
+                0 => break,
+                0x0A => self.mem.w8(DS, si, 0x0D),
+                _ => {}
+            }
+            si = si.wrapping_add(1);
+        }
+        // 1194:559F: past the first string (3000 bytes at most).
+        let mut si = info::TEXT;
+        for k in 1..=0xBB8 {
+            let c = self.mem.r8(DS, si);
+            si = si.wrapping_add(1);
+            if c == 0 || k == 0xBB8 {
+                break;
+            }
+        }
+        self.mem.w8(DS, si.wrapping_sub(1), 0x0D);
+        self.mem.w8(DS, si, 0);
+        Some(())
+    }
+
+    /// 1194:7E44. A special item's box: a block of 7530h bytes taken from
+    /// the heap's top (0000:9CD2, its segment kept at 12B4), the text so
+    /// far copied there and the special item's own text appended (1F9h
+    /// past its place in the 16 types at 78C3, 1194:D316; 1194:A36C mode
+    /// 2, wrapped at 3Ch), shown in a message box (1194:59CC) and the
+    /// block freed (0000:6C32); AFF9 2.
+    fn info_special(&mut self, files: &mut Files, hooks: &mut dyn TextHooks, it: u16) -> Option<()> {
+        let seg = self.heap_alloc_high(0x7530)?;
+        if seg == 0 {
+            return crate::giveup::not_ported("0000:9CD2: no room for 7E44's block: the original writes from 0:0");
+        }
+        self.mem.w16(DS, 0x12B4, seg);
+        let ty = self.mem.r8(DS, it);
+        let mut k = 0u16;
+        while k < 0x10 && self.mem.r8(DS, 0x78C3 + k) != ty {
+            k += 1;
+        }
+        self.mem.w16(DS, crate::text::var::TEXT, k.wrapping_add(0x1F9));
+        let (mut si, mut di) = (info::TEXT, 0u16);
+        loop {
+            let c = self.mem.r8(DS, si);
+            self.mem.w8(seg, di, c);
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+        }
+        self.mem.w8(DS, crate::text::var::WIDTH, 0x3C);
+        self.text(files, hooks, 2, seg, di.wrapping_sub(1))?;
+        let font = self.mem.r16(DS, 0x103A);
+        self.mem.w16(DS, 0xB038, font);
+        hooks.message_box_far(self, seg, 0);
+        self.heap_free(seg);
+        self.mem.w8(DS, 0xAFF9, 2);
         Some(())
     }
 

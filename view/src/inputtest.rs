@@ -543,8 +543,18 @@ fn inventory_by_i_and_a_click_equips_as_panels_do() {
     panels::equip_line(&mut b.engine.m, 0, &mut said);
     same(&a, &b, "line 0 clicked and panels::equip_line(0)");
     assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), said.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), "the same boxes said");
-    // A box up takes the next key (it is read); then I closes the panel.
+    // A refusal is drawn in the list's panel (1194:223A), not boxed.
+    let shown = match &a.panel {
+        Some(panels::Panel::Inventory(inv)) => inv.info.as_ref().map(|l| l[0].0.clone()),
+        _ => None,
+    };
+    assert_eq!(shown, said.panel, "the same refusal in the panel");
+    // A box up takes the next key (it is read), as a refusal in the
+    // panel does (1194:5536); then I closes the panel.
     while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    if shown.is_some() {
         d.key(&mut a, KeyCode::Enter, None);
     }
     d.key(&mut a, KeyCode::KeyI, None);
@@ -2043,4 +2053,23 @@ fn a_riddle_answered_wrong_shows_its_text_again() {
     let Some((shown, wall)) = riddle_answered("water") else { return };
     assert_eq!(shown, 0xFF00, "the wrong answer's text");
     assert_eq!(wall, 0xB000, "the door shut");
+}
+
+/// An item's description (a right click on its line, 1194:1988) is
+/// dismissed by a key as by a click (1194:5536: ACB0 or AFF9), the key
+/// doing nothing more: Esc doesn't leave the screen.
+#[test]
+fn an_items_description_is_dismissed_by_a_key() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    named(&mut a);
+    // A weapon given (`--do give`).
+    panels::give(&mut a.engine.m, 1);
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyK, None);
+    d.key(&mut a, KeyCode::KeyN, None);
+    d.click(&mut a, 60, 51, MouseButton::Right);
+    assert!(matches!(&a.panel, Some(panels::Panel::Inventory(inv)) if inv.info.is_some()), "the first line described");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(matches!(&a.panel, Some(panels::Panel::Inventory(inv)) if inv.info.is_none()), "Esc took the description away, not the screen");
 }

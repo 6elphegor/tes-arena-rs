@@ -3,8 +3,17 @@ screenfade | equipment | 28 | c63880118b2d904d
 screenfade | equipmentpick | 28 | c63880118b2d904d
 screenfade | equipmentspells | 28 | c63880118b2d904d
 screenfade | equipmentdown | 28 | c63880118b2d904d
+screenfade | equipmentquests | 28 | c63880118b2d904d
+screenfade | equipmentquestinfo | 28 | c63880118b2d904d
+screenfade | equipmentquestequip | 28 | c63880118b2d904d
 screenfade | equipmentinfo | 28 | c63880118b2d904d
 screenfade | equipmentoff | 28 | c63880118b2d904d
+screenfade | equipmentspellpage | 30 | 60223a0222993c8b
+screenfade | equipmentspellnext | 31 | bbc8aa575ea027a1
+screenfade | equipmentspellprev | 31 | bbc8aa575ea027a1
+screenfade | equipmentspelldelete | 30 | 60223a0222993c8b
+screenfade | equipmentspelldeleted | 31 | bbc8aa575ea027a1
+screenfade | equipmentspellexit | 57 | 3845aa8d6b1e4965
 screenfade | logbook | 27 | 6e85f83479df0314
 screenfade | logbookmore | 27 | 6e85f83479df0314
 screenfade | worldmap | 42 | 9eb220110e8f5f09
