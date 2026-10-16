@@ -261,7 +261,7 @@ impl Panel {
         };
         Some(crate::hud::Menu {
             title: Vec::new(),
-            entries: names.into_iter().map(|n| vec![Span { colour: 0xFD, text: n }]).collect(),
+            entries: names.into_iter().map(|n| vec![Span { colour: 0xFD, text: n, font: Default::default() }]).collect(),
             keys: Vec::new(),
             selected,
             list: true,
@@ -426,7 +426,7 @@ fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
 /// The drop's question as the original's yes-or-no menu (1194:48E9 ->
 /// 020E), entry `sel` highlighted.
 pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
-    let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string() }];
+    let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default() }];
     crate::hud::Menu {
         title: crate::hud::lines(text, 0x0F),
         entries: vec![line("Yes"), line("No")],
@@ -463,7 +463,7 @@ pub fn use_pick(m: &mut Machine, files: &mut arena::bsa::Files, pick: u16, said:
 pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
     crate::hud::Menu {
         title: crate::hud::lines(b"Use which item?", 0x0F),
-        entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone() }]).collect(),
+        entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone(), font: Default::default() }]).collect(),
         keys: Vec::new(),
         selected: sel,
         list: false,

@@ -61,6 +61,42 @@ impl Font {
 pub struct Span {
     pub colour: u8,
     pub text: String,
+    /// The font the game had selected when it drew the text (B036), for
+    /// the boxes: a box is drawn in its first span's.
+    pub font: GameFont,
+}
+
+/// The fonts the program's start loads and the routines select by
+/// copying their word to B036 (`world::fonts_load`): FONT_A.DAT ([1026]),
+/// FONT_B.DAT ([1028]), ARENAFNT.DAT ([102C]), TEENYFNT.DAT ([102E]).
+/// ARENAFNT where B036 holds none of them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GameFont {
+    A,
+    B,
+    #[default]
+    Arena,
+    Teeny,
+}
+
+impl GameFont {
+    /// The font B036 selects.
+    pub fn selected(m: &arena::machine::Machine) -> GameFont {
+        let r = |at| m.mem.r16(arena::mem::DS, at);
+        let b036 = r(0xB036);
+        [(0x1026, GameFont::A), (0x1028, GameFont::B), (0x102C, GameFont::Arena), (0x102E, GameFont::Teeny)]
+            .into_iter()
+            .find(|&(at, _)| r(at) != 0 && r(at) == b036)
+            .map_or(GameFont::Arena, |(_, f)| f)
+    }
+}
+
+/// `lines` with every span in `font`.
+pub fn in_font(mut lines: Vec<Vec<Span>>, font: GameFont) -> Vec<Vec<Span>> {
+    for s in lines.iter_mut().flatten() {
+        s.font = font;
+    }
+    lines
 }
 
 /// The game's text at DS:`at` split into lines of coloured spans: `\t`
@@ -74,7 +110,7 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
     let mut cur = String::new();
     let flush = |out: &mut Vec<Vec<Span>>, cur: &mut String, colour: u8| {
         if !cur.is_empty() {
-            out.last_mut().unwrap().push(Span { colour, text: std::mem::take(cur) });
+            out.last_mut().unwrap().push(Span { colour, text: std::mem::take(cur), font: Default::default() });
         }
     };
     let mut i = 0;
@@ -83,7 +119,7 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
             b'\t' if bytes.get(i + 1..i + 4).is_some_and(|d| d.iter().all(u8::is_ascii_digit)) => {
                 flush(&mut out, &mut cur, colour);
                 let col = String::from_utf8_lossy(&bytes[i..i + 4]).into_owned();
-                out.last_mut().unwrap().push(Span { colour, text: col });
+                out.last_mut().unwrap().push(Span { colour, text: col, font: Default::default() });
                 i += 3;
             }
             b'\t' => {
@@ -97,7 +133,7 @@ pub fn lines(bytes: &[u8], colour: u8) -> Vec<Vec<Span>> {
                 flush(&mut out, &mut cur, colour);
                 // A line its break ended: an empty span at its end (0000:965A
                 // centres such a line in its box).
-                out.last_mut().unwrap().push(Span { colour, text: String::new() });
+                out.last_mut().unwrap().push(Span { colour, text: String::new(), font: Default::default() });
                 out.push(Vec::new());
                 // \r\n is one break.
                 if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
@@ -470,6 +506,25 @@ pub struct Style {
     kinds: Vec<ListKind>,
     /// The list in the bar's corner (`BAR_LIST`).
     bar: ListKind,
+    /// FONT_B.DAT ([1028]), for a box drawn in it.
+    font_b: Option<Font>,
+}
+
+impl Style {
+    /// The font a box's text selected (`Span::font`).
+    fn font(&self, f: GameFont) -> &Font {
+        match f {
+            GameFont::A => &self.menu_font,
+            GameFont::B => self.font_b.as_ref().unwrap_or(&self.box_font),
+            GameFont::Arena => &self.box_font,
+            GameFont::Teeny => &self.list_font,
+        }
+    }
+
+    /// The font a box with `lines` is drawn in: its first span's.
+    fn box_font_of(&self, lines: &[Vec<Span>]) -> &Font {
+        self.font(lines.iter().flatten().next().map_or(GameFont::Arena, |s| s.font))
+    }
 }
 
 /// `Menu::kind` of the list 2542:06F8 shows in the bar's bottom right
@@ -563,7 +618,8 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
         kind("NEWPOP.IMG", RECORD_5006, 0xFD, None),
     ];
     let bar = kind("", RECORD_5AF4, 0xFD, None);
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds, bar });
+    let font_b = Font::load(archive, "FONT_B.DAT");
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, kinds, bar, font_b });
 }
 
 /// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
@@ -594,9 +650,15 @@ fn box_size_margin(st: &Style, font: &Font, lines: &[Vec<Span>], margin: i32) ->
     let (mut w, mut h) = (text_w + 2 * margin, lines.len() as i32 * (font.h as i32 + 1) + 2 * margin);
     let rw = (tw - w % tw) % tw;
     let rh = (th - h % th) % th;
+    // The text's x (A84E) is the margin plus the box's left edge centred
+    // on the width before it is rounded up to whole tiles (96F1), then
+    // half the rounding (9798); the box's edge is centred on the rounded
+    // width (97EE). Its y (A850) has half the rounding, up, then the
+    // box's top added after (9817).
+    let tx = (w + rw) / 2 - w / 2 + margin + rw / 2;
     w += rw;
     h += rh;
-    (w, h, margin + rw / 2, margin + (rh + 1) / 2)
+    (w, h, tx, margin + (rh + 1) / 2)
 }
 
 /// The box 965A draws for the text `text` with CX 7 (the town's welcome,
@@ -637,7 +699,7 @@ fn clip(hud: &Hud) -> (i32, i32, i32, i32) {
 /// or at the clip's top when a menu is up with it (the view shows both).
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
     let lines = hud.boxed.as_ref()?;
-    let (w, h, _, _) = box_size(st, &st.box_font, lines);
+    let (w, h, _, _) = box_size(st, st.box_font_of(lines), lines);
     let c = clip(hud);
     let x = (c.0 + c.2) / 2 - w / 2;
     let y = match &hud.menu {
@@ -712,14 +774,14 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
         for word in text.split_whitespace() {
             let next = if cur.is_empty() { word.to_string() } else { format!("{cur} {word}") };
             if font.width(&next) as i32 > max && !cur.is_empty() {
-                out.push(vec![Span { colour, text: std::mem::take(&mut cur) }]);
+                out.push(vec![Span { colour, text: std::mem::take(&mut cur), font: Default::default() }]);
                 cur = word.to_string();
             } else {
                 cur = next;
             }
         }
         if !cur.is_empty() {
-            out.push(vec![Span { colour, text: cur }]);
+            out.push(vec![Span { colour, text: cur, font: Default::default() }]);
         }
     }
     out
@@ -772,12 +834,12 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
     }
     let c = clip(hud);
     if let Some(s) = &hud.status {
-        let lines = vec![vec![Span { colour: 0x0F, text: s.clone() }]];
+        let lines = vec![vec![Span { colour: 0x0F, text: s.clone(), font: Default::default() }]];
         let (w, h, _, _) = box_size(st, &st.box_font, &lines);
         draw_box(screen, st, &st.box_font, ((c.0 + c.2) / 2 - w / 2, c.3 - h - 2, w, h), &lines, 0x0F);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
-        draw_box(screen, st, &st.box_font, r, lines, 0x60);
+        draw_box(screen, st, st.box_font_of(lines), r, lines, 0x60);
     }
     if let Some(menu) = &hud.menu {
         if menu.list {
@@ -1145,7 +1207,7 @@ mod tests {
     fn lines_split_colours_and_breaks() {
         let l = lines(b"\t\xc0 CAMP\r\t\xc0C\t\xd4amp\r", 0x0F);
         assert_eq!(l.len(), 2);
-        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into() }, Span { colour: 0xC0, text: String::new() }]);
+        assert_eq!(l[0], vec![Span { colour: 0xC0, text: " CAMP".into(), font: Default::default() }, Span { colour: 0xC0, text: String::new(), font: Default::default() }]);
         assert_eq!(plain(&l[1]), "Camp");
         assert_eq!(l[1][1].colour, 0xD4);
     }

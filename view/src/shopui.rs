@@ -113,7 +113,7 @@ struct ShopFront<'a, 'b> {
 }
 
 fn line(s: &str) -> Vec<Span> {
-    vec![Span { colour: 0x0F, text: s.to_string() }]
+    vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]
 }
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a

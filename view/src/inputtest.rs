@@ -750,7 +750,7 @@ fn a_movie_takes_keys_and_holds_the_game() {
     let mut a = app(&dir, &Start::default());
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
-    let line = |t: &str| vec![hud::Span { colour: 0x0F, text: t.to_string() }];
+    let line = |t: &str| vec![hud::Span { colour: 0x0F, text: t.to_string(), font: Default::default() }];
     let lines = (0..7).map(|i| line(&format!("line {i}"))).collect();
     let mv = flc::Movie::new(&a.assets.archive, "VISION.FLC", lines).expect("VISION.FLC");
     a.movies.push_back(mv);

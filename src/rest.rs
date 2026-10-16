@@ -155,10 +155,15 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:42EE / 2433:12E2: the text colours for a message (0000:9AE6,
-    /// 9AF8 are the drawing's), the colour byte 60h.
+    /// 1194:42EE / 2433:12E2, with AX [1026] as every caller loads it: the
+    /// message's font FONT_A.DAT (0000:9AE6: B036), its box tiles [1036]
+    /// (9AF8: B038) and the colour byte 60h.
     fn rest_colours(&mut self) {
+        let font = self.r_g16(0x1026);
+        self.mem.w16(DS, 0xB036, font);
         self.mem.w8(DS, COLOUR, 0x60);
+        let tiles = self.r_g16(0x1036);
+        self.mem.w16(DS, 0xB038, tiles);
     }
 
     /// 1194:59CC with the colours first.

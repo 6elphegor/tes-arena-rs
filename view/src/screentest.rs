@@ -225,3 +225,29 @@ fn the_spellmaker_as_the_original_draws_it() {
         layer,
     );
 }
+
+/// R: camping (2542:01E6, 1194:424E), refused in the guild: its box.
+#[test]
+fn camping_refused_as_the_original_draws_it() {
+    screen(
+        "camp",
+        |a, d| {
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+        },
+        over,
+    );
+}
+
+/// Shift+M: the world map (2542:03BF), refused inside: its box.
+#[test]
+fn the_world_map_refused_as_the_original_draws_it() {
+    screen("travelmap", |a, d| super::press(d, a, KeyCode::KeyM, true), over);
+}
+
+/// M: the automap (2542:045A, 0000:2CFE).
+#[test]
+#[ignore = "not yet the original's"]
+fn the_automap_as_the_original_draws_it() {
+    screen("automap", |a, d| d.key(a, KeyCode::KeyM, Some("m")), layer);
+}

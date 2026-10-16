@@ -172,7 +172,8 @@ impl Talk {
         if self.need.is_some() {
             return;
         }
-        let lines = text_at(m, si, 0x0F);
+        // In the font the caller selected (B036), as 965A draws it.
+        let lines = hud::in_font(text_at(m, si, 0x0F), hud::GameFont::selected(m));
         for l in &lines {
             println!("{}", hud::plain(l));
         }
@@ -186,7 +187,7 @@ impl Talk {
             return;
         }
         println!("{s}");
-        let lines = vec![vec![Span { colour: 0x0F, text: s.to_string() }]];
+        let lines = vec![vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]];
         self.boxes.push(lines.clone());
         self.since_answer.push(lines);
     }
@@ -218,7 +219,7 @@ impl Talk {
             let mut entry: Vec<Span> = Vec::new();
             for l in hud::lines(s, 0x0F) {
                 if !entry.is_empty() && !l.is_empty() {
-                    entry.push(Span { colour: 0x0F, text: "\t000".into() });
+                    entry.push(Span { colour: 0x0F, text: "\t000".into(), font: Default::default() });
                 }
                 entry.extend(l);
             }

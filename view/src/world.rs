@@ -43,6 +43,25 @@ pub const WALL_SHIFT: u32 = 1;
 /// Map squares are 128 units across.
 pub const SQUARE: f32 = 128.0;
 
+/// The fonts the program's start loads (21EE:0066..008F, each by
+/// 0000:7504: the file whole in a heap block of its own, its segment in
+/// the fonts' table at 91AC): FONT_A.DAT at [1026], FONT_B.DAT [1028],
+/// ARENAFNT.DAT [102C], TEENYFNT.DAT [102E]. The game's routines select a
+/// font by copying one of these words to B036 (0000:9AE6), which is how
+/// the view tells which font a box is drawn in (`hud::Span::font`).
+pub fn fonts_load(m: &mut Machine, dir: &Path) {
+    let archive = crate::archive::Archive::open(dir);
+    for (k, (name, at)) in [("FONT_A.DAT", 0x1026u16), ("FONT_B.DAT", 0x1028), ("ARENAFNT.DAT", 0x102C), ("TEENYFNT.DAT", 0x102E)].into_iter().enumerate() {
+        let Some(d) = archive.read(name) else { continue };
+        let Some((seg, _)) = m.heap_alloc(d.len().div_ceil(16).min(0xFFFF) as u16) else { continue };
+        for (i, &b) in d.iter().enumerate().take(0xFFFF) {
+            m.mem.w8(seg, i as u16, b);
+        }
+        m.mem.w16(DS, 0x91AC + 2 * k as u16, seg);
+        m.mem.w16(DS, at, seg);
+    }
+}
+
 /// Loads `level` (a .MIF) from the game in `dir` into an engine and
 /// enters it, as examples/play.rs does.
 pub fn load(dir: &Path, level: &str) -> Engine {
@@ -51,6 +70,7 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let mut files = Files::new(dir).expect("game directory");
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     m.heap_init(0xA000, 0xF000).expect("heap");
+    fonts_load(&mut m, dir);
     // The sound driver's buffer (EB89), FFDCh bytes as the program's
     // start allocates them (2294:CEDB): the level's sound files are read
     // through it on their way to EMS (23BA:0217, `sound_load`). The

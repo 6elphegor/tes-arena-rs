@@ -2017,7 +2017,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                 };
                 println!("{msg}");
-                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg }]]];
+                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default() }]]];
             }
             "key" => {
                 // A key (its scan code) down for a frame.
@@ -3228,7 +3228,7 @@ impl App {
     /// A box of the view's own.
     fn say(&mut self, s: &str) {
         println!("{s}");
-        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string() }]]);
+        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default() }]]);
     }
 
     /// What the HUD shows now.
