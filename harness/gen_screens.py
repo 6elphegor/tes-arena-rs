@@ -22,12 +22,24 @@ mask's (only where the screen leaves pixels undrawn) over a byte a pixel,
 1 drawn. With --dump DIR, NAME.page, NAME.mask and NAME.dac are written
 to DIR as well, for screentest's diff images (game pictures: never
 commit them).
+
+The colours on the way to the first pass's wait, at each wait for the
+retrace (0000:6BB8, 9B77: a fade to black, the screen's colours set in
+three parts), each kept when different from the one before, go to
+screenfades.txt beside OUT for the screens with more than one:
+
+  screenfade | NAME | <count> | <digest>
+
+the digest the FNV-1a over each state's FNV-1a (8 bytes, little-endian)
+in turn; with --dump, NAME.fade holds them (768 bytes each).
 """
 import os
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from emu import fnv
+from emu import LOAD_SEG, fnv
+from unicorn import UC_HOOK_CODE
 from screens import ScreenArena, PAGE_SEG_FIELD
 
 # The menu keys' handlers in play (2542:0100's), run as a key runs them
@@ -358,13 +370,29 @@ def main():
     a.start()
     base = a.snapshot()
     out = open(OUT, 'w', buffering=1)
+    fades = open(os.path.join(os.path.dirname(os.path.abspath(OUT)), 'screenfades.txt'), 'w', buffering=1)
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     for name, (handler, script, *waits) in SCREENS.items():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
         at = place(a, base, WHERE[name]) if name in WHERE else base
+        # The colours at each wait for the retrace on the way (0000:6BB8,
+        # 9B77): a fade, its colours set in parts.
+        seen = []
+
+        def sample(*_):
+            if not seen or seen[-1] != bytes(a.dac):
+                seen.append(bytes(a.dac))
+        hooks = [a.mu.hook_add(UC_HOOK_CODE, sample, None, a.lin(LOAD_SEG, o), a.lin(LOAD_SEG, o)) for o in (0x6BB8, 0x9B77)]
         p0, dac = draw(a, at, name, handler, script, 0x00, *waits)
+        for h in hooks:
+            a.mu.hook_del(h)
+        if len(seen) > 1:
+            fades.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
+            if dump:
+                os.makedirs(dump, exist_ok=True)
+                open(os.path.join(dump, f'{name}.fade'), 'wb').write(b''.join(seen))
         p1, _ = draw(a, at, name, handler, script, 0xFF, *waits)
         mask = bytes(int(x == y) for x, y in zip(p0, p1))
         page = bytes(x if k else 0 for x, k in zip(p0, mask))
@@ -375,6 +403,7 @@ def main():
             for ext, data in (('page', page), ('mask', mask), ('dac', dac)):
                 open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
     out.close()
+    fades.close()
 
 
 if __name__ == '__main__':

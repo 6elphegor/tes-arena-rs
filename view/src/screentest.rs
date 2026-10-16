@@ -148,8 +148,38 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
     };
     let (mut a, mut d) = loaded(&dir, &save);
     open(&mut a, &mut d);
+    check_fade(name, &mut a);
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
+}
+
+/// The colours the screen's opening showed (`App::fade`, each different
+/// from the one before) against the original's on its way to the screen
+/// (tests/vectors/screenfades.txt: their count and digest; a screen not
+/// there shows one at most); the fade then over.
+fn check_fade(name: &str, a: &mut App) {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/screenfades.txt")).expect("tests/vectors/screenfades.txt");
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[1] == name).map(|f| (f[2].parse::<usize>().unwrap(), u64::from_str_radix(f[3], 16).unwrap()));
+    let mut seen: Vec<u64> = Vec::new();
+    let mut raw: Vec<u8> = Vec::new();
+    for (dac, _) in a.fade.drain(..) {
+        let six: Vec<u8> = dac.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+        let d = fnv(six.iter().copied());
+        if seen.last() != Some(&d) {
+            seen.push(d);
+            raw.extend(six);
+        }
+    }
+    // With ARENA_SCREENS, the view's colours beside the original's
+    // (NAME.fade there).
+    if let Ok(dir) = std::env::var("ARENA_SCREENS") {
+        let _ = std::fs::write(PathBuf::from(dir).join(format!("{name}.viewfade")), &raw);
+    }
+    a.fade_old = None;
+    match want {
+        Some((n, digest)) => assert_eq!((seen.len(), fnv(seen.iter().flat_map(|d| d.to_le_bytes()))), (n, digest), "{name}: its fade differs from the original's"),
+        None => assert!(seen.len() <= 1, "{name}: a fade the original doesn't show ({} colours)", seen.len()),
+    }
 }
 
 /// F1: the character sheet (2542:00BE, 1194:0CF8), its first page.
@@ -457,6 +487,9 @@ fn the_world_map_as_the_original_draws_it() {
         "worldmap",
         |a, d| {
             area_left(a);
+            // The street drawn, as the window draws it before a key (its
+            // sky's colours in the DAC the fade starts from).
+            a.assets.drawn(&mut a.engine, 1.6);
             super::press(d, a, KeyCode::KeyM, true);
         },
         layer,

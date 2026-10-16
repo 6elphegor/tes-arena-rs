@@ -340,6 +340,7 @@ pub fn column(s: &Span) -> Option<i32> {
 /// The layer: RGBA, (0, 0, 0, 0) where nothing is drawn, and the palette
 /// colour each drawn pixel has (`NONE` where nothing is), for recolouring
 /// through a table as the original's 0000:9D84 recolours the screen.
+#[derive(Clone)]
 pub struct Screen {
     pub px: Vec<[u8; 4]>,
     idx: Vec<u16>,
@@ -367,9 +368,20 @@ impl Screen {
     }
 
     /// The colours drawn with (for the screen check).
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn palette(&self) -> &[[u8; 4]; 256] {
         &self.palette
+    }
+
+    /// The pixels drawn shown in `palette` from now on, as the DAC's
+    /// colours changing (a fade) show the screen's (their alpha kept).
+    pub fn recolour(&mut self, palette: [[u8; 4]; 256]) {
+        self.palette = palette;
+        for (p, &i) in self.px.iter_mut().zip(&self.idx) {
+            if i != NONE {
+                let c = palette[i as usize];
+                *p = [c[0], c[1], c[2], p[3]];
+            }
+        }
     }
 
     /// The colours from now on (the character sheet's screens have their

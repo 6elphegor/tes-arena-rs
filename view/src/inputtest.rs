@@ -1228,6 +1228,8 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     let before = notes_drawn(&a);
     d.key(&mut a, KeyCode::KeyM, None);
     assert!(a.map);
+    // The automap's fade in passed.
+    a.fade.clear();
     a.compose();
     let bare = a.screen.px.clone();
     d.click(&mut a, 100, 100, MouseButton::Left);

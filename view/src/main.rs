@@ -1359,6 +1359,9 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         creation,
         creation_engine: None,
         movie_at: Instant::now(),
+        fade: Default::default(),
+        fade_ms: 0,
+        fade_old: None,
     }
 }
 
@@ -2524,6 +2527,12 @@ struct App {
     creation_engine: Option<Engine>,
     /// When the screens' movie last advanced.
     movie_at: Instant,
+    /// A screen opening as the original opens it (`fade_open`): the
+    /// colours at each wait for the retrace, one a retrace (14 ms), and
+    /// whether the screen before is still shown (`fade_old`).
+    fade: std::collections::VecDeque<(film::Dac, bool)>,
+    fade_ms: u32,
+    fade_old: Option<hud::Screen>,
 }
 
 impl App {
@@ -2617,7 +2626,7 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some() {
+        if self.waiting() || !self.fade.is_empty() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some() {
             return;
         }
         let k = &self.keys;
@@ -2725,15 +2734,28 @@ impl App {
                 self.engine.files.clone_from(&w.0 .1);
                 self.travel = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
             }
-            if let dialog::Need::Spend(snap) = &need {
-                let mut e = Engine::new((*snap.0).clone(), self.engine.files.clone());
-                let c = create::Creation::level_up(&mut e.m, self.assets.archive.clone(), &self.dir, self.assets.palette);
-                self.creation = Some(c);
-                self.creation_engine = Some(e);
-            }
+            // The spellmaker's screen with its colours set (1194:6064,
+            // 0000:57DD). (A level's attribute screen fades in after its
+            // notice, `box_read`.)
+            let fade = match &need {
+                dialog::Need::Spellmaker => Some(0),
+                _ => None,
+            };
             let maker = talk.maker.take();
             let backdrop = talk.backdrop.take();
-            self.pending = Some(Pending { before, input, given, need, maker, backdrop });
+            let take = move |a: &mut App| {
+                if let dialog::Need::Spend(snap) = &need {
+                    let mut e = Engine::new((*snap.0).clone(), a.engine.files.clone());
+                    let c = create::Creation::level_up(&mut e.m, a.assets.archive.clone(), &a.dir, a.assets.palette);
+                    a.creation = Some(c);
+                    a.creation_engine = Some(e);
+                }
+                a.pending = Some(Pending { before, input, given, need, maker, backdrop });
+            };
+            match fade {
+                Some(steps) => self.fade_open(steps, 0, take),
+                None => take(self),
+            }
             if self.captured {
                 self.release();
             }
@@ -2842,6 +2864,14 @@ impl App {
             if let Some(l) = &self.live {
                 l.draw(&mut self.screen, false);
             }
+        }
+        // A screen opening: the screen before while it fades, then the new
+        // one's colours set.
+        if let Some(&(dac, old)) = self.fade.front() {
+            if let Some(o) = self.fade_old.as_ref().filter(|_| old) {
+                self.screen = o.clone();
+            }
+            self.screen.recolour(dac);
         }
         if prof::on() {
             prof::add("redraw.screen", t.elapsed());
@@ -3005,7 +3035,9 @@ impl App {
     fn open_travel(&mut self) {
         match travel::Travel::open(&mut self.engine, &self.assets.archive) {
             Ok(t) => {
-                self.travel = Some(t);
+                // 26F7:0000: the screen faded out in 8 steps, the map's
+                // colours faded in in 6.
+                self.fade_open(8, 6, |a| a.travel = Some(t));
                 if self.captured {
                     self.release();
                 }
@@ -3072,6 +3104,7 @@ impl App {
         let mut said = panels::Said::default();
         let m = &mut self.engine.m;
         let mut cast = None;
+        let mut page = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 if let Some((names, sel)) = inv.using.as_mut() {
@@ -3148,7 +3181,7 @@ impl App {
             }
             Some(panels::Panel::Sheet) => match code {
                 // 3276:52B0's records: 'N' the equipment page, Esc leaves.
-                KeyCode::KeyN => self.panel = Some(panels::equipment_page(m)),
+                KeyCode::KeyN => page = true,
                 KeyCode::Escape | KeyCode::KeyK => self.panel = None,
                 _ => {}
             },
@@ -3159,12 +3192,20 @@ impl App {
             },
             None => {}
         }
+        if page {
+            self.equipment_page();
+        }
         if let Some(line) = cast {
             self.panel = None;
             let sel = panels::book_pick(&mut self.engine.m, line);
             panels::cast(&mut self.engine, sel, &mut said);
         }
         self.boxes.extend(said.boxes);
+    }
+
+    /// The sheet's equipment page (1194:0D67): its colours set again (9B56).
+    fn equipment_page(&mut self) {
+        self.fade_open(0, 0, |a| a.panel = Some(panels::equipment_page(&mut a.engine.m)));
     }
 
     /// A click with a panel up (`right`: the right button): an inventory
@@ -3230,7 +3271,7 @@ impl App {
                 }
             }
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
-                Some(sheets::SheetClick::Equipment) => self.panel = Some(panels::equipment_page(&mut self.engine.m)),
+                Some(sheets::SheetClick::Equipment) => self.equipment_page(),
                 Some(sheets::SheetClick::Done) => self.panel = None,
                 None => {}
             },
@@ -3278,18 +3319,30 @@ impl App {
         }
     }
 
+    /// The automap screen left (0000:2EC8..2EF2): faded out in 12 steps,
+    /// the world drawn and faded in to its colours (999E) in 12.
+    fn close_automap(&mut self) {
+        self.fade_open(12, 12, |a| {
+            automap::close(&mut a.engine.m);
+            a.map = false;
+        });
+    }
+
     /// What a bar button (or the menu key with its handler) asks for.
     fn bar_action(&mut self, a: sheets::BarAction) {
         match a {
             sheets::BarAction::None => {}
             sheets::BarAction::WorldMap => self.open_travel(),
-            sheets::BarAction::Automap => {
-                automap::open(&mut self.engine, &self.assets.archive);
-                self.map = true;
-            }
+            // 0000:2D3E..2DAE: the screen faded out in 12 steps, the
+            // automap drawn and faded in in 12.
+            sheets::BarAction::Automap => self.fade_open(12, 12, |a| {
+                automap::open(&mut a.engine, &a.assets.archive);
+                a.map = true;
+            }),
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
             sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
-            sheets::BarAction::Log => self.panel = Some(panels::Panel::Log(sheets::open_log(&self.engine.m, &self.engine.files))),
+            // 27E3:0088: the screen faded out in 8 steps first.
+            sheets::BarAction::Log => self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Log(sheets::open_log(&a.engine.m, &a.engine.files)))),
             // 2542:066A: no list without an item to use (127C 0).
             sheets::BarAction::Use => {
                 let names = panels::usable_names(&self.engine.m);
@@ -3298,7 +3351,8 @@ impl App {
                 }
             }
             sheets::BarAction::Camp => self.camp = true,
-            sheets::BarAction::Sheet => self.panel = Some(panels::Panel::Sheet),
+            // 1194:0CF8: the screen faded out in 8 steps first.
+            sheets::BarAction::Sheet => self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Sheet)),
         }
     }
 
@@ -3323,13 +3377,58 @@ impl App {
         self.turn(before, input, Vec::new(), true);
     }
 
+    /// A screen opened by `open` as the original opens it: the screen
+    /// shown faded to black in `steps` (0000:5E3E; 0: none), then the new
+    /// screen's colours faded in in `fade_in` steps (0, 1: set at once,
+    /// 9B56's three parts), each wait for the retrace a frame (`fade`).
+    fn fade_open(&mut self, steps: i16, fade_in: i16, open: impl FnOnce(&mut Self)) {
+        // From where a fade under way ends.
+        let queued = std::mem::take(&mut self.fade);
+        self.compose();
+        let mut from = *self.screen.palette();
+        // The world seen outdoors: its sky's colours in entries 1..8 and the
+        // lamps' in 71h, as the game sets them in the DAC (`set_sky`).
+        let world = self.panel.as_ref().is_none_or(|p| p.over_play()) && !self.map && self.travel.is_none() && self.creation.is_none() && self.movies.is_empty();
+        // (The frame's view as last drawn: drawing one runs the game's view
+        // routines, which a screen opening mustn't.)
+        if let Some((sky, _, _)) = self.assets.frame_view.as_ref().filter(|_| world) {
+            if sky.outdoors {
+                for (i, c) in sky.colours.iter().enumerate() {
+                    from[1 + i] = [c[0], c[1], c[2], from[1 + i][3]];
+                }
+                if let Some(c) = sky.lamp {
+                    from[0x71] = [c[0], c[1], c[2], from[0x71][3]];
+                }
+            }
+        }
+        let before = self.screen.clone();
+        open(self);
+        self.compose();
+        let to = *self.screen.palette();
+        self.fade = queued;
+        let mut film = film::Film::new(Vec::new(), from);
+        if steps > 0 {
+            film.fade(&[[0, 0, 0, 0xFF]; 256], steps);
+        }
+        let out = film.frames.len();
+        if fade_in > 1 {
+            film.fade(&to, fade_in);
+        } else {
+            film.colours(&to);
+        }
+        self.fade.extend(film.frames.into_iter().enumerate().map(|(i, (_, dac))| (dac, i < out)));
+        if out > 0 {
+            self.fade_old = Some(before);
+        }
+    }
+
     /// The character sheet (K, the view's: the portrait without its
     /// touch cast).
     fn open_sheet(&mut self) {
         sheets::pics(&self.assets.archive, &self.engine.m);
         // As the portrait does before its sheet (1194:5F13).
         self.engine.m.drop_place();
-        self.panel = Some(panels::Panel::Sheet);
+        self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Sheet));
     }
 
     /// A box of the view's own.
@@ -3374,7 +3473,7 @@ impl App {
         use winit::keyboard::KeyCode;
         if !self.boxes.is_empty() {
             if matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape) {
-                self.boxes.pop_front();
+                self.box_read();
             }
             return;
         }
@@ -3463,10 +3562,21 @@ impl App {
         }
     }
 
+    /// A box read. The last before a level's attribute screen (its notice)
+    /// gives way to it as 2686:02D8 does: the screen faded out in 8
+    /// steps, the screen's colours set.
+    fn box_read(&mut self) {
+        self.boxes.pop_front();
+        if self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))) {
+            let c = self.creation.take();
+            self.fade_open(8, 0, |a| a.creation = c);
+        }
+    }
+
     /// A click while the game waits: a box read, or a menu's entry picked.
     fn dialog_click(&mut self) {
         if !self.boxes.is_empty() {
-            self.boxes.pop_front();
+            self.box_read();
             return;
         }
         let (x, y) = self.screen_point();
@@ -3595,6 +3705,8 @@ impl App {
                 }
             }
             In::Button { .. } | In::Key { .. } if self.saveui.is_some() => {}
+            // A level's notice read before its attribute screen.
+            In::Button { down: true, button: MouseButton::Left } if self.creation.is_some() && !self.boxes.is_empty() => self.box_read(),
             In::Button { button, down } if self.creation.is_some() => {
                 if down && button == MouseButton::Left {
                     let (x, y) = self.screen_point();
@@ -3658,8 +3770,7 @@ impl App {
             In::Button { down: true, .. } if self.map => {
                 let (x, y) = self.screen_point();
                 if automap::exit_at(x, y) {
-                    automap::close(&mut self.engine.m);
-                    self.map = false;
+                    self.close_automap();
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
                     self.engine.m.automap_origin();
@@ -3702,8 +3813,7 @@ impl App {
                     let b = match code {
                         _ if !down => return,
                         KeyCode::Escape | KeyCode::KeyM => {
-                            automap::close(&mut self.engine.m);
-                            self.map = false;
+                            self.close_automap();
                             return;
                         }
                         KeyCode::ArrowUp => 0,
@@ -3786,6 +3896,16 @@ impl App {
     /// a frame taking `frame_ticks`). While the game waits for the player,
     /// no time passes.
     fn tick(&mut self, now: Instant) {
+        if !self.fade.is_empty() {
+            self.fade_ms += now.duration_since(self.movie_at).as_millis() as u32;
+            while self.fade_ms >= film::RETRACE_MS && self.fade.pop_front().is_some() {
+                self.fade_ms -= film::RETRACE_MS;
+            }
+            if self.fade.is_empty() {
+                self.fade_ms = 0;
+                self.fade_old = None;
+            }
+        }
         if let Some(mv) = self.movies.front_mut() {
             mv.advance(now.duration_since(self.movie_at).as_millis() as u32);
             if mv.over {
@@ -3898,6 +4018,7 @@ impl winit::application::ApplicationHandler for App {
                     g.renderer.set_sky(sky);
                     g.renderer.set_lights(lights);
                     g.renderer.set_window(interface::window(&self.engine.m));
+                    g.renderer.set_fade(self.fade.front().map(|f| &f.0));
                     g.renderer.draw(&g.device, &g.queue, &view, g.config.width, g.config.height, cam, &sprites);
                     g.overlay.draw(&g.device, &g.queue, &view, &self.screen);
                     frame.present();
