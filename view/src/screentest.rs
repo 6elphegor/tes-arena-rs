@@ -1572,6 +1572,33 @@ fn a_taverns_name_looked_at_as_the_original_draws_it() {
     );
 }
 
+/// The boat boarded (2294:0DD0, `Machine::board_boat`, its record at
+/// FFE0h at the player's place, as gen_screens.py's `boat`): its prow
+/// (0000:395E) and "Hit 'J' to exit boat." on the message line.
+#[test]
+fn the_boats_prow_as_the_original_draws_it() {
+    screen(
+        "boatprow",
+        |a, _d| {
+            let m = &mut a.engine.m;
+            let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+            m.mem.w16(DS, 0xFFE0, x);
+            m.mem.w16(DS, 0xFFE4, y);
+            a.engine.m.board_boat(&mut a.engine.files, 0xFFE0).expect("the boat boarded");
+        },
+        |a| {
+            a.compose();
+            let hud = a.hud();
+            let mut s = hud::Screen::new(a.assets.dac());
+            a.assets.interface.boat_prow(&mut s, &a.engine.m);
+            hud::compose_over(&mut s, &a.font, &hud);
+            let idx = s.indices().to_vec();
+            let dac = s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+            (idx, dac)
+        },
+    );
+}
+
 /// gen_screens.py's `leveled`: the player's XP (05AD) the least past the
 /// next level's threshold (2686:0333's: from the class's first, DATA:47AE,
 /// each times 30/16 up to the ninth level's, 24/16 on) and the level's

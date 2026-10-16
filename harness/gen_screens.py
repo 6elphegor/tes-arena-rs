@@ -354,6 +354,13 @@ SCREENS = {
     # column 6Ch): its name on the message line (061A), drawn as the next
     # frame draws it (`AFTER`).
     'looktavern': ((0x2826, 0x0C15, {'eax': 0x086C}, 'near'), []),
+    # The boat boarded (2294:0DD0 with SI a record at BOAT_AT, `boat`: a
+    # boat's flat at the player's place, its square cleared): its prow
+    # (BOATPROL.IMG, loaded into the hands' bank) drawn as the weapon's
+    # frame draws it in the boat (0000:395E: 582C on [902E]), and "Hit 'J'
+    # to exit boat." on the message line as the next frame draws it
+    # (`AFTER`).
+    'boatprow': ((0x2294, 0x0DD0, {'esi': 0xFFE0}), []),
 }
 WAIT = (0, 0x8FC4)
 
@@ -714,6 +721,25 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
 AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight', 'looktavern')}
+
+
+def boat(a):
+    """A boat's record at BOAT_AT (FFE0h): its x and y (+0, +4) the
+    player's (C3D0, C3D4)."""
+    a.w16(0xFFE0, a.r16(0xC3D0))
+    a.w16(0xFFE4, a.r16(0xC3D4))
+
+
+def prow(a):
+    """0000:395E in the boat: the hands' bank (C8F4) mapped, the prow
+    at [902E] drawn (582C), then the message line (0511)."""
+    a.call_near(0, 0x5C8A, bx=a.mu.mem_read(a.lin(a.ds, 0xC8F4), 1)[0])
+    a.call_near(0, 0x582C, ds=a.r16(0x9030), esi=a.r16(0x902E))
+    a.call_near(0, 0x0511)
+
+
+BEFORE['boatprow'] = boat
+AFTER['boatprow'] = prow
 
 
 def draw(a, base, name, handler, script, fill, waits=None):
