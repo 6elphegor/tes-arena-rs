@@ -228,12 +228,14 @@ impl Screen {
     }
 
     /// Each pixel's palette colour, row by row; 100h where nothing is
-    /// drawn.
+    /// drawn (for the screen check).
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn indices(&self) -> &[u16] {
         &self.idx
     }
 
-    /// The colours drawn with.
+    /// The colours drawn with (for the screen check).
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn palette(&self) -> &[[u8; 4]; 256] {
         &self.palette
     }
@@ -777,7 +779,8 @@ fn menu_boxes(st: &Style, menu: &Menu, hud: &Hud) -> (Option<(i32, i32, i32, i32
     let sizes: Vec<_> = menu.entries.iter().map(|e| box_size(st, font, std::slice::from_ref(e))).collect();
     let w = sizes.iter().chain(title.iter()).map(|b| b.0).max().unwrap_or(0);
     let unrounded = |lines: &[Vec<Span>]| lines.len() as i32 * (font.h as i32 + 1) + 2 * MARGIN;
-    let total = (!title_lines.is_empty()).then(|| unrounded(&title_lines)).unwrap_or(0) + menu.entries.iter().map(|e| unrounded(std::slice::from_ref(e))).sum::<i32>();
+    let title_h = if title_lines.is_empty() { 0 } else { unrounded(&title_lines) };
+    let total = title_h + menu.entries.iter().map(|e| unrounded(std::slice::from_ref(e))).sum::<i32>();
     let mut y = 0x64 - total / 2;
     if let Some(b) = boxed_rect(st, hud) {
         y = y.max(b.1 + b.3 + 2);
