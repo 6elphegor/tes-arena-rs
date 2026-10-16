@@ -195,7 +195,7 @@ impl Machine {
     /// 1194:4E54: the text at `si` split at its line feeds: each becomes
     /// a NUL, and every LINE_MARK-th line ends at the NUL after it too;
     /// the lines counted at LINES.
-    pub(crate) fn split_lines(&mut self, si: u16) {
+    pub fn split_lines(&mut self, si: u16) {
         let mark = self.mem.r8(DS, LINE_MARK);
         let (mut si, mut cx, mut dl) = (si, 0u16, 0u8);
         while self.mem.r8(DS, si) != 0 {

@@ -48,6 +48,7 @@ use crate::hud::{self, Font, Screen, Span};
 use crate::interface::Image;
 use arena::bsa::Files;
 use arena::engine::Engine;
+use arena::lineedit::EditKey;
 use arena::machine::Machine;
 use arena::mapscreen::{MapHooks, MapStart};
 use arena::mem::DS;
@@ -98,12 +99,17 @@ fn inside(r: (i32, i32, i32, i32), x: i32, y: i32) -> bool {
 
 /// What the screen asks between clicks.
 enum Asking {
-    /// A name typed for the search.
-    Name(String),
+    /// A name typed for the search (the game's editor, `field::Live`).
+    Name(Box<crate::field::Live>),
     /// The province's places listed (the name typed matched none): the
-    /// names, the name typed.
-    List(Vec<String>, String),
+    /// names, the name's typing.
+    List(Vec<String>, Vec<EditKey>),
 }
+
+/// 26F7:0AD5's field: 1194:5C30 with the prompt at 6AD1, 14h characters
+/// into 9C62 (cleared before, 77C8, 1F4h bytes), in ARENAFNT.DAT
+/// ([102C], the map's) and the map's colour 60h (2542:03CF).
+const SEARCH_LOOK: crate::field::Look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
 
 pub struct Travel {
     start: MapStart,
@@ -165,7 +171,7 @@ fn dfa(archive: &crate::archive::Archive, name: &str) -> Vec<Image> {
 struct Hooks<'a> {
     boxes: &'a mut Vec<Lines>,
     files: Files,
-    typed: Vec<u8>,
+    typed: Vec<EditKey>,
     pick: u16,
     listed: Option<Vec<String>>,
     failed: bool,
@@ -209,9 +215,10 @@ impl TravelHooks for Hooks<'_> {
 }
 
 impl MapHooks for Hooks<'_> {
+    /// The name's typing given to the game's editor (`field::replay`).
     fn type_name(&mut self, m: &mut Machine) {
-        for (i, &c) in self.typed.iter().take(0x1F3).chain(&[0]).enumerate() {
-            m.mem.w8(DS, 0x9C62 + i as u16, c);
+        if crate::field::replay(m, &arena::lineedit::fields::search(), &SEARCH_LOOK, &self.typed) != Some(true) {
+            eprintln!("the search's name gave up: {}", arena::giveup::describe());
         }
     }
     fn list(&mut self, m: &mut Machine, si: u16, cx: u16) -> u16 {
@@ -326,7 +333,12 @@ impl Travel {
             }
             return;
         }
-        if self.asking.is_some() {
+        // The name's field: the right button ends it (A172).
+        if let Some(Asking::Name(live)) = &mut self.asking {
+            if right {
+                live.button();
+                self.name_ended(engine);
+            }
             return;
         }
         let Some(_) = self.shown else {
@@ -342,7 +354,7 @@ impl Travel {
         } else if inside(TRAVEL, x, y) {
             self.travel(engine);
         } else if inside(SEARCH, x, y) {
-            self.asking = Some(Asking::Name(String::new()));
+            self.ask_name(engine);
         } else {
             // 26F7:0625 with the button down (AFF9).
             use arena::controls::var::{BUTTONS, MOUSE_X, MOUSE_Y};
@@ -387,6 +399,9 @@ impl Travel {
     /// `ms` of time on: the passes counted, the journey's frames played.
     pub fn advance(&mut self, ms: u32) {
         self.up_ms = self.up_ms.wrapping_add(ms);
+        if let Some(Asking::Name(live)) = &mut self.asking {
+            live.frame();
+        }
         if !self.journey.is_empty() {
             self.journey_ms += ms;
             if (self.journey_ms / TICK_MS) as usize >= self.journey.len() {
@@ -424,11 +439,11 @@ impl Travel {
     /// The search (26F7:03A4) with the name `typed`; its list's pick `pick`
     /// (FFFFh: none). Run on a copy first: if the list is asked and not
     /// yet answered, it is shown instead.
-    fn search(&mut self, engine: &mut Engine, typed: String, pick: u16) {
+    fn search(&mut self, engine: &mut Engine, typed: Vec<EditKey>, pick: u16) {
         let mut copy = engine.m.clone();
         let mut scratch = Vec::new();
         let mut h = Self::hooks(&mut scratch, &engine.files);
-        h.typed = typed.clone().into_bytes();
+        h.typed = typed.clone();
         h.pick = 0xFFFF;
         let _ = copy.travel_search(&mut engine.files.clone(), &mut h);
         if let (Some(names), 0xFFFF) = (h.listed.take(), pick) {
@@ -436,39 +451,57 @@ impl Travel {
             return;
         }
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
-        h.typed = typed.into_bytes();
+        h.typed = typed;
         h.pick = pick;
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
             eprintln!("the search gave up: {}", arena::giveup::describe());
         }
     }
 
-    /// A key: Esc as Exit (a list or the name: left); the name typed;
-    /// Enter searches.
-    pub fn key(&mut self, engine: &mut Engine, code: winit::keyboard::KeyCode, text: Option<&str>) {
+    /// The search's name asked: the game's editor opened on a copy of the
+    /// game, its buffer cleared as 26F7:0AC4 clears it.
+    fn ask_name(&mut self, engine: &Engine) {
+        let mut m = engine.m.clone();
+        for i in 0..0x1F4 {
+            m.mem.w8(DS, 0x9C62 + i, 0);
+        }
+        self.asking = crate::field::Live::open(&m, arena::lineedit::fields::search(), SEARCH_LOOK).map(|l| Asking::Name(Box::new(l)));
+    }
+
+    /// Whether the search's name is being typed (the keys, pressed and
+    /// let go, are `field_key`'s).
+    pub fn typing(&self) -> bool {
+        matches!(self.asking, Some(Asking::Name(_)))
+    }
+
+    /// A key pressed or let go while the name is typed: to the game's
+    /// editor; when the field ends, the search with what was typed.
+    pub fn field_key(&mut self, engine: &mut Engine, scan: u8, down: bool) {
+        if let Some(Asking::Name(live)) = &mut self.asking {
+            live.key(scan, down);
+        }
+        self.name_ended(engine);
+    }
+
+    fn name_ended(&mut self, engine: &mut Engine) {
+        if let Some(Asking::Name(live)) = &self.asking {
+            if live.ended() {
+                let typed = live.keys().to_vec();
+                self.asking = None;
+                self.search(engine, typed, 0xFFFF);
+            }
+        }
+    }
+
+    /// A key: Esc as Exit (a list: left); S the search, T or Enter
+    /// travels.
+    pub fn key(&mut self, engine: &mut Engine, code: winit::keyboard::KeyCode, _text: Option<&str>) {
         use winit::keyboard::KeyCode;
         if self.done.is_some() {
             return;
         }
         match &mut self.asking {
-            Some(Asking::Name(s)) => match code {
-                KeyCode::Escape => self.asking = None,
-                KeyCode::Backspace => {
-                    s.pop();
-                }
-                KeyCode::Enter | KeyCode::NumpadEnter => {
-                    let typed = std::mem::take(s);
-                    self.asking = None;
-                    self.search(engine, typed, 0xFFFF);
-                }
-                _ => {
-                    if let Some(c) = text.and_then(|t| t.chars().next()).filter(|c| c.is_ascii_graphic() || *c == ' ') {
-                        if s.len() < 20 {
-                            s.push(c);
-                        }
-                    }
-                }
-            },
+            Some(Asking::Name(_)) => {}
             Some(Asking::List(..)) => {
                 if code == KeyCode::Escape {
                     self.asking = None;
@@ -477,7 +510,7 @@ impl Travel {
             None => match code {
                 KeyCode::Escape => self.exit(engine),
                 KeyCode::KeyT | KeyCode::Enter if self.shown.is_some() => self.travel(engine),
-                KeyCode::KeyS if self.shown.is_some() => self.asking = Some(Asking::Name(String::new())),
+                KeyCode::KeyS if self.shown.is_some() => self.ask_name(engine),
                 _ => {}
             },
         }
@@ -536,10 +569,11 @@ impl Travel {
             }
         }
         match &self.asking {
-            Some(Asking::Name(s)) => {
-                // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1.
-                let prompt = String::from_utf8_lossy(m.mem.cstr(DS, 0x6AD1)).into_owned();
-                hud::typed_prompt(screen, &prompt, s);
+            Some(Asking::Name(live)) => {
+                // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1, its box,
+                // then the field.
+                hud::typed_prompt(screen, &crate::field::prompt_5c30(m, DS, 0x6AD1));
+                live.draw(screen, false);
                 return;
             }
             Some(Asking::List(names, _)) => {

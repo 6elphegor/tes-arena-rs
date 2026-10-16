@@ -154,6 +154,42 @@ fn same(a: &App, b: &App, what: &str) {
     }
 }
 
+/// The key that types `c` on the game's first keyboard (A944, with
+/// Shift A9C4): a letter, a digit, a space; and whether Shift.
+fn key_for(c: u8) -> (KeyCode, bool) {
+    use KeyCode as K;
+    const LETTERS: [KeyCode; 26] = [
+        K::KeyA, K::KeyB, K::KeyC, K::KeyD, K::KeyE, K::KeyF, K::KeyG, K::KeyH, K::KeyI, K::KeyJ, K::KeyK, K::KeyL, K::KeyM, K::KeyN, K::KeyO, K::KeyP, K::KeyQ,
+        K::KeyR, K::KeyS, K::KeyT, K::KeyU, K::KeyV, K::KeyW, K::KeyX, K::KeyY, K::KeyZ,
+    ];
+    const DIGITS: [KeyCode; 10] = [K::Digit0, K::Digit1, K::Digit2, K::Digit3, K::Digit4, K::Digit5, K::Digit6, K::Digit7, K::Digit8, K::Digit9];
+    match c {
+        b'a'..=b'z' => (LETTERS[(c - b'a') as usize], false),
+        b'A'..=b'Z' => (LETTERS[(c - b'A') as usize], true),
+        b'0'..=b'9' => (DIGITS[(c - b'0') as usize], false),
+        _ => (K::Space, false),
+    }
+}
+
+/// `s` typed key by key into a typed field (Shift held for capitals).
+fn type_text(d: &mut Driver, app: &mut App, s: &str) {
+    for c in s.bytes() {
+        let (k, shift) = key_for(c);
+        if shift {
+            app.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+        }
+        d.key(app, k, Some(&(c as char).to_string()));
+        if shift {
+            app.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+        }
+    }
+}
+
+/// The typed field asked and its text as it stands.
+fn typed(app: &App) -> String {
+    app.live.as_ref().map(|l| String::from_utf8_lossy(&l.text()).into_owned()).unwrap_or_default()
+}
+
 fn text(spans: &[Vec<hud::Span>]) -> String {
     spans.iter().map(|l| l.iter().map(|s| s.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n")
 }
@@ -376,11 +412,15 @@ fn camping_with_typed_hours_as_by_script() {
     d.key(&mut a, KeyCode::Enter, None);
     match a.pending.as_ref().map(|p| &p.need) {
         // The prompt's trailing spaces kept: the field's room in its box.
-        Some(dialog::Need::Text(prompt)) => assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}"),
+        Some(dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(prompt), field, .. })) => {
+            assert!(prompt.starts_with("How many hours") && prompt.ends_with("  "), "prompt: {prompt:?}");
+            // 1194:46BF: the field at FCh, 44h, 3 characters.
+            assert_eq!((field.x, field.y, field.max), (0xFC, 0x44, 3));
+        }
         other => panic!("the hours asked for, not {:?}", other.map(|_| "something else")),
     }
     d.key(&mut a, KeyCode::Digit2, Some("2"));
-    assert_eq!(a.typed, "2");
+    assert_eq!(typed(&a), "2");
     d.key(&mut a, KeyCode::Backspace, None);
     d.key(&mut a, KeyCode::Digit2, Some("2"));
     d.key(&mut a, KeyCode::Enter, None);
@@ -603,12 +643,16 @@ fn creation_by_keys_and_clicks_as_by_script() {
             create::Input::Back => d.key(&mut a, KeyCode::Backspace, None),
             create::Input::Up => d.key(&mut a, KeyCode::ArrowUp, None),
             create::Input::Down => d.key(&mut a, KeyCode::ArrowDown, None),
+            // The name's characters by their keys (the game's editor
+            // reads keys); a menu's by the text its key gives.
+            create::Input::Char(c) if a.creation.as_ref().is_some_and(|c| c.typing()) => type_text(&mut d, &mut a, &(c as char).to_string()),
             create::Input::Char(c) => {
                 let t = (c as char).to_string();
                 d.key(&mut a, KeyCode::KeyA, Some(&t));
             }
             create::Input::Click(x, y) => d.click(&mut a, x, y, MouseButton::Left),
             create::Input::Wait(ms) => d.wait(&mut a, ms as u64),
+            create::Input::Key(..) => {}
         }
         b.creation_input(inp);
         let (Some(ca), Some(cb)) = (a.creation.as_ref(), b.creation.as_ref()) else { panic!("creation ended early at step {i}") };
@@ -1177,14 +1221,14 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     let bare = a.screen.px.clone();
     d.click(&mut a, 100, 100, MouseButton::Left);
     match a.pending.as_ref().map(|p| &p.need) {
-        Some(dialog::Need::Text(prompt)) => eprintln!("prompt: {prompt}"),
+        // Typed in place where clicked (0000:9EE9), not in a box.
+        Some(dialog::Need::Text(ask)) => {
+            assert!(matches!(ask.prompt, dialog::Prompt::Bare), "in place");
+            assert_eq!((ask.field.x, ask.field.y), (100, 100), "the note edited where clicked");
+        }
         _ => panic!("a click on the map asks for the note's text"),
     }
-    // Typed in place where clicked (0000:9EE9), not in a box.
-    assert_eq!(a.pending.as_ref().and_then(|p| p.at), Some((100, 100)), "the note edited where clicked");
-    for (k, c) in [(KeyCode::KeyH, "H"), (KeyCode::KeyI, "i")] {
-        d.key(&mut a, k, Some(c));
-    }
+    type_text(&mut d, &mut a, "Hi");
     a.compose();
     let field = |px: &[[u8; 4]]| -> Vec<[u8; 4]> { (0..6).flat_map(|r| (0..12).map(move |c| (100 + r) * hud::W + 100 + c)).map(|i| px[i]).collect() };
     assert_ne!(field(&a.screen.px), field(&bare), "the text typed drawn on the map");
@@ -1210,10 +1254,12 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     // Clicked again: the note's text asked for again, now edited.
     d.click(&mut a, note.0 as i32 + 1, note.1 as i32 + 1, MouseButton::Left);
     assert!(a.pending.is_some(), "a click on the note edits it");
-    assert_eq!(a.typed, "Hi", "the note's text to edit");
-    d.key(&mut a, KeyCode::Backspace, None);
-    d.key(&mut a, KeyCode::Backspace, None);
-    d.key(&mut a, KeyCode::KeyX, Some("X"));
+    assert_eq!(typed(&a), "Hi", "the note's text to edit");
+    // The cursor where the click falls (A1B9): a pixel in, before the
+    // first character; Del takes the two out.
+    d.key(&mut a, KeyCode::Delete, None);
+    d.key(&mut a, KeyCode::Delete, None);
+    type_text(&mut d, &mut a, "X");
     d.key(&mut a, KeyCode::Enter, None);
     let edited = notes_drawn(&a);
     assert_eq!(edited.len(), after.len(), "edited, not added");
@@ -1228,8 +1274,8 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     let x = edited.iter().find(|n| n.2 == "X").unwrap().clone();
     d.key(&mut a, KeyCode::KeyM, None);
     d.click(&mut a, x.0 as i32 + 1, x.1 as i32 + 1, MouseButton::Left);
-    d.key(&mut a, KeyCode::Backspace, None);
-    d.key(&mut a, KeyCode::KeyY, Some("Y"));
+    d.key(&mut a, KeyCode::Delete, None);
+    type_text(&mut d, &mut a, "Y");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(notes_drawn(&a).iter().any(|n| n.2 == "Y"), "changed after the save");
     d.key(&mut a, KeyCode::Escape, None);
@@ -1433,9 +1479,7 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Save), "the save menu is up");
     d.click(&mut a, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(a.saveui.as_ref().is_some_and(|u| u.typing.is_some()), "slot 3's name is typed");
-    for c in "Ria".chars() {
-        d.key(&mut a, KeyCode::KeyA, Some(&c.to_string()));
-    }
+    type_text(&mut d, &mut a, "Ria");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(a.saveui.is_none(), "the menu closed");
     let names = saveui::read_any_case(&scratch, "NAMES.DAT").expect("NAMES.DAT");
