@@ -10,3 +10,5 @@ screen | camp | 114983588e87d6c9 a97a4bafd992e4ed 3849c331458828b5
 screen | automap | 54404551bdb10785 58ab90d7887e02ed
 screen | travelmap | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
 screen | guild | ab9373c09721411 a97a4bafd992e4ed a2bb0df299dfaf5b
+screen | guildbuy | 6690ef7fd318272 a97a4bafd992e4ed cbbe02ff41da1aa8
+screen | guilddetect | fd65d3d236ac552e a97a4bafd992e4ed 11959e55b4dc6a85

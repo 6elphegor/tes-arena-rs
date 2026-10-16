@@ -51,6 +51,10 @@ SCREENS = {
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),
+    # Its Buy (the box at 3Ah..51h): the spells for sale.
+    'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
+    # Its Detect Magic (52h..69h): the items to look at.
+    'guilddetect': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x5E)]),
     # R: camping (01E6: 1194:424E), refused in the guild: its box.
     'camp': (0x01E6, []),
     # M: the automap (045A: 0000:2CFE), whose loop asks the mouse by the

@@ -241,6 +241,29 @@ fn the_guilds_menu_as_the_original_draws_it() {
     );
 }
 
+/// The guild's menu up, its entry `key` picked: the screen it asks next.
+fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
+    d.click(a, 164, 74, MouseButton::Left);
+    d.frame(a);
+    assert!(until_asked(d, a, 3), "the guild master asks");
+    d.key(a, key, Some(text));
+    assert!(a.pending.is_some(), "the guild asks again");
+}
+
+/// The guild's Buy: what kind of item (1194:A73E's next menu) over the
+/// gold left.
+#[test]
+#[ignore = "not yet the original's: the gold line under the menu (1194:545C) isn't drawn"]
+fn the_guilds_buy_as_the_original_draws_it() {
+    screen("guildbuy", |a, d| guild_pick(a, d, KeyCode::Digit1, "1"), layer);
+}
+
+/// The guild's Detect Magic: the items to look at, a list.
+#[test]
+fn the_guilds_detect_magic_as_the_original_draws_it() {
+    screen("guilddetect", |a, d| guild_pick(a, d, KeyCode::Digit2, "2"), layer);
+}
+
 /// R: camping (2542:01E6, 1194:424E), refused in the guild: its box.
 #[test]
 fn camping_refused_as_the_original_draws_it() {
