@@ -89,3 +89,4 @@ screen | equipmentspells | 7f7eccde5c640741 ef6ad023fa2b8c2b
 screen | logbookmore | 2f73e56cb1922472 491d016160c27c96
 screen | equipmentoff | 8e8691788f7b16b3 ef6ad023fa2b8c2b
 screen | equipmentinfo | a7cf26d6550a0eb5 ef6ad023fa2b8c2b
+screen | equipmentdown | f7048bd0f09df083 ef6ad023fa2b8c2b

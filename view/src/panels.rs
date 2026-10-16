@@ -575,13 +575,47 @@ pub fn scroll(m: &mut Machine, d: i32) {
     m.mem.w8(DS, FIRST_LINE, first as u8);
 }
 
-/// The inventory line under (x, y) on the 320 x 200 screen.
+/// The inventory line under (x, y) on the 320 x 200 screen, within the
+/// list's click record (the first of 1194:2325's five at 3276:57D8: 0Eh,
+/// 32h, 8Eh x 4Dh, to 1194:1AC6),
+/// as the lines are drawn (the click marks by 1C5E's rows, `mark_at`).
 pub fn line_at(x: i32, y: i32) -> Option<usize> {
-    if !(LIST_X - 4..171).contains(&x) || y < LIST_Y - 2 {
+    if !(0x0E..0x0E + 0x8E).contains(&x) || !(0x32..0x32 + 0x4D).contains(&y) {
         return None;
     }
     let row = ((y - LIST_Y + 2) / LINE_H) as usize;
-    (row < LIST_LINES).then_some(row)
+    Some(row.min(LIST_LINES - 1))
+}
+
+/// The list's arrows (their click records after the list's: 8 x 8 at
+/// 0Ch, 80h, key '+', 1194:1A4A; at 95h, 80h, key '-', 1A94): the
+/// lines moved on (+1) or back (-1).
+pub fn arrow_at(x: i32, y: i32) -> Option<i32> {
+    if !(0x80..0x88).contains(&y) {
+        return None;
+    }
+    match x {
+        0x0C..0x14 => Some(1),
+        0x95..0x9D => Some(-1),
+        _ => None,
+    }
+}
+
+/// 1194:1A4A / 1A94: the first line shown one on, while seven or more
+/// lines (the items, or the book's spells) leave lines below; or one
+/// back, unless at the first.
+pub fn arrow(m: &mut Machine, d: i32) {
+    let first = m.mem.r8(DS, FIRST_LINE);
+    if d < 0 {
+        if first != 0 {
+            m.mem.w8(DS, FIRST_LINE, first - 1);
+        }
+        return;
+    }
+    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as u16 } else { item_lines(m).len() as u16 };
+    if n >= 7 && first as u16 != n - 7 {
+        m.mem.w8(DS, FIRST_LINE, first.wrapping_add(1));
+    }
 }
 
 /// The equipment screen's buttons along its bottom.

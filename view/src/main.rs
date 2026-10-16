@@ -3327,6 +3327,8 @@ impl App {
                         panels::Button::Spellbook => panels::spells_button(&mut self.engine.m, &mut said),
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
+                } else if let Some(d) = panels::arrow_at(x, y) {
+                    panels::arrow(&mut self.engine.m, d);
                 } else if panels::line_at(x, y).is_some() {
                     panels::line_click(&mut self.engine.m, inv, y, right, &mut said);
                 }

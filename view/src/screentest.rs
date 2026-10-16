@@ -221,6 +221,20 @@ fn the_equipment_page_with_a_line_marked_as_the_original_draws_it() {
     );
 }
 
+/// The list's arrow at its left foot: a line on.
+#[test]
+fn the_equipment_list_moved_on_as_the_original_draws_it() {
+    screen(
+        "equipmentdown",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 16, 131, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// A line right-clicked: marked, its item described over the list's foot
 /// (1194:1988).
 #[test]
