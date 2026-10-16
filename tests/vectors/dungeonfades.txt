@@ -1,0 +1,3 @@
+screenfade | dungeonautomap | 72 | 2c86ca8f17bddf19
+screenfade | dungeonmap | 72 | 2c86ca8f17bddf19
+screenfade | dungeonleave | 42 | d1776a7dcc43aff4

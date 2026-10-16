@@ -1,0 +1,8 @@
+screen | dungeonstatus | 2e5d327360c1d20b a97a4bafd992e4ed b68093bd54873ad5
+screen | dungeonautomap | f06cdb1031c1207c 58ab90d7887e02ed
+screen | dungeonmap | e4af764381159d8a 58ab90d7887e02ed
+screen | dungeoncamp | 3ed9570a5ba21727 a97a4bafd992e4ed e73f5d8ce84b8c5
+screen | dungeontravel | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
+screen | dungeonloot | e905729cb65f5838 a97a4bafd992e4ed 77aee268a5bf4f45
+screen | dungeonloottake | e04d9311d37b0e6 a97a4bafd992e4ed 77aee268a5bf4f45
+screen | dungeonleave | 4c16ae6cc47301f 6c1d8428b606b30f

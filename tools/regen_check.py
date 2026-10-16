@@ -44,7 +44,7 @@ VECTORS = os.path.join(ROOT, 'tests', 'vectors')
 # Generators whose vector file isn't tests/vectors/NAME.txt.
 VECTOR = {'move': 'movement', 'savew': 'save_write'}
 # Vector files a generator writes beside its OUT, checked with it.
-BESIDE = {'screens': ['screenfades.txt'], 'createshot': ['createframes.txt']}
+BESIDE = {'screens': ['screenfades.txt'], 'createshot': ['createframes.txt'], 'dungeonscreens': ['dungeonfades.txt']}
 
 
 def usage(src):
