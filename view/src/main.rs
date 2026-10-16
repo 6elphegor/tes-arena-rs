@@ -3195,11 +3195,19 @@ impl App {
                     }
                 }
             }
-            // A line of the list in the bar's corner picked.
+            // A line of the list in the bar's corner clicked (2542:06F8):
+            // a line not marked is marked; the line marked is picked.
             Some(p @ (panels::Panel::Spellbook(_) | panels::Panel::Use(..))) => {
                 let hud = hud::Hud { menu: p.bar_list(&self.engine.m), ..Default::default() };
                 if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
-                    if matches!(p, panels::Panel::Spellbook(_)) {
+                    let marked = match p {
+                        panels::Panel::Spellbook(book) => &mut book.selected,
+                        panels::Panel::Use(_, sel) => sel,
+                        _ => unreachable!(),
+                    };
+                    if *marked != i {
+                        *marked = i;
+                    } else if matches!(p, panels::Panel::Spellbook(_)) {
                         cast = Some(i);
                     } else {
                         self.panel = None;

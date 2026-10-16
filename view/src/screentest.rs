@@ -195,6 +195,34 @@ fn the_use_list_as_the_original_draws_it() {
     screen("use", |a, d| d.key(a, KeyCode::KeyU, Some("u")), over);
 }
 
+/// C, then its second line clicked once (Air Foot): the line marked (a
+/// second click would cast it).
+#[test]
+fn the_spellbook_with_a_line_picked_as_the_original_draws_it() {
+    screen(
+        "spellpick",
+        |a, d| {
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.click(a, 0xF0, 164, MouseButton::Left);
+        },
+        over,
+    );
+}
+
+/// U, then its fourth line clicked once (Ring of Shielding): the line
+/// marked (a second click would use it).
+#[test]
+fn the_use_list_with_a_line_picked_as_the_original_draws_it() {
+    screen(
+        "usepick",
+        |a, d| {
+            d.key(a, KeyCode::KeyU, Some("u"));
+            d.click(a, 0xF0, 181, MouseButton::Left);
+        },
+        over,
+    );
+}
+
 /// Esc: the options screen (2542:000A), drawn alone.
 #[test]
 fn the_options_screen_as_the_original_draws_it() {

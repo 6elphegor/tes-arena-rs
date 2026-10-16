@@ -48,8 +48,14 @@ SCREENS = {
     'logbook': (0x02A3, []),
     # C: the spellbook (026D: 056A).
     'spellbook': (0x026D, []),
+    # A line of it clicked (the second): marked, as the use list's.
+    'spellpick': (0x026D, [('click', 0xF0, 164)]),
     # U: the items to use (034D).
     'use': (0x034D, []),
+    # A line of it clicked (the fourth, Ring of Shielding: the lines 8 or
+    # 9 apart from 9Bh in the bar's corner): the line picked marked (a
+    # second click uses it, the list gone).
+    'usepick': (0x034D, [('click', 0xF0, 181)]),
     # Esc: the options screen (000A).
     'options': (0x000A, []),
     # Its bottom row's buttons (the table at 5C2C: y 118..146), each
