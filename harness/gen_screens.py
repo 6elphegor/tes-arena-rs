@@ -144,6 +144,10 @@ SCREENS = {
     'optionsload': (0x000A, [('click', 96, 132)]),
     'optionssave': (0x000A, [('click', 160, 132)]),
     'optionsexit': (0x000A, [('click', 224, 132)]),
+    # Load's picker, then an empty slot's row clicked (the sixth: rows
+    # 0Eh high from y 4): 25FD:028D finds no SAVEGAME, and 1194:59C8 says
+    # so (5F0F) before the picker comes back.
+    'optionsloadempty': (0x000A, [('click', 96, 132), ('click', 100, 81)]),
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),

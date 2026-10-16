@@ -676,6 +676,22 @@ fn the_options_save_as_the_original_draws_it() {
     screen("optionssave", |a, d| options_click(a, d, 160, 132), options_menu_layer);
 }
 
+/// Its Load's picker, an empty slot's row clicked: 25FD:028D finds no
+/// SAVEGAME, and 1194:59C8's box says so over the picker (the text at
+/// 5F0F in the picker's font and colour), the picker then up again.
+#[test]
+fn an_empty_slot_as_the_original_draws_it() {
+    screen(
+        "optionsloadempty",
+        |a, d| {
+            options_click(a, d, 96, 132);
+            d.click(a, 100, 81, MouseButton::Left);
+            assert!(a.saveui.as_ref().is_some_and(|u| u.notice.is_some()), "the box over the picker");
+        },
+        options_menu_layer,
+    );
+}
+
 /// Its Exit (05DB): "Are you sure ?" over the screen.
 #[test]
 fn the_options_exit_as_the_original_draws_it() {
