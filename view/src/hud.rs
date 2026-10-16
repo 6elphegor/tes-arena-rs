@@ -346,8 +346,9 @@ pub struct Hud {
     /// A menu waiting for a pick: its title's lines, its entries, the
     /// entry highlighted.
     pub menu: Option<Menu>,
-    /// Hours to type: the prompt and what has been typed.
-    pub typing: Option<(String, String)>,
+    /// A typed field asked: what its caller shows around it (the field
+    /// itself is drawn over the layer, `field::Live::draw`).
+    pub typing: Option<crate::dialog::Prompt>,
     /// A status line at the bottom (the rest's hours).
     pub status: Option<String>,
     /// The level's text shown (`level_text`): each line with its row.
@@ -524,6 +525,7 @@ static STYLE: std::sync::OnceLock<Style> = std::sync::OnceLock::new();
 /// Loads the game's fonts, box tiles and list panel for the texts drawn
 /// from then on (without them the layer's own plain boxes are drawn).
 pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine) {
+    crate::field::init(archive);
     let (Some(menu_font), Some(box_font), Some(list_font), Some(tiles)) =
         (Font::load(archive, "FONT_A.DAT"), Font::load(archive, "ARENAFNT.DAT"), Font::load(archive, "TEENYFNT.DAT"), Tiles::load(archive, "MARBLE.CIF", 3, 3))
     else {
@@ -785,40 +787,31 @@ fn compose_game(screen: &mut Screen, font: &Font, st: &Style, hud: &Hud) {
             }
         }
     }
-    if let Some((prompt, typed)) = &hud.typing {
-        draw_typing(screen, st, c, prompt, typed);
+    match &hud.typing {
+        Some(crate::dialog::Prompt::Boxed(prompt)) => draw_typing(screen, st, c, prompt),
+        Some(crate::dialog::Prompt::Lines(lines)) => draw_dialog_lines(screen, st, lines),
+        _ => {}
     }
 }
 
-/// A typed prompt as the original draws it: the prompt in a box by 965A
-/// with CX 7 (centred in the clip) and a margin of 0Ah; then 0000:9EE9's
-/// field in the boxes' font ([102C]): the text typed (A0AE, by 9E0A) and
-/// the cursor (A0D9), a block the width of the character under it (at
-/// the end a space's, plus one) by the font's height, XORed with the
-/// text's colour. Two callers: 1194:4800 (the rest's hours, the
-/// repair's), whose prompt ends in spaces, the field's room on its line;
-/// 1194:5C30 (the travel map's search, the names), whose prompt is
-/// formatted "%s\r" and 17 spaces, the field's line under it.
-/// Approximate: the callers place the field themselves (the rest's at
-/// FCh,44h, the search's x 55h at y 64h), the view puts it after the
-/// last line's words, a space on (5C30's at its line's start); the
-/// text's colour (9288) is taken as the boxes' 0Fh. The cursor blinks
-/// (`cursor_on`).
-pub fn typed_prompt(screen: &mut Screen, prompt: &str, typed: &str) {
+/// A typed field's prompt box as the original draws it: the prompt in a
+/// box by 965A with CX 7 (centred in the clip) and a margin of 0Ah. Two
+/// callers: 1194:4800 (the rest's hours), whose prompt ends in spaces,
+/// the field's room on its line; 1194:5C30 (the travel map's search,
+/// creation's name), whose prompt is formatted "%s\r" and 17 spaces
+/// (4FBC), the field's line under it. The field itself (0000:9EE9) is
+/// where the caller puts it, drawn over the box (`field::Live::draw`).
+pub fn typed_prompt(screen: &mut Screen, prompt: &str) {
     if let Some(st) = STYLE.get() {
-        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt, typed);
+        draw_typing(screen, st, (0, 0, W as i32 - 1, H as i32 - 1), prompt);
     }
 }
 
 /// `typed_prompt` centred in the clip `c`.
-fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str, typed: &str) {
+fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt: &str) {
     let font = &st.box_font;
-    let mut text = lines(prompt.as_bytes(), 0x0F);
-    if !prompt.ends_with(' ') {
-        text.push(vec![Span { colour: 0x0F, text: " ".repeat(17) }]);
-    }
-    let last = text.len() - 1;
-    let words = font.width(plain(&text[last]).trim_end()) as i32;
+    let text = lines(prompt.as_bytes(), 0x0F);
+    let last = text.len().saturating_sub(1);
     let (w, h, tx, ty) = box_size_margin(st, font, &text, 10);
     let (x, y) = ((c.0 + c.2) / 2 - w / 2, (c.1 + c.3) / 2 - h / 2);
     screen.tiles(&st.tiles, x, y, w / st.tiles.w as i32, h / st.tiles.h as i32);
@@ -828,29 +821,22 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
         let lx = if i < last { x + w / 2 - lw / 2 } else { x + tx };
         screen.spans_game(font, lx, y + ty + i as i32 * lh, l, false, 0x0F);
     }
-    let fx = x + tx + if words > 0 { words + font.width(" ") as i32 } else { 0 };
-    let fy = y + ty + last as i32 * lh;
-    screen.text_raw(font, fx, fy, typed, 0x0F);
-    if cursor_on() {
-        screen.xor(fx + font.width(typed) as i32, fy, font.width(" ") as i32 + 1, font.h as i32, 0x0F);
+}
+
+/// 1194:4E88's lines before its typed field: each from (20h, 91h), 9
+/// apart, in TEENYFNT.DAT ([102E]) and colour C0h (4EAD..4EBF).
+fn draw_dialog_lines(screen: &mut Screen, st: &Style, lines: &[Vec<Span>]) {
+    for (i, l) in lines.iter().enumerate() {
+        screen.text_raw(&st.list_font, 0x20, 0x91 + 9 * i as i32, &plain(l), 0xC0);
     }
 }
 
-/// The typed field's cursor blink: 0000:A0D9 XORs the cursor on every
-/// eighth pass of the field's key wait (A84C & 7, the wait going once a
-/// frame through 946A), so it is on for eight frames and off for eight
-/// (the cursor keys' zeroing of the count, A005 and A026, doesn't arise:
-/// the view's cursor stays at the end). The window counts its frames
-/// here (`blink_frame`); a shot, never counting, shows it on.
+/// The window's frames counted, for what blinks on them (the travel
+/// map's markers keep their own passes).
 static BLINK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 pub fn blink_frame() {
     BLINK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// Whether the typed field's cursor is drawn this frame.
-pub fn cursor_on() -> bool {
-    BLINK.load(std::sync::atomic::Ordering::Relaxed) & 8 == 0
 }
 
 /// A list's line as 2F26:2DF6 draws it: each part but the last (ended by
@@ -998,13 +984,12 @@ pub fn compose_over(screen: &mut Screen, font: &Font, hud: &Hud) {
             screen.spans(font, ex, ly, l);
         }
     }
-    if let Some((prompt, typed)) = &hud.typing {
-        let line = format!("{prompt} {typed}_");
-        let w = (font.width(&line) as i32 + 16).clamp(80, W as i32 - 8);
+    if let Some(crate::dialog::Prompt::Boxed(prompt)) = &hud.typing {
+        let w = (font.width(prompt) as i32 + 16).clamp(80, W as i32 - 8);
         let x = (W as i32 - w) / 2;
         let y = H as i32 / 2 - lh;
         screen.panel(x, y, w, lh + 10, 0x0F);
-        screen.text(font, x + 8, y + 5, &line, 0x0F);
+        screen.text(font, x + 8, y + 5, prompt, 0x0F);
     }
 }
 

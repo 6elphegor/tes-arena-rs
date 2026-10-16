@@ -33,8 +33,11 @@ pub enum Click {
 pub enum Answer {
     /// A menu's entry (FFFFh: none, Esc).
     Pick(u16),
-    /// Text typed (the rest's hours).
+    /// Text typed (a script's): Esc where the field doesn't end on it
+    /// (it empties the field), its characters, Enter.
     Text(String),
+    /// A typed field's passes' inputs (`crate::field::Live`), as typed.
+    Keys(Vec<arena::lineedit::EditKey>),
     /// A level's points spent: the clicks, in order.
     Spend(Vec<Click>),
     /// A click at (x, y) of the 320 x 200 screen (the spellmaker's).
@@ -79,8 +82,8 @@ impl std::fmt::Debug for Snapshot {
 #[derive(Clone, Debug)]
 pub enum Need {
     Menu(Menu),
-    /// Text to type, its prompt.
-    Text(String),
+    /// A field to type in (0000:9EE9).
+    Text(Ask),
     /// A level's points to spend (1194:122C), on the attribute screen.
     Spend(Snapshot),
     /// A click on the spellmaker's screen (1194:5651), or on its form
@@ -89,6 +92,30 @@ pub enum Need {
     /// The travel map, from the game as the way out of a dungeon showed
     /// it (26F7:0000 with 1A81 set).
     Travel(World),
+}
+
+/// What a typed field's caller shows around it.
+#[derive(Clone, Debug)]
+pub enum Prompt {
+    /// A box with the prompt, centred (965A: 1194:4800's, 5C30's).
+    Boxed(String),
+    /// The dialog's lines (1194:4E88's, at 20h, 91h on, 9 apart, in
+    /// TEENYFNT.DAT, colour C0h), the field under them.
+    Lines(Vec<Vec<Span>>),
+    /// Nothing: the field on the caller's screen (the automap's notes,
+    /// the spellmaker's name, the save menu's).
+    Bare,
+}
+
+/// A typed field asked: what is shown around it, the field (where, how
+/// many characters, the text), how its text is drawn, and the game as it
+/// asked (the window's editor runs on a copy, `crate::field::Live`).
+#[derive(Clone, Debug)]
+pub struct Ask {
+    pub prompt: Prompt,
+    pub field: arena::lineedit::Field,
+    pub look: crate::field::Look,
+    pub game: Snapshot,
 }
 
 /// A turn's answers and what it showed.
@@ -111,9 +138,6 @@ pub struct Talk {
     /// click was asked, and the form open then (DATA:form). Kept when the
     /// turn stops inside the spellmaker.
     pub maker: Option<(Snapshot, Option<u16>)>,
-    /// The text asked for edited in place (0000:9EE9 with the automap's
-    /// notes): the field's screen point and the text there at the start.
-    pub text_at: Option<(i32, i32, String)>,
     /// The shop's screen the turn is inside (`crate::shopui::Backdrop`):
     /// drawn behind its questions.
     pub backdrop: Option<crate::shopui::Backdrop>,
@@ -226,26 +250,6 @@ impl Talk {
         self.since_answer.push(lines);
     }
 
-    /// Text typed under `prompt`: the next answer, or None (the question
-    /// left: nothing typed).
-    pub fn typed_text(&mut self, prompt: &str) -> Option<String> {
-        if self.need.is_some() {
-            return None;
-        }
-        match self.answers.front() {
-            Some(Answer::Text(t)) => {
-                let t = t.clone();
-                self.answers.pop_front();
-                self.since_answer.clear();
-                Some(t)
-            }
-            _ => {
-                self.need = Some(Need::Text(prompt.to_string()));
-                None
-            }
-        }
-    }
-
     /// `menu` asked: the next answer, or the question left (FFFFh).
     fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {
@@ -265,24 +269,27 @@ impl Talk {
         }
     }
 
-    /// Text typed into DS:`at` (up to `max` characters, then a NUL): the
-    /// next answer, or the question left (nothing typed).
-    pub fn typed(&mut self, m: &mut Machine, at: u16, max: usize, prompt: &str) {
+    /// A typed field (0000:9EE9): the next answer given to the game's
+    /// editor on `m` (`crate::field::replay`), or the question left (the
+    /// text as it was).
+    pub fn edit(&mut self, m: &mut Machine, field: arena::lineedit::Field, look: crate::field::Look, prompt: Prompt) {
         if self.need.is_some() {
             return;
         }
-        match self.answers.front() {
-            Some(Answer::Text(t)) => {
-                let t = t.clone();
-                self.answers.pop_front();
-                self.since_answer.clear();
-                for (i, b) in t.bytes().take(max).enumerate() {
-                    m.mem.w8(DS, at + i as u16, b);
-                }
-                m.mem.w8(DS, at + t.len().min(max) as u16, 0);
+        let keys = match self.answers.front() {
+            Some(Answer::Keys(k)) => k.clone(),
+            Some(Answer::Text(t)) => crate::field::keys_of(t, m.mem.r16(DS, arena::lineedit::var::FLAGS) & 0x1000 != 0),
+            _ => {
+                self.need = Some(Need::Text(Ask { prompt, field, look, game: Snapshot(Box::new(m.clone())) }));
+                return;
             }
-            _ => self.need = Some(Need::Text(prompt.to_string())),
+        };
+        self.answers.pop_front();
+        self.since_answer.clear();
+        if crate::field::replay(m, &field, &look, &keys) != Some(true) {
+            eprintln!("the typed field gave up: {}", arena::giveup::describe());
         }
+        println!("[typed] {:?}", String::from_utf8_lossy(m.mem.cstr(field.seg, field.off)));
     }
 }
 

@@ -111,6 +111,17 @@ pub trait HaggleIo {
     fn menu(&mut self) -> Option<u16>;
     fn text(&mut self) -> Option<Vec<u8>>;
     fn key(&mut self) -> Option<()>;
+    /// 1194:810D, 4E88 with 13D3 2: the offer typed into TYPED (zeroed
+    /// before; 6 characters at most, the field 0000:9EE9's,
+    /// `lineedit::fields::dialog`). By default `text`'s first 6 bytes
+    /// put there.
+    fn type_offer(&mut self, m: &mut Machine) -> Option<()> {
+        let typed = self.text()?;
+        for (i, &c) in typed.iter().take(6).enumerate() {
+            m.mem.w8(DS, TYPED + i as u16, c);
+        }
+        Some(())
+    }
     /// 2DA2:000A: the informant's line at DS:`di` has its codes
     /// substituted (the text port, `Machine::expand`).
     fn expand(&mut self, m: &mut Machine, files: &mut Files, di: u16) -> Option<()> {
@@ -242,10 +253,7 @@ impl Machine {
                 // 80F7: the prompt (65CA) in colour 3, typed text asked.
                 self.mem.w8(DS, SHOWN_COLOUR, 3);
                 self.mem.w8(DS, INPUT_KIND, 2);
-                let typed = io.text()?;
-                for (i, &c) in typed.iter().take(6).enumerate() {
-                    self.mem.w8(DS, TYPED + i as u16, c);
-                }
+                io.type_offer(self)?;
                 if self.mem.r8(DS, TYPED) == 0 {
                     return Some(Haggle::NoDeal);
                 }

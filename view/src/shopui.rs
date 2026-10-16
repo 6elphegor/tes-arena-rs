@@ -203,16 +203,23 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
                 }
             }
             _ => {
-                let prompt: String = lines.iter().map(|l| hud::plain(l)).collect::<Vec<_>>().join(" ");
-                // Not answered yet: "0", which every shop takes as leaving
-                // (the tavern's days are asked again until they are digits,
-                // so nothing typed would ask forever); the turn is then
-                // thrown away and the question shown.
-                let typed = self.talk().and_then(|t| t.typed_text(prompt.trim())).unwrap_or_else(|| "0".into());
-                let t = typed.as_bytes();
-                let t = &t[..t.len().min(5)];
-                for (i, &b) in t.iter().chain([0u8].iter()).enumerate() {
-                    m.mem.w8(DS, di.wrapping_add(i as u16), b);
+                // The field under the dialog's lines (1194:4F5A), as many
+                // characters as the caller's AX.
+                let field = arena::lineedit::fields::dialog(m, arena::lineedit::fields::dialog_max(di), di);
+                let look = crate::field::Look { font: "TEENYFNT.DAT", colour: 0xC0, put_font: true };
+                match self.talk() {
+                    Some(t) => {
+                        t.edit(m, field, look, crate::dialog::Prompt::Lines(lines));
+                        // Not answered yet: "0", which every shop takes as
+                        // leaving (the tavern's days are asked again until
+                        // they are digits, so nothing typed would ask
+                        // forever); the turn is then thrown away and the
+                        // question shown.
+                        if t.need.is_some() {
+                            m.mem.w16(DS, di, 0x30);
+                        }
+                    }
+                    None => m.mem.w16(DS, di, 0x30),
                 }
                 0
             }
@@ -407,10 +414,12 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
     }
-    /// The name typed into DS:`si` (581A, 1Fh characters and a NUL).
+    /// 1194:65FD: the name at DS:`si` (581A) edited in place on the
+    /// spellmaker's screen, in ARENAFNT.DAT ([102C]) and colour A0h.
     fn type_name(&mut self, m: &mut Machine, si: u16) {
         if let Some(t) = self.front.talk.as_deref_mut() {
-            t.typed(m, si, 0x1F, "The spell's name?");
+            let look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0xA0, put_font: true };
+            t.edit(m, arena::lineedit::fields::spell_name(m, si), look, crate::dialog::Prompt::Bare);
         }
     }
 }

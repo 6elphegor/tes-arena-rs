@@ -35,6 +35,7 @@ pub mod level;
 pub mod levelup;
 pub mod load;
 pub mod light;
+pub mod lineedit;
 pub mod log;
 pub mod loot;
 pub mod loot_window;

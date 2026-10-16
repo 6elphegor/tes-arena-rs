@@ -6,10 +6,12 @@
 //! given, the run stops there (the click taken as a cancel, the name as
 //! Esc; that run is thrown away) and the screen shows what it drew up to
 //! then: LOADSAVE.IMG, NAMES.DAT's names (from the save folder) centred
-//! over their boxes, and while a name is typed (0000:9EE5, not ported:
-//! the view's own editor, 2Fh characters at most) its box and the text.
-//! The names are drawn in FONT_A.DAT: the view doesn't map the menu's
-//! font record ([102C]) to its file.
+//! over their boxes, and while a name is typed its box and the game's
+//! editor on it (0000:9EE5, `field::Live`, 2Fh characters at most, in
+//! ARENAFNT.DAT ([102C]) and colour 0Fh; its passes' inputs the name's
+//! answer, given to the editor in the replay). The names are drawn in
+//! FONT_A.DAT: the view doesn't map the menu's font record ([102C]) to
+//! its file.
 
 use std::path::{Path, PathBuf};
 
@@ -19,7 +21,13 @@ use arena::machine::Machine;
 use arena::mem::DS;
 use arena::savemenu::{var, MenuHooks, SaveChoice};
 
+use crate::field::{Live, Look};
 use crate::hud::{Font, Screen};
+use arena::lineedit::EditKey;
+
+/// The name's field's look: ARENAFNT.DAT ([102C], 25FD:0039), colour 0Fh
+/// (25FD:0093).
+const LOOK: Look = Look { font: "ARENAFNT.DAT", colour: 0x0F, put_font: true };
 use crate::interface::Image;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,9 +63,10 @@ pub struct SaveUi {
     base: Engine,
     save_dir: PathBuf,
     clicks: Vec<(u16, u16)>,
-    names: Vec<Option<Vec<u8>>>,
-    /// The name being typed, with its box (BOX_X, BOX_Y).
-    pub typing: Option<(Vec<u8>, i32, i32)>,
+    names: Vec<Vec<EditKey>>,
+    /// The name being typed (the game's editor on a copy of the game as
+    /// the menu asked).
+    pub typing: Option<Box<Live>>,
     draws: Vec<Draw>,
     picture: Option<Image>,
     font: Option<Font>,
@@ -65,12 +74,12 @@ pub struct SaveUi {
 
 struct Script<'a> {
     clicks: &'a [(u16, u16)],
-    names: &'a [Option<Vec<u8>>],
+    names: &'a [Vec<EditKey>],
     dir: &'a Path,
     ci: usize,
     ni: usize,
     starved: bool,
-    typing: Option<(Vec<u8>, i32, i32)>,
+    typing: Option<Box<Live>>,
     draws: Vec<Draw>,
     message: Option<String>,
 }
@@ -107,20 +116,23 @@ impl MenuHooks for Script<'_> {
         self.starved = true;
         (0xFFFF, 0)
     }
+    /// 25FD:0098..00B0: the name's typing given to the game's editor; not
+    /// given yet, the editor opened for the window (the run stopped:
+    /// taken as Esc, FLAGS bit 1000h cleared).
     fn type_name(&mut self, m: &mut Machine) {
+        let field = arena::lineedit::fields::save_name(m);
         let given = self.names.get(self.ni).cloned();
         self.ni += 1;
         match given {
-            Some(Some(t)) => {
-                for (i, &b) in t.iter().take(0x2F).chain([0u8].iter()).enumerate() {
-                    m.mem.w8(DS, var::TYPED + i as u16, b);
+            Some(keys) => {
+                if crate::field::replay(m, &field, &LOOK, &keys) != Some(true) {
+                    eprintln!("the save's name gave up: {}", arena::giveup::describe());
                 }
             }
-            other => {
-                if other.is_none() && !self.starved {
+            None => {
+                if !self.starved {
                     self.starved = true;
-                    let (x, y) = (m.mem.r16(DS, var::BOX_X) as i32, m.mem.r16(DS, var::BOX_Y) as i32);
-                    self.typing = Some((m.mem.cstr(DS, var::TYPED).to_vec(), x, y));
+                    self.typing = Live::open(m, field, LOOK).map(Box::new);
                 }
                 let f = m.mem.r16(DS, var::FLAGS) & 0xEFFF;
                 m.mem.w16(DS, var::FLAGS, f);
@@ -174,47 +186,53 @@ impl SaveUi {
     /// A click at (x, y) of the screen (the right button cancels, as a
     /// negative x does).
     pub fn click(&mut self, x: i32, y: i32, right: bool) -> Ended {
-        if self.typing.is_some() {
-            return Ended::Open;
+        if let Some(l) = &mut self.typing {
+            // The right button ends the name's field (A172).
+            if right {
+                l.button();
+            }
+            return self.name_ended();
         }
         self.clicks.push(if right { (0xFFFF, 0) } else { (x as u16, y as u16) });
         self.replay()
     }
 
-    /// A key: while a name is typed, its characters, Backspace, Enter
-    /// (the name taken) and Esc (the menu again); otherwise Esc leaves.
-    pub fn key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) -> Ended {
-        use winit::keyboard::KeyCode;
-        let Some((t, _, _)) = &mut self.typing else {
-            if code == KeyCode::Escape {
-                self.clicks.push((0xFFFF, 0));
-                return self.replay();
-            }
-            return Ended::Open;
-        };
-        match code {
-            KeyCode::Enter | KeyCode::NumpadEnter => {
-                let t = t.clone();
-                self.names.push(Some(t));
-                self.replay()
-            }
-            KeyCode::Escape => {
-                self.names.push(None);
-                self.replay()
-            }
-            KeyCode::Backspace => {
-                t.pop();
-                Ended::Open
-            }
-            _ => {
-                for c in text.unwrap_or("").bytes().filter(|c| (0x20..0x7F).contains(c)) {
-                    if t.len() < 0x2F {
-                        t.push(c);
-                    }
-                }
-                Ended::Open
-            }
+    /// A key pressed: with no name typed, Esc leaves.
+    pub fn key(&mut self, code: winit::keyboard::KeyCode, _text: Option<&str>) -> Ended {
+        if self.typing.is_none() && code == winit::keyboard::KeyCode::Escape {
+            self.clicks.push((0xFFFF, 0));
+            return self.replay();
         }
+        Ended::Open
+    }
+
+    /// A key pressed or let go while a name is typed: to the game's
+    /// editor (Enter takes the name, Esc the menu again); the field
+    /// ended, the menu run again with its typing.
+    pub fn field_key(&mut self, scan: u8, down: bool) -> Ended {
+        if let Some(l) = &mut self.typing {
+            l.key(scan, down);
+        }
+        self.name_ended()
+    }
+
+    fn name_ended(&mut self) -> Ended {
+        match self.typing.as_ref().filter(|l| l.ended()).map(|l| l.keys().to_vec()) {
+            Some(keys) => {
+                self.typing = None;
+                self.names.push(keys);
+                self.replay()
+            }
+            None => Ended::Open,
+        }
+    }
+
+    /// A frame: the name's field's (`Live::frame`).
+    pub fn frame(&mut self) -> Ended {
+        if let Some(l) = &mut self.typing {
+            l.frame();
+        }
+        self.name_ended()
     }
 
     pub fn draw(&self, screen: &mut Screen) {
@@ -231,10 +249,11 @@ impl SaveUi {
                 }
             }
         }
-        if let Some((t, x, y)) = &self.typing {
-            screen.fill(*x, *y, 0x135, 9, 0, 0xFF);
-            let s = format!("{}_", String::from_utf8_lossy(t));
-            screen.text_plain(font, x + 0x0A, *y, &s, 0x0F);
+        // 25FD:0076..0088: the name's box cleared (9A6E, colour 0), then
+        // the field.
+        if let Some(l) = &self.typing {
+            screen.fill(l.field.x as i32 - 0x0A, l.field.y as i32, 0x135, 9, 0, 0xFF);
+            l.draw(screen, false);
         }
     }
 }
