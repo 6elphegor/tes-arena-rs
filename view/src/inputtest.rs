@@ -2044,3 +2044,22 @@ fn a_riddle_answered_wrong_shows_its_text_again() {
     assert_eq!(shown, 0xFF00, "the wrong answer's text");
     assert_eq!(wall, 0xB000, "the door shut");
 }
+
+/// An item's description (a right click on its line, 1194:1988) is
+/// dismissed by a key as by a click (1194:5536: ACB0 or AFF9), the key
+/// doing nothing more: Esc doesn't leave the screen.
+#[test]
+fn an_items_description_is_dismissed_by_a_key() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start::default());
+    named(&mut a);
+    // A weapon given (`--do give`).
+    panels::give(&mut a.engine.m, 1);
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyK, None);
+    d.key(&mut a, KeyCode::KeyN, None);
+    d.click(&mut a, 60, 51, MouseButton::Right);
+    assert!(matches!(&a.panel, Some(panels::Panel::Inventory(inv)) if inv.info.is_some()), "the first line described");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(matches!(&a.panel, Some(panels::Panel::Inventory(inv)) if inv.info.is_none()), "Esc took the description away, not the screen");
+}

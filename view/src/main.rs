@@ -3187,6 +3187,22 @@ impl App {
         let mut page = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
+                // A spell's page waits for clicks (51D1's 8FC4 loop); its
+                // Delete question takes its keys too (020E: Y, N at 4B60).
+                if let Some(page) = inv.page.clone() {
+                    let a = match code {
+                        KeyCode::KeyY if page.asking.is_some() => panels::PageAnswer::Confirm(0),
+                        KeyCode::KeyN if page.asking.is_some() => panels::PageAnswer::Confirm(1),
+                        _ => return,
+                    };
+                    self.page_answer(page, a);
+                    return;
+                }
+                // An item's description waits for a key or a click
+                // (1194:5536: ACB0 or AFF9), which does nothing more.
+                if inv.info.take().is_some() {
+                    return;
+                }
                 if let Some((names, sel)) = inv.using.as_mut() {
                     let n = names.len().max(1);
                     match code {
@@ -3288,6 +3304,26 @@ impl App {
         self.fade_open(0, 0, |a| a.panel = Some(panels::equipment_page(&mut a.engine.m)));
     }
 
+    /// An answer given to the spell's page `page` (up on the inventory).
+    /// A page shown sets its colours (1194:68D7, 9B56's parts); Exit fades
+    /// to black in 8 (1194:55B2) and the equipment screen's colours are
+    /// set again.
+    fn page_answer(&mut self, page: panels::SpellPage, a: panels::PageAnswer) {
+        let after = page.clone().answer(a.clone(), &mut self.engine.m.clone(), &mut self.engine.files.clone());
+        let drawn = page.pages;
+        let set = |s: &mut Self| {
+            if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
+                inv.page = page.answer(a, &mut s.engine.m, &mut s.engine.files);
+                inv.bare |= inv.page.is_none();
+            }
+        };
+        match after {
+            None => self.fade_open(8, 1, set),
+            Some(p) if p.pages > drawn => self.fade_open(0, 1, set),
+            Some(_) => set(self),
+        }
+    }
+
     /// A click with a panel up (`right`: the right button): an inventory
     /// line's item put on or off, or selected; the use list's entry used;
     /// the spellbook's entry cast.
@@ -3305,22 +3341,8 @@ impl App {
                         None if !right => Some(panels::PageAnswer::Click(x as u16, y as u16)),
                         None => None,
                     };
-                    let Some(a) = answer else { return };
-                    // A page shown sets its colours (1194:68D7, 9B56's
-                    // parts); Exit fades to black in 8 (1194:55B2) and the
-                    // equipment screen's colours are set again.
-                    let after = page.clone().answer(a.clone(), &mut self.engine.m.clone(), &mut self.engine.files.clone());
-                    let drawn = page.pages;
-                    let set = |s: &mut Self| {
-                        if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
-                            inv.page = page.answer(a, &mut s.engine.m, &mut s.engine.files);
-                            inv.bare |= inv.page.is_none();
-                        }
-                    };
-                    match after {
-                        None => self.fade_open(8, 1, set),
-                        Some(p) if p.pages > drawn => self.fade_open(0, 1, set),
-                        Some(_) => set(self),
+                    if let Some(a) = answer {
+                        self.page_answer(page, a);
                     }
                     return;
                 }
