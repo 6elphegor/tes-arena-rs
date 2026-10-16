@@ -1568,7 +1568,7 @@ fn the_options_screen_by_esc() {
     let mut a = app(&dir, &Start { save_dir: Some(scratch.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
-    let before = Engine { m: a.engine.m.clone(), files: a.engine.files.clone() };
+    let before = Engine::new(a.engine.m.clone(), a.engine.files.clone());
     d.key(&mut a, KeyCode::Escape, None);
     assert!(a.options.is_some() && !a.captured, "Esc opens the options screen, the mouse let go");
     let mut shot = hud::Screen::new(a.assets.palette);

@@ -247,7 +247,7 @@ pub fn load_game_title(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -
 
 fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: bool) -> Result<Run, String> {
     NEW_GAME.with(|n| n.set(false));
-    let mut e = Engine { m: engine.m.clone(), files: engine.files.clone() };
+    let mut e = Engine::new(engine.m.clone(), engine.files.clone());
     if title {
         let v = e.m.mem.r16(DS, 0x05C8) | 4;
         e.m.mem.w16(DS, 0x05C8, v);

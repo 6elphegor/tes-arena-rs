@@ -1586,7 +1586,7 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
 
 /// The engine copied, for a turn to run again (`dialog`).
 fn copy(engine: &Engine) -> Engine {
-    prof::time("turn.copy", || Engine { m: engine.m.clone(), files: engine.files.clone() })
+    prof::time("turn.copy", || Engine::new(engine.m.clone(), engine.files.clone()))
 }
 
 /// `src` copied into `dst`, reusing `dst`'s allocations (`copy` makes

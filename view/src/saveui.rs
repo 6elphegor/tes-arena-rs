@@ -158,7 +158,7 @@ impl SaveUi {
     /// The menu of `kind` opened on (a copy of) `engine`, the saves in
     /// `save_dir`.
     pub fn open(kind: Kind, engine: &Engine, save_dir: &Path, archive: &crate::archive::Archive) -> (SaveUi, Ended) {
-        let base = Engine { m: engine.m.clone(), files: engine.files.clone() };
+        let base = Engine::new(engine.m.clone(), engine.files.clone());
         let picture = crate::panels::load_image(archive, &engine.m, "LOADSAVE.IMG");
         let fonts = [(GameFont::A, "FONT_A.DAT"), (GameFont::B, "FONT_B.DAT"), (GameFont::Arena, "ARENAFNT.DAT"), (GameFont::Teeny, "TEENYFNT.DAT")]
             .into_iter()
@@ -171,7 +171,7 @@ impl SaveUi {
 
     /// The menu run again from the start with the inputs given.
     fn replay(&mut self) -> Ended {
-        let mut e = Engine { m: self.base.m.clone(), files: self.base.files.clone() };
+        let mut e = Engine::new(self.base.m.clone(), self.base.files.clone());
         let mut s = Script { clicks: &self.clicks, names: &self.names, dir: &self.save_dir, ci: 0, ni: 0, starved: false, typing: None, draws: Vec::new(), message: None };
         let end = match self.kind {
             Kind::Save => match e.m.save_menu(&mut e.files, &mut s) {

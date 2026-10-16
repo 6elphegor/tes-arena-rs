@@ -54,6 +54,7 @@ pub mod options;
 pub mod outfit;
 pub mod projectile;
 pub mod quest;
+pub mod render;
 pub mod questitems;
 pub mod movement;
 pub mod music;

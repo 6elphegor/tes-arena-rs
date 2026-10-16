@@ -340,3 +340,82 @@ fn the_3d_view_measured_against_the_originals() {
         enc.write_header().expect("png").write_image_data(&out).expect("png");
     }
 }
+
+/// The cases' set-ups and plays, by name (as the tests above play them).
+fn case(name: &str) -> Option<(Place, Box<dyn FnOnce(&mut App)>, Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>)> {
+    type Play = Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>;
+    let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
+        Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, n, until);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, after, |_| false);
+        })
+    };
+    Some(match name {
+        "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
+        "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
+        _ => return None,
+    })
+}
+
+/// The engine's own drawing of the 3D view (`render::draw`, the page it
+/// keeps) against the original's page, from gen_worldframes.py --dump's
+/// NAME.full and NAME.mask in ARENA_SCREENS: each case's 3D pixels (the
+/// mask's 0s) counted alike, the first that differ printed, and
+/// NAME-soft.png (the original's, the engine's, white where they
+/// differ).
+#[test]
+fn the_3d_view_drawn_as_the_original_draws_it() {
+    let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
+    let only = std::env::var("ARENA_CASE").ok();
+    for name in ["playdungeon", "playdown", "playcrypt"] {
+        if only.as_deref().is_some_and(|o| o != name) {
+            continue;
+        }
+        let (Ok(full), Ok(mask)) = (std::fs::read(dump.join(format!("{name}.full"))), std::fs::read(dump.join(format!("{name}.mask")))) else {
+            eprintln!("{name}: no dump");
+            continue;
+        };
+        let (place, setup, play) = case(name).unwrap();
+        let Some((a, _)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            // The original makes the level's lights (0000:478F) before
+            // its INF has loaded, from the last area's flats: none here.
+            a.engine.m.mem.w16(DS, 0xBC8E, 0);
+            a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
+            setup(a)
+        }, play) else { return };
+        let page = a.engine.page.clone().unwrap();
+        let (mut n, mut same) = (0, 0);
+        let mut shown = 0;
+        let mut out = vec![0u8; 960 * 200 * 3];
+        let pal = a.assets.dac();
+        for i in 0..64000 {
+            let three = mask[i] == 0;
+            let ok = full[i] == page[i];
+            if three {
+                n += 1;
+                if ok {
+                    same += 1;
+                } else if shown < 12 {
+                    eprintln!("{name}: ({}, {}) original {:02x}, engine {:02x}", i % 320, i / 320, full[i], page[i]);
+                    shown += 1;
+                }
+            }
+            let (x, y) = (i % 320, i / 320);
+            let diff = if !three { [0x40, 0, 0x40, 0] } else if ok { [0, 0, 0, 0] } else { [0xFF; 4] };
+            for (k, c) in [pal[full[i] as usize], pal[page[i] as usize], diff].into_iter().enumerate() {
+                let at = (y * 960 + k * 320 + x) * 3;
+                out[at..at + 3].copy_from_slice(&c[..3]);
+            }
+        }
+        eprintln!("{name}: {same} of {n} 3D pixels the original's ({:.2}%); not ported: {:?}", 100.0 * same as f64 / n.max(1) as f64, a.engine.page_gaps);
+        let file = std::fs::File::create(dump.join(format!("{name}-soft.png"))).expect("create");
+        let mut enc = png::Encoder::new(std::io::BufWriter::new(file), 960, 200);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.write_header().expect("png").write_image_data(&out).expect("png");
+    }
+}
