@@ -20,7 +20,7 @@
 use crate::Front;
 use crate::dialog::Talk;
 use crate::questui::{HaggleTalk, QuestFront};
-use crate::hud::{self, Menu, Span};
+use crate::hud::{self, Span};
 use arena::bsa::Files;
 use arena::haggle::Haggle;
 use arena::machine::Machine;
@@ -34,7 +34,7 @@ const NEW_OLD: u16 = 0x1346;
 /// the equipment store, 7 the mages' guild), as the talk enters it
 /// (`TalkHooks::shop`).
 pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
-    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new(), button: None };
+    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new() };
     let r = match kind {
         5 => m.temple(files, &mut ui),
         4 => m.tavern_shop(files, &mut ui),
@@ -117,12 +117,6 @@ struct ShopFront<'a, 'b> {
     picture: u16,
     /// Files the guild wrote (its stock), for the game's files after.
     written: Vec<(Vec<u8>, Vec<u8>)>,
-    /// The guild's spell screen: the button picked (a click inside it).
-    button: Option<(u16, u16)>,
-}
-
-fn line(s: &str) -> Vec<Span> {
-    vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]
 }
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a
@@ -172,23 +166,6 @@ impl ShopFront<'_, '_> {
         let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
         if let Some(b) = self.talk().and_then(|t| t.backdrop.as_mut()) {
             b.picture = Some(name);
-        }
-    }
-
-    /// A question the front end makes: the pick, or FFFFh (none, or left).
-    fn ask(&mut self, title: Vec<Vec<Span>>, entries: &[&str]) -> u16 {
-        let menu = Menu {
-            title,
-            entries: entries.iter().map(|e| line(e)).collect(),
-            keys: entries.iter().map(|e| e.as_bytes()[0]).collect(),
-            selected: 0,
-            list: false,
-            kind: 0,
-            font: None,
-        };
-        match self.talk() {
-            Some(t) => t.ask_menu(menu),
-            None => 0xFFFF,
         }
     }
 }
@@ -383,8 +360,8 @@ fn row(raw: &[u8]) -> Vec<Span> {
 
 /// The mages' guild: its menus, lists, haggling and boxes as the store's;
 /// the spell's screen (1194:68A3, its buttons Back, Buy and Exit along
-/// its bottom, clicked at y B8h up: x 5..69h, 78h..BEh, 11Dh..136h) asked
-/// as a question whose answer is a click inside the button picked.
+/// its bottom, clicked at y B8h up: x 5..69h, 78h..BEh, 11Dh..136h) shown
+/// as the spellmaker's is, a click on it the answer.
 impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     /// 1194:AD39: the screen and "Mages Guild" (6F11) on its banner.
     fn screen(&mut self, m: &mut Machine) {
@@ -433,18 +410,20 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             _ => (price, true),
         }
     }
-    fn spell_screen(&mut self, m: &mut Machine) {
-        let name = String::from_utf8_lossy(m.mem.cstr(DS, 0x57E6)).into_owned();
-        let pick = self.ask(vec![line(&name)], &["Buy", "Back", "Exit"]);
-        self.button = Some(match pick {
-            0 => (0x90, 0xC0),
-            1 => (0x30, 0xC0),
-            _ => (0x120, 0xC0),
-        });
-    }
-    fn click(&mut self, _m: &mut Machine) -> (u8, u16, u16) {
-        let (x, y) = self.button.take().unwrap_or((0x120, 0xC0));
-        (1, x, y)
+    /// The page is drawn behind the click asked (`click`: the screen kept
+    /// as the spellmaker's, `Talk::maker`, 68D7 drawing BUYSPELL.IMG for
+    /// 101D FFh).
+    fn spell_screen(&mut self, _m: &mut Machine) {}
+    /// Each poll of the page: a click on it asked (as the spellmaker's,
+    /// `Talk::spell_click`, the screen kept as 68D7 drew it: 101D FFh,
+    /// which 1194:A933 clears after); unanswered, "exit", as leaving does.
+    fn click(&mut self, m: &mut Machine) -> (u8, u16, u16) {
+        let mut drawn = m.clone();
+        drawn.mem.w8(DS, 0x101D, 0xFF);
+        match self.talk().and_then(|t| t.spell_click(&drawn, None)) {
+            Some((x, y)) => (1, x, y),
+            None => (1, 0x120, 0xC0),
+        }
     }
     /// The spellmaker (1194:6064 with SI the player), its clicks, lists
     /// and name answered through `dialog` (`LiveMaker`); its screen is

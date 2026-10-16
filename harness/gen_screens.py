@@ -99,6 +99,9 @@ SCREENS = {
     'templebless': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)]),
     'templecure': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x67)]),
     'templeheal': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x7F)]),
+    # The blessing's donation typed (1, 0, 0 and Enter, a key a wait):
+    # what the temple says to it.
+    'templedonate': ((0x1194, 0xC258, {}), [('click', 0xA0, 0x4F)] + [('keys', [k]) for k in (0x02, 0x0B, 0x0B, 0x1C)]),
     'storebuy': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x43)]),
     'storesell': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x5B)]),
     'storerepair': ((0x1194, 0xF48E, {}), [('click', 0xA0, 0x73)]),
@@ -158,6 +161,15 @@ SCREENS = {
     'talkrumor': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x7D)]),
     # Its Buy (the box at 3Ah..51h): the spells for sale.
     'guildbuy': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46)]),
+    # Its kinds (boxes 18h high, PICK ITEM's title first): the potions,
+    # the magic items, the spells for sale, each a list.
+    'guildpotions': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x59)]),
+    'guildmagic': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x71)]),
+    'guildspells': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x88)]),
+    # Their first lines clicked (the list's first row at 26h): what each
+    # asks.
+    'guildpotionpick': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26)]),
+    'guildspellpick': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x46), ('click', 0xA0, 0x88), ('click', 0x70, 0x26)]),
     # Its Detect Magic (52h..69h): the items to look at.
     'guilddetect': ((0x1194, 0xA73E, {}), [('click', 0xA0, 0x5E)]),
     # R: camping (01E6: 1194:424E), refused in the guild: its box.
@@ -204,7 +216,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
-              ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templecure', 'templeheal',
+              ('taverndrinks', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
                'storebuy', 'storesell', 'storerepair', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
                'tavernrumorgeneral', 'tavernrumorheard', 'tavernroomprice', 'tavernroomtaken',
                'tavernrest', 'tavernresthours', 'tavernrestneed')})

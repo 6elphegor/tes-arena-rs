@@ -716,7 +716,7 @@ impl Machine {
             self.mem.w8(DS, 0x137E, 3);
             self.split_lines(0x10A8);
             self.mem.w8(DS, 0x13D3, 2);
-            hooks.dialog(self, 2, 0x1044);
+            hooks.dialog_at(self, 2, 0x10A8, 0x1044);
             if self.rest_digits(0x1044) {
                 break;
             }
@@ -1021,11 +1021,15 @@ impl Machine {
             }
             self.guild_colour_102c();
             self.mem.w8(DS, 0x101D, 0xFF);
-            // 1194:68A3
+            // 1194:68A3: the record copied, the level the screen divides
+            // by (A898, A89A: the player's plus one), then its screen.
             for i in 0..0x55u16 {
                 let b = self.mem.r8(DATA, si.wrapping_add(i));
                 self.mem.w8(DS, SPELL_COPY + i, b);
             }
+            let level = (self.mem.r8(DS, 0x01AA) as u16).wrapping_add(1);
+            self.mem.w16(DS, 0xA89A, level);
+            self.mem.w16(DS, 0xA898, level);
             hooks.spell_screen(self);
             self.mem.w8(DS, 0x101D, 0);
             let restore = |m: &mut Self| {
@@ -1277,7 +1281,7 @@ impl Machine {
             self.mem.w8(DS, 0x137E, 3);
             self.split_lines(0x1044);
             self.mem.w8(DS, 0x13D3, 1);
-            if hooks.dialog(self, 1, 0x1044) != 0 {
+            if hooks.dialog_at(self, 1, 0x1044, 0x1044) != 0 {
                 return Some(());
             }
             let eax = self.mem.r32(DS, PRICE);

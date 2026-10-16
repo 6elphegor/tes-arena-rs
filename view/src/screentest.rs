@@ -1200,3 +1200,66 @@ fn the_maps_search_as_the_original_draws_it() {
 fn the_world_map_again_as_the_original_draws_it() {
     screen("worldback", |a, d| world_clicks(a, d, &[(70, 45), (80, 180)]), layer);
 }
+
+/// The guild's Buy, then its kind clicked at row `y` (as gen_screens.py's
+/// script clicks it, x A0h): the potions, the magic items, the spells.
+fn guild_buy(a: &mut App, d: &mut Driver, y: i32) {
+    guild_pick(a, d, KeyCode::Digit1, "1");
+    d.click(a, 0xA0, y, MouseButton::Left);
+}
+
+#[test]
+fn the_guilds_potions_as_the_original_draws_them() {
+    screen("guildpotions", |a, d| guild_buy(a, d, 0x59), layer);
+}
+
+/// The magic items: the inventory full (the save's), a box.
+#[test]
+fn the_guilds_magic_items_as_the_original_draws_them() {
+    screen("guildmagic", |a, d| guild_buy(a, d, 0x71), layer);
+}
+
+#[test]
+fn the_guilds_spells_as_the_original_draws_them() {
+    screen("guildspells", |a, d| guild_buy(a, d, 0x88), layer);
+}
+
+/// The potions' first line clicked: how many asked.
+#[test]
+fn a_guild_potion_picked_as_the_original_draws_it() {
+    screen(
+        "guildpotionpick",
+        |a, d| {
+            guild_buy(a, d, 0x59);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The spells' first line clicked: the spell's page.
+#[test]
+fn a_guild_spell_picked_as_the_original_draws_it() {
+    screen(
+        "guildspellpick",
+        |a, d| {
+            guild_buy(a, d, 0x88);
+            d.click(a, 0x70, 0x26, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
+/// The blessing's donation typed (100, Enter): what the temple says.
+#[test]
+fn a_temples_blessing_given_as_the_original_draws_it() {
+    screen(
+        "templedonate",
+        |a, d| {
+            shop_pick(a, d, 0x1004, 5, 0x4F);
+            super::type_text(d, a, "100");
+            d.key(a, KeyCode::Enter, None);
+        },
+        layer,
+    );
+}

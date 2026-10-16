@@ -9,3 +9,4 @@ screenfade | worldprovince | 70 | 40f6a41e18287ddc
 screenfade | worldtrip | 70 | 40f6a41e18287ddc
 screenfade | worldsearch | 70 | 40f6a41e18287ddc
 screenfade | worldback | 105 | ad34c8f6e802007
+screenfade | guildspellpick | 3 | e5b889bfc934ea49
