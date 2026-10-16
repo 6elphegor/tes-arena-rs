@@ -17,6 +17,7 @@ pub mod controls;
 pub mod creature;
 pub mod dice;
 pub mod dungeon;
+pub mod dungeonpic;
 pub mod effects;
 pub mod encounter;
 pub mod engine;

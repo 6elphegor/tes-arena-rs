@@ -61,6 +61,12 @@ SCREENS = {
     # (CD4E, 0000:4537) asks whether to leave by the travel map (26F7:0000,
     # 1A81 set: from anywhere).
     'dungeonleave': ((0, 0x4537, {}), []),
+    # A main quest's dungeon reached by the travel map (292B:0362, which
+    # the map screen's end calls with AX the province): its picture and
+    # words, the screen black before (`black`) as the map's end leaves it
+    # (26F7:00CE's 1194:55B2). Province 0 (CRYPT.IMG) and 3 (DAGOTHUR.IMG).
+    'questpic0': ((0x292B, 0x0362, {'eax': 0}), []),
+    'questpic3': ((0x292B, 0x0362, {'eax': 3}), []),
 }
 
 def seen(a):
@@ -85,7 +91,12 @@ def upstairs(a):
     a.mu.mem_write(a.lin(a.ds, 0xBB0A), b'\xff')
 
 
-BEFORE = {'dungeonleave': upstairs, 'dungeonautomap': marked, 'dungeonmap': seen, 'dungeonloot': gs.loot_seeded,
+def black(a):
+    """The colours black, as the travel map's end faded them."""
+    a.dac[:] = bytes(0x300)
+
+
+BEFORE = {'questpic0': black, 'questpic3': black, 'dungeonleave': upstairs, 'dungeonautomap': marked, 'dungeonmap': seen, 'dungeonloot': gs.loot_seeded,
           'dungeonloottake': gs.loot_seeded}
 
 

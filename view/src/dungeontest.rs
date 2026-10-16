@@ -172,3 +172,33 @@ fn upstairs(a: &mut App, d: &mut Driver) {
 fn leaving_a_dungeon_by_its_stairs_as_the_original_draws_it() {
     dungeon_screen("dungeonleave", upstairs, layer);
 }
+
+/// A main quest's dungeon reached by the travel map: its picture and
+/// words (292B:0362 with AX the province), its colours faded in over 12
+/// steps. The original's is run alone from black, as the map's end leaves
+/// it (26F7:00CE's 1194:55B2); the view's fade out of the map is left out.
+fn quest_picture(name: &str, ax: u16) {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let (mut a, _d) = loaded(&dir, &save);
+    a.travel = Some(crate::travel::Travel::forced(&mut a.engine, &a.assets.archive));
+    a.fade.clear();
+    a.travel_input(|t, e, _| t.show_picture(e, ax));
+    a.fade.retain(|&(_, out)| !out);
+    check_fade_in("dungeonfades.txt", name, &mut a);
+    let (idx, dac) = layer(&mut a);
+    assert!(check_in(VECTORS, name, &idx, &dac), "{name}: differs from the original's");
+}
+
+#[test]
+fn a_main_quest_dungeons_picture_as_the_original_draws_it() {
+    quest_picture("questpic0", 0);
+}
+
+#[test]
+fn another_main_quest_dungeons_picture_as_the_original_draws_it() {
+    quest_picture("questpic3", 3);
+}

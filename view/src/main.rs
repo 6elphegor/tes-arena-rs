@@ -3157,8 +3157,28 @@ impl App {
     fn travel_input(&mut self, f: impl FnOnce(&mut travel::Travel, &mut Engine, &archive::Archive)) {
         let Some(shown) = self.travel.as_ref().map(|t| t.shown()) else { return self.travel_after() };
         let was = self.fade_from();
+        let pic = self.travel.as_ref().is_some_and(|t| t.picture_up());
         if let Some(t) = &mut self.travel {
             f(t, &mut self.engine, &self.assets.archive);
+        }
+        let pic_now = self.travel.as_ref().is_some_and(|t| t.picture_up());
+        if pic != pic_now {
+            if pic_now {
+                // A main quest's dungeon reached (292B:0362): the map faded
+                // out in 8 steps (26F7:00CE's 1194:55B2, the picture's own
+                // 55B2 then black to black), the picture in in 12 (5E3E).
+                self.fade_to(was, 8, 12);
+            } else {
+                // Its button: faded out in 8 (55B2), the area left from
+                // black.
+                let (queued, from, before) = was;
+                self.fade = queued;
+                let mut film = film::Film::new(Vec::new(), from);
+                film.fade(&[[0, 0, 0, 0xFF]; 256], 8);
+                self.fade.extend(film.frames.into_iter().map(|(_, dac)| (dac, true)));
+                self.fade_old = Some(before);
+            }
+            return self.travel_after();
         }
         match (shown, self.travel.as_ref().and_then(|t| t.shown_now())) {
             // 26F7:0176: a province's map opened, the world map faded out

@@ -6,3 +6,5 @@ screen | dungeontravel | cae0f692d1439f72 a97a4bafd992e4ed 4dd94c41c6636b95
 screen | dungeonloot | e905729cb65f5838 a97a4bafd992e4ed 77aee268a5bf4f45
 screen | dungeonloottake | e04d9311d37b0e6 a97a4bafd992e4ed 77aee268a5bf4f45
 screen | dungeonleave | 4c16ae6cc47301f 6c1d8428b606b30f
+screen | questpic0 | 99b37d0689ec0d0f 3bea17e44e29da5e
+screen | questpic3 | b6db8bf7b5c69cd9 33b4efb7d68b71c4
