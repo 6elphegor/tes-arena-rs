@@ -75,7 +75,7 @@ impl FrameHooks for Hooks {
     fn message_box(&mut self, m: &mut Machine, _text: u16) {
         count(m, 0xFFE8);
     }
-    fn message_box_number(&mut self, m: &mut Machine) {
+    fn message_box_number(&mut self, m: &mut Machine, _files: &mut Files) {
         count(m, 0xFFE0);
     }
     fn guards_arrive(&mut self, m: &mut Machine, _files: &mut Files, hook: u32) -> Option<()> {

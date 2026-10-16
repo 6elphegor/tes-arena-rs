@@ -394,6 +394,13 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 1194:A36C with AX 0: text number [137A] shown in its box (a
+    /// building's words on the way in, 0000:4903; a holiday's; a quest's).
+    fn message_box_number(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if m.text(files, self, 0, arena::mem::DS, 0).is_none() {
+            eprintln!("the text gave up: {}", arena::giveup::describe());
+        }
+    }
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
     /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box,
     /// what the box covers kept at the frame's start (0000:4B18) as the

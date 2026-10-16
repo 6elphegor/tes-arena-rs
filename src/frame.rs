@@ -53,7 +53,7 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// 1194:59C8: a message box with the text at DGROUP `text`.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A36C: the message box of text number [137A].
-    fn message_box_number(&mut self, _m: &mut Machine) {}
+    fn message_box_number(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 0000:05B5: the level's text shown (`level_text`: at DS:[3D42] in
     /// the EMS frame) drawn: its lines (to a CR, a `%` code the player's
     /// name at 01AD, a line ending in `:` the riddle's last), each centred
@@ -255,7 +255,7 @@ impl Machine {
             self.mem.w8(DS, 0x191F, 0);
             self.mem.w8(DS, 0x101C, 0);
             self.mem.w8(DS, 0x137E, 0);
-            hooks.message_box_number(self);
+            hooks.message_box_number(self, files);
             self.mem.w16(DS, 0xCB5E, 0);
         }
         // 292B:032A: a one-time note for classes without bit 20h.
@@ -328,7 +328,7 @@ impl Machine {
                     self.mem.w16(DS, 0x137A, 0x2F + n);
                     self.mem.w8(DS, 0x101C, 0);
                     self.mem.w8(DS, 0x137E, 0);
-                    hooks.message_box_number(self);
+                    hooks.message_box_number(self, files);
                 }
             }
         }
@@ -355,7 +355,7 @@ impl Machine {
             self.mem.w16(DS, 0x137A, 0x05A6);
             self.mem.w8(DS, 0x137E, 0x3C);
             self.mem.w8(DS, 0x7387, 2);
-            hooks.message_box_number(self);
+            hooks.message_box_number(self, files);
         }
         // The clock: a minute each 90 ticks.
         let now = self.mem.r16(DS, TICKS);

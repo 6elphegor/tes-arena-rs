@@ -323,6 +323,9 @@ SCREENS = {
     # not where it drew them. No: text Fh; Yes: the offer itself asked
     # (its text, 1194:9162..9321), then taken or refused; with none on
     # offer (`unoffered`), text Dh.
+    # The palace's first frame (0000:4903): its pending box (191F, set on
+    # the way in) taken, text [137A] (0) shown by 1194:A36C with AX 0.
+    'palacewelcome': ((0x1194, 0xA36C, {'eax': 0}), []),
     'palace': ((0x1194, 0xDB6C, {}), []),
     'palaceno': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x88)]),
     'palaceyes': ((0x1194, 0xDB6C, {}), [('click', 0xA0, 0x6E)]),
@@ -342,7 +345,7 @@ WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp':
          'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
-         'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
+         'palacewelcome': 'palace', 'palace': 'palace', 'palaceno': 'palace', 'palaceaccept': 'palace', 'palacedecline': 'palace', 'palaceyes': 'palace', 'palacenone': 'palace'}
 WHERE.update({n: next(k for k in ('tavern', 'temple', 'store') if n.startswith(k)) for n in
               ('taverndrinks', 'taverndrink', 'tavernroom', 'tavernrumor', 'templebless', 'templedonate', 'templecure', 'templeheal',
                'storebuy', 'storebuyroom', 'storeweapons', 'storearmor', 'storeweapon', 'storebuyhaggle', 'storesell', 'storerepair', 'storerepairitem', 'storerepairworn', 'storesteal', 'storestolen', 'tavernroomdays', 'storesellequipped', 'storesellhaggle',
@@ -407,6 +410,16 @@ def ruler(a):
     a.w16(RECORD + 4, a.r16(0xC3D4))
     a.mu.mem_write(a.lin(a.ds, RECORD + 0xC), bytes([a.r16(0xC38E) & 0xFF]))
     a.w16(0xCB5E, RECORD)
+
+
+def pending(a):
+    """The frame's pending box taken as 0000:4903 takes it: CB5E FFFFh,
+    191F, 101C and 137E cleared."""
+    a.w16(0xCB5E, 0xFFFF)
+    for at in (0x191F, 0x101C, 0x137E):
+        a.mu.mem_write(a.lin(a.ds, at), bytes([0]))
+    # The text's variant rolled from SEED on both sides.
+    seeded(a)
 
 
 def unoffered(a):
@@ -638,7 +651,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'storesteal': lambda a: (room(a), seeded(a)),
           'storestolen': lambda a: (room(a), seeded(a, STEAL_SEED)),
           'equipmentpotion': potion, 'usepotions': potion, 'usepotion': potion,
-          'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
+          'palacewelcome': pending, 'palace': ruler, 'palaceno': ruler, 'palaceaccept': ruler, 'palacedecline': ruler, 'palaceyes': ruler, 'palacenone': lambda a: (unoffered(a), ruler(a))}
 
 
 # What a screen's routine is followed by that the next frame would do:

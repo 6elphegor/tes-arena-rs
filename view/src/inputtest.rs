@@ -311,7 +311,23 @@ fn esc_leaves_the_talk_as_by_script() {
     same(&a, &b, "Esc and --picks -1");
     // The game goes on afterwards.
     d.frames(&mut a, 3);
+    // The start's day is New Life: its message once in town by day.
+    holiday_read(&mut d, &mut a);
     assert!(a.pending.is_none() && a.boxes.is_empty());
+}
+
+/// The start's day (1st of Morning Star) is the New Life Festival: in a
+/// town by day the frame shows its message once (2DA2:111C's holiday,
+/// 05E0 bit 100h); frames until it is up, then it is read.
+fn holiday_read(d: &mut Driver, a: &mut App) {
+    for _ in 0..8 {
+        if a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x100 != 0 {
+            break;
+        }
+        d.frame(a);
+    }
+    assert!(a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x100 != 0, "the holiday's message");
+    clear(d, a);
 }
 
 #[test]
@@ -445,6 +461,7 @@ fn f5_saves_and_f9_loads_back() {
     let mut a = app(&dir, &Start { save_dir: Some(saves.to_path_buf()), ..Default::default() });
     let mut d = Driver::new(&mut a);
     d.frames(&mut a, 2);
+    holiday_read(&mut d, &mut a);
     let at = |app: &App| {
         let v = app.engine.view();
         (v.x, v.y, v.heading)
@@ -605,6 +622,7 @@ fn a_captured_click_and_swing_and_look() {
     let Some(dir) = game_dir() else { return };
     let mut a = app(&dir, &Start::default());
     let mut d = Driver::new(&mut a);
+    holiday_read(&mut d, &mut a);
     // A click on the bar (below the view) off its buttons captures the
     // mouse.
     d.click(&mut a, 240, 170, MouseButton::Left);

@@ -31,13 +31,8 @@ fn fnv(b: impl IntoIterator<Item = u8>) -> u64 {
     h
 }
 
-/// The vectors: per screen, the page's digest, the palette's, the mask's
-/// (None: the whole page).
-fn vectors() -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
-    vectors_in(VECTORS)
-}
-
-/// `vectors` from another file of them (dungeontest's).
+/// The vectors in the file at `path`: per screen, the page's digest, the
+/// palette's, the mask's (None: the whole page).
 fn vectors_in(path: &str) -> std::collections::HashMap<String, (u64, u64, Option<u64>)> {
     let text = std::fs::read_to_string(path).expect(path);
     let mut out = std::collections::HashMap::new();
@@ -907,6 +902,10 @@ fn into(a: &mut App, list: u16) {
     m.wall_trigger(&mut a.engine.files, &mut arena::trigger::NoTriggerHooks).expect("the door's trigger");
     assert!(m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the door leads in");
     area_left(a);
+    // The building's words on the way in (191F, which the first frame
+    // shows, 0000:4903) taken as read: gen_screens.py runs its screens
+    // from the snapshot without that frame.
+    a.engine.m.mem.w8(DS, 0x191F, 0);
 }
 
 /// The tavern's services (1194:B93C, the table at 869F's kind 4) in the
@@ -1987,6 +1986,23 @@ fn ruler(a: &mut App, d: &mut Driver) {
     m.rng.seed = SEED;
     d.frame(a);
     assert!(a.pending.is_some() || !a.boxes.is_empty(), "the ruler's words");
+}
+
+/// In the palace, its first frame: the box its way in left pending (191F,
+/// text [137A] 0), shown by 0000:4903 through 1194:A36C.
+#[test]
+fn the_palaces_audience_chamber_as_the_original_draws_it() {
+    screen(
+        "palacewelcome",
+        |a, d| {
+            into_palace(a);
+            a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+            a.engine.m.rng.seed = SEED;
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the palace's words");
+        },
+        over,
+    );
 }
 
 /// The ruler clicked: the save's quest on offer asked about.
