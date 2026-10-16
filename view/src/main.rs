@@ -3323,6 +3323,11 @@ impl App {
             if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
                 inv.page = page.answer(a, &mut s.engine.m, &mut s.engine.files);
                 inv.bare |= inv.page.is_none();
+                // Its name typed over (1194:65FD): the game's editor
+                // opened on the game as the page asked it.
+                if let Some((field, look, game)) = inv.page.as_ref().and_then(|p| p.typing.clone()) {
+                    s.live = field::Live::open(&game.0, field, look);
+                }
             }
         };
         match after {
@@ -3744,6 +3749,13 @@ impl App {
     fn field_ended(&mut self) {
         if let Some(keys) = self.live.as_ref().filter(|l| l.ended()).map(|l| l.keys().to_vec()) {
             self.live = None;
+            // A spell's page's name: the page's answer.
+            if let Some(panels::Panel::Inventory(inv)) = self.panel.as_ref() {
+                if let Some(page) = inv.page.clone().filter(|p| p.typing.is_some()) {
+                    self.page_answer(page, panels::PageAnswer::Keys(keys));
+                    return;
+                }
+            }
             self.answer(dialog::Answer::Keys(keys));
         }
     }

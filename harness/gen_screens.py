@@ -92,6 +92,13 @@ SCREENS = {
     # Delete's Yes: the spell off the list, the next one's page.
     'equipmentspelldeleted': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
                                        ('click', 0xE0, 190), ('click', 160, 112)]),
+    # The page's name (45h..83h, 30h..39h) clicked: typed over (1194:65FD,
+    # the editor at 45h, 30h, the cursor at the click's x less 45h); then
+    # X and Enter typed (a key a wait): the spell renamed, its page again.
+    'equipmentspellname': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                    ('click', 0x60, 0x34)]),
+    'equipmentspellrenamed': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
+                                       ('click', 0x60, 0x34)] + [('keys', [k]) for k in (0x2D, 0x1C)]),
     'equipmentspellexit': (0x00BE, [('click', 0x80, 0xB8), ('click', 78, 194), ('click', 60, 62), ('click', 60, 62),
                                     ('click', 0x120, 190)]),
     # S: the status box (037C: 04B1).

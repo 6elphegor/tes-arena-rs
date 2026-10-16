@@ -272,6 +272,8 @@ pub struct Inventory {
 pub enum PageAnswer {
     Click(u16, u16),
     Confirm(u16),
+    /// The name's field's passes' inputs (`field::Live`), as typed.
+    Keys(Vec<arena::lineedit::EditKey>),
 }
 
 /// A spell's page up (`Machine::spell_page`, 1194:51D1): the game as the
@@ -287,6 +289,9 @@ pub struct SpellPage {
     pub asking: Option<(Vec<u8>, usize)>,
     /// The pages drawn on the way (68D7, each setting its colours).
     pub pages: usize,
+    /// The name's field asked (1194:65FD), when that is what waits: the
+    /// field, its look and the game as it asked it.
+    pub typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
 }
 
 /// The page's questions answered from `answers`; the first one without
@@ -298,6 +303,7 @@ struct Replay {
     shown: Option<Machine>,
     asking: Option<Vec<u8>>,
     pages: usize,
+    typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
 }
 
 impl Replay {
@@ -324,6 +330,27 @@ impl arena::spellpage::SpellPageHooks for Replay {
         }
         (1, 0x120, 0xC0)
     }
+    /// 1194:65FD: the name at 581A typed over in place on the page
+    /// (1194:661B's field: 45h, 30h, the cursor at the click's x less
+    /// 45h), in ARENAFNT.DAT ([102C]) and colour A0h, as the spellmaker's.
+    fn type_name(&mut self, m: &mut Machine) {
+        if self.waiting {
+            return;
+        }
+        let field = arena::lineedit::fields::spell_name(m, arena::spellmaker::var::NAME);
+        let look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0xA0, put_font: true };
+        match self.answers.pop_front() {
+            Some(PageAnswer::Keys(keys)) => {
+                if crate::field::replay(m, &field, &look, &keys) != Some(true) {
+                    eprintln!("the spell's name gave up: {}", arena::giveup::describe());
+                }
+            }
+            _ => {
+                self.wait(m);
+                self.typing = Some((field, look, crate::dialog::Snapshot(Box::new(m.clone()))));
+            }
+        }
+    }
     fn confirm(&mut self, m: &mut Machine, si: u16) -> u16 {
         if !self.waiting {
             match self.answers.pop_front() {
@@ -344,7 +371,7 @@ impl SpellPage {
     fn run(start: &Machine, files: &mut arena::bsa::Files, answers: &[PageAnswer], m: &mut Machine) -> Option<SpellPage> {
         let mut game = start.clone();
         let mut fs = files.clone();
-        let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0 };
+        let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0, typing: None };
         if game.spell_page(&mut fs, &mut r).is_none() {
             eprintln!("the spell's page gave up: {}", arena::giveup::describe());
         }
@@ -355,6 +382,7 @@ impl SpellPage {
                 shown: crate::dialog::Snapshot(Box::new(shown)),
                 asking: r.asking.map(|t| (t, 0)),
                 pages: r.pages,
+                typing: r.typing,
             }),
             _ => {
                 *m = game;

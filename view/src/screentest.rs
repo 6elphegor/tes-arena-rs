@@ -433,6 +433,60 @@ fn a_spells_page_as_the_original_draws_it() {
     spell_page("equipmentspellpage", None);
 }
 
+/// `layer` with the typed field's cursor shown at its place, as the
+/// original's first pass shows it (a shot counts no frames of its blink).
+fn layer_typed(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    let live = a.live.take();
+    a.compose();
+    if let Some(l) = &live {
+        l.draw(&mut a.screen, true);
+    }
+    a.live = live;
+    let idx = a.screen.indices().to_vec();
+    let dac = a.screen.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+    (idx, dac)
+}
+
+/// Its name (45h..83h, 30h..39h) clicked: typed over (1194:65FD, the
+/// cursor where it was clicked).
+#[test]
+fn a_spells_name_asked_as_the_original_draws_it() {
+    screen(
+        "equipmentspellname",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0x60, 0x34, MouseButton::Left);
+            assert!(a.live.is_some(), "the name's field");
+        },
+        layer_typed,
+    );
+}
+
+/// X and Enter typed: the spell renamed ("Lightx Heal"), its page again.
+#[test]
+fn a_spell_renamed_as_the_original_draws_it() {
+    screen(
+        "equipmentspellrenamed",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 78, 194, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 60, 62, MouseButton::Left);
+            d.click(a, 0x60, 0x34, MouseButton::Left);
+            assert!(a.live.is_some(), "the name's field");
+            d.key(a, KeyCode::KeyX, Some("x"));
+            d.key(a, KeyCode::Enter, None);
+            assert!(a.live.is_none(), "the name's field ended");
+        },
+        layer,
+    );
+}
+
 #[test]
 fn a_spells_page_turned_on_as_the_original_draws_it() {
     spell_page("equipmentspellnext", Some((30, 190)));
