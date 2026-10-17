@@ -1,21 +1,7 @@
 # DGROUP ranges the load-state comparison leaves out (view/src/worldtest.rs
 # the_load_as_the_original_leaves_it): start end (hex, end exclusive) and why.
-# The harness's ways (screens.py `start` and dos.py):
+# The EMS banks (loadems) are compared whole. Only the harness's ways
+# (screens.py `start` and dos.py) are left:
 1020 1024 the extra block's far pointer: the harness puts its own at 0900:0010 (EXTRA), where main allocates it
 7d0d 7d0f the working slot's digits: the harness writes the slot (1A80, 1A6C) without main's 1194:3A51, which writes them
 9036 90b6 the EMS driver's page maps: the harness's stand-ins (dos.py `enable_ems`), no driver behind the port's EMS
-1aea 1b52 the DOS find's record and names as the slot's copy (25FD:06A1) leaves the last found: the harness's DOS fills them, in its own directory order
-# Not ported yet (the port's state differs; each named for what would
-# fix it):
-126c 1270 the bars' drawing (2901:00F4 BX) and 0000:67A2's word (25FD:0585): the load's screen, drawn by the view
-3f03 3f04 the number-to-text buffer's digits (0000:704D): a number the load's screen draws
-a933 a934 the number-to-text buffer's last digit (0000:703D)
-4b8f 4b90 1194:5070's byte: the load's screen
-5f5c 5f66 the level's sounds' handles (25FD:05D4 from 0000:6C0C): the sounds' loads not modelled on the machine
-9176 9186 the last file opened's name (0000:6B0D): the interface's loads (P1.IMG, STATUS.CIF, FACES03.CIF: 0000:4DD6's drawing) not run on the machine
-9192 919e the BSA directory cache's position (0000:6A71, 6879, 69B8, 69E5) after those loads
-a908 a90e the open file's state (0000:6B33, 6B38, 745C) after those loads
-9288 9289 the text colour (2901:0106): the bars' drawing
-a836 a859 the mouse's and the screen regions' state (0000:DBCA, 1A5C, 2686:062D, 0000:9663..99D2, F098, F165): the load's screen and pointer
-adb6 adb9 the text drawing's state (0000:9E18, 9E96)
-b038 b03a the boxes' tiles in use (0000:9AFC): the load's screen's box

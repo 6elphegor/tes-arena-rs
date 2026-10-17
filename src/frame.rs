@@ -796,6 +796,10 @@ impl Machine {
         for (o, v) in [(0xA91Eu16, 0x140u16), (0xA91C, 0xC8), (0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
             self.mem.w16(DS, o, v);
         }
+        // 4E20..4E29: the bar's picture (P1.IMG, named at 12E4) read into
+        // the draw page ([A900]) at B7C0h, row 147.
+        let page = self.mem.r16(DS, 0xA900);
+        self.file_load(files, 0x12E4, page, 0xB7C0)?;
         self.view_record(0x883E);
         self.weather_drops()?;
         let f = self.mem.r16(DS, 0x05CA) & !8;
@@ -803,17 +807,106 @@ impl Machine {
         if self.mem.r8(DS, 0x01A9) & 0x20 == 0 {
             self.mem.w16(DS, 0x05CA, f | 8);
         }
-        // 4E41..4E75, the bar's texts (their drawing the front end's):
-        // the font from 102E (9AEA: B036); the player's name (1194:4BC8
-        // with SI 1A4) copied to 1044, cut at its first space, colour F0h
-        // (9288); 12BA cleared for the portrait (4E81); the font from 102C.
+        // 4E41..4E7B, the bar's texts and pictures (their pixels the front
+        // end's): the font from 102E (9AEA: B036); the player's name
+        // (1194:4BC8 with SI 1A4) copied to 1044, cut at its first space,
+        // colour F0h (9288), drawn at (11h, 9Ah) (`text_state`); 12BA
+        // cleared, the condition's picture (4E81, `status_picture_load`)
+        // and the face (1194:2D5C, `portrait_load`) at (0Eh, A6h); the font
+        // from 102C; the page shown (946A); the bars (2901:00A8,
+        // `bars_state`).
         let v = self.mem.r16(DS, 0x102E);
         self.mem.w16(DS, 0xB036, v);
         self.name_text(0x01A4);
+        self.text_state(0x11, 0x9A, 0x1044);
         self.mem.w16(DS, 0x12BA, 0);
+        self.status_picture_load(files, 0x01A4)?;
+        self.portrait_load(files, 0x01A4, 0x0E, 0xA6)?;
         let v = self.mem.r16(DS, 0x102C);
         self.mem.w16(DS, 0xB036, v);
+        self.bars_state();
         Some(())
+    }
+
+    /// 0000:4E81 with SI `si` (a person's record; nothing with its name,
+    /// +9, empty): the condition's picture STATUS.CIF (named at 8856) read
+    /// into the frame ([9030]:0) with the load bank ([1030]) mapped, and
+    /// the bank mapped before put back. Which of its pictures, and its
+    /// drawing, are the front end's.
+    pub fn status_picture_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        if self.mem.r8(DS, si.wrapping_add(9)) == 0 {
+            return Some(());
+        }
+        let old = self.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
+        let bank = self.mem.r16(DS, 0x1030);
+        self.ems_map(bank);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.file_load(files, 0x8856, frame, 0)?;
+        self.ems_map(old);
+        Some(())
+    }
+
+    /// 1194:2D5C with SI `si` (a person's record), AX `x`, BX `y` and DX
+    /// 0: the face's file named (2DAF: FACES0r.CIF at 3EFD, a woman's,
+    /// +7 set, FACESF0r.CIF at 3F09; the character two before the '.'
+    /// '1' with 12BA set, else '0'; the race, +4, written in before the
+    /// '.' by 0000:7024) and read into the frame with bank 17h mapped
+    /// (0000:7428); then with bank 17h mapped again its picture +6Bh
+    /// found (5CCC) and, BX not FFFFh, its place set to (`x`, `y`); its
+    /// drawing (5828) is the front end's. The bank mapped before is put
+    /// back each time.
+    pub fn portrait_load(&mut self, files: &mut Files, si: u16, x: u16, y: u16) -> Option<()> {
+        use crate::level::var::EMS_MAPPED;
+        let name = if self.mem.r8(DS, si.wrapping_add(7)) != 0 { 0x3F09u16 } else { 0x3EFD };
+        // `repne scasb` for '.' in 14h bytes: DI past it (or past them).
+        let past_dot = |m: &Machine| {
+            let mut di = name;
+            for _ in 0..0x14 {
+                let b = m.mem.r8(DS, di);
+                di = di.wrapping_add(1);
+                if b == b'.' {
+                    break;
+                }
+            }
+            di
+        };
+        let di = past_dot(self);
+        let c = if self.mem.r16(DS, 0x12BA) != 0 { b'1' } else { b'0' };
+        self.mem.w8(DS, di.wrapping_sub(3), c);
+        let di = past_dot(self);
+        let race = self.mem.r8(DS, si.wrapping_add(4)) as u16;
+        self.store_utoa(race, di.wrapping_sub(2));
+        let old = self.mem.r16(DS, EMS_MAPPED) >> 2;
+        self.ems_map(0x17);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.file_load(files, name, frame, 0)?;
+        self.ems_map(old);
+        let old = self.mem.r16(DS, EMS_MAPPED) >> 2;
+        self.ems_map(0x17);
+        let mut at = 0u16;
+        for _ in 0..self.mem.r8(DS, si.wrapping_add(0x6B)) {
+            at = at.wrapping_add(self.mem.r16(frame, at.wrapping_add(0xA))).wrapping_add(0xC);
+        }
+        if y != 0xFFFF {
+            self.mem.w16(frame, at, x);
+            self.mem.w16(frame, at.wrapping_add(2), y);
+        }
+        self.ems_map(old);
+        Some(())
+    }
+
+    /// 2901:00A8's state: the three bars (health 1FD of 1FF at x 39h,
+    /// colour 1Ah; fatigue 201 of (1CD + 1D2) x 40h at 43h, 9Fh; spell
+    /// points 20A of 20C at 4Dh, 3Eh) drawn: each leaves its x at 126C
+    /// and, with a maximum not 0, its colour at 9288.
+    pub fn bars_state(&mut self) {
+        let fatigue = (self.mem.r8(DS, 0x01CD) as u16 + self.mem.r8(DS, 0x01D2) as u16) << 6;
+        for (x, max, colour) in [(0x39u16, self.mem.r16(DS, 0x01FF), 0x1Au8), (0x43, fatigue, 0x9F), (0x4D, self.mem.r16(DS, 0x020C), 0x3E)] {
+            self.mem.w16(DS, 0x126C, x);
+            if max != 0 {
+                self.mem.w8(DS, 0x9288, colour);
+            }
+        }
     }
 
     /// 1194:4BCC's text: 9288 F0h, the name at `si` + 9 copied to 1044

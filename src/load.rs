@@ -81,8 +81,12 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     fn automap_keep(&mut self, m: &mut Machine, files: &mut Files) {
         m.automap_write(files);
     }
-    /// 25FD:0803: "Loading..." shown.
-    fn loading(&mut self, _m: &mut Machine) {}
+    /// 25FD:0803: "Loading..." shown (`Machine::loading_shown`, by
+    /// default, its box's background black).
+    fn loading(&mut self, m: &mut Machine) {
+        // The box's background goes to the frame: no heap is asked.
+        let _ = m.loading_shown(None);
+    }
     /// 25FD:06A1: the slot's files (*.nn) copied to the working ones. The
     /// default copies through `files` (`Machine::slot_files_in`).
     fn slot_files(&mut self, m: &mut Machine, files: &mut Files) {
@@ -99,8 +103,11 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     }
     /// 0000:A5D1: the view's screen set up.
     fn screen(&mut self, _m: &mut Machine) {}
-    /// 0000:DA8E: the view updated.
-    fn view_update(&mut self, _m: &mut Machine) {}
+    /// 0000:DA8E: the view updated (the floor's and ceiling's row
+    /// tables, `Machine::row_tables`, by default).
+    fn view_update(&mut self, m: &mut Machine) {
+        m.row_tables();
+    }
     /// 0000:E5C9: outdoors, the sky's images loaded into the EMS bank
     /// C8F3.
     fn sky_graphics(&mut self, _m: &mut Machine, _files: &mut Files) {}
@@ -131,7 +138,9 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
         m.music_start(si);
     }
     /// 2294:0006, the 3D mode in play: true where the hook did it (the
-    /// vectors stub it); by default not, and `Machine::mode_3d` runs.
+    /// vectors stub it); by default not, and `Machine::mode_3d_level`
+    /// runs (2294:0006 alone: not 025B's wrapper, whose 5D70 frees the
+    /// EMS banks the level's INF just took).
     fn mode_3d(&mut self, _m: &mut Machine) -> bool {
         false
     }
@@ -144,6 +153,18 @@ impl AreaHooks for NoLoadHooks {}
 impl FightHooks for NoLoadHooks {}
 impl LightHooks for NoLoadHooks {}
 impl LoadHooks for NoLoadHooks {}
+
+/// Which of the slot copies' entries runs their loop (25FD:06A1, 0612,
+/// 062D).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Copies {
+    /// 06A1: a slot's files in.
+    In,
+    /// 0612: the working files out to a slot (5E42 set).
+    Out,
+    /// 062D from 0219: the game's own "*.65", by their bare names.
+    Fresh,
+}
 
 /// How a load went.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -228,7 +249,8 @@ impl Machine {
     /// the ceiling 64h, the walking speed, standing (3Ch), the view's
     /// window (A5D1), the world's entry without an INF (A49C, as A4ED in
     /// `Engine::world_enter`: the banks, the deep floors, no changing
-    /// squares, the rain's drops, no moving lights, dry ground, the
+    /// squares, the rain's drops, no moving lights, dry ground and the
+    /// water's frames (`water_frames`), the
     /// buffer block (BA54, CB8Eh bytes from the heap's top), the entry
     /// hook C3B0 and the place hook CD2A where set, outdoors the sky's
     /// images; the renderer's parts drawing only), then SAVEGAME
@@ -268,6 +290,8 @@ impl Machine {
             self.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         self.mem.w8(DS, 0xCB5B, 1);
+        // A4BF: on dry ground, the water's frames (DFDB).
+        self.water_frames(files, 0xBA17)?;
         // A4C5, A561.
         self.buffer_block_alloc()?;
         self.draw_buffers_alloc()?;
@@ -429,7 +453,7 @@ impl Machine {
         let slot = self.mem.r8(DS, SLOT);
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w16(DS, SLOT_FILES + 2, Self::slot_digits(slot));
-        self.copy_slot_files(files, slot, w);
+        self.copy_slot_files(files, slot, w, Copies::In);
     }
 
     /// 25FD:0612. The working slot's files ("*.ww", digits at
@@ -442,18 +466,28 @@ impl Machine {
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w8(DS, 0x5E42, 1);
         self.mem.w16(DS, WORKING_FILES + 2, Self::slot_digits(w));
-        self.mem.w16(DS, 0x929E, Self::slot_digits(slot));
-        self.mem.w8(DS, 0x92A0, 0);
-        let out = self.copy_slot_files(files, w, slot);
+        let out = self.copy_slot_files(files, w, slot, Copies::Out);
         self.mem.w8(DS, 0x5E42, 0);
         out
     }
 
-    /// The copies of 06A1 and 0612: each "*.`from`" to the same name with
-    /// `to`'s digits. Returns the names made.
-    fn copy_slot_files(&mut self, files: &mut Files, from: u8, to: u8) -> Vec<Vec<u8>> {
+    /// The copies of 06A1, 0612 and 062D: each "*.`from`" (found through
+    /// the pattern's path, 25FD:0844, but for 062D's) to the same name
+    /// with `to`'s digits (0612 and 062D build them at 929E first, 92A0
+    /// 0), each copied (25FD:056F) from its name's path (its bare name
+    /// for 062D's) to the new name's path. Returns the names made.
+    fn copy_slot_files(&mut self, files: &mut Files, from: u8, to: u8, how: Copies) -> Vec<Vec<u8>> {
         let ext = Self::slot_digits(from).to_le_bytes();
         let digits = Self::slot_digits(to).to_le_bytes();
+        match how {
+            Copies::In => {
+                self.save_path(SLOT_FILES);
+            }
+            Copies::Out => {
+                self.save_path(WORKING_FILES);
+            }
+            Copies::Fresh => {}
+        }
         let mut made = Vec::new();
         for name in files.with_ext(&ext) {
             let stem = &name[..name.iter().rposition(|&c| c == b'.').unwrap_or(name.len())];
@@ -465,7 +499,14 @@ impl Machine {
                     self.mem.w8(DS, at + i as u16, c);
                 }
             }
-            if files.copy(&name, &new) {
+            if how != Copies::In {
+                self.mem.w16(DS, 0x929E, u16::from_le_bytes(digits));
+                self.mem.w8(DS, 0x92A0, 0);
+            }
+            let from_path = if how == Copies::Fresh { 0x1044 } else { self.save_path(0x1044) };
+            let to_path = self.save_path(0x1051);
+            if files.exists(&name) {
+                self.file_copy(files, from_path, to_path);
                 made.push(new);
             }
         }
@@ -508,7 +549,7 @@ impl Machine {
         self.delete_matching(files, WORKING_FILES);
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w8(DS, SLOT, w);
-        self.copy_slot_files(files, 65, w);
+        self.copy_slot_files(files, 65, w, Copies::Fresh);
     }
 
     /// 0000:AA4B..AA5C, the end of SAVEGAME's load (after
@@ -532,7 +573,7 @@ impl Machine {
     /// - the fight under way (`fight_restore`), the effects' slots
     ///   (`fix_slot_segments`), the spells (`spells_load`), the province
     ///   (A46) loaded (`city_load_province`), the sky's images;
-    /// - in play (5C8 bit 4 clear) the 3D mode (`mode_3d`);
+    /// - in play (5C8 bit 4 clear) the 3D mode (2294:0006, `mode_3d_level`);
     /// - CB5C bit 80h clear, ENTERED (4BD0) the area; with no light
     ///   table (CCC2 0) and not full daylight, the renderer's set-up;
     /// - in the wilderness (C39A bit 200h): the area 1, its grid made
@@ -573,7 +614,7 @@ impl Machine {
         hooks.sky_graphics(self, files);
         let title = self.mem.r16(DS, 0x05C8) & 4 != 0;
         if !title && !hooks.mode_3d(self) {
-            self.mode_3d(hooks);
+            self.mode_3d_level(hooks);
         }
         let v = self.mem.r8(DS, 0xCB5C) & 0x7F;
         self.mem.w8(DS, 0xCB5C, v);

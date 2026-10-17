@@ -1011,15 +1011,17 @@ fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
 /// `areas::load_game_title` of the user's slot 1): DGROUP exactly the
 /// original's (`loadstate`), the engine's image segments taken to the
 /// harness's relocated ones and the offsets tests/vectors/loadexclude.txt
-/// names left out (`load_canonical`).
+/// names left out (`load_canonical`), and the EMS banks whole (`loadems`).
 #[test]
 fn the_load_as_the_original_leaves_it() {
     let Some(_) = played(Place::Street, |_| {}, |_, _, _| {}) else { return };
-    let (mine, _) = BASE.with(|b| b.borrow_mut().take()).unwrap();
+    let (mine, banks) = BASE.with(|b| b.borrow_mut().take()).unwrap();
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
     let want = text.lines().find_map(|l| l.strip_prefix("loadstate | ")).expect("a loadstate line");
     let got = fnv(load_canonical(&game_dir().unwrap(), &mine));
     assert_eq!(format!("{got:x}"), want, "the state after the load differs from the original's (the_load_measured_against_the_originals shows where)");
+    let want = text.lines().find_map(|l| l.strip_prefix("loadems | ")).expect("a loadems line");
+    assert_eq!(format!("{:x}", fnv(banks)), want, "the EMS banks after the load differ from the original's (the_load_measured_against_the_originals shows where)");
 }
 
 /// The game's state as the load leaves it, the engine's against the
@@ -1042,10 +1044,17 @@ fn the_load_measured_against_the_originals() {
     });
     let _ = std::fs::write(dump.join("base.mine"), &mine);
     let _ = std::fs::write(dump.join("base.mems"), &banks);
+    measured(&ds, &ems, &mine, &banks);
+}
+
+/// The DGROUP and EMS ranges where the engine's state (`mine`, `banks`)
+/// differs from the original's (`ds`, `ems`), printed: DGROUP in the
+/// original's form (`load_canonical`) and raw.
+fn measured(ds: &[u8], ems: &[u8], mine: &[u8], banks: &[u8]) {
     let hx = |v: &[u8]| v.iter().take(16).map(|b| format!("{b:02x}")).collect::<String>();
     // Against the original's in its form (`load_canonical`).
     let dir = game_dir().unwrap();
-    let canon = load_canonical(&dir, &mine);
+    let canon = load_canonical(&dir, mine);
     let mut skip = vec![false; 0x10000];
     excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadexclude.txt"), &mut skip);
     let orig: Vec<u8> = ds.iter().zip(&skip).map(|(&b, &x)| if x { 0 } else { b }).collect();
@@ -1054,15 +1063,75 @@ fn the_load_measured_against_the_originals() {
     for &(s, e) in &r {
         eprintln!("  c {s:04x}..{e:04x} orig {} mine {}", hx(&orig[s..e]), hx(&canon[s..e]));
     }
-    let r = differing(&ds, &mine, 4);
+    let r = differing(ds, mine, 4);
     eprintln!("DGROUP: {} bytes in {} ranges", (0..0x10000).filter(|&i| ds[i] != mine[i]).count(), r.len());
     for &(s, e) in &r {
         eprintln!("  {s:04x}..{e:04x} orig {} mine {}", hx(&ds[s..e]), hx(&mine[s..e]));
     }
-    let r = differing(&ems, &banks, 32);
+    let r = differing(ems, banks, 32);
     eprintln!("EMS: {} bytes in {} ranges", (0..ems.len()).filter(|&i| ems[i] != banks[i]).count(), r.len());
     for &(s, e) in r.iter().take(60) {
         eprintln!("  {:02x}:{:04x}..{:04x} orig {} mine {}", s >> 16, s & 0xFFFF, (s & 0xFFFF) + (e - s), hx(&ems[s..e]), hx(&banks[s..e]));
+    }
+}
+
+/// The places tests/vectors/playload.txt loads in (gen_playload.py): the
+/// guild as the title's Load leaves it, and the street.
+const PLAY_LOADS: [(&str, bool); 2] = [("guild", false), ("street", true)];
+
+/// Slot 1 loaded in play (`areas::load_game`: the load menu's 25FD:028D)
+/// at the top of a frame in the guild as the title's Load leaves it, or
+/// with `street` in the street (the guild left as `played` leaves it):
+/// DGROUP and the EMS banks after (`grab`).
+fn play_loaded(street: bool) -> Option<(Vec<u8>, Vec<u8>)> {
+    let dir = game_dir()?;
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return None;
+    };
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    a.engine.m.rng.seed = HARNESS_SEED;
+    a.engine.m.store_rng();
+    let mut d = Driver::new(&mut a);
+    clear(&mut d, &mut a);
+    if street {
+        area_left(&mut a);
+    }
+    if let Err(e) = crate::areas::load_game(&mut a.engine, &dir, &save.to_path_buf(), 1) {
+        panic!("the load in play failed: {e}");
+    }
+    Some(grab(&a))
+}
+
+/// A load in play leaves the game's state as the original's does: DGROUP
+/// in the original's form (`load_canonical`) and the EMS banks whole,
+/// against tests/vectors/playload.txt.
+#[test]
+fn the_play_loads_as_the_original_leaves_them() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/playload.txt");
+    let text = std::fs::read_to_string(path).expect(path);
+    for (name, street) in PLAY_LOADS {
+        let Some((mine, banks)) = play_loaded(street) else { return };
+        let want = text.lines().find_map(|l| l.strip_prefix(&format!("playload | {name} | "))).expect("a playload line");
+        let got = format!("{:x} {:x}", fnv(load_canonical(&game_dir().unwrap(), &mine)), fnv(banks));
+        assert_eq!(got, want, "{name}: the state after the load in play differs from the original's (the_play_loads_measured shows where)");
+    }
+}
+
+/// `the_play_loads_as_the_original_leaves_them` measured against the
+/// original's dumps (gen_playload.py --dump's NAME.ds and NAME.ems in
+/// ARENA_SCREENS): the ranges that differ, printed.
+#[test]
+fn the_play_loads_measured() {
+    let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
+    for (name, street) in PLAY_LOADS {
+        let (Ok(ds), Ok(ems)) = (std::fs::read(dump.join(format!("{name}.ds"))), std::fs::read(dump.join(format!("{name}.ems")))) else {
+            eprintln!("no {name} dump");
+            continue;
+        };
+        let Some((mine, banks)) = play_loaded(street) else { return };
+        eprintln!("== {name}");
+        measured(&ds, &ems, &mine, &banks);
     }
 }
 
@@ -1210,8 +1279,10 @@ fn the_state_as_the_original_leaves_it() {
 /// flag 1): the page as the last frame left it, which the view has as the
 /// screen it last showed (`Assets::shown`). Four frames in the street,
 /// the screen shown, then an arrival set (5C8 bit 100h, ENTERCTY.$$$ with
-/// gen_welcome.py's words) and one more frame: the kept header and rows
-/// against tests/vectors/welcome.txt.
+/// gen_welcome.py's words) and one more frame: the kept header and rows,
+/// as the welcome left them (the harness's at its wait for a key; the
+/// frame's 4DD6 loads the condition's picture over them after), against
+/// tests/vectors/welcome.txt.
 #[test]
 fn the_welcome_keeps_the_screen_as_the_original() {
     // The 3D view drawn by the engine's renderer, as the window has it.
@@ -1225,7 +1296,7 @@ fn the_welcome_keeps_the_screen_as_the_original() {
     a.engine.m.mem.w16(DS, 0x05C8, v);
     let mut d = Driver::new(&mut a);
     d.frame(&mut a);
-    let kept = a.engine.m.ems_bank(a.engine.m.mem.r16(DS, 0x1030));
+    let kept = crate::WELCOME_KEPT.with(|k| k.borrow_mut().take()).expect("no welcome");
     let w = |i: usize| u16::from_le_bytes([kept[2 * i], kept[2 * i + 1]]);
     let (x, y, wd, h) = (w(0) & 0x7FFF, w(1), w(2), w(3));
     assert_eq!(format!("{x:x} {y:x} {wd:x} {h:x}"), f[2], "the box's place");

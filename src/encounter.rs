@@ -109,8 +109,12 @@ impl Machine {
         if self.mem.r16(DS, si) == 0 {
             return Some(());
         }
+        // 1AF9 passes AX on as it finds it: the caller's for the first
+        // name (not kept here, 0), then 1A5C's own last, DS (1AF4).
+        let mut ax = 0;
         loop {
-            self.actor_graphics(files, si, 0x34, 0xFFFF, 0)?;
+            self.actor_graphics(files, si, 0x34, 0xFFFF, ax)?;
+            ax = DS;
             while self.mem.r8(DS, si) != 0 {
                 si = si.wrapping_add(1);
             }
