@@ -8,6 +8,7 @@ ba60 ba62 the frame's tick (BA60): the harness's timer ticks at each read of it
 acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' table
 cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 127a 127e 0000:47FD's return address kept on the stack's check
+af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
 # Where the heaps' layouts part (segments and scratch):
 8f6e 8f70 a segment the drawing keeps
 ccc2 ccc4 the light table's segment (the drawing's copy's own heap)
@@ -21,12 +22,5 @@ a908 a910 0000:742C's scratch
 9288 9289 the drawing's colour
 b036 b038 the texts' drawing's state
 adb6 adb8 the texts' drawing's state
-# The drawing's own variables, where the port's copy writes a word's high
-# byte the original's leaves (its pixels asserted exact apart, view3d):
-ba88 bb04 the walk's and the faces' variables
-c3e2 c3e4 the player's light's radius as the fog's step leaves it
-cd0b cd14 the faces' variables
-d7aa d7f0 the faces' variables
-d82a d83c the floor's and ceiling's rows' steps
-430f 4310 a flag the engine's entry leaves set and its first frame clears
-af88 af90 the polygon drawer's variables (85AE..8755), the port's kept in its own
+# The drawing's reading past its own tables into the heap:
+d82a d83c the ceiling's rows' light steps (0000:DC67): the crypt's farthest row reads one entry past its row table, the next heap block's header (as view3d1 leaves row 0 out)

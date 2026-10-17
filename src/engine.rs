@@ -308,7 +308,9 @@ impl Engine {
             self.page_gaps = gaps;
             self.page_creatures = creatures;
             for (o, before, after) in wrote {
-                self.page_wrote[o as usize] = Some((before, after));
+                // Written back to the machine's own byte: the original's
+                // holds the machine's there now, not an earlier frame's.
+                self.page_wrote[o as usize] = (before != after).then_some((before, after));
             }
         }
         // A322: the drawing's set-up (0000:D4B4, the floor's half).
@@ -317,7 +319,21 @@ impl Engine {
         }
         world_hook(m, files, hooks, Step::HookCD66, 0xCD66)?;
         if m.mem.r8(DS, 0xCB5C) != 0 {
-            world_hook(m, files, hooks, Step::Sky, 0xCD1A)?;
+            // The sky's hook runs on the machine too (its fog step,
+            // 2294:0B01): what it writes there is the machine's, not the
+            // drawing's copy's run of it.
+            let watched = self.page.is_some();
+            if watched {
+                m.mem.track();
+            }
+            let r = world_hook(m, files, hooks, Step::Sky, 0xCD1A);
+            if watched {
+                for o in m.mem.written_offsets() {
+                    self.page_wrote[o as usize] = None;
+                }
+                m.mem.untrack();
+            }
+            r?;
         } else {
             m.mem.w8(DS, STAGE, 4);
             if r(m, MAP_FLAGS) & 0x44 == 0 && !hooks.step(m, Step::DrawSetup(0xFEC0)) {

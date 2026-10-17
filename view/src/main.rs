@@ -1423,7 +1423,7 @@ fn main() {
             }
             arena::transit::Run::Start
         }
-        (None, None) => areas::start(&mut engine, args[2].starts_with("CITY:")),
+        (None, None) => areas::start(&mut engine, args[2].starts_with("CITY:"), !load_at_start),
     };
     interface::start(&mut engine.m);
     if load_at_start {

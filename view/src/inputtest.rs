@@ -53,7 +53,7 @@ fn app(dir: &Path, s: &Start) -> App {
             newgame::start(&mut engine, spec);
             arena::transit::Run::Start
         }
-        None => areas::start(&mut engine, s.level.starts_with("CITY:")),
+        None => areas::start(&mut engine, s.level.starts_with("CITY:"), s.load.is_none()),
     };
     interface::start(&mut engine.m);
     if let Some((save, slot)) = &s.load {
@@ -1493,7 +1493,7 @@ fn a_save_loaded_from_the_title_as_in_play() {
     };
     let fresh = || {
         let mut e = world::load(&dir, "START.MIF");
-        areas::start(&mut e, false);
+        areas::start(&mut e, false, true);
         e
     };
     let mut a = fresh();

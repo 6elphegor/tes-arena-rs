@@ -385,7 +385,7 @@ fn new_game(dir: &std::path::Path, spec: &str, level: u8) -> Option<(Engine, Run
     println!("1. {spec}: {}", state(m));
     // The town entered as the outer loop enters it (`areas::start`: the
     // working slot 65, whose CITYDATA.65 the quests write to; 0000:46B2).
-    let run = areas::start(&mut engine, true);
+    let run = areas::start(&mut engine, true, true);
     Some((engine, run))
 }
 
@@ -399,7 +399,7 @@ fn from_save(dir: &std::path::Path, save: &str) -> Option<(Engine, Run)> {
     let (p, i): (u8, u8) = (v.get(2).map_or(0, |s| s.parse().expect("P")), v.get(3).map_or(0, |s| s.parse().expect("I")));
     let mut engine = world::load(dir, "START.MIF");
     // As the view starts before its --load: an interior begun (`areas::start`).
-    areas::start(&mut engine, false);
+    areas::start(&mut engine, false, true);
     let mut run = match areas::load_game(&mut engine, dir, sdir, slot) {
         Ok(r) => r,
         Err(e) => {

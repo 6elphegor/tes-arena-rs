@@ -15,17 +15,21 @@ const SIZE: usize = 0x10_FFF0;
 
 pub struct Memory {
     bytes: Vec<u8>,
+    /// While tracking (`track`), DGROUP's offsets written, a bit each;
+    /// empty otherwise.
+    written: Vec<u64>,
 }
 
 impl Clone for Memory {
     fn clone(&self) -> Self {
-        Self { bytes: self.bytes.clone() }
+        Self { bytes: self.bytes.clone(), written: self.written.clone() }
     }
 
     /// Copied into this memory's own allocation: no fresh megabyte to
     /// fault in (a front end copying the machine every turn).
     fn clone_from(&mut self, source: &Self) {
         self.bytes.clone_from(&source.bytes);
+        self.written.clone_from(&source.written);
     }
 }
 
@@ -37,7 +41,7 @@ impl Memory {
     pub fn new(image: &Image) -> Self {
         let mut bytes = vec![0u8; SIZE];
         bytes[..image.bytes.len()].copy_from_slice(&image.bytes);
-        Self { bytes }
+        Self { bytes, written: Vec::new() }
     }
 
     pub fn r8(&self, seg: u16, off: u16) -> u8 {
@@ -53,7 +57,31 @@ impl Memory {
     }
 
     pub fn w8(&mut self, seg: u16, off: u16, v: u8) {
-        self.bytes[lin(seg, off)] = v;
+        let at = lin(seg, off);
+        self.bytes[at] = v;
+        if !self.written.is_empty() {
+            let o = at.wrapping_sub(lin(DS, 0));
+            if o < 0x10000 {
+                self.written[o >> 6] |= 1 << (o & 63);
+            }
+        }
+    }
+
+    /// DGROUP's writes tracked from now (`written_offsets`), any earlier
+    /// forgotten.
+    pub fn track(&mut self) {
+        self.written = vec![0; 0x10000 / 64];
+    }
+
+    /// Writes no longer tracked.
+    pub fn untrack(&mut self) {
+        self.written = Vec::new();
+    }
+
+    /// DGROUP's offsets written since `track` (written to whatever value,
+    /// its own included).
+    pub fn written_offsets(&self) -> Vec<u16> {
+        (0..self.written.len() * 64).filter(|&o| self.written[o >> 6] >> (o & 63) & 1 != 0).map(|o| o as u16).collect()
     }
 
     pub fn w16(&mut self, seg: u16, off: u16, v: u16) {
