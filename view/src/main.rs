@@ -652,8 +652,16 @@ impl arena::rest::RestHooks for Front<'_> {
             t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(arena::mem::DS, 0x9288), game_clip(m)));
         }
     }
+    /// 1194:59C8: the box's state (its bank mapped, its background kept
+    /// at [902E] from the screen as shown, the dissolve: `message_wait_box`)
+    /// and, once read, its ending's (`message_box_closed`); the box itself
+    /// the window's.
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        if m.message_wait_box(si, self.shown).is_none() {
+            eprintln!("the box gave up: {}", arena::giveup::describe());
+        }
         Front::message_box(self, m, si);
+        m.message_box_closed();
     }
     fn hours_text(&mut self, m: &mut arena::machine::Machine) {
         let s = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::rest::var::TEXT)).into_owned();
@@ -1299,7 +1307,15 @@ impl Assets {
             let day = engine.m.mem.r8(arena::mem::DS, arena::celestial::var::PHASE_DAY) as usize;
             self.moons = [day, (day + 0xE) & 0x1F];
             let mut cd = CelestialDraw { sheet: &self.sheet, focal, moons: &mut self.moons, out: Vec::new() };
+            // The view's own pass, not the game's (whose drawing ran E41A
+            // on its copy): what it leaves in DGROUP is put back, its bank
+            // mapped back first. Left, its PHASE_DAY kept the engine's
+            // `moon_phases` from making a new day's moons.
+            let mapped = engine.m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED);
+            let kept = engine.m.mem.segment(arena::mem::DS).to_vec();
             let ok = engine.m.celestial(&mut cd).is_some();
+            engine.m.ems_map(mapped >> 2);
+            engine.m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
             if ok {
                 bodies = cd.out;
             }

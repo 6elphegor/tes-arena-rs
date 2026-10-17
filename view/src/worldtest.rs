@@ -171,7 +171,8 @@ fn grab(a: &App) -> (Vec<u8>, Vec<u8>) {
     let mut e = arena::engine::Engine::new(a.engine.m.clone(), a.engine.files.clone());
     e.m.store_rng();
     e.page_wrote = a.engine.page_wrote.clone();
-    (e.page_state(), (0..0x20).flat_map(|b| e.m.ems_bank(b)).collect())
+    e.page_ems_wrote = a.engine.page_ems_wrote.clone();
+    (e.page_state(), (0..0x20).flat_map(|b| e.page_ems(b)).collect())
 }
 
 /// Into the place, `setup` run, then `play` driving frames and
@@ -590,9 +591,12 @@ fn resting(a: &mut App, heading: u16) {
 }
 
 /// `n` frames, a box read with Space after the frame that shows it, as
-/// gen_worldframes.py's script reads a box's wait (0000:8FC4).
+/// gen_worldframes.py's script reads a box's wait (0000:8FC4); the
+/// screen shown before each (`compose`, as the window shows it), for what
+/// a box keeps of it.
 fn frames_reading(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
     for _ in 0..n {
+        a.compose();
         frames(a, d, seen, 1, |_| false);
         if a.waiting() {
             d.key(a, KeyCode::Space, Some(" "));

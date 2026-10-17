@@ -346,6 +346,26 @@ impl Machine {
         Some(())
     }
 
+    /// 1194:5A23..5A6B, after `message_wait_box` when the box is waited on
+    /// (5E0 bit 800h clear): once the front end's wait (1194:5536) is
+    /// over, the background put back (933C: a given buffer, nothing
+    /// freed) and shown by the dissolve again (`dissolve`); the release
+    /// waited for (5E21, the front end's); in a dungeon (5E6 4) bank 11h
+    /// mapped and the first 4000h bytes at [902E] filled with 15h.
+    pub fn message_box_closed(&mut self) {
+        if self.mem.r16(DS, 0x05E0) & 0x800 != 0 {
+            return;
+        }
+        self.dissolve();
+        if self.mem.r8(DS, 0x05E6) == 4 {
+            self.ems_map(0x11);
+            let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+            for i in 0..0x4000u16 {
+                self.mem.w8(seg, off.wrapping_add(i), 0x15);
+            }
+        }
+    }
+
     /// 1194:4FF7's state (its pixels the front end's, view/src/film.rs):
     /// unless 5CA bit 2, the dissolve's generator (4B8E, 1194:5065: x
     /// 5E5h + 29h) stepped FA00h times, once a pixel.
