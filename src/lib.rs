@@ -94,6 +94,7 @@ pub mod strike;
 pub mod talk;
 pub mod tavern;
 pub mod text;
+pub mod textbox;
 pub mod transit;
 pub mod trigger;
 pub mod use_item;

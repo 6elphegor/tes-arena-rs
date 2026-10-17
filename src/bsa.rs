@@ -403,13 +403,59 @@ impl Machine {
     }
 
     /// 25FD:056F: the file named at DS:`from` copied to DS:`to` (kept in
-    /// `Files` as a written file, as `file_write` does). Nothing is
-    /// copied when `from` is missing.
+    /// `Files` as a written file, as `file_write` does), through the EMS
+    /// banks: `from` opened (0000:6B22, its handle at 126C and A836), `to`
+    /// deleted (9DC2) and made (67A2, its handle at 126E and A838; the
+    /// handles DOS's next free ones after GLOBAL.BSA's 5, 6 and 7), then
+    /// (05A5) up to FFFFh bytes read into the frame ([902E]) with each of
+    /// the four banks of the table at 5F5A mapped in turn (1Fh, 17h, 18h,
+    /// 12h; the count read at the entry's +2), until a read comes short,
+    /// and written out again bank by bank, until a write comes short;
+    /// four full banks read again. The banks keep what the copy left
+    /// there, the last bank written stays mapped. Nothing is copied when
+    /// `from` is missing.
     pub fn file_copy(&mut self, files: &mut Files, from: u16, to: u16) {
-        if let Some(data) = files.read_loose(self.mem.cstr(DS, from)) {
-            let base = Files::base(self.mem.cstr(DS, to)).to_ascii_uppercase();
-            files.written.insert(base, data);
+        let Some(data) = files.read_loose(self.mem.cstr(DS, from)) else { return };
+        const TABLE: u16 = 0x5F5A;
+        self.mem.w8(0, CS_IN_BSA, 0);
+        self.mem.w16(DS, OPEN_NAME, from);
+        self.mem.w16(DS, OPEN_NAME + 2, DS);
+        self.mem.w16(DS, 0x126C, LOOSE_DOS_HANDLE);
+        self.file_delete(files, to);
+        self.mem.w16(DS, OPEN_NAME, to);
+        self.mem.w16(DS, 0x126E, LOOSE_DOS_HANDLE + 1);
+        self.mem.w16(DS, 0xA836, LOOSE_DOS_HANDLE);
+        self.mem.w16(DS, 0xA838, LOOSE_DOS_HANDLE + 1);
+        let (mut pos, mut out) = (0usize, Vec::with_capacity(data.len()));
+        'copy: loop {
+            for k in 0..4u16 {
+                let bank = self.mem.r8(DS, TABLE + 4 * k) as u16;
+                self.ems_map(bank);
+                let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+                let n = (data.len() - pos).min(0xFFFF);
+                for (i, &b) in data[pos..pos + n].iter().enumerate() {
+                    self.mem.w8(seg, off.wrapping_add(i as u16), b);
+                }
+                pos += n;
+                self.mem.w16(DS, TABLE + 4 * k + 2, n as u16);
+                if n != 0xFFFF {
+                    break;
+                }
+            }
+            for k in 0..4u16 {
+                let bank = self.mem.r8(DS, TABLE + 4 * k) as u16;
+                self.ems_map(bank);
+                let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+                let n = self.mem.r16(DS, TABLE + 4 * k + 2);
+                out.extend((0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))));
+                if n != 0xFFFF {
+                    break 'copy;
+                }
+            }
         }
+        let base = Files::base(self.mem.cstr(DS, to)).to_ascii_uppercase();
+        files.deleted.remove(&base);
+        files.written.insert(base, Rc::from(out));
     }
 
     /// 0000:677A. Creates (or empties) the file named at DS:`name` (DOS
