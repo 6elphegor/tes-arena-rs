@@ -376,7 +376,7 @@ the original routine:
 | `TriggerHooks::enter_city` | src/trigger.rs:125 | 0000:4EFD and 946A | present | the view's window and the screen cleared | |
 | `TriggerHooks::enter_dungeon` | src/trigger.rs:127 | 217B:04DC | overridden | the view: main.rs Front<'_> | faithful: `wild_done` |
 | `TriggerHooks::guards` | src/trigger.rs:83 | 0000:3EBE | port | the default runs the port | |
-| `TriggerHooks::leave_city` | src/trigger.rs:120 | 217B:027A | overridden | the view: main.rs Front<'_> | faithful: `wild_leave_city` (playwild) |
+| `TriggerHooks::leave_city` | src/trigger.rs:120 | 217B:027A | port | the default runs the port (`wild_leave_city`; the view's Front<'_> the same) | |
 | `TriggerHooks::leave_interior` | src/trigger.rs:114 | 1194:D55F and 2433:0199 | port | the default runs the port | |
 | `TriggerHooks::message_box` | src/trigger.rs:77 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `TriggerHooks::music` | src/trigger.rs:108 | 23F1:0178 | elsewhere | the view picks the music each frame (`area_music`) | |

@@ -116,8 +116,10 @@ pub trait TriggerHooks {
         m.piles_forget(0);
         Some(())
     }
-    /// 217B:027A: a city's gate out to the wilderness.
-    fn leave_city(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+    /// 217B:027A: a city's gate out to the wilderness: the city written
+    /// as the wilderness's blocks 1..4 (`Machine::wild_leave_city`).
+    fn leave_city(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.wild_leave_city(files, &mut crate::wild::PortWild);
         Some(())
     }
     /// 0000:4EFD and 946A: a city's gate from the wilderness (the view's
