@@ -29,6 +29,8 @@
 //!   nearer than 1F4h, stepping by the texture's columns instead); the
 //!   flats on the square (CFBA -> B2A7 -> D18E -> C0F1) and the actors
 //!   on it (C032 -> C0CE -> C0F1) scaled by 78A8.
+//! - CBFF (`poly`): a square's cap, a polygon of the TOP texture, through
+//!   the generic polygon drawer (7C51: cut, clipped, projected, filled).
 //! - B4F5, B358: the deferred lists (BA80 clear), not ported: the 3D mode
 //!   draws at once.
 //!
@@ -42,6 +44,7 @@
 use crate::machine::Machine;
 use crate::mem::DS;
 
+mod poly;
 mod sky;
 
 /// The rows' offsets on the page (A6A0, a word a row).
@@ -100,6 +103,17 @@ pub fn draw(m: &mut Machine, under: &[u8]) -> (Vec<u8>, Vec<&'static str>) {
     r.page.truncate(64000);
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
     (r.page, r.gaps)
+}
+
+/// 0000:CBFF alone (tests/capdraw.rs): the cap at height `ax` wound by
+/// `cx` drawn on `m` into `page` (64 KB, the page's segment's bytes), as
+/// the 3D mode draws it; the machine and the page after, and the paths
+/// not ported it reached.
+pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
+    let mut r = Soft { m, page, gaps: Vec::new() };
+    r.page.resize(0x10000, 0);
+    r.cap_draw(0, ax, cx);
+    (r.m, r.page, r.gaps)
 }
 
 impl Soft {
@@ -938,9 +952,9 @@ impl Soft {
     }
 
     /// 0000:CBFF: a face's top or bottom (a square of the TOP texture at
-    /// height `ax`), drawn by B2E5: not ported.
-    fn cap(&mut self, _di: u16, _ax: u16, _cx: u16) {
-        self.gap("CBFF: a square's cap");
+    /// height `ax`), drawn by B2E5 (`poly`).
+    fn cap(&mut self, di: u16, ax: u16, cx: u16) {
+        self.cap_draw(di, ax, cx);
     }
 
     /// 0000:CC63: the square's side toward the neighbour at `bx` (the
@@ -2171,8 +2185,16 @@ impl Soft {
     fn chasm_sides(&mut self, es: u16, di: u16) {
         let cx = self.g16(0xCCCE);
         if self.m.mem.r16(es, di) >= cx {
+            // D165: from below the floor, the chasm's floor (a square
+            // whose wall word is positive, both bytes alike) as a cap at
+            // height 0 in the texture CD06.
             if (self.g16(0xC3D2) as i16) < 0 {
-                self.gap("D16C: a chasm's floor from below");
+                let w = self.m.mem.r16(self.g16(0xD806), di);
+                if (w as i16) > 0 && w as u8 == (w >> 8) as u8 {
+                    let t = self.g16(0xCD06);
+                    self.s16(0xD804, t);
+                    self.cap(di, 0, 1);
+                }
             }
             return;
         }
