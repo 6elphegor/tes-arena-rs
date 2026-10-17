@@ -140,6 +140,21 @@ thread_local! {
     /// The state as `played`'s load left it, before the place's entry
     /// (for `the_state_measured_against_the_originals`).
     static BASE: std::cell::RefCell<Option<(Vec<u8>, Vec<u8>)>> = const { std::cell::RefCell::new(None) };
+    /// The heap's blocks as `played`'s load left them (segment, size,
+    /// flags), for `the_load_measured_against_the_originals`.
+    static BASE_HEAP: std::cell::RefCell<Vec<(u16, u16, u8)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The heap's blocks from the first header (DGROUP 0157): segment, size,
+/// flags.
+fn heap_blocks(m: &arena::machine::Machine) -> Vec<(u16, u16, u8)> {
+    let (mut off, mut seg) = (m.mem.r16(DS, 0x157), m.mem.r16(DS, 0x159));
+    let mut out = Vec::new();
+    while (seg | off) != 0 && out.len() < 500 {
+        out.push((seg, m.mem.r16(seg, off.wrapping_add(8)), m.mem.r8(seg, off.wrapping_add(0xA))));
+        (seg, off) = (m.mem.r16(seg, off.wrapping_add(2)), m.mem.r16(seg, off));
+    }
+    out
 }
 
 /// DGROUP and the EMS banks 0..1Fh.
@@ -177,6 +192,7 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     let mut d = Driver::new(&mut a);
     clear(&mut d, &mut a);
     BASE.with(|b| *b.borrow_mut() = Some(grab(&a)));
+    BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
     match place {
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
@@ -784,6 +800,8 @@ fn the_state_measured_against_the_originals() {
         if std::env::var("ARENA_MINE").is_ok() {
             let _ = std::fs::write(dump.join(format!("{name}.mine")), &mine);
             let _ = std::fs::write(dump.join(format!("{name}.mine0")), &mine0);
+            let _ = std::fs::write(dump.join(format!("{name}.mems")), &banks);
+            let _ = std::fs::write(dump.join(format!("{name}.mems0")), &banks0);
         }
         // What each side's frames changed: a byte the original's changed
         // and the engine's didn't (or the other way), or both changed it
@@ -823,6 +841,96 @@ fn the_state_measured_against_the_originals() {
     }
 }
 
+/// DGROUP as the harness holds it, from the engine's: the image's
+/// segments 1000h higher (the harness relocates the image to 1000h; the
+/// port runs it unrelocated): every relocated word of the image that lies
+/// in DGROUP, and the words tests/vectors/loadsegs.txt names (segments of
+/// the image the game stores as it runs); the offsets
+/// tests/vectors/loadexclude.txt names zeroed (on both sides).
+fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
+    let image = arena::exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
+    let mut d = d.to_vec();
+    let base = DS as usize * 16;
+    let mut slots: Vec<usize> = image.relocs.iter().map(|&(seg, off)| seg as usize * 16 + off as usize).filter(|&l| l >= base && l + 1 < base + 0x10000).map(|l| l - base).collect();
+    let segs = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadsegs.txt");
+    for line in std::fs::read_to_string(segs).expect(segs).lines() {
+        if let Some(w) = line.split('#').next().and_then(|l| l.split_whitespace().next()) {
+            slots.push(usize::from_str_radix(w, 16).unwrap());
+        }
+    }
+    for at in slots {
+        let w = u16::from_le_bytes([d[at], d[at + 1]]).wrapping_add(0x1000);
+        d[at..at + 2].copy_from_slice(&w.to_le_bytes());
+    }
+    let mut skip = vec![false; 0x10000];
+    excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadexclude.txt"), &mut skip);
+    for (b, &x) in d.iter_mut().zip(&skip) {
+        if x {
+            *b = 0;
+        }
+    }
+    d
+}
+
+/// The game's state as the title's Load leaves it (`world::boot`, then
+/// `areas::load_game_title` of the user's slot 1): DGROUP exactly the
+/// original's (`loadstate`), the engine's image segments taken to the
+/// harness's relocated ones and the offsets tests/vectors/loadexclude.txt
+/// names left out (`load_canonical`).
+#[test]
+fn the_load_as_the_original_leaves_it() {
+    let Some(_) = played(Place::Street, |_| {}, |_, _, _| {}) else { return };
+    let (mine, _) = BASE.with(|b| b.borrow_mut().take()).unwrap();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("loadstate | ")).expect("a loadstate line");
+    let got = fnv(load_canonical(&game_dir().unwrap(), &mine));
+    assert_eq!(format!("{got:x}"), want, "the state after the load differs from the original's (the_load_measured_against_the_originals shows where)");
+}
+
+/// The game's state as the load leaves it, the engine's against the
+/// original's (gen_worldframes.py --dump's base.ds and base.ems in
+/// ARENA_SCREENS; the engine's written beside them as base.mine and
+/// base.mems): the DGROUP ranges and EMS ranges that differ, printed.
+#[test]
+fn the_load_measured_against_the_originals() {
+    let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
+    let (Ok(ds), Ok(ems)) = (std::fs::read(dump.join("base.ds")), std::fs::read(dump.join("base.ems"))) else {
+        eprintln!("no base dump");
+        return;
+    };
+    let Some(_) = played(Place::Street, |_| {}, |_, _, _| {}) else { return };
+    let (mine, banks) = BASE.with(|b| b.borrow_mut().take()).unwrap();
+    BASE_HEAP.with(|h| {
+        for (seg, size, used) in h.borrow().iter() {
+            eprintln!("block {seg:04x} size {size:04x} used {used}");
+        }
+    });
+    let _ = std::fs::write(dump.join("base.mine"), &mine);
+    let _ = std::fs::write(dump.join("base.mems"), &banks);
+    let hx = |v: &[u8]| v.iter().take(16).map(|b| format!("{b:02x}")).collect::<String>();
+    // Against the original's in its form (`load_canonical`).
+    let dir = game_dir().unwrap();
+    let canon = load_canonical(&dir, &mine);
+    let mut skip = vec![false; 0x10000];
+    excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadexclude.txt"), &mut skip);
+    let orig: Vec<u8> = ds.iter().zip(&skip).map(|(&b, &x)| if x { 0 } else { b }).collect();
+    let r = differing(&orig, &canon, 0);
+    eprintln!("canonical DGROUP: {} bytes in {} ranges", (0..0x10000).filter(|&i| orig[i] != canon[i]).count(), r.len());
+    for &(s, e) in &r {
+        eprintln!("  c {s:04x}..{e:04x} orig {} mine {}", hx(&orig[s..e]), hx(&canon[s..e]));
+    }
+    let r = differing(&ds, &mine, 4);
+    eprintln!("DGROUP: {} bytes in {} ranges", (0..0x10000).filter(|&i| ds[i] != mine[i]).count(), r.len());
+    for &(s, e) in &r {
+        eprintln!("  {s:04x}..{e:04x} orig {} mine {}", hx(&ds[s..e]), hx(&mine[s..e]));
+    }
+    let r = differing(&ems, &banks, 32);
+    eprintln!("EMS: {} bytes in {} ranges", (0..ems.len()).filter(|&i| ems[i] != banks[i]).count(), r.len());
+    for &(s, e) in r.iter().take(60) {
+        eprintln!("  {:02x}:{:04x}..{:04x} orig {} mine {}", s >> 16, s & 0xFFFF, (s & 0xFFFF) + (e - s), hx(&ems[s..e]), hx(&banks[s..e]));
+    }
+}
+
 /// tests/vectors/stateexclude.txt's DGROUP offsets (`state` lines leave
 /// them out).
 fn state_excluded() -> Vec<bool> {
@@ -836,6 +944,7 @@ fn state_excluded() -> Vec<bool> {
 fn state_load_excluded() -> Vec<bool> {
     let mut out = state_excluded();
     excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateloadexclude.txt"), &mut out);
+    excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadexclude.txt"), &mut out);
     out
 }
 
@@ -894,18 +1003,12 @@ fn state_compared(name: &str, from_load: bool) {
     let extra: Vec<usize> = (0..0x10000).filter(|&i| before[i] != after[i] && !skip[i] && !want[i] && a.engine.page_wrote[i].is_none()).collect();
     let got = fnv((0..0x10000).filter(|&i| want[i]).map(|i| after[i]));
     let hx = |v: &[usize]| v.iter().take(24).map(|i| format!("{i:04x}")).collect::<Vec<_>>().join(" ");
-    // From the load, the engine's load and the original's already part
-    // (some 1100 bytes: the program's start, the heap, scratch), so a byte
-    // the engine changes and the original doesn't may be the engine's
-    // setting it as the original's load had it: those are checked against
-    // a bit of each of the original's bytes as the case leaves them
-    // (`stateloadbits`; its bytes are the save's, never in the vectors).
+    // From the load the two start alike (`the_load_as_the_original_leaves_it`)
+    // but for loadexclude.txt's offsets, which aren't counted.
     let extra = if from_load {
-        let Some(bits) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "stateloadbits" && f[1] == name).map(|f| f[2].to_string()) else {
-            panic!("{name}: no stateloadbits line");
-        };
-        let bit = |i: usize| (u8::from_str_radix(&bits[(i >> 3) * 2..(i >> 3) * 2 + 2], 16).unwrap() >> (i & 7)) & 1;
-        extra.into_iter().filter(|&i| (fnv([after[i], i as u8, (i >> 8) as u8]) >> 63) as u8 != bit(i)).collect()
+        let mut skip = vec![false; 0x10000];
+        excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadexclude.txt"), &mut skip);
+        extra.into_iter().filter(|&i| !skip[i]).collect()
     } else {
         extra
     };

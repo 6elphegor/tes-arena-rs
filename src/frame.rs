@@ -450,6 +450,26 @@ impl Machine {
         hooks.weapon_graphics(self, files)
     }
 
+    /// 0000:3C4C with its load ported (`weapon_graphics_load`): as
+    /// `weapon_change`, for callers without the frame's hooks (the game's
+    /// set-up, 21EE:01CD).
+    pub fn weapon_change_load(&mut self, files: &mut Files) -> Option<()> {
+        use crate::weapon::var::{CAST_FRAME, CLASS, FRAME, SHOWN};
+        let cl = self.mem.r8(DS, CLASS);
+        if cl == self.mem.r8(DS, SHOWN)
+            || (self.mem.r8(DS, CAST_FRAME) as i8) >= 0
+            || self.mem.r16(DS, 0x05CA) & 0x10 != 0
+        {
+            return Some(());
+        }
+        self.mem.w8(DS, SHOWN, cl);
+        if (cl as i8) < 0 {
+            return Some(());
+        }
+        self.mem.w16(DS, FRAME, 0);
+        self.weapon_graphics_load(files)
+    }
+
     /// 2294:1125. Walking speed 14h + speed x 20 / 256 x (256 - fatigue
     /// byte 5BD) / 256 (C390, CCBE), turning 0Dh + half the first part
     /// (C392). In a fight (0FFB creatures), each creature slot not calm,

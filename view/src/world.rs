@@ -95,6 +95,28 @@ fn heap(m: &mut Machine) {
     m.mem.w16(DS, arena::heap::var::FREE, low + high);
 }
 
+/// The game at its title, as the original reaches it: the memory as the
+/// program finds it (`memory_init`), its start (21EE:0000,
+/// `program_start`), main's texts' segment (0000:108B) and working slot
+/// (1194:3A51, `working_slot_main`), then the title's Load (0000:1064:
+/// the working slot's files fresh, 25FD:0219; 117E: the set-up, 21EE:016C,
+/// `game_setup`). A save loaded from here (`areas::load_game_title`) is
+/// the title's Load's.
+pub fn boot(dir: &Path) -> Engine {
+    let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
+    let mut m = Machine::new(&image);
+    let mut files = Files::new(dir).expect("game directory");
+    m.memory_init().expect("the memory");
+    m.program_start(&mut files, &mut arena::start::PortStart).expect("the program's start");
+    let frame = m.mem.r16(DS, 0x9030);
+    m.mem.w16(DS, 0xCB8A, frame);
+    m.working_slot_main();
+    m.working_files_fresh(&mut files);
+    m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the game's set-up");
+    m.store_rng();
+    Engine::new(m, files)
+}
+
 /// Loads `level` (a .MIF) from the game in `dir` into an engine and
 /// enters it, as examples/play.rs does.
 pub fn load(dir: &Path, level: &str) -> Engine {
@@ -266,10 +288,7 @@ impl arena::light::LightHooks for Lgt<'_> {
 /// on the machine as the original makes them (`render::shade_tables`;
 /// fog's FOG.LGT reaches the banks so too). Returns its segment.
 pub fn light_table(m: &mut Machine) -> u16 {
-    let (light, _) = m.heap_alloc(0x100).expect("heap");
-    arena::render::shade_tables(m, light);
-    m.mem.w16(DS, 0xCCC2, light);
-    light
+    m.light_table_make().expect("heap")
 }
 
 /// A city, from `PROVINCE:INDEX[:TERRAIN:WEATHER[:DAY]]`: province 0..7 (8 the

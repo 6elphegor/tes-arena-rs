@@ -1,0 +1,29 @@
+# DGROUP words holding a segment of the image that the game stores as it
+# runs (the static ones come from the image's relocations): hex offset and why.
+8f72 the timer's hook's segment (21EE:028A, 21EE:0024)
+a90a the open file's name's segment (DGROUP, 0000:6B33)
+ba7c the world loop's return's segment (the far pointer at BA7A)
+c3a6 a level hook's segment (C3A4..C3BB: the frame's and the level's far hooks)
+c3aa a level hook's segment
+c3ae a level hook's segment
+c3b2 a level hook's segment
+c3b6 a level hook's segment
+c3ba a level hook's segment
+cd1c a 3D mode hook's segment (CD1A..CD75: the drawing's and the area's far hooks, 2294:0006)
+cd24 a 3D mode hook's segment
+cd28 a 3D mode hook's segment
+cd2c a 3D mode hook's segment
+cd30 a 3D mode hook's segment
+cd34 a 3D mode hook's segment
+cd3c a 3D mode hook's segment
+cd44 the entered hook's segment (CD42: 0000:468B)
+cd48 a 3D mode hook's segment
+cd4c a 3D mode hook's segment
+cd50 a 3D mode hook's segment
+cd54 a 3D mode hook's segment
+cd58 a 3D mode hook's segment
+cd5c a 3D mode hook's segment
+cd64 a 3D mode hook's segment
+cd6c a 3D mode hook's segment
+cd70 a 3D mode hook's segment
+cd74 the sky's hook's segment (2294:0CDE, 2294:0254)

@@ -172,7 +172,9 @@ pub trait AreaHooks {
     /// 0000:A5A0: the renderer's buffers freed (CD78, CD84, CD80, CD88;
     /// the buffer at BA56 is freed by `Machine::world_leave`), 0000:DE9B
     /// and AB2A.
-    fn world_free(&mut self, _m: &mut Machine) {}
+    fn world_free(&mut self, m: &mut Machine) {
+        m.draw_buffers_free();
+    }
     /// 0000:468B, the hook CD42 once the INF is loaded: the flats' flags,
     /// outdoors the light (0000:0390) and the city's people, indoors the
     /// level's lights from its flats (0000:478F, `Machine::flat_lights`)
@@ -784,6 +786,8 @@ impl crate::engine::Engine {
         }
         m.mem.w8(DS, 0xCB5B, 1);
         m.buffer_block_alloc()?;
+        m.draw_buffers_alloc()?;
+        m.light_table_make()?;
         if m.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
             m.area_entry(hooks);
         }

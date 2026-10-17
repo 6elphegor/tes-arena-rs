@@ -47,15 +47,21 @@ impl Default for Start<'_> {
 }
 
 fn app(dir: &Path, s: &Start) -> App {
-    let mut engine = world::load(dir, s.level);
+    // A save loaded from the title: the game as the original reaches its
+    // title (`world::boot`), no level of the view's own.
+    let title = s.load.is_some() && s.new_game.is_none();
+    let mut engine = if title { world::boot(dir) } else { world::load(dir, s.level) };
     let mut run = match s.new_game {
         Some(spec) => {
             newgame::start(&mut engine, spec);
             arena::transit::Run::Start
         }
+        None if title => arena::transit::Run::Start,
         None => areas::start(&mut engine, s.level.starts_with("CITY:"), s.load.is_none()),
     };
-    interface::start(&mut engine.m);
+    if !title {
+        interface::start(&mut engine.m);
+    }
     if let Some((save, slot)) = &s.load {
         // As the window's --load: the title's Load.
         run = areas::load_game_title(&mut engine, dir, save, *slot).expect("the save loads");

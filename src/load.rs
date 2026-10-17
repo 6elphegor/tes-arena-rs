@@ -104,8 +104,11 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     /// 0000:E5C9: outdoors, the sky's images loaded into the EMS bank
     /// C8F3.
     fn sky_graphics(&mut self, _m: &mut Machine, _files: &mut Files) {}
-    /// 0000:AAA2: the renderer's set-up (the light table at CCC2 made).
-    fn renderer(&mut self, _m: &mut Machine) {}
+    /// 0000:AAA2: the renderer's set-up (the light table at CCC2 made,
+    /// `Machine::light_table_make`).
+    fn renderer(&mut self, m: &mut Machine) {
+        m.light_table_make();
+    }
     /// 25FD:056F: the file at DS:`from` copied to DS:`to` (deleted, made
     /// again). The default copies through `files`.
     fn copy_file(&mut self, m: &mut Machine, files: &mut Files, from: u16, to: u16) {
@@ -265,8 +268,10 @@ impl Machine {
             self.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         self.mem.w8(DS, 0xCB5B, 1);
-        // A4C5.
+        // A4C5, A561.
         self.buffer_block_alloc()?;
+        self.draw_buffers_alloc()?;
+        hooks.renderer(self);
         hooks.view_update(self);
         self.clip_back();
         if self.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
@@ -322,6 +327,87 @@ impl Machine {
         }
         self.mem.w32(DS, crate::level::var::BUFFER_BLOCK, (seg as u32) << 16);
         Some(())
+    }
+
+    /// 0000:A561 (after A4C5): the renderer's buffers. 0000:DE1F's two
+    /// blocks of compiled stores (191h bytes: 28h pairs of `mov es:[di +
+    /// n], eax` and `mov [di + n], ebx`-like 5-byte templates, n stepping
+    /// by 4, its segment at CD8C; 3E9h bytes: C8h of `mov es:[bp + n],
+    /// al`, n stepping by 140h, at CD90); D48h bytes (CD86, far), 320h
+    /// twice (CD82, CD7E: the floor's and the ceiling's row tables), the
+    /// deferred lists' [CB8C] bytes (CD76 and CD7A: with none, EAX as the
+    /// last allocation left it, CD78 cleared first). The light table
+    /// (0000:AAA2, `light_table_make`) follows. None where an allocation
+    /// fails.
+    pub fn draw_buffers_alloc(&mut self) -> Option<()> {
+        let (seg, _) = self.heap_alloc_bytes(0x191)?;
+        let mut di = 0u16;
+        let mut dx = 0u16;
+        for _ in 0..0x28 {
+            for op in [0x85u8, 0x9D] {
+                self.mem.w16(seg, di, 0x8966);
+                self.mem.w8(seg, di + 2, op);
+                self.mem.w16(seg, di + 3, dx);
+                di += 5;
+                dx = dx.wrapping_add(4);
+            }
+        }
+        self.mem.w16(DS, 0xCD8C, seg);
+        self.mem.w16(DS, 0xCD8A, 0);
+        let (seg, _) = self.heap_alloc_bytes(0x3E9)?;
+        let mut di = 0u16;
+        let mut bx = 0u16;
+        for _ in 0..0xC8 {
+            self.mem.w16(seg, di, 0x8826);
+            self.mem.w8(seg, di + 2, 0x85);
+            self.mem.w16(seg, di + 3, bx);
+            di += 5;
+            bx = bx.wrapping_add(0x140);
+        }
+        self.mem.w16(DS, 0xCD90, seg);
+        self.mem.w16(DS, 0xCD8E, 0);
+        let mut eax = 0u32;
+        for (bytes, at) in [(0xD48u16, 0xCD86u16), (0x320, 0xCD82), (0x320, 0xCD7E)] {
+            let (seg, off) = self.heap_alloc_bytes(bytes)?;
+            eax = (seg as u32) << 16 | off as u32;
+            self.mem.w32(DS, at, eax);
+        }
+        let ax = self.mem.r16(DS, 0xCB8C);
+        self.mem.w16(DS, 0xCD78, 0);
+        eax = eax & 0xFFFF_0000 | ax as u32;
+        if ax != 0 {
+            let (seg, off) = self.heap_alloc_bytes(ax)?;
+            eax = (seg as u32) << 16 | off as u32;
+        }
+        self.mem.w32(DS, 0xCD76, eax);
+        self.mem.w32(DS, 0xCD7A, eax);
+        Some(())
+    }
+
+    /// 0000:AAA2: the light table made (1000h bytes from the heap, CCC2,
+    /// `render::shade_tables`); the old table isn't freed. None where the
+    /// allocation fails.
+    pub fn light_table_make(&mut self) -> Option<u16> {
+        let (seg, _) = self.heap_alloc_bytes(0x1000)?;
+        self.mem.w16(DS, 0xCCC2, seg);
+        crate::render::shade_tables(self, seg);
+        Some(seg)
+    }
+
+    /// 0000:A5A0's frees but the buffer block's (`world_leave` frees BA56):
+    /// the deferred lists' (CD78, with [CB8C] set), the row tables' (CD84,
+    /// CD80), CD88's; 0000:DE9B the compiled stores' (CD8C, CD90); 0000:
+    /// AB2A the light table (CCC2, then 0).
+    pub fn draw_buffers_free(&mut self) {
+        if self.mem.r16(DS, 0xCB8C) != 0 {
+            let s = self.mem.r16(DS, 0xCD78);
+            self.heap_free(s);
+        }
+        for at in [0xCD84u16, 0xCD80, 0xCD88, 0xCD8C, 0xCD90, 0xCCC2] {
+            let s = self.mem.r16(DS, at);
+            self.heap_free(s);
+        }
+        self.mem.w16(DS, 0xCCC2, 0);
     }
 
     /// 0000:A606: the clip (A914..A91B) put back from BA58.

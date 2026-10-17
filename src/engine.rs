@@ -530,6 +530,8 @@ impl Engine {
         m.weather_drops()?;
         m.mem.w8(DS, 0xCB5B, 1);
         m.buffer_block_alloc()?;
+        m.draw_buffers_alloc()?;
+        m.light_table_make()?;
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             m.info_load(&mut self.files, info)?;
