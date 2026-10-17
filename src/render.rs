@@ -2559,68 +2559,9 @@ impl Soft {
         }
     }
 
-    /// 0000:5656: frame `frame` of the packed frames at `seg`:`si` (the
-    /// count first; from +0Ah the first frame, RLE (567A), then each
-    /// next one's changes (56A8)) into `dseg`:`doff`.
+    /// 0000:5656 (`Machine::frames_unpack`).
     fn unpack(&mut self, seg: u16, si: u16, frame: u16, dseg: u16, doff: u16) {
-        if self.m.mem.r16(seg, si) <= frame {
-            return;
-        }
-        let mut p = si.wrapping_add(0xA);
-        let r8 = |m: &Machine, p: u16| m.mem.r8(seg, p);
-        let r16 = |m: &Machine, p: u16| m.mem.r16(seg, p);
-        // 567A.
-        {
-            let mut dx = r16(&self.m, p);
-            let mut q = p.wrapping_add(2);
-            let mut di = doff;
-            loop {
-                let al = r8(&self.m, q);
-                q = q.wrapping_add(1);
-                if al < 0x80 {
-                    let n = al as u16 + 1;
-                    for _ in 0..n {
-                        let b = r8(&self.m, q);
-                        self.m.mem.w8(dseg, di, b);
-                        q = q.wrapping_add(1);
-                        di = di.wrapping_add(1);
-                    }
-                    dx = dx.wrapping_sub(1).wrapping_sub(n);
-                } else {
-                    let n = (al & 0x7F) as u16 + 1;
-                    let v = r8(&self.m, q);
-                    q = q.wrapping_add(1);
-                    for _ in 0..n {
-                        self.m.mem.w8(dseg, di, v);
-                        di = di.wrapping_add(1);
-                    }
-                    dx = dx.wrapping_sub(2);
-                }
-                if dx == 0 {
-                    break;
-                }
-            }
-        }
-        if frame == 0 {
-            return;
-        }
-        for _ in 0..frame {
-            p = p.wrapping_add(r16(&self.m, p)).wrapping_add(2);
-        }
-        // 56A8.
-        let mut q = p.wrapping_add(2);
-        let n = r16(&self.m, q);
-        q = q.wrapping_add(2);
-        for _ in 0..n {
-            let off = r16(&self.m, q);
-            let len = r16(&self.m, q.wrapping_add(2));
-            q = q.wrapping_add(4);
-            for k in 0..len {
-                let b = r8(&self.m, q);
-                self.m.mem.w8(dseg, doff.wrapping_add(off).wrapping_add(k), b);
-                q = q.wrapping_add(1);
-            }
-        }
+        self.m.frames_unpack(seg, si, frame, dseg, doff);
     }
 
     /// 0000:78A8 with the 8-bit pixels: `w` x `h` from `src` scaled to
@@ -2834,6 +2775,72 @@ impl Soft {
             self.m.mem.w16(seg, si.wrapping_add(6), sar(c1));
             si = si.wrapping_add(8);
             cx = cx.wrapping_add(1);
+        }
+    }
+}
+
+impl Machine {
+    /// 0000:5656: frame `frame` of the packed frames at `seg`:`si` (the
+    /// count first; from +0Ah the first frame, RLE (567A), then each
+    /// next one's changes (56A8)) into `dseg`:`doff`.
+    pub fn frames_unpack(&mut self, seg: u16, si: u16, frame: u16, dseg: u16, doff: u16) {
+        if self.mem.r16(seg, si) <= frame {
+            return;
+        }
+        let mut p = si.wrapping_add(0xA);
+        let r8 = |m: &Machine, p: u16| m.mem.r8(seg, p);
+        let r16 = |m: &Machine, p: u16| m.mem.r16(seg, p);
+        // 567A.
+        {
+            let mut dx = r16(self, p);
+            let mut q = p.wrapping_add(2);
+            let mut di = doff;
+            loop {
+                let al = r8(self, q);
+                q = q.wrapping_add(1);
+                if al < 0x80 {
+                    let n = al as u16 + 1;
+                    for _ in 0..n {
+                        let b = r8(self, q);
+                        self.mem.w8(dseg, di, b);
+                        q = q.wrapping_add(1);
+                        di = di.wrapping_add(1);
+                    }
+                    dx = dx.wrapping_sub(1).wrapping_sub(n);
+                } else {
+                    let n = (al & 0x7F) as u16 + 1;
+                    let v = r8(self, q);
+                    q = q.wrapping_add(1);
+                    for _ in 0..n {
+                        self.mem.w8(dseg, di, v);
+                        di = di.wrapping_add(1);
+                    }
+                    dx = dx.wrapping_sub(2);
+                }
+                if dx == 0 {
+                    break;
+                }
+            }
+        }
+        if frame == 0 {
+            return;
+        }
+        for _ in 0..frame {
+            p = p.wrapping_add(r16(self, p)).wrapping_add(2);
+        }
+        // 56A8.
+        let mut q = p.wrapping_add(2);
+        let n = r16(self, q);
+        q = q.wrapping_add(2);
+        for _ in 0..n {
+            let off = r16(self, q);
+            let len = r16(self, q.wrapping_add(2));
+            q = q.wrapping_add(4);
+            for k in 0..len {
+                let b = r8(self, q);
+                self.mem.w8(dseg, doff.wrapping_add(off).wrapping_add(k), b);
+                q = q.wrapping_add(1);
+            }
         }
     }
 }

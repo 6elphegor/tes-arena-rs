@@ -1186,6 +1186,12 @@ impl Assets {
         let mut bodies = Vec::new();
         let flags = (engine.m.mem.r16(arena::mem::DS, 0xC398), engine.m.mem.r16(arena::mem::DS, 0xC39A));
         if flags.0 & 4 != 0 && flags.1 & 0x20 == 0 {
+            // The moons' frames as the phases last made (PHASE_DAY): the
+            // engine makes them before the frame's drawing where it draws
+            // the page (`Machine::moon_phases`), so the hook below may not
+            // see the day change.
+            let day = engine.m.mem.r8(arena::mem::DS, arena::celestial::var::PHASE_DAY) as usize;
+            self.moons = [day, (day + 0xE) & 0x1F];
             let mut cd = CelestialDraw { sheet: &self.sheet, focal, moons: &mut self.moons, out: Vec::new() };
             let ok = engine.m.celestial(&mut cd).is_some();
             if ok {

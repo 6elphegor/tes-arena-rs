@@ -292,6 +292,9 @@ impl Engine {
         }
         m.mem.w8(DS, STAGE, 3);
         if let Some(page) = self.page.as_mut() {
+            // The moons' phases for a new day, which the drawing's E41A
+            // loads from their files (its copy has none).
+            m.moon_phases(files)?;
             let (p, gaps) = crate::render::draw(m, page);
             *page = p;
             self.page_gaps = gaps;

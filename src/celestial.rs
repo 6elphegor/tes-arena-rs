@@ -234,6 +234,43 @@ impl Machine {
         Some(())
     }
 
+    /// 0000:E6CB: the moon file named at DS:`name` read to [BA54]
+    /// (0000:742C) and its frame `frame` unpacked (5656) into the EMS
+    /// frame ([9030]) at `dest`. None where the file doesn't load.
+    pub fn moon_phase_load(&mut self, files: &mut crate::bsa::Files, name: u16, frame: u16, dest: u16) -> Option<()> {
+        let (off, seg) = (self.mem.r16(DS, 0xBA54), self.mem.r16(DS, 0xBA56));
+        self.file_load(files, name, seg, off)?;
+        let es = self.mem.r16(DS, 0x9030);
+        self.frames_unpack(seg, off, frame, es, dest);
+        Some(())
+    }
+
+    /// 0000:E470..E49F, the moons' phases made for a new day (CCA8 not
+    /// PHASE_DAY), with the files (E6CB, `moon_phase_load`): for a front
+    /// end that draws the sky with `celestial` on a copy of the machine
+    /// (the copy's loads have no files), run on the machine itself first
+    /// where the frame's E41A would run (outdoors, out of fog, BB09
+    /// clear), in the bank E41A maps (C8F3), the bank mapped before put
+    /// back. The second moon's frame goes to the EMS frame at CCAEh, the
+    /// offset E499 puts in DI, not the far pointer there: the original's.
+    pub fn moon_phases(&mut self, files: &mut crate::bsa::Files) -> Option<()> {
+        let flags = (self.mem.r16(DS, 0xC398), self.mem.r16(DS, 0xC39A));
+        if flags.0 & 4 == 0 || flags.1 & 0x20 != 0 || self.mem.r8(DS, 0xBB09) != 0 {
+            return Some(());
+        }
+        let day = self.mem.r8(DS, 0xCCA8);
+        if day == self.mem.r8(DS, PHASE_DAY) {
+            return Some(());
+        }
+        let mapped = self.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
+        self.ems_map(self.mem.r8(DS, 0xC8F3) as u16);
+        self.mem.w8(DS, PHASE_DAY, day);
+        let dest = self.mem.r16(DS, MOON1);
+        let r = self.moon_phase_load(files, MOON1_NAME, day as u16, dest).and_then(|()| self.moon_phase_load(files, MOON2_NAME, (day as u16 + 0xE) & 0x1F, MOON2));
+        self.ems_map(mapped);
+        r
+    }
+
     /// 0000:E41A. The sky's bodies, in clear weather (BB09 0): the sky's
     /// bank mapped; the stars; by day (time 100h..2FFh) the sun at the
     /// sphere's (0, 3A98h, 0), its header's size (+4, +6), its picture
