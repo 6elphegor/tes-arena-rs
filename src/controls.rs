@@ -352,7 +352,10 @@ impl Machine {
         // the frame body doesn't brake the acceleration.
         let held = it.forward != 0 || it.strafe != 0 || it.turn != 0;
         let f = self.mem.r16(DS, 0x05E0) & !0x2000 | if held { 0x2000 } else { 0 };
-        self.mem.w16(DS, 0x05E0, f);
+        // The cursor is the view's centre's (the mouse held there, as the
+        // classic controls' centre handler sets 5E0 bit 40h, 2826:00F6):
+        // the bow (0000:392A) shoots only with it set.
+        self.mem.w16(DS, 0x05E0, f | 0x40);
         if it.look != 0 {
             self.turn(it.look as u16);
         }

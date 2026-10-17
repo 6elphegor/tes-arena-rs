@@ -200,6 +200,9 @@ struct Front<'a> {
     talk: Option<&'a mut dialog::Talk>,
     /// The window's width over its height (the click's line; 0: 1.6).
     aspect: f32,
+    /// An effect's words the frame drew (0000:5011), with the row: the
+    /// HUD shows them till the next frame.
+    effect: Option<(Vec<u8>, i32)>,
 }
 
 impl Front<'_> {
@@ -412,8 +415,26 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
-    fn interface(&mut self, m: &mut arena::machine::Machine) -> Option<()> {
-        m.interface_setup()
+    fn interface(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.interface_setup(files, self)
+    }
+    /// 0000:5011: an effect's words counted down; drawn at 0Bh above the
+    /// view's foot (C3A2) while they last.
+    fn effect_words(&mut self, m: &mut arena::machine::Machine) {
+        self.effect = m.effect_words().map(|t| (t, m.mem.r16(arena::mem::DS, 0xC3A2) as i16 as i32 - 0xB));
+    }
+    /// 0000:3C4C's load: the hands' graphic for the weapon class into
+    /// their bank (`Machine::weapon_graphics_load`; the view draws the
+    /// hands from its own copy of the files).
+    fn weapon_graphics(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        if m.weapon_graphics_load(files).is_none() {
+            eprintln!("the hands' graphic did not load: {}", arena::giveup::describe());
+        }
+        Some(())
+    }
+    /// 292B:000E: no projectile flying, their lights forgotten.
+    fn projectile_lights_end(&mut self, m: &mut arena::machine::Machine) {
+        m.projectile_lights_end();
     }
     /// 0000:17F9: the townspeople's graphics loaded, as they come back
     /// (`Machine::townsfolk_load`).
@@ -1011,8 +1032,9 @@ impl Assets {
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
+        let mut light = LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None };
         // 0000:46A2: the interface set up (4DD6), its drops made again.
-        let _ = engine.m.interface_setup();
+        let _ = engine.m.interface_setup(&mut engine.files, &mut Front::default());
         // Entering outdoors, the day's colours (0000:06B8, 2294:0428) and
         // the dither for the time of day (0000:46AF, 0390 -> 2294:0341)
         // loaded before the first frame draws the sky from them.
@@ -1022,7 +1044,11 @@ impl Assets {
             }
         }
         if engine.m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0 {
-            if let Some(name) = engine.m.sky_step().dither {
+            // 0000:46AF: the light for the time of day (0390, `outdoor_light`:
+            // the sky's window, day's or night's switch, the relight the
+            // first frame's `sky_loads` does).
+            engine.m.outdoor_light(&mut light);
+            if let Some(name) = light.dither.take() {
                 if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
                     eprintln!("the sky's dither did not load");
                 }
@@ -1043,7 +1069,7 @@ impl Assets {
             interface: prof::time("assets.interface", || interface::Interface::new(archive.clone())),
             archive,
             colours: None,
-            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None },
+            light,
             flash: std::cell::Cell::new(None),
             frame_view: None,
             moons: [0, 0],
@@ -1514,6 +1540,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         live: None,
         status: None,
         status_held: false,
+        effect: None,
         font,
         screen,
         cursor: (0.0, 0.0),
@@ -1584,6 +1611,8 @@ struct TurnIn {
 struct TurnOut {
     frame: Option<arena::engine::Frame>,
     level_changed: bool,
+    /// The effect's words the frame drew (`Front::effect`).
+    effect: Option<(Vec<u8>, i32)>,
 }
 
 /// One turn (`dialog`): camping if asked, then a frame, with `talk`
@@ -1594,17 +1623,17 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
-        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false };
+        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None };
     }
     let t = engine.frame_ticks();
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }
@@ -1632,8 +1661,9 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     }
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     let level_changed = stairs || wild_moved(engine, window);
+    let effect = hooks.effect.take();
     prof::time("view_frame", || assets.view_frame(engine, input.aspect));
-    TurnOut { frame, level_changed }
+    TurnOut { frame, level_changed, effect }
 }
 
 /// The drawing's creatures' flats (0000:CF96): each one reached goes to
@@ -1644,10 +1674,16 @@ fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
     if engine.m.mem.r32(DS, 0xCD56) != 0x25CA_0271 {
         return;
     }
-    let seg = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
-    for (col, row, di) in world::creature_flats_seen(&engine.m) {
-        let flat = engine.m.mem.r8(seg, di);
-        let (x, y) = (col << 7 | 0x40, row << 7 | 0x40);
+    // The original's renderer's own (the page drawn, nothing not ported
+    // met): the flats its walk reached, in its order; else the view's
+    // own guess of them (`world::creature_flats_seen`).
+    let reached: Vec<arena::render::Creature> = if engine.page.is_some() && engine.page_gaps.is_empty() {
+        std::mem::take(&mut engine.page_creatures)
+    } else {
+        let seg = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+        world::creature_flats_seen(&engine.m).into_iter().map(|(col, row, di)| (col << 7 | 0x40, row << 7 | 0x40, engine.m.mem.r8(seg, di), seg, di)).collect()
+    };
+    for (x, y, flat, seg, di) in reached {
         if engine.m.flat_creature(&mut engine.files, &mut FightFront(hooks), x, y, flat, seg, di).is_none() {
             eprintln!("a creature's flat gave up: {}", arena::giveup::describe());
             return;
@@ -1704,6 +1740,12 @@ fn copy_into(dst: &mut Engine, src: &Engine) {
 fn game_clip(m: &arena::machine::Machine) -> (i32, i32, i32, i32) {
     let r = |at| m.mem.r16(arena::mem::DS, at) as i16 as i32;
     (r(0xA914), r(0xA916), r(0xA918), r(0xA91A))
+}
+
+/// An effect's words a frame drew (0000:5011) as the HUD's: the text and
+/// its row.
+fn effect_of(effect: &Option<(Vec<u8>, i32)>) -> Option<(String, i32)> {
+    effect.as_ref().map(|(t, y)| (String::from_utf8_lossy(t).into_owned(), *y))
 }
 
 /// The message line (061A, shown while 061E counts down) as the HUD's.
@@ -1780,6 +1822,8 @@ struct Shot {
     /// The shop's screen behind the question asked (`Talk::backdrop`).
     backdrop: Option<shopui::Backdrop>,
     status: Option<String>,
+    /// The effect's words the last frame drew (0000:5011).
+    effect: Option<(Vec<u8>, i32)>,
     /// A panel up at the end (`inv`, `spells`).
     panel: Option<panels::Panel>,
     /// The automap shown (`--do map`).
@@ -1851,6 +1895,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         st.status = talk.status;
     }
     print_message(engine, &mut st.message);
+    st.effect = out.effect.clone();
     if out.level_changed {
         eprintln!("the level changed (stairs, or the wilderness's blocks)");
         st.assets.level(engine);
@@ -1887,7 +1932,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
     let music = music::Music::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));
-    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, backdrop: None, status: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
+    let st = &mut Shot { audio, music, movies: Vec::new(), assets, right: false, drag: (0, 0), clicked: false, camp: false, shop: None, answers, message: None, frames: 0, boxes: Vec::new(), need: None, maker_screen: None, backdrop: None, status: None, effect: None, panel: None, map: false, over: false, ui: None, travel: None, cursor: (160, 100), note: None };
     // One frame turning (or not) before the walk: the actors pick their
     // sprites in a frame.
     let intent = Intent { look: turn, ..Default::default() };
@@ -2327,7 +2372,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     r.draw(&device, &queue, &view, w, h, cam, &sprites);
     if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
         hud::init_style(&st.assets.archive, &engine.m);
-        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, counters: hud::spell_counters(&engine.m), level: hud::level_text(&engine.m), clip: game_clip(&engine.m), ..Default::default() };
+        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, counters: hud::spell_counters(&engine.m), level: hud::level_text(&engine.m), effect: effect_of(&st.effect), clip: game_clip(&engine.m), ..Default::default() };
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
@@ -2707,6 +2752,8 @@ struct App {
     status: Option<String>,
     /// `status` kept under the boxes of the turn that drew it last.
     status_held: bool,
+    /// The effect's words the last frame drew (0000:5011).
+    effect: Option<(Vec<u8>, i32)>,
     font: hud::Font,
     screen: hud::Screen,
     /// The cursor in the window, and the window's size (pixels).
@@ -3021,6 +3068,7 @@ impl App {
         // The turn stands: its copy is the next turn's to fill.
         self.spare = Some(before);
         print_message(&self.engine, &mut self.message);
+        self.effect = out.effect.clone();
         if out.level_changed {
             self.assets.level(&self.engine);
             self.remake_renderer();
@@ -3885,7 +3933,7 @@ impl App {
 
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
-        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), counters: hud::spell_counters(&self.engine.m), level: hud::level_text(&self.engine.m), clip: game_clip(&self.engine.m), ..Default::default() };
+        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), counters: hud::spell_counters(&self.engine.m), level: hud::level_text(&self.engine.m), effect: effect_of(&self.effect), clip: game_clip(&self.engine.m), ..Default::default() };
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 || (self.status_held && !self.boxes.is_empty()) {
             h.status = self.status.clone();
         }

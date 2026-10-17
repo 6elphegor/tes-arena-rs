@@ -136,6 +136,21 @@ fn into_wild(a: &mut App) {
 /// through the title and the load).
 const HARNESS_SEED: u32 = 0x19B7_6141;
 
+thread_local! {
+    /// The state as `played`'s load left it, before the place's entry
+    /// (for `the_state_measured_against_the_originals`).
+    static BASE: std::cell::RefCell<Option<(Vec<u8>, Vec<u8>)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// DGROUP and the EMS banks 0..1Fh.
+fn grab(a: &App) -> (Vec<u8>, Vec<u8>) {
+    // The random seed as the game's memory would hold it (the engine
+    // keeps it in `rng` between its stores).
+    let mut m = a.engine.m.clone();
+    m.store_rng();
+    ((0..0x10000u32).map(|o| m.mem.r8(DS, o as u16)).collect(), (0..0x20).flat_map(|b| m.ems_bank(b)).collect())
+}
+
 /// Into the place, `setup` run, then `play` driving frames and
 /// collecting the track: the app as the case leaves it.
 fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) -> Option<(App, Vec<[u16; 5]>)> {
@@ -158,6 +173,7 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     a.engine.m.store_rng();
     let mut d = Driver::new(&mut a);
     clear(&mut d, &mut a);
+    BASE.with(|b| *b.borrow_mut() = Some(grab(&a)));
     match place {
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
@@ -665,3 +681,86 @@ fn the_crypts_3d_view_drawn_as_the_original_draws_it() {
     assert!(ok, "playcrypt: the 3D view from row 1 differs from the original's ({same:?}% alike)");
 }
 
+
+/// Byte ranges where `a` and `b` differ, runs closer than `gap` joined.
+fn differing(a: &[u8], b: &[u8], gap: usize) -> Vec<(usize, usize)> {
+    let mut out: Vec<(usize, usize)> = Vec::new();
+    for i in (0..a.len().min(b.len())).filter(|&i| a[i] != b[i]) {
+        match out.last_mut() {
+            Some(r) if i - r.1 <= gap => r.1 = i + 1,
+            _ => out.push((i, i + 1)),
+        }
+    }
+    out
+}
+
+/// The game's state as each case leaves it, the engine's against the
+/// original's (gen_worldframes.py --dump's NAME.ds and NAME.ems in
+/// ARENA_SCREENS): DGROUP and the EMS banks, the ranges that differ
+/// printed. A report: what a frame stage the view skips leaves behind.
+#[test]
+fn the_state_measured_against_the_originals() {
+    let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
+    let only = std::env::var("ARENA_CASE").ok();
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog"] {
+        if only.as_deref().is_some_and(|o| o != name) {
+            continue;
+        }
+        let (Ok(ds), Ok(ems)) = (std::fs::read(dump.join(format!("{name}.ds"))), std::fs::read(dump.join(format!("{name}.ems")))) else {
+            eprintln!("{name}: no dump");
+            continue;
+        };
+        // From the load (ARENA_FROM=load: the places' entries counted
+        // too) or from the case's start.
+        let from_load = std::env::var("ARENA_FROM").is_ok_and(|v| v == "load");
+        let (f_ds, f_ems) = if from_load { ("base.ds".to_string(), "base.ems".to_string()) } else { (format!("{name}.ds0"), format!("{name}.ems0")) };
+        let (Ok(ds0), Ok(ems0)) = (std::fs::read(dump.join(f_ds)), std::fs::read(dump.join(f_ems))) else {
+            eprintln!("{name}: no dump of the start");
+            continue;
+        };
+        let (place, setup, play) = case(name).unwrap();
+        let pre = std::cell::RefCell::new(None);
+        let Some((a, _)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a);
+            *pre.borrow_mut() = Some(grab(a));
+        }, play) else { return };
+        let (mine0, banks0) = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap() } else { pre.into_inner().unwrap() };
+        let (mine, banks) = grab(&a);
+        // What each side's frames changed: a byte the original's changed
+        // and the engine's didn't (or the other way), or both changed it
+        // to different values where they started alike.
+        let drawn = a.engine.page_wrote.clone();
+        let report = |what: &str, o0: &[u8], o1: &[u8], m0: &[u8], m1: &[u8], gap: usize, unit: usize| {
+            let flag: Vec<u8> = (0..o0.len()).map(|i| {
+                // Where they end differently and one side's frames
+                // changed it and the other's didn't, or both started alike.
+                let (oc, mc) = (o0[i] != o1[i], m0[i] != m1[i]);
+                u8::from(o1[i] != m1[i] && (oc || mc) && (oc != mc || o0[i] == m0[i]))
+            }).collect();
+            let zero = vec![0u8; flag.len()];
+            let r = differing(&flag, &zero, gap);
+            eprintln!("{name}: {what} {} ranges", r.len());
+            let hx = |v: &[u8]| v.iter().take(12).map(|b| format!("{b:02x}")).collect::<String>();
+            for &(s, e) in r.iter().take(80) {
+                // The drawing's copy wrote there (DGROUP only).
+                let tag = if unit == 0x10000 && what == "DGROUP" && (s..e).all(|i| flag[i] == 0 || drawn[i] != 0) { " (the drawing's)" } else { "" };
+                eprintln!("  {:02x}:{:04x}..{:04x} orig {}->{} mine {}->{}{tag}", s / unit, s % unit, s % unit + (e - s), hx(&o0[s..e]), hx(&o1[s..e]), hx(&m0[s..e]), hx(&m1[s..e]));
+            }
+        };
+        report("DGROUP", &ds0, &ds, &mine0, &mine, 4, 0x10000);
+        if std::env::var("ARENA_STRICT").is_ok() {
+            // The changes as sets: changed on one side only, or on both to
+            // different values (the drawing's copy's writes left out).
+            let flag: Vec<u8> = (0..0x10000).map(|i| {
+                let (oc, mc) = (ds0[i] != ds[i], mine0[i] != mine[i]);
+                u8::from(drawn[i] == 0 && (oc != mc || (oc && ds[i] != mine[i])))
+            }).collect();
+            for &(s, e) in differing(&flag, &vec![0u8; 0x10000], 4).iter().take(80) {
+                let hx = |v: &[u8]| v.iter().take(12).map(|b| format!("{b:02x}")).collect::<String>();
+                eprintln!("  strict {s:04x}..{e:04x} orig {}->{} mine {}->{}", hx(&ds0[s..e]), hx(&ds[s..e]), hx(&mine0[s..e]), hx(&mine[s..e]));
+            }
+        }
+        report("EMS", &ems0, &ems, &banks0, &banks, 32, 0x10000);
+    }
+}

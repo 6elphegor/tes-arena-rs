@@ -616,6 +616,8 @@ pub struct Hud {
     pub counters: Option<String>,
     /// The level's text shown (`level_text`): each line with its row.
     pub level: Vec<(i32, Vec<Span>)>,
+    /// An effect's words (0000:5011) and their row.
+    pub effect: Option<(String, i32)>,
     /// The window the game centres its boxes in (A914, A916, A918, A91A:
     /// left, top, right, bottom); all zero: the whole screen.
     pub clip: (i32, i32, i32, i32),
@@ -1259,6 +1261,15 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
         let x = 0xA0 - (f.width(&text) as i32 >> 1);
         screen.text_plain(f, x, 0x14, &text, 0x70);
         screen.text_plain(f, x + 1, 0x14, &text, 0x9F);
+    }
+    // 0000:5011: an effect's words in [102C]'s font centred at x A0h
+    // (5364) 0Bh above the view's foot (C3A2), in colour FDh (9288),
+    // then one pixel right in FCh.
+    if let Some((text, y)) = &hud.effect {
+        let f = &st.box_font;
+        let x = 0xA0 - (f.width(text) as i32 >> 1);
+        screen.text_plain(f, x, *y, text, 0xFD);
+        screen.text_plain(f, x + 1, *y, text, 0xFC);
     }
     // 2826:0BB2: the spells' counters in [102C]'s font at (BEh, 2) in
     // colour 70h, then one pixel left in 9Fh (9E06).

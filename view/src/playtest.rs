@@ -279,6 +279,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         maker_screen: None,
         backdrop: None,
         status: None,
+        effect: None,
         panel: None,
         map: false,
         over: false,

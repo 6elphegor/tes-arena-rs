@@ -48,6 +48,12 @@ impl AreaHooks for Areas<'_> {
         m.states_keep(files);
     }
 
+    /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`); the
+    /// frame's 2294:0428 (`Sky::sky`) chooses its colours again.
+    fn hands(&mut self, m: &mut Machine) {
+        m.sky_reset();
+    }
+
     fn normal_lgt(&mut self, m: &mut Machine) {
         world::lgt(m, self.dir, arena::weather::NORMAL_LGT);
     }

@@ -153,7 +153,8 @@ pub trait AreaHooks {
     fn music(&mut self, _m: &mut Machine) -> u16 {
         0
     }
-    /// 0000:068A: the hands' graphics.
+    /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`), then
+    /// 2294:0428's colours for the weather.
     fn hands(&mut self, _m: &mut Machine) {}
     /// 0000:2631.
     fn hook_2631(&mut self, _m: &mut Machine) {}

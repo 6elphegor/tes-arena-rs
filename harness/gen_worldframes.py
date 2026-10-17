@@ -303,6 +303,9 @@ def run_case(a, at, name, setup, steps, tracks):
     a.buttons = 0
     if setup:
         setup(a)
+    # The state the frames start from (for the state comparison's
+    # changes: worldtest's `state_measured`).
+    a.pre_state = (bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), b''.join(a.ems_bank(b) for b in range(0x20)))
     def no_cursor(*_):
         a.w16(0x7A48, 0xFFFF)
     cursor = a.mu.hook_add(UC_HOOK_CODE, no_cursor, None, a.lin(LOAD_SEG, CURSOR_DRAW), a.lin(LOAD_SEG, CURSOR_DRAW))
@@ -356,6 +359,12 @@ def main():
     a = ScreenArena(EXE, GAME, SAVE)
     a.start()
     base = a.snapshot()
+    if dump:
+        # The state as the load leaves it (the state comparison's start,
+        # worldtest's `state_measured`, before the places' entries).
+        os.makedirs(dump, exist_ok=True)
+        open(os.path.join(dump, 'base.ds'), 'wb').write(bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)))
+        open(os.path.join(dump, 'base.ems'), 'wb').write(b''.join(a.ems_bank(b) for b in range(0x20)))
     places = {}
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     out = open(OUT, 'w', buffering=1)
@@ -392,6 +401,13 @@ def main():
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):
                 open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
+            # The game's state as the case leaves it, for the view's state
+            # comparison (worldtest's `state_measured`): DGROUP, and the
+            # EMS banks 0..1Fh.
+            open(os.path.join(dump, f'{name}.ds'), 'wb').write(bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)))
+            open(os.path.join(dump, f'{name}.ems'), 'wb').write(b''.join(a.ems_bank(b) for b in range(0x20)))
+            open(os.path.join(dump, f'{name}.ds0'), 'wb').write(a.pre_state[0])
+            open(os.path.join(dump, f'{name}.ems0'), 'wb').write(a.pre_state[1])
     out.close()
 
 
