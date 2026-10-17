@@ -1264,6 +1264,15 @@ impl Assets {
     /// filling the sky) for a view `aspect` wide, kept for the redraws
     /// until the next frame.
     fn view_frame(&mut self, engine: &mut Engine, aspect: f32) {
+        // The bank the frame left mapped (8FA8: the faces' 19h, 292B:0530),
+        // mapped again at the end: this is the view's own work after the
+        // frame, where the original maps none.
+        let mapped = engine.m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED);
+        self.view_frame_drawn(engine, aspect);
+        engine.m.ems_map(mapped >> 2);
+    }
+
+    fn view_frame_drawn(&mut self, engine: &mut Engine, aspect: f32) {
         let (mut sky, lights) = self.light_frame(&mut engine.m);
         self.sky_loads(engine);
         let focal = world::TAN_HALF * aspect;

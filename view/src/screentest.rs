@@ -1754,7 +1754,9 @@ fn the_dreams_as_the_original_shows_them() {
         return;
     };
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/dream.txt")).expect("tests/vectors/dream.txt");
-    let mut runs: Vec<((u8, u8), Vec<(u64, u64)>)> = Vec::new();
+    // ((level byte, F77), the states' digests).
+    type Run = ((u8, u8), Vec<(u64, u64)>);
+    let mut runs: Vec<Run> = Vec::new();
     for line in text.lines() {
         let f: Vec<&str> = line.split(" | ").collect();
         match f.as_slice() {
