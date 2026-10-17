@@ -120,6 +120,23 @@ def storm(heading, angle):
     return put
 
 
+def volcanic(heading, dx, dy):
+    """Facing `heading` with the location moved to province 3 at
+    (84h + `dx`, 34h + `dy`) and the sky's objects made again
+    (2294:08B9, the counts at 42B9 and 438C cleared first, as 0000:027A
+    clears them): the volcano seen near (volcano2.dfa) or far
+    (volcano3.img) by its distance."""
+    def put(a):
+        a.mu.mem_write(a.lin(a.ds, 0x0A46), b'\x03')
+        a.w16(0x0A48, 0x84 + dx)
+        a.w16(0x0A4A, 0x34 + dy)
+        a.mu.mem_write(a.lin(a.ds, 0x42B9), b'\x00')
+        a.mu.mem_write(a.lin(a.ds, 0x438C), b'\x00')
+        a.call_far(0x2294, 0x08B9)
+        a.w16(0xC3DA, heading)
+    return put
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -184,6 +201,11 @@ CASES = {
     # At night in a thunderstorm, a bolt forced at the circle's angle 0,
     # ahead: its second frame (2294:05A6, 0000:78A8) over the sky's flash.
     'playbolt': ('street', storm(0, 0), [((), (), 1, None)]),
+    # The wilderness moved near Red Mountain (province 3, 20h south of
+    # its 84h, 34h), facing it: the volcano's frames (volcano2.dfa,
+    # 292B:0201's 5652 and 5A66); then far (A0h: volcano3.img, 5828).
+    'playvolcano': ('wild', volcanic(0x100, 0, 0x20), [((), (), 1, None)]),
+    'playvolcanofar': ('wild', volcanic(0x100, 0, 0xA0), [((), (), 1, None)]),
     # The main quest dungeon 39699021.MIF entered (`named`), its first
     # frames, nothing held: its start sees a square's cap.
     'playcap': ('capped', None, [((), (), 3, None)]),
