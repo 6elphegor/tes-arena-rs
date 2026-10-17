@@ -420,27 +420,29 @@ impl Machine {
     /// 12h; the count read at the entry's +2), until a read comes short,
     /// and written out again bank by bank, until a write comes short;
     /// four full banks read again. The banks keep what the copy left
-    /// there, the last bank written stays mapped.
-    ///
-    /// When `from` is missing the original goes on all the same: its
-    /// "handle" is the open's error code (2), a device that reads nothing
-    /// (as `file_open_or_device` takes it), `to` gets the first free
-    /// handle, and is left empty (a save made in a town copies the
-    /// wilderness's blocks it hasn't: its WILD00N files empty).
+    /// there, the last bank written stays mapped. With `from` missing (or
+    /// only in GLOBAL.BSA: 6B22 opens DOS's files alone) its handle is
+    /// DOS's error, 2, a device that reads nothing: `to` is still made,
+    /// with the handle `from` would have had, and left empty, whatever it
+    /// held before.
     pub fn file_copy(&mut self, files: &mut Files, from: u16, to: u16) {
         let found = files.read_loose(self.mem.cstr(DS, from));
-        let (h_from, h_to) = if found.is_some() { (LOOSE_DOS_HANDLE, LOOSE_DOS_HANDLE + 1) } else { (2, LOOSE_DOS_HANDLE) };
-        let data = found.unwrap_or_else(|| Rc::from(&[][..]));
         const TABLE: u16 = 0x5F5A;
         self.mem.w8(0, CS_IN_BSA, 0);
         self.mem.w16(DS, OPEN_NAME, from);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
-        self.mem.w16(DS, 0x126C, h_from);
+        let (src, dst) = if found.is_some() { (LOOSE_DOS_HANDLE, LOOSE_DOS_HANDLE + 1) } else { (2, LOOSE_DOS_HANDLE) };
+        if let Some(d) = &found {
+            // 6B77: the size (the seek to the end) at A90C.
+            self.mem.w16(DS, OPEN_SIZE, d.len() as u16);
+        }
+        let data = found.unwrap_or_default();
+        self.mem.w16(DS, 0x126C, src);
         self.file_delete(files, to);
         self.mem.w16(DS, OPEN_NAME, to);
-        self.mem.w16(DS, 0x126E, h_to);
-        self.mem.w16(DS, 0xA836, h_from);
-        self.mem.w16(DS, 0xA838, h_to);
+        self.mem.w16(DS, 0x126E, dst);
+        self.mem.w16(DS, 0xA836, src);
+        self.mem.w16(DS, 0xA838, dst);
         let (mut pos, mut out) = (0usize, Vec::with_capacity(data.len()));
         'copy: loop {
             for k in 0..4u16 {

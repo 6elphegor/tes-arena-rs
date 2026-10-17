@@ -1188,4 +1188,14 @@ fn the_welcome_keeps_the_screen_as_the_original() {
     }
     let hash = fnv(kept[..8 + wd as usize * h as usize].iter().copied());
     assert_eq!(format!("{hash:x}"), f[3], "what the welcome kept differs from the original's");
+    // The box's working words as 965E leaves them (its place, AX and BX,
+    // what came before it leaves: the load's offset and the bank), and
+    // the line it laid out last.
+    let g: Vec<&str> = text.lines().find(|l| l.starts_with("welcomebox |")).expect("the box's line").split(" | ").collect();
+    let d = crate::WELCOME_BOX.with(|k| k.borrow_mut().take()).expect("no welcome box");
+    let w = |o: usize| u16::from_le_bytes([d[o], d[o + 1]]);
+    let words: Vec<String> = (0xA836..0xA85A).step_by(2).chain([0xADB6, 0xADB8]).map(|o| format!("{:x}", w(o))).collect();
+    assert_eq!(words.join(" "), g[2], "the welcome box's working words (A836..A858, ADB6, ADB8)");
+    let line: String = d[0x929E..].iter().take_while(|&&c| c != 0).map(|c| format!("{c:02x}")).collect();
+    assert_eq!(line, g[3], "the welcome box's last line (929E)");
 }

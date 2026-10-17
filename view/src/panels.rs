@@ -513,6 +513,13 @@ impl Said {
     fn text(&mut self, bytes: &[u8]) {
         self.boxes.push(crate::hud::lines(bytes, 0x0F));
     }
+    /// What 59C8 (59CC) leaves in the game's state for its box
+    /// (`Machine::message_shown`); the screen it covers isn't kept here.
+    fn shown(m: &mut Machine, text: (u16, u16)) {
+        if m.message_shown(text, None).is_none() {
+            eprintln!("the message box gave up: {}", arena::giveup::describe());
+        }
+    }
     fn in_panel(&mut self, bytes: &[u8]) {
         let t = bytes.split(|&c| c == b'\r').next().unwrap_or_default();
         self.panel = Some(String::from_utf8_lossy(t).into_owned());
@@ -538,6 +545,7 @@ impl arena::text::TextHooks for Said {
         let r = |at| m.mem.r16(DS, at) as i32;
         lines = crate::hud::in_marble2(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
         self.boxes.push(lines);
+        Said::shown(m, (seg, si));
     }
 }
 
@@ -548,6 +556,7 @@ impl arena::use_item::UseHooks for Said {
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         let t = m.mem.cstr(DS, si).to_vec();
         self.text(&t);
+        Said::shown(m, (DS, si));
     }
     /// 1194:1BE0: "This item can't be equipped." with another list up, for
     /// an accessory or a stack, or an item of type word 0 (+6); otherwise
@@ -585,6 +594,7 @@ impl arena::cast::CastHooks for Said {
     fn message_box(&mut self, m: &mut Machine, text: u16) {
         let t = m.mem.cstr(DS, text).to_vec();
         self.text(&t);
+        Said::shown(m, (DS, text));
     }
 }
 
