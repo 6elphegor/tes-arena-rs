@@ -1244,19 +1244,21 @@ impl Assets {
         let names = SKY_NAMES.with(|n| n.borrow().clone());
         let mut draw = SkyDraw { sheet: &self.sheet, images: &names, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
         // The view's own pass too (the game's drawing ran 2294:0A5D on its
-        // copy): DGROUP, the EMS frame and the banks are put back as it
-        // found them. Left, the images' x and flags it sets stood over the
-        // images a relight in the frame body had just read again.
-        let (ds, frame, banks) = {
+        // copy, whose DGROUP the pass stands in for: the bolt's steps, the
+        // flash): what it writes in EMS is put back as it found it, the
+        // bank mapped before mapped back. The drawing's own writes there
+        // are the copy's (`Engine::page_ems`); left, the images' x and
+        // flags the pass sets stood over the images a relight in the frame
+        // body had just read again.
+        let (mapped, seg, frame, banks) = {
             let m = &engine.m;
             let seg = m.mem.r16(arena::mem::DS, arena::mif::var::BUFFER_SEG);
-            (m.mem.segment(arena::mem::DS).to_vec(), m.mem.segment(seg).to_vec(), m.ems.clone())
+            (m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED), seg, m.mem.segment(seg).to_vec(), m.ems.clone())
         };
         let drawn = engine.m.sky_draw(&mut draw).is_some();
+        engine.m.ems_map(mapped >> 2);
         engine.m.ems = banks;
-        let seg = u16::from_le_bytes([ds[arena::mif::var::BUFFER_SEG as usize], ds[arena::mif::var::BUFFER_SEG as usize + 1]]);
         engine.m.mem.segment_mut(seg).copy_from_slice(&frame);
-        engine.m.mem.segment_mut(arena::mem::DS).copy_from_slice(&ds);
         if drawn {
             bodies.extend(draw.out);
         }
