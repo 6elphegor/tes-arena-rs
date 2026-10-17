@@ -317,13 +317,17 @@ fn city_load(m: &mut Machine, files: &mut Files, dir: &Path, spec: &str) {
 
 /// 0000:45FC..4631 for a city entered: in the daytime (CCFE 100h..300h)
 /// fifteen townspeople come around the player (`spawn_actors`, speed
-/// 0Ah); their graphics are the front end's (0000:17F9, `townsfolk`).
+/// 0Ah), their graphics loaded first (0000:17F9).
 /// The wilderness's seven are not done here.
 pub fn city_people(engine: &mut Engine) {
     let m = &mut engine.m;
     let t = m.mem.r16(DS, 0xCCFE);
     if m.mem.r16(DS, 0xC398) & 4 == 0 || m.mem.r16(DS, 0xC39A) & 0x200 != 0 || !(0x100..=0x300).contains(&t) {
         return;
+    }
+    // 0000:17F9: their graphics, for the original's renderer.
+    if m.townsfolk_load(&mut engine.files).is_none() {
+        eprintln!("the townspeople's graphics gave up: {}", arena::giveup::describe());
     }
     if m.spawn_actors(0xF, 0xA).is_none() {
         eprintln!("the townspeople gave up: {}", arena::giveup::describe());

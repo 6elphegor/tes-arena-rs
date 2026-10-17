@@ -2400,7 +2400,7 @@ impl Soft {
             self.s16(0xD438, v);
             self.s8(0xCD96, 1);
             if (self.g8(bx + 0xE) as i8) < 0 {
-                self.gap("C539: a flat drawn by its own frames");
+                self.sprite_framed(x, y, z, dx, bp);
             } else {
                 self.sprite_packed(x, y, z, dx, bp);
             }
@@ -2504,7 +2504,7 @@ impl Soft {
         self.s16(0xCD9A, h);
         self.s16(0xCD98, w);
         let flags = 1 | if self.g8(0xCD97) & 4 != 0 { 2 } else { 0 };
-        self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, flags, (dseg, doff));
+        self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, flags, (dseg, doff), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
             self.gap("E37F: a flat's glow");
         }
@@ -2547,15 +2547,300 @@ impl Soft {
         self.s16(0xA844, ax);
         self.s16(0xA84C, bx);
         let (shoff, shseg) = if self.g16(0xC398) & 0x8000 == 0 && self.g8(0xCD97) & 2 == 0 { self.flat_light() } else { (0, 0) };
-        let rec = self.g16(0xCD9C);
-        if self.g8(rec.wrapping_add(0xC)) & 0xC0 == 0xC0 && rec < 0x0C57 {
-            self.gap("292B:0074: a creature's colours");
-        }
+        // C877: the hook CD5A (292B:0028), a person's colours.
+        let (shseg, shoff) = self.person_colours(shseg, shoff);
         self.s16(0xCD9A, h);
         self.s16(0xCD98, w);
-        self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, 1, (es, si.wrapping_add(0xC)));
+        self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, 1, (es, si.wrapping_add(0xC)), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
             self.gap("E37F: a flat's glow");
+        }
+    }
+
+    /// 0000:C539: a flat drawn by its own frames (a person, the record's
+    /// frames FFh): the image at [D0B8 + 4n] in the bank [D0BA + 4n] (n
+    /// FFFFh: D0B4 and D0B6, which C0F1 set) has its width (+0), height
+    /// (+2), row bytes (+4), bits a pixel (+0Ah), the frames' offsets
+    /// (+0Ch) and its colours (+4Ch). Its height scaled by D438 and, for
+    /// flag 1, D434; placed, its frame `bp` unpacked into [BA54] (5B65),
+    /// lit, the hook CD5A (a person's colours) and drawn (78A8) through
+    /// its colours.
+    fn sprite_framed(&mut self, x: u16, y: u16, z: u16, n: u16, bp: u16) {
+        self.s16(0xA83C, x);
+        self.s16(0xA83E, z);
+        self.s16(0xA83A, bp);
+        let si4 = n.wrapping_mul(4);
+        let bank = self.g16(0xD0BAu16.wrapping_add(si4));
+        self.m.ems_map(bank);
+        let si = self.g16(0xD0B8u16.wrapping_add(si4));
+        let es = self.g16(0x9030);
+        let scale = |v: u16, k: u16| (((v as u32) * (k as u32)) >> 8) as u16;
+        let mut h = self.m.mem.r16(es, si.wrapping_add(2));
+        if self.g16(0xD438) != 0 {
+            h = scale(h, self.g16(0xD438));
+        }
+        if self.g8(0xCD97) & 1 != 0 {
+            h = scale(h, self.g16(0xD434));
+        }
+        let ax = x.wrapping_sub(self.g16(0xC3D0));
+        let bx = y.wrapping_sub(h).wrapping_add(self.g16(0xC3D2));
+        let cx = z.wrapping_sub(self.g16(0xC3D4));
+        let (ax, mut cx) = self.rot(self.g16(0xC3DA), ax, cx);
+        if (cx as i16) <= 0x14 {
+            return;
+        }
+        let ax = ax.wrapping_add(self.g16(0xD436));
+        self.s16(0xD436, 0);
+        let (ax, bx) = self.project(ax, bx, cx);
+        let x0 = ax.wrapping_add(self.g16(0xC3D6));
+        let y0 = bx.wrapping_add(self.g16(0xC3D8));
+        if self.g8(0xCD97) & 0x10 != 0 {
+            cx >>= 2;
+        }
+        let mut w = self.m.mem.r16(es, si);
+        if self.g16(0xD438) != 0 {
+            w = scale(w, self.g16(0xD438));
+        }
+        let (ax, bx) = self.project(w, h, cx);
+        if (ax as i16) <= 0 || (bx as i16) <= 0 {
+            return;
+        }
+        let x0 = x0.wrapping_sub(ax >> 1);
+        self.s16(0xA836, x0);
+        self.s16(0xA838, y0);
+        // C5F3..C621 (the right edge against the left one less the width).
+        if (x0.wrapping_add(ax) as i16) <= (self.g16(LEFT) as i16)
+            || (x0.wrapping_sub(ax) as i16) >= (self.g16(RIGHT) as i16)
+            || (y0 as i16) >= (self.g16(BOTTOM) as i16)
+            || (y0.wrapping_add(bx) as i16) <= (self.g16(TOP) as i16)
+        {
+            return;
+        }
+        self.s16(0xA844, ax);
+        self.s16(0xA84C, bx);
+        let a83a = self.g16(0xA83A);
+        let stride = self.m.mem.r16(es, si.wrapping_add(4));
+        let rows = self.m.mem.r16(es, si.wrapping_add(2));
+        let src = si.wrapping_add(self.m.mem.r16(es, si.wrapping_add(a83a.wrapping_add(a83a)).wrapping_add(0xC)));
+        let (doff, dseg) = (self.g16(0xBA54), self.g16(0xBA56));
+        self.runs_unpack(es, src, dseg, doff, stride, rows);
+        // C651..C6A9: the light.
+        let mut shade = (0u16, 0u16);
+        if self.g16(0xC398) & 0x8000 == 0 && self.g8(0xCD97) & 2 == 0 {
+            shade = (self.g16(0xCCC2).wrapping_add(0x10), 0);
+            if self.g8(0xCD97) & 0x20 == 0 {
+                let n = self.g16(0xC3DC);
+                for i in 0..n {
+                    self.s8(0xC997u16.wrapping_add(i), 0);
+                }
+                let (l, _) = self.light_of(self.g16(0xA83C), self.g16(0xA83E));
+                shade = (self.g16(0xCCC2), l.wrapping_mul(0x100));
+            }
+        }
+        let shade = self.person_colours(shade.0, shade.1);
+        let flags = 1 | if self.g8(0xCD97) & 4 != 0 { 2 } else { 0 };
+        let bpp = self.m.mem.r8(es, si.wrapping_add(0xA));
+        let (fh, fw) = (self.m.mem.r16(es, si.wrapping_add(2)), self.m.mem.r16(es, si));
+        self.s16(0xCD9A, fh);
+        self.s16(0xCD98, fw);
+        // C710: C4BB, the click's test, is the game's (the copy's).
+        self.blit(x0, y0, ax, bx, shade, fw, fh, flags, (dseg, doff), bpp, (es, si.wrapping_add(0x4C)));
+        if self.m.hook_set(0xCD3E) {
+            self.gap("C71C: the hook CD3E after a flat");
+        }
+        if self.g8(0xCD97) & 8 != 0 {
+            self.gap("E37F: a flat's glow");
+        }
+    }
+
+    /// 0000:5B65: `rows` x `stride` bytes run-length unpacked from
+    /// `seg`:`si` to `dseg`:`doff`: a byte under 80h, that many plus one
+    /// bytes copied; else its low bits plus one of the next byte; on
+    /// until the count comes to 0.
+    fn runs_unpack(&mut self, seg: u16, mut si: u16, dseg: u16, mut di: u16, stride: u16, rows: u16) {
+        let mut bx = rows.wrapping_mul(stride);
+        loop {
+            let al = self.m.mem.r8(seg, si);
+            si = si.wrapping_add(1);
+            let n = ((al & 0x7F) as u16) + 1;
+            bx = bx.wrapping_sub(n);
+            if al & 0x80 == 0 {
+                for _ in 0..n {
+                    let b = self.m.mem.r8(seg, si);
+                    self.m.mem.w8(dseg, di, b);
+                    si = si.wrapping_add(1);
+                    di = di.wrapping_add(1);
+                }
+            } else {
+                let b = self.m.mem.r8(seg, si);
+                si = si.wrapping_add(1);
+                for _ in 0..n {
+                    self.m.mem.w8(dseg, di, b);
+                    di = di.wrapping_add(1);
+                }
+            }
+            if bx == 0 {
+                break;
+            }
+        }
+    }
+
+    /// The hook CD5A (292B:0028): for a person (the record CD9C's number
+    /// C0h.. under the creatures) the shade `seg`:`off` made a table of
+    /// their own (292B:0074) at 4A30h: the shade's row twice (or the
+    /// colours as they are), then for each set bit of the person's record
+    /// word (+12h, its top bit cleared), rolled in from the top, ten
+    /// colours from 7D10's start for the bit put where 7D10's entry for
+    /// the low four bits names (80h left for low bits 0Bh), and for the
+    /// climate (0A46: not 0, 2, 5, 6) ten more (292B:0189). The shade is
+    /// then that table.
+    fn person_colours(&mut self, seg: u16, off: u16) -> (u16, u16) {
+        let rec = self.g16(0xCD9C);
+        if self.g8(rec.wrapping_add(0xC)) & 0xC0 != 0xC0 || rec >= 0x0C57 {
+            return (seg, off);
+        }
+        const T: u16 = 0x4A30;
+        let mut dx = self.g16(rec.wrapping_add(0x12)) & 0x7FFF;
+        for k in 0..0x200u16 {
+            let b = if seg != 0 { self.m.mem.r8(seg, off.wrapping_add(k & 0xFF)) } else { k as u8 };
+            self.m.mem.w8(T, k, b);
+        }
+        let mut bx = 0x7D10u16;
+        for _ in 0..0x10 {
+            dx = dx.rotate_left(1);
+            if dx & 1 != 0 {
+                let di = self.g8(bx) as u16;
+                if !(di == 0x80 && dx & 0xF == 0xB) {
+                    let si = (self.g8(0x7D10 + (dx & 0xF)) as u16).wrapping_add(0x100);
+                    for k in 0..0xA {
+                        let b = self.m.mem.r8(T, si.wrapping_add(k));
+                        self.m.mem.w8(T, di.wrapping_add(k), b);
+                    }
+                }
+            }
+            bx = bx.wrapping_add(1);
+        }
+        let al = self.g8(0x0A46);
+        if !matches!(al, 0 | 2 | 5 | 6) {
+            let mut b: u8 = match al {
+                7 => 0x74,
+                3 => 0x34,
+                4 => 0xC0,
+                _ => 0x94,
+            };
+            for k in 0..0xA {
+                let di = self.g8(0x7D20 + k) as u16;
+                let v = self.m.mem.r8(T, 0x100 | b as u16);
+                self.m.mem.w8(T, di, v);
+                b = b.wrapping_add(1);
+            }
+        }
+        (T, 0)
+    }
+
+    /// 0000:78A8 under 8 bits a pixel (`blit`): the compiled row reads
+    /// each pixel's bits from its column (the scale's whole part, from
+    /// the right when mirrored) in the row (the step's whole part times
+    /// the row's bytes, `bpp` x `w` bits rounded up).
+    #[allow(clippy::too_many_arguments)]
+    fn blit_bits(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+        let stride = ((bpp as u16 * (w & 0xFF)) + 7) >> 3 & 0xFF;
+        if dw == 0 {
+            return;
+        }
+        let xs = ((w & 0xFF) << 8) / dw;
+        if xs <= 4 || dh == 0 {
+            return;
+        }
+        let ys = ((h & 0xFF) << 8) / dh;
+        if ys <= 4 {
+            return;
+        }
+        let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+        let (mut fx, mut fy) = (0u16, 0u16);
+        let d = y.wrapping_sub(self.g16(TOP));
+        if (d as i16) < 0 {
+            dh = dh.wrapping_add(d);
+            if (dh as i16) <= 0 {
+                return;
+            }
+            y = y.wrapping_sub(d);
+            fy = d.wrapping_mul(ys).wrapping_neg();
+        }
+        let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(self.g16(BOTTOM));
+        if (c as i16) > 0 {
+            dh = dh.wrapping_sub(c);
+            if (dh as i16) <= 0 {
+                return;
+            }
+        }
+        let d = x.wrapping_sub(self.g16(LEFT));
+        if (d as i16) < 0 {
+            dw = dw.wrapping_add(d);
+            if (dw as i16) <= 0 {
+                return;
+            }
+            x = x.wrapping_sub(d);
+            fx = d.wrapping_mul(xs).wrapping_neg();
+        }
+        let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(self.g16(RIGHT));
+        if (c as i16) > 0 {
+            dw = dw.wrapping_sub(c);
+            if (dw as i16) <= 0 {
+                return;
+            }
+        }
+        // 795E..79A9: the colours, through the shade where it has one.
+        let mut lut: Option<[u8; 256]> = None;
+        if map.0 != 0 {
+            let mut t = [0u8; 256];
+            for (k, e) in t.iter_mut().enumerate().take(1 << bpp) {
+                let c = self.m.mem.r8(map.0, map.1.wrapping_add(k as u16));
+                *e = if shade.0 != 0 { self.m.mem.r8(shade.0, shade.1.wrapping_add(c as u16)) } else { c };
+            }
+            lut = Some(t);
+        } else if shade.0 != 0 {
+            let mut t = [0u8; 256];
+            for (k, e) in t.iter_mut().enumerate() {
+                *e = self.m.mem.r8(shade.0, shade.1.wrapping_add(k as u16));
+            }
+            lut = Some(t);
+        }
+        let mirror = flags & 2 != 0;
+        let see = flags & 1 != 0;
+        let mask = 0xFFu8 >> (8 - bpp);
+        let mut dest = self.row(y).wrapping_add(x);
+        let mut rows = dh as u8;
+        loop {
+            let base = src.1.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
+            let mut bx = fx;
+            let mut di = dest;
+            for _ in 0..dw {
+                let mut col = (bx >> 8) as u8;
+                if mirror {
+                    col = (w as u8).wrapping_sub(col).wrapping_sub(1);
+                }
+                let bit = col as u16 * bpp as u16;
+                let at = base.wrapping_add(bit >> 3);
+                let word = (self.m.mem.r8(src.0, at) as u16) << 8 | self.m.mem.r8(src.0, at.wrapping_add(1)) as u16;
+                let sh = (16 - bpp as u16).wrapping_sub(bit & 7) & 0xF;
+                let v = (word >> sh) as u8 & mask;
+                if !(see && v == 0) {
+                    let c = match &lut {
+                        Some(t) => t[v as usize],
+                        None => v,
+                    };
+                    self.px(di, c);
+                }
+                di = di.wrapping_add(1);
+                bx = bx.wrapping_add(xs);
+            }
+            dest = dest.wrapping_add(0x140);
+            fy = fy.wrapping_add(ys);
+            rows = rows.wrapping_sub(1);
+            if rows == 0 {
+                break;
+            }
         }
     }
 
@@ -2564,13 +2849,19 @@ impl Soft {
         self.m.frames_unpack(seg, si, frame, dseg, doff);
     }
 
-    /// 0000:78A8 with the 8-bit pixels: `w` x `h` from `src` scaled to
+    /// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
     /// `dw` x `dh` at (`x`, `y`), clipped to the window: as the code it
-    /// compiles at 3BA0:929E draws each row (`flags` bit 0 the 0s left
-    /// out, bit 1 mirrored; through the shade table where its segment
-    /// isn't 0).
+    /// compiles at 3BA0:929E (7A2B) draws each row (`flags` bit 0 the 0s
+    /// left out, bit 1 mirrored; through the shade table where its
+    /// segment isn't 0). Under 8 bits a pixel, a pixel is read from the
+    /// row's big-endian word at its bit, and goes through the colours
+    /// `map` (where its segment isn't 0): as they are unshaded, else
+    /// through the shade (the table made at CS:781E).
     #[allow(clippy::too_many_arguments)]
-    fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16)) {
+    fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+        if bpp != 8 {
+            return self.blit_bits(x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+        }
         let stride = ((8 * (w & 0xFF)) + 7) >> 3;
         let xs = ((w & 0xFF) << 8) / dw.max(1);
         if dw == 0 || xs <= 4 {

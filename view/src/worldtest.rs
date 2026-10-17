@@ -75,6 +75,11 @@ fn into_crypt(a: &mut App) {
     area_left(a);
 }
 
+/// The random seed of gen_worldframes.py's game after its load from the
+/// save (the harness's BIOS ticks at 21EE:0059, 0000:6FC2's seed, run on
+/// through the title and the load).
+const HARNESS_SEED: u32 = 0x19B7_6141;
+
 /// Into the place, `setup` run, then `play` driving frames and
 /// collecting the track: the app as the case leaves it.
 fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) -> Option<(App, Vec<[u16; 5]>)> {
@@ -90,6 +95,11 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     // the next level's lights; the fall's floor E8BC, still 0, which
     // drops the player a step on the street's door square).
     let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    // The random seed as the harness's game has it after its load: the
+    // original seeds it from the BIOS ticks (21EE:0059 -> 0000:6FC2), so
+    // a game run in the harness has the seed its clock gives.
+    a.engine.m.rng.seed = HARNESS_SEED;
+    a.engine.m.store_rng();
     let mut d = Driver::new(&mut a);
     clear(&mut d, &mut a);
     match place {
@@ -509,13 +519,14 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
 }
 
 /// The street outside the guild by day (the sky's rows, the water's
-/// frame under the floor, the floor and the walls unshaded, the trees)
-/// and at ten at night (the afternoon's dither, the textures relit by the
-/// night's row of the light table), every pixel as the original's
-/// renderer draws them.
+/// frame under the floor, the floor and the walls unshaded, the trees,
+/// the townspeople in their colours), turned to the open sky (a cloud,
+/// a lamp post, people far off) and at ten at night (the afternoon's
+/// dither, the textures relit by the night's row of the light table),
+/// every pixel as the original's renderer draws them.
 #[test]
 fn the_streets_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playstreet", "playnight"] {
+    for name in ["playstreet", "playsky", "playnight"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -523,11 +534,10 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
 
 /// Measured, not yet exact: the crypt (its farthest ceiling row reads
 /// past the row table, where the original finds what an earlier area
-/// left in its heap; and five rows of its ceiling differ) and the street
-/// facing open sky (a few of the sky's objects' pixels).
+/// left in its heap; and five rows of its ceiling differ).
 #[test]
 fn the_crypts_3d_view_measured() {
-    for name in ["playcrypt", "playsky"] {
+    for name in ["playcrypt"] {
         if let Some((ok, same)) = soft_view(name) {
             eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
         }

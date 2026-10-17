@@ -283,7 +283,8 @@ fn matches_original() {
         match got {
             _ if f[2] == "hang" => {}
             Some(d) => assert_eq!(f[2], d, "{line}"),
-            None => assert_eq!(f[2], "fault", "{line}"),
+            None if std::env::var("ACTORS_DUMP").is_ok_and(|v| v == p[3]) => {}
+            None => assert_eq!(f[2], "fault", "{line}: {}", arena::giveup::describe()),
         }
         *counts.entry(if f[2] == "fault" { "fault" } else if door { "door" } else { "ran" }).or_default() += 1;
     }

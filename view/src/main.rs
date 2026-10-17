@@ -412,6 +412,11 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 0000:17F9: the townspeople's graphics loaded, as they come back
+    /// (`Machine::townsfolk_load`).
+    fn townsfolk_graphics(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.townsfolk_load(files)
+    }
     /// 1194:59C8: the text at DGROUP `text` in a box (drowning in the
     /// wild, 7927).
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {

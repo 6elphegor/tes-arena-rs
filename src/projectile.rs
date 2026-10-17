@@ -376,7 +376,7 @@ impl Machine {
     /// list (a head whose object is 0 starts the list over). Nodes come
     /// from the pool (0000:C005), searched on without end: None where
     /// that never finds a free node.
-    fn column_add(&mut self, col: u16, row: u16, obj: u16) -> Option<()> {
+    pub(crate) fn column_add(&mut self, col: u16, row: u16, obj: u16) -> Option<()> {
         let head_at = COLUMNS.wrapping_add(col.wrapping_mul(2));
         let mut head = self.mem.r16(DS, head_at);
         if head != 0 && self.list_word(head.wrapping_add(4))? == 0 {

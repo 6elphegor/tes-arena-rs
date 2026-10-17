@@ -7,8 +7,8 @@ Each case loads a level with an INFO chunk and its INF (as gen_info.py
 does, with EMS on), puts the player on a free square, fills the actors
 from a seed (`setup`, mirrored in tests/actors.rs) and runs one frame of
 the actors. The door hooks are the game's: the lock check 2826:0AAB and
-the sound 23BA:002A (stubbed with a RETF, as sound is not ported, like
-0000:1B7F and FE58, which build the draw list), and so is the message
+the sound 23BA:002A (stubbed with a RETF, as sound is not ported), and
+so is the message
 box of a broken special item (1194:A36C) in a creature's blow. Casting
 runs for real, with gen_spell.py's stops (a projectile spawned by an
 effect, 29CF:0270, is an INT 3; a spell effect leaving DS at the
@@ -25,7 +25,8 @@ Lines (fields separated by " | "):
 with the DGROUP variables of VARS (hex; sizes in VARS), and digests:
 FNV-1a of the changed DGROUP bytes (offset, value), of the wall plane
 (32 KB) and of the creature segment (32 KB at 7800h). "hang" where the
-budget runs out.
+budget runs out; "fault" where a word access reaches DGROUP offset
+FFFF (a #GP on a 386).
 """
 import os
 import random
@@ -124,7 +125,7 @@ def setup(seed, px, py, corpse):
 
 a = DosArena(EXE, GAME)
 a.std_devices = True
-for seg, off, code in [(0, 0x1B7F, b'\xc3'), (0, 0xFE58, b'\xc3'), (0, 0xDA8E, b'\xc3'), (0, 0x8FC8, b'\xc3'),
+for seg, off, code in [(0, 0xDA8E, b'\xc3'), (0, 0x8FC8, b'\xc3'),
                        (0x23BA, 0x002A, b'\xcb'), (0x1194, 0xA36C, b'\xcb')]:
     a.patch(seg, off, code)
 a.init_heap()
@@ -155,6 +156,14 @@ for seg_, off_ in [(0x2CDD, 0x03E5), (0x2CDD, 0x003F), (0x29CF, 0x09A3)]:
     lin = (LOAD_SEG + seg_) * 16 + off_
     a.mu.hook_add(UC_HOOK_CODE, leak, None, lin, lin)
 a.w16(0xCD48, LOAD_SEG + 0x23BA)
+# A word access at DGROUP offset FFFF (the object lists' node pool run
+# out, 0000:C005 searching on past it): a 386 raises #GP for it in real
+# mode; unicorn reads on past the segment. A fault, as gen_projectile.py.
+from unicorn import UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE  # noqa: E402
+wrap = []
+a.mu.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE,
+              lambda mu, acc, addr, size, v, _: wrap.append(1) if size > 1 else None, None,
+              a.lin(a.ds, 0xFFFF), a.lin(a.ds, 0xFFFF))
 BASE = a.snapshot()
 
 bsa = open(os.path.join(GAME, a.names['GLOBAL.BSA']), 'rb').read()
@@ -290,8 +299,11 @@ for _ in range(1500):
     before = a.seg_bytes(a.ds)
     c0 = a.seg_bytes(CSEG)
     try:
+        wrap.clear()
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
+        if wrap:
+            raise Fault(13)
         unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
         changed = changes(before, after)
@@ -361,8 +373,11 @@ for _ in range(300):
     before = a.seg_bytes(a.ds)
     c0 = a.seg_bytes(CSEG)
     try:
+        wrap.clear()
         a._setup([0, STUB_SEG], {})
         a._run(0, 0x1854, STUB_SEG, 0)
+        if wrap:
+            raise Fault(13)
         unrelocate(before, c0)
         after = a.seg_bytes(a.ds)
         changed = changes(before, after)
