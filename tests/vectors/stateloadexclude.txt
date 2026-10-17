@@ -1,0 +1,18 @@
+# DGROUP ranges the state comparison from the load (gen_worldframes.py's
+# `stateload` lines, view/src/worldtest.rs's
+# the_state_from_the_load_as_the_original_leaves_it) leaves out besides
+# stateexclude.txt's: start end (hex, end exclusive) and why.
+# The heaps' segments the way in makes (the original's heap's, the
+# engine's its own):
+ba56 ba58 [BA54]'s segment, the frames' unpacking buffer (0000:5652)
+ccd0 ccd2 a level plane's segment (FS/GS of the drawing and the actors)
+cd76 cd7e the deferred draw lists' buffer, [CB8C] bytes (0000:A585..A596): the engine's copy draws without them (BA80 set)
+cd8c cd92 the drawing's buffers' segments made on the way in
+d748 d74a a buffer's segment made on the way in
+d806 d808 a level plane's segment (FS/ES/DS of the actors and the drawing)
+e2e8 e2ea a buffer's segment made on the way in (FFFFh till then)
+# Scratch the load leaves:
+a933 a934 the number-to-text buffer's last digit (0000:7028 writes down from A933): the last number written, the load's own on the original's side
+1044 1052 the strings' buffer (names, paths, a file's found and made names, 06A1/062D; the lamps' colour, 0000:0390): on the way into a dungeon the original's holds the load's "Drakain" again where the engine's holds the street's 0, 0, 0 (not found which routine puts it back)
+# The harness's ways:
+fff8 fff9 the harness's own count at the top of DGROUP

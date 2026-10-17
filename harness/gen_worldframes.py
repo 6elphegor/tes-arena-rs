@@ -52,6 +52,24 @@ runs, and the digest of their bytes after:
 
   state | NAME | <start+length ...> | <digest>
 
+and the same from the load (the place's entry counted too; the offsets
+tests/vectors/stateloadexclude.txt names left out as well: the heaps'
+segments made on the way in, scratch the load and the entry leave):
+
+  stateload | NAME | <start+length ...> | <digest>
+
+and for the cases the view checks so (LOAD_CASES), one bit of each byte
+of DGROUP as the case leaves it (`state_bits`): the bytes the engine's
+way in changes and the original's doesn't are checked against them.
+
+  stateloadbits | NAME | <hex>
+
+What the case's frames changed in the EMS banks 0..1Fh (64K each, end to
+end), from the case's start: how many bytes, the digest of their offsets
+(four bytes each, little-endian), the digest of their bytes after:
+
+  stateems | NAME | <count> <offsets' digest> | <digest>
+
 The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
@@ -360,10 +378,11 @@ def play(a, name, steps, tracks):
     return full, page, mask, bytes(a.dac)
 
 
-def excluded():
-    """The DGROUP offsets tests/vectors/stateexclude.txt leaves out."""
+def excluded(name='stateexclude.txt'):
+    """The DGROUP offsets tests/vectors/stateexclude.txt (or `name`)
+    leaves out."""
     out = set()
-    path = os.path.join(os.path.dirname(__file__), '..', 'tests', 'vectors', 'stateexclude.txt')
+    path = os.path.join(os.path.dirname(__file__), '..', 'tests', 'vectors', name)
     for line in open(path):
         f = line.split('#')[0].split()
         if len(f) >= 2:
@@ -371,7 +390,42 @@ def excluded():
     return out
 
 
-def state_line(name, before, after, skip):
+# The cases whose state from the load the view checks (worldtest's
+# the_state_from_the_load_as_the_original_leaves_it).
+LOAD_CASES = ('playstreet', 'playnight', 'playrain', 'playsnow', 'playwild', 'playdungeon', 'playdown',
+              'playcrypt', 'playfog', 'playcap', 'playsky')
+
+
+def state_bit(i, b):
+    """One bit of DGROUP's byte `b` at offset `i`: FNV-1a's top bit over
+    the byte, then the offset (the byte first: FNV-1a's top bit hardly
+    depends on its last byte)."""
+    return fnv(bytes((b, i & 0xFF, i >> 8))) >> 63
+
+
+def state_bits(after):
+    """`state_bit` of each byte of DGROUP as the case leaves it, eight to
+    a byte (offset 8k + j at bit j of byte k), in hex: what the view
+    checks the bytes its frames change and the original's don't against,
+    where the two loads part (the original's bytes are the save's, never
+    in the vectors; a bit each tells a byte changed otherwise half the
+    time)."""
+    out = bytearray(0x2000)
+    for i in range(0x10000):
+        out[i >> 3] |= state_bit(i, after[i]) << (i & 7)
+    return out.hex()
+
+
+def state_runs(kind, name, before, after):
+    """What changed between `before` and `after` (the EMS banks 0..1Fh,
+    64K each, end to end): how many bytes, the digest of their offsets
+    (each four bytes, little-endian) and of their bytes after."""
+    changed = [i for i in range(len(after)) if before[i] != after[i]]
+    offs = fnv(b''.join(struct.pack('<I', i) for i in changed))
+    return f'{kind} | {name} | {len(changed):x} {offs:x} | {fnv(bytes(after[i] for i in changed)):x}\n'
+
+
+def state_line(name, before, after, skip, kind='state'):
     """What the case's frames changed in DGROUP (the offsets left out
     aside): the offsets, as runs `start+length`, and the digest of their
     bytes after."""
@@ -383,7 +437,7 @@ def state_line(name, before, after, skip):
         else:
             runs.append([i, 1])
     offs = ' '.join(f'{s:x}+{n:x}' for s, n in runs)
-    return f'state | {name} | {offs} | {fnv(bytes(after[i] for i in changed)):x}\n'
+    return f'{kind} | {name} | {offs} | {fnv(bytes(after[i] for i in changed)):x}\n'
 
 
 def main():
@@ -392,6 +446,7 @@ def main():
     a = ScreenArena(EXE, GAME, SAVE)
     a.start()
     base = a.snapshot()
+    loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
     if dump:
         # The state as the load leaves it (the state comparison's start,
         # worldtest's `state_measured`, before the places' entries).
@@ -402,6 +457,7 @@ def main():
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     out = open(OUT, 'w', buffering=1)
     skip = excluded()
+    skip_load = skip | excluded('stateloadexclude.txt')
     for name, (where, setup, steps) in CASES.items():
         if only and name not in only:
             continue
@@ -425,7 +481,13 @@ def main():
             out.write(t)
         if len(seen) > 1:
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
-        out.write(state_line(name, a.pre_state[0], bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), skip))
+        after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+        out.write(state_line(name, a.pre_state[0], after, skip))
+        out.write(state_line(name, loaded, after, skip_load, 'stateload'))
+        if name in LOAD_CASES:
+            out.write(f'stateloadbits | {name} | {state_bits(after)}\n')
+        ems = b''.join(a.ems_bank(b) for b in range(0x20))
+        out.write(state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
         # The 3D pixels from row 1 on: the topmost row of a ceiling reads

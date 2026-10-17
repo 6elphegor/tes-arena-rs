@@ -170,7 +170,7 @@ fn check_fade(name: &str, a: &mut App) {
 fn check_fade_in(file: &str, name: &str, a: &mut App) {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/vectors").join(file);
     let text = std::fs::read_to_string(&path).expect("the fades' vectors");
-    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] != "state" && f[1] == name).map(|f| (f[2].parse::<usize>().unwrap(), u64::from_str_radix(f[3], 16).unwrap()));
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && !f[0].starts_with("state") && f[1] == name).map(|f| (f[2].parse::<usize>().unwrap(), u64::from_str_radix(f[3], 16).unwrap()));
     let mut seen: Vec<u64> = Vec::new();
     let mut raw: Vec<u8> = Vec::new();
     for (dac, _) in a.fade.drain(..) {
