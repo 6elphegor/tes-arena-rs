@@ -533,7 +533,7 @@ impl Soft {
                 }
                 reload = true;
                 let ax = self.m.mem.r16(sseg, si);
-                let dark = (ax == self.m.mem.r16(sseg, si.wrapping_add(4)) && ax == cx) || (ax == cx && self.m.mem.r16(sseg, si.wrapping_add(2)) == 0);
+                let dark = ax == cx && (ax == self.m.mem.r16(sseg, si.wrapping_add(4)) || self.m.mem.r16(sseg, si.wrapping_add(2)) == 0);
                 if dark {
                     si = si.wrapping_add(4);
                     for _ in 0..(seg >> 2) as u32 * 4 {
@@ -868,7 +868,7 @@ impl Soft {
             self.s8(0xD73F, 0);
             let pack = |v: u16| {
                 let v = (v & 0x8080) >> 7;
-                ((v as u8) | ((v >> 8) as u8).wrapping_add((v >> 8) as u8)) as u8
+                (v as u8) | ((v >> 8) as u8).wrapping_add((v >> 8) as u8)
             };
             let a = pack(rd(&self.m, 0));
             self.s8(0xD741, a);
@@ -1474,7 +1474,7 @@ impl Soft {
         if n2 != 0 {
             let b = self.light_list2(ax, bx, 0xBBCC, a.1, n2);
             carry = self.g16(0xA846) < b.0;
-            if !(self.g16(0xA846) <= b.0) {
+            if self.g16(0xA846) > b.0 {
                 self.s16(0xA846, b.0);
             }
         }
@@ -2492,7 +2492,7 @@ impl Soft {
         let mut rows = dh as u8;
         loop {
             let mut di = dest;
-            let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF) & 0xFFFF);
+            let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF));
             let mut bx = fx;
             let mut n = dw;
             loop {
