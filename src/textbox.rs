@@ -198,7 +198,7 @@ impl Machine {
     /// the line's end is followed by one. Then the widest is added to
     /// A83A, the lines times the last font's height and one to A83C, and
     /// the font put back.
-    fn box_lines(&mut self) {
+    pub(crate) fn box_lines(&mut self) {
         let w = |m: &mut Machine, o: u16, v: u16| m.mem.w16(DS, o, v);
         let r = |m: &Machine, o: u16| m.mem.r16(DS, o);
         let font = r(self, 0xB036);
@@ -413,6 +413,93 @@ impl Machine {
             self.heap_free(seg);
         }
         rect
+    }
+
+    /// 1194:4800 up to its field (9EE5): `cx` bytes at `es`:`di` (the
+    /// field's text) cleared, the keys flushed (710E), the prompt at
+    /// `text` in its box (965A: CX 7, DX 0Ah, centred, its background in
+    /// the heap's top, DI FFFEh), with AX's low byte the stosb's 0 (AH and
+    /// BX what the caller left: the field's place, which the field takes
+    /// over at once), the background's segment kept at 1044 and ARENAFNT
+    /// selected ([102C] into B036) for the field. None where the heap has
+    /// no room.
+    pub fn prompt_shown(&mut self, text: (u16, u16), (ax, bx): (u16, u16), (es, di): (u16, u16), cx: u16, screen: Option<&[u8]>) -> Option<()> {
+        for i in 0..cx {
+            self.mem.w8(es, di.wrapping_add(i), 0);
+        }
+        self.key_flush();
+        self.prompt_box(text, (ax & 0xFF00, bx), es, screen)
+    }
+
+    /// 965A with CX 7, DX 0Ah, DI FFFEh as 1194:4800 and 5C34 call it,
+    /// then 1044 the background's segment (DX) and [102C] into B036.
+    fn prompt_box(&mut self, text: (u16, u16), at: (u16, u16), es: u16, screen: Option<&[u8]>) -> Option<()> {
+        let (seg, _) = self.message_box(text, at, 7, 0x0A, (es, 0xFFFE), (0, 0), screen)?;
+        self.mem.w16(DS, 0x1044, seg);
+        let v = self.mem.r16(DS, 0x102C);
+        self.mem.w16(DS, 0xB036, v);
+        Some(())
+    }
+
+    /// 1194:4800 after its field: the box's background put back (933C,
+    /// `box_restore`, its segment from 1044). The page's showing (9466)
+    /// is the front end's.
+    pub fn prompt_closed(&mut self) {
+        let seg = self.mem.r16(DS, 0x1044);
+        self.box_restore(seg);
+    }
+
+    /// 1194:5C34 up to its field (9EE5): the keys flushed (710E), the
+    /// prompt at `text` written to 1044 with a line of room under it
+    /// (8D14 with 4FBC "%s\r" and 25h spaces, "\r"), its box as 4800's
+    /// (`prompt_box`; ES the formatter's, DGROUP), and the dissolve
+    /// (4FF7 over the whole screen, `dissolve`). AX is what the
+    /// formatter leaves: its %s's length (9CB0) with the last byte read,
+    /// 0, in AL; BX, its arguments' pointer, is an offset on the stack
+    /// (`bx`; the field overwrites both at once). None where the heap has
+    /// no room.
+    pub fn named_shown(&mut self, text: (u16, u16), bx: u16, screen: Option<&[u8]>) -> Option<()> {
+        self.key_flush();
+        let mut len = 0u16;
+        while self.mem.r8(text.0, text.1.wrapping_add(len)) != 0 {
+            len = len.wrapping_add(1);
+        }
+        self.sprintf((DS, 0x1044), (DS, 0x4FBC), &[crate::format::Arg::Str(text.0, text.1)]);
+        self.prompt_box((DS, 0x1044), (len & 0xFF00, bx), DS, screen)?;
+        self.dissolve();
+        Some(())
+    }
+
+    /// 1194:5C34 after its field: the background put back (933C from
+    /// 1044) and the dissolve again. The page's showing (9466) is the
+    /// front end's.
+    pub fn named_closed(&mut self) {
+        self.prompt_closed();
+        self.dissolve();
+    }
+
+    /// 2542:051A..052B: the status box (the text at 941E, `status_box`)
+    /// in a box centred both ways, its background not kept (965A: CX 6,
+    /// DX 5, DI FFFFh, ES DGROUP as the text's formatting leaves it). AX
+    /// and BX are what came before leaves: [1036] from the tiles' choice
+    /// (9AF8), and the formatter's arguments' pointer, an offset on the
+    /// stack (`bx`). The page's showing (9466) and the wait for a click or
+    /// a key are the front end's.
+    pub fn status_shown(&mut self, bx: u16, screen: Option<&[u8]>) -> Option<()> {
+        let ax = self.mem.r16(DS, 0x1036);
+        self.message_box((DS, 0x941E), (ax, bx), 6, 5, (DS, 0xFFFF), (0, 0), screen)?;
+        Some(())
+    }
+
+    /// 0000:53AE: the mouse's limits, x from `ax` over `cx` and y from
+    /// `bx` over `dx` (8F74 left, 8F76 right, 8F78 top, 8F7A bottom, the
+    /// last pixel in). Giving them to the driver (int 33h 7, 8) and its
+    /// cursor put at their middle when outside are the front end's.
+    pub fn mouse_limits(&mut self, ax: u16, bx: u16, cx: u16, dx: u16) {
+        self.mem.w16(DS, 0x8F78, bx);
+        self.mem.w16(DS, 0x8F7A, dx.wrapping_add(bx).wrapping_sub(1));
+        self.mem.w16(DS, 0x8F74, ax);
+        self.mem.w16(DS, 0x8F76, cx.wrapping_add(ax).wrapping_sub(1));
     }
 
     /// 1194:4FF7's state (its pixels the front end's, view/src/film.rs):
