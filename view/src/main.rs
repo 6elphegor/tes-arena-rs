@@ -412,6 +412,11 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 0000:17F9: the townspeople's graphics loaded, as they come back
+    /// (`Machine::townsfolk_load`).
+    fn townsfolk_graphics(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.townsfolk_load(files)
+    }
     /// 1194:59C8: the text at DGROUP `text` in a box (drowning in the
     /// wild, 7927).
     fn message_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
@@ -2353,6 +2358,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         // (where its renderer reached no path not ported).
         if let (false, Some(page), true) = (sheet, &engine.page, engine.page_gaps.is_empty()) {
             screen.underlay(page);
+        }
+        if !engine.page_gaps.is_empty() {
+            eprintln!("the 3D view is the view's own: not ported {:?}", engine.page_gaps);
         }
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {

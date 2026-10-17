@@ -178,6 +178,15 @@ impl AreaHooks for Areas<'_> {
         }
     }
 
+    /// 0000:17F9 (`Machine::townsfolk_load`).
+    fn townsfolk_graphics(&mut self, m: &mut Machine) {
+        if let Some(files) = self.files.as_deref_mut() {
+            if m.townsfolk_load(files).is_none() {
+                self.failed = true;
+            }
+        }
+    }
+
     fn spawn(&mut self, m: &mut Machine, n: u16) {
         if m.spawn_actors(n, 0xA).is_none() {
             eprintln!("the townspeople gave up: {}", arena::giveup::describe());

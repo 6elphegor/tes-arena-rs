@@ -31,8 +31,10 @@
 //! Creatures and people who see the player cast now and then
 //! (`crate::spell::actor_cast`).
 //!
-//! Not ported: building the frame's draw list (0000:1B7F, FE58) and
-//! sound.
+//! Each actor drawn is filed under its map column for the renderer
+//! (0000:1B7F, FE58), a creature in its frames past the sixth as copies
+//! with their frames (and its second layer's) appended to the flats'
+//! table. Not ported: sound.
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -63,10 +65,14 @@ pub mod var {
     pub const CLOSE: u16 = 0x101B;
     /// The corpse flat (byte; add FLAT_BASE).
     pub const CORPSE: u16 = 0xC936;
-    /// The draw list's next free entry, and the copied-actor list's end
-    /// (both reset each frame; filled by code not ported).
+    /// The draw list's next free entry (in the flats' table, D0B8 the
+    /// frame's offset and D0BA its bank, 4 bytes each), and the
+    /// copied-actor list's end (from 627C; both reset each frame).
     pub const DRAW_NEXT: u16 = 0x651C;
     pub const COPIES_END: u16 = 0x627A;
+    pub const COPIES: u16 = 0x627C;
+    /// The five views' loaded sizes (words), for the actors' graphics.
+    pub const SIZES: u16 = 0x6270;
     /// Steps by heading quarter (x, y words), and square offsets by
     /// heading quarter.
     pub const STEPS: u16 = 0x61F6;
@@ -225,9 +231,7 @@ impl Machine {
             } else {
                 self.actor_frame(si)?;
             }
-            // 0000:27BF: the actor's copy in the effect list (draw list,
-            // not ported).
-            self.actor_effect(si);
+            self.actor_effect(si)?;
             if self.actor_present(si) {
                 let sq = square(self.act16(si, f::X), self.act16(si, f::Y));
                 self.mem.w16(DS, di, sq);
@@ -243,7 +247,178 @@ impl Machine {
                 self.sound_at(0x20, at)?;
             }
         }
+        // 0000:1A31: the copies filed under their columns.
+        let end = self.mem.r16(DS, COPIES_END);
+        if end != COPIES {
+            let n = end.wrapping_sub(COPIES) / SIZE;
+            for i in 0..n {
+                if self.mem.r8(DS, 0x1013) == 0 {
+                    let c = COPIES + i * SIZE;
+                    self.file_under_column(c)?;
+                }
+            }
+        }
         Some(())
+    }
+
+    /// 0000:17F9: the townspeople's graphics loaded (`actor_graphics`):
+    /// the men's (flats 34h.., the file by the climate DA8 / 4 from the
+    /// names at 620A), then the women's (39h..: 623D in climate 4, 624A
+    /// with snow, BB09's low bits 2, else 6231), each with the loaded
+    /// sizes' table at 6270 emptied first and a view to a half bank
+    /// (0FFF 8000h).
+    pub fn townsfolk_load(&mut self, files: &mut Files) -> Option<()> {
+        let empty = |m: &mut Self| {
+            for i in 0..5 {
+                m.mem.w16(DS, SIZES + 2 * i, 0);
+            }
+        };
+        empty(self);
+        self.mem.w16(DS, 0x0FFF, 0x8000);
+        let men = self.skip_strings(DS, 0x620A, self.mem.r16(DS, 0x0DA8) >> 2);
+        self.actor_graphics(files, men, 0x34, 0xFFFF, 0)?;
+        empty(self);
+        let women = if self.mem.r16(DS, 0x0DA8) == 4 {
+            0x623D
+        } else if self.mem.r8(DS, 0xBB09) & 0x7F == 2 {
+            0x624A
+        } else {
+            0x6231
+        };
+        self.actor_graphics(files, women, 0x39, 0xFFFF, 0)
+    }
+
+    /// 0000:1A5C: the five views of the actor named at `si` (its `@`
+    /// made 1..5) loaded into the EMS frame from bank `bx` / 2 (the half
+    /// by its low bit), each at its view's next free place (the sizes at
+    /// 6270) of a half bank on (0FFF: 8000h a half, else a bank each),
+    /// the file's size kept at its +4Ah; with `cx` a bank (not negative)
+    /// one more file there at `ax`.
+    fn actor_graphics(&mut self, files: &mut Files, si: u16, bx: u16, cx: u16, ax: u16) -> Option<()> {
+        self.mem.w16(DS, 0xA83A, cx);
+        self.mem.w16(DS, 0xA83C, ax);
+        // The `@` (repne scasb over 0Dh bytes, DI one back).
+        let mut at = si;
+        for _ in 0..0xD {
+            let b = self.mem.r8(DS, at);
+            at = at.wrapping_add(1);
+            if b == b'@' {
+                break;
+            }
+        }
+        let at = at.wrapping_sub(1);
+        self.mem.w8(DS, at, b'1');
+        self.mem.w16(DS, 0xA836, at);
+        self.mem.w16(DS, 0xA838, bx >> 1);
+        let mut di = (bx & 1) << 15;
+        self.ems_map(bx >> 1);
+        let es = self.mem.r16(DS, crate::projectile::var::FRAME);
+        self.mem.w16(DS, 0xA83E, 0);
+        for _ in 0..5 {
+            let k = self.mem.r16(DS, 0xA83E);
+            let to = di.wrapping_add(self.mem.r16(DS, SIZES.wrapping_add(k)));
+            self.file_load_or_carry(files, si, es, to)?;
+            let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+            self.mem.w16(es, to.wrapping_add(0x4A), size);
+            let v = self.mem.r16(DS, SIZES.wrapping_add(k)).wrapping_add(size);
+            self.mem.w16(DS, SIZES.wrapping_add(k), v);
+            let step = self.mem.r16(DS, 0x0FFF);
+            let (next, carry) = di.overflowing_add(step);
+            di = next;
+            let mut bank = self.mem.r16(DS, 0xA838).wrapping_add(carry as u16);
+            if step != 0x8000 {
+                di = 0;
+                bank = bank.wrapping_add(1);
+            }
+            self.mem.w16(DS, 0xA838, bank);
+            self.ems_map(bank);
+            let c = self.mem.r8(DS, at).wrapping_add(1);
+            self.mem.w8(DS, at, c);
+            self.mem.w16(DS, 0xA83E, k.wrapping_add(2));
+        }
+        let extra = self.mem.r16(DS, 0xA83A);
+        if (extra as i16) >= 0 {
+            self.ems_map(extra);
+            let to = self.mem.r16(DS, 0xA83C);
+            self.file_load_or_carry(files, si, es, to)?;
+        }
+        self.mem.w8(DS, at, b'@');
+        Some(())
+    }
+
+    /// 0000:FE58: the record at `si` filed under its map column.
+    fn file_under_column(&mut self, si: u16) -> Option<()> {
+        let (x, y) = (self.act16(si, f::X), self.act16(si, f::Y));
+        self.column_add(x >> 7, y >> 7, si)
+    }
+
+    /// 0000:1B7F: the actor drawn this frame: filed under its column
+    /// (FE58), or a creature not of the 1000h kind in a frame from the
+    /// sixth on as its copies (1B9B).
+    fn actor_draw(&mut self, si: u16) -> Option<()> {
+        if si >= CREATURES && !self.actor_is_creature(si) && (self.act8(si, f::FRAME) as i8) >= 6 {
+            return self.actor_layers(si);
+        }
+        self.file_under_column(si)
+    }
+
+    /// 0000:1B9B..1C99: a creature's frame as a flat of its own: the
+    /// next entry of the flats' table (DRAW_NEXT) its bank (the flat's
+    /// images, +11h plus the view, halved) and its frame (the bank's
+    /// half by the odd bit, plus the half's +4Ah), the actor copied
+    /// with it (1CB0); with +40D bit 400h a second layer, the frame
+    /// after, copied raised and shifted by the two frames' offsets.
+    fn actor_layers(&mut self, si: u16) -> Option<()> {
+        let fs = self.mem.r16(DS, crate::projectile::var::FRAME);
+        let entry = |m: &mut Self| -> (u16, u16) {
+            let bx = m.mem.r16(DS, DRAW_NEXT);
+            m.mem.w16(DS, DRAW_NEXT, bx.wrapping_add(4));
+            let v = (m.act8(si, 0x11) as u16).wrapping_add((m.act8(si, f::SPRITE) & 0xF) as u16);
+            let bank = v >> 1;
+            m.mem.w16(DS, 0xD0BAu16.wrapping_add(bx), bank);
+            m.ems_map(bank);
+            let di = (v & 1) << 15;
+            (bx, di.wrapping_add(m.mem.r16(fs, di.wrapping_add(0x4A))))
+        };
+        let (bx, di) = entry(self);
+        self.mem.w16(DS, 0xD0B8u16.wrapping_add(bx), di);
+        self.actor_copy(si, 0, 0);
+        if self.act_rec16(si, 0x40D) & 0x400 != 0 {
+            let (bx, b) = entry(self);
+            let di = b.wrapping_add(self.mem.r16(fs, b.wrapping_add(0x4A)));
+            let w = |m: &Self, o: u16, k: u16| m.mem.r16(fs, o.wrapping_add(k));
+            let ax = w(self, b, 8).wrapping_sub(w(self, di, 8)).wrapping_add(w(self, b, 2)).wrapping_sub(w(self, di, 2));
+            let ax = ax.wrapping_neg().wrapping_add(0xE);
+            let cx = w(self, di, 6).wrapping_sub(w(self, b, 6)).wrapping_add(4);
+            self.mem.w16(DS, 0xD0B8u16.wrapping_add(bx), di);
+            self.actor_copy(si, ax, cx);
+        }
+        // 1C35: the +40D bit 800h layer is jumped over (`jmp` before its
+        // `je`).
+        Some(())
+    }
+
+    /// 0000:1CB0: the actor copied to the end of the copies (COPIES_END)
+    /// as a flat of the draw list's last entry: `ax` its height, `cx`
+    /// its shift (+14h, negated when mirrored), its frame the actor's
+    /// less six, its frames none (FFh), flag 4.
+    fn actor_copy(&mut self, si: u16, ax: u16, cx: u16) {
+        let di = self.mem.r16(DS, COPIES_END);
+        for k in 0..SIZE {
+            let b = self.mem.r8(DS, si.wrapping_add(k));
+            self.mem.w8(DS, di.wrapping_add(k), b);
+        }
+        self.mem.w16(DS, COPIES_END, di.wrapping_add(SIZE));
+        self.mem.w16(DS, di.wrapping_add(2), ax);
+        let flags = self.mem.r16(DS, di.wrapping_add(f::FLAGS));
+        let bx = if flags & 2 != 0 { cx.wrapping_neg() } else { cx };
+        self.mem.w16(DS, di.wrapping_add(0x14), bx);
+        let n = self.mem.r16(DS, DRAW_NEXT).wrapping_sub(4) >> 2;
+        self.mem.w8(DS, di.wrapping_add(f::SPRITE), n as u8);
+        self.mem.w8(DS, di.wrapping_add(f::LIMIT), 0xFF);
+        self.mem.w16(DS, di.wrapping_add(f::FLAGS), self.mem.r16(DS, di.wrapping_add(f::FLAGS)) | 4);
+        let fr = self.act8(si, f::FRAME).wrapping_sub(6);
+        self.mem.w8(DS, di.wrapping_add(f::FRAME), fr);
     }
 
     /// Active, not dying and not a corpse.
@@ -316,7 +491,7 @@ impl Machine {
         self.set_act8(si, f::LIMIT, 0xFF);
         let c = self.act8(si, f::SPRITE);
         if c == self.corpse_sprite() || c == 0xC5 {
-            return Some(());
+            return self.actor_draw(si);
         }
         let al = if self.act_flags(si) & 1 != 0 && si < CREATURES { 0xC0 } else { self.actor_view(si) as u8 | 0xC0 };
         self.set_act8(si, f::SPRITE, al);
@@ -326,8 +501,12 @@ impl Machine {
                 self.set_act8(si, f::FRAME, 0);
             }
         }
-        // (0000:1B7F adds the actor to the draw list.)
-        Some(())
+        // 19C2: a creature whose record has +41A bit 1, or with an
+        // overlay up (1013), isn't drawn.
+        if si >= CREATURES && (self.act_rec16(si, 0x41A) & 1 != 0 || self.mem.r8(DS, 0x1013) != 0) {
+            return Some(());
+        }
+        self.actor_draw(si)
     }
 
     /// 0000:FE7E. Which way the actor is seen from the player: 0 facing
@@ -359,14 +538,19 @@ impl Machine {
     }
 
     /// 0000:27BF. The actor's entry in the list at 5F6A (effects drawn
-    /// with it) goes inactive when its frame reaches its limit.
-    fn actor_effect(&mut self, si: u16) {
+    /// with it) goes inactive when its frame reaches its limit, else is
+    /// filed under its column (FE58).
+    fn actor_effect(&mut self, si: u16) -> Option<()> {
         let e = si.wrapping_sub(ACTORS).wrapping_add(0x5F6A);
-        if self.act_flags(e) & 0x4000 == 0 && self.act8(e, f::FRAME) >= self.act8(e, f::LIMIT) & 0x7F {
+        if self.act_flags(e) & 0x4000 != 0 {
+            return Some(());
+        }
+        if self.act8(e, f::FRAME) >= self.act8(e, f::LIMIT) & 0x7F {
             let fl = self.act_flags(e) | 0x4000;
             self.set_act_flags(e, fl);
+            return Some(());
         }
-        // (Otherwise 0000:FE58 adds it to the draw list.)
+        self.file_under_column(e)
     }
 
     /// 0000:269E (2EBD:0084). Spell effects on the actor's record end:
