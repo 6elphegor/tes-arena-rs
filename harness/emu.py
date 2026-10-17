@@ -1,4 +1,5 @@
 """Run routines from ACD_unpacked.EXE under unicorn (16-bit real mode)."""
+import os
 import struct
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_INTR
 from unicorn.x86_const import *
@@ -108,13 +109,33 @@ class Arena:
         self.mu.mem_write(STUB_SEG * 16, b'\xf4')
         self.ds = LOAD_SEG + DGROUP
         self.fault = None
-        self.mu.hook_add(UC_HOOK_INTR, self._intr)
+        self.dos_trace = os.environ.get('DOS_TRACE')
+        self.mu.hook_add(UC_HOOK_INTR, self._intr_traced if self.dos_trace else self._intr)
 
     # INT 3s the game itself executes, which DOS's default handler makes
     # no-ops (CS:IP after them, image-relative): 2EBD:0696 in the effect
     # tick and 2CDD:0A1B in the timed-flag lookup. Elsewhere an INT 3 is
     # a harness stub marking a fault.
     GAME_INT3 = {(0x2EBD, 0x0697), (0x2CDD, 0x0A1C)}
+
+    def _intr_traced(self, mu, intno, u):
+        """`_intr`, each DOS file call (int 21h AH 3Ch..42h) appended to
+        the file DOS_TRACE names: where (image-relative), AH, BX, CX, the
+        name for an open, create or delete, then AX and the carry after."""
+        rd = lambda r: mu.reg_read(globals()['UC_X86_REG_' + r])
+        ax, bx, cx = rd('AX'), rd('BX'), rd('CX')
+        ah = ax >> 8
+        if intno != 0x21 or not 0x3C <= ah <= 0x42:
+            return self._intr(mu, intno, u)
+        name = ''
+        if ah in (0x3C, 0x3D, 0x41):
+            lin = rd('DS') * 16 + rd('DX')
+            name = bytes(mu.mem_read(lin, 80)).split(b'\0')[0].decode('latin1')
+        at = '%04X:%04X' % ((rd('CS') - LOAD_SEG) & 0xFFFF, rd('IP'))
+        self._intr(mu, intno, u)
+        with open(self.dos_trace, 'a') as f:
+            f.write('%s %02X bx=%d cx=%04X %s -> ax=%04X cf=%d\n'
+                    % (at, ah, bx, cx, name, rd('AX'), rd('EFLAGS') & 1))
 
     def _intr(self, mu, intno, _):
         if intno == 3:
