@@ -48,7 +48,8 @@ fn night(a: &mut App, heading: u16) {
     m.mem.w32(DS, MINUTES, t - t % 1440 + 22 * 60);
     m.mem.w16(DS, HOUR, 22);
     m.mem.w16(DS, MINUTE, 0);
-    m.mem.w16(DS, SKY_TIME, ((22 * 60) << 10) / 1440);
+    // (In u32: 22 x 60 shifted left by 10 is past a u16.)
+    m.mem.w16(DS, SKY_TIME, (((22 * 60) << 10) / 1440u32) as u16);
 }
 
 /// Where a case is played: the dungeon `into_dungeon` makes, or the main
@@ -507,23 +508,26 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
     }
 }
 
-/// The street outside the guild by day: the sky's rows, the water's
-/// frame under the floor, the floor and the walls unshaded, the trees,
-/// every pixel as the original's renderer draws them.
+/// The street outside the guild by day (the sky's rows, the water's
+/// frame under the floor, the floor and the walls unshaded, the trees)
+/// and at ten at night (the afternoon's dither, the textures relit by the
+/// night's row of the light table), every pixel as the original's
+/// renderer draws them.
 #[test]
 fn the_streets_3d_view_drawn_as_the_original_draws_it() {
-    let Some((ok, same)) = soft_view("playstreet") else { return };
-    assert!(ok, "playstreet: the 3D view differs from the original's ({same:?}% alike)");
+    for name in ["playstreet", "playnight"] {
+        let Some((ok, same)) = soft_view(name) else { return };
+        assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
+    }
 }
 
 /// Measured, not yet exact: the crypt (its farthest ceiling row reads
 /// past the row table, where the original finds what an earlier area
-/// left in its heap; and five rows of its ceiling differ), the street
-/// facing open sky (a few of the sky's objects' pixels) and the street
-/// at night (the shaded paths by the lamps' lights).
+/// left in its heap; and five rows of its ceiling differ) and the street
+/// facing open sky (a few of the sky's objects' pixels).
 #[test]
 fn the_crypts_3d_view_measured() {
-    for name in ["playcrypt", "playsky", "playnight"] {
+    for name in ["playcrypt", "playsky"] {
         if let Some((ok, same)) = soft_view(name) {
             eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
         }
