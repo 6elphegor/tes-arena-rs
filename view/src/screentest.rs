@@ -1713,6 +1713,35 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
     }
 }
 
+/// The house the staff's end shows last (1194:DA25..DAC4, harness/
+/// gen_house.py, tests/vectors/house.txt): HOUSE.IMG in its own colours,
+/// text 579h's lines drawn one under another from row 32h, centred on
+/// column A0h, in colour 5Ch (0000:5364, `EndHooks::line`), as the view's
+/// still (`movies_of`, `Movie::draw`) shows it.
+#[test]
+fn the_house_at_the_staffs_end_as_the_original_shows_it() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/house.txt")).expect("tests/vectors/house.txt");
+    let f: Vec<&str> = text.lines().next().expect("a house line").split(" | ").collect();
+    let want = (u64::from_str_radix(f[1], 16).unwrap(), u64::from_str_radix(f[2], 16).unwrap());
+    let (mut a, _d) = loaded(&dir, &save);
+    let archive = a.assets.archive.clone();
+    let mv = crate::movies_of(&mut a.engine, &archive, vec![("HOUSE.IMG", Some(0x579), 0x5C)]).pop().expect("HOUSE.IMG");
+    let mut s = hud::Screen::new(a.assets.palette);
+    mv.draw(&mut s, &a.font);
+    if let Ok(d) = std::env::var("ARENA_SCREENS") {
+        let raw: Vec<u8> = s.indices().iter().map(|&i| i as u8).chain(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+        std::fs::write(PathBuf::from(d).join("house.view"), raw).unwrap();
+    }
+    let got = (fnv(s.indices().iter().map(|&i| i as u8)), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+    assert_eq!(got.0, want.0, "the house's screen differs from the original's");
+    assert_eq!(got.1, want.1, "the house's colours differ from the original's");
+}
+
 /// gen_screens.py's `riddled`: a riddle on the player's square as its
 /// lookup leaves it (0000:06BE): the text at FF00h in the level's texts'
 /// bank (C8FE), shown (3D42) and waiting as a riddle (7C5E), its answers
