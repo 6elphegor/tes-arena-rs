@@ -88,21 +88,40 @@ impl Flc {
     }
 
     /// The next frame decoded; after the last, the ring frame (a delta
-    /// back to the first) and on from the second.
+    /// back to the first), then the first frame decoded again unseen and
+    /// on from the second, as the game's player loops a movie (0000:667F,
+    /// 64F0: the file sought back to its first frame, read with nothing
+    /// shown): the ring frame's picture is not the first's in every file.
     pub fn step(&mut self) {
         if self.shown as usize > self.frames as usize {
-            // Past the ring frame: on from the second frame.
-            self.at = self.second;
+            // Past the ring frame: the first again, then on from the second.
+            self.at = self.first;
+            if !self.decode() {
+                self.at = self.second.max(self.first);
+            }
             self.shown = 1;
             self.looped = true;
         }
-        let at = self.at;
-        let size = le32(&self.data, at) as usize;
-        if size < 16 || at + size > self.data.len() {
+        if !self.decode() {
             self.at = self.second.max(self.first);
             self.shown = 1;
             self.looped = true;
             return;
+        }
+        self.shown += 1;
+        if self.shown as usize == self.frames as usize {
+            self.looped = true;
+        }
+    }
+
+    /// The frame at `at` decoded into the picture and colours, `at` then
+    /// the next frame's; false (nothing done) where the file has no frame
+    /// there.
+    fn decode(&mut self) -> bool {
+        let at = self.at;
+        let size = le32(&self.data, at) as usize;
+        if size < 16 || at + size > self.data.len() {
+            return false;
         }
         if le16(&self.data, at + 4) == 0xF1FA {
             let data = std::mem::take(&mut self.data);
@@ -120,10 +139,7 @@ impl Flc {
             self.data = data;
         }
         self.at = at + size;
-        self.shown += 1;
-        if self.shown as usize == self.frames as usize {
-            self.looped = true;
-        }
+        true
     }
 
     fn chunk(&mut self, kind: u16, d: &[u8]) {
@@ -423,9 +439,12 @@ impl Movie {
         }
     }
 
-    /// A key or click: the next three lines, or the end.
+    /// A key or click: the next three lines, or the end. The page turns
+    /// while three lines or more are left from the one shown (2294:0810,
+    /// 0834: [43D2] at 3 or more, 084C), so a text of a multiple of three
+    /// lines turns to an empty page before its end (the original's).
     pub fn key(&mut self) {
-        if !self.full && self.top + VISION_LINES < self.lines.len() {
+        if !self.full && self.lines.len().saturating_sub(self.top) >= VISION_LINES {
             self.top += VISION_LINES;
         } else {
             self.over = true;

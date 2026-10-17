@@ -1857,6 +1857,106 @@ fn the_dreams_as_the_original_shows_them() {
     }
 }
 
+/// The two movies of a dream at level 1 one after the other (1194:D3F1,
+/// then D41C; gen_dream.py's `dreamthrough` lines, the install's speech
+/// served): the first played to its end, a click at each frame of the
+/// movie where the original took one (2294:084C turning the page, the
+/// last ending it at 0845), and the second's way in from the first's last
+/// frame as the window brings it (`lead_later`, then `lead_from` when the
+/// first is over, `App::movies_over`): the first's last state, then the
+/// states from its end against the original's: the fades to black from
+/// that frame and the cleared screen, to the second movie's first frame.
+///
+/// The movies' own frames aren't compared here: with the speech the
+/// original's player draws straight into the VGA (2F75:00B5 frees the
+/// page, A8FE A000:0000), so a frame is seen before its colours or its
+/// text, states the window never holds (gen_dream.py).
+#[test]
+fn the_dreams_two_movies_as_the_original_shows_them() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/dream.txt")).expect("tests/vectors/dream.txt");
+    // ((level byte, F77), the clicks' frames, the first's end, the states).
+    type Run = ((u8, u8), Vec<u32>, usize, Vec<(u64, u64)>);
+    let mut runs: Vec<Run> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["dreamthrough", "script", level, f77, _, _] => runs.push(((level.parse().unwrap(), f77.parse().unwrap()), Vec::new(), 0, Vec::new())),
+            ["dreamthrough", _, _, "key", _, k] => runs.last_mut().unwrap().1.push(k.parse().unwrap()),
+            ["dreamthrough", _, _, "end", n] => runs.last_mut().unwrap().2 = n.parse().unwrap(),
+            ["dreamthrough", _, _, _, s, p] => runs.last_mut().unwrap().3.push((u64::from_str_radix(s, 16).unwrap(), u64::from_str_radix(p, 16).unwrap())),
+            _ => {}
+        }
+    }
+    assert!(!runs.is_empty());
+    for ((level, f77), keys, end, want) in runs {
+        let all = want.clone();
+        let want = &want[end..];
+        let (mut a, _d) = loaded(&dir, &save);
+        for (at, v) in [(0x01AA, level), (0x0F76, 1), (0x0F77, f77), (0x0F7A, 0)] {
+            a.engine.m.mem.w8(DS, at, v);
+        }
+        let mut talk = dialog::Talk::default();
+        a.engine.m.dream_show(&mut Front { talk: Some(&mut talk), ..Default::default() });
+        let archive = a.assets.archive.clone();
+        let cleared = vec![0u8; 64000];
+        let mut movies: std::collections::VecDeque<_> = crate::movies_of(&mut a.engine, &archive, std::mem::take(&mut talk.movies), Some((&cleared, a.assets.palette))).into();
+        assert_eq!(movies.len(), 2, "level {level} F77 {f77}: the dream's movies");
+        assert!(movies[1].lead_later);
+        let state = |mv: &crate::flc::Movie| {
+            let mut s = hud::Screen::new(a.assets.palette);
+            mv.draw(&mut s, &a.font);
+            let shown: Vec<u8> = s.indices().iter().map(|&i| i as u8).collect();
+            let st = (fnv(shown.iter().copied()), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+            (st, shown, *s.palette())
+        };
+        // The first: its frames counted (each step of the file), a click
+        // at each of the original's.
+        let mut first = movies.pop_front().unwrap();
+        let (mut frames, mut was, mut clicks) = (0u32, (first.flc.shown, first.flc.looped), keys.iter().peekable());
+        let mut ms = 0;
+        while !first.over && ms < 600_000 {
+            first.advance(1);
+            ms += 1;
+            if (first.flc.shown, first.flc.looped) != was {
+                was = (first.flc.shown, first.flc.looped);
+                frames += 1;
+            }
+            while clicks.next_if(|&&k| k <= frames).is_some() {
+                first.key();
+            }
+        }
+        assert!(first.over, "level {level} F77 {f77}: the first movie never ended");
+        // The first's last state, the original's last before its end.
+        let (ended, shown, dac) = state(&first);
+        assert_eq!(Some(&ended), all.get(end.wrapping_sub(1)), "level {level} F77 {f77}: the first movie's last state");
+        let mut second = movies.pop_front().unwrap();
+        second.lead_from(&shown, dac);
+        let mut seen: Vec<(u64, u64)> = Vec::new();
+        let mut was = ended;
+        let mut ms = 0;
+        while seen.len() < want.len() && ms < 60_000 {
+            let (st, shown, pal) = state(&second);
+            if was != st {
+                was = st;
+                if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                    let raw: Vec<u8> = shown.iter().copied().chain(pal.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("through{level}-{f77}-{}.view", end + seen.len())), raw).unwrap();
+                }
+                seen.push(st);
+            }
+            second.advance(1);
+            ms += 1;
+        }
+        let at = seen.iter().zip(want).position(|(v, o)| v != o);
+        assert!(at.is_none() && seen.len() == want.len(), "level {level} F77 {f77}: the second movie's way in differs from the original's at {at:?} after the first's end ({} seen, {} wanted)", seen.len(), want.len());
+    }
+}
+
 /// The house the staff's end shows last (1194:DA25..DAC4, harness/
 /// gen_house.py, tests/vectors/house.txt): HOUSE.IMG in its own colours,
 /// text 579h's lines drawn one under another from row 32h, centred on
