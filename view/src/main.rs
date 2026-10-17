@@ -2383,10 +2383,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]]];
             }
             "key" => {
-                // A key (its scan code) down for a frame.
-                engine.m.set_key(n as u8, true);
+                // A key (its scan code) down for a frame, through the key
+                // interrupt (0000:718A) as the window gives its keys.
+                let _ = engine.m.key_event(n as u8);
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
-                engine.m.set_key(n as u8, false);
+                let _ = engine.m.key_event(n as u8 | 0x80);
             }
             "turn" => shot_frame(dir, &mut engine, run, st, &Intent { look: n as i16, ..Default::default() }).expect("area"),
             "walk" | "wait" => {
@@ -2996,7 +2997,16 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || !self.fade.is_empty() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some() {
+        let screen = self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some();
+        if screen {
+            // Each of the original's screens (its menus, lists, boxes, the
+            // travel map, the movies) forgets the keys typed in play as it
+            // begins (0000:7112, from 3159:002F, 1194:5536, 26F7:03BE,
+            // 2294:0701 and the others); the keys a screen here takes
+            // never reach the ring, so play resumes with it empty.
+            self.engine.m.key_flush();
+        }
+        if screen || !self.fade.is_empty() {
             return;
         }
         let k = &self.keys;
@@ -4251,12 +4261,13 @@ impl App {
     fn input(&mut self, ev: In) {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
-        // A key let go is let go in the game's key state whatever is up,
-        // and its latch (2542:05B8) cleared as the original's next frame
-        // asking for it clears it, so its next press is taken.
+        // A key let go is let go in the game's key state whatever is up
+        // (its break code through the key interrupt, 0000:718A), and its
+        // latch (2542:05B8) cleared as the original's next frame asking
+        // for it clears it, so its next press is taken.
         if let In::Key { code, down: false, .. } = ev {
             if let Some(scan) = interface::scan_code(code) {
-                self.engine.m.set_key(scan, false);
+                let _ = self.engine.m.key_event(scan | 0x80);
                 self.engine.m.key_pressed(scan as u16);
             }
         }
@@ -4478,13 +4489,19 @@ impl App {
                 if down && resting {
                     self.key = true;
                 }
-                // The key's state where the game keeps it (DS:ACB5 + its
-                // scan code), for the frame's own keys (- and =, F2, F3,
-                // F4, N, the debug keys) and the menu keys; a menu key's
-                // press runs the menu keys' check (2542:0100) at once.
+                // The key's make code through the key interrupt (0000:718A,
+                // `key_event`): its state where the game keeps it (DS:ACB5
+                // + its scan code, FFh), for the frame's own keys (- and =,
+                // F2, F3, F4, N, the debug keys) and the menu keys, and its
+                // character into the ring of keys typed, which play never
+                // reads (the next screen's entry forgets it: `step`). A
+                // menu key's press runs the menu keys' check (2542:0100)
+                // at once. (Its break was given above.)
                 let scan = interface::scan_code(code);
-                if let Some(scan) = scan {
-                    self.engine.m.set_key(scan, down);
+                if let Some(scan) = scan.filter(|_| down) {
+                    if self.engine.m.key_event(scan).is_none() {
+                        eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
+                    }
                 }
                 if down && !resting && scan.is_some_and(interface::is_menu_key) {
                     self.menu_key();
