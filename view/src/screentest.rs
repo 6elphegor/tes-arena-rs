@@ -837,8 +837,13 @@ fn area_left(a: &mut App) {
     a.last = Some(arena::engine::Frame::Running);
 }
 
-/// Daggerfall's gates (tests/vectors/gates.txt, gen_gates.py): from the
-/// street, the player on the open square beside each facing it, the gate
+/// Cities' gates (tests/vectors/gates.txt, gen_gates.py): Daggerfall as
+/// the save has it (`save`), and a sample of places across the provinces
+/// (PROVINCE:INDEX) entered from that street as the outer loop enters a
+/// city (the province's block loaded, 1194:2E18; its location at 0A4C;
+/// 5E6 0). From each open square beside each gate, facing it (the
+/// player's square, CB90, as a frame sets it: the way out's nudge measures
+/// it), the gate
 /// picked (CB92) and its trigger run (0000:43B1), the wilderness entered
 /// (`areas::next`): the player's place there, and its square's wall word,
 /// as the original's.
@@ -851,25 +856,44 @@ fn a_gate_leads_out_as_the_original() {
     };
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/gates.txt")).expect("tests/vectors/gates.txt");
     let hex = |s: &str| s.split(' ').map(|v| u16::from_str_radix(v, 16).unwrap()).collect::<Vec<_>>();
+    // The city's street, made once per place.
+    let mut street: Option<(String, Engine, arena::transit::Run)> = None;
+    let (mut a, _d) = loaded(&dir, &save);
+    area_left(&mut a);
+    let first = (copy(&a.engine), a.run);
     for line in text.lines() {
         let f: Vec<&str> = line.split(" | ").collect();
-        let (gate, from, want) = (hex(f[1]), hex(f[2]), (hex(f[3]), u16::from_str_radix(f[4], 16).unwrap()));
-        let (mut a, _d) = loaded(&dir, &save);
-        area_left(&mut a);
+        let (city, gate, from, want) = (f[1], hex(f[2]), hex(f[3]), (hex(f[4]), u16::from_str_radix(f[5], 16).unwrap()));
+        if street.as_ref().is_none_or(|(c, _, _)| c != city) {
+            a.engine = copy(&first.0);
+            a.run = first.1;
+            if city != "save" {
+                let pi: Vec<u8> = city.split(':').map(|v| v.parse().unwrap()).collect();
+                let m = &mut a.engine.m;
+                m.city_load_province(&mut a.engine.files, pi[0]).expect("the province's block");
+                m.mem.w8(DS, 0x0A4C, pi[0].wrapping_mul(32).wrapping_add(pi[1]));
+                m.mem.w8(DS, arena::trigger::var::AREA, 0);
+                area_left(&mut a);
+            }
+            street = Some((city.to_string(), copy(&a.engine), a.run));
+        }
+        let (_, e, run) = street.as_ref().unwrap();
+        a.engine = copy(e);
+        a.run = *run;
         let m = &mut a.engine.m;
         let (x, y) = ((from[0] << 7) + 0x40, (from[1] << 7) + 0x40);
-        for (o, v) in [(0xC3D0, x), (0xC3D4, y), (0xC3DA, from[2]), (0xBA62, x), (0xBA66, y)] {
+        for (o, v) in [(0xC3D0, x), (0xC3D4, y), (0xC3DA, from[2]), (0xBA62, x), (0xBA66, y), (0xCB90, from[1] << 8 | from[0] << 1)] {
             m.mem.w16(DS, o, v);
         }
         m.mem.w16(DS, arena::controls::var::PICKED, gate[1] << 8 | gate[0] << 1);
         m.wall_trigger(&mut a.engine.files, &mut DoorHooks::default()).expect("the gate's trigger");
-        assert!(a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the gate at {gate:?} led nowhere");
+        assert!(a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "{city}: the gate at {gate:?} led nowhere");
         a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the wilderness");
         let m = &a.engine.m;
         let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
         let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
         let wall = m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1);
-        assert_eq!((vec![x, y], wall), want, "the gate at {gate:?}: the place in the wilderness differs from the original's");
+        assert_eq!((vec![x, y], wall), want, "{city}: the gate at {gate:?} from {from:?}: the place in the wilderness differs from the original's");
     }
 }
 
@@ -2395,3 +2419,4 @@ fn a_floor_spells_counter_as_the_original_draws_it() {
         over,
     );
 }
+

@@ -123,6 +123,8 @@ struct Watch {
     sub_level: u8,
     seed: u32,
     same: usize,
+    /// The square an area was entered on, while the player stays there.
+    entry: Option<(u16, u16)>,
 }
 
 impl Watch {
@@ -132,10 +134,11 @@ impl Watch {
             sub_level: engine.m.mem.r8(arena::mem::DATA, arena::text::var::SUB_LEVEL),
             seed: engine.m.rng.seed,
             same: 0,
+            entry: None,
         }
     }
 
-    fn check(&mut self, engine: &Engine, outdoors: bool) -> Option<String> {
+    fn check(&mut self, engine: &Engine, outdoors: bool, entered: bool) -> Option<String> {
         let m = &engine.m;
         let r = |at| m.mem.r16(DS, at);
         let (w, d) = (r(0xC357), r(0xC359));
@@ -152,7 +155,16 @@ impl Watch {
         // player out (`player_unstick`).
         let walls = r(arena::mif::var::MAP1_SEG);
         let wall = m.mem.r16(walls, row << 8 | col << 1);
-        if h >= 0 && w != 0 && wall != 0 && wall >> 8 == wall & 0xFF {
+        // Not on the square an area was entered on, while the player stays
+        // there: the original's own way out of a city by some gates puts
+        // the player in the wall (217B:058F's nudge 12Ch back,
+        // tests/vectors/gates.txt: 14 of 432 cases).
+        if entered {
+            self.entry = Some((col, row));
+        } else if self.entry != Some((col, row)) {
+            self.entry = None;
+        }
+        if self.entry.is_none() && h >= 0 && w != 0 && wall != 0 && wall >> 8 == wall & 0xFF {
             return Some(format!("inside a wall: square ({col}, {row}) {wall:#06x}"));
         }
         // DGROUP's constant file names stay as the image has them: the text
@@ -406,7 +418,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         }
         engine.m.gave_up = None;
         arena::giveup::take();
+        let before = std::mem::discriminant(&*run);
         let r = catch_unwind(AssertUnwindSafe(|| shot_frame(dir, engine, run, st, &intent)));
+        let entered = before != std::mem::discriminant(&*run);
         let ms = t.elapsed().as_millis();
         if ms > 1000 {
             println!("SLOW frame {n} ({what}): {ms} ms, {}", place(engine, run));
@@ -437,7 +451,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         }
         let w = watch.get_or_insert_with(|| Watch::new(engine));
         let outdoors = matches!(run, arena::transit::Run::City | arena::transit::Run::Wild);
-        if let Some(o) = w.check(engine, outdoors) {
+        if let Some(o) = w.check(engine, outdoors, entered) {
             if last_odd.as_ref() != Some(&o) {
                 println!("ODD frame {n} ({what}): {o}; {}", place(engine, run));
                 issues.set(issues.get() + 1);
