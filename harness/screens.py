@@ -56,6 +56,9 @@ class ScreenArena(DosArena):
         self.retrace = 0
         self.mouse = (160, 100)
         self.buttons = 0
+        # The mouse's motion since the last read of it (INT 33h function
+        # 0Bh: mickeys, taken and cleared by the read).
+        self.motion = (0, 0)
         self.waits = set()
         self.std_devices = True
         self.mu.hook_add(UC_HOOK_INSN, self._in, None, 1, 0, UC_X86_INS_IN)
@@ -271,6 +274,10 @@ class ScreenArena(DosArena):
             elif ax in (5, 6):
                 self._wreg('ax', self.buttons)
                 self._wreg('bx', 0)
+            elif ax == 0x0B:
+                self._wreg('cx', self.motion[0])
+                self._wreg('dx', self.motion[1])
+                self.motion = (0, 0)
             return
         if intno == 0x16:
             self.waiting = ('int16', ax >> 8)
@@ -589,6 +596,9 @@ class ScreenArena(DosArena):
             self._setup([], {})
             mu.reg_write(UC_X86_REG_SS, ss)
             mu.reg_write(UC_X86_REG_SP, at)
+            # (The code segment set too: a set-up's call into another
+            # segment leaves CS there, and the start is taken in it.)
+            mu.reg_write(UC_X86_REG_CS, LOAD_SEG)
             mu.emu_start(self.lin(LOAD_SEG, 0x71BB), self.lin(LOAD_SEG, 0x72B2), count=100_000)
             where = (mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
             assert where == (LOAD_SEG, 0x72B2), f'the key interrupt stopped at {where}'

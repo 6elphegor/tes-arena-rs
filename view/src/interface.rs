@@ -302,14 +302,16 @@ impl Interface {
         }
     }
 
-    /// 29CF:0A28's drawing: frame [7F80] of the casting hands' .CFA, as
-    /// loaded at offset [902E] of EMS bank [C8F4], at its offsets.
+    /// 29CF:0A28's drawing: the frame of the casting hands' .CFA (as
+    /// loaded at offset [902E] of EMS bank [C8F4]) that the frame drew,
+    /// at its offsets: [7F80] counted on after it, so the one before (at
+    /// 0, the hands not yet drawn).
     fn cast_hands(&mut self, screen: &mut Screen, m: &Machine) {
         let bank = m.ems_bank(m.mem.r8(DS, 0xC8F4) as u16);
         let at = m.mem.r16(DS, 0x902E) as usize;
         let Some(d) = bank.get(at..) else { return };
         let Some(f) = crate::flats::cfa(d) else { return };
-        let k = m.mem.r8(DS, arena::weapon::var::CAST_FRAME) as usize;
+        let Some(k) = (m.mem.r8(DS, arena::weapon::var::CAST_FRAME) as usize).checked_sub(1) else { return };
         if let Some(px) = f.frames.get(k) {
             screen.blit(le16(d, 6) as i32, le16(d, 8) as i32, f.w, f.h, px, 0x93);
         }

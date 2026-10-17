@@ -12,9 +12,11 @@ the actors (so a landing swing reaches none), and per frame the mouse's
 motion; then runs N frames of 0000:38CE.
 
 The mouse driver's motion counters (INT 33h function 0Bh) return the
-frame's motion and clear it. The hand drawing 0000:3B8E (RET) and the
-graphics calls of the casting hands (0000:5C86, 5B3C, 78A8: RETF; 5C8A:
-RET) are the renderer's, the sound 23BA:002A a RETF. The wall bash runs
+frame's motion and clear it. The hand drawing 0000:3B8E (RET), the
+casting hands' bank switches and drawing (0000:5C86, 78A8: RETF; 5C8A:
+RET) are the renderer's, the sound 23BA:002A a RETF. The hands' frame is
+unpacked (5B3C) as the game does; with no EMS here the frame lands on
+the graphic itself, as it does in the port's test. The wall bash runs
 on an empty wall plane with gen_bash.py's stubs; the bow 29CF:037F
 counts its calls at DGROUP FFF6 (the port's test hooks do the same).
 
@@ -97,7 +99,7 @@ def main():
     EXE, OUT = sys.argv[1:3]
     out = open(OUT, 'w', buffering=1)
     a = MouseArena(EXE)
-    for seg, off, code in [(0, 0x3B8E, b'\xc3'), (0, 0x5C8A, b'\xc3'), (0, 0x5C86, b'\xcb'), (0, 0x5B3C, b'\xcb'),
+    for seg, off, code in [(0, 0x3B8E, b'\xc3'), (0, 0x5C8A, b'\xc3'), (0, 0x5C86, b'\xcb'),
                            (0, 0x78A8, b'\xcb'), (0x23BA, 0x002A, b'\xcb'),
                            (0, 0x43B1, TRIGGER), (0x1194, 0x4FB8, CLOSED),
                            (0x29CF, 0x037F, bytes.fromhex('ff06f6ffcb'))]:

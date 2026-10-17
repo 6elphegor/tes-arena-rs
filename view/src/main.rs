@@ -1325,7 +1325,15 @@ impl Assets {
             let day = engine.m.mem.r8(arena::mem::DS, arena::celestial::var::PHASE_DAY) as usize;
             self.moons = [day, (day + 0xE) & 0x1F];
             let mut cd = CelestialDraw { sheet: &self.sheet, focal, moons: &mut self.moons, out: Vec::new() };
+            // The view's own pass, not the game's (whose drawing ran E41A
+            // on its copy): what it leaves in DGROUP is put back, its bank
+            // mapped back first. Left, its PHASE_DAY kept the engine's
+            // `moon_phases` from making a new day's moons.
+            let mapped = engine.m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED);
+            let kept = engine.m.mem.segment(arena::mem::DS).to_vec();
             let ok = engine.m.celestial(&mut cd).is_some();
+            engine.m.ems_map(mapped >> 2);
+            engine.m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
             if ok {
                 bodies = cd.out;
             }
@@ -1618,6 +1626,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         click_point: None,
         look_click: false,
         right_drag: 0.0,
+        ring_screen: None,
         camp: false,
         key: false,
         message: None,
@@ -2419,10 +2428,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]]];
             }
             "key" => {
-                // A key (its scan code) down for a frame.
-                engine.m.set_key(n as u8, true);
+                // A key (its scan code) down for a frame, through the key
+                // interrupt (0000:718A) as the window gives its keys.
+                let _ = engine.m.key_event(n as u8);
                 shot_frame(dir, &mut engine, run, st, &Intent::default()).expect("area");
-                engine.m.set_key(n as u8, false);
+                let _ = engine.m.key_event(n as u8 | 0x80);
             }
             "turn" => shot_frame(dir, &mut engine, run, st, &Intent { look: n as i16, ..Default::default() }).expect("area"),
             "walk" | "wait" => {
@@ -2855,6 +2865,9 @@ struct App {
     /// the centre (2826:0C15) after the next frame; the drag so far.
     look_click: bool,
     right_drag: f64,
+    /// The screen up as the ring of keys typed last saw it (`ring_screen`):
+    /// none, a box alone (true) or another (false).
+    ring_screen: Option<bool>,
     /// Camping asked for (R), and a key pressed (it ends a rest).
     camp: bool,
     key: bool,
@@ -3049,9 +3062,39 @@ impl App {
         self.pending.is_some() || !self.boxes.is_empty()
     }
 
+    /// The screen up over play, if one: a box alone (true: the original's
+    /// wait for a key or a click, 1194:5536) or another (false: a menu, a
+    /// list, a panel, the travel map, a movie, creation, the options).
+    fn screen_up(&self) -> Option<bool> {
+        let other = self.pending.is_some() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some();
+        if other {
+            Some(false)
+        } else if !self.boxes.is_empty() {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    /// The ring of keys typed (AC4C) as the screens leave it: each of the
+    /// original's screens forgets it as it begins (0000:7112, from the
+    /// menus 3159:002F, the boxes 1194:5536, the travel map 26F7:03BE, the
+    /// movies 2294:0701 and the others); its menus, lists and panels read
+    /// the keys typed while they are up out of it (0000:7138), so it is
+    /// empty as they end; a box only waits for one (1194:5545), which is
+    /// left in it. Called before each input and after each tick, so a
+    /// screen's beginning is seen before the next key.
+    fn ring_screen(&mut self) {
+        let now = self.screen_up();
+        if now != self.ring_screen && !(self.ring_screen == Some(true) && now.is_none()) {
+            self.engine.m.key_flush();
+        }
+        self.ring_screen = now;
+    }
+
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.waiting() || !self.fade.is_empty() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some() {
+        if self.screen_up().is_some() || !self.fade.is_empty() {
             return;
         }
         let k = &self.keys;
@@ -4309,13 +4352,23 @@ impl App {
     fn input(&mut self, ev: In) {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
-        // A key let go is let go in the game's key state whatever is up,
-        // and its latch (2542:05B8) cleared as the original's next frame
-        // asking for it clears it, so its next press is taken.
-        if let In::Key { code, down: false, .. } = ev {
+        self.ring_screen();
+        // A key goes through the key interrupt (0000:718A, `key_event`)
+        // whatever is up, as the original's every key does: its state
+        // where the game keeps it (DS:ACB5 + its scan code, FFh down), for
+        // the frame's own keys (- and =, F2, F3, F4, N, the debug keys)
+        // and the menu keys, and a make's character into the ring of keys
+        // typed (`ring_screen`). A key let go has its latch (2542:05B8)
+        // cleared too, as the original's next frame asking for it clears
+        // it, so its next press is taken.
+        if let In::Key { code, down, .. } = ev {
             if let Some(scan) = interface::scan_code(code) {
-                self.engine.m.set_key(scan, false);
-                self.engine.m.key_pressed(scan as u16);
+                if self.engine.m.key_event(if down { scan } else { scan | 0x80 }).is_none() {
+                    eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
+                }
+                if !down {
+                    self.engine.m.key_pressed(scan as u16);
+                }
             }
         }
         match ev {
@@ -4536,14 +4589,9 @@ impl App {
                 if down && resting {
                     self.key = true;
                 }
-                // The key's state where the game keeps it (DS:ACB5 + its
-                // scan code), for the frame's own keys (- and =, F2, F3,
-                // F4, N, the debug keys) and the menu keys; a menu key's
-                // press runs the menu keys' check (2542:0100) at once.
+                // (The key went through the key interrupt above.) A menu
+                // key's press runs the menu keys' check (2542:0100) at once.
                 let scan = interface::scan_code(code);
-                if let Some(scan) = scan {
-                    self.engine.m.set_key(scan, down);
-                }
                 if down && !resting && scan.is_some_and(interface::is_menu_key) {
                     self.menu_key();
                 }
@@ -4636,6 +4684,7 @@ impl App {
             let ticks = self.engine.frame_ticks() as f64;
             self.next = now + Duration::from_secs_f64(ticks / 18.2);
         }
+        self.ring_screen();
     }
 }
 

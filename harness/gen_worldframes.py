@@ -85,8 +85,9 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from emu import LOAD_SEG, fnv
+from emu import LOAD_SEG, STUB_SEG, fnv
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
+from unicorn.x86_const import UC_X86_REG_FS
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 
@@ -117,19 +118,24 @@ def facing(heading):
     return put
 
 
-def night(heading):
-    """Facing `heading` at ten at night of the save's day: the minutes
-    (05CC) and the hour (05D6, minute 05D8 0) set to 22:00, the sky's time
-    (CCFE) as 0000:16F7 makes it from them."""
+def at_hour(hour, heading, minute=0):
+    """Facing `heading` at `hour`:`minute` of the save's day: the minutes
+    (05CC), the hour (05D6) and the minute (05D8) set to it, the sky's
+    time (CCFE) as 0000:16F7 makes it from them."""
     def put(a):
         a.w16(0xC3DA, heading)
         m = struct.unpack('<I', a.mu.mem_read(a.lin(a.ds, 0x05CC), 4))[0]
-        m = m - m % 1440 + 22 * 60
+        m = m - m % 1440 + hour * 60 + minute
         a.mu.mem_write(a.lin(a.ds, 0x05CC), struct.pack('<I', m))
-        a.w16(0x05D6, 22)
-        a.w16(0x05D8, 0)
-        a.w16(0xCCFE, ((22 * 60) << 10) // 1440)
+        a.w16(0x05D6, hour)
+        a.w16(0x05D8, minute)
+        a.w16(0xCCFE, ((hour * 60 + minute) << 10) // 1440)
     return put
+
+
+def night(heading):
+    """Facing `heading` at ten at night of the save's day (`at_hour`)."""
+    return at_hour(22, heading)
 
 
 def storm(heading, angle):
@@ -181,6 +187,90 @@ def ghost(a):
     a.w16(0x0C57 + 4, a.r16(0xC3D4) + GHOST_AHEAD)
     a.w16(0x0C57, a.r16(0xC3D0))
     a.w16(0xC3DA, 0)
+
+
+def brought(ty, level=1, ahead=0x180, heading=0):
+    """A creature of type `ty` at `level` brought by a quest's encounter
+    (1194:89A7, as `ghost`), put `ahead` north of the player's place
+    (down the start's corridor), the player facing `heading` (0: it)."""
+    def put(a):
+        a.call_near(0x1194, 0x89A7, cx=1, ax=ty, bx=level)
+        a.w16(0x0C57 + 4, (a.r16(0xC3D4) + ahead) & 0xFFFF)
+        a.w16(0x0C57, a.r16(0xC3D0))
+        a.w16(0xC3DA, heading)
+    return put
+
+
+def stairs_fight(a):
+    """South of the first level's down stairs facing them (`playdown`'s
+    place), a creature (type 1) brought two squares behind."""
+    at_square(11, 10, 0x100)(a)
+    brought(1, ahead=0x100, heading=0x100)(a)
+
+
+def casting(ty, spell, level=1, ahead=0x200):
+    """`brought(ty, level, ahead)`, then spell `spell` of the spellbook
+    cast as its pick casts it (29CF:071F, AL the index, SI the player's
+    record): an aimed spell waits for its target (0620)."""
+    def put(a):
+        brought(ty, level, ahead)(a)
+        a._setup([0, STUB_SEG], {'eax': spell, 'esi': 0x1A4})
+        a.mu.reg_write(UC_X86_REG_FS, a.ds)
+        a._run(0x29CF, 0x071F, STUB_SEG, 0, count=10_000_000)
+        assert a.r16(0x0620), 'the spell not waiting for its target'
+    return put
+
+
+def night_encounter(heading):
+    """At ten at night (`at_hour`) the wilderness's encounter as a roll
+    that comes up brings it (1194:887A past its roll, 88AA..88C8): the
+    night (1238, 1194:561C's), 5C8 bit 1000h cleared, the rank 1 (1294),
+    and the row of the terrain (A50) plus 7 at night brought (89D4, BX
+    the row)."""
+    def put(a):
+        at_hour(22, heading)(a)
+        a.w16(0x1238, 1)
+        a.w16(0x05C8, a.r16(0x05C8) & ~0x1000)
+        a.w16(0x1294, 1)
+        row = a.mu.mem_read(a.lin(a.ds, 0x0A50), 1)[0] + 7
+        assert row <= 0xC, 'no encounter for the terrain'
+        a.call_near(0x1194, 0x89D4, ebx=row)
+    return put
+
+
+def resting(heading):
+    """At ten at night (`at_hour`), the player's health down to 1 (+59h),
+    a rest until healed begun as the camp's menu's second entry begins it
+    (1194:424E, its menu 1194:020E giving 1)."""
+    def put(a):
+        at_hour(22, heading)(a)
+        a.w16(0x01A4 + 0x59, 1)
+        menu = a.lin(LOAD_SEG + 0x1194, 0x020E)
+        saved = bytes(a.mu.mem_read(menu, 4))
+        a.code_write(menu, b'\xb8\x01\x00\xcb')
+        try:
+            a.call_far(0x1194, 0x424E)
+        finally:
+            a.code_write(menu, saved)
+        assert a.mu.mem_read(a.lin(a.ds, 0x1013), 1)[0], 'not resting'
+    return put
+
+
+# The world loop's read of the mouse (0000:8FC4): once a frame, round
+# and round in a box's wait (1194:553B).
+MOUSE_READ = (0, 0x8FC4)
+# Space (a box's wait ends on any key).
+KEY_SPACE = 0x39
+
+# Wizard's Fire, the save's spellbook's seventh (type 2: aimed).
+WIZARDS_FIRE = 6
+
+# The A key (2542:0100's ready, 5E0 bit 10h).
+KEY_A = 0x1E
+# The right button held with the mouse dragged down 60h mickeys before
+# each frame: a swing (0000:3C9F) begun whenever the last has ended.
+SWINGING = {'buttons': 2, 'drag': (0, 0x60)}
+LET_GO = {'buttons': 0}
 
 
 def wild_edge(a):
@@ -292,6 +382,40 @@ CASES = {
     # arrow: the window's origin a row above the grid, its blocks loaded
     # from what lies before it.
     'playwildedge': ('wild', wild_edge, [((UP,), (), 12, None), ((), (UP,), 1, None)]),
+    # The street at noon (`at_hour`), facing north, walked on with the up
+    # arrow for 60 frames and then stood in for 240: the townspeople
+    # made on the way in walking about the player.
+    'playcrowd': ('street', at_hour(12, 0), [((UP,), (), 60, None), ((), (UP,), 240, None)]),
+    # A creature (type 1, level 1: `brought`) three squares down the
+    # dungeon's corridor; the weapon readied (A held a frame), waited
+    # for as the creature comes and strikes, then swung at it frame on
+    # frame (`SWINGING`) till it falls, and let go: blows both ways, the
+    # kill (2AA1:06A0), its corpse.
+    'playfight': ('dungeon', brought(1), [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
+                                          ((), (), 200, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]),
+    # The same creature four squares off, Wizard's Fire cast at it
+    # (`casting`), the view clicked at its centre two frames on (the
+    # frame's controls launch it from the player, 29CF:0000), and the
+    # fire followed through its flight into the creature (29CF:037F's
+    # missile, 0000:2566's moves).
+    'playcast': ('dungeon', casting(1, WIZARDS_FIRE), [((), (), 2, None), ((), (), 10, None, [(160, 100)]), ((), (), 120, None)]),
+    # The wilderness at night, its encounter brought (`night_encounter`),
+    # stood in: what came comes for the player and strikes.
+    'playwildnight': ('wild', night_encounter(0x100), [((), (), 400, None)]),
+    # A creature that casts (type Bh: one spell in its record's list at
+    # +366h) six squares down the corridor, stood before: seeing the
+    # player it casts (29CF:0145: its spell launched at the player) and
+    # comes.
+    'playcreaturecast': ('dungeon', brought(0xB, ahead=0x300), [((), (), 400, None)]),
+    # `stairs_fight`: stood in while the creature comes and strikes, then
+    # the up arrow held into the stairs mid-fight (0000:F76F), and two
+    # dozen frames on the level below.
+    'playstairsfight': ('dungeon', stairs_fight, [((), (), 40, None), ((UP,), (), 20, level_changed), ((), (UP,), 24, None)]),
+    # The wilderness at night, a rest until healed begun (`resting`): each
+    # frame 20 minutes (1194:4635), the clock's hours rolling for
+    # encounters (1194:887A) until enemies come and end it ("Enemies are
+    # nearby", the box read with Space), then what came comes on.
+    'playrest': ('wild', resting(0x100), [((), (), 300, None, [], {'script': [('keys', [KEY_SPACE])]})]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -387,11 +511,27 @@ def run_case(a, at, name, setup, steps, tracks):
 
 def play(a, name, steps, tracks):
     frame = [0]
+    drag = [None]
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
         frame[0] += 1
-    for held, let_go, n, until, *clicks in steps:
-        a.clicks.extend(clicks[0] if clicks else [])
+        # The step's drag: the mouse moved by it before each frame.
+        if drag[0] is not None:
+            a.motion = drag[0]
+    for held, let_go, n, until, *more in steps:
+        a.clicks.extend(more[0] if more else [])
+        # A step's options: the buttons held through it (`buttons`, 2 the
+        # right), the mouse's motion before each of its frames (`drag`).
+        opts = more[1] if len(more) > 1 else {}
+        if 'buttons' in opts:
+            a.buttons = opts['buttons']
+        # (`script`: actions for the waits for input on the way, a box's
+        # loop round the mouse's read, 0000:8FC4, which a frame reads once.)
+        if 'script' in opts:
+            a.waits = {MOUSE_READ}
+            a.script = list(opts['script'])
+        drag[0] = opts.get('drag')
+        a.motion = (0, 0)
         if held:
             a.keys_held(held)
         if let_go:
@@ -401,6 +541,8 @@ def play(a, name, steps, tracks):
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
         frame[0] -= 1
+    drag[0] = None
+    a.motion = (0, 0)
     # The last frame again, its page's writes watched.
     base = a.lin(a.r16(PAGE_SEG_FIELD), 0)
     last = bytearray(64000)

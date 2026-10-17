@@ -38,18 +38,23 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
 }
 
-/// Facing `heading` at ten at night of the save's day, as
-/// gen_worldframes.py's `night` sets it.
-fn night(a: &mut App, heading: u16) {
+/// Facing `heading` at `hour` o'clock of the save's day, as
+/// gen_worldframes.py's `at_hour` sets it.
+fn at_hour(a: &mut App, hour: u16, heading: u16) {
     use arena::clock::var::{HOUR, MINUTE, MINUTES, SKY_TIME};
     let m = &mut a.engine.m;
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
     let t = m.mem.r32(DS, MINUTES);
-    m.mem.w32(DS, MINUTES, t - t % 1440 + 22 * 60);
-    m.mem.w16(DS, HOUR, 22);
+    m.mem.w32(DS, MINUTES, t - t % 1440 + hour as u32 * 60);
+    m.mem.w16(DS, HOUR, hour);
     m.mem.w16(DS, MINUTE, 0);
-    // (In u32: 22 x 60 shifted left by 10 is past a u16.)
-    m.mem.w16(DS, SKY_TIME, (((22 * 60) << 10) / 1440u32) as u16);
+    // (In u32: the minutes shifted left by 10 are past a u16.)
+    m.mem.w16(DS, SKY_TIME, (((hour as u32 * 60) << 10) / 1440) as u16);
+}
+
+/// Facing `heading` at ten at night of the save's day (`at_hour`).
+fn night(a: &mut App, heading: u16) {
+    at_hour(a, 22, heading);
 }
 
 /// `night(heading)` in a thunderstorm with a bolt forced at the circle's
@@ -173,7 +178,8 @@ fn grab(a: &App) -> (Vec<u8>, Vec<u8>) {
     let mut e = arena::engine::Engine::new(a.engine.m.clone(), a.engine.files.clone());
     e.m.store_rng();
     e.page_wrote = a.engine.page_wrote.clone();
-    (e.page_state(), (0..0x20).flat_map(|b| e.m.ems_bank(b)).collect())
+    e.page_ems_wrote = a.engine.page_ems_wrote.clone();
+    (e.page_state(), (0..0x20).flat_map(|b| e.page_ems(b)).collect())
 }
 
 /// Into the place, `setup` run, then `play` driving frames and
@@ -554,6 +560,94 @@ fn ghost(a: &mut App) {
     e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
 }
 
+/// gen_worldframes.py's `brought`: a creature of type `ty` at `level`
+/// brought by a quest's encounter (1194:89A7), put `ahead` north of the
+/// start, the player facing it.
+fn brought(a: &mut App, ty: u8, level: u8, ahead: u16) {
+    use arena::encounter::var::CREATURE_SLOTS;
+    let e = &mut a.engine;
+    e.m.quest_encounter(&mut e.files, &mut arena::encounter::NoFightHooks, 1, ty, level).expect("a creature brought");
+    let (x, z) = (e.m.mem.r16(DS, 0xC3D0), e.m.mem.r16(DS, 0xC3D4));
+    e.m.mem.w16(DS, CREATURE_SLOTS + 4, z.wrapping_add(ahead));
+    e.m.mem.w16(DS, CREATURE_SLOTS, x);
+    e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
+}
+
+/// gen_worldframes.py's `night_encounter`: at ten at night the
+/// wilderness's encounter brought as a roll that comes up brings it (the
+/// night, 5C8 bit 1000h cleared, the rank 1, the terrain's row plus 7).
+fn night_encounter(a: &mut App, heading: u16) {
+    at_hour(a, 22, heading);
+    let e = &mut a.engine;
+    e.m.mem.w16(DS, arena::encounter::var::NIGHT, 1);
+    let f = e.m.mem.r16(DS, 0x05C8) & !0x1000;
+    e.m.mem.w16(DS, 0x05C8, f);
+    e.m.mem.w16(DS, arena::encounter::var::GUARD_RANK, 1);
+    let row = e.m.mem.r8(DS, 0x0A50) as u16 + 7;
+    e.m.encounter(&mut e.files, &mut arena::encounter::NoFightHooks, row).expect("the encounter brought");
+}
+
+/// The camp's menu's second entry picked: resting until healed.
+struct UntilHealed;
+
+impl arena::clock::ClockHooks for UntilHealed {}
+
+impl arena::rest::RestHooks for UntilHealed {
+    fn menu(&mut self, _m: &mut arena::machine::Machine, _si: u16, _bx: u16, _di: u16) -> u16 {
+        1
+    }
+}
+
+/// gen_worldframes.py's `resting`: at ten at night, the player's health
+/// down to 1, a rest until healed begun (1194:424E).
+fn resting(a: &mut App, heading: u16) {
+    at_hour(a, 22, heading);
+    let e = &mut a.engine;
+    e.m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 1);
+    e.m.rest_start(&mut e.files, &mut UntilHealed).expect("the rest begun");
+    assert_ne!(e.m.mem.r8(DS, arena::rest::var::RESTING), 0, "not resting");
+}
+
+/// `n` frames, a box read with Space after the frame that shows it, as
+/// gen_worldframes.py's script reads a box's wait (0000:8FC4); the
+/// screen shown before each (`compose`, as the window shows it), for what
+/// a box keeps of it.
+fn frames_reading(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
+    for _ in 0..n {
+        a.compose();
+        frames(a, d, seen, 1, |_| false);
+        if a.waiting() {
+            d.key(a, KeyCode::Space, Some(" "));
+        }
+    }
+}
+
+/// The mouse captured (a right click in the view: the window's first
+/// click takes it, as the original's mouse is always the game's).
+fn captured(a: &mut App) {
+    a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+    a.input(In::Button { button: MouseButton::Right, down: true });
+    a.input(In::Button { button: MouseButton::Right, down: false });
+}
+
+/// gen_worldframes.py's `SWINGING` for `n` frames: the right button held,
+/// the mouse dragged down 60h mickeys before each frame.
+fn swinging(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
+    a.input(In::Button { button: MouseButton::Right, down: true });
+    for _ in 0..n {
+        a.input(In::Motion(0.0, 96.0));
+        frames(a, d, seen, 1, |_| false);
+    }
+    a.input(In::Button { button: MouseButton::Right, down: false });
+}
+
+/// The A key held for a frame (the weapon readied), let go.
+fn ready(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    a.input(In::Key { code: KeyCode::KeyA, down: true, text: Some("a".into()) });
+    frames(a, d, seen, 1, |_| false);
+    a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
+}
+
 /// gen_worldframes.py's `wild_edge`: the wilderness's window at the
 /// grid's top row, the player just inside its second quarter, facing
 /// north.
@@ -606,6 +700,48 @@ fn case(name: &str) -> Option<Case> {
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playfight" => (Place::Dungeon, Box::new(|a: &mut App| {
+            brought(a, 1, 1, 0x180);
+            captured(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            ready(a, d, seen);
+            frames(a, d, seen, 30, |_| false);
+            swinging(a, d, seen, 200);
+            frames(a, d, seen, 20, |_| false);
+        })),
+        "playcast" => (Place::Dungeon, Box::new(|a: &mut App| {
+            // gen_worldframes.py's `casting`: the creature four squares
+            // off, Wizard's Fire (the spellbook's seventh) cast at it.
+            brought(a, 1, 1, 0x200);
+            let e = &mut a.engine;
+            e.m.cast_spell(&mut e.files, &mut arena::cast::NoCastHooks, 6).expect("the spell cast");
+            assert_ne!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "the spell not waiting for its target");
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 9, |_| false);
+            frames(a, d, seen, 120, |_| false);
+        })),
+        "playcreaturecast" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 0xB, 1, 0x300)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        "playstairsfight" => (Place::Dungeon, Box::new(|a: &mut App| {
+            // gen_worldframes.py's `stairs_fight`: south of the down
+            // stairs facing them, a creature two squares behind.
+            at_square(a, 11, 10, 0x100);
+            brought(a, 1, 1, 0x100);
+            a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 40, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 24, |_| false);
+        })),
+        "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
+        "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         _ => return None,
     })
@@ -787,11 +923,10 @@ fn differing(a: &[u8], b: &[u8], gap: usize) -> Vec<(usize, usize)> {
 #[test]
 fn the_state_measured_against_the_originals() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
+    // (ARENA_CASE: that case alone, whichever it is.)
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playghostclick"] {
-        if only.as_deref().is_some_and(|o| o != name) {
-            continue;
-        }
+    let all = ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playghostclick"];
+    for name in only.as_deref().map_or(all.to_vec(), |o| vec![o]) {
         let (Ok(ds), Ok(ems)) = (std::fs::read(dump.join(format!("{name}.ds"))), std::fs::read(dump.join(format!("{name}.ems")))) else {
             eprintln!("{name}: no dump");
             continue;
@@ -809,6 +944,10 @@ fn the_state_measured_against_the_originals() {
         let Some((a, _)) = played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);
             setup(a);
+            // (ARENA_HEAP: the heap's blocks as the case starts.)
+            if std::env::var("ARENA_HEAP").is_ok() {
+                eprintln!("heap {:?}", heap_blocks(&a.engine.m));
+            }
             *pre.borrow_mut() = Some(grab(a));
         }, play) else { return };
         let (mine0, banks0) = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap() } else { pre.into_inner().unwrap() };
@@ -1154,6 +1293,41 @@ fn the_state_from_the_load_as_the_original_leaves_it() {
 fn the_state_as_the_original_leaves_it() {
     for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky", "playghostclick", "playwildedge"] {
         state_case(name);
+    }
+}
+
+/// The busy cases: hundreds of frames of play each (a crowd at noon, a
+/// fight swung through, a spell cast into a creature, a creature casting,
+/// the wilderness's night encounter, the stairs taken mid-fight, a rest
+/// ended by enemies).
+const BUSY: [&str; 7] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest"];
+
+/// Each busy case's player, frame by frame, as the original's.
+#[test]
+fn busy_play_goes_as_the_originals() {
+    for name in BUSY {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+    }
+}
+
+/// Each busy case's frames leave DGROUP as the original's do, from the
+/// case's start and from the load (`state_case`, `state_load_case`).
+#[test]
+fn busy_play_leaves_the_state_as_the_original() {
+    for name in BUSY {
+        state_case(name);
+        state_load_case(name);
+    }
+}
+
+/// Each busy case's frames change the EMS banks as the original's do
+/// (`state_ems_case`).
+#[test]
+fn busy_play_leaves_the_ems_banks_as_the_original() {
+    for name in BUSY {
+        state_ems_case(name);
     }
 }
 

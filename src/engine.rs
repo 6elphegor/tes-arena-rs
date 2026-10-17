@@ -224,6 +224,9 @@ pub struct Engine {
     /// original's drawing leaves in DGROUP and the engine's doesn't (for
     /// the state comparison, `page_state`).
     pub page_wrote: Vec<Option<(u8, u8)>>,
+    /// The EMS bytes the drawing has changed on its copy, likewise (the
+    /// bank times 10000h plus the offset: `page_ems`).
+    pub page_ems_wrote: std::collections::HashMap<u32, (u8, u8)>,
     /// The creatures' flats the last page's drawing reached
     /// (`render::Creature`, CF96), for the hook CD56 on the machine.
     pub page_creatures: Vec<crate::render::Creature>,
@@ -234,7 +237,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
-        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_creatures: Vec::new(), walked: None }
+        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_ems_wrote: Default::default(), page_creatures: Vec::new(), walked: None }
     }
 
     /// The BIOS timer advances `n` ticks (18.2 a second).
@@ -310,7 +313,19 @@ impl Engine {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
             m.moon_phases(files)?;
-            let (p, gaps, wrote, creatures, walked) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            // An EMS byte the machine has written since the drawing changed
+            // it on its copy is the machine's (as `page_wrote`'s are).
+            self.page_ems_wrote.retain(|&o, &mut (before, _)| {
+                let bank = (o >> 16) as u16;
+                let i = (o & 0xFFFF) as u16;
+                let mapped = m.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2 == bank && m.mem.r8(DS, crate::level::var::EMS_ON) != 0;
+                let now = if mapped { m.mem.r8(m.mem.r16(DS, crate::mif::var::BUFFER_SEG), i) } else { m.ems.get(bank as usize).map_or(0, |b| b[i as usize]) };
+                now == before
+            });
+            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            for (o, before, after) in ems {
+                self.page_ems_wrote.insert(o, (before, after));
+            }
             *page = p;
             self.walked = Some(walked);
             self.page_gaps = gaps;
@@ -555,6 +570,22 @@ impl Engine {
                 }
             })
             .collect()
+    }
+
+    /// EMS bank `b` as the original's would hold it, its drawing done on
+    /// the machine (`page_state`'s rule): the machine's bytes, with the
+    /// drawing's copy's last change where the machine's byte is still what
+    /// the copy started from.
+    pub fn page_ems(&self, b: u16) -> Vec<u8> {
+        let mut bank = self.m.ems_bank(b);
+        for (i, x) in bank.iter_mut().enumerate() {
+            if let Some(&(before, after)) = self.page_ems_wrote.get(&((b as u32) << 16 | i as u32)) {
+                if *x == before {
+                    *x = after;
+                }
+            }
+        }
+        bank
     }
 
     pub fn view(&self) -> View {
