@@ -2397,7 +2397,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
                 let msg = if what == "save" {
-                    save_to(&mut engine, sdir, slot, st.assets.palette, None)
+                    save_to(&mut engine, sdir, slot, st.assets.dac(), None)
                 } else {
                     match load_from(&mut engine, dir, sdir, slot) {
                         Ok((m, r)) => {
@@ -2653,16 +2653,40 @@ struct SaveDir<'a> {
 }
 
 impl SaveDir<'_> {
-    fn path(&self, m: &arena::machine::Machine, path: u16) -> PathBuf {
+    fn name(m: &arena::machine::Machine, path: u16) -> String {
         let p = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, path)).into_owned();
-        let name = p.rsplit(['\\', '/']).next().unwrap_or(&p).to_string();
-        self.dir.join(name)
+        p.rsplit(['\\', '/']).next().unwrap_or(&p).to_string()
     }
+    fn path(&self, m: &arena::machine::Machine, path: u16) -> PathBuf {
+        dos_file(self.dir, &Self::name(m, path))
+    }
+}
+
+/// The save folder's file of the DOS name `name`: the one there, whatever
+/// the case of its letters (DOS's names have none; the folder may be on a
+/// file system where they do, and the game's own paths are lower case
+/// where the copies' are upper), else the name in upper case, as DOS
+/// keeps it. Without this a save wrote saveengn.05 beside the working
+/// slot's SAVEENGN.05 copied just before, and a load could find the old.
+fn dos_file(dir: &std::path::Path, name: &str) -> PathBuf {
+    std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        .map(|e| e.path())
+        .unwrap_or_else(|| dir.join(name.to_ascii_uppercase()))
 }
 
 impl arena::save_write::SaveHooks for SaveDir<'_> {
     fn delete(&mut self, m: &arena::machine::Machine, path: u16) {
-        let _ = std::fs::remove_file(self.path(m, path));
+        // Every file of the name, whatever its case (DOS has one).
+        let name = Self::name(m, path);
+        for e in std::fs::read_dir(self.dir).into_iter().flatten().flatten() {
+            if e.file_name().to_string_lossy().eq_ignore_ascii_case(&name) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
     }
     fn write(&mut self, m: &arena::machine::Machine, path: u16, data: &[u8]) {
         let p = self.path(m, path);
@@ -2696,14 +2720,9 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     if let Err(e) = std::fs::create_dir_all(dir) {
         return format!("{}: {e}", dir.display());
     }
-    // The saved position (BA62: x, z, y), which saving the level makes the
-    // player's (the world loop keeps it each frame, A2A3; the view's
-    // frames don't): the player's.
-    use arena::save_write::var::{POSITION, SAVED_POSITION};
-    for i in 0..3 {
-        let w = engine.m.mem.r16(arena::mem::DS, POSITION + 2 * i);
-        engine.m.mem.w16(arena::mem::DS, SAVED_POSITION + 2 * i, w);
-    }
+    // (The saved position, BA62, which saving the level makes the
+    // player's, is the world loop's (A2A3), the engine's frame's: the
+    // player's place, not the eye's 1Eh behind it in C3D0.)
     engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
     // As 25FD:010B..0110: the automap written (23F1:0145), the working
     // slot's files (CITYDATA, SPELLS, AUTOMAP, ...) copied to the slot's
@@ -2711,7 +2730,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     engine.m.automap_write(&mut engine.files);
     for name in engine.m.slot_files_out(&mut engine.files) {
         let Some(data) = engine.files.written(&name) else { continue };
-        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        let p = dos_file(dir, &String::from_utf8_lossy(&name));
         if let Err(e) = std::fs::write(&p, data) {
             eprintln!("{}: {e}", p.display());
         }
@@ -2730,7 +2749,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     // slot, an interior's automap loaded.
     for name in engine.m.save_finish(&mut engine.files) {
         let Some(data) = engine.files.written(&name) else { continue };
-        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        let p = dos_file(dir, &String::from_utf8_lossy(&name));
         if let Err(e) = std::fs::write(&p, data) {
             eprintln!("{}: {e}", p.display());
         }
@@ -3391,7 +3410,7 @@ impl App {
             Some(dir) => {
                 // The port's own key: the screen as the window shows it.
                 let shot: Vec<u8> = self.screen.indices().iter().map(|&c| c as u8).collect();
-                save_to(&mut self.engine, &dir, self.slot, self.assets.palette, Some(&shot))
+                save_to(&mut self.engine, &dir, self.slot, self.assets.dac(), Some(&shot))
             }
             None => "No save directory (--save-dir).".to_string(),
         };
@@ -3426,7 +3445,7 @@ impl App {
                 // its wait, 25FD:0803, while the disk is used); a failure
                 // the original wouldn't have is told.
                 let shot = self.save_shot();
-                let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette, Some(&shot));
+                let msg = save_to(&mut self.engine, &dir, slot, self.assets.dac(), Some(&shot));
                 if msg.starts_with("Saved to slot") {
                     println!("{msg}");
                 } else {
@@ -3465,7 +3484,10 @@ impl App {
                     }
                 }
             }
-            saveui::Ended::Left(msg) => {
+            saveui::Ended::Left(engine, msg) => {
+                // The game goes on as the menu left it (a load menu left
+                // has deleted log.64, re*.64 and in*.64).
+                self.engine = *engine;
                 if let Some(m) = msg {
                     self.say(&m);
                 }

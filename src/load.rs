@@ -223,7 +223,7 @@ impl Machine {
             self.mem.w16(DS, 0xCCC2, 0);
         }
         hooks.loading(self);
-        self.working_files_digits();
+        self.working_files_delete(files);
         hooks.slot_files(self, files);
         hooks.citydata(self, files);
         if title {
@@ -531,6 +531,15 @@ impl Machine {
         self.mem.w16(DS, WORKING_FILES + 2, Self::slot_digits(slot));
     }
 
+    /// 25FD:022A whole: the digits (`working_files_digits`), then the
+    /// working slot's files deleted ("*.ww", 1194:4D91), as a load does
+    /// before the slot's are copied in (02F6): the rooms, the stores'
+    /// stock and the rest of the game left behind don't survive it.
+    pub fn working_files_delete(&mut self, files: &mut Files) {
+        self.working_files_digits();
+        self.delete_matching(files, WORKING_FILES);
+    }
+
     /// 1194:3A51 with no "STA=" in the environment (3A71..3A82): the
     /// working slot 40h, its digits in STATES.nn (7D0D) only; 8B06 and
     /// the patterns at 5CAF.. keep the "64" they're built with.
@@ -545,8 +554,7 @@ impl Machine {
     /// copied to the working slot's names (062D), as the title's New and
     /// Load (0000:1171, 1064) start.
     pub fn working_files_fresh(&mut self, files: &mut Files) {
-        self.working_files_digits();
-        self.delete_matching(files, WORKING_FILES);
+        self.working_files_delete(files);
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w8(DS, SLOT, w);
         self.copy_slot_files(files, 65, w, Copies::Fresh);

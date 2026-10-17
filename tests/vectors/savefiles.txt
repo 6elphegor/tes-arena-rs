@@ -1,0 +1,449 @@
+playdel | saveguild | 
+save | saveguild | AUTOMAP.05 20040 7b1d25cc3490e935
+save | saveguild | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | saveguild | LOG.05 801 560dadd0d3e0ffa9
+save | saveguild | NAMES.DAT 1e0 135b60819fc85484
+save | saveguild | SAVEENGN.05 463f 73c11e840aed9037
+save | saveguild | SAVEGAME.05 28ae7 ac58cdff38db6bd9
+save | saveguild | SPELLS.05 aa0 f7dcb810b229e795
+save | saveguild | SPELLSG.05 2a80 f218f906c87ea04d
+save | saveguild | STATES.05 7080 bb75605fbb712a4b
+save | saveguild | WILD001.05 0 cbf29ce484222325
+save | saveguild | WILD002.05 0 cbf29ce484222325
+save | saveguild | WILD003.05 0 cbf29ce484222325
+save | saveguild | WILD004.05 0 cbf29ce484222325
+savedel | saveguild | 
+loadplace | saveguild | 19b76141 | da3f8f0eb13a59c4
+play | savestreet | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savestreet | 
+save | savestreet | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savestreet | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savestreet | LOG.05 801 560dadd0d3e0ffa9
+save | savestreet | NAMES.DAT 1e0 fe92d7ddafe72a4b
+save | savestreet | SAVEENGN.05 463f e7ba1f7529e483cb
+save | savestreet | SAVEGAME.05 28ae7 8c3274a850339a90
+save | savestreet | SPELLS.05 aa0 f7dcb810b229e795
+save | savestreet | SPELLSG.05 2a80 f218f906c87ea04d
+save | savestreet | STATES.05 7080 bb75605fbb712a4b
+save | savestreet | WILD001.05 0 cbf29ce484222325
+save | savestreet | WILD002.05 0 cbf29ce484222325
+save | savestreet | WILD003.05 0 cbf29ce484222325
+save | savestreet | WILD004.05 0 cbf29ce484222325
+savedel | savestreet | 
+loadplace | savestreet | 19b76141 | 6d57db1b4ce25a5
+play | savewild | TMP2.$$$ fa00 9ddbfae4c25ae77f
+play | savewild | WILD001.RMD 183e 1914c477a5ae59e8
+play | savewild | WILD002.RMD 1a56 7c67972d0f120f7c
+play | savewild | WILD003.RMD 1558 d10265bdb9423ea9
+play | savewild | WILD004.RMD 1046 3119a9ed52265f8d
+playdel | savewild | 
+save | savewild | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savewild | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savewild | LOG.05 801 560dadd0d3e0ffa9
+save | savewild | NAMES.DAT 1e0 135b60819fc85484
+save | savewild | SAVEENGN.05 463f 82913e6e6d7c401f
+save | savewild | SAVEGAME.05 28ae7 fa81b7f1ba3aa407
+save | savewild | SPELLS.05 aa0 f7dcb810b229e795
+save | savewild | SPELLSG.05 2a80 f218f906c87ea04d
+save | savewild | STATES.05 7080 bb75605fbb712a4b
+save | savewild | WILD001.05 183e 1914c477a5ae59e8
+save | savewild | WILD002.05 1a56 7c67972d0f120f7c
+save | savewild | WILD003.05 1558 d10265bdb9423ea9
+save | savewild | WILD004.05 1046 3119a9ed52265f8d
+savedel | savewild | 
+loadplace | savewild | 19b76141 | 2e6c50f955d2e7be
+play | savedungeon | AUTOMAP.64 20040 217fd87bed8f0e3d
+play | savedungeon | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savedungeon | 
+save | savedungeon | AUTOMAP.05 20040 f740491216b9ffa
+save | savedungeon | AUTOMAP.64 20040 f740491216b9ffa
+save | savedungeon | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savedungeon | LOG.05 801 560dadd0d3e0ffa9
+save | savedungeon | NAMES.DAT 1e0 135b60819fc85484
+save | savedungeon | SAVEENGN.05 463f 34c6d84c7b3fa060
+save | savedungeon | SAVEGAME.05 28ae7 28b09ca46ab2b45b
+save | savedungeon | SPELLS.05 aa0 f7dcb810b229e795
+save | savedungeon | SPELLSG.05 2a80 f218f906c87ea04d
+save | savedungeon | STATES.05 7080 bb75605fbb712a4b
+save | savedungeon | WILD001.05 0 cbf29ce484222325
+save | savedungeon | WILD002.05 0 cbf29ce484222325
+save | savedungeon | WILD003.05 0 cbf29ce484222325
+save | savedungeon | WILD004.05 0 cbf29ce484222325
+savedel | savedungeon | 
+loadplace | savedungeon | 19b76141 | 6cb04d418ab69c0c
+play | savecrypt | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savecrypt | 
+save | savecrypt | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savecrypt | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savecrypt | LOG.05 801 560dadd0d3e0ffa9
+save | savecrypt | NAMES.DAT 1e0 135b60819fc85484
+save | savecrypt | SAVEENGN.05 463f 1cb4c9c7a93af9a2
+save | savecrypt | SAVEGAME.05 28ae7 32bbfebfc3ee934
+save | savecrypt | SPELLS.05 aa0 f7dcb810b229e795
+save | savecrypt | SPELLSG.05 2a80 f218f906c87ea04d
+save | savecrypt | STATES.05 7080 bb75605fbb712a4b
+save | savecrypt | WILD001.05 0 cbf29ce484222325
+save | savecrypt | WILD002.05 0 cbf29ce484222325
+save | savecrypt | WILD003.05 0 cbf29ce484222325
+save | savecrypt | WILD004.05 0 cbf29ce484222325
+savedel | savecrypt | 
+loadplace | savecrypt | 19b76141 | fcf1ce276f4cab6a
+screen | sheet | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | sheet | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | sheet | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | sheet | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | sheet | 
+screen | equipment | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipment | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipment | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipment | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipment | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipment | 
+screen | equipmentpick | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentpick | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentpick | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentpick | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentpick | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentpick | 
+screen | equipmentspells | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspells | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspells | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspells | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspells | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspells | 
+screen | equipmentdown | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentdown | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentdown | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentdown | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentdown | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentdown | 
+screen | equipmentquests | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentquests | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentquests | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentquests | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentquests | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentquests | 
+screen | equipmentquestinfo | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentquestinfo | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentquestinfo | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentquestinfo | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentquestinfo | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentquestinfo | 
+screen | equipmentspecial | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspecial | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspecial | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspecial | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspecial | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspecial | 
+screen | equipmentpotion | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentpotion | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentpotion | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentpotion | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentpotion | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentpotion | 
+screen | equipmentquestequip | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentquestequip | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentquestequip | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentquestequip | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentquestequip | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentquestequip | 
+screen | equipmentinfo | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentinfo | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentinfo | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentinfo | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentinfo | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentinfo | 
+screen | equipmentoff | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentoff | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentoff | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentoff | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentoff | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentoff | 
+screen | equipmentspellpage | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellpage | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellpage | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellpage | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellpage | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellpage | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellpage | 
+screen | equipmentspellnext | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellnext | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellnext | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellnext | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellnext | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellnext | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellnext | 
+screen | equipmentspellprev | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellprev | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellprev | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellprev | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellprev | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellprev | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellprev | 
+screen | equipmentspelldelete | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspelldelete | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspelldelete | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspelldelete | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspelldelete | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspelldelete | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspelldelete | 
+screen | equipmentspelldeleted | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspelldeleted | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspelldeleted | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspelldeleted | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspelldeleted | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspelldeleted | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspelldeleted | 
+screen | equipmentspellname | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellname | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellname | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellname | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellname | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellname | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellname | 
+screen | equipmentspellrenamed | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellrenamed | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellrenamed | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellrenamed | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellrenamed | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellrenamed | SPELLSG.64 2a80 9e20424df257afe1
+screen | equipmentspellrenamed | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellrenamed | 
+screen | equipmentspellexit | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentspellexit | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentspellexit | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentspellexit | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentspellexit | SPELBOOK.$$$ fa00 87e37969c071673
+screen | equipmentspellexit | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentspellexit | 
+screen | logbook | LOG.$$$ fa00 7e3f819b112a516f
+screen | logbook | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | logbook | 
+screen | logbookmore | LOG.$$$ fa00 7e3f819b112a516f
+screen | logbookmore | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | logbookmore | 
+screendel | optionsload | LOG.64
+screendel | optionsloadempty | LOG.64
+screen | optionssaved | AUTOMAP.05 20040 7b1d25cc3490e935
+screen | optionssaved | CITYDATA.05 2b2c 60b03b3f356fd1e4
+screen | optionssaved | LOG.05 801 560dadd0d3e0ffa9
+screen | optionssaved | NAMES.DAT 1e0 135b60819fc85484
+screen | optionssaved | SAVEENGN.05 463f 73c11e840aed9037
+screen | optionssaved | SAVEGAME.05 28ae7 64e06ae52e9df0cc
+screen | optionssaved | SPELLS.05 aa0 f7dcb810b229e795
+screen | optionssaved | SPELLSG.05 2a80 f218f906c87ea04d
+screen | optionssaved | STATES.05 7080 bb75605fbb712a4b
+screen | optionssaved | WILD001.05 0 cbf29ce484222325
+screen | optionssaved | WILD002.05 0 cbf29ce484222325
+screen | optionssaved | WILD003.05 0 cbf29ce484222325
+screen | optionssaved | WILD004.05 0 cbf29ce484222325
+screendel | optionssaved | 
+screen | guild | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guild | 
+screen | tavern | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavern | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavern | 
+screen | temple | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | temple | TMP2.$$$ fa00 98e7d995733ab27
+screendel | temple | 
+screen | store | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | store | TMP2.$$$ fa00 98e7d995733ab27
+screendel | store | 
+screen | taverndrinks | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | taverndrinks | TMP2.$$$ fa00 98e7d995733ab27
+screendel | taverndrinks | 
+screen | tavernroom | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernroom | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernroom | 
+screen | tavernrumor | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernrumor | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernrumor | 
+screen | templebless | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | templebless | TMP2.$$$ fa00 98e7d995733ab27
+screendel | templebless | 
+screen | templecure | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | templecure | TMP2.$$$ fa00 98e7d995733ab27
+screendel | templecure | 
+screen | templeheal | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | templeheal | TMP2.$$$ fa00 98e7d995733ab27
+screendel | templeheal | 
+screen | taverndrink | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | taverndrink | TMP2.$$$ fa00 98e7d995733ab27
+screendel | taverndrink | 
+screen | templedonate | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | templedonate | TMP2.$$$ fa00 98e7d995733ab27
+screendel | templedonate | 
+screen | storebuy | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storebuy | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storebuy | 
+screen | storesell | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storesell | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storesell | 
+screen | storerepair | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storerepair | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storerepair | 
+screen | storerepairitem | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storerepairitem | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storerepairitem | 
+screen | storerepairworn | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storerepairworn | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storerepairworn | 
+screen | storesteal | EQ32.64 228 e593238f39555534
+screen | storesteal | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storesteal | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storesteal | RE32.64
+screen | storestolen | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storestolen | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storestolen | 
+screen | storebuyroom | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storebuyroom | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storebuyroom | 
+screen | storeweapons | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storeweapons | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storeweapons | 
+screen | storearmor | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storearmor | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storearmor | 
+screen | storeweapon | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storeweapon | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storeweapon | 
+screen | storebuyhaggle | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storebuyhaggle | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storebuyhaggle | 
+screen | tavernroomdays | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernroomdays | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernroomdays | 
+screen | tavernroomprice | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernroomprice | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernroomprice | 
+screen | tavernroomtaken | IN56.64 6 a47c6f2f70712be5
+screen | tavernroomtaken | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernroomtaken | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernroomtaken | 
+screen | tavernrest | IN56.64 6 a47c6f2f70712be5
+screen | tavernrest | SCREENSV.$$2 fa00 f9fec89d9508156a
+screen | tavernrest | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernrest | 
+screen | tavernresthours | IN56.64 6 a47c6f2f70712be5
+screen | tavernresthours | SCREENSV.$$2 fa00 f9fec89d9508156a
+screen | tavernresthours | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernresthours | 
+screen | tavernrestneed | IN56.64 6 a47c6f2f70712be5
+screen | tavernrestneed | SCREENSV.$$2 fa00 f9fec89d9508156a
+screen | tavernrestneed | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernrestneed | 
+screen | storesellequipped | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storesellequipped | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storesellequipped | 
+screen | tavernrumorgeneral | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernrumorgeneral | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernrumorgeneral | 
+screen | tavernrumorheard | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | tavernrumorheard | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernrumorheard | 
+screen | storesellhaggle | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | storesellhaggle | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storesellhaggle | 
+screen | streetcamp | TMP2.$$$ fa00 98e7d995733ab27
+screendel | streetcamp | 
+screen | worldmap | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldmap | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldmap | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldmap | 
+screen | worldprovince | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldprovince | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldprovince | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldprovince | 
+screen | worldtrip | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldtrip | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldtrip | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldtrip | 
+screen | worldunwell | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldunwell | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldunwell | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldunwell | 
+screen | worldsearch | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldsearch | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldsearch | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldsearch | 
+screen | worldback | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldback | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldback | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldback | 
+screen | worldsearchtyped | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldsearchtyped | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldsearchtyped | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldsearchtyped | 
+screen | worldsearchlist | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldsearchlist | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldsearchlist | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldsearchlist | 
+screen | worldsearchpick | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldsearchpick | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldsearchpick | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldsearchpick | 
+screen | worldsearchgo | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldsearchgo | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldsearchgo | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldsearchgo | 
+screen | talk | TMP2.$$$ fa00 98e7d995733ab27
+screendel | talk | 
+screen | talkwho | TMP2.$$$ fa00 98e7d995733ab27
+screendel | talkwho | 
+screen | talkwhere | TMP2.$$$ fa00 98e7d995733ab27
+screendel | talkwhere | 
+screen | talkrumor | TMP2.$$$ fa00 98e7d995733ab27
+screendel | talkrumor | 
+screen | guildbuy | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildbuy | 
+screen | guildpotions | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildpotions | 
+screen | guildmagic | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildmagic | 
+screen | guildspells | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildspells | 
+screen | guildmagicroom | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildmagicroom | 
+screen | guildpotionpick | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildpotionpick | 
+screen | guildspellpick | MENU.$$$ fa00 e370ddfa8c271d84
+screen | guildspellpick | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guildspellpick | 
+screen | guilddetect | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | guilddetect | 
+screen | automap | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screendel | automap | 
+screen | levelupstats | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | levelupstats | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | levelupstats | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | levelupstats | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | levelupstats | 
+screen | palacewelcome | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palacewelcome | 
+screen | tavernwelcome | TMP2.$$$ fa00 98e7d995733ab27
+screendel | tavernwelcome | 
+screen | templewelcome | TMP2.$$$ fa00 98e7d995733ab27
+screendel | templewelcome | 
+screen | storewelcome | TMP2.$$$ fa00 98e7d995733ab27
+screendel | storewelcome | 
+screen | guildwelcome | TMP2.$$$ fa00 98e7d995733ab27
+screendel | guildwelcome | 
+screen | holiday | TMP2.$$$ fa00 98e7d995733ab27
+screendel | holiday | 
+screen | questmessage | TMP2.$$$ fa00 98e7d995733ab27
+screendel | questmessage | 
+screen | palace | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palace | 
+screen | palaceno | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palaceno | 
+screen | palaceyes | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palaceyes | 
+screen | palaceaccept | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palaceaccept | 
+screen | palacedecline | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palacedecline | 
+screen | palacenone | TMP2.$$$ fa00 98e7d995733ab27
+screendel | palacenone | 
+screen | looktavern | AUTOMAP.64 20040 e432850c6dfcf92
+screen | looktavern | TMP2.$$$ fa00 98e7d995733ab27
+screendel | looktavern | 
