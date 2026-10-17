@@ -157,3 +157,176 @@ fn the_message_box_shown_and_put_away_as_the_original() {
     }
     assert!(n >= 6, "{n} cases");
 }
+
+fn unhex(s: &str) -> Vec<u8> {
+    if s == "-" {
+        return Vec::new();
+    }
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+}
+
+/// The started game as the generator's later cases have it: the tiles
+/// and font the message box's, the cursor where the harness's mouse is.
+fn case_start(base: &Machine, mouse: (u16, u16)) -> Machine {
+    let mut m = base.clone();
+    let v = m.mem.r16(DS, 0x1036);
+    m.mem.w16(DS, 0xB038, v);
+    let v = m.mem.r16(DS, 0x102C);
+    m.mem.w16(DS, 0xB036, v);
+    m.mem.w16(DS, 0x8F92, mouse.0);
+    m.mem.w16(DS, 0x8F94, mouse.1);
+    m
+}
+
+/// The cursor the menu's wait draws (0000:5454) and takes away: its place,
+/// size and 8F2A's return, the screen under it at EDB0h and its picture at
+/// EBB0h (the generator's CURSOR): the front end's.
+fn cursor(i: usize) -> bool {
+    (0x8F7C..0x8F80).contains(&i) || (0x8F8C..0x8F92).contains(&i) || (0xEBB0..0xECB0).contains(&i) || (0xEDB0..0xEEB0).contains(&i)
+}
+
+/// A `state_line`'s four fields (`f`) against what the port changed since
+/// `d0`: the DGROUP bytes changed (the mouse's words left out, and those
+/// `leave` says), their digest, the heap's blocks, the EMS banks.
+fn check_state(name: &str, d0: &[u8], m: &Machine, f: &[&str]) {
+    check_state_leaving(name, d0, m, f, |_| false)
+}
+
+fn check_state_leaving(name: &str, d0: &[u8], m: &Machine, f: &[&str], leave: fn(usize) -> bool) {
+    let left = |i: usize| MOUSE.contains(&i) || leave(i);
+    let d1 = m.mem.segment(DS);
+    let mut want = vec![false; 0x10000];
+    for run in f[0].split_whitespace() {
+        let (s, k) = run.split_once('+').unwrap();
+        let (s, k) = (usize::from_str_radix(s, 16).unwrap(), usize::from_str_radix(k, 16).unwrap());
+        want[s..s + k].iter_mut().for_each(|x| *x = true);
+    }
+    let extra: Vec<String> = (0..0x10000).filter(|&i| d0[i] != d1[i] && !want[i] && !left(i)).map(|i| format!("{i:04x}")).collect();
+    let missing: Vec<String> = (0..0x10000).filter(|&i| want[i] && d0[i] == d1[i] && !left(i)).map(|i| format!("{i:04x}")).collect();
+    assert!(extra.is_empty() && missing.is_empty(), "{name}: changed here only {extra:?}; there only {missing:?}");
+    let digest = fnv((0..0x10000).filter(|&i| want[i] && !left(i)).map(|i| d1[i]));
+    assert_eq!(format!("{digest:x}"), f[1], "{name}: DGROUP's changed bytes");
+    assert_eq!(heap_line(m), f[2], "{name}: the heap after");
+    assert_eq!(format!("{:x}", fnv((0..0x20).flat_map(|b| m.ems_bank(b)))), f[3], "{name}: the EMS banks after");
+}
+
+#[test]
+fn the_prompts_boxes_as_the_original() {
+    let Some(base) = set_up() else { return };
+    let pattern: Vec<u8> = (0..64000u32).map(|i| (i * 7 + 3) as u8).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("prompt |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let r: Vec<u16> = f[2].split(' ').map(hex).collect();
+        let mut m = case_start(&base, (0xA0, 0x64));
+        for (i, &b) in unhex(f[3]).iter().chain(std::iter::once(&0)).enumerate() {
+            m.mem.w8(DS, 0x1044 + i as u16, b);
+        }
+        for i in 0..8 {
+            m.mem.w8(DS, 0x1144 + i, 0xFF);
+        }
+        let d0 = m.mem.segment(DS).to_vec();
+        m.prompt_shown((DS, 0x1044), (r[0], r[1]), (DS, 0x1144), r[2], Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
+        m.prompt_closed();
+        check_state(name, &d0, &m, &f[4..]);
+        n += 1;
+    }
+    assert!(n >= 5, "{n} cases");
+    n = 0;
+    for l in text.lines().filter(|l| l.starts_with("named |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let r: Vec<&str> = f[2].split(' ').collect();
+        let mut m = case_start(&base, (0xA0, 0x64));
+        let si = if r[2].contains("other") { 0x1300 } else { 0x1044 };
+        for (i, &b) in unhex(f[3]).iter().chain(std::iter::once(&0)).enumerate() {
+            m.mem.w8(DS, si + i as u16, b);
+        }
+        let v = (m.mem.r16(DS, 0x05CA) & !2) | if r[2].contains("nodissolve") { 2 } else { 0 };
+        m.mem.w16(DS, 0x05CA, v);
+        let d0 = m.mem.segment(DS).to_vec();
+        m.named_shown((DS, si), hex(f[4]), Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
+        m.named_closed();
+        check_state(name, &d0, &m, &f[5..]);
+        n += 1;
+    }
+    assert!(n >= 6, "{n} cases");
+}
+
+#[test]
+fn the_status_box_as_the_original() {
+    let Some(base) = set_up() else { return };
+    let pattern: Vec<u8> = (0..64000u32).map(|i| (i * 7 + 3) as u8).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("status |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let mut m = case_start(&base, (0xA0, 0x64));
+        for w in f[2].split(' ').filter(|w| *w != "-") {
+            let (off, data) = w.split_once(':').unwrap();
+            for (i, &b) in unhex(data).iter().enumerate() {
+                m.mem.w8(DS, hex(off) + i as u16, b);
+            }
+        }
+        let d0 = m.mem.segment(DS).to_vec();
+        m.status_box();
+        m.status_shown(hex(f[3]), Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
+        check_state(name, &d0, &m, &f[4..]);
+        n += 1;
+    }
+    assert!(n >= 2, "{n} cases");
+}
+
+#[test]
+fn the_menus_boxes_as_the_original() {
+    let Some(base) = set_up() else { return };
+    let pattern: Vec<u8> = (0..64000u32).map(|i| (i * 7 + 3) as u8).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("menu |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let r: Vec<&str> = f[2].split(' ').collect();
+        let mut m = case_start(&base, (hex(r[0]), hex(r[1])));
+        for (i, &b) in unhex(f[3]).iter().chain(std::iter::once(&0)).enumerate() {
+            m.mem.w8(DS, 0x1044 + i as u16, b);
+        }
+        let mut at = 0x1100u16;
+        let mut table = Vec::new();
+        for e in f[4].split(',') {
+            table.push(at);
+            for &b in unhex(e).iter().chain(std::iter::once(&0)) {
+                m.mem.w8(DS, at, b);
+                at += 1;
+            }
+        }
+        table.push(0);
+        for (i, &t) in table.iter().enumerate() {
+            m.mem.w16(DS, 0x1180 + 2 * i as u16, t);
+        }
+        for (i, &b) in unhex(f[5]).iter().chain(std::iter::once(&0)).enumerate() {
+            m.mem.w8(DS, 0x1170 + i as u16, b);
+        }
+        let v = (m.mem.r16(DS, 0x05CA) & !2) | if r[2].contains("nodissolve") { 2 } else { 0 };
+        m.mem.w16(DS, 0x05CA, v);
+        let d0 = m.mem.segment(DS).to_vec();
+        let boxes = m.menu_boxes(0x1044, 0x1180, Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
+        assert_eq!(boxes.is_none(), f[6] == "-", "{name}: shown");
+        // A key picked: the key interrupt's make and break, as the harness
+        // presses it at the menu's wait.
+        if let Some(keys) = f[6].strip_prefix("keys ") {
+            for k in keys.split(',') {
+                let k = hex(k) as u8;
+                m.key_event(k).unwrap();
+                m.key_event(k | 0x80).unwrap();
+            }
+        }
+        m.menu_closed(boxes.as_ref());
+        check_state_leaving(name, &d0, &m, &f[8..], cursor);
+        n += 1;
+    }
+    assert!(n >= 10, "{n} cases");
+}

@@ -185,9 +185,7 @@ class ScreenArena(DosArena):
             if ah == 0x3C:
                 self.written[name] = bytearray()
                 self.deleted.discard(name)
-            h = 5
-            while h in self.handles:
-                h += 1
+            h = self.new_handle(name)
             self.handles[h] = [self.written[name], 0]
             self._wreg('ax', h)
             self._set_cf(False)

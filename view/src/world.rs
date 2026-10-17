@@ -126,6 +126,15 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     heap(&mut m);
     fonts_load(&mut m, dir);
+    // The boxes' tiles as the program's start registers them (0000:756C:
+    // BRASS, BRASS2 at 1034, 103E, MARBLE, MARBLE2 at 1036, 103A), MARBLE2
+    // in use (B038): the message boxes and menus are laid out on them.
+    for (name, w, at) in [(0x3AC0u16, 8u16, 0x1034u16), (0x3ACA, 8, 0x103E), (0x3AD5, 3, 0x1036), (0x3AF6, 3, 0x103A)] {
+        let slot = m.resource_add(&mut files, name, w, w).expect("the boxes' tiles");
+        m.mem.w16(DS, at, slot);
+    }
+    let tiles = m.mem.r16(DS, 0x103A);
+    m.mem.w16(DS, 0xB038, tiles);
     // The sound driver's buffer (EB89), FFDCh bytes from the heap as the
     // program's start allocates them (2294:CEDB): the level's sound files
     // are read through it on their way to EMS (23BA:0217, `sound_load`).

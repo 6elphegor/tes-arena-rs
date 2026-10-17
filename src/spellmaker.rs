@@ -1435,7 +1435,7 @@ impl Machine {
     /// 0000:756C: a resource registered (91BE: the first free of 6-byte
     /// slots, AX and BX kept, its file loaded on the heap, 742C with DI
     /// FFFFh); returns its slot's offset (0 with the table full).
-    pub(crate) fn resource_add(&mut self, files: &mut Files, si: u16, ax: u16, bx: u16) -> Option<u16> {
+    pub fn resource_add(&mut self, files: &mut Files, si: u16, ax: u16, bx: u16) -> Option<u16> {
         if self.sg16(RESOURCES) == 8 {
             return Some(0);
         }
