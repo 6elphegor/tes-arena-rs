@@ -1511,7 +1511,7 @@ impl Machine {
 
     /// 0000:7024. `v` in decimal at DS:`di` (no NUL), its digits made
     /// backwards from DGROUP A933 down first (they stay there).
-    fn store_utoa(&mut self, v: u16, di: u16) {
+    pub(crate) fn store_utoa(&mut self, v: u16, di: u16) {
         let mut at = 0xA933u16;
         let mut v = v;
         loop {

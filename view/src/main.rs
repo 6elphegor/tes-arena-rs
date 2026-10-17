@@ -186,18 +186,17 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+thread_local! {
+    /// The load bank as the town's welcome left it (`town_welcome`).
+    static WELCOME_KEPT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+}
+
 /// The front end's hooks. With the sprites (`sheet`, animations at
 /// `tick`) the drawing makes the hit test for a click left for the actors
 /// (`clicked`); with the light state the stairs make the light table
 /// again; with `talk` the game's questions are answered and its boxes
 /// kept (`dialog`), else its menus are left and its texts printed.
-#[cfg(test)]
-thread_local! {
-    /// The load bank [1030] as the town's welcome left it (`town_welcome`),
-    /// for worldtest's check of what it keeps.
-    static WELCOME_KEPT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
-}
-
 #[derive(Default)]
 struct Front<'a> {
     sheet: Option<&'a world::SpriteSheet>,
@@ -480,11 +479,11 @@ impl arena::frame::FrameHooks for Front<'_> {
             if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
                 let frame = m.mem.r16(arena::mem::DS, 0x9030);
                 m.box_background(frame, 0, rect, self.shown);
-                // The bank as the welcome leaves it, before the frame's
-                // interface set-up (4DD6, which the welcome's D39 bit 80h
-                // brings) loads STATUS.CIF over it.
+                // What it kept, as the box's wait for a key has it (the
+                // frame's interface set-up after loads the condition's
+                // picture over it, 4DD6 with D39 bit 80h).
                 #[cfg(test)]
-                WELCOME_KEPT.with(|k| *k.borrow_mut() = Some(m.ems_bank(m.mem.r16(arena::mem::DS, 0x1030))));
+                WELCOME_KEPT.with(|k| *k.borrow_mut() = Some(m.mem.segment(frame).to_vec()));
             }
             self.message_box(m, 0x1044);
         }

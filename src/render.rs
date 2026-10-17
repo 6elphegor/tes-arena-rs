@@ -70,6 +70,19 @@ fn abs16(v: u16) -> u16 {
 }
 
 /// 16-bit `imul` then `idiv`: (a * b) / c, the quotient's low word.
+/// 0000:93BC (`Soft::rot`) on the machine's sine and cosine tables.
+fn rot(m: &Machine, di: u16, ax: u16, cx: u16) -> (u16, u16) {
+    let di = di.wrapping_add(di);
+    let (ax, cx) = (ax.wrapping_add(ax), cx.wrapping_add(cx));
+    let c = s(m.mem.r16(DS, 0xB13Cu16.wrapping_add(di)));
+    let sn = m.mem.r16(DS, 0xB03Cu16.wrapping_add(di));
+    let nsin = if sn == 0x8000 { 0x7FFF } else { s(sn.wrapping_neg()) };
+    let hi = |p: i32| (p >> 16) as u16;
+    let x = hi(s(ax) * c).wrapping_add(hi(s(cx) * nsin));
+    let y = hi(s(ax) * s(sn)).wrapping_add(hi(s(cx) * c));
+    (x, y)
+}
+
 fn muldiv(a: u16, b: u16, c: u16) -> u16 {
     let c = s(c);
     if c == 0 {
@@ -840,15 +853,7 @@ impl Soft {
     /// words of the doubled values' products with the sine (B03C) and
     /// cosine (B13C), -sin taken as 7FFFh for 8000h.
     fn rot(&self, di: u16, ax: u16, cx: u16) -> (u16, u16) {
-        let di = di.wrapping_add(di);
-        let (ax, cx) = (ax.wrapping_add(ax), cx.wrapping_add(cx));
-        let c = s(self.g16(0xB13Cu16.wrapping_add(di)));
-        let sn = self.g16(0xB03Cu16.wrapping_add(di));
-        let nsin = if sn == 0x8000 { 0x7FFF } else { s(sn.wrapping_neg()) };
-        let hi = |p: i32| (p >> 16) as u16;
-        let x = hi(s(ax) * c).wrapping_add(hi(s(cx) * nsin));
-        let y = hi(s(ax) * s(sn)).wrapping_add(hi(s(cx) * c));
-        (x, y)
+        rot(&self.m, di, ax, cx)
     }
 
     /// 0000:E032: (`ax`, `bx`) at depth `cx` onto the screen: each times
@@ -3707,58 +3712,72 @@ impl Soft {
         self.row_tables();
     }
 
+    /// 0000:DA8E in the copy (`Machine::row_tables`).
+    fn row_tables(&mut self) {
+        self.m.row_tables();
+    }
+}
+
+impl Machine {
     /// 0000:DA8E: the floor's row table at CD82 (each row below the
     /// horizon: the row's two ends on the floor, turned by the heading),
-    /// then DB78 the ceiling's at CD7E.
-    fn row_tables(&mut self) {
-        if self.g16(0xC398) & 0x4000 != 0 {
+    /// then DB78 the ceiling's at CD7E. Each keeps its distance's
+    /// product at A836, A838 (DAC3, DBCA).
+    pub fn row_tables(&mut self) {
+        let g = |m: &Machine, o: u16| m.mem.r16(DS, o);
+        if g(self, 0xC398) & 0x4000 != 0 {
             return;
         }
-        let mut h = self.g16(0xC3D2);
-        if self.g16(0xC398) & 0x40 != 0 {
+        let mut h = g(self, 0xC3D2);
+        if g(self, 0xC398) & 0x40 != 0 {
             h = h.wrapping_add(0x64);
         }
         if (h as i16) <= 0 {
             return;
         }
-        let bp = self.g16(0xC3A2).wrapping_sub(self.g16(0xC3D8)).wrapping_add(2);
-        let num = h as u32 * self.g16(0xCCF6) as u32;
-        self.row_table(self.g16(0xCD82), self.g16(0xCD84), num, bp);
+        let bp = g(self, 0xC3A2).wrapping_sub(g(self, 0xC3D8)).wrapping_add(2);
+        let num = h as u32 * g(self, 0xCCF6) as u32;
+        self.mem.w16(DS, 0xA836, num as u16);
+        self.mem.w16(DS, 0xA838, (num >> 16) as u16);
+        self.row_table(g(self, 0xCD82), g(self, 0xCD84), num, bp);
         // DB78.
-        if self.g16(0xC39A) & 8 != 0 {
+        if g(self, 0xC39A) & 8 != 0 {
             return;
         }
-        let (fo, fs, co, cs) = (self.g16(0xCD82), self.g16(0xCD84), self.g16(0xCD7E), self.g16(0xCD80));
-        if self.g16(0xC3D2) == self.g16(0xD80C) >> 1 {
+        let (fo, fs, co, cs) = (g(self, 0xCD82), g(self, 0xCD84), g(self, 0xCD7E), g(self, 0xCD80));
+        if g(self, 0xC3D2) == g(self, 0xD80C) >> 1 {
             for i in 0..0x320u16 {
-                let b = self.m.mem.r8(fs, fo.wrapping_add(i));
-                self.m.mem.w8(cs, co.wrapping_add(i), b);
+                let b = self.mem.r8(fs, fo.wrapping_add(i));
+                self.mem.w8(cs, co.wrapping_add(i), b);
             }
             return;
         }
-        let mut bp = self.g16(0xC3A2).wrapping_sub(self.g16(0xC3D8)).wrapping_add(3);
+        let mut bp = g(self, 0xC3A2).wrapping_sub(g(self, 0xC3D8)).wrapping_add(3);
         if bp > 0x64 {
             bp = 0x66;
         }
-        let num = (self.g16(0xD80C).wrapping_sub(self.g16(0xC3D2)) as u32 * self.g16(0xCCF6) as u32) & 0xFFFF;
-        self.row_table(co, cs, num, bp);
+        let num = g(self, 0xD80C).wrapping_sub(g(self, 0xC3D2)) as u32 * g(self, 0xCCF6) as u32;
+        self.mem.w16(DS, 0xA836, num as u16);
+        self.mem.w16(DS, 0xA838, (num >> 16) as u16);
+        // The divisions after take its low word alone.
+        self.row_table(co, cs, num & 0xFFFF, bp);
     }
 
     /// DACA..DB3C: rows 2.. `bp` - 1 of a row table at `seg`:`si`, the
     /// distance `num` over the row.
     fn row_table(&mut self, mut si: u16, seg: u16, num: u32, bp: u16) {
         let mut cx = 2u16;
-        let turn = self.g16(0xC3DA).wrapping_neg().wrapping_add(0x1FF);
+        let turn = self.mem.r16(DS, 0xC3DA).wrapping_neg().wrapping_add(0x1FF);
         while cx != bp {
             let d = (num / cx as u32) as u16;
-            let x = muldiv(d, self.g16(LEFT).wrapping_sub(self.g16(0xC3D6)), self.g16(0xCCF4));
-            let (a0, c0) = self.rot(turn, x, d);
-            let (a1, c1) = self.rot(turn, x.wrapping_neg(), d);
+            let x = muldiv(d, self.mem.r16(DS, LEFT).wrapping_sub(self.mem.r16(DS, 0xC3D6)), self.mem.r16(DS, 0xCCF4));
+            let (a0, c0) = rot(self, turn, x, d);
+            let (a1, c1) = rot(self, turn, x.wrapping_neg(), d);
             let sar = |v: u16| ((v as i16) >> 1) as u16;
-            self.m.mem.w16(seg, si, sar(a0));
-            self.m.mem.w16(seg, si.wrapping_add(2), sar(c0));
-            self.m.mem.w16(seg, si.wrapping_add(4), sar(a1));
-            self.m.mem.w16(seg, si.wrapping_add(6), sar(c1));
+            self.mem.w16(seg, si, sar(a0));
+            self.mem.w16(seg, si.wrapping_add(2), sar(c0));
+            self.mem.w16(seg, si.wrapping_add(4), sar(a1));
+            self.mem.w16(seg, si.wrapping_add(6), sar(c1));
             si = si.wrapping_add(8);
             cx = cx.wrapping_add(1);
         }
