@@ -52,6 +52,10 @@ harness's form, its image's segments 1000h higher: worldtest's
 
   loadstate | <digest>
 
+and the EMS banks 0..1Fh as it leaves them (64K each, end to end):
+
+  loadems | <digest>
+
 What the case's frames changed in DGROUP, from the case's start (its
 set-up done) to its end (the offsets tests/vectors/stateexclude.txt
 names left out: the harness's ways, the heaps' layouts): the offsets as
@@ -462,6 +466,7 @@ def main():
     a.start()
     base = a.snapshot()
     loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+    loaded_ems = b''.join(a.ems_bank(b) for b in range(0x20))
     if dump:
         # The state as the load leaves it (the state comparison's start,
         # worldtest's `state_measured`, before the places' entries).
@@ -477,6 +482,7 @@ def main():
     skip_base = excluded('loadexclude.txt')
     if not only:
         out.write(f'loadstate | {fnv(bytes(0 if i in skip_base else b for i, b in enumerate(loaded))):x}\n')
+        out.write(f'loadems | {fnv(loaded_ems):x}\n')
     skip = excluded()
     skip_load = skip | excluded('stateloadexclude.txt') | excluded('loadexclude.txt')
     for name, (where, setup, steps) in CASES.items():

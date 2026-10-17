@@ -91,7 +91,8 @@ impl AreaHooks for Areas<'_> {
         m.mem.w16(DS, 0xBA56, seg);
     }
 
-    /// 0000:468B: indoors, the level entered (`Machine::area_entered_inside`:
+    /// 0000:468B: the interface set up (`Machine::interface_setup`); indoors,
+    /// the level entered (`Machine::area_entered_inside`:
     /// its lights, a main quest dungeon's locks and triggers (STATES.nn),
     /// the main quest's piece and a side quest's item or person placed,
     /// its piles of treasure, the palace's automap kept and loaded again,
@@ -100,6 +101,14 @@ impl AreaHooks for Areas<'_> {
     /// 0000:46B2).
     fn entered(&mut self, m: &mut Machine) {
         m.entered_flats();
+        // 0000:46A2: the interface set up where it changed (4DD6), its
+        // files read here, before what follows the entry.
+        if let Some(files) = self.files.as_deref_mut() {
+            if m.interface_setup(files, &mut arena::frame::NoFrameHooks).is_none() {
+                eprintln!("the interface's set-up gave up (0000:4DD6): {}", arena::giveup::describe());
+                self.failed = true;
+            }
+        }
         if m.mem.r16(DS, 0xC398) & 4 == 0 {
             let Some(files) = self.files.as_deref_mut() else {
                 m.flat_lights();
