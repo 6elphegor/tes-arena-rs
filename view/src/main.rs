@@ -1460,6 +1460,12 @@ fn main() {
         world::summon_people(&mut engine);
     }
     if let Some((seed, frames, setup)) = playtest {
+        // The 3D view drawn as the window's is: the renderer's walk picks
+        // the creature flats play acts on (`creature_flats`), so a
+        // playtest without the page would play another game.
+        if !GPU_WORLD.load(std::sync::atomic::Ordering::Relaxed) {
+            engine.page = Some(vec![0; 64000]);
+        }
         playtest::run(&dir, engine, run, seed, frames, &setup, save_dir.as_deref().map(|d| (d, slot)));
         return;
     }

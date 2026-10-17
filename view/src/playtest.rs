@@ -145,6 +145,11 @@ impl Watch {
                 return Some(format!("DGROUP {at:04X} overwritten: {:?}", String::from_utf8_lossy(m.mem.cstr(DS, at))));
             }
         }
+        // The renderer reached no path it doesn't port (the window would
+        // fall back to its own world).
+        if !engine.page_gaps.is_empty() {
+            return Some(format!("the renderer's page fell back: not ported {:?}", engine.page_gaps));
+        }
         if !m.heap_check() {
             return Some("the heap's chain broken (heap_check)".into());
         }
@@ -805,11 +810,20 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     if let crate::saveui::Ended::Open = e {
                         e = ui.click(160, row(slot), false);
                     }
+                    // The name typed into the game's editor as the window
+                    // types it: each key's scan code pressed and let go,
+                    // then Enter.
                     if let crate::saveui::Ended::Open = e {
-                        for c in format!("pt{n}").chars() {
-                            ui.key(KeyCode::KeyA, Some(&c.to_string()));
+                        let digit = |c: char| [KeyCode::Digit0, KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9][c.to_digit(10).unwrap() as usize];
+                        let codes: Vec<KeyCode> = [KeyCode::KeyP, KeyCode::KeyT].into_iter().chain(n.to_string().chars().map(digit)).chain([KeyCode::Enter]).collect();
+                        for code in codes {
+                            let Some(scan) = crate::interface::scan_code(code) else { continue };
+                            for down in [true, false] {
+                                if ui.typing.is_some() {
+                                    e = ui.field_key(scan, down);
+                                }
+                            }
                         }
-                        e = ui.key(KeyCode::Enter, None);
                     }
                     match e {
                         crate::saveui::Ended::Save(e2, s) => {
