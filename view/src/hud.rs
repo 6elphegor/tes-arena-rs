@@ -727,30 +727,6 @@ pub struct Menu {
     pub font: Option<GameFont>,
 }
 
-/// What drawing `text` through 0000:98xx (the boxes', the menus' lines)
-/// leaves in the game's state: each `\t` and the byte after it the
-/// colour (9288, 996C), each `0Ch` and a number n the font of the table
-/// at 91AC's n-th word (B036, 9987).
-pub fn text_codes(m: &mut arena::machine::Machine, text: &[u8]) {
-    use arena::mem::DS;
-    let mut i = 0;
-    while i + 1 < text.len() {
-        match text[i] {
-            9 => {
-                m.mem.w8(DS, 0x9288, text[i + 1]);
-                i += 2;
-            }
-            0x0C => {
-                let n = text[i + 1].wrapping_sub(1) as u16;
-                let f = m.mem.r16(DS, 0x91AC_u16.wrapping_add(n.wrapping_mul(2)));
-                m.mem.w16(DS, 0xB036, f);
-                i += 2;
-            }
-            _ => i += 1,
-        }
-    }
-}
-
 /// A list 1194:5734 asks (its kind `Machine::list_kind`): its title and
 /// lines kept in the font selected as it is asked (B036), which 3159:06A0
 /// draws them in.

@@ -134,6 +134,8 @@ const QUESTION_ENTRIES: u16 = 0x4B63;
 /// ([102C], the map's) and the map's colour EEh (26F7:0091's [9288],
 /// over the 60h 2542:03CF set before it).
 const SEARCH_LOOK: crate::field::Look = crate::field::Look { font: "ARENAFNT.DAT", colour: 0xEE, put_font: true };
+/// The search's prompt (26F7:0ACF's SI).
+const SEARCH_PROMPT: u16 = 0x6AD1;
 
 pub struct Travel {
     start: MapStart,
@@ -268,11 +270,20 @@ impl MapHooks for Hooks<'_> {
     fn quest_dungeon(&mut self, _m: &mut Machine, ax: u16) {
         self.quest = Some(ax);
     }
-    /// The name's typing given to the game's editor (`field::replay`).
+    /// 26F7:0AD5's 5C30: the prompt (6AD1) in its box as the game's state
+    /// has it round the field (`Machine::named_shown`, `named_closed`;
+    /// BX, an offset on the original's stack, 0: the field writes it
+    /// over), the name's typing given to the game's editor
+    /// (`field::replay`).
     fn type_name(&mut self, m: &mut Machine) {
+        if m.named_shown((DS, SEARCH_PROMPT), 0, None).is_none() {
+            eprintln!("the search's box gave up: {}", arena::giveup::describe());
+            return;
+        }
         if crate::field::replay(m, &arena::lineedit::fields::search(), &SEARCH_LOOK, &self.typed) != Some(true) {
             eprintln!("the search's name gave up: {}", arena::giveup::describe());
         }
+        m.named_closed();
     }
     fn list(&mut self, m: &mut Machine, si: u16, cx: u16) -> u16 {
         let mut at = si;

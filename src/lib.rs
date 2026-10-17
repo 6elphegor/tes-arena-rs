@@ -45,6 +45,7 @@ pub mod look;
 pub mod loot;
 pub mod loot_window;
 pub mod machine;
+pub mod menubox;
 pub mod menukeys;
 pub mod mapscreen;
 pub mod mem;
