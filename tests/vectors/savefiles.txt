@@ -1,0 +1,85 @@
+playdel | saveguild | 
+save | saveguild | AUTOMAP.05 20040 7b1d25cc3490e935
+save | saveguild | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | saveguild | LOG.05 801 560dadd0d3e0ffa9
+save | saveguild | NAMES.DAT 1e0 135b60819fc85484
+save | saveguild | SAVEENGN.05 463f 73c11e840aed9037
+save | saveguild | SAVEGAME.05 28ae7 ac58cdff38db6bd9
+save | saveguild | SPELLS.05 aa0 f7dcb810b229e795
+save | saveguild | SPELLSG.05 2a80 f218f906c87ea04d
+save | saveguild | STATES.05 7080 bb75605fbb712a4b
+save | saveguild | WILD001.05 0 cbf29ce484222325
+save | saveguild | WILD002.05 0 cbf29ce484222325
+save | saveguild | WILD003.05 0 cbf29ce484222325
+save | saveguild | WILD004.05 0 cbf29ce484222325
+savedel | saveguild | 
+play | savestreet | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savestreet | 
+save | savestreet | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savestreet | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savestreet | LOG.05 801 560dadd0d3e0ffa9
+save | savestreet | NAMES.DAT 1e0 fe92d7ddafe72a4b
+save | savestreet | SAVEENGN.05 463f e7ba1f7529e483cb
+save | savestreet | SAVEGAME.05 28ae7 8c3274a850339a90
+save | savestreet | SPELLS.05 aa0 f7dcb810b229e795
+save | savestreet | SPELLSG.05 2a80 f218f906c87ea04d
+save | savestreet | STATES.05 7080 bb75605fbb712a4b
+save | savestreet | WILD001.05 0 cbf29ce484222325
+save | savestreet | WILD002.05 0 cbf29ce484222325
+save | savestreet | WILD003.05 0 cbf29ce484222325
+save | savestreet | WILD004.05 0 cbf29ce484222325
+savedel | savestreet | 
+play | savewild | TMP2.$$$ fa00 9ddbfae4c25ae77f
+play | savewild | WILD001.RMD 183e 1914c477a5ae59e8
+play | savewild | WILD002.RMD 1a56 7c67972d0f120f7c
+play | savewild | WILD003.RMD 1558 d10265bdb9423ea9
+play | savewild | WILD004.RMD 1046 3119a9ed52265f8d
+playdel | savewild | 
+save | savewild | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savewild | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savewild | LOG.05 801 560dadd0d3e0ffa9
+save | savewild | NAMES.DAT 1e0 135b60819fc85484
+save | savewild | SAVEENGN.05 463f 82913e6e6d7c401f
+save | savewild | SAVEGAME.05 28ae7 fa81b7f1ba3aa407
+save | savewild | SPELLS.05 aa0 f7dcb810b229e795
+save | savewild | SPELLSG.05 2a80 f218f906c87ea04d
+save | savewild | STATES.05 7080 bb75605fbb712a4b
+save | savewild | WILD001.05 183e 1914c477a5ae59e8
+save | savewild | WILD002.05 1a56 7c67972d0f120f7c
+save | savewild | WILD003.05 1558 d10265bdb9423ea9
+save | savewild | WILD004.05 1046 3119a9ed52265f8d
+savedel | savewild | 
+play | savedungeon | AUTOMAP.64 20040 217fd87bed8f0e3d
+play | savedungeon | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savedungeon | 
+save | savedungeon | AUTOMAP.05 20040 f740491216b9ffa
+save | savedungeon | AUTOMAP.64 20040 f740491216b9ffa
+save | savedungeon | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savedungeon | LOG.05 801 560dadd0d3e0ffa9
+save | savedungeon | NAMES.DAT 1e0 135b60819fc85484
+save | savedungeon | SAVEENGN.05 463f 34c6d84c7b3fa060
+save | savedungeon | SAVEGAME.05 28ae7 28b09ca46ab2b45b
+save | savedungeon | SPELLS.05 aa0 f7dcb810b229e795
+save | savedungeon | SPELLSG.05 2a80 f218f906c87ea04d
+save | savedungeon | STATES.05 7080 bb75605fbb712a4b
+save | savedungeon | WILD001.05 0 cbf29ce484222325
+save | savedungeon | WILD002.05 0 cbf29ce484222325
+save | savedungeon | WILD003.05 0 cbf29ce484222325
+save | savedungeon | WILD004.05 0 cbf29ce484222325
+savedel | savedungeon | 
+play | savecrypt | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savecrypt | 
+save | savecrypt | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savecrypt | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savecrypt | LOG.05 801 560dadd0d3e0ffa9
+save | savecrypt | NAMES.DAT 1e0 135b60819fc85484
+save | savecrypt | SAVEENGN.05 463f 1cb4c9c7a93af9a2
+save | savecrypt | SAVEGAME.05 28ae7 32bbfebfc3ee934
+save | savecrypt | SPELLS.05 aa0 f7dcb810b229e795
+save | savecrypt | SPELLSG.05 2a80 f218f906c87ea04d
+save | savecrypt | STATES.05 7080 bb75605fbb712a4b
+save | savecrypt | WILD001.05 0 cbf29ce484222325
+save | savecrypt | WILD002.05 0 cbf29ce484222325
+save | savecrypt | WILD003.05 0 cbf29ce484222325
+save | savecrypt | WILD004.05 0 cbf29ce484222325
+savedel | savecrypt | 

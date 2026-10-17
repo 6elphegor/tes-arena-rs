@@ -16,11 +16,12 @@ A light's 0s are always left out, as the flats' calls have it.
 The case where 9546 would read the code segment through 781E's colours
 (under 8 bits, colours and a shade) isn't made.
 
-  scaler | seed | <page digest>
+  scaler | seed | <page digest> | <rows' digest>
   scaler | seed | fault
 
-The page's 64 KB after the call (digest: FNV-1a). "fault": a division
-by 0 (a size drawn of 0).
+The page's 64 KB after the call (digest: FNV-1a), and the 1000h bytes of
+DGROUP from 929E, where 78A8 compiles the row it draws by (the code is
+left there after). "fault": a division by 0 (a size drawn of 0).
 """
 import os
 import struct
@@ -123,7 +124,8 @@ def main():
                 out.write(f'scaler | {seed:x} | fault\n')
                 continue
             page = bytes(a.mu.mem_read(a.lin(PSEG, 0), 0x10000))
-            out.write(f'scaler | {seed:x} | {fnv(page):x}\n')
+            rows = bytes(a.mu.mem_read(a.lin(a.ds, 0x929E), 0x1000))
+            out.write(f'scaler | {seed:x} | {fnv(page):x} | {fnv(rows):x}\n')
 
 
 if __name__ == '__main__':
