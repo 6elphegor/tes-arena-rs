@@ -96,7 +96,7 @@ fn wanted(kind: &str, name: &str) -> Vec<String> {
         if f[0] == kind && f.len() == 3 && !(skip && scratch(f[2])) {
             out.push(l.trim_end().to_string());
         } else if f[0] == del {
-            let gone: Vec<&str> = f.get(2).map(|g| g.split(' ').filter(|n| !n.is_empty() && !(skip && scratch(n))).collect()).unwrap_or_default();
+            let gone: Vec<&str> = f.get(2).map(|g| g.split(' ').filter(|n| !(n.is_empty() || skip && scratch(n))).collect()).unwrap_or_default();
             out.push(format!("{del} | {name} | {}", gone.join(" ")).trim_end().to_string());
         }
     }
