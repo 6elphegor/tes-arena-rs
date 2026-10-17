@@ -756,12 +756,14 @@ impl crate::engine::Engine {
     /// ceiling 64h, the walking speed, standing (`enter_area`'s); the EMS
     /// banks but the level's freed, the deep floors, no changing squares,
     /// the rain's drops, no moving lights (0000:E122), on dry ground
-    /// (0000:A4ED), the buffer block (A516, `buffer_block_alloc`); the
+    /// (0000:A4ED) with the water's frames (A513, `water_frames`), the
+    /// buffer block (A516, `buffer_block_alloc`); the
     /// entry hook (C3B0: 0000:4632, `area_entry`); the
     /// level loaded unless its name starts with `#` (a city built, a
     /// dungeon made) or the hook CD5E is set, with RELOAD set (A548: the
     /// buffer block freed and taken again by each plane); the place hook (CD2A:
-    /// 0000:45B2, `area_place`); the INF loaded (0000:EC03); the entered
+    /// 0000:45B2, `area_place`); outdoors the sky's images (A55D,
+    /// `sky_images`); the INF loaded (0000:EC03); the entered
     /// hook (CD42: 0000:468B, `AreaHooks::entered`).
     ///
     /// The hooks are recognised by their value: the port loads the image
@@ -786,6 +788,9 @@ impl crate::engine::Engine {
             m.mem.w16(DS, 0xBB0C + 2 * i, 0x8000);
         }
         m.mem.w8(DS, 0xCB5B, 1);
+        // A510..A513: on dry ground, the water's frames (DFDB with BA17).
+        m.water_frames(&mut self.files, 0xBA17)?;
+        let m = &mut self.m;
         m.buffer_block_alloc()?;
         m.draw_buffers_alloc()?;
         m.light_table_make()?;
@@ -807,6 +812,9 @@ impl crate::engine::Engine {
         if m.mem.r32(DS, PLACE_HOOK) == 0x45B2 {
             m.area_place(hooks);
         }
+        // A55D: outdoors, the sky's images (0000:E5C9).
+        m.sky_images(&mut self.files)?;
+        let m = &mut self.m;
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             m.info_load(&mut self.files, info)?;

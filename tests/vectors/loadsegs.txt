@@ -1,8 +1,11 @@
 # DGROUP words holding a segment of the image that the game stores as it
 # runs (the static ones come from the image's relocations): hex offset and why.
+# Most are a far pointer's segment, shifted unless the pointer is null
+# (0:0); `alone` marks a word that holds a segment by itself, shifted
+# unless it is 0 (another writer's).
 8f72 the timer's hook's segment (21EE:028A, 21EE:0024)
 a90a the open file's name's segment (DGROUP, 0000:6B33)
-a83c 1A5C's AX kept: DGROUP, 1A5C's last return (1AF4) for each name after the first (0000:1AF9)
+a83c alone 1A5C's AX kept: DGROUP, 1A5C's last return (1AF4) for each name after the first (0000:1AF9)
 a846 the message box's text's segment (0000:9663): DGROUP for "Loading..." (25FD:0803)
 ba7c the world loop's return's segment (the far pointer at BA7A)
 c3a6 a level hook's segment (C3A4..C3BB: the frame's and the level's far hooks)

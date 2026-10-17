@@ -162,6 +162,7 @@ mod hooktest;
 #[cfg(test)]
 mod doortest;
 mod interface;
+mod light;
 mod music;
 mod newgame;
 mod panels;
@@ -179,6 +180,7 @@ mod world;
 
 use arena::controls::{ControlHooks, Intent};
 use arena::engine::{Engine, EngineHooks, Input};
+use light::{LightNow, LightState, ENTRY_LIGHT, SKY_NAMES, GameSkyLoad, sky_objects_made};
 use render::{Camera, Renderer, Scene};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -445,6 +447,21 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn interface(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.interface_setup(files, self)
     }
+    /// 0000:4B84: 0390 with the view's `LightState`, its loads made in it
+    /// (`LightNow`).
+    fn outdoor_light(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if let Some(light) = self.light.as_deref_mut() {
+            m.outdoor_light(&mut LightNow { light, files });
+        }
+    }
+    /// 0000:4C7E, 2294:0428: a new day's colours loaded.
+    fn sky_colours(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if let Some(name) = m.sky_colours() {
+            if m.sky_colours_load(files, name).is_none() {
+                eprintln!("the sky's colours did not load");
+            }
+        }
+    }
     /// 0000:5011: an effect's words counted down; drawn at 0Bh above the
     /// view's foot (C3A2) while they last.
     fn effect_words(&mut self, m: &mut arena::machine::Machine) {
@@ -463,13 +480,6 @@ impl arena::frame::FrameHooks for Front<'_> {
     /// 19h mapped.
     fn faces(&mut self, m: &mut arena::machine::Machine) {
         m.faces_draw();
-    }
-    /// 0000:4B84: the light for the time of day (`outdoor_light`), its
-    /// dither, relighting and lamps' colour kept for after the frame.
-    fn outdoor_light(&mut self, m: &mut arena::machine::Machine) {
-        if let Some(light) = self.light.as_deref_mut() {
-            m.outdoor_light(light);
-        }
     }
     /// 292B:000E: no projectile flying, their lights forgotten.
     fn projectile_lights_end(&mut self, m: &mut arena::machine::Machine) {
@@ -842,59 +852,6 @@ struct Assets {
     shown: Vec<u8>,
 }
 
-/// The view's side of the day and night switch and the fog
-/// (`LightHooks`): the row the textures are remapped through (0 as
-/// loaded), palette entry 71h (the lamps' glow; PAL.COL's until set), the
-/// light table's segment, and this frame's fog colour (filling the view
-/// for the sky).
-struct LightState {
-    dir: PathBuf,
-    dark: u32,
-    lamp: Option<[u8; 3]>,
-    table: u16,
-    fog: Option<u8>,
-    /// The sky's images loaded (`SkyLoad`).
-    sky: SkyLoad,
-    /// The dither and the day's colours the sky's steps asked for
-    /// (2294:0341, 0428), loaded into the game's memory after the frame
-    /// (`Assets::view_frame`), where the files are.
-    dither: Option<u16>,
-    colours: Option<u16>,
-    /// The relight's level (0000:027A, 02F2), its remapping of the sky's
-    /// images and the water's frames in the game's memory done after the
-    /// frame with the files (`Assets::sky_loads`).
-    relight: Option<u16>,
-    /// 0000:DFDB with BA17 asked (the day's textures as loaded, put back:
-    /// `water_frames`), done with the files after the frame.
-    restore: bool,
-}
-
-/// The sky's images loaded as 0000:7428 loads them with DI FFFDh: the
-/// file's size allocated in EMS (0000:5C26, which maps the bank), the
-/// file read there. Their names are kept, by their offset in the EMS
-/// frame, for the atlas.
-struct SkyLoad {
-    archive: Rc<archive::Archive>,
-    images: HashMap<u16, String>,
-}
-
-impl arena::skyobj::SkyHooks for SkyLoad {
-    fn load(&mut self, m: &mut arena::machine::Machine, name: u16) -> Option<(u16, u16)> {
-        let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).to_ascii_uppercase();
-        let data = self.archive.read(&file)?;
-        if data.is_empty() || data.len() > 0xFFFF {
-            return None;
-        }
-        let (off, _) = m.ems_alloc(data.len() as u16)?;
-        let frame = m.mem.r16(arena::mem::DS, 0x9030);
-        for (i, &b) in data.iter().enumerate() {
-            m.mem.w8(frame, off.wrapping_add(i as u16), b);
-        }
-        self.images.insert(off, file);
-        Some((frame, off))
-    }
-}
-
 /// The sky's objects drawn this frame (2294:0A5D's draws), as quads.
 /// `fog` is this frame's fog step's answer (`LightState::fog`), already
 /// run with the drawing's lights.
@@ -1004,75 +961,6 @@ impl arena::celestial::CelestialHooks for CelestialDraw<'_> {
     }
 }
 
-impl LightState {
-    /// The table freed and made again from the .LGT named at `name`.
-    fn table(&mut self, m: &mut arena::machine::Machine, name: u16) {
-        world::lgt(m, &self.dir, name);
-        if self.table != 0 {
-            m.heap_free(self.table);
-        }
-        self.table = world::light_table(m);
-    }
-}
-
-impl arena::light::LightHooks for LightState {
-    /// 2294:0341's dither load, for after the frame.
-    fn sky(&mut self, _m: &mut arena::machine::Machine, step: arena::sky::SkyStep) {
-        if step.dither.is_some() {
-            self.dither = step.dither;
-        }
-    }
-
-    fn light_table(&mut self, m: &mut arena::machine::Machine) {
-        self.table(m, arena::weather::NORMAL_LGT);
-    }
-
-    fn fog_light_table(&mut self, m: &mut arena::machine::Machine) {
-        self.table(m, arena::weather::FOG_LGT);
-    }
-
-    fn lgt(&mut self, m: &mut arena::machine::Machine, name: u16) {
-        world::lgt(m, &self.dir, name);
-    }
-
-    fn fog_fill(&mut self, m: &mut arena::machine::Machine) {
-        self.fog = Some(m.mem.r8(arena::mem::DS, arena::weather::var::FILL_COLOUR));
-    }
-
-    /// 0000:027A: the sky's objects made again, when there are any (their
-    /// images are then remapped with the textures: the shader's `dark`).
-    fn relight(&mut self, m: &mut arena::machine::Machine, level: u16) {
-        use arena::skyobj::var::{CLOUD_COUNT, OBJECT_COUNT};
-        if m.mem.r8(arena::mem::DS, OBJECT_COUNT) | m.mem.r8(arena::mem::DS, CLOUD_COUNT) != 0 {
-            m.mem.w8(arena::mem::DS, OBJECT_COUNT, 0);
-            m.mem.w8(arena::mem::DS, CLOUD_COUNT, 0);
-            arena::light::LightHooks::sky_objects(self, m);
-        }
-        self.dark = (level >> 8) as u32;
-        self.relight = Some(level);
-    }
-
-    fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
-        self.dark = 0;
-        self.restore = true;
-    }
-
-    /// 2294:08B9, the sky's objects made again (by day, and before
-    /// relighting by night).
-    fn sky_objects(&mut self, m: &mut arena::machine::Machine) {
-        self.sky.images.clear();
-        m.sky_objects(&mut self.sky);
-    }
-
-    /// Only entry 71h is written through here; its 6-bit colour made 8-bit.
-    fn palette(&mut self, m: &mut arena::machine::Machine, index: u8, at: u16) {
-        if index == 0x71 {
-            let c = |i: u16| m.mem.r8(arena::mem::DS, at + i) & 0x3F;
-            self.lamp = Some([0, 1, 2].map(|i| c(i) << 2 | c(i) >> 4));
-        }
-    }
-}
-
 impl Assets {
     /// The colours on the screen as the original's DAC holds them: PAL.COL
     /// but, after a frame outdoors, entries 1..8 the sky's colours for the
@@ -1098,50 +986,48 @@ impl Assets {
         prof::time("assets.new", || Self::make(dir, engine))
     }
 
-    fn make(dir: &std::path::Path, engine: &mut Engine) -> Self {
-        let flats = prof::time("assets.flats", || world::flats(&engine.m));
-        let archive = prof::time("assets.archive", || Rc::new(archive::Archive::open(dir)));
-        let sheet = prof::time("assets.sheet", || world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m)));
-        interface::enter(&mut engine.m);
-        // Outdoors, the sky's images (the sun, the moons, the lightning's
-        // bolts, the stars) into the sky's bank, as entering the area does
-        // (0000:A4E9 calls 0000:E5C9).
+    /// The area's entry's loads made by the view, where no entry made
+    /// them (`Assets::make`): outdoors the sky's images (0000:A4E9's
+    /// E5C9) and objects (464A), the water's frames (A50B), the interface
+    /// (46A2), the day's colours (06B8) and outdoors the light for the
+    /// time of day (46AF's 0390), its loads made in it.
+    fn entry_loads(dir: &std::path::Path, engine: &mut Engine) -> LightState {
         if prof::time("assets.sky_images", || engine.m.sky_images(&mut engine.files)).is_none() {
             eprintln!("the sky's images did not load");
         }
-        let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
-        prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
-        let mut light = LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None, restore: false };
-        // 0000:A50B..A513 (A4BA..A4C2 after a load): the world entered on
-        // dry ground, the water's frames read into their banks (DFDB,
-        // `water_frames`), which the frames then keep (CD00).
+        SKY_NAMES.with(|n| n.borrow_mut().clear());
+        prof::time("assets.area_sky", || engine.m.area_sky(&mut GameSkyLoad { files: &mut engine.files }));
+        let mut light = LightState::new(dir, &engine.m);
         if engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
             eprintln!("the water's frames did not load");
         }
-        // 0000:46A2: the interface set up (4DD6), its drops made again.
         let _ = engine.m.interface_setup(&mut engine.files, &mut Front::default());
-        // Entering outdoors, the day's colours (0000:06B8, 2294:0428) and
-        // the dither for the time of day (0000:46AF, 0390 -> 2294:0341)
-        // loaded before the first frame draws the sky from them.
         if let Some(name) = engine.m.sky_colours() {
             if engine.m.sky_colours_load(&mut engine.files, name).is_none() {
                 eprintln!("the sky's colours did not load");
             }
         }
         if engine.m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0 {
-            // 0000:46AF: the light for the time of day (0390, `outdoor_light`:
-            // the sky's window, day's or night's switch, the relight the
-            // first frame's `sky_loads` does).
-            engine.m.outdoor_light(&mut light);
-            if std::mem::take(&mut light.restore) && engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
-                eprintln!("the water's frames did not load");
-            }
-            if let Some(name) = light.dither.take() {
-                if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
-                    eprintln!("the sky's dither did not load");
-                }
-            }
+            engine.m.outdoor_light(&mut LightNow { light: &mut light, files: &mut engine.files });
         }
+        light
+    }
+
+    fn make(dir: &std::path::Path, engine: &mut Engine) -> Self {
+        let flats = prof::time("assets.flats", || world::flats(&engine.m));
+        let archive = prof::time("assets.archive", || Rc::new(archive::Archive::open(dir)));
+        let sheet = prof::time("assets.sheet", || world::sprite_sheet(&flats, &archive, &world::creature_names(&engine.m)));
+        interface::enter(&mut engine.m);
+        // The area's entry made its loads where the original makes them
+        // (`Areas`: the sky's images, its objects, the water's frames, the
+        // interface, the day's colours and 46AF's light) and handed its
+        // light over. Without one (a level the view starts in, the assets
+        // made again after stairs or the wilderness's blocks), they are
+        // made here.
+        let light = match ENTRY_LIGHT.with(|l| l.borrow_mut().take()) {
+            Some(light) => light,
+            None => Self::entry_loads(dir, engine),
+        };
         Assets {
             palette: world::palette(dir),
             charsheet: world::palette_file(dir, "CHARSHT.COL"),
@@ -1198,10 +1084,11 @@ impl Assets {
         prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
-    /// The sky after a frame (2294:0428, after the frame's 0000:0390 with
-    /// 2294:0341; the .COL loads here): outdoors, palette entries 1..8 from
-    /// the day's colours at the window for the time of day, the textures
-    /// darkened by night and the lamps lit.
+    /// The sky after a frame (the frame body's 0390 and 2294:0428 made the
+    /// light and the colours: `Front::outdoor_light`, `sky_colours`):
+    /// outdoors, palette entries 1..8 from the day's colours at the window
+    /// for the time of day, the textures darkened by night and the lamps
+    /// lit.
     fn sky(&mut self, m: &mut arena::machine::Machine) -> render::Sky {
         use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
         let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
@@ -1210,11 +1097,6 @@ impl Assets {
             // greys it: 2294:0C36).
             return render::Sky { lamp: self.light.lamp, ..Default::default() };
         }
-        if let Some(name) = m.sky_colours() {
-            self.light.colours = Some(name);
-        }
-        // (The frame's light for the time of day ran in the frame, at
-        // 0000:4B84: `Front::outdoor_light`.)
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
             let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();
@@ -1252,8 +1134,18 @@ impl Assets {
     /// if the player moved to another place (`lights_near`), then the
     /// near and the moving lights; outdoors the sky's hook's fog step
     /// (2294:0B01, from 0000:D513), which in fog leaves only the player's
-    /// light. None in full daylight (C398 bit 8000h).
+    /// light. None in full daylight (C398 bit 8000h). The view's own work
+    /// after the frame, where the original does none: DGROUP is left as the
+    /// frame left it (the player's light stays at the eye of the frame's
+    /// start, A2EC's, until the next frame's).
     fn lights(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
+        let kept = m.mem.segment(arena::mem::DS).to_vec();
+        let lights = self.lights_made(m);
+        m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
+        lights
+    }
+
+    fn lights_made(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
         use arena::light::var::*;
         use arena::mem::DS;
         let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
@@ -1308,6 +1200,9 @@ impl Assets {
                 eprintln!("the sky's dither did not load");
             }
         }
+        if std::mem::take(&mut self.light.objects) {
+            sky_objects_made(&mut engine.m, &mut engine.files);
+        }
         if let Some(level) = self.light.relight.take() {
             engine.m.sky_images_relight(level);
             if engine.m.water_relight(&mut engine.files, level).is_none() {
@@ -1358,8 +1253,25 @@ impl Assets {
                 bodies = cd.out;
             }
         }
-        let mut draw = SkyDraw { sheet: &self.sheet, images: &self.light.sky.images, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
-        if engine.m.sky_draw(&mut draw).is_some() {
+        let names = SKY_NAMES.with(|n| n.borrow().clone());
+        let mut draw = SkyDraw { sheet: &self.sheet, images: &names, focal, fog: self.light.fog.is_some(), out: Vec::new(), flash: None };
+        // The view's own pass too (the game's drawing ran 2294:0A5D on its
+        // copy, whose DGROUP the pass stands in for: the bolt's steps, the
+        // flash): what it writes in EMS is put back as it found it, the
+        // bank mapped before mapped back. The drawing's own writes there
+        // are the copy's (`Engine::page_ems`); left, the images' x and
+        // flags the pass sets stood over the images a relight in the frame
+        // body had just read again.
+        let (mapped, seg, frame, banks) = {
+            let m = &engine.m;
+            let seg = m.mem.r16(arena::mem::DS, arena::mif::var::BUFFER_SEG);
+            (m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED), seg, m.mem.segment(seg).to_vec(), m.ems.clone())
+        };
+        let drawn = engine.m.sky_draw(&mut draw).is_some();
+        engine.m.ems_map(mapped >> 2);
+        engine.m.ems = banks;
+        engine.m.mem.segment_mut(seg).copy_from_slice(&frame);
+        if drawn {
             bodies.extend(draw.out);
         }
         let quads = bodies;

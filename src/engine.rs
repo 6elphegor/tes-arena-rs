@@ -312,6 +312,7 @@ impl Engine {
         self.walked = None;
         // (A frame that gave up last time left its tracking on.)
         self.m.mem.untrack();
+        self.m.mem.frame_written();
         let (m, files) = (&mut self.m, &mut self.files);
         let r = |m: &Machine, at: u16| m.mem.r16(DS, at);
         m.mem.w8(DS, STAGE, 0);
@@ -456,6 +457,8 @@ impl Engine {
         // the original holds (`after_drawing`).
         if self.page.is_some() {
             m.mem.track();
+            let frame = r(m, crate::mif::var::BUFFER_SEG);
+            m.mem.watch_frame(frame, r(m, crate::level::var::EMS_MAPPED) >> 2);
         }
         m.mem.w8(DS, STAGE, 8);
         hooks.step(m, Step::DrawFlats);
@@ -552,6 +555,12 @@ impl Engine {
             }
         }
         self.m.mem.untrack();
+        // The EMS frame's likewise, by the bank mapped as each was written
+        // (the sky's images read again into bank 0Eh by a relight in the
+        // frame body, over what the drawing's sky hook changed in them).
+        for o in self.m.mem.frame_written() {
+            self.page_ems_wrote.remove(&o);
+        }
     }
 
     /// The end of the world's entry and the loop's start: the view's

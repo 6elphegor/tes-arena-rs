@@ -51,6 +51,8 @@ mod flats;
 mod archive;
 #[path = "../src/areas.rs"]
 mod areas;
+#[path = "../src/light.rs"]
+mod light;
 #[path = "mainquest/staff.rs"]
 mod staff;
 use arena::bsa::Files;

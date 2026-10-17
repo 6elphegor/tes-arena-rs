@@ -1095,7 +1095,9 @@ fn the_state_measured_against_the_originals() {
 /// segments 1000h higher (the harness relocates the image to 1000h; the
 /// port runs it unrelocated): every relocated word of the image that lies
 /// in DGROUP, and the words tests/vectors/loadsegs.txt names (segments of
-/// the image the game stores as it runs); the offsets
+/// the image the game stores as it runs, unless their far pointer is null,
+/// 0:0, a hook the area left unset, which the harness's holds as 0:0
+/// too, or a word marked `alone` is 0, another writer's); the offsets
 /// tests/vectors/loadexclude.txt names zeroed (on both sides).
 fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let image = arena::exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
@@ -1104,8 +1106,13 @@ fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let mut slots: Vec<usize> = image.relocs.iter().map(|&(seg, off)| seg as usize * 16 + off as usize).filter(|&l| l >= base && l + 1 < base + 0x10000).map(|l| l - base).collect();
     let segs = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadsegs.txt");
     for line in std::fs::read_to_string(segs).expect(segs).lines() {
-        if let Some(w) = line.split('#').next().and_then(|l| l.split_whitespace().next()) {
-            slots.push(usize::from_str_radix(w, 16).unwrap());
+        let mut f = line.split('#').next().unwrap_or("").split_whitespace();
+        if let Some(w) = f.next() {
+            let at = usize::from_str_radix(w, 16).unwrap();
+            let held = if f.next() == Some("alone") { &d[at..at + 2] } else { &d[at - 2..at + 2] };
+            if held.iter().any(|&b| b != 0) {
+                slots.push(at);
+            }
         }
     }
     for at in slots {
