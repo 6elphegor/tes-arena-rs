@@ -671,6 +671,52 @@ fn wild_edge(a: &mut App) {
     m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
 }
 
+/// gen_worldframes.py's `picking`: `locked_door`'s door with a lock of
+/// `level`, picking armed (5CA bit 0).
+fn picking(a: &mut App, level: u8) {
+    at_square(a, 13, 4, 0);
+    let m = &mut a.engine.m;
+    let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+    let rec = arena::movement::var::LOCKS + 3 * n as u16;
+    m.mem.w16(DS, rec, 0x0E04);
+    m.mem.w8(DS, rec + 2, level);
+    m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+    let f = m.mem.r16(DS, 0x05CA) | 1;
+    m.mem.w16(DS, 0x05CA, f);
+}
+
+/// gen_worldframes.py's `levitating`: spell flag 80h (05BE), its timer
+/// 30 minutes.
+fn levitating(a: &mut App) {
+    let m = &mut a.engine.m;
+    let f = m.mem.r16(DS, 0x05BE) | 0x80;
+    m.mem.w16(DS, 0x05BE, f);
+    let (off, seg) = (m.mem.r16(DS, 0x1020), m.mem.r16(DS, 0x1022));
+    m.mem.w16(seg, off + 4 * 7, 30);
+}
+
+/// gen_worldframes.py's POTION: a potion of healing (spell FFh) in a
+/// stack of one.
+const POTION: [u8; 19] = [0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0, 0, 0, 0x4C, 0xFF, 0xFF, 0xFF, 0];
+
+/// gen_worldframes.py's `wounded_with_potion`: health 64h, POTION in the
+/// inventory's 39th slot (the use list's fifth).
+fn wounded_with_potion(a: &mut App) {
+    use arena::character::{field, PLAYER};
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, PLAYER + field::HP, 0x64);
+    for (i, &b) in POTION.iter().enumerate() {
+        m.mem.w8(DS, PLAYER + 0x6E + 0x13 * 38 + i as u16, b);
+    }
+}
+
+/// gen_worldframes.py's `used`: the use list's `index`-th item used, as
+/// the view's use button uses it (`panels::use_pick`).
+fn used(a: &mut App, index: u16) {
+    let e = &mut a.engine;
+    crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -754,6 +800,42 @@ fn case(name: &str) -> Option<Case> {
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
+        "playpick" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 19, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 40, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 10, |_| false);
+        })),
+        "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
+        "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
+            at_square(a, 21, 7, 0);
+            levitating(a);
+        }), held(30, |_| false, 30)),
+        "playscreens" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 1, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 20, |_| false);
+            // The automap (M) and the character sheet (F1) opened and
+            // left with Esc, each in the frame after (the original's
+            // frame body opens them: 2542:0100).
+            d.key(a, KeyCode::KeyM, Some("m"));
+            d.key(a, KeyCode::Escape, None);
+            frames(a, d, seen, 11, |_| false);
+            d.key(a, KeyCode::F1, None);
+            d.key(a, KeyCode::Escape, None);
+            frames(a, d, seen, 31, |_| false);
+        })),
+        "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            used(a, 4);
+            frames(a, d, seen, 5, |_| false);
+            used(a, 3);
+            frames(a, d, seen, 60, |_| false);
+        })),
         _ => return None,
     })
 }
@@ -1307,11 +1389,13 @@ fn the_state_as_the_original_leaves_it() {
     }
 }
 
-/// The busy cases: hundreds of frames of play each (a crowd at noon, a
-/// fight swung through, a spell cast into a creature, a creature casting,
-/// the wilderness's night encounter, the stairs taken mid-fight, a rest
-/// ended by enemies).
-const BUSY: [&str; 7] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest"];
+/// The busy cases: tens to hundreds of frames of play each (a crowd at
+/// noon, a fight swung through, a spell cast into a creature, a creature
+/// casting, the wilderness's night encounter, the stairs taken mid-fight,
+/// a rest ended by enemies, a lock picked and its door walked through,
+/// water swum in and levitated over, a potion and a ring used, the
+/// automap and the character sheet opened mid-fight).
+const BUSY: [&str; 12] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]

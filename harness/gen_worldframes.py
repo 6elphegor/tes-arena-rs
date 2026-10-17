@@ -87,7 +87,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, STUB_SEG, fnv
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
-from unicorn.x86_const import UC_X86_REG_FS
+from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 
@@ -265,6 +265,13 @@ MOUSE_READ = (0, 0x8FC4)
 # Space (a box's wait ends on any key).
 KEY_SPACE = 0x39
 
+# M (2542:0100's automap), F1 (the character sheet), Esc (both left).
+KEY_M = 0x32
+KEY_F1 = 0x3B
+KEY_ESC = 0x01
+# The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
+AUTOMAP_READ = (0, 0x8FC8)
+
 # Wizard's Fire, the save's spellbook's seventh (type 2: aimed).
 WIZARDS_FIRE = 6
 
@@ -286,6 +293,57 @@ def wild_edge(a):
     for o in (0xC3D4, 0xBA66, 0x0602):
         a.w16(o, 0x1008)
     a.w16(0xC3DA, 0x100)
+
+
+def picking(level):
+    """`locked_door`'s door, its lock of `level`, and picking armed (5CA
+    bit 0, the lockpick's key: 2826:0AAB tries it once per door)."""
+    def put(a):
+        at_square(13, 4, 0)(a)
+        n = a.mu.mem_read(a.lin(a.ds, 0xC6E4), 1)[0]
+        a.mu.mem_write(a.lin(a.ds, 0xC624 + 3 * n), struct.pack('<HB', 0x0E04, level))
+        a.mu.mem_write(a.lin(a.ds, 0xC6E4), bytes([n + 1]))
+        a.w16(0x05CA, a.r16(0x05CA) | 1)
+    return put
+
+
+def levitating(put):
+    """`put`, then the player levitating as the Levitate spell leaves
+    them: spell flag 80h (05BE, the frame body's C39A bit 1, which
+    0000:F9C4 keeps above water), its timer (the flag's word in the
+    table at [1020], four bytes a flag) 30 minutes."""
+    def both(a):
+        put(a)
+        a.w16(0x05BE, a.r16(0x05BE) | 0x80)
+        off, seg = a.r16(0x1020), a.r16(0x1022)
+        a.mu.mem_write(a.lin(seg, off + 4 * 7), struct.pack('<H', 30))
+    return both
+
+
+# A potion of healing (spell FFh at +11h) in a stack of one (flags 4Ch:
+# a stack, the slot in use).
+POTION = bytes([0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0, 0, 0, 0x4C, 0xFF, 0xFF, 0xFF, 0])
+
+
+def wounded_with_potion(a):
+    """The player's health down to 64h (+59h) and a potion of healing
+    (POTION) in the inventory's 39th slot (01A4 + 6Eh, 19 bytes a slot:
+    the save's forty are all in use; the 39th, an accessory not worn,
+    given up for it): the use list's fifth, before the coffer (8Dh)."""
+    a.w16(0x01A4 + 0x59, 0x64)
+    a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
+
+
+def used(index):
+    """The use button's list's `index`-th item used as 24FA:07CD uses it
+    once its list is picked from: the list made (0AFE), the item found
+    (1194:7AE7, AX the index, SI the player), then used (29CF:07C3)."""
+    def do(a):
+        a.call_near(0x24FA, 0x0AFE, esi=0x01A4)
+        a.call_far(0x1194, 0x7AE7, eax=index, esi=0x01A4)
+        si = a.mu.reg_read(UC_X86_REG_SI)
+        a.call_far(0x29CF, 0x07C3, esi=si)
+    return do
 
 
 def level_changed(a):
@@ -421,6 +479,32 @@ CASES = {
     # nearby", the box read with Space), then what came comes on.
     'playrest': ('wild', resting(0x100), [((), (), 300, None, [], {'script': [('keys', [KEY_SPACE])]})]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # `locked_door`'s door with a lock of level 1, picking armed
+    # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
+    # door opens; then the up arrow held through it and let go.
+    'playpick': ('crypt', picking(1), [((), (), 2, None), ((), (), 20, None, [(160, 100)]), ((UP,), (), 40, None), ((), (UP,), 10, None)]),
+    # The crypt's water (row 22, columns 6..10) walked into from the
+    # square north of it (row 21, column 7), facing it (heading 0): the
+    # player sinks (0000:F9C4's water), swims and bobs (C39A bit 10h,
+    # CB68), the footsteps the swimming sound.
+    'playswim': ('crypt', at_square(21, 7, 0), [((UP,), (), 30, None), ((), (UP,), 60, None)]),
+    # The same levitating (`levitating`): kept up over the water, bobbing
+    # (2826:0042).
+    'playlevitate': ('crypt', levitating(at_square(21, 7, 0)), [((UP,), (), 30, None), ((), (UP,), 30, None)]),
+    # Wounded with a potion (`wounded_with_potion`): two frames, the
+    # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
+    # frames, the Ring of Shielding used (the list's fourth: its spell
+    # cast on the player, its charge spent), sixty frames on.
+    # A creature brought (`brought`) and fought off by standing: twenty
+    # frames, then M held a frame (the automap, 2542:045A, left with Esc
+    # at its wait), ten frames, F1 held a frame (the character sheet,
+    # 1194:0CF8, left with Esc), thirty frames: the screens opened and
+    # closed mid-fight.
+    'playscreens': ('dungeon', brought(1), [((), (), 20, None), ((KEY_M,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'waits': {AUTOMAP_READ}}),
+                                            ((), (KEY_M,), 10, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
+                                            ((), (KEY_F1,), 30, None)]),
+    'playuse': ('dungeon', wounded_with_potion, [((), (), 2, None), ((), (), 5, None, [], {'do': used(4)}),
+                                                 ((), (), 60, None, [], {'do': used(3)})]),
 }
 
 
@@ -530,12 +614,17 @@ def play(a, name, steps, tracks):
         if 'buttons' in opts:
             a.buttons = opts['buttons']
         # (`script`: actions for the waits for input on the way, a box's
-        # loop round the mouse's read, 0000:8FC4, which a frame reads once.)
+        # loop round the mouse's read, 0000:8FC4, which a frame reads once;
+        # `waits`, other reads a screen's loop asks by.)
         if 'script' in opts:
-            a.waits = {MOUSE_READ}
+            a.waits = {MOUSE_READ} | opts.get('waits', set())
             a.script = list(opts['script'])
         drag[0] = opts.get('drag')
         a.motion = (0, 0)
+        # (`do`: something the player does between frames, before the
+        # step's: an item used, a key's screen.)
+        if 'do' in opts:
+            opts['do'](a)
         if held:
             a.keys_held(held)
         if let_go:

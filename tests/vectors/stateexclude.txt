@@ -37,7 +37,7 @@ ccc2 ccc4 the light table's segment (the drawing's copy's own heap)
 cd7e cd8a the drawing's buffers' segments (the copy's own heap)
 eebc eee2 the level's segments made on a level's change
 929e 97e2 scratch (strings, numbers made, the heap's first blocks)
-9176 91a4 the file's name, handle and size of the last file opened
+9176 91a4 the file's name, handle and size of the last file opened: the view opens the sky's dither (2294:0341) on the way outdoors before the first frame, the original in it
 a836 a863 scratch of the drawing's and the texts'
 a908 a910 0000:742C's scratch
 9288 9289 the drawing's colour
