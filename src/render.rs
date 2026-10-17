@@ -42,6 +42,8 @@
 use crate::machine::Machine;
 use crate::mem::DS;
 
+mod sky;
+
 /// The rows' offsets on the page (A6A0, a word a row).
 const ROWS: u16 = 0xA6A0;
 /// The view's window: left, top, right, bottom (A914..A91B).
@@ -82,15 +84,21 @@ pub struct Soft {
 
 /// The view drawn from the machine's state at the start of the frame's
 /// drawing stages (before 0000:A322): the page, the pixels it drew
-/// written over `under` (the last page), and the paths not ported.
-pub fn draw(m: &Machine, under: &[u8]) -> (Vec<u8>, Vec<&'static str>) {
+/// written over `under` (the last page), and the paths not ported. Of
+/// what the drawing changes, the water's step (D813), which only it
+/// keeps, is put back in `m`.
+pub fn draw(m: &mut Machine, under: &[u8]) -> (Vec<u8>, Vec<&'static str>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
-        let _ = std::fs::write(p, m.mem.segment(DS));
+        // The first frame's (a file there already is kept).
+        if !std::path::Path::new(&p).exists() {
+            let _ = std::fs::write(p, m.mem.segment(DS));
+        }
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new() };
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
+    m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
     (r.page, r.gaps)
 }
 
@@ -154,7 +162,8 @@ impl Soft {
         self.s8(0xBA4B, 3);
         self.draw_half(0x140);
         if self.g8(0xCB5C) != 0 {
-            self.gap("A33E: the sky");
+            // A33E: the sky's hook (its fog step fills the view).
+            self.sky_hook();
         } else {
             self.s8(0xBA4B, 4);
             if self.g16(0xC398) & 0x44 == 0 {
@@ -223,13 +232,14 @@ impl Soft {
                 self.half_fill();
             }
             if self.g16(0xC398) & 4 != 0 {
-                self.gap("D502: outdoors");
-                return;
+                // D502: outdoors, the sky.
+                self.sky();
+            } else {
+                if neg {
+                    return self.half_ceiling(half);
+                }
+                self.half_under();
             }
-            if neg {
-                return self.half_ceiling(half);
-            }
-            self.half_under();
         }
         // D531.
         if self.g16(0xC398) & 0x4000 != 0 {
@@ -288,13 +298,38 @@ impl Soft {
     /// lava's frames (not ported).
     fn half_fill(&mut self) {
         if self.g8(0xCB5B) != 0 {
-            self.gap("DEAF: water or lava");
-            return;
+            return self.water();
         }
         let c = self.g8(0xC3C6);
         self.s8(0x9288, c);
         let (l, r, b, h) = (self.g16(LEFT), self.g16(RIGHT), self.g16(BOTTOM), self.g16(0xC3D8));
         self.fill_rect(l, h, r.wrapping_sub(l).wrapping_add(1), b.wrapping_sub(h).wrapping_add(1));
+    }
+
+    /// 0000:DEAF: water or lava (C8F2 their first bank; FFh none): the
+    /// frame counter D813 stepped (0..4), its half the bank after C8F2,
+    /// its odd steps the second half of the bank (from 8000h), the rows
+    /// from the horizon down copied from 300h before that.
+    fn water(&mut self) {
+        let first = self.g8(0xC8F2);
+        if first & 0x80 != 0 {
+            return;
+        }
+        let step = (self.g8(0xD813) as u16 + 1) % 5;
+        self.s8(0xD813, step as u8);
+        self.m.ems_map((step >> 1) + first as u16);
+        let si: u16 = if step & 1 != 0 { 0x8000u16.wrapping_sub(0x300) } else { 0 };
+        let rows = self.g16(BOTTOM).wrapping_sub(self.g16(0xC3D8));
+        let n = (0x50u16 * (rows & 0xFF)) as u32 * 4;
+        let mut di = self.row(self.g16(0xC3D8));
+        let seg = self.g16(0x9030);
+        let mut si = si;
+        for _ in 0..n {
+            let b = self.m.mem.r8(seg, si);
+            self.px(di, b);
+            di = di.wrapping_add(1);
+            si = si.wrapping_add(1);
+        }
     }
 
     /// 0000:DFA2: with C398 bit 4000h or the eye below the floor, a half
@@ -497,6 +532,34 @@ impl Soft {
         }
     }
 
+    /// 0000:D7AD: `floor_row` in full daylight (C398 bit 8000h): across
+    /// the view a pair of pixels at a time, each its square's floor
+    /// texture (the map's word at fs, its high byte the segment) unless
+    /// that is CCCE or more, unshaded.
+    fn floor_row_day(&mut self, x: u32, y: u32, xstep: u32, ystep: u32, mut di: u16, fs: u16) {
+        let thr = self.g16(0xCCCE);
+        let mut pairs = self.g16(RIGHT).wrapping_sub(self.g16(LEFT)).wrapping_add(1) >> 1;
+        let (xs2, ys2) = (xstep << 1, ystep << 1);
+        let (mut px, mut py) = (x, y);
+        loop {
+            px = px.wrapping_add(xs2);
+            py = py.wrapping_add(ys2);
+            let (u, v) = ((px >> 16) as u16, (py >> 16) as u16);
+            let bx = ((((v as i16) >> 6) as u16) << 8).wrapping_add((((u as i16) >> 6) as u16).wrapping_add(((u as i16) >> 6) as u16)) & 0x7FFF;
+            let tex = self.m.mem.r16(fs, bx) & 0xFF00;
+            if tex < thr {
+                let al = self.m.mem.r8(tex, ((v & 0x3F) << 6).wrapping_add(u & 0x3F));
+                self.px(di, al);
+                self.px(di.wrapping_add(1), al);
+            }
+            di = di.wrapping_add(2);
+            pairs = pairs.wrapping_sub(1);
+            if pairs == 0 {
+                break;
+            }
+        }
+    }
+
     /// 0000:D78C: one row of the floor (`D77E` positive) or the ceiling,
     /// from (x, y) in 16.16 by the steps, at the page's `di`.
     fn floor_row(&mut self, x: u32, y: u32, xstep: u32, ystep: u32, mut di: u16, fs: u16) {
@@ -504,8 +567,7 @@ impl Soft {
         let y = y.wrapping_add(self.c32(0xD77A));
         let neg = (self.c16(0xD77E) as i16) < 0;
         if !neg && self.g16(0xC398) & 0x8000 != 0 {
-            self.gap("D7AD: the floor unshaded");
-            return;
+            return self.floor_row_day(x, y, xstep, ystep, di, fs);
         }
         let (xs2, ys2) = (xstep << 1, ystep << 1);
         let thr = self.g16(0xCCCE);
@@ -520,7 +582,31 @@ impl Soft {
         let tables = self.g16(0x9030);
         if neg {
             if self.g16(0xC398) & 0x8000 != 0 {
-                self.gap("D953: the ceiling unshaded");
+                // D953: in full daylight, the ceiling's texels themselves,
+                // a pair of pixels each, D762 at a time.
+                let tex = self.g16(0xCB64);
+                let mut left = self.c16(0xD752);
+                loop {
+                    let mut ah = pairs;
+                    loop {
+                        edx = edx.wrapping_add(xs2);
+                        ebp = ebp.wrapping_add(ys2);
+                        let (u, v) = ((edx >> 16) as u16, (ebp >> 16) as u16);
+                        let al = self.m.mem.r8(tex, ((v & 0x3F) << 6).wrapping_add(u & 0x3F));
+                        self.px(di, al);
+                        self.px(di.wrapping_add(1), al);
+                        di = di.wrapping_add(2);
+                        ah = ah.wrapping_sub(1);
+                        if ah == 0 {
+                            break;
+                        }
+                    }
+                    left = left.wrapping_sub(seg);
+                    self.cs16(0xD752, left);
+                    if left == 0 {
+                        break;
+                    }
+                }
                 return;
             }
             let (mut si, sseg) = (self.g16(0xCD86), self.g16(0xCD88));
@@ -1065,7 +1151,7 @@ impl Soft {
         if bp == WALL {
             self.wall(al, side);
         } else {
-            self.gap("D22B: a square's top face");
+            self.top(al, side);
         }
         self.cs16(0xAA9E, 0x40);
         self.cs16(0xAAA0, 0);
@@ -1158,6 +1244,24 @@ impl Soft {
             self.s16(0xCCF8, 0xFFFF);
         }
         self.face_draw();
+    }
+
+    /// 0000:D22B: a square's top face: its heights from D73F and D740
+    /// (the top at -63h x D73F - 63h, the bottom 63h x (D740 + 1) above
+    /// it), drawn as a wall (D27A) with BB04 the texture's repeats.
+    fn top(&mut self, al: u16, bx: u16) {
+        let al = al & 0x7F;
+        let cx = self.g8(0xD740) as u16 + 1;
+        let dx = (0xFF9Du16.wrapping_mul(self.g8(0xD73F) as u16)).wrapping_sub(0x63);
+        self.s16(0xD7B8, dx);
+        self.s16(0xD7BE, dx);
+        let dx = self.g16(0xD7B8).wrapping_sub(0x63u16.wrapping_mul(cx));
+        self.s16(0xD7AC, dx);
+        self.s16(0xD7B2, dx);
+        self.s16(0xD810, dx.wrapping_neg());
+        self.s16(0xBB04, cx);
+        self.wall(al, bx);
+        self.s16(0xBB04, 0);
     }
 
     /// 0000:AE0D: a face turned from the eye (CCF8 its side) is culled:
@@ -1601,9 +1705,6 @@ impl Soft {
             std::mem::swap(&mut ax, &mut bx);
         }
         if (bx as i16) >= (self.g16(LEFT) as i16) && (ax as i16) < (self.g16(RIGHT) as i16) && self.span_setup(si, dx) != 0 {
-            if self.g16(0xBB04) != 0 {
-                self.gap("B96E: the other column drawer");
-            }
             self.s16(0xBAEC, 0);
             self.s16(0xBB00, 0x8AD0);
             let saved = self.g16(0x9030);
@@ -1626,7 +1727,7 @@ impl Soft {
                 while let Some((ax, bx, cx)) = self.next_column() {
                     let t = self.g16(si + 0x10).wrapping_add(self.g16(0xBAEA));
                     let dx = self.g16(0xBAE6);
-                    if !self.column(ax, bx, cx, t, dx) {
+                    if !self.column_drawn(ax, bx, cx, t, dx) {
                         break;
                     }
                 }
@@ -1757,6 +1858,86 @@ impl Soft {
         }
     }
 
+    /// The column drawer AB78 sets at CS:B1AB: B835 (`column`), or with
+    /// BB04 a square's top's height (`top`) B96E (`column_top`).
+    fn column_drawn(&mut self, x: u16, bx: u16, cx: u16, si: u16, dx: u16) -> bool {
+        if self.g16(0xBB04) != 0 {
+            self.column_top(x, bx, cx, si, dx)
+        } else {
+            self.column(x, bx, cx, si, dx)
+        }
+    }
+
+    /// 0000:B96E: `column` for a square's top face, BB04 heights of the
+    /// texture's CS:AA9E texels over the column (wrapping within the
+    /// texture's column: the texel's row masked by AA9E - 1; the 0s-left-
+    /// out shaded drawer adds the mask instead, as the original does),
+    /// from the texture's column `si` in [9030] made a segment of its
+    /// own (si >> 4 paragraphs on).
+    fn column_top(&mut self, x: u16, bx: u16, cx: u16, si: u16, dx: u16) -> bool {
+        let mut shade = dx;
+        let bp = cx.wrapping_sub(bx);
+        if bp == 0 {
+            return false;
+        }
+        let h = self.c16(0xAA9E).wrapping_mul(self.g16(0xBB04));
+        let step = ((h as u32) << 16) / bp as u32;
+        let mut esi = 0u32;
+        let mut bx = bx;
+        if (bx as i16) < (self.g16(TOP) as i16) {
+            let k = self.g16(TOP).wrapping_sub(bx) as u32;
+            esi = step.wrapping_mul(k);
+            bx = self.g16(TOP);
+        }
+        let mut cx = cx;
+        if (cx as i16) > (self.g16(BOTTOM) as i16) {
+            cx = self.g16(BOTTOM);
+        }
+        let n = cx.wrapping_sub(bx);
+        if (n as i16) <= 0 {
+            return true;
+        }
+        if (x ^ bx) & 1 != 0 {
+            let other = self.g16(0xBAE8);
+            self.s16(0xBAE8, shade);
+            shade = other;
+        }
+        let mut di = x.wrapping_add(self.row(bx));
+        let mask = self.c16(0xAA9E).wrapping_sub(1);
+        let see = self.g8(0xBA7F) != 0;
+        let seg = (si >> 4).wrapping_add(self.g16(0x9030));
+        if self.g16(0xC398) & 0x8000 != 0 {
+            for _ in 0..n {
+                let al = self.m.mem.r8(seg, (esi >> 16) as u16 & mask);
+                if !see || al != 0 {
+                    self.px(di, al);
+                }
+                esi = esi.wrapping_add(step);
+                di = di.wrapping_add(0x140);
+            }
+            return true;
+        }
+        shade = shade.wrapping_sub(si);
+        let v = self.g16(0xBAE6).wrapping_sub(si);
+        self.s16(0xBAE6, v);
+        let v = self.g16(0xBAE8).wrapping_sub(si);
+        self.s16(0xBAE8, v);
+        for _ in 0..n {
+            let t = (esi >> 16) as u16;
+            let al = self.m.mem.r8(seg, if see { t.wrapping_add(mask) } else { t & mask });
+            if !see || al != 0 {
+                let c = self.m.mem.r8(seg, shade.wrapping_add(al as u16));
+                self.px(di, c);
+            }
+            let other = self.g16(0xBAE8);
+            self.s16(0xBAE8, shade);
+            shade = other;
+            esi = esi.wrapping_add(step);
+            di = di.wrapping_add(0x140);
+        }
+        true
+    }
+
     /// 0000:B835: a column of the face at `x` from `bx` to `cx`, the
     /// texture's column at `si` in [9030] (CS:AA9E texels high, from
     /// CS:AAA0), shaded by the table at `dx`, which alternates with
@@ -1791,12 +1972,20 @@ impl Soft {
         }
         let mut di = x.wrapping_add(self.row(bx));
         esi = esi.wrapping_add((self.c16(0xAAA0) as u32) << 16);
-        if self.g16(0xC398) & 0x8000 != 0 {
-            self.gap("B8BA: a column unshaded");
-            return true;
-        }
         let tex = self.g16(0x9030);
         let see = self.g8(0xBA7F) != 0;
+        if self.g16(0xC398) & 0x8000 != 0 {
+            // B8BA: in full daylight, the texels themselves.
+            for _ in 0..n {
+                let al = self.m.mem.r8(tex, (esi >> 16) as u16);
+                if !see || al != 0 {
+                    self.px(di, al);
+                }
+                esi = esi.wrapping_add(step);
+                di = di.wrapping_add(0x140);
+            }
+            return true;
+        }
         for _ in 0..n {
             let al = self.m.mem.r8(tex, (esi >> 16) as u16);
             if !see || al != 0 {
@@ -1951,7 +2140,7 @@ impl Soft {
             }
             let t = t.wrapping_add(self.g16(0xBA9A));
             let dx = self.g16(0xBAE6);
-            self.column(x, top, bot, t, dx);
+            self.column_drawn(x, top, bot, t, dx);
             if self.g16(0xC398) & 0x8000 == 0 {
                 let v = self.g16(0xA85E).wrapping_add(self.g16(0xA860));
                 self.s16(0xA85E, v);
