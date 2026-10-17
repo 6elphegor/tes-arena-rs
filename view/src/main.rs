@@ -237,25 +237,27 @@ impl Front<'_> {
         }
     }
 
-    /// A menu (1194:020E): 3159:0F2A draws its title (DS:`si`) and its
-    /// entries (the words at DS:`di`, to a 0), leaving their codes in the
-    /// game's state as `message_box` does.
+    /// A menu (1194:020E): its title (DS:`si`) and entries (the words at
+    /// DS:`di`, to a 0) in boxes, as the game's state has them round the
+    /// pick (`Machine::menu_boxes`, `menu_closed`); a menu too big for
+    /// the screen isn't shown, FFFFh.
     fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
-        let pick = match self.talk.as_deref_mut() {
-            Some(t) => t.menu(m, si, bx, di),
-            None => 0xFFFF,
+        use arena::mem::DS;
+        let colour = m.mem.r8(DS, 0x9288);
+        let Some(boxes) = m.menu_boxes(si, di, self.shown) else {
+            eprintln!("the menu gave up: {}", arena::giveup::describe());
+            return 0xFFFF;
         };
-        let mut texts = vec![m.mem.cstr(arena::mem::DS, si).to_vec()];
-        for i in 0..32u16 {
-            let p = m.mem.r16(arena::mem::DS, di.wrapping_add(2 * i));
-            if p == 0 {
-                break;
-            }
-            texts.push(m.mem.cstr(arena::mem::DS, p).to_vec());
-        }
-        for t in texts {
-            hud::text_codes(m, &t);
-        }
+        // The lines are drawn from the colour the caller left (the boxes'
+        // colour codes change 9288 as they are drawn).
+        let drawn = m.mem.r8(DS, 0x9288);
+        m.mem.w8(DS, 0x9288, colour);
+        let pick = match (&boxes, self.talk.as_deref_mut()) {
+            (Some(_), Some(t)) => t.menu(m, si, bx, di),
+            _ => 0xFFFF,
+        };
+        m.mem.w8(DS, 0x9288, drawn);
+        m.menu_closed(boxes.as_ref());
         pick
     }
 
@@ -666,12 +668,26 @@ impl arena::rest::RestHooks for Front<'_> {
         Front::menu(self, m, si, bx, di)
     }
     /// 1194:46BF's 4800: the prompt's box, the field at FCh, 44h in
-    /// ARENAFNT.DAT ([102C]) and colour 60h.
+    /// ARENAFNT.DAT ([102C]) and colour 60h. The box's state as the game
+    /// has it round the field (`Machine::prompt_shown`, `prompt_closed`),
+    /// after 46BF's font and tiles ([102C] into B036, [1036] into B038:
+    /// 9AE6, 9AF8, which the port leaves to the front end).
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
-            let prompt = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, REST_PROMPT)).to_string();
+            use arena::mem::DS;
+            for (to, from) in [(0xB036u16, 0x102Cu16), (0xB038, 0x1036)] {
+                let v = m.mem.r16(DS, from);
+                m.mem.w16(DS, to, v);
+            }
+            let typed = arena::rest::var::TYPED;
+            if m.prompt_shown((DS, REST_PROMPT), (0xFC, 0x44), (DS, typed), 3, self.shown).is_none() {
+                eprintln!("the prompt's box gave up: {}", arena::giveup::describe());
+                return;
+            }
+            let prompt = String::from_utf8_lossy(m.mem.cstr(DS, REST_PROMPT)).to_string();
             let look = field::Look { font: "ARENAFNT.DAT", colour: 0x60, put_font: true };
-            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(arena::mem::DS, 0x9288), game_clip(m)));
+            t.edit(m, arena::lineedit::fields::rest(), look, dialog::Prompt::Boxed(prompt, m.mem.r8(DS, 0x9288), game_clip(m)));
+            m.prompt_closed();
         }
     }
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {

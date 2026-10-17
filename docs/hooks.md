@@ -188,7 +188,7 @@ the original routine:
 | `LootHooks::text` | src/loot_window.rs:63 | 1194:A374 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
 | `MapHooks::list` | src/mapscreen.rs:34 | 1194:5730 | overridden | the view: travel.rs Hooks<'_> | present: the game's list (screens.txt) |
 | `MapHooks::quest_dungeon` | src/mapscreen.rs:28 | 292B:0362 | overridden | the view: travel.rs Hooks<'_> | faithful: the picture shown after the screen (dungeonpic vectors, screens) |
-| `MapHooks::type_name` | src/mapscreen.rs:31 | 1194:5C30 | overridden | the view: travel.rs Hooks<'_> | present: the game's editor (screens.txt) |
+| `MapHooks::type_name` | src/mapscreen.rs:31 | 1194:5C30 | overridden | the view: travel.rs Hooks<'_> | present: the game's editor (screens.txt); the prompt's box state round it (`named_shown`, `named_closed`; msgbox vectors) |
 | `MenuHooks::automap_keep` | src/savemenu.rs:111 | 23F1:0145 | port | the default runs the port | |
 | `MenuHooks::centred` | src/savemenu.rs:88 |  | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
 | `MenuHooks::click` | src/savemenu.rs:92 | 1194:564D | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
@@ -266,13 +266,13 @@ the original routine:
 | `RestHooks::advance` | src/rest.rs:129 | 0000:142D | stub | false: the game's clock runs the minutes | |
 | `RestHooks::dream` | src/rest.rs:108 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
 | `RestHooks::hours_text` | src/rest.rs:106 | 1194:4659 / 452F | overridden | the view: main.rs Front<'_> | present: drawn as 1194:4659 draws it (screens.txt) |
-| `RestHooks::menu` | src/rest.rs:97 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt) |
+| `RestHooks::menu` | src/rest.rs:97 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `RestHooks::message` | src/rest.rs:104 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `RestHooks::room_file` | src/rest.rs:120 | 1194:BA91 | port | the default runs the port | |
 | `RestHooks::room_load` | src/rest.rs:115 | 1194:C04C | port | the default runs the port | |
 | `RestHooks::screen` | src/rest.rs:125 |  | present | the screen redrawn after the rest | |
 | `RestHooks::sky` | src/rest.rs:110 | 2294:0341 | port | the default runs the port | |
-| `RestHooks::type_hours` | src/rest.rs:102 | 1194:4800 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors) |
+| `RestHooks::type_hours` | src/rest.rs:102 | 1194:4800 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors); the prompt's box state round it (`prompt_shown`, `prompt_closed`; msgbox vectors) |
 | `SaveHooks::delete` | src/save_write.rs:53 | 0000:9DC6 | overridden | the view: main.rs SaveDir<'_> | faithful: the file deleted |
 | `SaveHooks::palette` | src/save_write.rs:59 | 0000:6E3C | overridden | the view: main.rs SaveDir<'_> | present: the window's palette for the save's |
 | `SaveHooks::write` | src/save_write.rs:56 |  | overridden | the view: main.rs SaveDir<'_> | faithful: the save's files written (save vectors); SAVEGAME's screen bytes black, the window's picture not being the game's |
@@ -351,7 +351,7 @@ the original routine:
 | `TavernHooks::rumours` | src/tavern.rs:100 | 1194:E3F7 | stub | false: the port's rumours run | |
 | `TavernHooks::tavern_quest` | src/tavern.rs:73 | 1194:90B9 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `TavernHooks::text` | src/tavern.rs:105 | 1194:A374 | stub | false: the text port runs | |
-| `TextHooks::menu` | src/text.rs:54 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt) |
+| `TextHooks::menu` | src/text.rs:54 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `TextHooks::message_box` | src/text.rs:43 | 1194:59CC | overridden | the view: main.rs Front<'_>, panels.rs Said | present: the game's box (screens.txt) |
 | `TextHooks::message_box_far` | src/text.rs:47 | 1194:59CC | overridden | the view: panels.rs Said | present: the special item's box (screens.txt) |
 | `TravelHooks::advance` | src/travelmap.rs:105 | 0000:142D | stub | false: the game's clock runs the minutes | |

@@ -10,6 +10,7 @@ up (src/heap.rs ports it).
 """
 import os
 import struct
+import sys
 from emu import Arena, LOAD_SEG
 from unicorn.x86_const import *
 
@@ -33,6 +34,12 @@ class DosArena(Arena):
         # seek gives 0, a read 0 bytes, a close succeeds. Code that goes
         # on after a failed open uses handle 2 (the open's error code).
         self.std_devices = False
+        # The character devices closed that way: DOS frees a closed
+        # handle, and its next open or create takes the lowest free one,
+        # 2 before 5. The harness (and the port, src/bsa.rs) hands out 5
+        # on: an open after such a close is reported (DOS_REUSE_LOG), to
+        # find the vectors the difference would change.
+        self.std_closed = set()
 
     def enable_ems(self, frame, banks=0x20, maps_seg=0x0600):
         """EMS on, `banks` 64 KB banks, bank 0 mapped into `frame` (also
@@ -95,9 +102,7 @@ class DosArena(Arena):
                 self._wreg('ax', 2)
                 self._set_cf(True)
                 return True
-            h = 5
-            while h in self.handles:
-                h += 1
+            h = self.new_handle(name)
             self.handles[h] = [open(name, 'rb').read(), 0]
             self._wreg('ax', h)
             self._set_cf(False)
@@ -105,6 +110,8 @@ class DosArena(Arena):
         h = self._reg('bx')
         if h not in self.handles:
             if self.std_devices and h <= 2 and ah in (0x3F, 0x42, 0x3E):
+                if ah == 0x3E:
+                    self.std_closed.add(h)
                 self._wreg('ax', 0)
                 if ah == 0x42:
                     self._wreg('dx', 0)
@@ -152,9 +159,24 @@ class DosArena(Arena):
 
     def snapshot(self):
         ems = self.ems and dict(self.ems, banks=dict(self.ems['banks']))
-        return bytes(self.mu.mem_read(0, 0x110000)), dict((h, list(f)) for h, f in self.handles.items()), ems
+        return (bytes(self.mu.mem_read(0, 0x110000)), dict((h, list(f)) for h, f in self.handles.items()), ems,
+                set(self.std_closed))
 
     def restore(self, snap):
         self.mu.mem_write(0, snap[0])
         self.handles = dict((h, list(f)) for h, f in snap[1].items())
         self.ems = snap[2] and dict(snap[2], banks=dict(snap[2]['banks']))
+        self.std_closed = set(snap[3])
+
+    def new_handle(self, name):
+        """The handle an open or create of `name` gets: the lowest free
+        from 5 (see `std_closed`)."""
+        if self.std_closed:
+            log = os.environ.get('DOS_REUSE_LOG')
+            if log:
+                with open(log, 'a') as f:
+                    f.write(f'{sorted(self.std_closed)} {name} {os.path.basename(sys.argv[0])} {sys.argv[-1]}\n')
+        h = 5
+        while h in self.handles:
+            h += 1
+        return h
