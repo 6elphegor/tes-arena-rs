@@ -164,7 +164,10 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.mem.w16(DS, 0xBA54, off);
         m.mem.w16(DS, 0xBA56, seg);
     } else {
-        m.level_load(&mut files, 0xF000).expect("level");
+        if m.level_load(&mut files, 0xF000).is_none() {
+            eprintln!("{level}: no such level in {} (a .MIF in GLOBAL.BSA or the game folder, or CITY:PROVINCE:INDEX)", dir.display());
+            std::process::exit(2);
+        }
     }
     let info = m.mem.r16(DS, 0xCB84);
     // The 3D world begun as the outer loop begins it for every area
