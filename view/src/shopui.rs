@@ -200,21 +200,7 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         }
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
-        let pick = self.front.menu(m, si, bx, di);
-        // 3159:0F2A drew the title and the entries (0000:98xx): their
-        // colour and font codes left in the game's state.
-        let mut texts = vec![m.mem.cstr(DS, si).to_vec()];
-        for i in 0..32u16 {
-            let p = m.mem.r16(DS, di.wrapping_add(2 * i));
-            if p == 0 {
-                break;
-            }
-            texts.push(m.mem.cstr(DS, p).to_vec());
-        }
-        for t in texts {
-            crate::hud::text_codes(m, &t);
-        }
-        pick
+        self.front.menu(m, si, bx, di)
     }
     fn dialog(&mut self, m: &mut Machine, kind: u8, di: u16) -> u16 {
         self.dialog_at(m, kind, 0, di)
@@ -467,10 +453,7 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
         }
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
-        match self.front.talk.as_deref_mut() {
-            Some(t) => t.menu(m, si, bx, di),
-            None => 0xFFFF,
-        }
+        self.front.menu(m, si, bx, di)
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
