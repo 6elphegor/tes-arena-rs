@@ -365,9 +365,11 @@ class ScreenArena(DosArena):
         """The sounds left out (no driver), and with `location` the
         location record's build (1194:3AE8, as gen_titleload.py's load has
         it): what was there. (25CA:01E6 isn't stubbed: it counts the
-        creature slots marked usable, 4000h, and needs nothing.)"""
+        creature slots marked usable, 4000h, and needs nothing; nor is a
+        fight's sound, 23BA:01C7, which loads the creature's .VOC into
+        bank 15h as `Machine::fight_sound` does.)"""
         from gen_frame import counter
-        stubs = [(0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2F9F, 0x001F, counter(0xFFF2, True))]
+        stubs = [(0x2F9F, 0x001F, counter(0xFFF2, True))]
         if location:
             stubs.append((0x1194, 0x3AE8, counter(0xFFEE, True)))
         saved = []

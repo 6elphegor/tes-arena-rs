@@ -692,6 +692,32 @@ fn an_empty_slot_as_the_original_draws_it() {
     );
 }
 
+/// Its Save's picker, the sixth slot's row clicked, "a" typed and Enter:
+/// the game saved. SAVEGAME's screen (its first FA00h bytes: the page,
+/// A8FE, as 25FD:0110 writes it, "Kindly waiteth..." over the menu) and
+/// its colours (the 300h after) as the original's save holds them.
+#[test]
+fn a_save_keeps_the_screen_as_the_original_does() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let (mut a, mut d) = loaded(&dir, &save);
+    options_click(&mut a, &mut d, 160, 132);
+    d.click(&mut a, 100, 81, MouseButton::Left);
+    d.key(&mut a, KeyCode::KeyA, Some("a"));
+    // The pixels the original's case drew (its page filled 00h then FFh
+    // before): the menu's, as `options_menu_layer` draws them; the rest
+    // (the interface, drawn before) the vectors leave out.
+    let (layer, _) = options_menu_layer(&mut a);
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.saveui.is_none(), "the menu ended");
+    let data = saveui::read_any_case(&save, "SAVEGAME.05").expect("the save written");
+    let idx: Vec<u16> = data[..0xFA00].iter().zip(&layer).map(|(&c, &l)| if l < 0x100 { c as u16 } else { 0x100 }).collect();
+    assert!(check("optionssaved", &idx, &data[0xFA00..0xFD00]), "optionssaved: differs from the original's");
+}
+
 /// Its Exit (05DB): "Are you sure ?" over the screen.
 #[test]
 fn the_options_exit_as_the_original_draws_it() {
@@ -1816,6 +1842,22 @@ fn a_provinces_map_as_the_original_draws_it() {
 #[test]
 fn a_journeys_length_as_the_original_draws_it() {
     screen("worldtrip", |a, d| world_clicks(a, d, &[(70, 45), (200, 100)]), layer);
+}
+
+/// Poisoned (05B1 bit 0), a place clicked, its journey read (a click) and
+/// Travel clicked: 1194:48DB asks "Considering your condition..." as a
+/// menu (1194:020E) over the province's map.
+#[test]
+fn the_unwell_travellers_question_as_the_original_draws_it() {
+    screen(
+        "worldunwell",
+        |a, d| {
+            let v = a.engine.m.mem.r8(DS, 0x05B1) | 1;
+            a.engine.m.mem.w8(DS, 0x05B1, v);
+            world_clicks(a, d, &[(70, 45), (200, 100), (200, 100), (62, 180)]);
+        },
+        layer,
+    );
 }
 
 /// Its Search: a name asked, after the editor's two passes before its

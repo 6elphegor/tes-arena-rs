@@ -67,6 +67,10 @@ pub struct SaveUi {
     /// The name being typed (the game's editor on a copy of the game as
     /// the menu asked).
     pub typing: Option<Box<Live>>,
+    /// The name's field as its typing ended (Enter): left on the screen
+    /// as the editor leaves it, which the save's picture keeps (25FD:
+    /// 0110, `App::save_shot`).
+    typed: Option<Box<Live>>,
     draws: Vec<Draw>,
     picture: Option<Image>,
     /// The four fonts the game selects among (`GameFont`).
@@ -164,7 +168,7 @@ impl SaveUi {
             .into_iter()
             .filter_map(|(g, name)| Font::load(archive, name).map(|f| (g, f)))
             .collect();
-        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, draws: Vec::new(), picture, fonts, notice: None };
+        let mut ui = SaveUi { kind, base, save_dir: save_dir.to_path_buf(), clicks: Vec::new(), names: Vec::new(), typing: None, typed: None, draws: Vec::new(), picture, fonts, notice: None };
         let e = ui.replay();
         (ui, e)
     }
@@ -252,7 +256,7 @@ impl SaveUi {
     fn name_ended(&mut self) -> Ended {
         match self.typing.as_ref().filter(|l| l.ended()).map(|l| l.keys().to_vec()) {
             Some(keys) => {
-                self.typing = None;
+                self.typed = self.typing.take();
                 self.names.push(keys);
                 self.replay()
             }
@@ -284,7 +288,7 @@ impl SaveUi {
         }
         // 25FD:0076..0088: the name's box cleared (9A6E, colour 0), then
         // the field.
-        if let Some(l) = &self.typing {
+        if let Some(l) = self.typing.as_ref().or(self.typed.as_ref()) {
             screen.fill(l.field.x as i32 - 0x0A, l.field.y as i32, 0x135, 9, 0, 0xFF);
             l.draw(screen, false);
         }
