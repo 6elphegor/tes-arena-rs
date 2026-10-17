@@ -27,6 +27,10 @@
 //! palace doors (trigger entries 11..13) and click, and after each load
 //! run the CITYDATA check (242A:000E), reporting a failure as odd.
 //!
+//! `PT_FOCUS=dungeon,cast,...` makes half the targeted acts one of those
+//! (dungeon, cast, door, talk, travel, stairs), to meet more often what
+//! they meet.
+//!
 //! The targeted acts also travel (the map opened, a random place or
 //! region clicked, Travel), open the bar's screens (automap, sheet,
 //! logbook, status, camp), write automap notes, and make for a
@@ -125,6 +129,8 @@ struct Watch {
     same: usize,
     /// The square an area was entered on, while the player stays there.
     entry: Option<(u16, u16)>,
+    /// The level of the area's levels (BB0A), to see stairs taken.
+    level: u8,
 }
 
 impl Watch {
@@ -135,6 +141,7 @@ impl Watch {
             seed: engine.m.rng.seed,
             same: 0,
             entry: None,
+            level: engine.m.mem.r8(DS, arena::movement::var::LEVEL),
         }
     }
 
@@ -159,13 +166,24 @@ impl Watch {
         // there: the original's own way out of a city by some gates puts
         // the player in the wall (217B:058F's nudge 12Ch back,
         // tests/vectors/gates.txt: 14 of 432 cases).
-        if entered {
+        //
+        // Nor on a square reached two other ways the original leaves the
+        // player in a wall by: stairs (0000:F7B5 keeps the place and turns
+        // round, and the next level's square there can be a wall: seed 24
+        // from the save, frame 9427), and below height 3Ch, where the moves
+        // test the floor plane, not the walls (0000:F697): a chasm walked
+        // under a wall's square and climbed out of there (a new
+        // character's seed 32, frame 5889).
+        let level = m.mem.r8(DS, arena::movement::var::LEVEL);
+        let changed = std::mem::replace(&mut self.level, level) != level;
+        if entered || changed || h < 0x3C {
             self.entry = Some((col, row));
         } else if self.entry != Some((col, row)) {
             self.entry = None;
         }
         if self.entry.is_none() && h >= 0 && w != 0 && wall != 0 && wall >> 8 == wall & 0xFF {
-            return Some(format!("inside a wall: square ({col}, {row}) {wall:#06x}"));
+            let marks = (m.mem.r8(DS, arena::movement::var::STAIRS_UP), m.mem.r8(DS, arena::movement::var::STAIRS_DOWN));
+            return Some(format!("inside a wall: square ({col}, {row}) {wall:#06x} (stairs {:#04x} {:#04x})", marks.0, marks.1));
         }
         // DGROUP's constant file names stay as the image has them: the text
         // system's POINTER1.DAT (197F) and TEMPLATE.DAT (6E57).
@@ -393,6 +411,19 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     // number), with a save to come back to after a death.
     let tours_pc: u64 = std::env::var("PT_TOURS").ok().map(|v| v.parse().unwrap_or(30)).unwrap_or(0);
     let tours = tours_pc > 0;
+    let focus: Option<Vec<Act>> = std::env::var("PT_FOCUS").ok().map(|v| {
+        v.split(',')
+            .filter_map(|a| match a {
+                "dungeon" => Some(Act::Dungeon),
+                "cast" => Some(Act::Cast),
+                "door" => Some(Act::Door),
+                "talk" => Some(Act::Talk),
+                "travel" => Some(Act::Travel),
+                "stairs" => Some(Act::Stairs),
+                _ => None,
+            })
+            .collect()
+    });
     let mut no_heal = 0usize;
     if let (true, Some((sdir, slot))) = (tours, saves) {
         crate::save_to(&mut engine, sdir, slot, st.assets.palette, None);
@@ -531,6 +562,11 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if left == 0 {
             left = 5 + dice.below(40) as usize;
             act = if tours && dice.below(100) < tours_pc {
+                // PT_FOCUS=dungeon,cast,...: half the targeted acts one of
+                // those (to look for what they meet more often).
+                if let Some(f) = focus.as_ref().filter(|f| !f.is_empty() && dice.below(2) == 0) {
+                    f[dice.below(f.len() as u64) as usize]
+                } else {
                 match dice.below(26) {
                     25 => Act::Dungeon,
                     22 => Act::Menus,
@@ -548,6 +584,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     20 => Act::Screens,
                     21 => Act::Note,
                     _ => Act::Die,
+                }
                 }
             } else {
                 match dice.below(100) {
