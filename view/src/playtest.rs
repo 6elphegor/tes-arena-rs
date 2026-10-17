@@ -498,7 +498,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
     });
     let mut no_heal = 0usize;
     if let (true, Some((sdir, slot))) = (tours, saves) {
-        crate::save_to(&mut engine, sdir, slot, st.assets.palette, None);
+        crate::save_to(&mut engine, sdir, slot, st.assets.dac(), None);
     }
     // A sub-step that gives up (None) is reported and the run goes on.
     let report_none = |what: &str, n: usize, engine: &Engine, run: &arena::transit::Run| match arena::giveup::peek() {
@@ -1088,7 +1088,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     match e {
                         crate::saveui::Ended::Save(e2, s) => {
                             engine = e2;
-                            let msg = crate::save_to(&mut engine, sdir, s, st.assets.palette, None);
+                            let msg = crate::save_to(&mut engine, sdir, s, st.assets.dac(), None);
                             if msg.contains("failed") {
                                 println!("ODD frame {n} (menus): {msg}; {}", place(&engine, run));
                                 issues.set(issues.get() + 1);
@@ -1117,7 +1117,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                         issues.set(issues.get() + 1);
                                     }
                                 },
-                                crate::saveui::Ended::Left(m) => {
+                                crate::saveui::Ended::Left(_, m) => {
                                     println!("ODD frame {n} (menus): the load menu left ({m:?}); {}", place(&engine, run));
                                     issues.set(issues.get() + 1);
                                 }
@@ -1128,7 +1128,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             }
                         }
                         // A refusal (in a shop, say) is the game's.
-                        crate::saveui::Ended::Left(_) => *counts.entry("menu refused").or_default() += 1,
+                        crate::saveui::Ended::Left(..) => *counts.entry("menu refused").or_default() += 1,
                         _ => {
                             println!("ODD frame {n} (menus): the save menu didn't end; {}", place(&engine, run));
                             issues.set(issues.get() + 1);
@@ -1216,7 +1216,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::SaveLoad => {
                 if let (0, Some((sdir, slot))) = (left, saves) {
                     let pre = place(&engine, run);
-                    let msg = crate::save_to(&mut engine, sdir, slot, st.assets.palette, None);
+                    let msg = crate::save_to(&mut engine, sdir, slot, st.assets.dac(), None);
                     let before = place(&engine, run);
                     let was = kept(&engine);
                     if std::env::var_os("PT_VERBOSE").is_some() {

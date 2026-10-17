@@ -181,6 +181,9 @@ impl Machine {
         loop {
             self.menu_or16(0x05C8, 2);
             let (ax, by) = hooks.click(self);
+            // 1194:567E, 5692: the click's way back clears the bit either
+            // way (a click or Esc).
+            self.menu_and16(0x05C8, 0xFFFD);
             if (ax as i16) < 0 {
                 return None;
             }
@@ -305,19 +308,18 @@ impl Machine {
 
     /// 1194:4D91 (4F89): the files matching the pattern at DS:`si` (a
     /// prefix, '*', then the extension) deleted. The original makes the
-    /// pattern's path, then each found file's (25FD:0844, which flips the
-    /// path buffers each time) from the DTA, and deletes it (0000:9DC2).
-    /// Here the files are found through `Files`, and each match flips the
-    /// buffers with the pattern's path instead: the toggle ends as the
-    /// original's, but the buffers hold the pattern's path, not the last
-    /// file's.
+    /// pattern's path, then each found file's from the DTA's name
+    /// (25FD:0844, which flips the path buffers each time: DOS gives the
+    /// names in upper case), and deletes it (0000:9DC2). Here the files
+    /// are found through `Files`, in name order (DOS gives directory
+    /// order).
     pub fn delete_matching(&mut self, files: &mut Files, si: u16) {
         self.save_path(si);
         let pattern = self.mem.cstr(DS, si).to_ascii_uppercase();
         let Some(star) = pattern.iter().position(|&c| c == b'*') else {
             // No wildcard: find first finds the file itself, if it's there.
             if files.exists(&pattern) {
-                self.save_path(si);
+                self.save_path_of(&pattern);
                 files.delete(&pattern);
             }
             return;
@@ -332,7 +334,7 @@ impl Machine {
             if !name.starts_with(prefix) {
                 continue;
             }
-            self.save_path(si);
+            self.save_path_of(&name);
             files.delete(&name);
         }
     }

@@ -92,6 +92,8 @@ fn volcanic(a: &mut App, heading: u16, dx: u16, dy: u16) {
 /// quest's Crypt of Hearts (`into_crypt`).
 #[derive(Clone, Copy)]
 enum Place {
+    /// The guild the load leaves, no frame run (savetest's).
+    Guild,
     Dungeon,
     Crypt,
     Street,
@@ -143,7 +145,12 @@ thread_local! {
     /// The heap's blocks as `played`'s load left them (segment, size,
     /// flags), for `the_load_measured_against_the_originals`.
     static BASE_HEAP: std::cell::RefCell<Vec<(u16, u16, u8)>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// The files as `played`'s load left them (savetest's).
+    static BASE_FILES: std::cell::RefCell<Option<Disk>> = const { std::cell::RefCell::new(None) };
 }
+
+#[path = "savetest.rs"]
+mod savetest;
 
 /// The heap's blocks from the first header (DGROUP 0157): segment, size,
 /// flags.
@@ -172,6 +179,12 @@ fn grab(a: &App) -> (Vec<u8>, Vec<u8>) {
 /// Into the place, `setup` run, then `play` driving frames and
 /// collecting the track: the app as the case leaves it.
 fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) -> Option<(App, Vec<[u16; 5]>)> {
+    played_in(place, setup, play).map(|(a, seen, _)| (a, seen))
+}
+
+/// As `played`, and the save folder's copy the game was loaded from and
+/// saves to (removed when dropped), and the driver.
+fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) -> Option<(App, Vec<[u16; 5]>, Scratch)> {
     let dir = game_dir()?;
     let Some(save) = save_copy() else {
         eprintln!("skipping: no ARENA_SAVE");
@@ -193,7 +206,9 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     clear(&mut d, &mut a);
     BASE.with(|b| *b.borrow_mut() = Some(grab(&a)));
     BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
+    BASE_FILES.with(|b| *b.borrow_mut() = Some(files_now(&a, &save)));
     match place {
+        Place::Guild => {}
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -215,9 +230,12 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     let mut seen = vec![state(&a)];
     play(&mut a, &mut d, &mut seen);
     // The harness's last frame, run again with the page's writes watched
-    // (gen_worldframes.py `play`): the page it leaves is the case's.
-    d.frame(&mut a);
-    Some((a, seen))
+    // (gen_worldframes.py `play`): the page it leaves is the case's. (The
+    // guild's case runs none.)
+    if !matches!(place, Place::Guild) {
+        d.frame(&mut a);
+    }
+    Some((a, seen, save))
 }
 
 /// Into the place, `setup` run, then `play` driving frames and

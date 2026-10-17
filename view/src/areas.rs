@@ -232,10 +232,12 @@ impl arena::load::LoadHooks for Areas<'_> {
     /// before the load): the area's entry (`entered`: a town's
     /// buildings, from CITYDATA) runs inside the load and reads the copy.
     fn slot_files(&mut self, m: &mut Machine, files: &mut Files) {
-        m.slot_files_in(files);
+        // The copy's on a scratch machine: the game's copies once (their
+        // paths' turns, handles and EMS banks are the game's state).
         if let Some(copy) = self.files.as_deref_mut() {
-            m.slot_files_in(copy);
+            m.clone().slot_files_in(copy);
         }
+        m.slot_files_in(files);
     }
 }
 

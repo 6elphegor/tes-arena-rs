@@ -118,9 +118,8 @@ impl Machine {
         for _ in 0..4 {
             let from = self.save_path(FROM);
             let to = self.save_path(TO);
-            if files.data(self.mem.cstr(DS, from)).is_some() {
-                made.push(self.mem.cstr(DS, TO).to_ascii_uppercase());
-            }
+            // (Made empty where the block is missing: `file_copy`.)
+            made.push(self.mem.cstr(DS, TO).to_ascii_uppercase());
             self.file_copy(files, from, to);
             for at in [FROM + 6, TO + 6] {
                 let c = self.mem.r8(DS, at).wrapping_add(1);

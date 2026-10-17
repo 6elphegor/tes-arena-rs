@@ -1,7 +1,8 @@
 //! Differential test of the flats' scaler (src/render.rs `blit_rows`:
 //! 0000:78A8 with its rows compiled by 7A2B, or by 9546 after 953E, a
 //! light's) against vectors from the original code
-//! (harness/gen_scaler.py): the page after.
+//! (harness/gen_scaler.py): the page after, and the row's code it
+//! compiled at DGROUP 929E.
 mod common;
 
 use arena::machine::Machine;
@@ -95,8 +96,11 @@ fn matches_original() {
         m.mem.w16(0, 0x789E, if light { 0x9546 } else { 0x7A2B });
         let before = page_of(seed);
         let mut page = before.clone();
-        arena::render::scaler_alone(&m, &mut page, args, odd).unwrap_or_else(|| panic!("{line}: not ported"));
+        arena::render::scaler_alone(&mut m, &mut page, args, odd).unwrap_or_else(|| panic!("{line}: not ported"));
         assert_eq!(f[2], format!("{:x}", fnv(page.iter().copied())), "{line}: light {light} {args:x?} odd {odd}");
+        // The row's code 78A8 compiled, left at 929E.
+        let rows = (0..0x1000u16).map(|i| m.mem.r8(DS, 0x929E + i));
+        assert_eq!(f[3], format!("{:x}", fnv(rows)), "{line}: the row's code: light {light} {args:x?}");
         if page == before {
             same += 1;
         } else if light {

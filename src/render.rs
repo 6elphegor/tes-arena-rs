@@ -110,6 +110,8 @@ pub struct Soft {
     /// compiled by 7A2B left it on the stack: 9546 doesn't set it, and
     /// the rows' start reads it.
     odd: u8,
+    /// How far the rows 78A8 compiled reached (ROW_CODE on; 0 none).
+    rows_end: u16,
     /// The actors' and projectiles' records whose animation the drawing
     /// stepped (C23A), in order (`Walked::stepped`).
     stepped: Vec<u16>,
@@ -175,13 +177,22 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, stepped: Vec::new() };
+    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
     r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
     let wrote = r.m.mem.written_offsets().into_iter().map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
+    // The rows 78A8 compiled, which stay at ROW_CODE for the game to read
+    // after (the save menu's names where NAMES.DAT doesn't load).
+    for o in ROW_CODE..r.rows_end.max(ROW_CODE) {
+        m.mem.w8(DS, o, r.m.mem.r8(DS, o));
+    }
+    // C398 bit 1, whether the last span the drawing set up ran along x
+    // (0000:AFD6), which a save writes with the level's block.
+    let f = m.mem.r16(DS, 0xC398) & !2 | r.m.mem.r16(DS, 0xC398) & 2;
+    m.mem.w16(DS, 0xC398, f);
     if r.gaps.is_empty() {
         // The player's square's floor (CB5B: 0 dry, 1 water, 2 lava, as
         // the walk finds it, 0000:CDxx), which the game reads after: the
@@ -203,7 +214,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
 /// the 3D mode draws it; the machine and the page after, and the paths
 /// not ported it reached.
 pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
-    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0, stepped: Vec::new() };
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
     r.page.resize(0x10000, 0);
     r.cap_draw(0, ax, cx);
     (r.m, r.page, r.gaps)
@@ -213,11 +224,15 @@ pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u
 /// CS:789E names on `m`: the arguments as pushed (x, y, the size drawn,
 /// the shade's offset and segment, the size, bits a pixel, the flags,
 /// the source's offset and segment, the colours' offset and segment),
-/// `odd` the stack's [BP-14h]; onto `page` (the page's segment, 64 KB).
-/// None where it would read the code segment's colours (not ported).
-pub fn scaler_alone(m: &Machine, page: &mut [u8], a: [u16; 14], odd: u8) -> Option<()> {
-    let mut odd = odd;
-    blit_rows(m, page, a[0], a[1], a[2], a[3], (a[5], a[4]), a[6], a[7], a[9], (a[11], a[10]), a[8] as u8, (a[13], a[12]), &mut odd).then_some(())
+/// `odd` the stack's [BP-14h]; onto `page` (the page's segment, 64 KB),
+/// the row's code compiled at ROW_CODE on `m`. None where it would read
+/// the code segment's colours (not ported).
+pub fn scaler_alone(m: &mut Machine, page: &mut [u8], a: [u16; 14], odd: u8) -> Option<()> {
+    let mut r = Soft { m: m.clone(), page: page.to_vec(), gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd, rows_end: 0, stepped: Vec::new() };
+    r.blit(a[0], a[1], a[2], a[3], (a[5], a[4]), a[6], a[7], a[9], (a[11], a[10]), a[8] as u8, (a[13], a[12]));
+    *m = r.m;
+    page.copy_from_slice(&r.page[..page.len()]);
+    r.gaps.is_empty().then_some(())
 }
 
 impl Soft {
@@ -2986,10 +3001,276 @@ impl Soft {
     /// 0000:78A8 (`blit_rows`) onto the page.
     #[allow(clippy::too_many_arguments)]
     fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+        // 79B7..79C8: the row compiled at ROW_CODE (the shade's segment
+        // as 7965..79A9 leave it: the colours', or CS, for a source under
+        // 8 bits with colours).
+        if let Some([cx, _, cw, _, fx, _, xs, _]) = clip(&self.m, x, y, dw, dh, w, h) {
+            let light = self.m.mem.r16(0, GENERATOR) == LIGHT_ROWS;
+            let shaded = shade.0 != 0 || (bpp != 8 && map.0 != 0);
+            let end = compile_rows(&mut self.m, light, cx, cw, fx, xs, flags, w, bpp, shaded);
+            self.rows_end = self.rows_end.max(end);
+        }
         if !blit_rows(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map, &mut self.odd) {
             self.gap("9546: a light flat through 781E's colours");
         }
     }
+}
+
+/// Where 78A8 has the row compiled and calls it: DGROUP 929E (79BF,
+/// 7A0F). The code stays there after (the save menu's names read it
+/// where NAMES.DAT doesn't load, 25FD:0718).
+const ROW_CODE: u16 = 0x929E;
+
+/// The code 78A8's row compiler (CS:789E: 7A2B, or 9546 after 953E)
+/// writes at ROW_CODE for a draw, byte for byte: `x`, `dw` and `fx` as
+/// clipped ([BP+6], CX, BX), the step `xs` (DX); `flags` bit 0 the 0s
+/// left out, bit 1 mirrored ([BP-1Ah]); `w` and `bpp` the source's;
+/// `shaded` where [BP+10h], the shade's segment, isn't 0 (the colours'
+/// or CS for a source under 8 bits with colours, 7965..79A9). The
+/// machine's code is drawn by `blit` and `blit_light` instead; only its
+/// bytes are kept.
+#[allow(clippy::too_many_arguments)]
+fn compile_rows(m: &mut Machine, light: bool, x: u16, dw: u16, fx: u16, xs: u16, flags: u16, w: u16, bpp: u8, shaded: bool) -> u16 {
+    struct Out<'a> {
+        m: &'a mut Machine,
+        di: u16,
+    }
+    impl Out<'_> {
+        fn b(&mut self, v: u8) {
+            self.m.mem.w8(DS, self.di, v);
+            self.di = self.di.wrapping_add(1);
+        }
+        fn w(&mut self, v: u16) {
+            self.b(v as u8);
+            self.b((v >> 8) as u8);
+        }
+        fn at(&mut self, d: i16, v: u16) {
+            self.m.mem.w16(DS, self.di.wrapping_add(d as u16), v);
+        }
+    }
+    let mirror = flags & 2 != 0;
+    let see = flags & 1 != 0;
+    let mut o = Out { m, di: ROW_CODE };
+    let (mut cx, mut bx) = (dw, fx);
+    let hi = |bx: u16| (bx >> 8) as u8;
+    // The run of output pixels on one source pixel (7AEE, 9594): CX
+    // counted down by `loope`.
+    let run = |cx: &mut u16, bx: &mut u16| -> u8 {
+        let mut n = 0u8;
+        loop {
+            n = n.wrapping_add(1);
+            let ah = hi(*bx);
+            *bx = bx.wrapping_add(xs);
+            *cx = cx.wrapping_sub(1);
+            if *cx == 0 || ah != hi(*bx) {
+                return n;
+            }
+        }
+    };
+    // The step to the next source pixel (7BFC, 9625): inc/dec si, or add
+    // si by the bytes moved.
+    let step = |o: &mut Out, bx: &mut u16| {
+        let ah = hi(*bx);
+        *bx = bx.wrapping_add(xs);
+        let d = hi(*bx).wrapping_sub(ah);
+        if d == 1 {
+            o.b(if mirror { 0x4E } else { 0x46 });
+        } else {
+            o.at(0, 0xC683);
+            o.m.mem.w8(DS, o.di.wrapping_add(2), if mirror { d.wrapping_neg() } else { d });
+            o.di = o.di.wrapping_add(3);
+        }
+    };
+    if light {
+        if xs < 0x100 {
+            let mut e = 0u16;
+            let mut col = x;
+            loop {
+                if mirror {
+                    o.w(0x048A);
+                } else {
+                    o.b(0xAC);
+                }
+                if see {
+                    o.w(0xC008);
+                    o.b(0x75);
+                    o.b(3);
+                    o.b(0xE9);
+                    e = o.di;
+                    o.di = o.di.wrapping_add(2);
+                }
+                o.w(0xC788);
+                let n = run(&mut cx, &mut bx);
+                for _ in 0..n {
+                    o.b(0x26);
+                    o.w(0x1D8A);
+                    o.b(0x64);
+                    o.w(0x078A);
+                    col = col.wrapping_add(1);
+                    o.b(0xAA);
+                }
+                if e != 0 {
+                    o.w(0xEF83);
+                    o.b(n);
+                    let d = o.di.wrapping_sub(e).wrapping_sub(2);
+                    o.m.mem.w16(DS, e, d);
+                    o.w(0xC783);
+                    o.b(n);
+                }
+                if mirror {
+                    o.b(0x4E);
+                }
+                if cx == 0 {
+                    break;
+                }
+            }
+            let _ = col;
+        } else {
+            loop {
+                o.w(0x3C8A);
+                if see {
+                    o.w(0xFF08);
+                    o.b(0x74);
+                    o.b(9);
+                }
+                o.b(0x26);
+                o.w(0x1D8A);
+                o.b(0x64);
+                o.w(0x078A);
+                o.b(0x26);
+                o.w(0x0588);
+                o.b(0x47);
+                cx = cx.wrapping_sub(1);
+                if cx == 0 {
+                    break;
+                }
+                step(&mut o, &mut bx);
+            }
+        }
+        o.b(0xCB);
+        return o.di;
+    }
+    let odd = bpp != 8;
+    let (sh16, mask) = if odd { (16u8.wrapping_sub(bpp), 0xFFu8 >> (8 - bpp)) } else { (0, 0) };
+    // 7A63..7AB4, 7B6B..7BBA: a pixel of `bpp` bits read from the row's
+    // big-endian word at its bit (mov ax,[si+d]; xchg al,ah; shr ax,n;
+    // and al,mask), the shift left out where it is 0 and done on the
+    // byte where it is 8 or more.
+    let bits = |o: &mut Out, bx: u16| {
+        o.w(0x848B);
+        let mut al = hi(bx);
+        if mirror {
+            al = al.wrapping_neg().wrapping_add(w as u8).wrapping_sub(1);
+        }
+        let ax = al as u16 * bpp as u16;
+        o.w(ax >> 3);
+        o.w(0xC486);
+        o.w(0xE8C1);
+        let mut s = sh16.wrapping_sub(ax as u8 & 7) & 0xF;
+        if s >= 8 {
+            s -= 8;
+            o.di = o.di.wrapping_sub(2);
+            o.at(-2, 0xE8C1);
+            o.at(-6, 0x848A);
+        }
+        o.b(s);
+        if s == 0 {
+            o.di = o.di.wrapping_sub(3);
+        }
+        o.w(0x24 | (mask as u16) << 8);
+    };
+    if xs < 0x100 {
+        let mut e = 0u16;
+        let mut col = x;
+        loop {
+            if odd {
+                bits(&mut o, bx);
+            } else if mirror {
+                o.w(0x048A);
+            } else {
+                o.b(0xAC);
+            }
+            if see {
+                if !odd {
+                    o.w(0xC008);
+                }
+                o.b(0x74);
+                e = o.di;
+                o.di = o.di.wrapping_add(1);
+            }
+            if shaded {
+                o.w(0xD764);
+            }
+            let n = run(&mut cx, &mut bx);
+            if n >= 2 {
+                o.b(0x88);
+                o.b(0xC4);
+            }
+            let mut ah = n;
+            while ah != 0 {
+                if ah >= 2 && col & 3 == 0 {
+                    o.b(0xAB);
+                    ah -= 2;
+                } else {
+                    o.b(0xAA);
+                    col = col.wrapping_add(1);
+                    ah -= 1;
+                }
+            }
+            if e != 0 {
+                o.w(0xEF83);
+                o.b(n);
+                let d = o.di.wrapping_sub(e).wrapping_sub(1) as u8;
+                o.m.mem.w8(DS, e, d);
+                o.w(0xC783);
+                o.b(n);
+            }
+            if !odd && mirror {
+                o.b(0x4E);
+            }
+            if cx == 0 {
+                break;
+            }
+        }
+    } else {
+        loop {
+            if odd {
+                bits(&mut o, bx);
+            } else {
+                o.w(0x048A);
+            }
+            if see {
+                if !odd {
+                    o.w(0xC008);
+                }
+                o.b(0x74);
+                o.b(3);
+            }
+            if shaded {
+                if see {
+                    let at = o.di.wrapping_sub(1);
+                    let v = o.m.mem.r8(DS, at).wrapping_add(2);
+                    o.m.mem.w8(DS, at, v);
+                }
+                o.w(0xD764);
+            }
+            o.b(0x26);
+            o.w(0x0588);
+            cx = cx.wrapping_sub(1);
+            if cx == 0 {
+                break;
+            }
+            o.b(0x47);
+            if odd {
+                let _ = hi(bx);
+                bx = bx.wrapping_add(xs);
+                continue;
+            }
+            step(&mut o, &mut bx);
+        }
+    }
+    o.b(0xCB);
+    o.di
 }
 
 /// CS:789E, the routine 78A8 has compile each row: 7A2B (`blit`) or,

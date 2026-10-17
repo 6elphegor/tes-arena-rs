@@ -170,6 +170,14 @@ impl Files {
         self.deleted.insert(base);
     }
 
+    /// The names of the files the game deleted and hasn't made again
+    /// (upper case, sorted).
+    pub fn deleted_names(&self) -> Vec<Vec<u8>> {
+        let mut v: Vec<Vec<u8>> = self.deleted.iter().cloned().collect();
+        v.sort();
+        v
+    }
+
     /// Whether the game deleted the file (by DOS name).
     pub fn was_deleted(&self, name: &[u8]) -> bool {
         self.deleted.contains(&Self::base(name).to_ascii_uppercase())

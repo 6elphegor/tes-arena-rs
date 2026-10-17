@@ -54,8 +54,10 @@ pub enum Ended {
     Save(Engine, u8),
     /// A slot picked to load: the engine after the menu.
     Load(Engine, u8),
-    /// The menu left, with the message it showed (a refusal) if any.
-    Left(Option<String>),
+    /// The menu left: the engine as it left it (the load menu has deleted
+    /// the working log and rooms, 25FD:0242, whatever comes next), and the
+    /// message it showed (a refusal) if any.
+    Left(Box<Engine>, Option<String>),
 }
 
 pub struct SaveUi {
@@ -196,7 +198,7 @@ impl SaveUi {
             None => Ended::Open,
             Some(Ok(n)) if self.kind == Kind::Save => Ended::Save(e, n),
             Some(Ok(n)) => Ended::Load(e, n),
-            Some(Err(msg)) => Ended::Left(msg),
+            Some(Err(msg)) => Ended::Left(Box::new(e), msg),
         }
     }
 
@@ -281,8 +283,10 @@ impl SaveUi {
                 Draw::Fill(x, y, w, h, c) => screen.fill(*x, *y, *w, *h, *c, 0xFF),
                 Draw::Text(x, y, t, c, g) => {
                     let Some((_, font)) = self.fonts.iter().find(|(f, _)| f == g) else { continue };
-                    let s = String::from_utf8_lossy(t);
-                    screen.text_plain(font, x - font.width(&s) as i32 / 2, *y, &s, *c);
+                    // 0000:5368: x less half 66F6's width, the bytes as
+                    // they are (a slot's name may be anything NAMES.DAT
+                    // or the memory there held).
+                    screen.text_plain_bytes(font, x - font.width_of(t) as i32 / 2, *y, t, *c);
                 }
             }
         }
