@@ -23,6 +23,7 @@ screenfade | logbookmore | 27 | 6e85f83479df0314
 screenfade | worldmap | 42 | 9eb220110e8f5f09
 screenfade | worldprovince | 70 | 40f6a41e18287ddc
 screenfade | worldtrip | 70 | 40f6a41e18287ddc
+screenfade | worldunwell | 70 | 40f6a41e18287ddc
 screenfade | worldsearch | 70 | 40f6a41e18287ddc
 screenfade | worldback | 105 | ad34c8f6e802007
 screenfade | worldsearchtyped | 70 | 40f6a41e18287ddc

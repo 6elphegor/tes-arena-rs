@@ -95,7 +95,7 @@ the original routine:
 | `EndHooks::line` | src/staffend.rs:46 | 0000:5364 | elsewhere | the view's still of HOUSE.IMG draws the lines as 0000:5364 does (`Movie::draw`: centred on A0h from row 32h, 0Ah apart), screen-checked against the original (gen_house.py, house.txt) | |
 | `EndHooks::movie` | src/staffend.rs:28 | 2294:0895 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies (not screen-checked) |
 | `EndHooks::shown` | src/staffend.rs:49 | 1194:DAC4 | present | the screen shown and a key waited for | |
-| `EndHooks::speech` | src/staffend.rs:31 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies with their texts (not screen-checked) |
+| `EndHooks::speech` | src/staffend.rs:31 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies with their texts, brought in as D459 brings them (`Movie::lead_in`, checked on the dreams) |
 | `EndHooks::text` | src/staffend.rs:41 | 1194:A36C | port | the default runs the port | |
 | `EngineHooks::draw` | src/engine.rs:49 | 0000:C980 | overridden | the view: main.rs Front<'_> | fixed: was the view's stand-in (every projectile and changed square in reach stepped, the click hit-tested on the GPU, a door's span the whole width): with the page the engine now takes the drawing's own walk (`render::Walked`: C23A's steps, D3F9's, the square and door under the cursor, the hit test 0000:C4BB with the hook CD3A); the stand-in is left for --gpu-world. playghostclick's state matches |
 | `EngineHooks::draw_setup` | src/engine.rs:65 | 0000:D4B4 | elsewhere | the drawing's set-up is the renderer's (`render::draw`); fog's step runs on the machine (`fog_step`) | |
@@ -108,7 +108,7 @@ the original routine:
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |
 | `FightHooks::fight_graphics` | src/encounter.rs:48 | 0000:1AF9 | port | the default runs the port | |
 | `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's | |
-| `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie (not screen-checked) |
+| `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
 | `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
 | `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
 | `FrameHooks::actor_click` | src/frame.rs:90 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
@@ -127,7 +127,7 @@ the original routine:
 | `FrameHooks::quest_carry` | src/frame.rs:117 | 0000:4D00 | port | the default runs the port | |
 | `FrameHooks::rest` | src/frame.rs:133 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
 | `FrameHooks::riddle` | src/frame.rs:80 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
-| `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | present: ENTERCTY.$$$ in the game's box; what it covers is kept black, the window's picture not being the game's 256 colours (not screen-checked) |
+| `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: ENTERCTY.$$$ in the game's box; what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`) |
 | `FrameHooks::townsfolk_graphics` | src/frame.rs:108 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
 | `FrameHooks::weapon_graphics` | src/frame.rs:104 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
 | `FxHooks::spell_reflected` | src/effects.rs:172 | 0000:27E5 | overridden | the engine: GameHooks | faithful: the engine's |
@@ -261,7 +261,7 @@ the original routine:
 | `QuestHooks::text_shown` | src/quest.rs:81 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port and its box |
 | `QuestHooks::travel` | src/quest.rs:116 | 1194:2E69 | port | the default runs the port | |
 | `RestHooks::advance` | src/rest.rs:129 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `RestHooks::dream` | src/rest.rs:108 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does (by reading the code; not screen-checked) |
+| `RestHooks::dream` | src/rest.rs:108 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
 | `RestHooks::hours_text` | src/rest.rs:106 | 1194:4659 / 452F | overridden | the view: main.rs Front<'_> | present: drawn as 1194:4659 draws it (screens.txt) |
 | `RestHooks::menu` | src/rest.rs:97 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt) |
 | `RestHooks::message` | src/rest.rs:104 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
@@ -367,7 +367,7 @@ the original routine:
 | `TravelHooks::message_box` | src/travelmap.rs:78 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
 | `TravelHooks::pick_stub` | src/travelmap.rs:138 |  | stub | a test's stand-in | |
 | `TravelHooks::province` | src/travelmap.rs:110 | 1194:2E14 / 2E18 | port | the default runs the port | |
-| `TravelHooks::question` | src/travelmap.rs:80 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`; not screen-checked) |
+| `TravelHooks::question` | src/travelmap.rs:80 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
 | `TravelHooks::resource` | src/travelmap.rs:87 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
 | `TravelHooks::screen` | src/travelmap.rs:85 |  | present | a fade | |
 | `TravelHooks::show_bank` | src/travelmap.rs:93 | 1194:4D74 | present | a screen bank shown | |

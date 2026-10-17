@@ -344,6 +344,11 @@ pub struct Movie {
     /// A still picture with its text all at once from row 32h, over the
     /// whole picture (the ending's house, 1194:DA38..DAC2); a key ends it.
     pub full: bool,
+    /// What the screen shows before the movie, a frame a retrace (the
+    /// vision's way in, 1194:D459: the colours faded to black in 8 over
+    /// the screen there, 55B2, then the screen cleared): `lead_in`.
+    lead: std::collections::VecDeque<(Vec<u8>, crate::film::Dac)>,
+    lead_ms: u32,
 }
 
 impl Flc {
@@ -361,17 +366,40 @@ impl Movie {
     /// `name` played; with `lines`, as a vision with that text.
     pub fn new(archive: &Archive, name: &str, lines: Vec<Vec<Span>>) -> Option<Movie> {
         let flc = Flc::open(archive, name)?;
-        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false })
+        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false, lead: Default::default(), lead_ms: 0 })
     }
 
     /// A still picture shown with all its text (`full`).
     pub fn still(flc: Flc, lines: Vec<Vec<Span>>) -> Movie {
-        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true }
+        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true, lead: Default::default(), lead_ms: 0 }
+    }
+
+    /// The vision's way in (1194:D459): from `shown` in `dac`, the colours
+    /// faded to black in 8 (55B2), the screen cleared, then the movie.
+    pub fn lead_in(mut self, shown: &[u8], dac: crate::film::Dac) -> Movie {
+        let mut film = crate::film::Film::new(shown.to_vec(), dac);
+        film.fade(&[[0, 0, 0, 0xFF]; 256], 8);
+        film.whole(&[0; W * H]);
+        film.wait();
+        self.lead = film.frames.into();
+        self
     }
 
     /// Time passing (milliseconds): frames stepped at the file's speed. An
     /// animation without text is over when it has been through once.
     pub fn advance(&mut self, ms: u32) {
+        // The way in first, a frame a retrace.
+        if !self.lead.is_empty() {
+            self.lead_ms += ms;
+            while !self.lead.is_empty() && self.lead_ms >= crate::film::RETRACE_MS {
+                self.lead_ms -= crate::film::RETRACE_MS;
+                self.lead.pop_front();
+            }
+            if !self.lead.is_empty() {
+                return;
+            }
+            self.lead_ms = 0;
+        }
         self.elapsed += ms;
         while self.elapsed >= self.flc.speed && !self.over {
             self.elapsed -= self.flc.speed;
@@ -393,6 +421,12 @@ impl Movie {
 
     /// The frame, and the text's lines now in `font`.
     pub fn draw(&self, screen: &mut Screen, font: &Font) {
+        if let Some((px, dac)) = self.lead.front() {
+            screen.set_palette(*dac);
+            screen.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+            screen.blit(0, 0, W, H, px, H as i32);
+            return;
+        }
         if self.full {
             // 1194:DA91..DAC2: every line centred at x A0h from row 32h,
             // ten apart, over the whole picture.

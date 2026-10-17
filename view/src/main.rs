@@ -203,6 +203,9 @@ struct Front<'a> {
     /// An effect's words the frame drew (0000:5011), with the row: the
     /// HUD shows them till the next frame.
     effect: Option<(Vec<u8>, i32)>,
+    /// The screen as last shown (`Assets::shown`): the page at the frame's
+    /// start.
+    shown: Option<&'a [u8]>,
 }
 
 impl Front<'_> {
@@ -462,13 +465,14 @@ impl arena::frame::FrameHooks for Front<'_> {
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
     /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box,
     /// what the box covers kept at the frame's start (0000:4B18) as the
-    /// original keeps it; the view's screen isn't the game's 256 colours,
-    /// so the kept pixels are black.
+    /// original keeps it: the page then, the screen last shown (the
+    /// cursor, which the original takes off the page between frames, is
+    /// never on the view's).
     fn town_welcome(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         if m.file_load(files, 0x130C, arena::mem::DS, 0x1044).is_some() {
             if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
                 let frame = m.mem.r16(arena::mem::DS, 0x9030);
-                m.box_background(frame, 0, rect, None);
+                m.box_background(frame, 0, rect, self.shown);
             }
             self.message_box(m, 0x1044);
         }
@@ -776,6 +780,10 @@ struct Assets {
     light: LightState,
     /// The player's interface (`interface`).
     interface: interface::Interface,
+    /// The screen last composed (`App::compose`), a byte a pixel: the page
+    /// as the original holds it at a frame's start, which a box keeps what
+    /// it covers from (`Front::town_welcome`).
+    shown: Vec<u8>,
 }
 
 /// The view's side of the day and night switch and the fog
@@ -1097,6 +1105,7 @@ impl Assets {
             flash: std::cell::Cell::new(None),
             frame_view: None,
             moons: [0, 0],
+            shown: vec![0; 64000],
         }
     }
 
@@ -1255,6 +1264,15 @@ impl Assets {
     /// filling the sky) for a view `aspect` wide, kept for the redraws
     /// until the next frame.
     fn view_frame(&mut self, engine: &mut Engine, aspect: f32) {
+        // The bank the frame left mapped (8FA8: the faces' 19h, 292B:0530),
+        // mapped again at the end: this is the view's own work after the
+        // frame, where the original maps none.
+        let mapped = engine.m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED);
+        self.view_frame_drawn(engine, aspect);
+        engine.m.ems_map(mapped >> 2);
+    }
+
+    fn view_frame_drawn(&mut self, engine: &mut Engine, aspect: f32) {
         let (mut sky, lights) = self.light_frame(&mut engine.m);
         self.sky_loads(engine);
         let focal = world::TAN_HALF * aspect;
@@ -1656,7 +1674,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown) };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
@@ -1666,7 +1684,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }
@@ -1726,7 +1744,9 @@ fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
 
 /// The animations a turn played (`dialog::Talk::movies`), made: a text's
 /// lines through the text port (1194:D459), the files from the game's.
-fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>) -> Vec<flc::Movie> {
+/// With `from` (the screen shown and its colours), a movie with text
+/// comes in as 1194:D459 brings it (`Movie::lead_in`).
+fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>, from: Option<(&[u8], film::Dac)>) -> Vec<flc::Movie> {
     played
         .into_iter()
         .filter_map(|(name, text, colour)| {
@@ -1750,7 +1770,11 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
                 return Some(flc::Movie::still(flc::Flc::still(px, pal), lines));
             }
             let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
-            flc::Movie::new(archive, name, lines)
+            let mv = flc::Movie::new(archive, name, lines)?;
+            Some(match (text, from) {
+                (Some(_), Some((shown, dac))) => mv.lead_in(shown, dac),
+                _ => mv,
+            })
         })
         .collect()
 }
@@ -1905,7 +1929,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     st.audio.after(&mut engine.m);
     let played = std::mem::take(&mut talk.movies);
     let archive = st.assets.archive.clone();
-    st.movies.extend(movies_of(engine, &archive, played));
+    st.movies.extend(movies_of(engine, &archive, played, None));
     st.music.after(&mut engine.m, ticks);
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
@@ -2081,7 +2105,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             let colour = parts.next().map_or(0x33, |c| u8::from_str_radix(c, 16).expect("--do movie:NAME:TEXT:COLOUR"));
             let name: &'static str = Box::leak(name.to_ascii_uppercase().into_boxed_str());
             let archive = st.assets.archive.clone();
-            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, colour)]));
+            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, colour)], None));
             continue;
         }
         if let Some(d) = step.strip_prefix("swing:") {
@@ -2330,7 +2354,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
                 let msg = if what == "save" {
-                    save_to(&mut engine, sdir, slot, st.assets.palette)
+                    save_to(&mut engine, sdir, slot, st.assets.palette, None)
                 } else {
                     match load_from(&mut engine, dir, sdir, slot) {
                         Ok((m, r)) => {
@@ -2572,11 +2596,13 @@ fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (
 
 /// Saving writes the game's files into the save directory (by their
 /// names, the game's directory dropped); the VGA's palette is the view's.
-/// The screen saved with the level (0xFA00 bytes from A8FE, the original's
-/// screen) is left black: the view's picture isn't in the machine.
+/// The screen saved with the level (0xFA00 bytes from A8FE, the page as
+/// the save writes it) is `shot`, the view's screen at that moment
+/// (`App::save_shot`); without one it is left black.
 struct SaveDir<'a> {
     dir: &'a std::path::Path,
     palette: [[u8; 4]; 256],
+    shot: Option<&'a [u8]>,
     /// The files written (their DOS names, their bytes), for the game's
     /// `Files` to have them too (`save_to`).
     written: Vec<(Vec<u8>, Vec<u8>)>,
@@ -2599,7 +2625,10 @@ impl arena::save_write::SaveHooks for SaveDir<'_> {
         let mut data = data.to_vec();
         if p.file_name().is_some_and(|n| n.to_string_lossy().to_ascii_uppercase().starts_with("SAVEGAME")) {
             let n = data.len().min(0xFA00);
-            data[..n].fill(0);
+            match self.shot {
+                Some(shot) => data[..n].copy_from_slice(&shot[..n]),
+                None => data[..n].fill(0),
+            }
         }
         if let Err(e) = std::fs::write(&p, &data) {
             eprintln!("{}: {e}", p.display());
@@ -2619,7 +2648,7 @@ impl arena::save_write::SaveHooks for SaveDir<'_> {
 
 /// The game saved to `slot` in `dir` (25FD:0113, `save_game`): NAMES.DAT,
 /// SAVEGAME.nn and SAVEENGN.nn. What happened, to show.
-fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 4]; 256]) -> String {
+fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 4]; 256], shot: Option<&[u8]>) -> String {
     if let Err(e) = std::fs::create_dir_all(dir) {
         return format!("{}: {e}", dir.display());
     }
@@ -2643,7 +2672,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
             eprintln!("{}: {e}", p.display());
         }
     }
-    let mut out = SaveDir { dir, palette, written: Vec::new() };
+    let mut out = SaveDir { dir, palette, shot, written: Vec::new() };
     engine.m.save_game(&mut out);
     // The game's files have them too: a load reads the files written in
     // play before the directories' (`Files`), and the slot's copies made
@@ -3028,7 +3057,9 @@ impl App {
             self.audio.after(&mut self.engine.m);
             let played = std::mem::take(&mut talk.movies);
             let archive = self.assets.archive.clone();
-            self.movies.extend(movies_of(&mut self.engine, &archive, played));
+            let from = Some((&self.assets.shown[..], *self.screen.palette()));
+            let mv = movies_of(&mut self.engine, &archive, played, from);
+            self.movies.extend(mv);
             self.music.after(&mut self.engine.m, ticks);
         } else {
             self.engine.m.songs.clear();
@@ -3229,10 +3260,33 @@ impl App {
             }
             self.screen.recolour(dac);
         }
+        self.assets.shown.clear();
+        self.assets.shown.extend(self.screen.indices().iter().map(|&c| c as u8));
         if prof::on() {
             prof::add("redraw.screen", t.elapsed());
         }
         cam
+    }
+
+    /// The page as the save menu leaves it when the game is written
+    /// (25FD:0110, A8FE): the interface, the options screen and the menu
+    /// over it, as `compose` draws them, and "Kindly waiteth..." (0803:
+    /// the text at 5F26 in the fonts and colour it selects) boxed over
+    /// them.
+    fn save_shot(&mut self) -> Vec<u8> {
+        let mut s = hud::Screen::new(self.assets.palette);
+        s.set_palette(self.assets.dac());
+        if let Some(o) = &self.saveui_under {
+            self.assets.interface.draw(&mut s, &self.font, &self.engine.m);
+            o.draw(&mut s, &self.font);
+        }
+        if let Some(ui) = &self.saveui {
+            ui.draw(&mut s);
+        }
+        let m = &self.engine.m;
+        let lines = hud::in_font(dialog::text_at(m, arena::savemenu::var::WAIT, m.mem.r8(arena::mem::DS, 0x9288)), hud::GameFont::selected(m));
+        hud::compose_over(&mut s, &self.font, &hud::Hud { boxed: Some(lines), ..Default::default() });
+        s.indices().iter().map(|&c| c as u8).collect()
     }
 
     fn remake_renderer(&mut self) {
@@ -3253,7 +3307,11 @@ impl App {
     /// F5: the game saved to the slot in the save directory.
     fn save(&mut self) {
         let msg = match self.save_dir.clone() {
-            Some(dir) => save_to(&mut self.engine, &dir, self.slot, self.assets.palette),
+            Some(dir) => {
+                // The port's own key: the screen as the window shows it.
+                let shot: Vec<u8> = self.screen.indices().iter().map(|&c| c as u8).collect();
+                save_to(&mut self.engine, &dir, self.slot, self.assets.palette, Some(&shot))
+            }
             None => "No save directory (--save-dir).".to_string(),
         };
         self.say(&msg);
@@ -3286,7 +3344,8 @@ impl App {
                 // The game's menu says nothing once the game is saved (only
                 // its wait, 25FD:0803, while the disk is used); a failure
                 // the original wouldn't have is told.
-                let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette);
+                let shot = self.save_shot();
+                let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette, Some(&shot));
                 if msg.starts_with("Saved to slot") {
                     println!("{msg}");
                 } else {

@@ -811,7 +811,7 @@ impl Machine {
     /// 1194:D3AF. A pending dream not yet shown: at level 1 the first
     /// (text 5DCh), then the one for DREAM_COUNT (50Eh + it, a byte
     /// add); the screen to be redrawn, the dream shown.
-    fn dream_show(&mut self, hooks: &mut dyn RestHooks) {
+    pub fn dream_show(&mut self, hooks: &mut dyn RestHooks) {
         if self.r_g8(DREAM) == 0 || self.r_g8(DREAM_SHOWN) != 0 {
             return;
         }

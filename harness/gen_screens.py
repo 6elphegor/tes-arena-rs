@@ -148,6 +148,12 @@ SCREENS = {
     # 0Eh high from y 4): 25FD:028D finds no SAVEGAME, and 1194:59C8 says
     # so (5F0F) before the picker comes back.
     'optionsloadempty': (0x000A, [('click', 96, 132), ('click', 100, 81)]),
+    # Save's picker, the sixth slot's row clicked, "A" typed and Enter:
+    # the game saved (25FD:0002..0110, 0113). Its "screen" is SAVEGAME's
+    # first FA00h bytes, the page (A8FE) as the save writes it (`SAVED`),
+    # with "Kindly waiteth..." (0803) over the menu; its colours the 300h
+    # after them (929E, read from the VGA).
+    'optionssaved': (0x000A, [('click', 160, 132), ('click', 100, 81)] + [('keys', [k]) for k in (0x1E, 0x1C)]),
     # The mages' guild's menu (1194:A73E, kind 7 of 869F's: its screen,
     # banner and menu), as the guild master's click runs it.
     'guild': ((0x1194, 0xA73E, {}), []),
@@ -249,6 +255,10 @@ SCREENS = {
     # asked; its Search (the button at 34, 167): a name asked.
     'worldprovince': (0x03BF, [('click', 70, 45)]),
     'worldtrip': (0x03BF, [('click', 70, 45), ('click', 200, 100)]),
+    # Unwell (`unwell`: poisoned, 05B1 bit 0), the place's journey read
+    # (a click) and Travel (26F7:07CD, the button at 62, 180) clicked:
+    # 1194:48DB asks "Considering your condition..." (6B1D) as a menu.
+    'worldunwell': (0x03BF, [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]),
     'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
     # The province's Exit (the button at 72, 167): the world map again.
     'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
@@ -375,7 +385,7 @@ WAIT = (0, 0x8FC4)
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
           'people': None, 'palace': 'triggers', 'guild': 'guild'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
-         'worldprovince': 'street', 'worldtrip': 'street', 'worldsearch': 'street', 'worldback': 'street',
+         'worldprovince': 'street', 'worldtrip': 'street', 'worldunwell': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
          'tavernwelcome': 'tavern', 'templewelcome': 'temple', 'storewelcome': 'store', 'guildwelcome': 'guild',
@@ -645,6 +655,12 @@ def resting(countdown, hours, step=0):
     return at
 
 
+def unwell(a):
+    """The player poisoned (05B1 bit 0): unwell for the journey's
+    question (26F7:07CD's 5B1 & 7)."""
+    a.mu.mem_write(a.lin(a.ds, 0x05B1), bytes([a.mu.mem_read(a.lin(a.ds, 0x05B1), 1)[0] | 1]))
+
+
 def hurt(a):
     """The player's health (01FD) at half its maximum (01FF): not rested."""
     a.w16(0x01FD, a.r16(0x01FF) // 2)
@@ -724,6 +740,9 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
 # What a screen's routine is followed by that the next frame would do:
 # the message line drawn (0000:0511: in [102C]'s font, centred at x A0h,
 # y 14h, in colour 70h, then one pixel right in 9Fh).
+# The screens that are a save's picture (its SAVEGAME's screen and
+# colours: the slot picked, the sixth's).
+SAVED = {'optionssaved': 'SAVEGAME.05'}
 AFTER = {n: lambda a: a.call_near(0, 0x0511) for n in ('usemessage', 'usepotion', 'spellarea', 'spellself', 'spelllight', 'looktavern')}
 
 
@@ -743,6 +762,7 @@ def prow(a):
 
 
 BEFORE['boatprow'] = boat
+BEFORE['worldunwell'] = unwell
 AFTER['boatprow'] = prow
 
 
@@ -766,6 +786,9 @@ def draw(a, base, name, handler, script, fill, waits=None):
         a.run_screen(MENU, handler, near=True)
     if name in AFTER:
         AFTER[name](a)
+    if name in SAVED:
+        saved = a.written[SAVED[name]]
+        return bytes(saved[:0xFA00]), bytes(saved[0xFA00:0xFD00])
     return a.page(), bytes(a.dac)
 
 

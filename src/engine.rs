@@ -264,6 +264,8 @@ impl Engine {
     /// tick of a level without C39A bit 400h shows in BA60.
     pub fn frame(&mut self, input: Input, hooks: &mut dyn EngineHooks) -> Option<Frame> {
         self.walked = None;
+        // (A frame that gave up last time left its tracking on.)
+        self.m.mem.untrack();
         let (m, files) = (&mut self.m, &mut self.files);
         let r = |m: &Machine, at: u16| m.mem.r16(DS, at);
         m.mem.w8(DS, STAGE, 0);
@@ -387,6 +389,13 @@ impl Engine {
             }
         }
         hooks.step(m, Step::DrawLists);
+        // The drawing over (the view stage above is the machine's part of
+        // it): what the machine writes from here to the frame's end comes
+        // after it in the original, so it, not the copy's write, is what
+        // the original holds (`after_drawing`).
+        if self.page.is_some() {
+            m.mem.track();
+        }
         m.mem.w8(DS, STAGE, 8);
         hooks.step(m, Step::DrawFlats);
         m.mem.w16(DS, 0xC394, reach);
@@ -458,7 +467,29 @@ impl Engine {
         // its sprites file themselves again); without it the node pool
         // fills up and filing a projectile (0000:BFC0) runs away.
         m.object_lists_clear();
+        self.after_drawing();
+        let m = &self.m;
         Some(if r(m, MAP_FLAGS) & 0x80 != 0 { Frame::Left } else { Frame::Running })
+    }
+
+    /// The machine's writes since the drawing (tracked from its end) made
+    /// the machine's own in `page_state`: the original did them after its
+    /// drawing, over what the drawing left (the bank mapped last, 8FA8, the
+    /// faces' 19h). Not the flags the frame sets and
+    /// clears bits of (C398, CCCA): the machine's read-modify-write there
+    /// worked on its own bytes, without the drawing's bits, which the
+    /// original's kept.
+    fn after_drawing(&mut self) {
+        const BITS: [u16; 4] = [0xC398, 0xC399, 0xCCCA, 0xCCCB];
+        if self.page.is_none() {
+            return;
+        }
+        for o in self.m.mem.written_offsets() {
+            if !BITS.contains(&o) {
+                self.page_wrote[o as usize] = None;
+            }
+        }
+        self.m.mem.untrack();
     }
 
     /// The end of the world's entry and the loop's start: the view's

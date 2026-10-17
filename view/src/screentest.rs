@@ -692,6 +692,32 @@ fn an_empty_slot_as_the_original_draws_it() {
     );
 }
 
+/// Its Save's picker, the sixth slot's row clicked, "a" typed and Enter:
+/// the game saved. SAVEGAME's screen (its first FA00h bytes: the page,
+/// A8FE, as 25FD:0110 writes it, "Kindly waiteth..." over the menu) and
+/// its colours (the 300h after) as the original's save holds them.
+#[test]
+fn a_save_keeps_the_screen_as_the_original_does() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let (mut a, mut d) = loaded(&dir, &save);
+    options_click(&mut a, &mut d, 160, 132);
+    d.click(&mut a, 100, 81, MouseButton::Left);
+    d.key(&mut a, KeyCode::KeyA, Some("a"));
+    // The pixels the original's case drew (its page filled 00h then FFh
+    // before): the menu's, as `options_menu_layer` draws them; the rest
+    // (the interface, drawn before) the vectors leave out.
+    let (layer, _) = options_menu_layer(&mut a);
+    d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.saveui.is_none(), "the menu ended");
+    let data = saveui::read_any_case(&save, "SAVEGAME.05").expect("the save written");
+    let idx: Vec<u16> = data[..0xFA00].iter().zip(&layer).map(|(&c, &l)| if l < 0x100 { c as u16 } else { 0x100 }).collect();
+    assert!(check("optionssaved", &idx, &data[0xFA00..0xFD00]), "optionssaved: differs from the original's");
+}
+
 /// Its Exit (05DB): "Are you sure ?" over the screen.
 #[test]
 fn the_options_exit_as_the_original_draws_it() {
@@ -809,6 +835,42 @@ fn area_left(a: &mut App) {
     a.assets = Assets::new(&a.dir, &mut a.engine);
     a.remake_renderer();
     a.last = Some(arena::engine::Frame::Running);
+}
+
+/// Daggerfall's gates (tests/vectors/gates.txt, gen_gates.py): from the
+/// street, the player on the open square beside each facing it, the gate
+/// picked (CB92) and its trigger run (0000:43B1), the wilderness entered
+/// (`areas::next`): the player's place there, and its square's wall word,
+/// as the original's.
+#[test]
+fn a_gate_leads_out_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/gates.txt")).expect("tests/vectors/gates.txt");
+    let hex = |s: &str| s.split(' ').map(|v| u16::from_str_radix(v, 16).unwrap()).collect::<Vec<_>>();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        let (gate, from, want) = (hex(f[1]), hex(f[2]), (hex(f[3]), u16::from_str_radix(f[4], 16).unwrap()));
+        let (mut a, _d) = loaded(&dir, &save);
+        area_left(&mut a);
+        let m = &mut a.engine.m;
+        let (x, y) = ((from[0] << 7) + 0x40, (from[1] << 7) + 0x40);
+        for (o, v) in [(0xC3D0, x), (0xC3D4, y), (0xC3DA, from[2]), (0xBA62, x), (0xBA66, y)] {
+            m.mem.w16(DS, o, v);
+        }
+        m.mem.w16(DS, arena::controls::var::PICKED, gate[1] << 8 | gate[0] << 1);
+        m.wall_trigger(&mut a.engine.files, &mut DoorHooks::default()).expect("the gate's trigger");
+        assert!(a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the gate at {gate:?} led nowhere");
+        a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the wilderness");
+        let m = &a.engine.m;
+        let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+        let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+        let wall = m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1);
+        assert_eq!((vec![x, y], wall), want, "the gate at {gate:?}: the place in the wilderness differs from the original's");
+    }
 }
 
 /// The trigger's hooks for a door: the way in's blackout (1194:55B2)
@@ -1713,6 +1775,64 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
     }
 }
 
+/// The main quest's dream after a rest (1194:D3AF, the dream pending:
+/// F76 1, F7A 0) at the player's level byte and dreams' count each of
+/// gen_dream.py's scripts (tests/vectors/dream.txt): the dream asked of the
+/// view's hook (`Front::dream`), and its first movie as the window plays
+/// it (`movies_of` from the screen shown, here cleared in the game's
+/// colours: D459's fade to black in 8, the screen cleared, the movie's
+/// frames with its text), state by state against the original's.
+#[test]
+fn the_dreams_as_the_original_shows_them() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/dream.txt")).expect("tests/vectors/dream.txt");
+    // ((level byte, F77), the states' digests).
+    type Run = ((u8, u8), Vec<(u64, u64)>);
+    let mut runs: Vec<Run> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["dream", "script", level, f77, _] => runs.push(((level.parse().unwrap(), f77.parse().unwrap()), Vec::new())),
+            ["dream", _, _, _, s, p] => runs.last_mut().unwrap().1.push((u64::from_str_radix(s, 16).unwrap(), u64::from_str_radix(p, 16).unwrap())),
+            _ => {}
+        }
+    }
+    assert!(!runs.is_empty());
+    for ((level, f77), want) in runs {
+        let (mut a, _d) = loaded(&dir, &save);
+        for (at, v) in [(0x01AA, level), (0x0F76, 1), (0x0F77, f77), (0x0F7A, 0)] {
+            a.engine.m.mem.w8(DS, at, v);
+        }
+        let mut talk = dialog::Talk::default();
+        a.engine.m.dream_show(&mut Front { talk: Some(&mut talk), ..Default::default() });
+        let archive = a.assets.archive.clone();
+        let cleared = vec![0u8; 64000];
+        let mut mv = crate::movies_of(&mut a.engine, &archive, std::mem::take(&mut talk.movies), Some((&cleared, a.assets.palette))).into_iter().next().expect("a dream");
+        let mut seen: Vec<(u64, u64)> = Vec::new();
+        let mut ms = 0;
+        while seen.len() < want.len() && ms < 60_000 {
+            let mut s = hud::Screen::new(a.assets.palette);
+            mv.draw(&mut s, &a.font);
+            let st = (fnv(s.indices().iter().map(|&i| i as u8)), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+            if seen.last() != Some(&st) {
+                if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                    let raw: Vec<u8> = s.indices().iter().map(|&i| i as u8).chain(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("dream{level}-{f77}-{}.view", seen.len())), raw).unwrap();
+                }
+                seen.push(st);
+            }
+            mv.advance(1);
+            ms += 1;
+        }
+        let first = seen.iter().zip(&want).position(|(v, o)| v != o);
+        assert!(first.is_none() && seen.len() == want.len(), "level {level} F77 {f77}: the dream's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
+    }
+}
+
 /// The house the staff's end shows last (1194:DA25..DAC4, harness/
 /// gen_house.py, tests/vectors/house.txt): HOUSE.IMG in its own colours,
 /// text 579h's lines drawn one under another from row 32h, centred on
@@ -1730,7 +1850,7 @@ fn the_house_at_the_staffs_end_as_the_original_shows_it() {
     let want = (u64::from_str_radix(f[1], 16).unwrap(), u64::from_str_radix(f[2], 16).unwrap());
     let (mut a, _d) = loaded(&dir, &save);
     let archive = a.assets.archive.clone();
-    let mv = crate::movies_of(&mut a.engine, &archive, vec![("HOUSE.IMG", Some(0x579), 0x5C)]).pop().expect("HOUSE.IMG");
+    let mv = crate::movies_of(&mut a.engine, &archive, vec![("HOUSE.IMG", Some(0x579), 0x5C)], None).pop().expect("HOUSE.IMG");
     let mut s = hud::Screen::new(a.assets.palette);
     mv.draw(&mut s, &a.font);
     if let Ok(d) = std::env::var("ARENA_SCREENS") {
@@ -1816,6 +1936,22 @@ fn a_provinces_map_as_the_original_draws_it() {
 #[test]
 fn a_journeys_length_as_the_original_draws_it() {
     screen("worldtrip", |a, d| world_clicks(a, d, &[(70, 45), (200, 100)]), layer);
+}
+
+/// Poisoned (05B1 bit 0), a place clicked, its journey read (a click) and
+/// Travel clicked: 1194:48DB asks "Considering your condition..." as a
+/// menu (1194:020E) over the province's map.
+#[test]
+fn the_unwell_travellers_question_as_the_original_draws_it() {
+    screen(
+        "worldunwell",
+        |a, d| {
+            let v = a.engine.m.mem.r8(DS, 0x05B1) | 1;
+            a.engine.m.mem.w8(DS, 0x05B1, v);
+            world_clicks(a, d, &[(70, 45), (200, 100), (200, 100), (62, 180)]);
+        },
+        layer,
+    );
 }
 
 /// Its Search: a name asked, after the editor's two passes before its

@@ -36,7 +36,6 @@ eebc eee2 the level's segments made on a level's change
 9176 91a4 the file's name, handle and size of the last file opened
 a836 a863 scratch of the drawing's and the texts'
 a908 a910 0000:742C's scratch
-8fa8 8faa the EMS bank mapped last: still differs with the faces (292B:0530, mapping 19h each frame) and a fight's sound (23BA:01C7, bank 15h) ported, in playstreet with neither; not traced
 9288 9289 the drawing's colour
 b036 b038 the texts' drawing's state
 adb6 adb9 the texts' drawing's state (ADB8 the last row 9E0A drew: the message line's, which the view draws itself)

@@ -966,3 +966,34 @@ fn the_state_as_the_original_leaves_it() {
         state_case(name);
     }
 }
+
+/// The town's welcome (0000:4ACD) keeps what its box covers at the
+/// frame's start (4B18: into the load bank [1030] at offset 0, 0000:965E's
+/// flag 1): the page as the last frame left it, which the view has as the
+/// screen it last showed (`Assets::shown`). Four frames in the street,
+/// the screen shown, then an arrival set (5C8 bit 100h, ENTERCTY.$$$ with
+/// gen_welcome.py's words) and one more frame: the kept header and rows
+/// against tests/vectors/welcome.txt.
+#[test]
+fn the_welcome_keeps_the_screen_as_the_original() {
+    // The 3D view drawn by the engine's renderer, as the window has it.
+    let Some((mut a, _)) = played(Place::Street, |a| a.engine.page = Some(vec![0; 64000]), |a, d, seen| frames(a, d, seen, 4, |_| false)) else { return };
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/vectors/welcome.txt");
+    let text = std::fs::read_to_string(path).expect("the welcome's vector");
+    let f: Vec<&str> = text.lines().next().expect("a line").split(" | ").collect();
+    a.compose();
+    a.engine.files.put(b"ENTERCTY.$$$", b"You have arrived in a test town.\r\0");
+    let v = a.engine.m.mem.r16(DS, 0x05C8) | 0x100;
+    a.engine.m.mem.w16(DS, 0x05C8, v);
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    let kept = a.engine.m.ems_bank(a.engine.m.mem.r16(DS, 0x1030));
+    let w = |i: usize| u16::from_le_bytes([kept[2 * i], kept[2 * i + 1]]);
+    let (x, y, wd, h) = (w(0) & 0x7FFF, w(1), w(2), w(3));
+    assert_eq!(format!("{x:x} {y:x} {wd:x} {h:x}"), f[2], "the box's place");
+    if let Ok(d) = std::env::var("ARENA_SCREENS") {
+        std::fs::write(PathBuf::from(d).join("welcome.view"), &kept[..8 + wd as usize * h as usize]).ok();
+    }
+    let hash = fnv(kept[..8 + wd as usize * h as usize].iter().copied());
+    assert_eq!(format!("{hash:x}"), f[3], "what the welcome kept differs from the original's");
+}

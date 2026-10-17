@@ -36,6 +36,7 @@ screen | optionsload | 29528d995137f284 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionssave | 29528d995137f284 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionsexit | b4c41413148569c5 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | optionsloadempty | 8c9fae80fab97d9f a97a4bafd992e4ed e9dd241a64a6dae5
+screen | optionssaved | 482dd2fe7400fa98 a97a4bafd992e4ed e9dd241a64a6dae5
 screen | guild | ab9373c09721411 a97a4bafd992e4ed a2bb0df299dfaf5b
 screen | tavern | 91f232a0fa7b43c a97a4bafd992e4ed f278b29d6123829b
 screen | temple | fc0e8a3f54ddb265 a97a4bafd992e4ed 65259bf793414fff
@@ -78,6 +79,7 @@ screen | streetcamp | 114983588e87d6c9 2376632b30141d5 3849c331458828b5
 screen | worldmap | 4c16ae6cc47301f 6c1d8428b606b30f
 screen | worldprovince | f3f78560a3108ebb db15945b94271757
 screen | worldtrip | 258358a48621ee11 db15945b94271757
+screen | worldunwell | 30401c250c4ebfff db15945b94271757
 screen | worldsearch | 933f15b614404805 db15945b94271757
 screen | worldback | 4c16ae6cc47301f 6c1d8428b606b30f
 screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
