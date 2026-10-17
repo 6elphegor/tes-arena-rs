@@ -2765,207 +2765,213 @@ impl Soft {
         (T, 0)
     }
 
-    /// 0000:78A8 under 8 bits a pixel (`blit`): the compiled row reads
-    /// each pixel's bits from its column (the scale's whole part, from
-    /// the right when mirrored) in the row (the step's whole part times
-    /// the row's bytes, `bpp` x `w` bits rounded up).
-    #[allow(clippy::too_many_arguments)]
-    fn blit_bits(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
-        let stride = ((bpp as u16 * (w & 0xFF)) + 7) >> 3 & 0xFF;
-        if dw == 0 {
-            return;
-        }
-        let xs = ((w & 0xFF) << 8) / dw;
-        if xs <= 4 || dh == 0 {
-            return;
-        }
-        let ys = ((h & 0xFF) << 8) / dh;
-        if ys <= 4 {
-            return;
-        }
-        let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
-        let (mut fx, mut fy) = (0u16, 0u16);
-        let d = y.wrapping_sub(self.g16(TOP));
-        if (d as i16) < 0 {
-            dh = dh.wrapping_add(d);
-            if (dh as i16) <= 0 {
-                return;
-            }
-            y = y.wrapping_sub(d);
-            fy = d.wrapping_mul(ys).wrapping_neg();
-        }
-        let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(self.g16(BOTTOM));
-        if (c as i16) > 0 {
-            dh = dh.wrapping_sub(c);
-            if (dh as i16) <= 0 {
-                return;
-            }
-        }
-        let d = x.wrapping_sub(self.g16(LEFT));
-        if (d as i16) < 0 {
-            dw = dw.wrapping_add(d);
-            if (dw as i16) <= 0 {
-                return;
-            }
-            x = x.wrapping_sub(d);
-            fx = d.wrapping_mul(xs).wrapping_neg();
-        }
-        let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(self.g16(RIGHT));
-        if (c as i16) > 0 {
-            dw = dw.wrapping_sub(c);
-            if (dw as i16) <= 0 {
-                return;
-            }
-        }
-        // 795E..79A9: the colours, through the shade where it has one.
-        let mut lut: Option<[u8; 256]> = None;
-        if map.0 != 0 {
-            let mut t = [0u8; 256];
-            for (k, e) in t.iter_mut().enumerate().take(1 << bpp) {
-                let c = self.m.mem.r8(map.0, map.1.wrapping_add(k as u16));
-                *e = if shade.0 != 0 { self.m.mem.r8(shade.0, shade.1.wrapping_add(c as u16)) } else { c };
-            }
-            lut = Some(t);
-        } else if shade.0 != 0 {
-            let mut t = [0u8; 256];
-            for (k, e) in t.iter_mut().enumerate() {
-                *e = self.m.mem.r8(shade.0, shade.1.wrapping_add(k as u16));
-            }
-            lut = Some(t);
-        }
-        let mirror = flags & 2 != 0;
-        let see = flags & 1 != 0;
-        let mask = 0xFFu8 >> (8 - bpp);
-        let mut dest = self.row(y).wrapping_add(x);
-        let mut rows = dh as u8;
-        loop {
-            let base = src.1.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
-            let mut bx = fx;
-            let mut di = dest;
-            for _ in 0..dw {
-                let mut col = (bx >> 8) as u8;
-                if mirror {
-                    col = (w as u8).wrapping_sub(col).wrapping_sub(1);
-                }
-                let bit = col as u16 * bpp as u16;
-                let at = base.wrapping_add(bit >> 3);
-                let word = (self.m.mem.r8(src.0, at) as u16) << 8 | self.m.mem.r8(src.0, at.wrapping_add(1)) as u16;
-                let sh = (16 - bpp as u16).wrapping_sub(bit & 7) & 0xF;
-                let v = (word >> sh) as u8 & mask;
-                if !(see && v == 0) {
-                    let c = match &lut {
-                        Some(t) => t[v as usize],
-                        None => v,
-                    };
-                    self.px(di, c);
-                }
-                di = di.wrapping_add(1);
-                bx = bx.wrapping_add(xs);
-            }
-            dest = dest.wrapping_add(0x140);
-            fy = fy.wrapping_add(ys);
-            rows = rows.wrapping_sub(1);
-            if rows == 0 {
-                break;
-            }
-        }
-    }
-
     /// 0000:5656 (`Machine::frames_unpack`).
     fn unpack(&mut self, seg: u16, si: u16, frame: u16, dseg: u16, doff: u16) {
         self.m.frames_unpack(seg, si, frame, dseg, doff);
     }
 
-    /// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
-    /// `dw` x `dh` at (`x`, `y`), clipped to the window: as the code it
-    /// compiles at 3BA0:929E (7A2B) draws each row (`flags` bit 0 the 0s
-    /// left out, bit 1 mirrored; through the shade table where its
-    /// segment isn't 0). Under 8 bits a pixel, a pixel is read from the
-    /// row's big-endian word at its bit, and goes through the colours
-    /// `map` (where its segment isn't 0): as they are unshaded, else
-    /// through the shade (the table made at CS:781E).
+    /// 0000:78A8 (`blit`) onto the page.
     #[allow(clippy::too_many_arguments)]
     fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
-        if bpp != 8 {
-            return self.blit_bits(x, y, dw, dh, shade, w, h, flags, src, bpp, map);
-        }
-        let stride = ((8 * (w & 0xFF)) + 7) >> 3;
-        let xs = ((w & 0xFF) << 8) / dw.max(1);
-        if dw == 0 || xs <= 4 {
+        blit(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+    }
+}
+
+/// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
+/// `dw` x `dh` at (`x`, `y`), clipped to the window: as the code it
+/// compiles at 3BA0:929E (7A2B) draws each row (`flags` bit 0 the 0s
+/// left out, bit 1 mirrored; through the shade table where its
+/// segment isn't 0). Under 8 bits a pixel, a pixel is read from the
+/// row's big-endian word at its bit, and goes through the colours
+/// `map` (where its segment isn't 0): as they are unshaded, else
+/// through the shade (the table made at CS:781E).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn blit(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+    if bpp != 8 {
+        return blit_bits(m, page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+    }
+    let stride = ((8 * (w & 0xFF)) + 7) >> 3;
+    let xs = ((w & 0xFF) << 8) / dw.max(1);
+    if dw == 0 || xs <= 4 {
+        return;
+    }
+    let ys = ((h & 0xFF) << 8) / dh.max(1);
+    if dh == 0 || ys <= 4 {
+        return;
+    }
+    let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+    let (mut fx, mut fy) = (0u16, 0u16);
+    let d = y.wrapping_sub(m.mem.r16(DS, TOP));
+    if (d as i16) < 0 {
+        dh = dh.wrapping_add(d);
+        if (dh as i16) <= 0 {
             return;
         }
-        let ys = ((h & 0xFF) << 8) / dh.max(1);
-        if dh == 0 || ys <= 4 {
+        y = y.wrapping_sub(d);
+        fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, BOTTOM));
+    if (c as i16) > 0 {
+        dh = dh.wrapping_sub(c);
+        if (dh as i16) <= 0 {
             return;
         }
-        let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
-        let (mut fx, mut fy) = (0u16, 0u16);
-        let d = y.wrapping_sub(self.g16(TOP));
-        if (d as i16) < 0 {
-            dh = dh.wrapping_add(d);
-            if (dh as i16) <= 0 {
-                return;
-            }
-            y = y.wrapping_sub(d);
-            fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let d = x.wrapping_sub(m.mem.r16(DS, LEFT));
+    if (d as i16) < 0 {
+        dw = dw.wrapping_add(d);
+        if (dw as i16) <= 0 {
+            return;
         }
-        let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(self.g16(BOTTOM));
-        if (c as i16) > 0 {
-            dh = dh.wrapping_sub(c);
-            if (dh as i16) <= 0 {
-                return;
-            }
+        x = x.wrapping_sub(d);
+        fx = d.wrapping_mul(xs).wrapping_neg();
+    }
+    let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, RIGHT));
+    if (c as i16) > 0 {
+        dw = dw.wrapping_sub(c);
+        if (dw as i16) <= 0 {
+            return;
         }
-        let d = x.wrapping_sub(self.g16(LEFT));
-        if (d as i16) < 0 {
-            dw = dw.wrapping_add(d);
-            if (dw as i16) <= 0 {
-                return;
-            }
-            x = x.wrapping_sub(d);
-            fx = d.wrapping_mul(xs).wrapping_neg();
-        }
-        let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(self.g16(RIGHT));
-        if (c as i16) > 0 {
-            dw = dw.wrapping_sub(c);
-            if (dw as i16) <= 0 {
-                return;
-            }
-        }
-        let mirror = flags & 2 != 0;
-        let see = flags & 1 != 0;
-        let mut dest = self.row(y).wrapping_add(x);
-        let hi = fx >> 8;
-        let start = src.1.wrapping_add(if mirror { hi.wrapping_neg().wrapping_add(w).wrapping_sub(1) } else { hi });
-        let mut rows = dh as u8;
+    }
+    let mirror = flags & 2 != 0;
+    let see = flags & 1 != 0;
+    let mut dest = m.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+    let hi = fx >> 8;
+    let start = src.1.wrapping_add(if mirror { hi.wrapping_neg().wrapping_add(w).wrapping_sub(1) } else { hi });
+    let mut rows = dh as u8;
+    loop {
+        let mut di = dest;
+        let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF));
+        let mut bx = fx;
+        let mut n = dw;
         loop {
-            let mut di = dest;
-            let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF));
-            let mut bx = fx;
-            let mut n = dw;
-            loop {
-                let al = self.m.mem.r8(src.0, si);
-                if !(see && al == 0) {
-                    let c = if shade.0 != 0 { self.m.mem.r8(shade.0, shade.1.wrapping_add(al as u16)) } else { al };
-                    self.px(di, c);
-                }
-                n = n.wrapping_sub(1);
-                if n == 0 {
-                    break;
-                }
-                di = di.wrapping_add(1);
-                let old = (bx >> 8) as u8;
-                bx = bx.wrapping_add(xs);
-                let delta = ((bx >> 8) as u8).wrapping_sub(old);
-                let delta = if mirror { delta.wrapping_neg() } else { delta };
-                si = si.wrapping_add(delta as i8 as i16 as u16);
+            let al = m.mem.r8(src.0, si);
+            if !(see && al == 0) {
+                let c = if shade.0 != 0 { m.mem.r8(shade.0, shade.1.wrapping_add(al as u16)) } else { al };
+                page[di as usize] = c;
             }
-            dest = dest.wrapping_add(0x140);
-            fy = fy.wrapping_add(ys);
-            rows = rows.wrapping_sub(1);
-            if rows == 0 {
+            n = n.wrapping_sub(1);
+            if n == 0 {
                 break;
             }
+            di = di.wrapping_add(1);
+            let old = (bx >> 8) as u8;
+            bx = bx.wrapping_add(xs);
+            let delta = ((bx >> 8) as u8).wrapping_sub(old);
+            let delta = if mirror { delta.wrapping_neg() } else { delta };
+            si = si.wrapping_add(delta as i8 as i16 as u16);
+        }
+        dest = dest.wrapping_add(0x140);
+        fy = fy.wrapping_add(ys);
+        rows = rows.wrapping_sub(1);
+        if rows == 0 {
+            break;
+        }
+    }
+}
+
+/// 0000:78A8 under 8 bits a pixel (`blit`): the compiled row reads
+/// each pixel's bits from its column (the scale's whole part, from
+/// the right when mirrored) in the row (the step's whole part times
+/// the row's bytes, `bpp` x `w` bits rounded up).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn blit_bits(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+    let stride = ((bpp as u16 * (w & 0xFF)) + 7) >> 3 & 0xFF;
+    if dw == 0 {
+        return;
+    }
+    let xs = ((w & 0xFF) << 8) / dw;
+    if xs <= 4 || dh == 0 {
+        return;
+    }
+    let ys = ((h & 0xFF) << 8) / dh;
+    if ys <= 4 {
+        return;
+    }
+    let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+    let (mut fx, mut fy) = (0u16, 0u16);
+    let d = y.wrapping_sub(m.mem.r16(DS, TOP));
+    if (d as i16) < 0 {
+        dh = dh.wrapping_add(d);
+        if (dh as i16) <= 0 {
+            return;
+        }
+        y = y.wrapping_sub(d);
+        fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, BOTTOM));
+    if (c as i16) > 0 {
+        dh = dh.wrapping_sub(c);
+        if (dh as i16) <= 0 {
+            return;
+        }
+    }
+    let d = x.wrapping_sub(m.mem.r16(DS, LEFT));
+    if (d as i16) < 0 {
+        dw = dw.wrapping_add(d);
+        if (dw as i16) <= 0 {
+            return;
+        }
+        x = x.wrapping_sub(d);
+        fx = d.wrapping_mul(xs).wrapping_neg();
+    }
+    let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, RIGHT));
+    if (c as i16) > 0 {
+        dw = dw.wrapping_sub(c);
+        if (dw as i16) <= 0 {
+            return;
+        }
+    }
+    // 795E..79A9: the colours, through the shade where it has one.
+    let mut lut: Option<[u8; 256]> = None;
+    if map.0 != 0 {
+        let mut t = [0u8; 256];
+        for (k, e) in t.iter_mut().enumerate().take(1 << bpp) {
+            let c = m.mem.r8(map.0, map.1.wrapping_add(k as u16));
+            *e = if shade.0 != 0 { m.mem.r8(shade.0, shade.1.wrapping_add(c as u16)) } else { c };
+        }
+        lut = Some(t);
+    } else if shade.0 != 0 {
+        let mut t = [0u8; 256];
+        for (k, e) in t.iter_mut().enumerate() {
+            *e = m.mem.r8(shade.0, shade.1.wrapping_add(k as u16));
+        }
+        lut = Some(t);
+    }
+    let mirror = flags & 2 != 0;
+    let see = flags & 1 != 0;
+    let mask = 0xFFu8 >> (8 - bpp);
+    let mut dest = m.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+    let mut rows = dh as u8;
+    loop {
+        let base = src.1.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
+        let mut bx = fx;
+        let mut di = dest;
+        for _ in 0..dw {
+            let mut col = (bx >> 8) as u8;
+            if mirror {
+                col = (w as u8).wrapping_sub(col).wrapping_sub(1);
+            }
+            let bit = col as u16 * bpp as u16;
+            let at = base.wrapping_add(bit >> 3);
+            let word = (m.mem.r8(src.0, at) as u16) << 8 | m.mem.r8(src.0, at.wrapping_add(1)) as u16;
+            let sh = (16 - bpp as u16).wrapping_sub(bit & 7) & 0xF;
+            let v = (word >> sh) as u8 & mask;
+            if !(see && v == 0) {
+                let c = match &lut {
+                    Some(t) => t[v as usize],
+                    None => v,
+                };
+                page[di as usize] = c;
+            }
+            di = di.wrapping_add(1);
+            bx = bx.wrapping_add(xs);
+        }
+        dest = dest.wrapping_add(0x140);
+        fy = fy.wrapping_add(ys);
+        rows = rows.wrapping_sub(1);
+        if rows == 0 {
+            break;
         }
     }
 }

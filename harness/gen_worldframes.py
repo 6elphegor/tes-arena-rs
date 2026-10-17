@@ -102,6 +102,24 @@ def night(heading):
     return put
 
 
+def storm(heading, angle):
+    """`night(heading)` in a thunderstorm with a bolt forced: the weather
+    rain (BB09 1), 5C8 bit 1 set, and a bolt begun as 2294:06B6..06FB
+    begins one: the first of the six images (D8AE), its frame 0 (43C6),
+    its place on the circle at `angle` (43C2, 43C4: 2710h times the sine
+    table's words at B03C and B13C, high word doubled)."""
+    def put(a):
+        night(heading)(a)
+        a.mu.mem_write(a.lin(a.ds, 0xBB09), b'\x01')
+        a.w16(0x05C8, a.r16(0x05C8) | 1)
+        a.w16(0x43C8, a.r16(0xD8AE))
+        a.w16(0x43C6, 0)
+        for at, table in ((0x43C2, 0xB03C), (0x43C4, 0xB13C)):
+            v = struct.unpack('<h', struct.pack('<H', a.r16(table + 2 * angle)))[0]
+            a.w16(at, (((0x2710 * v) >> 16) * 2) & 0xFFFF)
+    return put
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -163,6 +181,9 @@ CASES = {
     # Out of the city's gate into the wilderness (`wild`), its first
     # frames, nothing held: the wild's 3D view (fields, the sky).
     'playwild': ('wild', None, [((), (), 3, None)]),
+    # At night in a thunderstorm, a bolt forced at the circle's angle 0,
+    # ahead: its second frame (2294:05A6, 0000:78A8) over the sky's flash.
+    'playbolt': ('street', storm(0, 0), [((), (), 1, None)]),
     # The main quest dungeon 39699021.MIF entered (`named`), its first
     # frames, nothing held: its start sees a square's cap.
     'playcap': ('capped', None, [((), (), 3, None)]),

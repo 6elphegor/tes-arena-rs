@@ -254,14 +254,29 @@ impl crate::skyobj::SkyHooks for Objects<'_> {
     fn draw_image(&mut self, m: &mut Machine, seg: u16, off: u16) {
         image(m, &mut self.0, seg, off);
     }
-    fn draw_dfa(&mut self, _m: &mut Machine, _seg: u16, _off: u16, _frame: u16, _x: u16, _y: u16) {
-        self.0.gap("292B:0201: the volcano's frames");
+    /// 292B:0247..0271: the frame unpacked into [BA54] (0000:5652), then
+    /// drawn from there cut to the view with its 0s left out (5A66), its
+    /// width and height the DFA's (+6, +8).
+    fn draw_dfa(&mut self, m: &mut Machine, seg: u16, off: u16, frame: u16, x: u16, y: u16) {
+        let w = m.mem.r16(seg, off.wrapping_add(6));
+        let h = m.mem.r16(seg, off.wrapping_add(8));
+        let (doff, dseg) = (r16(m, 0xBA54), r16(m, 0xBA56));
+        m.frames_unpack(seg, off, frame, dseg, doff);
+        clipped(m, &mut self.0, x, y, w, h, dseg, doff, true);
     }
     fn fill(&mut self, m: &mut Machine, x: u16, y: u16, w: u16, h: u16) {
         fill(m, &mut self.0, x, y, w, h);
     }
-    fn bolt(&mut self, _m: &mut Machine, _seg: u16, _off: u16, _frame: u16) {
-        self.0.gap("0000:78A8: lightning's bolt");
+    /// 2294:0646..068B: 0000:78A8 at the bolt's place (+6, +8), unscaled
+    /// (+0, +2 both the size and the scale's), no shade, its 0s left out,
+    /// `frame`'s pixels (from the offset at +0Ch + 2 x `frame`) of +0Ah's
+    /// bits through the colours at +4Ch.
+    fn bolt(&mut self, m: &mut Machine, seg: u16, off: u16, frame: u16) {
+        let r = |k: u16| m.mem.r16(seg, off.wrapping_add(k));
+        let (x, y, w, h) = (r(6), r(8), r(0), r(2));
+        let bpp = m.mem.r8(seg, off.wrapping_add(0xA));
+        let src = off.wrapping_add(r(frame.wrapping_add(frame).wrapping_add(0xC)));
+        super::blit(m, self.0.page, x, y, w, h, (0, 0), w, h, 1, (seg, src), bpp, (seg, off.wrapping_add(0x4C)));
     }
 }
 
