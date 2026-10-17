@@ -51,9 +51,9 @@ fn matches_original() {
             m.mem.w16(DS, at, w);
         }
         let got = match m.floor_pick() {
-            Ok(Some(si)) => format!("{si:x}"),
-            Ok(None) => "ffff".to_string(),
-            Err(()) => "fault".to_string(),
+            Some(Some(si)) => format!("{si:x}"),
+            Some(None) => "ffff".to_string(),
+            None => "fault".to_string(),
         };
         assert_eq!(got, f[2], "{line}");
         if f[2] != "ffff" && f[2] != "fault" {

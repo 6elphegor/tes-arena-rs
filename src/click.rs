@@ -570,46 +570,46 @@ impl Machine {
     /// the floor under the cursor (8F92, 8F94, each plus 4): the rows
     /// below the horizon (C3D8) inside the view (A91A) projected onto the
     /// floor (0000:DB43) and kept where on the map (C357 columns, C359
-    /// rows). None (the carry) where it isn't; Err where the original's
-    /// division faults.
-    pub fn floor_pick(&self) -> Result<Option<u16>, ()> {
+    /// rows). Some(None) (the carry) where it isn't; None where the
+    /// original's division faults.
+    pub fn floor_pick(&self) -> Option<Option<u16>> {
         let ax = self.mem.r16(DS, 0x8F92).wrapping_add(4);
         let (y, horizon) = (self.mem.r16(DS, 0x8F94).wrapping_add(4), self.mem.r16(DS, 0xC3D8));
         let bx = y.wrapping_sub(horizon);
         // `sub` then `jle`: the row against the horizon, signed.
         if (y as i16) <= horizon as i16 || (bx as i16) >= self.mem.r16(DS, 0xA91A) as i16 {
-            return Ok(None);
+            return Some(None);
         }
         let (ax, bx) = self.floor_point(ax, bx)?;
         if (ax as i16) < 0 || (bx as i16) < 0 {
-            return Ok(None);
+            return Some(None);
         }
         let row = bx >> 7;
         if row >= self.mem.r16(DS, 0xC359) {
-            return Ok(None);
+            return Some(None);
         }
         let col = ax >> 7;
         if col >= self.mem.r16(DS, 0xC357) {
-            return Ok(None);
+            return Some(None);
         }
-        Ok(Some(row << 8 | (col as u8).wrapping_add(col as u8) as u16))
+        Some(Some(row << 8 | (col as u8).wrapping_add(col as u8) as u16))
     }
 
     /// 0000:DB43: screen column `ax` at `bx` rows below the horizon,
     /// projected onto the floor: the depth the eye's height (C3D2) over
     /// the rows gives (with CCF6), the column's offset from the centre
     /// (C3D6) at that depth (over CCF4), turned by the heading (1FFh -
-    /// C3DA, 93BC) and put at the eye (C3D0, C3D4): (x, y). Err where a
+    /// C3DA, 93BC) and put at the eye (C3D0, C3D4): (x, y). None where a
     /// division overflows.
-    fn floor_point(&self, ax: u16, bx: u16) -> Result<(u16, u16), ()> {
+    fn floor_point(&self, ax: u16, bx: u16) -> Option<(u16, u16)> {
         let p = self.mem.r16(DS, 0xC3D2) as u32 * self.mem.r16(DS, 0xCCF6) as u32;
-        let z = p.checked_div(bx as u32).filter(|&q| q <= 0xFFFF).ok_or(())?;
+        let z = p.checked_div(bx as u32).filter(|&q| q <= 0xFFFF)?;
         // imul with AX the depth's low word.
         let p = (z as u16 as i16 as i32) * (ax.wrapping_sub(self.mem.r16(DS, 0xC3D6)) as i16 as i32);
         let d = self.mem.r16(DS, 0xCCF4) as i16 as i32;
-        let x = p.checked_div(d).filter(|&q| (-0x8000..=0x7FFF).contains(&q)).ok_or(())?;
+        let x = p.checked_div(d).filter(|&q| (-0x8000..=0x7FFF).contains(&q))?;
         let di = 0x1FFu16.wrapping_sub(self.mem.r16(DS, 0xC3DA));
         let (x, y) = self.turn_93bc(x as u16, z as u16, di);
-        Ok((x.wrapping_add(self.mem.r16(DS, 0xC3D0)), y.wrapping_add(self.mem.r16(DS, 0xC3D4))))
+        Some((x.wrapping_add(self.mem.r16(DS, 0xC3D0)), y.wrapping_add(self.mem.r16(DS, 0xC3D4))))
     }
 }
