@@ -380,6 +380,16 @@ impl Screen {
         self.idx.fill(NONE);
     }
 
+    /// The 3D view's page (320 x 200 palette indices) under everything
+    /// drawn after.
+    pub fn underlay(&mut self, page: &[u8]) {
+        for (i, &c) in page.iter().enumerate().take(W * H) {
+            self.idx[i] = c as u16;
+            let p = self.palette[c as usize];
+            self.px[i] = [p[0], p[1], p[2], 0xFF];
+        }
+    }
+
     /// Each pixel's palette colour, row by row; 100h where nothing is
     /// drawn (for the screen check).
     #[cfg_attr(not(test), allow(dead_code))]

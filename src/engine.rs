@@ -190,11 +190,17 @@ impl PhysicsHooks for Physics<'_, '_> {
 pub struct Engine {
     pub m: Machine,
     pub files: Files,
+    /// With a page, each frame draws the 3D view into it as the original
+    /// does (`render::draw`, at the start of the drawing stages), over
+    /// the last frame's; the paths it met that aren't ported in
+    /// `page_gaps`.
+    pub page: Option<Vec<u8>>,
+    pub page_gaps: Vec<&'static str>,
 }
 
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
-        Self { m, files }
+        Self { m, files, page: None, page_gaps: Vec::new() }
     }
 
     /// The BIOS timer advances `n` ticks (18.2 a second).
@@ -263,6 +269,11 @@ impl Engine {
             m.moving_lights();
         }
         m.mem.w8(DS, STAGE, 3);
+        if let Some(page) = self.page.as_mut() {
+            let (p, gaps) = crate::render::draw(m, page);
+            *page = p;
+            self.page_gaps = gaps;
+        }
         // A322: the drawing's set-up (0000:D4B4, the floor's half).
         if !hooks.step(m, Step::DrawSetup(0x140)) {
             hooks.draw_setup(m, 0x140);

@@ -33,6 +33,12 @@ drawing's; the page's 3D pixels 0). With --dump DIR, NAME.page,
 NAME.mask, NAME.dac and NAME.full (the page with its 3D) for
 screentest's diff images (game pictures: never commit them).
 
+and the 3D view itself, the page's pixels the drawing stages wrote last
+(the mask's 0s; the others 0), for the engine's own drawing of it
+(src/render.rs):
+
+  view3d | NAME | <digest>
+
 The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
@@ -237,6 +243,7 @@ def main():
         if len(seen) > 1:
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
+        out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):

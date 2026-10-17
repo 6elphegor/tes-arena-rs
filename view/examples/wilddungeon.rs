@@ -166,7 +166,7 @@ fn main() {
         }
         // Each way from where the player arrived, a few frames' walk.
         for h in [0u16, 0x80, 0x100, 0x180] {
-            let mut t = Engine { m: e.m.clone(), files: e.files.clone() };
+            let mut t = Engine::new(e.m.clone(), e.files.clone());
             t.m.mem.w16(DS, HEADING, h);
             let walk = Intent { forward: 256, ..Default::default() };
             for _ in 0..8 {

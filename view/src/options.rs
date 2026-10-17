@@ -107,7 +107,7 @@ impl OptionsHooks for Script<'_> {
 impl OptionsUi {
     /// The screen opened on (a copy of) `engine`.
     pub fn open(engine: &Engine, archive: &crate::archive::Archive) -> (OptionsUi, Ended) {
-        let base = Engine { m: engine.m.clone(), files: engine.files.clone() };
+        let base = Engine::new(engine.m.clone(), engine.files.clone());
         let picture = crate::panels::load_image(archive, &engine.m, "OP.IMG");
         let font = Font::load(archive, "ARENAFNT.DAT");
         let mut ui = OptionsUi { base, clicks: Vec::new(), answers: Vec::new(), draws: Vec::new(), confirm: None, picture, font };
@@ -117,7 +117,7 @@ impl OptionsUi {
 
     /// The screen run again from the start with the inputs given.
     fn replay(&mut self) -> Ended {
-        let mut e = Engine { m: self.base.m.clone(), files: self.base.files.clone() };
+        let mut e = Engine::new(self.base.m.clone(), self.base.files.clone());
         let mut s = Script { clicks: &self.clicks, answers: &self.answers, ci: 0, ai: 0, starved: false, draws: Vec::new(), confirm: None };
         let end = e.m.options_screen(&mut e.files, &mut s);
         let starved = s.starved;
