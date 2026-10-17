@@ -141,6 +141,13 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
             None => crate::giveup::original("2826:0B52: the floor's projection divides past a word (0000:DB43)"),
         }
     }
+    /// With the steering controls (`Machine::player_steer`), a left click
+    /// in the view the front end has waiting, taken where the classic
+    /// controls take theirs (2826:0128, `view_click`): the front end sets
+    /// the mouse and calls `Machine::view_click`. By default none.
+    fn take_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
     /// 0000:43B1: a click on a wall may run its trigger (texts, riddles).
     fn wall_trigger(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
@@ -385,6 +392,10 @@ impl Machine {
         } else {
             self.mem.w16(DS, SPEED, 0);
         }
+        // Where the classic controls' centre handler takes a left click
+        // (2826:00F6..0128, after the moves): the front end's click, if one
+        // is waiting, in this frame's input step as the original's.
+        hooks.take_click(self, files)?;
         if it.jump {
             self.jump(it.run);
         }

@@ -216,6 +216,9 @@ struct Front<'a> {
     /// The screen as last shown (`Assets::shown`): the page at the frame's
     /// start.
     shown: Option<&'a [u8]>,
+    /// A left click in the view waiting for the frame's input step
+    /// (`ControlHooks::take_click`): where on the 320 x 200 screen.
+    click: Option<(i32, i32)>,
 }
 
 impl Front<'_> {
@@ -317,6 +320,18 @@ impl arena::hooks::StairsHooks for Front<'_> {
     }
 }
 impl ControlHooks for Front<'_> {
+    /// The window's click, in the frame's input step where the original
+    /// takes it (after that frame's actors): the mouse put 4 up and left
+    /// of it (the click, CB60, is the cursor + 4), the click
+    /// (`Machine::view_click`), and whether it was left for the actors
+    /// (C39A bit 80h: the drawing finds what is under it, `clicked`).
+    fn take_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        let Some((x, y)) = self.click.take() else { return Some(()) };
+        m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
+        m.view_click(files, self)?;
+        self.clicked = m.mem.r16(arena::mem::DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0;
+        Some(())
+    }
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -1544,6 +1559,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         click: false,
         clicked: false,
         click_point: None,
+        queued_click: None,
         look_click: false,
         right_drag: 0.0,
         ring_screen: None,
@@ -1626,6 +1642,9 @@ struct TurnIn {
     /// A click on the automap screen's map at this point (0000:31FE): the
     /// note there edited or one begun, its text asked for; no frame runs.
     note: Option<(u16, u16)>,
+    /// A left click in the view at this point of the 320 x 200 screen,
+    /// taken in the frame's input step (`Front::take_click`).
+    click: Option<(i32, i32)>,
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -1636,6 +1655,10 @@ struct TurnOut {
     level_changed: bool,
     /// The effect's words the frame drew (`Front::effect`).
     effect: Option<(Vec<u8>, i32)>,
+    /// The frame's input step took a click left for the actors
+    /// (`Front::take_click`): the next frame's drawing finds what is under
+    /// it, as the original's (its drawing comes before its input step).
+    clicked: bool,
 }
 
 /// One turn (`dialog`): camping if asked, then a frame, with `talk`
@@ -1646,17 +1669,17 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown) };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), click: None };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
-        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None };
+        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None, clicked: false };
     }
     let t = engine.frame_ticks();
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown) };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), click: input.click };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }
@@ -1685,8 +1708,9 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     let level_changed = stairs || wild_moved(engine, window);
     let effect = hooks.effect.take();
+    let clicked = hooks.click.is_none() && hooks.clicked && input.click.is_some();
     prof::time("view_frame", || assets.view_frame(engine, input.aspect));
-    TurnOut { frame, level_changed, effect }
+    TurnOut { frame, level_changed, effect, clicked }
 }
 
 /// The drawing's creatures' flats (0000:CF96): each one reached goes to
@@ -1889,6 +1913,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     }
     st.frames += 1;
     let input = TurnIn {
+        click: None,
         intent: *intent,
         clicked: std::mem::take(&mut st.clicked),
         camp: std::mem::take(&mut st.camp),
@@ -2780,6 +2805,8 @@ struct App {
     /// Where the waiting click is on the 320 x 200 screen (None: the
     /// centre, as with the mouse captured).
     click_point: Option<(i32, i32)>,
+    /// The click taken: the next frame's input step takes it (`TurnIn::click`).
+    queued_click: Option<(i32, i32)>,
     /// A right click in the view (the button let go with less of a drag
     /// than a swing needs, 0000:3C9F's 40h): looking at the square under
     /// the centre (2826:0C15) after the next frame; the drag so far.
@@ -3044,6 +3071,7 @@ impl App {
             drag: (drag.0.round() as i16, drag.1.round() as i16),
             aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
             note: None,
+            click: self.queued_click.take(),
         };
         // The engine before the turn, for a question to run it again: into
         // the last standing turn's copy, its allocations reused.
@@ -3055,14 +3083,10 @@ impl App {
             None => copy(&self.engine),
         };
         self.turn(before, input, Vec::new(), true);
-        // A click now is found by the next frame's drawing.
+        // A click now is the next frame's: its input step takes it (as the
+        // original's controls read the mouse), after that frame's actors.
         if !self.waiting() && std::mem::take(&mut self.click) {
-            let mut boxes = Vec::new();
-            self.clicked = match self.click_point.take() {
-                Some(at) => click_at(&mut self.engine, &mut boxes, at),
-                None => centre_click(&mut self.engine, &mut boxes),
-            };
-            self.boxes.extend(boxes);
+            self.queued_click = Some(self.click_point.take().unwrap_or((164, 74)));
         }
         if !self.waiting() && std::mem::take(&mut self.look_click) {
             look_centre(&mut self.engine);
@@ -3085,6 +3109,9 @@ impl App {
         self.music.before(&mut self.engine.m);
         let ticks = self.engine.frame_ticks() as u32;
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
+        if talk.need.is_none() && out.clicked {
+            self.clicked = true;
+        }
         // (A turn stopped at a question runs again: the rerun's.)
         self.blackout |= talk.blackout && talk.need.is_none();
         // A turn stopped at a question is run again once answered: its
@@ -3945,6 +3972,7 @@ impl App {
     fn note_turn(&mut self, x: i32, y: i32) {
         let before = copy(&self.engine);
         let input = TurnIn {
+            click: None,
             intent: Default::default(),
             clicked: false,
             camp: false,

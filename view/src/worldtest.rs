@@ -682,10 +682,11 @@ fn case(name: &str) -> Option<Case> {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playghostclick" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
-            // The harness's click is read by the next frame's controls
-            // (its input step, after that frame's drawing): the window's
-            // turn takes it before a frame, as that step's.
-            frames(a, d, seen, 2, |_| false);
+            // The harness's click: the button seen down by its step's first
+            // frame's controls, let go (the click, 2826:0D85) by the next's;
+            // the window's click is taken by the input step of the frame
+            // after the one it came before (`TurnIn::click`).
+            frames(a, d, seen, 1, |_| false);
             // The harness's mouse at (160, 100): the click 4 on (CB60).
             a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
@@ -947,7 +948,8 @@ fn the_state_measured_against_the_originals() {
             eprintln!("{name}: no dump of the start");
             continue;
         };
-        let (place, setup, play) = case(name).unwrap();
+        // (Or gen_areaplay.py's: their dumps beside these.)
+        let (place, setup, play) = case(name).or_else(|| areaplaytest::transit_case(name)).unwrap();
         let pre = std::cell::RefCell::new(None);
         let Some((a, _)) = played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);

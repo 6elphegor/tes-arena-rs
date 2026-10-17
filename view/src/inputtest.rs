@@ -384,6 +384,7 @@ fn a_click_on_a_menu_entry_picks_it() {
 fn shop_turn(app: &mut App, kind: u8) {
     let before = copy(&app.engine);
     let input = TurnIn {
+        click: None,
         intent: Default::default(),
         clicked: false,
         camp: false,
