@@ -74,8 +74,14 @@ impl Dice {
 fn place(engine: &Engine, run: &arena::transit::Run) -> String {
     let r = |at| engine.m.mem.r16(DS, at);
     format!(
-        "{run:?} {} at ({:#x}, {:#x}) square ({}, {}) heading {:#x} height {} slot {}",
+        "{run:?} {} ({} {}:{}) at ({:#x}, {:#x}) square ({}, {}) heading {:#x} height {} slot {}",
         String::from_utf8_lossy(engine.m.mem.cstr(DS, arena::transit::var::LEVEL_NAME)),
+        // The location's name, province and id (0A22, 0A46, 0A4C), to
+        // enter it again (gen_gates.py's PROVINCE:INDEX is the id's low
+        // five bits).
+        String::from_utf8_lossy(engine.m.mem.cstr(DS, 0x0A22)),
+        engine.m.mem.r8(DS, 0x0A46),
+        engine.m.mem.r8(DS, 0x0A4C),
         r(X),
         r(Y),
         r(X) >> 7,

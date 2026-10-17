@@ -455,7 +455,9 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let next = r?;
     let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
     if engine.world_enter(h).is_none() || h.failed {
-        eprintln!("entering the area gave up: {}", arena::giveup::describe());
+        // Kept noted (peek, not describe's take), so the caller can tell
+        // the original's own fault from the port's.
+        eprintln!("entering the area gave up: {}", arena::giveup::peek().map_or_else(|| "no reason noted".to_string(), |g| g.to_string()));
         return None;
     }
     eprintln!("entered {next:?} ({})", area_name(&engine.m));
