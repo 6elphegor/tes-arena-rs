@@ -229,10 +229,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     BASE_FILES.with(|b| *b.borrow_mut() = Some(files_now(&a, &save)));
     match place {
         Place::Guild | Place::Loaded => {}
-        // (The building's words on the way in, 191F, left for its first
-        // frame to show, as the harness's frames show them.)
-        Place::Store => into_words(&mut a, 0x1008),
-        Place::Tavern => into_words(&mut a, 0x1AB5),
+        // (The building's words on the way in, 191F, taken as read, as
+        // gen_worldframes.py's `building` takes them.)
+        Place::Store => into(&mut a, 0x1008),
+        Place::Tavern => into(&mut a, 0x1AB5),
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -1507,8 +1507,10 @@ fn the_state_as_the_original_leaves_it() {
 /// casting, the wilderness's night encounter, the stairs taken mid-fight,
 /// a rest ended by enemies, a lock picked and its door walked through,
 /// water swum in and levitated over, a potion and a ring used, the
-/// automap and the character sheet opened mid-fight).
-const BUSY: [&str; 12] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens"];
+/// automap and the character sheet opened mid-fight, a store's buying,
+/// selling and repairing, a potion bought in the mages' guild, the main
+/// quest's informant paid in a tavern).
+const BUSY: [&str; 15] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]

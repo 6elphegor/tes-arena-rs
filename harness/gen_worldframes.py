@@ -604,7 +604,7 @@ def guild(a, base):
 def building(where):
     """The snapshot of the game in the town's first `where` (gen_screens.py's
     PLACES: its entry list and count), in at its door from the street as
-    gen_screens.py's `place` goes in."""
+    gen_screens.py's `place` goes in, its words on the way in read."""
     def enter(a, base):
         a.restore(base)
         assert a.area_ended() == ('world',), 'the guild not left'
@@ -613,6 +613,10 @@ def building(where):
         sq = a.r16(a.r16(at), seg=a.r16(at + 2))
         door = (sq & 0xFF00) | ((sq & 0xFF) << 1)
         assert a.enter(door) == ('world',), f'the {where} not entered'
+        # The building's words on the way in (191F, which its first frame
+        # shows in a box waiting for a click, 0000:4903) taken as read, as
+        # gen_screens.py's screens take them.
+        a.mu.mem_write(a.lin(a.ds, 0x191F), b'\0')
         return a.snapshot()
     return enter
 
