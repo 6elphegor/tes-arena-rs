@@ -94,14 +94,7 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     match place {
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_crypt(&mut a),
-        Place::Street => {
-            // The sky's buffers, as the game's set-up makes them
-            // (2294:01F1), which the view doesn't make yet (made at its
-            // start, they move its heap and the world map's tests fail).
-            let Engine { m, files, .. } = &mut a.engine;
-            m.sky_buffers(files).expect("the sky's buffers");
-            area_left(&mut a)
-        }
+        Place::Street => area_left(&mut a),
     }
     a.fade.clear();
     a.fade_old = None;

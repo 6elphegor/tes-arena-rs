@@ -2326,7 +2326,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
         };
         let sheet = st.panel.as_ref().is_some_and(|p| !p.over_play());
-        let mut screen = hud::Screen::new(if sheet { st.assets.charsheet } else { st.assets.palette });
+        let mut screen = hud::Screen::new(if sheet { st.assets.charsheet } else { st.assets.dac() });
         if let Some(mk) = &maker {
             spellmaker::draw(&mut screen, &font, &st.assets.archive, &engine.files, mk);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
