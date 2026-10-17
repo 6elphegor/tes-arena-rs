@@ -1346,6 +1346,10 @@ fn main() {
         }
         let frames: usize = args.get(5).map_or(0, |v| v.parse().expect("frames"));
         let turn: i16 = args.get(6).map_or(0, |v| v.parse().expect("turn"));
+        // The shot's 3D view drawn as the window's is (`arena::render`).
+        if !GPU_WORLD.load(std::sync::atomic::Ordering::Relaxed) {
+            engine.page = Some(vec![0; 64000]);
+        }
         shot(&dir, engine, run, out, click, wait, frames, turn, &steps, answers, save_dir.as_deref().map(|d| (d, slot)), &maker_script);
         return;
     }
@@ -2282,6 +2286,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             draw_live(&mut screen);
             hud::Overlay::new(&device, format).draw(&device, &queue, &view, &screen);
         } else {
+        // The original's 3D view under the interface, as the window's
+        // (where its renderer reached no path not ported).
+        if let (false, Some(page), true) = (sheet, &engine.page, engine.page_gaps.is_empty()) {
+            screen.underlay(page);
+        }
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");

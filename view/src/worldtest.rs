@@ -69,6 +69,13 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
         return None;
     };
     let (mut a, mut d) = loaded(&dir, &save);
+    // The harness leaves the guild without a frame run there, so the
+    // load's 5CA bit 4000h (25FD:03xx), which the world loop's first
+    // frame clears (0000:48BE), is still set as it enters the next area
+    // (and the level's lights aren't made, 0000:4767); the view's first
+    // frame (`loaded`) cleared it.
+    let f = a.engine.m.mem.r16(DS, 0x05CA) | 0x4000;
+    a.engine.m.mem.w16(DS, 0x05CA, f);
     match place {
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_crypt(&mut a),
@@ -78,6 +85,9 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     setup(&mut a);
     let mut seen = vec![state(&a)];
     play(&mut a, &mut d, &mut seen);
+    // The harness's last frame, run again with the page's writes watched
+    // (gen_worldframes.py `play`): the page it leaves is the case's.
+    d.frame(&mut a);
     Some((a, seen))
 }
 
@@ -383,12 +393,6 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
         let (place, setup, play) = case(name).unwrap();
         let Some((a, _)) = played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);
-            // The original makes the level's lights (0000:478F) before
-            // its INF has loaded, from the last area's flats: none here.
-            a.engine.m.mem.w16(DS, 0xBC8E, 0);
-            a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
-            let v = a.engine.m.mem.r16(DS, 0xCCBC).wrapping_add(1);
-            a.engine.m.mem.w16(DS, 0xCCBC, v);
             setup(a)
         }, play) else { return };
         let page = a.engine.page.clone().unwrap();
@@ -449,17 +453,6 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
         place,
         |a| {
             a.engine.page = Some(vec![0; 64000]);
-            // The original makes the level's lights (0000:478F, through
-            // 4767) only when 5CA bit 4000h is clear, which entering these
-            // from the save it isn't: none. The view makes them (13 in the
-            // dungeon), so here they are taken away as the original has
-            // them.
-            a.engine.m.mem.w16(DS, 0xBC8E, 0);
-            a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
-            // The frame count (CCBC, which picks an animated flat's frame)
-            // stands one ahead in the original from these entries.
-            let v = a.engine.m.mem.r16(DS, 0xCCBC).wrapping_add(1);
-            a.engine.m.mem.w16(DS, 0xCCBC, v);
             setup(a)
         },
         play,
@@ -499,3 +492,4 @@ fn the_crypts_3d_view_measured() {
         }
     }
 }
+
