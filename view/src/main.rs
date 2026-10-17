@@ -381,7 +381,8 @@ impl arena::clock::ClockHooks for Front<'_> {
         Some(())
     }
     /// 1194:86F2: a quest's ambush, its text shown (the fight's
-    /// graphics and music are the view's own, as for `NoFightHooks`).
+    /// graphics loaded as `NoFightHooks` loads them, its music the
+    /// view's own).
     fn encounter_minute(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         let fs = files.clone();
         m.quest_ambush(files, &mut arena::encounter::NoFightHooks, &mut questui::QuestFront(self, fs))

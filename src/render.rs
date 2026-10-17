@@ -3336,6 +3336,7 @@ impl Soft {
             return;
         };
         let (lights, floor, ceiling) = (seg + SHADES_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS + ROWS_PARAS);
+        let machines = self.g16(0xCCC2);
         self.s16(0xCCC2, seg);
         self.table = seg;
         shade_tables(&mut self.m, seg);
@@ -3347,6 +3348,15 @@ impl Soft {
         if (self.g8(0xCB5C) | self.g8(0x0F81)) & 0x80 != 0 {
             for i in 0..0x200u16 {
                 self.m.mem.w8(seg, 0xD00 + i, fog);
+            }
+        }
+        // The rows E00h and F00h as the machine's table has them: a
+        // remapped creature's colours (25CA:013A, `place_creatures`), which
+        // its light rows (953E) draw.
+        if machines != 0 {
+            for i in 0xE00..0x1000u16 {
+                let b = self.m.mem.r8(machines, i);
+                self.m.mem.w8(seg, i, b);
             }
         }
         // A561.

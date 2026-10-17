@@ -44,9 +44,9 @@ use var::*;
 /// What starting a fight leaves to the front end.
 pub trait FightHooks {
     /// 0000:1AF9 (people) / 1A5C (monsters): the creatures' graphics
-    /// load.
-    fn fight_graphics(&mut self, _m: &mut Machine, _files: &mut Files, _people: bool) -> Option<()> {
-        Some(())
+    /// load (`Machine::fight_graphics_load`).
+    fn fight_graphics(&mut self, m: &mut Machine, files: &mut Files, people: bool) -> Option<()> {
+        m.fight_graphics_load(files, people)
     }
     /// 23BA:01C7: the fight's music (`MUSIC`).
     fn fight_music(&mut self, _m: &mut Machine, _music: u8) {}
@@ -90,6 +90,32 @@ impl Machine {
             hooks.fight_music(self, music);
         }
         Some(())
+    }
+
+    /// 25CA:0021..004F: the fight's graphics from the names at DGROUP
+    /// 1044, where every caller leaves SI (8B12's monster's file or
+    /// people's list, 2686:0423's list): people's by 0000:1AF9, each name
+    /// of the list (to an empty one) loaded by 1A5C into bank 34h / 2's
+    /// half on; a monster's (0FFF 1: a bank each) by 1A5C with its file
+    /// at 8000h of bank 19h too.
+    pub fn fight_graphics_load(&mut self, files: &mut Files, people: bool) -> Option<()> {
+        let mut si = 0x1044u16;
+        if !people {
+            return self.actor_graphics(files, si, 0x34, 0x19, 0x8000);
+        }
+        if self.mem.r16(DS, si) == 0 {
+            return Some(());
+        }
+        loop {
+            self.actor_graphics(files, si, 0x34, 0xFFFF, 0)?;
+            while self.mem.r8(DS, si) != 0 {
+                si = si.wrapping_add(1);
+            }
+            si = si.wrapping_add(1);
+            if self.mem.r8(DS, si) == 0 {
+                return Some(());
+            }
+        }
     }
 
     /// 25CA:006A. Up to `count` creatures (count 0 means 65536) come into
