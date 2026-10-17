@@ -13,7 +13,8 @@ typed names (or Esc). Every routine the menus call out to is a stub
 whose Python hook logs it with its registers and plays the script:
 0000:8FC4 (clears AFF9), 9AE6/9AF8 (fonts), 5C86 (a bank), 7428 (a file
 loaded: NAMES.DAT's names written at 9686), 5828, 9A6E, 5364, 9466, 541E
-(drawing), 1194:564D (a click: AX, BX), 0000:9EE5 (the name typed at
+(drawing), 1194:564D (a click: AX, BX; 5C8 bit 1 cleared as its way
+back clears it), 0000:9EE5 (the name typed at
 1044, or Esc clearing A902 bit 1000h), 1194:59C8 (a message), 1194:4D91
 (a deletion), 292B:095E, 23F1:0145, 2294:11F2. The save stops at
 25FD:0110 (the writing), the load at 25FD:028D (the load); a cancelled or
@@ -135,6 +136,9 @@ def main():
             mu.reg_write(UC_X86_REG_AX, ax)
             mu.reg_write(UC_X86_REG_BX, bx)
             mu.mem_write(a.lin(ds, 0xAFF9), bytes([buttons]))
+            # 1194:567E, 5692: 5C8 bit 1 cleared on the way back.
+            f = struct.unpack('<H', mu.mem_read(a.lin(ds, 0x05C8), 2))[0] & 0xFFFD
+            mu.mem_write(a.lin(ds, 0x05C8), struct.pack('<H', f))
         elif name == 'type':
             e = state['edits']
             t = e.pop(0) if e else b''

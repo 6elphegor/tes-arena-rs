@@ -181,6 +181,9 @@ impl Machine {
         loop {
             self.menu_or16(0x05C8, 2);
             let (ax, by) = hooks.click(self);
+            // 1194:567E, 5692: the click's way back clears the bit either
+            // way (a click or Esc).
+            self.menu_and16(0x05C8, 0xFFFD);
             if (ax as i16) < 0 {
                 return None;
             }

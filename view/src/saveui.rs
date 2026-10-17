@@ -54,8 +54,10 @@ pub enum Ended {
     Save(Engine, u8),
     /// A slot picked to load: the engine after the menu.
     Load(Engine, u8),
-    /// The menu left, with the message it showed (a refusal) if any.
-    Left(Option<String>),
+    /// The menu left: the engine as it left it (the load menu has deleted
+    /// the working log and rooms, 25FD:0242, whatever comes next), and the
+    /// message it showed (a refusal) if any.
+    Left(Box<Engine>, Option<String>),
 }
 
 pub struct SaveUi {
@@ -196,7 +198,7 @@ impl SaveUi {
             None => Ended::Open,
             Some(Ok(n)) if self.kind == Kind::Save => Ended::Save(e, n),
             Some(Ok(n)) => Ended::Load(e, n),
-            Some(Err(msg)) => Ended::Left(msg),
+            Some(Err(msg)) => Ended::Left(Box::new(e), msg),
         }
     }
 

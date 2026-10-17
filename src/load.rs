@@ -465,9 +465,9 @@ impl Machine {
                     self.mem.w8(DS, at + i as u16, c);
                 }
             }
-            if files.copy(&name, &new) {
-                made.push(new);
-            }
+            // (25FD:056F, through the EMS banks: `file_copy`.)
+            self.file_copy(files, 0x1044, 0x1051);
+            made.push(new);
         }
         made
     }

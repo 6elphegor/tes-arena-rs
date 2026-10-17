@@ -152,10 +152,27 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
         return;
     };
     let (mut a, mut d) = loaded(&dir, &save);
+    let before = files_now(&a, &save);
     open(&mut a, &mut d);
     check_fade(name, &mut a);
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
+    // The files written from the load, against the original's
+    // (tests/vectors/savefiles.txt's `screen` lines). A menu the view
+    // runs over a copy of the game till it ends (the spell's page, the
+    // tavern's, the load menu) is ended first, as nothing after the
+    // original's stop writes more.
+    match name {
+        "equipmentspellrenamed" => d.click(&mut a, 0x120, 0xC0, MouseButton::Left),
+        "tavernroomtaken" => d.click(&mut a, 0xA0, 0x87, MouseButton::Left),
+        "optionsload" => d.key(&mut a, KeyCode::Escape, None),
+        "optionsloadempty" => {
+            d.key(&mut a, KeyCode::Escape, None);
+            d.key(&mut a, KeyCode::Escape, None);
+        }
+        _ => {}
+    }
+    assert!(!check_files(&a, name, "screen", &before, &files_now(&a, &save)), "{name}: the files it wrote differ from the original's");
 }
 
 /// The colours the screen's opening showed (`App::fade`, each different
@@ -195,6 +212,9 @@ fn check_fade_in(file: &str, name: &str, a: &mut App) {
 
 #[path = "dungeontest.rs"]
 mod dungeontest;
+#[path = "filecheck.rs"]
+mod filecheck;
+use filecheck::{check_files, files_now, Disk};
 
 /// F1: the character sheet (2542:00BE, 1194:0CF8), its first page.
 #[test]

@@ -310,12 +310,12 @@ class ScreenArena(DosArena):
 
     # --- the game started and a save loaded -----------------------------------
 
-    def start(self):
+    def start(self, slot=1):
         """The game's start as far as its screens need: 21EE:0000 (the
-        page, the fonts, the cursors, the interface's pictures), then slot
-        1's saved game loaded from the title (gen_titleload.py's run: the
-        load 25FD:0309 into the world loop's entry, 0000:A2AC, with its
-        stubs, taken out again after)."""
+        page, the fonts, the cursors, the interface's pictures), then the
+        saved game of `slot` (1 by default) loaded from the title
+        (gen_titleload.py's run: the load 25FD:0309 into the world loop's
+        entry, 0000:A2AC, with its stubs, taken out again after)."""
         self.init_memory()
         assert self.run_screen(0x21EE, 0) is None, 'the start waited'
         # The texts' far pointer's segment the EMS frame's, as the program's
@@ -343,7 +343,7 @@ class ScreenArena(DosArena):
         # The load menu from its slot picked (slot 1, 25FD:028D): the slot's
         # files copied to the working slot's (06A1), then the load
         # (0309), into the world loop's entry.
-        self._setup([], {'eax': 1})
+        self._setup([], {"eax": slot})
         self._run(0x25FD, 0x028D, LOAD_SEG, 0xA2AC)
         # The stack the world loop runs on: the interior's run (0000:0936,
         # called at 0E7A) and the outer loop under it.

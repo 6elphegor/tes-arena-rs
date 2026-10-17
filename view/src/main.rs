@@ -191,6 +191,13 @@ use std::time::{Duration, Instant};
 /// (`clicked`); with the light state the stairs make the light table
 /// again; with `talk` the game's questions are answered and its boxes
 /// kept (`dialog`), else its menus are left and its texts printed.
+#[cfg(test)]
+thread_local! {
+    /// The load bank [1030] as the town's welcome left it (`town_welcome`),
+    /// for worldtest's check of what it keeps.
+    static WELCOME_KEPT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+}
+
 #[derive(Default)]
 struct Front<'a> {
     sheet: Option<&'a world::SpriteSheet>,
@@ -473,6 +480,11 @@ impl arena::frame::FrameHooks for Front<'_> {
             if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
                 let frame = m.mem.r16(arena::mem::DS, 0x9030);
                 m.box_background(frame, 0, rect, self.shown);
+                // The bank as the welcome leaves it, before the frame's
+                // interface set-up (4DD6, which the welcome's D39 bit 80h
+                // brings) loads STATUS.CIF over it.
+                #[cfg(test)]
+                WELCOME_KEPT.with(|k| *k.borrow_mut() = Some(m.ems_bank(m.mem.r16(arena::mem::DS, 0x1030))));
             }
             self.message_box(m, 0x1044);
         }
@@ -2368,7 +2380,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "save" | "load" => {
                 let (sdir, slot) = saves.expect("--do save/load needs --save-dir");
                 let msg = if what == "save" {
-                    save_to(&mut engine, sdir, slot, st.assets.palette, None)
+                    save_to(&mut engine, sdir, slot, st.assets.dac(), None)
                 } else {
                     match load_from(&mut engine, dir, sdir, slot) {
                         Ok((m, r)) => {
@@ -2666,14 +2678,9 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     if let Err(e) = std::fs::create_dir_all(dir) {
         return format!("{}: {e}", dir.display());
     }
-    // The saved position (BA62: x, z, y), which saving the level makes the
-    // player's (the world loop keeps it each frame, A2A3; the view's
-    // frames don't): the player's.
-    use arena::save_write::var::{POSITION, SAVED_POSITION};
-    for i in 0..3 {
-        let w = engine.m.mem.r16(arena::mem::DS, POSITION + 2 * i);
-        engine.m.mem.w16(arena::mem::DS, SAVED_POSITION + 2 * i, w);
-    }
+    // (The saved position, BA62, which saving the level makes the
+    // player's, is the world loop's (A2A3), the engine's frame's: the
+    // player's place, not the eye's 1Eh behind it in C3D0.)
     engine.m.mem.w8(arena::mem::DS, arena::save::var::SLOT, slot);
     // As 25FD:010B..0110: the automap written (23F1:0145), the working
     // slot's files (CITYDATA, SPELLS, AUTOMAP, ...) copied to the slot's
@@ -3328,7 +3335,7 @@ impl App {
             Some(dir) => {
                 // The port's own key: the screen as the window shows it.
                 let shot: Vec<u8> = self.screen.indices().iter().map(|&c| c as u8).collect();
-                save_to(&mut self.engine, &dir, self.slot, self.assets.palette, Some(&shot))
+                save_to(&mut self.engine, &dir, self.slot, self.assets.dac(), Some(&shot))
             }
             None => "No save directory (--save-dir).".to_string(),
         };
@@ -3363,7 +3370,7 @@ impl App {
                 // its wait, 25FD:0803, while the disk is used); a failure
                 // the original wouldn't have is told.
                 let shot = self.save_shot();
-                let msg = save_to(&mut self.engine, &dir, slot, self.assets.palette, Some(&shot));
+                let msg = save_to(&mut self.engine, &dir, slot, self.assets.dac(), Some(&shot));
                 if msg.starts_with("Saved to slot") {
                     println!("{msg}");
                 } else {
@@ -3402,7 +3409,10 @@ impl App {
                     }
                 }
             }
-            saveui::Ended::Left(msg) => {
+            saveui::Ended::Left(engine, msg) => {
+                // The game goes on as the menu left it (a load menu left
+                // has deleted log.64, re*.64 and in*.64).
+                self.engine = *engine;
                 if let Some(m) = msg {
                     self.say(&m);
                 }

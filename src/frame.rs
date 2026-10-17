@@ -811,8 +811,28 @@ impl Machine {
         self.mem.w16(DS, 0xB036, v);
         self.name_text(0x01A4);
         self.mem.w16(DS, 0x12BA, 0);
+        self.status_picture_load(files, 0x01A4)?;
         let v = self.mem.r16(DS, 0x102C);
         self.mem.w16(DS, 0xB036, v);
+        Some(())
+    }
+
+    /// 0000:4E81 with SI `si` (a character's record): where it has a name
+    /// (+9), the condition's picture loaded, STATUS.CIF (8856) whole to
+    /// the buffer ([9030]:0, 742C) with bank [1030] mapped (5C8A), the
+    /// bank mapped before put back. Which image is drawn (by 2686:0270,
+    /// +40Dh, the health: 3C94) and its drawing (582C) are the front
+    /// end's.
+    pub fn status_picture_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        if self.mem.r8(DS, si.wrapping_add(9)) == 0 {
+            return Some(());
+        }
+        let old = self.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
+        let bank = self.mem.r16(DS, 0x1030);
+        self.ems_map(bank);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.file_load(files, 0x8856, frame, 0)?;
+        self.ems_map(old);
         Some(())
     }
 

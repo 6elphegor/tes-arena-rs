@@ -27,6 +27,14 @@ and deleted:
   save | NAME | <file> <length> <digest>
   savedel | NAME | <file> ...
 
+and that save loaded back from the title by a game started afresh on the
+save's folder with the files the save wrote (`load_line`): the random
+seed it reaches (the harness's clock's, which the view takes) and
+DGROUP's digest, tests/vectors/loadexclude.txt's offsets 0 (as
+gen_worldframes.py's loadstate):
+
+  loadplace | NAME | <seed> | <digest>
+
 The files are taken to the port's form first (`canonical`): SAVEGAME's
 level block (DGROUP BB08.., FD00h on in the file) holds segments of the
 image (the level's hooks, C3A4..C3BB), which the harness's load puts
@@ -36,11 +44,25 @@ ceiling (its plane's segment, D748, 0) the save writes the 32 KB at
 DOS's memory, not the game's: the port's is its image), left out as 0s
 (view/src/savetest.rs does the same to the view's).
 
+Then gen_screens.py's screens, each run once as that runs it (from the
+load, or in its building), and the files made, changed or deleted from
+the load to the screen (the way into its building counted), where there
+are any:
+
+  screen | NAME | <file> <length> <digest>
+  screendel | NAME | <file> ...
+
+for view/src/screentest.rs's `screen`, which checks each screen's files
+against these (none where a screen has no lines).
+
 With --dump DIR, each file as written (in that form): DIR/NAME.play/<file>
-and DIR/NAME.save/<file> (game data: never commit them).
+and DIR/NAME.save/<file>, DIR/NAME.screen/<file> (game data: never commit
+them).
 """
 import os
+import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(__file__))
 import struct
@@ -51,6 +73,8 @@ import gen_screens as gs
 import gen_worldframes as gw
 
 UP = gw.UP
+# The random seed (DGROUP).
+SEED = 0x91F6
 
 # The save as optionssaved makes it.
 SAVE_SCRIPT = [('click', 160, 132), ('click', 100, 81)] + [('keys', [k]) for k in (0x1E, 0x1C)]
@@ -117,6 +141,35 @@ def canonical(segs, name, data, no_ceiling):
     return bytes(data)
 
 
+# Inputs past gen_screens.py's script for the files (see `main`): the
+# failed theft's words clicked away, the store left (1194:F526 writes its
+# stock and deletes its empty repairs).
+ON = {'storesteal': [('click', 0xA0, 0x64)]}
+
+
+def load_line(exe, game, save, name, saved, skip, dump=None):
+    """The save just made loaded back from the title, by a game started
+    afresh on a folder of the save's files and what the save wrote (as
+    the view's save folder holds them): the random seed it reaches (the
+    harness's clock's) and DGROUP's digest, `skip`'s offsets 0
+    (tests/vectors/loadexclude.txt)."""
+    tmp = tempfile.mkdtemp(prefix='arena-savefiles-')
+    try:
+        for n in os.listdir(save):
+            shutil.copy(os.path.join(save, n), os.path.join(tmp, n))
+        for n, d in saved.items():
+            open(os.path.join(tmp, n), 'wb').write(d)
+        b = ScreenArena(exe, game, tmp)
+        b.start(5)
+        ds = bytes(b.mu.mem_read(b.lin(b.ds, 0), 0x10000))
+    finally:
+        shutil.rmtree(tmp)
+    seed = struct.unpack_from('<I', ds, SEED)[0]
+    if dump:
+        open(os.path.join(dump, f'{name}.loadds'), 'wb').write(bytes(0 if i in skip else v for i, v in enumerate(ds)))
+    return f'loadplace | {name} | {seed:x} | {fnv(bytes(0 if i in skip else v for i, v in enumerate(ds))):x}\n'
+
+
 def files_changed(before, after):
     """The files of `after` (name: bytes) new or changed since `before`."""
     return {n: bytes(d) for n, d in after.items() if n not in before or bytes(before[n]) != bytes(d)}
@@ -140,6 +193,7 @@ def main():
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     segs = image_segments(EXE)
+    skip_load = gw.excluded('loadexclude.txt')
     a = ScreenArena(EXE, GAME, SAVE)
     a.start()
     base = a.snapshot()
@@ -175,6 +229,34 @@ def main():
             out.write(l)
         if dump:
             dump_files(dump, name, 'save', saved)
+        out.write(load_line(EXE, GAME, SAVE, name, files_changed(before[0], a.written), skip_load, dump))
+    # gen_screens.py's screens, each run once as it runs them (in its
+    # building), and what the run wrote, where it wrote anything. The
+    # tavern looked at is noted on the automap at the square under the
+    # cursor (CB92, 2826:0D0x), which gen_screens.py's call (AX the
+    # square only) leaves 0: here the one screentest's right click in
+    # the view's centre picks (row 7, column 0Eh).
+    gs.BEFORE['looktavern'] = lambda a: a.w16(0xCB92, 0x071C)
+    for name, (handler, script, *waits) in gs.SCREENS.items():
+        if only and name not in only:
+            continue
+        # Screens the view's menus run past the original's stop before
+        # they show it (the shop's turn is replayed to its next question):
+        # their files after the original goes on as far.
+        script = script + ON.get(name, [])
+        print(name, file=sys.stderr)
+        at = gs.place(a, base, gs.WHERE[name]) if name in gs.WHERE else base
+        # From the load: a building's way in counted (the view's screens
+        # go in as part of theirs).
+        before = loaded
+        gs.draw(a, at, name, handler, script, 0x00, *waits)
+        made = {n: canonical(segs, n, d, a.r16(0xD748) == 0) for n, d in files_changed(before[0], a.written).items()}
+        gone = a.deleted - before[1]
+        if made or gone:
+            for l in lines('screen', name, made, gone):
+                out.write(l)
+            if dump:
+                dump_files(dump, name, 'screen', made)
     out.close()
 
 
