@@ -178,8 +178,11 @@ impl Machine {
         let (off, seg) = (r(self, 0xA848), r(self, 0xA84A));
         let given = r(self, 0xA84C) & 0x20 != 0;
         self.box_background(seg, off, (x, y, bw, bh), screen);
+        // The head's x as 9876 writes it: 8000h set with the buffer given,
+        // as it is from the heap (a box left of the screen, x negative,
+        // has it set too, and 933C then doesn't free its block).
         if !given {
-            self.mem.w16(seg, off, x & 0x7FFF);
+            self.mem.w16(seg, off, x);
         }
         self.mem.w16(DS, 0xA8FC, 0);
         Some(())
@@ -323,7 +326,7 @@ impl Machine {
         self.mem.w8(DS, 0x9288, 0xD4);
         let f = self.mem.r16(DS, 0x05E0);
         self.mem.w16(DS, 0x05E0, f | 0x800);
-        self.message_wait_box(0x5F26, screen)?;
+        self.message_wait_box((DS, 0x5F26), screen)?;
         let f = self.mem.r16(DS, 0x05E0);
         self.mem.w16(DS, 0x05E0, f & !0x800);
         let f = self.mem.r16(DS, 0xA902);
@@ -331,31 +334,63 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:59C8 with 5E0 bit 800h set (no wait): bank 18h mapped (11h in
-    /// a dungeon, 5E6 4), the box (965A: CX 4007h, DX 5, centred in the
-    /// clip, its background at [902E], the frame's start) for the text at
-    /// DS:`si`. The mouse's wait (8FC4), the sound's poll (2F26:02A1), the
-    /// keys' flush (710E) and the page's showing (9466) are the front
-    /// end's; of the dissolve that shows it, its generator (`dissolve`).
-    pub fn message_wait_box(&mut self, si: u16, screen: Option<&[u8]>) -> Option<()> {
+    /// 0000:4B02..4B21: the town's welcome: the file named at 130C
+    /// (ENTERCTY.$$$) loaded by its path in the save's folder (25FD:0844,
+    /// 7428) to 1044, then its box (965E: CX 7, DX 5, centred, what it
+    /// covers kept at the frame's start, [9030]:0, in the bank the caller
+    /// mapped, [1030]). AX and BX are what came before leaves: the load's
+    /// offset and the bank (4AFB). The page's showing (946A) and the wait
+    /// for a key (1194:5532) are the front end's. None where the file
+    /// can't be loaded.
+    pub fn town_welcome_box(&mut self, files: &mut crate::bsa::Files, screen: Option<&[u8]>) -> Option<()> {
+        let path = self.save_path(0x130C);
+        let (_, off) = self.file_load(files, path, DS, 0x1044)?;
+        let bank = self.mem.r16(DS, 0x1030);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.message_box((DS, 0x1044), (off, bank), 7, 5, (frame, 0), (0, 0), screen)?;
+        Some(())
+    }
+
+    /// 1194:59C8 whole: the box shown (`message_wait_box`) and, unless 5E0
+    /// bit 800h, once the front end's wait for a click or a key (1194:5536)
+    /// is over, put away (`message_box_closed`). The mouse's reads on the
+    /// way (8FC4: 8F92, 8F94, 8FA8, AFF9) are the front end's.
+    pub fn message_shown(&mut self, text: (u16, u16), screen: Option<&[u8]>) -> Option<()> {
+        self.message_wait_box(text, screen)?;
+        if self.mem.r16(DS, 0x05E0) & 0x800 == 0 {
+            self.message_box_closed();
+        }
+        Some(())
+    }
+
+    /// 1194:59C8 up to 5A23 (all of it with 5E0 bit 800h set): bank 18h
+    /// mapped (11h in a dungeon, 5E6 4), the box (965A: CX 4007h, DX 5,
+    /// centred in the clip, its background at [902E], the frame's start)
+    /// for the text at `text`. The mouse's wait (8FC4), the sound's poll
+    /// (2F26:02A1), the keys' flush (710E) and the page's showing (9466)
+    /// are the front end's; of the dissolve that shows it, its generator
+    /// (`dissolve`).
+    pub fn message_wait_box(&mut self, text: (u16, u16), screen: Option<&[u8]>) -> Option<()> {
         let bank = if self.mem.r8(DS, 0x05E6) == 4 { 0x11 } else { 0x18 };
         self.ems_map(bank);
         let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
-        self.message_box((DS, si), (0, 0), 0x4007, 5, (seg, off), (0, 0), screen)?;
+        // AX and BX as the mouse's read (8FC4) leaves them: the cursor's
+        // x and y (8F92, 8F94), which 965A keeps at A836 and A838.
+        let at = (self.mem.r16(DS, 0x8F92), self.mem.r16(DS, 0x8F94));
+        self.message_box(text, at, 0x4007, 5, (seg, off), (0, 0), screen)?;
         self.dissolve();
         Some(())
     }
 
-    /// 1194:5A23..5A6B, after `message_wait_box` when the box is waited on
-    /// (5E0 bit 800h clear): once the front end's wait (1194:5536) is
-    /// over, the background put back (933C: a given buffer, nothing
-    /// freed) and shown by the dissolve again (`dissolve`); the release
-    /// waited for (5E21, the front end's); in a dungeon (5E6 4) bank 11h
-    /// mapped and the first 4000h bytes at [902E] filled with 15h.
+    /// 1194:5A2E..5A6B, after the wait: the background put back (933C,
+    /// `box_restore`, from the segment 965A returned in DX, A84A), the
+    /// dissolve's generator stepped again, and in a dungeon (5E6 4) bank
+    /// 11h mapped and the 4000h bytes at [902E] filled with 15h. The
+    /// page's showing (9466) and the wait for the buttons' release (5E21)
+    /// are the front end's.
     pub fn message_box_closed(&mut self) {
-        if self.mem.r16(DS, 0x05E0) & 0x800 != 0 {
-            return;
-        }
+        let seg = self.mem.r16(DS, 0xA84A);
+        self.box_restore(seg);
         self.dissolve();
         if self.mem.r8(DS, 0x05E6) == 4 {
             self.ems_map(0x11);
@@ -364,6 +399,20 @@ impl Machine {
                 self.mem.w8(seg, off.wrapping_add(i), 0x15);
             }
         }
+    }
+
+    /// 0000:933C: a box's background put back from the record at `seg`:0
+    /// (its x, y, width and height, the pixels after; the page is the
+    /// front end's), and unless its x has bit 15 (a buffer given, or a
+    /// box left of the screen) the heap's block at `seg` freed (6C36).
+    /// Returns (x less bit 15, y, width, height) for the front end.
+    pub fn box_restore(&mut self, seg: u16) -> (u16, u16, u16, u16) {
+        let x = self.mem.r16(seg, 0);
+        let rect = (x & 0x7FFF, self.mem.r16(seg, 2), self.mem.r16(seg, 4), self.mem.r16(seg, 6));
+        if x & 0x8000 == 0 {
+            self.heap_free(seg);
+        }
+        rect
     }
 
     /// 1194:4FF7's state (its pixels the front end's, view/src/film.rs):

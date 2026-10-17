@@ -615,14 +615,26 @@ impl Machine {
         for (i, v) in [x | 0x8000, y, w, h].into_iter().enumerate() {
             self.mem.w16(seg, off.wrapping_add(2 * i as u16), v);
         }
+        // 8F2A's rows: from the row table (A6A0) plus x, on 140h a row,
+        // each read in the page's segment (or [8F9C]'s with the dword at
+        // 8F9A set), wrapping in it; what lies past the page (FA00h on)
+        // is the memory after it, as is any other segment's.
+        let page = self.mem.r16(DS, 0xA900);
+        let from = if self.mem.r32(DS, 0x8F9A) != 0 { self.mem.r16(DS, 0x8F9C) } else { page };
+        let mut row = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
         let mut at = off.wrapping_add(8);
-        for r in 0..h as usize {
-            let row = (y as usize + r) * 320 + x as usize;
-            for c in 0..w as usize {
-                let v = screen.and_then(|s| s.get(row + c)).copied().unwrap_or(0);
+        for _ in 0..h {
+            for c in 0..w {
+                let o = row.wrapping_add(c);
+                let v = match screen {
+                    Some(s) if from == page && (o as usize) < s.len() => s[o as usize],
+                    None if from == page && o < 0xFA00 => 0,
+                    _ => self.mem.r8(from, o),
+                };
                 self.mem.w8(seg, at, v);
                 at = at.wrapping_add(1);
             }
+            row = row.wrapping_add(0x140);
         }
     }
 

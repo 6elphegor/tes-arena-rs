@@ -127,7 +127,7 @@ the original routine:
 | `FrameHooks::quest_carry` | src/frame.rs:117 | 0000:4D00 | port | the default runs the port | |
 | `FrameHooks::rest` | src/frame.rs:133 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
 | `FrameHooks::riddle` | src/frame.rs:80 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
-| `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: ENTERCTY.$$$ in the game's box; what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`) |
+| `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
 | `FrameHooks::townsfolk_graphics` | src/frame.rs:108 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
 | `FrameHooks::weapon_graphics` | src/frame.rs:104 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
 | `FxHooks::spell_reflected` | src/effects.rs:172 | 0000:27E5 | overridden | the engine: GameHooks | faithful: the engine's |
