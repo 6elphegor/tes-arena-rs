@@ -1,0 +1,9 @@
+dos | con | miss NOSUCH.A; seek 2; seek 0; read 0; close; open LOG.01; seek 2; close | 2; 0; 0; 0 cbf29ce484222325; 3e00 0; 2; 801; 3e00 0
+dos | free | miss NOSUCH.A; seek 2; read 0; close; miss NOSUCH.B; seek 2; seek 0; read 6; close | 2; 0; 0 cbf29ce484222325; 3e00 0; 2; 6; 6; 6 fadc32306ac1bb5f; 6 1
+dos | reused | miss NOSUCH.A; close; open LOG.01; miss NOSUCH.B; seek 2; seek 0; read 10; close; close | 2; 3e00 0; 2; 2; 801; 0; 10 a32ec0389dcca69f; 3e00 0; 6 1
+dos | two-files | miss NOSUCH.A; close; open LOG.01; open CITYDATA.01; seek 2; close | 2; 3e00 0; 2; 6; 2b2c; 3e00 0
+dos | copy-missing | miss NOSUCH.A; close; copy NOSUCH.C NOSUCH.99 | 2; 3e00 0; 2 2 2 2 0 0 0 0 0/cbf29ce484222325
+dos | copy-over | miss NOSUCH.A; close; copy NOSUCH.C STATES.01 | 2; 3e00 0; 2 2 2 2 0 0 0 0 0/cbf29ce484222325
+dos | copy-there | miss NOSUCH.A; close; copy LOG.01 LOG.99 | 2; 3e00 0; 2 6 2 6 801 0 0 0 801/560dadd0d3e0ffa9
+dos | copy-con | copy NOSUCH.C NOSUCH.99 | waits
+dos | con-read | miss NOSUCH.A; read 10 | 2; waits

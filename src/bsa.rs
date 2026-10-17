@@ -59,22 +59,155 @@ use var::*;
 const CS_HANDLE: u16 = 0x6837;
 const CS_IN_BSA: u16 = 0x6839;
 
-const BSA_DOS_HANDLE: u16 = 5;
-const LOOSE_DOS_HANDLE: u16 = 6;
+/// DOS's error code for an invalid handle (a closed one), which a read,
+/// write, seek or close on it returns in AX with the carry set.
+const INVALID_HANDLE: u16 = 6;
+
+/// A file open on a DOS handle: its bytes, position and upper-case name
+/// (writes to it are kept under the name, `file_put`).
+#[derive(Clone)]
+struct OpenFile {
+    data: Rc<[u8]>,
+    pos: u32,
+    name: Vec<u8>,
+}
+
+/// What a DOS handle is: a file, one of the character devices DOS opens a
+/// program with (still open), or nothing (free, or closed).
+enum On<'a> {
+    File(&'a mut OpenFile),
+    Device(u16),
+    Free,
+}
+
+/// DOS's handles for the program (the 20 of its PSP). DOS starts a
+/// program with its character devices on the first five, CON on 0, 1
+/// and 2 (one open file: one position), AUX on 3, PRN on 4; each is open
+/// until the program closes it, and an open or create takes the lowest
+/// free handle. The game closes 2 itself where it goes on after a missing
+/// file with the open's error code, 2 ("file not found"), as its handle:
+/// from then on its next file is opened on 2, and an operation on 2 with
+/// nothing open there fails as an invalid handle (MS-DOS 4.0's
+/// HANDLE.ASM: $Close frees the JFN even with CON's other references).
+#[derive(Clone)]
+struct Dos {
+    /// Bit h set: device handle h (0..4) still open.
+    devices: u8,
+    /// CON's position (its size is 0: a seek from the end is the offset).
+    con_pos: u32,
+    files: std::collections::BTreeMap<u16, OpenFile>,
+    /// GLOBAL.BSA's handle (kept open from the start, read through `bsa`).
+    bsa: Option<u16>,
+    /// The handle the port's file calls work on: the last opened or
+    /// made, or the error code a failed open left (CS:6837 for the
+    /// routines that keep it there).
+    cur: u16,
+}
+
+impl Default for Dos {
+    fn default() -> Self {
+        Self { devices: 0x1F, con_pos: 0, files: Default::default(), bsa: None, cur: 0xFFFF }
+    }
+}
+
+impl Dos {
+    /// The handle the next open or create gets: the lowest free.
+    fn free(&self) -> u16 {
+        (0..20).find(|&h| !self.on_device(h) && !self.files.contains_key(&h) && self.bsa != Some(h)).unwrap_or(0xFFFF)
+    }
+
+    fn on_device(&self, h: u16) -> bool {
+        h < 5 && self.devices & (1 << h) != 0
+    }
+
+    /// A file opened (or made) on the lowest free handle, made current.
+    fn open(&mut self, data: Rc<[u8]>, name: Vec<u8>) -> u16 {
+        let h = self.free();
+        self.files.insert(h, OpenFile { data, pos: 0, name });
+        self.cur = h;
+        h
+    }
+
+    fn on(&mut self, h: u16) -> On<'_> {
+        if self.on_device(h) {
+            return On::Device(h);
+        }
+        match self.files.get_mut(&h) {
+            Some(f) => On::File(f),
+            None => On::Free,
+        }
+    }
+
+    /// DOS read (3Fh) of up to `n` bytes on `h`: the bytes, or Err(AX)
+    /// with the carry set. A count of 0 returns at once, on a device too
+    /// (DISK.ASM's DOS_READ: "no bytes to read - fast return"); more from
+    /// CON waits for a line typed at the keyboard ($STD_CON_STRING_INPUT),
+    /// which the port can't give: it reads nothing, noted as where the
+    /// original would wait.
+    fn read(&mut self, h: u16, n: u16) -> Result<Vec<u8>, u16> {
+        match self.on(h) {
+            On::File(f) => {
+                let start = (f.pos as usize).min(f.data.len());
+                let end = (start + n as usize).min(f.data.len());
+                f.pos = f.pos.wrapping_add((end - start) as u32);
+                Ok(f.data[start..end].to_vec())
+            }
+            On::Device(_) => {
+                if n != 0 {
+                    let _: Option<()> = crate::giveup::original("DOS read from a character device: waits for the keyboard");
+                }
+                Ok(Vec::new())
+            }
+            On::Free => Err(INVALID_HANDLE),
+        }
+    }
+
+    /// DOS seek (42h) on `h` by `off` from the start (0), the position
+    /// (1) or the end (any other, as the game only passes 0..2): the new
+    /// position, or Err(AX) with the carry set. A device's position is
+    /// its file's, its size 0 ($LSEEK has no case for devices).
+    fn seek(&mut self, h: u16, whence: u8, off: u32) -> Result<u32, u16> {
+        let base = |pos: u32, size: u32| match whence {
+            0 => 0,
+            1 => pos,
+            _ => size,
+        };
+        match self.on(h) {
+            On::File(f) => {
+                f.pos = base(f.pos, f.data.len() as u32).wrapping_add(off);
+                Ok(f.pos)
+            }
+            On::Device(d) => {
+                let p = if d <= 2 { &mut self.con_pos } else { return Ok(off) };
+                *p = base(*p, 0).wrapping_add(off);
+                Ok(*p)
+            }
+            On::Free => Err(INVALID_HANDLE),
+        }
+    }
+
+    /// DOS close (3Eh) of `h`: false (the carry set, AX 6) where nothing
+    /// is open on it.
+    fn close(&mut self, h: u16) -> bool {
+        if self.on_device(h) {
+            self.devices &= !(1 << h);
+            return true;
+        }
+        self.files.remove(&h).is_some()
+    }
+}
 
 /// The game directory: loose files (matched case-insensitively, as DOS
-/// does) and the DOS file positions of open files. Cloning is cheap: file
-/// contents are shared.
+/// does) and DOS's handles with the files open on them. Cloning is cheap:
+/// file contents are shared.
 #[derive(Clone, Default)]
 pub struct Files {
     names: HashMap<Vec<u8>, PathBuf>,
     bsa: Option<(Rc<[u8]>, u32)>,
-    loose: Option<(Rc<[u8]>, u32)>,
+    dos: Dos,
     /// Files the game wrote (`Machine::file_write`), by upper-case name:
     /// kept here, not on disk, and found before the directories' files.
     written: HashMap<Vec<u8>, Rc<[u8]>>,
-    /// The open loose file's name, so writes to it are kept (`file_put`).
-    loose_name: Option<Vec<u8>>,
     /// Files the game deleted (`Machine::file_delete`): hidden from then
     /// on, the directories' files too (nothing is deleted on disk).
     deleted: std::collections::HashSet<Vec<u8>>,
@@ -82,7 +215,7 @@ pub struct Files {
 
 impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
-        let mut files = Self { names: HashMap::new(), bsa: None, loose: None, written: HashMap::new(), loose_name: None, deleted: Default::default() };
+        let mut files = Self { names: HashMap::new(), bsa: None, dos: Dos::default(), written: HashMap::new(), deleted: Default::default() };
         files.add_dir(dir)?;
         Ok(files)
     }
@@ -248,7 +381,9 @@ impl Machine {
         if head.len() != 2 {
             return false;
         }
-        self.mem.w16(DS, BSA_HANDLE, BSA_DOS_HANDLE);
+        let h = files.dos.free();
+        files.dos.bsa = Some(h);
+        self.mem.w16(DS, BSA_HANDLE, h);
         let count = self.mem.r16(DS, BSA_COUNT) as u32;
         let dir = (f.0.len() as u32).wrapping_sub(count * 18);
         self.mem.w32(DS, BSA_DIR, dir);
@@ -413,48 +548,48 @@ impl Machine {
     /// 25FD:056F: the file named at DS:`from` copied to DS:`to` (kept in
     /// `Files` as a written file, as `file_write` does), through the EMS
     /// banks: `from` opened (0000:6B22, its handle at 126C and A836), `to`
-    /// deleted (9DC2) and made (67A2, its handle at 126E and A838; the
-    /// handles DOS's next free ones after GLOBAL.BSA's 5, 6 and 7), then
-    /// (05A5) up to FFFFh bytes read into the frame ([902E]) with each of
-    /// the four banks of the table at 5F5A mapped in turn (1Fh, 17h, 18h,
-    /// 12h; the count read at the entry's +2), until a read comes short,
-    /// and written out again bank by bank, until a write comes short;
-    /// four full banks read again. The banks keep what the copy left
-    /// there, the last bank written stays mapped. With `from` missing (or
-    /// only in GLOBAL.BSA: 6B22 opens DOS's files alone) its handle is
-    /// DOS's error, 2, a device that reads nothing: `to` is still made,
-    /// with the handle `from` would have had, and left empty, whatever it
-    /// held before.
+    /// deleted (9DC2) and made (67A2, its handle at 126E and A838; both
+    /// DOS's lowest free handles), then (05A5) up to FFFFh bytes read
+    /// into the frame ([902E]) with each of the four banks of the table
+    /// at 5F5A mapped in turn (1Fh, 17h, 18h, 12h; AX, the count read, at
+    /// the entry's +2), until a read comes short, and written out again
+    /// bank by bank, until a write comes short; four full banks read
+    /// again. Both handles are closed (0000:6762), `from`'s first. The
+    /// banks keep what the copy left there, the last bank written stays
+    /// mapped. With `from` missing (or only in GLOBAL.BSA: 6B22 opens
+    /// DOS's files alone) its handle is DOS's error, 2, and the copy reads
+    /// what DOS has on 2: CON at first, which reads nothing; once the game
+    /// has closed 2, `to` itself, made there, empty (the copy leaves it
+    /// so, whatever it held before; its second close fails).
     pub fn file_copy(&mut self, files: &mut Files, from: u16, to: u16) {
         let found = files.read_loose(self.mem.cstr(DS, from));
         const TABLE: u16 = 0x5F5A;
         self.mem.w8(0, CS_IN_BSA, 0);
         self.mem.w16(DS, OPEN_NAME, from);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
-        let (src, dst) = if found.is_some() { (LOOSE_DOS_HANDLE, LOOSE_DOS_HANDLE + 1) } else { (2, LOOSE_DOS_HANDLE) };
-        if let Some(d) = &found {
-            // 6B77: the size (the seek to the end) at A90C.
-            self.mem.w16(DS, OPEN_SIZE, d.len() as u16);
-        }
-        let data = found.unwrap_or_default();
+        let src = match found {
+            Some(d) => {
+                // 6B77: the size (the seek to the end) at A90C.
+                self.mem.w16(DS, OPEN_SIZE, d.len() as u16);
+                let name = Files::base(self.mem.cstr(DS, from)).to_ascii_uppercase();
+                files.dos.open(d, name)
+            }
+            None => 2,
+        };
         self.mem.w16(DS, 0x126C, src);
         self.file_delete(files, to);
         self.mem.w16(DS, OPEN_NAME, to);
+        let dst = self.dos_create(files, to);
         self.mem.w16(DS, 0x126E, dst);
         self.mem.w16(DS, 0xA836, src);
         self.mem.w16(DS, 0xA838, dst);
-        let (mut pos, mut out) = (0usize, Vec::with_capacity(data.len()));
         'copy: loop {
             for k in 0..4u16 {
                 let bank = self.mem.r8(DS, TABLE + 4 * k) as u16;
                 self.ems_map(bank);
                 let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
-                let n = (data.len() - pos).min(0xFFFF);
-                for (i, &b) in data[pos..pos + n].iter().enumerate() {
-                    self.mem.w8(seg, off.wrapping_add(i as u16), b);
-                }
-                pos += n;
-                self.mem.w16(DS, TABLE + 4 * k + 2, n as u16);
+                let n = self.dos_read(files, src, seg, off, 0xFFFF);
+                self.mem.w16(DS, TABLE + 4 * k + 2, n);
                 if n != 0xFFFF {
                     break;
                 }
@@ -464,51 +599,66 @@ impl Machine {
                 self.ems_map(bank);
                 let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
                 let n = self.mem.r16(DS, TABLE + 4 * k + 2);
-                out.extend((0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))));
-                if n != 0xFFFF {
+                if self.dos_write(files, dst, seg, off, n) != 0xFFFF {
                     break 'copy;
                 }
             }
         }
-        let base = Files::base(self.mem.cstr(DS, to)).to_ascii_uppercase();
-        files.deleted.remove(&base);
-        files.written.insert(base, Rc::from(out));
+        files.dos.close(src);
+        files.dos.close(dst);
     }
 
     /// 0000:677A. Creates (or empties) the file named at DS:`name` (DOS
-    /// create, 3Ch) and makes it the open file; the original keeps the
-    /// handle at CS:6837 (its error code on a failure, which the port
-    /// never has). OPEN_NAME is set as for an open.
+    /// create, 3Ch, on the lowest free handle) and makes it the open file;
+    /// the original keeps the handle at CS:6837 (its error code on a
+    /// failure, which the port never has). OPEN_NAME is set as for an
+    /// open.
     pub fn file_create(&mut self, files: &mut Files, name: u16) {
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
+        let h = self.dos_create(files, name);
+        self.mem.w8(0, CS_IN_BSA, 0);
+        self.mem.w16(0, CS_HANDLE, h);
+    }
+
+    /// DOS create (3Ch) of the file named at DS:`name`: made empty (kept
+    /// as written) and opened on the lowest free handle, which it returns.
+    fn dos_create(&mut self, files: &mut Files, name: u16) -> u16 {
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
         let empty: Rc<[u8]> = Rc::from(Vec::new());
         files.deleted.remove(&base);
         files.written.insert(base.clone(), empty.clone());
-        files.loose = Some((empty, 0));
-        files.loose_name = Some(base);
-        self.mem.w8(0, CS_IN_BSA, 0);
-        self.mem.w16(0, CS_HANDLE, LOOSE_DOS_HANDLE);
+        files.dos.open(empty, base)
     }
 
     /// 0000:6DDC. Writes `n` bytes from `seg`:`off` to the open file at
     /// its position (DOS write, 40h: over what is there, the file growing
-    /// past its end, never shortened). Returns AX, the count written (0
-    /// with no loose file open, where DOS would fail).
+    /// past its end, never shortened). Returns AX, the count written (6,
+    /// an invalid handle, with nothing open on the handle).
     pub fn file_put(&mut self, files: &mut Files, seg: u16, off: u16, n: u16) -> u16 {
-        let (Some(f), Some(name)) = (files.loose.as_mut(), files.loose_name.clone()) else { return 0 };
-        let mut data = f.0.to_vec();
-        let pos = f.1 as usize;
+        let h = files.dos.cur;
+        self.dos_write(files, h, seg, off, n)
+    }
+
+    /// DOS write (40h) of `n` bytes from `seg`:`off` on handle `h`: AX,
+    /// the count (a device takes them all), or 6 where nothing is open.
+    fn dos_write(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {
+        let bytes: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
+        let f = match files.dos.on(h) {
+            On::File(f) => f,
+            On::Device(_) => return n,
+            On::Free => return INVALID_HANDLE,
+        };
+        let mut data = f.data.to_vec();
+        let pos = f.pos as usize;
         if data.len() < pos + n as usize {
             data.resize(pos + n as usize, 0);
         }
-        for i in 0..n as usize {
-            data[pos + i] = self.mem.r8(seg, off.wrapping_add(i as u16));
-        }
+        data[pos..pos + n as usize].copy_from_slice(&bytes);
         let rc: Rc<[u8]> = Rc::from(data);
-        f.0 = rc.clone();
-        f.1 = f.1.wrapping_add(n as u32);
+        f.data = rc.clone();
+        f.pos = f.pos.wrapping_add(n as u32);
+        let name = f.name.clone();
         files.written.insert(name, rc);
         n
     }
@@ -540,14 +690,14 @@ impl Machine {
     /// `file_open` for callers that go on after a failed open (0000:67C8
     /// returns with carry set after 0000:74E5): Some(false) when nothing
     /// was found, and the handle left at CS:6837 is then DOS's error code
-    /// 2, a character device, which reads nothing and seeks to 0 (as
-    /// `file_read` and `file_seek` do with no file open). None where the
-    /// open or the error hook is set.
+    /// 2: what DOS has on handle 2 is read, seeked and closed instead
+    /// (CON at first, which reads nothing and seeks to 0; once closed, an
+    /// invalid handle, or a file opened there since; see `Dos`). None
+    /// where the open or the error hook is set.
     pub fn file_open_or_device(&mut self, files: &mut Files, name: u16) -> Option<bool> {
         let (handle, found) = self.file_open_any(files, name)?;
         self.mem.w16(0, CS_HANDLE, handle);
         if !found {
-            files.loose = None;
             if self.mem.r32(DS, ERROR_HOOK) != 0 {
                 return crate::giveup::error("0000:67C8: a file missing, the error hook set");
             }
@@ -576,10 +726,11 @@ impl Machine {
         let raw = self.mem.cstr(DS, name).to_vec();
         if let Some(bytes) = files.read_loose(&raw) {
             self.mem.w16(DS, OPEN_SIZE, bytes.len() as u16);
-            files.loose = Some((bytes, 0));
-            files.loose_name = Some(Files::base(&raw).to_ascii_uppercase());
-            return Some((LOOSE_DOS_HANDLE, true));
+            let h = files.dos.open(bytes, Files::base(&raw).to_ascii_uppercase());
+            return Some((h, true));
         }
+        // DOS's error code, 2, is the handle from here on.
+        files.dos.cur = 2;
         Some((2, self.bsa_find(files, name)))
     }
 
@@ -588,15 +739,12 @@ impl Machine {
     /// bytes remaining; a capped count of 0 returns 0, any other returns
     /// `n` itself (not the bytes read), and an encrypted entry decrypts
     /// all `n` buffer bytes, read or not. The position advances by the
-    /// capped count.
+    /// capped count. Elsewhere it is DOS's read on the handle: the count
+    /// read, or 6 with nothing open on the handle (DOS's error, in AX).
     pub fn file_read(&mut self, files: &mut Files, seg: u16, off: u16, n: u16) -> u16 {
         if self.bsa_cs(CS_IN_BSA) == 0 {
-            let Some(f) = files.loose.as_mut() else { return 0 };
-            let data = Files::dos_read(f, n);
-            for (i, &b) in data.iter().enumerate() {
-                self.mem.w8(seg, off.wrapping_add(i as u16), b);
-            }
-            return data.len() as u16;
+            let h = files.dos.cur;
+            return self.dos_read(files, h, seg, off, n);
         }
         let remaining = self.mem.r32(DS, REMAINING);
         let capped = (n as u32).min(remaining);
@@ -632,14 +780,9 @@ impl Machine {
     /// run on into the following entries.
     pub fn file_seek(&mut self, files: &mut Files, whence: u8, off: u32) -> u32 {
         if self.bsa_cs(CS_IN_BSA) == 0 {
-            let Some(f) = files.loose.as_mut() else { return 0 };
-            let base = match whence {
-                0 => 0,
-                1 => f.1,
-                _ => f.0.len() as u32,
-            };
-            f.1 = base.wrapping_add(off);
-            return f.1;
+            // A failed seek leaves DX the offset's low word (6D42 passed
+            // it in DX) and AX the error.
+            return files.dos.seek(files.dos.cur, whence, off).unwrap_or_else(|e| (off << 16) | e as u32);
         }
         let size = self.mem.r32(DS, SIZE);
         let pos = match whence {
@@ -709,12 +852,29 @@ impl Machine {
         Some(Some((seg, off)))
     }
 
-    /// 0000:6742.
-    pub fn file_close(&mut self, files: &mut Files) {
+    /// 0000:6742. Outside a BSA entry, DOS's close of the handle, which
+    /// fails (false: the carry set, AX 6), changing nothing, where nothing
+    /// is open on it.
+    pub fn file_close(&mut self, files: &mut Files) -> bool {
         if self.bsa_cs(CS_IN_BSA) != 0 {
             self.mem.w8(0, CS_IN_BSA, 0);
+            true
         } else {
-            files.loose = None;
+            files.dos.close(files.dos.cur)
+        }
+    }
+
+    /// DOS read (3Fh) of up to `n` bytes on handle `h` to `seg`:`off`:
+    /// AX, the count read, or 6 (nothing read) with nothing open on `h`.
+    fn dos_read(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {
+        match files.dos.read(h, n) {
+            Ok(data) => {
+                for (i, &b) in data.iter().enumerate() {
+                    self.mem.w8(seg, off.wrapping_add(i as u16), b);
+                }
+                data.len() as u16
+            }
+            Err(e) => e,
         }
     }
 }
