@@ -1747,6 +1747,7 @@ fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
 /// With `from` (the screen shown and its colours), a movie with text
 /// comes in as 1194:D459 brings it (`Movie::lead_in`).
 fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>, from: Option<(&[u8], film::Dac)>) -> Vec<flc::Movie> {
+    let mut first = true;
     played
         .into_iter()
         .filter_map(|(name, text, colour)| {
@@ -1770,8 +1771,15 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
                 return Some(flc::Movie::still(flc::Flc::still(px, pal), lines));
             }
             let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
-            let mv = flc::Movie::new(archive, name, lines)?;
+            let mut mv = flc::Movie::new(archive, name, lines)?;
+            // The first from the screen shown; one after it from what the
+            // one before showed last (`lead_later`, `App::next_movie`).
+            let earlier = !std::mem::replace(&mut first, false);
             Some(match (text, from) {
+                (Some(_), Some(_)) if earlier => {
+                    mv.lead_later = true;
+                    mv
+                }
                 (Some(_), Some((shown, dac))) => mv.lead_in(shown, dac),
                 _ => mv,
             })
@@ -2872,6 +2880,10 @@ struct App {
 impl App {
     /// The movies all shown: the song before them back (1194:DB26).
     fn movies_over(&mut self) {
+        // The next one's way in from what the one ended showed last.
+        if let Some(mv) = self.movies.front_mut().filter(|m| m.lead_later) {
+            mv.lead_from(&self.assets.shown, *self.screen.palette());
+        }
         if self.movies.is_empty() {
             self.engine.m.music_resume();
             self.music.after(&mut self.engine.m, 0);

@@ -349,6 +349,12 @@ pub struct Movie {
     /// the screen there, 55B2, then the screen cleared): `lead_in`.
     lead: std::collections::VecDeque<(Vec<u8>, crate::film::Dac)>,
     lead_ms: u32,
+    /// A text movie after another of the same batch: its way in is made
+    /// when the one before it ends (`lead_from`), from what that showed
+    /// last. The original's 2294:0700 leaves the VGA as its last frame was
+    /// (0000:4EFD after it fills only the page), and the next D459 fades
+    /// from there.
+    pub lead_later: bool,
 }
 
 impl Flc {
@@ -366,23 +372,30 @@ impl Movie {
     /// `name` played; with `lines`, as a vision with that text.
     pub fn new(archive: &Archive, name: &str, lines: Vec<Vec<Span>>) -> Option<Movie> {
         let flc = Flc::open(archive, name)?;
-        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false, lead: Default::default(), lead_ms: 0 })
+        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false, lead: Default::default(), lead_ms: 0, lead_later: false })
     }
 
     /// A still picture shown with all its text (`full`).
     pub fn still(flc: Flc, lines: Vec<Vec<Span>>) -> Movie {
-        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true, lead: Default::default(), lead_ms: 0 }
+        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true, lead: Default::default(), lead_ms: 0, lead_later: false }
     }
 
     /// The vision's way in (1194:D459): from `shown` in `dac`, the colours
     /// faded to black in 8 (55B2), the screen cleared, then the movie.
     pub fn lead_in(mut self, shown: &[u8], dac: crate::film::Dac) -> Movie {
+        self.lead_from(shown, dac);
+        self
+    }
+
+    /// `lead_in` in place (a `lead_later` movie's, when the one before it
+    /// ends).
+    pub fn lead_from(&mut self, shown: &[u8], dac: crate::film::Dac) {
         let mut film = crate::film::Film::new(shown.to_vec(), dac);
         film.fade(&[[0, 0, 0, 0xFF]; 256], 8);
         film.whole(&[0; W * H]);
         film.wait();
         self.lead = film.frames.into();
-        self
+        self.lead_later = false;
     }
 
     /// Time passing (milliseconds): frames stepped at the file's speed. An
