@@ -3097,7 +3097,7 @@ pub(super) fn blit_bits(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, d
 /// texture bank (C8F0, C8F1 of them, each mapped: the last is left so)
 /// its shading rows at F000h (0000:B174): the table's 13 rows, then three
 /// of the fill colour.
-pub(super) fn shade_tables(m: &mut Machine, seg: u16) {
+pub fn shade_tables(m: &mut Machine, seg: u16) {
     for i in 0..0xD00u16 {
         let b = m.mem.r8(0x3AAC, 0x240 + i);
         m.mem.w8(seg, i, b);

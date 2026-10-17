@@ -260,21 +260,14 @@ impl arena::light::LightHooks for Lgt<'_> {
 
 /// 0000:AAA2, the renderer's set-up: the light table (CCC2) the INF
 /// loader copies into each texture bank's shading rows (0000:B174):
-/// NORMAL.LGT's 13 rows as the image holds them at 3AAC:0240, then two of
+/// the .LGT's 13 rows as the image holds them at 3AAC:0240, then two of
 /// 16 zeros and the fill colour (C3C6: 70h, as 0000:095A sets it in clear
-/// weather). Returns its segment.
+/// weather); CCD2's rows; and each texture bank's shading rows at F000h,
+/// on the machine as the original makes them (`render::shade_tables`;
+/// fog's FOG.LGT reaches the banks so too). Returns its segment.
 pub fn light_table(m: &mut Machine) -> u16 {
-    let fill = m.mem.r8(DS, 0xC3C6);
     let (light, _) = m.heap_alloc(0x100).expect("heap");
-    for i in 0..0xD00u16 {
-        let b = m.mem.r8(0x3AAC, 0x240 + i);
-        m.mem.w8(light, i, b);
-    }
-    for row in 0..2u16 {
-        for i in 0..0x100u16 {
-            m.mem.w8(light, 0xD00 + row * 0x100 + i, if i < 0x10 { 0 } else { fill });
-        }
-    }
+    arena::render::shade_tables(m, light);
     m.mem.w16(DS, 0xCCC2, light);
     light
 }
