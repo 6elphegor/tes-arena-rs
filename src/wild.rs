@@ -197,7 +197,7 @@ impl Machine {
     pub fn wild_load_block(&mut self, files: &mut crate::bsa::Files, slot: u8, block: u8) -> Option<()> {
         use crate::level::var::BUFFER_BLOCK;
         use crate::mif::var::{BUFFER_SEG, FLOOR_SEG, MAP1_SEG, MAP2_SEG};
-        self.heap_check().then_some(())?;
+        self.wild_heap_check()?;
         let dest = self.mem.r16(DS, WINDOW_OFFSETS.wrapping_add(slot as u16 * 2));
         let digits = [block / 100 % 10, block / 10 % 10, block % 10].map(|d| b'0' + d);
         for (i, &d) in digits.iter().enumerate() {
@@ -211,13 +211,15 @@ impl Machine {
         }
         self.file_load(files, name, bseg, boff);
         for _ in 0..2 {
-            self.heap_check().then_some(())?;
+            self.wild_heap_check()?;
         }
         let buf = self.mem.r16(DS, BUFFER_SEG);
         let out = self.mem.r16(DS, UNPACK_OFF);
-        self.wild_unpack(bseg, boff, buf, out)?;
+        if self.wild_unpack(bseg, boff, buf, out).is_none() {
+            return crate::giveup::original("2294:0CBD: a block's runs never bring its total to 0; the original reads on for ever");
+        }
         for _ in 0..2 {
-            self.heap_check().then_some(())?;
+            self.wild_heap_check()?;
         }
         let mut si = 0u16;
         for (var, add) in [(FLOOR_SEG, buf), (MAP1_SEG, 0), (MAP2_SEG, 0)] {
@@ -233,7 +235,16 @@ impl Machine {
                 di = di.wrapping_add(0x80);
             }
         }
-        self.heap_check().then_some(())
+        self.wild_heap_check()
+    }
+
+    /// 2294:11F2 between 217B:0189's steps: a heap that fails the check
+    /// stops the original at an int3.
+    fn wild_heap_check(&self) -> Option<()> {
+        if self.heap_check() {
+            return Some(());
+        }
+        crate::giveup::original("2294:11F2: the heap fails its check while a wild block loads; the original stops at an int3")
     }
 
     /// 2294:0CBD. Word run-length decoding from src_seg:src to dst_seg:dst:

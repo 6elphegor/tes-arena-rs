@@ -134,34 +134,106 @@ fn whole(m: &Machine, out: &mut Out, x: u16, y: u16, w: u16, h: u16, seg: u16, o
 /// 0000:5828: the image whose 12-byte header is at seg:off (x, y, width,
 /// height, flags), drawn at its place: whole where it lies within the
 /// view (or 9207 says so), else cut to it; 0s left out with flags bit
-/// 800h. Compressed images (flags 1, 2, 4, 8) and the capture to 8F9A
-/// aren't ported.
-fn image(m: &Machine, out: &mut Out, seg: u16, off: u16) {
+/// 800h. A packed image (flags 1, 4, 8) is unpacked into a heap block
+/// first and the block freed after (`Machine::image_unpack`); flag 2
+/// draws by runs (5B9A, `runs`). The capture to 8F9A isn't ported.
+fn image(m: &mut Machine, out: &mut Out, seg: u16, off: u16) {
     let flags = m.mem.r16(seg, off.wrapping_add(8));
     if m.mem.r32(DS, 0x8F9A) != 0 {
         return out.gap("5854: an image to the capture buffer");
     }
-    if flags & 0xF != 0 {
-        return out.gap("5871: a compressed image");
-    }
+    let (dseg, si) = match m.image_unpack(seg, off) {
+        None => return out.gap("5871: an image's unpacking gave up"),
+        Some(crate::imgpack::Unpacked::Runs) => return runs(m, out, seg, off),
+        Some(crate::imgpack::Unpacked::Block(bs, bo)) => (bs, bo),
+        Some(crate::imgpack::Unpacked::Plain) => (seg, off.wrapping_add(0xC)),
+    };
     let x = m.mem.r16(seg, off);
     let y = m.mem.r16(seg, off.wrapping_add(2));
     let w = m.mem.r16(seg, off.wrapping_add(4));
     let h = m.mem.r16(seg, off.wrapping_add(6));
-    let si = off.wrapping_add(0xC);
     let transparent = flags & 0x800 != 0;
     let gt = |a: u16, b: u16| (a as i16) > (b as i16);
     let (left, top, right, bottom) = (r16(m, LEFT), r16(m, TOP), r16(m, RIGHT), r16(m, BOTTOM));
+    let mut draw = true;
     if m.mem.r8(DS, 0x9207) == 0 {
         if gt(x, right) || gt(y, bottom) || below(y.wrapping_add(h), top) || below(x.wrapping_add(w), left) {
-            return;
-        }
-        let inside = !below(y, top) && !gt(y.wrapping_add(h), bottom) && !below(x, left) && !gt(x.wrapping_add(w), right);
-        if !inside {
-            return clipped(m, out, x, y, w, h, seg, si, transparent);
+            draw = false;
+        } else if below(y, top) || gt(y.wrapping_add(h), bottom) || below(x, left) || gt(x.wrapping_add(w), right) {
+            clipped(m, out, x, y, w, h, dseg, si, transparent);
+            draw = false;
         }
     }
-    whole(m, out, x, y, w, h, seg, si, transparent)
+    if draw {
+        whole(m, out, x, y, w, h, dseg, si, transparent);
+    }
+    // 5983: the block freed (0000:6C36).
+    if flags & 0xD != 0 {
+        m.heap_free(dseg);
+    }
+}
+
+/// 0000:5B9A: the image at seg:off drawn by runs from its bytes after
+/// the header at its place, not cut: each row's runs until the width is
+/// used up exactly (a byte n under 80h: n + 1 bytes follow, else (n &
+/// 7Fh) + 1 of the next byte), 0s left out.
+fn runs(m: &Machine, out: &mut Out, seg: u16, off: u16) {
+    let x = m.mem.r16(seg, off);
+    let y = m.mem.r16(seg, off.wrapping_add(2));
+    let w = m.mem.r16(seg, off.wrapping_add(4));
+    let h = m.mem.r16(seg, off.wrapping_add(6));
+    let mut si = off.wrapping_add(0xC);
+    let mut row_at = row(m, y).wrapping_add(x);
+    let rows = if h == 0 { 0x10000u32 } else { h as u32 };
+    for _ in 0..rows {
+        let mut di = row_at;
+        let mut bx = w;
+        let mut left = 0x20000u32;
+        loop {
+            let al = m.mem.r8(seg, si);
+            si = si.wrapping_add(1);
+            let n = ((al & 0x7F) as u16) + 1;
+            bx = bx.wrapping_sub(n);
+            if al & 0x80 == 0 {
+                for _ in 0..n {
+                    let b = m.mem.r8(seg, si);
+                    si = si.wrapping_add(1);
+                    if b != 0 {
+                        out.page[di as usize] = b;
+                    }
+                    di = di.wrapping_add(1);
+                }
+            } else {
+                let b = m.mem.r8(seg, si);
+                si = si.wrapping_add(1);
+                for _ in 0..n {
+                    if b != 0 {
+                        out.page[di as usize] = b;
+                    }
+                    di = di.wrapping_add(1);
+                }
+            }
+            if bx == 0 {
+                break;
+            }
+            left -= 1;
+            if left == 0 {
+                return out.gap("5B9A: an image's runs never use up its row");
+            }
+        }
+        row_at = row_at.wrapping_add(0x140);
+    }
+}
+
+/// 0000:5828 for a test: the image at seg:off drawn into `page` (64 KiB,
+/// the screen's segment) as the sky's objects draw theirs; the paths not
+/// ported it met.
+pub fn image_page(m: &mut Machine, page: &mut [u8], seg: u16, off: u16) -> Vec<&'static str> {
+    let mut gaps = Vec::new();
+    let lgts = super::Lgts::default();
+    let mut out = Out { page, gaps: &mut gaps, lgts: &lgts, table: 0 };
+    image(m, &mut out, seg, off);
+    gaps
 }
 
 /// 0000:9A72: a rectangle `w` x `h` of [9288] at (`x`, `y`).
