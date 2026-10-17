@@ -110,7 +110,7 @@ impl AreaHooks for Hooks {
         count(m, 0xFF82);
         count(m, 0xFF84);
     }
-    fn music(&mut self, m: &mut Machine) -> u16 {
+    fn slots_usable(&mut self, m: &mut Machine) -> u16 {
         count(m, 0xFF86);
         m.mem.r16(DS, 0xFFC0)
     }

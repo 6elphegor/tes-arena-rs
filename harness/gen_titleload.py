@@ -26,7 +26,7 @@ to 0000:A2AC, where the frames begin.
 Counted in DGROUP (stubs): as gen_load.py's (0000:1AF9 FFE0, 1A5C FFE2,
 23BA:01C7 FFE4, 0000:E5C9 FFE6, 0000:AAA2 FFEA, 25FD:056F FFEC,
 1194:3AE8 FFEE, 292B:09AC FFF0, 2F9F:001F FFF2, 0000:3503 FFF4), and
-0000:DA8E (FFF6, the view update), 25CA:01E6 (FFF8, the music's number,
+0000:DA8E (FFF6, the view update), 25CA:01E6 (FFF8, the creature slots marked usable,
 returning 0), 0000:17F9 (FFFA), 0000:068A (FFFC) and 0000:468B (FFFE,
 the entered hook). Not counted, drawing only: 0000:DFDB, A561, 946A,
 9B56.
@@ -115,13 +115,13 @@ def main():
     out = open(OUT, 'w', buffering=1)
     a = DosArena(EXE, GAME, SAVE)
     a.std_devices = True  # a missing texture is read from handle 2 (see src/info.rs)
-    music = b'\xff\x06\xf8\xff\x31\xc0\xcb'  # inc word [FFF8]; xor ax, ax; retf
+    slots = b'\xff\x06\xf8\xff\x31\xc0\xcb'  # inc word [FFF8]; xor ax, ax; retf
     for seg, off, code in [(0, 0x1AF9, counter(0xFFE0, True)), (0, 0x1A5C, counter(0xFFE2, True)),
                            (0x23BA, 0x01C7, counter(0xFFE4, True)), (0, 0xE5C9, counter(0xFFE6, True)),
                            (0, 0xAAA2, counter(0xFFEA, True)), (0x25FD, 0x056F, counter(0xFFEC, True)),
                            (0x1194, 0x3AE8, counter(0xFFEE, True)), (0x292B, 0x09AC, counter(0xFFF0, True)),
                            (0x2F9F, 0x001F, counter(0xFFF2, True)), (0, 0x3503, counter(0xFFF4, True)),
-                           (0, 0xDA8E, counter(0xFFF6, False)), (0x25CA, 0x01E6, music),
+                           (0, 0xDA8E, counter(0xFFF6, False)), (0x25CA, 0x01E6, slots),
                            (0, 0x17F9, counter(0xFFFA, True)), (0, 0x068A, counter(0xFFFC, True)),
                            (0, 0x468B, counter(0xFFFE, True)),
                            (0, 0xDFDB, b'\xc3'), (0, 0xA561, b'\xc3'),

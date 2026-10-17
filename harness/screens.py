@@ -362,25 +362,31 @@ class ScreenArena(DosArena):
         self.call_far(0, 0x9B4E, esi=0x929E)
 
     def stub(self, location=True):
-        """The sounds and the music left out (no driver), and with
-        `location` the location record's build (1194:3AE8, as
-        gen_titleload.py's load has it): what was there."""
+        """The sounds left out (no driver), and with `location` the
+        location record's build (1194:3AE8, as gen_titleload.py's load has
+        it): what was there. (25CA:01E6 isn't stubbed: it counts the
+        creature slots marked usable, 4000h, and needs nothing.)"""
         from gen_frame import counter
-        music = b'\xff\x06\xf8\xff\x31\xc0\xcb'  # inc word [FFF8]; xor ax, ax; retf
-        stubs = [(0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2F9F, 0x001F, counter(0xFFF2, True)),
-                 (0x25CA, 0x01E6, music)]
+        stubs = [(0x23BA, 0x01C7, counter(0xFFE4, True)), (0x2F9F, 0x001F, counter(0xFFF2, True))]
         if location:
             stubs.append((0x1194, 0x3AE8, counter(0xFFEE, True)))
         saved = []
         for seg, off, code in stubs:
             lin = self.lin(LOAD_SEG + seg, off)
             saved.append((lin, bytes(self.mu.mem_read(lin, len(code)))))
-            self.mu.mem_write(lin, code)
+            self.code_write(lin, code)
         return saved
 
     def unstub(self, saved):
         for lin, b in saved:
-            self.mu.mem_write(lin, b)
+            self.code_write(lin, b)
+
+    def code_write(self, lin, b):
+        """Code written, and unicorn's translation of the bytes there
+        dropped: otherwise a stub taken out again keeps running from its
+        cached translation."""
+        self.mu.mem_write(lin, b)
+        self.mu.ctl_remove_cache(lin, lin + len(b))
 
     # --- moving between areas ---------------------------------------------------
 
