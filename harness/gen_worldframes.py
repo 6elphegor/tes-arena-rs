@@ -39,6 +39,12 @@ and the 3D view itself, the page's pixels the drawing stages wrote last
 
   view3d | NAME | <digest>
 
+and the same from row 1 on (row 0 left 0): a ceiling's topmost row reads
+one entry past its row table (0000:DB78's), the next heap block's header,
+whose words are the original's heap's segments, which no other layout has:
+
+  view3d1 | NAME | <digest>
+
 The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
@@ -154,6 +160,16 @@ CASES = {
     # The same at ten at night (`night`): the frame's light turns to the
     # night's (0000:0390) and the next frames are drawn by it.
     'playnight': ('street', night(0), [((), (), 3, None)]),
+    # Out of the city's gate into the wilderness (`wild`), its first
+    # frames, nothing held: the wild's 3D view (fields, the sky).
+    'playwild': ('wild', None, [((), (), 3, None)]),
+    # The main quest dungeon 39699021.MIF entered (`named`), its first
+    # frames, nothing held: its start sees a square's cap.
+    'playcap': ('capped', None, [((), (), 3, None)]),
+    # The main quest dungeon 40516921.MIF entered (`named`), its first
+    # frames, nothing held: its fog (2294:0B01, the view filled to the
+    # horizon with the background colour, only the player's light).
+    'playfog': ('fogged', None, [((), (), 3, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -166,18 +182,42 @@ def street(a, base):
     return a.snapshot()
 
 
-def crypt(a, base):
-    """The snapshot of the game just inside the Crypt of Hearts, the way
-    the outer loop enters a named level (0000:0993, `Run::Start`): the
-    guild left for the street, then the street left with the next area 2
-    (5E6), no interior (D58) and the level's name at 0A36."""
+def wild(a, base):
+    """The snapshot of the game just outside the city, the way a gate
+    leaves it (0000:43A0, the city's trigger 7 or 8): the guild left for
+    the street, the city written as the wilderness's blocks 1..4
+    (217B:027A, its files kept in memory), the next area 1 (5E6), then
+    the street left."""
     a.restore(base)
     assert a.area_ended() == ('world',), 'the guild not left'
-    a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x02')
-    a.w16(0x0D58, 0)
-    a.mu.mem_write(a.lin(a.ds, 0x0A36), CRYPT + b'\0')
-    assert a.area_ended() == ('world',), 'the crypt not entered'
+    a.call_far(0x217B, 0x027A)
+    a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x01')
+    assert a.area_ended() == ('world',), 'the wilderness not entered'
     return a.snapshot()
+
+
+def named(name):
+    """The snapshot of the game just inside the named level `name`, the
+    way the outer loop enters one (0000:0993, `Run::Start`): the guild
+    left for the street, then the street left with the next area 2
+    (5E6), no interior (D58) and the level's name at 0A36."""
+    def enter(a, base):
+        a.restore(base)
+        assert a.area_ended() == ('world',), 'the guild not left'
+        a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x02')
+        a.w16(0x0D58, 0)
+        a.mu.mem_write(a.lin(a.ds, 0x0A36), name + b'\0')
+        assert a.area_ended() == ('world',), f'{name} not entered'
+        return a.snapshot()
+    return enter
+
+
+crypt = named(CRYPT)
+
+# A main quest dungeon whose start sees a square's cap (0000:CBFF).
+CAPPED = b'39699021.MIF'
+# A main quest dungeon with fog (its INF's, CB5C).
+FOGGED = b'40516921.MIF'
 
 
 def track_line(a, name, frame):
@@ -255,7 +295,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
@@ -276,6 +316,10 @@ def main():
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
+        # The 3D pixels from row 1 on: the topmost row of a ceiling reads
+        # past its row table (DB78's last entry, the next heap block's
+        # header), whose words are the original's heap's segments.
+        out.write(f'view3d1 | {name} | {fnv(bytes(x if not k and i >= 320 else 0 for i, (x, k) in enumerate(zip(full, mask)))):x}\n')
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):

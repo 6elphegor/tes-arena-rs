@@ -59,19 +59,36 @@ enum Place {
     Dungeon,
     Crypt,
     Street,
+    Wild,
+    /// The main quest dungeon 39699021.MIF, whose start sees a square's
+    /// cap.
+    Capped,
+    /// The main quest dungeon 40516921.MIF, with fog.
+    Fogged,
 }
 
-/// From the guild to the street, then into the Crypt of Hearts the way
-/// the outer loop enters a named level (0000:0993): the next area 2, no
+/// From the guild to the street, then into the level `name` the way the
+/// outer loop enters a named level (0000:0993): the next area 2, no
 /// interior, its .MIF named at 0A36.
-fn into_crypt(a: &mut App) {
+fn into_named(a: &mut App, name: &[u8]) {
     area_left(a);
     let m = &mut a.engine.m;
     m.mem.w8(DS, arena::trigger::var::AREA, 2);
     m.mem.w16(DS, arena::transit::var::INTERIOR, 0);
-    for (i, &c) in b"41649375.MIF\0".iter().enumerate() {
+    for (i, &c) in name.iter().chain(b"\0").enumerate() {
         m.mem.w8(DS, 0x0A36 + i as u16, c);
     }
+    area_left(a);
+}
+
+/// From the guild to the street, then out of the city's gate the way
+/// its trigger leaves (0000:43A0): the city written as the wilderness's
+/// blocks 1..4 (217B:027A, `wild_leave_city`), the next area 1.
+fn into_wild(a: &mut App) {
+    area_left(a);
+    let e = &mut a.engine;
+    e.m.wild_leave_city(&mut e.files, &mut arena::wild::PortWild);
+    e.m.mem.w8(DS, arena::trigger::var::AREA, 1);
     area_left(a);
 }
 
@@ -104,8 +121,11 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
     clear(&mut d, &mut a);
     match place {
         Place::Dungeon => into_dungeon(&mut a),
-        Place::Crypt => into_crypt(&mut a),
+        Place::Crypt => into_named(&mut a, b"41649375.MIF"),
+        Place::Capped => into_named(&mut a, b"39699021.MIF"),
+        Place::Fogged => into_named(&mut a, b"40516921.MIF"),
         Place::Street => area_left(&mut a),
+        Place::Wild => into_wild(&mut a),
     }
     a.fade.clear();
     a.fade_old = None;
@@ -150,6 +170,30 @@ fn play_in_a_dungeon_as_the_original_draws_it() {
 fn play_in_the_street_as_the_original_draws_it() {
     let (place, setup, play) = case("playstreet").unwrap();
     world_case("playstreet", place, setup, play);
+}
+
+/// Inside the main quest's dungeon 39699021.MIF, its first frames,
+/// nothing held.
+#[test]
+fn play_in_a_main_quest_dungeon_as_the_original_draws_it() {
+    let (place, setup, play) = case("playcap").unwrap();
+    world_case("playcap", place, setup, play);
+}
+
+/// Inside the main quest's dungeon 40516921.MIF, with fog, its first
+/// frames, nothing held.
+#[test]
+fn play_in_fog_as_the_original_draws_it() {
+    let (place, setup, play) = case("playfog").unwrap();
+    world_case("playfog", place, setup, play);
+}
+
+/// Out of the city's gate into the wilderness, its first frames, nothing
+/// held.
+#[test]
+fn play_in_the_wilderness_as_the_original_draws_it() {
+    let (place, setup, play) = case("playwild").unwrap();
+    world_case("playwild", place, setup, play);
 }
 
 /// The first level's down stairs walked into with the up arrow held from
@@ -403,6 +447,9 @@ fn case(name: &str) -> Option<Case> {
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playfog" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playcap" => (Place::Capped, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playwild" => (Place::Wild, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         _ => return None,
@@ -419,7 +466,7 @@ fn case(name: &str) -> Option<Case> {
 fn the_3d_view_drawn_as_the_original_draws_it() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight"] {
+    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild", "playcap", "playfog"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -485,6 +532,12 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
 /// against the original's (`view3d`), and the share of them alike where
 /// ARENA_SCREENS has the original's page.
 fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
+    soft_view_from(name, 0)
+}
+
+/// `soft_view` from row `top` on (`view3d1`: from row 1, the rows above
+/// left 0).
+fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
     let (place, setup, play) = case(name)?;
     let (mut a, _) = played(
         place,
@@ -496,9 +549,10 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
     )?;
     let page = a.engine.page.take().unwrap();
     let (idx, _) = layer(&mut a);
-    let three: Vec<u8> = page.iter().zip(&idx).map(|(&c, &i)| if i >= 0x100 { c } else { 0 }).collect();
+    let three: Vec<u8> = page.iter().zip(&idx).enumerate().map(|(k, (&c, &i))| if i >= 0x100 && k >= top * 320 { c } else { 0 }).collect();
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
-    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "view3d" && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
+    let kind = if top == 0 { "view3d" } else { "view3d1" };
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == kind && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
     let same = std::env::var("ARENA_SCREENS").ok().and_then(|d| {
         let full = std::fs::read(PathBuf::from(&d).join(format!("{name}.full"))).ok()?;
         let n = idx.iter().filter(|&&i| i >= 0x100).count();
@@ -508,11 +562,14 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
     Some((want == Some(fnv(three.iter().copied())), same))
 }
 
-/// The dungeon's first frames' 3D view, and the second level's after the
-/// stairs, every pixel as the original's renderer draws them.
+/// The dungeon's first frames' 3D view, the second level's after the
+/// stairs, and two of the main quest's dungeons' (one with fog: the view
+/// filled to the horizon with its colour, 2294:0B4D, the fog's light
+/// table's last rows the fill colour, 0C36), every pixel as the
+/// original's renderer draws them.
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playdungeon", "playdown"] {
+    for name in ["playdungeon", "playdown", "playcap", "playfog"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -532,18 +589,24 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
     }
 }
 
-/// Measured, not exact: the crypt. Its farthest ceiling row reads past
-/// the row table, where the original finds what an earlier area left in
-/// its heap; and rows 40..44 of its ceiling step their dark runs by the
-/// EMS frame's segment (CCCE, the original's bug at 0000:D865), the
-/// harness's at F000h and the view's on its heap: with the harness's
-/// value they match.
+/// The wilderness out of the city's gate (its fields, the sky), every
+/// pixel as the original's renderer draws them.
 #[test]
-fn the_crypts_3d_view_measured() {
-    for name in ["playcrypt"] {
-        if let Some((ok, same)) = soft_view(name) {
-            eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
-        }
-    }
+fn the_wildernesss_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view("playwild") else { return };
+    assert!(ok, "playwild: the 3D view differs from the original's ({same:?}% alike)");
+}
+
+/// The crypt (the ceiling's dark runs stepped by the EMS frame's segment,
+/// CCCE: 0000:D865's EDX bug, the frame at F000h as the harness's), every
+/// pixel as the original's renderer draws them from row 1 on. Its topmost
+/// ceiling row reads one entry past the row table (DB78's), the next heap
+/// block's header in the original, whose words are its heap's segments
+/// (7A33h, 78FFh there): no other layout has them, so row 0 is left out
+/// (`view3d1`).
+#[test]
+fn the_crypts_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view_from("playcrypt", 1) else { return };
+    assert!(ok, "playcrypt: the 3D view from row 1 differs from the original's ({same:?}% alike)");
 }
 

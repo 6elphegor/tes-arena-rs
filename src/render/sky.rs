@@ -220,8 +220,10 @@ impl crate::celestial::CelestialHooks for Bodies<'_> {
     }
 }
 
-/// The light's steps the fog's (2294:0B01) may take: none of them is
-/// ported here; taking one is a gap.
+/// The light's steps the fog's (2294:0B01) may take: the view filled
+/// with the fog's colour (2294:0B4D); the light tables made again (once
+/// a fog begins: files and the heap, the real machine's to do, which the
+/// front end's own fog step does after the frame) are gaps.
 struct Fogless<'a, 'b>(&'a mut Out<'b>);
 
 impl crate::light::LightHooks for Fogless<'_, '_> {
@@ -234,8 +236,11 @@ impl crate::light::LightHooks for Fogless<'_, '_> {
     fn fog_light_table(&mut self, _m: &mut Machine) {
         self.0.gap("2294:0C36: the fog's light table");
     }
-    fn fog_fill(&mut self, _m: &mut Machine) {
-        self.0.gap("2294:0B4D: the view filled with the fog");
+    /// 2294:0B42..0B4D: 9A6E over the view's width from row 0 to the
+    /// horizon (C3D8), in [9288] (the background colour).
+    fn fog_fill(&mut self, m: &mut Machine) {
+        let h = r16(m, 0xC3D8);
+        fill(m, self.0, 0, 0, 0x140, h);
     }
 }
 
@@ -244,11 +249,7 @@ struct Objects<'a>(Out<'a>);
 
 impl crate::skyobj::SkyHooks for Objects<'_> {
     fn fog(&mut self, m: &mut Machine) -> bool {
-        let fog = m.fog_step(&mut Fogless(&mut self.0));
-        if fog {
-            self.0.gap("2294:0B01: fog");
-        }
-        fog
+        m.fog_step(&mut Fogless(&mut self.0))
     }
     fn draw_image(&mut self, m: &mut Machine, seg: u16, off: u16) {
         image(m, &mut self.0, seg, off);
