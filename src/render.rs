@@ -2948,14 +2948,15 @@ impl Soft {
     }
 }
 
-/// Where the copy keeps the renderer's buffers the view's start doesn't
-/// make (above the view's heap, A000h..F000h): the shade tables (CCC2),
-/// the rows' lights (CD86), the floor's and ceiling's row tables (CD82,
-/// CD7E).
-const SHADES_SEG: u16 = 0xF800;
-const LIGHTS_SEG: u16 = 0xF900;
-const FLOOR_SEG: u16 = 0xFA00;
-const CEILING_SEG: u16 = 0xFA40;
+/// The renderer's buffers the view's start doesn't make, in paragraphs:
+/// the shade tables (CCC2), the rows' lights (CD86), the floor's and
+/// ceiling's row tables (CD82, CD7E). The copy takes them from its own
+/// heap each frame (the copy is dropped after), so they never sit where
+/// the EMS frame does: at fixed segments F800h..FA80h they lay inside a
+/// frame at F000h (the harness's), and the dungeon's textures read them.
+const SHADES_PARAS: u16 = 0x100;
+const LIGHTS_PARAS: u16 = 0x100;
+const ROWS_PARAS: u16 = 0x40;
 
 impl Soft {
     /// What the original's start and the 3D mode's entry set up for the
@@ -2965,7 +2966,11 @@ impl Soft {
     fn setup(&mut self) {
         self.s8(0xBA80, 1);
         // AAA2.
-        let seg = SHADES_SEG;
+        let Some((seg, _)) = self.m.heap_alloc(SHADES_PARAS + LIGHTS_PARAS + 2 * ROWS_PARAS) else {
+            self.gap("AAA2: no heap for the renderer's buffers");
+            return;
+        };
+        let (lights, floor, ceiling) = (seg + SHADES_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS + ROWS_PARAS);
         self.s16(0xCCC2, seg);
         for i in 0..0xD00u16 {
             let b = self.m.mem.r8(0x3AAC, 0x240 + i);
@@ -3009,11 +3014,11 @@ impl Soft {
         self.m.ems_map(first);
         // A561.
         self.s16(0xCD86, 0);
-        self.s16(0xCD88, LIGHTS_SEG);
+        self.s16(0xCD88, lights);
         self.s16(0xCD82, 0);
-        self.s16(0xCD84, FLOOR_SEG);
+        self.s16(0xCD84, floor);
         self.s16(0xCD7E, 0);
-        self.s16(0xCD80, CEILING_SEG);
+        self.s16(0xCD80, ceiling);
         self.row_tables();
     }
 

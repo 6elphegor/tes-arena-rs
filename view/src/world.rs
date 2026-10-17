@@ -104,19 +104,17 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     heap(&mut m);
     fonts_load(&mut m, dir);
-    // The sound driver's buffer (EB89), FFDCh bytes as the program's
-    // start allocates them (2294:CEDB): the level's sound files are read
-    // through it on their way to EMS (23BA:0217, `sound_load`). The
-    // original's heap is all of conventional memory; the view's, A000h..
-    // F000h, has no 64 KB to spare, so it sits above it.
-    let (dseg, doff) = (0xF000u16, 0u16);
+    // The sound driver's buffer (EB89), FFDCh bytes from the heap as the
+    // program's start allocates them (2294:CEDB): the level's sound files
+    // are read through it on their way to EMS (23BA:0217, `sound_load`).
+    let (dseg, doff) = m.heap_alloc_bytes(0xFFDC).expect("heap");
     m.mem.w16(DS, arena::sound::var::BUFFER, doff);
     m.mem.w16(DS, arena::sound::var::BUFFER + 2, dseg);
-    // The EMS frame: the floor plane's words have its segment added
-    // (1194:04DD), so it must be page-aligned as the hardware's is, or
-    // their low bytes (a flat's number) shift.
-    let (block, _) = m.heap_alloc(0x1100).expect("heap");
-    let buf = (block + 0xFF) & 0xFF00;
+    // The EMS frame at F000h, above conventional memory as the EMS
+    // driver's page frame is (and the harness's): the floor plane's words
+    // have its segment added (1194:04DD), and the ceiling's dark runs step
+    // by it plus C00h (CCCE, 0000:D865's EDX bug), so its value shows.
+    let buf = 0xF000u16;
     m.mem.w16(DS, 0x9030, buf);
     // EMS on: 32 banks swapped through the frame, the last kept back
     // (21EE:0035): the INF loader caches GLOBAL.BSA's directory there

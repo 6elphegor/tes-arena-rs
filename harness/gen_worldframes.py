@@ -39,6 +39,12 @@ and the 3D view itself, the page's pixels the drawing stages wrote last
 
   view3d | NAME | <digest>
 
+and the same from row 1 on (row 0 left 0): a ceiling's topmost row reads
+one entry past its row table (0000:DB78's), the next heap block's header,
+whose words are the original's heap's segments, which no other layout has:
+
+  view3d1 | NAME | <digest>
+
 The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
@@ -276,6 +282,10 @@ def main():
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
+        # The 3D pixels from row 1 on: the topmost row of a ceiling reads
+        # past its row table (DB78's last entry, the next heap block's
+        # header), whose words are the original's heap's segments.
+        out.write(f'view3d1 | {name} | {fnv(bytes(x if not k and i >= 320 else 0 for i, (x, k) in enumerate(zip(full, mask)))):x}\n')
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):

@@ -485,6 +485,12 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
 /// against the original's (`view3d`), and the share of them alike where
 /// ARENA_SCREENS has the original's page.
 fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
+    soft_view_from(name, 0)
+}
+
+/// `soft_view` from row `top` on (`view3d1`: from row 1, the rows above
+/// left 0).
+fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
     let (place, setup, play) = case(name)?;
     let (mut a, _) = played(
         place,
@@ -496,9 +502,10 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
     )?;
     let page = a.engine.page.take().unwrap();
     let (idx, _) = layer(&mut a);
-    let three: Vec<u8> = page.iter().zip(&idx).map(|(&c, &i)| if i >= 0x100 { c } else { 0 }).collect();
+    let three: Vec<u8> = page.iter().zip(&idx).enumerate().map(|(k, (&c, &i))| if i >= 0x100 && k >= top * 320 { c } else { 0 }).collect();
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
-    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "view3d" && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
+    let kind = if top == 0 { "view3d" } else { "view3d1" };
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == kind && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
     let same = std::env::var("ARENA_SCREENS").ok().and_then(|d| {
         let full = std::fs::read(PathBuf::from(&d).join(format!("{name}.full"))).ok()?;
         let n = idx.iter().filter(|&&i| i >= 0x100).count();
@@ -532,18 +539,16 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
     }
 }
 
-/// Measured, not exact: the crypt. Its farthest ceiling row reads past
-/// the row table, where the original finds what an earlier area left in
-/// its heap; and rows 40..44 of its ceiling step their dark runs by the
-/// EMS frame's segment (CCCE, the original's bug at 0000:D865), the
-/// harness's at F000h and the view's on its heap: with the harness's
-/// value they match.
+/// The crypt (the ceiling's dark runs stepped by the EMS frame's segment,
+/// CCCE: 0000:D865's EDX bug, the frame at F000h as the harness's), every
+/// pixel as the original's renderer draws them from row 1 on. Its topmost
+/// ceiling row reads one entry past the row table (DB78's), the next heap
+/// block's header in the original, whose words are its heap's segments
+/// (7A33h, 78FFh there): no other layout has them, so row 0 is left out
+/// (`view3d1`).
 #[test]
-fn the_crypts_3d_view_measured() {
-    for name in ["playcrypt"] {
-        if let Some((ok, same)) = soft_view(name) {
-            eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
-        }
-    }
+fn the_crypts_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view_from("playcrypt", 1) else { return };
+    assert!(ok, "playcrypt: the 3D view from row 1 differs from the original's ({same:?}% alike)");
 }
 
