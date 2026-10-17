@@ -18,11 +18,23 @@ pub struct Memory {
     /// While tracking (`track`), DGROUP's offsets written, a bit each;
     /// empty otherwise.
     written: Vec<u64>,
+    /// While watching the EMS frame (`watch_frame`), the bytes written
+    /// there, by the bank mapped as each was written.
+    frame: Option<FrameWatch>,
+}
+
+/// The EMS frame watched: its linear start, the bank mapped, and the
+/// bytes written (the bank times 10000h plus the offset).
+#[derive(Clone)]
+struct FrameWatch {
+    base: usize,
+    bank: u16,
+    written: std::collections::HashSet<u32>,
 }
 
 impl Clone for Memory {
     fn clone(&self) -> Self {
-        Self { bytes: self.bytes.clone(), written: self.written.clone() }
+        Self { bytes: self.bytes.clone(), written: self.written.clone(), frame: self.frame.clone() }
     }
 
     /// Copied into this memory's own allocation: no fresh megabyte to
@@ -30,6 +42,7 @@ impl Clone for Memory {
     fn clone_from(&mut self, source: &Self) {
         self.bytes.clone_from(&source.bytes);
         self.written.clone_from(&source.written);
+        self.frame.clone_from(&source.frame);
     }
 }
 
@@ -41,7 +54,7 @@ impl Memory {
     pub fn new(image: &Image) -> Self {
         let mut bytes = vec![0u8; SIZE];
         bytes[..image.bytes.len()].copy_from_slice(&image.bytes);
-        Self { bytes, written: Vec::new() }
+        Self { bytes, written: Vec::new(), frame: None }
     }
 
     pub fn r8(&self, seg: u16, off: u16) -> u8 {
@@ -65,6 +78,31 @@ impl Memory {
                 self.written[o >> 6] |= 1 << (o & 63);
             }
         }
+        if let Some(f) = &mut self.frame {
+            let o = at.wrapping_sub(f.base);
+            if o < 0x10000 {
+                f.written.insert((f.bank as u32) << 16 | o as u32);
+            }
+        }
+    }
+
+    /// The writes to the EMS frame at segment `seg` watched from now
+    /// (`frame_written`), bank `bank` mapped there.
+    pub fn watch_frame(&mut self, seg: u16, bank: u16) {
+        self.frame = Some(FrameWatch { base: lin(seg, 0), bank, written: Default::default() });
+    }
+
+    /// Bank `bank` mapped into the watched frame (`Machine::ems_map`).
+    pub fn frame_mapped(&mut self, bank: u16) {
+        if let Some(f) = &mut self.frame {
+            f.bank = bank;
+        }
+    }
+
+    /// The frame's bytes written since `watch_frame` (the bank times
+    /// 10000h plus the offset), and the watch ended.
+    pub fn frame_written(&mut self) -> std::collections::HashSet<u32> {
+        self.frame.take().map(|f| f.written).unwrap_or_default()
     }
 
     /// DGROUP's writes tracked from now (`written_offsets`), any earlier

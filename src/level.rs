@@ -195,6 +195,7 @@ impl Machine {
         if page != old {
             self.mem.segment_mut(frame).copy_from_slice(&self.ems[page]);
         }
+        self.mem.frame_mapped(page as u16);
     }
 
     /// 0000:5C26. Allocates `size` bytes of EMS: from the first bank

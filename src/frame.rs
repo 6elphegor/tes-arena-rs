@@ -133,6 +133,16 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn rest(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    /// 0000:4B84, 0390: the light for the time of day
+    /// (`Machine::outdoor_light`, indoors the row limits only), with the
+    /// front end's `LightHooks`, whose loads (the dither, the sky's images
+    /// and the water's frames relit) the original makes inside it. Nothing
+    /// by default.
+    fn outdoor_light(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// 0000:4C7E, 2294:0428: the day's colours loaded where the province's
+    /// changed (`Machine::sky_colours`, `sky_colours_load`). Nothing by
+    /// default.
+    fn sky_colours(&mut self, _m: &mut Machine, _files: &mut Files) {}
 }
 
 /// `FrameHooks` that do nothing.
@@ -364,6 +374,8 @@ impl Machine {
             let v = self.mem.r8(DS, 0x8812) ^ 0xFF;
             self.mem.w8(DS, 0x8812, v);
         }
+        // 4B84: 0000:0390, the light for the time of day.
+        hooks.outdoor_light(self, files);
         // A quest's message, once.
         if self.mem.r16(DS, 0x05CA) & 0x200 != 0 && !hooks.quest_carry(self) && self.mem.r16(DS, 0x05E0) & 0x400 == 0 {
             let f = self.mem.r16(DS, 0x05E0) | 0x400;
@@ -381,10 +393,11 @@ impl Machine {
         }
         self.hurt_flash();
         // 4C7B: 0000:5011, an effect's words over the view's foot
-        // (`effect_words`); 4C7E: 2294:0428, the sky's colours (the front
-        // end's); 4C83: 4DD6, the interface where it changed
-        // (`interface_setup`); 4CBB: 292B:000E (`projectile_lights_end`).
+        // (`effect_words`); 4C7E: 2294:0428, the sky's colours; 4C83:
+        // 4DD6, the interface where it changed (`interface_setup`); 4CBB:
+        // 292B:000E (`projectile_lights_end`).
         hooks.effect_words(self);
+        hooks.sky_colours(self, files);
         hooks.interface(self, files)?;
         // 4C86: 292B:0530, the faces (`faces_draw`).
         hooks.faces(self);
