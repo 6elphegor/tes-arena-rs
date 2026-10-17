@@ -18,9 +18,11 @@ fn base() -> Option<Machine> {
     m.mem.w16(DS, 0xC3D2, 0x3C);
     m.mem.w16(DS, 0xC3DA, 0x37);
     m.mem.w16(DS, 0xCB90, (0x1040 >> 7 << 8) + (0x1040 >> 7 << 1));
-    // The cursor rests on the interface bar, so no region steers.
+    // The cursor rests on the view's centre, as the modern controls take
+    // it (they set 5E0 bit 40h as its handler does): no region steers, and
+    // with no click the handler leaves the speed 0 (2826:015C).
     m.mem.w16(DS, 0xA91A, 0x93);
-    m.set_mouse(0xA0, 0xB0, 0);
+    m.set_mouse(0xA0, 0x48, 0);
     Some(m)
 }
 

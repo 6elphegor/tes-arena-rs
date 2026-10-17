@@ -41,15 +41,21 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
 /// Facing `heading` at `hour` o'clock of the save's day, as
 /// gen_worldframes.py's `at_hour` sets it.
 fn at_hour(a: &mut App, hour: u16, heading: u16) {
+    at_time(a, hour, 0, heading);
+}
+
+/// `at_hour` at `hour`:`minute`.
+fn at_time(a: &mut App, hour: u16, minute: u16, heading: u16) {
     use arena::clock::var::{HOUR, MINUTE, MINUTES, SKY_TIME};
     let m = &mut a.engine.m;
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
     let t = m.mem.r32(DS, MINUTES);
-    m.mem.w32(DS, MINUTES, t - t % 1440 + hour as u32 * 60);
+    let of_day = hour as u32 * 60 + minute as u32;
+    m.mem.w32(DS, MINUTES, t - t % 1440 + of_day);
     m.mem.w16(DS, HOUR, hour);
-    m.mem.w16(DS, MINUTE, 0);
+    m.mem.w16(DS, MINUTE, minute);
     // (In u32: the minutes shifted left by 10 are past a u16.)
-    m.mem.w16(DS, SKY_TIME, (((hour as u32 * 60) << 10) / 1440) as u16);
+    m.mem.w16(DS, SKY_TIME, ((of_day << 10) / 1440) as u16);
 }
 
 /// Facing `heading` at ten at night of the save's day (`at_hour`).
@@ -573,19 +579,24 @@ fn brought(a: &mut App, ty: u8, level: u8, ahead: u16) {
     e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
 }
 
-/// gen_worldframes.py's `night_encounter`: at ten at night the
-/// wilderness's encounter brought as a roll that comes up brings it (the
-/// night, 5C8 bit 1000h cleared, the rank 1, the terrain's row plus 7).
+/// gen_worldframes.py's `night_encounter`: a minute before ten at night,
+/// the clock's minute due on the first frame (MINUTE_TICK 91 ticks back),
+/// the seed one whose next roll is 0 (`ENCOUNTER_SEED`): the hour's
+/// encounter check (0000:1622 -> 1194:887A) comes up and brings the
+/// wilderness's night encounter as play does.
 fn night_encounter(a: &mut App, heading: u16) {
-    at_hour(a, 22, heading);
-    let e = &mut a.engine;
-    e.m.mem.w16(DS, arena::encounter::var::NIGHT, 1);
-    let f = e.m.mem.r16(DS, 0x05C8) & !0x1000;
-    e.m.mem.w16(DS, 0x05C8, f);
-    e.m.mem.w16(DS, arena::encounter::var::GUARD_RANK, 1);
-    let row = e.m.mem.r8(DS, 0x0A50) as u16 + 7;
-    e.m.encounter(&mut e.files, &mut arena::encounter::NoFightHooks, row).expect("the encounter brought");
+    use arena::frame::var::{MINUTE_TICK, TICKS};
+    at_time(a, 21, 59, heading);
+    let m = &mut a.engine.m;
+    let t = m.mem.r16(DS, TICKS).wrapping_sub(0x5B);
+    m.mem.w16(DS, MINUTE_TICK, t);
+    m.rng.seed = ENCOUNTER_SEED;
+    m.store_rng();
 }
+
+/// gen_worldframes.py's ENCOUNTER_SEED: 99B5h (high word 0: a roll of 0)
+/// stepped back once through the LCG (6D002Dh's inverse mod 2^32).
+const ENCOUNTER_SEED: u32 = 0x56AA_ECA9;
 
 /// The camp's menu's second entry picked: resting until healed.
 struct UntilHealed;
@@ -658,6 +669,52 @@ fn wild_edge(a: &mut App) {
         m.mem.w16(DS, o, 0x1008);
     }
     m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
+}
+
+/// gen_worldframes.py's `picking`: `locked_door`'s door with a lock of
+/// `level`, picking armed (5CA bit 0).
+fn picking(a: &mut App, level: u8) {
+    at_square(a, 13, 4, 0);
+    let m = &mut a.engine.m;
+    let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+    let rec = arena::movement::var::LOCKS + 3 * n as u16;
+    m.mem.w16(DS, rec, 0x0E04);
+    m.mem.w8(DS, rec + 2, level);
+    m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+    let f = m.mem.r16(DS, 0x05CA) | 1;
+    m.mem.w16(DS, 0x05CA, f);
+}
+
+/// gen_worldframes.py's `levitating`: spell flag 80h (05BE), its timer
+/// 30 minutes.
+fn levitating(a: &mut App) {
+    let m = &mut a.engine.m;
+    let f = m.mem.r16(DS, 0x05BE) | 0x80;
+    m.mem.w16(DS, 0x05BE, f);
+    let (off, seg) = (m.mem.r16(DS, 0x1020), m.mem.r16(DS, 0x1022));
+    m.mem.w16(seg, off + 4 * 7, 30);
+}
+
+/// gen_worldframes.py's POTION: a potion of healing (spell FFh) in a
+/// stack of one.
+const POTION: [u8; 19] = [0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0, 0, 0, 0x4C, 0xFF, 0xFF, 0xFF, 0];
+
+/// gen_worldframes.py's `wounded_with_potion`: health 64h, POTION in the
+/// inventory's 39th slot (the use list's fifth).
+fn wounded_with_potion(a: &mut App) {
+    use arena::character::{field, PLAYER};
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, PLAYER + field::HP, 0x64);
+    for (i, &b) in POTION.iter().enumerate() {
+        m.mem.w8(DS, PLAYER + 0x6E + 0x13 * 38 + i as u16, b);
+    }
+}
+
+/// gen_worldframes.py's `used`: the use list's `index`-th item used, as
+/// the view's use button uses it (`panels::use_pick`).
+fn used(a: &mut App, index: u16) {
+    let e = &mut a.engine;
+    crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
 }
 
 /// The cases' set-ups and plays, by name (as the tests above play them).
@@ -743,6 +800,42 @@ fn case(name: &str) -> Option<Case> {
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
+        "playpick" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 19, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 40, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 10, |_| false);
+        })),
+        "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
+        "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
+            at_square(a, 21, 7, 0);
+            levitating(a);
+        }), held(30, |_| false, 30)),
+        "playscreens" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 1, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 20, |_| false);
+            // The automap (M) opened and left by its exit (0000:2E30), the
+            // character sheet (F1) with Esc, each in the frame after (the
+            // original's frame body opens them: 2542:0100).
+            d.key(a, KeyCode::KeyM, Some("m"));
+            d.click(a, 0x100, 0xB0, MouseButton::Left);
+            frames(a, d, seen, 11, |_| false);
+            d.key(a, KeyCode::F1, None);
+            d.key(a, KeyCode::Escape, None);
+            frames(a, d, seen, 31, |_| false);
+        })),
+        "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            used(a, 4);
+            frames(a, d, seen, 5, |_| false);
+            used(a, 3);
+            frames(a, d, seen, 60, |_| false);
+        })),
         _ => return None,
     })
 }
@@ -1303,11 +1396,13 @@ fn the_state_as_the_original_leaves_it() {
     }
 }
 
-/// The busy cases: hundreds of frames of play each (a crowd at noon, a
-/// fight swung through, a spell cast into a creature, a creature casting,
-/// the wilderness's night encounter, the stairs taken mid-fight, a rest
-/// ended by enemies).
-const BUSY: [&str; 7] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest"];
+/// The busy cases: tens to hundreds of frames of play each (a crowd at
+/// noon, a fight swung through, a spell cast into a creature, a creature
+/// casting, the wilderness's night encounter, the stairs taken mid-fight,
+/// a rest ended by enemies, a lock picked and its door walked through,
+/// water swum in and levitated over, a potion and a ring used, the
+/// automap and the character sheet opened mid-fight).
+const BUSY: [&str; 12] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1319,11 +1414,18 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
+/// The busy cases whose state is compared: all but playscreens, whose
+/// screens the view shows with its own state (the original's automap and
+/// character sheet save the screen to temporary files, 1AEA, 1AF7, 1B47;
+/// fade with the timer's ticks, 0151; and leave their palettes, 99A3,
+/// A3A3, and scratch, 1044, 10A8, 12A4: not ported).
+const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse"];
+
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
 #[test]
 fn busy_play_leaves_the_state_as_the_original() {
-    for name in BUSY {
+    for name in BUSY_STATE {
         state_case(name);
         state_load_case(name);
     }
@@ -1333,7 +1435,7 @@ fn busy_play_leaves_the_state_as_the_original() {
 /// (`state_ems_case`).
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
-    for name in BUSY {
+    for name in BUSY_STATE {
         state_ems_case(name);
     }
 }
