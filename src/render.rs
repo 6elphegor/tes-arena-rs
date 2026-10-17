@@ -136,6 +136,36 @@ pub type Creature = (u16, u16, u8, u16, u16);
 /// A DGROUP byte the drawing wrote on its copy: offset, before, after.
 pub type Wrote = (u16, u8, u8);
 
+/// An EMS byte the drawing changed on its copy (0000:5652's frames
+/// unpacked into their banks): the bank times 10000h plus the offset,
+/// before, after.
+pub type EmsWrote = (u32, u8, u8);
+
+/// The EMS bytes `after` (the drawing's copy) holds otherwise than
+/// `before` (the machine): of the banks either has mapped or holds apart.
+fn ems_changes(before: &Machine, after: &Machine) -> Vec<EmsWrote> {
+    let mapped = |m: &Machine| (m.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2) as usize;
+    let n = before.ems.len().max(after.ems.len());
+    let mut out = Vec::new();
+    for b in 0..n {
+        let same = match (before.ems.get(b), after.ems.get(b)) {
+            (Some(x), Some(y)) => std::sync::Arc::ptr_eq(x, y),
+            (None, None) => true,
+            _ => false,
+        };
+        if same && b != mapped(before) && b != mapped(after) {
+            continue;
+        }
+        let (x, y) = (before.ems_bank(b as u16), after.ems_bank(b as u16));
+        for (i, (&p, &q)) in x.iter().zip(&y).enumerate() {
+            if p != q {
+                out.push(((b as u32) << 16 | i as u32, p, q));
+            }
+        }
+    }
+    out
+}
+
 /// NORMAL.LGT's and FOG.LGT's bytes, for the fog's steps the drawing's
 /// sky hook may take (2294:0BEF's load, 0C36's and 0B8A's tables made
 /// again), which the original does with its files in the middle of the
@@ -169,8 +199,10 @@ impl Lgts {
 /// original's, drawing on the machine itself, leaves there), each with its
 /// byte before and after (the same where it wrote the machine's own); the
 /// fourth
-/// the creatures' flats it reached (`Soft::creatures`), in order.
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked) {
+/// the creatures' flats it reached (`Soft::creatures`), in order; the
+/// sixth the EMS bytes it changed on its copy (`EmsWrote`).
+#[allow(clippy::type_complexity)]
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked, Vec<EmsWrote>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
@@ -210,7 +242,8 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         }
     }
     let walked = Walked { stepped: r.stepped, left };
-    (r.page, r.gaps, wrote, r.creatures, walked)
+    let ems = ems_changes(m, &r.m);
+    (r.page, r.gaps, wrote, r.creatures, walked, ems)
 }
 
 /// 0000:CBFF alone (tests/capdraw.rs): the cap at height `ax` wound by
@@ -3017,6 +3050,20 @@ impl Soft {
         if !blit_rows(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map, &mut self.odd) {
             self.gap("9546: a light flat through 781E's colours");
         }
+    }
+}
+
+/// 0000:78A8's row compiled for a draw the front end makes (its pixels
+/// the front end's): clipped as 78A8 clips (78B2..7955) and, where it
+/// draws, the row's code at ROW_CODE (`compile_rows`). The arguments as
+/// pushed: the place, the size drawn, the shade's segment, the source's
+/// size, its flags and bits a pixel, the colours' segment.
+#[allow(clippy::too_many_arguments)]
+pub fn scaler_rows(m: &mut Machine, x: u16, y: u16, dw: u16, dh: u16, shade_seg: u16, w: u16, h: u16, flags: u16, bpp: u8, map_seg: u16) {
+    if let Some([cx, _, cw, _, fx, _, xs, _]) = clip(m, x, y, dw, dh, w, h) {
+        let light = m.mem.r16(0, GENERATOR) == LIGHT_ROWS;
+        let shaded = shade_seg != 0 || (bpp != 8 && map_seg != 0);
+        compile_rows(m, light, cx, cw, fx, xs, flags, w, bpp, shaded);
     }
 }
 

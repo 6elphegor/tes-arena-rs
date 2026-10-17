@@ -478,7 +478,7 @@ impl Machine {
     /// a creature a quest waits for (1194:A19C, A1D1) doesn't come, nor
     /// another kind than those already fighting; otherwise the creatures
     /// are made (`encounter_spawn`), named (`encounter_text`), and placed.
-    fn encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, row: u16) -> Option<()> {
+    pub fn encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, row: u16) -> Option<()> {
         self.mem.w16(DS, 0x12AC, 0);
         let mut level = self.mem.r8(DS, 0x01AA) as u16;
         if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 && self.jagar_words(hooks) {

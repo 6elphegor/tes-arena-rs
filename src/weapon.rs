@@ -80,16 +80,54 @@ impl Machine {
         std::mem::take(&mut self.mouse_motion)
     }
 
-    /// 29CF:0A28. The casting hands advance a frame, and stop (FFh) after
-    /// the graphic's last.
-    fn cast_hands(&mut self) {
+    /// 29CF:0A28. The casting hands' frame: with the graphic's bank
+    /// (C8F4) mapped, past its last frame they stop (FFh); otherwise its
+    /// header (14Ch bytes) and the frame's packed bytes (the width times
+    /// the height, in dwords, from the frame's offset at +0Ch: read from
+    /// the segment's start, whatever [902E]'s offset) go to the frames'
+    /// buffer [BA54], and with the load bank ([1030]) mapped they are
+    /// unpacked by runs into the EMS frame at [902E] (0000:5B3C), which
+    /// 78A8 draws twice (the renderer's) before the frame counts on. None
+    /// where the runs never end.
+    fn cast_hands(&mut self) -> Option<()> {
         let f = self.mem.r8(DS, CAST_FRAME);
         if (f as i8) < 0 {
-            return;
+            return Some(());
         }
+        self.ems_map(self.mem.r8(DS, crate::info::var::OTHER_BANKS) as u16);
         let (off, seg) = (self.mem.r16(DS, HANDS), self.mem.r16(DS, HANDS + 2));
-        let frames = self.mem.r8(seg, off.wrapping_add(0xB));
-        self.mem.w8(DS, CAST_FRAME, if f >= frames { 0xFF } else { f + 1 });
+        if f >= self.mem.r8(seg, off.wrapping_add(0xB)) {
+            self.mem.w8(DS, CAST_FRAME, 0xFF);
+            return Some(());
+        }
+        use crate::info::var::BUFFER;
+        let (boff, bseg) = (self.mem.r16(DS, BUFFER), self.mem.r16(DS, BUFFER + 2));
+        for i in 0..0x14C {
+            let b = self.mem.r8(seg, off.wrapping_add(i));
+            self.mem.w8(bseg, boff.wrapping_add(i), b);
+        }
+        let size = self.mem.r16(seg, 4).wrapping_mul(self.mem.r16(seg, 2));
+        let src = self.mem.r16(seg, (f as u16 * 2).wrapping_add(0xC));
+        let dwords = size.wrapping_add(3) >> 2;
+        for i in 0..dwords as u32 * 4 {
+            let b = self.mem.r8(seg, src.wrapping_add(i as u16));
+            self.mem.w8(bseg, boff.wrapping_add(0x14C).wrapping_add(i as u16), b);
+        }
+        self.ems_map(self.mem.r16(DS, 0x1030));
+        let (doff, dseg) = (self.mem.r16(DS, HANDS), self.mem.r16(DS, HANDS + 2));
+        let (cx, dx) = (self.mem.r16(bseg, boff.wrapping_add(4)), self.mem.r16(bseg, boff.wrapping_add(2)));
+        self.rle_runs(bseg, boff.wrapping_add(0x14C), cx, dx, dseg, doff)?;
+        // 0AA5..0B27: drawn twice by 78A8 from the header at [BA54] (its
+        // size at +0, +2, its place at +6, +8, its bits a pixel at +0Ah,
+        // its colours at +4Ch), then mirrored at x 9Fh: the drawing the
+        // front end's, the rows' code each compiles the machine's.
+        let hd = |m: &Machine, o: u16| m.mem.r16(bseg, boff.wrapping_add(o));
+        let (w, h, x, y) = (hd(self, 0), hd(self, 2), hd(self, 6), hd(self, 8));
+        let bpp = self.mem.r8(bseg, boff.wrapping_add(0xA));
+        crate::render::scaler_rows(self, x, y, w, h, 0, w, h, 1, bpp, bseg);
+        crate::render::scaler_rows(self, 0x9F, y, w, h, 0, w, h, 3, bpp, bseg);
+        self.mem.w8(DS, CAST_FRAME, f + 1);
+        Some(())
     }
 
     /// 0000:38CE. The player's weapon this frame. None where a strike
@@ -99,7 +137,7 @@ impl Machine {
         if r != 0 {
             self.mem.w8(DS, RELOAD, r - 1);
         }
-        self.cast_hands();
+        self.cast_hands()?;
         if (self.mem.r8(DS, CAST_FRAME) as i8) >= 0 || self.mem.r16(DS, 0x0620) != 0 {
             return Some(());
         }
