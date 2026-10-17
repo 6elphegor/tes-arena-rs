@@ -54,12 +54,14 @@ pub fn start(engine: &mut Engine, spec: &str) {
 /// weather (of 21EE:016C; its allocations the view's own), then the start
 /// dungeon (0000:0C66, its run 0997).
 pub fn play(engine: &mut Engine) {
+    // The working slot as the original's main picks it (1194:3A51) and
+    // the game's own *.65 files copied to its names (25FD:0219, before
+    // 21EE:016C), as `areas::start` does: without it a save copies no
+    // CITYDATA (or the slot's other files) and loading it back gives up
+    // at CITYDATA.nn (1194:2E18).
+    engine.m.working_slot_main();
+    engine.m.working_files_fresh(&mut engine.files);
     let m = &mut engine.m;
-    // The working slot (1194:3AC5) the game's own *.65 files, as
-    // `areas::start` sets it: without it a save copies no CITYDATA (or the
-    // slot's other files) and loading it back gives up at CITYDATA.nn
-    // (1194:2E18).
-    m.working_slot_set(65);
     if m.game_date().is_none() || m.weather_roll().is_none() {
         eprintln!("the game's date or weather could not be set");
     }

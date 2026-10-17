@@ -404,6 +404,27 @@ impl Machine {
         self.mem.w16(DS, WORKING_FILES + 2, Self::slot_digits(slot));
     }
 
+    /// 1194:3A51 with no "STA=" in the environment (3A71..3A82): the
+    /// working slot 40h, its digits in STATES.nn (7D0D) only; 8B06 and
+    /// the patterns at 5CAF.. keep the "64" they're built with.
+    pub fn working_slot_main(&mut self) {
+        self.mem.w8(DS, WORKING_SLOT, 0x40);
+        self.mem.w8(DS, SLOT, 0x40);
+        self.mem.w16(DS, 0x7D0D, Self::slot_digits(0x40));
+    }
+
+    /// 25FD:0219: the working slot's files deleted ("*.ww", 022A through
+    /// 1194:4D91), SLOT the working slot, then the game's own "*.65" (5EB0)
+    /// copied to the working slot's names (062D), as the title's New and
+    /// Load (0000:1171, 1064) start.
+    pub fn working_files_fresh(&mut self, files: &mut Files) {
+        self.working_files_digits();
+        self.delete_matching(files, WORKING_FILES);
+        let w = self.mem.r8(DS, WORKING_SLOT);
+        self.mem.w8(DS, SLOT, w);
+        self.copy_slot_files(files, 65, w);
+    }
+
     /// 0000:AA4B..AA5C, the end of SAVEGAME's load (after
     /// `save_load_level`): the view's screen, the level's INF (named in
     /// the saved state, SAVED_INF) loaded, the view updated and outdoors

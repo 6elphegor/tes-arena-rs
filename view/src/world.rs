@@ -147,12 +147,15 @@ pub fn load(dir: &Path, level: &str) -> Engine {
         m.mem.w8(DS, 0xF000 + i as u16, b);
         m.mem.w8(DS, 0xC37F + i as u16, b);
     }
-    // The spells (records the casting reads): a new game's, slot 65.
-    m.save_set_slot(65);
+    // The spells (records the casting reads): a new game's, from the
+    // working slot's copies of the game's *.65 (1194:3A51, 25FD:0219).
+    m.working_slot_main();
+    m.working_files_fresh(&mut files);
+    m.save_set_slot(0x40);
     m.spells_load(&mut files).expect("spells");
     let (sseg, _) = m.spell_record(0);
     if m.mem.r16(sseg, 0x18) == 0 {
-        eprintln!("the spells did not load (SPELLSG.65)");
+        eprintln!("the spells did not load (SPELLSG.64)");
     }
     // The light table's source as the game starts with it.
     lgt(&mut m, dir, arena::weather::NORMAL_LGT);

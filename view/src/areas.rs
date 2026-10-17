@@ -285,6 +285,18 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
         _ => return Err(format!("Slot {slot} gave up while loading: {}.", arena::giveup::describe())),
     }
     let run = run_of(&e.m);
+    // When this area ends: a title load goes back to after the area's run
+    // (no run's end); a load in play to the end of the run whose world
+    // loop it loaded in.
+    let tail = if title {
+        Tail::None
+    } else {
+        match TAIL.with(|t| t.get()) {
+            Tail::Current => Tail::Run(run_of(&engine.m)),
+            other => other,
+        }
+    };
+    TAIL.with(|t| t.set(tail));
     *engine = e;
     Ok(run)
 }
@@ -304,6 +316,23 @@ thread_local! {
     /// start (0000:0C95): it ends through 0000:0C98 (`new_game_next`), not
     /// the outer loop's switch.
     static NEW_GAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Whose run's end follows the world loop going (`Tail`).
+    static TAIL: std::cell::Cell<Tail> = const { std::cell::Cell::new(Tail::Current) };
+}
+
+/// What follows the world loop going when its area ends: the run that
+/// entered it (its end, `area_end`: indoors the level hooks cleared,
+/// 0000:0971/09D8, a city's 2294:11F2 at 0AA3).
+#[derive(Clone, Copy)]
+enum Tail {
+    /// The run of the area it's in (entered by the outer loop).
+    Current,
+    /// None: a title-screen load enters the world loop afresh, to go back
+    /// to the outer loop's code after the area's run (25FD:0539, 0ED5).
+    None,
+    /// A load in play loads inside the world loop going: when it ends, it
+    /// goes back into the run that entered it, the area's before the load.
+    Run(Run),
 }
 
 /// A new game's start dungeon is the run going (`newgame::play`).
@@ -318,11 +347,15 @@ pub fn new_game_started() {
 /// would otherwise find the town's song marked playing, 430F).
 pub fn start(engine: &mut Engine, city: bool, town: bool) -> Run {
     NEW_GAME.with(|n| n.set(false));
+    TAIL.with(|t| t.set(Tail::Current));
     let area = if city { 0 } else { 4 };
-    // The working slot (1194:3AC5): the view plays from the game's own
-    // *.65 files (CITYDATA.65, SPELLSG.65, ...), where the original first
-    // copies them to *.00. Saves copy them to the slot's names, loads back.
-    engine.m.working_slot_set(65);
+    // The working slot as the original's main picks it (1194:3A51: 40h,
+    // with no "STA=") and the game's own *.65 files (CITYDATA.65,
+    // SPELLSG.65, ...) copied to its names (25FD:0219), in the engine's
+    // files only: the game's folder is never written. Saves copy them to
+    // the slot's names, loads back.
+    engine.m.working_slot_main();
+    engine.m.working_files_fresh(&mut engine.files);
     engine.m.mem.w8(DS, arena::trigger::var::AREA, area);
     engine.m.mem.w8(DS, arena::transit::var::ENTERED, area);
     // The area's automap (0000:3503), as entering the world loads it.
@@ -372,7 +405,11 @@ pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
         let m = &mut engine.m;
         m.world_leave(h);
         m.world_end(h);
-        m.area_end(run, h);
+        match TAIL.with(|t| t.replace(Tail::Current)) {
+            Tail::Current => m.area_end(run, h),
+            Tail::Run(r) => m.area_end(r, h),
+            Tail::None => {}
+        }
         // A new game's start dungeon ends at 0000:0C98 (into the town
         // of the player's province); every other run goes through 0ED5.
         let next = if run == Run::Start && NEW_GAME.with(|n| n.replace(false)) { m.new_game_next(h) } else { m.area_next(h) };
