@@ -532,9 +532,12 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
     }
 }
 
-/// Measured, not yet exact: the crypt (its farthest ceiling row reads
-/// past the row table, where the original finds what an earlier area
-/// left in its heap; and five rows of its ceiling differ).
+/// Measured, not exact: the crypt. Its farthest ceiling row reads past
+/// the row table, where the original finds what an earlier area left in
+/// its heap; and rows 40..44 of its ceiling step their dark runs by the
+/// EMS frame's segment (CCCE, the original's bug at 0000:D865), the
+/// harness's at F000h and the view's on its heap: with the harness's
+/// value they match.
 #[test]
 fn the_crypts_3d_view_measured() {
     for name in ["playcrypt"] {

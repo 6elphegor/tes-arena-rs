@@ -572,7 +572,12 @@ impl Soft {
         let (xs2, ys2) = (xstep << 1, ystep << 1);
         let thr = self.g16(0xCCCE);
         let d762 = self.c32(0xD762);
-        let xseg = (xstep as i32 as i64 * d762 as i32 as i64) as u32;
+        // D865..D878: the dark run's x step is EDX times D762 after DX
+        // took CCCE (the original's bug): the step's high word, CCCE low.
+        // CCCE is the EMS frame's segment plus C00h (A49F), so where the
+        // ceiling has dark runs, its texels after them depend on where
+        // the frame is (the harness's at F000h, the view's on its heap).
+        let xseg = (((xstep & 0xFFFF_0000) | thr as u32) as i32 as i64 * d762 as i32 as i64) as u32;
         let yseg = (ystep as i32 as i64 * d762 as i32 as i64) as u32;
         self.cs32(0xD754, xseg);
         self.cs32(0xD758, yseg);
