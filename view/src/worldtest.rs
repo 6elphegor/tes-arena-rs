@@ -52,6 +52,42 @@ fn night(a: &mut App, heading: u16) {
     m.mem.w16(DS, SKY_TIME, (((22 * 60) << 10) / 1440u32) as u16);
 }
 
+/// `night(heading)` in a thunderstorm with a bolt forced at the circle's
+/// `angle`, as gen_worldframes.py's `storm` sets it: the weather rain
+/// (BB09 1), 5C8 bit 1, the first bolt's image (D8AE) at its frame 0
+/// (43C6), its place 2710h times the sine table's words (B03C, B13C),
+/// the high word doubled.
+fn storm(a: &mut App, heading: u16, angle: u16) {
+    night(a, heading);
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, 0xBB09, 1);
+    let v = m.mem.r16(DS, 0x05C8);
+    m.mem.w16(DS, 0x05C8, v | 1);
+    let image = m.mem.r16(DS, 0xD8AE);
+    m.mem.w16(DS, 0x43C8, image);
+    m.mem.w16(DS, 0x43C6, 0);
+    for (at, table) in [(0x43C2u16, 0xB03Cu16), (0x43C4, 0xB13C)] {
+        let v = m.mem.r16(DS, table + 2 * angle) as i16 as i32;
+        m.mem.w16(DS, at, ((((0x2710 * v) >> 16) * 2) & 0xFFFF) as u16);
+    }
+}
+
+/// Facing `heading`, the location moved to province 3 at (84h + `dx`,
+/// 34h + `dy`) and the sky's objects made again (the counts cleared
+/// first, as 0000:027A clears them), as gen_worldframes.py's `volcanic`
+/// sets it.
+fn volcanic(a: &mut App, heading: u16, dx: u16, dy: u16) {
+    use arena::skyobj::var::{CLOUD_COUNT, OBJECT_COUNT};
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, 0x0A46, 3);
+    m.mem.w16(DS, 0x0A48, 0x84 + dx);
+    m.mem.w16(DS, 0x0A4A, 0x34 + dy);
+    m.mem.w8(DS, OBJECT_COUNT, 0);
+    m.mem.w8(DS, CLOUD_COUNT, 0);
+    arena::light::LightHooks::sky_objects(&mut a.assets.light, &mut a.engine.m);
+    a.engine.m.mem.w16(DS, arena::movement::var::HEADING, heading);
+}
+
 /// Where a case is played: the dungeon `into_dungeon` makes, or the main
 /// quest's Crypt of Hearts (`into_crypt`).
 #[derive(Clone, Copy)]
@@ -59,6 +95,9 @@ enum Place {
     Dungeon,
     Crypt,
     Street,
+    /// The street with its zone's weather rain (`wet_street`), or snow.
+    WetStreet,
+    SnowStreet,
     Wild,
     /// The main quest dungeon 39699021.MIF, whose start sees a square's
     /// cap.
@@ -125,6 +164,14 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
         Place::Fogged => into_named(&mut a, b"40516921.MIF"),
         Place::Street => area_left(&mut a),
+        Place::WetStreet | Place::SnowStreet => {
+            // gen_worldframes.py's `weathered`: the zone's weather (A5A
+            // + the zone at A51) rain (2) or snow (3) as the guild is left.
+            let w = if matches!(place, Place::WetStreet) { 2 } else { 3 };
+            let zone = a.engine.m.mem.r8(DS, arena::weather::var::ZONE) as u16;
+            a.engine.m.mem.w8(DS, arena::weather::var::ZONE_WEATHER + zone, w);
+            area_left(&mut a)
+        }
         Place::Wild => into_wild(&mut a),
     }
     a.fade.clear();
@@ -447,9 +494,15 @@ fn case(name: &str) -> Option<Case> {
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playbolt" => (Place::Street, Box::new(|a: &mut App| storm(a, 0, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playfog" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playfogfirst" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 0, |_| false))),
         "playcap" => (Place::Capped, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playrain" => (Place::WetStreet, Box::new(|a: &mut App| at_square(a, 89, 41, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playsnow" => (Place::SnowStreet, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playwild" => (Place::Wild, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
+        "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         _ => return None,
@@ -569,7 +622,7 @@ fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
 /// original's renderer draws them.
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playdungeon", "playdown", "playcap", "playfog"] {
+    for name in ["playdungeon", "playdown", "playcap", "playfog", "playfogfirst"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -583,7 +636,7 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
 /// every pixel as the original's renderer draws them.
 #[test]
 fn the_streets_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playstreet", "playsky", "playnight"] {
+    for name in ["playstreet", "playsky", "playnight", "playbolt", "playrain", "playsnow"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -593,8 +646,10 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
 /// pixel as the original's renderer draws them.
 #[test]
 fn the_wildernesss_3d_view_drawn_as_the_original_draws_it() {
-    let Some((ok, same)) = soft_view("playwild") else { return };
-    assert!(ok, "playwild: the 3D view differs from the original's ({same:?}% alike)");
+    for name in ["playwild", "playvolcano", "playvolcanofar"] {
+        let Some((ok, same)) = soft_view(name) else { return };
+        assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
+    }
 }
 
 /// The crypt (the ceiling's dark runs stepped by the EMS frame's segment,

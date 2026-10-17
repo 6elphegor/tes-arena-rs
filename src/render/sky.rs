@@ -23,6 +23,8 @@ const BOTTOM: u16 = super::BOTTOM;
 struct Out<'a> {
     page: &'a mut [u8],
     gaps: &'a mut Vec<&'static str>,
+    lgts: &'a super::Lgts,
+    table: u16,
 }
 
 impl Out<'_> {
@@ -221,20 +223,47 @@ impl crate::celestial::CelestialHooks for Bodies<'_> {
 }
 
 /// The light's steps the fog's (2294:0B01) may take: the view filled
-/// with the fog's colour (2294:0B4D); the light tables made again (once
-/// a fog begins: files and the heap, the real machine's to do, which the
-/// front end's own fog step does after the frame) are gaps.
+/// with the fog's colour (2294:0B4D); FOG.LGT or NORMAL.LGT loaded to
+/// 3AAC:0240 (0000:7428) and the light table made again from it (0C36
+/// and 0B8A free CCC2's and make a new one, 0000:AAA2: here made again
+/// where the copy's is, which only the drawing reads after).
 struct Fogless<'a, 'b>(&'a mut Out<'b>);
 
+impl Fogless<'_, '_> {
+    /// 0000:7428: the .LGT named at DS:`name`, its first D00h bytes (13
+    /// rows), to 3AAC:0240.
+    fn load(&mut self, m: &mut Machine, name: u16) -> bool {
+        let Some(d) = self.0.lgts.named(name) else {
+            self.0.gap("0000:7428: a light file not found");
+            return false;
+        };
+        for (i, &b) in d.iter().take(0xD00).enumerate() {
+            m.mem.w8(0x3AAC, 0x240 + i as u16, b);
+        }
+        true
+    }
+    /// 0000:AAA2: the table at CCC2 made again from 3AAC:0240, and the
+    /// texture banks' shading rows from it (`shade_tables`).
+    fn table(&mut self, m: &mut Machine) {
+        let seg = self.0.table;
+        m.mem.w16(DS, 0xCCC2, seg);
+        super::shade_tables(m, seg);
+    }
+}
+
 impl crate::light::LightHooks for Fogless<'_, '_> {
-    fn light_table(&mut self, _m: &mut Machine) {
-        self.0.gap("2294:0B8A: the light table made again");
+    fn light_table(&mut self, m: &mut Machine) {
+        if self.load(m, crate::weather::NORMAL_LGT) {
+            self.table(m);
+        }
     }
-    fn lgt(&mut self, _m: &mut Machine, _name: u16) {
-        self.0.gap("2294:0BEF: the fog's light loaded");
+    fn lgt(&mut self, m: &mut Machine, name: u16) {
+        self.load(m, name);
     }
-    fn fog_light_table(&mut self, _m: &mut Machine) {
-        self.0.gap("2294:0C36: the fog's light table");
+    fn fog_light_table(&mut self, m: &mut Machine) {
+        if self.load(m, crate::weather::FOG_LGT) {
+            self.table(m);
+        }
     }
     /// 2294:0B42..0B4D: 9A6E over the view's width from row 0 to the
     /// horizon (C3D8), in [9288] (the background colour).
@@ -254,14 +283,29 @@ impl crate::skyobj::SkyHooks for Objects<'_> {
     fn draw_image(&mut self, m: &mut Machine, seg: u16, off: u16) {
         image(m, &mut self.0, seg, off);
     }
-    fn draw_dfa(&mut self, _m: &mut Machine, _seg: u16, _off: u16, _frame: u16, _x: u16, _y: u16) {
-        self.0.gap("292B:0201: the volcano's frames");
+    /// 292B:0247..0271: the frame unpacked into [BA54] (0000:5652), then
+    /// drawn from there cut to the view with its 0s left out (5A66), its
+    /// width and height the DFA's (+6, +8).
+    fn draw_dfa(&mut self, m: &mut Machine, seg: u16, off: u16, frame: u16, x: u16, y: u16) {
+        let w = m.mem.r16(seg, off.wrapping_add(6));
+        let h = m.mem.r16(seg, off.wrapping_add(8));
+        let (doff, dseg) = (r16(m, 0xBA54), r16(m, 0xBA56));
+        m.frames_unpack(seg, off, frame, dseg, doff);
+        clipped(m, &mut self.0, x, y, w, h, dseg, doff, true);
     }
     fn fill(&mut self, m: &mut Machine, x: u16, y: u16, w: u16, h: u16) {
         fill(m, &mut self.0, x, y, w, h);
     }
-    fn bolt(&mut self, _m: &mut Machine, _seg: u16, _off: u16, _frame: u16) {
-        self.0.gap("0000:78A8: lightning's bolt");
+    /// 2294:0646..068B: 0000:78A8 at the bolt's place (+6, +8), unscaled
+    /// (+0, +2 both the size and the scale's), no shade, its 0s left out,
+    /// `frame`'s pixels (from the offset at +0Ch + 2 x `frame`) of +0Ah's
+    /// bits through the colours at +4Ch.
+    fn bolt(&mut self, m: &mut Machine, seg: u16, off: u16, frame: u16) {
+        let r = |k: u16| m.mem.r16(seg, off.wrapping_add(k));
+        let (x, y, w, h) = (r(6), r(8), r(0), r(2));
+        let bpp = m.mem.r8(seg, off.wrapping_add(0xA));
+        let src = off.wrapping_add(r(frame.wrapping_add(frame).wrapping_add(0xC)));
+        super::blit(m, self.0.page, x, y, w, h, (0, 0), w, h, 1, (seg, src), bpp, (seg, off.wrapping_add(0x4C)));
     }
 }
 
@@ -271,8 +315,8 @@ impl Soft {
     pub(super) fn sky(&mut self) {
         if self.g16(0xC39A) & 0x20 == 0 {
             self.sky_rows();
-            let Soft { m, page, gaps } = self;
-            if m.celestial(&mut Bodies(Out { page, gaps })).is_none() {
+            let Soft { m, page, gaps, lgts, table } = self;
+            if m.celestial(&mut Bodies(Out { page, gaps, lgts, table: *table })).is_none() {
                 self.gap("0000:E51B: a sky's body's division overflows");
             }
         }
@@ -287,8 +331,8 @@ impl Soft {
         if self.g32(0xCD1A) != 0x2294_0A5D {
             return self.gap("0000:A8EF: the sky's hook another routine");
         }
-        let Soft { m, page, gaps } = self;
-        if m.sky_draw(&mut Objects(Out { page, gaps })).is_none() {
+        let Soft { m, page, gaps, lgts, table } = self;
+        if m.sky_draw(&mut Objects(Out { page, gaps, lgts, table: *table })).is_none() {
             self.gap("2294:0A5D: a sky's object's division");
         }
     }

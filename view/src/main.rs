@@ -412,6 +412,9 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    fn interface(&mut self, m: &mut arena::machine::Machine) -> Option<()> {
+        m.interface_setup()
+    }
     /// 0000:17F9: the townspeople's graphics loaded, as they come back
     /// (`Machine::townsfolk_load`).
     fn townsfolk_graphics(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -1008,6 +1011,8 @@ impl Assets {
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
+        // 0000:46A2: the interface set up (4DD6), its drops made again.
+        let _ = engine.m.interface_setup();
         // Entering outdoors, the day's colours (0000:06B8, 2294:0428) and
         // the dither for the time of day (0000:46AF, 0390 -> 2294:0341)
         // loaded before the first frame draws the sky from them.

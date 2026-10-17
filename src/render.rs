@@ -83,6 +83,35 @@ pub struct Soft {
     pub page: Vec<u8>,
     /// Paths met that aren't ported, by the original's address.
     pub gaps: Vec<&'static str>,
+    /// The .LGT files the fog's steps load (`Lgts`).
+    lgts: Lgts,
+    /// The light table the copy made (`setup`, CCC2), made again in place
+    /// where a fog's step makes it again.
+    table: u16,
+}
+
+/// NORMAL.LGT's and FOG.LGT's bytes, for the fog's steps the drawing's
+/// sky hook may take (2294:0BEF's load, 0C36's and 0B8A's tables made
+/// again), which the original does with its files in the middle of the
+/// frame.
+#[derive(Clone, Default)]
+pub struct Lgts {
+    pub normal: Option<std::rc::Rc<[u8]>>,
+    pub fog: Option<std::rc::Rc<[u8]>>,
+}
+
+impl Lgts {
+    pub fn of(files: &crate::bsa::Files) -> Self {
+        Lgts { normal: files.data(b"NORMAL.LGT"), fog: files.data(b"FOG.LGT") }
+    }
+    /// The one named at DS:`name` (NORMAL.LGT 1A6Dh, FOG.LGT 1A78h).
+    fn named(&self, name: u16) -> Option<&[u8]> {
+        match name {
+            crate::weather::NORMAL_LGT => self.normal.as_deref(),
+            crate::weather::FOG_LGT => self.fog.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 /// The view drawn from the machine's state at the start of the frame's
@@ -90,14 +119,14 @@ pub struct Soft {
 /// written over `under` (the last page), and the paths not ported. Of
 /// what the drawing changes, the water's step (D813), which only it
 /// keeps, is put back in `m`.
-pub fn draw(m: &mut Machine, under: &[u8]) -> (Vec<u8>, Vec<&'static str>) {
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new() };
+    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0 };
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
@@ -110,7 +139,7 @@ pub fn draw(m: &mut Machine, under: &[u8]) -> (Vec<u8>, Vec<&'static str>) {
 /// the 3D mode draws it; the machine and the page after, and the paths
 /// not ported it reached.
 pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
-    let mut r = Soft { m, page, gaps: Vec::new() };
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0 };
     r.page.resize(0x10000, 0);
     r.cap_draw(0, ax, cx);
     (r.m, r.page, r.gaps)
@@ -2533,7 +2562,7 @@ impl Soft {
         let flags = 1 | if self.g8(0xCD97) & 4 != 0 { 2 } else { 0 };
         self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, flags, (dseg, doff), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
-            self.gap("E37F: a flat's glow");
+            self.reflect();
         }
     }
 
@@ -2580,7 +2609,7 @@ impl Soft {
         self.s16(0xCD98, w);
         self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, 1, (es, si.wrapping_add(0xC)), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
-            self.gap("E37F: a flat's glow");
+            self.reflect();
         }
     }
 
@@ -2676,7 +2705,7 @@ impl Soft {
             self.gap("C71C: the hook CD3E after a flat");
         }
         if self.g8(0xCD97) & 8 != 0 {
-            self.gap("E37F: a flat's glow");
+            self.reflect();
         }
     }
 
@@ -2765,105 +2794,54 @@ impl Soft {
         (T, 0)
     }
 
-    /// 0000:78A8 under 8 bits a pixel (`blit`): the compiled row reads
-    /// each pixel's bits from its column (the scale's whole part, from
-    /// the right when mirrored) in the row (the step's whole part times
-    /// the row's bytes, `bpp` x `w` bits rounded up).
-    #[allow(clippy::too_many_arguments)]
-    fn blit_bits(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
-        let stride = ((bpp as u16 * (w & 0xFF)) + 7) >> 3 & 0xFF;
-        if dw == 0 {
-            return;
-        }
-        let xs = ((w & 0xFF) << 8) / dw;
-        if xs <= 4 || dh == 0 {
-            return;
-        }
-        let ys = ((h & 0xFF) << 8) / dh;
-        if ys <= 4 {
-            return;
-        }
-        let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
-        let (mut fx, mut fy) = (0u16, 0u16);
-        let d = y.wrapping_sub(self.g16(TOP));
-        if (d as i16) < 0 {
-            dh = dh.wrapping_add(d);
-            if (dh as i16) <= 0 {
+    /// 0000:E37F, after a flat with CD97 bit 8 is drawn, over its
+    /// rectangle (A836, A838; A844 wide, A84C high), cut to the view's
+    /// left, right and bottom (not its top): each pixel of colour 1Eh
+    /// takes the one mirrored about the horizon (C3D8: the row table's
+    /// word for the row less the horizon, doubled and negated, as the
+    /// mirror's offset, read wherever the table's index falls), then each
+    /// of 67h the one a row above that; the mirror moves up two rows
+    /// with each row down. The page is read and written as both of its
+    /// passes leave it (`repne scasb` from each match on).
+    fn reflect(&mut self) {
+        let (mut ax, bx, mut cx, mut dx) = (self.g16(0xA836), self.g16(0xA838), self.g16(0xA844), self.g16(0xA84C));
+        let left = self.g16(LEFT);
+        if (ax as i16) < (left as i16) {
+            cx = cx.wrapping_add(ax.wrapping_sub(left));
+            if (cx as i16) <= 0 {
                 return;
             }
-            y = y.wrapping_sub(d);
-            fy = d.wrapping_mul(ys).wrapping_neg();
+            ax = left;
         }
-        let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(self.g16(BOTTOM));
-        if (c as i16) > 0 {
-            dh = dh.wrapping_sub(c);
-            if (dh as i16) <= 0 {
+        let bp = ax.wrapping_add(cx).wrapping_sub(self.g16(RIGHT));
+        if (bp as i16) > 0 {
+            cx = cx.wrapping_sub(bp);
+            if (cx as i16) <= 0 {
                 return;
             }
         }
-        let d = x.wrapping_sub(self.g16(LEFT));
-        if (d as i16) < 0 {
-            dw = dw.wrapping_add(d);
-            if (dw as i16) <= 0 {
-                return;
-            }
-            x = x.wrapping_sub(d);
-            fx = d.wrapping_mul(xs).wrapping_neg();
-        }
-        let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(self.g16(RIGHT));
-        if (c as i16) > 0 {
-            dw = dw.wrapping_sub(c);
-            if (dw as i16) <= 0 {
+        let bp = bx.wrapping_add(dx).wrapping_sub(self.g16(BOTTOM));
+        if (bp as i16) > 0 {
+            dx = dx.wrapping_sub(bp);
+            if (dx as i16) <= 0 {
                 return;
             }
         }
-        // 795E..79A9: the colours, through the shade where it has one.
-        let mut lut: Option<[u8; 256]> = None;
-        if map.0 != 0 {
-            let mut t = [0u8; 256];
-            for (k, e) in t.iter_mut().enumerate().take(1 << bpp) {
-                let c = self.m.mem.r8(map.0, map.1.wrapping_add(k as u16));
-                *e = if shade.0 != 0 { self.m.mem.r8(shade.0, shade.1.wrapping_add(c as u16)) } else { c };
-            }
-            lut = Some(t);
-        } else if shade.0 != 0 {
-            let mut t = [0u8; 256];
-            for (k, e) in t.iter_mut().enumerate() {
-                *e = self.m.mem.r8(shade.0, shade.1.wrapping_add(k as u16));
-            }
-            lut = Some(t);
-        }
-        let mirror = flags & 2 != 0;
-        let see = flags & 1 != 0;
-        let mask = 0xFFu8 >> (8 - bpp);
-        let mut dest = self.row(y).wrapping_add(x);
-        let mut rows = dh as u8;
+        let mut di = self.row(bx).wrapping_add(ax);
+        let mut mirror = self.row(bx.wrapping_sub(self.g16(0xC3D8))).wrapping_add(self.row(bx.wrapping_sub(self.g16(0xC3D8)))).wrapping_neg();
+        let (w, mut rows) = (cx, dx);
         loop {
-            let base = src.1.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
-            let mut bx = fx;
-            let mut di = dest;
-            for _ in 0..dw {
-                let mut col = (bx >> 8) as u8;
-                if mirror {
-                    col = (w as u8).wrapping_sub(col).wrapping_sub(1);
+            for (colour, up) in [(0x1Eu8, 0u16), (0x67, 0x140)] {
+                for k in 0..w {
+                    let at = di.wrapping_add(k);
+                    if self.page[at as usize] == colour {
+                        let v = self.page[at.wrapping_add(mirror).wrapping_sub(up) as usize];
+                        self.page[at as usize] = v;
+                    }
                 }
-                let bit = col as u16 * bpp as u16;
-                let at = base.wrapping_add(bit >> 3);
-                let word = (self.m.mem.r8(src.0, at) as u16) << 8 | self.m.mem.r8(src.0, at.wrapping_add(1)) as u16;
-                let sh = (16 - bpp as u16).wrapping_sub(bit & 7) & 0xF;
-                let v = (word >> sh) as u8 & mask;
-                if !(see && v == 0) {
-                    let c = match &lut {
-                        Some(t) => t[v as usize],
-                        None => v,
-                    };
-                    self.px(di, c);
-                }
-                di = di.wrapping_add(1);
-                bx = bx.wrapping_add(xs);
             }
-            dest = dest.wrapping_add(0x140);
-            fy = fy.wrapping_add(ys);
+            di = di.wrapping_add(0x140);
+            mirror = mirror.wrapping_sub(0x280);
             rows = rows.wrapping_sub(1);
             if rows == 0 {
                 break;
@@ -2876,95 +2854,255 @@ impl Soft {
         self.m.frames_unpack(seg, si, frame, dseg, doff);
     }
 
-    /// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
-    /// `dw` x `dh` at (`x`, `y`), clipped to the window: as the code it
-    /// compiles at 3BA0:929E (7A2B) draws each row (`flags` bit 0 the 0s
-    /// left out, bit 1 mirrored; through the shade table where its
-    /// segment isn't 0). Under 8 bits a pixel, a pixel is read from the
-    /// row's big-endian word at its bit, and goes through the colours
-    /// `map` (where its segment isn't 0): as they are unshaded, else
-    /// through the shade (the table made at CS:781E).
+    /// 0000:78A8 (`blit`) onto the page.
     #[allow(clippy::too_many_arguments)]
     fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
-        if bpp != 8 {
-            return self.blit_bits(x, y, dw, dh, shade, w, h, flags, src, bpp, map);
-        }
-        let stride = ((8 * (w & 0xFF)) + 7) >> 3;
-        let xs = ((w & 0xFF) << 8) / dw.max(1);
-        if dw == 0 || xs <= 4 {
+        blit(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+    }
+}
+
+/// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
+/// `dw` x `dh` at (`x`, `y`), clipped to the window: as the code it
+/// compiles at 3BA0:929E (7A2B) draws each row (`flags` bit 0 the 0s
+/// left out, bit 1 mirrored; through the shade table where its
+/// segment isn't 0). Under 8 bits a pixel, a pixel is read from the
+/// row's big-endian word at its bit, and goes through the colours
+/// `map` (where its segment isn't 0): as they are unshaded, else
+/// through the shade (the table made at CS:781E).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn blit(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+    if bpp != 8 {
+        return blit_bits(m, page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+    }
+    let stride = ((8 * (w & 0xFF)) + 7) >> 3;
+    let xs = ((w & 0xFF) << 8) / dw.max(1);
+    if dw == 0 || xs <= 4 {
+        return;
+    }
+    let ys = ((h & 0xFF) << 8) / dh.max(1);
+    if dh == 0 || ys <= 4 {
+        return;
+    }
+    let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+    let (mut fx, mut fy) = (0u16, 0u16);
+    let d = y.wrapping_sub(m.mem.r16(DS, TOP));
+    if (d as i16) < 0 {
+        dh = dh.wrapping_add(d);
+        if (dh as i16) <= 0 {
             return;
         }
-        let ys = ((h & 0xFF) << 8) / dh.max(1);
-        if dh == 0 || ys <= 4 {
+        y = y.wrapping_sub(d);
+        fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, BOTTOM));
+    if (c as i16) > 0 {
+        dh = dh.wrapping_sub(c);
+        if (dh as i16) <= 0 {
             return;
         }
-        let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
-        let (mut fx, mut fy) = (0u16, 0u16);
-        let d = y.wrapping_sub(self.g16(TOP));
-        if (d as i16) < 0 {
-            dh = dh.wrapping_add(d);
-            if (dh as i16) <= 0 {
-                return;
-            }
-            y = y.wrapping_sub(d);
-            fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let d = x.wrapping_sub(m.mem.r16(DS, LEFT));
+    if (d as i16) < 0 {
+        dw = dw.wrapping_add(d);
+        if (dw as i16) <= 0 {
+            return;
         }
-        let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(self.g16(BOTTOM));
-        if (c as i16) > 0 {
-            dh = dh.wrapping_sub(c);
-            if (dh as i16) <= 0 {
-                return;
-            }
+        x = x.wrapping_sub(d);
+        fx = d.wrapping_mul(xs).wrapping_neg();
+    }
+    let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, RIGHT));
+    if (c as i16) > 0 {
+        dw = dw.wrapping_sub(c);
+        if (dw as i16) <= 0 {
+            return;
         }
-        let d = x.wrapping_sub(self.g16(LEFT));
-        if (d as i16) < 0 {
-            dw = dw.wrapping_add(d);
-            if (dw as i16) <= 0 {
-                return;
-            }
-            x = x.wrapping_sub(d);
-            fx = d.wrapping_mul(xs).wrapping_neg();
-        }
-        let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(self.g16(RIGHT));
-        if (c as i16) > 0 {
-            dw = dw.wrapping_sub(c);
-            if (dw as i16) <= 0 {
-                return;
-            }
-        }
-        let mirror = flags & 2 != 0;
-        let see = flags & 1 != 0;
-        let mut dest = self.row(y).wrapping_add(x);
-        let hi = fx >> 8;
-        let start = src.1.wrapping_add(if mirror { hi.wrapping_neg().wrapping_add(w).wrapping_sub(1) } else { hi });
-        let mut rows = dh as u8;
+    }
+    let mirror = flags & 2 != 0;
+    let see = flags & 1 != 0;
+    let mut dest = m.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+    let hi = fx >> 8;
+    let start = src.1.wrapping_add(if mirror { hi.wrapping_neg().wrapping_add(w).wrapping_sub(1) } else { hi });
+    let mut rows = dh as u8;
+    loop {
+        let mut di = dest;
+        let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF));
+        let mut bx = fx;
+        let mut n = dw;
         loop {
-            let mut di = dest;
-            let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride & 0xFF));
-            let mut bx = fx;
-            let mut n = dw;
-            loop {
-                let al = self.m.mem.r8(src.0, si);
-                if !(see && al == 0) {
-                    let c = if shade.0 != 0 { self.m.mem.r8(shade.0, shade.1.wrapping_add(al as u16)) } else { al };
-                    self.px(di, c);
-                }
-                n = n.wrapping_sub(1);
-                if n == 0 {
-                    break;
-                }
-                di = di.wrapping_add(1);
-                let old = (bx >> 8) as u8;
-                bx = bx.wrapping_add(xs);
-                let delta = ((bx >> 8) as u8).wrapping_sub(old);
-                let delta = if mirror { delta.wrapping_neg() } else { delta };
-                si = si.wrapping_add(delta as i8 as i16 as u16);
+            let al = m.mem.r8(src.0, si);
+            if !(see && al == 0) {
+                let c = if shade.0 != 0 { m.mem.r8(shade.0, shade.1.wrapping_add(al as u16)) } else { al };
+                page[di as usize] = c;
             }
-            dest = dest.wrapping_add(0x140);
-            fy = fy.wrapping_add(ys);
-            rows = rows.wrapping_sub(1);
-            if rows == 0 {
+            n = n.wrapping_sub(1);
+            if n == 0 {
                 break;
+            }
+            di = di.wrapping_add(1);
+            let old = (bx >> 8) as u8;
+            bx = bx.wrapping_add(xs);
+            let delta = ((bx >> 8) as u8).wrapping_sub(old);
+            let delta = if mirror { delta.wrapping_neg() } else { delta };
+            si = si.wrapping_add(delta as i8 as i16 as u16);
+        }
+        dest = dest.wrapping_add(0x140);
+        fy = fy.wrapping_add(ys);
+        rows = rows.wrapping_sub(1);
+        if rows == 0 {
+            break;
+        }
+    }
+}
+
+/// 0000:78A8 under 8 bits a pixel (`blit`): the compiled row reads
+/// each pixel's bits from its column (the scale's whole part, from
+/// the right when mirrored) in the row (the step's whole part times
+/// the row's bytes, `bpp` x `w` bits rounded up).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn blit_bits(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
+    let stride = ((bpp as u16 * (w & 0xFF)) + 7) >> 3 & 0xFF;
+    if dw == 0 {
+        return;
+    }
+    let xs = ((w & 0xFF) << 8) / dw;
+    if xs <= 4 || dh == 0 {
+        return;
+    }
+    let ys = ((h & 0xFF) << 8) / dh;
+    if ys <= 4 {
+        return;
+    }
+    let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+    let (mut fx, mut fy) = (0u16, 0u16);
+    let d = y.wrapping_sub(m.mem.r16(DS, TOP));
+    if (d as i16) < 0 {
+        dh = dh.wrapping_add(d);
+        if (dh as i16) <= 0 {
+            return;
+        }
+        y = y.wrapping_sub(d);
+        fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, BOTTOM));
+    if (c as i16) > 0 {
+        dh = dh.wrapping_sub(c);
+        if (dh as i16) <= 0 {
+            return;
+        }
+    }
+    let d = x.wrapping_sub(m.mem.r16(DS, LEFT));
+    if (d as i16) < 0 {
+        dw = dw.wrapping_add(d);
+        if (dw as i16) <= 0 {
+            return;
+        }
+        x = x.wrapping_sub(d);
+        fx = d.wrapping_mul(xs).wrapping_neg();
+    }
+    let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, RIGHT));
+    if (c as i16) > 0 {
+        dw = dw.wrapping_sub(c);
+        if (dw as i16) <= 0 {
+            return;
+        }
+    }
+    // 795E..79A9: the colours, through the shade where it has one.
+    let mut lut: Option<[u8; 256]> = None;
+    if map.0 != 0 {
+        let mut t = [0u8; 256];
+        for (k, e) in t.iter_mut().enumerate().take(1 << bpp) {
+            let c = m.mem.r8(map.0, map.1.wrapping_add(k as u16));
+            *e = if shade.0 != 0 { m.mem.r8(shade.0, shade.1.wrapping_add(c as u16)) } else { c };
+        }
+        lut = Some(t);
+    } else if shade.0 != 0 {
+        let mut t = [0u8; 256];
+        for (k, e) in t.iter_mut().enumerate() {
+            *e = m.mem.r8(shade.0, shade.1.wrapping_add(k as u16));
+        }
+        lut = Some(t);
+    }
+    let mirror = flags & 2 != 0;
+    let see = flags & 1 != 0;
+    let mask = 0xFFu8 >> (8 - bpp);
+    let mut dest = m.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+    let mut rows = dh as u8;
+    loop {
+        let base = src.1.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
+        let mut bx = fx;
+        let mut di = dest;
+        for _ in 0..dw {
+            let mut col = (bx >> 8) as u8;
+            if mirror {
+                col = (w as u8).wrapping_sub(col).wrapping_sub(1);
+            }
+            let bit = col as u16 * bpp as u16;
+            let at = base.wrapping_add(bit >> 3);
+            let word = (m.mem.r8(src.0, at) as u16) << 8 | m.mem.r8(src.0, at.wrapping_add(1)) as u16;
+            let sh = (16 - bpp as u16).wrapping_sub(bit & 7) & 0xF;
+            let v = (word >> sh) as u8 & mask;
+            if !(see && v == 0) {
+                let c = match &lut {
+                    Some(t) => t[v as usize],
+                    None => v,
+                };
+                page[di as usize] = c;
+            }
+            di = di.wrapping_add(1);
+            bx = bx.wrapping_add(xs);
+        }
+        dest = dest.wrapping_add(0x140);
+        fy = fy.wrapping_add(ys);
+        rows = rows.wrapping_sub(1);
+        if rows == 0 {
+            break;
+        }
+    }
+}
+
+/// 0000:AAA2 past its allocation, the table at `seg` (CCC2): 3AAC:0240's
+/// 13 rows (the .LGT loaded there), then two of 16 zeros and the fill
+/// colour (C3C6); CCD2's 15 rows in the EMS frame (F010h..); and in each
+/// texture bank (C8F0, C8F1 of them, each mapped: the last is left so)
+/// its shading rows at F000h (0000:B174): the table's 13 rows, then three
+/// of the fill colour.
+pub(super) fn shade_tables(m: &mut Machine, seg: u16) {
+    for i in 0..0xD00u16 {
+        let b = m.mem.r8(0x3AAC, 0x240 + i);
+        m.mem.w8(seg, i, b);
+    }
+    let fog = m.mem.r8(DS, 0xC3C6);
+    let mut di = 0xD00u16;
+    for _ in 0..2 {
+        for _ in 0..0x10 {
+            m.mem.w8(seg, di, 0);
+            di += 1;
+        }
+        for _ in 0..0xF0 {
+            m.mem.w8(seg, di, fog);
+            di += 1;
+        }
+    }
+    for i in 0..0xFu16 {
+        m.mem.w16(DS, 0xCCD2 + 2 * i, 0xF010 + i * 0x100);
+    }
+    let first = m.mem.r8(DS, 0xC8F0) as u16;
+    let n = m.mem.r8(DS, 0xC8F1) as u16;
+    for b in first..first + n {
+        m.ems_map(b);
+        let frame = m.mem.r16(DS, 0x9030);
+        let mut si = 0u16;
+        for row in 0..16u16 {
+            let d = 0xF000 + row * 0x100;
+            for i in 0..0x100u16 {
+                let v = if d < 0xFD00 {
+                    let v = m.mem.r8(seg, si);
+                    si += 1;
+                    v
+                } else {
+                    fog
+                };
+                m.mem.w8(frame, d + i, v);
             }
         }
     }
@@ -2994,45 +3132,10 @@ impl Soft {
         };
         let (lights, floor, ceiling) = (seg + SHADES_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS, seg + SHADES_PARAS + LIGHTS_PARAS + ROWS_PARAS);
         self.s16(0xCCC2, seg);
-        for i in 0..0xD00u16 {
-            let b = self.m.mem.r8(0x3AAC, 0x240 + i);
-            self.m.mem.w8(seg, i, b);
-        }
-        let fog = self.g8(0xC3C6);
-        let mut di = 0xD00u16;
-        for _ in 0..2 {
-            for _ in 0..0x10 {
-                self.m.mem.w8(seg, di, 0);
-                di += 1;
-            }
-            for _ in 0..0xF0 {
-                self.m.mem.w8(seg, di, fog);
-                di += 1;
-            }
-        }
-        for i in 0..0xFu16 {
-            self.s16(0xCCD2 + 2 * i, 0xF010 + i * 0x100);
-        }
+        self.table = seg;
+        shade_tables(&mut self.m, seg);
         let first = self.g8(0xC8F0) as u16;
-        let n = self.g8(0xC8F1) as u16;
-        for b in first..first + n {
-            self.m.ems_map(b);
-            let frame = self.g16(0x9030);
-            let mut si = 0u16;
-            for row in 0..16u16 {
-                let d = 0xF000 + row * 0x100;
-                for i in 0..0x100u16 {
-                    let v = if d < 0xFD00 {
-                        let v = self.m.mem.r8(seg, si);
-                        si += 1;
-                        v
-                    } else {
-                        fog
-                    };
-                    self.m.mem.w8(frame, d + i, v);
-                }
-            }
-        }
+        let fog = self.g8(0xC3C6);
         self.m.ems_map(first);
         // The fog's table (2294:0C36, once its bit 80h of CB5C or F81 is
         // set) is AAA2's with its last two rows the fill colour.

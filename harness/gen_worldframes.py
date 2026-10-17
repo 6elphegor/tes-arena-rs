@@ -102,6 +102,41 @@ def night(heading):
     return put
 
 
+def storm(heading, angle):
+    """`night(heading)` in a thunderstorm with a bolt forced: the weather
+    rain (BB09 1), 5C8 bit 1 set, and a bolt begun as 2294:06B6..06FB
+    begins one: the first of the six images (D8AE), its frame 0 (43C6),
+    its place on the circle at `angle` (43C2, 43C4: 2710h times the sine
+    table's words at B03C and B13C, high word doubled)."""
+    def put(a):
+        night(heading)(a)
+        a.mu.mem_write(a.lin(a.ds, 0xBB09), b'\x01')
+        a.w16(0x05C8, a.r16(0x05C8) | 1)
+        a.w16(0x43C8, a.r16(0xD8AE))
+        a.w16(0x43C6, 0)
+        for at, table in ((0x43C2, 0xB03C), (0x43C4, 0xB13C)):
+            v = struct.unpack('<h', struct.pack('<H', a.r16(table + 2 * angle)))[0]
+            a.w16(at, (((0x2710 * v) >> 16) * 2) & 0xFFFF)
+    return put
+
+
+def volcanic(heading, dx, dy):
+    """Facing `heading` with the location moved to province 3 at
+    (84h + `dx`, 34h + `dy`) and the sky's objects made again
+    (2294:08B9, the counts at 42B9 and 438C cleared first, as 0000:027A
+    clears them): the volcano seen near (volcano2.dfa) or far
+    (volcano3.img) by its distance."""
+    def put(a):
+        a.mu.mem_write(a.lin(a.ds, 0x0A46), b'\x03')
+        a.w16(0x0A48, 0x84 + dx)
+        a.w16(0x0A4A, 0x34 + dy)
+        a.mu.mem_write(a.lin(a.ds, 0x42B9), b'\x00')
+        a.mu.mem_write(a.lin(a.ds, 0x438C), b'\x00')
+        a.call_far(0x2294, 0x08B9)
+        a.w16(0xC3DA, heading)
+    return put
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -163,6 +198,20 @@ CASES = {
     # Out of the city's gate into the wilderness (`wild`), its first
     # frames, nothing held: the wild's 3D view (fields, the sky).
     'playwild': ('wild', None, [((), (), 3, None)]),
+    # The street in rain, two squares short of a puddle (flat 60 at row
+    # 91, column 41): the rainy INF's flats that mirror the sky (CDA1 bit
+    # 2), each drawn then 0000:E37F over it.
+    'playrain': ('wetstreet', at_square(89, 41, 0), [((), (), 3, None)]),
+    # The street in snow: 0000:E26B's flakes over the view.
+    'playsnow': ('snowstreet', None, [((), (), 3, None)]),
+    # At night in a thunderstorm, a bolt forced at the circle's angle 0,
+    # ahead: its second frame (2294:05A6, 0000:78A8) over the sky's flash.
+    'playbolt': ('street', storm(0, 0), [((), (), 1, None)]),
+    # The wilderness moved near Red Mountain (province 3, 20h south of
+    # its 84h, 34h), facing it: the volcano's frames (volcano2.dfa,
+    # 292B:0201's 5652 and 5A66); then far (A0h: volcano3.img, 5828).
+    'playvolcano': ('wild', volcanic(0x100, 0, 0x20), [((), (), 1, None)]),
+    'playvolcanofar': ('wild', volcanic(0x100, 0, 0xA0), [((), (), 1, None)]),
     # The main quest dungeon 39699021.MIF entered (`named`), its first
     # frames, nothing held: its start sees a square's cap.
     'playcap': ('capped', None, [((), (), 3, None)]),
@@ -170,6 +219,9 @@ CASES = {
     # frames, nothing held: its fog (2294:0B01, the view filled to the
     # horizon with the background colour, only the player's light).
     'playfog': ('fogged', None, [((), (), 3, None)]),
+    # Its first frame: the fog's step making FOG.LGT's table (2294:0C36,
+    # 0BEF's load) in the middle of the drawing, after the floor's half.
+    'playfogfirst': ('fogged', None, []),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -180,6 +232,22 @@ def street(a, base):
     a.restore(base)
     assert a.area_ended() == ('world',), 'the guild not left'
     return a.snapshot()
+
+
+def weathered(w):
+    """`street`, but its zone's weather (A5A + the zone at A51) `w` as the
+    guild is left, so 0000:0F05 makes the street's weather from it (2
+    rain, 3 snow) and its INF the weather's."""
+    def enter(a, base):
+        a.restore(base)
+        zone = a.mu.mem_read(a.lin(a.ds, 0x0A51), 1)[0]
+        a.mu.mem_write(a.lin(a.ds, 0x0A5A + zone), bytes([w]))
+        assert a.area_ended() == ('world',), 'the guild not left'
+        return a.snapshot()
+    return enter
+
+
+wet_street = weathered(2)
 
 
 def wild(a, base):
@@ -295,7 +363,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
