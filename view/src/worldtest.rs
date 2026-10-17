@@ -38,12 +38,26 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
 }
 
+/// Facing `heading` at ten at night of the save's day, as
+/// gen_worldframes.py's `night` sets it.
+fn night(a: &mut App, heading: u16) {
+    use arena::clock::var::{HOUR, MINUTE, MINUTES, SKY_TIME};
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, arena::movement::var::HEADING, heading);
+    let t = m.mem.r32(DS, MINUTES);
+    m.mem.w32(DS, MINUTES, t - t % 1440 + 22 * 60);
+    m.mem.w16(DS, HOUR, 22);
+    m.mem.w16(DS, MINUTE, 0);
+    m.mem.w16(DS, SKY_TIME, ((22 * 60) << 10) / 1440);
+}
+
 /// Where a case is played: the dungeon `into_dungeon` makes, or the main
 /// quest's Crypt of Hearts (`into_crypt`).
 #[derive(Clone, Copy)]
 enum Place {
     Dungeon,
     Crypt,
+    Street,
 }
 
 /// From the guild to the street, then into the Crypt of Hearts the way
@@ -68,17 +82,26 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
         eprintln!("skipping: no ARENA_SAVE");
         return None;
     };
-    let (mut a, mut d) = loaded(&dir, &save);
-    // The harness leaves the guild without a frame run there, so the
-    // load's 5CA bit 4000h (25FD:03xx), which the world loop's first
-    // frame clears (0000:48BE), is still set as it enters the next area
-    // (and the level's lights aren't made, 0000:4767); the view's first
-    // frame (`loaded`) cleared it.
-    let f = a.engine.m.mem.r16(DS, 0x05CA) | 0x4000;
-    a.engine.m.mem.w16(DS, 0x05CA, f);
+    // Loaded as `loaded` loads, but with no frame run in the guild: the
+    // harness leaves it straight from the load, so what the world loop's
+    // first frame would change is still the load's (the load's 5CA bit
+    // 4000h, which 0000:48BE clears and which keeps 0000:4767 from making
+    // the next level's lights; the fall's floor E8BC, still 0, which
+    // drops the player a step on the street's door square).
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    clear(&mut d, &mut a);
     match place {
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_crypt(&mut a),
+        Place::Street => {
+            // The sky's buffers, as the game's set-up makes them
+            // (2294:01F1), which the view doesn't make yet (made at its
+            // start, they move its heap and the world map's tests fail).
+            let Engine { m, files, .. } = &mut a.engine;
+            m.sky_buffers(files).expect("the sky's buffers");
+            area_left(&mut a)
+        }
     }
     a.fade.clear();
     a.fade_old = None;
@@ -116,6 +139,13 @@ fn frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, until
 #[test]
 fn play_in_a_dungeon_as_the_original_draws_it() {
     world_case("playdungeon", Place::Dungeon, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+}
+
+/// The street outside the guild, its first frames, nothing held.
+#[test]
+fn play_in_the_street_as_the_original_draws_it() {
+    let (place, setup, play) = case("playstreet").unwrap();
+    world_case("playstreet", place, setup, play);
 }
 
 /// The first level's down stairs walked into with the up arrow held from
@@ -367,6 +397,9 @@ fn case(name: &str) -> Option<Case> {
     Some(match name {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
+        "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         _ => return None,
     })
@@ -382,7 +415,7 @@ fn case(name: &str) -> Option<Case> {
 fn the_3d_view_drawn_as_the_original_draws_it() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playdungeon", "playdown", "playcrypt"] {
+    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -481,12 +514,23 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
     }
 }
 
-/// The crypt's measured (not yet exact: its farthest ceiling row reads
+/// The street outside the guild by day: the sky's rows, the water's
+/// frame under the floor, the floor and the walls unshaded, the trees,
+/// every pixel as the original's renderer draws them.
+#[test]
+fn the_streets_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view("playstreet") else { return };
+    assert!(ok, "playstreet: the 3D view differs from the original's ({same:?}% alike)");
+}
+
+/// Measured, not yet exact: the crypt (its farthest ceiling row reads
 /// past the row table, where the original finds what an earlier area
-/// left in its heap; and five rows of its ceiling differ).
+/// left in its heap; and five rows of its ceiling differ), the street
+/// facing open sky (a few of the sky's objects' pixels) and the street
+/// at night (the shaded paths by the lamps' lights).
 #[test]
 fn the_crypts_3d_view_measured() {
-    for name in ["playcrypt"] {
+    for name in ["playcrypt", "playsky", "playnight"] {
         if let Some((ok, same)) = soft_view(name) {
             eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
         }

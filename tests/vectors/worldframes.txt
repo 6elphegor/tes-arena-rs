@@ -24,6 +24,24 @@ track | playcrypt | 7 0 140 3c 250 100
 track | playcrypt | 8 0 140 3c 250 100
 screen | playcrypt | 1f4c2a75da1d90ea a97a4bafd992e4ed 6c32ab33561d7ae0
 view3d | playcrypt | 19d8458e45d49776
+track | playstreet | 0 0 1a68 3c 2fa8 71
+track | playstreet | 1 0 1a58 38 2fb8 71
+track | playstreet | 2 0 1a58 3c 2fb8 71
+track | playstreet | 3 0 1a58 3c 2fb8 71
+screen | playstreet | 59afeb14759697d7 2376632b30141d5 df87cca47c2f5ed6
+view3d | playstreet | 9b6bcd9e6755e761
+track | playsky | 0 0 1a68 3c 2fa8 0
+track | playsky | 1 0 1a58 38 2fb8 0
+track | playsky | 2 0 1a58 3c 2fb8 0
+track | playsky | 3 0 1a58 3c 2fb8 0
+screen | playsky | 3e7ebf78489330ab 2376632b30141d5 df87cca47c2f5ed6
+view3d | playsky | 6d0e4ac186de8a48
+track | playnight | 0 0 1a68 3c 2fa8 0
+track | playnight | 1 0 1a58 38 2fb8 0
+track | playnight | 2 0 1a58 3c 2fb8 0
+track | playnight | 3 0 1a58 3c 2fb8 0
+screen | playnight | 3e7ebf78489330ab e1c74f28bf2d59c8 df87cca47c2f5ed6
+view3d | playnight | 3320707fb810b16d
 track | playlock | 0 0 240 3c 6c0 0
 track | playlock | 1 0 240 3c 6c0 0
 track | playlock | 2 0 240 3c 6c0 0

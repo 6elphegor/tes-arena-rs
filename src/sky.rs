@@ -18,6 +18,7 @@
 //! The file loads and the palette writes are the front end's: these
 //! routines keep the game's record of what is loaded and say what to do.
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -41,6 +42,12 @@ pub mod var {
     /// The time of day (0..3FFh) and the weather.
     pub const TIME: u16 = 0xCCFE;
     pub const WEATHER: u16 = 0xBB09;
+    /// The segments of the day's colours (318h bytes: 300h and the first
+    /// eight colours again) and of the dither image (8 x 100).
+    pub const COLOURS_SEG: u16 = 0x43C0;
+    pub const DITHER_SEG: u16 = 0xCD04;
+    /// "dither.img", the first dither the game loads.
+    pub const DITHER_FIRST: u16 = 0x4381;
 }
 use var::*;
 
@@ -95,6 +102,62 @@ impl Machine {
         };
         self.mem.w16(DS, LIGHT, level);
         level
+    }
+
+    /// 2294:01F1's sky part (from the game's set-up, 21EE:016C): 318h
+    /// bytes for the day's colours (0000:51E2, the segment at
+    /// COLOURS_SEG), and dither.img loaded where 0000:7428 allocates it
+    /// (DI FFFFh: 51EC of the file's size), its segment at DITHER_SEG.
+    /// (Before them the routine loads the compass, the slider, the arrows
+    /// and the keys, which are the front end's.) None where an allocation
+    /// or the load fails. The loads below do nothing until it has run.
+    pub fn sky_buffers(&mut self, files: &mut Files) -> Option<()> {
+        let (seg, _) = self.heap_alloc_bytes(0x318)?;
+        self.mem.w16(DS, COLOURS_SEG, seg);
+        self.file_open_handle(files, DITHER_FIRST)?;
+        let size = self.file_seek(files, 2, 0);
+        self.file_close(files);
+        let (seg, off) = self.heap_alloc_bytes(size as u16)?;
+        self.file_load(files, DITHER_FIRST, seg, off)?;
+        self.mem.w16(DS, DITHER_SEG, seg);
+        Some(())
+    }
+
+    /// 2294:0341's load: the dither named at DS:`name` (`SkyStep::dither`)
+    /// read to DITHER_SEG:0 (0000:7428).
+    pub fn sky_dither_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
+        let seg = self.mem.r16(DS, DITHER_SEG);
+        if seg == 0 {
+            return Some(());
+        }
+        self.file_load(files, name, seg, 0).map(|_| ())
+    }
+
+    /// 2294:0428's load: the .COL named at DS:`name` (`sky_colours`) read
+    /// as 0000:7530 reads one, to COLOURS_SEG:0: the file to 929E (7428),
+    /// then 300h bytes, its own if it is 300h long, else past an 8-byte
+    /// header each shifted right by 2; then its first 18h bytes again at
+    /// +300h.
+    pub fn sky_colours_load(&mut self, files: &mut Files, name: u16) -> Option<()> {
+        if self.mem.r16(DS, COLOURS_SEG) == 0 {
+            return Some(());
+        }
+        let (seg, _) = self.file_load(files, name, DS, 0x929E)?;
+        let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+        let to = self.mem.r16(DS, COLOURS_SEG);
+        for i in 0..0x300u16 {
+            let b = if size == 0x300 {
+                self.mem.r8(seg, 0x929E + i)
+            } else {
+                self.mem.r8(seg, 0x929E + 8 + i) >> 2
+            };
+            self.mem.w8(to, i, b);
+        }
+        for i in 0..0x18u16 {
+            let b = self.mem.r8(to, i);
+            self.mem.w8(to, 0x300 + i, b);
+        }
+        Some(())
     }
 
     /// 2294:0341. The window for the time of day, and the dither for the

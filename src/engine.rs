@@ -59,9 +59,6 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     fn step(&mut self, _m: &mut Machine, _step: Step) -> bool {
         false
     }
-    /// 0000:DFDB: the textures put back from the copy at SI (BA17 as
-    /// loaded); the renderer's.
-    fn textures(&mut self, _m: &mut Machine, _si: u16) {}
     /// 0000:D4B4: the drawing's set-up (the floor's half, 140h, then the
     /// ceiling's, FEC0h, unless outdoors or C398 bit 40h), which in fog
     /// runs the fog's step (2294:0B01); the renderer's.
@@ -135,6 +132,31 @@ fn clip_back(m: &mut Machine) {
     for i in 0..8u16 {
         let b = m.mem.r8(DS, 0xBA58 + i);
         m.mem.w8(DS, 0xA914 + i, b);
+    }
+}
+
+impl Machine {
+    /// 0000:DFDB: the water's (or the lava's) animation, the .RCI named at
+    /// DS:`si` (waterani.rci at BA17, lavaani.rci at BA24: five frames of
+    /// 320 x 100), read into EMS banks 4, 5 and 6 (FA00h, FA00h and 7D00h
+    /// bytes, through the frame at 902E) unless they have none (C8F2's
+    /// sign) or hold that file already (CD00). The floor's half is filled
+    /// from them (0000:DEA8). Where the file isn't there the original
+    /// reads on from a device that gives nothing (`file_open_or_device`).
+    /// None where the open's error hook is set.
+    pub fn water_frames(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        if self.mem.r8(DS, 0xC8F2) & 0x80 != 0 || self.mem.r16(DS, 0xCD00) == si {
+            return Some(());
+        }
+        self.mem.w16(DS, 0xCD00, si);
+        self.file_open_or_device(files, si)?;
+        for (bank, n) in [(4u16, 0xFA00u16), (5, 0xFA00), (6, 0x7D00)] {
+            self.ems_map(bank);
+            let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+            self.file_read(files, seg, off, n);
+        }
+        self.file_close(files);
+        Some(())
     }
 }
 
@@ -259,7 +281,7 @@ impl Engine {
         // outdoors or on dry ground, else from BA24's.
         let si = if r(m, MAP_FLAGS) & 4 != 0 || m.mem.r8(DS, 0xCB5B) == 1 { 0xBA17 } else { 0xBA24 };
         if !hooks.step(m, Step::Textures(si)) {
-            hooks.textures(m, si);
+            m.water_frames(files, si)?;
         }
         let bank = m.mem.r8(DS, 0xC8F0) as u16;
         if !hooks.step(m, Step::MapBank(bank)) {

@@ -739,6 +739,15 @@ struct LightState {
     fog: Option<u8>,
     /// The sky's images loaded (`SkyLoad`).
     sky: SkyLoad,
+    /// The dither and the day's colours the sky's steps asked for
+    /// (2294:0341, 0428), loaded into the game's memory after the frame
+    /// (`Assets::view_frame`), where the files are.
+    dither: Option<u16>,
+    colours: Option<u16>,
+    /// The relight's level (0000:027A, 02F2), its remapping of the sky's
+    /// images and the water's frames in the game's memory done after the
+    /// frame with the files (`Assets::sky_loads`).
+    relight: Option<u16>,
 }
 
 /// The sky's images loaded as 0000:7428 loads them with DI FFFDh: the
@@ -888,6 +897,13 @@ impl LightState {
 }
 
 impl arena::light::LightHooks for LightState {
+    /// 2294:0341's dither load, for after the frame.
+    fn sky(&mut self, _m: &mut arena::machine::Machine, step: arena::sky::SkyStep) {
+        if step.dither.is_some() {
+            self.dither = step.dither;
+        }
+    }
+
     fn light_table(&mut self, m: &mut arena::machine::Machine) {
         self.table(m, arena::weather::NORMAL_LGT);
     }
@@ -914,6 +930,7 @@ impl arena::light::LightHooks for LightState {
             arena::light::LightHooks::sky_objects(self, m);
         }
         self.dark = (level >> 8) as u32;
+        self.relight = Some(level);
     }
 
     fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
@@ -974,6 +991,21 @@ impl Assets {
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
+        // Entering outdoors, the day's colours (0000:06B8, 2294:0428) and
+        // the dither for the time of day (0000:46AF, 0390 -> 2294:0341)
+        // loaded before the first frame draws the sky from them.
+        if let Some(name) = engine.m.sky_colours() {
+            if engine.m.sky_colours_load(&mut engine.files, name).is_none() {
+                eprintln!("the sky's colours did not load");
+            }
+        }
+        if engine.m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0 {
+            if let Some(name) = engine.m.sky_step().dither {
+                if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
+                    eprintln!("the sky's dither did not load");
+                }
+            }
+        }
         Assets {
             palette: world::palette(dir),
             charsheet: world::palette_file(dir, "CHARSHT.COL"),
@@ -989,7 +1021,7 @@ impl Assets {
             interface: prof::time("assets.interface", || interface::Interface::new(archive.clone())),
             archive,
             colours: None,
-            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky },
+            light: LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None },
             flash: std::cell::Cell::new(None),
             frame_view: None,
             moons: [0, 0],
@@ -1039,7 +1071,9 @@ impl Assets {
         if !outdoors {
             return render::Sky::default();
         }
-        m.sky_colours();
+        if let Some(name) = m.sky_colours() {
+            self.light.colours = Some(name);
+        }
         m.outdoor_light(&mut self.light);
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
@@ -1117,12 +1151,35 @@ impl Assets {
         v
     }
 
+    /// The sky's loads its steps asked for (2294:0428's .COL to 43C0,
+    /// 2294:0341's dither to CD04), into the game's memory: the original's
+    /// renderer draws the sky from them.
+    fn sky_loads(&mut self, engine: &mut Engine) {
+        if let Some(name) = self.light.colours.take() {
+            if engine.m.sky_colours_load(&mut engine.files, name).is_none() {
+                eprintln!("the sky's colours did not load");
+            }
+        }
+        if let Some(name) = self.light.dither.take() {
+            if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
+                eprintln!("the sky's dither did not load");
+            }
+        }
+        if let Some(level) = self.light.relight.take() {
+            engine.m.sky_images_relight(level);
+            if engine.m.water_relight(&mut engine.files, level).is_none() {
+                eprintln!("the water's frames did not load");
+            }
+        }
+    }
+
     /// After a game frame: the frame's sky and lights (`light_frame`), then
     /// the sky's hook (2294:0A5D: its objects and the lightning, the flash
     /// filling the sky) for a view `aspect` wide, kept for the redraws
     /// until the next frame.
     fn view_frame(&mut self, engine: &mut Engine, aspect: f32) {
         let (mut sky, lights) = self.light_frame(&mut engine.m);
+        self.sky_loads(engine);
         let focal = world::TAN_HALF * aspect;
         // 0000:D4FA..D50D: outdoors, not in fog (C39A bit 20h), the sky's
         // bodies, then the sky's hook.

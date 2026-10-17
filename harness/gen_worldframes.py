@@ -81,6 +81,21 @@ def facing(heading):
     return put
 
 
+def night(heading):
+    """Facing `heading` at ten at night of the save's day: the minutes
+    (05CC) and the hour (05D6, minute 05D8 0) set to 22:00, the sky's time
+    (CCFE) as 0000:16F7 makes it from them."""
+    def put(a):
+        a.w16(0xC3DA, heading)
+        m = struct.unpack('<I', a.mu.mem_read(a.lin(a.ds, 0x05CC), 4))[0]
+        m = m - m % 1440 + 22 * 60
+        a.mu.mem_write(a.lin(a.ds, 0x05CC), struct.pack('<I', m))
+        a.w16(0x05D6, 22)
+        a.w16(0x05D8, 0)
+        a.w16(0xCCFE, ((22 * 60) << 10) // 1440)
+    return put
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -130,8 +145,25 @@ CASES = {
     # frames on: not armed (5CA bit 0 clear), not picked, the lock's words
     # by the player's chance put on the message line (2826:09AC, 0B1A),
     # which the next frames draw.
+    # The street outside the guild, its first frames, nothing held: the
+    # city's 3D view (0000:D502's outdoor half, the sky).
+    'playstreet': ('street', None, [((), (), 3, None)]),
+    # The street turned north (heading 0): open sky over the houses, a
+    # cloud, a lamp post.
+    'playsky': ('street', facing(0), [((), (), 3, None)]),
+    # The same at ten at night (`night`): the frame's light turns to the
+    # night's (0000:0390) and the next frames are drawn by it.
+    'playnight': ('street', night(0), [((), (), 3, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
+
+
+def street(a, base):
+    """The snapshot of the game in the street, the guild left (the
+    outer loop's next area the city, 5E6 0)."""
+    a.restore(base)
+    assert a.area_ended() == ('world',), 'the guild not left'
+    return a.snapshot()
 
 
 def crypt(a, base):
@@ -223,7 +255,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []

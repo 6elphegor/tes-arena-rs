@@ -124,6 +124,54 @@ fn reach(m: &Machine, ax: u16, bx: u16, si: u16) -> u16 {
 }
 
 impl Machine {
+    /// 2294:032E: `n` bytes (0 for 65536) at the EMS frame's offset `si`
+    /// each put through row `row` of the light table (CCC2: the byte at
+    /// `row` + itself).
+    pub fn light_remap(&mut self, si: u16, n: u16, row: u16) {
+        let (frame, table) = (self.mem.r16(DS, 0x9030), self.mem.r16(DS, 0xCCC2));
+        let count = if n == 0 { 0x10000 } else { n as u32 };
+        let mut si = si;
+        for _ in 0..count {
+            let al = self.mem.r8(frame, si);
+            let v = self.mem.r8(table, row.wrapping_add(al as u16));
+            self.mem.w8(frame, si, v);
+            si = si.wrapping_add(1);
+        }
+    }
+
+    /// 0000:027A's remapping (after the objects are made again, which the
+    /// front end's `LightHooks::relight` does): the sky's bank mapped,
+    /// each object's image (OBJECTS, six bytes an entry: the image's
+    /// offset first) then each cloud's, its header's width x height
+    /// pixels past the 12-byte header, through row `level` of the light
+    /// table.
+    pub fn sky_images_relight(&mut self, level: u16) {
+        use crate::skyobj::var::{BANK, CLOUDS, CLOUD_COUNT, OBJECTS, OBJECT_COUNT};
+        self.ems_map(self.mem.r8(DS, BANK) as u16);
+        let frame = self.mem.r16(DS, 0x9030);
+        for (list, count) in [(OBJECTS, OBJECT_COUNT), (CLOUDS, CLOUD_COUNT)] {
+            for i in 0..self.mem.r8(DS, count) as u16 {
+                let si = self.mem.r16(DS, list + 6 * i);
+                let n = self.mem.r16(frame, si.wrapping_add(4)).wrapping_mul(self.mem.r16(frame, si.wrapping_add(6)));
+                self.light_remap(si.wrapping_add(0xC), n, level);
+            }
+        }
+    }
+
+    /// 0000:02F2: the water's frames read again (CD00 FFFFh, 0000:DFDB with
+    /// BA17) and put through row `level` of the light table: the bank at
+    /// C8F2 and the next whole, the third's first 8000h bytes.
+    pub fn water_relight(&mut self, files: &mut crate::bsa::Files, level: u16) -> Option<()> {
+        self.mem.w16(DS, 0xCD00, 0xFFFF);
+        self.water_frames(files, 0xBA17)?;
+        let first = self.mem.r8(DS, 0xC8F2) as u16;
+        for (k, n) in [(0u16, 0u16), (1, 0), (2, 0x8000)] {
+            self.ems_map(first.wrapping_add(k));
+            self.light_remap(0, n, level);
+        }
+        Some(())
+    }
+
     /// 0000:0810. The level's lights from its flats: for each square, a
     /// flat in the floor plane (its low byte, less 1) or a wall of flats
     /// (high byte 80h; its low byte), whose record (from FLAT_BASE) has a
