@@ -496,11 +496,11 @@ CASES = {
     # frames, the Ring of Shielding used (the list's fourth: its spell
     # cast on the player, its charge spent), sixty frames on.
     # A creature brought (`brought`) and fought off by standing: twenty
-    # frames, then M held a frame (the automap, 2542:045A, left with Esc
-    # at its wait), ten frames, F1 held a frame (the character sheet,
-    # 1194:0CF8, left with Esc), thirty frames: the screens opened and
-    # closed mid-fight.
-    'playscreens': ('dungeon', brought(1), [((), (), 20, None), ((KEY_M,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'waits': {AUTOMAP_READ}}),
+    # frames, then M held a frame (the automap, 2542:045A, left by a click
+    # on its exit, 0000:2E30: F0h..120h, A4h..BBh), ten frames, F1 held a
+    # frame (the character sheet, 1194:0CF8, left with Esc), thirty
+    # frames: the screens opened and closed mid-fight.
+    'playscreens': ('dungeon', brought(1), [((), (), 20, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                                             ((), (KEY_M,), 10, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                             ((), (KEY_F1,), 30, None)]),
     'playuse': ('dungeon', wounded_with_potion, [((), (), 2, None), ((), (), 5, None, [], {'do': used(4)}),

@@ -313,6 +313,11 @@ impl arena::hooks::StairsHooks for Front<'_> {
     }
 }
 impl ControlHooks for Front<'_> {
+    /// 2826:0008: the stat bars' state (`bars_state`; the window draws
+    /// them itself).
+    fn bars(&mut self, m: &mut arena::machine::Machine) {
+        m.bars_state();
+    }
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -691,6 +696,13 @@ impl arena::rest::RestHooks for Front<'_> {
 /// "How many hours do you wish to rest?" (DGROUP), which 1194:4800 shows.
 const REST_PROMPT: u16 = 0x4984;
 impl EngineHooks for Front<'_> {
+    /// 0000:CF96: the creatures' flats the page's drawing reached, brought
+    /// to life where the drawing reaches them (`flats_brought`; a flat
+    /// that gives up is printed and the frame goes on, as before).
+    fn creature_flats(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, reached: &[arena::render::Creature]) -> Option<()> {
+        let _ = flats_brought(m, files, self, reached);
+        Some(())
+    }
     /// The hook CD1A (2294:0A5D) in a level with fog (CB5C): its first
     /// step, the fog's (2294:0B01), on the game's memory with the files
     /// (FOG.LGT, the light table made: `LightState`), as the drawing's
@@ -1751,7 +1763,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
-    if frame == Some(arena::engine::Frame::Running) {
+    if frame == Some(arena::engine::Frame::Running) && !(engine.page.is_some() && engine.page_gaps.is_empty()) {
         creature_flats(engine, &mut hooks);
     }
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
@@ -1766,24 +1778,38 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
 /// centre, its number and its word, as the original's drawing calls it.
 fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
     use arena::mem::DS;
-    if engine.m.mem.r32(DS, 0xCD56) != 0x25CA_0271 {
-        return;
+    // Without the original's renderer's page (the GPU world, or a page
+    // that met something not ported) the view's own guess of the flats
+    // its walk would reach (`world::creature_flats_seen`), after the
+    // frame; with it, `Front::creature_flats` runs them where the
+    // drawing does.
+    let seg = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let reached: Vec<arena::render::Creature> = world::creature_flats_seen(&engine.m).into_iter().map(|(col, row, di)| (col << 7 | 0x40, row << 7 | 0x40, engine.m.mem.r8(seg, di), seg, di)).collect();
+    let _ = flats_brought(&mut engine.m, &mut engine.files, hooks, &reached);
+}
+
+/// The hook CD56 (25CA:0271, `Machine::flat_creature`), when the 3D mode
+/// set it, for each flat the walk reached, in its order. The drawing
+/// calls it as its walk meets the flat (0000:CF96): a flat brought to
+/// life on the way has its square's word cleared (25CA:0233), so a later
+/// visit to that square in the same walk finds no creature's flat there
+/// and calls nothing.
+fn flats_brought(m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, hooks: &mut Front<'_>, reached: &[arena::render::Creature]) -> Option<()> {
+    use arena::mem::DS;
+    if m.mem.r32(DS, 0xCD56) != 0x25CA_0271 {
+        return Some(());
     }
-    // The original's renderer's own (the page drawn, nothing not ported
-    // met): the flats its walk reached, in its order; else the view's
-    // own guess of them (`world::creature_flats_seen`).
-    let reached: Vec<arena::render::Creature> = if engine.page.is_some() && engine.page_gaps.is_empty() {
-        std::mem::take(&mut engine.page_creatures)
-    } else {
-        let seg = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
-        world::creature_flats_seen(&engine.m).into_iter().map(|(col, row, di)| (col << 7 | 0x40, row << 7 | 0x40, engine.m.mem.r8(seg, di), seg, di)).collect()
-    };
-    for (x, y, flat, seg, di) in reached {
-        if engine.m.flat_creature(&mut engine.files, &mut FightFront(hooks), x, y, flat, seg, di).is_none() {
+    for &(x, y, flat, seg, di) in reached {
+        let w = m.mem.r16(seg, di);
+        if w >> 12 != 8 || (w >> 8) & 2 == 0 || w as u8 != flat {
+            continue;
+        }
+        if m.flat_creature(files, &mut FightFront(hooks), x, y, flat, seg, di).is_none() {
             eprintln!("a creature's flat gave up: {}", arena::giveup::describe());
-            return;
+            return None;
         }
     }
+    Some(())
 }
 
 /// The animations a turn played (`dialog::Talk::movies`), made: a text's

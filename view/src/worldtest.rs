@@ -819,11 +819,11 @@ fn case(name: &str) -> Option<Case> {
         }), held(30, |_| false, 30)),
         "playscreens" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 1, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 20, |_| false);
-            // The automap (M) and the character sheet (F1) opened and
-            // left with Esc, each in the frame after (the original's
-            // frame body opens them: 2542:0100).
+            // The automap (M) opened and left by its exit (0000:2E30), the
+            // character sheet (F1) with Esc, each in the frame after (the
+            // original's frame body opens them: 2542:0100).
             d.key(a, KeyCode::KeyM, Some("m"));
-            d.key(a, KeyCode::Escape, None);
+            d.click(a, 0x100, 0xB0, MouseButton::Left);
             frames(a, d, seen, 11, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
