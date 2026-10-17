@@ -3,6 +3,7 @@
 # start end (hex, end exclusive) and why.
 # The harness's ways, not the game's:
 ba60 ba62 the frame's tick (BA60): the harness's timer ticks at each read of it
+884a 884c the minute's tick (884A, 0000:4BC8: the ticks then): the view's frames tick before the frame, the harness's at its waits after, one less at the clock (the minutes come on the same frames)
 8f92 8f96 the mouse's place: the harness's mouse reads 160, 100; the view's controls don't read it
 7a4a 7a5a the cursor's record (2826:00xx): the classic controls' regions; the view's are its own
 acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' table
@@ -41,7 +42,6 @@ ccc2 ccc4 the light table's segment (the drawing's copy's own heap)
 cd7e cd8a the drawing's buffers' segments (the copy's own heap)
 eebc eee2 the level's segments made on a level's change
 929e 97e2 scratch (strings, numbers made, the heap's first blocks)
-9176 91a4 the file's name, handle and size of the last file opened
 a836 a863 scratch of the drawing's and the texts'
 a908 a910 0000:742C's scratch
 9288 9289 the drawing's colour

@@ -64,6 +64,14 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     /// ceiling's, FEC0h, unless outdoors or C398 bit 40h), which in fog
     /// runs the fog's step (2294:0B01); the renderer's.
     fn draw_setup(&mut self, _m: &mut Machine, _half: u16) {}
+    /// 0000:CF96, the hook CD56 (25CA:0271, `Machine::flat_creature`) for
+    /// each creature's flat the page's drawing reached, in its walk's
+    /// order, called on the machine as the drawing ends (the drawing ran
+    /// on a copy). Nothing by default: the flats stay in
+    /// `Engine::page_creatures`.
+    fn creature_flats(&mut self, _m: &mut Machine, _files: &mut Files, _reached: &[crate::render::Creature]) -> Option<()> {
+        Some(())
+    }
     /// The hook CD1A, 2294:0A5D: the sky's objects drawn (`sky_draw`,
     /// with the renderer's SkyHooks).
     fn sky(&mut self, _m: &mut Machine) {}
@@ -118,6 +126,41 @@ pub enum Step {
     InfoLoad,
     /// 0000:A7B4, the picture put on the screen.
     Present,
+}
+
+impl Machine {
+    /// 0000:A7B4..A827, the state the picture's putting on the screen
+    /// leaves when it is shaken (CB68, the bob in water, not 0): by its
+    /// size `n` (CB68 or its negative), the step BA70 (2^n / 2, negative
+    /// with BA6E FFFFh and BA6C 140h for a negative shake, else BA6E 1 and
+    /// BA6C FEC0h), the view's rows (A916..A91A) and quarter columns
+    /// (A914..A918) over 2^n at BA68 and BA6A, and 2^n's low byte at BA4A.
+    /// The copy to the screen after (A82A..) is the front end's.
+    pub fn present_shake(&mut self) {
+        let shake = self.mem.r16(DS, 0xCB68);
+        if shake == 0 {
+            return;
+        }
+        let r = |m: &Machine, at: u16| m.mem.r16(DS, at);
+        let n = (if (shake as i16) < 0 { shake.wrapping_neg() } else { shake }) as u8 & 0x1F;
+        let pow = if n < 16 { 1u16 << n } else { 0 };
+        let half = pow >> 1;
+        if (shake as i16) < 0 {
+            self.mem.w16(DS, 0xBA70, half.wrapping_neg());
+            self.mem.w16(DS, 0xBA6E, 0xFFFF);
+            self.mem.w16(DS, 0xBA6C, 0x140);
+        } else {
+            self.mem.w16(DS, 0xBA6E, 1);
+            self.mem.w16(DS, 0xBA6C, 0xFEC0);
+            self.mem.w16(DS, 0xBA70, half);
+        }
+        let shr = |v: u16| if n < 16 { v >> n } else { 0 };
+        let rows = shr(r(self, 0xA91A).wrapping_sub(r(self, 0xA916)).wrapping_add(1));
+        self.mem.w16(DS, 0xBA68, rows);
+        let cols = shr(r(self, 0xA918).wrapping_sub(r(self, 0xA914)).wrapping_add(1)) >> 2;
+        self.mem.w16(DS, 0xBA6A, cols);
+        self.mem.w8(DS, 0xBA4A, pow as u8);
+    }
 }
 
 /// `n` words copied in DGROUP from `from` to `to`.
@@ -330,6 +373,9 @@ impl Engine {
             *page = p;
             self.walked = Some(walked);
             self.page_gaps = gaps;
+            if self.page_gaps.is_empty() {
+                hooks.creature_flats(m, files, &creatures)?;
+            }
             self.page_creatures = creatures;
             for (o, before, after) in wrote {
                 // Written back to the machine's own byte: the original's
@@ -484,6 +530,7 @@ impl Engine {
             m.info_load(files, info)?;
         }
         if !hooks.step(m, Step::Present) {
+            m.present_shake();
             hooks.present(m);
         }
         m.mem.w16(DS, 0xCB5E, 0);
