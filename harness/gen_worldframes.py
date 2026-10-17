@@ -45,6 +45,13 @@ whose words are the original's heap's segments, which no other layout has:
 
   view3d1 | NAME | <digest>
 
+What the case's frames changed in DGROUP, from the case's start (its
+set-up done) to its end (the offsets tests/vectors/stateexclude.txt
+names left out: the harness's ways, the heaps' layouts): the offsets as
+runs, and the digest of their bytes after:
+
+  state | NAME | <start+length ...> | <digest>
+
 The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
@@ -353,6 +360,32 @@ def play(a, name, steps, tracks):
     return full, page, mask, bytes(a.dac)
 
 
+def excluded():
+    """The DGROUP offsets tests/vectors/stateexclude.txt leaves out."""
+    out = set()
+    path = os.path.join(os.path.dirname(__file__), '..', 'tests', 'vectors', 'stateexclude.txt')
+    for line in open(path):
+        f = line.split('#')[0].split()
+        if len(f) >= 2:
+            out.update(range(int(f[0], 16), int(f[1], 16)))
+    return out
+
+
+def state_line(name, before, after, skip):
+    """What the case's frames changed in DGROUP (the offsets left out
+    aside): the offsets, as runs `start+length`, and the digest of their
+    bytes after."""
+    changed = [i for i in range(0x10000) if before[i] != after[i] and i not in skip]
+    runs = []
+    for i in changed:
+        if runs and runs[-1][0] + runs[-1][1] == i:
+            runs[-1][1] += 1
+        else:
+            runs.append([i, 1])
+    offs = ' '.join(f'{s:x}+{n:x}' for s, n in runs)
+    return f'state | {name} | {offs} | {fnv(bytes(after[i] for i in changed)):x}\n'
+
+
 def main():
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
@@ -368,6 +401,7 @@ def main():
     places = {}
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     out = open(OUT, 'w', buffering=1)
+    skip = excluded()
     for name, (where, setup, steps) in CASES.items():
         if only and name not in only:
             continue
@@ -391,6 +425,7 @@ def main():
             out.write(t)
         if len(seen) > 1:
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
+        out.write(state_line(name, a.pre_state[0], bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), skip))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
         # The 3D pixels from row 1 on: the topmost row of a ceiling reads

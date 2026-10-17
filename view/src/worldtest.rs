@@ -146,9 +146,12 @@ thread_local! {
 fn grab(a: &App) -> (Vec<u8>, Vec<u8>) {
     // The random seed as the game's memory would hold it (the engine
     // keeps it in `rng` between its stores).
-    let mut m = a.engine.m.clone();
-    m.store_rng();
-    ((0..0x10000u32).map(|o| m.mem.r8(DS, o as u16)).collect(), (0..0x20).flat_map(|b| m.ems_bank(b)).collect())
+    // DGROUP with the drawing's writes on its copy as the original's,
+    // drawing on the machine, has them (`Engine::page_state`).
+    let mut e = arena::engine::Engine::new(a.engine.m.clone(), a.engine.files.clone());
+    e.m.store_rng();
+    e.page_wrote = a.engine.page_wrote.clone();
+    (e.page_state(), (0..0x20).flat_map(|b| e.m.ems_bank(b)).collect())
 }
 
 /// Into the place, `setup` run, then `play` driving frames and
@@ -730,7 +733,7 @@ fn the_state_measured_against_the_originals() {
         // What each side's frames changed: a byte the original's changed
         // and the engine's didn't (or the other way), or both changed it
         // to different values where they started alike.
-        let drawn = a.engine.page_wrote.clone();
+        let drawn: Vec<u8> = a.engine.page_wrote.iter().map(|w| u8::from(w.is_some())).collect();
         let report = |what: &str, o0: &[u8], o1: &[u8], m0: &[u8], m1: &[u8], gap: usize, unit: usize| {
             let flag: Vec<u8> = (0..o0.len()).map(|i| {
                 // Where they end differently and one side's frames
@@ -762,5 +765,68 @@ fn the_state_measured_against_the_originals() {
             }
         }
         report("EMS", &ems0, &ems, &banks0, &banks, 32, 0x10000);
+    }
+}
+
+/// tests/vectors/stateexclude.txt's DGROUP offsets (`state` lines leave
+/// them out).
+fn state_excluded() -> Vec<bool> {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateexclude.txt");
+    let mut out = vec![false; 0x10000];
+    for line in std::fs::read_to_string(path).expect(path).lines() {
+        let f: Vec<&str> = line.split('#').next().unwrap_or("").split_whitespace().collect();
+        if f.len() >= 2 {
+            let (s, e) = (usize::from_str_radix(f[0], 16).unwrap(), usize::from_str_radix(f[1], 16).unwrap());
+            out[s..e].iter_mut().for_each(|x| *x = true);
+        }
+    }
+    out
+}
+
+/// The case's frames' changes to DGROUP against the original's (`state`
+/// lines: the offsets it changed, the digest of their bytes after), the
+/// drawing's writes on its copy counted as the original's drawing makes
+/// them on the machine (`Engine::page_state`): the same offsets changed,
+/// to the same bytes. Where a stage the view skips leaves the game's
+/// state other than the original's, this fails.
+fn state_case(name: &str) {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == "state" && f[1] == name) else {
+        panic!("{name}: no state line");
+    };
+    let mut want = vec![false; 0x10000];
+    for run in f[2].split_whitespace() {
+        let (s, n) = run.split_once('+').unwrap();
+        let (s, n) = (usize::from_str_radix(s, 16).unwrap(), usize::from_str_radix(n, 16).unwrap());
+        want[s..s + n].iter_mut().for_each(|x| *x = true);
+    }
+    let digest = u64::from_str_radix(f[3], 16).unwrap();
+    let skip = state_excluded();
+    let (place, setup, play) = case(name).unwrap();
+    let pre = std::cell::RefCell::new(None);
+    let Some((a, _)) = played(place, |a| {
+        a.engine.page = Some(vec![0; 64000]);
+        setup(a);
+        *pre.borrow_mut() = Some(grab(a).0);
+    }, play) else { return };
+    let before = pre.into_inner().unwrap();
+    let after = grab(&a).0;
+    // (The drawing's own setting up, the original's done before the case
+    // starts, the engine's copy's at its first page: not counted.)
+    let extra: Vec<usize> = (0..0x10000).filter(|&i| before[i] != after[i] && !skip[i] && !want[i] && a.engine.page_wrote[i].is_none()).collect();
+    let got = fnv((0..0x10000).filter(|&i| want[i]).map(|i| after[i]));
+    let hx = |v: &[usize]| v.iter().take(24).map(|i| format!("{i:04x}")).collect::<Vec<_>>().join(" ");
+    assert!(extra.is_empty(), "{name}: the frames changed what the original's don't: {}", hx(&extra));
+    let unchanged: Vec<usize> = (0..0x10000).filter(|&i| want[i] && before[i] == after[i]).collect();
+    assert_eq!(got, digest, "{name}: the state differs from the original's (of its changes, unchanged here: {})", hx(&unchanged));
+}
+
+/// Each case's frames leave the game's state as the original's do
+/// (`state_case`): the street by day, at night, in rain and snow, the
+/// wilderness, a dungeon and its stairs, the crypt, fog.
+#[test]
+fn the_state_as_the_original_leaves_it() {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky"] {
+        state_case(name);
     }
 }

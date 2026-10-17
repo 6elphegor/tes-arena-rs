@@ -97,6 +97,9 @@ pub struct Soft {
 /// A creature's flat the drawing reached (`Soft::creatures`).
 pub type Creature = (u16, u16, u8, u16, u16);
 
+/// A DGROUP byte the drawing wrote on its copy: offset, before, after.
+pub type Wrote = (u16, u8, u8);
+
 /// NORMAL.LGT's and FOG.LGT's bytes, for the fog's steps the drawing's
 /// sky hook may take (2294:0BEF's load, 0C36's and 0B8A's tables made
 /// again), which the original does with its files in the middle of the
@@ -127,9 +130,10 @@ impl Lgts {
 /// what the drawing changes, the water's step (D813), which only it
 /// keeps, is put back in `m`.
 /// The third: DGROUP's offsets the drawing wrote on its copy (which the
-/// original's, drawing on the machine itself, leaves there); the fourth
+/// original's, drawing on the machine itself, leaves there), each with its
+/// byte before and after; the fourth
 /// the creatures' flats it reached (`Soft::creatures`), in order.
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<u16>, Vec<Creature>) {
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
@@ -140,7 +144,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
-    let wrote = (0..=0xFFFFu16).filter(|&o| r.m.mem.r8(DS, o) != m.mem.r8(DS, o)).collect();
+    let wrote = (0..=0xFFFFu16).filter(|&o| r.m.mem.r8(DS, o) != m.mem.r8(DS, o)).map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
     if r.gaps.is_empty() {
         // The player's square's floor (CB5B: 0 dry, 1 water, 2 lava, as
@@ -921,9 +925,11 @@ impl Soft {
         if self.m.mem.r16(es, di) >= bx {
             let bl = (bx >> 8) as u8;
             let hi = self.m.mem.r8(es, di.wrapping_add(1));
+            // CABF..CADD: 0 the frame's own floor; outdoors 1; indoors 1
+            // (water) one past it, else 2 (lava).
             let al = if bl == hi {
                 0
-            } else if self.g16(0xC398) & 4 == 0 && hi == bl.wrapping_add(1) {
+            } else if self.g16(0xC398) & 4 == 0 && hi != bl.wrapping_add(1) {
                 2
             } else {
                 1

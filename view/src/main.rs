@@ -789,6 +789,9 @@ struct LightState {
     /// images and the water's frames in the game's memory done after the
     /// frame with the files (`Assets::sky_loads`).
     relight: Option<u16>,
+    /// 0000:DFDB with BA17 asked (the day's textures as loaded, put back:
+    /// `water_frames`), done with the files after the frame.
+    restore: bool,
 }
 
 /// The sky's images loaded as 0000:7428 loads them with DI FFFDh: the
@@ -976,6 +979,7 @@ impl arena::light::LightHooks for LightState {
 
     fn restore_textures(&mut self, _m: &mut arena::machine::Machine) {
         self.dark = 0;
+        self.restore = true;
     }
 
     /// 2294:08B9, the sky's objects made again (by day, and before
@@ -1032,7 +1036,13 @@ impl Assets {
         }
         let mut sky = SkyLoad { archive: archive.clone(), images: HashMap::new() };
         prof::time("assets.area_sky", || engine.m.area_sky(&mut sky));
-        let mut light = LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None };
+        let mut light = LightState { dir: dir.to_path_buf(), dark: 0, lamp: None, table: engine.m.mem.r16(arena::mem::DS, 0xCCC2), fog: None, sky, dither: None, colours: None, relight: None, restore: false };
+        // 0000:A50B..A513 (A4BA..A4C2 after a load): the world entered on
+        // dry ground, the water's frames read into their banks (DFDB,
+        // `water_frames`), which the frames then keep (CD00).
+        if engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
+            eprintln!("the water's frames did not load");
+        }
         // 0000:46A2: the interface set up (4DD6), its drops made again.
         let _ = engine.m.interface_setup(&mut engine.files, &mut Front::default());
         // Entering outdoors, the day's colours (0000:06B8, 2294:0428) and
@@ -1048,6 +1058,9 @@ impl Assets {
             // the sky's window, day's or night's switch, the relight the
             // first frame's `sky_loads` does).
             engine.m.outdoor_light(&mut light);
+            if std::mem::take(&mut light.restore) && engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
+                eprintln!("the water's frames did not load");
+            }
             if let Some(name) = light.dither.take() {
                 if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
                     eprintln!("the sky's dither did not load");
@@ -1205,6 +1218,9 @@ impl Assets {
     /// 2294:0341's dither to CD04), into the game's memory: the original's
     /// renderer draws the sky from them.
     fn sky_loads(&mut self, engine: &mut Engine) {
+        if std::mem::take(&mut self.light.restore) && engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
+            eprintln!("the water's frames did not load");
+        }
         if let Some(name) = self.light.colours.take() {
             if engine.m.sky_colours_load(&mut engine.files, name).is_none() {
                 eprintln!("the sky's colours did not load");
