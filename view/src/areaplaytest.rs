@@ -37,15 +37,6 @@ fn frames_until(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize,
         a.compose();
         d.frame(a);
         seen.push(state(a));
-        if std::env::var("ARENA_TRACE").is_ok() {
-            let m = &a.engine.m;
-            eprintln!("frame {} A91A {:x} BA5E {:x} FF0 {:x} 4D77 {:x} seed {:08x}", seen.len() - 1, m.mem.r16(DS, 0xA91A), m.mem.r16(DS, 0xBA5E), m.mem.r16(DS, 0x0FF0), m.mem.r8(DS, 0x4D77), m.rng.seed);
-            for i in 0..0x17u16 {
-                let at = 0x0AB3 + i * 0x1C;
-                let rec: String = (0..0x1C).map(|k| format!("{:02x}", m.mem.r8(DS, at + k))).collect();
-                eprintln!("  actor {i:2} {rec}");
-            }
-        }
         if a.waiting() {
             d.key(a, KeyCode::Space, Some(" "));
         }

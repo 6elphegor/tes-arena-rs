@@ -769,6 +769,33 @@ impl crate::engine::Engine {
     /// The hooks are recognised by their value: the port loads the image
     /// at segment 0, so the original's hooks into segment 0000 read as
     /// unset to the original's test of the segment (0000:A8EF).
+    /// The machine's writes watched from here (`area_watched`): an area's
+    /// change, between frames.
+    pub fn area_watch(&mut self) {
+        let frame = self.m.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        let bank = self.m.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
+        self.m.mem.watch_frame(frame, bank);
+        self.m.mem.track();
+    }
+
+    /// What the way from one area into the next wrote since `area_watch`
+    /// (the water's frames, the sky's images read again into their banks,
+    /// the words the entry sets) is the machine's: the drawing's earlier
+    /// writes there (`page_wrote`, `page_ems_wrote`) are gone in the
+    /// original, even where the bytes written are the ones the drawing
+    /// found.
+    pub fn area_watched(&mut self) {
+        for o in self.m.mem.frame_written() {
+            self.page_ems_wrote.remove(&o);
+        }
+        for o in self.m.mem.written_offsets() {
+            if let Some(w) = self.page_wrote.get_mut(o as usize) {
+                *w = None;
+            }
+        }
+        self.m.mem.untrack();
+    }
+
     pub fn world_enter(&mut self, hooks: &mut dyn AreaHooks) -> Option<()> {
         let m = &mut self.m;
         m.mem.w16(DS, crate::frame::var::TICKS, 0);

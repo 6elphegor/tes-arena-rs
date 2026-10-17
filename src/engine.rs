@@ -456,6 +456,9 @@ impl Engine {
         }
         copy_words(m, X, 0xBA62, 3);
         if r(m, MAP_FLAGS) & 0x80 != 0 {
+            // Left in the physics (a door, a gate): what the machine wrote
+            // since the drawing is its own as at a frame's end.
+            self.after_drawing();
             return Some(Frame::Left);
         }
         m.mem.w8(DS, STAGE, 0x0B);

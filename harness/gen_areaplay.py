@@ -148,6 +148,12 @@ def main():
     a.start()
     base = a.snapshot()
     loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+    if dump:
+        # The state as the load leaves it (worldtest's state report from
+        # the load, ARENA_FROM=load).
+        os.makedirs(dump, exist_ok=True)
+        open(os.path.join(dump, 'base.ds'), 'wb').write(loaded)
+        open(os.path.join(dump, 'base.ems'), 'wb').write(b''.join(a.ems_bank(b) for b in range(0x20)))
     skip = w.excluded()
     skip_load = skip | w.excluded('stateloadexclude.txt') | w.excluded('loadexclude.txt')
     places = {}

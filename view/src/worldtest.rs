@@ -1262,6 +1262,14 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     };
     assert!(extra.is_empty(), "{name}: the frames changed what the original's don't: {}", hx(&extra));
     let unchanged: Vec<usize> = (0..0x10000).filter(|&i| want[i] && before[i] == after[i]).collect();
+    // (With ARENA_SCREENS holding gen_worldframes.py's or gen_areaplay.py's
+    // dumps: the offsets of the changes whose bytes end otherwise.)
+    if got != digest {
+        if let Some(orig) = std::env::var("ARENA_SCREENS").ok().and_then(|d| std::fs::read(PathBuf::from(d).join(format!("{name}.ds"))).ok()) {
+            let off: Vec<usize> = (0..0x10000).filter(|&i| want[i] && orig[i] != after[i]).collect();
+            eprintln!("{name}: {kind}: ending otherwise: {}", off.iter().map(|i| format!("{i:04x} {:02x}/{:02x}", orig[*i], after[*i])).collect::<Vec<_>>().join(", "));
+        }
+    }
     assert_eq!(got, digest, "{name}: the state differs from the original's (of its changes, unchanged here: {})", hx(&unchanged));
 }
 

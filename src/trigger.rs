@@ -264,12 +264,7 @@ impl Machine {
         self.mem.w8(DS, 0x191F, 1);
         self.mem.w16(DS, 0x137A, 2);
         self.mem.w8(DS, 0x137E, 0);
-        let before = self.rng.seed;
-        let roll = self.rng.next();
-        if std::env::var("ARENA_TRACE").is_ok() {
-            eprintln!("tavern roll seed {before:08x} -> {roll:04x}");
-        }
-        let music = if (roll as i16) < 0 { SQUARE_XMI } else { TAVERN_XMI };
+        let music = if (self.rng.next() as i16) < 0 { SQUARE_XMI } else { TAVERN_XMI };
         self.mem.w16(DS, MUSIC, music);
         self.mem.w8(DS, KIND, 4);
         self.enter_building(files, hooks, dl)

@@ -322,15 +322,13 @@ impl arena::hooks::StairsHooks for Front<'_> {
 impl ControlHooks for Front<'_> {
     /// The window's click, in the frame's input step where the original
     /// takes it (after that frame's actors): the mouse put 4 up and left
-    /// of it (the click, CB60, is the cursor + 4), the click
-    /// (`Machine::view_click`), and whether it was left for the actors
-    /// (C39A bit 80h: the drawing finds what is under it, `clicked`).
+    /// of it (the click, CB60, is the cursor + 4), then the click
+    /// (`Machine::view_click`); one left for the actors (C39A bit 80h) is
+    /// found by the next frame's drawing.
     fn take_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         let Some((x, y)) = self.click.take() else { return Some(()) };
         m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
-        m.view_click(files, self)?;
-        self.clicked = m.mem.r16(arena::mem::DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0;
-        Some(())
+        m.view_click(files, self)
     }
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
@@ -761,11 +759,14 @@ impl EngineHooks for Front<'_> {
                 m.drawn_step(si);
             }
         }
-        // The click left for the actors (`view_click`, before the frame,
-        // whose input step clears C39A bit 80h) stands while it is drawn,
-        // as in the original, where the click comes in the input step: the
-        // sprite under it becomes CB5E (0000:C4FA), made ready for 1194:DB6C.
-        if let (true, Some(sheet)) = (std::mem::take(&mut self.clicked), self.sheet) {
+        // The click left for the actors (C39A bit 80h, set by the input
+        // step's click, `take_click`, which the next input step clears; or
+        // a click made before the frame, `view_click` between turns, whose
+        // input step clears it first) stands while it is drawn, as in the
+        // original: the sprite under it becomes CB5E (0000:C4FA), made ready
+        // for 1194:DB6C.
+        let left = m.mem.r16(DS, LEVEL_FLAGS) & 0x80 != 0;
+        if let (true, Some(sheet)) = (std::mem::take(&mut self.clicked) || left, self.sheet) {
             let f = m.mem.r16(DS, LEVEL_FLAGS) | 0x80;
             m.mem.w16(DS, LEVEL_FLAGS, f);
             let v = arena::engine::View::of(m);
@@ -1655,10 +1656,6 @@ struct TurnOut {
     level_changed: bool,
     /// The effect's words the frame drew (`Front::effect`).
     effect: Option<(Vec<u8>, i32)>,
-    /// The frame's input step took a click left for the actors
-    /// (`Front::take_click`): the next frame's drawing finds what is under
-    /// it, as the original's (its drawing comes before its input step).
-    clicked: bool,
 }
 
 /// One turn (`dialog`): camping if asked, then a frame, with `talk`
@@ -1673,7 +1670,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
-        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None, clicked: false };
+        return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None };
     }
     let t = engine.frame_ticks();
     engine.tick(t);
@@ -1708,9 +1705,8 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let stairs = engine.m.mem.r8(DS, arena::movement::var::LEVEL) != level;
     let level_changed = stairs || wild_moved(engine, window);
     let effect = hooks.effect.take();
-    let clicked = hooks.click.is_none() && hooks.clicked && input.click.is_some();
     prof::time("view_frame", || assets.view_frame(engine, input.aspect));
-    TurnOut { frame, level_changed, effect, clicked }
+    TurnOut { frame, level_changed, effect }
 }
 
 /// The drawing's creatures' flats (0000:CF96): each one reached goes to
@@ -3109,9 +3105,6 @@ impl App {
         self.music.before(&mut self.engine.m);
         let ticks = self.engine.frame_ticks() as u32;
         let out = run_turn(&mut self.engine, &mut self.assets, &input, &mut talk);
-        if talk.need.is_none() && out.clicked {
-            self.clicked = true;
-        }
         // (A turn stopped at a question runs again: the rerun's.)
         self.blackout |= talk.blackout && talk.need.is_none();
         // A turn stopped at a question is run again once answered: its
