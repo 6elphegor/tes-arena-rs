@@ -10,6 +10,7 @@ acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' tabl
 cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 127a 127e 0000:47FD's return address kept on the stack's check
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
+1024 1026 the haggle's SP (1194:8467), kept for its way out (84A4, 84AC): the port has no stack
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
 061c 061e the message's segment (061A's far pointer)
 068a 068c a far pointer to the player's record (01A4) at 0688: its segment DGROUP's
