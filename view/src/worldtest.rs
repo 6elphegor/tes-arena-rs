@@ -11,7 +11,12 @@ const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/wor
 
 /// The case's track: per frame, level, x, height, y, heading.
 fn track(name: &str) -> Vec<[u16; 5]> {
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    track_in(VECTORS, name)
+}
+
+/// `track` from the vectors at `path`.
+fn track_in(path: &str, name: &str) -> Vec<[u16; 5]> {
+    let text = std::fs::read_to_string(path).expect(path);
     text.lines()
         .map(|l| l.split(" | ").collect::<Vec<_>>())
         .filter(|f| f.len() == 3 && f[0] == "track" && f[1] == name)
@@ -156,6 +161,9 @@ thread_local! {
 
 #[path = "savetest.rs"]
 mod savetest;
+
+#[path = "areaplaytest.rs"]
+mod areaplaytest;
 
 /// The heap's blocks from the first header (DGROUP 0157): segment, size,
 /// flags.
@@ -1209,8 +1217,13 @@ fn state_load_case(name: &str) {
 }
 
 fn state_compared(name: &str, from_load: bool) {
+    state_compared_in(VECTORS, name, from_load, case(name).unwrap());
+}
+
+/// `state_compared` against the vectors at `path`, the case `c`.
+fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let kind = if from_load { "stateload" } else { "state" };
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let text = std::fs::read_to_string(path).expect(path);
     let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == kind && f[1] == name) else {
         panic!("{name}: no {kind} line");
     };
@@ -1222,7 +1235,7 @@ fn state_compared(name: &str, from_load: bool) {
     }
     let digest = u64::from_str_radix(f[3], 16).unwrap();
     let skip = if from_load { state_load_excluded() } else { state_excluded() };
-    let (place, setup, play) = case(name).unwrap();
+    let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);
@@ -1253,13 +1266,18 @@ fn state_compared(name: &str, from_load: bool) {
 /// Each case's frames change the EMS banks 0..1Fh as the original's do
 /// (`stateems` lines: the same bytes changed, to the same values).
 fn state_ems_case(name: &str) {
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    state_ems_in(VECTORS, name, case(name).unwrap());
+}
+
+/// `state_ems_case` against the vectors at `path`, the case `c`.
+fn state_ems_in(path: &str, name: &str, c: Case) {
+    let text = std::fs::read_to_string(path).expect(path);
     let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == "stateems" && f[1] == name) else {
         panic!("{name}: no stateems line");
     };
     let (count, offs) = f[2].split_once(' ').unwrap();
     let want = (usize::from_str_radix(count, 16).unwrap(), u64::from_str_radix(offs, 16).unwrap(), u64::from_str_radix(f[3], 16).unwrap());
-    let (place, setup, play) = case(name).unwrap();
+    let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);

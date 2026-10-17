@@ -1,0 +1,180 @@
+"""Emit the original's area transitions played from the user's saved
+game, for view/src/areaplaytest.rs: the stairs down and back up, the
+wilderness's blocks crossed each way, a city's gate out and in again,
+buildings entered and left, each followed through the frames after.
+
+Usage: gen_areaplay.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [NAME...]
+
+The cases are run as gen_worldframes.py runs its (the same places, the
+keys held through the key interrupt, the clicks queued for the mouse's
+reads, the timer ticking at the frame's waits); a step that leaves the
+area (`leaves`: a door or a gate clicked) goes on through the outer loop
+into the next area (`ScreenArena.area_next`), its boxes on the way in
+(a building's welcome) read with Space, and the case plays on there.
+
+The lines are gen_worldframes.py's for each case: the player's track
+(the level, the physics' place, the heading at the top of each frame),
+what the frames changed in DGROUP from the case's start (`state`) and
+from the load (`stateload`), what they changed in the EMS banks from the
+case's start (`stateems`), and the page as the last frame's 2D drawing
+left it (`screen`):
+
+  track | NAME | <frame> <level> <x> <height> <y> <heading>
+  state | NAME | <start+length ...> | <digest>
+  stateload | NAME | <start+length ...> | <digest>
+  stateems | NAME | <count> <offsets' digest> | <digest>
+  screen | NAME | <page digest> <palette digest> <mask digest>
+
+With --dump DIR, each case's NAME.ds/.ems (as it ends) and NAME.ds0/
+.ems0 (as it starts) for worldtest's state reports (game data: never
+commit them).
+"""
+import os
+import struct
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+from emu import LOAD_SEG, fnv
+from unicorn import UC_HOOK_CODE
+from screens import ScreenArena
+import gen_dungeonscreens as gd
+import gen_worldframes as w
+
+UP = 0x48
+LEFT = 0x4B
+SPACE = 0x39
+
+
+def level_is(n):
+    return lambda a: a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] == n
+
+
+def heading_near(h):
+    """The heading within 10h of `h` (the turn keys step it by more than
+    one a frame)."""
+    return lambda a: ((a.r16(0xC3DA) - h + 0x10) & 0x1FF) <= 0x20
+
+
+# The script a building's welcome box (its wait for input, 0000:8FC4
+# round and round) is read by.
+BOXES = {'script': [('keys', [SPACE])] * 4}
+# A click in the middle of the view (the mouse there: its column the
+# drawing's pick, CB92), the area left in its frame.
+CLICK = [(160, 100)]
+LEAVES = dict(BOXES, leaves=True)
+
+
+def wild_at(x=None, y=None, heading=0):
+    """The wilderness's player put at `x` and/or `y` (the place the
+    physics moves, BA62/BA66, and the eye's, C3D0/C3D4) with the last
+    place the window's quarters are measured from (0600, 0602) the same,
+    facing `heading`: walking on crosses into the window's first or last
+    quarter and 217B:0434 moves the origin a block."""
+    def put(a):
+        if x is not None:
+            for o in (0xC3D0, 0xBA62, 0x0600):
+                a.w16(o, x)
+        if y is not None:
+            for o in (0xC3D4, 0xBA66, 0x0602):
+                a.w16(o, y)
+        a.w16(0xC3DA, heading)
+        a.origin0 = (a.r16(0x0608), a.r16(0x060A))
+    return put
+
+
+def origin_moved(a):
+    """The wilderness's window moved a block (its origin, 0608 and 060A,
+    no longer the case's start's)."""
+    return (a.r16(0x0608), a.r16(0x060A)) != a.origin0
+
+
+def building(row, col, heading, back=None):
+    """Before a building's door in the street (`at_square`), two frames,
+    the door clicked (the area left for its interior), three frames
+    inside (its welcome read), the way out in front clicked (an
+    interior's every trigger leaves it, 0000:44BD), three frames in the
+    street. With `back`, the way out is behind: the left arrow held till
+    the player faces `back` first."""
+    turn = [((LEFT,), (), 40, heading_near(back)), ((), (LEFT,), 10, None, CLICK, LEAVES)] if back is not None \
+        else [((), (), 10, None, CLICK, LEAVES)]
+    return ('street', w.at_square(row, col, heading),
+            [((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)] + turn + [((), (), 3, None)])
+
+
+CASES = {
+    # The first level's down stairs walked into (`playdown`'s), then the
+    # left arrow held until the player faces back up the corridor, the
+    # up arrow held into the up stairs: the first level again, three
+    # frames on.
+    'transitstairs': ('dungeon', w.at_square(11, 10, 0x100),
+                      [((UP,), (), 20, level_is(1)), ((LEFT,), (UP,), 40, heading_near(0x100)),
+                       ((UP,), (LEFT,), 30, level_is(0)), ((), (UP,), 3, None)]),
+    # The wilderness's window's quarters crossed each way from the
+    # place a gate leaves the player (`wild`): north (y just inside the
+    # second quarter, 100h), south (just inside the third, 0), west (x,
+    # 180h) and east (80h); the up arrow held till the window moves, then
+    # three frames.
+    'transitwildnorth': ('wild', wild_at(y=0x1008, heading=0x100), [((UP,), (), 12, origin_moved), ((), (UP,), 3, None)]),
+    'transitwildsouth': ('wild', wild_at(y=0x2FF8, heading=0), [((UP,), (), 12, origin_moved), ((), (UP,), 3, None)]),
+    'transitwildwest': ('wild', wild_at(x=0x1008, heading=0x180), [((UP,), (), 12, origin_moved), ((), (UP,), 3, None)]),
+    'transitwildeast': ('wild', wild_at(x=0x2FF8, heading=0x80), [((UP,), (), 12, origin_moved), ((), (UP,), 3, None)]),
+    # Daggerfall's west gate (column 0, row 15: trigger 7) clicked from
+    # the square inside it, facing it: the wilderness, three frames; the
+    # left arrow held till the player faces the gate again (80h), the
+    # gate clicked from outside (the wilderness's trigger 6): the city,
+    # three frames.
+    'transitgate': ('street', w.at_square(15, 1, 0x180),
+                    [((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None),
+                     ((LEFT,), (), 40, heading_near(0x80)), ((), (LEFT,), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
+    # The town's first tavern (row 8, column 6Ch), its temple (8, 33h),
+    # its equipment store (4, 6Ch), the palace (8, 7Dh) and the mages'
+    # guild (5Eh, 34h), each from the street square before its door (the
+    # tavern's and the temple's the square of their sign, bit 8000h: walked
+    # on). The temple's, the palace's and the guild's ways out are two
+    # squares south of their entries (heading 0).
+    'transittavern': building(7, 108, 0),
+    'transittemple': building(8, 50, 0x80, back=0),
+    'transitstore': building(3, 108, 0),
+    'transitpalace': building(8, 124, 0x80, back=0),
+    'transitguild': building(95, 52, 0x100, back=0),
+}
+
+
+def main():
+    EXE, GAME, SAVE, OUT = sys.argv[1:5]
+    dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
+    only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
+    a = ScreenArena(EXE, GAME, SAVE)
+    a.start()
+    base = a.snapshot()
+    loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+    skip = w.excluded()
+    skip_load = skip | w.excluded('stateloadexclude.txt') | w.excluded('loadexclude.txt')
+    places = {}
+    out = open(OUT, 'w', buffering=1)
+    for name, (where, setup, steps) in CASES.items():
+        if only and name not in only:
+            continue
+        if where not in places:
+            places[where] = {'dungeon': gd.dungeon, 'street': w.street, 'wild': w.wild}[where](a, base)
+        print(name, file=sys.stderr)
+        tracks = []
+        full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
+        for t in tracks:
+            out.write(t)
+        after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+        out.write(w.state_line(name, a.pre_state[0], after, skip))
+        out.write(w.state_line(name, loaded, after, skip_load, 'stateload'))
+        ems = b''.join(a.ems_bank(b) for b in range(0x20))
+        out.write(w.state_runs('stateems', name, a.pre_state[1], ems))
+        out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
+        if dump:
+            os.makedirs(dump, exist_ok=True)
+            for ext, data in (('ds', after), ('ems', ems), ('ds0', a.pre_state[0]), ('ems0', a.pre_state[1]),
+                              ('page', page), ('mask', mask), ('dac', dac), ('full', full)):
+                open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
+    out.close()
+
+
+if __name__ == '__main__':
+    main()

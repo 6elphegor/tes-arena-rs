@@ -537,6 +537,14 @@ def play(a, name, steps, tracks):
         if let_go:
             a.keys_held(let_go, down=False)
         why, _ = a.world_frames(n, until=until, each=each)
+        if why == ('ended',) and opts.get('leaves'):
+            # The area left in the step's frame (a door, a gate): the
+            # outer loop on into the next (`area_next`, its boxes on the
+            # way in read by the script), stopped before its first
+            # frame, which the next step's first top sees.
+            why = a.area_next()
+            assert why == ('world',), f'{name}: the next area stopped by {why}'
+            continue
         assert why == ('frames',), f'{name}: stopped by {why}'
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
