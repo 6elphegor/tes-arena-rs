@@ -971,6 +971,21 @@ impl Machine {
         }
     }
 
+    /// 0000:468B..46A2, the hook CD42's head: the flats past the first 10h
+    /// (C38E - 10h of them, 5-byte records from CD9E) flagged 4 in their
+    /// fourth byte, then 0000:50B9 (`clear_dungeon_flats`). (0000:4DD6
+    /// follows, `interface_setup`.)
+    pub fn entered_flats(&mut self) {
+        let n = self.mem.r16(DS, 0xC38E).wrapping_sub(0x10);
+        let mut si = 0xCD9Eu16;
+        for _ in 0..n {
+            let v = self.mem.r8(DS, si.wrapping_add(3)) | 4;
+            self.mem.w8(DS, si.wrapping_add(3), v);
+            si = si.wrapping_add(5);
+        }
+        self.clear_dungeon_flats();
+    }
+
     /// 0000:50B9. In a dungeon (kind 4) once 191D is set, flats (type 8)
     /// that are C943, or one of the eight at C987, are cleared from the
     /// map.

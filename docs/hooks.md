@@ -59,7 +59,7 @@ the original routine:
 | `AreaHooks::wild_done` | src/transit.rs:100 | 217B:04DC | overridden | the view: areas.rs Areas<'_> | faithful: `wild_done` |
 | `AreaHooks::wild_empty` | src/transit.rs:142 | 217B:0184 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_shift`, `wild_quarter_ok` (wild vectors; playwild) |
 | `AreaHooks::wild_setup` | src/transit.rs:98 | 217B:0084 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_setup` (wild vectors) |
-| `AreaHooks::world_free` | src/transit.rs:175 | 0000:A5A0 | elsewhere | the renderer's buffers live on the drawing's copy; the light table (CCC2) is freed by the next load (25FD:02E4) | |
+| `AreaHooks::world_free` | src/transit.rs:175 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
 | `AreaHooks::world_screen` | src/transit.rs:171 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`; the screens' fades are the window's (areafade.txt) |
 | `CastHooks::message_box` | src/cast.rs:42 | 1194:59C8 | overridden | the view: panels.rs Said | present: the cast's box in the equipment page (screens.txt) |
 | `CelestialHooks::draw` | src/celestial.rs:35 | 0000:E4D2 | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -170,7 +170,7 @@ the original routine:
 | `LoadHooks::loading` | src/load.rs:85 | 25FD:0803 | present | "Loading..." shown | |
 | `LoadHooks::message` | src/load.rs:78 | 1194:59C8 | elsewhere | the view's save menu shows the empty slot's words (`SaveUi::empty_slot`) | |
 | `LoadHooks::mode_3d` | src/load.rs:132 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
-| `LoadHooks::renderer` | src/load.rs:108 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_> | faithful: the light table made (titleload vectors) |
+| `LoadHooks::renderer` | src/load.rs:108 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
 | `LoadHooks::screen` | src/load.rs:101 | 0000:A5D1 | present | the view's screen set up | |
 | `LoadHooks::sky_graphics` | src/load.rs:106 | 0000:E5C9 | elsewhere | the view loads the sky's images with its assets (`Assets::sky_loads`) | |
 | `LoadHooks::slot_files` | src/load.rs:88 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
@@ -206,12 +206,12 @@ the original routine:
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
 | `NewGameHooks::creation_done` | src/newgame.rs:107 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
 | `NewGameHooks::game_screen` | src/newgame.rs:111 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `NewGameHooks::hands` | src/newgame.rs:116 | 0000:3C4C | elsewhere | the view loads the hands (`weapon_graphics_load`) | |
-| `NewGameHooks::level_flats` | src/newgame.rs:121 | 21EE:0134 | elsewhere | the view's world load loads the level's flats | |
+| `NewGameHooks::hands` | src/newgame.rs:116 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
+| `NewGameHooks::level_flats` | src/newgame.rs:121 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
 | `NewGameHooks::message_box` | src/newgame.rs:99 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
 | `NewGameHooks::palette` | src/newgame.rs:104 | 1194:1695 | present | the attribute screen's palette | |
-| `NewGameHooks::resources` | src/newgame.rs:114 | 2294:01F1 | elsewhere | the view loads fonts and images with its assets | |
-| `NewGameHooks::spells` | src/newgame.rs:118 | 29CF:0691 | elsewhere | the view loads the spells (`spells_load`, world.rs) | |
+| `NewGameHooks::resources` | src/newgame.rs:114 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::spells` | src/newgame.rs:118 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
 | `NewGameHooks::stats_screen` | src/newgame.rs:102 | 1194:0DC7 | present | creation's screens are the view's (`create.rs`) | |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
@@ -396,3 +396,5 @@ the original routine:
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |
 | `WildHooks::write` | src/wild.rs:74 | 0000:9DD2 | port | the default runs the port | |
+| `StartHooks::video_mode` | src/start.rs:22 | 0000:6F21 | original | INT 10h AH=0Fh's mode before the start's 13h: 3, the text mode DOS leaves (the harness's too) | |
+| `StartHooks::mouse` | src/start.rs:27 | 0000:5384 | original | a mouse driver present (the harness's has one): the pointer's drawing [B02C] chosen (9B04) | |

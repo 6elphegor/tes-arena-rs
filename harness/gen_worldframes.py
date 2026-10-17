@@ -45,6 +45,13 @@ whose words are the original's heap's segments, which no other layout has:
 
   view3d1 | NAME | <digest>
 
+First, DGROUP as the title's Load leaves it (the offsets
+tests/vectors/loadexclude.txt names zeroed; the port's taken to the
+harness's form, its image's segments 1000h higher: worldtest's
+`load_canonical`):
+
+  loadstate | <digest>
+
 What the case's frames changed in DGROUP, from the case's start (its
 set-up done) to its end (the offsets tests/vectors/stateexclude.txt
 names left out: the harness's ways, the heaps' layouts): the offsets as
@@ -57,12 +64,6 @@ tests/vectors/stateloadexclude.txt names left out as well: the heaps'
 segments made on the way in, scratch the load and the entry leave):
 
   stateload | NAME | <start+length ...> | <digest>
-
-and for the cases the view checks so (LOAD_CASES), one bit of each byte
-of DGROUP as the case leaves it (`state_bits`): the bytes the engine's
-way in changes and the original's doesn't are checked against them.
-
-  stateloadbits | NAME | <hex>
 
 What the case's frames changed in the EMS banks 0..1Fh (64K each, end to
 end), from the case's start: how many bytes, the digest of their offsets
@@ -430,32 +431,6 @@ def excluded(name='stateexclude.txt'):
     return out
 
 
-# The cases whose state from the load the view checks (worldtest's
-# the_state_from_the_load_as_the_original_leaves_it).
-LOAD_CASES = ('playstreet', 'playnight', 'playrain', 'playsnow', 'playwild', 'playdungeon', 'playdown',
-              'playcrypt', 'playfog', 'playcap', 'playsky')
-
-
-def state_bit(i, b):
-    """One bit of DGROUP's byte `b` at offset `i`: FNV-1a's top bit over
-    the byte, then the offset (the byte first: FNV-1a's top bit hardly
-    depends on its last byte)."""
-    return fnv(bytes((b, i & 0xFF, i >> 8))) >> 63
-
-
-def state_bits(after):
-    """`state_bit` of each byte of DGROUP as the case leaves it, eight to
-    a byte (offset 8k + j at bit j of byte k), in hex: what the view
-    checks the bytes its frames change and the original's don't against,
-    where the two loads part (the original's bytes are the save's, never
-    in the vectors; a bit each tells a byte changed otherwise half the
-    time)."""
-    out = bytearray(0x2000)
-    for i in range(0x10000):
-        out[i >> 3] |= state_bit(i, after[i]) << (i & 7)
-    return out.hex()
-
-
 def state_runs(kind, name, before, after):
     """What changed between `before` and `after` (the EMS banks 0..1Fh,
     64K each, end to end): how many bytes, the digest of their offsets
@@ -496,8 +471,14 @@ def main():
     places = {}
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     out = open(OUT, 'w', buffering=1)
+    # The state as the title's Load leaves it: DGROUP, the offsets
+    # tests/vectors/loadexclude.txt names zeroed (the port's in this form:
+    # worldtest's `load_canonical`).
+    skip_base = excluded('loadexclude.txt')
+    if not only:
+        out.write(f'loadstate | {fnv(bytes(0 if i in skip_base else b for i, b in enumerate(loaded))):x}\n')
     skip = excluded()
-    skip_load = skip | excluded('stateloadexclude.txt')
+    skip_load = skip | excluded('stateloadexclude.txt') | excluded('loadexclude.txt')
     for name, (where, setup, steps) in CASES.items():
         if only and name not in only:
             continue
@@ -524,8 +505,6 @@ def main():
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(state_line(name, a.pre_state[0], after, skip))
         out.write(state_line(name, loaded, after, skip_load, 'stateload'))
-        if name in LOAD_CASES:
-            out.write(f'stateloadbits | {name} | {state_bits(after)}\n')
         ems = b''.join(a.ems_bank(b) for b in range(0x20))
         out.write(state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')

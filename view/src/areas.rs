@@ -99,6 +99,7 @@ impl AreaHooks for Areas<'_> {
     /// buildings listed and its quests made (`Machine::city_entered`,
     /// 0000:46B2).
     fn entered(&mut self, m: &mut Machine) {
+        m.entered_flats();
         if m.mem.r16(DS, 0xC398) & 4 == 0 {
             let Some(files) = self.files.as_deref_mut() else {
                 m.flat_lights();
@@ -283,6 +284,11 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
         // 1194:59C8: the game's own words for an empty slot (5F0F).
         Some(arena::load::Loaded::Missing) => return Err(String::from_utf8_lossy(e.m.mem.cstr(DS, arena::load::var::NO_SAVE)).into_owned()),
         _ => return Err(format!("Slot {slot} gave up while loading: {}.", arena::giveup::describe())),
+    }
+    // The load menu's way back (1194:5E87): PAL.COL read into 929E
+    // (0000:7534), the screen's colours set from it.
+    if title {
+        e.m.colours_load(&mut e.files, 0x1304, 0x929E);
     }
     let run = run_of(&e.m);
     // When this area ends: a title load goes back to after the area's run

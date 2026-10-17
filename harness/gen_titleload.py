@@ -28,8 +28,9 @@ Counted in DGROUP (stubs): as gen_load.py's (0000:1AF9 FFE0, 1A5C FFE2,
 1194:3AE8 FFEE, 292B:09AC FFF0, 2F9F:001F FFF2, 0000:3503 FFF4), and
 0000:DA8E (FFF6, the view update), 25CA:01E6 (FFF8, the creature slots marked usable,
 returning 0), 0000:17F9 (FFFA), 0000:068A (FFFC) and 0000:468B (FFFE,
-the entered hook). Not counted, drawing only: 0000:DFDB, A561, 946A,
-9B56.
+the entered hook). Not counted, drawing only: 0000:DFDB, 946A, 9B56.
+(0000:A561, the renderer's buffers, runs: `draw_buffers_alloc`; its
+AAA2 is counted.)
 
   title | seed | result
 
@@ -124,7 +125,7 @@ def main():
                            (0, 0xDA8E, counter(0xFFF6, False)), (0x25CA, 0x01E6, slots),
                            (0, 0x17F9, counter(0xFFFA, True)), (0, 0x068A, counter(0xFFFC, True)),
                            (0, 0x468B, counter(0xFFFE, True)),
-                           (0, 0xDFDB, b'\xc3'), (0, 0xA561, b'\xc3'),
+                           (0, 0xDFDB, b'\xc3'),
                            (0, 0x946A, b'\xc3'), (0, 0x9B56, b'\xc3')]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
     a.init_heap()
