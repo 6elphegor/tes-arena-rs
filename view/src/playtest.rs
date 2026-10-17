@@ -126,7 +126,7 @@ impl Watch {
         }
     }
 
-    fn check(&mut self, engine: &Engine) -> Option<String> {
+    fn check(&mut self, engine: &Engine, outdoors: bool) -> Option<String> {
         let m = &engine.m;
         let r = |at| m.mem.r16(DS, at);
         let (w, d) = (r(0xC357), r(0xC359));
@@ -145,6 +145,11 @@ impl Watch {
                 return Some(format!("DGROUP {at:04X} overwritten: {:?}", String::from_utf8_lossy(m.mem.cstr(DS, at))));
             }
         }
+        // The renderer reached no path it doesn't port (the window would
+        // fall back to its own world).
+        if !engine.page_gaps.is_empty() {
+            return Some(format!("the renderer's page fell back: not ported {:?}", engine.page_gaps));
+        }
         if !m.heap_check() {
             return Some("the heap's chain broken (heap_check)".into());
         }
@@ -159,10 +164,14 @@ impl Watch {
         if (tl, sl) != (self.text_level, self.sub_level) {
             return Some(format!("text nesting left at {tl}, substitutions at {sl} (rest {}, {})", self.text_level, self.sub_level));
         }
+        // The dice still for 2000 turns outdoors (once a streak). Indoors
+        // that is the original's too: a quiet interior's frames take no
+        // rolls (the save's guild, 40 frames standing and 40 walking,
+        // keep 91F6 as it is under the harness).
         if m.rng.seed == self.seed {
             self.same += 1;
-            if self.same >= 2000 {
-                return Some(format!("the dice stuck: seed {:#x} for {} turns", self.seed, self.same));
+            if self.same == 2000 && outdoors {
+                return Some(format!("the dice stuck: seed {:#x} for 2000 turns outdoors", self.seed));
             }
         } else {
             self.seed = m.rng.seed;
@@ -254,6 +263,18 @@ fn stand(engine: &mut Engine, (c, r, h): (u16, u16, u16)) {
     engine.m.mem.w16(DS, X, c << 7 | 0x40);
     engine.m.mem.w16(DS, Y, r << 7 | 0x40);
     engine.m.mem.w16(DS, HEADING, h);
+    placed(engine);
+}
+
+/// The player's place written (C3D0's x, height, y) made the player's
+/// own (BA62), as entering the world loop makes it (0000:A2A3): the
+/// frame moves the player from BA62, so a place written to C3D0 alone is
+/// gone by the next turn.
+fn placed(engine: &mut Engine) {
+    for i in 0..3u16 {
+        let w = engine.m.mem.r16(DS, X + 2 * i);
+        engine.m.mem.w16(DS, 0xBA62 + 2 * i, w);
+    }
 }
 
 pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u64, frames: usize, setup: &str, saves: Option<(&Path, u8)>) {
@@ -348,7 +369,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             }
         }
         let w = watch.get_or_insert_with(|| Watch::new(engine));
-        if let Some(o) = w.check(engine) {
+        let outdoors = matches!(run, arena::transit::Run::City | arena::transit::Run::Wild);
+        if let Some(o) = w.check(engine, outdoors) {
             if last_odd.as_ref() != Some(&o) {
                 println!("ODD frame {n} ({what}): {o}; {}", place(engine, run));
                 issues.set(issues.get() + 1);
@@ -370,6 +392,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             let v: Vec<u16> = at.split(':').map(|x| x.parse().expect("at:COL:ROW:HEADING")).collect();
             engine.m.mem.w16(DS, X, v[0] << 7 | 0x40);
             engine.m.mem.w16(DS, Y, v[1] << 7 | 0x40);
+            placed(&mut engine);
             engine.m.mem.w16(DS, HEADING, v[2]);
             n += 1;
             alive = turn(&mut engine, st, run, Intent::default(), step, n);
@@ -506,6 +529,15 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             *counts.entry("rested").or_default() += 1;
         }
         *counts.entry(name).or_default() += 1;
+        // The turns by the kind of area played in.
+        let area = match *run {
+            arena::transit::Run::City => "in city",
+            arena::transit::Run::Wild => "in wild",
+            arena::transit::Run::Dungeon => "in dungeon",
+            arena::transit::Run::Interior(_) => "in interior",
+            _ => "in start",
+        };
+        *counts.entry(area).or_default() += 1;
         // The game's questions answered at random (talk menus, shops,
         // haggles, rests): menu entries 0..5, now and then a number typed.
         while st.answers.len() < 3 {
@@ -556,6 +588,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         if engine.m.mem.r16(walls, r << 8 | c << 1) == 0 {
                             engine.m.mem.w16(DS, X, c << 7 | 0x40);
                             engine.m.mem.w16(DS, Y, r << 7 | 0x40);
+                            placed(&mut engine);
                             break;
                         }
                     }
@@ -572,8 +605,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         stand(&mut engine, d);
                         *counts.entry("door found").or_default() += 1;
                     }
-                } else if left == 9 || left == 5 {
+                } else if left == 10 || left == 9 {
                     st.clicked = crate::centre_click(&mut engine, &mut st.boxes);
+                } else if left <= 7 {
+                    // Then walked into, as 0000:43B1 tests a move: a
+                    // building entered, an interior or a city left (eight
+                    // turns from where `stand` puts the player reach the
+                    // door's square).
+                    intent.forward = 256;
                 }
             }
             Act::Stairs => {
@@ -605,6 +644,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         let a = h / 512.0 * std::f32::consts::TAU;
                         engine.m.mem.w16(DS, X, (ax - a.sin() * 150.0).clamp(64.0, w as f32 - 64.0) as u16);
                         engine.m.mem.w16(DS, Y, (ay - a.cos() * 150.0).clamp(64.0, d as f32 - 64.0) as u16);
+                        placed(&mut engine);
                         engine.m.mem.w16(DS, HEADING, h as u16);
                         *counts.entry("actor found").or_default() += 1;
                     }
@@ -732,7 +772,15 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             // No journey: the screen left as Esc leaves it.
                             for _ in 0..4 {
                                 if let Some(t) = open.as_mut() {
-                                    t.key(&mut engine, KeyCode::Escape, None);
+                                    // A main quest's dungeon reached: its
+                                    // picture up until its button is
+                                    // clicked (292B:042B), Esc or not.
+                                    if t.picture_up() {
+                                        t.click(&mut engine, &archive, 0x120, 0xBD, false);
+                                        *counts.entry("quest dungeon pictures").or_default() += 1;
+                                    } else {
+                                        t.key(&mut engine, KeyCode::Escape, None);
+                                    }
                                     t.advance(60_000);
                                 }
                                 crate::travel::after(&mut open, &mut engine, &mut boxes, true);
@@ -805,11 +853,20 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     if let crate::saveui::Ended::Open = e {
                         e = ui.click(160, row(slot), false);
                     }
+                    // The name typed into the game's editor as the window
+                    // types it: each key's scan code pressed and let go,
+                    // then Enter.
                     if let crate::saveui::Ended::Open = e {
-                        for c in format!("pt{n}").chars() {
-                            ui.key(KeyCode::KeyA, Some(&c.to_string()));
+                        let digit = |c: char| [KeyCode::Digit0, KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9][c.to_digit(10).unwrap() as usize];
+                        let codes: Vec<KeyCode> = [KeyCode::KeyP, KeyCode::KeyT].into_iter().chain(n.to_string().chars().map(digit)).chain([KeyCode::Enter]).collect();
+                        for code in codes {
+                            let Some(scan) = crate::interface::scan_code(code) else { continue };
+                            for down in [true, false] {
+                                if ui.typing.is_some() {
+                                    e = ui.field_key(scan, down);
+                                }
+                            }
                         }
-                        e = ui.key(KeyCode::Enter, None);
                     }
                     match e {
                         crate::saveui::Ended::Save(e2, s) => {

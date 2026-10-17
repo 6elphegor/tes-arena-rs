@@ -13,6 +13,5 @@ d806 d808 a level plane's segment (FS/ES/DS of the actors and the drawing)
 e2e8 e2ea a buffer's segment made on the way in (FFFFh till then)
 # Scratch the load leaves:
 a933 a934 the number-to-text buffer's last digit (0000:7028 writes down from A933): the last number written, the load's own on the original's side
-1044 1052 the strings' buffer (names, paths, a file's found and made names, 06A1/062D; the lamps' colour, 0000:0390): on the way into a dungeon the original's holds the load's "Drakain" again where the engine's holds the street's 0, 0, 0 (not found which routine puts it back)
 # The harness's ways:
 fff8 fff9 the harness's own count at the top of DGROUP

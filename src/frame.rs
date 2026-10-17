@@ -778,7 +778,43 @@ impl Machine {
         if self.mem.r8(DS, 0x01A9) & 0x20 == 0 {
             self.mem.w16(DS, 0x05CA, f | 8);
         }
+        // 4E41..4E75, the bar's texts (their drawing the front end's):
+        // the font from 102E (9AEA: B036); the player's name (1194:4BC8
+        // with SI 1A4) copied to 1044, cut at its first space, colour F0h
+        // (9288); 12BA cleared for the portrait (4E81); the font from 102C.
+        let v = self.mem.r16(DS, 0x102E);
+        self.mem.w16(DS, 0xB036, v);
+        self.name_text(0x01A4);
+        self.mem.w16(DS, 0x12BA, 0);
+        let v = self.mem.r16(DS, 0x102C);
+        self.mem.w16(DS, 0xB036, v);
         Some(())
+    }
+
+    /// 1194:4BCC's text: 9288 F0h, the name at `si` + 9 copied to 1044
+    /// (0000:9CA0) and cut where a space is in its first 14h bytes, else
+    /// at the 14h'th (`repne scasb`, which looks on past the name's end):
+    /// the 0 over the space or the last byte looked at.
+    pub fn name_text(&mut self, si: u16) {
+        self.mem.w8(DS, 0x9288, 0xF0);
+        let mut i = 0u16;
+        loop {
+            let b = self.mem.r8(DS, si.wrapping_add(9).wrapping_add(i));
+            self.mem.w8(DS, 0x1044u16.wrapping_add(i), b);
+            if b == 0 {
+                break;
+            }
+            i = i.wrapping_add(1);
+        }
+        let mut di = 0x1044u16;
+        for _ in 0..0x14 {
+            let b = self.mem.r8(DS, di);
+            di = di.wrapping_add(1);
+            if b == 0x20 {
+                break;
+            }
+        }
+        self.mem.w8(DS, di.wrapping_sub(1), 0);
     }
 
     /// 0000:4F1B with SI `si`: the view's window C39C..C3A3 the record's
