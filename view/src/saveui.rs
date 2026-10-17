@@ -283,8 +283,10 @@ impl SaveUi {
                 Draw::Fill(x, y, w, h, c) => screen.fill(*x, *y, *w, *h, *c, 0xFF),
                 Draw::Text(x, y, t, c, g) => {
                     let Some((_, font)) = self.fonts.iter().find(|(f, _)| f == g) else { continue };
-                    let s = String::from_utf8_lossy(t);
-                    screen.text_plain(font, x - font.width(&s) as i32 / 2, *y, &s, *c);
+                    // 0000:5368: x less half 66F6's width, the bytes as
+                    // they are (a slot's name may be anything NAMES.DAT
+                    // or the memory there held).
+                    screen.text_plain_bytes(font, x - font.width_of(t) as i32 / 2, *y, t, *c);
                 }
             }
         }

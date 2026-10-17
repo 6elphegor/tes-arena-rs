@@ -14,7 +14,9 @@ pub const H: usize = 200;
 /// A font of the game's.
 pub struct Font {
     pub h: usize,
-    widths: [u8; 94],
+    /// The widths of 21h..7Eh, then the byte after them (the first row's
+    /// low byte), which 66F6 and 9E0A read as 7Fh's.
+    widths: [u8; 95],
     rows: Vec<u16>,
 }
 
@@ -23,11 +25,11 @@ impl Font {
     pub fn load(archive: &crate::archive::Archive, name: &str) -> Option<Font> {
         let d = archive.read(name)?;
         let h = *d.first()? as usize;
-        if h == 0 || d.len() < 95 + 94 * h * 2 {
+        if h == 0 || d.len() < 96 + 94 * h * 2 {
             return None;
         }
-        let mut widths = [0u8; 94];
-        widths.copy_from_slice(&d[1..95]);
+        let mut widths = [0u8; 95];
+        widths.copy_from_slice(&d[1..96]);
         let rows = d[95..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
         Some(Font { h, widths, rows })
     }
@@ -38,21 +40,30 @@ impl Font {
         self.widths[0] as usize + 1
     }
 
-    /// The width of `c` and its glyph's index (None: a space or a
-    /// character the font hasn't).
+    /// The width of `c` and its glyph's index (None: nothing drawn), as
+    /// 0000:66F6 measures and 9E0A draws: a space the first glyph's width
+    /// plus one; 21h..7Fh their glyphs (7Fh's past the 94, its width the
+    /// rows' first byte, its rows whatever follows); the bytes below 20h
+    /// and from 80h nothing, taking no room.
     fn glyph(&self, c: u8) -> (usize, Option<usize>) {
         match c {
-            0x21..=0x7E => {
+            0x20 => (self.space(), None),
+            0x21..=0x7F => {
                 let k = (c - 0x21) as usize;
                 (self.widths[k] as usize, Some(k))
             }
-            _ => (self.space(), None),
+            _ => (0, None),
         }
     }
 
     /// The width of a line of plain text.
     pub fn width(&self, s: &str) -> usize {
-        s.bytes().map(|c| self.glyph(c).0).sum()
+        self.width_of(s.as_bytes())
+    }
+
+    /// The width of a line of the game's bytes (66F6).
+    pub fn width_of(&self, s: &[u8]) -> usize {
+        s.iter().map(|&c| self.glyph(c).0).sum()
     }
 }
 
@@ -74,7 +85,7 @@ impl Span {
     /// plus one) for 20h, none below it or from 80h, else the glyph's.
     fn code_width(&self, font: &Font) -> i32 {
         match self.code {
-            Some(c @ 0x20..=0x7E) => font.glyph(c).0 as i32,
+            Some(c @ 0x20..=0x7F) => font.glyph(c).0 as i32,
             _ => 0,
         }
     }
@@ -500,6 +511,12 @@ impl Screen {
 
     /// Text at (x, y) in colour `c`, without a shadow.
     pub fn text_plain(&mut self, font: &Font, x: i32, y: i32, s: &str, c: u8) {
+        self.text_raw(font, x, y, s.as_bytes(), c);
+    }
+
+    /// The game's bytes at (x, y) in colour `c`, without a shadow, as 9E0A
+    /// draws them (`Font::glyph`).
+    pub fn text_plain_bytes(&mut self, font: &Font, x: i32, y: i32, s: &[u8], c: u8) {
         self.text_raw(font, x, y, s, c);
     }
 
@@ -515,13 +532,13 @@ impl Screen {
     /// Plain text at (x, y), its top left, in colour `c`, with a shadow
     /// one pixel down and right in colour 0.
     pub fn text(&mut self, font: &Font, x: i32, y: i32, s: &str, c: u8) {
-        self.text_raw(font, x + 1, y + 1, s, 0);
-        self.text_raw(font, x, y, s, c);
+        self.text_raw(font, x + 1, y + 1, s.as_bytes(), 0);
+        self.text_raw(font, x, y, s.as_bytes(), c);
     }
 
-    fn text_raw(&mut self, font: &Font, mut x: i32, y: i32, s: &str, c: u8) {
+    fn text_raw(&mut self, font: &Font, mut x: i32, y: i32, s: &[u8], c: u8) {
         let p = self.palette[c as usize];
-        for ch in s.bytes() {
+        for &ch in s {
             let (w, g) = font.glyph(ch);
             if let Some(k) = g {
                 for r in 0..font.h {
@@ -573,7 +590,7 @@ impl Screen {
                 continue;
             }
             let c = if s.colour == 0x0F { default } else { s.colour };
-            self.text_raw(font, x, y, &s.text, c);
+            self.text_raw(font, x, y, s.text.as_bytes(), c);
             x += font.width(&s.text) as i32;
         }
     }
@@ -1354,7 +1371,7 @@ fn draw_typing(screen: &mut Screen, st: &Style, c: (i32, i32, i32, i32), prompt:
 /// apart, in TEENYFNT.DAT ([102E]) and colour C0h (4EAD..4EBF).
 fn draw_dialog_lines(screen: &mut Screen, st: &Style, lines: &[Vec<Span>]) {
     for (i, l) in lines.iter().enumerate() {
-        screen.text_raw(&st.list_font, 0x20, 0x91 + 9 * i as i32, &plain(l), 0xC0);
+        screen.text_raw(&st.list_font, 0x20, 0x91 + 9 * i as i32, plain(l).as_bytes(), 0xC0);
     }
 }
 
