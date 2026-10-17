@@ -11,6 +11,9 @@ cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
 061c 061e the message's segment (061A's far pointer)
+068a 068c a far pointer to the player's record (01A4) at 0688: its segment DGROUP's
+0d5e 0d60 the spell target list's first entry's segment (0D5C: DGROUP's for the player, 29CF:0145's cast at the player)
+7dbb 7dbc the flags a cast waiting for its target saves (7DBA): its high byte AH, the spells' segment's (3276h) left by the lookup (29CF:00FA)
 7f88 7f8a cast record 0's spell's segment
 7f8c 7f8e cast record 0's caster's segment (a heap block's)
 7f9e 7fa0 cast record 1's spell's segment
@@ -40,5 +43,6 @@ a908 a910 0000:742C's scratch
 b036 b038 the texts' drawing's state
 adb6 adb9 the texts' drawing's state (ADB8 the last row 9E0A drew: the message line's, which the view draws itself)
 97e2 9800 the message line's text as its drawing (0000:0511) lays it out: the view draws the line itself
+9800 9e00 scratch of the texts, lists and names (written before each use), over which the scaler compiles each image's rows from 929E on (0000:79BF: 7A2B, or 9546 for the light's), as long as the image is wide (to 9D4A for a spell's fire up close): the port draws without compiling them (not ported)
 # The drawing's reading past its own tables into the heap:
 d82a d83c the ceiling's rows' light steps (0000:DC67): the crypt's farthest row reads one entry past its row table, the next heap block's header (as view3d1 leaves row 0 out)

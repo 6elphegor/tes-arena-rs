@@ -1278,6 +1278,41 @@ fn the_state_as_the_original_leaves_it() {
     }
 }
 
+/// The busy cases: hundreds of frames of play each (a crowd at noon, a
+/// fight swung through, a spell cast into a creature, a creature casting,
+/// the wilderness's night encounter, the stairs taken mid-fight, a rest
+/// ended by enemies).
+const BUSY: [&str; 7] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest"];
+
+/// Each busy case's player, frame by frame, as the original's.
+#[test]
+fn busy_play_goes_as_the_originals() {
+    for name in BUSY {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+    }
+}
+
+/// Each busy case's frames leave DGROUP as the original's do, from the
+/// case's start and from the load (`state_case`, `state_load_case`).
+#[test]
+fn busy_play_leaves_the_state_as_the_original() {
+    for name in BUSY {
+        state_case(name);
+        state_load_case(name);
+    }
+}
+
+/// Each busy case's frames change the EMS banks as the original's do
+/// (`state_ems_case`).
+#[test]
+fn busy_play_leaves_the_ems_banks_as_the_original() {
+    for name in BUSY {
+        state_ems_case(name);
+    }
+}
+
 /// The town's welcome (0000:4ACD) keeps what its box covers at the
 /// frame's start (4B18: into the load bank [1030] at offset 0, 0000:965E's
 /// flag 1): the page as the last frame left it, which the view has as the
