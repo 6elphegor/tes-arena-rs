@@ -386,6 +386,9 @@ def serviced(seg, off, script):
         finally:
             a.waits = set()
             a.script = []
+        # The mouse back at the view's centre, where the view's controls
+        # take it to be (the classic controls' centre region, 2826:00F0).
+        a.mouse = (160, 100)
     return do
 
 
