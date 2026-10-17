@@ -93,6 +93,10 @@ pub struct Soft {
     /// original calls there: the square's centre (x, y), the flat's
     /// number, its map word's segment and offset.
     pub creatures: Vec<Creature>,
+    /// 78A8's local [BP-14h] (bits a pixel not 8) as the last row
+    /// compiled by 7A2B left it on the stack: 9546 doesn't set it, and
+    /// the rows' start reads it.
+    odd: u8,
 }
 
 /// A creature's flat the drawing reached (`Soft::creatures`).
@@ -142,7 +146,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new() };
+    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0 };
     r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
@@ -163,10 +167,21 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
 /// the 3D mode draws it; the machine and the page after, and the paths
 /// not ported it reached.
 pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
-    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new() };
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0 };
     r.page.resize(0x10000, 0);
     r.cap_draw(0, ax, cx);
     (r.m, r.page, r.gaps)
+}
+
+/// 0000:78A8 alone (tests/scaler.rs), its rows compiled by the routine
+/// CS:789E names on `m`: the arguments as pushed (x, y, the size drawn,
+/// the shade's offset and segment, the size, bits a pixel, the flags,
+/// the source's offset and segment, the colours' offset and segment),
+/// `odd` the stack's [BP-14h]; onto `page` (the page's segment, 64 KB).
+/// None where it would read the code segment's colours (not ported).
+pub fn scaler_alone(m: &Machine, page: &mut [u8], a: [u16; 14], odd: u8) -> Option<()> {
+    let mut odd = odd;
+    blit_rows(m, page, a[0], a[1], a[2], a[3], (a[5], a[4]), a[6], a[7], a[9], (a[11], a[10]), a[8] as u8, (a[13], a[12]), &mut odd).then_some(())
 }
 
 impl Soft {
@@ -2429,7 +2444,8 @@ impl Soft {
                 self.s8(bx + 0xE, 0xFF);
             }
             if self.g16(bx + 0xF) & 0x20 != 0 {
-                self.gap("C19F: an actor's light");
+                or97(self, 0x20);
+                self.light_rows();
             }
             or97(self, 1);
             let mut ax = self.g8(bx + 0x11) as u16;
@@ -2466,7 +2482,8 @@ impl Soft {
                 self.s16(bx + 0x16, 0x200);
             }
             if self.g16(bx + 0xF) & 0x20 != 0 || f & 0x10 != 0 {
-                self.gap("C16D: a flat's light");
+                or97(self, 0x20);
+                self.light_rows();
             }
             if self.g8(bx + 0xD) & 0x80 == 0 {
                 if self.g16(bx + 0xF) & 4 != 0 {
@@ -2478,7 +2495,8 @@ impl Soft {
         let (x, y, z) = (self.g16(bx), self.g16(bx + 2), self.g16(bx + 4));
         if packed {
             if self.g16(bx + 0xF) & 0x20 != 0 {
-                self.gap("C1EF: a flat's light");
+                or97(self, 0x20);
+                self.light_rows();
             }
             let bp = self.g8(bx + 0xD) as u16;
             self.s16(0xCD9C, bx);
@@ -2492,6 +2510,7 @@ impl Soft {
             } else {
                 self.sprite_packed(x, y, z, dx, bp);
             }
+            self.plain_rows();
             let v = self.g16(0xD43A);
             self.s16(bx + 0x16, v);
             if self.g16(bx + 0xF) & 0x2004 == 0 {
@@ -2510,7 +2529,19 @@ impl Soft {
             self.s16(0xD438, v);
             self.s8(0xCD96, 0);
             self.sprite_raw(x, y, z, dx);
+            self.plain_rows();
         }
+    }
+
+    /// 0000:953E: 78A8's rows compiled by 9546 (`blit`: through the
+    /// light table, the screen's pixel under each), CS:789E.
+    fn light_rows(&mut self) {
+        self.cs16(GENERATOR, LIGHT_ROWS);
+    }
+
+    /// 0000:78A0: 78A8's rows compiled by 7A2B again.
+    fn plain_rows(&mut self) {
+        self.cs16(GENERATOR, PLAIN_ROWS);
     }
 
     /// The flat's place turned and projected (C2F0..C33C, C769..C793):
@@ -2886,11 +2917,153 @@ impl Soft {
         self.m.frames_unpack(seg, si, frame, dseg, doff);
     }
 
-    /// 0000:78A8 (`blit`) onto the page.
+    /// 0000:78A8 (`blit_rows`) onto the page.
     #[allow(clippy::too_many_arguments)]
     fn blit(&mut self, x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) {
-        blit(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+        if !blit_rows(&self.m, &mut self.page, x, y, dw, dh, shade, w, h, flags, src, bpp, map, &mut self.odd) {
+            self.gap("9546: a light flat through 781E's colours");
+        }
     }
+}
+
+/// CS:789E, the routine 78A8 has compile each row: 7A2B (`blit`) or,
+/// after 953E, 9546 (`blit_light`).
+const GENERATOR: u16 = 0x789E;
+const PLAIN_ROWS: u16 = 0x7A2B;
+const LIGHT_ROWS: u16 = 0x9546;
+
+/// 0000:78A8 by the routine CS:789E names (`blit` or `blit_light`),
+/// `odd` its local [BP-14h] as the stack holds it (7A2B sets it, 9546
+/// reads it). False where 9546 would read the code segment through the
+/// colours' table at CS:781E (not ported).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn blit_rows(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16), odd: &mut u8) -> bool {
+    let light = m.mem.r16(0, GENERATOR) == LIGHT_ROWS;
+    if light {
+        return blit_light(m, page, x, y, dw, dh, shade, w, h, flags, src, bpp, map, *odd);
+    }
+    if clip(m, x, y, dw, dh, w, h).is_some() {
+        *odd = (bpp != 8) as u8;
+    }
+    blit(m, page, x, y, dw, dh, shade, w, h, flags, src, bpp, map);
+    true
+}
+
+/// 78A8's steps and clipping (78B2..7955): the place, size and the
+/// scale's start (x, y, dw, dh, fx, fy) and steps (xs, ys); None where it
+/// returns before compiling a row.
+fn clip(m: &Machine, x: u16, y: u16, dw: u16, dh: u16, w: u16, h: u16) -> Option<[u16; 8]> {
+    if dw == 0 {
+        return None;
+    }
+    let xs = ((w & 0xFF) << 8) / dw;
+    if xs <= 4 || dh == 0 {
+        return None;
+    }
+    let ys = ((h & 0xFF) << 8) / dh;
+    if ys <= 4 {
+        return None;
+    }
+    let (mut x, mut y, mut dw, mut dh) = (x, y, dw, dh);
+    let (mut fx, mut fy) = (0u16, 0u16);
+    let d = y.wrapping_sub(m.mem.r16(DS, TOP));
+    if (d as i16) < 0 {
+        dh = dh.wrapping_add(d);
+        if (dh as i16) <= 0 {
+            return None;
+        }
+        y = y.wrapping_sub(d);
+        fy = d.wrapping_mul(ys).wrapping_neg();
+    }
+    let c = y.wrapping_add(dh).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, BOTTOM));
+    if (c as i16) > 0 {
+        dh = dh.wrapping_sub(c);
+        if (dh as i16) <= 0 {
+            return None;
+        }
+    }
+    let d = x.wrapping_sub(m.mem.r16(DS, LEFT));
+    if (d as i16) < 0 {
+        dw = dw.wrapping_add(d);
+        if (dw as i16) <= 0 {
+            return None;
+        }
+        x = x.wrapping_sub(d);
+        fx = d.wrapping_mul(xs).wrapping_neg();
+    }
+    let c = x.wrapping_add(dw).wrapping_sub(1).wrapping_sub(m.mem.r16(DS, RIGHT));
+    if (c as i16) > 0 {
+        dw = dw.wrapping_sub(c);
+        if (dw as i16) <= 0 {
+            return None;
+        }
+    }
+    Some([x, y, dw, dh, fx, fy, xs, ys])
+}
+
+/// 0000:78A8 with its rows compiled by 9546 (953E): each source byte
+/// (8 bits whatever `bpp`, the rows `bpp` x `w` bits apart) and the
+/// screen's pixel under it pick the pixel from the table at the shade's
+/// segment, less 10h where the 0s are left out (9546 takes it from the
+/// argument), at byte x 100h + the screen's (the shade's offset unused).
+/// Under 8 bits a pixel with colours, the shade is the colours' where
+/// it has none; else the table made at CS:781E, which isn't ported
+/// (false). The rows start past the scale's whole part unless `odd`
+/// (78A8's [BP-14h], 9546 not setting it).
+#[allow(clippy::too_many_arguments)]
+fn blit_light(m: &Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16), odd: u8) -> bool {
+    let stride = ((bpp as u16 & 0xFF) * (w & 0xFF) + 7) >> 3 & 0xFF;
+    let Some([x, y, dw, dh, fx, fy, xs, ys]) = clip(m, x, y, dw, dh, w, h) else { return true };
+    let mut seg = shade.0;
+    if bpp != 8 && map.0 != 0 {
+        if shade.0 != 0 {
+            return false;
+        }
+        seg = map.0;
+    }
+    let see = flags & 1 != 0;
+    let mirror = flags & 2 != 0;
+    if see {
+        seg = seg.wrapping_sub(0x10);
+    }
+    let mut start = src.1;
+    if odd == 0 {
+        let hi = fx >> 8;
+        start = start.wrapping_add(if mirror { hi.wrapping_neg().wrapping_add(w).wrapping_sub(1) } else { hi });
+    }
+    let mut dest = m.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+    let mut fy = fy;
+    let mut rows = dh as u8;
+    loop {
+        let mut di = dest;
+        let mut si = start.wrapping_add(((fy >> 8) as u8 as u16).wrapping_mul(stride));
+        let mut bx = fx;
+        let mut n = dw;
+        loop {
+            let t = m.mem.r8(src.0, si);
+            if !(see && t == 0) {
+                let under = page[di as usize];
+                page[di as usize] = m.mem.r8(seg, (t as u16) << 8 | under as u16);
+            }
+            n = n.wrapping_sub(1);
+            if n == 0 {
+                break;
+            }
+            di = di.wrapping_add(1);
+            let old = (bx >> 8) as u8;
+            bx = bx.wrapping_add(xs);
+            let delta = ((bx >> 8) as u8).wrapping_sub(old);
+            let delta = if mirror { delta.wrapping_neg() } else { delta };
+            si = si.wrapping_add(delta as i8 as i16 as u16);
+        }
+        dest = dest.wrapping_add(0x140);
+        fy = fy.wrapping_add(ys);
+        rows = rows.wrapping_sub(1);
+        if rows == 0 {
+            break;
+        }
+    }
+    true
 }
 
 /// 0000:78A8: `w` x `h` pixels of `bpp` bits from `src` scaled to
