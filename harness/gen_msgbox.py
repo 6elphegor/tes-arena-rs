@@ -24,6 +24,13 @@ than the screen (`wide`, x negative) has only its head recorded (`h:`
 and the head's digest): the tiles' drawing (9727) writes its rows past
 the page with 32-bit offsets, over the background's own buffer, and the
 pixels are the front end's.
+
+Then 1194:59C8 whole (`Machine::message_shown`, SHOWN), one line a case:
+
+  shown | NAME | FLAGS 5E6 | TEXT | <runs> | <digest> | <heap> | <ems>
+
+what it changed in DGROUP (the digest without the mouse's words, MOUSE),
+the heap's blocks and the 32 EMS banks' digest after.
 """
 import os
 import struct

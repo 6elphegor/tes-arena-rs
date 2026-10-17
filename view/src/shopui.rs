@@ -318,9 +318,6 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-        // 965A drew it (0000:98xx): its codes left in the game's state.
-        let text = m.mem.cstr(DS, si).to_vec();
-        crate::hud::text_codes(m, &text);
     }
     fn haggle(&mut self, m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         let (quality, mood) = (m.mem.r8(DS, 0x13CA), m.mem.r8(DS, 0x13CB));
@@ -386,9 +383,6 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-        // 965A drew it (0000:98xx): its codes left in the game's state.
-        let text = m.mem.cstr(DS, si).to_vec();
-        crate::hud::text_codes(m, &text);
     }
     fn stock_list(&mut self, m: &mut Machine, seg: u16, si: u16, cx: u16) -> u16 {
         let mut entries = Vec::new();
@@ -480,9 +474,6 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-        // 965A drew it (0000:98xx): its codes left in the game's state.
-        let text = m.mem.cstr(DS, si).to_vec();
-        crate::hud::text_codes(m, &text);
     }
     /// 1194:65FD: the name at DS:`si` (581A) edited in place on the
     /// spellmaker's screen, in ARENAFNT.DAT ([102C]) and colour A0h.
@@ -509,9 +500,6 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
-        // 965A drew it (0000:98xx): its codes left in the game's state.
-        let text = m.mem.cstr(DS, si).to_vec();
-        crate::hud::text_codes(m, &text);
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {

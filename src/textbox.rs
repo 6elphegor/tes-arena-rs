@@ -334,6 +334,23 @@ impl Machine {
         Some(())
     }
 
+    /// 0000:4B02..4B21: the town's welcome: the file named at 130C
+    /// (ENTERCTY.$$$) loaded by its path in the save's folder (25FD:0844,
+    /// 7428) to 1044, then its box (965E: CX 7, DX 5, centred, what it
+    /// covers kept at the frame's start, [9030]:0, in the bank the caller
+    /// mapped, [1030]). AX and BX are what came before leaves: the load's
+    /// offset and the bank (4AFB). The page's showing (946A) and the wait
+    /// for a key (1194:5532) are the front end's. None where the file
+    /// can't be loaded.
+    pub fn town_welcome_box(&mut self, files: &mut crate::bsa::Files, screen: Option<&[u8]>) -> Option<()> {
+        let path = self.save_path(0x130C);
+        let (_, off) = self.file_load(files, path, DS, 0x1044)?;
+        let bank = self.mem.r16(DS, 0x1030);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.message_box((DS, 0x1044), (off, bank), 7, 5, (frame, 0), (0, 0), screen)?;
+        Some(())
+    }
+
     /// 1194:59C8 whole: the box shown (`message_wait_box`) and, unless 5E0
     /// bit 800h, once the front end's wait for a click or a key (1194:5536)
     /// is over, put away (`message_box_closed`). The mouse's reads on the
