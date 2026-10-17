@@ -95,6 +95,9 @@ enum Place {
     Dungeon,
     Crypt,
     Street,
+    /// The street with its zone's weather rain (`wet_street`), or snow.
+    WetStreet,
+    SnowStreet,
     Wild,
     /// The main quest dungeon 39699021.MIF, whose start sees a square's
     /// cap.
@@ -161,6 +164,14 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
         Place::Fogged => into_named(&mut a, b"40516921.MIF"),
         Place::Street => area_left(&mut a),
+        Place::WetStreet | Place::SnowStreet => {
+            // gen_worldframes.py's `weathered`: the zone's weather (A5A
+            // + the zone at A51) rain (2) or snow (3) as the guild is left.
+            let w = if matches!(place, Place::WetStreet) { 2 } else { 3 };
+            let zone = a.engine.m.mem.r8(DS, arena::weather::var::ZONE) as u16;
+            a.engine.m.mem.w8(DS, arena::weather::var::ZONE_WEATHER + zone, w);
+            area_left(&mut a)
+        }
         Place::Wild => into_wild(&mut a),
     }
     a.fade.clear();
@@ -485,7 +496,10 @@ fn case(name: &str) -> Option<Case> {
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playbolt" => (Place::Street, Box::new(|a: &mut App| storm(a, 0, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playfog" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playfogfirst" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 0, |_| false))),
         "playcap" => (Place::Capped, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playrain" => (Place::WetStreet, Box::new(|a: &mut App| at_square(a, 89, 41, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playsnow" => (Place::SnowStreet, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playwild" => (Place::Wild, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
@@ -608,7 +622,7 @@ fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
 /// original's renderer draws them.
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playdungeon", "playdown", "playcap", "playfog"] {
+    for name in ["playdungeon", "playdown", "playcap", "playfog", "playfogfirst"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -622,7 +636,7 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
 /// every pixel as the original's renderer draws them.
 #[test]
 fn the_streets_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playstreet", "playsky", "playnight", "playbolt"] {
+    for name in ["playstreet", "playsky", "playnight", "playbolt", "playrain", "playsnow"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }

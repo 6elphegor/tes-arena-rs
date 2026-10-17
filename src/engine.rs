@@ -295,7 +295,7 @@ impl Engine {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
             m.moon_phases(files)?;
-            let (p, gaps) = crate::render::draw(m, page);
+            let (p, gaps) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
             *page = p;
             self.page_gaps = gaps;
         }
@@ -348,11 +348,13 @@ impl Engine {
             match m.mem.r8(DS, 0xBB09) {
                 0x82 => {
                     if !hooks.step(m, Step::Snow) {
+                        m.snow_drops(self.page.as_deref_mut())?;
                         hooks.snow(m);
                     }
                 }
                 0x81 => {
                     if !hooks.step(m, Step::Rain) {
+                        m.rain_drops(self.page.as_deref_mut())?;
                         hooks.rain(m);
                     }
                 }

@@ -198,6 +198,12 @@ CASES = {
     # Out of the city's gate into the wilderness (`wild`), its first
     # frames, nothing held: the wild's 3D view (fields, the sky).
     'playwild': ('wild', None, [((), (), 3, None)]),
+    # The street in rain, two squares short of a puddle (flat 60 at row
+    # 91, column 41): the rainy INF's flats that mirror the sky (CDA1 bit
+    # 2), each drawn then 0000:E37F over it.
+    'playrain': ('wetstreet', at_square(89, 41, 0), [((), (), 3, None)]),
+    # The street in snow: 0000:E26B's flakes over the view.
+    'playsnow': ('snowstreet', None, [((), (), 3, None)]),
     # At night in a thunderstorm, a bolt forced at the circle's angle 0,
     # ahead: its second frame (2294:05A6, 0000:78A8) over the sky's flash.
     'playbolt': ('street', storm(0, 0), [((), (), 1, None)]),
@@ -213,6 +219,9 @@ CASES = {
     # frames, nothing held: its fog (2294:0B01, the view filled to the
     # horizon with the background colour, only the player's light).
     'playfog': ('fogged', None, [((), (), 3, None)]),
+    # Its first frame: the fog's step making FOG.LGT's table (2294:0C36,
+    # 0BEF's load) in the middle of the drawing, after the floor's half.
+    'playfogfirst': ('fogged', None, []),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -223,6 +232,22 @@ def street(a, base):
     a.restore(base)
     assert a.area_ended() == ('world',), 'the guild not left'
     return a.snapshot()
+
+
+def weathered(w):
+    """`street`, but its zone's weather (A5A + the zone at A51) `w` as the
+    guild is left, so 0000:0F05 makes the street's weather from it (2
+    rain, 3 snow) and its INF the weather's."""
+    def enter(a, base):
+        a.restore(base)
+        zone = a.mu.mem_read(a.lin(a.ds, 0x0A51), 1)[0]
+        a.mu.mem_write(a.lin(a.ds, 0x0A5A + zone), bytes([w]))
+        assert a.area_ended() == ('world',), 'the guild not left'
+        return a.snapshot()
+    return enter
+
+
+wet_street = weathered(2)
 
 
 def wild(a, base):
@@ -338,7 +363,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []

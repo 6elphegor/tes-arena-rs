@@ -55,6 +55,20 @@ track | playwild | 3 0 1b94 3c 10d4 71
 screen | playwild | 59afeb14759697d7 2376632b30141d5 df87cca47c2f5ed6
 view3d | playwild | 31343b98e7ff2331
 view3d1 | playwild | 3719377fe440be61
+track | playrain | 0 0 14c0 3c 2cc0 0
+track | playrain | 1 0 14c0 3c 2cc0 0
+track | playrain | 2 0 14c0 3c 2cc0 0
+track | playrain | 3 0 14c0 3c 2cc0 0
+screen | playrain | 3e7ebf78489330ab 5d0d9c735e763d48 df87cca47c2f5ed6
+view3d | playrain | 2849ab9fc8fcdf1a
+view3d1 | playrain | 1b14bbafa1382eb9
+track | playsnow | 0 0 1a68 3c 2fa8 71
+track | playsnow | 1 0 1a58 38 2fb8 71
+track | playsnow | 2 0 1a58 3c 2fb8 71
+track | playsnow | 3 0 1a58 3c 2fb8 71
+screen | playsnow | 59afeb14759697d7 5d0d9c735e763d48 df87cca47c2f5ed6
+view3d | playsnow | f8723e1a34f4eeb9
+view3d1 | playsnow | 665b9af2d08fbddd
 track | playbolt | 0 0 1a68 3c 2fa8 0
 track | playbolt | 1 0 1a58 38 2fb8 0
 screen | playbolt | 3e7ebf78489330ab 5b07ef4aab732f92 df87cca47c2f5ed6
@@ -84,6 +98,10 @@ track | playfog | 3 0 1b40 3c 440 71
 screen | playfog | 59afeb14759697d7 1531a95ef73343fd df87cca47c2f5ed6
 view3d | playfog | e24d64b19f73cd2
 view3d1 | playfog | cceb72a9b1681db5
+track | playfogfirst | 0 0 1b40 3c 440 71
+screen | playfogfirst | 59afeb14759697d7 1531a95ef73343fd df87cca47c2f5ed6
+view3d | playfogfirst | c7c0d3665fb67aa
+view3d1 | playfogfirst | 3fb0a86cfc288de
 track | playlock | 0 0 240 3c 6c0 0
 track | playlock | 1 0 240 3c 6c0 0
 track | playlock | 2 0 240 3c 6c0 0

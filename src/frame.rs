@@ -50,6 +50,11 @@ use var::*;
 
 /// What the frame body leaves to the front end or to code not ported.
 pub trait FrameHooks: WeaponHooks + ClockHooks {
+    /// 0000:4C83, 4DD6: the interface set up again where it changed
+    /// (`Machine::interface_setup`; the bar's drawing is the front end's).
+    fn interface(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
     /// 1194:59C8: a message box with the text at DGROUP `text`.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A36C: the message box of text number [137A].
@@ -366,6 +371,7 @@ impl Machine {
             self.advance_minutes(files, 1, hooks)?;
         }
         self.hurt_flash();
+        hooks.interface(self)?;
         let v = self.mem.r16(DS, 0x0D37);
         self.mem.w16(DS, 0xC394, v);
         let f = self.mem.r16(DS, 0x05CA) & !0x200;
@@ -664,6 +670,164 @@ impl Machine {
             self.mem.w16(DS, si, x);
             let drift = if self.rng.next() & 0x20 != 0 { 0xFFFE } else { 2 };
             self.mem.w16(DS, si.wrapping_add(4), drift);
+            si = si.wrapping_add(6);
+        }
+        Some(())
+    }
+}
+
+impl Machine {
+    /// 0000:4DD6's state, where the interface changed (D39, its bit 80h
+    /// cleared, not 1011): both D39's; 5CA bit 2000h cleared, then set by
+    /// 292B:048F (which draws the staff's pieces' counts); the clip the
+    /// whole screen (9A9C with 0, 0, 140h, C8h: A914..A91E); the rain's
+    /// or snow's drops made again in it (E322, `weather_drops`); 5CA bit
+    /// 8 cleared. The bar's picture and texts are the front end's.
+    pub fn interface_setup(&mut self) -> Option<()> {
+        let al = self.mem.r8(DS, 0x0D39);
+        if al == self.mem.r8(DS, 0x1011) {
+            return Some(());
+        }
+        let al = al & 0x7F;
+        self.mem.w8(DS, 0x1011, al);
+        self.mem.w8(DS, 0x0D39, al);
+        let f = self.mem.r16(DS, 0x05CA) & !0x2000;
+        self.mem.w16(DS, 0x05CA, f | 0x2000);
+        for (o, v) in [(0xA91Eu16, 0x140u16), (0xA91C, 0xC8), (0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
+            self.mem.w16(DS, o, v);
+        }
+        self.weather_drops()?;
+        let f = self.mem.r16(DS, 0x05CA) & !8;
+        self.mem.w16(DS, 0x05CA, f);
+        Some(())
+    }
+
+    /// 0000:E1A2. The rain's 60 drops (4 bytes at E05E: x, y) moved and
+    /// drawn: a drop at or left of the view's left + 8, or at or below
+    /// its bottom - 8 (unsigned), comes back (a roll: with bit 40h at the
+    /// right edge (A918) at a row of the roll mod the view's height less
+    /// 14h, not offset by its top; else along the top at a column of the
+    /// roll mod its width) and is looked at again; one in view falls by
+    /// the speed (E05C, set from E05A before the first; from the 20th on
+    /// E058's, from the 40th E056's, the count going down from 3Ch) and
+    /// left by half of it, and is drawn where it was, a streak of eight
+    /// pixels of 67h stepping a pixel left every other row, into `page`
+    /// (the page's segment, A900) where there is one. None where the view
+    /// has no width or height (the original divides by zero).
+    pub fn rain_drops(&mut self, mut page: Option<&mut [u8]>) -> Option<()> {
+        let r = |m: &Machine, a: u16| m.mem.r16(DS, a);
+        let v = r(self, 0xE05A);
+        self.mem.w16(DS, 0xE05C, v);
+        let mut si = 0xE05Eu16;
+        let mut cx = 0x3Cu16;
+        loop {
+            let (x, y) = (r(self, si), r(self, si.wrapping_add(2)));
+            if x <= r(self, 0xA914).wrapping_add(8) || y >= r(self, 0xA91A).wrapping_sub(8) {
+                let v = self.rng.next();
+                if v & 0x40 != 0 {
+                    let h = r(self, 0xA91A).wrapping_sub(r(self, 0xA916)).wrapping_sub(0x14);
+                    if h == 0 {
+                        return crate::giveup::original("0000:E25D: the view has no height: the original divides by zero");
+                    }
+                    self.mem.w16(DS, si.wrapping_add(2), v % h);
+                    let right = r(self, 0xA918);
+                    self.mem.w16(DS, si, right);
+                } else {
+                    let w = r(self, 0xA918).wrapping_sub(r(self, 0xA914));
+                    if w == 0 {
+                        return crate::giveup::original("0000:E23E: the view has no width: the original divides by zero");
+                    }
+                    let x = (v % w).wrapping_add(r(self, 0xA914));
+                    self.mem.w16(DS, si, x);
+                    let top = r(self, 0xA916);
+                    self.mem.w16(DS, si.wrapping_add(2), top);
+                }
+                continue;
+            }
+            let di = r(self, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+            let speed = r(self, 0xE05C);
+            self.mem.w16(DS, si.wrapping_add(2), y.wrapping_add(speed));
+            self.mem.w16(DS, si, x.wrapping_sub(speed >> 1));
+            if let Some(p) = page.as_deref_mut() {
+                for k in [0u16, 0x140, 0x27F, 0x3BF, 0x4FF, 0x63E, 0x77E, 0x8BE] {
+                    if let Some(px) = p.get_mut(di.wrapping_add(k) as usize) {
+                        *px = 0x67;
+                    }
+                }
+            }
+            si = si.wrapping_add(4);
+            let v = if cx < 0x14 {
+                r(self, 0xE056)
+            } else if cx < 0x28 {
+                r(self, 0xE058)
+            } else {
+                r(self, 0xE05A)
+            };
+            self.mem.w16(DS, 0xE05C, v);
+            cx -= 1;
+            if cx == 0 {
+                return Some(());
+            }
+        }
+    }
+
+    /// 0000:E26B. The snow's 100 flakes (6 bytes at E05E: x, y, drift)
+    /// moved and drawn: a flake at or left of the view's left, at or
+    /// right of its right, or at or below its bottom - 4 (unsigned) comes
+    /// back (a roll: its drift 2, or -2 with bit 20h; a column of the
+    /// same roll mod the view's width along its top) and is looked at
+    /// again; one in view is drawn where it was in colour 10h (the first
+    /// 20, counting down from 64h, as 2 x 2; the next 30 as 2 x 2; the
+    /// last 50 as one pixel) into `page` where there is one, falls by its
+    /// band's speed (E2BA, E2B8, E2B6) and drifts, the other way on a
+    /// roll under 3A98h. A flake that came back is banded by what the
+    /// original's division left in CX, the view's width, not the count
+    /// (kept). None where the view has no width.
+    pub fn snow_drops(&mut self, mut page: Option<&mut [u8]>) -> Option<()> {
+        let r = |m: &Machine, a: u16| m.mem.r16(DS, a);
+        let mut si = 0xE05Eu16;
+        for count in (1..=0x64u16).rev() {
+            let mut cx = count;
+            loop {
+                let (x, y) = (r(self, si), r(self, si.wrapping_add(2)));
+                if x <= r(self, 0xA914) || x >= r(self, 0xA918) || y >= r(self, 0xA91A).wrapping_sub(4) {
+                    let v = self.rng.next();
+                    let drift = if v & 0x20 != 0 { 0xFFFE } else { 2 };
+                    self.mem.w16(DS, si.wrapping_add(4), drift);
+                    let w = r(self, 0xA918).wrapping_sub(r(self, 0xA914));
+                    if w == 0 {
+                        return crate::giveup::original("0000:E311: the view has no width: the original divides by zero");
+                    }
+                    let x = (v % w).wrapping_add(r(self, 0xA914));
+                    self.mem.w16(DS, si, x);
+                    let top = r(self, 0xA916);
+                    self.mem.w16(DS, si.wrapping_add(2), top);
+                    cx = w;
+                    continue;
+                }
+                let bx = r(self, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+                let (cells, speed): (&[u16], u16) = if cx >= 0x50 {
+                    (&[0, 1, 0x140, 0x141], r(self, 0xE2BA))
+                } else if cx >= 0x32 {
+                    (&[0, 1, 0x140, 0x141], r(self, 0xE2B8))
+                } else {
+                    (&[0], r(self, 0xE2B6))
+                };
+                if let Some(p) = page.as_deref_mut() {
+                    for &k in cells {
+                        if let Some(px) = p.get_mut(bx.wrapping_add(k) as usize) {
+                            *px = 0x10;
+                        }
+                    }
+                }
+                let mut drift = r(self, si.wrapping_add(4));
+                if self.rng.next() < 0x3A98 {
+                    drift = drift.wrapping_neg();
+                }
+                self.mem.w16(DS, si, x.wrapping_add(drift));
+                self.mem.w16(DS, si.wrapping_add(2), y.wrapping_add(speed));
+                break;
+            }
             si = si.wrapping_add(6);
         }
         Some(())
