@@ -971,20 +971,6 @@ fn box_size_in(tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32) -> 
     (w, h, tx, margin + (rh + 1) / 2)
 }
 
-/// The box 965A draws for the text `text` with CX 7 (the town's welcome,
-/// 0000:4B21): sized as `box_size` in the boxes' font, centred in the
-/// clip (A914..A91A, flags 2 and 4). (x, y, width, height); None before
-/// the game's style is loaded.
-pub fn centred_box(m: &arena::machine::Machine, text: &[u8]) -> Option<(u16, u16, u16, u16)> {
-    let st = STYLE.get()?;
-    let (w, h, _, _) = box_size(st, &st.box_font, &lines(text, 0));
-    let (w, h) = (w as u16, h as u16);
-    let r = |at| m.mem.r16(arena::mem::DS, at);
-    let x = (r(0xA918).wrapping_add(r(0xA914)) >> 1).wrapping_sub(w >> 1);
-    let y = (r(0xA91A).wrapping_add(r(0xA916)) >> 1).wrapping_sub(h >> 1);
-    Some((x, y, w, h))
-}
-
 /// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them:
 /// a line ended by a CR (`lines` leaves an empty span at its end) centred
 /// on the box, a last one without from the text's x.

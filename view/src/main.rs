@@ -190,6 +190,8 @@ use std::time::{Duration, Instant};
 thread_local! {
     /// The load bank as the town's welcome left it (`town_welcome`).
     static WELCOME_KEPT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+    /// DGROUP as the town's welcome box left it (`town_welcome`).
+    static WELCOME_BOX: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// The front end's hooks. With the sprites (`sheet`, animations at
@@ -215,16 +217,24 @@ struct Front<'a> {
 }
 
 impl Front<'_> {
-    /// A message box with the text at DS:`si`; 965A's drawing (0000:98xx)
-    /// leaves its colour and font codes in the game's state
-    /// (`hud::text_codes`).
+    /// 1194:59C8: a message box with the text at DS:`si`, shown (`show`)
+    /// and what it leaves in the game's state (`Machine::message_shown`:
+    /// the box laid out, its background kept, the dissolve, put away
+    /// after the player's click unless 5E0 bit 800h).
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
+        self.show(m, si);
+        if m.message_shown((arena::mem::DS, si), self.shown).is_none() {
+            eprintln!("the message box gave up: {}", arena::giveup::describe());
+        }
+    }
+
+    /// The box with the text at DS:`si` kept for the window (`dialog`), or
+    /// printed.
+    fn show(&mut self, m: &mut arena::machine::Machine, si: u16) {
         match self.talk.as_deref_mut() {
             Some(t) => t.message_box(m, si),
             None => println!("{}", String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, si)).replace('\r', "\n")),
         }
-        let text = m.mem.cstr(arena::mem::DS, si).to_vec();
-        hud::text_codes(m, &text);
     }
 
     /// A menu (1194:020E): 3159:0F2A draws its title (DS:`si`) and its
@@ -469,23 +479,23 @@ impl arena::frame::FrameHooks for Front<'_> {
         }
     }
     /// 0000:4ACD's welcome: ENTERCTY.$$$ (named at 130C, the arrival's
-    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in a box,
-    /// what the box covers kept at the frame's start (0000:4B18) as the
-    /// original keeps it: the page then, the screen last shown (the
-    /// cursor, which the original takes off the page between frames, is
-    /// never on the view's).
+    /// text, `Machine::travel_arrival`) loaded to 1044 and shown in its
+    /// box (`Machine::town_welcome_box`), what the box covers kept at the
+    /// frame's start (0000:4B18) as the original keeps it: the page then,
+    /// the screen last shown (the cursor, which the original takes off
+    /// the page between frames, is never on the view's).
     fn town_welcome(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
-        if m.file_load(files, 0x130C, arena::mem::DS, 0x1044).is_some() {
-            if let Some(rect) = hud::centred_box(m, m.mem.cstr(arena::mem::DS, 0x1044)) {
+        if m.town_welcome_box(files, self.shown).is_some() {
+            // What it kept, as the box's wait for a key has it (the
+            // frame's interface set-up after loads the condition's
+            // picture over it, 4DD6 with D39 bit 80h).
+            #[cfg(test)]
+            {
                 let frame = m.mem.r16(arena::mem::DS, 0x9030);
-                m.box_background(frame, 0, rect, self.shown);
-                // What it kept, as the box's wait for a key has it (the
-                // frame's interface set-up after loads the condition's
-                // picture over it, 4DD6 with D39 bit 80h).
-                #[cfg(test)]
                 WELCOME_KEPT.with(|k| *k.borrow_mut() = Some(m.mem.segment(frame).to_vec()));
+                WELCOME_BOX.with(|k| *k.borrow_mut() = Some(m.mem.segment(arena::mem::DS).to_vec()));
             }
-            self.message_box(m, 0x1044);
+            self.show(m, 0x1044);
         }
     }
     /// 1194:DB6C with the view's own talk hooks.
@@ -2010,8 +2020,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     let run = &mut run;
     let assets = Assets::new(dir, &mut engine);
     // The texts' style from the start, as the window has it: the boxes
-    // the turns show are sized in it (the welcome's keeps what it covers,
-    // `hud::centred_box`).
+    // the turns show are drawn in it.
     hud::init_style(&assets.archive, &engine.m);
     // Shots play nothing; with --sound-log they print what would play.
     let audio = audio::Audio::new(assets.archive.clone(), false, SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed));

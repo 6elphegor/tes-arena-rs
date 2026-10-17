@@ -14,6 +14,11 @@ last frame left it: its digest, and the box's place, are the line, for
 view/src/worldtest.rs's `the_welcome_keeps_the_screen_as_the_original`.
 
 Lines:  welcome | street | x y w h | fnv(header and rows)
+        welcomebox | street | <words A836..A858> <ADB6> <ADB8> | <929E's line>
+
+the second the message box's working words as 965E leaves them (its
+place, AX and BX, as what came before leaves them) and the line it laid
+out last, for `the_welcome_box_as_the_original_lays_it`.
 """
 
 import os
@@ -55,6 +60,12 @@ def main():
     x, y, w, h = struct.unpack('<4H', kept[:8])
     with open(OUT, 'w') as out:
         out.write(f'welcome | street | {x & 0x7FFF:x} {y:x} {w:x} {h:x} | {fnv(kept[:8 + w * h]):x}\n')
+        # The text's segment (A846) is DGROUP, 1000h higher here than the
+        # port's.
+        word = lambda o: a.r16(o) - (0x1000 if o == 0xA846 and a.r16(o) == a.ds else 0)
+        words = ' '.join(f'{word(o):x}' for o in [*range(0xA836, 0xA85A, 2), 0xADB6, 0xADB8])
+        line = bytes(a.mu.mem_read(a.lin(a.ds, 0x929E), 0x80)).split(b'\0')[0]
+        out.write(f'welcomebox | street | {words} | {line.hex()}\n')
 
 
 if __name__ == '__main__':
