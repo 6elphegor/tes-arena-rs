@@ -2359,6 +2359,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if let (false, Some(page), true) = (sheet, &engine.page, engine.page_gaps.is_empty()) {
             screen.underlay(page);
         }
+        if !engine.page_gaps.is_empty() {
+            eprintln!("the 3D view is the view's own: not ported {:?}", engine.page_gaps);
+        }
         st.assets.interface.draw(&mut screen, &font, &engine.m);
         if let Some(panel) = &st.panel {
             let equip = panels::load_image(&st.assets.archive, &engine.m, "EQUIP.IMG");
