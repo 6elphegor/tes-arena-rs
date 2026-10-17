@@ -256,7 +256,7 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     // The harness's last frame, run again with the page's writes watched
     // (gen_worldframes.py `play`): the page it leaves is the case's. (The
     // guild's case runs none.)
-    if !matches!(place, Place::Guild) {
+    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 {
         d.frame(&mut a);
     }
     Some((a, seen, save))
@@ -934,6 +934,16 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 4, &INFORMANT_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playdeath" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // gen_worldframes.py's `killed`: health 0, 2686:02B4; the
+            // frame that ends the world loop for it, and the view's way on
+            // (`App::area_next`: the outer loop's death, 0000:0CE1..0D43).
+            let m = &mut a.engine.m;
+            m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+            m.player_dies();
+            d.frame(a);
+        })),
         "playguild" => (Place::Loaded, Box::new(|a: &mut App| {
             room(a);
             seeded(a);
@@ -1546,6 +1556,21 @@ fn busy_play_leaves_the_ems_banks_as_the_original() {
     for name in BUSY_STATE {
         state_ems_case(name);
     }
+}
+
+/// The player killed in the dungeon (`playdeath`): the frame that ends the
+/// world loop, then the outer loop's death (0000:0CE1..0D43, the save's
+/// F77 9: no vision) as the view takes it on (`App::area_next`): the
+/// player's frames, DGROUP from the case's start and from the load, and
+/// the EMS banks, as the original leaves them at the death's RET.
+#[test]
+fn a_death_leaves_the_state_as_the_original() {
+    let (place, setup, play) = case("playdeath").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playdeath"), "playdeath: the player's frames differ from the original's");
+    state_case("playdeath");
+    state_load_case("playdeath");
+    state_ems_case("playdeath");
 }
 
 /// The town's welcome (0000:4ACD) keeps what its box covers at the

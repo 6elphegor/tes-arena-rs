@@ -372,6 +372,43 @@ def message_up(a):
     return a.r16(0x061E) != 0
 
 
+def killed(a):
+    """The player's health 0 and 2686:02B4 run, as a blow that kills runs
+    it (2EBD:04D6 on the player): 5B1 bit 100h, the area left (C398 bit
+    80h), the effects and spells on the player cleared."""
+    a.w16(0x01A4 + 0x59, 0)
+    a.call_far(0x2686, 0x02B4)
+
+
+def died(a):
+    """From the world loop's end (0000:A45D, on the world's stack as
+    `area_ended` goes on from it) through the outer loop (0CAD) to its
+    death's way out (0CE1..0D43: the clip the screen, the ending's text
+    picked, 1194:D459's vision unless F77 is 9, the save's), stopped at its
+    RET (0D43), before the program's main takes the game back to its menu
+    (0000:10B0, 108B)."""
+    ss, sp, words = a.world_stack
+    a.mu.mem_write(a.lin(ss, sp), words)
+    saved = a.stub(location=False)
+    at = a.lin(LOAD_SEG, 0x0D43)
+
+    def out(mu, addr, size, _):
+        a.waiting = ('died',)
+        mu.emu_stop()
+    h = a.mu.hook_add(UC_HOOK_CODE, out, None, at, at)
+    try:
+        r = a.run_screen(0, 0xA45D, stack=(ss, sp))
+    finally:
+        a.mu.hook_del(h)
+        a.unstub(saved)
+    assert r == ('died',), f'the death went on to {r}'
+    # The dying frame's tick: the harness ticks the timer (0151) at the
+    # frame's waits for it (0000:A428, A43D), which a frame that ends the
+    # world loop leaves before; the timer ticks all the same (the view's
+    # frames tick before the frame).
+    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+
+
 def serviced(seg, off, script):
     """A building's services run as its keeper's click runs them (the
     table at 869F: 1194:F48E the equipment store's, A73E the mages'
@@ -587,6 +624,11 @@ CASES = {
     # weapon bought, an item sold, one repaired (STORE_SCRIPT), thirty
     # frames on.
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
+    # The dungeon, two frames, the player killed (`killed`) and the frame
+    # that ends the world loop for it, the outer loop's death followed to
+    # its way back to the program's menu (`died`; the save's F77 is 9: no
+    # vision).
+    'playdeath': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True})]),
     # In the mages' guild the load leaves (`guild`), a slot free and
     # seeded: two frames, a potion bought (GUILD_SCRIPT), thirty frames.
     # In the town's first tavern with the main quest's informant there
@@ -746,6 +788,13 @@ def play(a, name, steps, tracks):
         if let_go:
             a.keys_held(let_go, down=False)
         why, _ = a.world_frames(n, until=until, each=each)
+        if opts.get('dies'):
+            # (`dies`: the frames end the world loop, the player dead: the
+            # outer loop's death followed, `died`; the case ends there.)
+            assert why == ('ended',), f'{name}: stopped by {why}'
+            died(a)
+            page = a.page()
+            return page, page, bytes([1]) * 64000, bytes(a.dac)
         assert why == ('frames',), f'{name}: stopped by {why}'
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
