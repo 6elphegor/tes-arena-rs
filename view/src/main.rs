@@ -1352,7 +1352,6 @@ fn main() {
     let play = !MUTE.load(std::sync::atomic::Ordering::Relaxed);
     // The 3D view drawn by the original's renderer (`arena::render`), or
     // with --gpu-world by the view's own polygons, for comparison.
-    let mut engine = engine;
     if !GPU_WORLD.load(std::sync::atomic::Ordering::Relaxed) {
         engine.page = Some(vec![0; 64000]);
     }
@@ -3010,8 +3009,10 @@ impl App {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
             self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
             // The original's 3D view (the engine's page) under the
-            // interface, over the view's own world.
-            if let (false, Some(page)) = (sheet, &self.engine.page) {
+            // interface, over the view's own world; where the renderer
+            // reached a path not ported (outdoors, the sky, water...),
+            // the view's own world shows instead.
+            if let (false, Some(page), true) = (sheet, &self.engine.page, self.engine.page_gaps.is_empty()) {
                 self.screen.underlay(page);
             }
             self.assets.interface.draw(&mut self.screen, &self.font, &self.engine.m);

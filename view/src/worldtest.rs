@@ -341,9 +341,11 @@ fn the_3d_view_measured_against_the_originals() {
     }
 }
 
+type Play = Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>;
+type Case = (Place, Box<dyn FnOnce(&mut App)>, Play);
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
-fn case(name: &str) -> Option<(Place, Box<dyn FnOnce(&mut App)>, Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>)> {
-    type Play = Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>;
+fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
         Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
