@@ -149,7 +149,13 @@ impl Watch {
         let m = &engine.m;
         let r = |at| m.mem.r16(DS, at);
         let (w, d) = (r(0xC357), r(0xC359));
-        let (col, row) = (r(X) >> 7, r(Y) >> 7);
+        // The place the physics moves (BA62, BA66), not the eye's (C3D0,
+        // C3D4), which each frame moves back along the heading after it:
+        // with the player's back to a wall the eye is in the wall's square
+        // (and a save keeps the eye, which a load makes the place,
+        // 0000:AA18..AA33, so the next frame's eye goes further: seed 132
+        // from the save, frame 3781).
+        let (col, row) = (r(0xBA62) >> 7, r(0xBA66) >> 7);
         if w != 0 && d != 0 && (col >= w || row >= d) {
             return Some(format!("off the map: square ({col}, {row}) of {w} x {d}"));
         }
@@ -322,6 +328,34 @@ fn to_dungeon_block(engine: &mut Engine, dice: &mut Dice) -> bool {
     true
 }
 
+/// A test aid after `to_dungeon_block`: the player, standing in a solid
+/// wall (bit 15 clear, the bytes alike), moved to the centre of the
+/// nearest free square (its word 0). Whether moved.
+fn off_wall(engine: &mut Engine) -> bool {
+    let m = &engine.m;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let (w, d) = (m.mem.r16(DS, 0xC357).min(128) as i32, m.mem.r16(DS, 0xC359).min(128) as i32);
+    let word = |c: i32, r: i32| m.mem.r16(walls, (r as u16) << 8 | (c as u16) << 1);
+    let (c0, r0) = ((m.mem.r16(DS, X) >> 7) as i32, (m.mem.r16(DS, Y) >> 7) as i32);
+    let v = word(c0, r0);
+    if v == 0 || v & 0x8000 != 0 || v >> 8 != v & 0xFF {
+        return false;
+    }
+    for ring in 1..w.max(d) {
+        for r in r0 - ring..=r0 + ring {
+            for c in c0 - ring..=c0 + ring {
+                if (r - r0).abs().max((c - c0).abs()) == ring && (0..w).contains(&c) && (0..d).contains(&r) && word(c, r) == 0 {
+                    engine.m.mem.w16(DS, X, (c as u16) << 7 | 0x40);
+                    engine.m.mem.w16(DS, Y, (r as u16) << 7 | 0x40);
+                    placed(engine);
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// A wilderness dungeon's entrances: the walls plane's flats (top nibble
 /// 8) of the dungeon's flat number (C943, KEEPER_FLAT: 217B:05C2's wall
 /// 8000h | [C943]; 1194:DDCE enters on a click within two squares).
@@ -364,15 +398,20 @@ fn facing(engine: &Engine, pred: impl Fn(u16) -> bool) -> Vec<(u16, u16, u16)> {
 
 /// The squares of the map the player's square reaches through squares
 /// that aren't solid walls (bit 15 clear and the bytes alike: what the
-/// moves never pass, 0000:FB81): doors and the like taken as passable, a
-/// building's or a gate's front (a trigger wall of alike bytes) not.
+/// moves never pass, 0000:FB81) or triggers (a gate's or a building's
+/// front, 0000:43B1's test: walked into, the area is left): doors and the
+/// like taken as passable. (Through a city's gate a run was put beside
+/// it in the wall's outer row, Greenheights' (8, 0), and walked off.)
 fn reach(engine: &Engine) -> std::collections::HashSet<(u16, u16)> {
     let m = &engine.m;
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     let (w, d) = (m.mem.r16(DS, 0xC357).min(128), m.mem.r16(DS, 0xC359).min(128));
+    let trig: Vec<u8> = (0..0x10).map(|i| m.mem.r8(DS, arena::movement::var::TRIGGERS + i)).filter(|&t| t != 0).collect();
     let open = |c: u16, r: u16| {
         let v = m.mem.r16(walls, r << 8 | c << 1);
-        c < w && r < d && (v & 0x8000 != 0 || v >> 8 != v & 0xFF || v == 0)
+        let alike = v >> 8 == v & 0xFF;
+        let trigger = v != 0 && (v & 0x8000 != 0 || alike) && trig.contains(&(v as u8 & 0x3F));
+        c < w && r < d && !trigger && (v & 0x8000 != 0 || !alike || v == 0)
     };
     let start = (m.mem.r16(DS, X) >> 7, m.mem.r16(DS, Y) >> 7);
     let mut seen = std::collections::HashSet::from([start]);
@@ -806,13 +845,17 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         // square's centre: a place on its edge by a wall
                         // (y 500h under a wall's row) is one the moves keep
                         // clear of, and the next step from it went in.
+                        // And one the player's square reaches (`reach`): a
+                        // city's actor by its wall put a run on the edge row
+                        // outside it, and on off Greenheights' map.
                         let walls = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+                        let reach = reach(&engine);
                         let h0 = dice.below(512) as u16;
                         let spot = (0..8u16).map(|k| (h0 + k * 64) & 0x1FF).find_map(|h| {
                             let a = h as f32 / 512.0 * std::f32::consts::TAU;
                             let x = (ax - a.sin() * 150.0).clamp(64.0, w as f32 - 64.0) as u16;
                             let y = (ay - a.cos() * 150.0).clamp(64.0, d as f32 - 64.0) as u16;
-                            (engine.m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1) == 0).then_some((x & !0x7F | 0x40, y & !0x7F | 0x40, h))
+                            (engine.m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1) == 0 && reach.contains(&(x >> 7, y >> 7))).then_some((x & !0x7F | 0x40, y & !0x7F | 0x40, h))
                         });
                         if let Some((x, y, h)) = spot {
                             engine.m.mem.w16(DS, X, x);
@@ -1133,6 +1176,13 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 let left = if wild && left <= 10 { left + 5 } else { left };
                 if left == 15 && wild && dungeon_flats(&engine).is_empty() && to_dungeon_block(&mut engine, &mut dice) {
                     *counts.entry("dungeon block").or_default() += 1;
+                } else if left == 14 && wild {
+                    // The blocks loaded: off a wall the window's middle may
+                    // hold (a tree or a rock), as no move would leave the
+                    // player in one.
+                    if off_wall(&mut engine) {
+                        *counts.entry("off a wall").or_default() += 1;
+                    }
                 } else if left == 13 && (wild || city) {
                     let doors = if wild { dungeon_flats(&engine) } else { trigger_walls(&engine, &[7, 8]) };
                     if !doors.is_empty() {
