@@ -627,6 +627,18 @@ impl arena::rest::RestHooks for Front<'_> {
 /// "How many hours do you wish to rest?" (DGROUP), which 1194:4800 shows.
 const REST_PROMPT: u16 = 0x4984;
 impl EngineHooks for Front<'_> {
+    /// The hook CD1A (2294:0A5D) in a level with fog (CB5C): its first
+    /// step, the fog's (2294:0B01), on the game's memory with the files
+    /// (FOG.LGT, the light table made: `LightState`), as the drawing's
+    /// stage A33E runs it. Outdoors the frame's lights run it
+    /// (`Assets::lights`).
+    fn sky(&mut self, m: &mut arena::machine::Machine) {
+        if m.mem.r8(arena::mem::DS, arena::weather::var::LEVEL_FOG) != 0 {
+            if let Some(light) = self.light.as_deref_mut() {
+                m.fog_step(light);
+            }
+        }
+    }
     /// The original stepped the changed squares it drew: here those
     /// within the view's reach (C394 squares) step, seen or not.
     fn draw(&mut self, m: &mut arena::machine::Machine) {
@@ -1074,7 +1086,9 @@ impl Assets {
         use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
         let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
         if !outdoors {
-            return render::Sky::default();
+            // Indoors no sky, but 71h as the game set it (a level's fog
+            // greys it: 2294:0C36).
+            return render::Sky { lamp: self.light.lamp, ..Default::default() };
         }
         if let Some(name) = m.sky_colours() {
             self.light.colours = Some(name);

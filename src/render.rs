@@ -3034,6 +3034,13 @@ impl Soft {
             }
         }
         self.m.ems_map(first);
+        // The fog's table (2294:0C36, once its bit 80h of CB5C or F81 is
+        // set) is AAA2's with its last two rows the fill colour.
+        if (self.g8(0xCB5C) | self.g8(0x0F81)) & 0x80 != 0 {
+            for i in 0..0x200u16 {
+                self.m.mem.w8(seg, 0xD00 + i, fog);
+            }
+        }
         // A561.
         self.s16(0xCD86, 0);
         self.s16(0xCD88, lights);

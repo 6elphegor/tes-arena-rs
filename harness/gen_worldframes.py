@@ -163,6 +163,13 @@ CASES = {
     # Out of the city's gate into the wilderness (`wild`), its first
     # frames, nothing held: the wild's 3D view (fields, the sky).
     'playwild': ('wild', None, [((), (), 3, None)]),
+    # The main quest dungeon 39699021.MIF entered (`named`), its first
+    # frames, nothing held: its start sees a square's cap.
+    'playcap': ('capped', None, [((), (), 3, None)]),
+    # The main quest dungeon 40516921.MIF entered (`named`), its first
+    # frames, nothing held: its fog (2294:0B01, the view filled to the
+    # horizon with the background colour, only the player's light).
+    'playfog': ('fogged', None, [((), (), 3, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -189,18 +196,28 @@ def wild(a, base):
     return a.snapshot()
 
 
-def crypt(a, base):
-    """The snapshot of the game just inside the Crypt of Hearts, the way
-    the outer loop enters a named level (0000:0993, `Run::Start`): the
-    guild left for the street, then the street left with the next area 2
+def named(name):
+    """The snapshot of the game just inside the named level `name`, the
+    way the outer loop enters one (0000:0993, `Run::Start`): the guild
+    left for the street, then the street left with the next area 2
     (5E6), no interior (D58) and the level's name at 0A36."""
-    a.restore(base)
-    assert a.area_ended() == ('world',), 'the guild not left'
-    a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x02')
-    a.w16(0x0D58, 0)
-    a.mu.mem_write(a.lin(a.ds, 0x0A36), CRYPT + b'\0')
-    assert a.area_ended() == ('world',), 'the crypt not entered'
-    return a.snapshot()
+    def enter(a, base):
+        a.restore(base)
+        assert a.area_ended() == ('world',), 'the guild not left'
+        a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x02')
+        a.w16(0x0D58, 0)
+        a.mu.mem_write(a.lin(a.ds, 0x0A36), name + b'\0')
+        assert a.area_ended() == ('world',), f'{name} not entered'
+        return a.snapshot()
+    return enter
+
+
+crypt = named(CRYPT)
+
+# A main quest dungeon whose start sees a square's cap (0000:CBFF).
+CAPPED = b'39699021.MIF'
+# A main quest dungeon with fog (its INF's, CB5C).
+FOGGED = b'40516921.MIF'
 
 
 def track_line(a, name, frame):
@@ -278,7 +295,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
