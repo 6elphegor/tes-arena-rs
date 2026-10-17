@@ -29,7 +29,9 @@
 //!
 //! The targeted acts also travel (the map opened, a random place or
 //! region clicked, Travel), open the bar's screens (automap, sheet,
-//! logbook, status, camp) and write automap notes. Every turn checks
+//! logbook, status, camp), write automap notes, and make for a
+//! wilderness dungeon (a city's gate, then a dungeon's door, the window
+//! moved onto a dungeon's block when it holds none). Every turn checks
 //! the heap's chain, the EMS bank mapped, the text nesting (6E54,
 //! 3276:7307) back at rest, the dice's seed moving, and DGROUP's file
 //! names intact.
@@ -229,6 +231,47 @@ enum Act {
     /// The automap opened and a note begun where a click falls, its text
     /// typed from the answers.
     Note,
+    /// A wilderness dungeon entered: in a city, out through its gate (city
+    /// triggers 7, 8); in the wild, a dungeon's door (wild triggers 8, 9)
+    /// walked into, the player first moved to a block of the dungeons'
+    /// list (396B's first) when the window holds none.
+    Dungeon,
+}
+
+/// The wall triggers of kinds `kinds` (their wall's low six bits, the
+/// trigger table C917's entries), as `facing` finds them.
+fn trigger_walls(engine: &Engine, kinds: &[u16]) -> Vec<(u16, u16, u16)> {
+    let codes: Vec<u8> = kinds.iter().map(|&k| engine.m.mem.r8(DS, arena::movement::var::TRIGGERS + k)).collect();
+    facing(engine, |w| w != 0 && ((w as i16) < 0 || (w >> 8) as u8 == w as u8) && codes.contains(&(w as u8 & 0x3F)))
+}
+
+/// A test aid, as `Act::Jump` is: the wild's window moved onto a block
+/// of the dungeons' list (217B:05C2's kind 0: 396B's list, the grid in
+/// bank 11h at the buffer's F000h), the player in its middle, the blocks
+/// loaded by the next frame (5C8 bit 40h, as `wild_window` reads it).
+/// Whether one was found.
+fn to_dungeon_block(engine: &mut Engine, dice: &mut Dice) -> bool {
+    use arena::wild::var::{LAST_X, LAST_Y, ORIGIN_X, ORIGIN_Y};
+    let m = &mut engine.m;
+    let list = m.mem.r16(DS, 0x396B);
+    let kinds: Vec<u8> = (0..m.mem.r8(DS, list) as u16).map(|i| m.mem.r8(DS, list.wrapping_add(1 + i))).collect();
+    let mapped = m.mem.r16(DS, arena::level::var::EMS_MAPPED) >> 2;
+    m.ems_map(0x11);
+    let buf = m.mem.r16(DS, arena::mif::var::BUFFER_SEG);
+    let blocks: Vec<(u16, u16)> = (0..63u16).flat_map(|y| (0..63u16).map(move |x| (x, y))).filter(|&(x, y)| kinds.contains(&m.mem.r8(buf, arena::wild::GRID + (y << 6) + x))).collect();
+    m.ems_map(mapped);
+    let Some(&(x, y)) = blocks.get(dice.below(blocks.len().max(1) as u64) as usize) else {
+        return false;
+    };
+    m.mem.w16(DS, ORIGIN_X, x);
+    m.mem.w16(DS, ORIGIN_Y, y);
+    for at in [X, Y, LAST_X, LAST_Y] {
+        m.mem.w16(DS, at, 0x1840);
+    }
+    let v = m.mem.r16(DS, 0x05C8) | 0x40;
+    m.mem.w16(DS, 0x05C8, v);
+    placed(engine);
+    true
 }
 
 /// The squares of the walls plane whose word `pred` takes, each with an
@@ -425,7 +468,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 // As the window does after the game's end (`game_over`): the
                 // main menu's Load on a fresh engine, the start dungeon loaded.
                 (true, Some((sdir, slot))) => {
-                    engine = crate::world::load(dir, "START.MIF");
+                    let mut fresh = crate::world::load(dir, "START.MIF");
+                    fresh.files.disk_from(&engine.files);
+                    engine = fresh;
                     let loaded = crate::load_from(&mut engine, dir, sdir, slot);
                     match loaded {
                         Ok((_, r)) => {
@@ -448,7 +493,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         if left == 0 {
             left = 5 + dice.below(40) as usize;
             act = if tours && dice.below(100) < tours_pc {
-                match dice.below(25) {
+                match dice.below(26) {
+                    25 => Act::Dungeon,
                     22 => Act::Menus,
                     23 => Act::TitleLoad,
                     24 => Act::Palace,
@@ -481,6 +527,9 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             if let Act::Door | Act::Stairs | Act::Talk | Act::Shop(_) | Act::Quest | Act::Cast | Act::Xp | Act::Items | Act::Die | Act::Travel | Act::Screens | Act::Note | Act::Menus | Act::TitleLoad | Act::Palace = act {
                 left = 12;
             }
+            if let Act::Dungeon = act {
+                left = 16;
+            }
         }
         left -= 1;
         n += 1;
@@ -507,6 +556,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::Menus => "menus",
             Act::TitleLoad => "title load",
             Act::Palace => "palace",
+            Act::Dungeon => "dungeon",
         };
         // A test aid, as --do hp is: the player healed when below a third,
         // so a run goes on past its fights.
@@ -922,7 +972,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             Act::TitleLoad => {
                 if let (11, Some((sdir, _)), Some(slot)) = (left, saves, last_menu_slot) {
                     let archive = st.assets.archive.clone();
-                    let fresh = crate::world::load(dir, "START.MIF");
+                    let mut fresh = crate::world::load(dir, "START.MIF");
+                    fresh.files.disk_from(&engine.files);
                     let (mut ui, mut e) = crate::saveui::SaveUi::open(crate::saveui::Kind::TitleLoad, &fresh, sdir, &archive);
                     if let crate::saveui::Ended::Open = e {
                         e = ui.click(160, 4 + slot as i32 * 14 + 3, false);
@@ -948,6 +999,24 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             issues.set(issues.get() + 1);
                         }
                     }
+                }
+            }
+            Act::Dungeon => {
+                let wild = matches!(*run, arena::transit::Run::Wild);
+                let city = matches!(*run, arena::transit::Run::City);
+                if left == 15 && wild && trigger_walls(&engine, &[8, 9]).is_empty() && to_dungeon_block(&mut engine, &mut dice) {
+                    *counts.entry("dungeon block").or_default() += 1;
+                } else if left == 13 && (wild || city) {
+                    let doors = trigger_walls(&engine, if wild { &[8, 9] } else { &[7, 8] });
+                    if !doors.is_empty() {
+                        let d = doors[dice.below(doors.len() as u64) as usize];
+                        stand(&mut engine, d);
+                        *counts.entry(if wild { "dungeon door found" } else { "gate found" }).or_default() += 1;
+                    }
+                } else if left == 12 || left == 11 {
+                    st.clicked = crate::centre_click(&mut engine, &mut st.boxes);
+                } else if left <= 9 {
+                    intent.forward = 256;
                 }
             }
             Act::Palace => {

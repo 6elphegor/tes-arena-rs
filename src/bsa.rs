@@ -87,6 +87,17 @@ impl Files {
         Ok(files)
     }
 
+    /// The game directory as `other` left it: the files it wrote and
+    /// deleted. The original's writes go to disk and outlive a return to
+    /// the title screen (a load from the main menu, a new game), so a
+    /// fresh engine for one carries them on (a city's wilderness blocks,
+    /// wild00N.rmd, written at its gate and read on the way back out of a
+    /// building there).
+    pub fn disk_from(&mut self, other: &Files) {
+        self.written = other.written.clone();
+        self.deleted = other.deleted.clone();
+    }
+
     /// A file the game wrote, by DOS name (its last component).
     pub fn written(&self, name: &[u8]) -> Option<&[u8]> {
         self.written.get(&Self::base(name).to_ascii_uppercase()).map(|d| &d[..])

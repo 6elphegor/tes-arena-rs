@@ -1935,7 +1935,9 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
             st.over = true;
             print_message(engine, &mut st.message);
             let c = create::Creation::ending(engine, st.assets.archive.clone(), dir, st.assets.palette, None);
-            st.ui = Some((c, world::load(dir, "START.MIF")));
+            let mut fresh = world::load(dir, "START.MIF");
+            fresh.files.disk_from(&engine.files);
+            st.ui = Some((c, fresh));
             return Some(());
         }
         *run = next?;
@@ -2927,7 +2929,9 @@ impl App {
         let archive = self.assets.archive.clone();
         let mut c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette, None);
         c.faded();
-        self.engine = world::load(&self.dir, "START.MIF");
+        let mut fresh = world::load(&self.dir, "START.MIF");
+        fresh.files.disk_from(&self.engine.files);
+        self.engine = fresh;
         self.creation = Some(c);
         self.movie_at = Instant::now();
     }
@@ -3362,7 +3366,9 @@ impl App {
             arena::options::OptionsEnd::NewGame => {
                 let archive = self.assets.archive.clone();
                 let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
-                self.engine = world::load(&self.dir, "START.MIF");
+                let mut fresh = world::load(&self.dir, "START.MIF");
+                fresh.files.disk_from(&self.engine.files);
+                self.engine = fresh;
                 self.creation = Some(c);
                 self.movie_at = Instant::now();
             }
