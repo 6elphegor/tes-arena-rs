@@ -126,7 +126,7 @@ impl Watch {
         }
     }
 
-    fn check(&mut self, engine: &Engine) -> Option<String> {
+    fn check(&mut self, engine: &Engine, outdoors: bool) -> Option<String> {
         let m = &engine.m;
         let r = |at| m.mem.r16(DS, at);
         let (w, d) = (r(0xC357), r(0xC359));
@@ -164,10 +164,14 @@ impl Watch {
         if (tl, sl) != (self.text_level, self.sub_level) {
             return Some(format!("text nesting left at {tl}, substitutions at {sl} (rest {}, {})", self.text_level, self.sub_level));
         }
+        // The dice still for 2000 turns outdoors (once a streak). Indoors
+        // that is the original's too: a quiet interior's frames take no
+        // rolls (the save's guild, 40 frames standing and 40 walking,
+        // keep 91F6 as it is under the harness).
         if m.rng.seed == self.seed {
             self.same += 1;
-            if self.same >= 2000 {
-                return Some(format!("the dice stuck: seed {:#x} for {} turns", self.seed, self.same));
+            if self.same == 2000 && outdoors {
+                return Some(format!("the dice stuck: seed {:#x} for 2000 turns outdoors", self.seed));
             }
         } else {
             self.seed = m.rng.seed;
@@ -353,7 +357,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             }
         }
         let w = watch.get_or_insert_with(|| Watch::new(engine));
-        if let Some(o) = w.check(engine) {
+        let outdoors = matches!(run, arena::transit::Run::City | arena::transit::Run::Wild);
+        if let Some(o) = w.check(engine, outdoors) {
             if last_odd.as_ref() != Some(&o) {
                 println!("ODD frame {n} ({what}): {o}; {}", place(engine, run));
                 issues.set(issues.get() + 1);
