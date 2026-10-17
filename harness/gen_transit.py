@@ -22,7 +22,7 @@ registers: 1194:D459 AX, SI, DI at FFB0..FFB4, 1194:3AE8 AX at FFB6,
 0000:28BC BX, AX at FFB8, FFBA, 0000:0AA9 SI at FFBC (and CD32, CD4E at
 FFC4, FFC6), 0000:1793 AX at
 FF92. 26F7:0000 and 217B:0058 return the carry from FFDE bits 0 and 1;
-25CA:01E6 returns FFC0.
+25CA:01E6 (the creature slots marked usable) returns FFC0.
 
   transit | seed | result
 

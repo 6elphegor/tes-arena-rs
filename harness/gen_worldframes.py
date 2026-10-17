@@ -162,6 +162,22 @@ def volcanic(heading, dx, dy):
     return put
 
 
+# How far along +z (north) of the dungeon's start the ghost is put.
+GHOST_AHEAD = 0x100
+
+
+def ghost(a):
+    """A ghost (type Ch, 1194:8CEE's remapped: CCC2's rows E00h and F00h
+    9Eh) brought by a quest's encounter (1194:89A7: one at level 1,
+    placed near the player), put GHOST_AHEAD north of the start's place
+    (down the corridor there) and faced (heading 0): drawn through the
+    light table (0000:953E, 78A8's rows by 9546)."""
+    a.call_near(0x1194, 0x89A7, cx=1, ax=0xC, bx=1)
+    a.w16(0x0C57 + 4, a.r16(0xC3D4) + GHOST_AHEAD)
+    a.w16(0x0C57, a.r16(0xC3D0))
+    a.w16(0xC3DA, 0)
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -247,6 +263,9 @@ CASES = {
     # Its first frame: the fog's step making FOG.LGT's table (2294:0C36,
     # 0BEF's load) in the middle of the drawing, after the floor's half.
     'playfogfirst': ('fogged', None, []),
+    # The dungeon with a ghost brought near and faced (`ghost`), one
+    # frame: its flat drawn through the light table (0000:953E).
+    'playghost': ('dungeon', ghost, [((), (), 1, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 

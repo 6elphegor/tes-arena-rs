@@ -498,6 +498,19 @@ fn the_3d_view_measured_against_the_originals() {
 type Play = Box<dyn FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)>;
 type Case = (Place, Box<dyn FnOnce(&mut App)>, Play);
 
+/// gen_worldframes.py's `ghost`: a ghost (type Ch, remapped: drawn
+/// through the light table, 0000:953E) brought by a quest's encounter
+/// (1194:89A7, one at level 1), put 100h north of the start and faced.
+fn ghost(a: &mut App) {
+    use arena::encounter::var::CREATURE_SLOTS;
+    let e = &mut a.engine;
+    e.m.quest_encounter(&mut e.files, &mut arena::encounter::NoFightHooks, 1, 0xC, 1).expect("a ghost brought");
+    let (x, z) = (e.m.mem.r16(DS, 0xC3D0), e.m.mem.r16(DS, 0xC3D4));
+    e.m.mem.w16(DS, CREATURE_SLOTS + 4, z.wrapping_add(0x100));
+    e.m.mem.w16(DS, CREATURE_SLOTS, x);
+    e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -510,6 +523,7 @@ fn case(name: &str) -> Option<Case> {
     };
     Some(match name {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
@@ -538,7 +552,7 @@ fn case(name: &str) -> Option<Case> {
 fn the_3d_view_drawn_as_the_original_draws_it() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild", "playcap", "playfog"] {
+    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild", "playcap", "playfog", "playghost"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -641,7 +655,7 @@ fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
 /// original's renderer draws them.
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
-    for name in ["playdungeon", "playdown", "playcap", "playfog", "playfogfirst"] {
+    for name in ["playdungeon", "playdown", "playcap", "playfog", "playfogfirst", "playghost"] {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }

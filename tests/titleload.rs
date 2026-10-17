@@ -55,7 +55,7 @@ impl AreaHooks for Count {
     fn location(&mut self, m: &mut Machine, _id: u16) {
         count(m, 0xFFEE);
     }
-    fn music(&mut self, m: &mut Machine) -> u16 {
+    fn slots_usable(&mut self, m: &mut Machine) -> u16 {
         count(m, 0xFFF8);
         0
     }

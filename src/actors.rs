@@ -294,7 +294,7 @@ impl Machine {
     /// 6270) of a half bank on (0FFF: 8000h a half, else a bank each),
     /// the file's size kept at its +4Ah; with `cx` a bank (not negative)
     /// one more file there at `ax`.
-    fn actor_graphics(&mut self, files: &mut Files, si: u16, bx: u16, cx: u16, ax: u16) -> Option<()> {
+    pub(crate) fn actor_graphics(&mut self, files: &mut Files, si: u16, bx: u16, cx: u16, ax: u16) -> Option<()> {
         self.mem.w16(DS, 0xA83A, cx);
         self.mem.w16(DS, 0xA83C, ax);
         // The `@` (repne scasb over 0Dh bytes, DI one back).

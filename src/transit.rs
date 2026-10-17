@@ -149,9 +149,10 @@ pub trait AreaHooks {
     fn border(&mut self, _m: &mut Machine) {}
     /// 25FD:034B and 0000:16F7 (5C8 bit 4: a saved game's level).
     fn restore_level(&mut self, _m: &mut Machine) {}
-    /// 25CA:01E6: the music's number.
-    fn music(&mut self, _m: &mut Machine) -> u16 {
-        0
+    /// 25CA:01E6: how many creature slots are marked usable (4000h,
+    /// `Machine::usable_creature_slots`): 8 with no fight under way.
+    fn slots_usable(&mut self, m: &mut Machine) -> u16 {
+        m.usable_creature_slots()
     }
     /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`), then
     /// 2294:0428's colours for the weather.
@@ -527,7 +528,8 @@ impl Machine {
     }
 
     /// 2294:025B. The 3D mode set: the hands' frame (1947) and C38C 0,
-    /// 2294:0006 (the frame count, a saved game's level, the music; the
+    /// 2294:0006 (the frame count, a saved game's level, the townspeople's
+    /// graphics where no creature slot is taken; the
     /// world loop's hooks: C3A4 the actors, C3A8 the frame, C3B0 the
     /// entry 0000:4632, C3B4 the input 2826:0002, C3AC 0000:4470, C3B8
     /// 44D7, CD6E 51B8, CD1A the sky 2294:0A5D, CD22, CD26, CD2A the
@@ -562,7 +564,7 @@ impl Machine {
             self.and16(0x05C8, 0xFFFB);
             self.mem.w16(DS, 0xBA78, 0);
         }
-        if hooks.music(self) == 8 && self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
+        if hooks.slots_usable(self) == 8 && self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
             hooks.townsfolk_graphics(self);
         }
         let v = self.mem.r8(DS, 0x0D39) | 0x80;
