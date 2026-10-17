@@ -84,6 +84,7 @@ pub mod sound;
 pub mod spell;
 pub mod spellmaker;
 pub mod spellpage;
+pub mod start;
 pub mod status;
 pub mod squares;
 pub mod staffend;

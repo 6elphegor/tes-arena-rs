@@ -1427,7 +1427,10 @@ fn main() {
     }
     let dir = PathBuf::from(&args[1]);
     let started = Instant::now();
-    let mut engine = prof::time("start.load", || world::load(&dir, &args[2]));
+    // A save loaded as the program starts: the game as the original reaches
+    // its title (`world::boot`), no level of the view's own.
+    let title = load_at_start && new_game.is_none() && create_script.is_none();
+    let mut engine = prof::time("start.load", || if title { world::boot(&dir) } else { world::load(&dir, &args[2]) });
     // The music driver loads at the program's start (2F9F:01C7, 035B),
     // before the first area picks a song.
     if SOUND_LOG.load(std::sync::atomic::Ordering::Relaxed) || (!MUTE.load(std::sync::atomic::Ordering::Relaxed) && !NO_MUSIC.load(std::sync::atomic::Ordering::Relaxed)) {
@@ -1452,9 +1455,12 @@ fn main() {
             }
             arena::transit::Run::Start
         }
+        (None, None) if title => arena::transit::Run::Start,
         (None, None) => areas::start(&mut engine, args[2].starts_with("CITY:"), !load_at_start),
     };
-    interface::start(&mut engine.m);
+    if !title {
+        interface::start(&mut engine.m);
+    }
     if load_at_start {
         let save = save_dir.as_deref().expect("--load needs --save-dir");
         // A save loaded as the program starts is the title's Load (0000:117E).
