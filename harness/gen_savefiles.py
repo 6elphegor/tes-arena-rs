@@ -36,6 +36,15 @@ loadstate):
 
   loadplace | NAME | <seed> | <digest>
 
+and for the cases saved outdoors (FRAMES: the street's and the
+wilderness's entry finishes in the loop's first frames, 0000:4B84's
+0390 relighting the sky), the world loop run on from that load, nothing
+held (`load_frames`): at the top of each frame after the first, DGROUP's
+digest (loadexclude.txt's and stateexclude.txt's offsets 0) and the EMS
+banks 0..1Fh's (64K each, end to end):
+
+  loadframe | NAME | <frame> | <DGROUP digest> <EMS digest>
+
 The files are taken to the port's form first (`canonical`): SAVEGAME's
 level block (DGROUP BB08.., FD00h on in the file) holds segments of the
 image (the level's hooks, C3A4..C3BB), which the harness's load puts
@@ -57,8 +66,10 @@ for view/src/screentest.rs's `screen`, which checks each screen's files
 against these (none where a screen has no lines).
 
 With --dump DIR, each file as written (in that form): DIR/NAME.play/<file>
-and DIR/NAME.save/<file>, DIR/NAME.screen/<file> (game data: never commit
-them).
+and DIR/NAME.save/<file>, DIR/NAME.screen/<file>; the load's DGROUP as
+NAME.loadds, and each frame's after it, raw, as NAME.loadds<frame> and
+NAME.loadems<frame> (view/src/savetest.rs writes its own beside them;
+game data: never commit them).
 """
 import os
 import shutil
@@ -68,6 +79,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 import struct
 from emu import DGROUP, LOAD_SEG, fnv
+from unicorn import UC_HOOK_CODE
 from screens import ScreenArena
 import gen_dungeonscreens as gd
 import gen_screens as gs
@@ -148,6 +160,13 @@ def canonical(segs, name, data, no_ceiling):
 ON = {'storesteal': [('click', 0xA0, 0x64)]}
 
 
+# The cases loaded back outdoors, and the world frames run after their
+# load (`load_line`): the street's and the wilderness's entry (the sky's
+# colours, the dither) is made in the loop's first frame, past where the
+# load stops.
+FRAMES = {'savestreet': 3, 'savewild': 3}
+
+
 def load_line(exe, game, save, name, saved, skip, dump=None):
     """The save just made loaded back from the title, by a game started
     afresh on a folder of the save's files and what the save wrote (as
@@ -167,11 +186,44 @@ def load_line(exe, game, save, name, saved, skip, dump=None):
         b.start(5)
         seed = struct.unpack('<I', b.mu.mem_read(b.lin(b.ds, SEED), 4))[0]
         ds = bytes(b.mu.mem_read(b.lin(b.ds, 0), 0x10000))
+        frames = []
+        if name in FRAMES:
+            frames = load_frames(b, FRAMES[name])
     finally:
         shutil.rmtree(tmp)
     if dump:
         open(os.path.join(dump, f'{name}.loadds'), 'wb').write(bytes(0 if i in skip else v for i, v in enumerate(ds)))
-    return f'loadplace | {name} | {seed:x} | {fnv(bytes(0 if i in skip else v for i, v in enumerate(ds))):x}\n'
+        for k, (fds, fems) in enumerate(frames, 1):
+            open(os.path.join(dump, f'{name}.loadds{k}'), 'wb').write(fds)
+            open(os.path.join(dump, f'{name}.loadems{k}'), 'wb').write(fems)
+    out = f'loadplace | {name} | {seed:x} | {fnv(bytes(0 if i in skip else v for i, v in enumerate(ds))):x}\n'
+    skip_frames = skip | gw.excluded()
+    for k, (fds, fems) in enumerate(frames, 1):
+        out += f'loadframe | {name} | {k} | {fnv(bytes(0 if i in skip_frames else v for i, v in enumerate(fds))):x} {fnv(fems):x}\n'
+    return out
+
+
+def load_frames(b, n):
+    """The world loop run on `n` frames from the load (nothing held, the
+    arrow cursor not drawn: gen_worldframes.py's `run_case`): DGROUP and
+    the EMS banks 0..1Fh at the top of each frame after the first."""
+    b.waits = set()
+    b.script = []
+    b.clicks = []
+    b.mouse = (160, 100)
+    b.buttons = 0
+    def no_cursor(*_):
+        b.w16(0x7A48, 0xFFFF)
+    cursor = b.mu.hook_add(UC_HOOK_CODE, no_cursor, None, b.lin(LOAD_SEG, gw.CURSOR_DRAW), b.lin(LOAD_SEG, gw.CURSOR_DRAW))
+    out = []
+    try:
+        for _ in range(n):
+            why, _ = b.world_frames(1)
+            assert why == ('frames',), f'the frame after the load stopped by {why}'
+            out.append((bytes(b.mu.mem_read(b.lin(b.ds, 0), 0x10000)), b''.join(b.ems_bank(k) for k in range(0x20))))
+    finally:
+        b.mu.hook_del(cursor)
+    return out
 
 
 def files_changed(before, after):

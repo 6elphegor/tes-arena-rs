@@ -10,11 +10,12 @@ use super::*;
 /// The case `name`: into `place`, `setup`, `play`; the files play wrote
 /// against the original's; then the game saved (Esc's options screen,
 /// its Save, the sixth slot's row, "a" and Enter: gen_screens.py's
-/// optionssaved) and the files that wrote against the original's; with
-/// `compare_load`, the save loaded back from the title against the
-/// original's load of its own. With ARENA_SAVEFILES set to a folder of
-/// gen_savefiles.py --dump's, the first bytes that differ are printed.
-fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
+/// optionssaved) and the files that wrote against the original's; the
+/// save loaded back from the title against the original's load of its
+/// own, and outdoors its first frames. With ARENA_SAVEFILES set to a
+/// folder of gen_savefiles.py --dump's, the states are written beside its
+/// dumps.
+fn save_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
     // The 3D view drawn by the engine's renderer, as the window has it (the
     // rows it compiles stay in DGROUP, where the save menu reads its names).
     let page = |a: &mut App| a.engine.page = Some(vec![0; 64000]);
@@ -32,13 +33,8 @@ fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&m
     bad |= check_files(&a, name, "save", &before, &after);
     assert!(!bad, "{name}: the files differ from the original's");
     // The save loaded back from the title, as gen_savefiles.py's
-    // `load_line` loads the original's: DGROUP as the load leaves it.
-    // Outdoors the view makes the area's entry (the hook CD42, 0000:468B:
-    // the sky's colours, the dither) before the first frame, the original
-    // in it, after where the harness stops: not compared there.
-    if !compare_load {
-        return;
-    }
+    // `load_line` loads the original's: DGROUP as the load leaves it, and
+    // where there are `loadframe` lines the world frames run on after it.
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/savefiles.txt")).expect("savefiles.txt");
     let prefix = format!("loadplace | {name} | ");
     let Some(want) = text.lines().find_map(|l| l.strip_prefix(prefix.as_str())) else { panic!("{name}: no loadplace line") };
@@ -51,36 +47,65 @@ fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&m
     clear(&mut d, &mut b);
     let (ds, _) = grab(&b);
     let canon = load_canonical(&dir, &ds);
-    if let Ok(dump) = std::env::var("ARENA_SAVEFILES") {
+    let dump = std::env::var("ARENA_SAVEFILES").ok().map(PathBuf::from);
+    if let Some(dump) = &dump {
         // Beside gen_savefiles.py --dump's NAME.loadds.
-        let _ = std::fs::write(Path::new(&dump).join(format!("{name}.loadds.port")), &canon);
+        let _ = std::fs::write(dump.join(format!("{name}.loadds.port")), &canon);
     }
     assert_eq!(format!("{:x}", fnv(canon)), digest, "{name}: the save loaded back differs from the original's load of its own");
+    // The frames after the load (gen_savefiles.py's `load_frames`): DGROUP
+    // in the original's form, stateexclude.txt's offsets left out as well,
+    // and the EMS banks, at the top of each.
+    let frames: Vec<(usize, &str)> = text
+        .lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split(" | ").collect();
+            (f.len() == 4 && f[0] == "loadframe" && f[1] == name).then(|| (f[2].parse().unwrap(), f[3]))
+        })
+        .collect();
+    let skip = state_excluded();
+    page(&mut b);
+    let mut bad = Vec::new();
+    for (k, want) in frames {
+        d.frame(&mut b);
+        let (ds, banks) = grab(&b);
+        let mut canon = load_canonical(&dir, &ds);
+        canon.iter_mut().zip(&skip).filter(|(_, s)| **s).for_each(|(x, _)| *x = 0);
+        if let Some(dump) = &dump {
+            // Raw, beside gen_savefiles.py --dump's NAME.loadds<k>.
+            let _ = std::fs::write(dump.join(format!("{name}.loadds{k}.port")), &ds);
+            let _ = std::fs::write(dump.join(format!("{name}.loadems{k}.port")), &banks);
+        }
+        if format!("{:x} {:x}", fnv(canon), fnv(banks)) != want {
+            bad.push(k);
+        }
+    }
+    assert!(bad.is_empty(), "{name}: the frames after the save loaded back differ from the original's: {bad:?}");
 }
 
 #[test]
 fn a_save_in_the_guild_writes_the_originals_files() {
-    save_case("saveguild", true, Place::Guild, |_| {}, |_, _, _| {});
+    save_case("saveguild", Place::Guild, |_| {}, |_, _, _| {});
 }
 
 #[test]
 fn a_save_in_the_street_writes_the_originals_files() {
-    save_case("savestreet", false, Place::Street, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+    save_case("savestreet", Place::Street, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
 }
 
 #[test]
 fn a_save_in_the_wilderness_writes_the_originals_files() {
-    save_case("savewild", false, Place::Wild, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+    save_case("savewild", Place::Wild, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
 }
 
 #[test]
 fn a_save_in_a_dungeon_writes_the_originals_files() {
     let (place, setup, play) = case("playdown").unwrap();
-    save_case("savedungeon", true, place, setup, play);
+    save_case("savedungeon", place, setup, play);
 }
 
 #[test]
 fn a_save_in_the_crypt_writes_the_originals_files() {
     let (place, setup, play) = case("playcrypt").unwrap();
-    save_case("savecrypt", true, place, setup, play);
+    save_case("savecrypt", place, setup, play);
 }
