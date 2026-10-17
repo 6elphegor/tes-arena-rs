@@ -263,6 +263,18 @@ fn stand(engine: &mut Engine, (c, r, h): (u16, u16, u16)) {
     engine.m.mem.w16(DS, X, c << 7 | 0x40);
     engine.m.mem.w16(DS, Y, r << 7 | 0x40);
     engine.m.mem.w16(DS, HEADING, h);
+    placed(engine);
+}
+
+/// The player's place written (C3D0's x, height, y) made the player's
+/// own (BA62), as entering the world loop makes it (0000:A2A3): the
+/// frame moves the player from BA62, so a place written to C3D0 alone is
+/// gone by the next turn.
+fn placed(engine: &mut Engine) {
+    for i in 0..3u16 {
+        let w = engine.m.mem.r16(DS, X + 2 * i);
+        engine.m.mem.w16(DS, 0xBA62 + 2 * i, w);
+    }
 }
 
 pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u64, frames: usize, setup: &str, saves: Option<(&Path, u8)>) {
@@ -380,6 +392,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             let v: Vec<u16> = at.split(':').map(|x| x.parse().expect("at:COL:ROW:HEADING")).collect();
             engine.m.mem.w16(DS, X, v[0] << 7 | 0x40);
             engine.m.mem.w16(DS, Y, v[1] << 7 | 0x40);
+            placed(&mut engine);
             engine.m.mem.w16(DS, HEADING, v[2]);
             n += 1;
             alive = turn(&mut engine, st, run, Intent::default(), step, n);
@@ -516,6 +529,15 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
             *counts.entry("rested").or_default() += 1;
         }
         *counts.entry(name).or_default() += 1;
+        // The turns by the kind of area played in.
+        let area = match *run {
+            arena::transit::Run::City => "in city",
+            arena::transit::Run::Wild => "in wild",
+            arena::transit::Run::Dungeon => "in dungeon",
+            arena::transit::Run::Interior(_) => "in interior",
+            _ => "in start",
+        };
+        *counts.entry(area).or_default() += 1;
         // The game's questions answered at random (talk menus, shops,
         // haggles, rests): menu entries 0..5, now and then a number typed.
         while st.answers.len() < 3 {
@@ -566,6 +588,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         if engine.m.mem.r16(walls, r << 8 | c << 1) == 0 {
                             engine.m.mem.w16(DS, X, c << 7 | 0x40);
                             engine.m.mem.w16(DS, Y, r << 7 | 0x40);
+                            placed(&mut engine);
                             break;
                         }
                     }
@@ -582,8 +605,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         stand(&mut engine, d);
                         *counts.entry("door found").or_default() += 1;
                     }
-                } else if left == 9 || left == 5 {
+                } else if left == 10 || left == 9 {
                     st.clicked = crate::centre_click(&mut engine, &mut st.boxes);
+                } else if left <= 7 {
+                    // Then walked into, as 0000:43B1 tests a move: a
+                    // building entered, an interior or a city left (eight
+                    // turns from where `stand` puts the player reach the
+                    // door's square).
+                    intent.forward = 256;
                 }
             }
             Act::Stairs => {
@@ -615,6 +644,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         let a = h / 512.0 * std::f32::consts::TAU;
                         engine.m.mem.w16(DS, X, (ax - a.sin() * 150.0).clamp(64.0, w as f32 - 64.0) as u16);
                         engine.m.mem.w16(DS, Y, (ay - a.cos() * 150.0).clamp(64.0, d as f32 - 64.0) as u16);
+                        placed(&mut engine);
                         engine.m.mem.w16(DS, HEADING, h as u16);
                         *counts.entry("actor found").or_default() += 1;
                     }
