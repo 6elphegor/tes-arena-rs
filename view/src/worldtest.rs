@@ -385,6 +385,8 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
             // its INF has loaded, from the last area's flats: none here.
             a.engine.m.mem.w16(DS, 0xBC8E, 0);
             a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
+            let v = a.engine.m.mem.r16(DS, 0xCCBC).wrapping_add(1);
+            a.engine.m.mem.w16(DS, 0xCCBC, v);
             setup(a)
         }, play) else { return };
         let page = a.engine.page.clone().unwrap();
@@ -452,6 +454,10 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
             // them.
             a.engine.m.mem.w16(DS, 0xBC8E, 0);
             a.engine.m.mem.w16(DS, 0xC8ED, 0xFFFF);
+            // The frame count (CCBC, which picks an animated flat's frame)
+            // stands one ahead in the original from these entries.
+            let v = a.engine.m.mem.r16(DS, 0xCCBC).wrapping_add(1);
+            a.engine.m.mem.w16(DS, 0xCCBC, v);
             setup(a)
         },
         play,
@@ -470,21 +476,22 @@ fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
     Some((want == Some(fnv(three.iter().copied())), same))
 }
 
-/// The dungeon's first frames' 3D view, every pixel as the original's
-/// renderer draws it.
+/// The dungeon's first frames' 3D view, and the second level's after the
+/// stairs, every pixel as the original's renderer draws them.
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
-    let Some((ok, same)) = soft_view("playdungeon") else { return };
-    assert!(ok, "the 3D view differs from the original's ({same:?}% alike)");
+    for name in ["playdungeon", "playdown"] {
+        let Some((ok, same)) = soft_view(name) else { return };
+        assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
+    }
 }
 
-/// The other cases measured (not yet exact: the crypt's farthest ceiling
-/// row reads past the row table, where the original finds what an
-/// earlier area left in its heap; a few rows of its ceiling and a flat
-/// below the stairs differ).
+/// The crypt's measured (not yet exact: its farthest ceiling row reads
+/// past the row table, where the original finds what an earlier area
+/// left in its heap; and five rows of its ceiling differ).
 #[test]
-fn the_other_3d_views_measured() {
-    for name in ["playdown", "playcrypt"] {
+fn the_crypts_3d_view_measured() {
+    for name in ["playcrypt"] {
         if let Some((ok, same)) = soft_view(name) {
             eprintln!("{name}: {} ({same:?}% alike)", if ok { "exact" } else { "differs" });
         }
