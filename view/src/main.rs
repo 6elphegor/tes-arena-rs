@@ -1735,7 +1735,9 @@ fn creature_flats(engine: &mut Engine, hooks: &mut Front<'_>) {
 
 /// The animations a turn played (`dialog::Talk::movies`), made: a text's
 /// lines through the text port (1194:D459), the files from the game's.
-fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>) -> Vec<flc::Movie> {
+/// With `from` (the screen shown and its colours), a movie with text
+/// comes in as 1194:D459 brings it (`Movie::lead_in`).
+fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'static str, Option<u16>, u8)>, from: Option<(&[u8], film::Dac)>) -> Vec<flc::Movie> {
     played
         .into_iter()
         .filter_map(|(name, text, colour)| {
@@ -1759,7 +1761,11 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
                 return Some(flc::Movie::still(flc::Flc::still(px, pal), lines));
             }
             let lines = text.map(|t| create::vision_text(engine, t, colour)).unwrap_or_default();
-            flc::Movie::new(archive, name, lines)
+            let mv = flc::Movie::new(archive, name, lines)?;
+            Some(match (text, from) {
+                (Some(_), Some((shown, dac))) => mv.lead_in(shown, dac),
+                _ => mv,
+            })
         })
         .collect()
 }
@@ -1914,7 +1920,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
     st.audio.after(&mut engine.m);
     let played = std::mem::take(&mut talk.movies);
     let archive = st.assets.archive.clone();
-    st.movies.extend(movies_of(engine, &archive, played));
+    st.movies.extend(movies_of(engine, &archive, played, None));
     st.music.after(&mut engine.m, ticks);
     st.answers = talk.answers;
     if !talk.boxes.is_empty() {
@@ -2090,7 +2096,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             let colour = parts.next().map_or(0x33, |c| u8::from_str_radix(c, 16).expect("--do movie:NAME:TEXT:COLOUR"));
             let name: &'static str = Box::leak(name.to_ascii_uppercase().into_boxed_str());
             let archive = st.assets.archive.clone();
-            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, colour)]));
+            st.movies.extend(movies_of(&mut engine, &archive, vec![(name, text, colour)], None));
             continue;
         }
         if let Some(d) = step.strip_prefix("swing:") {
@@ -3042,7 +3048,9 @@ impl App {
             self.audio.after(&mut self.engine.m);
             let played = std::mem::take(&mut talk.movies);
             let archive = self.assets.archive.clone();
-            self.movies.extend(movies_of(&mut self.engine, &archive, played));
+            let from = Some((&self.assets.shown[..], *self.screen.palette()));
+            let mv = movies_of(&mut self.engine, &archive, played, from);
+            self.movies.extend(mv);
             self.music.after(&mut self.engine.m, ticks);
         } else {
             self.engine.m.songs.clear();

@@ -1739,6 +1739,62 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
     }
 }
 
+/// The main quest's dream after a rest (1194:D3AF, the dream pending:
+/// F76 1, F7A 0) at the player's level byte and dreams' count each of
+/// gen_dream.py's scripts (tests/vectors/dream.txt): the dream asked of the
+/// view's hook (`Front::dream`), and its first movie as the window plays
+/// it (`movies_of` from the screen shown, here cleared in the game's
+/// colours: D459's fade to black in 8, the screen cleared, the movie's
+/// frames with its text), state by state against the original's.
+#[test]
+fn the_dreams_as_the_original_shows_them() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/dream.txt")).expect("tests/vectors/dream.txt");
+    let mut runs: Vec<((u8, u8), Vec<(u64, u64)>)> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["dream", "script", level, f77, _] => runs.push(((level.parse().unwrap(), f77.parse().unwrap()), Vec::new())),
+            ["dream", _, _, _, s, p] => runs.last_mut().unwrap().1.push((u64::from_str_radix(s, 16).unwrap(), u64::from_str_radix(p, 16).unwrap())),
+            _ => {}
+        }
+    }
+    assert!(!runs.is_empty());
+    for ((level, f77), want) in runs {
+        let (mut a, _d) = loaded(&dir, &save);
+        for (at, v) in [(0x01AA, level), (0x0F76, 1), (0x0F77, f77), (0x0F7A, 0)] {
+            a.engine.m.mem.w8(DS, at, v);
+        }
+        let mut talk = dialog::Talk::default();
+        a.engine.m.dream_show(&mut Front { talk: Some(&mut talk), ..Default::default() });
+        let archive = a.assets.archive.clone();
+        let cleared = vec![0u8; 64000];
+        let mut mv = crate::movies_of(&mut a.engine, &archive, std::mem::take(&mut talk.movies), Some((&cleared, a.assets.palette))).into_iter().next().expect("a dream");
+        let mut seen: Vec<(u64, u64)> = Vec::new();
+        let mut ms = 0;
+        while seen.len() < want.len() && ms < 60_000 {
+            let mut s = hud::Screen::new(a.assets.palette);
+            mv.draw(&mut s, &a.font);
+            let st = (fnv(s.indices().iter().map(|&i| i as u8)), fnv(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])));
+            if seen.last() != Some(&st) {
+                if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                    let raw: Vec<u8> = s.indices().iter().map(|&i| i as u8).chain(s.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2])).collect();
+                    std::fs::write(PathBuf::from(d).join(format!("dream{level}-{f77}-{}.view", seen.len())), raw).unwrap();
+                }
+                seen.push(st);
+            }
+            mv.advance(1);
+            ms += 1;
+        }
+        let first = seen.iter().zip(&want).position(|(v, o)| v != o);
+        assert!(first.is_none() && seen.len() == want.len(), "level {level} F77 {f77}: the dream's states differ from the original's at {first:?} ({} seen, {} wanted)", seen.len(), want.len());
+    }
+}
+
 /// The house the staff's end shows last (1194:DA25..DAC4, harness/
 /// gen_house.py, tests/vectors/house.txt): HOUSE.IMG in its own colours,
 /// text 579h's lines drawn one under another from row 32h, centred on
@@ -1756,7 +1812,7 @@ fn the_house_at_the_staffs_end_as_the_original_shows_it() {
     let want = (u64::from_str_radix(f[1], 16).unwrap(), u64::from_str_radix(f[2], 16).unwrap());
     let (mut a, _d) = loaded(&dir, &save);
     let archive = a.assets.archive.clone();
-    let mv = crate::movies_of(&mut a.engine, &archive, vec![("HOUSE.IMG", Some(0x579), 0x5C)]).pop().expect("HOUSE.IMG");
+    let mv = crate::movies_of(&mut a.engine, &archive, vec![("HOUSE.IMG", Some(0x579), 0x5C)], None).pop().expect("HOUSE.IMG");
     let mut s = hud::Screen::new(a.assets.palette);
     mv.draw(&mut s, &a.font);
     if let Ok(d) = std::env::var("ARENA_SCREENS") {
