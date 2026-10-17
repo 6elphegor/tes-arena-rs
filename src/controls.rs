@@ -20,8 +20,8 @@
 //! (8F92, 8F94, in 320 x 200 pixels) and the buttons (AFF9: bit 0 left,
 //! bit 1 right) with `set_mouse`, and the keys (one byte per scan code
 //! at ACB5) with `set_key`. The cursor drawing (0000:541E, 77EC), the
-//! stat bars (2901:00A8) and the view refreshes (0000:DA8A) are the
-//! renderer's. The Logitech CyberMan (2F26, when 8BEC is set) is not
+//! stat bars' pixels (2901:00A8: their state is `ControlHooks::bars`)
+//! and the view refreshes (0000:DA8A) are the renderer's. The Logitech CyberMan (2F26, when 8BEC is set) is not
 //! ported.
 
 use crate::bsa::Files;
@@ -132,6 +132,10 @@ const CENTRE: u16 = 0x077E;
 /// What the controls leave to code not ported here (and, through the
 /// walk, the stairs' hooks).
 pub trait ControlHooks: crate::hooks::StairsHooks {
+    /// 2826:0008, 2901:00A8: the stat bars drawn, the state they leave
+    /// (`Machine::bars_state`: 126C, 9288). Nothing by default, as
+    /// gen_input.py stubs it.
+    fn bars(&mut self, _m: &mut Machine) {}
     /// 2826:0B52: the map square (offset) of the floor under the cursor,
     /// None when there is none: the cursor projected onto the floor
     /// (`Machine::floor_pick`).
@@ -252,6 +256,7 @@ impl Machine {
 
     fn player_frame(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks, intent: Option<&Intent>) -> Option<()> {
         self.mem.w16(DS, CURSOR, 0xFFFF);
+        hooks.bars(self);
         if self.mem.r16(DS, 0x061E) == 0xFFFE {
             self.mem.w16(DS, 0x061E, 0);
         }
@@ -348,8 +353,8 @@ impl Machine {
     /// along the combined direction of `forward` and `strafe` at the
     /// larger of their speeds (the original walks one region's direction
     /// a frame) as if the left button were down, so the acceleration
-    /// builds; going back is at half speed. Nothing moving, the speed is
-    /// 0 at once (as with the keys and the cursor in the centre).
+    /// builds; going back is at half speed. The speed is 0 after, moving
+    /// or not, as the keys with the cursor in the centre leave it.
     fn intent_step(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks, it: &Intent) -> Option<()> {
         // Moving or turning holds 5E0 bit 2000h as the arrow keys do, so
         // the frame body doesn't brake the acceleration.
@@ -382,6 +387,11 @@ impl Machine {
             let r = self.walk(files, hooks, speed, h);
             self.mem.w8(DS, BUTTONS, buttons);
             r?;
+            // As the arrow keys leave it (2826:0473 walks, then the
+            // cursor's handler, the view's centre with no click, puts the
+            // speed to 0: 015C): a fall or a jump after keeps none
+            // (0468, 0226).
+            self.mem.w16(DS, SPEED, 0);
         } else {
             self.mem.w16(DS, SPEED, 0);
         }

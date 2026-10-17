@@ -88,7 +88,8 @@ impl Machine {
     /// buffer [BA54], and with the load bank ([1030]) mapped they are
     /// unpacked by runs into the EMS frame at [902E] (0000:5B3C), which
     /// 78A8 draws twice (the renderer's) before the frame counts on. None
-    /// where the runs never end.
+    /// where the runs never end, or the frame is of no size (78A8 divides
+    /// by it: what the frame unpacked over its own header leaves).
     fn cast_hands(&mut self) -> Option<()> {
         let f = self.mem.r8(DS, CAST_FRAME);
         if (f as i8) < 0 {
@@ -124,6 +125,11 @@ impl Machine {
         let hd = |m: &Machine, o: u16| m.mem.r16(bseg, boff.wrapping_add(o));
         let (w, h, x, y) = (hd(self, 0), hd(self, 2), hd(self, 6), hd(self, 8));
         let bpp = self.mem.r8(bseg, boff.wrapping_add(0xA));
+        if w == 0 || h == 0 {
+            // 78C8..78E7: the steps, 100h times the source's size over
+            // the drawing's, divide by it.
+            return crate::giveup::original("0000:78CB: the casting hands' frame of no size: the scaler divides by 0");
+        }
         crate::render::scaler_rows(self, x, y, w, h, 0, w, h, 1, bpp, bseg);
         crate::render::scaler_rows(self, 0x9F, y, w, h, 0, w, h, 3, bpp, bseg);
         self.mem.w8(DS, CAST_FRAME, f + 1);

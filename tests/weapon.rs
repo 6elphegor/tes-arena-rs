@@ -95,6 +95,19 @@ fn setup(m: &mut Machine, seed: u32) -> Vec<(u16, u16)> {
     m.mem.w16(DS, 0xC3DA, v);
     let v = if s.byte() < 0xE0 { 0x3C } else { 0 };
     m.mem.w16(DS, 0xC3D2, v);
+    // The casting hands' graphic: a size, the runs' width, a place (y a
+    // multiple of 10h: +8 is also 582C's flags), its bits a pixel, its
+    // frames packed at 200h (zeros: runs of one byte).
+    let (wd, ht) = (1 + (s.byte() % 0x40) as u16, 1 + (s.byte() % 0x40) as u16);
+    let (x, y) = (s.word() % 0x160, ((s.byte() % 0xD) as u16) << 4);
+    for (i, v) in [wd, ht, wd, x, y].into_iter().enumerate() {
+        m.mem.w16(HSEG, 2 * i as u16, v);
+    }
+    let v = if s.byte() < 0xC0 { 8 } else { 4 };
+    m.mem.w8(HSEG, 0x0A, v);
+    for f in 0..10u16 {
+        m.mem.w16(HSEG, 0x0C + 2 * f, 0x200);
+    }
     let n = 1 + s.byte() % 12;
     (0..n)
         .map(|_| {
