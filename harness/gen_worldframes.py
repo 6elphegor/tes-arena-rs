@@ -160,6 +160,9 @@ CASES = {
     # The same at ten at night (`night`): the frame's light turns to the
     # night's (0000:0390) and the next frames are drawn by it.
     'playnight': ('street', night(0), [((), (), 3, None)]),
+    # Out of the city's gate into the wilderness (`wild`), its first
+    # frames, nothing held: the wild's 3D view (fields, the sky).
+    'playwild': ('wild', None, [((), (), 3, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
@@ -169,6 +172,20 @@ def street(a, base):
     outer loop's next area the city, 5E6 0)."""
     a.restore(base)
     assert a.area_ended() == ('world',), 'the guild not left'
+    return a.snapshot()
+
+
+def wild(a, base):
+    """The snapshot of the game just outside the city, the way a gate
+    leaves it (0000:43A0, the city's trigger 7 or 8): the guild left for
+    the street, the city written as the wilderness's blocks 1..4
+    (217B:027A, its files kept in memory), the next area 1 (5E6), then
+    the street left."""
+    a.restore(base)
+    assert a.area_ended() == ('world',), 'the guild not left'
+    a.call_far(0x217B, 0x027A)
+    a.mu.mem_write(a.lin(a.ds, 0x05E6), b'\x01')
+    assert a.area_ended() == ('world',), 'the wilderness not entered'
     return a.snapshot()
 
 
@@ -261,7 +278,7 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wild': wild}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []

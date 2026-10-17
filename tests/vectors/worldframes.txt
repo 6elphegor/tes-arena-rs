@@ -48,6 +48,13 @@ track | playnight | 3 0 1a58 3c 2fb8 0
 screen | playnight | 3e7ebf78489330ab e1c74f28bf2d59c8 df87cca47c2f5ed6
 view3d | playnight | 3320707fb810b16d
 view3d1 | playnight | 12411318b04956a7
+track | playwild | 0 0 1b94 3c 10d4 71
+track | playwild | 1 0 1b94 3c 10d4 71
+track | playwild | 2 0 1b94 3c 10d4 71
+track | playwild | 3 0 1b94 3c 10d4 71
+screen | playwild | 59afeb14759697d7 2376632b30141d5 df87cca47c2f5ed6
+view3d | playwild | 31343b98e7ff2331
+view3d1 | playwild | 3719377fe440be61
 track | playlock | 0 0 240 3c 6c0 0
 track | playlock | 1 0 240 3c 6c0 0
 track | playlock | 2 0 240 3c 6c0 0

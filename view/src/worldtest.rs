@@ -59,6 +59,7 @@ enum Place {
     Dungeon,
     Crypt,
     Street,
+    Wild,
 }
 
 /// From the guild to the street, then into the Crypt of Hearts the way
@@ -72,6 +73,17 @@ fn into_crypt(a: &mut App) {
     for (i, &c) in b"41649375.MIF\0".iter().enumerate() {
         m.mem.w8(DS, 0x0A36 + i as u16, c);
     }
+    area_left(a);
+}
+
+/// From the guild to the street, then out of the city's gate the way
+/// its trigger leaves (0000:43A0): the city written as the wilderness's
+/// blocks 1..4 (217B:027A, `wild_leave_city`), the next area 1.
+fn into_wild(a: &mut App) {
+    area_left(a);
+    let e = &mut a.engine;
+    e.m.wild_leave_city(&mut e.files, &mut arena::wild::PortWild);
+    e.m.mem.w8(DS, arena::trigger::var::AREA, 1);
     area_left(a);
 }
 
@@ -106,6 +118,7 @@ fn played(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_crypt(&mut a),
         Place::Street => area_left(&mut a),
+        Place::Wild => into_wild(&mut a),
     }
     a.fade.clear();
     a.fade_old = None;
@@ -150,6 +163,14 @@ fn play_in_a_dungeon_as_the_original_draws_it() {
 fn play_in_the_street_as_the_original_draws_it() {
     let (place, setup, play) = case("playstreet").unwrap();
     world_case("playstreet", place, setup, play);
+}
+
+/// Out of the city's gate into the wilderness, its first frames, nothing
+/// held.
+#[test]
+fn play_in_the_wilderness_as_the_original_draws_it() {
+    let (place, setup, play) = case("playwild").unwrap();
+    world_case("playwild", place, setup, play);
 }
 
 /// The first level's down stairs walked into with the up arrow held from
@@ -403,6 +424,7 @@ fn case(name: &str) -> Option<Case> {
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playwild" => (Place::Wild, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         _ => return None,
@@ -419,7 +441,7 @@ fn case(name: &str) -> Option<Case> {
 fn the_3d_view_drawn_as_the_original_draws_it() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight"] {
+    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -537,6 +559,14 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
+}
+
+/// The wilderness out of the city's gate (its fields, the sky), every
+/// pixel as the original's renderer draws them.
+#[test]
+fn the_wildernesss_3d_view_drawn_as_the_original_draws_it() {
+    let Some((ok, same)) = soft_view("playwild") else { return };
+    assert!(ok, "playwild: the 3D view differs from the original's ({same:?}% alike)");
 }
 
 /// The crypt (the ceiling's dark runs stepped by the EMS frame's segment,
