@@ -36,12 +36,20 @@ impl Machine {
     pub fn rle_unpack(&mut self, seg: u16, off: u16, dst_seg: u16, dst: u16) -> Option<()> {
         let w = self.mem.r16(seg, off.wrapping_add(4));
         let h = self.mem.r16(seg, off.wrapping_add(6));
-        let mut si = off.wrapping_add(0xC);
+        self.rle_runs(seg, off.wrapping_add(0xC), w, h, dst_seg, dst)
+    }
+
+    /// 0000:5B3C (5B65): the runs at seg:si into dst_seg:dst, CX = `cx`
+    /// and DX = `dx` as the caller gives them (5B5C's: the width and the
+    /// height): cx x dx bytes (16 bits) counted, the first run's count
+    /// with DX's high byte (CX after `xchg dx, cx`), as `rle_unpack`.
+    pub fn rle_runs(&mut self, seg: u16, si: u16, cx: u16, dx: u16, dst_seg: u16, dst: u16) -> Option<()> {
+        let mut si = si;
         let mut di = dst;
-        let mut bx = h.wrapping_mul(w);
-        // CX after `xchg dx, cx`: the height; each run's `mov cl, al`
-        // keeps its high byte until a copy or fill leaves CX 0.
-        let mut ch = h & 0xFF00;
+        let mut bx = dx.wrapping_mul(cx);
+        // CX after `xchg dx, cx`: DX; each run's `mov cl, al` keeps its
+        // high byte until a copy or fill leaves CX 0.
+        let mut ch = dx & 0xFF00;
         for _ in 0..0x20000 {
             let al = self.mem.r8(seg, si);
             si = si.wrapping_add(1);
@@ -68,7 +76,7 @@ impl Machine {
                 return Some(());
             }
         }
-        crate::giveup::original("0000:5B5C: an image's runs never bring its count to 0; the original runs on through memory")
+        crate::giveup::original("0000:5B65: an image's runs never bring its count to 0; the original runs on through memory")
     }
 
     /// 0000:5871..58E0 for the image whose header is at seg:off (the
