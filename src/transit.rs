@@ -157,10 +157,15 @@ pub trait AreaHooks {
     /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`), then
     /// 2294:0428's colours for the weather.
     fn hands(&mut self, _m: &mut Machine) {}
-    /// 0000:2631.
-    fn hook_2631(&mut self, _m: &mut Machine) {}
-    /// 0000:5D70: EMS banks freed.
-    fn ems_free(&mut self, _m: &mut Machine) {}
+    /// 0000:2631: a player standing in a solid wall moved to an empty
+    /// square beside it (`Machine::player_unstick`).
+    fn hook_2631(&mut self, m: &mut Machine) {
+        m.player_unstick();
+    }
+    /// 0000:5D70: EMS banks freed but the level's (`Machine::ems_reset`).
+    fn ems_free(&mut self, m: &mut Machine) {
+        m.ems_reset();
+    }
     /// After the world loop (0000:0AD7..0B07): 23F1:013C, the palette
     /// faded to black (5E3E), 4EFD and 946A.
     fn world_screen(&mut self, _m: &mut Machine) {}
