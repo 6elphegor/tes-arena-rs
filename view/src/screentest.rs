@@ -837,6 +837,42 @@ fn area_left(a: &mut App) {
     a.last = Some(arena::engine::Frame::Running);
 }
 
+/// Daggerfall's gates (tests/vectors/gates.txt, gen_gates.py): from the
+/// street, the player on the open square beside each facing it, the gate
+/// picked (CB92) and its trigger run (0000:43B1), the wilderness entered
+/// (`areas::next`): the player's place there, and its square's wall word,
+/// as the original's.
+#[test]
+fn a_gate_leads_out_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/gates.txt")).expect("tests/vectors/gates.txt");
+    let hex = |s: &str| s.split(' ').map(|v| u16::from_str_radix(v, 16).unwrap()).collect::<Vec<_>>();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        let (gate, from, want) = (hex(f[1]), hex(f[2]), (hex(f[3]), u16::from_str_radix(f[4], 16).unwrap()));
+        let (mut a, _d) = loaded(&dir, &save);
+        area_left(&mut a);
+        let m = &mut a.engine.m;
+        let (x, y) = ((from[0] << 7) + 0x40, (from[1] << 7) + 0x40);
+        for (o, v) in [(0xC3D0, x), (0xC3D4, y), (0xC3DA, from[2]), (0xBA62, x), (0xBA66, y)] {
+            m.mem.w16(DS, o, v);
+        }
+        m.mem.w16(DS, arena::controls::var::PICKED, gate[1] << 8 | gate[0] << 1);
+        m.wall_trigger(&mut a.engine.files, &mut DoorHooks::default()).expect("the gate's trigger");
+        assert!(a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "the gate at {gate:?} led nowhere");
+        a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the wilderness");
+        let m = &a.engine.m;
+        let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+        let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+        let wall = m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1);
+        assert_eq!((vec![x, y], wall), want, "the gate at {gate:?}: the place in the wilderness differs from the original's");
+    }
+}
+
 /// The trigger's hooks for a door: the way in's blackout (1194:55B2)
 /// noted, as the window's turn notes it (`Talk::blackout`).
 #[derive(Default)]
