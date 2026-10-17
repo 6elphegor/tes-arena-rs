@@ -2634,16 +2634,40 @@ struct SaveDir<'a> {
 }
 
 impl SaveDir<'_> {
-    fn path(&self, m: &arena::machine::Machine, path: u16) -> PathBuf {
+    fn name(m: &arena::machine::Machine, path: u16) -> String {
         let p = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, path)).into_owned();
-        let name = p.rsplit(['\\', '/']).next().unwrap_or(&p).to_string();
-        self.dir.join(name)
+        p.rsplit(['\\', '/']).next().unwrap_or(&p).to_string()
     }
+    fn path(&self, m: &arena::machine::Machine, path: u16) -> PathBuf {
+        dos_file(self.dir, &Self::name(m, path))
+    }
+}
+
+/// The save folder's file of the DOS name `name`: the one there, whatever
+/// the case of its letters (DOS's names have none; the folder may be on a
+/// file system where they do, and the game's own paths are lower case
+/// where the copies' are upper), else the name in upper case, as DOS
+/// keeps it. Without this a save wrote saveengn.05 beside the working
+/// slot's SAVEENGN.05 copied just before, and a load could find the old.
+fn dos_file(dir: &std::path::Path, name: &str) -> PathBuf {
+    std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        .map(|e| e.path())
+        .unwrap_or_else(|| dir.join(name.to_ascii_uppercase()))
 }
 
 impl arena::save_write::SaveHooks for SaveDir<'_> {
     fn delete(&mut self, m: &arena::machine::Machine, path: u16) {
-        let _ = std::fs::remove_file(self.path(m, path));
+        // Every file of the name, whatever its case (DOS has one).
+        let name = Self::name(m, path);
+        for e in std::fs::read_dir(self.dir).into_iter().flatten().flatten() {
+            if e.file_name().to_string_lossy().eq_ignore_ascii_case(&name) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
     }
     fn write(&mut self, m: &arena::machine::Machine, path: u16, data: &[u8]) {
         let p = self.path(m, path);
@@ -2687,7 +2711,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     engine.m.automap_write(&mut engine.files);
     for name in engine.m.slot_files_out(&mut engine.files) {
         let Some(data) = engine.files.written(&name) else { continue };
-        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        let p = dos_file(dir, &String::from_utf8_lossy(&name));
         if let Err(e) = std::fs::write(&p, data) {
             eprintln!("{}: {e}", p.display());
         }
@@ -2706,7 +2730,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     // slot, an interior's automap loaded.
     for name in engine.m.save_finish(&mut engine.files) {
         let Some(data) = engine.files.written(&name) else { continue };
-        let p = dir.join(String::from_utf8_lossy(&name).into_owned());
+        let p = dos_file(dir, &String::from_utf8_lossy(&name));
         if let Err(e) = std::fs::write(&p, data) {
             eprintln!("{}: {e}", p.display());
         }

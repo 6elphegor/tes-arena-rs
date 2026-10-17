@@ -189,6 +189,10 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
     for o in ROW_CODE..r.rows_end.max(ROW_CODE) {
         m.mem.w8(DS, o, r.m.mem.r8(DS, o));
     }
+    // C398 bit 1, whether the last span the drawing set up ran along x
+    // (0000:AFD6), which a save writes with the level's block.
+    let f = m.mem.r16(DS, 0xC398) & !2 | r.m.mem.r16(DS, 0xC398) & 2;
+    m.mem.w16(DS, 0xC398, f);
     if r.gaps.is_empty() {
         // The player's square's floor (CB5B: 0 dry, 1 water, 2 lava, as
         // the walk finds it, 0000:CDxx), which the game reads after: the

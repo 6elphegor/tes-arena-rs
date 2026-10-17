@@ -13,6 +13,7 @@ save | saveguild | WILD002.05 0 cbf29ce484222325
 save | saveguild | WILD003.05 0 cbf29ce484222325
 save | saveguild | WILD004.05 0 cbf29ce484222325
 savedel | saveguild | 
+loadplace | saveguild | 19b76141 | da3f8f0eb13a59c4
 play | savestreet | TMP2.$$$ fa00 98e7d995733ab27
 playdel | savestreet | 
 save | savestreet | AUTOMAP.05 20040 7b1d25cc3490e935
@@ -29,6 +30,7 @@ save | savestreet | WILD002.05 0 cbf29ce484222325
 save | savestreet | WILD003.05 0 cbf29ce484222325
 save | savestreet | WILD004.05 0 cbf29ce484222325
 savedel | savestreet | 
+loadplace | savestreet | 19b76141 | 6d57db1b4ce25a5
 play | savewild | TMP2.$$$ fa00 9ddbfae4c25ae77f
 play | savewild | WILD001.RMD 183e 1914c477a5ae59e8
 play | savewild | WILD002.RMD 1a56 7c67972d0f120f7c
@@ -49,6 +51,7 @@ save | savewild | WILD002.05 1a56 7c67972d0f120f7c
 save | savewild | WILD003.05 1558 d10265bdb9423ea9
 save | savewild | WILD004.05 1046 3119a9ed52265f8d
 savedel | savewild | 
+loadplace | savewild | 19b76141 | 2e6c50f955d2e7be
 play | savedungeon | AUTOMAP.64 20040 217fd87bed8f0e3d
 play | savedungeon | TMP2.$$$ fa00 98e7d995733ab27
 playdel | savedungeon | 
@@ -67,6 +70,7 @@ save | savedungeon | WILD002.05 0 cbf29ce484222325
 save | savedungeon | WILD003.05 0 cbf29ce484222325
 save | savedungeon | WILD004.05 0 cbf29ce484222325
 savedel | savedungeon | 
+loadplace | savedungeon | 19b76141 | 6cb04d418ab69c0c
 play | savecrypt | TMP2.$$$ fa00 98e7d995733ab27
 playdel | savecrypt | 
 save | savecrypt | AUTOMAP.05 20040 7b1d25cc3490e935
@@ -83,6 +87,7 @@ save | savecrypt | WILD002.05 0 cbf29ce484222325
 save | savecrypt | WILD003.05 0 cbf29ce484222325
 save | savecrypt | WILD004.05 0 cbf29ce484222325
 savedel | savecrypt | 
+loadplace | savecrypt | 19b76141 | fcf1ce276f4cab6a
 screen | sheet | CHARSHET.$$$ fa00 18f6da19f846c98d
 screen | sheet | SAVEFACE.$$$ 21c 167cdb245601327a
 screen | sheet | SCREENSV.$$2 fa00 dd14fcc6528cab25

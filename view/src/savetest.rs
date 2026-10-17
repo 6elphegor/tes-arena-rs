@@ -10,11 +10,15 @@ use super::*;
 /// The case `name`: into `place`, `setup`, `play`; the files play wrote
 /// against the original's; then the game saved (Esc's options screen,
 /// its Save, the sixth slot's row, "a" and Enter: gen_screens.py's
-/// optionssaved) and the files that wrote against the original's. With
-/// ARENA_SAVEFILES set to a folder of gen_savefiles.py --dump's, the
-/// first bytes that differ are printed.
-fn save_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
-    let Some((mut a, _, save)) = played_in(place, setup, play) else { return };
+/// optionssaved) and the files that wrote against the original's; with
+/// `compare_load`, the save loaded back from the title against the
+/// original's load of its own. With ARENA_SAVEFILES set to a folder of
+/// gen_savefiles.py --dump's, the first bytes that differ are printed.
+fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
+    // The 3D view drawn by the engine's renderer, as the window has it (the
+    // rows it compiles stay in DGROUP, where the save menu reads its names).
+    let page = |a: &mut App| a.engine.page = Some(vec![0; 64000]);
+    let Some((mut a, _, save)) = played_in(place, |a| { page(a); setup(a) }, play) else { return };
     let base = BASE_FILES.with(|b| b.borrow().clone()).expect("the load's files");
     let before = files_now(&a, &save);
     let mut bad = check_files(&a, name, "play", &base, &before);
@@ -29,6 +33,12 @@ fn save_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl 
     assert!(!bad, "{name}: the files differ from the original's");
     // The save loaded back from the title, as gen_savefiles.py's
     // `load_line` loads the original's: DGROUP as the load leaves it.
+    // Outdoors the view makes the area's entry (the hook CD42, 0000:468B:
+    // the sky's colours, the dither) before the first frame, the original
+    // in it, after where the harness stops: not compared there.
+    if !compare_load {
+        return;
+    }
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/savefiles.txt")).expect("savefiles.txt");
     let prefix = format!("loadplace | {name} | ");
     let Some(want) = text.lines().find_map(|l| l.strip_prefix(prefix.as_str())) else { panic!("{name}: no loadplace line") };
@@ -50,27 +60,27 @@ fn save_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl 
 
 #[test]
 fn a_save_in_the_guild_writes_the_originals_files() {
-    save_case("saveguild", Place::Guild, |_| {}, |_, _, _| {});
+    save_case("saveguild", true, Place::Guild, |_| {}, |_, _, _| {});
 }
 
 #[test]
 fn a_save_in_the_street_writes_the_originals_files() {
-    save_case("savestreet", Place::Street, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+    save_case("savestreet", false, Place::Street, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
 }
 
 #[test]
 fn a_save_in_the_wilderness_writes_the_originals_files() {
-    save_case("savewild", Place::Wild, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
+    save_case("savewild", false, Place::Wild, |_| {}, |a, d, seen| frames(a, d, seen, 3, |_| false));
 }
 
 #[test]
 fn a_save_in_a_dungeon_writes_the_originals_files() {
     let (place, setup, play) = case("playdown").unwrap();
-    save_case("savedungeon", place, setup, play);
+    save_case("savedungeon", true, place, setup, play);
 }
 
 #[test]
 fn a_save_in_the_crypt_writes_the_originals_files() {
     let (place, setup, play) = case("playcrypt").unwrap();
-    save_case("savecrypt", place, setup, play);
+    save_case("savecrypt", true, place, setup, play);
 }

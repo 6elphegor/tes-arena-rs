@@ -30,8 +30,9 @@ and deleted:
 and that save loaded back from the title by a game started afresh on the
 save's folder with the files the save wrote (`load_line`): the random
 seed it reaches (the harness's clock's, which the view takes) and
-DGROUP's digest, tests/vectors/loadexclude.txt's offsets 0 (as
-gen_worldframes.py's loadstate):
+DGROUP's digest as the load leaves it (at the world loop's first frame),
+tests/vectors/loadexclude.txt's offsets 0 (as gen_worldframes.py's
+loadstate):
 
   loadplace | NAME | <seed> | <digest>
 
@@ -158,13 +159,16 @@ def load_line(exe, game, save, name, saved, skip, dump=None):
         for n in os.listdir(save):
             shutil.copy(os.path.join(save, n), os.path.join(tmp, n))
         for n, d in saved.items():
-            open(os.path.join(tmp, n), 'wb').write(d)
+            # Not the working slot's (*.64: the automap kept, 23F1:0145),
+            # which the view keeps in memory, not in the save's folder.
+            if not n.endswith('.64'):
+                open(os.path.join(tmp, n), 'wb').write(d)
         b = ScreenArena(exe, game, tmp)
         b.start(5)
+        seed = struct.unpack('<I', b.mu.mem_read(b.lin(b.ds, SEED), 4))[0]
         ds = bytes(b.mu.mem_read(b.lin(b.ds, 0), 0x10000))
     finally:
         shutil.rmtree(tmp)
-    seed = struct.unpack_from('<I', ds, SEED)[0]
     if dump:
         open(os.path.join(dump, f'{name}.loadds'), 'wb').write(bytes(0 if i in skip else v for i, v in enumerate(ds)))
     return f'loadplace | {name} | {seed:x} | {fnv(bytes(0 if i in skip else v for i, v in enumerate(ds))):x}\n'

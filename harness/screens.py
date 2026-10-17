@@ -327,7 +327,10 @@ class ScreenArena(DosArena):
         # the environment (1194:3A72: 40h).
         self.mu.mem_write(self.lin(self.ds, 0x1A80), b'\x40')
         self.mu.mem_write(self.lin(self.ds, 0x1A6C), b'\x40')
-        # The title's Load (0000:117E): the game set up (21EE:016C: the
+        # The title's Load (0000:116F): the working slot's files fresh
+        # (25FD:0219: "*.64" deleted, the game's "*.65" copied to them).
+        assert self.run_screen(0x25FD, 0x0219) is None, 'the fresh files waited'
+        # Its set-up (0000:117E): the game set up (21EE:016C: the
         # towns' lists at 1AB5, 1004, 1008, the people's records at 1042,
         # ...) before the load menu.
         assert self.run_screen(0x21EE, 0x016C) is None, 'the setup waited'

@@ -198,6 +198,22 @@ impl Machine {
         dest
     }
 
+    /// 25FD:0844 with DS:SI a name outside DGROUP (a DOS find's, in its
+    /// DTA: 1194:4FA0): its path built as `save_path` builds one.
+    pub fn save_path_of(&mut self, name: &[u8]) -> u16 {
+        let toggle = self.mem.r8(DS, PATH_TOGGLE);
+        let dest = if toggle != 0 { PATH_B } else { PATH_A };
+        let mut di = self.save_append(dest, DIR);
+        self.mem.w8(DS, di, b'\\');
+        for &c in name.iter().take_while(|&&c| c != 0) {
+            di = di.wrapping_add(1);
+            self.mem.w8(DS, di, c);
+        }
+        self.mem.w8(DS, di.wrapping_add(1), 0);
+        self.mem.w8(DS, PATH_TOGGLE, toggle ^ 0xFF);
+        dest
+    }
+
     /// Copies the string at DS:`si` to DS:`di` without its NUL; returns
     /// the offset after it.
     fn save_append(&mut self, mut di: u16, mut si: u16) -> u16 {
