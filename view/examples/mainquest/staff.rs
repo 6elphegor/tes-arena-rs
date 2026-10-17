@@ -396,7 +396,7 @@ pub fn walk(dir: &std::path::Path, save: &str, level: u8) {
     let v: Vec<&str> = save.split(':').collect();
     let (sdir, slot) = (std::path::Path::new(v[0]), v.get(1).map_or(1, |s| s.parse().expect("SLOT")));
     let mut engine = world::load(dir, "START.MIF");
-    areas::start(&mut engine, false);
+    areas::start(&mut engine, false, true);
     let mut run = match areas::load_game(&mut engine, dir, sdir, slot) {
         Ok(r) => r,
         Err(e) => {

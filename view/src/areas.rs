@@ -312,8 +312,11 @@ pub fn new_game_started() {
 }
 
 /// The area the view starts in, as the outer loop would have entered it:
-/// a city (5E6 0) or an interior (4).
-pub fn start(engine: &mut Engine, city: bool) -> Run {
+/// a city (5E6 0) or an interior (4). `town`: the city's entry run (its
+/// buildings listed, its quests made, its song started); not where a save
+/// is loaded straight after, as the title's Load enters no town first (and
+/// would otherwise find the town's song marked playing, 430F).
+pub fn start(engine: &mut Engine, city: bool, town: bool) -> Run {
     NEW_GAME.with(|n| n.set(false));
     let area = if city { 0 } else { 4 };
     // The working slot (1194:3AC5): the view plays from the game's own
@@ -328,7 +331,7 @@ pub fn start(engine: &mut Engine, city: bool) -> Run {
     // the areas after): its buildings listed (1008 the equipment stores,
     // ...) and its quests made. A store's greeting names it from that
     // list (%en).
-    if city && engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
+    if city && town && engine.m.city_entered(&mut engine.files, &mut arena::quest::NoQuestHooks).is_none() {
         eprintln!("the town's quests gave up: {}", arena::giveup::describe());
     }
     // A level begun as an interior: its level hooks (0000:0B15, as an

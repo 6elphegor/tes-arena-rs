@@ -131,7 +131,8 @@ impl Lgts {
 /// keeps, is put back in `m`.
 /// The third: DGROUP's offsets the drawing wrote on its copy (which the
 /// original's, drawing on the machine itself, leaves there), each with its
-/// byte before and after; the fourth
+/// byte before and after (the same where it wrote the machine's own); the
+/// fourth
 /// the creatures' flats it reached (`Soft::creatures`), in order.
 pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
@@ -141,10 +142,11 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         }
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new() };
+    r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
-    let wrote = (0..=0xFFFFu16).filter(|&o| r.m.mem.r8(DS, o) != m.mem.r8(DS, o)).map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
+    let wrote = r.m.mem.written_offsets().into_iter().map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
     if r.gaps.is_empty() {
         // The player's square's floor (CB5B: 0 dry, 1 water, 2 lava, as

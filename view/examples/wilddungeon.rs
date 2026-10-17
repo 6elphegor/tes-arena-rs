@@ -123,7 +123,7 @@ fn main() {
     let a: Vec<String> = std::env::args().collect();
     let dir = Path::new(&a[1]);
     let mut e = world::load(dir, &a[2]);
-    let mut run = areas::start(&mut e, true);
+    let mut run = areas::start(&mut e, true, true);
 
     // A city's gates are its triggers 7 and 8 (898B).
     let trig: Vec<u8> = (0..16).map(|i| e.m.mem.r8(DS, TRIGGERS + i)).collect();
