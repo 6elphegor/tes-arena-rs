@@ -133,10 +133,13 @@ const CENTRE: u16 = 0x077E;
 /// walk, the stairs' hooks).
 pub trait ControlHooks: crate::hooks::StairsHooks {
     /// 2826:0B52: the map square (offset) of the floor under the cursor,
-    /// None when there is none. The original projects the cursor onto
-    /// the floor (0000:DB43); with a new renderer, its pick.
-    fn floor_pick(&mut self, _m: &mut Machine) -> Option<u16> {
-        None
+    /// None when there is none: the cursor projected onto the floor
+    /// (`Machine::floor_pick`).
+    fn floor_pick(&mut self, m: &mut Machine) -> Option<u16> {
+        match m.floor_pick() {
+            Some(v) => v,
+            None => crate::giveup::original("2826:0B52: the floor's projection divides past a word (0000:DB43)"),
+        }
     }
     /// 0000:43B1: a click on a wall may run its trigger (texts, riddles).
     fn wall_trigger(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {

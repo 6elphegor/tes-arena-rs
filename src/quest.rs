@@ -98,9 +98,12 @@ pub trait QuestHooks {
     /// text's box: the mouse's column (0000:9012 halves INT 33h's CX), so
     /// `Machine::level_up_screen(MOUSE_X)`.
     fn finale(&mut self, _m: &mut Machine) {}
-    /// 1194:42EA: the text saying the inventory is full (AX, from 1026)
-    /// written to 19DE, before its message box.
-    fn inventory_full(&mut self, _m: &mut Machine, _ax: u16) {}
+    /// 1194:42EA, before the message box of 19DE's "Your inventory is
+    /// full.": the fonts selected (0000:9AE6 with AX, from 1026, and 9AF8
+    /// with 1036: the front end's) and the colour 9288 60h.
+    fn inventory_full(&mut self, m: &mut Machine, _ax: u16) {
+        m.mem.w8(DS, 0x9288, 0x60);
+    }
     /// 1194:3EC3 (and far 3EBF) with AX `ax`: the buildings of place AL
     /// listed (`Machine::city_info`: the counts at 1387/1389/138B, the
     /// lists at 1AB5/1004/1008). AH matters only for another place (100h

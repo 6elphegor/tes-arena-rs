@@ -102,8 +102,11 @@ pub trait NewGameHooks {
     fn stats_screen(&mut self, _m: &mut Machine) {}
     /// 1194:1695: the attribute screen's palette.
     fn palette(&mut self, _m: &mut Machine) {}
-    /// 0000:5D70, at the end of creation.
-    fn creation_done(&mut self, _m: &mut Machine) {}
+    /// 0000:5D70, at the end of creation: EMS banks freed but the
+    /// level's (`Machine::ems_reset`).
+    fn creation_done(&mut self, m: &mut Machine) {
+        m.ems_reset();
+    }
     /// 2294:11F2, at the end of creation.
     fn game_screen(&mut self, _m: &mut Machine) {}
     /// 2294:01F1: the game's resources loaded (fonts, images; the far

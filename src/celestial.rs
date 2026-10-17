@@ -122,7 +122,7 @@ impl Machine {
 
     /// 0000:93BC. (`ax`, `cx`) turned by `di`: AX = 2c (-sin) + 2a cos,
     /// CX = 2a sin + 2c cos.
-    fn turn_93bc(&self, ax: u16, cx: u16, di: u16) -> (u16, u16) {
+    pub(crate) fn turn_93bc(&self, ax: u16, cx: u16, di: u16) -> (u16, u16) {
         let (sin, cos) = self.trig(di);
         let (a, c) = (ax.wrapping_add(ax), cx.wrapping_add(cx));
         let x = hi(c, negs(sin)).wrapping_add(hi(a, cos));
