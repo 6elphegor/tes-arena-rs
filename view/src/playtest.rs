@@ -772,7 +772,15 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             // No journey: the screen left as Esc leaves it.
                             for _ in 0..4 {
                                 if let Some(t) = open.as_mut() {
-                                    t.key(&mut engine, KeyCode::Escape, None);
+                                    // A main quest's dungeon reached: its
+                                    // picture up until its button is
+                                    // clicked (292B:042B), Esc or not.
+                                    if t.picture_up() {
+                                        t.click(&mut engine, &archive, 0x120, 0xBD, false);
+                                        *counts.entry("quest dungeon pictures").or_default() += 1;
+                                    } else {
+                                        t.key(&mut engine, KeyCode::Escape, None);
+                                    }
                                     t.advance(60_000);
                                 }
                                 crate::travel::after(&mut open, &mut engine, &mut boxes, true);
