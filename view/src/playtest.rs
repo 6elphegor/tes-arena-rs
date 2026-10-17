@@ -709,14 +709,17 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         let si = active[dice.below(active.len() as u64) as usize];
                         let (ax, ay) = (engine.m.mem.r16(DS, si) as f32, engine.m.mem.r16(DS, si + 4) as f32);
                         // A place 150 from it on an open square (no wall
-                        // word there: the moves never stand in one).
+                        // word there: the moves never stand in one), at the
+                        // square's centre: a place on its edge by a wall
+                        // (y 500h under a wall's row) is one the moves keep
+                        // clear of, and the next step from it went in.
                         let walls = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
                         let h0 = dice.below(512) as u16;
                         let spot = (0..8u16).map(|k| (h0 + k * 64) & 0x1FF).find_map(|h| {
                             let a = h as f32 / 512.0 * std::f32::consts::TAU;
                             let x = (ax - a.sin() * 150.0).clamp(64.0, w as f32 - 64.0) as u16;
                             let y = (ay - a.cos() * 150.0).clamp(64.0, d as f32 - 64.0) as u16;
-                            (engine.m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1) == 0).then_some((x, y, h))
+                            (engine.m.mem.r16(walls, (y >> 7) << 8 | (x >> 7) << 1) == 0).then_some((x & !0x7F | 0x40, y & !0x7F | 0x40, h))
                         });
                         if let Some((x, y, h)) = spot {
                             engine.m.mem.w16(DS, X, x);
