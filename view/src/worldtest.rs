@@ -117,6 +117,14 @@ enum Place {
     Capped,
     /// The main quest dungeon 40516921.MIF, with fog.
     Fogged,
+    /// The guild the load leaves, played on as the other places are
+    /// (gen_worldframes.py's `guild`).
+    Loaded,
+    /// The town's first equipment store, in at its door from the street
+    /// (gen_worldframes.py's `building`).
+    Store,
+    /// The town's first tavern, in as the store.
+    Tavern,
 }
 
 /// From the guild to the street, then into the level `name` the way the
@@ -220,7 +228,11 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
     BASE_FILES.with(|b| *b.borrow_mut() = Some(files_now(&a, &save)));
     match place {
-        Place::Guild => {}
+        Place::Guild | Place::Loaded => {}
+        // (The building's words on the way in, 191F, left for its first
+        // frame to show, as the harness's frames show them.)
+        Place::Store => into_words(&mut a, 0x1008),
+        Place::Tavern => into_words(&mut a, 0x1AB5),
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -717,6 +729,82 @@ fn used(a: &mut App, index: u16) {
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
 }
 
+/// gen_worldframes.py's `shopping`: a slot free (`room`), each item worn
+/// to half (`worn`), the seed gen_screens.py's SEED (`seeded`).
+fn shopping(a: &mut App) {
+    room(a);
+    worn(a);
+    seeded(a);
+}
+
+fn seeded(a: &mut App) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+}
+
+/// A step of gen_worldframes.py's STORE_SCRIPT or GUILD_SCRIPT: a click
+/// at (x, y), or a key typed.
+enum Act {
+    Click(i32, i32),
+    Key(KeyCode, &'static str),
+}
+
+/// gen_worldframes.py's ACCEPT and MORE.
+const ACCEPT: Act = Act::Click(110, 133);
+const MORE: Act = Act::Click(297, 172);
+
+/// gen_worldframes.py's STORE_SCRIPT: a weapon bought, an item sold, one
+/// repaired, the store left.
+const STORE_SCRIPT: [Act; 17] = [
+    Act::Click(0xA0, 0x43), Act::Click(0xA0, 0x65), Act::Click(0x70, 0x26), Act::Click(0x70, 0x26), MORE, ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0x5B), Act::Click(0x80, 0x25), Act::Click(0xA0, 0x69), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0x73), Act::Click(0x70, 0x26), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's `informant`: the main quest's informant in this
+/// tavern, offered but not met, ten days and 100 gold; the seed SEED.
+fn informant(a: &mut App) {
+    let m = &mut a.engine.m;
+    let w = m.mem.r16(DS, arena::sidequest::var::TALKER);
+    m.mem.w8(DS, 0x0FDD, 0x0F);
+    m.mem.w16(DS, 0x0FDE, w & 0xFF00 | (w & 0xFF) >> 1);
+    let province = m.mem.r8(DS, 0x0A46);
+    m.mem.w8(DS, 0x0FE3, province);
+    m.mem.w8(DS, 0x0FE6, 2);
+    let now = m.mem.r32(DS, 0x05CC);
+    m.mem.w32(DS, 0x0FE9, now);
+    m.mem.w8(DS, 0x0FED, 10);
+    m.mem.w16(DS, 0x0FEE, 100);
+    seeded(a);
+}
+
+/// gen_worldframes.py's INFORMANT_SCRIPT: the informant's words paged, his
+/// price accepted, the rest paged to the tavern's menu, its Exit.
+const INFORMANT_SCRIPT: [Act; 8] = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, Act::Click(0xA0, 0xA3)];
+
+/// gen_worldframes.py's GUILD_SCRIPT: a potion bought, the guild left.
+const GUILD_SCRIPT: [Act; 8] = [
+    Act::Click(0xA0, 0x46), Act::Click(0xA0, 0x59), Act::Click(0x70, 0x26), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's `serviced`: the building's services (869F's
+/// `kind`) run as its keeper's click runs them, between frames, `script`
+/// answering them; the turn's frame after them counted as the case's next.
+fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, script: &[Act]) {
+    super::super::super::shop_turn(a, kind);
+    for act in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");
+        match *act {
+            Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
+            Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
+        }
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the services still asking");
+    seen.push(state(a));
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -835,6 +923,24 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 5, |_| false);
             used(a, 3);
             frames(a, d, seen, 60, |_| false);
+        })),
+        "playstore" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 6, &STORE_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playinformant" => (Place::Tavern, Box::new(informant), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &INFORMANT_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playguild" => (Place::Loaded, Box::new(|a: &mut App| {
+            room(a);
+            seeded(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 7, &GUILD_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
         })),
         _ => return None,
     })
