@@ -137,19 +137,31 @@ fn differs(a: &Engine, b: &Engine) -> Vec<u16> {
         .collect()
 }
 
+/// The key interrupt's own bookkeeping (0000:718A): the ring of keys
+/// typed, its pointers, count and full flag, the release prefix and the
+/// last key (AC46..ACB4). The window's keys go through it; the scripted
+/// path calls the handlers and has no keyboard, so these are the input's
+/// alone and not compared.
+const KEY_RING: std::ops::Range<u16> = 0xAC46..0xACB5;
+
 fn same(a: &App, b: &App, what: &str) {
-    let d = differs(&a.engine, &b.engine);
+    let mut b_engine = Engine::new(b.engine.m.clone(), b.engine.files.clone());
+    for o in KEY_RING {
+        let v = a.engine.m.mem.r8(arena::mem::DS, o);
+        b_engine.m.mem.w8(arena::mem::DS, o, v);
+    }
+    let d = differs(&a.engine, &b_engine);
     if !d.is_empty() {
         let ds = arena::mem::DS as usize * 16;
         let bytes: Vec<String> = a
             .engine
             .m
             .mem
-            .diff(&b.engine.m.mem, 0..0x10_0000)
+            .diff(&b_engine.m.mem, 0..0x10_0000)
             .iter()
             .take(24)
             .map(|&(i, v)| {
-                let other = b.engine.m.mem.segment((i >> 4) as u16)[i & 15];
+                let other = b_engine.m.mem.segment((i >> 4) as u16)[i & 15];
                 if (ds..ds + 0x10000).contains(&i) { format!("DS:{:04X} {v:02x}/{other:02x}", i - ds) } else { format!("{i:05x} {v:02x}/{other:02x}") }
             })
             .collect();

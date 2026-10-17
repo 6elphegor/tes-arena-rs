@@ -759,7 +759,8 @@ impl crate::engine::Engine {
     /// (0000:A4ED), the buffer block (A516, `buffer_block_alloc`); the
     /// entry hook (C3B0: 0000:4632, `area_entry`); the
     /// level loaded unless its name starts with `#` (a city built, a
-    /// dungeon made) or the hook CD5E is set; the place hook (CD2A:
+    /// dungeon made) or the hook CD5E is set, with RELOAD set (A548: the
+    /// buffer block freed and taken again by each plane); the place hook (CD2A:
     /// 0000:45B2, `area_place`); the INF loaded (0000:EC03); the entered
     /// hook (CD42: 0000:468B, `AreaHooks::entered`).
     ///
@@ -795,7 +796,12 @@ impl crate::engine::Engine {
             return crate::giveup::not_ported("0000:A26F: the level-load hook CD5E set: not ported");
         }
         if m.mem.r8(DS, LEVEL_NAME) != b'#' {
-            m.level_load(&mut self.files, LEVEL_NAME)?;
+            // A548..A550: loaded with RELOAD set, each plane freeing the
+            // buffer block and taking it again from the heap's first fit.
+            m.mem.w8(DS, crate::level::var::RELOAD, 1);
+            let r = m.level_load(&mut self.files, LEVEL_NAME);
+            self.m.mem.w8(DS, crate::level::var::RELOAD, 0);
+            r?;
         }
         let m = &mut self.m;
         if m.mem.r32(DS, PLACE_HOOK) == 0x45B2 {
