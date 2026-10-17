@@ -1407,11 +1407,18 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
+/// The busy cases whose state is compared: all but playscreens, whose
+/// screens the view shows with its own state (the original's automap and
+/// character sheet save the screen to temporary files, 1AEA, 1AF7, 1B47;
+/// fade with the timer's ticks, 0151; and leave their palettes, 99A3,
+/// A3A3, and scratch, 1044, 10A8, 12A4: not ported).
+const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse"];
+
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
 #[test]
 fn busy_play_leaves_the_state_as_the_original() {
-    for name in BUSY {
+    for name in BUSY_STATE {
         state_case(name);
         state_load_case(name);
     }
@@ -1421,7 +1428,7 @@ fn busy_play_leaves_the_state_as_the_original() {
 /// (`state_ems_case`).
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
-    for name in BUSY {
+    for name in BUSY_STATE {
         state_ems_case(name);
     }
 }
