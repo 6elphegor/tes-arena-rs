@@ -60,6 +60,7 @@ fn the_start_as_the_original() {
     let d0 = m.mem.segment(DS).to_vec();
     m.program_start(&mut files, &mut arena::start::PortStart).expect("the start");
     assert_eq!(heap_line(&m), line("heap", "start")[2], "the heap after the start");
+    assert_eq!(format!("{:x}", fnv((0..0x20).flat_map(|b| m.ems_bank(b)))), line("ems", "start")[2], "the EMS banks after the start");
     check_dgroup("start", &d0, &m);
 }
 
@@ -85,5 +86,6 @@ fn the_setup_as_the_original() {
         std::fs::write(d, m.mem.segment(DS)).unwrap();
     }
     assert_eq!(heap_line(&m), line("heap", "setup")[2], "the heap after the set-up");
+    assert_eq!(format!("{:x}", fnv((0..0x20).flat_map(|b| m.ems_bank(b)))), line("ems", "setup")[2], "the EMS banks after the set-up");
     check_dgroup("setup", &d0, &m);
 }

@@ -11,7 +11,10 @@ then 21EE:016C. After each stage:
   heap | STAGE | <segment size flags> ...
   dgroup | STAGE | <start+length ...> | <digest>
 
-the heap's blocks from the first header, and what the stage changed in
+  ems | STAGE | <digest>
+
+the heap's blocks from the first header, the EMS banks 0..1Fh (end to
+end), and what the stage changed in
 DGROUP from the memory's start (the offsets as runs, the digest of their
 bytes after). The image is relocated 1000h higher here than the port's
 unrelocated image: the words SEGMENTS names (each an image segment the
@@ -49,6 +52,10 @@ def heap_line(a, stage):
     return f'heap | {stage} | {" ".join(out)}\n'
 
 
+def ems_line(a, stage):
+    return f'ems | {stage} | {fnv(b"".join(a.ems_bank(b) for b in range(0x20))):x}\n'
+
+
 def dgroup_line(d0, d1, stage):
     d1 = bytearray(d1)
     segs = {}
@@ -78,6 +85,7 @@ def main():
     out = open(OUT, 'w')
     assert a.run_screen(0x21EE, 0) is None, 'the start waited'
     out.write(heap_line(a, 'start'))
+    out.write(ems_line(a, 'start'))
     out.write(dgroup_line(d0, bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), 'start'))
     a.w16(0xCB8A, a.r16(0x9030))
     saved = a.stub()
@@ -86,6 +94,7 @@ def main():
     assert a.run_screen(0x21EE, 0x016C) is None, 'the setup waited'
     a.unstub(saved)
     out.write(heap_line(a, 'setup'))
+    out.write(ems_line(a, 'setup'))
     out.write(dgroup_line(d0, bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), 'setup'))
     out.close()
 

@@ -237,7 +237,7 @@ impl Machine {
 
 /// The set-up's parts (21EE:016C, `game_setup`) as the original runs
 /// them: the resources (2294:01F1, `game_resources`), the hands' graphics
-/// (0000:3C4C), the spells (29CF:0691), the effects' flats (21EE:0134,
+/// (0000:3C4C, `weapon_change_load`), the spells (29CF:0691), the effects' flats (21EE:0134,
 /// `effect_flats`, and C38E from D432).
 pub struct SetupPort<'a>(pub &'a mut Files);
 
@@ -246,7 +246,7 @@ impl crate::newgame::NewGameHooks for SetupPort<'_> {
         m.game_resources(self.0);
     }
     fn hands(&mut self, m: &mut Machine) {
-        m.weapon_graphics_load(self.0);
+        m.weapon_change_load(self.0);
     }
     fn spells(&mut self, m: &mut Machine) {
         m.spells_load(self.0);
@@ -255,5 +255,25 @@ impl crate::newgame::NewGameHooks for SetupPort<'_> {
         m.effect_flats(self.0);
         let v = m.mem.r16(DS, 0xD432);
         m.mem.w16(DS, 0xC38E, v);
+    }
+}
+
+impl Machine {
+    /// 0000:7534: the colours named at DS:`name` read to 929E (0000:742C)
+    /// and put at DS:`di`: 300h bytes as they are where the file is 300h
+    /// long, else past its 8-byte header each shifted right by 2. None
+    /// where the file doesn't load.
+    pub fn colours_load(&mut self, files: &mut Files, name: u16, di: u16) -> Option<()> {
+        self.file_load(files, name, DS, 0x929E)?;
+        let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+        for i in 0..0x300u16 {
+            let b = if size == 0x300 {
+                self.mem.r8(DS, 0x929E + i)
+            } else {
+                self.mem.r8(DS, 0x929E + 8 + i) >> 2
+            };
+            self.mem.w8(DS, di.wrapping_add(i), b);
+        }
+        Some(())
     }
 }
