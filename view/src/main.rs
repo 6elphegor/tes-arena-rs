@@ -1581,6 +1581,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         click_point: None,
         look_click: false,
         right_drag: 0.0,
+        ring_screen: None,
         camp: false,
         key: false,
         message: None,
@@ -2801,6 +2802,9 @@ struct App {
     /// the centre (2826:0C15) after the next frame; the drag so far.
     look_click: bool,
     right_drag: f64,
+    /// The screen up as the ring of keys typed last saw it (`ring_screen`):
+    /// none, a box alone (true) or another (false).
+    ring_screen: Option<bool>,
     /// Camping asked for (R), and a key pressed (it ends a rest).
     camp: bool,
     key: bool,
@@ -2995,18 +2999,39 @@ impl App {
         self.pending.is_some() || !self.boxes.is_empty()
     }
 
-    /// One engine turn with the keys and the mouse as an Intent.
-    fn step(&mut self) {
-        let screen = self.waiting() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some();
-        if screen {
-            // Each of the original's screens (its menus, lists, boxes, the
-            // travel map, the movies) forgets the keys typed in play as it
-            // begins (0000:7112, from 3159:002F, 1194:5536, 26F7:03BE,
-            // 2294:0701 and the others); the keys a screen here takes
-            // never reach the ring, so play resumes with it empty.
+    /// The screen up over play, if one: a box alone (true: the original's
+    /// wait for a key or a click, 1194:5536) or another (false: a menu, a
+    /// list, a panel, the travel map, a movie, creation, the options).
+    fn screen_up(&self) -> Option<bool> {
+        let other = self.pending.is_some() || self.panel.is_some() || self.creation.is_some() || !self.movies.is_empty() || self.travel.is_some() || self.saveui.is_some() || self.options.is_some();
+        if other {
+            Some(false)
+        } else if !self.boxes.is_empty() {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    /// The ring of keys typed (AC4C) as the screens leave it: each of the
+    /// original's screens forgets it as it begins (0000:7112, from the
+    /// menus 3159:002F, the boxes 1194:5536, the travel map 26F7:03BE, the
+    /// movies 2294:0701 and the others); its menus, lists and panels read
+    /// the keys typed while they are up out of it (0000:7138), so it is
+    /// empty as they end; a box only waits for one (1194:5545), which is
+    /// left in it. Called before each input and after each tick, so a
+    /// screen's beginning is seen before the next key.
+    fn ring_screen(&mut self) {
+        let now = self.screen_up();
+        if now != self.ring_screen && !(self.ring_screen == Some(true) && now.is_none()) {
             self.engine.m.key_flush();
         }
-        if screen || !self.fade.is_empty() {
+        self.ring_screen = now;
+    }
+
+    /// One engine turn with the keys and the mouse as an Intent.
+    fn step(&mut self) {
+        if self.screen_up().is_some() || !self.fade.is_empty() {
             return;
         }
         let k = &self.keys;
@@ -4261,14 +4286,23 @@ impl App {
     fn input(&mut self, ev: In) {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
-        // A key let go is let go in the game's key state whatever is up
-        // (its break code through the key interrupt, 0000:718A), and its
-        // latch (2542:05B8) cleared as the original's next frame asking
-        // for it clears it, so its next press is taken.
-        if let In::Key { code, down: false, .. } = ev {
+        self.ring_screen();
+        // A key goes through the key interrupt (0000:718A, `key_event`)
+        // whatever is up, as the original's every key does: its state
+        // where the game keeps it (DS:ACB5 + its scan code, FFh down), for
+        // the frame's own keys (- and =, F2, F3, F4, N, the debug keys)
+        // and the menu keys, and a make's character into the ring of keys
+        // typed (`ring_screen`). A key let go has its latch (2542:05B8)
+        // cleared too, as the original's next frame asking for it clears
+        // it, so its next press is taken.
+        if let In::Key { code, down, .. } = ev {
             if let Some(scan) = interface::scan_code(code) {
-                let _ = self.engine.m.key_event(scan | 0x80);
-                self.engine.m.key_pressed(scan as u16);
+                if self.engine.m.key_event(if down { scan } else { scan | 0x80 }).is_none() {
+                    eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
+                }
+                if !down {
+                    self.engine.m.key_pressed(scan as u16);
+                }
             }
         }
         match ev {
@@ -4489,20 +4523,9 @@ impl App {
                 if down && resting {
                     self.key = true;
                 }
-                // The key's make code through the key interrupt (0000:718A,
-                // `key_event`): its state where the game keeps it (DS:ACB5
-                // + its scan code, FFh), for the frame's own keys (- and =,
-                // F2, F3, F4, N, the debug keys) and the menu keys, and its
-                // character into the ring of keys typed, which play never
-                // reads (the next screen's entry forgets it: `step`). A
-                // menu key's press runs the menu keys' check (2542:0100)
-                // at once. (Its break was given above.)
+                // (The key went through the key interrupt above.) A menu
+                // key's press runs the menu keys' check (2542:0100) at once.
                 let scan = interface::scan_code(code);
-                if let Some(scan) = scan.filter(|_| down) {
-                    if self.engine.m.key_event(scan).is_none() {
-                        eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
-                    }
-                }
                 if down && !resting && scan.is_some_and(interface::is_menu_key) {
                     self.menu_key();
                 }
@@ -4595,6 +4618,7 @@ impl App {
             let ticks = self.engine.frame_ticks() as f64;
             self.next = now + Duration::from_secs_f64(ticks / 18.2);
         }
+        self.ring_screen();
     }
 }
 
