@@ -262,6 +262,15 @@ fn play_in_the_wilderness_as_the_original_draws_it() {
     world_case("playwild", place, setup, play);
 }
 
+/// The wilderness's top edge walked over: the window's origin a row above
+/// the grid (217B:0434), its blocks loaded from the words before the grid
+/// (217B:03C0), as the original goes on.
+#[test]
+fn over_the_wildernesss_edge_as_the_original_goes() {
+    let (place, setup, play) = case("playwildedge").unwrap();
+    world_case("playwildedge", place, setup, play);
+}
+
 /// The first level's down stairs walked into with the up arrow held from
 /// the square south of them, facing north: the second level.
 #[test]
@@ -511,6 +520,18 @@ fn ghost(a: &mut App) {
     e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
 }
 
+/// gen_worldframes.py's `wild_edge`: the wilderness's window at the
+/// grid's top row, the player just inside its second quarter, facing
+/// north.
+fn wild_edge(a: &mut App) {
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, 0x060A, 0);
+    for o in [0xC3D4, 0xBA66, 0x0602] {
+        m.mem.w16(DS, o, 0x1008);
+    }
+    m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -524,6 +545,19 @@ fn case(name: &str) -> Option<Case> {
     Some(match name {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
+        "playghostclick" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            // The harness's click is read by the next frame's controls
+            // (its input step, after that frame's drawing): the window's
+            // turn takes it before a frame, as that step's.
+            frames(a, d, seen, 2, |_| false);
+            // The harness's mouse at (160, 100): the click 4 on (CB60).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+            frames(a, d, seen, 1, |_| false);
+        })),
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
@@ -533,6 +567,7 @@ fn case(name: &str) -> Option<Case> {
         "playcap" => (Place::Capped, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playrain" => (Place::WetStreet, Box::new(|a: &mut App| at_square(a, 89, 41, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playsnow" => (Place::SnowStreet, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playwildedge" => (Place::Wild, Box::new(wild_edge), held(12, |_| false, 1)),
         "playwild" => (Place::Wild, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
@@ -719,7 +754,7 @@ fn differing(a: &[u8], b: &[u8], gap: usize) -> Vec<(usize, usize)> {
 fn the_state_measured_against_the_originals() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog"] {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playghostclick"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -927,7 +962,7 @@ fn the_state_from_the_load_as_the_original_leaves_it() {
 /// wilderness, a dungeon and its stairs, the crypt, fog.
 #[test]
 fn the_state_as_the_original_leaves_it() {
-    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky"] {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky", "playghostclick", "playwildedge"] {
         state_case(name);
     }
 }

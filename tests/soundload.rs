@@ -2,7 +2,8 @@
 //! against vectors from the original code (harness/gen_soundload.py):
 //! the loader called on its own with random sound files, bank settings,
 //! EMS room and driver buffers, and the INF loader with sound on, its
-//! hook loading the level's sounds. Needs the game directory (ESarena/,
+//! hook loading the level's sounds, and a fight's sound (23BA:01C7,
+//! `fight_sound`). Needs the game directory (ESarena/,
 //! next to ACD.EXE); the vectors hold only names, settings and digests.
 mod common;
 
@@ -41,7 +42,11 @@ fn digests(m: &Machine, before: &Machine) -> String {
     let changed = (0..=0xFFFFu16)
         .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))
         .flat_map(|o| [o as u8, (o >> 8) as u8, m.mem.r8(DS, o)]);
-    let banks = (0..0x20).flat_map(|b| m.ems_bank(b));
+    // The harness's banks (harness/dos.py `ems_bank`): the frame for the
+    // bank mapped, EMS on (8FA6) or not.
+    let mapped = m.mem.r16(DS, 0x8FA8) >> 2;
+    let frame = m.mem.r16(DS, 0x9030);
+    let banks = (0..0x20).flat_map(|b| if b == mapped { m.mem.segment(frame).to_vec() } else { m.ems_bank(b) });
     let (seg, off) = (m.mem.r16(DS, 0xBA56), m.mem.r16(DS, 0xBA54));
     let block = (0..BLOCK).map(|i| m.mem.r8(seg, off.wrapping_add(i)));
     format!("{:x} {:x} {:x}", fnv(changed), fnv(banks), fnv(block))
@@ -105,6 +110,11 @@ fn matches_original() {
                     digests(&m, &before)
                 })
             }
+            "fight" => {
+                m.mem.w8(DS, 0x8FA6, hex(p[1]) as u8);
+                let before = m.clone();
+                m.fight_sound(&mut fs, hex(p[0]) as u16).map(|()| digests(&m, &before))
+            }
             "inf" => {
                 put(&mut m, NAME, format!("{}\0", p[0]).as_bytes());
                 m.mem.w8(DS, 0xBB0B, 0xFF);
@@ -130,7 +140,7 @@ fn matches_original() {
         *counts.entry(f[0]).or_default() += 1;
     }
     eprintln!("{counts:?}, {loaded} sounds loaded");
-    assert_eq!(counts.len(), 2);
+    assert_eq!(counts.len(), 3);
     assert!(loaded > 1000);
 }
 

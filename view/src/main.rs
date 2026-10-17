@@ -647,10 +647,12 @@ impl arena::rest::RestHooks for Front<'_> {
             None => println!("{s}"),
         }
     }
-    /// 1194:D3D4: the dream on CHAOSVSN.FLC, its text in 33h (the
-    /// colour of the first level's dream; the others' are taken alike).
-    fn dream(&mut self, _m: &mut arena::machine::Machine, text: u16) {
-        self.movie("CHAOSVSN.FLC", Some(text), 0x33);
+    /// 1194:D3AF: the first level's dream (text 5DCh) on CHAOSVSN.FLC
+    /// (DI 4E16h), the others (50Eh + F77) on VISION.FLC (DI 8085h), each
+    /// in the colour the port set at 9288 (33h, then 2Fh).
+    fn dream(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        let flc = if text == 0x5DC { "CHAOSVSN.FLC" } else { "VISION.FLC" };
+        self.movie(flc, Some(text), m.mem.r8(arena::mem::DS, arena::rest::var::COLOUR));
     }
 }
 
@@ -669,8 +671,11 @@ impl EngineHooks for Front<'_> {
             }
         }
     }
-    /// The original stepped the changed squares it drew: here those
-    /// within the view's reach (C394 squares) step, seen or not.
+    /// Only with the view's own GPU world (no engine page: --gpu-world),
+    /// a stand-in for what the original's walk leaves the game; with the
+    /// page the engine takes the drawing's own (`render::Walked`): the
+    /// changed squares within the view's reach (C394 squares) step, seen
+    /// or not.
     fn draw(&mut self, m: &mut arena::machine::Machine) {
         use arena::click::var::{DOOR_AT, DOOR_COL, DOOR_ROW, DOOR_X0, DOOR_X1};
         use arena::mem::DS;

@@ -118,7 +118,16 @@ enum Asking {
     /// list as 1194:5734 shows it (kind 8, `list_kind`: POPUP8.IMG, its
     /// lines in EEh), the name's typing.
     List(hud::Menu, Vec<EditKey>),
+    /// Travel while unwell (05B1 bits 0..2): 1194:48DB's question, the
+    /// menu 1194:020E with the text at 6B1D, its keys at 4B60 ("YN") and
+    /// entries at 4B63 (Yes, No): its title and entries.
+    Question(Lines, Lines),
 }
+
+/// 1194:48DB's question (DGROUP 6B1D) and its menu's entries' table (4B63:
+/// Yes, No).
+const QUESTION: u16 = 0x6B1D;
+const QUESTION_ENTRIES: u16 = 0x4B63;
 
 /// 26F7:0AD5's field: 1194:5C30 with the prompt at 6AD1, 14h characters
 /// into 9C62 (cleared before, 77C8, 1F4h bytes), in ARENAFNT.DAT
@@ -208,6 +217,10 @@ struct Hooks<'a> {
     failed: bool,
     /// The journey's frames drawn (1194:30F1, one a day).
     frames: Vec<u8>,
+    /// The unwell traveller's question's answer (1194:48DB's AX: 0 Yes,
+    /// 1 No, FFFFh none), once asked; `asked` whether it was.
+    answer: Option<u16>,
+    asked: bool,
     /// The province whose main quest's dungeon was reached (292B:0362's
     /// AX, `MapHooks::quest_dungeon`): its picture to show.
     quest: Option<u16>,
@@ -223,11 +236,11 @@ impl TravelHooks for Hooks<'_> {
         }
         self.boxes.push(lines);
     }
-    /// The question (unwell: "Considering your condition...") shown; the
-    /// journey goes ahead.
-    fn question(&mut self, m: &mut Machine, si: u16) -> u16 {
-        self.message_box(m, DS, si);
-        0
+    /// 1194:48DB: the question (unwell: "Considering your condition...")
+    /// asked as a menu (`Asking::Question`); not yet answered, staying.
+    fn question(&mut self, _m: &mut Machine, _si: u16) -> u16 {
+        self.asked = true;
+        self.answer.unwrap_or(0xFFFF)
     }
     fn location(&mut self, m: &mut Machine, id: u16) {
         let ax = if m.mem.r8(DS, 0x0A46) == 8 { 0x100 } else { id };
@@ -281,14 +294,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -306,7 +319,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None };
+        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
         let start = m.travel_map_begin(&mut h);
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
         // The window it runs (3159:000C on DATA:6C56) is the world map's:
@@ -348,7 +361,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None }
+        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded, `travel_province`).
@@ -404,6 +417,17 @@ impl Travel {
             return;
         }
         if self.done.is_some() {
+            return;
+        }
+        if let Some(Asking::Question(title, entries)) = &self.asking {
+            let pick = match (&self.parch, self.menu_font()) {
+                (Some(t), Some(f)) => hud::custom::menu_rects(t, f, title, entries).1.iter().position(|&(x0, y0, x1, y1)| (x0..=x1).contains(&x) && (y0..=y1).contains(&y)),
+                _ => None,
+            };
+            if let Some(i) = pick {
+                self.asking = None;
+                self.travel_answered(engine, Some(i as u16));
+            }
             return;
         }
         if let Some(Asking::List(menu, typed)) = &mut self.asking {
@@ -464,6 +488,12 @@ impl Travel {
         }
     }
 
+    /// The font the question's menu is drawn in (ARENAFNT.DAT, the map's
+    /// [B036]).
+    fn menu_font(&self) -> Option<&Font> {
+        self.fonts.iter().find(|(g, _)| *g == hud::GameFont::Arena).map(|(_, f)| f)
+    }
+
     /// The province whose map is shown; None: the world map.
     pub fn shown(&self) -> Option<u8> {
         self.shown
@@ -485,8 +515,33 @@ impl Travel {
     }
 
     /// Travel (26F7:07CD); once a journey is made the screen ends (0236).
+    /// Unwell, it asks first (1194:48DB, run on a copy to see): the
+    /// question's menu is shown, and its answer travels or stays
+    /// (`travel_answered`).
     fn travel(&mut self, engine: &mut Engine) {
+        let mut copy = engine.m.clone();
+        let mut scratch = Vec::new();
+        let mut h = Self::hooks(&mut scratch, &engine.files);
+        let _ = copy.travel_go(&mut engine.files.clone(), &mut h);
+        if h.asked {
+            let m = &engine.m;
+            let title = hud::lines(m.mem.cstr(DS, QUESTION), 0x0F);
+            let mut entries = Vec::new();
+            for i in 0..2u16 {
+                let at = m.mem.r16(DS, QUESTION_ENTRIES + 2 * i);
+                entries.extend(hud::lines(m.mem.cstr(DS, at), 0x0F));
+            }
+            self.asking = Some(Asking::Question(title, entries));
+            return;
+        }
+        self.travel_answered(engine, None);
+    }
+
+    /// The journey made, the question's answer `answer` (0 Yes, 1 No,
+    /// FFFFh none) given if asked.
+    fn travel_answered(&mut self, engine: &mut Engine, answer: Option<u16>) {
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        h.answer = answer;
         let ok = engine.m.travel_go(&mut engine.files, &mut h);
         let failed = h.failed;
         self.journey = std::mem::take(&mut h.frames);
@@ -622,6 +677,17 @@ impl Travel {
                 if code == KeyCode::Escape {
                     self.asking = None;
                 }
+            }
+            // Its keys (4B60: Y, N); Esc none.
+            Some(Asking::Question(..)) => {
+                let answer = match code {
+                    KeyCode::KeyY => 0,
+                    KeyCode::KeyN => 1,
+                    KeyCode::Escape => 0xFFFF,
+                    _ => return,
+                };
+                self.asking = None;
+                self.travel_answered(engine, Some(answer));
             }
             None => match code {
                 KeyCode::Escape => self.exit(engine),
@@ -764,6 +830,12 @@ impl Travel {
                 live.draw(screen, false);
             }
             Some(Asking::List(menu, _)) => hud::custom::draw_game_list(screen, menu),
+            // 1194:020E's boxes in the map's tiles and colour.
+            Some(Asking::Question(title, entries)) => {
+                if let (Some(t), Some(f)) = (&self.parch, self.menu_font()) {
+                    hud::custom::draw_menu(screen, t, f, title, entries, 0xEE);
+                }
+            }
             None => {}
         }
         // 1194:30F1: the day's frame of the journey.

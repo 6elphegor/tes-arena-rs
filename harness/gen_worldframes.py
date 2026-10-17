@@ -178,6 +178,18 @@ def ghost(a):
     a.w16(0xC3DA, 0)
 
 
+def wild_edge(a):
+    """The wilderness's window at the grid's top row (origin y 0, 060A),
+    the player just inside its second quarter (y 1008h: C3D4, BA66 and
+    the last y, 0602), facing north (100h): walking on crosses into the
+    first quarter, and 217B:0434 moves the origin to FFFFh, a row above
+    the grid (217B:03C0 reads the words before it)."""
+    a.w16(0x060A, 0)
+    for o in (0xC3D4, 0xBA66, 0x0602):
+        a.w16(o, 0x1008)
+    a.w16(0xC3DA, 0x100)
+
+
 def level_changed(a):
     return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != 0
 
@@ -267,6 +279,15 @@ CASES = {
     # frame: its flat drawn through the light table (0000:953E).
     'playghost': ('dungeon', ghost, [((), (), 1, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # The ghost (`ghost`) clicked in the middle of the view a frame on:
+    # the drawing's hit test (0000:C4BB, before 78A8 scales it) finds it
+    # under the click (CB5E, the hook CD3A), the frame's actor click
+    # (1194:DB6C) names it on the message line.
+    # The wilderness's top edge (`wild_edge`) walked over with the up
+    # arrow: the window's origin a row above the grid, its blocks loaded
+    # from what lies before it.
+    'playwildedge': ('wild', wild_edge, [((UP,), (), 12, None), ((), (UP,), 1, None)]),
+    'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
 

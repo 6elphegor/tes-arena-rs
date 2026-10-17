@@ -45,7 +45,8 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     /// 0000:C980, the walk over the squares in view (C394 squares out),
     /// back to front: for the game's state, each square drawn steps if it
     /// is changing (`Machine::temp_walls_begin_draw` then
-    /// `temp_wall_drawn`).
+    /// `temp_wall_drawn`). Called only without a page: with one, the
+    /// drawing's own walk (`render::Walked`) is taken instead.
     fn draw(&mut self, _m: &mut Machine) {}
     /// The door hook (CD46, 0000:A8EF): a door's sound, as the walk
     /// steps it (`Machine::view_walk_doors`), when the hook is set, at the
@@ -226,11 +227,14 @@ pub struct Engine {
     /// The creatures' flats the last page's drawing reached
     /// (`render::Creature`, CF96), for the hook CD56 on the machine.
     pub page_creatures: Vec<crate::render::Creature>,
+    /// What this frame's drawing left the game (`render::Walked`), taken
+    /// at the walk (A367) in place of the front end's `EngineHooks::draw`.
+    walked: Option<crate::render::Walked>,
 }
 
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
-        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_creatures: Vec::new() }
+        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_creatures: Vec::new(), walked: None }
     }
 
     /// The BIOS timer advances `n` ticks (18.2 a second).
@@ -259,6 +263,7 @@ impl Engine {
     /// (A428..A444) are the front end's (`frame_ticks`, `tick`); the extra
     /// tick of a level without C39A bit 400h shows in BA60.
     pub fn frame(&mut self, input: Input, hooks: &mut dyn EngineHooks) -> Option<Frame> {
+        self.walked = None;
         let (m, files) = (&mut self.m, &mut self.files);
         let r = |m: &Machine, at: u16| m.mem.r16(DS, at);
         m.mem.w8(DS, STAGE, 0);
@@ -303,8 +308,9 @@ impl Engine {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
             m.moon_phases(files)?;
-            let (p, gaps, wrote, creatures) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            let (p, gaps, wrote, creatures, walked) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
             *page = p;
+            self.walked = Some(walked);
             self.page_gaps = gaps;
             self.page_creatures = creatures;
             for (o, before, after) in wrote {
@@ -357,7 +363,21 @@ impl Engine {
             for (s, at) in m.view_walk_doors() {
                 hooks.sound(m, s, at);
             }
-            hooks.draw(m);
+            match self.walked.take() {
+                // The drawing's own: the objects it stepped (C23A), what
+                // it left under the cursor and the changed squares' steps.
+                Some(w) => {
+                    for &si in &w.stepped {
+                        m.drawn_step(si);
+                    }
+                    for &(o, b) in &w.left {
+                        m.mem.w8(DS, o, b);
+                        // The machine's own now (`page_state`).
+                        self.page_wrote[o as usize] = None;
+                    }
+                }
+                None => hooks.draw(m),
+            }
             // 0000:C9E8: the trigger squares at the end of the walk, while
             // the eye isn't below the floor.
             if (r(m, HEIGHT) as i16) >= 0 {

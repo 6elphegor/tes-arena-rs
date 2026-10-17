@@ -41,8 +41,9 @@ impl FightHooks for Hooks {
     fn view_restored(&mut self, m: &mut Machine) {
         count(m, 0xFFEA);
     }
-    fn fight_music(&mut self, m: &mut Machine, _music: u8) {
+    fn fight_music(&mut self, m: &mut Machine, _files: &mut Files, _music: u8) -> Option<()> {
         count(m, 0xFFE4);
+        Some(())
     }
 }
 

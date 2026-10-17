@@ -48,8 +48,11 @@ pub trait FightHooks {
     fn fight_graphics(&mut self, m: &mut Machine, files: &mut Files, people: bool) -> Option<()> {
         m.fight_graphics_load(files, people)
     }
-    /// 23BA:01C7: the fight's music (`MUSIC`).
-    fn fight_music(&mut self, _m: &mut Machine, _music: u8) {}
+    /// 23BA:01C7: the fight's sound (`MUSIC`: the creature's) loaded
+    /// into bank 15h and made the file slot (`Machine::fight_sound`).
+    fn fight_music(&mut self, m: &mut Machine, files: &mut Files, music: u8) -> Option<()> {
+        m.fight_sound(files, music as u16)
+    }
     /// 1194:D45D: JAGAR.FLC with text `text` (colour 9288 F5h), Jagar's
     /// words before a main quest's encounter.
     fn jagar(&mut self, _m: &mut Machine, _text: u16) {}
@@ -87,7 +90,7 @@ impl Machine {
         }
         if !people {
             let music = self.mem.r8(DS, MUSIC);
-            hooks.fight_music(self, music);
+            hooks.fight_music(self, files, music)?;
         }
         Some(())
     }

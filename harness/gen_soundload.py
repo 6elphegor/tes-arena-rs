@@ -16,6 +16,10 @@ Lines (fields separated by " | "):
       bytes at 45F0 and 1044 (hex, 16 bytes), `fill` the slots' bytes
       before (44F0 + i: i * fill + (fill >> 3)), `table` the 32 bank free
       counts at 8FAA (hex words, 4 digits each).
+  fight | ax ems | digests
+      23BA:01C7 called with AX `ax` (the creature's sound, 100D) and
+      `ems` 8FA6: the AX-th name at 43D7 loaded into bank 15h at AFC8h,
+      the file slot at 45F0 made.
   inf | mif banks | digests
       as gen_info.py's info cases (flags 400h, section 80h, the level's
       own INF), with sound on, the hook CD4A at 23BA:0217 and the banks
@@ -123,8 +127,8 @@ def free_count():
     return rng.choice([0, 0xFFFF, 0xFFFF, rng.getrandbits(16), rng.randint(0, 0x3000)])
 
 
-LOADS, INFS = 1600, 200
-total = LOADS + INFS
+LOADS, INFS, FIGHTS = 1600, 200, 300
+total = LOADS + INFS + FIGHTS
 for n in range(LOADS):
     on = rng.choice([1] * 12 + [0, rng.getrandbits(16) | 1])
     first = rng.choice([rng.randint(0, 0x1F), rng.randint(0x10, 0x16), rng.randint(0, 0x40)])
@@ -168,7 +172,7 @@ for n in range(LOADS):
     nm = ','.join(x.decode() for x in names) or '-'
     out.write(f'load | {on:x} {first:02x}{k:02x} {ems:x} {buf:x} {kept.hex()} {fill:x} {tab} {nm} | {res}\n')
 
-for n in range(LOADS, total):
+for n in range(LOADS, LOADS + INFS):
     mif = rng.choice(INFO_MIFS)
     first = rng.choice([rng.randint(0, 0x1F), 0x0D, rng.randint(0x10, 0x16)])
     k = rng.choice([1, 2, 3, rng.randint(1, 8)])
@@ -201,4 +205,20 @@ for n in range(LOADS, total):
     except AssertionError:
         res = 'hang'
     out.write(f'inf | {mif.lower().decode()} {first:02x}{k:02x} | {res}\n')
+for n in range(LOADS + INFS, total):
+    ax = rng.choice([rng.randint(0, 0x19)] * 8 + [rng.randint(0x1A, 0x60), 0xFF])
+    ems = rng.choice([1] * 10 + [0])
+    if not mine(n, total):
+        continue
+    a.restore(BASE)
+    a.mu.mem_write(a.lin(a.ds, 0x8FA6), bytes([ems]))
+    before = a.seg_bytes(a.ds)
+    try:
+        a.call_far(0x23BA, 0x01C7, ax=ax)
+        res = digests(before)
+    except Fault:
+        res = 'fault'
+    except AssertionError:
+        res = 'hang'
+    out.write(f'fight | {ax:x} {ems:x} | {res}\n')
 out.close()
