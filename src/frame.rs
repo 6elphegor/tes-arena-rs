@@ -60,6 +60,8 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// [102C]'s font centred at x A0h, 0Bh above the view's foot, C3A2,
     /// in colour FDh, then one pixel right in FCh).
     fn effect_words(&mut self, _m: &mut Machine) {}
+    /// 0000:4C86, 292B:0530: the faces drawn (`Machine::faces_draw`).
+    fn faces(&mut self, _m: &mut Machine) {}
     /// 292B:000E (`Machine::projectile_lights_end`).
     fn projectile_lights_end(&mut self, _m: &mut Machine) {}
     /// 1194:59C8: a message box with the text at DGROUP `text`.
@@ -384,6 +386,8 @@ impl Machine {
         // (`interface_setup`); 4CBB: 292B:000E (`projectile_lights_end`).
         hooks.effect_words(self);
         hooks.interface(self, files)?;
+        // 4C86: 292B:0530, the faces (`faces_draw`).
+        hooks.faces(self);
         hooks.projectile_lights_end(self);
         let v = self.mem.r16(DS, 0x0D37);
         self.mem.w16(DS, 0xC394, v);
@@ -739,7 +743,7 @@ impl Machine {
 
     /// 0000:4DD6's state, where the interface changed (D39, its bit 80h
     /// cleared, not 1011): both D39's; 5CA bit 2000h cleared, then set by
-    /// 292B:048F (which draws the staff's pieces' counts); the cursor's
+    /// 292B:048F (`faces_load`: the faces' pictures into bank 19h); the cursor's
     /// background flag (A902 bit 1, 5422) cleared; with the bow's hands
     /// up (1012 6) the hands made again (1012 FFh, 3C4C: `weapon_change`);
     /// the clip the whole screen (9A9C with 0, 0, 140h, C8h: A914..A91E);
@@ -761,7 +765,8 @@ impl Machine {
         self.mem.w8(DS, 0x1011, al);
         self.mem.w8(DS, 0x0D39, al);
         let f = self.mem.r16(DS, 0x05CA) & !0x2000;
-        self.mem.w16(DS, 0x05CA, f | 0x2000);
+        self.mem.w16(DS, 0x05CA, f);
+        self.faces_load(files)?;
         let f = self.mem.r16(DS, 0xA902);
         self.mem.w16(DS, 0xA902, f & !1);
         if self.mem.r8(DS, 0x1012) == 6 {

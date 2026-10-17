@@ -432,6 +432,11 @@ impl arena::frame::FrameHooks for Front<'_> {
         }
         Some(())
     }
+    /// 292B:0530: the faces drawn (none in play: FACES stays FFh), bank
+    /// 19h mapped.
+    fn faces(&mut self, m: &mut arena::machine::Machine) {
+        m.faces_draw();
+    }
     /// 292B:000E: no projectile flying, their lights forgotten.
     fn projectile_lights_end(&mut self, m: &mut arena::machine::Machine) {
         m.projectile_lights_end();

@@ -33,6 +33,7 @@ pub mod hooks;
 pub mod info;
 pub mod inventory;
 pub mod item;
+pub mod faces;
 pub mod level;
 pub mod levelup;
 pub mod load;
