@@ -457,6 +457,13 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn faces(&mut self, m: &mut arena::machine::Machine) {
         m.faces_draw();
     }
+    /// 0000:4B84: the light for the time of day (`outdoor_light`), its
+    /// dither, relighting and lamps' colour kept for after the frame.
+    fn outdoor_light(&mut self, m: &mut arena::machine::Machine) {
+        if let Some(light) = self.light.as_deref_mut() {
+            m.outdoor_light(light);
+        }
+    }
     /// 292B:000E: no projectile flying, their lights forgotten.
     fn projectile_lights_end(&mut self, m: &mut arena::machine::Machine) {
         m.projectile_lights_end();
@@ -1163,10 +1170,10 @@ impl Assets {
         prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
-    /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
-    /// the .COL loads here): outdoors, palette entries 1..8 from the day's
-    /// colours at the window for the time of day, the textures darkened by
-    /// night and the lamps lit.
+    /// The sky after a frame (2294:0428, after the frame's 0000:0390 with
+    /// 2294:0341; the .COL loads here): outdoors, palette entries 1..8 from
+    /// the day's colours at the window for the time of day, the textures
+    /// darkened by night and the lamps lit.
     fn sky(&mut self, m: &mut arena::machine::Machine) -> render::Sky {
         use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
         let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
@@ -1178,7 +1185,8 @@ impl Assets {
         if let Some(name) = m.sky_colours() {
             self.light.colours = Some(name);
         }
-        m.outdoor_light(&mut self.light);
+        // (The frame's light for the time of day ran in the frame, at
+        // 0000:4B84: `Front::outdoor_light`.)
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
             let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();

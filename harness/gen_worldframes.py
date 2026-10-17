@@ -221,20 +221,23 @@ def casting(ty, spell, level=1, ahead=0x200):
     return put
 
 
+# A seed whose next roll is 0: 99B5h (high word 0) stepped back once
+# through the LCG (0000:6E10's 6D002Dh, inverted mod 2^32).
+ENCOUNTER_SEED = 0x99B5 * pow(0x6D002D, -1, 1 << 32) % (1 << 32)
+
+
 def night_encounter(heading):
-    """At ten at night (`at_hour`) the wilderness's encounter as a roll
-    that comes up brings it (1194:887A past its roll, 88AA..88C8): the
-    night (1238, 1194:561C's), 5C8 bit 1000h cleared, the rank 1 (1294),
-    and the row of the terrain (A50) plus 7 at night brought (89D4, BX
-    the row)."""
+    """A minute before ten at night (`at_hour`), the clock's minute due on
+    the first frame (884A 91 ticks back: due on the first frame here and
+    in the view, whose frames tick before the frame, not at its waits)
+    and the seed ENCOUNTER_SEED: the hour's encounter check (0000:1622 ->
+    1194:887A, its roll the seed's next, nothing rolled before it in the
+    frame) comes up and brings the wilderness's night encounter (89D4) as
+    play does."""
     def put(a):
-        at_hour(22, heading)(a)
-        a.w16(0x1238, 1)
-        a.w16(0x05C8, a.r16(0x05C8) & ~0x1000)
-        a.w16(0x1294, 1)
-        row = a.mu.mem_read(a.lin(a.ds, 0x0A50), 1)[0] + 7
-        assert row <= 0xC, 'no encounter for the terrain'
-        a.call_near(0x1194, 0x89D4, ebx=row)
+        at_hour(21, heading, minute=59)(a)
+        a.w16(0x884A, (a.r16(0x0151) - 0x5B) & 0xFFFF)
+        a.mu.mem_write(a.lin(a.ds, 0x91F6), struct.pack('<I', ENCOUNTER_SEED))
     return put
 
 
@@ -399,8 +402,9 @@ CASES = {
     # fire followed through its flight into the creature (29CF:037F's
     # missile, 0000:2566's moves).
     'playcast': ('dungeon', casting(1, WIZARDS_FIRE), [((), (), 2, None), ((), (), 10, None, [(160, 100)]), ((), (), 120, None)]),
-    # The wilderness at night, its encounter brought (`night_encounter`),
-    # stood in: what came comes for the player and strikes.
+    # The wilderness at ten at night, the hour's encounter roll come up
+    # (`night_encounter`), stood in: what came comes for the player and
+    # strikes.
     'playwildnight': ('wild', night_encounter(0x100), [((), (), 400, None)]),
     # A creature that casts (type Bh: one spell in its record's list at
     # +366h) six squares down the corridor, stood before: seeing the

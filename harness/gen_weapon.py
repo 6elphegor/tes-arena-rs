@@ -13,10 +13,11 @@ motion; then runs N frames of 0000:38CE.
 
 The mouse driver's motion counters (INT 33h function 0Bh) return the
 frame's motion and clear it. The hand drawing 0000:3B8E (RET), the
-casting hands' bank switches and drawing (0000:5C86, 78A8: RETF; 5C8A:
-RET) are the renderer's, the sound 23BA:002A a RETF. The hands' frame is
-unpacked (5B3C) as the game does; with no EMS here the frame lands on
-the graphic itself, as it does in the port's test. The wall bash runs
+casting hands' bank switches (0000:5C86: RETF; 5C8A: RET) are the
+renderer's, the sound 23BA:002A a RETF. The hands' frame is unpacked
+(5B3C) as the game does; with no EMS here the frame lands on the graphic
+itself, as it does in the port's test. 78A8 draws it, twice, on the page
+at PAGE (A900): the rows' code it compiles at DGROUP 929E is counted. The wall bash runs
 on an empty wall plane with gen_bash.py's stubs; the bow 29CF:037F
 counts its calls at DGROUP FFF6 (the port's test hooks do the same).
 
@@ -39,6 +40,8 @@ from gen_attack import fnv, stream
 from gen_bash import TRIGGER, CLOSED, WSEG, unrelocated
 
 HSEG, BUFSEG = 0x6000, 0x6800
+# The page's segment (A900).
+PAGE_SEG_FIELD, PAGE = 0xA900, 0x8800
 
 
 class MouseArena(Arena):
@@ -83,6 +86,16 @@ def setup(seed):
     w.append((None, 0xC3D4, pk(0x800 + word() % 0x4000)))
     w.append((None, 0xC3DA, pk(word() & 0x1FF)))
     w.append((None, 0xC3D2, pk(0x3C if byte() < 0xE0 else 0)))
+    # The casting hands' graphic (HSEG: its header, read from the
+    # segment's start) a size (+0, +2; +4 the runs' width) and a place
+    # (+6, +8) for 78A8, 8 bits a pixel mostly (+0Ah), its frames packed
+    # at 200h (+0Ch..: zeros there, runs of one byte each). The y a
+    # multiple of 10h: +8 is also the flags 0000:582C reads where the
+    # header is drawn as an image (3972, 5CA bit 10h), none of 1, 2, 4, 8.
+    wd, ht = 1 + byte() % 0x40, 1 + byte() % 0x40
+    w.append((HSEG, 0, pk(wd) + pk(ht) + pk(wd) + pk(word() % 0x160) + pk((byte() % 0xD) << 4)))
+    w.append((HSEG, 0x0A, pb(8 if byte() < 0xC0 else 4)))
+    w.append((HSEG, 0x0C, pk(0x200) * 10))
     motions = []
     for _ in range(1 + byte() % 12):
         k = byte()
@@ -100,7 +113,7 @@ def main():
     out = open(OUT, 'w', buffering=1)
     a = MouseArena(EXE)
     for seg, off, code in [(0, 0x3B8E, b'\xc3'), (0, 0x5C8A, b'\xc3'), (0, 0x5C86, b'\xcb'),
-                           (0, 0x78A8, b'\xcb'), (0x23BA, 0x002A, b'\xcb'),
+                           (0x23BA, 0x002A, b'\xcb'),
                            (0, 0x43B1, TRIGGER), (0x1194, 0x4FB8, CLOSED),
                            (0x29CF, 0x037F, bytes.fromhex('ff06f6ffcb'))]:
         a.mu.mem_write(a.lin(LOAD_SEG + seg, off), code)
@@ -111,6 +124,8 @@ def main():
     a.w16(0xD806, WSEG)
     a.w16(0x1042, 0x7800)
     a.w16(0x91F0, 0)
+    # The page 78A8 draws the casting hands on.
+    a.w16(PAGE_SEG_FIELD, PAGE)
     base_ds = a.seg_bytes(a.ds)
     zero = bytes(0x10000)
     rng = random.Random(0x1994_38CE)
@@ -120,7 +135,7 @@ def main():
         if not mine(n, total):
             continue
         a.mu.mem_write(a.lin(a.ds, 0), base_ds)
-        for seg in (HSEG, BUFSEG, WSEG):
+        for seg in (HSEG, BUFSEG, WSEG, PAGE):
             a.mu.mem_write(a.lin(seg, 0), zero)
         w, motions = setup(seed)
         for seg, off, data in w:

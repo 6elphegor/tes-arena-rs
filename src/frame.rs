@@ -62,6 +62,10 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn effect_words(&mut self, _m: &mut Machine) {}
     /// 0000:4C86, 292B:0530: the faces drawn (`Machine::faces_draw`).
     fn faces(&mut self, _m: &mut Machine) {}
+    /// 0000:4B84, 0390: the frame's light for the time of day
+    /// (`Machine::outdoor_light`, its loads and the palette the front
+    /// end's `LightHooks`). Nothing by default, as gen_frame.py stubs it.
+    fn outdoor_light(&mut self, _m: &mut Machine) {}
     /// 292B:000E (`Machine::projectile_lights_end`).
     fn projectile_lights_end(&mut self, _m: &mut Machine) {}
     /// 1194:59C8: a message box with the text at DGROUP `text`.
@@ -364,6 +368,10 @@ impl Machine {
             let v = self.mem.r8(DS, 0x8812) ^ 0xFF;
             self.mem.w8(DS, 0x8812, v);
         }
+        // 4B84: the light for the time of day, before the clock below (a
+        // minute's encounter writes its name over the lamps' colour at
+        // 1044).
+        hooks.outdoor_light(self);
         // A quest's message, once.
         if self.mem.r16(DS, 0x05CA) & 0x200 != 0 && !hooks.quest_carry(self) && self.mem.r16(DS, 0x05E0) & 0x400 == 0 {
             let f = self.mem.r16(DS, 0x05E0) | 0x400;

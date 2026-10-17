@@ -41,15 +41,21 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
 /// Facing `heading` at `hour` o'clock of the save's day, as
 /// gen_worldframes.py's `at_hour` sets it.
 fn at_hour(a: &mut App, hour: u16, heading: u16) {
+    at_time(a, hour, 0, heading);
+}
+
+/// `at_hour` at `hour`:`minute`.
+fn at_time(a: &mut App, hour: u16, minute: u16, heading: u16) {
     use arena::clock::var::{HOUR, MINUTE, MINUTES, SKY_TIME};
     let m = &mut a.engine.m;
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
     let t = m.mem.r32(DS, MINUTES);
-    m.mem.w32(DS, MINUTES, t - t % 1440 + hour as u32 * 60);
+    let of_day = hour as u32 * 60 + minute as u32;
+    m.mem.w32(DS, MINUTES, t - t % 1440 + of_day);
     m.mem.w16(DS, HOUR, hour);
-    m.mem.w16(DS, MINUTE, 0);
+    m.mem.w16(DS, MINUTE, minute);
     // (In u32: the minutes shifted left by 10 are past a u16.)
-    m.mem.w16(DS, SKY_TIME, (((hour as u32 * 60) << 10) / 1440) as u16);
+    m.mem.w16(DS, SKY_TIME, ((of_day << 10) / 1440) as u16);
 }
 
 /// Facing `heading` at ten at night of the save's day (`at_hour`).
@@ -573,19 +579,24 @@ fn brought(a: &mut App, ty: u8, level: u8, ahead: u16) {
     e.m.mem.w16(DS, arena::movement::var::HEADING, 0);
 }
 
-/// gen_worldframes.py's `night_encounter`: at ten at night the
-/// wilderness's encounter brought as a roll that comes up brings it (the
-/// night, 5C8 bit 1000h cleared, the rank 1, the terrain's row plus 7).
+/// gen_worldframes.py's `night_encounter`: a minute before ten at night,
+/// the clock's minute due on the first frame (MINUTE_TICK 91 ticks back),
+/// the seed one whose next roll is 0 (`ENCOUNTER_SEED`): the hour's
+/// encounter check (0000:1622 -> 1194:887A) comes up and brings the
+/// wilderness's night encounter as play does.
 fn night_encounter(a: &mut App, heading: u16) {
-    at_hour(a, 22, heading);
-    let e = &mut a.engine;
-    e.m.mem.w16(DS, arena::encounter::var::NIGHT, 1);
-    let f = e.m.mem.r16(DS, 0x05C8) & !0x1000;
-    e.m.mem.w16(DS, 0x05C8, f);
-    e.m.mem.w16(DS, arena::encounter::var::GUARD_RANK, 1);
-    let row = e.m.mem.r8(DS, 0x0A50) as u16 + 7;
-    e.m.encounter(&mut e.files, &mut arena::encounter::NoFightHooks, row).expect("the encounter brought");
+    use arena::frame::var::{MINUTE_TICK, TICKS};
+    at_time(a, 21, 59, heading);
+    let m = &mut a.engine.m;
+    let t = m.mem.r16(DS, TICKS).wrapping_sub(0x5B);
+    m.mem.w16(DS, MINUTE_TICK, t);
+    m.rng.seed = ENCOUNTER_SEED;
+    m.store_rng();
 }
+
+/// gen_worldframes.py's ENCOUNTER_SEED: 99B5h (high word 0: a roll of 0)
+/// stepped back once through the LCG (6D002Dh's inverse mod 2^32).
+const ENCOUNTER_SEED: u32 = 0x56AA_ECA9;
 
 /// The camp's menu's second entry picked: resting until healed.
 struct UntilHealed;

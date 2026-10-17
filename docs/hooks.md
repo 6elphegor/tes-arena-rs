@@ -123,6 +123,7 @@ the original routine:
 | `FrameHooks::menu_keys` | src/frame.rs:112 | 2542:0100 | elsewhere | the view reads its keys itself (`menukeys` ported, called by the view) | |
 | `FrameHooks::message_box` | src/frame.rs:68 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `FrameHooks::message_box_number` | src/frame.rs:70 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port then its box (entry boxes in screens.txt) |
+| `FrameHooks::outdoor_light` | src/frame.rs:66 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | fixed: the view ran `outdoor_light` after the frame, so the lamps' colour (1044..1046) came after a clock encounter's name there; now at 4B84 in the frame (playwildnight) |
 | `FrameHooks::projectile_lights_end` | src/frame.rs:66 | 292B:000E | overridden | the view: main.rs Front<'_> | faithful: `projectile_lights_end` |
 | `FrameHooks::quest_carry` | src/frame.rs:117 | 0000:4D00 | port | the default runs the port | |
 | `FrameHooks::rest` | src/frame.rs:133 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
