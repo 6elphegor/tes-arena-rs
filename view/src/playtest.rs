@@ -158,7 +158,9 @@ impl Watch {
             return Some(format!("height {h}"));
         }
         // Standing in a solid wall (its word's bytes alike, as 0000:2631
-        // tests), which the moves never allow: a load would move the
+        // tests, and bit 15 clear: 0000:FB81 lets the player through a
+        // word with it of kinds other than 8, 9, A, B and D, a C3C3h of
+        // START.MIF's), which the moves never allow: a load would move the
         // player out (`player_unstick`).
         let walls = r(arena::mif::var::MAP1_SEG);
         let wall = m.mem.r16(walls, row << 8 | col << 1);
@@ -181,7 +183,7 @@ impl Watch {
         } else if self.entry != Some((col, row)) {
             self.entry = None;
         }
-        if self.entry.is_none() && h >= 0 && w != 0 && wall != 0 && wall >> 8 == wall & 0xFF {
+        if self.entry.is_none() && h >= 0 && w != 0 && wall != 0 && wall & 0x8000 == 0 && wall >> 8 == wall & 0xFF {
             let marks = (m.mem.r8(DS, arena::movement::var::STAIRS_UP), m.mem.r8(DS, arena::movement::var::STAIRS_DOWN));
             return Some(format!("inside a wall: square ({col}, {row}) {wall:#06x} (stairs {:#04x} {:#04x})", marks.0, marks.1));
         }
@@ -335,6 +337,11 @@ fn facing(engine: &Engine, pred: impl Fn(u16) -> bool) -> Vec<(u16, u16, u16)> {
     let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
     let (w, d) = (m.mem.r16(DS, 0xC357).min(128), m.mem.r16(DS, 0xC359).min(128));
     let word = |c: u16, r: u16| m.mem.r16(walls, r << 8 | c << 1);
+    // Only from a side the player can walk to: a city gate's outer side
+    // is outside the walls, a place play never reaches (a run stood
+    // there walked off White Haven's map).
+    let reach = reach(engine);
+    let side = |c: u16, r: u16| if reach.contains(&(c, r)) { word(c, r) } else { 0xFFFF };
     let mut out = Vec::new();
     for r in 0..d {
         for c in 0..w {
@@ -345,7 +352,7 @@ fn facing(engine: &Engine, pred: impl Fn(u16) -> bool) -> Vec<(u16, u16, u16)> {
             // (100h), the west facing +x (80h), the east facing -x (180h).
             for (dc, dr, h) in [(0i32, -1i32, 0u16), (0, 1, 0x100), (-1, 0, 0x80), (1, 0, 0x180)] {
                 let (nc, nr) = (c as i32 + dc, r as i32 + dr);
-                if nc >= 0 && nr >= 0 && (nc as u16) < w && (nr as u16) < d && word(nc as u16, nr as u16) == 0 {
+                if nc >= 0 && nr >= 0 && (nc as u16) < w && (nr as u16) < d && side(nc as u16, nr as u16) == 0 {
                     out.push((nc as u16, nr as u16, h));
                     break;
                 }
@@ -353,6 +360,32 @@ fn facing(engine: &Engine, pred: impl Fn(u16) -> bool) -> Vec<(u16, u16, u16)> {
         }
     }
     out
+}
+
+/// The squares of the map the player's square reaches through squares
+/// that aren't solid walls (bit 15 clear and the bytes alike: what the
+/// moves never pass, 0000:FB81): doors and the like taken as passable, a
+/// building's or a gate's front (a trigger wall of alike bytes) not.
+fn reach(engine: &Engine) -> std::collections::HashSet<(u16, u16)> {
+    let m = &engine.m;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let (w, d) = (m.mem.r16(DS, 0xC357).min(128), m.mem.r16(DS, 0xC359).min(128));
+    let open = |c: u16, r: u16| {
+        let v = m.mem.r16(walls, r << 8 | c << 1);
+        c < w && r < d && (v & 0x8000 != 0 || v >> 8 != v & 0xFF || v == 0)
+    };
+    let start = (m.mem.r16(DS, X) >> 7, m.mem.r16(DS, Y) >> 7);
+    let mut seen = std::collections::HashSet::from([start]);
+    let mut todo = vec![start];
+    while let Some((c, r)) = todo.pop() {
+        for (dc, dr) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (nc, nr) = (c as i32 + dc, r as i32 + dr);
+            if nc >= 0 && nr >= 0 && open(nc as u16, nr as u16) && seen.insert((nc as u16, nr as u16)) {
+                todo.push((nc as u16, nr as u16));
+            }
+        }
+    }
+    seen
 }
 
 /// The player put on a square's centre facing `heading`.
@@ -703,19 +736,22 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 }
             }
             Act::Jump => {
-                // To a random free square of the map (its walls' word 0), a
-                // test aid spreading a run over the map, as --at is.
+                // To a random free square of the map (its walls' word 0)
+                // that the player's square reaches through free squares, a
+                // test aid spreading a run over the map, as --at is. (Any
+                // free square once: a closed-off square at the Crypt of
+                // Hearts' edge let a run walk off its map, as the original
+                // lets one: outside the map the planes hold the EMS frame's
+                // segment, 0000:F321, a word F000h no move blocks, FB81.)
                 if left == 0 {
                     let walls = engine.m.mem.r16(DS, arena::mif::var::MAP1_SEG);
-                    let (w, d) = (engine.m.mem.r16(DS, 0xC357).min(128) as u64, engine.m.mem.r16(DS, 0xC359).min(128) as u64);
-                    for _ in 0..200 {
-                        let (c, r) = (dice.below(w.max(1)) as u16, dice.below(d.max(1)) as u16);
-                        if engine.m.mem.r16(walls, r << 8 | c << 1) == 0 {
-                            engine.m.mem.w16(DS, X, c << 7 | 0x40);
-                            engine.m.mem.w16(DS, Y, r << 7 | 0x40);
-                            placed(&mut engine);
-                            break;
-                        }
+                    let mut reach: Vec<(u16, u16)> = reach(&engine).into_iter().filter(|&(c, r)| engine.m.mem.r16(walls, r << 8 | c << 1) == 0).collect();
+                    reach.sort_unstable();
+                    if !reach.is_empty() {
+                        let (c, r) = reach[dice.below(reach.len() as u64) as usize];
+                        engine.m.mem.w16(DS, X, c << 7 | 0x40);
+                        engine.m.mem.w16(DS, Y, r << 7 | 0x40);
+                        placed(&mut engine);
                     }
                 }
             }
