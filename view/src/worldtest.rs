@@ -730,6 +730,12 @@ fn the_state_measured_against_the_originals() {
         }, play) else { return };
         let (mine0, banks0) = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap() } else { pre.into_inner().unwrap() };
         let (mine, banks) = grab(&a);
+        // (ARENA_MINE: the engine's DGROUP as the case leaves it, and as
+        // the load left it, beside the original's dumps.)
+        if std::env::var("ARENA_MINE").is_ok() {
+            let _ = std::fs::write(dump.join(format!("{name}.mine")), &mine);
+            let _ = std::fs::write(dump.join(format!("{name}.mine0")), &mine0);
+        }
         // What each side's frames changed: a byte the original's changed
         // and the engine's didn't (or the other way), or both changed it
         // to different values where they started alike.
@@ -771,8 +777,21 @@ fn the_state_measured_against_the_originals() {
 /// tests/vectors/stateexclude.txt's DGROUP offsets (`state` lines leave
 /// them out).
 fn state_excluded() -> Vec<bool> {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateexclude.txt");
     let mut out = vec![false; 0x10000];
+    excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateexclude.txt"), &mut out);
+    out
+}
+
+/// stateexclude.txt's and stateloadexclude.txt's DGROUP offsets
+/// (`stateload` lines leave them out).
+fn state_load_excluded() -> Vec<bool> {
+    let mut out = state_excluded();
+    excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateloadexclude.txt"), &mut out);
+    out
+}
+
+/// The ranges a state exclusion file names, marked in `out`.
+fn excluded_in(path: &str, out: &mut [bool]) {
     for line in std::fs::read_to_string(path).expect(path).lines() {
         let f: Vec<&str> = line.split('#').next().unwrap_or("").split_whitespace().collect();
         if f.len() >= 2 {
@@ -780,7 +799,6 @@ fn state_excluded() -> Vec<bool> {
             out[s..e].iter_mut().for_each(|x| *x = true);
         }
     }
-    out
 }
 
 /// The case's frames' changes to DGROUP against the original's (`state`
@@ -790,9 +808,20 @@ fn state_excluded() -> Vec<bool> {
 /// to the same bytes. Where a stage the view skips leaves the game's
 /// state other than the original's, this fails.
 fn state_case(name: &str) {
+    state_compared(name, false);
+}
+
+/// `state_case` from the load (`stateload` lines): the place's way in
+/// counted too, against the state `played`'s load left (`BASE`).
+fn state_load_case(name: &str) {
+    state_compared(name, true);
+}
+
+fn state_compared(name: &str, from_load: bool) {
+    let kind = if from_load { "stateload" } else { "state" };
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
-    let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == "state" && f[1] == name) else {
-        panic!("{name}: no state line");
+    let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == kind && f[1] == name) else {
+        panic!("{name}: no {kind} line");
     };
     let mut want = vec![false; 0x10000];
     for run in f[2].split_whitespace() {
@@ -801,7 +830,7 @@ fn state_case(name: &str) {
         want[s..s + n].iter_mut().for_each(|x| *x = true);
     }
     let digest = u64::from_str_radix(f[3], 16).unwrap();
-    let skip = state_excluded();
+    let skip = if from_load { state_load_excluded() } else { state_excluded() };
     let (place, setup, play) = case(name).unwrap();
     let pre = std::cell::RefCell::new(None);
     let Some((a, _)) = played(place, |a| {
@@ -809,16 +838,74 @@ fn state_case(name: &str) {
         setup(a);
         *pre.borrow_mut() = Some(grab(a).0);
     }, play) else { return };
-    let before = pre.into_inner().unwrap();
+    let before = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap().0 } else { pre.into_inner().unwrap() };
     let after = grab(&a).0;
     // (The drawing's own setting up, the original's done before the case
     // starts, the engine's copy's at its first page: not counted.)
     let extra: Vec<usize> = (0..0x10000).filter(|&i| before[i] != after[i] && !skip[i] && !want[i] && a.engine.page_wrote[i].is_none()).collect();
     let got = fnv((0..0x10000).filter(|&i| want[i]).map(|i| after[i]));
     let hx = |v: &[usize]| v.iter().take(24).map(|i| format!("{i:04x}")).collect::<Vec<_>>().join(" ");
+    // From the load, the engine's load and the original's already part
+    // (some 1100 bytes: the program's start, the heap, scratch), so a byte
+    // the engine changes and the original doesn't may be the engine's
+    // setting it as the original's load had it: those are checked against
+    // a bit of each of the original's bytes as the case leaves them
+    // (`stateloadbits`; its bytes are the save's, never in the vectors).
+    let extra = if from_load {
+        let Some(bits) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "stateloadbits" && f[1] == name).map(|f| f[2].to_string()) else {
+            panic!("{name}: no stateloadbits line");
+        };
+        let bit = |i: usize| (u8::from_str_radix(&bits[(i >> 3) * 2..(i >> 3) * 2 + 2], 16).unwrap() >> (i & 7)) & 1;
+        extra.into_iter().filter(|&i| (fnv([after[i], i as u8, (i >> 8) as u8]) >> 63) as u8 != bit(i)).collect()
+    } else {
+        extra
+    };
     assert!(extra.is_empty(), "{name}: the frames changed what the original's don't: {}", hx(&extra));
     let unchanged: Vec<usize> = (0..0x10000).filter(|&i| want[i] && before[i] == after[i]).collect();
     assert_eq!(got, digest, "{name}: the state differs from the original's (of its changes, unchanged here: {})", hx(&unchanged));
+}
+
+/// Each case's frames change the EMS banks 0..1Fh as the original's do
+/// (`stateems` lines: the same bytes changed, to the same values).
+fn state_ems_case(name: &str) {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == "stateems" && f[1] == name) else {
+        panic!("{name}: no stateems line");
+    };
+    let (count, offs) = f[2].split_once(' ').unwrap();
+    let want = (usize::from_str_radix(count, 16).unwrap(), u64::from_str_radix(offs, 16).unwrap(), u64::from_str_radix(f[3], 16).unwrap());
+    let (place, setup, play) = case(name).unwrap();
+    let pre = std::cell::RefCell::new(None);
+    let Some((a, _)) = played(place, |a| {
+        a.engine.page = Some(vec![0; 64000]);
+        setup(a);
+        *pre.borrow_mut() = Some(grab(a).1);
+    }, play) else { return };
+    let before = pre.into_inner().unwrap();
+    let after = grab(&a).1;
+    let changed: Vec<usize> = (0..after.len()).filter(|&i| before[i] != after[i]).collect();
+    let got = (changed.len(), fnv(changed.iter().flat_map(|&i| (i as u32).to_le_bytes())), fnv(changed.iter().map(|&i| after[i])));
+    assert_eq!(got, want, "{name}: the EMS banks' changes differ from the original's ({} bytes changed here)", changed.len());
+}
+
+/// Each case's frames change the EMS banks as the original's do
+/// (`state_ems_case`). Not the stairs' (playdown): three bytes the
+/// original's frames change already hold their value as the engine's
+/// case starts (no byte ends otherwise, the report finds).
+#[test]
+fn the_ems_banks_as_the_original_leaves_them() {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playcrypt", "playfog", "playcap", "playsky"] {
+        state_ems_case(name);
+    }
+}
+
+/// From the load, the way into each case's place and its frames leave
+/// the game's state as the original's do (`state_load_case`).
+#[test]
+fn the_state_from_the_load_as_the_original_leaves_it() {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky"] {
+        state_load_case(name);
+    }
 }
 
 /// Each case's frames leave the game's state as the original's do

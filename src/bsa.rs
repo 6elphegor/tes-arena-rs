@@ -129,14 +129,18 @@ impl Files {
 
     /// A file written (by DOS name) with `data`, replacing any.
     pub fn store(&mut self, name: &[u8], data: Vec<u8>) {
-        self.written.insert(Self::base(name).to_ascii_uppercase(), Rc::from(data));
+        let base = Self::base(name).to_ascii_uppercase();
+        self.deleted.remove(&base);
+        self.written.insert(base, Rc::from(data));
     }
 
     /// The file named `from` copied to `to` (by DOS name) as a written
     /// file. False where `from` doesn't exist.
     pub fn copy(&mut self, from: &[u8], to: &[u8]) -> bool {
         let Some(data) = self.read_loose(from) else { return false };
-        self.written.insert(Self::base(to).to_ascii_uppercase(), data);
+        let base = Self::base(to).to_ascii_uppercase();
+        self.deleted.remove(&base);
+        self.written.insert(base, data);
         true
     }
 

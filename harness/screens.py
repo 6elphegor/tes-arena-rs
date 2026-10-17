@@ -142,15 +142,22 @@ class ScreenArena(DosArena):
                     self.dac_at += 1
 
     def snapshot(self):
+        # The world loop's stack kept (`area_ended`, `world_frames`) is the
+        # snapshot's too: restored without it, leaving an area resumed
+        # whichever world loop ran last (a named level's run, whose end
+        # clears the level hooks at 0000:09D8, for the street left from
+        # the load's guild, whose loop returns through 0ED5 and doesn't).
         return (super().snapshot(), bytes(self.dac), {k: bytes(v) for k, v in self.written.items()},
-                set(self.deleted))
+                set(self.deleted), getattr(self, 'world_stack', None))
 
     def restore(self, snap):
-        base, dac, written, deleted = snap
+        base, dac, written, deleted, world_stack = snap
         super().restore(base)
         self.dac = bytearray(dac)
         self.written = {k: bytearray(v) for k, v in written.items()}
         self.deleted = set(deleted)
+        if world_stack is not None:
+            self.world_stack = world_stack
 
     # --- files written ------------------------------------------------------
 

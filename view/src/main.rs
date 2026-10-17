@@ -2628,7 +2628,7 @@ fn save_to(engine: &mut Engine, dir: &std::path::Path, slot: u8, palette: [[u8; 
     engine.m.save_game(&mut out);
     // The game's files have them too: a load reads the files written in
     // play before the directories' (`Files`), and the slot's copies made
-    // above (25FD:0612 copies every "*.65", SAVEGAME's and SAVEENGN's of an
+    // above (25FD:0612 copies every working "*.64", SAVEGAME's and SAVEENGN's of an
     // earlier load included) would otherwise hide the save just made.
     for (name, data) in out.written {
         engine.files.put(&name, &data);
