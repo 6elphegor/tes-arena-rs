@@ -315,7 +315,7 @@ impl Soft {
     pub(super) fn sky(&mut self) {
         if self.g16(0xC39A) & 0x20 == 0 {
             self.sky_rows();
-            let Soft { m, page, gaps, lgts, table } = self;
+            let Soft { m, page, gaps, lgts, table, .. } = self;
             if m.celestial(&mut Bodies(Out { page, gaps, lgts, table: *table })).is_none() {
                 self.gap("0000:E51B: a sky's body's division overflows");
             }
@@ -331,7 +331,7 @@ impl Soft {
         if self.g32(0xCD1A) != 0x2294_0A5D {
             return self.gap("0000:A8EF: the sky's hook another routine");
         }
-        let Soft { m, page, gaps, lgts, table } = self;
+        let Soft { m, page, gaps, lgts, table, .. } = self;
         if m.sky_draw(&mut Objects(Out { page, gaps, lgts, table: *table })).is_none() {
             self.gap("2294:0A5D: a sky's object's division");
         }

@@ -52,9 +52,16 @@ use var::*;
 pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// 0000:4C83, 4DD6: the interface set up again where it changed
     /// (`Machine::interface_setup`; the bar's drawing is the front end's).
-    fn interface(&mut self, _m: &mut Machine) -> Option<()> {
+    fn interface(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    /// 0000:5011: an effect's words counted down and drawn
+    /// (`Machine::effect_words`: the front end draws what it returns in
+    /// [102C]'s font centred at x A0h, 0Bh above the view's foot, C3A2,
+    /// in colour FDh, then one pixel right in FCh).
+    fn effect_words(&mut self, _m: &mut Machine) {}
+    /// 292B:000E (`Machine::projectile_lights_end`).
+    fn projectile_lights_end(&mut self, _m: &mut Machine) {}
     /// 1194:59C8: a message box with the text at DGROUP `text`.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A36C: the message box of text number [137A].
@@ -371,7 +378,13 @@ impl Machine {
             self.advance_minutes(files, 1, hooks)?;
         }
         self.hurt_flash();
-        hooks.interface(self)?;
+        // 4C7B: 0000:5011, an effect's words over the view's foot
+        // (`effect_words`); 4C7E: 2294:0428, the sky's colours (the front
+        // end's); 4C83: 4DD6, the interface where it changed
+        // (`interface_setup`); 4CBB: 292B:000E (`projectile_lights_end`).
+        hooks.effect_words(self);
+        hooks.interface(self, files)?;
+        hooks.projectile_lights_end(self);
         let v = self.mem.r16(DS, 0x0D37);
         self.mem.w16(DS, 0xC394, v);
         let f = self.mem.r16(DS, 0x05CA) & !0x200;
@@ -677,13 +690,69 @@ impl Machine {
 }
 
 impl Machine {
+    /// 0000:5011, each frame: unless a level's text is up (3C82), an
+    /// effect's words (1405, `effects::var::MESSAGE_TEXT`) are drawn (the
+    /// words returned) and their count (1428) goes down; at 0 the words
+    /// are cleared (23h bytes).
+    pub fn effect_words(&mut self) -> Option<Vec<u8>> {
+        use crate::effects::var::{MESSAGE, MESSAGE_TEXT};
+        if self.mem.r8(DS, 0x3C82) != 0 || self.mem.r8(DS, MESSAGE_TEXT) == 0 {
+            return None;
+        }
+        let text = self.mem.cstr(DS, MESSAGE_TEXT).to_vec();
+        let n = self.mem.r8(DS, MESSAGE).wrapping_sub(1);
+        self.mem.w8(DS, MESSAGE, n);
+        if n == 0 {
+            for i in 0..0x23u16 {
+                self.mem.w8(DS, MESSAGE_TEXT + i, 0);
+            }
+        }
+        Some(text)
+    }
+
+    /// 0000:3C76..3C8C, the hands' graphic for weapon class `class`
+    /// (1012): its file the class'th name of the list at 674E (1194:559F)
+    /// loaded (742C) to the EMS frame (9030:0) with the hands' bank (C8F4)
+    /// mapped (5C8A). None where the file doesn't load.
+    pub fn weapon_graphics_load(&mut self, files: &mut Files) -> Option<()> {
+        let class = self.mem.r8(DS, crate::weapon::var::CLASS) as u16;
+        let name = self.skip_strings(DS, 0x674E, class);
+        let bank = self.mem.r8(DS, 0xC8F4) as u16;
+        self.ems_map(bank);
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        self.file_load(files, name, frame, 0).map(|_| ())
+    }
+
+    /// 292B:000E, each frame: with no projectile flying (7DB8), their
+    /// lights (BB0C, 60h words) forgotten, 8000h each, and counted none
+    /// (BC8C).
+    pub fn projectile_lights_end(&mut self) {
+        use crate::projectile::var::{COUNT, LIGHTS, LIGHT_COUNT};
+        if self.mem.r16(DS, COUNT) != 0 {
+            return;
+        }
+        self.mem.w16(DS, LIGHT_COUNT, 0);
+        for i in 0..0x60u16 {
+            self.mem.w16(DS, LIGHTS + 2 * i, 0x8000);
+        }
+    }
+
     /// 0000:4DD6's state, where the interface changed (D39, its bit 80h
     /// cleared, not 1011): both D39's; 5CA bit 2000h cleared, then set by
-    /// 292B:048F (which draws the staff's pieces' counts); the clip the
-    /// whole screen (9A9C with 0, 0, 140h, C8h: A914..A91E); the rain's
-    /// or snow's drops made again in it (E322, `weather_drops`); 5CA bit
-    /// 8 cleared. The bar's picture and texts are the front end's.
-    pub fn interface_setup(&mut self) -> Option<()> {
+    /// 292B:048F (which draws the staff's pieces' counts); the cursor's
+    /// background flag (A902 bit 1, 5422) cleared; with the bow's hands
+    /// up (1012 6) the hands made again (1012 FFh, 3C4C: `weapon_change`);
+    /// the clip the whole screen (9A9C with 0, 0, 140h, C8h: A914..A91E);
+    /// the view's window from the interface's record (4F1B with SI 883E:
+    /// C39C..C3A3 its first eight bytes, C3D8 its next word; the view's
+    /// click box 1B8C..1B92, its corner two in, 10h less each way; the
+    /// mouse kept to 0..134h, 0..C7h, 53AE, and put at the view's middle,
+    /// C3D6 and C3D8; C398 bit 2000h, the row tables made again); the
+    /// rain's or snow's drops made again in the clip (E322,
+    /// `weather_drops`); 5CA bit 8 cleared, then set again by 292B:032A
+    /// for a class without 1A9 bit 20h. The bar's picture, the name, the
+    /// bars and their texts are the front end's.
+    pub fn interface_setup(&mut self, files: &mut Files, hooks: &mut dyn FrameHooks) -> Option<()> {
         let al = self.mem.r8(DS, 0x0D39);
         if al == self.mem.r8(DS, 0x1011) {
             return Some(());
@@ -693,13 +762,55 @@ impl Machine {
         self.mem.w8(DS, 0x0D39, al);
         let f = self.mem.r16(DS, 0x05CA) & !0x2000;
         self.mem.w16(DS, 0x05CA, f | 0x2000);
+        let f = self.mem.r16(DS, 0xA902);
+        self.mem.w16(DS, 0xA902, f & !1);
+        if self.mem.r8(DS, 0x1012) == 6 {
+            self.mem.w8(DS, 0x1012, 0xFF);
+            self.weapon_change(files, hooks)?;
+        }
         for (o, v) in [(0xA91Eu16, 0x140u16), (0xA91C, 0xC8), (0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
             self.mem.w16(DS, o, v);
         }
+        self.view_record(0x883E);
         self.weather_drops()?;
         let f = self.mem.r16(DS, 0x05CA) & !8;
         self.mem.w16(DS, 0x05CA, f);
+        if self.mem.r8(DS, 0x01A9) & 0x20 == 0 {
+            self.mem.w16(DS, 0x05CA, f | 8);
+        }
         Some(())
+    }
+
+    /// 0000:4F1B with SI `si`: the view's window C39C..C3A3 the record's
+    /// first eight bytes and C3D8 its next word; the view's click box
+    /// (1B8C x, 1B8E y, 1B90 width, 1B92 height) two in from its corner,
+    /// 10h smaller each way; the mouse's limits (53AE with 0, 0, 135h,
+    /// C8h: 8F74 0, 8F76 134h, 8F78 0, 8F7A C7h; the driver's are the
+    /// front end's) and the mouse put at the view's middle (8F92 C3D6,
+    /// 8F94 C3D8); C398 bit 2000h, the floor's and ceiling's row tables
+    /// to be made again (0000:F587).
+    pub fn view_record(&mut self, si: u16) {
+        for i in 0..8u16 {
+            let b = self.mem.r8(DS, si.wrapping_add(i));
+            self.mem.w8(DS, 0xC39C + i, b);
+        }
+        let v = self.mem.r16(DS, si.wrapping_add(8));
+        self.mem.w16(DS, 0xC3D8, v);
+        let r = |m: &Machine, o: u16| m.mem.r16(DS, si.wrapping_add(o));
+        let (ax, bx) = (r(self, 0), r(self, 2));
+        let cx = r(self, 4).wrapping_sub(ax).wrapping_sub(0x10);
+        let dx = r(self, 6).wrapping_sub(bx).wrapping_sub(0x10);
+        for (o, v) in [(0x1B8Cu16, ax.wrapping_add(2)), (0x1B8E, bx.wrapping_add(2)), (0x1B90, cx), (0x1B92, dx)] {
+            self.mem.w16(DS, o, v);
+        }
+        for (o, v) in [(0x8F78u16, 0u16), (0x8F7A, 0xC7), (0x8F74, 0), (0x8F76, 0x134)] {
+            self.mem.w16(DS, o, v);
+        }
+        let (x, y) = (self.mem.r16(DS, 0xC3D6), self.mem.r16(DS, 0xC3D8));
+        self.mem.w16(DS, 0x8F92, x);
+        self.mem.w16(DS, 0x8F94, y);
+        let f = self.mem.r16(DS, 0xC398);
+        self.mem.w16(DS, 0xC398, f | 0x2000);
     }
 
     /// 0000:E1A2. The rain's 60 drops (4 bytes at E05E: x, y) moved and

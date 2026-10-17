@@ -88,7 +88,17 @@ pub struct Soft {
     /// The light table the copy made (`setup`, CCC2), made again in place
     /// where a fog's step makes it again.
     table: u16,
+    /// The creatures' flats reached (CF96), for the hook CD56 the
+    /// original calls there: the square's centre (x, y), the flat's
+    /// number, its map word's segment and offset.
+    pub creatures: Vec<Creature>,
 }
+
+/// A creature's flat the drawing reached (`Soft::creatures`).
+pub type Creature = (u16, u16, u8, u16, u16);
+
+/// A DGROUP byte the drawing wrote on its copy: offset, before, after.
+pub type Wrote = (u16, u8, u8);
 
 /// NORMAL.LGT's and FOG.LGT's bytes, for the fog's steps the drawing's
 /// sky hook may take (2294:0BEF's load, 0C36's and 0B8A's tables made
@@ -119,19 +129,30 @@ impl Lgts {
 /// written over `under` (the last page), and the paths not ported. Of
 /// what the drawing changes, the water's step (D813), which only it
 /// keeps, is put back in `m`.
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>) {
+/// The third: DGROUP's offsets the drawing wrote on its copy (which the
+/// original's, drawing on the machine itself, leaves there), each with its
+/// byte before and after; the fourth
+/// the creatures' flats it reached (`Soft::creatures`), in order.
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0 };
+    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new() };
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
+    let wrote = (0..=0xFFFFu16).filter(|&o| r.m.mem.r8(DS, o) != m.mem.r8(DS, o)).map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
-    (r.page, r.gaps)
+    if r.gaps.is_empty() {
+        // The player's square's floor (CB5B: 0 dry, 1 water, 2 lava, as
+        // the walk finds it, 0000:CDxx), which the game reads after: the
+        // textures' copy put back (A483) and a click's wall.
+        m.mem.w8(DS, 0xCB5B, r.m.mem.r8(DS, 0xCB5B));
+    }
+    (r.page, r.gaps, wrote, r.creatures)
 }
 
 /// 0000:CBFF alone (tests/capdraw.rs): the cap at height `ax` wound by
@@ -139,7 +160,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
 /// the 3D mode draws it; the machine and the page after, and the paths
 /// not ported it reached.
 pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
-    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0 };
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new() };
     r.page.resize(0x10000, 0);
     r.cap_draw(0, ax, cx);
     (r.m, r.page, r.gaps)
@@ -904,9 +925,11 @@ impl Soft {
         if self.m.mem.r16(es, di) >= bx {
             let bl = (bx >> 8) as u8;
             let hi = self.m.mem.r8(es, di.wrapping_add(1));
+            // CABF..CADD: 0 the frame's own floor; outdoors 1; indoors 1
+            // (water) one past it, else 2 (lava).
             let al = if bl == hi {
                 0
-            } else if self.g16(0xC398) & 4 == 0 && hi == bl.wrapping_add(1) {
+            } else if self.g16(0xC398) & 4 == 0 && hi != bl.wrapping_add(1) {
                 2
             } else {
                 1
@@ -1089,7 +1112,13 @@ impl Soft {
             8 => {
                 self.s8(0xD742, 1);
                 if self.m.mem.r8(es, di.wrapping_add(1)) & 2 != 0 {
-                    // CF96: the creature's flat: the hook CD56 (the game's).
+                    // CF96: the creature's flat: the hook CD56 (the game's,
+                    // called on the machine after: `creatures`) with the
+                    // square's centre and the flat's number.
+                    let x = (self.g16(0xA84A) << 7).wrapping_add(0x40);
+                    let y = (self.g16(0xA84E) << 7).wrapping_add(0x40);
+                    let flat = self.m.mem.r8(es, di);
+                    self.creatures.push((x, y, flat, es, di));
                     return;
                 }
                 return self.flat_square(es, di);

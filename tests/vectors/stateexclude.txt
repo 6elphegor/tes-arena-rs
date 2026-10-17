@@ -1,0 +1,32 @@
+# DGROUP ranges the state comparison (gen_worldframes.py's `state` lines,
+# view/src/worldtest.rs's the_state_as_the_original_leaves_it) leaves out:
+# start end (hex, end exclusive) and why.
+# The harness's ways, not the game's:
+ba60 ba62 the frame's tick (BA60): the harness's timer ticks at each read of it
+8f92 8f96 the mouse's place: the harness's mouse reads 160, 100; the view's controls don't read it
+7a4a 7a5a the cursor's record (2826:00xx): the classic controls' regions; the view's are its own
+acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' table
+cb92 cb94 the square under the cursor (the drawing's, from the mouse)
+127a 127e 0000:47FD's return address kept on the stack's check
+# Where the heaps' layouts part (segments and scratch):
+8f6e 8f70 a segment the drawing keeps
+ccc2 ccc4 the light table's segment (the drawing's copy's own heap)
+cd7e cd8a the drawing's buffers' segments (the copy's own heap)
+eebc eee2 the level's segments made on a level's change
+929e 97e2 scratch (strings, numbers made, the heap's first blocks)
+9176 91a4 the file's name, handle and size of the last file opened
+a836 a863 scratch of the drawing's and the texts'
+a908 a910 0000:742C's scratch
+8fa8 8faa the EMS bank mapped last (the staff's pieces' drawing, 292B:0530)
+9288 9289 the drawing's colour
+b036 b038 the texts' drawing's state
+adb6 adb8 the texts' drawing's state
+# The drawing's own variables, where the port's copy writes a word's high
+# byte the original's leaves (its pixels asserted exact apart, view3d):
+ba88 bb04 the walk's and the faces' variables
+c3e2 c3e4 the player's light's radius as the fog's step leaves it
+cd0b cd14 the faces' variables
+d7aa d7f0 the faces' variables
+d82a d83c the floor's and ceiling's rows' steps
+430f 4310 a flag the engine's entry leaves set and its first frame clears
+af88 af90 the polygon drawer's variables (85AE..8755), the port's kept in its own

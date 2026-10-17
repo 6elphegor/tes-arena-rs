@@ -61,6 +61,20 @@ pub struct SkyStep {
 }
 
 impl Machine {
+    /// 0000:068A..06B2, the sky's state forgotten on entering an area
+    /// (2294:0057): 427D FFh, 3C8D FFFFh, 8702 1, the .COL, the dither,
+    /// the window and the light level loaded none (FFFFh), D56 FFFFh; the
+    /// .COL for the weather then chosen again (06B8, 2294:0428:
+    /// `sky_colours`, which the frame runs too).
+    pub fn sky_reset(&mut self) {
+        self.mem.w8(DS, 0x427D, 0xFF);
+        self.mem.w16(DS, 0x3C8D, 0xFFFF);
+        self.mem.w8(DS, 0x8702, 1);
+        for at in [COLOURS, DITHER, WINDOW, 0x0D56, LIGHT] {
+            self.mem.w16(DS, at, 0xFFFF);
+        }
+    }
+
     /// 2294:0428. Outdoors (C398 bit 4), the .COL for the weather:
     /// DAYTIME.COL when clear (BB09 0), else DREARY.COL. Returns its
     /// name when it isn't the one loaded (recorded at COLOURS): the front

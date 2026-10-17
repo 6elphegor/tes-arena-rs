@@ -218,11 +218,19 @@ pub struct Engine {
     /// `page_gaps`.
     pub page: Option<Vec<u8>>,
     pub page_gaps: Vec<&'static str>,
+    /// DGROUP's bytes the drawing has written on its copy, frame after
+    /// frame, the last write's (before, after) for each: the state the
+    /// original's drawing leaves in DGROUP and the engine's doesn't (for
+    /// the state comparison, `page_state`).
+    pub page_wrote: Vec<Option<(u8, u8)>>,
+    /// The creatures' flats the last page's drawing reached
+    /// (`render::Creature`, CF96), for the hook CD56 on the machine.
+    pub page_creatures: Vec<crate::render::Creature>,
 }
 
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
-        Self { m, files, page: None, page_gaps: Vec::new() }
+        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_creatures: Vec::new() }
     }
 
     /// The BIOS timer advances `n` ticks (18.2 a second).
@@ -295,9 +303,13 @@ impl Engine {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
             m.moon_phases(files)?;
-            let (p, gaps) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            let (p, gaps, wrote, creatures) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
             *page = p;
             self.page_gaps = gaps;
+            self.page_creatures = creatures;
+            for (o, before, after) in wrote {
+                self.page_wrote[o as usize] = Some((before, after));
+            }
         }
         // A322: the drawing's set-up (0000:D4B4, the floor's half).
         if !hooks.step(m, Step::DrawSetup(0x140)) {
@@ -461,6 +473,21 @@ impl Engine {
     }
 
     /// What the renderer needs most often.
+    /// DGROUP as the original's would hold it, its drawing done on the
+    /// machine: the machine's bytes, with the drawing's copy's last write
+    /// where the machine's byte is still what the copy started from.
+    pub fn page_state(&self) -> Vec<u8> {
+        (0..=0xFFFFu16)
+            .map(|o| {
+                let b = self.m.mem.r8(DS, o);
+                match self.page_wrote[o as usize] {
+                    Some((before, after)) if b == before => after,
+                    _ => b,
+                }
+            })
+            .collect()
+    }
+
     pub fn view(&self) -> View {
         View::of(&self.m)
     }

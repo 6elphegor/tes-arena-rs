@@ -586,6 +586,10 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
         // (5CA bit 8, 292B:032A), C then opening nothing.
         let c = app.engine.m.mem.r8(arena::mem::DS, 0x01A9) | 0x20;
         app.engine.m.mem.w8(arena::mem::DS, 0x01A9, c);
+        // As entering the area leaves a caster's: 4DD6's 292B:032A bars
+        // the book (5CA bit 8) only for the others.
+        let f = app.engine.m.mem.r16(arena::mem::DS, 0x05CA) & !8;
+        app.engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
         panels::learn(&mut app.engine.m, 0);
         app.engine.m.mem.w16(arena::mem::DS, 0x020A, 500);
         app.engine.m.mem.w16(arena::mem::DS, 0x020C, 500);
@@ -1199,8 +1203,13 @@ fn each_bar_button_as_the_original_wires_it() {
     b.engine.m.status_box();
     let want = String::from_utf8_lossy(b.engine.m.mem.cstr(DS, arena::status::var::STATUS_TEXT)).into_owned();
     assert!(want.contains("You are poisoned.\r"), "status_box: {want:?}");
-    // 4, the star: the spellbook.
+    // 4, the star: the spellbook (a caster's: 4DD6's 292B:032A bars it,
+    // 5CA bit 8, for the others as the area is entered).
     let (mut a, mut d) = fresh();
+    let c = a.engine.m.mem.r8(DS, 0x01A9) | 0x20;
+    a.engine.m.mem.w8(DS, 0x01A9, c);
+    let f = a.engine.m.mem.r16(DS, 0x05CA) & !8;
+    a.engine.m.mem.w16(DS, 0x05CA, f);
     click(&mut a, &mut d, 4);
     assert!(matches!(a.panel, Some(panels::Panel::Spellbook(_))), "the spellbook");
     // 5, the scroll: the logbook.
