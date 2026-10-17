@@ -117,6 +117,15 @@ impl Machine {
         let (doff, dseg) = (self.mem.r16(DS, HANDS), self.mem.r16(DS, HANDS + 2));
         let (cx, dx) = (self.mem.r16(bseg, boff.wrapping_add(4)), self.mem.r16(bseg, boff.wrapping_add(2)));
         self.rle_runs(bseg, boff.wrapping_add(0x14C), cx, dx, dseg, doff)?;
+        // 0AA5..0B27: drawn twice by 78A8 from the header at [BA54] (its
+        // size at +0, +2, its place at +6, +8, its bits a pixel at +0Ah,
+        // its colours at +4Ch), then mirrored at x 9Fh: the drawing the
+        // front end's, the rows' code each compiles the machine's.
+        let hd = |m: &Machine, o: u16| m.mem.r16(bseg, boff.wrapping_add(o));
+        let (w, h, x, y) = (hd(self, 0), hd(self, 2), hd(self, 6), hd(self, 8));
+        let bpp = self.mem.r8(bseg, boff.wrapping_add(0xA));
+        crate::render::scaler_rows(self, x, y, w, h, 0, w, h, 1, bpp, bseg);
+        crate::render::scaler_rows(self, 0x9F, y, w, h, 0, w, h, 3, bpp, bseg);
         self.mem.w8(DS, CAST_FRAME, f + 1);
         Some(())
     }

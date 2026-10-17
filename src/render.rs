@@ -3049,6 +3049,20 @@ impl Soft {
     }
 }
 
+/// 0000:78A8's row compiled for a draw the front end makes (its pixels
+/// the front end's): clipped as 78A8 clips (78B2..7955) and, where it
+/// draws, the row's code at ROW_CODE (`compile_rows`). The arguments as
+/// pushed: the place, the size drawn, the shade's segment, the source's
+/// size, its flags and bits a pixel, the colours' segment.
+#[allow(clippy::too_many_arguments)]
+pub fn scaler_rows(m: &mut Machine, x: u16, y: u16, dw: u16, dh: u16, shade_seg: u16, w: u16, h: u16, flags: u16, bpp: u8, map_seg: u16) {
+    if let Some([cx, _, cw, _, fx, _, xs, _]) = clip(m, x, y, dw, dh, w, h) {
+        let light = m.mem.r16(0, GENERATOR) == LIGHT_ROWS;
+        let shaded = shade_seg != 0 || (bpp != 8 && map_seg != 0);
+        compile_rows(m, light, cx, cw, fx, xs, flags, w, bpp, shaded);
+    }
+}
+
 /// Where 78A8 has the row compiled and calls it: DGROUP 929E (79BF,
 /// 7A0F). The code stays there after (the save menu's names read it
 /// where NAMES.DAT doesn't load, 25FD:0718).
