@@ -93,6 +93,8 @@ fn matches_original() {
     base.heap_init(0xA000, 0xF000).unwrap();
     let dir = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena"));
     let Ok(mut files) = Files::new(&dir) else { return };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in include_str!("vectors/guards.txt").lines().take(std::env::var("GUARDS_N").map_or(usize::MAX, |v| v.parse().unwrap())) {
         let f: Vec<&str> = line.split(" | ").collect();

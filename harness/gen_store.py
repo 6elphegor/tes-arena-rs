@@ -82,10 +82,7 @@ class StoreDos(DosArena):
         return raw.replace(':', '\\').split('\\')[-1].upper()
 
     def _handle(self):
-        h = 0x20
-        while h in self.mh:
-            h += 1
-        return h
+        return self.new_handle(None, taken=self.mh)
 
     def _dos(self):
         ah = self._reg('ax') >> 8

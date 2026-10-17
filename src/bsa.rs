@@ -266,6 +266,14 @@ impl Files {
         v
     }
 
+    /// GLOBAL.BSA's handle taken without the file (5, the lowest free at
+    /// the start), for a game set up without opening it, as a harness
+    /// that stands an empty file in for it has it: loose files then open
+    /// from 6, as in the game.
+    pub fn bsa_handle_taken(&mut self) {
+        self.dos.bsa = Some(self.dos.free());
+    }
+
     /// A file's bytes by DOS name (written first, then the directories').
     pub fn data(&self, name: &[u8]) -> Option<Rc<[u8]>> {
         self.read_loose(name)

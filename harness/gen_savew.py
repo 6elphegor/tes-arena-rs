@@ -54,9 +54,7 @@ class WriteDos(DosArena):
     def _dos(self):
         ah = self._reg('ax') >> 8
         if ah == 0x3C:
-            h = 5
-            while h in self.handles or h in self.open_w:
-                h += 1
+            h = self.new_handle(None, taken=self.open_w)
             self.open_w[h] = [self._name(), bytearray()]
             self._wreg('ax', h)
             self._set_cf(False)
