@@ -33,8 +33,9 @@ impl FightHooks for Hooks {
         count(m, if people { 0xFFE0 } else { 0xFFE2 });
         Some(())
     }
-    fn fight_music(&mut self, m: &mut Machine, _music: u8) {
+    fn fight_music(&mut self, m: &mut Machine, _files: &mut Files, _music: u8) -> Option<()> {
         count(m, 0xFFE4);
+        Some(())
     }
 }
 
@@ -52,8 +53,8 @@ impl FightHooks for Fight<'_> {
     fn fight_graphics(&mut self, m: &mut Machine, files: &mut Files, people: bool) -> Option<()> {
         self.0.fight_graphics(m, files, people)
     }
-    fn fight_music(&mut self, m: &mut Machine, music: u8) {
-        self.0.fight_music(m, music)
+    fn fight_music(&mut self, m: &mut Machine, files: &mut Files, music: u8) -> Option<()> {
+        self.0.fight_music(m, files, music)
     }
 }
 

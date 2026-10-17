@@ -107,7 +107,7 @@ the original routine:
 | `EngineHooks::step` | src/engine.rs:59 |  | stub | a test's stand-in; false lets the engine run the step | |
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |
 | `FightHooks::fight_graphics` | src/encounter.rs:48 | 0000:1AF9 | port | the default runs the port | |
-| `FightHooks::fight_music` | src/encounter.rs:52 | 23BA:01C7 | left | 23BA:01C7: the fight's sounds loaded into EMS bank 15h at AFC8 and the driver told; no sound port | |
+| `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's | |
 | `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie (not screen-checked) |
 | `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
 | `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |

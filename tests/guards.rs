@@ -31,8 +31,9 @@ impl FightHooks for Hooks {
         count(m, if people { 0xFFE0 } else { 0xFFE2 });
         Some(())
     }
-    fn fight_music(&mut self, m: &mut Machine, _music: u8) {
+    fn fight_music(&mut self, m: &mut Machine, _files: &mut Files, _music: u8) -> Option<()> {
         count(m, 0xFFE4);
+        Some(())
     }
 }
 

@@ -81,6 +81,11 @@ pub enum Played {
     File(Vec<u8>),
 }
 
+/// The fights' sounds' names (firedaem.voc, ghost.voc, ..., vampire.voc).
+const FIGHT_SOUNDS: u16 = 0x43D7;
+/// Where a fight's sound is loaded in the EMS frame.
+const FIGHT_SOUND_AT: u16 = 0xAFC8;
+
 impl Machine {
     /// 23BA:012B. The sound file named at DS:`si` played (with sound on):
     /// loaded into the driver's buffer and played over any playing.
@@ -185,6 +190,27 @@ impl Machine {
     /// None also where a hook it would call is set (the open, error and
     /// out-of-EMS hooks), or the buffer is one 7428 allocates (an offset
     /// of FFFDh..FFFFh).
+    /// 23BA:01C7. A fight's sound, AX the creature's (100D, 25CA:005F):
+    /// the AX-th name of the list at FIGHT_SOUNDS (1194:559F: 5585 skips
+    /// AX names, each searched at most BB8h bytes for its end) loaded
+    /// whole into the EMS frame at FIGHT_SOUND_AT in bank 15h (0000:5C86,
+    /// 7428; a file not found loads nothing and goes on), the driver
+    /// readied (0FFD:0D4C, call 85h: the front end's), and the file slot
+    /// (FILE_SLOT, which 23BA:012B plays from) made: bank 15h, the
+    /// offset, the frame's segment, the size 7428 left at A90C. None
+    /// where 7428 would call the error hook (not ported).
+    pub fn fight_sound(&mut self, files: &mut Files, ax: u16) -> Option<()> {
+        let si = self.skip_strings(DS, FIGHT_SOUNDS, ax);
+        self.ems_map(0x15);
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        let _ = self.file_load_or_carry(files, si, frame, FIGHT_SOUND_AT)?;
+        let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+        for (i, w) in [0x15, FIGHT_SOUND_AT, frame, size].into_iter().enumerate() {
+            self.mem.w16(DS, FILE_SLOT + 2 * i as u16, w);
+        }
+        Some(())
+    }
+
     pub fn sound_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
         if self.mem.r16(DS, ENABLED) == 0 {
             return Some(());
