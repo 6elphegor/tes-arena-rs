@@ -322,7 +322,11 @@ class ScreenArena(DosArena):
         # main sets it after the start (0000:108B): an INF's @TEXT is copied
         # there (and a level's triggers read their texts from it).
         self.w16(0xCB8A, self.r16(0x9030))
-        saved = self.stub()
+        # The location record's build (1194:3AE8) not stubbed: the rebuild
+        # runs it for a save made in a city's street (25FD:03F9, CB5C bit
+        # 4 without the wilderness's C39A bit 200h), and the town's lists
+        # the entered hook makes (1194:3EBF) are built from it.
+        saved = self.stub(location=False)
         # The working slot as the start leaves it with no ARENA variable in
         # the environment (1194:3A72: 40h).
         self.mu.mem_write(self.lin(self.ds, 0x1A80), b'\x40')

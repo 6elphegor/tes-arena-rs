@@ -863,8 +863,10 @@ fn the_state_measured_against_the_originals() {
 /// segments 1000h higher (the harness relocates the image to 1000h; the
 /// port runs it unrelocated): every relocated word of the image that lies
 /// in DGROUP, and the words tests/vectors/loadsegs.txt names (segments of
-/// the image the game stores as it runs); the offsets
-/// tests/vectors/loadexclude.txt names zeroed (on both sides).
+/// the image the game stores as it runs, unless their far pointer is null,
+/// 0:0, a hook the area left unset, which the harness's holds as 0:0
+/// too); the offsets tests/vectors/loadexclude.txt names zeroed (on both
+/// sides).
 fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let image = arena::exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
     let mut d = d.to_vec();
@@ -873,7 +875,10 @@ fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let segs = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadsegs.txt");
     for line in std::fs::read_to_string(segs).expect(segs).lines() {
         if let Some(w) = line.split('#').next().and_then(|l| l.split_whitespace().next()) {
-            slots.push(usize::from_str_radix(w, 16).unwrap());
+            let at = usize::from_str_radix(w, 16).unwrap();
+            if d[at - 2..at + 2].iter().any(|&b| b != 0) {
+                slots.push(at);
+            }
         }
     }
     for at in slots {

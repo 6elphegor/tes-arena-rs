@@ -438,6 +438,21 @@ impl arena::frame::FrameHooks for Front<'_> {
     fn interface(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.interface_setup(files, self)
     }
+    /// 0000:4B84: 0390 with the view's `LightState`, its loads made in it
+    /// (`LightNow`).
+    fn outdoor_light(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if let Some(light) = self.light.as_deref_mut() {
+            m.outdoor_light(&mut LightNow { light, files });
+        }
+    }
+    /// 0000:4C7E, 2294:0428: a new day's colours loaded.
+    fn sky_colours(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if let Some(name) = m.sky_colours() {
+            if m.sky_colours_load(files, name).is_none() {
+                eprintln!("the sky's colours did not load");
+            }
+        }
+    }
     /// 0000:5011: an effect's words counted down; drawn at 0Bh above the
     /// view's foot (C3A2) while they last.
     fn effect_words(&mut self, m: &mut arena::machine::Machine) {
@@ -1038,6 +1053,71 @@ impl arena::light::LightHooks for LightState {
     }
 }
 
+/// `LightState` with the files: 0000:0390's loads made as it asks for
+/// them, inside it as the original makes them (2294:0341's dither,
+/// 027A's sky's images made again then 02F2's relighting of them and of
+/// the water's frames, DFDB's textures put back).
+struct LightNow<'a> {
+    light: &'a mut LightState,
+    files: &'a mut arena::bsa::Files,
+}
+
+impl arena::light::LightHooks for LightNow<'_> {
+    fn sky(&mut self, m: &mut arena::machine::Machine, step: arena::sky::SkyStep) {
+        self.light.sky(m, step);
+        if let Some(name) = self.light.dither.take() {
+            if m.sky_dither_load(self.files, name).is_none() {
+                eprintln!("the sky's dither did not load");
+            }
+        }
+    }
+
+    fn light_table(&mut self, m: &mut arena::machine::Machine) {
+        self.light.light_table(m);
+    }
+
+    fn fog_light_table(&mut self, m: &mut arena::machine::Machine) {
+        self.light.fog_light_table(m);
+    }
+
+    fn lgt(&mut self, m: &mut arena::machine::Machine, name: u16) {
+        self.light.lgt(m, name);
+    }
+
+    fn fog_fill(&mut self, m: &mut arena::machine::Machine) {
+        self.light.fog_fill(m);
+    }
+
+    fn relight(&mut self, m: &mut arena::machine::Machine, level: u16) {
+        self.light.relight(m, level);
+        if let Some(level) = self.light.relight.take() {
+            m.sky_images_relight(level);
+            if m.water_relight(self.files, level).is_none() {
+                eprintln!("the water's frames did not load");
+            }
+        }
+    }
+
+    fn restore_textures(&mut self, m: &mut arena::machine::Machine) {
+        self.light.restore_textures(m);
+        if std::mem::take(&mut self.light.restore) && m.water_frames(self.files, 0xBA17).is_none() {
+            eprintln!("the water's frames did not load");
+        }
+    }
+
+    fn sky_objects(&mut self, m: &mut arena::machine::Machine) {
+        self.light.sky_objects(m);
+    }
+
+    fn palette(&mut self, m: &mut arena::machine::Machine, index: u8, at: u16) {
+        self.light.palette(m, index, at);
+    }
+
+    fn weather_palette(&mut self, m: &mut arena::machine::Machine) {
+        self.light.weather_palette(m);
+    }
+}
+
 impl Assets {
     /// The colours on the screen as the original's DAC holds them: PAL.COL
     /// but, after a frame outdoors, entries 1..8 the sky's colours for the
@@ -1095,17 +1175,9 @@ impl Assets {
         }
         if engine.m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0 {
             // 0000:46AF: the light for the time of day (0390, `outdoor_light`:
-            // the sky's window, day's or night's switch, the relight the
-            // first frame's `sky_loads` does).
-            engine.m.outdoor_light(&mut light);
-            if std::mem::take(&mut light.restore) && engine.m.water_frames(&mut engine.files, 0xBA17).is_none() {
-                eprintln!("the water's frames did not load");
-            }
-            if let Some(name) = light.dither.take() {
-                if engine.m.sky_dither_load(&mut engine.files, name).is_none() {
-                    eprintln!("the sky's dither did not load");
-                }
-            }
+            // the sky's window and its dither, day's or night's switch, the
+            // relight), its loads made in it.
+            engine.m.outdoor_light(&mut LightNow { light: &mut light, files: &mut engine.files });
         }
         Assets {
             palette: world::palette(dir),
@@ -1163,10 +1235,11 @@ impl Assets {
         prof::time("renderer.reload", || r.reload(device, queue, &self.scene()));
     }
 
-    /// The sky after a frame (2294:0428, then 0000:0390 with 2294:0341;
-    /// the .COL loads here): outdoors, palette entries 1..8 from the day's
-    /// colours at the window for the time of day, the textures darkened by
-    /// night and the lamps lit.
+    /// The sky after a frame (the frame body's 0390 and 2294:0428 made the
+    /// light and the colours: `Front::outdoor_light`, `sky_colours`):
+    /// outdoors, palette entries 1..8 from the day's colours at the window
+    /// for the time of day, the textures darkened by night and the lamps
+    /// lit.
     fn sky(&mut self, m: &mut arena::machine::Machine) -> render::Sky {
         use arena::sky::var::{COLOURS, DITHER, DITHER_AFTERNOON, WINDOW};
         let outdoors = m.mem.r16(arena::mem::DS, 0xC398) & 4 != 0;
@@ -1175,10 +1248,6 @@ impl Assets {
             // greys it: 2294:0C36).
             return render::Sky { lamp: self.light.lamp, ..Default::default() };
         }
-        if let Some(name) = m.sky_colours() {
-            self.light.colours = Some(name);
-        }
-        m.outdoor_light(&mut self.light);
         let name = m.mem.r16(arena::mem::DS, COLOURS);
         if self.colours.as_ref().map(|c| c.0) != Some(name) {
             let file = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, name)).into_owned();
@@ -1216,8 +1285,18 @@ impl Assets {
     /// if the player moved to another place (`lights_near`), then the
     /// near and the moving lights; outdoors the sky's hook's fog step
     /// (2294:0B01, from 0000:D513), which in fog leaves only the player's
-    /// light. None in full daylight (C398 bit 8000h).
+    /// light. None in full daylight (C398 bit 8000h). The view's own work
+    /// after the frame, where the original does none: DGROUP is left as the
+    /// frame left it (the player's light stays at the eye of the frame's
+    /// start, A2EC's, until the next frame's).
     fn lights(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
+        let kept = m.mem.segment(arena::mem::DS).to_vec();
+        let lights = self.lights_made(m);
+        m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
+        lights
+    }
+
+    fn lights_made(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
         use arena::light::var::*;
         use arena::mem::DS;
         let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));

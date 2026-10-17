@@ -32,13 +32,9 @@ fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&m
     bad |= check_files(&a, name, "save", &before, &after);
     assert!(!bad, "{name}: the files differ from the original's");
     // The save loaded back from the title, as gen_savefiles.py's
-    // `load_line` loads the original's: DGROUP as the load leaves it.
-    // Outdoors the view makes the area's entry (the hook CD42, 0000:468B:
-    // the sky's colours, the dither) before the first frame, the original
-    // in it, after where the harness stops: not compared there.
-    if !compare_load {
-        return;
-    }
+    // `load_line` loads the original's: DGROUP as the load leaves it (with
+    // `compare_load`), and where there are `loadframe` lines the world
+    // frames run on after it.
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/savefiles.txt")).expect("savefiles.txt");
     let prefix = format!("loadplace | {name} | ");
     let Some(want) = text.lines().find_map(|l| l.strip_prefix(prefix.as_str())) else { panic!("{name}: no loadplace line") };
@@ -51,11 +47,42 @@ fn save_case(name: &str, compare_load: bool, place: Place, setup: impl FnOnce(&m
     clear(&mut d, &mut b);
     let (ds, _) = grab(&b);
     let canon = load_canonical(&dir, &ds);
-    if let Ok(dump) = std::env::var("ARENA_SAVEFILES") {
+    let dump = std::env::var("ARENA_SAVEFILES").ok().map(PathBuf::from);
+    if let Some(dump) = &dump {
         // Beside gen_savefiles.py --dump's NAME.loadds.
-        let _ = std::fs::write(Path::new(&dump).join(format!("{name}.loadds.port")), &canon);
+        let _ = std::fs::write(dump.join(format!("{name}.loadds.port")), &canon);
     }
-    assert_eq!(format!("{:x}", fnv(canon)), digest, "{name}: the save loaded back differs from the original's load of its own");
+    if compare_load {
+        assert_eq!(format!("{:x}", fnv(canon)), digest, "{name}: the save loaded back differs from the original's load of its own");
+    }
+    // The frames after the load (gen_savefiles.py's `load_frames`): DGROUP
+    // in the original's form, stateexclude.txt's offsets left out as well,
+    // and the EMS banks, at the top of each.
+    let frames: Vec<(usize, &str)> = text
+        .lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split(" | ").collect();
+            (f.len() == 4 && f[0] == "loadframe" && f[1] == name).then(|| (f[2].parse().unwrap(), f[3]))
+        })
+        .collect();
+    let skip = state_excluded();
+    page(&mut b);
+    let mut bad = Vec::new();
+    for (k, want) in frames {
+        d.frame(&mut b);
+        let (ds, banks) = grab(&b);
+        let mut canon = load_canonical(&dir, &ds);
+        canon.iter_mut().zip(&skip).filter(|(_, s)| **s).for_each(|(x, _)| *x = 0);
+        if let Some(dump) = &dump {
+            // Raw, beside gen_savefiles.py --dump's NAME.loadds<k>.
+            let _ = std::fs::write(dump.join(format!("{name}.loadds{k}.port")), &ds);
+            let _ = std::fs::write(dump.join(format!("{name}.loadems{k}.port")), &banks);
+        }
+        if format!("{:x} {:x}", fnv(canon), fnv(banks)) != want {
+            bad.push(k);
+        }
+    }
+    assert!(bad.is_empty(), "{name}: the frames after the save loaded back differ from the original's: {bad:?}");
 }
 
 #[test]

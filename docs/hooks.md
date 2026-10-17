@@ -123,10 +123,12 @@ the original routine:
 | `FrameHooks::menu_keys` | src/frame.rs:112 | 2542:0100 | elsewhere | the view reads its keys itself (`menukeys` ported, called by the view) | |
 | `FrameHooks::message_box` | src/frame.rs:68 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `FrameHooks::message_box_number` | src/frame.rs:70 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port then its box (entry boxes in screens.txt) |
+| `FrameHooks::outdoor_light` | src/frame.rs:141 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | faithful: `outdoor_light` with its loads made inside it (`LightNow`), in the frame body where the original runs it; was the view's after the frame, so a title load's first frame lost its relight (savefiles.txt `loadframe` lines) |
 | `FrameHooks::projectile_lights_end` | src/frame.rs:66 | 292B:000E | overridden | the view: main.rs Front<'_> | faithful: `projectile_lights_end` |
 | `FrameHooks::quest_carry` | src/frame.rs:117 | 0000:4D00 | port | the default runs the port | |
 | `FrameHooks::rest` | src/frame.rs:133 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
 | `FrameHooks::riddle` | src/frame.rs:80 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
+| `FrameHooks::sky_colours` | src/frame.rs:145 | 0000:4C7E, 2294:0428 | overridden | the view: main.rs Front<'_> | faithful: `sky_colours`, `sky_colours_load` in the frame body (was after the frame) |
 | `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
 | `FrameHooks::townsfolk_graphics` | src/frame.rs:108 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
 | `FrameHooks::weapon_graphics` | src/frame.rs:104 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |

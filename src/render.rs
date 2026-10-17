@@ -199,8 +199,12 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         // textures' copy put back (A483) and a click's wall.
         m.mem.w8(DS, 0xCB5B, r.m.mem.r8(DS, 0xCB5B));
     }
+    // (CD14 and CCCA too, the last square the walk took and its offset:
+    // the machine's walk, `view_begin`, puts the walk's resets there, F830h
+    // and FFFFh, which the copy, started from the machine's last bytes,
+    // may not have begun from: the first frame after a load.)
     let mut left = Vec::new();
-    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCA), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (0xD7F0, 0xD7F2), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D)] {
+    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (0xD7F0, 0xD7F2), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D)] {
         for o in from..to {
             left.push((o, r.m.mem.r8(DS, o)));
         }
