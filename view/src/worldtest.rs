@@ -524,6 +524,19 @@ fn case(name: &str) -> Option<Case> {
     Some(match name {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
+        "playghostclick" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            // The harness's click is read by the next frame's controls
+            // (its input step, after that frame's drawing): the window's
+            // turn takes it before a frame, as that step's.
+            frames(a, d, seen, 2, |_| false);
+            // The harness's mouse at (160, 100): the click 4 on (CB60).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+            frames(a, d, seen, 1, |_| false);
+        })),
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
@@ -719,7 +732,7 @@ fn differing(a: &[u8], b: &[u8], gap: usize) -> Vec<(usize, usize)> {
 fn the_state_measured_against_the_originals() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog"] {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playghostclick"] {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
@@ -927,7 +940,7 @@ fn the_state_from_the_load_as_the_original_leaves_it() {
 /// wilderness, a dungeon and its stairs, the crypt, fog.
 #[test]
 fn the_state_as_the_original_leaves_it() {
-    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky"] {
+    for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky", "playghostclick"] {
         state_case(name);
     }
 }

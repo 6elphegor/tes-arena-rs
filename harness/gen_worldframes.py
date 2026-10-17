@@ -267,6 +267,11 @@ CASES = {
     # frame: its flat drawn through the light table (0000:953E).
     'playghost': ('dungeon', ghost, [((), (), 1, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # The ghost (`ghost`) clicked in the middle of the view a frame on:
+    # the drawing's hit test (0000:C4BB, before 78A8 scales it) finds it
+    # under the click (CB5E, the hook CD3A), the frame's actor click
+    # (1194:DB6C) names it on the message line.
+    'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
 }
 
 

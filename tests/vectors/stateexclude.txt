@@ -9,6 +9,24 @@ acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' tabl
 cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 127a 127e 0000:47FD's return address kept on the stack's check
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
+# Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
+061c 061e the message's segment (061A's far pointer)
+7f88 7f8a cast record 0's spell's segment
+7f8c 7f8e cast record 0's caster's segment (a heap block's)
+7f9e 7fa0 cast record 1's spell's segment
+7fa2 7fa4 cast record 1's caster's segment (a heap block's)
+7fb4 7fb6 cast record 2's spell's segment
+7fb8 7fba cast record 2's caster's segment (a heap block's)
+7fca 7fcc cast record 3's spell's segment
+7fce 7fd0 cast record 3's caster's segment (a heap block's)
+7fe0 7fe2 cast record 4's spell's segment
+7fe4 7fe6 cast record 4's caster's segment (a heap block's)
+7ff6 7ff8 cast record 5's spell's segment
+7ffa 7ffc cast record 5's caster's segment (a heap block's)
+800c 800e cast record 6's spell's segment
+8010 8012 cast record 6's caster's segment (a heap block's)
+8022 8024 cast record 7's spell's segment
+8026 8028 cast record 7's caster's segment (a heap block's)
 # Where the heaps' layouts part (segments and scratch):
 8f6e 8f70 a segment the drawing keeps
 ccc2 ccc4 the light table's segment (the drawing's copy's own heap)
@@ -21,6 +39,7 @@ a908 a910 0000:742C's scratch
 8fa8 8faa the EMS bank mapped last: still differs with the faces (292B:0530, mapping 19h each frame) ported; not traced
 9288 9289 the drawing's colour
 b036 b038 the texts' drawing's state
-adb6 adb8 the texts' drawing's state
+adb6 adb9 the texts' drawing's state (ADB8 the last row 9E0A drew: the message line's, which the view draws itself)
+97e2 9800 the message line's text as its drawing (0000:0511) lays it out: the view draws the line itself
 # The drawing's reading past its own tables into the heap:
 d82a d83c the ceiling's rows' light steps (0000:DC67): the crypt's farthest row reads one entry past its row table, the next heap block's header (as view3d1 leaves row 0 out)

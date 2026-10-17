@@ -97,6 +97,22 @@ pub struct Soft {
     /// compiled by 7A2B left it on the stack: 9546 doesn't set it, and
     /// the rows' start reads it.
     odd: u8,
+    /// The actors' and projectiles' records whose animation the drawing
+    /// stepped (C23A), in order (`Walked::stepped`).
+    stepped: Vec<u16>,
+}
+
+/// What the walk leaves the game (`draw`'s fourth): the objects it
+/// stepped (0000:C23A, for `Machine::drawn_step` on the game's memory)
+/// and DGROUP's words and bytes it left that the game reads after the
+/// drawing, by offset: the square and the door's span under the cursor
+/// (CB92, CCB2..CCB9, CCC8), the hit test's find (CB5E, the record at
+/// 3D96 and the scratch flat's +12h, 0000:C4BB and the hook CD3A), the
+/// changed squares' steps (C302.., CB59, CB5A, D73C).
+#[derive(Clone, Debug, Default)]
+pub struct Walked {
+    pub stepped: Vec<u16>,
+    pub left: Vec<(u16, u8)>,
 }
 
 /// A creature's flat the drawing reached (`Soft::creatures`).
@@ -139,14 +155,14 @@ impl Lgts {
 /// byte before and after (the same where it wrote the machine's own); the
 /// fourth
 /// the creatures' flats it reached (`Soft::creatures`), in order.
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>) {
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0 };
+    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, stepped: Vec::new() };
     r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
@@ -159,7 +175,14 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         // textures' copy put back (A483) and a click's wall.
         m.mem.w8(DS, 0xCB5B, r.m.mem.r8(DS, 0xCB5B));
     }
-    (r.page, r.gaps, wrote, r.creatures)
+    let mut left = Vec::new();
+    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCA), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (0xD7F0, 0xD7F2), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D)] {
+        for o in from..to {
+            left.push((o, r.m.mem.r8(DS, o)));
+        }
+    }
+    let walked = Walked { stepped: r.stepped, left };
+    (r.page, r.gaps, wrote, r.creatures, walked)
 }
 
 /// 0000:CBFF alone (tests/capdraw.rs): the cap at height `ax` wound by
@@ -167,7 +190,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
 /// the 3D mode draws it; the machine and the page after, and the paths
 /// not ported it reached.
 pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u8>, Vec<&'static str>) {
-    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0 };
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0, stepped: Vec::new() };
     r.page.resize(0x10000, 0);
     r.cap_draw(0, ax, cx);
     (r.m, r.page, r.gaps)
@@ -2513,15 +2536,11 @@ impl Soft {
             self.plain_rows();
             let v = self.g16(0xD43A);
             self.s16(bx + 0x16, v);
-            if self.g16(bx + 0xF) & 0x2004 == 0 {
-                let f = self.g8(bx + 0xD).wrapping_add(1);
-                self.s8(bx + 0xD, f);
-                if f > self.g8(bx + 0xE) & 0x7F {
-                    if self.g16(bx + 0xF) & 0x100 != 0 {
-                        self.gap("C255: a flat's last frame");
-                    }
-                    self.s8(bx + 0xD, 0);
-                }
+            // C23A..C26C: its animation stepped (`Machine::drawn_step`),
+            // which the game's memory takes too (`Walked::stepped`).
+            self.m.drawn_step(bx);
+            if bx != crate::talk::var::FLAT_DRAWN {
+                self.stepped.push(bx);
             }
         } else {
             self.s16(0xCD9C, bx);
@@ -2530,6 +2549,45 @@ impl Soft {
             self.s8(0xCD96, 0);
             self.sprite_raw(x, y, z, dx);
             self.plain_rows();
+        }
+    }
+
+    /// 0000:C4BB, before a flat is scaled (C485, C710, C8C8): with a
+    /// click left (C39A bit 80h, or 1000h), the flat at (A836, A838),
+    /// A844 x A84C, under the click's point (CB60, CB62; its x alone with
+    /// C39A bit 1000h) becomes CB5E (its record, CD9C) and the hook CD3A
+    /// is called with AL CD96 (the 3D mode's 2294:047B,
+    /// `Machine::clicked_flat`). A map flat drawn through the scratch
+    /// record (CD02 D7DEh) is tried only if its kind's flags (CDA1 + 5n)
+    /// have bit 0 or its byte at CD9F + 5n is set, unless C39A bit 400h.
+    fn hit_test(&mut self) {
+        let lf = self.g16(0xC39A);
+        if lf & 0x1080 == 0 {
+            return;
+        }
+        if self.g16(0xCD02) == crate::talk::var::FLAT_DRAWN && lf & 0x400 == 0 {
+            let n = self.g8(0xD7EA) as u16 * 5;
+            if self.g8(0xCDA1u16.wrapping_add(n)) & 1 == 0 && self.g8(0xCD9Fu16.wrapping_add(n)) == 0 {
+                return;
+            }
+        }
+        let (x, y, w, h) = (s(self.g16(0xA836)), s(self.g16(0xA838)), self.g16(0xA844), self.g16(0xA84C));
+        let cx = s(self.g16(0xCB60));
+        if x >= cx || cx >= s(self.g16(0xA836).wrapping_add(w)) {
+            return;
+        }
+        if lf & 0x1000 == 0 {
+            let cy = s(self.g16(0xCB62));
+            if y >= cy || cy >= s(self.g16(0xA838).wrapping_add(h)) {
+                return;
+            }
+        }
+        let v = self.g16(0xCD9C);
+        self.s16(crate::talk::var::CLICKED, v);
+        match self.g32(0xCD3A) {
+            0 => {}
+            0x2294_047B => self.m.clicked_flat(),
+            _ => self.gap("C52A: the hook CD3A"),
         }
     }
 
@@ -2623,6 +2681,7 @@ impl Soft {
         self.s16(0xCD9A, h);
         self.s16(0xCD98, w);
         let flags = 1 | if self.g8(0xCD97) & 4 != 0 { 2 } else { 0 };
+        self.hit_test();
         self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, flags, (dseg, doff), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
             self.reflect();
@@ -2670,6 +2729,7 @@ impl Soft {
         let (shseg, shoff) = self.person_colours(shseg, shoff);
         self.s16(0xCD9A, h);
         self.s16(0xCD98, w);
+        self.hit_test();
         self.blit(x0, y0, ax, bx, (shseg, shoff), w, h, 1, (es, si.wrapping_add(0xC)), 8, (0, 0));
         if self.g8(0xCD97) & 8 != 0 {
             self.reflect();
@@ -2763,6 +2823,7 @@ impl Soft {
         self.s16(0xCD9A, fh);
         self.s16(0xCD98, fw);
         // C710: C4BB, the click's test, is the game's (the copy's).
+        self.hit_test();
         self.blit(x0, y0, ax, bx, shade, fw, fh, flags, (dseg, doff), bpp, (es, si.wrapping_add(0x4C)));
         if self.m.hook_set(0xCD3E) {
             self.gap("C71C: the hook CD3E after a flat");
