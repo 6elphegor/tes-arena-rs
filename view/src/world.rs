@@ -65,6 +65,36 @@ pub fn fonts_load(m: &mut Machine, dir: &Path) {
     }
 }
 
+/// The heap as the original's (0000:00CC over conventional memory from
+/// the image's end, the screen's 64 KB a block in use, as the harness
+/// lays it out: free 4C00h..8FFEh, the screen's block, free A000h..EFFDh
+/// here, the image's segments being the harness's less 1000h). The
+/// view's was A000h..F000h alone, 3400h paragraphs short: with the sky's
+/// buffers allocated as the game's set-up allocates them (2294:01F1) the
+/// LZHUF unpacker's tables (83Eh paragraphs, `mif_decompress`) no longer
+/// fitted, and the world map's pictures (OUTPROV.CIF) weren't unpacked.
+fn heap(m: &mut Machine) {
+    const LOW: u16 = 0x4C00;
+    const SCREEN: u16 = 0x8FFF;
+    const HIGH: u16 = 0xA000;
+    const TOP: u16 = 0xF000;
+    m.heap_init(LOW, TOP).expect("heap");
+    let header = |m: &mut Machine, seg: u16, next: u16, prev: u16, size: u16, used: u8| {
+        m.mem.w16(seg, 0, 0);
+        m.mem.w16(seg, 2, next);
+        m.mem.w16(seg, 4, 0);
+        m.mem.w16(seg, 6, prev);
+        m.mem.w16(seg, 8, size);
+        m.mem.w8(seg, 0xA, used);
+    };
+    let low = SCREEN - LOW - 1;
+    let high = TOP - HIGH - 3;
+    header(m, LOW, SCREEN, 0, low, 0);
+    header(m, SCREEN, HIGH, LOW, 0x1000, 1);
+    header(m, HIGH, 0, SCREEN, high, 0);
+    m.mem.w16(DS, arena::heap::var::FREE, low + high);
+}
+
 /// Loads `level` (a .MIF) from the game in `dir` into an engine and
 /// enters it, as examples/play.rs does.
 pub fn load(dir: &Path, level: &str) -> Engine {
@@ -72,7 +102,7 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     let mut m = Machine::new(&image);
     let mut files = Files::new(dir).expect("game directory");
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
-    m.heap_init(0xA000, 0xF000).expect("heap");
+    heap(&mut m);
     fonts_load(&mut m, dir);
     // The sound driver's buffer (EB89), FFDCh bytes as the program's
     // start allocates them (2294:CEDB): the level's sound files are read
@@ -158,6 +188,9 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     // 100h and the stores' at 180h of its segment). Left at 0:0, the
     // first entry of a list sits at offset 0, which the lookup (1194:3EB1)
     // returns as "none": the first temple's name came out random.
+    // The sky's buffers: the day's colours and the dither (2294:01F1, the
+    // set-up's resources, before its allocations below).
+    m.sky_buffers(&mut files).expect("the sky's buffers");
     let (seg, off) = m.heap_alloc_bytes(0x280).expect("heap");
     let hi = (seg as u32) << 16;
     m.mem.w32(DS, 0x1AB5, hi | off as u32);

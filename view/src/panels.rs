@@ -64,14 +64,18 @@ pub fn image_type8(m: &Machine, d: &[u8]) -> Option<Image> {
         return None;
     }
     let data = d.get(12..12 + size)?;
+    // The packed data and the picture in blocks of the copy's heap, as
+    // the original loads a file into an allocation (the heap reaches over
+    // all of conventional memory, as the original's: fixed segments would
+    // be inside it, under the unpacker's tables).
     let mut c = m.clone();
-    const SRC: u16 = 0x6000;
-    const DST: u16 = 0x7000;
+    let (src, src_off) = c.heap_alloc_bytes(u16::try_from(size).ok()?)?;
+    let (dst, dst_off) = c.heap_alloc_bytes(u16::try_from(w * h).ok()?)?;
     for (i, &b) in data.iter().enumerate() {
-        c.mem.w8(SRC + (i >> 4) as u16, (i & 15) as u16, b);
+        c.mem.w8(src, src_off.wrapping_add(i as u16), b);
     }
-    c.mif_decompress(SRC, 0, DST, 0, size as u16)?;
-    let px = (0..w * h).map(|i| c.mem.r8(DST, i as u16)).collect();
+    c.mif_decompress(src, src_off, dst, dst_off, size as u16)?;
+    let px = (0..w * h).map(|i| c.mem.r8(dst, dst_off.wrapping_add(i as u16))).collect();
     Some(Image { x: x as i16 as i32, y: y as i16 as i32, w, h, px })
 }
 
