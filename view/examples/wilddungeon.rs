@@ -20,6 +20,8 @@ mod flats;
 mod archive;
 #[path = "../src/areas.rs"]
 mod areas;
+#[path = "../src/light.rs"]
+mod light;
 use arena::controls::Intent;
 use arena::engine::{Engine, Frame, Input};
 use arena::machine::Machine;

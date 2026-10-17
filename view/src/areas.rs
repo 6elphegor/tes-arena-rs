@@ -11,6 +11,7 @@
 //! location's seed (2294:0ED4, 0000:28BC), its levels as they are
 //! entered (0000:2957, the INF's hook).
 
+use crate::light;
 use crate::world;
 use arena::bsa::Files;
 use arena::engine::Engine;
@@ -48,10 +49,27 @@ impl AreaHooks for Areas<'_> {
         m.states_keep(files);
     }
 
-    /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`); the
-    /// frame's 2294:0428 (`Sky::sky`) chooses its colours again.
+    /// 0000:068A: the sky's state forgotten (`Machine::sky_reset`), then
+    /// 06B8's 2294:0428: the day's colours for the weather loaded.
     fn hands(&mut self, m: &mut Machine) {
         m.sky_reset();
+        if let (Some(name), Some(files)) = (m.sky_colours(), self.files.as_deref_mut()) {
+            if m.sky_colours_load(files, name).is_none() {
+                eprintln!("the sky's colours did not load (2294:0428)");
+                self.failed = true;
+            }
+        }
+    }
+
+    /// 0000:464A..467C: the sky's objects made (`Machine::area_sky`), their
+    /// images loaded as the game loads them (`GameSkyLoad`); where it
+    /// answers false the palette named at 1304 read to 929E (0000:7530).
+    fn sky(&mut self, m: &mut Machine) {
+        let Some(files) = self.files.as_deref_mut() else { return };
+        light::SKY_NAMES.with(|n| n.borrow_mut().clear());
+        if !m.area_sky(&mut light::GameSkyLoad { files }) && m.colours_load(files, 0x1304, 0x929E).is_none() {
+            eprintln!("the palette did not load (0000:7530)");
+        }
     }
 
     fn normal_lgt(&mut self, m: &mut Machine) {
@@ -109,6 +127,15 @@ impl AreaHooks for Areas<'_> {
                 self.failed = true;
             }
         }
+        // 46AF: outdoors, 0390's light for the time of day, its loads made
+        // in it (`LightNow`); the light handed to the assets made next.
+        let mut light = light::LightState::new(self.dir, m);
+        if m.mem.r16(DS, 0xC398) & 4 != 0 {
+            if let Some(files) = self.files.as_deref_mut() {
+                m.outdoor_light(&mut light::LightNow { light: &mut light, files });
+            }
+        }
+        light::ENTRY_LIGHT.with(|l| *l.borrow_mut() = Some(light));
         if m.mem.r16(DS, 0xC398) & 4 == 0 {
             let Some(files) = self.files.as_deref_mut() else {
                 m.flat_lights();
@@ -226,6 +253,14 @@ impl arena::load::LoadHooks for Areas<'_> {
     /// 0000:AAA2: the light table made (the load freed it).
     fn renderer(&mut self, m: &mut Machine) {
         world::light_table(m);
+    }
+    /// 0000:E5C9: outdoors, the sky's images into the sky's bank
+    /// (`Machine::sky_images`).
+    fn sky_graphics(&mut self, m: &mut Machine, files: &mut Files) {
+        if m.sky_images(files).is_none() {
+            eprintln!("the sky's images did not load (0000:E5C9)");
+            self.failed = true;
+        }
     }
     /// 25FD:06A1: the slot's files copied to the working ones, in the
     /// engine's files and in the copy these hooks read (`files`, taken

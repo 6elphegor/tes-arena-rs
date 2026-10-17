@@ -39,8 +39,8 @@ the original routine:
 | `AreaHooks::city_screen` | src/transit.rs:106 | 2294:11F2 | present | 2294:11F2 is the heap check (int3 on a bad heap); nothing to keep | |
 | `AreaHooks::ems_free` | src/transit.rs:166 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
 | `AreaHooks::ending` | src/transit.rs:87 | 1194:D459 | overridden | the view: areas.rs Areas<'_> | elsewhere: the window shows the farewell's vision (`Creation::ending`, vision.txt frame by frame); the message line is only the scripted runs' |
-| `AreaHooks::entered` | src/transit.rs:180 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load) |
-| `AreaHooks::hands` | src/transit.rs:159 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset` (state tests) |
+| `AreaHooks::entered` | src/transit.rs:180 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
+| `AreaHooks::hands` | src/transit.rs:159 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
 | `AreaHooks::hook_2631` | src/transit.rs:162 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
 | `AreaHooks::hook_2974` | src/transit.rs:139 | 0000:2974 | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_first_level` (dungeon vectors) |
 | `AreaHooks::leave_dungeon` | src/transit.rs:129 | 2433:0199 | port | the default runs the port | |
@@ -50,7 +50,7 @@ the original routine:
 | `AreaHooks::mouse_wait` | src/transit.rs:146 | 0000:8FC4 | present | waiting for the buttons up; input only | |
 | `AreaHooks::normal_lgt` | src/transit.rs:89 | 0000:742C | overridden | the view: areas.rs Areas<'_> | faithful: NORMAL.LGT loaded as 0000:742C loads it |
 | `AreaHooks::restore_level` | src/transit.rs:151 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
-| `AreaHooks::sky` | src/transit.rs:137 | 0000:464A | elsewhere | the view makes the sky objects (`area_sky`) and the palette with its assets on entry | |
+| `AreaHooks::sky` | src/transit.rs:137 | 0000:464A | overridden | the view: areas.rs Areas<'_> | faithful: `area_sky` with the game's loads (`file_load_ems`, 7428 with DI FFFDh), else PAL.COL to 929E; was the assets' own after the entry, with the view's reads |
 | `AreaHooks::slots_usable` | src/transit.rs:154 | 25CA:01E6 | port | the default runs the port | |
 | `AreaHooks::spawn` | src/transit.rs:134 | 0000:1793 | overridden | the view: areas.rs Areas<'_> | faithful: `spawn_actors` (actors vectors) |
 | `AreaHooks::sync` | src/transit.rs:82 | 2F9F:0438 | port | the default runs the port | |
@@ -174,7 +174,7 @@ the original routine:
 | `LoadHooks::mode_3d` | src/load.rs:132 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
 | `LoadHooks::renderer` | src/load.rs:108 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
 | `LoadHooks::screen` | src/load.rs:101 | 0000:A5D1 | present | the view's screen set up | |
-| `LoadHooks::sky_graphics` | src/load.rs:106 | 0000:E5C9 | elsewhere | the view loads the sky's images with its assets (`Assets::sky_loads`) | |
+| `LoadHooks::sky_graphics` | src/load.rs:106 | 0000:E5C9 | overridden | the view: areas.rs Areas<'_> | faithful: `sky_images` where the load runs it (25FD:0417, AA5C); was the assets' own after the load (savefiles.txt `loadplace`) |
 | `LoadHooks::slot_files` | src/load.rs:88 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
 | `LoadHooks::sound_off` | src/load.rs:70 | 23BA:000C | present | the sound stopped | |
 | `LoadHooks::view_update` | src/load.rs:103 | 0000:DA8E | present | the view updated | |

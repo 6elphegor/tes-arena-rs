@@ -1004,8 +1004,8 @@ fn the_state_measured_against_the_originals() {
 /// in DGROUP, and the words tests/vectors/loadsegs.txt names (segments of
 /// the image the game stores as it runs, unless their far pointer is null,
 /// 0:0, a hook the area left unset, which the harness's holds as 0:0
-/// too); the offsets tests/vectors/loadexclude.txt names zeroed (on both
-/// sides).
+/// too, or a word marked `alone` is 0, another writer's); the offsets
+/// tests/vectors/loadexclude.txt names zeroed (on both sides).
 fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let image = arena::exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
     let mut d = d.to_vec();
@@ -1013,9 +1013,11 @@ fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
     let mut slots: Vec<usize> = image.relocs.iter().map(|&(seg, off)| seg as usize * 16 + off as usize).filter(|&l| l >= base && l + 1 < base + 0x10000).map(|l| l - base).collect();
     let segs = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/loadsegs.txt");
     for line in std::fs::read_to_string(segs).expect(segs).lines() {
-        if let Some(w) = line.split('#').next().and_then(|l| l.split_whitespace().next()) {
+        let mut f = line.split('#').next().unwrap_or("").split_whitespace();
+        if let Some(w) = f.next() {
             let at = usize::from_str_radix(w, 16).unwrap();
-            if d[at - 2..at + 2].iter().any(|&b| b != 0) {
+            let held = if f.next() == Some("alone") { &d[at..at + 2] } else { &d[at - 2..at + 2] };
+            if held.iter().any(|&b| b != 0) {
                 slots.push(at);
             }
         }

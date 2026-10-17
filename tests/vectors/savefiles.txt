@@ -30,10 +30,10 @@ save | savestreet | WILD002.05 0 cbf29ce484222325
 save | savestreet | WILD003.05 0 cbf29ce484222325
 save | savestreet | WILD004.05 0 cbf29ce484222325
 savedel | savestreet | 
-loadplace | savestreet | 19b76141 | 6d57db1b4ce25a5
-loadframe | savestreet | 1 | 567df40091ba1ffa 91b103fbcb421b9f
-loadframe | savestreet | 2 | 520bc90fadae5be2 91b103fbcb421b9f
-loadframe | savestreet | 3 | 5d0cd7fb14421257 91b103fbcb421b9f
+loadplace | savestreet | 19b76141 | 909d2e384cc7576d
+loadframe | savestreet | 1 | f2eee047b4872ff7 92b1332f340d551
+loadframe | savestreet | 2 | 92e30cf3c09b608f 92b1332f340d551
+loadframe | savestreet | 3 | d14f74d345720706 92b1332f340d551
 play | savewild | TMP2.$$$ fa00 9ddbfae4c25ae77f
 play | savewild | WILD001.RMD 183e 1914c477a5ae59e8
 play | savewild | WILD002.RMD 1a56 7c67972d0f120f7c
@@ -55,9 +55,9 @@ save | savewild | WILD003.05 1558 d10265bdb9423ea9
 save | savewild | WILD004.05 1046 3119a9ed52265f8d
 savedel | savewild | 
 loadplace | savewild | 19b76141 | 2e6c50f955d2e7be
-loadframe | savewild | 1 | a7c3c76518323815 c39ebb263930ce05
-loadframe | savewild | 2 | 1836105c7de66c2b 8d4209a6f0492e44
-loadframe | savewild | 3 | 11ca02a3a9e80619 8d4209a6f0492e44
+loadframe | savewild | 1 | e468918631766d44 c39ebb263930ce05
+loadframe | savewild | 2 | c1db2838d7e64212 8d4209a6f0492e44
+loadframe | savewild | 3 | d6faf51483d0c954 8d4209a6f0492e44
 play | savedungeon | AUTOMAP.64 20040 217fd87bed8f0e3d
 play | savedungeon | TMP2.$$$ fa00 98e7d995733ab27
 playdel | savedungeon | 

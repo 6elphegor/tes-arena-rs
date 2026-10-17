@@ -36,6 +36,15 @@ loadstate):
 
   loadplace | NAME | <seed> | <digest>
 
+and for the cases saved outdoors (FRAMES: the street's and the
+wilderness's entry finishes in the loop's first frames, 0000:4B84's
+0390 relighting the sky), the world loop run on from that load, nothing
+held (`load_frames`): at the top of each frame after the first, DGROUP's
+digest (loadexclude.txt's and stateexclude.txt's offsets 0) and the EMS
+banks 0..1Fh's (64K each, end to end):
+
+  loadframe | NAME | <frame> | <DGROUP digest> <EMS digest>
+
 The files are taken to the port's form first (`canonical`): SAVEGAME's
 level block (DGROUP BB08.., FD00h on in the file) holds segments of the
 image (the level's hooks, C3A4..C3BB), which the harness's load puts
@@ -57,8 +66,10 @@ for view/src/screentest.rs's `screen`, which checks each screen's files
 against these (none where a screen has no lines).
 
 With --dump DIR, each file as written (in that form): DIR/NAME.play/<file>
-and DIR/NAME.save/<file>, DIR/NAME.screen/<file> (game data: never commit
-them).
+and DIR/NAME.save/<file>, DIR/NAME.screen/<file>; the load's DGROUP as
+NAME.loadds, and each frame's after it, raw, as NAME.loadds<frame> and
+NAME.loadems<frame> (view/src/savetest.rs writes its own beside them;
+game data: never commit them).
 """
 import os
 import shutil
