@@ -246,6 +246,9 @@ fn as_far_as(b: &mut App, a: &App) {
 fn faded(a: &mut App) {
     a.fade.clear();
     a.fade_old = None;
+    // (A screen inside a frame ended: the frame's rest, as the tick
+    // runs it once the fade is over.)
+    a.screen_ended();
 }
 
 fn until_asked(d: &mut Driver, app: &mut App, n: usize) -> bool {
@@ -811,12 +814,15 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     setup(&mut b);
     let mut db = Driver::new(&mut b);
     db.frame(&mut b);
-    // The frame that took C.
-    db.frame(&mut b);
+    // The frame that takes C, the list up inside it.
+    db.key(&mut b, KeyCode::KeyC, None);
     // The list's run with its first line picked (`book_cast`: the page
-    // kept as shown, the line read back through 0B9C's order) and the cast.
+    // kept as shown, the line read back through 0B9C's order) and the
+    // cast, then the rest of the frame.
     let mut said = panels::Said { screen: Some(b.assets.shown.clone()), ..Default::default() };
+    b.panel = None;
     panels::book_cast(&mut b.engine, 0, &mut said);
+    b.screen_ended();
     same(&a, &b, "spell 0 clicked and panels::book_cast(0)");
     // Its target clicked in the view: the same click as the script's.
     d.click(&mut a, 164, 74, MouseButton::Left);

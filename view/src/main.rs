@@ -236,10 +236,15 @@ impl Front<'_> {
         }
     }
 
-    /// The screen the frame leaves the window to open (`Talk::taken`).
-    fn taken(&mut self, taken: Option<sheets::Taken>) {
+    /// The screen a menu key or the bar's button asks for, inside the
+    /// frame (`Talk::screen`): the travel map and the options screen the
+    /// window's after the frame (`Talk::taken`).
+    fn taken(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, taken: Option<sheets::Taken>) {
         if let (Some(t), Some(talk)) = (taken, self.talk.as_deref_mut()) {
-            talk.taken = Some(t);
+            match t {
+                sheets::Taken::Options | sheets::Taken::Action(sheets::BarAction::WorldMap) => talk.taken = Some(t),
+                t => talk.screen(m, files, t),
+            }
         }
     }
 
@@ -384,10 +389,9 @@ impl ControlHooks for Front<'_> {
     /// 2542:00BA: the window's click on the bar, in the frame's input step
     /// where the original takes it (after that frame's actors and
     /// drawing): its button's handler (`sheets::bar_click`), camping's in
-    /// place; a screen it asks for is the window's after the frame
-    /// (`Talk::taken`).
-    fn bar_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
-        let Some((x, y, right)) = self.talk.as_deref_mut().and_then(|t| t.bar.take()) else { return Some(()) };
+    /// place; a screen it asks for opens inside the frame (`taken`).
+    fn bar_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<bool> {
+        let Some((x, y, right)) = self.talk.as_deref_mut().and_then(|t| t.bar.take()) else { return Some(false) };
         let taken = match sheets::bar_click(m, files, x, y, right) {
             None | Some(sheets::BarAction::None) => None,
             Some(sheets::BarAction::Camp) => {
@@ -396,8 +400,8 @@ impl ControlHooks for Front<'_> {
             }
             Some(a) => Some(sheets::Taken::Action(a)),
         };
-        self.taken(taken);
-        Some(())
+        self.taken(m, files, taken);
+        Some(true)
     }
     /// 2826:0008: the stat bars' state (`bars_state`; the window draws
     /// them itself).
@@ -530,8 +534,8 @@ impl arena::frame::FrameHooks for Front<'_> {
     /// after the frame's actors, drawing and physics, before the rest of
     /// its body): what only changes the game's state done there (the
     /// weapon readied, picking armed, a touch spell cast, the compass),
-    /// camping's in place (2542:01E6); a screen is the window's after the
-    /// frame (`Talk::taken`).
+    /// camping's in place (2542:01E6); a screen opens inside the frame
+    /// (`taken`).
     fn menu_keys(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         use arena::menukeys::{MenuKey, NoMenuKeyHooks};
         let key = m.menu_keys(files, &mut NoMenuKeyHooks).unwrap_or(MenuKey::None);
@@ -544,7 +548,7 @@ impl arena::frame::FrameHooks for Front<'_> {
             MenuKey::Options => Some(sheets::Taken::Options),
             k => sheets::menu_action(m, k).map(sheets::Taken::Action),
         };
-        self.taken(taken);
+        self.taken(m, files, taken);
         Some(())
     }
     fn interface(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -1731,6 +1735,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         run,
         script: answers,
         pending: None,
+        inside: None,
+        screen_press: false,
         box_backdrop: None,
         boxes: Default::default(),
         selected: 0,
@@ -2688,7 +2694,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 hud.typing = Some(a.prompt.clone());
                 live = field::Live::open(&a.game.0, a.field, a.look);
             }
-            Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
+            Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_) | dialog::Need::Screen(..)) | None => {}
         }
         let draw_live = |screen: &mut hud::Screen| {
             if let Some(l) = &live {
@@ -3004,6 +3010,15 @@ struct Pending {
     backdrop: Option<shopui::Backdrop>,
 }
 
+/// A turn stopped inside its frame at a screen a menu key or the bar's
+/// button opened (`dialog::Need::Screen`): the turn, run again once the
+/// screen ends with the game as it left it (`App::screen_ended`).
+struct Inside {
+    before: Engine,
+    input: TurnIn,
+    given: Vec<dialog::Answer>,
+}
+
 struct App {
     /// How often the renderer was made again (`remake_renderer`; a
     /// headless bench keeps its own).
@@ -3074,6 +3089,13 @@ struct App {
     /// menu's entry highlighted; the typed field asked, as typed so far
     /// (`field::Live`); the rest's hours.
     pending: Option<Pending>,
+    /// The turn whose frame a screen is up inside (a menu key's, the
+    /// bar's button's), to run again when it ends.
+    inside: Option<Inside>,
+    /// The press a screen ended on (the logbook's, the automap's exit),
+    /// left in AFF9 by its loop's last read (0000:8FC4) for the rest of
+    /// the frame; the next frame's read finds the button let go.
+    screen_press: bool,
     /// The shop's screen behind the boxes a turn left after the shop ended
     /// (`Talk::backdrop`): the original's box (42EE) waits over the screen
     /// before the shop's way out (stealing, the guards called).
@@ -3311,8 +3333,12 @@ impl App {
 
     /// One engine turn with the keys and the mouse as an Intent.
     fn step(&mut self) {
-        if self.screen_up().is_some() || !self.fade.is_empty() {
+        if self.screen_up().is_some() || !self.fade.is_empty() || self.inside.is_some() {
             return;
+        }
+        // The press a screen ended on let go by this frame's read.
+        if std::mem::take(&mut self.screen_press) {
+            self.engine.m.mem.w8(arena::mem::DS, arena::controls::var::BUTTONS, 0);
         }
         let k = &self.keys;
         let axis = |p: bool, n: bool| (p as i16 - n as i16) * 256;
@@ -3421,6 +3447,17 @@ impl App {
         if talk.status.is_some() {
             self.status = talk.status;
         }
+        if let Some(dialog::Need::Screen(t, w)) = talk.need {
+            // A screen inside the frame: opened on the game as the frame
+            // asked for it; the turn runs again as it ends, the game it
+            // leaves taken on there (`screen_ended`).
+            self.engine.m.clone_from(&w.0 .0);
+            self.engine.files.clone_from(&w.0 .1);
+            self.inside = Some(Inside { before, input, given });
+            self.open_taken(t);
+            self.screen_ended();
+            return;
+        }
         if let Some(need) = talk.need {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
@@ -3504,6 +3541,20 @@ impl App {
         if let Some(t) = taken {
             self.open_taken(t);
         }
+    }
+
+    /// A screen up inside a turn's frame (`inside`) ended, nothing else
+    /// up: the turn runs again, the game as the screen left it taken on
+    /// where the frame asked for it, and the rest of the frame after.
+    /// (After the screen's last fade: the original's frame goes on once
+    /// the screen's way out is drawn, its keys let go by then.)
+    fn screen_ended(&mut self) {
+        if self.inside.is_none() || self.screen_up().is_some() || self.map || !self.fade.is_empty() {
+            return;
+        }
+        let Inside { before, input, mut given } = self.inside.take().unwrap();
+        given.push(dialog::Answer::Screen(dialog::World(Box::new((self.engine.m.clone(), self.engine.files.clone())))));
+        self.turn(before, input, given, false);
     }
 
     /// The answer to the question waiting: its turn runs again.
@@ -4581,7 +4632,7 @@ impl App {
 
     /// A click on the interface bar: on a button (2542:06CE's table), the
     /// frame run now takes it in its input step (`Front::bar_click`) and
-    /// the screen it asks for opens after it (`open_taken`); whether on a
+    /// the screen it asks for opens inside it (`open_taken`); whether on a
     /// button.
     fn bar(&mut self, x: i32, y: i32, right: bool) -> bool {
         if sheets::bar_button(x, y).is_none() {
@@ -4593,7 +4644,8 @@ impl App {
     }
 
     /// The screen a frame's menu key (2542:0100) or bar button asked for
-    /// opened, the mouse let go for it.
+    /// opened (inside the frame, `Talk::screen`; the travel map and the
+    /// options screen after it), the mouse let go for it.
     fn open_taken(&mut self, t: sheets::Taken) {
         self.release();
         sheets::pics(&self.assets.archive, &self.engine.m);
@@ -4864,14 +4916,14 @@ impl App {
     }
 
     /// The logbook left (`Machine::log_close`). The buttons its last read
-    /// left in AFF9 (the click that left) are the next frame's read's
-    /// (0000:8FC4: let go by then), which the view's frames don't make.
+    /// left in AFF9 (the click that left, `log_turn`'s) stay for the rest
+    /// of the frame it opened in (`screen_press`).
     fn log_end(&mut self) {
         self.panel = None;
         if let Some(run) = self.log_run.take() {
             let e = &mut self.engine;
             e.m.log_close(&mut e.files, run);
-            e.m.mem.w8(arena::mem::DS, arena::controls::var::BUTTONS, 0);
+            self.screen_press = e.m.mem.r8(arena::mem::DS, arena::controls::var::BUTTONS) != 0;
         }
     }
 
@@ -4921,7 +4973,7 @@ impl App {
                 Some(dialog::Need::Text(a)) => h.typing = Some(a.prompt.clone()),
                 // A level's points: the attribute screen (`creation`); the
                 // spellmaker's screen is drawn behind (`maker_screen`).
-                Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_)) | None => {}
+                Some(dialog::Need::Spend(_) | dialog::Need::Spellmaker | dialog::Need::Travel(_) | dialog::Need::Screen(..)) | None => {}
             }
         }
         h
@@ -4982,7 +5034,7 @@ impl App {
             // The attribute screen takes the keys (`creation_input`).
             dialog::Need::Spend(_) => {}
             // The travel map takes the keys (`travel`).
-            dialog::Need::Travel(_) => {}
+            dialog::Need::Travel(_) | dialog::Need::Screen(..) => {}
             // On the spellmaker, Esc clicks as leaving does: its "exit",
             // or the form's done box.
             dialog::Need::Spellmaker => {
@@ -5133,8 +5185,15 @@ enum In {
 impl App {
     /// One input: an animation's next lines; creation's screens; a box or
     /// a question answered; a panel's keys and clicks; else the game's
-    /// keys, the mouse captured, a click in the view.
+    /// keys, the mouse captured, a click in the view. Then a screen up
+    /// inside a frame, ended by it, has the frame's rest run
+    /// (`screen_ended`).
     fn input(&mut self, ev: In) {
+        self.input_one(ev);
+        self.screen_ended();
+    }
+
+    fn input_one(&mut self, ev: In) {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
         self.ring_screen();
@@ -5341,6 +5400,11 @@ impl App {
                 // drawn where it is).
                 automap::turn(&mut self.engine.m, (x, y));
                 if automap::exit_at(x, y) {
+                    // The press its loop's last read (0000:8FC4) saw, in
+                    // AFF9 for the rest of the frame (`screen_press`).
+                    let b = self.engine.m.mem.r8(arena::mem::DS, arena::controls::var::BUTTONS) | 1;
+                    self.engine.m.mem.w8(arena::mem::DS, arena::controls::var::BUTTONS, b);
+                    self.screen_press = true;
                     self.close_automap();
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
@@ -5419,7 +5483,7 @@ impl App {
                 // key's press runs the frame that takes it now: its body
                 // asks the menu keys (2542:0100, `Front::menu_keys`) after
                 // its actors, drawing and physics, and the screen the key
-                // asks for opens after it.
+                // asks for opens inside it (`Talk::screen`).
                 let scan = interface::scan_code(code);
                 if let (true, false, Some(scan)) = (down, resting, scan.filter(|&s| interface::is_menu_key(s))) {
                     if !self.menu_held.iter().any(|h| h.0 == scan) {
@@ -5516,6 +5580,7 @@ impl App {
             self.travel_after();
         }
         self.movie_at = now;
+        self.screen_ended();
         if now >= self.next && !travelling {
             self.step();
             let ticks = self.engine.frame_ticks() as f64;

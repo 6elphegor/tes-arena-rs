@@ -293,6 +293,7 @@ KEY_S = 0x1F
 # L (2542:02A3: the logbook, 27E3:0088), U (034D: the use list), C
 # (026D: the spellbook).
 KEY_L = 0x26
+KEY_J = 0x24
 KEY_U = 0x16
 KEY_C = 0x2E
 # R (2542:01E6: camping, 1194:424E), the digit 2 and Enter (the hours
@@ -773,6 +774,14 @@ CASES = {
     # the mouse, up at the one after: the bar's click), a click off its
     # buttons, Exit twice; as playlog, but the SP kept at 12C6 a word
     # deeper.
+    # The bar's crossed swords clicked with J held (2542:06CE's table,
+    # 0486: the weapon readied): two frames, the button pressed (down at
+    # the next frame's read), then the frame whose read finds it let go,
+    # J held: the cursor on the bar, the controls end at 2826:00CB on
+    # 02E2's carry, so no jump; J let go and the mouse back at the view's
+    # centre (where the window's controls take it to be), five frames.
+    'playbarjump': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [(102, 161)]), ((KEY_J,), (), 1, None),
+                                       ((), (KEY_J,), 5, None, [], {'do': lambda a: setattr(a, 'mouse', (160, 100))})]),
     'playlogbar': ('dungeon', None, [((), (), 2, None), ((), (), 11, None, [(131, 186)], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]})]),
     'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
                                    ((), (KEY_L,), 10, None)]),
@@ -783,6 +792,16 @@ CASES = {
     # `printed` line.
     'playlogprint': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0x30, 0xBC), ('click', 0x110, 0xBC)]}),
                                         ((), (KEY_L,), 10, None)]),
+    # The screens a menu key opens inside the frame (2542:0100 from
+    # 0000:4952, after the frame's actors, drawing and physics), each
+    # case ending with that frame (`ends`): the screen closed, then the
+    # rest of the frame's body (the clock, faces, interface, present,
+    # counters) run after it. As playsheet, playlog, playautomap and
+    # playbook, without the frames after.
+    'playsheetend': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playlogend': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)], 'ends': True})]),
+    'playautomapend': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}, 'ends': True})]),
+    'playbookend': ('dungeon', None, [((), (), 2, None), ((KEY_C,), (), 1, None, [], {'script': [('rclick', 0xF0, 0xA0)], 'ends': True})]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth
     # line (`wounded_with_potion`), two frames, U held a frame: the list
     # in the bar's corner (066A, 06F8: 3159:06A0 over 5AF4), its fifth
@@ -1204,6 +1223,14 @@ def play(a, name, steps, tracks):
                 a.buttons = 0
             continue
         assert why == ('frames',), f'{name}: stopped by {why}'
+        if opts.get('ends'):
+            # (`ends`: the case ends with the step's last frame, a screen
+            # its menu key opened inside it (2542:0100 from 0000:4952)
+            # closed and the rest of that frame's body run after it: the
+            # state as that frame leaves it, no frame after.)
+            tracks.pop()
+            page = a.page()
+            return page, page, bytes([1]) * 64000, bytes(a.dac)
         if clicked:
             # A screen's clicks done, the mouse back at the view's centre,
             # where the view's controls take it to be (2826:00F0); the
