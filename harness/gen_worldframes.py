@@ -613,6 +613,13 @@ CASES = {
     'playscreens': ('dungeon', brought(1), [((), (), 20, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                                             ((), (KEY_M,), 10, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                             ((), (KEY_F1,), 30, None)]),
+    # The two screens alone: in the dungeon, two frames, M held a frame
+    # (the automap, left by its exit), ten frames; F1 held a frame (the
+    # character sheet, left with Esc), ten frames.
+    'playautomap': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
+                                       ((), (KEY_M,), 10, None)]),
+    'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
+                                     ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
     # frames, the Ring of Shielding used (the list's fourth: its spell
@@ -796,6 +803,14 @@ def play(a, name, steps, tracks):
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         assert why == ('frames',), f'{name}: stopped by {why}'
+        if any(act[0] in ('click', 'rclick') for act in opts.get('script', [])):
+            # A screen's clicks done, the mouse back at the view's centre,
+            # where the view's controls take it to be (2826:00F0); the
+            # last click's release, which the screen left for the next
+            # read, the screen's (the window gives the screen whole clicks).
+            a.mouse = (160, 100)
+            a.clicks = []
+            a.buttons = 0
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
         frame[0] -= 1

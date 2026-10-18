@@ -729,6 +729,14 @@ fn used(a: &mut App, index: u16) {
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
 }
 
+/// The window's fades played out at once: the original's screens fade
+/// inside the frame that opens them, which the harness's timer doesn't
+/// count; the window's queue would hold back the next frames instead.
+fn faded(a: &mut App) {
+    a.fade.clear();
+    a.fade_old = None;
+}
+
 /// gen_worldframes.py's `shopping`: a slot free (`room`), each item worn
 /// to half (`worn`), the seed gen_screens.py's SEED (`seeded`).
 fn shopping(a: &mut App) {
@@ -910,12 +918,34 @@ fn case(name: &str) -> Option<Case> {
             // The automap (M) opened and left by its exit (0000:2E30), the
             // character sheet (F1) with Esc, each in the frame after (the
             // original's frame body opens them: 2542:0100).
+            // The harness's mouse at the view's centre, where the screen's loop
+            // first reads it.
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
             d.key(a, KeyCode::KeyM, Some("m"));
             d.click(a, 0x100, 0xB0, MouseButton::Left);
+            faded(a);
             frames(a, d, seen, 11, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
+            faded(a);
             frames(a, d, seen, 31, |_| false);
+        })),
+        "playautomap" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The harness's mouse at the view's centre, where the screen's loop
+            // first reads it.
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::KeyM, Some("m"));
+            d.click(a, 0x100, 0xB0, MouseButton::Left);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            d.key(a, KeyCode::F1, None);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
         })),
         "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1571,6 +1601,25 @@ fn a_death_leaves_the_state_as_the_original() {
     state_case("playdeath");
     state_load_case("playdeath");
     state_ems_case("playdeath");
+}
+
+/// The screens opened in play whose state is the engine's
+/// (`playautomap`: the automap screen, 0000:2CFE..2F0F, run as
+/// `automap_screen_begin`, its loop's turns and `automap_screen_end`).
+const SCREENS_STATE: [&str; 1] = ["playautomap"];
+
+/// Each screen's case: the player's frames, DGROUP from the case's start
+/// and from the load, and the EMS banks, as the original leaves them.
+#[test]
+fn the_screens_leave_the_state_as_the_original() {
+    for name in SCREENS_STATE {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+        state_case(name);
+        state_load_case(name);
+        state_ems_case(name);
+    }
 }
 
 /// The town's welcome (0000:4ACD) keeps what its box covers at the

@@ -4,6 +4,7 @@
 pub mod actors;
 pub mod attack;
 pub mod automap;
+pub mod automapscreen;
 pub mod bsa;
 pub mod cast;
 pub mod celestial;
@@ -78,6 +79,7 @@ pub mod wild;
 pub mod scale;
 pub mod shop;
 pub mod shops;
+pub mod shopscreen;
 pub mod sidequest;
 pub mod sky;
 pub mod skyobj;
