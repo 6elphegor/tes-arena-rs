@@ -224,18 +224,20 @@ fn into_a_store_and_out_as_the_original() {
     transit("transitstore");
 }
 
-/// Open: the palace's interior leaves EMS bank 11h's 5000h..5C1Bh other
-/// than the original's (a table the interior's entry fills differently).
+/// The Imperial palace's door at stage 9 (the artifact's audience, text
+/// 5DDh, 0000:424F): the box opens in the click's frame after its drawing,
+/// and saves what it covers (0000:8F2A, into bank 11h from offset 8) from
+/// this frame's view, not the last shown (`EngineHooks::drawn`); a later
+/// smaller box over the same buffer leaves the end of it, 5000h..5C1Bh.
 #[test]
-#[ignore = "bank 11h 5000h..5C1Bh after the palace differs from the original's"]
 fn into_the_palace_and_out_as_the_original() {
     transit("transitpalace");
 }
 
-/// Open: back in the street the drawing's shading words BAE6/BAE8
-/// (0000:B896) end F0h where the original's end F5h.
+/// Back in the street by day nothing steps the light along a face, so
+/// a side face's first shades (BAE6/BAE8, 0000:BE02..BE2D) come of the
+/// light (A85E) the guild's last frame left: the drawing hands both back.
 #[test]
-#[ignore = "the drawing's shading at BAE7/BAE9 after the guild differs from the original's"]
 fn into_the_mages_guild_and_out_as_the_original() {
     transit("transitguild");
 }
