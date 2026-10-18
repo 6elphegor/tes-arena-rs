@@ -506,10 +506,6 @@ fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             // The options screen's New (5CA bit 8000h): the outer loop's
             // way out (0000:0CDF), the program's main on to its menu.
             Run::Quit => None,
-            other => {
-                eprintln!("the next area isn't followed yet: {other:?}");
-                None
-            }
         }
     };
     // The world's entry reads the engine's files; the place hook's chunk
