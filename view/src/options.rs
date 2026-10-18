@@ -83,6 +83,8 @@ impl OptionsHooks for Script<'_> {
             return None;
         };
         self.ci += 1;
+        // (8FC4: the left button down, which ends 564D's wait.)
+        m.mem.w8(DS, 0xAFF9, 1);
         m.mem.w16(DS, var::MOUSE_X, x);
         m.mem.w16(DS, var::MOUSE_Y, y);
         Some((x, y))

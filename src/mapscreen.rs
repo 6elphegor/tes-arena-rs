@@ -177,9 +177,28 @@ impl Machine {
     /// routine 26F7:013E: OUTPROV.CIF to the frame in bank [1030]).
     fn travel_world_open(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>) -> Option<()> {
         self.window_open(files, WORLD, dac)?;
-        self.map_file_to_frame(files, 0x6BAA)?;
+        self.province_outlined(files)?;
         self.window_opened();
         Some(())
+    }
+
+    /// 26F7:013E: OUTPROV.CIF loaded to the frame in bank [1030] (0000:
+    /// 7428), its image for the current province (A46: 1194:5CC8) drawn
+    /// into the page where the page is the heap's block (5828, its
+    /// LZHUF unpacked into a heap block and freed), the bank before
+    /// mapped again.
+    fn province_outlined(&mut self, files: &mut Files) -> Option<()> {
+        let old = self.ms16(crate::level::var::EMS_MAPPED) >> 2;
+        let bank = self.ms16(0x1030);
+        self.ems_map(bank);
+        let frame = self.ms16(0x9030);
+        let r = self.file_load(files, 0x6BAA, frame, 0).map(|_| ());
+        if r.is_some() && self.page_is_block() {
+            let si = self.cif_frame(self.ms8(0x0A46) as u16);
+            self.page_image(frame, si);
+        }
+        self.ems_map(old);
+        r
     }
 
     /// The world map's region under the cursor at (`x`, `y`) (8F92,

@@ -1049,13 +1049,15 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     while !a.boxes.is_empty() {
         d.key(&mut a, KeyCode::Enter, None);
     }
-    // The same through the scripted path's calls (`--do travel,tclick`).
+    // The same through the travel map's own calls (`--do tclick`), on the
+    // screen the same key opens inside its frame.
     let mut b = app(&dir, &start);
-    Driver::new(&mut b);
-    // (The frame that takes the button, as the key's.)
-    b.step();
+    let mut db = Driver::new(&mut b);
+    b.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    db.key(&mut b, KeyCode::KeyM, Some("M"));
+    b.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
     let archive = b.assets.archive.clone();
-    let mut t = Some(travel::Travel::open(&mut b.engine, &archive, Some(&b.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))).unwrap_or_else(|_| panic!("it opens")));
+    let mut t = b.travel.take();
     t.as_mut().unwrap().click(&mut b.engine, &archive, px, py, false);
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
@@ -1070,13 +1072,21 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
         d.wait(&mut a, 100);
     }
     assert!(a.travel.is_none(), "the screen ends after the journey");
+    // Its fade played, the rest of the frame that took the key.
+    for _ in 0..20 {
+        if a.inside.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
     t.as_mut().unwrap().click(&mut b.engine, &archive, 62, 180, false);
     t.as_mut().unwrap().skip_journey();
     travel::after(&mut t, &mut b.engine, &mut Vec::new(), true);
     assert!(t.is_none());
-    // The area left with the screen (the end of the frame that took the
-    // button), no frame more.
-    assert!(b.area_left());
+    // The rest of the frame that took the key, run after the screen: the
+    // area left at its end, no frame more.
+    b.fade.clear();
+    b.screen_ended();
     same(&a, &b, "Travel clicked, and Travel::click");
     // The next turns arrive: the town's welcome reads the arrival.
     let mut welcome = String::new();
@@ -1994,9 +2004,9 @@ fn the_options_screen_by_esc() {
     assert!(a.options.is_none() && a.quit, "Yes: the program ends");
 }
 
-/// The options screen's New: the area left, and with the next frame the
-/// world loop's end and the outer loop's way out (5CA bit 8000h) bring up
-/// the main menu.
+/// The options screen's New: the area left, and the rest of the frame the
+/// screen opened in ends the world loop; the outer loop's way out (5CA
+/// bit 8000h) brings up the main menu.
 #[test]
 fn the_options_screens_new_goes_to_the_main_menu() {
     let Some(dir) = game_dir() else { return };
@@ -2005,9 +2015,16 @@ fn the_options_screens_new_goes_to_the_main_menu() {
     d.frame(&mut a);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x20, 0x80, MouseButton::Left);
-    assert!(a.options.is_none() && a.creation.is_none(), "New: the game goes on to the frame's end");
-    d.frame(&mut a);
-    assert!(a.creation.is_some(), "New: the main menu after the frame");
+    assert!(a.options.is_none(), "New leaves the screen");
+    // The rest of the frame the screen opened in, after its fade: the
+    // world loop's end, no frame more.
+    for _ in 0..50 {
+        if a.creation.is_some() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
+    assert!(a.creation.is_some(), "New: the main menu at the frame's end");
 }
 
 /// A creature's flat (bit 2 of its map word's high byte) ahead of the

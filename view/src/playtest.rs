@@ -996,7 +996,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                         t.click(&mut engine, &archive, 0x120, 0xBD, false);
                                         *counts.entry("quest dungeon pictures").or_default() += 1;
                                     } else {
-                                        t.key(&mut engine, KeyCode::Escape, None);
+                                        t.key(&mut engine, KeyCode::Escape, None, (160, 100));
                                     }
                                     t.advance(60_000);
                                 }

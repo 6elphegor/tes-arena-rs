@@ -166,6 +166,7 @@ impl Machine {
         hooks.automap_write(self, files);
         let bank = self.mem.r16(DS, 0x1030);
         hooks.map_bank(self, bank);
+        self.options_picture(files);
         hooks.picture(self, files, PICTURE);
         let v = self.mem.r8(DS, SOUND) as u16;
         self.opt_box(hooks, v, SOUND_BOX);
@@ -264,6 +265,15 @@ impl Machine {
         let f = self.mem.r16(DS, 0xA902) & !1;
         self.mem.w16(DS, 0xA902, f);
         Some(end)
+    }
+
+    /// 2542:0020..0030: OP.IMG loaded to [902E] (0000:7428) and drawn
+    /// into the page there (5828) where the page is the heap's block.
+    fn options_picture(&mut self, files: &mut Files) {
+        let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+        if self.file_load(files, PICTURE, seg, off).is_some() && self.page_is_block() {
+            self.page_image(seg, off);
+        }
     }
 
     /// 2542:0808. A volume's box at DS:`si` (x0, y0, x1, y1) filled in
