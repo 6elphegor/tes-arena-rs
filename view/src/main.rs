@@ -3985,7 +3985,7 @@ impl App {
                 inv.bare |= inv.page.is_none();
                 // Its name typed over (1194:65FD): the game's editor
                 // opened on the game as the page asked it.
-                if let Some((field, look, game)) = inv.page.as_ref().and_then(|p| p.typing.clone()) {
+                if let Some((field, look, game)) = inv.page.as_ref().and_then(|p| p.typing.clone()).map(|b| *b) {
                     s.live = field::Live::open(&game.0, field, look);
                 }
             }

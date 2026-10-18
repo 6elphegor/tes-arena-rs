@@ -304,7 +304,7 @@ pub struct SpellPage {
     pub pages: usize,
     /// The name's field asked (1194:65FD), when that is what waits: the
     /// field, its look and the game as it asked it.
-    pub typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
+    pub typing: Option<Box<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>>,
 }
 
 /// The page's questions answered from `answers`; the first one without
@@ -397,7 +397,7 @@ impl SpellPage {
                 shown: crate::dialog::Snapshot(Box::new(shown)),
                 asking: r.asking.map(|t| (t, 0)),
                 pages: r.pages,
-                typing: r.typing,
+                typing: r.typing.map(Box::new),
             }),
             _ => {
                 *m = game;
