@@ -67,37 +67,97 @@ impl Machine {
         self.mem.w16(DS, 0xA894, before);
         // The page kept in the load bank (3E80h dwords from [A8FE]).
         self.page_copy(true);
-        let (panel, record, bx) = match kind {
-            3 => {
-                let f = self.mem.r16(DS, 0x5006 + 0x20) | 0x4000;
-                self.mem.w16(DS, 0x5006 + 0x20, f);
-                (0x4F4C, 0x5006, 0xD5)
+        let (record, bx, dl) = match kind {
+            6 => {
+                // 58D7: POPUP2's panel (its bank 17h mapped and the bank
+                // before again), the title (A872) in colour 1 centred on
+                // x A0h at row 20h in the caller's font (5364), the lines'
+                // font [1026]; DL FDh.
+                let old = self.map_bank(0x17, 0);
+                self.panel_load(files, 0x4F56)?;
+                self.map_bank(old, 0);
+                self.mem.w8(DS, 0x9288, 1);
+                let title = self.mem.r16(DS, 0xA872);
+                self.title_centred(title, 0xA0, 0x20);
+                self.select_font(0x1026);
+                (0x515A, 0xFD, 0xFD)
             }
-            5 => {
-                let f = self.mem.r16(DS, 0x5006 + 0x20) | 0x4000;
-                self.mem.w16(DS, 0x5006 + 0x20, f);
-                (0x4F82, 0x5006, 0xFD)
+            9 => {
+                // 5884: the picture named at 4FA5 loaded into bank 19h at
+                // [902E] (0000:7428) and drawn (5828); the bank 19h's
+                // mapping found made [1030] and A894 both (the load bank:
+                // bug kept, the list's end leaves it mapped, not the bank
+                // before), 5CA bit 2000h off, D39 bit 80h on. The lines'
+                // colour 65h; DL as that drawing leaves DX.
+                let old = self.map_bank(0x19, 0);
+                let (frame, at) = (self.mem.r16(DS, 0x9030), self.mem.r16(DS, 0x902E));
+                self.file_load(files, 0x4FA5, frame, at)?;
+                let dx = self.image_drawn_dx(frame, at)?;
+                self.page_image(frame, at);
+                self.mem.w16(DS, 0x1030, old);
+                self.mem.w16(DS, 0xA894, old);
+                let f = self.mem.r16(DS, 0x05CA) & 0xDFFF;
+                self.mem.w16(DS, 0x05CA, f);
+                let f = self.mem.r8(DS, 0x0D39) | 0x80;
+                self.mem.w8(DS, 0x0D39, f);
+                (0x5105, 0x65, dx as u8)
             }
-            0 => (0x4F4C, 0x5006, 0xFD),
-            2 => (0x4F6C, 0x50B0, 0xFD),
-            4 => (0x4F77, 0x5006, 0xFD),
-            7 => (0x4F8F, 0x50B0, 0xFD),
-            8 => (0x4F9A, 0x5006, 0xEE),
-            0xB => (0x4FB1, 0x5006, 0xFD),
-            1 => (0x4F61, 0x50B0, 0xFD),
-            _ => return crate::giveup::not_ported("1194:5734: a list kind with a title or a picture of its own (6, 9, Ah)"),
+            0xA => {
+                // 57F5: the title's font [102C] ([1026] with 137F 4), the
+                // panel at 4FB1 (bank 17h mapped and the bank before
+                // again), the title in colour 60h centred on x A0h at row
+                // 1Fh, the lines' font the same; DL as 56C8 leaves DX (its
+                // last background's segment, A840: 5C86, 5364, 9466 and
+                // 9AE6 keep it).
+                let dungeon = self.mem.r8(DS, 0x137F) == 4;
+                self.select_font(0x1026);
+                if !dungeon {
+                    self.select_font(0x102C);
+                }
+                let old = self.map_bank(0x17, 0);
+                self.panel_load(files, 0x4FB1)?;
+                self.map_bank(old, 0);
+                self.mem.w8(DS, 0x9288, 0x60);
+                let title = self.mem.r16(DS, 0xA872);
+                self.title_centred(title, 0xA0, 0x1F);
+                self.select_font(0x102C);
+                if dungeon {
+                    self.select_font(0x1026);
+                }
+                (0x505B, 0xFD, self.mem.r8(DS, 0xA840))
+            }
+            _ => {
+                let (panel, record, bx) = match kind {
+                    3 => {
+                        let f = self.mem.r16(DS, 0x5006 + 0x20) | 0x4000;
+                        self.mem.w16(DS, 0x5006 + 0x20, f);
+                        (0x4F4C, 0x5006, 0xD5)
+                    }
+                    5 => {
+                        let f = self.mem.r16(DS, 0x5006 + 0x20) | 0x4000;
+                        self.mem.w16(DS, 0x5006 + 0x20, f);
+                        (0x4F82, 0x5006, 0xFD)
+                    }
+                    0 => (0x4F4C, 0x5006, 0xFD),
+                    2 => (0x4F6C, 0x50B0, 0xFD),
+                    4 => (0x4F77, 0x5006, 0xFD),
+                    7 => (0x4F8F, 0x50B0, 0xFD),
+                    8 => (0x4F9A, 0x5006, 0xEE),
+                    0xB => (0x4FB1, 0x5006, 0xFD),
+                    _ => (0x4F61, 0x50B0, 0xFD),
+                };
+                // 5938: the panel's picture into bank 17h at the frame's
+                // start and drawn (0000:56C8 with BX 14h); DL as 56C8
+                // leaves DX: the high word of A83E's dword (A840, the last
+                // background it kept; kind 8's F0h set before it is lost).
+                self.map_bank(0x17, 0);
+                self.panel_load(files, panel)?;
+                (record, bx, self.mem.r8(DS, 0xA840))
+            }
         };
-        // 5938: the panel's picture into bank 17h at the frame's start and
-        // drawn (0000:56C8 with BX 14h).
-        self.map_bank(0x17, 0);
-        self.panel_load(files, panel)?;
-        // 594A: the bank before the list mapped; the record filled, +2B
-        // DL as the panel's drawing leaves DX (3C0h for each panel the
-        // shops show, measured against the original; kind 8's F0h set
-        // before it is lost).
+        // 594A: the bank before the list (A894) mapped; the record filled.
         let a894 = self.mem.r16(DS, 0xA894);
         self.map_bank(a894, 0);
-        let dl = 0xC0u8;
         self.mem.w16(DS, record + 0x22, si);
         self.mem.w16(DS, record + 0x24, ds);
         self.mem.w16(DS, record + 0x26, cx);
@@ -324,6 +384,44 @@ impl Machine {
         false
     }
 
+    /// 0000:5364: the title at DS:`si` centred on x `ax` at row `bx` (its
+    /// width, 66F6, halved off) in colour [9288] and the font selected
+    /// (9E0A: into the page where it is the game's own block).
+    fn title_centred(&mut self, si: u16, ax: u16, bx: u16) {
+        let x = ax.wrapping_sub(self.text_width(si) >> 1);
+        self.page_text_at(x, bx, (DS, si));
+    }
+
+    /// DX as 0000:582C leaves it, drawing the picture whose header is at
+    /// `seg`:`off`: with the capture pointer (8F9A) set, its segment
+    /// (8F9C); else, unpacked, its width where it is drawn (9207 set, or
+    /// wholly inside the clip, A914..A91A: 59A4 and 5B08 swap it into DX)
+    /// and its height where it lies wholly outside. None (not ported) for
+    /// a packed one (its buffer's 51EC and 6C36 leave DX) or one the clip
+    /// cuts (59D8, 5A6A).
+    fn image_drawn_dx(&mut self, seg: u16, off: u16) -> Option<u16> {
+        if self.mem.r32(DS, 0x8F9A) != 0 {
+            return Some(self.mem.r16(DS, 0x8F9C));
+        }
+        let r = |m: &Machine, o: u16| m.mem.r16(seg, off.wrapping_add(o));
+        if r(self, 8) & 0xF != 0 {
+            return crate::giveup::not_ported("0000:582C: DX after a packed picture's drawing (its buffer's 51EC and 6C36)");
+        }
+        let (x, y, w, h) = (r(self, 0) as i16, r(self, 2) as i16, r(self, 4), r(self, 6));
+        let clip = |m: &Machine, o: u16| m.mem.r16(DS, o) as i16;
+        if self.mem.r8(DS, 0x9207) != 0 {
+            return Some(w);
+        }
+        let (right, bottom) = (x.wrapping_add(w as i16), y.wrapping_add(h as i16));
+        if x > clip(self, 0xA918) || y > clip(self, 0xA91A) || bottom < clip(self, 0xA916) || right < clip(self, 0xA914) {
+            return Some(h);
+        }
+        if y >= clip(self, 0xA916) && bottom <= clip(self, 0xA91A) && x >= clip(self, 0xA914) && right <= clip(self, 0xA918) {
+            return Some(w);
+        }
+        crate::giveup::not_ported("0000:582C: DX after a picture the clip cuts (59D8, 5A6A)")
+    }
+
     /// The page ([A8FE], FA00h bytes) to the frame's start (`to_frame`), or
     /// back.
     fn page_copy(&mut self, to_frame: bool) {
@@ -459,42 +557,79 @@ impl Machine {
     /// (599C, its pixels the front end's), and of the lines shown from the
     /// first (+3B, at most the rows), each one's tab stops (9 and three
     /// digits) written at A836 of the texts' segment (0B07: DS is theirs),
-    /// the last stop's left. The colour (9288) and the texts' drawing are
-    /// the front end's.
+    /// the last stop's left; the colour (9288) as the lines' colour codes
+    /// and their count leave it. The texts' drawing is the front end's.
     fn list_drawn(&mut self, seg: u16, rec: u16) {
         let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
         let (tseg, mut at) = (r16(self, 0x24), r16(self, 0x22));
         let colour = if r16(self, 0x26) == 0 { self.mem.r8(seg, rec + 0x2B) } else { self.mem.r8(seg, rec + 0x28) };
         self.mem.w8(DS, 0x9288, colour);
+        // 0BAE after each line passed or drawn: BP, from the texts'
+        // count (+26), counted down, and where it reaches 0 the colour
+        // after them (+2B) taken.
+        let mut bp = r16(self, 0x26);
+        let mut line_done = |m: &mut Machine| {
+            bp = bp.wrapping_sub(1);
+            if bp == 0 {
+                let c = m.mem.r8(seg, rec + 0x2B);
+                m.mem.w8(DS, 0x9288, c);
+            }
+        };
         for _ in 0..r16(self, 0x3B) {
             while self.mem.r8(tseg, at) != 0 {
                 at = at.wrapping_add(1);
             }
             at = at.wrapping_add(1);
+            line_done(self);
         }
         let mut n = r16(self, 0x3D).wrapping_sub(r16(self, 0x3B));
         if r16(self, 0x37) < n {
             n = r16(self, 0x37);
         }
         for _ in 0..n {
-            let mut p = at;
+            // 0AE2 by its segments from SI: a tab stop (9 and three digits)
+            // at a segment's start written at A836 of the texts' segment;
+            // the bytes after the segment's first (and after a stop's
+            // digits, its fourth) looked at: 1 a colour code (its colour
+            // taken, the segment after it next), Ah, Dh and 8 a segment
+            // drawn (Dh Ah the pair passed), 0 the line's end, drawn
+            // through +41 from the last segment's start, SI past its NUL.
+            let mut start = at;
             loop {
-                let c = self.mem.r8(tseg, p);
-                if c == 0 {
-                    break;
-                }
-                if c == 9 {
+                let mut p = start;
+                if self.mem.r8(tseg, p) == 9 {
                     for k in 0..3u16 {
                         let d = self.mem.r8(tseg, p.wrapping_add(1 + k));
                         self.mem.w8(tseg, 0xA836 + k, d);
                     }
                     self.mem.w8(tseg, 0xA839, 0);
                     p = p.wrapping_add(4);
-                    continue;
                 }
-                p = p.wrapping_add(1);
+                let next = loop {
+                    p = p.wrapping_add(1);
+                    match self.mem.r8(tseg, p) {
+                        0 => break None,
+                        1 => {
+                            let colour = self.mem.r8(tseg, p.wrapping_add(1));
+                            self.mem.w8(DS, 0x9288, colour);
+                            break Some(p.wrapping_add(2));
+                        }
+                        0x0A | 8 => break Some(p.wrapping_add(1)),
+                        0x0D if self.mem.r8(tseg, p.wrapping_add(1)) == 0x0A => break Some(p.wrapping_add(2)),
+                        0x0D => break Some(p.wrapping_add(1)),
+                        _ => {}
+                    }
+                };
+                match next {
+                    Some(s) => start = s,
+                    None => break,
+                }
             }
-            at = p.wrapping_add(1);
+            while self.mem.r8(tseg, start) != 0 {
+                start = start.wrapping_add(1);
+            }
+            at = start.wrapping_add(1);
+            line_done(self);
         }
     }
 
