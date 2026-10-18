@@ -75,8 +75,10 @@ pub trait OptionsHooks {
         m.ems_map(bank);
     }
     /// 0000:7428 then 5828: the picture named at DS:`name` (OP.IMG) loaded
-    /// to [902E] and drawn.
-    fn picture(&mut self, _m: &mut Machine, _files: &mut Files, _name: u16) {}
+    /// to [902E] and drawn (by default `Machine::options_picture`).
+    fn picture(&mut self, m: &mut Machine, files: &mut Files, _name: u16) {
+        m.options_picture(files);
+    }
     /// 0000:9A6E: a box (x `ax`, y `bx`, `cx` wide, `dx` high) filled in
     /// colour 9288. 0000:5364: the text at DS:`si` centred on x `ax` at y
     /// `bx`. Drawing only.
@@ -264,6 +266,15 @@ impl Machine {
         let f = self.mem.r16(DS, 0xA902) & !1;
         self.mem.w16(DS, 0xA902, f);
         Some(end)
+    }
+
+    /// 2542:0020..0030: OP.IMG loaded to [902E] (0000:7428) and drawn
+    /// into the page there (5828) where the page is the heap's block.
+    pub fn options_picture(&mut self, files: &mut Files) {
+        let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+        if self.file_load(files, PICTURE, seg, off).is_some() && self.page_is_block() {
+            self.page_image(seg, off);
+        }
     }
 
     /// 2542:0808. A volume's box at DS:`si` (x0, y0, x1, y1) filled in

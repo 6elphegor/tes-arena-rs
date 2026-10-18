@@ -237,14 +237,13 @@ impl Front<'_> {
     }
 
     /// The screen a menu key or the bar's button asks for, inside the
-    /// frame (`Talk::screen`): the travel map and the options screen the
-    /// window's after the frame (`Talk::taken`).
+    /// frame (`Talk::screen`): the travel map's journey and the options
+    /// screen's Load and New too, the rest of the frame run on what they
+    /// leave (2542:0434 sets C398 bit 80h, 0627 with 5CA bit 8000h: the
+    /// frame's end leaves the world loop).
     fn taken(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, taken: Option<sheets::Taken>) {
         if let (Some(t), Some(talk)) = (taken, self.talk.as_deref_mut()) {
-            match t {
-                sheets::Taken::Options | sheets::Taken::Action(sheets::BarAction::WorldMap) => talk.taken = Some(t),
-                t => talk.screen(m, files, t),
-            }
+            talk.screen(m, files, t);
         }
     }
 
@@ -2289,7 +2288,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     _ => (KeyCode::KeyA, Some(k)),
                 };
                 if let Some(t) = &mut st.travel {
-                    t.key(&mut engine, code, text);
+                    t.key(&mut engine, code, text, (160, 100));
                 }
             }
             if let Some(t) = &mut st.travel {
@@ -3514,7 +3513,6 @@ impl App {
         for scan in std::mem::take(&mut self.released) {
             self.key_up(scan);
         }
-        let taken = talk.taken.take();
         print_message(&self.engine, &mut self.message);
         self.effect = out.effect.clone();
         if out.level_changed {
@@ -3537,9 +3535,6 @@ impl App {
                 None => eprintln!("the frame ended: None ({})", arena::giveup::describe()),
             }
             self.last = frame;
-        }
-        if let Some(t) = taken {
-            self.open_taken(t);
         }
     }
 
@@ -3738,7 +3733,8 @@ impl App {
         match e {
             saveui::Ended::Open => return,
             saveui::Ended::Save(engine, slot) => {
-                self.engine = engine;
+                self.engine.m.clone_from(&engine.m);
+                self.engine.files.clone_from(&engine.files);
                 // The game's menu says nothing once the game is saved (only
                 // its wait, 25FD:0803, while the disk is used); a failure
                 // the original wouldn't have is told.
@@ -3835,12 +3831,19 @@ impl App {
     fn options_ended(&mut self, e: options::Ended) {
         let options::Ended::Left(engine, end) = e else { return };
         let under = self.options.take();
-        self.engine = *engine;
-        // The keys let go while the screen was up went to the engine it
-        // replaced: the game's key state and latches let go here.
-        for scan in 1..0x60u8 {
-            self.engine.m.set_key(scan, false);
-            self.engine.m.key_pressed(scan as u16);
+        // The game as the screen left it, on this engine (its page and the
+        // drawing's record of what it wrote kept). The keys went to this
+        // engine while the screen was up: their state is taken on, the
+        // latches of those let go cleared.
+        let keys = arena::controls::var::KEYS;
+        let held: Vec<u8> = (0..0x80u16).map(|scan| self.engine.m.mem.r8(arena::mem::DS, keys + scan)).collect();
+        self.engine.m.clone_from(&engine.m);
+        self.engine.files.clone_from(&engine.files);
+        for (scan, &down) in held.iter().enumerate().skip(1) {
+            self.engine.m.mem.w8(arena::mem::DS, keys + scan as u16, down);
+            if down == 0 {
+                self.engine.m.key_pressed(scan as u16);
+            }
         }
         match end {
             arena::options::OptionsEnd::Resume => {}
@@ -3852,11 +3855,17 @@ impl App {
                 self.open_saveui(saveui::Kind::Load);
                 self.saveui_under = under;
             }
-            // New left the area (C398 bit 80h, 5CA bit 8000h): the next
-            // frame ends the world loop, and the outer loop's way out
-            // takes the game to the main menu (`new_game_menu`).
+            // New left the area (C398 bit 80h, 5CA bit 8000h): the rest
+            // of the frame the screen opened in (`screen_ended`) ends the
+            // world loop, and the outer loop's way out takes the game to
+            // the main menu (`new_game_menu`).
             arena::options::OptionsEnd::NewGame => {}
-            arena::options::OptionsEnd::Quit => self.quit = true,
+            // (21EE:01ED: the program ends there, nothing of the frame
+            // after it.)
+            arena::options::OptionsEnd::Quit => {
+                self.inside = None;
+                self.quit = true;
+            }
         }
     }
 
@@ -3955,13 +3964,9 @@ impl App {
         let forced = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_)));
         let carry = travel::after(&mut self.travel, &mut self.engine, &mut boxes, !forced);
         self.boxes.extend(boxes);
-        // The journey made from the map button (2542:0434): the area left
-        // in the frame that took the button, at its end (0000:A453), no
-        // frame more.
-        if !forced && carry.is_some() && self.engine.m.mem.r16(arena::mem::DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0 {
-            self.area_left();
-            return;
-        }
+        // (Opened by the map button inside the frame: its end runs the
+        // rest of that frame (`screen_ended`), which a journey's C398 bit
+        // 80h (2542:0434) ends the world loop at, 0000:A453.)
         if let (true, Some(carry)) = (forced, carry) {
             // The key that ended the screen is the screen's: the turn runs
             // again at once, while it is down, so its latch is set (as
@@ -5391,7 +5396,8 @@ impl App {
                 }
             }
             In::Key { code, down: true, text } if self.travel.is_some() && self.boxes.is_empty() => {
-                self.travel_input(|t, e, _| t.key(e, code, text.as_deref()));
+                let at = self.screen_point();
+                self.travel_input(|t, e, _| t.key(e, code, text.as_deref(), at));
             }
             // The automap screen up: its buttons and its exit (0000:2E30).
             In::Button { down: true, .. } if self.map => {

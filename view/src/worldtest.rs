@@ -1199,6 +1199,68 @@ fn case(name: &str) -> Option<Case> {
             assert!(a.panel.is_none(), "a right click leaves the list");
             ENDS.with(|e| e.set(true));
         })),
+        // The screens whose ends can leave the world loop, inside the
+        // frame too: the options screen left by its Resume, the travel
+        // map by Esc, a journey (the area left at the frame's end, the
+        // next area entered, before its first frame).
+        "playoptionsend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::Escape, down: true, text: None });
+            faded(a);
+            assert!(a.options.is_some(), "Esc opens the options screen");
+            held_click(a, 288, 132);
+            faded(a);
+            assert!(a.options.is_none(), "Resume leaves it");
+            ENDS.with(|e| e.set(true));
+        })),
+        "playmapend" => (Place::Street, Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            assert!(a.travel.is_some(), "Shift+M opens the travel map");
+            // (The harness's mouse at the screen's centre, which the
+            // map's passes find a region under.)
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::Escape, None);
+            for _ in 0..100 {
+                if a.travel.is_none() {
+                    break;
+                }
+                d.wait(a, 100);
+            }
+            faded(a);
+            assert!(a.travel.is_none(), "Esc leaves the world map");
+            ENDS.with(|e| e.set(true));
+        })),
+        "playjourneyend" => (Place::Street, Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            for (x, y) in [(70, 45), (200, 100), (200, 100), (62, 180)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
+            for _ in 0..100 {
+                if a.travel.is_none() {
+                    break;
+                }
+                d.wait(a, 100);
+            }
+            faded(a);
+            assert!(a.travel.is_none(), "the journey ends the travel map");
+            ENDS.with(|e| e.set(true));
+        })),
+        "playnewend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playnew, New clicked on the options screen Esc opens in
+            // the frame: the rest of that frame ends the world loop.
+            a.input(In::Key { code: KeyCode::Escape, down: true, text: None });
+            faded(a);
+            d.click(a, 32, 132, MouseButton::Left);
+            faded(a);
+            a.engine = a.title_engine.take().expect("the way back to the menu");
+        })),
         "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             d.key(a, KeyCode::F1, None);
@@ -2204,7 +2266,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 46] = ["playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 49] = ["playoptionsend", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2312,7 +2374,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 51] = ["playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 54] = ["playoptionsend", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
@@ -2409,6 +2471,25 @@ fn new_goes_back_to_the_menu_as_the_original() {
     state_case("playnew");
     state_load_case("playnew");
     state_ems_case("playnew");
+}
+
+/// The options screen's New clicked on the screen Esc opens inside the
+/// frame (`playnewend`): the rest of that frame ends the world loop (no
+/// frame more), then the way out and main back to the menu, as playnew.
+#[test]
+fn new_in_the_frame_goes_back_to_the_menu_as_the_original() {
+    let (place, setup, play) = case("playnewend").unwrap();
+    let Some((a, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playnewend"), "playnewend: the player's frames differ from the original's");
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("screen | playnewend | ")).expect("a screen line");
+    assert_eq!(format!("{:x}", fnv(page)), want.split(' ').next().unwrap(), "playnewend: the menu's page differs from the original's");
+    state_case("playnewend");
+    state_load_case("playnewend");
+    state_ems_case("playnewend");
 }
 
 /// A death at the main quest's third stage (`playfarewell`: F77 3, so

@@ -1297,7 +1297,7 @@ impl Machine {
     }
 
     /// 1194:5CCC: the offset of frame `k` of the CIF in the EMS frame.
-    fn cif_frame(&self, k: u16) -> u16 {
+    pub(crate) fn cif_frame(&self, k: u16) -> u16 {
         let frame = self.mem.r16(DS, FRAME);
         let mut si = 0u16;
         for _ in 0..k {

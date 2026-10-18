@@ -64,8 +64,9 @@ impl OptionsHooks for Script<'_> {
     fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
         m.mem.w16(DS, if text { 0xB038 } else { 0xB036 }, ax);
     }
-    fn picture(&mut self, _m: &mut Machine, _files: &mut Files, _name: u16) {
+    fn picture(&mut self, m: &mut Machine, files: &mut Files, _name: u16) {
         self.draws.clear();
+        m.options_picture(files);
     }
     fn fill(&mut self, m: &mut Machine, ax: u16, bx: u16, cx: u16, dx: u16) {
         if !self.starved {
@@ -83,6 +84,8 @@ impl OptionsHooks for Script<'_> {
             return None;
         };
         self.ci += 1;
+        // (8FC4: the left button down, which ends 564D's wait.)
+        m.mem.w8(DS, 0xAFF9, 1);
         m.mem.w16(DS, var::MOUSE_X, x);
         m.mem.w16(DS, var::MOUSE_Y, y);
         Some((x, y))

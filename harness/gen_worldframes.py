@@ -319,6 +319,9 @@ def crowded_square(a):
     a.mu.mem_write(a.lin(a.r16(0xD806), a.r16(0xCB90)), bytes([1]))
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
+# The travel map's clicks (gen_areaplay.py's TRAVEL): High Rock's region,
+# the place nearest (200, 100), its journey's box read, Travel.
+TRAVEL = [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]
 
 # Wizard's Fire, the save's spellbook's seventh (type 2: aimed).
 WIZARDS_FIRE = 6
@@ -802,6 +805,21 @@ CASES = {
     'playlogend': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)], 'ends': True})]),
     'playautomapend': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}, 'ends': True})]),
     'playbookend': ('dungeon', None, [((), (), 2, None), ((KEY_C,), (), 1, None, [], {'script': [('rclick', 0xF0, 0xA0)], 'ends': True})]),
+    # The same for the screens whose ends can leave the world loop: the
+    # options screen (Esc, 2542:000A) left by its Resume (101h..13Fh on
+    # the bottom row: no handler, 0084); the travel map (Shift+M, the
+    # street's 2542:03BF) left by Esc (the world map's Exit's key); a
+    # journey (gen_areaplay.py's travelfast: High Rock, the place nearest
+    # (200, 100), its box read, Travel: 2542:0411..0434, the area left),
+    # the rest of that frame ending the world loop, the outer loop on
+    # into the next area, stopped before its first frame. And the options
+    # screen's New (0..40h, 0627) in the frame, the rest of it ending the
+    # world loop, the outer loop's way out and main back to its menu (as
+    # playnew, which runs the handler between frames).
+    'playoptionsend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 288, 132)], 'ends': True})]),
+    'playmapend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playjourneyend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL + [('keys', [KEY_SPACE])] * 4, 'leaves': True, 'ends': True})]),
+    'playnewend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 32, 132)], 'dies': True, 'title': True})]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth
     # line (`wounded_with_potion`), two frames, U held a frame: the list
     # in the bar's corner (066A, 06F8: 3159:06A0 over 5AF4), its fifth
@@ -1217,6 +1235,11 @@ def play(a, name, steps, tracks):
             # first, as below.
             why = a.area_next()
             assert why == ('world',), f'{name}: the next area stopped by {why}'
+            if opts.get('ends'):
+                # (`ends` with `leaves`: the case ends there, before the
+                # next area's first frame, whose top isn't reached.)
+                page = a.page()
+                return page, page, bytes([1]) * 64000, bytes(a.dac)
             if clicked:
                 a.mouse = (160, 100)
                 a.clicks = []

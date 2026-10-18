@@ -769,7 +769,7 @@ impl Travel {
     /// 3159:0171); a province's map's regions and buttons have none, so
     /// no key does anything there. A list's keys as 3159:06A0 takes them
     /// (`hud::list_key`; Enter picks the line marked, Esc leaves).
-    pub fn key(&mut self, engine: &mut Engine, code: winit::keyboard::KeyCode, _text: Option<&str>) {
+    pub fn key(&mut self, engine: &mut Engine, code: winit::keyboard::KeyCode, _text: Option<&str>, at: (i32, i32)) {
         use winit::keyboard::KeyCode;
         if self.done.is_some() {
             return;
@@ -810,6 +810,12 @@ impl Travel {
             }
             None => {
                 if code == KeyCode::Escape && self.shown.is_none() {
+                    // The key's region (B7C6 9, 3159:0171), its handler
+                    // (0006: the loop ended), then the pass's region under
+                    // the cursor (019A) once more before the loop's test.
+                    self.at = (at.0.clamp(0, 319) as u16, at.1.clamp(0, 199) as u16);
+                    engine.m.mem.w16(DS, 0xB7C6, 9);
+                    engine.m.travel_world_region(self.at.0, self.at.1);
                     self.end(engine);
                 }
             }

@@ -161,10 +161,6 @@ pub struct Talk {
     /// (2826:02E2, 2542:00BA): where on the 320 x 200 screen, and whether
     /// with the right button.
     pub bar: Option<(i32, i32, bool)>,
-    /// The screen a menu key (2542:0100) or the bar's button left the
-    /// window to open after the frame (the travel map and the options
-    /// screen; the others are `Talk::screen`'s).
-    pub taken: Option<crate::sheets::Taken>,
 }
 
 /// The game's text at DS:`at`, as lines.
