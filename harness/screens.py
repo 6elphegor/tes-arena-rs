@@ -414,6 +414,18 @@ class ScreenArena(DosArena):
         self.w16(0xC398, self.r16(0xC398) | 0x80)
         ss, sp, words = self.world_stack
         self.mu.mem_write(self.lin(ss, sp), words)
+        return self.area_next(count=count, stack=(ss, sp))
+
+    def area_next(self, count=2_000_000_000, stack=None):
+        """From the world loop's end (0000:A45D, where `world_frames`
+        stops at an area left in play: ('ended',)), on its own stack (or
+        `stack`), the outer loop into the next area until its world loop
+        is about to run its first frame (0000:A2AC), as `area_ended`. Its
+        waits for input (a box on the way in) are `waits` and `script`'s,
+        as `run_screen`'s. That world's stack is kept for the next."""
+        if stack is None:
+            stack = (self.mu.reg_read(UC_X86_REG_SS), self.mu.reg_read(UC_X86_REG_SP))
+        ss, sp = stack
         saved = self.stub(location=False)
         # Where the next world loop starts its frames: its stack then.
         at = self.lin(LOAD_SEG, 0xA2AC)

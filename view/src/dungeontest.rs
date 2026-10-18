@@ -115,6 +115,7 @@ fn looted_here(a: &mut App, _d: &mut Driver) {
     a.engine.m.rng.seed = LOOT_SEED;
     let before = copy(&a.engine);
     let input = TurnIn {
+        click: None,
         intent: Default::default(),
         clicked: false,
         camp: false,

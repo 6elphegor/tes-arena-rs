@@ -769,6 +769,33 @@ impl crate::engine::Engine {
     /// The hooks are recognised by their value: the port loads the image
     /// at segment 0, so the original's hooks into segment 0000 read as
     /// unset to the original's test of the segment (0000:A8EF).
+    /// The machine's writes watched from here (`area_watched`): an area's
+    /// change, between frames.
+    pub fn area_watch(&mut self) {
+        let frame = self.m.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        let bank = self.m.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
+        self.m.mem.watch_frame(frame, bank);
+        self.m.mem.track();
+    }
+
+    /// What the way from one area into the next wrote since `area_watch`
+    /// (the water's frames, the sky's images read again into their banks,
+    /// the words the entry sets) is the machine's: the drawing's earlier
+    /// writes there (`page_wrote`, `page_ems_wrote`) are gone in the
+    /// original, even where the bytes written are the ones the drawing
+    /// found.
+    pub fn area_watched(&mut self) {
+        for o in self.m.mem.frame_written() {
+            self.page_ems_wrote.remove(&o);
+        }
+        for o in self.m.mem.written_offsets() {
+            if let Some(w) = self.page_wrote.get_mut(o as usize) {
+                *w = None;
+            }
+        }
+        self.m.mem.untrack();
+    }
+
     pub fn world_enter(&mut self, hooks: &mut dyn AreaHooks) -> Option<()> {
         let m = &mut self.m;
         m.mem.w16(DS, crate::frame::var::TICKS, 0);
@@ -777,6 +804,11 @@ impl crate::engine::Engine {
         let v = m.mem.r16(DS, 0xC390);
         m.mem.w16(DS, crate::controls::var::WALK, v);
         m.mem.w16(DS, crate::movement::var::HEIGHT, 0x3C);
+        // A28D: the view's window (A5D1), the clip as it is saved first:
+        // where the area was left in a frame (a door, a gate clicked in the
+        // physics) the frame's own A5D1 had set it and its A606 never came,
+        // so the view's window is what is saved, and put back at the end.
+        m.view_window();
         m.ems_reset();
         let v = m.mem.r16(DS, crate::movement::var::FRAME_SEG).wrapping_add(0xC00);
         m.mem.w16(DS, crate::movement::var::FLOOR_SOLID, v);
@@ -794,9 +826,13 @@ impl crate::engine::Engine {
         m.buffer_block_alloc()?;
         m.draw_buffers_alloc()?;
         m.light_table_make()?;
+        // A526..A532: the clip put back (A606) around the entry hook, the
+        // window set again after it (A5D1).
+        m.clip_back();
         if m.mem.r32(DS, ENTRY_HOOK) == 0x4632 {
             m.area_entry(hooks);
         }
+        m.view_window();
         if m.mem.r16(DS, 0xCD60) != 0 {
             return crate::giveup::not_ported("0000:A26F: the level-load hook CD5E set: not ported");
         }
@@ -823,7 +859,9 @@ impl crate::engine::Engine {
         if self.m.mem.r32(DS, ENTERED_HOOK) == 0x468B {
             hooks.entered(&mut self.m);
         }
-        self.world_loop_start();
+        // A2A0..A2AB: the clip put back (A606), the player's position kept.
+        self.m.clip_back();
+        self.world_loop_kept();
         Some(())
     }
 }

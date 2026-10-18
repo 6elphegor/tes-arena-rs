@@ -802,6 +802,14 @@ def play(a, name, steps, tracks):
             died(a)
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
+        if why == ('ended',) and opts.get('leaves'):
+            # The area left in the step's frame (a door, a gate): the
+            # outer loop on into the next (`area_next`, its boxes on the
+            # way in read by the script), stopped before its first
+            # frame, which the next step's first top sees.
+            why = a.area_next()
+            assert why == ('world',), f'{name}: the next area stopped by {why}'
+            continue
         assert why == ('frames',), f'{name}: stopped by {why}'
         if any(act[0] in ('click', 'rclick') for act in opts.get('script', [])):
             # A screen's clicks done, the mouse back at the view's centre,
