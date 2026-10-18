@@ -705,10 +705,8 @@ impl Machine {
     pub fn file_open_or_device(&mut self, files: &mut Files, name: u16) -> Option<bool> {
         let (handle, found) = self.file_open_any(files, name)?;
         self.mem.w16(0, CS_HANDLE, handle);
-        if !found {
-            if self.mem.r32(DS, ERROR_HOOK) != 0 {
-                return crate::giveup::error("0000:67C8: a file missing, the error hook set");
-            }
+        if !found && self.mem.r32(DS, ERROR_HOOK) != 0 {
+            return crate::giveup::error("0000:67C8: a file missing, the error hook set");
         }
         Some(found)
     }
