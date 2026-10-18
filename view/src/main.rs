@@ -1627,6 +1627,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         save_dir,
         slot,
         panel: None,
+        sheet_run: None,
+        ring_kept: false,
         travel: None,
         saveui: None,
         saveui_under: None,
@@ -2909,6 +2911,13 @@ struct App {
     /// A screen up over the game (I, C), which stops it; EQUIP.IMG once
     /// loaded.
     panel: Option<panels::Panel>,
+    /// The character sheet's run up (`Machine::sheet_open`): B7C4 as it
+    /// found it, for `sheet_close`.
+    sheet_run: Option<u8>,
+    /// The ring of keys as the sheet's end left it (its loop's flush and
+    /// the key read, `Machine::sheet_close`): not forgotten again as the
+    /// screen goes (`ring_screen`).
+    ring_kept: bool,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
     /// The save or load menu up (`saveui`: the options screen's Save and
@@ -3082,6 +3091,10 @@ impl App {
     /// screen's beginning is seen before the next key.
     fn ring_screen(&mut self) {
         let now = self.screen_up();
+        if std::mem::take(&mut self.ring_kept) && now.is_none() {
+            self.ring_screen = now;
+            return;
+        }
         if now != self.ring_screen && !(self.ring_screen == Some(true) && now.is_none()) {
             self.engine.m.key_flush();
         }
@@ -3783,7 +3796,8 @@ impl App {
             Some(panels::Panel::Sheet) => match code {
                 // 3276:52B0's records: 'N' the equipment page, Esc leaves.
                 KeyCode::KeyN => page = true,
-                KeyCode::Escape | KeyCode::KeyK => self.panel = None,
+                KeyCode::Escape => self.sheet_end(Some(0x1B)),
+                KeyCode::KeyK => self.sheet_end(None),
                 _ => {}
             },
             Some(panels::Panel::Log(log)) => match code {
@@ -3928,7 +3942,7 @@ impl App {
             }
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
                 Some(sheets::SheetClick::Equipment) => self.equipment_page(),
-                Some(sheets::SheetClick::Done) => self.panel = None,
+                Some(sheets::SheetClick::Done) => self.sheet_end(None),
                 None => {}
             },
             Some(panels::Panel::Log(log)) => match sheets::log_click(x, y) {
@@ -4013,7 +4027,10 @@ impl App {
             }
             sheets::BarAction::Camp => self.camp = true,
             // 1194:0CF8: the screen faded out in 8 steps first.
-            sheets::BarAction::Sheet => self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Sheet)),
+            sheets::BarAction::Sheet => self.fade_open(8, 0, |a| {
+                a.sheet_begin();
+                a.panel = Some(panels::Panel::Sheet)
+            }),
         }
     }
 
@@ -4138,7 +4155,35 @@ impl App {
         sheets::pics(&self.assets.archive, &self.engine.m);
         // As the portrait does before its sheet (1194:5F13).
         self.engine.m.drop_place();
-        self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Sheet));
+        self.fade_open(8, 0, |a| {
+            a.sheet_begin();
+            a.panel = Some(panels::Panel::Sheet)
+        });
+    }
+
+    /// The sheet's run in the game's state (2542:00E0..00F0, 1194:0CF8
+    /// to its buttons' loop: `Machine::sheet_open`), the colours read as
+    /// shown.
+    fn sheet_begin(&mut self) {
+        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let e = &mut self.engine;
+        self.sheet_run = e.m.sheet_open(&mut e.files, Some(&dac));
+        if self.sheet_run.is_none() {
+            eprintln!("the character sheet gave up: {}", arena::giveup::describe());
+        }
+    }
+
+    /// The sheet left by its exit, `key` typed (Esc) or clicked (None):
+    /// the run's end (`Machine::sheet_close`).
+    fn sheet_end(&mut self, key: Option<u8>) {
+        self.panel = None;
+        if let Some(saved) = self.sheet_run.take() {
+            let e = &mut self.engine;
+            self.ring_kept = true;
+            if e.m.sheet_close(&mut e.files, saved, key).is_none() {
+                eprintln!("the character sheet's end gave up: {}", arena::giveup::describe());
+            }
+        }
     }
 
     /// A box of the view's own.

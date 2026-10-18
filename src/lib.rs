@@ -9,6 +9,7 @@ pub mod bsa;
 pub mod cast;
 pub mod celestial;
 pub mod character;
+pub mod charsheet;
 pub mod city;
 pub mod cityinfo;
 pub mod click;

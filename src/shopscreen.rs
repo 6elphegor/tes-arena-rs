@@ -193,7 +193,7 @@ impl Machine {
 
     /// 0000:9A98 with AX 0, BX 0, CX 140h, DX C8h: the clip the whole
     /// screen.
-    fn clip_whole(&mut self) {
+    pub(crate) fn clip_whole(&mut self) {
         for (o, v) in [(0xA91Eu16, 0x140u16), (0xA91C, 0xC8), (0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
             self.mem.w16(DS, o, v);
         }
