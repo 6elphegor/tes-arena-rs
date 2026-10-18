@@ -571,8 +571,11 @@ def newgame(a):
 
 def farewell(a):
     """The main quest at its third stage (F77 3), so a death plays the
-    farewell vision (1194:D459, VISION.FLC with text 57Bh)."""
+    farewell vision (1194:D459, VISION.FLC with text 57Bh); 9A6E, where
+    D45D reads the colours (6E38), filled with something they aren't, so
+    the read is seen (the DAC, faded to the cleared 929E, is black)."""
     a.mu.mem_write(a.lin(a.ds, 0x0F77), bytes([3]))
+    a.mu.mem_write(a.lin(a.ds, 0x9A6E), bytes((i * 7 + 1) & 0x3F for i in range(0x300)))
 
 
 def informant(a):
