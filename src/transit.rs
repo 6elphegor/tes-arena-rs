@@ -109,11 +109,18 @@ pub trait AreaHooks {
     fn automap(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 26F7:0000, the travel map shown on the way out of a dungeon (1A81
     /// set: from anywhere): its carry (a journey made, or another place
-    /// chosen) whether to leave (the view saved and put back around it,
-    /// 0000:A611/A606/A5D1, and redrawn after, A6B5, 2542:0446). The
-    /// default stays.
+    /// chosen) whether to leave. The world kept before it and given back
+    /// after are `Machine::area_exit`'s; the screens redrawn after (9426,
+    /// 9466) and the palette (2542:0446) the front end's. The default
+    /// stays.
     fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
+    }
+    /// The colours on the screen as the VGA holds them (6 bits each),
+    /// which the world's keeping before that map reads (0000:A611's 6E3C,
+    /// to A39E). None: A39E left as it is.
+    fn screen_colours(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
     }
     /// The screen after leaving (0000:9426, 9466).
     fn leave_screen(&mut self, _m: &mut Machine) {}
@@ -624,8 +631,10 @@ impl Machine {
     /// - 0000:4537 (interiors, dungeons): the automap kept (with the
     ///   level one more meanwhile); an interior, the wilderness's dungeon
     ///   (5C8 bit 80h) or one entered by a trigger (5C8 bit 4000h, now
-    ///   clear) is left; otherwise the player is asked (`ask_leave`), and
-    ///   on yes C994 is set, the screens shown and the area left;
+    ///   clear) is left; otherwise the world is kept (0000:A611, A606:
+    ///   `map_keep`) and the player asked (`ask_leave`), then the view's
+    ///   window made (A5D1) and the world given back (A6B5), and on yes,
+    ///   with C994 set before that, the screens shown and the area left;
     /// - 0000:44BD (the wilderness's dungeons): left, 1194:D55F and
     ///   2433:0199.
     ///
@@ -643,13 +652,19 @@ impl Machine {
                     if f & 0x4000 != 0 {
                         self.and16(0x05C8, 0xBFFF);
                     } else {
+                        let dac = hooks.screen_colours();
+                        self.map_keep(files, dac.as_ref());
                         self.mem.w8(DS, 0x1A81, 1);
                         let leave = hooks.ask_leave(self, files);
                         self.mem.w8(DS, 0x1A81, 0);
+                        self.view_window();
+                        if leave {
+                            self.mem.w8(DS, 0xC994, 1);
+                        }
+                        self.world_back(files)?;
                         if !leave {
                             return Some(());
                         }
-                        self.mem.w8(DS, 0xC994, 1);
                         hooks.leave_screen(self);
                         hooks.leave_dungeon(self);
                     }

@@ -330,6 +330,9 @@ impl arena::hooks::StairsHooks for Front<'_> {
             None => false,
         }
     }
+    fn screen_colours(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.dac
+    }
 }
 /// How the sheet's drop came out (`App::sheet_drop`): a question asked
 /// (its text), "Drop what?" waiting in its loop (its lines and their first
