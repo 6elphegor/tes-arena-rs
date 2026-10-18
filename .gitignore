@@ -4,3 +4,5 @@
 __pycache__/
 # Agent worktrees.
 /.claude/
+# regen_check.py results cache.
+/.regen_cache.json
