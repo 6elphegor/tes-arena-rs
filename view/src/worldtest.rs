@@ -959,6 +959,20 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             frames(a, d, seen, 11, |_| false);
         })),
+        "playequip" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The sheet (F1), its equipment page (N, 1194:0D67), the page's
+            // exit (Esc, 3276:57D8's fifth record) and the sheet's (Esc).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             used(a, 4);
@@ -1606,10 +1620,11 @@ fn the_state_as_the_original_leaves_it() {
 /// casting, the wilderness's night encounter, the stairs taken mid-fight,
 /// a rest ended by enemies, a lock picked and its door walked through,
 /// water swum in and levitated over, a potion and a ring used, the
-/// automap and the character sheet opened mid-fight, a store's buying,
+/// automap and the character sheet opened mid-fight, the sheet's
+/// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 17] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet"];
+const BUSY: [&str; 18] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1629,8 +1644,11 @@ fn busy_play_goes_as_the_originals() {
 /// dropped through bank 1Fh: `Machine::log_add`), and the character
 /// sheet's in playscreens and playsheet (the world kept and given back
 /// around it, 0000:A611 and A6B5; its files, banks 17h and [1030] and
-/// numbers, 1194:0CF8: `Machine::sheet_open`, `sheet_close`).
-const BUSY_STATE: [&str; 16] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet"];
+/// numbers, 1194:0CF8: `Machine::sheet_open`, `sheet_close`) and its
+/// equipment page's in playequip (1194:0D67 and 16BD: BACKMSG.$$$ and
+/// banks 4, 5 and [1032], the list's and the quests' lines:
+/// `Machine::sheet_equipment`, `sheet_equipment_close`).
+const BUSY_STATE: [&str; 17] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

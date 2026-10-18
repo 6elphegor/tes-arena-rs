@@ -21,9 +21,18 @@
 //!   the attributes' copy at 10A8 their only state), PAGE2.IMG and
 //!   CHARSHT.COL's colours (1695).
 //! - Its buttons (5CF4 over 3276:52B0's two records): N turns to the
-//!   equipment page (the front end's), Esc (or the click at 0, AAh, 1Fh
+//!   equipment page (0D67, 16BD), Esc (or the click at 0, AAh, 1Fh
 //!   x 11h) leaves (3159:0006). Then the colours black again (55B6),
 //!   12BA 0, B7C4 as it was, CD00 FFFFh.
+//! - The equipment page (16E0): the page cleared, CHARSHET.$$$ and
+//!   EQUIP.IMG on it, the page kept in bank 5, the doll's place in bank 4
+//!   (C350h) and the message's in bank [1032] and BACKMSG.$$$ (1738); then
+//!   drawn (23B1): the doll, the name, race, class and level, the list of
+//!   the items and the quests' lines (1DC8), the armour's classes (76B4).
+//!   Its own buttons' loop (5CF4 over 3276:57D8's six) with B7C4 bit 4;
+//!   its exit (the fifth, Esc) goes back to the stats' page (0D8E). Its
+//!   other buttons (the list, the arrows, Drop, Spells) are the front
+//!   end's, through the inventory's ports (`use_item.rs`).
 //! - The world given back (A6B5): the buffer block, the planes read back
 //!   from TEMPSAVE.$$$, the renderer's buffers (A561), SCREENSV.$$2, the
 //!   mouse's box (53AE), the row tables (DA8E) and outdoors the sky's
@@ -57,6 +66,10 @@ const EQUIP: u16 = 0x3E6D;
 const SHIRT: u16 = 0x3E42;
 const PANTS: u16 = 0x3E4E;
 const HELMET: u16 = 0x3E78;
+const EQUIP_IMG: u16 = 0x3E59;
+const BACKMSG: u16 = 0x1AA5;
+/// The equipment list's own lines shown (1194:1DC8's count).
+const LIST_SHOWN: u16 = 0x126E;
 
 /// The planes' segments: the ceiling's (CCD0), the walls' (D806), the
 /// floor's (D748).
@@ -199,12 +212,7 @@ impl Machine {
         if self.mem.r16(DS, 0x05E0) & 0x200 == 0 {
             self.sheet_keep(files)?;
         }
-        // 2462: the equipment's frames into bank 17h (left mapped).
-        let n = self.mem.r8(DS, 0x01AB).wrapping_add(b'0');
-        self.mem.w8(DS, EQUIP, n);
-        self.map_bank(0x17, 0);
-        let frame = self.mem.r16(DS, FRAME);
-        self.file_load(files, EQUIP, frame, 0)?;
+        self.equip_frames(files)?;
         self.mem.w16(DS, SHEET, 1);
         self.select_font(0x102C);
         self.select_tiles(0x103A);
@@ -241,6 +249,307 @@ impl Machine {
         self.world_back(files)?;
         self.piles_mark();
         Some(())
+    }
+
+    /// The sheet's loop on N (5CF4's first record, 3276:52B0), `key` its
+    /// key typed (`n`; None, a click on it): 1194:0D67's turn to the
+    /// equipment page, 129B 1, and 16BD up to its own buttons' loop
+    /// (`equipment_setup`, then B7C4 bit 4: no waits for the buttons'
+    /// release).
+    pub fn sheet_equipment(&mut self, files: &mut Files, key: Option<u8>) -> Option<()> {
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        self.mem.w16(DS, LOOP_MATCH, 0);
+        // 5DE2: the keys flushed, the key read; the first record matched.
+        self.key_flush();
+        if let Some(k) = key {
+            self.ring_typed(k);
+        }
+        let v = self.mem.r8(DS, STATS) ^ 1;
+        self.mem.w8(DS, STATS, v);
+        self.equipment_setup(files)?;
+        let f = self.mem.r8(DS, LOOP_FLAGS) | 4;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        // 5D08..5D1E: its loop's start, the keys flushed before its wait
+        // (5DE2: a key typed comes after).
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        self.mem.w16(DS, LOOP_MATCH, 0);
+        self.key_flush();
+        Some(())
+    }
+
+    /// The equipment page's loop left by its exit (3276:57D8's fifth
+    /// record, 3159:0006), `key` its key typed (Esc, 1Bh; None, a click):
+    /// 16D7 B7C4 bit 4 off, back in 0D80 129B as it was, B7C4 0 and the
+    /// stats' page drawn again (0D8E); the sheet's loop goes on.
+    pub fn sheet_equipment_close(&mut self, files: &mut Files, key: Option<u8>) -> Option<()> {
+        self.key_flush();
+        if let Some(k) = key {
+            self.ring_typed(k);
+        }
+        self.mem.w16(DS, LOOP_MATCH, 4);
+        let f = self.mem.r8(DS, LOOP_FLAGS) | 1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !4;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        let v = self.mem.r8(DS, STATS) ^ 1;
+        self.mem.w8(DS, STATS, v);
+        self.mem.w8(DS, LOOP_FLAGS, 0);
+        self.sheet_stats(files)?;
+        // 5D08..5D1E: the sheet's loop's next turn, the keys flushed
+        // before its wait.
+        self.mem.w16(DS, LOOP_MATCH, 0);
+        self.key_flush();
+        Some(())
+    }
+
+    /// 1194:16E0: the equipment page made: the clothes' names (1D22), no
+    /// other list (1299 0, 1270, 1272 0), the quests' lines counted at
+    /// 126C (A206 and 2433:083D into 1044), the own items' list (129A 1)
+    /// with its first line selected and shown first (1296, 1297 0), the
+    /// page's back (1738) and the page drawn (23B1).
+    fn equipment_setup(&mut self, files: &mut Files) -> Option<()> {
+        self.sheet_clothes();
+        self.mem.w8(DS, 0x1299, 0);
+        self.mem.w16(DS, 0x1270, 0);
+        self.mem.w16(DS, 0x1272, 0);
+        self.mem.w8(DS, NUMBER, 0);
+        self.quest_lines_counted(files)?;
+        self.mem.w8(DS, 0x9288, 0xFE);
+        self.mem.w8(DS, 0x129A, 1);
+        self.mem.w8(DS, 0x1296, 0);
+        self.mem.w8(DS, 0x1297, 0);
+        self.equipment_back(files)?;
+        self.equipment_drawn(files)
+    }
+
+    /// 1194:A206 and 2433:083D into 1044, their lines counted at 126C.
+    fn quest_lines_counted(&mut self, files: &mut Files) -> Option<u16> {
+        use crate::questitems::var::COUNT;
+        self.mem.w16(DS, COUNT, 0);
+        let more = self.quest_item_names(files, NUMBER)?;
+        let n = self.mem.r16(DS, COUNT).wrapping_add(more);
+        self.mem.w16(DS, COUNT, n);
+        Some(n)
+    }
+
+    /// 1194:1738: the page cleared (9426), CHARSHET.$$$ over it (1647),
+    /// the page copied to bank 5 (7702), EQUIP.IMG drawn (5CD9), the doll's
+    /// place (0Ch, 2Fh; 92h by 58h) kept in bank 4 at C350h and the
+    /// message's (0, 8Fh; ABh by 2Ch) in bank [1032] and written to
+    /// BACKMSG.$$$ (8F26, 9DD2), bank 5 left mapped; CHARSHT.COL's colours
+    /// (1695).
+    fn equipment_back(&mut self, files: &mut Files) -> Option<()> {
+        self.page_clear();
+        self.sheet_back(files)?;
+        self.map_bank(5, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        let page = self.mem.r16(DS, 0xA900);
+        for i in 0..0xFA00u16 {
+            let b = self.mem.r8(page, i);
+            self.mem.w8(frame, i, b);
+        }
+        self.sheet_image(files, EQUIP_IMG)?;
+        let old = self.map_bank(4, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        self.page_rect_save((frame, 0xC350), 0x0C, 0x2F, 0x92, 0x58);
+        self.map_bank(old, 0);
+        let bank = self.mem.r16(DS, 0x1032);
+        let old = self.map_bank(bank, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        self.page_rect_save((frame, 0), 0, 0x8F, 0xAB, 0x2C);
+        let path = self.save_path(BACKMSG);
+        self.file_write(files, path, frame, 0, 0x1D64);
+        self.map_bank(old, 0);
+        self.sheet_colours(files)
+    }
+
+    /// 1194:23B1: the page given back from bank 5 (21F1: 5B04, its 0s left
+    /// out) and the doll's place from bank 4 (21C2: 599C), EQUIP.IMG drawn
+    /// again (the spells' pictures too with the spells' list, 129A 0),
+    /// the doll (23E5), the name, race, class and level (22F5), the list
+    /// (1DC8) and the armour's classes (76B4).
+    fn equipment_drawn(&mut self, files: &mut Files) -> Option<()> {
+        let old = self.map_bank(5, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        let block = self.page_is_block();
+        if block {
+            let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
+            for i in 0..0xFA00u16 {
+                let b = self.mem.r8(frame, i);
+                if b != 0 {
+                    self.mem.w8(seg, off.wrapping_add(i), b);
+                }
+            }
+        }
+        let back = self.map_bank(4, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        if block {
+            self.page_rect_put((frame, 0xC350), 0x0C, 0x2F, 0x92, 0x58);
+        }
+        self.map_bank(back, 0);
+        self.map_bank(old, 0);
+        self.sheet_image(files, EQUIP_IMG)?;
+        if self.mem.r8(DS, 0x129A) == 0 {
+            self.sheet_image(files, 0x3E94)?;
+            self.sheet_image(files, 0x3E89)?;
+        }
+        self.doll_drawn(files)?;
+        // 22F5 (0E19): the name, the race, the class.
+        self.mem.w8(DS, 0x9288, 0xFE);
+        self.page_text_at(0x0B, 0x07, (DS, PLAYER + 9));
+        let race = self.mem.r8(DS, PLAYER + 4) as u16;
+        let si = self.skip_strings(DS, 0x2B94, race);
+        self.page_text_at(0x0B, 0x10, (DS, si));
+        let class = self.class_name(DS, PLAYER);
+        self.page_text_at(0x0B, 0x19, class);
+        // 5634: the level, at 929E (7052).
+        let level = self.mem.r8(DS, PLAYER + 6) as u16 + 1;
+        self.utoa_nul(level, SCRATCH);
+        self.page_text_at(0x80, 0x17, (DS, SCRATCH));
+        self.equipment_list(files)?;
+        // 76B4 with BX the sex (+7): the armour's classes (7719) at the
+        // places of 5D8D's (5DA9's for a woman) seven (48F5), in 8Ah,
+        // then again one to the left in C3h.
+        let woman = self.mem.r8(DS, PLAYER + 7) != 0;
+        self.player_armor_class();
+        let table = if woman { 0x5DA9 } else { 0x5D8D };
+        for (colour, dx) in [(0x8Au8, 0u16), (0xC3, 1)] {
+            self.mem.w8(DS, 0x9288, colour);
+            for i in 0..7u16 {
+                let cx = self.mem.r8(DS, crate::inventory::ARMOR_CLASS + i) as i8 as i16 as u16;
+                let x = self.mem.r16(DATA, table + 4 * i).wrapping_sub(dx);
+                let y = self.mem.r16(DATA, table + 4 * i + 2);
+                self.sheet_signed(cx, 0);
+                self.page_text_at(x, y, (DS, NUMBER));
+            }
+        }
+        Some(())
+    }
+
+    /// 1194:1DC8 for the own items (129A 1): no other list (1270, 1272
+    /// 0), TEENYFNT ([102E]); up to seven lines from [1297] (fewer past
+    /// the 28h slots), each slot in use (+0Eh 40h) counted at 126E and
+    /// drawn at (0Eh, 32h + 0Bh a line) in A0h, 58h one the class can use
+    /// (7772), 55h worn, the selected one ([1296]) boxed (22AF) and an
+    /// enchanted known one (+0Eh 1 and 2) 68h, 65h worn; a stack's (kind
+    /// 3) unknown name with its count (1F30), any other's 7388. Under
+    /// seven, the quests' lines after them (1EB8: A206 and 2433:083D into
+    /// 1044 again) in A0h, the selected one boxed. Then [102C]'s font.
+    fn equipment_list(&mut self, files: &mut Files) -> Option<()> {
+        self.mem.w16(DS, 0x1270, 0);
+        self.mem.w16(DS, 0x1272, 0);
+        self.select_font(0x102E);
+        let first = self.mem.r8(DS, 0x1297) as u16;
+        let mut cx = 7u16;
+        if first + 7 > 0x28 {
+            cx = 0x28u8.wrapping_sub(first as u8) as u16;
+        }
+        let mut si = ITEMS.wrapping_add(first.wrapping_mul(SLOT));
+        let (mut ax, mut bx) = (first, 0x32u16);
+        self.mem.w16(DS, LIST_SHOWN, 0);
+        for _ in 0..cx {
+            let flags = self.mem.r8(DS, si.wrapping_add(0x0E));
+            if flags & 0x40 != 0 {
+                let n = self.mem.r16(DS, LIST_SHOWN).wrapping_add(1);
+                self.mem.w16(DS, LIST_SHOWN, n);
+                self.mem.w8(DS, 0x9288, 0xA0);
+                let class = (self.mem.r8(DS, 0x01A9) & 0x1F) as u16;
+                if self.class_can_use(DS, si, class)? {
+                    self.mem.w8(DS, 0x9288, if flags & 0x80 != 0 { 0x55 } else { 0x58 });
+                }
+                if self.mem.r8(DS, 0x1296) == ax as u8 {
+                    let c = self.mem.r8(DS, 0x9288);
+                    self.mem.w8(DS, 0x9288, 0xA0);
+                    self.line_box(bx);
+                    self.mem.w8(DS, 0x9288, c);
+                }
+                if flags & 1 != 0 && flags & 2 != 0 {
+                    self.mem.w8(DS, 0x9288, if flags & 0x80 != 0 { 0x65 } else { 0x68 });
+                }
+                let name = if self.item_category(DS, si) == 3 && flags & 2 == 0 {
+                    // 1F30: "%s (%d)" (3276:5B6D), the name and +1 plus one.
+                    let count = self.mem.r16(DS, si.wrapping_add(1)).wrapping_add(1);
+                    let name = self.display_name(si)?;
+                    self.sprintf((DS, NUMBER), (DATA, 0x5B6D), &[crate::format::Arg::Str(DS, name), crate::format::Arg::Int(count)]);
+                    NUMBER
+                } else {
+                    self.display_name(si)?
+                };
+                self.page_text_at(0x0E, bx, (DS, name));
+            }
+            si = si.wrapping_add(SLOT);
+            bx = bx.wrapping_add(0x0B);
+            ax = ax.wrapping_add(1);
+        }
+        if self.mem.r16(DS, LIST_SHOWN) != 7 {
+            let n = self.quest_lines_counted(files)?;
+            if n != 0 {
+                self.mem.w8(DS, 0x9288, 0xA0);
+                let shown = self.mem.r16(DS, LIST_SHOWN);
+                let room = 7u16.wrapping_sub(shown);
+                let cx = if room < n { room } else { n };
+                let mut si = NUMBER;
+                let mut bx = shown.wrapping_mul(0x0B).wrapping_add(0x33);
+                for _ in 0..cx {
+                    si = self.page_text_at(0x0E, bx, (DS, si));
+                    let dl = (self.mem.r16(DS, LIST_SHOWN) as u8).wrapping_add(self.mem.r8(DS, 0x1297));
+                    if dl == self.mem.r8(DS, 0x1296) {
+                        self.line_box(bx);
+                    }
+                    let v = self.mem.r16(DS, LIST_SHOWN).wrapping_add(1);
+                    self.mem.w16(DS, LIST_SHOWN, v);
+                    bx = bx.wrapping_add(0x0B);
+                }
+            }
+        }
+        self.select_font(0x102C);
+        Some(())
+    }
+
+    /// 1194:22AF: the box round a selected line at row `bx` (0000:7334's
+    /// four lines from (0Ch, `bx` - 2) by 9Dh and 9Ch, `bx` + 0Ah): the
+    /// state they leave, ADB6 and ADB8 at the last line's end (each line
+    /// starts at them; its pixels are the front end's).
+    fn line_box(&mut self, bx: u16) {
+        let y = bx.wrapping_sub(2);
+        self.mem.w16(DS, 0xADB6, 0x0C);
+        self.mem.w16(DS, 0xADB8, y);
+        self.line_to(0x9D, y);
+        self.line_to(0x9C, y.wrapping_add(0x0C));
+        let v = self.mem.r16(DS, 0xADB8).wrapping_sub(1);
+        self.mem.w16(DS, 0xADB8, v);
+        self.line_to(0x0B, y.wrapping_add(0x0C));
+        let v = self.mem.r16(DS, 0xADB8).wrapping_sub(1);
+        self.mem.w16(DS, 0xADB8, v);
+        self.line_to(0x0C, y);
+    }
+
+    /// 0000:7334's state: a line from (ADB6, ADB8) to (`ax`, `bx`) leaves
+    /// them at its end, unless it has no length.
+    fn line_to(&mut self, ax: u16, bx: u16) {
+        if self.mem.r16(DS, 0xADB6) == ax && self.mem.r16(DS, 0xADB8) == bx {
+            return;
+        }
+        self.mem.w16(DS, 0xADB6, ax);
+        self.mem.w16(DS, 0xADB8, bx);
+    }
+
+    /// 0000:9E06: the text at `seg`:`si` drawn at (`x`, `y`) (into the page
+    /// where it is the game's own block, else its state alone:
+    /// `Machine::text_state`); SI past its NUL.
+    fn page_text_at(&mut self, x: u16, y: u16, (seg, si): (u16, u16)) -> u16 {
+        if self.page_is_block() {
+            self.page_text((seg, si), x, y);
+        } else {
+            self.text_state_far(x, y, (seg, si));
+        }
+        let mut at = si;
+        while self.mem.r8(seg, at) != 0 {
+            at = at.wrapping_add(1);
+        }
+        at.wrapping_add(1)
     }
 
     /// 1194:55B6: the colours at 929E black (the fade to them, 5E3E, the
@@ -373,6 +682,17 @@ impl Machine {
     /// PAGE2.IMG and CHARSHT.COL's colours read to 929E (1695: 7530).
     fn sheet_stats(&mut self, files: &mut Files) -> Option<()> {
         self.mem.w8(DS, 0x9288, 0xFE);
+        self.sheet_back(files)?;
+        self.sheet_doll(files)?;
+        self.sheet_image(files, CHARSTAT)?;
+        self.sheet_texts();
+        self.sheet_image(files, PAGE2)?;
+        self.sheet_colours(files)
+    }
+
+    /// 1194:1647: CHARSHET.$$$ loaded into bank [1030] and drawn over
+    /// the page (5B04, its 0s left out), the bank before mapped again.
+    fn sheet_back(&mut self, files: &mut Files) -> Option<()> {
         let bank = self.mem.r16(DS, 0x1030);
         let old = self.map_bank(bank, 0);
         let path = self.save_path(CHARSHET);
@@ -389,10 +709,13 @@ impl Machine {
             }
         }
         self.map_bank(old, 0);
-        self.sheet_doll(files)?;
-        self.sheet_image(files, CHARSTAT)?;
-        self.sheet_texts();
-        self.sheet_image(files, PAGE2)?;
+        Some(())
+    }
+
+    /// 1194:1695: CHARSHT.COL's colours read to 929E (0000:7530: a file
+    /// of other than 300h bytes its colours past an 8-byte header, made
+    /// 6-bit); their setting (9B4E) the front end's.
+    fn sheet_colours(&mut self, files: &mut Files) -> Option<()> {
         let n = self.file_load(files, COLOURS, DS, SCRATCH).map(|_| self.mem.r16(DS, crate::bsa::var::OPEN_SIZE))?;
         if n != 0x300 {
             for i in 0..0x300u16 {
@@ -409,12 +732,23 @@ impl Machine {
     /// a worn shirt's item (type 2, kind 0: 2187) under the shirt, then
     /// each worn item of the first [129D] slots but such shirts (2451).
     fn sheet_doll(&mut self, files: &mut Files) -> Option<()> {
+        self.sheet_clothes();
+        self.doll_drawn(files)
+    }
+
+    /// 1194:1D22: the clothes' names by sex and class (SHIRT's two
+    /// letters, the trousers' and the helmet's first).
+    pub fn sheet_clothes(&mut self) {
         let bl = if self.mem.r8(DS, PLAYER + 5) & 0x20 != 0 { b'r' } else { b's' };
         let al = if self.mem.r8(DS, PLAYER + 7) != 0 { b'f' } else { b'm' };
         self.mem.w8(DS, SHIRT, al);
         self.mem.w8(DS, SHIRT + 1, bl);
         self.mem.w8(DS, PANTS, al);
         self.mem.w8(DS, HELMET, al);
+    }
+
+    /// 1194:23E5: the doll (see `sheet_doll`).
+    fn doll_drawn(&mut self, files: &mut Files) -> Option<()> {
         self.map_bank(0x17, 0);
         let (n, _) = self.count_items(DS, ITEMS);
         self.mem.w8(DS, WORN, n as u8);
@@ -424,14 +758,16 @@ impl Machine {
         }
         self.sheet_image(files, PANTS)?;
         let n = self.mem.r8(DS, WORN) as u16;
+        // (Each picture 5CD9 draws leaves DI 0; each item's DI goes on to
+        // the next: `sheet_item`.)
         if let Some(si) = self.worn_find(2, 0, n) {
-            self.sheet_item(files, si)?;
+            self.sheet_item(files, si, 0)?;
         }
         self.sheet_image(files, SHIRT)?;
-        let mut si = ITEMS;
+        let (mut si, mut di) = (ITEMS, 0);
         for _ in 0..self.mem.r8(DS, WORN) {
             if self.mem.r8(DS, si.wrapping_add(0x0E)) & 0x80 != 0 && !(self.mem.r8(DS, si) == 2 && self.item_category(DS, si) == 0) {
-                self.sheet_item(files, si)?;
+                di = self.sheet_item(files, si, di)?;
             }
             si = si.wrapping_add(SLOT);
         }
@@ -467,15 +803,28 @@ impl Machine {
         }
     }
 
-    /// 1194:1F8D: the worn item at DS:`si` on the doll: its frame in bank
-    /// 17h (5CCC: weapons by type, the armour's by type and kind, 21A8;
-    /// none for kind 2), drawn as it is or, coloured (+0Eh bit 1, its
-    /// colour +10h at 12A4), its header copied to 12A8 and its frame to
-    /// 929E and recoloured through bank 4 (20BF: bank 4's first C350h
-    /// bytes cleared, the frame drawn there and mapped through the
-    /// colours; that drawing the front end's); a helmet (type 5, kind 0)
-    /// then for the classes that show one (2020).
-    fn sheet_item(&mut self, files: &mut Files, si: u16) -> Option<()> {
+    /// 1194:2462: the equipment's frames (nEQUIP.CIF, n the player's +7)
+    /// loaded into bank 17h, left mapped.
+    pub fn equip_frames(&mut self, files: &mut Files) -> Option<()> {
+        let n = self.mem.r8(DS, 0x01AB).wrapping_add(b'0');
+        self.mem.w8(DS, EQUIP, n);
+        self.map_bank(0x17, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        self.file_load(files, EQUIP, frame, 0)?;
+        Some(())
+    }
+
+    /// 1194:1F8D: the worn item at DS:`si` on the doll, bank 17h mapped
+    /// (`equip_frames`): its frame there (5CCC: weapons by type, the
+    /// armour's by type and kind, 21A8; none for kind 2), drawn as it is
+    /// or, coloured (+0Eh bit 1, its colour +10h at 12A4), its header
+    /// copied to 12A8 and its frame to 929E and recoloured through bank 4
+    /// (`item_coloured`); after any but a coloured one, a helmet (type 5,
+    /// kind 0) by the race (`sheet_helmet`). `di` is DI as 1F8D finds it,
+    /// which race 7's helmet loads its picture at; DI after it (C350h
+    /// after a coloured one, 929Eh after races 1, 3 and 4's helmet, else
+    /// as it was).
+    pub fn sheet_item(&mut self, files: &mut Files, si: u16, di: u16) -> Option<u16> {
         let colour = if self.mem.r8(DS, si.wrapping_add(0x0E)) & 1 != 0 { self.mem.r8(DS, si.wrapping_add(0x10)) as i8 as i16 as u16 } else { 0xFFFF };
         self.mem.w16(DS, ITEM_COLOUR, colour);
         let ty = self.mem.r8(DS, si);
@@ -507,32 +856,189 @@ impl Machine {
                     let b = self.mem.r8(frame, img.wrapping_add(i));
                     self.mem.w8(DS, SCRATCH.wrapping_add(i), b);
                 }
-                // 20BF.
-                let old = self.map_bank(4, 0);
-                let frame = self.mem.r16(DS, FRAME);
-                for i in 0..0xC350u16 {
-                    self.mem.w8(frame, i, 0);
-                }
-                self.mem.w32(DS, 0x8F9A, 0);
-                for i in 0..0x100u16 {
-                    self.mem.w8(DS, SCRATCH + i, i as u8);
-                }
-                self.mem.w16(DS, ITEM_STEPS, 0);
-                self.map_bank(old, 0);
-                return Some(());
+                // (No helmet after a coloured item: 201C's RET.)
+                return self.item_coloured().map(|_| 0xC350);
             }
             if self.page_is_block() {
                 self.page_image(frame, img);
             }
         }
         if self.mem.r8(DS, si) == 5 && self.item_category(DS, si) == 0 {
-            // 2020: by the class (1A8): 7, the helmet's picture by its kind.
-            let class = self.mem.r8(DS, 0x01A8);
-            if class == 7 {
-                return crate::giveup::not_ported("1194:20B0: a helmet's picture for class 7 (0000:56C8 with BX 7)");
-            }
-            let _ = files;
+            return self.sheet_helmet(files, si, di);
         }
+        Some(di)
+    }
+
+    /// 1194:20BF: the worn item's frame copied to 929E recoloured: bank 4
+    /// mapped and its first C350h bytes cleared, the frame unpacked to
+    /// its start (5828 with [8F9C] the EMS frame: `image_capture`), 929E
+    /// made a table of each colour to itself but from 938C the item's
+    /// colours: 13 from 3EA0's byte for its colour, or for colour 2 seven
+    /// then 80h..84h (12A6 counting the second part); the bank's C350h
+    /// bytes mapped through the table and its first [12ACh] x [12AEh]
+    /// drawn at (12A8, 12AA), 0s left out (5B04, where the page is the
+    /// game's own block); the bank before mapped again.
+    fn item_coloured(&mut self) -> Option<()> {
+        let old = self.map_bank(4, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        for i in 0..0xC350u16 {
+            self.mem.w8(frame, i, 0);
+        }
+        self.mem.w16(DS, 0x8F9C, frame);
+        self.image_capture(DS, SCRATCH)?;
+        self.mem.w32(DS, 0x8F9A, 0);
+        for i in 0..0x100u16 {
+            self.mem.w8(DS, SCRATCH + i, i as u8);
+        }
+        let colour = self.mem.r16(DS, ITEM_COLOUR);
+        self.mem.w16(DS, ITEM_STEPS, 0);
+        let mut al = self.mem.r8(DS, 0x3EA0u16.wrapping_add(colour));
+        let mut di = 0x938Cu16;
+        let mut cx = 0x0Du16;
+        if colour == 2 {
+            self.mem.w16(DS, ITEM_STEPS, 1);
+            cx = 7;
+        }
+        loop {
+            for _ in 0..cx {
+                self.mem.w8(DS, di, al);
+                di = di.wrapping_add(1);
+                al = al.wrapping_add(1);
+            }
+            if self.mem.r16(DS, ITEM_STEPS) == 0 {
+                break;
+            }
+            cx = 5;
+            al = 0x80;
+            let v = self.mem.r16(DS, ITEM_STEPS).wrapping_sub(1);
+            self.mem.w16(DS, ITEM_STEPS, v);
+            if colour != 2 {
+                break;
+            }
+        }
+        for i in 0..0xC350u16 {
+            let b = self.mem.r8(frame, i);
+            let c = self.mem.r8(DS, SCRATCH.wrapping_add(b as u16));
+            self.mem.w8(frame, i, c);
+        }
+        if self.page_is_block() {
+            let r = |m: &Self, o: u16| m.mem.r16(DS, ITEM_HEADER + o);
+            let (x, y, w, h) = (r(self, 0), r(self, 2), r(self, 4), r(self, 6));
+            let page = self.mem.r16(DS, 0xA900);
+            let mut di = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+            let mut si = 0u16;
+            for _ in 0..h {
+                for k in 0..w {
+                    let b = self.mem.r8(frame, si);
+                    si = si.wrapping_add(1);
+                    if b != 0 {
+                        self.mem.w8(page, di.wrapping_add(k), b);
+                    }
+                }
+                di = di.wrapping_add(0x140);
+            }
+        }
+        self.map_bank(old, 0);
+        Some(())
+    }
+
+    /// 0000:5828 with the far pointer at 8F9A set: the image whose header
+    /// is at seg:off unpacked to [8F9C]:[8F9A] rather than drawn (flags 1
+    /// runs, 8 LZHUF, 4 LZSS; an unpacked one writes nothing). Flags 2
+    /// draws by runs (5B9A), not ported here.
+    fn image_capture(&mut self, seg: u16, off: u16) -> Option<()> {
+        let flags = self.mem.r16(seg, off.wrapping_add(8));
+        let (bs, bo) = (self.mem.r16(DS, 0x8F9C), self.mem.r16(DS, 0x8F9A));
+        if flags & 1 != 0 {
+            self.rle_unpack(seg, off, bs, bo)?;
+        } else if flags & 2 != 0 {
+            return crate::giveup::not_ported("0000:5897: an image by runs to the capture buffer (5B9A)");
+        } else if flags & 8 != 0 {
+            let len = self.mem.r16(seg, off.wrapping_add(0xA));
+            self.mif_decompress(seg, off.wrapping_add(0xC), bs, bo, len)?;
+        } else if flags & 4 != 0 {
+            self.lzss_unpack(seg, off.wrapping_add(0xA), bs, bo)?;
+        }
+        Some(())
+    }
+
+    /// 1194:2020: a worn helmet (type 5, kind 0) by the race at 1A8:
+    /// 7, the helmet's own picture by its armour's kind (20B0: the digit
+    /// of mliz?.img, 5CD9); 1, 3 and 4, the head's colours remapped (929E
+    /// a table of each colour to itself but the 1Eh at 3276:5750's places
+    /// from the race's list at 3276:576E) over (F4h, 13h; 13h by 17h), or
+    /// a woman's (ECh, 12h; Fh by Fh) on the page (9D84, where the page is
+    /// the game's own block); others nothing.
+    fn sheet_helmet(&mut self, files: &mut Files, si: u16, di: u16) -> Option<u16> {
+        let race = self.mem.r8(DS, PLAYER + 4) as u16;
+        match race {
+            7 => {
+                let k = self.armor_kind(DS, si) as u8;
+                self.mem.w8(DS, HELMET + 4, k.wrapping_add(b'0'));
+                self.helmet_picture(files, di)?;
+                Some(di)
+            }
+            1 | 3 | 4 => {
+                let list = self.mem.r16(DATA, 0x576E + race * 2);
+                for i in 0..0x100u16 {
+                    self.mem.w8(DS, SCRATCH + i, i as u8);
+                }
+                for k in 0..0x1Eu16 {
+                    let at = self.mem.r8(DATA, 0x5750 + k) as u16;
+                    let b = self.mem.r8(DATA, list.wrapping_add(k));
+                    self.mem.w8(DS, SCRATCH.wrapping_add(at), b);
+                }
+                let (x, y, w, h) = if self.mem.r8(DS, PLAYER + 7) != 0 { (0xEC, 0x12, 0x0F, 0x0F) } else { (0xF4, 0x13, 0x13, 0x17) };
+                if self.page_is_block() {
+                    let page = self.mem.r16(DS, 0xA900);
+                    let mut di = self.mem.r16(DS, 0xA6A0u16 + 2 * y).wrapping_add(x);
+                    for _ in 0..h {
+                        for k in 0..w {
+                            let b = self.mem.r8(page, di.wrapping_add(k));
+                            let c = self.mem.r8(DS, SCRATCH.wrapping_add(b as u16));
+                            self.mem.w8(page, di.wrapping_add(k), c);
+                        }
+                        di = di.wrapping_add(0x140);
+                    }
+                }
+                Some(SCRATCH)
+            }
+            _ => Some(di),
+        }
+    }
+
+    /// 1194:5CD9 with BX 7 (from 20B0): bank [1030] mapped and 0000:56C8
+    /// with BX 7: bit 2 keeps the caller's ES:DI, so the picture named at
+    /// HELMET is loaded into DGROUP at `di` (over whatever is there: from
+    /// the doll's loop DGROUP's start), its header's words to A836..A83C;
+    /// bit 1 keeps what it covers: a heap block (9CD6) of its width times
+    /// its height plus 8 at A83E (EAX: 0, the segment), the header's four
+    /// words and the page's rows there (8F2A), never freed; then the
+    /// picture drawn (582C, where the page is the game's own block). Its
+    /// colours (9B56) are the VGA's. The bank before mapped again.
+    fn helmet_picture(&mut self, files: &mut Files, di: u16) -> Option<()> {
+        let bank = self.mem.r16(DS, 0x1030);
+        let old = self.map_bank(bank, 0);
+        self.file_load(files, HELMET, DS, di)?;
+        let h: Vec<u16> = (0..4u16).map(|k| self.mem.r16(DS, di.wrapping_add(2 * k))).collect();
+        for (k, &v) in h.iter().enumerate() {
+            self.mem.w16(DS, 0xA836 + 2 * k as u16, v);
+        }
+        let (x, y, w, hh) = (h[0], h[1], h[2], h[3]);
+        let seg = self.heap_alloc_high(w.wrapping_mul(hh).wrapping_add(8))?;
+        if seg == 0 {
+            return crate::giveup::original("0000:573C: no room for the helmet's background: the original writes it at 0:0");
+        }
+        self.mem.w16(DS, 0xA83E, 0);
+        self.mem.w16(DS, 0xA840, seg);
+        for (k, &v) in h.iter().enumerate() {
+            self.mem.w16(seg, 2 * k as u16, v);
+        }
+        self.page_rect_save((seg, 8), x, y, w, hh);
+        if self.page_is_block() {
+            self.page_image(DS, di);
+        }
+        self.map_bank(old, 0);
         Some(())
     }
 
