@@ -1074,12 +1074,6 @@ pub mod custom {
             super::draw_list(screen, st, menu);
         }
     }
-
-    /// `list_pick` in the list's own font.
-    pub fn game_list_pick(menu: &Menu, x: i32, y: i32) -> Option<usize> {
-        let st = STYLE.get()?;
-        list_pick(list_font(st, menu), menu, x, y)
-    }
 }
 
 /// The window boxes are centred in; the whole screen when unset.
@@ -1387,6 +1381,7 @@ fn list_key_in(menu: &mut Menu, key: ListKey, rows: usize) {
 }
 
 /// The up and down arrows' boxes (x, y, w, h) of a list of kind `kind`.
+#[cfg(test)]
 pub fn list_arrows(kind: u16) -> Option<(Rect, Rect)> {
     let st = STYLE.get()?;
     let k = list_kind(st, &Menu { kind, list: true, ..Default::default() });

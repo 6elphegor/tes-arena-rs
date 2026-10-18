@@ -726,6 +726,7 @@ impl Travel {
     }
 
     /// Whether the search's list of places is up.
+    #[cfg(test)]
     pub fn listing(&self) -> bool {
         matches!(self.asking, Some(Asking::List(..)))
     }
