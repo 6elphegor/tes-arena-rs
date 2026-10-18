@@ -93,8 +93,10 @@ enum On<'a> {
 struct Dos {
     /// Bit h set: device handle h (0..4) still open.
     devices: u8,
-    /// CON's position (its size is 0: a seek from the end is the offset).
-    con_pos: u32,
+    /// The devices' positions, CON's, AUX's and PRN's (`Dos::dev`):
+    /// moved by seeks and by the bytes written (DISK2.ASM's AddRec); a
+    /// device's size is 0, so a seek from the end is the offset.
+    dev_pos: [u32; 3],
     files: std::collections::BTreeMap<u16, OpenFile>,
     /// GLOBAL.BSA's handle (kept open from the start, read through `bsa`).
     bsa: Option<u16>,
@@ -106,7 +108,7 @@ struct Dos {
 
 impl Default for Dos {
     fn default() -> Self {
-        Self { devices: 0x1F, con_pos: 0, files: Default::default(), bsa: None, cur: 0xFFFF }
+        Self { devices: 0x1F, dev_pos: [0; 3], files: Default::default(), bsa: None, cur: 0xFFFF }
     }
 }
 
@@ -118,6 +120,12 @@ impl Dos {
 
     fn on_device(&self, h: u16) -> bool {
         h < 5 && self.devices & (1 << h) != 0
+    }
+
+    /// Device handle `h`'s device: 0 CON (handles 0..2, one open file),
+    /// 1 AUX (3), 2 PRN (4).
+    fn dev(h: u16) -> usize {
+        (h.max(2) - 2) as usize
     }
 
     /// A file opened (or made) on the lowest free handle, made current.
@@ -178,7 +186,7 @@ impl Dos {
                 Ok(f.pos)
             }
             On::Device(d) => {
-                let p = if d <= 2 { &mut self.con_pos } else { return Ok(off) };
+                let p = &mut self.dev_pos[Self::dev(d)];
                 *p = base(*p, 0).wrapping_add(off);
                 Ok(*p)
             }
@@ -211,11 +219,14 @@ pub struct Files {
     /// Files the game deleted (`Machine::file_delete`): hidden from then
     /// on, the directories' files too (nothing is deleted on disk).
     deleted: std::collections::HashSet<Vec<u8>>,
+    /// What the game wrote to PRN (the logbook's Print), the printer
+    /// taken as ready.
+    printed: Vec<u8>,
 }
 
 impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
-        let mut files = Self { names: HashMap::new(), bsa: None, dos: Dos::default(), written: HashMap::new(), deleted: Default::default() };
+        let mut files = Self { names: HashMap::new(), bsa: None, dos: Dos::default(), written: HashMap::new(), deleted: Default::default(), printed: Vec::new() };
         files.add_dir(dir)?;
         // The install's speech (SPEECH\nnnn_mmX.VOC, 2F75:000A and 023F
         // open them by that path), by their names as the rest; a name the
@@ -237,6 +248,11 @@ impl Files {
     pub fn disk_from(&mut self, other: &Files) {
         self.written = other.written.clone();
         self.deleted = other.deleted.clone();
+    }
+
+    /// The bytes the game wrote to PRN so far.
+    pub fn printed(&self) -> &[u8] {
+        &self.printed
     }
 
     /// A file the game wrote, by DOS name (its last component).
@@ -789,12 +805,27 @@ impl Machine {
     }
 
     /// DOS write (40h) of `n` bytes from `seg`:`off` on handle `h`: AX,
-    /// the count (a device takes them all), or 6 where nothing is open.
+    /// the count, or 6 where nothing is open. A device in DOS's cooked
+    /// mode (the game never makes one raw) takes the bytes one at a time
+    /// up to the first ^Z, which ends the write (DISK.ASM's WRTDEV and
+    /// WRITECON); the count is those taken, its position moved by it. The
+    /// device is taken as ready: PRN's bytes are kept (`Files::printed`).
+    /// A printer not ready would have DOS ask the critical error handler,
+    /// whose answer here is always Retry (21EE:03D9, set from 0000:1036),
+    /// so the original would wait there for it.
     fn dos_write(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {
         let bytes: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
         let f = match files.dos.on(h) {
             On::File(f) => f,
-            On::Device(_) => return n,
+            On::Device(d) => {
+                let took = bytes.iter().position(|&b| b == 0x1A).unwrap_or(bytes.len());
+                let p = &mut files.dos.dev_pos[Dos::dev(d)];
+                *p = p.wrapping_add(took as u32);
+                if Dos::dev(d) == 2 {
+                    files.printed.extend_from_slice(&bytes[..took]);
+                }
+                return took as u16;
+            }
             On::Free => return INVALID_HANDLE,
         };
         let mut data = f.data.to_vec();

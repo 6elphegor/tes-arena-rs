@@ -87,6 +87,11 @@ state since changed or not), each as eleven words (ROW_INPUTS, of the
 flags only the bits DA8E reads), their digest:
 
   rows | NAME | <drawings> <digest>
+
+A case that printed (the logbook's Print), what PRN took, its length
+and digest:
+
+  printed | NAME | <length> <digest>
 """
 import os
 import struct
@@ -376,6 +381,15 @@ def wounded_with_potion(a):
     a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
 
 
+def dreaming(a):
+    """The staff's line at stage 3 with its dream seen (F76 set, F77 3,
+    F78 and F7D clear): "Where is" lists the stage's place tenth (1194:
+    DFB9..E003: the nine kinds and 1C7E's third copied to 1044); the save
+    itself is at stage 9, past it."""
+    a.mu.mem_write(a.lin(a.ds, 0x0F76), b'\x01\x03\x00')
+    a.mu.mem_write(a.lin(a.ds, 0x0F7D), b'\x00')
+
+
 def used(index):
     """The use button's list's `index`-th item used as 24FA:07CD uses it
     once its list is picked from: the list made (0AFE), the item found
@@ -598,6 +612,7 @@ STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x
 # words paged to the tavern's menu; its Exit.
 INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
 TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 95), ('click', 100, 95), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
@@ -761,6 +776,13 @@ CASES = {
     'playlogbar': ('dungeon', None, [((), (), 2, None), ((), (), 11, None, [(131, 186)], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]})]),
     'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
                                    ((), (KEY_L,), 10, None)]),
+    # The logbook printed: two frames, L held a frame, Print (25h..4Ch on
+    # the bottom row) on the first page: every line of the log to PRN
+    # with an LF CR and a form feed (27E3:0272), which ends the pages'
+    # loop as Exit does; Exit leaves; ten frames. What PRN took is the
+    # `printed` line.
+    'playlogprint': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0x30, 0xBC), ('click', 0x110, 0xBC)]}),
+                                        ((), (KEY_L,), 10, None)]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth
     # line (`wounded_with_potion`), two frames, U held a frame: the list
     # in the bar's corner (066A, 06F8: 3159:06A0 over 5AF4), its fifth
@@ -900,6 +922,15 @@ CASES = {
     # click, taken by the second: 3159:0A1D; the way told at once,
     # 1194:E0DE): the list's DI, A872, as the talk's menu left it.
     'playtalkpalace': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_PALACE_SCRIPT)})]),
+    # As playtalkwhere, the staff's line at stage 3 (`dreaming`): the
+    # list from 1044 with the stage's place tenth (1194:E003), its first
+    # line taken (E04F: not the quest's, on as E074).
+    'playtalkquest': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_WHERE_SCRIPT)})]),
+    # The same list's tenth line: the down arrow (35h, 65h: 3159:09E8)
+    # scrolls it into the last row, clicked twice (marked, then taken):
+    # the quest's place (E015: A862's 9), its person's words (1194:D593:
+    # one box, clicked away), back to the menu's Goodbye.
+    'playtalkquestplace': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_QUEST_SCRIPT)})]),
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
     # The dungeon, two frames, the player killed (`killed`) and the frame
     # that ends the world loop for it, the outer loop's death followed to
@@ -1296,6 +1327,8 @@ def main():
         if len(seen) > 1:
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
         out.write(rows_line(a, name))
+        if a.printed:
+            out.write(f'printed | {name} | {len(a.printed):x} {fnv(bytes(a.printed)):x}\n')
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(state_line(name, a.pre_state[0], after, skip))
         out.write(state_line(name, loaded, after, skip_load, 'stateload'))

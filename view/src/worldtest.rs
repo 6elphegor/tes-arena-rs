@@ -816,10 +816,27 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
 /// menu's Goodbye.
 const TALK_WHERE_SCRIPT: [Act; 5] = [Act::Click(0xA0, 0x65), Act::Click(100, 23), Act::Click(100, 23), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
 
+/// gen_worldframes.py's TALK_QUEST_SCRIPT: "Where is" with the quest's
+/// place tenth, the down arrow (35h, 65h) scrolling it into the last
+/// row, that row clicked twice (marked, taken: 1194:D593, the quest's
+/// person's one box clicked away), then the menu's Goodbye.
+const TALK_QUEST_SCRIPT: [Act; 6] = [Act::Click(0xA0, 0x65), Act::Click(58, 105), Act::Click(100, 95), Act::Click(100, 95), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
 /// gen_worldframes.py's TALK_PALACE_SCRIPT ("Where is", the palace,
 /// the way's box, Goodbye), the list's fourth line taken by its number
 /// (the original's two clicks on it: the first marks it).
 const TALK_PALACE_SCRIPT: [Act; 4] = [Act::Click(0xA0, 0x65), Act::Key(KeyCode::Digit4, "4"), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's `dreaming`: the staff's line at stage 3 with its
+/// dream seen (F76 set, F77 3, F78 and F7D clear), so "Where is" lists
+/// the stage's place tenth (1194:E003).
+fn dreaming(a: &mut App) {
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, 0x0F76, 1);
+    m.mem.w8(DS, 0x0F77, 3);
+    m.mem.w8(DS, 0x0F78, 0);
+    m.mem.w8(DS, 0x0F7D, 0);
+}
 
 /// gen_worldframes.py's `talked`: the first townsperson clicked with the
 /// player on their square (gen_screens.py's `beside`: the timer 0151 at
@@ -1047,6 +1064,19 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0xA0, 0x60, MouseButton::Left);
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "the first Exit ends only the pages' loop");
+            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playlogprint" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The logbook (L), Print on its first page (27E3:0272: the
+            // whole log to PRN, the pages' loop ended), Exit.
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::KeyL, Some("l"));
+            faded(a);
+            d.click(a, 0x30, 0xBC, MouseButton::Left);
+            assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "Print ends only the pages' loop");
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
             frames(a, d, seen, 11, |_| false);
@@ -1371,6 +1401,16 @@ fn case(name: &str) -> Option<Case> {
         "playtalkwhere" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             talked(a, d, seen, &TALK_WHERE_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
+        "playtalkquest" => (Place::People, Box::new(dreaming), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_WHERE_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
+        "playtalkquestplace" => (Place::People, Box::new(dreaming), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_QUEST_SCRIPT);
             frames(a, d, seen, 1, |_| false);
         })),
         "playtalkpalace" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2058,7 +2098,20 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 38] = ["playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 41] = ["playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+
+/// The logbook's Print in playlogprint hands PRN what the original's
+/// does: each of the log's lines with an LF CR, then the form feed
+/// (27E3:0272, DOS's cooked write, `Files::printed`).
+#[test]
+fn the_logbook_prints_as_the_original() {
+    let (place, setup, play) = case("playlogprint").unwrap();
+    let Some((a, _)) = played(place, setup, play) else { return };
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "printed" && f[1] == "playlogprint").expect("the printed line")[2].to_string();
+    let p = a.engine.files.printed();
+    assert_eq!(format!("{:x} {:x}", p.len(), fnv(p.iter().copied())), want, "what PRN took differs from the original's");
+}
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -2153,7 +2206,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 43] = ["playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 46] = ["playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
