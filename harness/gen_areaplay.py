@@ -1,7 +1,8 @@
 """Emit the original's area transitions played from the user's saved
 game, for view/src/areaplaytest.rs: the stairs down and back up, the
 wilderness's blocks crossed each way, a city's gate out and in again,
-buildings entered and left, each followed through the frames after.
+buildings entered and left, fast travel to another place, a dungeon in
+the wilderness entered, each followed through the frames after.
 
 Usage: gen_areaplay.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [NAME...]
 
@@ -50,6 +51,8 @@ import gen_worldframes as w
 UP = 0x48
 LEFT = 0x4B
 SPACE = 0x39
+SHIFT = 0x2A
+M = 0x32
 
 
 def level_is(n):
@@ -69,6 +72,10 @@ BOXES = {'script': [('keys', [SPACE])] * 4}
 # drawing's pick, CB92), the area left in its frame.
 CLICK = [(160, 100)]
 LEAVES = dict(BOXES, leaves=True)
+# The travel map's clicks (gen_screens.py's `worldunwell`'s, well): High
+# Rock's region, the place nearest (200, 100), its journey's box read,
+# Travel.
+TRAVEL = [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]
 
 
 def wild_at(x=None, y=None, heading=0):
@@ -93,6 +100,27 @@ def origin_moved(a):
     """The wilderness's window moved a block (its origin, 0608 and 060A,
     no longer the case's start's)."""
     return (a.r16(0x0608), a.r16(0x060A)) != a.origin0
+
+
+# The player just inside the window's third quarter, facing south (y
+# grows): walking on crosses into the last and the origin moves a block
+# south.
+wild_south = wild_at(y=0x2FF8, heading=0)
+# A crossing south: the up arrow held till the window moves, let go for
+# a frame, the player put back before the next quarter (`wild_south`).
+WILD_SOUTH = [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=wild_south))]
+
+
+def before_entrance(a):
+    """The player on the square south of WILD065's entrance (row 49,
+    column 12 of the window's first row of blocks), 20h into it, facing
+    north (100h), the last place the same."""
+    x, y = (12 << 7) + 0x40, (50 << 7) + 0x20
+    for o in (0xC3D0, 0xBA62, 0x0600):
+        a.w16(o, x)
+    for o in (0xC3D4, 0xBA66, 0x0602):
+        a.w16(o, y)
+    a.w16(0xC3DA, 0x100)
 
 
 def building(row, col, heading, back=None):
@@ -144,6 +172,26 @@ CASES = {
     'transitstore': building(3, 108, 0),
     'transitpalace': building(8, 124, 0x80, back=0),
     'transitguild': building(95, 52, 0x100, back=0),
+    # Fast travel from the street before the guild: two frames, Shift+M
+    # held (2542:03BF in the frame's input: 26F7's travel map), High
+    # Rock's region clicked (the province's map), the place nearest
+    # (200, 100) clicked (Wind Keep: the journey's box), the box read
+    # with a click, Travel (62, 180): the days pass, the screen ends with
+    # the carry and the area is left; the outer loop on into the village,
+    # its welcome (the arrival's text) read with Space; three frames.
+    'travelfast': ('street', w.at_square(95, 52, 0x100),
+                   [((), (), 2, None),
+                    ((SHIFT, M), (), 1, None, [], dict(script=TRAVEL + BOXES['script'], leaves=True)),
+                    ((), (SHIFT, M), 3, None)]),
+    # A dungeon in the wilderness: the window crossed south three times
+    # (`wild_south`), which brings the grid's block (1Fh, 23h), WILD065
+    # (its entrance, a 3333h wall: trigger 8), to the window's first
+    # row; the player put before it (`before_entrance`), two frames, the
+    # entrance clicked (217B:04DC, 0000:08EC: the area left), the outer
+    # loop on into the dungeon; three frames.
+    'wilddungeon': ('wild', wild_south,
+                    WILD_SOUTH * 2 + [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=before_entrance)),
+                                      ((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
 }
 
 
