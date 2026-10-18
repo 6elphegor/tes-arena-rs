@@ -980,6 +980,18 @@ fn case(name: &str) -> Option<Case> {
             assert!(a.panel.is_none(), "the potion picked");
             frames(a, d, seen, 61, |_| false);
         })),
+        "playbook" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The spellbook (C, 2542:056A): its names sorted and listed in
+            // the bar's corner (0000:0B9C, 2542:06F8), left by a right
+            // click (5AF4's flag 4000h).
+            a.compose();
+            d.key(a, KeyCode::KeyC, Some("c"));
+            assert!(matches!(a.panel, Some(crate::panels::Panel::Spellbook(_))), "C opens the spellbook");
+            d.click(a, 0xF0, 0xA0, MouseButton::Right);
+            assert!(a.panel.is_none(), "a right click leaves the list");
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             d.key(a, KeyCode::F1, None);
@@ -1901,7 +1913,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 32] = ["playlog", "playuselist", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 33] = ["playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -2018,13 +2030,14 @@ fn one_case_leaves_the_state_as_the_original() {
 }
 
 /// The cases whose DGROUP is the original's from their start and from
-/// the load, but not their EMS: the use list (playuselist: 2542:06F8
+/// the load, but not their EMS: the use list and the spellbook
+/// (playuselist, playbook, the book's names sorted by 0000:0B9C: 2542:06F8
 /// keeps the page in bank [1032], which the port takes from the screen
 /// the view composed, `Machine::bar_list`'s `screen`; the view's frame
 /// differs from the original's page in the compass and in the row under
 /// the view, 146, which the view clears after the drawing where the
 /// original's drawing covers it).
-const BUSY_STATE_DGROUP: [&str; 1] = ["playuselist"];
+const BUSY_STATE_DGROUP: [&str; 2] = ["playuselist", "playbook"];
 
 /// `BUSY_STATE_DGROUP`'s cases leave DGROUP as the original's do.
 #[test]

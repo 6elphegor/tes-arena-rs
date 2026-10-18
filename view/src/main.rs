@@ -3851,7 +3851,8 @@ impl App {
             Some(panels::Panel::Spellbook(book)) => {
                 let n = panels::spells(m).len().max(1);
                 match code {
-                    KeyCode::Escape | KeyCode::KeyC => self.panel = None,
+                    // The library's loop left with nothing picked (FFFFh).
+                    KeyCode::Escape => cast = Some(usize::MAX),
                     KeyCode::ArrowUp => book.selected = (book.selected + n - 1) % n,
                     KeyCode::ArrowDown => book.selected = (book.selected + 1) % n,
                     KeyCode::Enter | KeyCode::NumpadEnter => cast = Some(book.selected),
@@ -3906,8 +3907,7 @@ impl App {
         }
         if let Some(line) = cast {
             self.panel = None;
-            let sel = panels::book_pick(&mut self.engine.m, line);
-            panels::cast(&mut self.engine, sel, &mut said);
+            panels::book_cast(&mut self.engine, line, &mut said);
         }
         self.boxes.extend(said.boxes);
     }
@@ -4267,6 +4267,7 @@ impl App {
             // a line not marked is marked; the line marked is picked.
             // A right click leaves the list (5AF4's flag 4000h), nothing
             // picked.
+            Some(panels::Panel::Spellbook(_)) if right => cast = Some(usize::MAX),
             Some(panels::Panel::Use(..)) if right => {
                 self.panel = None;
                 panels::use_pick(&mut self.engine.m, &mut self.engine.files, 0xFFFF, &mut said);
@@ -4311,8 +4312,7 @@ impl App {
         }
         if let Some(line) = cast {
             self.panel = None;
-            let sel = panels::book_pick(&mut self.engine.m, line);
-            panels::cast(&mut self.engine, sel, &mut said);
+            panels::book_cast(&mut self.engine, line, &mut said);
         }
         self.boxes.extend(said.boxes);
     }

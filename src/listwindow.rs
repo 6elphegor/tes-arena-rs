@@ -163,6 +163,139 @@ impl Machine {
         Some(ax)
     }
 
+    /// 2542:056A..05B1 (24FA:09EA the same) by its list, up to the cast:
+    /// 100E 9, the book's names listed (29CF:060B) and the line `pick`
+    /// picked (FFFFh none; `screen` as `bar_list`'s), and the spell picked
+    /// kept at 5CAE. Returns the spell's number for the cast (29CF:071F,
+    /// `Machine::cast_spell`), None where nothing was picked. (Shift+C,
+    /// the last spell again without the list, is not this.) None outside
+    /// where the list gives up.
+    pub fn spellbook_list(&mut self, files: &mut Files, screen: Option<&[u8]>, pick: u16) -> Option<Option<u8>> {
+        const BOOK: u16 = 0x01A4 + 0x367;
+        self.mem.w8(DS, 0x100E, 9);
+        let cx = self.mem.r8(DS, 0x01A4 + 0x366) as u16;
+        let ax = self.book_names_listed(files, screen, BOOK, cx, pick)?;
+        if (ax as i16) < 0 {
+            return Some(None);
+        }
+        self.mem.w8(DS, 0x5CAE, ax as u8);
+        Some(Some(self.mem.r8(DS, BOOK.wrapping_add(ax))))
+    }
+
+    /// 29CF:060B: the names of the `cx` spells numbered at DS:`si` copied
+    /// to 929E (29CF:0654: from the spells' records, 3276:34h on, the
+    /// player's own, 80h and up, from 2AB4h, 55h bytes each; a NUL after
+    /// the last), then with [8036] 9 sorted (0000:0B9C) and listed in the
+    /// bar's corner (2542:06F8), the line picked read back through the
+    /// order 0B9C left at 1044; otherwise the list of kind [8036]
+    /// (1194:5734) over them as they are. FFFFh with no spells.
+    fn book_names_listed(&mut self, files: &mut Files, screen: Option<&[u8]>, si: u16, cx: u16, pick: u16) -> Option<u16> {
+        if cx == 0 {
+            return Some(0xFFFF);
+        }
+        let mut di = 0x929Eu16;
+        for k in 0..cx {
+            let n = self.mem.r8(DS, si.wrapping_add(k));
+            let (seg, rec) = if n & 0x80 != 0 { (0x3276u16, 0x2AB4u16) } else { (0x3276, 0x0034) };
+            let mut from = rec.wrapping_add((n & 0x7F) as u16 * 0x55);
+            loop {
+                let c = self.mem.r8(seg, from);
+                self.mem.w8(DS, di, c);
+                from = from.wrapping_add(1);
+                di = di.wrapping_add(1);
+                if c == 0 {
+                    break;
+                }
+            }
+        }
+        self.mem.w8(DS, di, 0);
+        let kind = self.mem.r16(DS, 0x8036);
+        if kind != 9 {
+            return self.list_window(files, kind, (DS, 0x929E), cx, di, pick);
+        }
+        let names = self.names_sorted(0x929E, cx);
+        let ax = self.bar_list(screen, (DS, names), cx, pick)?;
+        if (ax as i16) < 0 {
+            return Some(ax);
+        }
+        Some(self.mem.r8(DS, 0x1044u16.wrapping_add(ax)) as u16)
+    }
+
+    /// 0000:0B9C: the `cx` names at DS:`si` sorted: with more than one,
+    /// 1044.. their order (0, 1, ...), a table of pointers to them at
+    /// 929E+800h (0C36), the table and the order swapped as 0BC6's
+    /// exchange sort compares the names (9C0A, A85E and A860 its two
+    /// places), then the names copied in the table's order after the
+    /// table. Returns where they are (with one, `si` itself, 1044 as it
+    /// was: bug kept, the pick read through it unsorted).
+    fn names_sorted(&mut self, si: u16, cx: u16) -> u16 {
+        if cx <= 1 {
+            return si;
+        }
+        let table = 0x929Eu16 + 0x800;
+        for k in 0..cx {
+            self.mem.w8(DS, 0x1044 + k, k as u8);
+        }
+        let mut at = si;
+        for k in 0..cx {
+            self.mem.w16(DS, table + 2 * k, at);
+            while self.mem.r8(DS, at) != 0 {
+                at = at.wrapping_add(1);
+            }
+            at = at.wrapping_add(1);
+        }
+        let end = table + 2 * cx;
+        self.mem.w16(DS, 0xA85E, 0);
+        for i in 0..cx - 1 {
+            self.mem.w16(DS, 0xA860, i + 1);
+            for j in i + 1..cx {
+                let a = self.mem.r16(DS, table + 2 * i);
+                let b = self.mem.r16(DS, table + 2 * j);
+                if self.name_after(a, b) {
+                    self.mem.w16(DS, table + 2 * i, b);
+                    self.mem.w16(DS, table + 2 * j, a);
+                    let (x, y) = (self.mem.r8(DS, 0x1044 + i), self.mem.r8(DS, 0x1044 + j));
+                    self.mem.w8(DS, 0x1044 + i, y);
+                    self.mem.w8(DS, 0x1044 + j, x);
+                }
+                self.mem.w16(DS, 0xA860, j + 1);
+            }
+            self.mem.w16(DS, 0xA85E, i + 1);
+        }
+        let mut di = end;
+        for k in 0..cx {
+            let mut from = self.mem.r16(DS, table + 2 * k);
+            loop {
+                let c = self.mem.r8(DS, from);
+                self.mem.w8(DS, di, c);
+                from = from.wrapping_add(1);
+                di = di.wrapping_add(1);
+                if c == 0 {
+                    break;
+                }
+            }
+        }
+        end
+    }
+
+    /// 0000:9C0A with SI `a`, DI `b`: their bytes compared over `b`'s
+    /// length and its NUL; whether the first that differ has `a`'s the
+    /// greater, as a byte's difference with its sign clear (AX FFFFh).
+    fn name_after(&self, a: u16, b: u16) -> bool {
+        let mut n = 0u16;
+        while self.mem.r8(DS, b.wrapping_add(n)) != 0 {
+            n = n.wrapping_add(1);
+        }
+        for k in 0..=n {
+            let (x, y) = (self.mem.r8(DS, a.wrapping_add(k)), self.mem.r8(DS, b.wrapping_add(k)));
+            if x != y {
+                let d = x.wrapping_sub(y);
+                return d & 0x80 == 0;
+            }
+        }
+        false
+    }
+
     /// The page ([A8FE], FA00h bytes) to the frame's start (`to_frame`), or
     /// back.
     fn page_copy(&mut self, to_frame: bool) {

@@ -210,17 +210,6 @@ fn book_names(m: &Machine) -> Vec<Vec<u8>> {
         .collect()
 }
 
-/// The book's entry for the spellbook's line `line` picked (29CF:0642):
-/// the order table written as 0B9C writes it, then read at the line.
-pub fn book_pick(m: &mut Machine, line: usize) -> usize {
-    if let Some(order) = book_order(&book_names(m)) {
-        for (k, &o) in order.iter().enumerate() {
-            m.mem.w8(DS, 0x1044 + k as u16, o);
-        }
-    }
-    m.mem.r8(DS, 0x1044 + line as u16) as usize
-}
-
 /// `--do learn:N`: spell N of the spell files put in the player's book,
 /// for trying the spellbook (not how the game teaches spells: the mages'
 /// guild sells them).
@@ -906,6 +895,24 @@ pub fn cast(engine: &mut arena::engine::Engine, sel: usize, said: &mut Said) {
         if engine.m.cast_spell(&mut engine.files, said, s.index).is_none() {
             eprintln!("the cast gave up: {}", arena::giveup::describe());
         }
+    }
+}
+
+/// The spellbook's list left with line `line` picked (`usize::MAX`:
+/// nothing; `Machine::spellbook_list`, its screen `said`'s) and the spell
+/// cast (29CF:071F); a spell with a target then waits for a click in the
+/// view, which aims it.
+pub fn book_cast(engine: &mut arena::engine::Engine, line: usize, said: &mut Said) {
+    let pick = if line == usize::MAX { 0xFFFF } else { line as u16 };
+    let screen = said.screen.take();
+    match engine.m.spellbook_list(&mut engine.files, screen.as_deref(), pick) {
+        Some(Some(n)) => {
+            if engine.m.cast_spell(&mut engine.files, said, n).is_none() {
+                eprintln!("the cast gave up: {}", arena::giveup::describe());
+            }
+        }
+        Some(None) => {}
+        None => eprintln!("the spellbook's list gave up: {}", arena::giveup::describe()),
     }
 }
 

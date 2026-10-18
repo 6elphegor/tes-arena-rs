@@ -657,6 +657,11 @@ CASES = {
     # frames.
     'playuselist': ('dungeon', wounded_with_potion, [((), (), 2, None), ((KEY_U,), (), 1, None, [], {'script': [('click', 0xF0, 0xBD), ('click', 0xF0, 0xBD)]}),
                                                       ((), (KEY_U,), 60, None)]),
+    # The spellbook (C, 2542:026D, 056A): two frames, C held a frame: the
+    # book's names sorted (0000:0B9C) and listed in the bar's corner
+    # (06F8), left by a right click (5AF4's flag 4000h); ten frames.
+    'playbook': ('dungeon', None, [((), (), 2, None), ((KEY_C,), (), 1, None, [], {'script': [('rclick', 0xF0, 0xA0)]}),
+                                    ((), (KEY_C,), 10, None)]),
     'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                      ((), (KEY_F1,), 10, None)]),
     # The sheet's equipment page: two frames, F1 held a frame (the sheet),
