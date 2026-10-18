@@ -51,10 +51,14 @@ class WriteDos(DosArena):
         raw = bytes(self.mu.mem_read(lin, 128)).split(b'\0')[0].decode('latin1')
         return raw.replace(':', '\\').split('\\')[-1].upper()
 
+    def new_handle(self, name, taken=()):
+        # One table: the files written here and the game directory's.
+        return super().new_handle(name, set(taken) | set(self.open_w))
+
     def _dos(self):
         ah = self._reg('ax') >> 8
         if ah == 0x3C:
-            h = self.new_handle(None, taken=self.open_w)
+            h = self.new_handle(None)
             self.open_w[h] = [self._name(), bytearray()]
             self._wreg('ax', h)
             self._set_cf(False)
