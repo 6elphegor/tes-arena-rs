@@ -198,7 +198,11 @@ impl Machine {
         di: u16,
     ) -> Option<Haggle> {
         if !matches!(mode, 1..=6) {
-            return crate::giveup::not_ported("1194:8020: a haggle mode not ported");
+            // 807D calls through the mode's word in the table at 65BC: 0
+            // for mode 0, other variables' bytes past 6. Every caller
+            // passes 1 to 6 (0A3E 4, B3A5 and B562 2, C1A4 3, CF8B 5 or
+            // 6, F90C 1).
+            return crate::giveup::original("1194:807D: a haggle mode outside 1..6 calls through no routine (no caller passes one)");
         }
         self.mem.w8(DS, HALVED, 0);
         self.mem.w8(DS, ROUND, 0);
@@ -533,8 +537,10 @@ impl Machine {
     /// formatted into SHOWN and shown. None where a code lies before
     /// LINE: its argument is pushed too, and the formatter (which reads
     /// the stack's words as each conversion asks) would take it for the
-    /// line's first; not modelled. The bytes before LINE are DGROUP's
-    /// variables, not text.
+    /// line's first; not modelled. The bytes before LINE are the far
+    /// pointer 3BA0:929E in the program's data (929A..929D: 9Eh 92h A0h
+    /// 3Bh, then 9299 0, the scan's end), which only 0000:5F6D reads and
+    /// nothing writes: no '%' is ever there.
     fn haggle_say(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
         if matches!(self.mem.r8(DS, MODE), 5 | 6) {
             return self.haggle_say_informant(files, io, kind);

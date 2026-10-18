@@ -201,6 +201,24 @@ impl Machine {
         self.ng_fill(0x0652, 0xC, 0xC5);
     }
 
+    /// 1194:2512..251C, after `newgame_reset`: FONT_C.DAT (its name at
+    /// 3EF2) loaded whole (0000:7504) to [102A], the class list's title's
+    /// font.
+    pub fn creation_font(&mut self, files: &mut Files) {
+        let seg = self.font_load(files, 0x3EF2);
+        self.mem.w16(DS, 0x102A, seg);
+    }
+
+    /// 1194:2536..2542, the class chosen (1194:25B9, by the questions or
+    /// the list): FONT_C ([102A]) freed (0000:930A: its word in the fonts'
+    /// table cleared, its block freed) and the colour EEh (9288) for the
+    /// name's prompt.
+    pub fn class_done(&mut self) {
+        let seg = self.mem.r16(DS, 0x102A);
+        self.font_free(seg);
+        self.mem.w8(DS, 0x9288, 0xEE);
+    }
+
     /// 1194:D327: the main quest's state started over: AB2 FFh, its 13h
     /// bytes from FDD zeroed, FE4 FFh. (Also the frame's debug keys Alt+F5,
     /// ACED and ACF4, which then say "Artifact Quest now possible.")
@@ -359,6 +377,40 @@ impl Machine {
             }
         };
         Some(self.mem.r8(frame, at))
+    }
+
+    /// 1194:2678..26DB: the class list. The cursor put back (541E, the
+    /// front end's), the screen at 3ED9 drawn (5CD9 with BX 0: loaded
+    /// into bank [1030], its colours the VGA's) and shown (9466, the front
+    /// end's); the 18 classes' names in the order of 2AEE (each byte's low
+    /// 5 bits the name's place in the list at 2A62, 5585) copied one after
+    /// another to 1044 (9CA0); B7C4 cleared, FONT_C ([102A]) selected, the
+    /// list of kind 6 over them under the title at 3F56 (1194:5734,
+    /// `list_window`: `pick` the line the library's loop takes), then
+    /// FONT_B ([102C]) selected. Returns the class picked: 2AEE's byte at
+    /// the pick (AX whole, as BX). None where the list gives up.
+    pub fn class_list(&mut self, files: &mut Files, pick: u16) -> Option<u8> {
+        self.sheet_image(files, 0x3ED9)?;
+        let mut di = 0x1044u16;
+        for k in 0..0x12u16 {
+            let cx = (self.mem.r8(DS, 0x2AEE + k) & 0x1F) as u16;
+            let mut si = self.skip_strings(DS, 0x2A62, cx);
+            loop {
+                let c = self.mem.r8(DS, si);
+                self.mem.w8(DS, di, c);
+                si = si.wrapping_add(1);
+                di = di.wrapping_add(1);
+                if c == 0 {
+                    break;
+                }
+            }
+        }
+        self.mem.w8(DS, 0xB7C4, 0);
+        self.select_font(0x102A);
+        let ax = self.list_window(files, 6, (DS, 0x1044), 0x12, 0x3F56, pick)?;
+        let class = self.mem.r8(DS, 0x2AEEu16.wrapping_add(ax));
+        self.select_font(0x102C);
+        Some(class)
     }
 
     /// 1194:2655..2677 then 26DC. The class `class` chosen (its byte to

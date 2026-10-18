@@ -1310,7 +1310,7 @@ impl Machine {
     /// are the front end's): the picture named at DS:`si` loaded into
     /// bank [1030] and drawn (`sheet_image_here`), the bank before
     /// mapped again.
-    fn sheet_image(&mut self, files: &mut Files, si: u16) -> Option<()> {
+    pub(crate) fn sheet_image(&mut self, files: &mut Files, si: u16) -> Option<()> {
         let bank = self.mem.r16(DS, 0x1030);
         let old = self.map_bank(bank, 0);
         self.sheet_image_here(files, si)?;

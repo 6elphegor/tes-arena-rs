@@ -157,6 +157,34 @@ MENUS = [
 ]
 
 
+# 1194:5734 (near): (name, kind, 137F, font, title, lines, action) with
+# the title at 1044 (DI), the lines at 1100 on (SI, CX their count), the
+# font at B036 given from the DGROUP word `font`. The action at the
+# list's wait: ('line', n) the n-th line's middle clicked (twice where it
+# isn't the first: picked, then taken), ('keys', [scan]) or ('rclick', n).
+LIST_LINES = [b'Mage', b'Spellsword', b'Battlemage', b'Sorceror', b'Healer', b'Nightblade',
+              b'Bard', b'Burglar', b'Rogue', b'Acrobat', b'Thief', b'Assassin',
+              b'Monk', b'Archer', b'Ranger', b'Barbarian', b'Warrior', b'Knight']
+LISTS = [
+    ('class-first', 6, 0, 0x102A, b'Choose thy class', LIST_LINES, ('line', 0)),
+    ('class-third', 6, 0, 0x102A, b'Choose thy class', LIST_LINES, ('line', 2)),
+    ('class-few', 6, 0, 0x102A, b'Few', LIST_LINES[:3], ('line', 1)),
+    ('where-first', 9, 0, 0x102C, b'Where is...', [b'Temple', b'Mages Guild', b'Tavern', b'Equipment'], ('line', 0)),
+    ('where-last', 9, 0, 0x102C, b'Where is...', [b'Temple', b'Mages Guild', b'Tavern', b'Equipment'], ('line', 3)),
+    ('where-right', 9, 0, 0x102C, b'Where is...', [b'Temple', b'Mages Guild'], ('rclick', 0)),
+    ('room-second', 0xA, 0, 0x102C, b'What kind of room?', [b'Single', b'Double', b'Suite', b'Common', b'Stable'], ('line', 1)),
+    ('room-right', 0xA, 0, 0x102C, b'What kind of room?', [b'Single', b'Double'], ('rclick', 0)),
+    ('room-dungeon', 0xA, 4, 0x102C, b'Cure what?', [b'Disease', b'Poison'], ('line', 0)),
+    ('store-first', 0, 0, 0x102C, b'Buy', [b'Dagger', b'Sword'], ('line', 0)),
+    ('guild-second', 0xB, 0, 0x102C, b'Which?', [b'One', b'Two', b'Three'], ('line', 1)),
+]
+
+# 1194:2678 (near) whole, creation's class list, FONT_C loaded at [102A]
+# as creation has it: (name, line) the line clicked (twice where it isn't
+# the first) among the six first shown.
+CLASSLISTS = [('first', 0), ('second', 1), ('sixth', 5)]
+
+
 def stack_bx(a, at):
     """A hook keeping BX at each 965A called from `at` (seg, off of the
     call): the formatter's leftover, an offset on the stack."""
@@ -362,7 +390,87 @@ def main():
         out.write(f'menu | {name} | {mouse[0]:x} {mouse[1]:x} {" ".join(flags) or "-"} | {title.hex()} | '
                   f'{",".join(e.hex() for e in entries)} | {keys.hex()} | {act} | {pick:x} | {state_line(a, d0, MOUSE | CURSOR | (OVER if 'nobg' in flags else set()))}\n')
         out.flush()
+    for name, kind, place, font, title, lines, action in LISTS:
+        start(name)
+        if font == 0x102A:
+            # FONT_C.DAT loaded whole (0000:7504), as creation and the
+            # shops' banner have it at [102A].
+            assert a.run_screen(0, 0x7504, dict(si=0x4B03)) is None, f'{name}: FONT_C waited'
+            a.w16(0x102A, a.mu.reg_read(UC_X86_REG_AX))
+        a.w16(0xB036, a.r16(font))
+        a.mu.mem_write(a.lin(a.ds, 0x137F), bytes([place]))
+        a.mu.mem_write(a.lin(a.ds, 0x1044), title + b'\0')
+        a.mu.mem_write(a.lin(a.ds, 0x1100), b''.join(e + b'\0' for e in lines))
+        rec = LIST_RECORDS.get(kind, 0x5006)
+        if action[0] in ('line', 'rclick'):
+            # The lines' box (+18: x, y, w, h), a line the font's height
+            # the list's own fonts make (the kinds that select theirs).
+            bx_, by, bw, _ = (a.r16(rec + 0x18 + 2 * k) for k in range(4))
+            hfont = LIST_FONTS.get((kind, place), font)
+            height = a.mu.mem_read(a.lin(a.r16(hfont), a.r16(0xB034)), 1)[0]
+            x, y = bx_ + bw // 2, by + action[1] * height + height // 2
+            # A line not picked yet is picked by its first click and
+            # taken by its second (3159:0A1D, B7C4 bit 0); the first line
+            # is picked from the start.
+            n = 1 if action[0] == 'rclick' or action[1] == 0 else 2
+            a.script = [('click' if action[0] == 'line' else 'rclick', x, y)] * n
+        else:
+            a.script = [action]
+        d0 = a.seg_bytes(a.ds)
+        regs = dict(ax=kind, si=0x1100, cx=len(lines), di=0x1044, ds=a.ds, es=a.ds)
+        r = a.run_screen(0x1194, 0x5734, regs, near=True)
+        assert r is None, f'{name}: the list waited {r}'
+        assert not a.script and not a.clicks, f'{name}: the action was left'
+        pick = a.mu.reg_read(UC_X86_REG_AX)
+        page = fnv(bytes(a.mu.mem_read(a.lin(a.r16(0xA900), 0), 0xFA00)))
+        act = ' '.join(str(v) if isinstance(v, str) else ','.join(f'{k:x}' for k in v) if isinstance(v, list) else f'{v:x}'
+                       for v in action)
+        # The lines' drawing's far pointer (+41, from the table at B7FE: in
+        # the image's segment 0) taken 1000h lower, as the port's.
+        if a.r16(rec + 0x43) == 0x1000:
+            a.w16(rec + 0x43, 0)
+        # The texts' segment (+24, DGROUP) likewise, and the record's
+        # (B80A's far pointer).
+        for w in (rec + 0x24, 0xB80C):
+            if a.r16(w) == a.ds:
+                a.w16(w, a.ds - 0x1000)
+        if dump:
+            open(os.path.join(dump, f'{name}.dgroup'), 'wb').write(a.seg_bytes(a.ds))
+        out.write(f'list | {name} | {kind:x} {place:x} {font:x} | {title.hex()} | {",".join(e.hex() for e in lines)} | '
+                  f'{act} | {pick:x} | {a.r16(0x8FA8):x} {page:x} | {state_line(a, d0, MOUSE | CURSOR | TEXTS)}\n')
+        out.flush()
+    for name, line in CLASSLISTS:
+        start(name)
+        assert a.run_screen(0, 0x7504, dict(si=0x4B03)) is None, f'{name}: FONT_C waited'
+        a.w16(0x102A, a.mu.reg_read(UC_X86_REG_AX))
+        rec = LIST_RECORDS[6]
+        bx_, by, bw, _ = (a.r16(rec + 0x18 + 2 * k) for k in range(4))
+        height = a.mu.mem_read(a.lin(a.r16(0x1026), a.r16(0xB034)), 1)[0]
+        a.script = [('click', bx_ + bw // 2, by + line * height + height // 2)] * (1 if line == 0 else 2)
+        d0 = a.seg_bytes(a.ds)
+        r = a.run_screen(0x1194, 0x2678, {}, near=True)
+        assert r is None, f'{name}: the class list waited {r}'
+        assert not a.script and not a.clicks, f'{name}: the clicks were left'
+        cls = a.mu.reg_read(UC_X86_REG_AX) & 0xFF
+        page = fnv(bytes(a.mu.mem_read(a.lin(a.r16(0xA900), 0), 0xFA00)))
+        for w in (rec + 0x24, 0xB80C):
+            if a.r16(w) == a.ds:
+                a.w16(w, a.ds - 0x1000)
+        if a.r16(rec + 0x43) == 0x1000:
+            a.w16(rec + 0x43, 0)
+        if dump:
+            open(os.path.join(dump, f'class-{name}.dgroup'), 'wb').write(a.seg_bytes(a.ds))
+        out.write(f'classlist | {name} | {line:x} | {cls:x} | {a.r16(0x8FA8):x} {page:x} | {state_line(a, d0, MOUSE | CURSOR | TEXTS)}\n')
+        out.flush()
     out.close()
+
+
+# The records 1194:5734's kinds fill (the others' 5006h): 6's 515Ah, 9's
+# 5105h, Ah's 505Bh, 1, 2 and 7's 50B0h.
+LIST_RECORDS = {6: 0x515A, 9: 0x5105, 0xA: 0x505B, 1: 0x50B0, 2: 0x50B0, 7: 0x50B0}
+# The font a kind's lines are drawn in where it selects its own: 6's
+# [1026]; Ah's [102C], or with 137F 4 [1026].
+LIST_FONTS = {(6, 0): 0x1026, (0xA, 0): 0x102C, (0xA, 4): 0x1026}
 
 
 # The mouse's words 8FC4 writes on 59C8's way (the cursor's x and y, and
@@ -376,6 +484,10 @@ MOUSE = {0x8F92, 0x8F93, 0x8F94, 0x8F95, 0x8FA8, 0x8FA9}
 # its picture at [8F88] (EBB0h): the front end's, left out of the `menu`
 # lines' digests.
 CURSOR = set(range(0x8F7C, 0x8F80)) | set(range(0x8F8C, 0x8F92)) | set(range(0xEBB0, 0xECB0)) | set(range(0xEDB0, 0xEEB0))
+
+# The texts' drawing's state (0000:9E0A's ADB6 and ADB8): the `list`
+# lines' last is the lines' drawing's (3159:0A58), the front end's.
+TEXTS = set(range(0xADB6, 0xADBA))
 
 # With A902 bit 800h (`nobg`), all of DGROUP from EB00h too: that cursor,
 # drawn inside the mouse's limits the boxes' records at DGROUP:FFFEh give,

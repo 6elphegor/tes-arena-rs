@@ -27,20 +27,7 @@ fn heap_line(m: &Machine) -> String {
 
 /// The game started and set up (tests/programstart.rs's stages).
 fn set_up() -> Option<Machine> {
-    let image = common::image()?;
-    let Ok(mut files) = Files::new(&common::game_dir()) else {
-        eprintln!("skipping: no game directory");
-        return None;
-    };
-    let mut m = Machine::new(&image);
-    m.memory_init().expect("the memory");
-    m.program_start(&mut files, &mut arena::start::PortStart).expect("the start");
-    let frame = m.mem.r16(DS, 0x9030);
-    m.mem.w16(DS, 0xCB8A, frame);
-    m.mem.w8(DS, 0x1A80, 0x40);
-    m.mem.w8(DS, 0x1A6C, 0x40);
-    m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the set-up");
-    Some(m)
+    set_up_files().map(|(m, _)| m)
 }
 
 fn hex(s: &str) -> u16 {
@@ -414,4 +401,118 @@ fn creations_name_asked_as_the_original() {
         n += 1;
     }
     assert!(n >= 8, "{n} cases");
+}
+
+/// 1194:5734's lists (`Machine::list_window`) of the kinds with a title
+/// or a picture of their own (6, the creation's classes; 9, "Where is";
+/// Ah, a room or a cure) and two of the shops' for a check: the picture
+/// and title drawn, the record filled, the line the generator's clicks
+/// take (a right click: none) picked, the page kept and put back: the
+/// pick, the bank left mapped, the page, and the state after.
+#[test]
+fn the_lists_kinds_as_the_original() {
+    let Some((base, files)) = set_up_files() else { return };
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("list |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let r: Vec<u16> = f[2].split(' ').map(hex).collect();
+        let (kind, place, font) = (r[0], r[1] as u8, r[2]);
+        let mut m = case_start(&base, (0xA0, 0x64));
+        let page = m.mem.r16(DS, 0xA900);
+        for i in 0..0xFA00u16 {
+            m.mem.w8(page, i, (i as u32 * 7 + 3) as u8);
+        }
+        let mut fs = files.clone();
+        if font == 0x102A {
+            let seg = m.font_load(&mut fs, 0x4B03);
+            m.mem.w16(DS, 0x102A, seg);
+        }
+        let v = m.mem.r16(DS, font);
+        m.mem.w16(DS, 0xB036, v);
+        m.mem.w8(DS, 0x137F, place);
+        for (i, &b) in unhex(f[3]).iter().chain(std::iter::once(&0)).enumerate() {
+            m.mem.w8(DS, 0x1044 + i as u16, b);
+        }
+        let mut at = 0x1100u16;
+        let mut count = 0;
+        for e in f[4].split(',') {
+            for &b in unhex(e).iter().chain(std::iter::once(&0)) {
+                m.mem.w8(DS, at, b);
+                at += 1;
+            }
+            count += 1;
+        }
+        let pick = match f[5].split_once(' ') {
+            Some(("line", k)) => hex(k),
+            _ => 0xFFFF,
+        };
+        let d0 = m.mem.segment(DS).to_vec();
+        let ax = m.list_window(&mut fs, kind, (DS, 0x1100), count, 0x1044, pick).unwrap_or_else(|| panic!("{name}: gave up: {}", arena::giveup::describe()));
+        assert_eq!(format!("{ax:x}"), f[6], "{name}: the pick");
+        let page = m.mem.r16(DS, 0xA900);
+        assert_eq!(format!("{:x} {:x}", m.mem.r16(DS, 0x8FA8), fnv((0..0xFA00u16).map(|i| m.mem.r8(page, i)))), f[7], "{name}: the bank mapped and the page");
+        if let Ok(d) = std::env::var("MSGBOX_DUMP") {
+            std::fs::write(format!("{d}/{name}.port.dgroup"), m.mem.segment(DS)).unwrap();
+        }
+        check_state_leaving(name, &d0, &m, &f[8..], cursor_texts);
+        n += 1;
+    }
+    assert!(n >= 10, "{n} cases");
+}
+
+/// Creation's class list (1194:2678 whole, `Machine::class_list`) with
+/// FONT_C loaded at [102A], a line among the six first shown taken: the
+/// class picked, the bank left mapped, the page, and the state after.
+#[test]
+fn the_class_list_as_the_original() {
+    let Some((base, files)) = set_up_files() else { return };
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("classlist |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let mut m = case_start(&base, (0xA0, 0x64));
+        let page = m.mem.r16(DS, 0xA900);
+        for i in 0..0xFA00u16 {
+            m.mem.w8(page, i, (i as u32 * 7 + 3) as u8);
+        }
+        let mut fs = files.clone();
+        let seg = m.font_load(&mut fs, 0x4B03);
+        m.mem.w16(DS, 0x102A, seg);
+        let d0 = m.mem.segment(DS).to_vec();
+        let class = m.class_list(&mut fs, hex(f[2])).unwrap_or_else(|| panic!("{name}: gave up: {}", arena::giveup::describe()));
+        assert_eq!(format!("{class:x}"), f[3], "{name}: the class");
+        let page = m.mem.r16(DS, 0xA900);
+        assert_eq!(format!("{:x} {:x}", m.mem.r16(DS, 0x8FA8), fnv((0..0xFA00u16).map(|i| m.mem.r8(page, i)))), f[4], "{name}: the bank mapped and the page");
+        check_state_leaving(name, &d0, &m, &f[5..], cursor_texts);
+        n += 1;
+    }
+    assert!(n >= 3, "{n} cases");
+}
+
+/// `cursor`, and the texts' drawing's state (0000:9E0A's ADB6, ADB8): a
+/// list's last is its lines' drawing's (3159:0A58), the front end's.
+fn cursor_texts(i: usize) -> bool {
+    cursor(i) || (0xADB6..0xADBA).contains(&i)
+}
+
+/// The game started and set up (tests/programstart.rs's stages), and the
+/// game's files.
+fn set_up_files() -> Option<(Machine, Files)> {
+    let image = common::image()?;
+    let Ok(mut files) = Files::new(&common::game_dir()) else {
+        eprintln!("skipping: no game directory");
+        return None;
+    };
+    let mut m = Machine::new(&image);
+    m.memory_init().expect("the memory");
+    m.program_start(&mut files, &mut arena::start::PortStart).expect("the start");
+    let frame = m.mem.r16(DS, 0x9030);
+    m.mem.w16(DS, 0xCB8A, frame);
+    m.mem.w8(DS, 0x1A80, 0x40);
+    m.mem.w8(DS, 0x1A6C, 0x40);
+    m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the set-up");
+    Some((m, files))
 }
