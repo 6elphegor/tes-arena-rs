@@ -1040,6 +1040,23 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             frames(a, d, seen, 11, |_| false);
         })),
+        "playequipdescribe" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequip, the list's second line right-clicked (marked,
+            // 1194:1C5E, and described, 1988) and the click the panel's
+            // wait takes (5536).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            d.click(a, 0x40, 0x42, MouseButton::Right);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             used(a, 4);
@@ -1691,7 +1708,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 22] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells"];
+const BUSY: [&str; 23] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1719,7 +1736,7 @@ fn busy_play_goes_as_the_originals() {
 /// list's click and the drop with its question: 1194:1A4A, 1A94, 1AC6,
 /// 17D8: `sheet_equipment_scroll`, `sheet_equipment_click`,
 /// `sheet_equipment_drop`).
-const BUSY_STATE: [&str; 21] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells"];
+const BUSY_STATE: [&str; 22] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

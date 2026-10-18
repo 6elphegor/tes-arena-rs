@@ -4059,27 +4059,29 @@ impl App {
                     }
                 } else if let Some(d) = panels::arrow_at(x, y) {
                     panels::arrow(&mut self.engine.m, &self.engine.files, d);
-                } else if panels::line_at(x, y).is_some()
-                    && !right
-                    && inv.from_sheet
-                    && self.sheet_run.is_some()
-                    && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0
-                    && {
-                        // The sheet's own page: the list's record's handler
-                        // (1194:1AC6), unless it leaves the click to the
-                        // view's own (a quest's line clicked again).
-                        let e = &mut self.engine;
-                        match e.m.sheet_equipment_click(&mut e.files, &mut said, y as u16) {
-                            Some(handled) => handled,
-                            None => {
-                                eprintln!("the list's click gave up: {}", arena::giveup::describe());
-                                true
-                            }
-                        }
+                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0 {
+                    // The sheet's own page: the list's record's handler
+                    // (1194:1AC6); a right click describes the line it
+                    // marks (1988). What the list's panel shows (223A)
+                    // waits there for a click or a key (5536).
+                    let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
+                    let mut wait = |_: &mut arena::machine::Machine, lines: &[(Vec<u8>, u8)], top: u16| {
+                        shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
+                    };
+                    let e = &mut self.engine;
+                    let gave_up = if right {
+                        e.m.sheet_equipment_describe(&mut e.files, &mut said, y as u16, &mut wait).is_none()
+                    } else {
+                        e.m.sheet_equipment_click(&mut e.files, &mut said, y as u16, &mut wait).is_none()
+                    };
+                    if gave_up {
+                        eprintln!("the list's click gave up: {}", arena::giveup::describe());
                     }
-                {
-                    // A refusal's text (1BE0, 1B78) in the list's panel.
-                    if let Some(t) = said.panel.take() {
+                    if let Some((lines, top)) = shown {
+                        inv.info = Some(lines);
+                        inv.info_y = Some(top as i32);
+                    } else if let Some(t) = said.panel.take() {
+                        // A refusal's text (1BE0, 1B78) in the list's panel.
                         inv.info = Some(vec![(t, 0xA0)]);
                         inv.info_y = Some(0xA0);
                     }

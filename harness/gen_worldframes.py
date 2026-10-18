@@ -660,6 +660,13 @@ CASES = {
     'playequipspells': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_S]), ('keys', [KEY_PAD_PLUS]),
                                                                                                    ('keys', [KEY_S]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                            ((), (KEY_F1,), 10, None)]),
+    # An item described on the equipment page: as playequip, the second
+    # line right-clicked (1194:1AC6 with AFF9 2: marked, 1C5E, then
+    # described in the list's panel, 1988, 223A), the click its wait
+    # takes (5536), between N and Esc.
+    'playequipdescribe': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('rclick', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                     ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                             ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
     # frames, the Ring of Shielding used (the list's fourth: its spell
