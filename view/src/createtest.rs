@@ -90,7 +90,7 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
     for inp in create::parse_script("S,esc,esc") {
         c.input(&mut engine, inp);
     }
-    c.settle();
+    c.settle(&mut engine.m);
     // The dissolve's generator as the generator's start leaves it (the
     // story's first picture dissolved in has stepped it).
     engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
@@ -137,7 +137,7 @@ fn creation_draws_as_the_original() {
             }
             if let Some(&inp) = inputs.get(at) {
                 c.input(&mut engine, inp);
-                c.settle();
+                c.settle(&mut engine.m);
             }
         }
     }
@@ -210,7 +210,7 @@ fn creation_animates_as_the_original() {
             if let Some(&inp) = inputs.get(at) {
                 c.input(&mut engine, inp);
                 states = c.film_frames().into_iter().map(|(f, dac)| (f.into_iter().map(u16::from).collect(), dac)).collect();
-                c.settle();
+                c.settle(&mut engine.m);
             }
         }
     }
@@ -225,7 +225,10 @@ const INTRO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/intro
 /// generator at its end.
 struct IntroRun {
     name: String,
-    keys: Vec<create::Input>,
+    /// Each key, the state it's pressed in when the harness pressed it as
+    /// a state was first seen (`sN`; else at a poll), and how many waits
+    /// for the retrace it's held.
+    keys: Vec<(create::Input, Option<usize>, u32)>,
     states: Vec<(u64, u64, u32, u32)>,
     seed: u16,
 }
@@ -237,7 +240,15 @@ fn intro_runs() -> Vec<IntroRun> {
         let f: Vec<&str> = line.split(" | ").collect();
         match f.as_slice() {
             ["introframes", name, "script", keys] => {
-                let keys = keys.split(',').filter(|k| *k != "-").map(|k| if k.starts_with("1b@") { create::Input::Esc } else { create::Input::Enter }).collect();
+                let keys = keys
+                    .split(',')
+                    .filter(|k| *k != "-")
+                    .map(|k| {
+                        let inp = if k.starts_with("1b@") { create::Input::Esc } else { create::Input::Enter };
+                        let (at, held) = k[3..].split_once('+').expect("KEY@POLL+HELD");
+                        (inp, at.strip_prefix('s').map(|n| n.parse().expect("a state")), held.parse().expect("held"))
+                    })
+                    .collect();
                 out.push(IntroRun { name: name.to_string(), keys, states: Vec::new(), seed: 0 });
             }
             ["introframes", _, "end", seed] => out.last_mut().expect("a script line").seed = u16::from_str_radix(seed, 16).expect("a seed"),
@@ -277,16 +288,17 @@ fn the_intro_plays_as_the_original() {
         // states in step) where it differs next; a movie's frame there (a
         // key seen after the next frame is read, shown) the one before.
         let plain = none(story);
+        let polled = run.keys.iter().filter(|k| k.1.is_none()).count();
         let mut at = Vec::new();
         for (i, (a, b)) in run.states.iter().zip(&plain.states).enumerate() {
-            if at.len() < run.keys.len() && a != b {
+            if at.len() < polled && a != b {
                 at.push(if b.3 > 0 { i - 1 } else { i });
                 if a.0 != b.0 || a.1 != b.1 {
                     break;
                 }
             }
         }
-        assert_eq!(at.len(), run.keys.len(), "{}: where its keys are taken", run.name);
+        assert_eq!(at.len(), polled, "{}: where its keys are taken", run.name);
         let mut engine = world::load(&dir, "START.MIF");
         let archive = Rc::new(archive::Archive::open(&dir));
         hud::init_style(&archive, &engine.m);
@@ -297,14 +309,17 @@ fn the_intro_plays_as_the_original() {
             for inp in create::parse_script("enter,esc") {
                 c.input(&mut engine, inp);
             }
-            c.settle();
+            c.settle(&mut engine.m);
             c.input(&mut engine, create::Input::Char(b'S'));
             engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
         }
         // Each state the view shows and for how long (ms).
         let mut seen: Vec<(u64, u64, u32)> = Vec::new();
         let mut phase = None;
-        let mut keys = run.keys.iter().zip(&at).peekable();
+        let mut polls = at.iter();
+        let mut keys = run.keys.iter().map(|&(inp, s, held)| (inp, s.unwrap_or_else(|| *polls.next().expect("a poll's state")), s.is_some(), held)).collect::<Vec<_>>().into_iter().peekable();
+        // An Esc's let go, the milliseconds to it (a short hold's).
+        let mut let_go: Option<u32> = None;
         for _ in 0..200_000 {
             if c.phase() != phase.unwrap_or_default() || phase.is_none() {
                 phase = Some(c.phase());
@@ -317,12 +332,25 @@ fn the_intro_plays_as_the_original() {
             seen.last_mut().expect("a state").2 += 1;
             // A key in its state, half its time on (the run's own).
             let from = seen.iter().position(|s| (s.0, s.1) == (run.states[1].0, run.states[1].1));
-            if let (Some(&(&inp, &k)), Some(from)) = (keys.peek(), from) {
+            // (A state's key, `sN`, as the state is first shown.)
+            if let (Some(&(inp, k, first, held)), Some(from)) = (keys.peek(), from) {
                 let (i, want) = (seen.len() - 1 - from + 1, &run.states[k]);
-                if i == k && (seen[seen.len() - 1].0, seen[seen.len() - 1].1) == (want.0, want.1) && seen[seen.len() - 1].2 >= (want.2 * RETRACE + want.3 * TICK) / 2 {
+                let time = if first { 1 } else { (want.2 * RETRACE + want.3 * TICK) / 2 };
+                if i == k && (seen[seen.len() - 1].0, seen[seen.len() - 1].1) == (want.0, want.1) && seen[seen.len() - 1].2 >= time {
                     c.input(&mut engine, inp);
                     keys.next();
                     phase = None;
+                    if inp == create::Input::Esc && held < 100 {
+                        let_go = Some(held * RETRACE);
+                    }
+                }
+            }
+            if let Some(ms) = &mut let_go {
+                if *ms == 0 {
+                    c.input(&mut engine, create::Input::Key(0x01, false));
+                    let_go = None;
+                } else {
+                    *ms -= 1;
                 }
             }
             if from.is_some_and(|f| seen.len() - f >= run.states.len() + 1) {
