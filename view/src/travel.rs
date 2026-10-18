@@ -503,8 +503,10 @@ impl Travel {
             return;
         }
         if let Some(Asking::Question(title, entries)) = &self.asking {
+            // The right button leaves the menu (3159:10D6), as Esc.
             let pick = match (&self.parch, self.menu_font()) {
-                (Some(t), Some(f)) => hud::custom::menu_rects(t, f, title, entries).1.iter().position(|&(x0, y0, x1, y1)| (x0..=x1).contains(&x) && (y0..=y1).contains(&y)),
+                _ if right => Some(0xFFFF),
+                (Some(t), Some(f)) => hud::custom::menu_entry(&hud::custom::menu_rects(t, f, title, entries).1, y),
                 _ => None,
             };
             if let Some(i) = pick {

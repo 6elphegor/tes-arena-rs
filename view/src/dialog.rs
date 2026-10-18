@@ -176,7 +176,7 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
     }
     let keys = m.mem.cstr(DS, bx).to_vec();
     // 3159:0F2A draws it in the font selected as it is asked (B036).
-    Menu { title, entries, keys, selected: 0, list: false, kind: 0, font: Some(hud::GameFont::selected(m)) }
+    Menu { title, entries, keys, selected: 0, list: false, kind: 0, font: Some(hud::GameFont::selected(m)), top: None }
 }
 
 impl Talk {

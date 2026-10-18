@@ -334,6 +334,72 @@ fn esc_leaves_the_talk_as_by_script() {
     assert!(a.pending.is_none() && a.boxes.is_empty());
 }
 
+#[test]
+fn a_right_click_leaves_the_talk_as_by_script() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    // 1194:020E's menu (3159:0F2A with flags 4006h): the right button
+    // leaves it as Esc does (10D6), wherever it is.
+    d.click(&mut a, 5, 190, MouseButton::Right);
+    assert!(a.pending.is_none(), "the right button leaves the menu");
+    let (mut b, _) = talk_start(&dir, "-1");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "the right button and --picks -1");
+}
+
+#[test]
+fn a_menu_click_picks_by_its_height_alone() {
+    let Some(dir) = game_dir() else { return };
+    let (mut a, mut d) = talk_start(&dir, "");
+    assert!(until_asked(&mut d, &mut a, 3));
+    // 0F2A keeps the mouse to its entries' boxes (0000:53AA) and picks
+    // the last entry whose box starts at or above the click (1164): a
+    // click at the screen's left edge at entry 1's height picks entry 1,
+    // and one above the boxes picks entry 0.
+    let (_, y1) = entry_at(&a, 1).expect("entry 1 shown");
+    let hud = a.hud();
+    assert_eq!(hud::menu_pick(&a.font, &hud, 0, 0), Some(0), "above the boxes: the first entry");
+    assert_eq!(hud::menu_pick(&a.font, &hud, 319, 199).map(|i| i + 1), menu(&a).map(|m| m.entries.len()), "below them: the last");
+    d.click(&mut a, 0, y1, MouseButton::Left);
+    let (mut b, _) = talk_start(&dir, "1");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "entry 1 clicked off its box and --picks 1");
+}
+
+#[test]
+fn a_list_takes_two_clicks_and_leaves_by_the_right_button() {
+    let Some(dir) = game_dir() else { return };
+    let where_is = || {
+        let (mut a, mut d) = talk_start(&dir, "");
+        assert!(until_asked(&mut d, &mut a, 3));
+        let m = menu(&a).expect("a menu").clone();
+        let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
+        d.key(&mut a, KeyCode::KeyW, Some(&letter));
+        assert!(menu(&a).is_some_and(|l| l.list), "the places' list");
+        (a, d)
+    };
+    // Up at the first line stays there (3159:09C2); a click on the
+    // second line marks it (0A1D), a second click picks it (0A41).
+    let (mut a, mut d) = where_is();
+    d.key(&mut a, KeyCode::ArrowUp, None);
+    assert_eq!(a.selected, 0, "the list's arrows stop at its first line");
+    let (x, y) = entry_at(&a, 1).unwrap_or_else(|| panic!("line 1 shown: {:?}", menu(&a).map(|m| (m.entries.len(), m.kind))));
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert!(menu(&a).is_some_and(|l| l.list) && a.selected == 1, "the first click marks the line");
+    d.click(&mut a, x, y, MouseButton::Left);
+    let (mut b, _) = talk_start(&dir, "1,1");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "a place clicked twice and --picks 1,1");
+    // The record at 5105 has flag 4000h: the right button leaves.
+    let (mut a, mut d) = where_is();
+    d.click(&mut a, 5, 5, MouseButton::Right);
+    assert!(!menu(&a).is_some_and(|l| l.list), "the right button leaves the list");
+    let (mut b, _) = talk_start(&dir, "1,-1");
+    as_far_as(&mut b, &a);
+    same(&a, &b, "the list left by the right button and --picks 1,-1");
+}
+
 /// The start's day (1st of Morning Star) is the New Life Festival: in a
 /// town by day the frame shows its message once (2DA2:111C's holiday,
 /// 05E0 bit 100h); frames until it is up, then it is read.
@@ -717,8 +783,12 @@ fn creation_by_keys_and_clicks_as_by_script() {
     Driver::new(&mut b);
     // The intro's movie skipped, the rest of it left (Esc at the title),
     // Start; the opening story skipped;
-    // "Select" the class; the list's first class; the name; the gender.
-    let script = "enter,esc,S,esc,S,enter,type:Ria,enter,F";
+    // "Select" the class; on the classes' list (kind 6, the record at
+    // 515A: no flag 4000h) the right button and Esc do nothing, a click
+    // marks the second class (FONT_A's 11 rows from the box's y 2Dh) and
+    // a second click picks it; the name; the gender.
+    let script = "enter,esc,S,esc,S,right,esc,click:94:62,click:94:62,type:Ria,enter,F";
+    let typing = |app: &App| app.creation.as_ref().is_some_and(|c| c.typing());
     for (i, inp) in create::parse_script(script).into_iter().enumerate() {
         match inp {
             create::Input::Enter => d.key(&mut a, KeyCode::Enter, None),
@@ -734,10 +804,19 @@ fn creation_by_keys_and_clicks_as_by_script() {
                 d.key(&mut a, KeyCode::KeyA, Some(&t));
             }
             create::Input::Click(x, y) => d.click(&mut a, x, y, MouseButton::Left),
+            create::Input::Right => d.click(&mut a, 160, 100, MouseButton::Right),
             create::Input::Wait(ms) => d.wait(&mut a, ms as u64),
             create::Input::Key(..) => {}
         }
         b.creation_input(inp);
+        // The list waits through the right button, Esc and the first
+        // click; the second asks the name.
+        if (5..=7).contains(&i) {
+            assert!(!typing(&a), "step {i} ({inp:?}): the classes' list still up");
+        }
+        if i == 8 {
+            assert!(typing(&a), "the second click on the marked class picks it");
+        }
         let (Some(ca), Some(cb)) = (a.creation.as_ref(), b.creation.as_ref()) else { panic!("creation ended early at step {i}") };
         let mut sa = hud::Screen::new(a.assets.palette);
         let mut sb = hud::Screen::new(a.assets.palette);

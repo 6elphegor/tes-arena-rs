@@ -419,15 +419,15 @@ impl SpellPage {
         crate::hud::Tiles::load(archive, "SPPARTS.RCI", 3, 3)
     }
 
-    /// The Delete question's entry under (x, y): its boxes as 0F2A lays
-    /// them out in those tiles and ARENAFNT ([102C]).
-    pub fn menu_pick(&self, archive: &crate::archive::Archive, x: i32, y: i32) -> Option<usize> {
+    /// The Delete question's entry a click at y picks (`menu_entry`): its
+    /// boxes as 0F2A lays them out in those tiles and ARENAFNT ([102C]).
+    pub fn menu_pick(&self, archive: &crate::archive::Archive, _x: i32, y: i32) -> Option<usize> {
         let pics = crate::sheets::loaded()?;
         let f = pics.arena.as_ref()?;
         let tiles = SpellPage::tiles(archive)?;
         let menu = self.menu();
         let (_, es) = crate::hud::custom::menu_rects(&tiles, f, &menu.title, &menu.entries);
-        es.iter().position(|&(rx, ry, rw, rh)| x >= rx && x < rx + rw && y >= ry && y < ry + rh)
+        crate::hud::custom::menu_entry(&es, y)
     }
 
     /// 1194:1B3C: the marked spell's page opened.
@@ -486,6 +486,7 @@ impl Panel {
             list: true,
             kind: crate::hud::BAR_LIST,
             font: None,
+            top: None,
         })
     }
 }
@@ -857,6 +858,7 @@ pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
         list: false,
         kind: 0,
         font: None,
+        top: None,
     }
 }
 
@@ -892,6 +894,7 @@ pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
         list: false,
         kind: 0,
         font: None,
+        top: None,
     }
 }
 
