@@ -2316,7 +2316,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // time passing for its movie (`ui:ms:N`).
             if let Some((c, e)) = &mut st.ui {
                 match t.strip_prefix("ms:") {
-                    Some(ms) => c.advance(ms.parse().expect("--do ui:ms:N")),
+                    Some(ms) => c.advance(&mut e.m, ms.parse().expect("--do ui:ms:N")),
                     None => {
                         for inp in create::parse_script(t) {
                             c.input(e, inp);
@@ -5568,7 +5568,7 @@ impl App {
             }
         }
         if let Some(c) = &mut self.creation {
-            c.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            c.advance(&mut self.engine.m, now.duration_since(self.movie_at).as_millis() as u32);
             self.creation_outcome();
         }
         self.creation_music();

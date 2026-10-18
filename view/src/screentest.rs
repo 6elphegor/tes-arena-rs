@@ -1829,7 +1829,7 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
                 }
                 seen.push(st);
             }
-            c.advance(1);
+            c.advance(&mut a.engine.m, 1);
             ms += 1;
         }
         let first = seen.iter().zip(&want).position(|(v, o)| v != o);

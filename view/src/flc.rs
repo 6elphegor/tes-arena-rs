@@ -1,7 +1,7 @@
 //! The game's animations (.FLC, Autodesk Animator Pro: all 320 x 200, 8
 //! bits), as the original plays them (0000:6546): frame by frame at the
-//! file's speed, in the file's own colours, the ring frame looping back
-//! to the second.
+//! file's speed in whole timer ticks (`Movie`), in the file's own colours,
+//! the ring frame looping back to the second.
 //!
 //! The chunks the game's files use: 4 (256-colour palette), 15 (the first
 //! frame, run-length), 7 (later frames, word deltas, with 0000:63B4's
@@ -25,6 +25,9 @@ use crate::hud::{self, Font, Screen, Span};
 
 pub const W: usize = 320;
 pub const H: usize = 200;
+/// A timer tick (1/18.2 s) in milliseconds: the movies' pace (0000:6587's
+/// 37h).
+pub const TICK_MS: u32 = 55;
 
 /// An animation being played.
 pub struct Flc {
@@ -353,8 +356,11 @@ pub struct Movie {
     /// last key ends it).
     pub lines: Vec<Vec<Span>>,
     pub top: usize,
-    /// Milliseconds into the current frame.
+    /// Milliseconds into the current frame, and a frame's (0000:6546's
+    /// pace: the file's speed in timer ticks, [bp-2] = speed / 37h, at
+    /// least one; 18.2 ticks a second).
     elapsed: u32,
+    period: u32,
     /// Over: a key past the text, or (no text) a key or the end.
     pub over: bool,
     /// A still picture with its text all at once from row 32h, over the
@@ -388,12 +394,13 @@ impl Movie {
     /// `name` played; with `lines`, as a vision with that text.
     pub fn new(archive: &Archive, name: &str, lines: Vec<Vec<Span>>) -> Option<Movie> {
         let flc = Flc::open(archive, name)?;
-        Some(Movie { flc, lines, top: 0, elapsed: 0, over: false, full: false, lead: Default::default(), lead_ms: 0, lead_later: false })
+        let period = flc.speed.max(TICK_MS) / TICK_MS * TICK_MS;
+        Some(Movie { flc, lines, top: 0, elapsed: 0, period, over: false, full: false, lead: Default::default(), lead_ms: 0, lead_later: false })
     }
 
     /// A still picture shown with all its text (`full`).
     pub fn still(flc: Flc, lines: Vec<Vec<Span>>) -> Movie {
-        Movie { flc, lines, top: 0, elapsed: 0, over: false, full: true, lead: Default::default(), lead_ms: 0, lead_later: false }
+        Movie { flc, lines, top: 0, elapsed: 0, period: u32::MAX, over: false, full: true, lead: Default::default(), lead_ms: 0, lead_later: false }
     }
 
     /// The vision's way in (1194:D459): from `shown` in `dac`, the colours
@@ -414,8 +421,10 @@ impl Movie {
         self.lead_later = false;
     }
 
-    /// Time passing (milliseconds): frames stepped at the file's speed. An
-    /// animation without text is over when it has been through once.
+    /// Time passing (milliseconds): frames stepped at the player's pace
+    /// (`period`). An animation without text is over when it has been
+    /// through once: at its last frame, which the player shows without a
+    /// wait after it.
     pub fn advance(&mut self, ms: u32) {
         // The way in first, a frame a retrace.
         if !self.lead.is_empty() {
@@ -430,13 +439,25 @@ impl Movie {
             self.lead_ms = 0;
         }
         self.elapsed += ms;
-        while self.elapsed >= self.flc.speed && !self.over {
-            self.elapsed -= self.flc.speed;
+        while self.elapsed >= self.period && !self.over {
+            self.elapsed -= self.period;
             self.flc.step();
             if self.lines.is_empty() && self.flc.looped {
                 self.over = true;
             }
         }
+    }
+
+    /// A key pressed in a movie without text (0000:65CD: the keyboard's
+    /// buffer tested after the next frame is read, before its wait): that
+    /// frame still shown, then the end; a click (65F0: the button tested
+    /// after the read of the mouse, before the frame is shown) ends it at
+    /// the frame shown.
+    pub fn cut(&mut self, click: bool) {
+        if !click && !self.over && !self.flc.looped {
+            self.flc.step();
+        }
+        self.over = true;
     }
 
     /// A key or click: the next three lines, or the end. The page turns

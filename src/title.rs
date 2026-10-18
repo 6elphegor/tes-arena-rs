@@ -16,8 +16,9 @@
 //!   retraces; with Esc held (ACB6) no more; else SCROLL.FLC (6546
 //!   straight, A69E the frame again), then SCROLL01..03.IMG (the digit
 //!   at 4DCB counted from '1') each into the frame, drawn and dissolved in
-//!   (1393: 742C to [902E], 582C, 1194:4FF7), waited 4A6h, 4A6h and 1A4h
-//!   retraces, Esc ending them; the screen faded out.
+//!   (1393: 742C to [902E], 582C, 1194:4FF7: its generator, 4B8E, stepped
+//!   unless 5CA bit 2), waited 4A6h, 4A6h and 1A4h retraces, Esc ending
+//!   them; the screen faded out.
 //! - 10E2: A902 bit 1 cleared, the clip and the page again, MENU.IMG
 //!   loaded high, drawn and freed (56CC with BX 40h), the disk's free
 //!   space checked (1194:54D4: a box under 5M, the front end's).
@@ -203,6 +204,9 @@ impl Machine {
                     self.file_load(files, SCROLL_IMG, seg, off)?;
                     self.title_image(seg, off)?;
                     hooks.picture(self, seg, off, 2);
+                    // 1194:4FF7's generator (4B8E) stepped (the hook sees
+                    // it as the dissolve starts; the pixels its).
+                    self.dissolve();
                     self.title_wait(hooks, n);
                     let d = self.mem.r8(DS, SCROLL_DIGIT).wrapping_add(1);
                     self.mem.w8(DS, SCROLL_DIGIT, d);

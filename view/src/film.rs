@@ -59,8 +59,12 @@ impl Film {
     /// 1194:5065: x 5E5h + 29h), its remainder by the rectangle's size, a
     /// pixel there (row, column) copied from the page to the screen; a
     /// wait after the 201h-th and every 400h after (62); then the page
-    /// shown whole (9466).
+    /// shown whole (9466). With 5CA bit 2 (F4's) none of it: the page
+    /// shown whole.
     pub fn dissolve(&mut self, m: &mut Machine, page: &[u8], rect: (usize, usize, usize, usize)) {
+        if m.mem.r16(DS, 0x05CA) & 2 != 0 {
+            return self.whole(page);
+        }
         let (x0, y0, w, h) = rect;
         let size = (w * h) as u32;
         let mut r = m.mem.r16(DS, DISSOLVE_SEED);
@@ -91,11 +95,16 @@ impl Film {
     }
 
     /// 0000:5E50: the colours taken to `to` in `steps` (1 or less: set at
-    /// once). Each component as 8.8 (the DAC's 6 bits), the step its
-    /// difference over `steps` (idiv), added `steps` - 1 times (below 0:
-    /// 0), each set (9B56); then `to` set.
+    /// once). The DAC read first (6E3C: a wait for the retrace after its
+    /// first colour, its ABh-th from the end and its 56h-th); each
+    /// component as 8.8 (the DAC's 6 bits), the step its difference over
+    /// `steps` (idiv), added `steps` - 1 times (below 0: 0), each set
+    /// (9B56); then `to` set.
     pub fn fade(&mut self, to: &Dac, steps: i16) {
         if steps > 1 {
+            for _ in 0..3 {
+                self.wait();
+            }
             let mut acc = [0i16; 0x300];
             let mut step = [0i16; 0x300];
             for i in 0..0x300 {
