@@ -64,8 +64,9 @@ impl OptionsHooks for Script<'_> {
     fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
         m.mem.w16(DS, if text { 0xB038 } else { 0xB036 }, ax);
     }
-    fn picture(&mut self, _m: &mut Machine, _files: &mut Files, _name: u16) {
+    fn picture(&mut self, m: &mut Machine, files: &mut Files, _name: u16) {
         self.draws.clear();
+        m.options_picture(files);
     }
     fn fill(&mut self, m: &mut Machine, ax: u16, bx: u16, cx: u16, dx: u16) {
         if !self.starved {

@@ -2004,6 +2004,37 @@ fn the_options_screen_by_esc() {
     assert!(a.options.is_none() && a.quit, "Yes: the program ends");
 }
 
+/// The options screen's Load in play, slot 1 picked: the game loaded
+/// inside the frame Esc opened the screen in (25FD:0242 from 2542:061E),
+/// the rest of that frame run on it, then play goes on.
+#[test]
+fn the_options_screens_load_goes_on_in_the_frame() {
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.inside.is_some() && a.options.is_some(), "Esc opens the screen inside the frame");
+    d.click(&mut a, 0x60, 0x80, MouseButton::Left);
+    assert!(a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Load), "Load: the load menu");
+    d.click(&mut a, 160, 4 + 14 + 3, MouseButton::Left);
+    for _ in 0..50 {
+        if a.inside.is_none() {
+            break;
+        }
+        d.wait(&mut a, 100);
+    }
+    assert!(a.saveui.is_none() && a.inside.is_none(), "loaded, the frame's rest run");
+    for _ in 0..5 {
+        d.frame(&mut a);
+    }
+    assert!(a.creation.is_none(), "play goes on");
+}
+
 /// The options screen's New: the area left, and the rest of the frame the
 /// screen opened in ends the world loop; the outer loop's way out (5CA
 /// bit 8000h) brings up the main menu.
