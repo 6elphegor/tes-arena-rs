@@ -36,12 +36,17 @@ impl Machine {
     /// second byte and one more, a signed result below 0 is passed over,
     /// any other draws the character and moves on its width.
     pub fn text_state(&mut self, x: u16, y: u16, si: u16) {
+        self.text_state_far(x, y, (DS, si));
+    }
+
+    /// `text_state` of the text at `tseg`:`si`.
+    pub fn text_state_far(&mut self, x: u16, y: u16, (tseg, si): (u16, u16)) {
         let (off, seg) = (self.mem.r16(DS, 0xB034), self.mem.r16(DS, 0xB036));
         let mut x = x;
         self.mem.w16(DS, 0xADB8, y);
         let mut at = si;
         loop {
-            let c = self.mem.r8(DS, at);
+            let c = self.mem.r8(tseg, at);
             at = at.wrapping_add(1);
             if c == 0 {
                 break;

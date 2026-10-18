@@ -270,6 +270,8 @@ KEY_SPACE = 0x39
 KEY_M = 0x32
 KEY_F1 = 0x3B
 KEY_ESC = 0x01
+# N (the sheet's equipment page, 3276:52B0's first record).
+KEY_N = 0x31
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
 
@@ -619,6 +621,11 @@ CASES = {
     'playautomap': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                                        ((), (KEY_M,), 10, None)]),
     'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
+                                     ((), (KEY_F1,), 10, None)]),
+    # The sheet's equipment page: two frames, F1 held a frame (the sheet),
+    # N (1194:0D67: the equipment page, 16BD), Esc (its exit, back to
+    # the sheet), Esc (the sheet left), ten frames.
+    'playequip': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                      ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five

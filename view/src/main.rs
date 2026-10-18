@@ -3702,6 +3702,7 @@ impl App {
         let m = &mut self.engine.m;
         let mut cast = None;
         let mut page = false;
+        let mut back: Option<Option<u8>> = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
@@ -3752,10 +3753,8 @@ impl App {
                     }
                 } else {
                     match code {
-                        KeyCode::Escape | KeyCode::KeyI => {
-                            let back = inv.from_sheet;
-                            self.panel = back.then_some(panels::Panel::Sheet)
-                        },
+                        KeyCode::Escape | KeyCode::KeyI if inv.from_sheet => back = Some((code == KeyCode::Escape).then_some(0x1B)),
+                        KeyCode::Escape | KeyCode::KeyI => self.panel = None,
                         KeyCode::ArrowUp => panels::scroll(m, -1),
                         KeyCode::ArrowDown => panels::scroll(m, 1),
                         KeyCode::KeyD => panels::drop_press(m, inv, &mut said),
@@ -3808,7 +3807,10 @@ impl App {
             None => {}
         }
         if page {
-            self.equipment_page();
+            self.equipment_page(Some(b'n'));
+        }
+        if let Some(key) = back {
+            self.equipment_back(key);
         }
         if let Some(line) = cast {
             self.panel = None;
@@ -3818,9 +3820,33 @@ impl App {
         self.boxes.extend(said.boxes);
     }
 
-    /// The sheet's equipment page (1194:0D67): its colours set again (9B56).
-    fn equipment_page(&mut self) {
-        self.fade_open(0, 0, |a| a.panel = Some(panels::equipment_page(&mut a.engine.m)));
+    /// The sheet's equipment page (1194:0D67), `key` typed (`n`) or its
+    /// button clicked (None): in the game's state the sheet's run turned
+    /// to it (`Machine::sheet_equipment`); its colours set again (9B56).
+    fn equipment_page(&mut self, key: Option<u8>) {
+        self.fade_open(0, 0, |a| {
+            if a.sheet_run.is_none() {
+                a.panel = Some(panels::equipment_page(&mut a.engine.m));
+                return;
+            }
+            let e = &mut a.engine;
+            if e.m.sheet_equipment(&mut e.files, key).is_none() {
+                eprintln!("the equipment page gave up: {}", arena::giveup::describe());
+            }
+            a.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() }));
+        });
+    }
+
+    /// The sheet's equipment page left by its exit, `key` typed (Esc) or
+    /// clicked (None): back to the sheet (`Machine::sheet_equipment_close`).
+    fn equipment_back(&mut self, key: Option<u8>) {
+        self.panel = Some(panels::Panel::Sheet);
+        if self.sheet_run.is_some() {
+            let e = &mut self.engine;
+            if e.m.sheet_equipment_close(&mut e.files, key).is_none() {
+                eprintln!("the equipment page's end gave up: {}", arena::giveup::describe());
+            }
+        }
     }
 
     /// An answer given to the spell's page `page` (up on the inventory).
@@ -3855,6 +3881,7 @@ impl App {
         let (x, y) = self.screen_point();
         let mut said = panels::Said::default();
         let mut cast = None;
+        let mut back = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page up (1194:51D1): the click its question
@@ -3894,10 +3921,8 @@ impl App {
                     }
                 } else if let Some(b) = panels::button_at(x, y) {
                     match b {
-                        panels::Button::Exit => {
-                            let back = inv.from_sheet;
-                            self.panel = back.then_some(panels::Panel::Sheet)
-                        },
+                        panels::Button::Exit if inv.from_sheet => back = true,
+                        panels::Button::Exit => self.panel = None,
                         panels::Button::Spellbook => {
                             inv.bare = false;
                             panels::spells_button(&mut self.engine.m, &mut said)
@@ -3941,7 +3966,7 @@ impl App {
                 }
             }
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
-                Some(sheets::SheetClick::Equipment) => self.equipment_page(),
+                Some(sheets::SheetClick::Equipment) => self.equipment_page(None),
                 Some(sheets::SheetClick::Done) => self.sheet_end(None),
                 None => {}
             },
@@ -3951,6 +3976,9 @@ impl App {
                 _ => {}
             },
             None => {}
+        }
+        if back {
+            self.equipment_back(None);
         }
         if let Some(line) = cast {
             self.panel = None;
