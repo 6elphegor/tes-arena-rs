@@ -35,6 +35,10 @@ thread_local! {
     /// Each frame's 3D view (the engine's page, its first 92h rows) as
     /// the frame left it, for `boxview`.
     static VIEWS: std::cell::RefCell<Vec<Option<u64>>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// A box opened over a screen of its own, not the 3D view (the travel
+    /// map's journey box): the frame it opened in and that screen's first
+    /// 92h rows, for `boxview` in place of the frame's view.
+    static BOXED: std::cell::Cell<Option<(usize, u64)>> = const { std::cell::Cell::new(None) };
 }
 
 /// `n` frames as gen_areaplay.py's steps play them, a box read with Space
@@ -211,8 +215,15 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                 key(a, KeyCode::ShiftLeft, true);
                 d.key(a, KeyCode::KeyM, Some("M"));
                 key(a, KeyCode::ShiftLeft, false);
+                // The frame that took the key (the screen up after it).
+                let frame = VIEWS.with(|v| v.borrow().len());
                 for (x, y) in [(70, 45), (200, 100), (200, 100), (62, 180)] {
                     d.click(a, x, y, MouseButton::Left);
+                    // The journey's box opens over the province's map, in
+                    // that frame.
+                    if let Some(p) = a.travel.as_ref().and_then(|t| t.boxed_over.as_ref()) {
+                        BOXED.set(Some((frame, fnv(p[..0x92 * 320].iter().copied()))));
+                    }
                 }
                 for _ in 0..100 {
                     if a.travel.is_none() {
@@ -221,7 +232,9 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                     d.wait(a, 100);
                 }
                 assert!(a.travel.is_none(), "the journey ends the travel map");
-                frames_until(a, d, seen, 4, |_| false);
+                // The area left at that frame's end: the village entered.
+                seen.push(state(a));
+                frames_until(a, d, seen, 3, |_| false);
             }),
         ),
         "wilddungeon" => (
@@ -256,6 +269,7 @@ fn transit(name: &str) {
         let (frame, digest): (usize, u64) = (frame.parse().unwrap(), u64::from_str_radix(digest, 16).unwrap());
         let (place, setup, play) = transit_case(name).unwrap();
         VIEWS.with(|v| v.borrow_mut().clear());
+        BOXED.set(None);
         played(
             place,
             |a| {
@@ -264,7 +278,7 @@ fn transit(name: &str) {
             },
             play,
         );
-        let view = VIEWS.with(|v| v.borrow().get(frame).copied().flatten());
+        let view = BOXED.take().filter(|&(f, _)| f == frame).map(|(_, v)| v).or_else(|| VIEWS.with(|v| v.borrow().get(frame).copied().flatten()));
         assert_eq!(view, Some(digest), "{name}: the 3D view the box opens over (frame {frame}) differs from the original's");
     }
     state_compared_in(AREAPLAY, name, false, transit_case(name).unwrap());
@@ -345,19 +359,17 @@ fn fast_travel_frames_as_the_original() {
     assert_eq!(seen, track_in(AREAPLAY, "travelfast"), "travelfast: the player's frames differ from the original's");
 }
 
-/// Open: the state fast travel leaves. The journey, the date, the
-/// village and its errand (seeded from the BIOS's ticks), the world kept
-/// and put back around the screen (0000:A611, A5CD, A6B5), the screen's
-/// windows (3159), resources and last pass and its files in EMS (banks
-/// 0, 12h, 15h, 18h) are the original's. What differs is in the village,
-/// in its fog by night (F81): the fog's step (2294:0B01) sets C39A bit
-/// 20h on the drawing's copy, which the frame's own writes there then
-/// lose, so the view draws (the people's column lists D498.., the sky's
-/// bank 6, the 3D view under the welcome) where the original's fills
-/// the view; C8ED (0000:E14B), and the faces unpacked into bank 19h
-/// (292B:048F) where the original's bank stays empty.
+/// The state fast travel leaves: the frame that takes Shift+M run to its
+/// end first (its hook C3A8 opens the screen, 2542:040A), the journey,
+/// the date, the village and its errand (seeded from the BIOS's ticks),
+/// the world kept and put back around the screen (0000:A611, A5CD, A6B5),
+/// the screen's windows (3159), resources and last pass and its files in
+/// EMS (banks 0, 12h, 15h, 18h), the area left at that frame's end; in
+/// the village's fog (F81) its step's flags (2294:0B01: C398 bit 8000h
+/// off, C39A bit 20h on) the machine's, so the near lights are made
+/// (0000:E12E, C8ED) and the next frames' sky left out (D502). The
+/// journey's box opens over the province's map (`Travel::boxed_over`).
 #[test]
-#[ignore = "in the village's fog the drawing's C39A bit 20h is lost to the frame's writes (2294:0B01), and the faces' bank 19h isn't the original's"]
 fn fast_travel_as_the_original() {
     transit("travelfast");
 }

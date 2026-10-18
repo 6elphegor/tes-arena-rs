@@ -1224,9 +1224,19 @@ impl Assets {
     /// frame left it (the player's light stays at the eye of the frame's
     /// start, A2EC's, until the next frame's).
     fn lights(&mut self, m: &mut arena::machine::Machine) -> render::Lights {
-        let kept = m.mem.segment(arena::mem::DS).to_vec();
+        use arena::mem::DS;
+        // The EMS too (the fog's light table maps banks, 0000:AB2A): the
+        // banks and the frame as they were, with the bank DGROUP says is
+        // mapped (8FA8), so the next mapping keeps the frame's bytes in
+        // their own bank.
+        let kept = m.mem.segment(DS).to_vec();
+        let frame = m.mem.r16(DS, arena::mif::var::BUFFER_SEG);
+        let (banks, framed) = (m.ems.clone(), m.mem.segment(frame).to_vec());
         let lights = self.lights_made(m);
-        m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
+        m.ems = banks;
+        m.mem.segment_mut(frame).copy_from_slice(&framed);
+        m.mem.segment_mut(DS).copy_from_slice(&kept);
+        m.mem.frame_mapped(m.mem.r16(DS, arena::level::var::EMS_MAPPED) >> 2);
         lights
     }
 
@@ -3369,17 +3379,7 @@ impl App {
             match frame {
                 Some(arena::engine::Frame::Running) => {}
                 Some(arena::engine::Frame::Left) => {
-                    // On to the next area, whose assets are made afresh,
-                    // its colours faded (`area_fade`).
-                    let was = self.fade_from();
-                    let blackout = std::mem::take(&mut self.blackout);
-                    if self.area_next() {
-                        self.area_fade(was, blackout);
-                        return;
-                    }
-                    self.fade = was.0;
-                    if self.engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
-                        self.game_ending();
+                    if self.area_left() {
                         return;
                     }
                 }
@@ -3776,6 +3776,13 @@ impl App {
         let forced = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_)));
         let carry = travel::after(&mut self.travel, &mut self.engine, &mut boxes, !forced);
         self.boxes.extend(boxes);
+        // The journey made from the map button (2542:0434): the area left
+        // in the frame that took the button, at its end (0000:A453), no
+        // frame more.
+        if !forced && carry.is_some() && self.engine.m.mem.r16(arena::mem::DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0 {
+            self.area_left();
+            return;
+        }
         if let (true, Some(carry)) = (forced, carry) {
             let world = dialog::World(Box::new((self.engine.m.clone(), self.engine.files.clone())));
             self.answer(dialog::Answer::Travel(world, carry));
@@ -4456,7 +4463,13 @@ impl App {
     fn bar_action(&mut self, a: sheets::BarAction) {
         match a {
             sheets::BarAction::None => {}
-            sheets::BarAction::WorldMap => self.open_travel(),
+            // The frame that takes the button first: its hook C3A8 runs
+            // the menu keys (0000:4952, 2542:0100) and the button's
+            // 2542:040A after the frame's actors, drawing and physics.
+            sheets::BarAction::WorldMap => {
+                self.step();
+                self.open_travel();
+            }
             // 0000:2D3E..2DAE: the screen faded out in 12 steps, the
             // automap drawn and faded in in 12.
             sheets::BarAction::Automap => {
@@ -4554,6 +4567,24 @@ impl App {
             }
         }
         (queued, from, self.screen.clone())
+    }
+
+    /// The area left (C398 bit 80h): on to the next area, whose assets
+    /// are made afresh, its colours faded (`area_fade`), or the game's
+    /// end; whether either.
+    fn area_left(&mut self) -> bool {
+        let was = self.fade_from();
+        let blackout = std::mem::take(&mut self.blackout);
+        if self.area_next() {
+            self.area_fade(was, blackout);
+            return true;
+        }
+        self.fade = was.0;
+        if self.engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
+            self.game_ending();
+            return true;
+        }
+        false
     }
 
     /// On to the next area (`areas::next`), its assets made afresh;

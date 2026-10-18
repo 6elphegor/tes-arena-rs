@@ -173,6 +173,9 @@ pub struct Travel {
     /// taken as its name is asked) put back after the list (0000:710E),
     /// until the map's next click.
     label_held: bool,
+    /// The page the screen's first box opened over (`page`, the journey's
+    /// box at 1194:59C8 keeping what it covers of it).
+    pub boxed_over: Option<Vec<u8>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -373,6 +376,7 @@ impl Travel {
             journey: Vec::new(),
             journey_ms: 0,
             up_ms: 0,
+            boxed_over: None,
         }
     }
 
@@ -444,10 +448,15 @@ impl Travel {
         m.window_regions();
         let b = m.mem.r8(DS, BUTTONS);
         m.mem.w8(DS, BUTTONS, down as u8);
+        let shown = self.boxes.len();
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         h.screen = screen;
         if m.travel_click(&mut engine.files, &mut h).is_none() {
             eprintln!("the map's pass gave up: {}", arena::giveup::describe());
+        }
+        let screen = h.screen.take();
+        if self.boxes.len() > shown && self.boxed_over.is_none() {
+            self.boxed_over = screen;
         }
         m.mem.w8(DS, BUTTONS, b);
     }
