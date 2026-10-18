@@ -678,6 +678,18 @@ CASES = {
                                                                                                      ('keys', [KEY_D]), ('click', 0x40, 0x42), ('keys', [KEY_Y]),
                                                                                                      ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                              ((), (KEY_F1,), 10, None)]),
+    # "Drop what?"'s loop with a drop within: as playequipdropwhat to its
+    # loop, then '+' (the list moved on in the loop: 1A4A), Y (no record's
+    # key: only the ring takes it), D (17D8 within the loop: "Drop what?"
+    # again, 2325 within), the second line clicked (the inner loop left,
+    # the line marked, 1C5E; 17D8 over again), its question answered Y,
+    # then Esc (the outer loop, its 1299 cleared by the inner, left: no
+    # mark), between N and Esc.
+    'playequipdropin': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
+                                                                                                   ('keys', [KEY_D]), ('keys', [KEY_PAD_PLUS]), ('keys', [KEY_Y]), ('keys', [KEY_D]),
+                                                                                                   ('click', 0x40, 0x42), ('keys', [KEY_Y]), ('keys', [KEY_ESC]),
+                                                                                                   ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                           ((), (KEY_F1,), 10, None)]),
     # The equipment page's Spells button: as playequip, S (3276:57D8's
     # sixth record, 1194:2365: the caster's list turned to the spells,
     # 1D5C), '+' (that list one line on), S (back to the items) between
@@ -702,6 +714,23 @@ CASES = {
     'playequipstaff': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N])] + [('keys', [KEY_PAD_PLUS])] * 34 + [
         ('click', 0x40, 0x7A), ('rclick', 0x40, 0x7A), ('click', 0x40, 0x42), ('click', 0x40, 0x7A), ('click', 0x40, 0x42), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                           ((), (KEY_F1,), 10, None)]),
+    # An accessory refused on the equipment page: as playequip, the list
+    # moved on 16 lines, the second line shown (the save's 18th item, a
+    # ring of a kind worn already) clicked (marked, 1194:1C5E) and
+    # clicked again (1AFB: 7804 finds the clash, 1B78: "You can only
+    # equip one %s.", 223A) and the click its wait takes, between N and
+    # Esc.
+    'playequipclash': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N])] + [('keys', [KEY_PAD_PLUS])] * 16 + [
+        ('click', 0x40, 0x42), ('click', 0x40, 0x42), ('click', 0x40, 0x42), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                         ((), (KEY_F1,), 10, None)]),
+    # An item the class can't use refused on the equipment page: as
+    # playequipstaff's end of the list ('+' 34 times), the sixth line
+    # shown (the save's last item, type 8Dh) clicked (marked) and clicked
+    # again (1AFB: 7772 refuses it, 1B6F: 748E, 1BE0: "This item can't be
+    # equipped.", 223A) and the click its wait takes, between N and Esc.
+    'playequipcantuse': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N])] + [('keys', [KEY_PAD_PLUS])] * 34 + [
+        ('click', 0x40, 0x6F), ('click', 0x40, 0x6F), ('click', 0x40, 0x42), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                           ((), (KEY_F1,), 10, None)]),
     # A spell's page from the equipment page: as playequip, S (the
     # spells' list, 1194:2365), its second line clicked (marked, 1C5E)
     # and clicked again (1B3C: the spell's page, 51D1), the page's Exit

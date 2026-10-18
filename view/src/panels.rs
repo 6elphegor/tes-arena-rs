@@ -258,10 +258,15 @@ pub struct Inventory {
     /// (`Machine::sheet_equipment_drop`'s pick), as the original's does;
     /// and the drop's key (None, its button clicked).
     pub drop_ring: Option<Box<(Vec<u8>, Option<u8>)>>,
-    /// On the sheet's own page, "Drop what?" up (1194:18CA) or its
-    /// question after: the inputs its loop (2325) has taken, the drop run
-    /// again from its start with them (`App::sheet_drop`).
-    pub drop_what: Option<Vec<arena::charsheet::PageInput>>,
+    /// On the sheet's own page, a drop under way: its question or "Drop
+    /// what?" up (1194:18CA), and what it has taken (its loop's inputs,
+    /// 2325, and the questions' answers), the drop run again from its
+    /// start with them (`App::sheet_drop`).
+    pub drop_what: Option<Vec<crate::DropStep>>,
+    /// While "Drop what?" waits, the list's first line shown (1297) as its
+    /// loop's arrows left it on the drop's copy, the game's untouched
+    /// until the drop is done.
+    pub drop_first: Option<u8>,
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,
@@ -998,7 +1003,7 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
             // (1296) framed in A0h, 12 rows high from 2 above it, 146 wide
             // from 2 left of the text (1194:1F27).
             let teeny = pics.as_ref().and_then(|p| p.teeny.as_ref()).unwrap_or(font);
-            let first = m.mem.r8(DS, FIRST_LINE) as u16;
+            let first = inv.drop_first.unwrap_or_else(|| m.mem.r8(DS, FIRST_LINE)) as u16;
             let selected = m.mem.r8(DS, SELECTED);
             let frame = |screen: &mut Screen, y: i32| {
                 let (fx, fy, fw, fh) = (LIST_X - 2, y - 2, 146, 12);

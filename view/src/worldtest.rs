@@ -1082,6 +1082,50 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             frames(a, d, seen, 11, |_| false);
         })),
+        "playequipclash" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequip, the list moved on 16 lines, its second line (a
+            // ring of a kind worn already) clicked (marked) and clicked
+            // again (1B78: "You can only equip one %s.", 223A) and the
+            // click the panel's wait takes (5536).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            for _ in 0..16 {
+                d.key(a, KeyCode::NumpadAdd, Some("+"));
+            }
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playequipcantuse" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequipstaff's end of the list, its sixth line (the
+            // save's last item, type 8Dh) clicked (marked) and clicked
+            // again (1B6F, 1BE0: "This item can't be equipped.", 223A) and
+            // the click the panel's wait takes (5536).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            for _ in 0..34 {
+                d.key(a, KeyCode::NumpadAdd, Some("+"));
+            }
+            d.click(a, 0x40, 0x6F, MouseButton::Left);
+            d.click(a, 0x40, 0x6F, MouseButton::Left);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playequipspellpage" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             // As playequip, the spells' list (S, 1194:2365), its second
@@ -1119,6 +1163,33 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::KeyD, Some("d"));
             d.click(a, 0x40, 0x42, MouseButton::Left);
             d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playequipdropin" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequipdropwhat to "Drop what?"'s loop (2325), then '+'
+            // (the list moved on in it), Y (no record's: the ring's only),
+            // D (17D8 within: "Drop what?" and its loop again), the second
+            // line clicked (the inner loop left, the line marked), its
+            // question answered Y, and Esc (the outer loop left, no mark).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            d.click(a, 0x40, 0x4D, MouseButton::Left);
+            d.key(a, KeyCode::KeyD, Some("d"));
+            d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::KeyD, Some("d"));
+            d.key(a, KeyCode::NumpadAdd, Some("+"));
+            d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::KeyD, Some("d"));
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::Escape, None);
             d.key(a, KeyCode::Escape, None);
             faded(a);
             d.key(a, KeyCode::Escape, None);
@@ -1802,7 +1873,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 27] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage", "playequipdropwhat"];
+const BUSY: [&str; 30] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1876,7 +1947,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// bank [1032]: `Machine::sm_screen`), and "Drop what?" with no line
 /// marked in playequipdropwhat (18CA: its loop, 2325, left by a line's
 /// click that marks it, the drop over again: `drop_what_loop`).
-const BUSY_STATE: [&str; 26] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage", "playequipdropwhat"];
+const BUSY_STATE: [&str; 29] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
