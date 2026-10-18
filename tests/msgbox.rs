@@ -181,6 +181,16 @@ fn case_start(base: &Machine, mouse: (u16, u16)) -> Machine {
 /// The cursor the menu's wait draws (0000:5454) and takes away: its place,
 /// size and 8F2A's return, the screen under it at EDB0h and its picture at
 /// EBB0h (the generator's CURSOR): the front end's.
+/// `cursor`, and with A902 bit 800h all of DGROUP from EB00h: the wait's
+/// cursor drawn and taken away (5519, 770C) inside the mouse's limits the
+/// records at DGROUP:FFFEh gave (`menu_boxes`) runs past its buffers there,
+/// and on past DGROUP's end (the heap isn't compared). Nothing in the game
+/// sets the bit (A902 is only ever given 8 whole, 0000:6F34, and bits 1
+/// and 200h); these cases check 0F2A's path for it all the same.
+fn cursor_over(i: usize) -> bool {
+    cursor(i) || i >= 0xEB00
+}
+
 fn cursor(i: usize) -> bool {
     (0x8F7C..0x8F80).contains(&i) || (0x8F8C..0x8F92).contains(&i) || (0xEBB0..0xECB0).contains(&i) || (0xEDB0..0xEEB0).contains(&i)
 }
@@ -193,6 +203,10 @@ fn check_state(name: &str, d0: &[u8], m: &Machine, f: &[&str]) {
 }
 
 fn check_state_leaving(name: &str, d0: &[u8], m: &Machine, f: &[&str], leave: fn(usize) -> bool) {
+    check_state_heap(name, d0, m, f, leave, true)
+}
+
+fn check_state_heap(name: &str, d0: &[u8], m: &Machine, f: &[&str], leave: fn(usize) -> bool, heap: bool) {
     let left = |i: usize| MOUSE.contains(&i) || leave(i);
     let d1 = m.mem.segment(DS);
     let mut want = vec![false; 0x10000];
@@ -206,7 +220,9 @@ fn check_state_leaving(name: &str, d0: &[u8], m: &Machine, f: &[&str], leave: fn
     assert!(extra.is_empty() && missing.is_empty(), "{name}: changed here only {extra:?}; there only {missing:?}");
     let digest = fnv((0..0x10000).filter(|&i| want[i] && !left(i)).map(|i| d1[i]));
     assert_eq!(format!("{digest:x}"), f[1], "{name}: DGROUP's changed bytes");
-    assert_eq!(heap_line(m), f[2], "{name}: the heap after");
+    if heap {
+        assert_eq!(heap_line(m), f[2], "{name}: the heap after");
+    }
     assert_eq!(format!("{:x}", fnv((0..0x20).flat_map(|b| m.ems_bank(b)))), f[3], "{name}: the EMS banks after");
 }
 
@@ -312,6 +328,8 @@ fn the_menus_boxes_as_the_original() {
         }
         let v = (m.mem.r16(DS, 0x05CA) & !2) | if r[2].contains("nodissolve") { 2 } else { 0 };
         m.mem.w16(DS, 0x05CA, v);
+        let v = (m.mem.r16(DS, 0xA902) & !0x800) | if r[2].contains("nobg") { 0x800 } else { 0 };
+        m.mem.w16(DS, 0xA902, v);
         let d0 = m.mem.segment(DS).to_vec();
         let boxes = m.menu_boxes(0x1044, 0x1180, Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
         assert_eq!(boxes.is_none(), f[6] == "-", "{name}: shown");
@@ -325,8 +343,75 @@ fn the_menus_boxes_as_the_original() {
             }
         }
         m.menu_closed(boxes.as_ref());
-        check_state_leaving(name, &d0, &m, &f[8..], cursor);
+        // (With A902 bit 800h the wait's cursor runs on past DGROUP's end
+        // over the first heap block's head, the original's chain broken
+        // after: not the port's to follow.)
+        if r[2].contains("nobg") {
+            check_state_heap(name, &d0, &m, &f[8..], cursor_over, false);
+        } else {
+            check_state_leaving(name, &d0, &m, &f[8..], cursor);
+        }
         n += 1;
     }
     assert!(n >= 10, "{n} cases");
+}
+
+/// Creation's name (1194:2711 to its RET): the prompt made
+/// (`Machine::creation_name_prompt`), 5C34's box round the field
+/// (`named_shown`, `named_closed`), the field typed key by key as the
+/// generator presses them, and asked again while the name is empty. A key
+/// is pressed at the third poll of the loop's wait (A0D9, the cursor, run
+/// at each); the run going on from that poll's hook counts it again, so
+/// after the first key one poll more is the next key's.
+#[test]
+fn creations_name_asked_as_the_original() {
+    use arena::lineedit::{fields, EditKey};
+    let Some(base) = set_up() else { return };
+    let pattern: Vec<u8> = (0..64000u32).map(|i| (i * 7 + 3) as u8).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with("creationname |")) {
+        let f: Vec<&str> = l.split(" | ").collect();
+        let name = f[1];
+        let mut m = case_start(&base, (0xA0, 0x64));
+        m.mem.w8(DS, 0x01A4 + 5, u8::from_str_radix(f[2], 16).unwrap());
+        let v = m.mem.r16(DS, 0x01A4 + 0x40D) & !0x1000;
+        m.mem.w16(DS, 0x01A4 + 0x40D, v);
+        let mut keys = f[3].split(' ').map(|k| u8::from_str_radix(k, 16).unwrap());
+        let mut bxs = f[4].split(' ').map(hex);
+        let d0 = m.mem.segment(DS).to_vec();
+        let mut polls = 2;
+        loop {
+            m.creation_name_prompt();
+            let bx = bxs.next().unwrap_or_else(|| panic!("{name}: asked more often than the original"));
+            m.named_shown((DS, 0x1044), bx, Some(&pattern)).unwrap_or_else(|| panic!("{name}: gave up"));
+            m.edit_open(&fields::creation_name()).unwrap_or_else(|| panic!("{name}: the field gave up"));
+            loop {
+                for _ in 0..polls {
+                    m.edit_cursor();
+                }
+                polls = 1;
+                let scan = keys.next().unwrap_or_else(|| panic!("{name}: the keys ran out"));
+                m.key_event(scan).unwrap();
+                m.key_event(scan | 0x80).unwrap();
+                m.edit_cursor();
+                let k = m.edit_input().unwrap_or(EditKey::Key(0));
+                if m.edit_key(k).unwrap_or_else(|| panic!("{name}: the field gave up")) {
+                    m.edit_close();
+                    break;
+                }
+            }
+            m.named_closed();
+            if m.mem.r8(DS, 0x01AD) != 0 {
+                break;
+            }
+        }
+        assert!(keys.next().is_none() && bxs.next().is_none(), "{name}: asked less often than the original");
+        if let Ok(d) = std::env::var("MSGBOX_DUMP") {
+            std::fs::write(format!("{d}/{name}.port.dgroup"), m.mem.segment(DS)).unwrap();
+        }
+        check_state(name, &d0, &m, &f[5..]);
+        n += 1;
+    }
+    assert!(n >= 8, "{n} cases");
 }

@@ -115,6 +115,23 @@ STATUS = [
     ('conditions', [(0x01A4 + 0x40D, b'\x26\x02'), (0x05CC, struct.pack('<I', 123457))]),
 ]
 
+# 1194:2711 (near) to its RET, creation's name asked: (name, class, keys)
+# with the player's class byte (01A4 + 5) `class`, the field (0000:9EE5)
+# live and each scan code in `keys` pressed and let go through the key
+# interrupt at a wait of its loop (0000:A174's 8FC4); an Enter on an empty
+# name asks again (2789).
+CREATION = [
+    ('mage', 0, [0x25, 0x1E, 0x12, 0x26, 0x1C]),
+    ('spellsword', 1, [0x1F, 0x1C]),
+    ('sorceror', 3, [0x30, 0x1E, 0x13, 0x1C]),
+    ('healer', 4, [0x23, 0x0E, 0x23, 0x18, 0x1C]),
+    ('barbarian', 15, [0x2D, 0x1C]),
+    ('warrior-long', 16, [0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+                          0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x2C, 0x1C]),
+    ('empty-first', 6, [0x1C, 0x30, 0x1C]),
+    ('esc', 12, [0x2D, 0x01, 0x32, 0x1C]),
+]
+
 # 1194:020E (far): (name, mouse, title, entries, keys, action, flags) with
 # the title at 1044, the entries at 1100 on (their table at 1180, a 0
 # after), the keys at 1170. The action at the menu's wait: ('click', x,
@@ -131,6 +148,12 @@ MENUS = [
     ('codes', (160, 100), b'\t\xd5Coloured', [b'\x0c\x02Big one', b'\t\xf0Small'], b'BS', ('click', 160, 0x70), ()),
     ('nodissolve', (160, 100), b'Yes or no?', [b'Yes', b'No'], b'YN', ('click', 160, 0x60), ('nodissolve',)),
     ('too-wide', (160, 100), b'W' * 60, [b'Yes', b'No'], b'YN', None, ()),
+    # A902 bit 800h: no backgrounds kept (3159:0F3E), the boxes laid out
+    # from records read at DGROUP:FFFEh.
+    ('nobg-click', (160, 100), b'Pick one', [b'First', b'Second'], b'FS', ('click', 160, 0x60), ('nobg',)),
+    ('nobg-key', (160, 100), b'Pick one', [b'First', b'Second'], b'FS', ('keys', [0x1F]), ('nobg',)),
+    ('nobg-many', (40, 20), b'A longer title\rof two lines',
+     [b'One', b'Two', b'Three', b'Four', b'Five', b'Six'], b'OTHFIS', ('click', 160, 0x80), ('nobg',)),
 ]
 
 
@@ -291,6 +314,28 @@ def main():
         w = ' '.join(f'{off:x}:{data.hex()}' for off, data in writes) or '-'
         out.write(f'status | {name} | {w} | {seen[0]:x} | {state_line(a, d0)}\n')
         out.flush()
+    for name, cls, keys in CREATION:
+        start(name)
+        a.code_write(field, bytes(a.mu.mem_read(field, 1)))
+        a.mu.mem_write(a.lin(a.ds, 0x01A4 + 5), bytes([cls]))
+        a.w16(0x01A4 + 0x40D, a.r16(0x01A4 + 0x40D) & ~0x1000)
+        a.script = [('keys', [k]) for k in keys]
+        d0 = a.seg_bytes(a.ds)
+        seen, h = stack_bx(a, (0x1194, 0x5C61))
+        try:
+            assert a.run_screen(0x1194, 0x2711, {}, near=True) is None, f'{name}: the name waited'
+        finally:
+            a.mu.hook_del(h)
+        assert not a.script, f'{name}: keys were left'
+        if dump:
+            open(os.path.join(dump, f'{name}.dgroup'), 'wb').write(a.seg_bytes(a.ds))
+        # The field's text segment (A83C, its caller's DS) taken 1000h
+        # lower, as the port's.
+        if a.r16(0xA83C) == a.ds:
+            a.w16(0xA83C, a.ds - 0x1000)
+        k = ' '.join(f'{k:x}' for k in keys)
+        out.write(f'creationname | {name} | {cls:x} | {k} | {" ".join(f"{b:x}" for b in seen)} | {state_line(a, d0)}\n')
+        out.flush()
     from unicorn.x86_const import UC_X86_REG_AX
     for name, mouse, title, entries, keys, action, flags in MENUS:
         start(name)
@@ -304,6 +349,7 @@ def main():
         a.mu.mem_write(a.lin(a.ds, 0x1180), struct.pack(f'<{len(table) + 1}H', *table, 0))
         a.mu.mem_write(a.lin(a.ds, 0x1170), keys + b'\0')
         a.w16(0x05CA, (a.r16(0x05CA) & ~2) | (2 if 'nodissolve' in flags else 0))
+        a.w16(0xA902, (a.r16(0xA902) & ~0x800) | (0x800 if 'nobg' in flags else 0))
         a.script = [action] if action else []
         d0 = a.seg_bytes(a.ds)
         assert a.run_screen(0x1194, 0x020E, dict(si=0x1044, bx=0x1170, di=0x1180)) is None, f'{name}: the menu waited'
@@ -314,7 +360,7 @@ def main():
                                                     ','.join(f'{k:x}' for k in v) if isinstance(v, list) else f'{v:x}'
                                                     for v in action)
         out.write(f'menu | {name} | {mouse[0]:x} {mouse[1]:x} {" ".join(flags) or "-"} | {title.hex()} | '
-                  f'{",".join(e.hex() for e in entries)} | {keys.hex()} | {act} | {pick:x} | {state_line(a, d0, MOUSE | CURSOR)}\n')
+                  f'{",".join(e.hex() for e in entries)} | {keys.hex()} | {act} | {pick:x} | {state_line(a, d0, MOUSE | CURSOR | (OVER if 'nobg' in flags else set()))}\n')
         out.flush()
     out.close()
 
@@ -330,6 +376,11 @@ MOUSE = {0x8F92, 0x8F93, 0x8F94, 0x8F95, 0x8FA8, 0x8FA9}
 # its picture at [8F88] (EBB0h): the front end's, left out of the `menu`
 # lines' digests.
 CURSOR = set(range(0x8F7C, 0x8F80)) | set(range(0x8F8C, 0x8F92)) | set(range(0xEBB0, 0xECB0)) | set(range(0xEDB0, 0xEEB0))
+
+# With A902 bit 800h (`nobg`), all of DGROUP from EB00h too: that cursor,
+# drawn inside the mouse's limits the boxes' records at DGROUP:FFFEh give,
+# runs past its buffers there (5519, 770C).
+OVER = set(range(0xEB00, 0x10000))
 
 
 def runs(d0, d1, leave=()):
