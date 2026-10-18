@@ -190,6 +190,12 @@ impl Lgts {
     }
 }
 
+/// The words naming the buffers each drawing's copy makes itself on its
+/// own heap (`Soft::setup`: the light table CCC2, the lights' and rows'
+/// tables CD7E..CD89), which its next copy, starting from the machine's
+/// heap, doesn't have: not laid over it (`draw`'s `prior`).
+const OWN_BUFFERS: [(u16, u16); 2] = [(0xCCC2, 0xCCC4), (0xCD7E, 0xCD8A)];
+
 /// The view drawn from the machine's state at the start of the frame's
 /// drawing stages (before 0000:A322): the page, the pixels it drew
 /// written over `under` (the last page), and the paths not ported. Of
@@ -216,9 +222,10 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
     for (o, w) in prior.iter().enumerate() {
+        let o = o as u16;
         if let Some((before, after)) = *w {
-            if m.mem.r8(DS, o as u16) == before {
-                r.m.mem.w8(DS, o as u16, after);
+            if m.mem.r8(DS, o) == before && !OWN_BUFFERS.iter().any(|&(a, b)| (a..b).contains(&o)) {
+                r.m.mem.w8(DS, o, after);
             }
         }
     }
