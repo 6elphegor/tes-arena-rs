@@ -55,6 +55,17 @@ fn step(m: &mut Machine, fs: &mut Files, op: &str) -> Option<String> {
             let v: Vec<String> = words.iter().chain(counts.iter()).map(|v| format!("{v:x}")).collect();
             format!("{} {written}", v.join(" "))
         }
+        // AX after the append's close: AH 3Eh, AL left from the write's
+        // count, the entry's length (what LOG.64 grew by: its trim's
+        // create is refused, so it only grows).
+        "log" => {
+            let len = |fs: &Files| fs.written(b"LOG.64").map_or(0, |d| d.len());
+            let before = len(fs);
+            put(m, 0x1044, &op[4..]);
+            m.log_add(fs, 0x1044).expect("the log");
+            format!("3e{:02x}", (len(fs) - before) & 0xFF)
+        }
+        "file" => fs.written(w[1].as_bytes()).map_or("-".to_string(), |d| format!("{:x}/{:x}", d.len(), fnv(d.iter().copied()))),
         _ => panic!("{op}"),
     };
     match arena::giveup::take() {
@@ -102,5 +113,5 @@ fn the_handles_as_dos_gives_them() {
         assert_eq!(got.join("; "), f[3], "{}: {}", f[1], f[2]);
         n += 1;
     }
-    assert!(n >= 9, "{n} cases");
+    assert!(n >= 12, "{n} cases");
 }

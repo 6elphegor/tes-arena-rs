@@ -17,6 +17,83 @@ from unicorn.x86_const import *
 # port alike; the stack is at 9000h).
 HEAP_START, HEAP_TOP = 0xA000, 0xF000
 
+# What ends a name in a path (MS-DOS 4.0's FCB.ASM, CharType: the
+# characters GETLET finds no file character, besides the space, which
+# NameTrans lets into a name after its first character) and separates
+# its components.
+NAME_ENDS = set('."/\\[]:<|>+=;,') | {chr(c) for c in range(0x20)}
+SEPARATORS = '\\/'
+
+
+def path_error(raw):
+    """DOS's verdict on a path's form, before any directory is looked
+    at (MS-DOS 4.0's MACRO2.ASM: TransPath, Canonicalize, CopyComponent;
+    FCB.ASM: NameTrans's NORMSCAN): (error, metas) where error is None
+    for a well-formed path, else error_path_not_found (3) or
+    error_file_not_found (2), and metas whether a name holds '?' or '*'.
+    - A drive ("C:") is taken off the front (DriveFromText).
+    - Each component is "." or ".." (".." above the root is 3) or a name:
+      its characters up to one of NAME_ENDS (the space allowed after the
+      first), a '.' and the extension's likewise. A component with no
+      name (CopyComponent's CopyBad) or a name followed by anything but a
+      separator or the end (Canonicalize's CanonBad) is bad: 3 where a
+      separator follows later in the path (ScanPathChar), else 2.
+    - A second name with metas is bad the same way (cMeta past 0), and a
+      name without them after one with them is 3 (CopyBadPath).
+    So "C:\\ARENA_CD\\C:\\ARENA_CD\\LOG.64" is 3: the third component's name
+    is "C", ended by the ':', and a '\\' follows. The 8.3 truncation and
+    the buffer's length (TEMPLEN) aren't modelled; no path of the game's
+    reaches them."""
+    s = raw
+    if len(s) >= 2 and s[0] != '\0' and s[1] == ':':
+        s = s[2:]
+    i, n = 0, len(s)
+    absolute = n > 0 and s[0] in SEPARATORS
+    while i < n and s[i] in SEPARATORS:
+        i += 1
+    depth, c_meta = 0, -1
+
+    def bad(at):
+        return (3 if any(c in SEPARATORS for c in s[at:]) else 2), False
+
+    while i < n:
+        if s[i] == '.':
+            j = i + 1
+            if j == n or s[j] in SEPARATORS:
+                i = j
+            elif s[j] == '.' and (j + 1 == n or s[j + 1] in SEPARATORS):
+                i = j + 1
+                depth -= 1
+                if absolute and depth < 0:
+                    return 3, False
+            else:
+                # TryTwoDot has taken the character after the '.'.
+                return bad(j + 1)
+        else:
+            if s[i] in NAME_ENDS or s[i] == ' ':
+                return bad(i)
+            j = i
+            while j < n and s[j] not in NAME_ENDS:
+                j += 1
+            if j < n and s[j] == '.':
+                j += 1
+                while j < n and s[j] not in NAME_ENDS:
+                    j += 1
+            # CopyComponent: cMeta (-1) += fMeta; past 0 CopyBad, at 0
+            # with no metas in this name CopyBadPath.
+            c_meta += any(c in '?*' for c in s[i:j])
+            if c_meta > 0:
+                return bad(j)
+            if c_meta == 0 and not any(c in '?*' for c in s[i:j]):
+                return 3, False
+            depth += 1
+            i = j
+        if i < n and s[i] not in SEPARATORS:
+            return bad(i)
+        while i < n and s[i] in SEPARATORS:
+            i += 1
+    return None, c_meta == 0
+
 
 class DosArena(Arena):
     def __init__(self, exe_path, game_dir, *more_dirs):
@@ -79,7 +156,7 @@ class DosArena(Arena):
     # --- interrupts -------------------------------------------------------
 
     def _intr(self, mu, intno, _):
-        if intno == 0x21 and self._dos():
+        if intno == 0x21 and (self._bad_path() or self._dos()):
             return
         if intno == 0x67 and self._ems_call():
             return
@@ -95,19 +172,51 @@ class DosArena(Arena):
     def _wreg(self, r, v):
         self.mu.reg_write(globals()['UC_X86_REG_' + r.upper()], v & 0xffff)
 
+    def _bad_path(self):
+        """A path call (int 21h AH 3Ch create, 3Dh open, 41h delete, 4Eh
+        find first) on a path DOS takes as badly formed (`path_error`)
+        fails there, whatever file layer would have served it: AX the
+        error, the carry set, no handle taken (the JFN and SFN $Open took
+        are given back at OpenClean). Open and create return
+        Canonicalize's error, metas making it 2 (error_file_not_found);
+        delete maps any to 3, metas too (FILE.ASM: $UNLINK's ChModErr and
+        NotFound); find first maps any to 3 and takes metas (SEARCH.ASM:
+        FindError). The path's directories aren't looked for: every one
+        is the game's (the names' lookup by last component)."""
+        ah = self._reg('ax') >> 8
+        if ah not in (0x3C, 0x3D, 0x41, 0x4E):
+            return False
+        lin = self.lin(self._reg('ds'), self._reg('dx'))
+        raw = bytes(self.mu.mem_read(lin, 128)).split(b'\0')[0].decode('latin1')
+        err, metas = path_error(raw)
+        if err is None and metas and ah in (0x3C, 0x3D):
+            err = 2
+        elif err is None and metas and ah == 0x41:
+            err = 3
+        elif err is not None and ah in (0x41, 0x4E):
+            err = 3
+        if err is None:
+            return False
+        self._wreg('ax', err)
+        self._set_cf(True)
+        return True
+
     def _dos(self):
         ah = self._reg('ax') >> 8
         if ah == 0x3D:
             lin = self.lin(self._reg('ds'), self._reg('dx'))
             raw = bytes(self.mu.mem_read(lin, 128)).split(b'\0')[0].decode('latin1')
             # A DOS path is looked up by its last component.
-            name = self.names.get(raw.replace(':', '\\').split('\\')[-1].upper())
+            key = raw.replace(':', '\\').split('\\')[-1].upper()
+            name = self.names.get(key)
             if name is None:
                 self._wreg('ax', 2)
                 self._set_cf(True)
                 return True
             h = self.new_handle(name)
-            self.handles[h] = [open(name, 'rb').read(), 0]
+            # The bytes, the position and the name (for a file layer that
+            # writes: screens.py's first write keeps it as written).
+            self.handles[h] = [open(name, 'rb').read(), 0, key]
             self._wreg('ax', h)
             self._set_cf(False)
             return True

@@ -7,3 +7,6 @@ dos | copy-over | miss NOSUCH.A; close; copy NOSUCH.C STATES.01 | 2; 3e00 0; 2 2
 dos | copy-there | miss NOSUCH.A; close; copy LOG.01 LOG.99 | 2; 3e00 0; 2 6 2 6 801 0 0 0 801/560dadd0d3e0ffa9
 dos | copy-con | copy NOSUCH.C NOSUCH.99 | waits
 dos | con-read | miss NOSUCH.A; read 10 | 2; waits
+dos | log-new | log Found the first piece.; file LOG.64 | 3e47; 47/c4ec79895bfdc35a
+dos | log-full | miss NOSUCH.A; close; copy LOG.01 LOG.64; log Found the second piece.; file LOG.64 | 2; 3e00 0; 2 6 2 6 801 0 0 0 801/560dadd0d3e0ffa9; 3e48; 849/8d59608013328664
+dos | log-twice | miss NOSUCH.A; close; copy LOG.01 LOG.64; log One.; log Two.; file LOG.64 | 2; 3e00 0; 2 6 2 6 801 0 0 0 801/560dadd0d3e0ffa9; 3e35; 3e35; 86b/8c76b5bc7fcf197

@@ -324,8 +324,12 @@ impl Files {
         self.deleted.contains(&Self::base(name).to_ascii_uppercase())
     }
 
-    /// Whether a loose file of that name exists (DOS find first).
+    /// Whether a loose file of that name exists (DOS find first; not on a
+    /// path DOS refuses, `path_refused`).
     pub fn exists(&self, name: &[u8]) -> bool {
+        if Self::path_refused(0x4E, name).is_some() {
+            return false;
+        }
         let base = Self::base(name).to_ascii_uppercase();
         !self.deleted.contains(&base) && (self.written.contains_key(&base) || self.names.contains_key(&base))
     }
@@ -338,6 +342,104 @@ impl Files {
 
     fn base(name: &[u8]) -> &[u8] {
         name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name)
+    }
+
+    /// DOS's verdict on a path's form, before any directory is looked at
+    /// (MS-DOS 4.0's MACRO2.ASM: TransPath, Canonicalize, CopyComponent;
+    /// FCB.ASM: NameTrans's NORMSCAN), as harness/dos.py `path_error`:
+    /// `Err(3)` (error_path_not_found) or `Err(2)` (error_file_not_found)
+    /// for a badly formed path, else `Ok(metas)`, whether a name holds '?'
+    /// or '*'.
+    /// - A drive ("C:") is taken off the front.
+    /// - Each component is "." or ".." (".." above the root is 3) or a
+    ///   name: its characters up to one that ends a name (`name_end`; the
+    ///   space allowed after the first), a '.' and the extension's
+    ///   likewise. No name, or a name followed by anything but a
+    ///   separator or the end, is bad: 3 where a separator follows later
+    ///   in the path (ScanPathChar), else 2.
+    /// - A second name with metas is bad the same way (cMeta past 0), and
+    ///   a name without them after one with them is 3 (CopyBadPath).
+    ///
+    /// So the logbook trim's "C:\ARENA_CD\C:\ARENA_CD\LOG.nn" is 3: its
+    /// third component's name is "C", ended by the ':'. The 8.3
+    /// truncation and the buffer's length aren't modelled; no path of the
+    /// game's reaches them.
+    pub fn path_error(raw: &[u8]) -> Result<bool, u16> {
+        let sep = |c: u8| c == b'\\' || c == b'/';
+        let name_end = |c: u8| c < 0x20 || b".\"/\\[]:<|>+=;,".contains(&c);
+        let s = if raw.len() >= 2 && raw[0] != 0 && raw[1] == b':' { &raw[2..] } else { raw };
+        let bad = |at: usize| Err(if s[at.min(s.len())..].iter().any(|&c| sep(c)) { 3 } else { 2 });
+        let absolute = s.first().is_some_and(|&c| sep(c));
+        let mut i = 0;
+        while i < s.len() && sep(s[i]) {
+            i += 1;
+        }
+        let (mut depth, mut c_meta) = (0i32, -1i32);
+        while i < s.len() {
+            if s[i] == b'.' {
+                let j = i + 1;
+                if j == s.len() || sep(s[j]) {
+                    i = j;
+                } else if s[j] == b'.' && (j + 1 == s.len() || sep(s[j + 1])) {
+                    i = j + 1;
+                    depth -= 1;
+                    if absolute && depth < 0 {
+                        return Err(3);
+                    }
+                } else {
+                    // TryTwoDot has taken the character after the '.'.
+                    return bad(j + 1);
+                }
+            } else {
+                if name_end(s[i]) || s[i] == b' ' {
+                    return bad(i);
+                }
+                let mut j = i;
+                while j < s.len() && !name_end(s[j]) {
+                    j += 1;
+                }
+                if j < s.len() && s[j] == b'.' {
+                    j += 1;
+                    while j < s.len() && !name_end(s[j]) {
+                        j += 1;
+                    }
+                }
+                let meta = s[i..j].iter().any(|&c| c == b'?' || c == b'*');
+                c_meta += meta as i32;
+                if c_meta > 0 {
+                    return bad(j);
+                }
+                if c_meta == 0 && !meta {
+                    return Err(3);
+                }
+                depth += 1;
+                i = j;
+            }
+            if i < s.len() && !sep(s[i]) {
+                return bad(i);
+            }
+            while i < s.len() && sep(s[i]) {
+                i += 1;
+            }
+        }
+        Ok(c_meta == 0)
+    }
+
+    /// The error DOS gives call `ah` (3Ch create, 3Dh open, 41h delete,
+    /// 4Eh find first) on the path `raw`, where its form is bad
+    /// (`path_error`): open and create return Canonicalize's, metas
+    /// making it 2; delete maps any to 3, metas too (FILE.ASM's $UNLINK);
+    /// find first maps any to 3 and takes metas (SEARCH.ASM's FindError).
+    /// The path's directories aren't looked for: every one is the
+    /// game's. None for a path the call goes on with.
+    pub fn path_refused(ah: u8, raw: &[u8]) -> Option<u16> {
+        match (Self::path_error(raw), ah) {
+            (Ok(true), 0x3C | 0x3D) => Some(2),
+            (Ok(true), 0x41) => Some(3),
+            (Ok(_), _) => None,
+            (Err(_), 0x41 | 0x4E) => Some(3),
+            (Err(e), _) => Some(e),
+        }
     }
 
     /// Makes the files in `dir` available too (a save game's folder, for
@@ -543,14 +645,27 @@ impl Machine {
     }
 
     /// 0000:9DD2. A new file named at DS:`name` (DOS create, 3Ch) with the
-    /// `n` bytes at `seg`:`off` written, then closed; AX 1. The port
-    /// keeps written files in `Files` (later opens find them) and never
-    /// fails, where the original reports a failed create through 0000:74E5.
-    pub fn file_write(&mut self, files: &mut Files, name: u16, seg: u16, off: u16, n: u16) {
+    /// `n` bytes at `seg`:`off` written, then closed; returns AX, 1. The
+    /// port keeps written files in `Files` (later opens find them). On a
+    /// path DOS refuses (`Files::path_refused`) the create fails: nothing
+    /// is written, no handle taken, and AX is 0 (9DFB: 0000:74E5, which
+    /// calls the hook at ERROR_HOOK where one is set; `error_hook_set`
+    /// says whether the caller should give up for it).
+    pub fn file_write(&mut self, files: &mut Files, name: u16, seg: u16, off: u16, n: u16) -> u16 {
+        if Files::path_refused(0x3C, self.mem.cstr(DS, name)).is_some() {
+            return 0;
+        }
         let data: Vec<u8> = (0..n).map(|i| self.mem.r8(seg, off.wrapping_add(i))).collect();
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
         files.deleted.remove(&base);
         files.written.insert(base, Rc::from(data));
+        1
+    }
+
+    /// Whether 0000:74E5, the file layer's error report, calls a hook
+    /// (DGROUP ERROR_HOOK set): a routine nothing in the port runs.
+    pub fn error_hook_set(&self) -> bool {
+        self.mem.r32(DS, ERROR_HOOK) != 0
     }
 
     /// Whether a file named at DS:`name` exists, loose or written (0000:600C,
@@ -637,7 +752,13 @@ impl Machine {
 
     /// DOS create (3Ch) of the file named at DS:`name`: made empty (kept
     /// as written) and opened on the lowest free handle, which it returns.
+    /// On a path DOS refuses (`Files::path_refused`) nothing is made and
+    /// the error code is returned (AX, which the callers keep as the
+    /// handle).
     fn dos_create(&mut self, files: &mut Files, name: u16) -> u16 {
+        if let Some(err) = Files::path_refused(0x3C, self.mem.cstr(DS, name)) {
+            return err;
+        }
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
         let empty: Rc<[u8]> = Rc::from(Vec::new());
         files.deleted.remove(&base);
@@ -682,8 +803,12 @@ impl Machine {
         n
     }
 
-    /// 0000:9DC2. Deletes the file named at DS:`name` (DOS 41h).
+    /// 0000:9DC2. Deletes the file named at DS:`name` (DOS 41h; nothing on
+    /// a path DOS refuses, `Files::path_refused`).
     pub fn file_delete(&mut self, files: &mut Files, name: u16) {
+        if Files::path_refused(0x41, self.mem.cstr(DS, name)).is_some() {
+            return;
+        }
         let base = Files::base(self.mem.cstr(DS, name)).to_ascii_uppercase();
         files.written.remove(&base);
         files.deleted.insert(base);
@@ -716,7 +841,7 @@ impl Machine {
     pub fn file_open_or_device(&mut self, files: &mut Files, name: u16) -> Option<bool> {
         let (handle, found) = self.file_open_any(files, name)?;
         self.mem.w16(0, CS_HANDLE, handle);
-        if !found && self.mem.r32(DS, ERROR_HOOK) != 0 {
+        if !found && self.error_hook_set() {
             return crate::giveup::error("0000:67C8: a file missing, the error hook set");
         }
         Some(found)
@@ -741,14 +866,17 @@ impl Machine {
             return crate::giveup::not_ported("0000:67C4: the open hook set to a routine not ported");
         }
         let raw = self.mem.cstr(DS, name).to_vec();
-        if let Some(bytes) = files.read_loose(&raw) {
+        let refused = Files::path_refused(0x3D, &raw);
+        if let Some(bytes) = files.read_loose(&raw).filter(|_| refused.is_none()) {
             self.mem.w16(DS, OPEN_SIZE, bytes.len() as u16);
             let h = files.dos.open(bytes, Files::base(&raw).to_ascii_uppercase());
             return Some((h, true));
         }
-        // DOS's error code, 2, is the handle from here on.
-        files.dos.cur = 2;
-        Some((2, self.bsa_find(files, name)))
+        // DOS's error code, 2 (3 for a path it refuses as such), is the
+        // handle from here on.
+        let err = refused.unwrap_or(2);
+        files.dos.cur = err;
+        Some((err, self.bsa_find(files, name)))
     }
 
     /// 0000:6BEC. Reads up to `n` bytes to DS... at `seg`:`off`; returns
