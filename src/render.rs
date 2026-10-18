@@ -221,6 +221,8 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
         }
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
+    // (The entry's row tables serve this drawing alone.)
+    m.rows_entry = None;
     for (o, w) in prior.iter().enumerate() {
         let o = o as u16;
         if let Some((before, after)) = *w {
@@ -3792,7 +3794,22 @@ impl Soft {
         self.s16(0xCD84, floor);
         self.s16(0xCD7E, 0);
         self.s16(0xCD80, ceiling);
-        self.row_tables();
+        // DA8E's tables, as the last made them: an area's first frame
+        // the entry's (`rows_entry`), any other the state's now (the
+        // physics and the controls made them at the last frame's end).
+        match self.m.rows_entry.take() {
+            Some(kept) => {
+                let now: Vec<(u16, u16)> = kept.iter().map(|&(o, _)| (o, self.g16(o))).collect();
+                for &(o, v) in &kept {
+                    self.s16(o, v);
+                }
+                self.row_tables();
+                for (o, v) in now {
+                    self.s16(o, v);
+                }
+            }
+            None => self.row_tables(),
+        }
     }
 
     /// 0000:DA8E in the copy (`Machine::row_tables`).
@@ -3802,6 +3819,14 @@ impl Soft {
 }
 
 impl Machine {
+    /// 0000:A523's DA8E, an area's entry: the row tables' inputs kept
+    /// (`rows_entry`) for the first frame's drawing, which the original
+    /// does with the tables made here, before the INF's ceiling (D80C).
+    pub fn rows_keep(&mut self) {
+        const INPUTS: [u16; 11] = [0xC398, 0xC39A, 0xC3D2, 0xC3A2, 0xC3D8, 0xCCF6, 0xCCF4, 0xC3D6, LEFT, 0xC3DA, 0xD80C];
+        self.rows_entry = Some(INPUTS.iter().map(|&o| (o, self.mem.r16(DS, o))).collect());
+    }
+
     /// 0000:DA8E: the floor's row table at CD82 (each row below the
     /// horizon: the row's two ends on the floor, turned by the heading),
     /// then DB78 the ceiling's at CD7E. Each keeps its distance's
