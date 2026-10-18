@@ -30,9 +30,15 @@
 //!   drawn (23B1): the doll, the name, race, class and level, the list of
 //!   the items and the quests' lines (1DC8), the armour's classes (76B4).
 //!   Its own buttons' loop (5CF4 over 3276:57D8's six) with B7C4 bit 4;
-//!   its exit (the fifth, Esc) goes back to the stats' page (0D8E). Its
-//!   other buttons (the list, the arrows, Drop, Spells) are the front
-//!   end's, through the inventory's ports (`use_item.rs`).
+//!   its exit (the fifth, Esc) goes back to the stats' page (0D8E). The
+//!   others are the original's handlers: the list's clicks (1AC6: a line
+//!   marked, worn or taken off, a quest's line's note; a right click's
+//!   description, 1988), the arrows (1A4A, 1A94), Drop (17D8) and Spells
+//!   (2365, the spells' list 1D5C). What they say goes in the list's
+//!   panel (223A), the wait there the front end's. Not ported: a quest's
+//!   line marked with the staff's pieces held (1F56, whose count takes
+//!   DI as 1DC8 leaves it), "Drop what?" (18CA, 223A with the caller's
+//!   DI) and the spell's page from the spells' list (1B3C).
 //! - The world given back (A6B5): the buffer block, the planes read back
 //!   from TEMPSAVE.$$$, the renderer's buffers (A561), SCREENSV.$$2, the
 //!   mouse's box (53AE), the row tables (DA8E) and outdoors the sky's
