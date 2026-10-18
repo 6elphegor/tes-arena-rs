@@ -463,8 +463,10 @@ fn the_lists_kinds_as_the_original() {
 }
 
 /// Creation's class list (1194:2678 whole, `Machine::class_list`) with
-/// FONT_C loaded at [102A], a line among the six first shown taken: the
-/// class picked, the bank left mapped, the page, and the state after.
+/// FONT_C loaded at [102A], a line taken among the six first shown, or
+/// with the lines scrolled by the down arrow first (3159:09E8, 0E68: the
+/// first line shown, the knob): the class picked, the bank left mapped,
+/// the page, and the state after.
 #[test]
 fn the_class_list_as_the_original() {
     let Some((base, files)) = set_up_files() else { return };
@@ -482,14 +484,16 @@ fn the_class_list_as_the_original() {
         let seg = m.font_load(&mut fs, 0x4B03);
         m.mem.w16(DS, 0x102A, seg);
         let d0 = m.mem.segment(DS).to_vec();
-        let class = m.class_list(&mut fs, hex(f[2])).unwrap_or_else(|| panic!("{name}: gave up: {}", arena::giveup::describe()));
+        // The line picked, and with the lines scrolled the first shown.
+        let (pick, top) = f[2].split_once(',').map_or_else(|| (hex(f[2]), 0), |(p, t)| (hex(p), hex(t)));
+        let class = m.class_list(&mut fs, pick, top).unwrap_or_else(|| panic!("{name}: gave up: {}", arena::giveup::describe()));
         assert_eq!(format!("{class:x}"), f[3], "{name}: the class");
         let page = m.mem.r16(DS, 0xA900);
         assert_eq!(format!("{:x} {:x}", m.mem.r16(DS, 0x8FA8), fnv((0..0xFA00u16).map(|i| m.mem.r8(page, i)))), f[4], "{name}: the bank mapped and the page");
         check_state_leaving(name, &d0, &m, &f[5..], cursor_texts);
         n += 1;
     }
-    assert!(n >= 3, "{n} cases");
+    assert!(n >= 6, "{n} cases");
 }
 
 /// `cursor`, and the texts' drawing's state (0000:9E0A's ADB6, ADB8): a

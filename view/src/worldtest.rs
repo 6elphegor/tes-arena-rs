@@ -132,6 +132,10 @@ enum Place {
     Store,
     /// The town's first tavern, in as the store.
     Tavern,
+    /// The street with the guild left from the seed SEED
+    /// (gen_worldframes.py's `people`): its townspeople placed the same
+    /// on both sides.
+    People,
 }
 
 /// From the guild to the street, then into the level `name` the way the
@@ -248,6 +252,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
         Place::Fogged => into_named(&mut a, b"40516921.MIF"),
         Place::Street => area_left(&mut a),
+        Place::People => {
+            seeded(&mut a);
+            area_left(&mut a)
+        }
         Place::WetStreet | Place::SnowStreet => {
             // gen_worldframes.py's `weathered`: the zone's weather (A5A
             // + the zone at A51) rain (2) or snow (3) as the guild is left.
@@ -803,6 +811,41 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
     seen.push(state(a));
 }
 
+/// gen_worldframes.py's TALK_WHERE_SCRIPT: "Where is", its first line,
+/// the sorted list's first line, the way's box clicked away, then the
+/// menu's Goodbye.
+const TALK_WHERE_SCRIPT: [Act; 5] = [Act::Click(0xA0, 0x65), Act::Click(100, 23), Act::Click(100, 23), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's TALK_PALACE_SCRIPT ("Where is", the palace,
+/// the way's box, Goodbye), the list's fourth line taken by its number
+/// (the original's two clicks on it: the first marks it).
+const TALK_PALACE_SCRIPT: [Act; 4] = [Act::Click(0xA0, 0x65), Act::Key(KeyCode::Digit4, "4"), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's `talked`: the first townsperson clicked with the
+/// player on their square (gen_screens.py's `beside`: the timer 0151 at
+/// TALK_TICKS), the seed SEED, and the click run between frames
+/// (`talk_turn`), `script` answering it.
+fn talked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act]) {
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    m.mem.w16(DS, arena::movement::var::X, x);
+    m.mem.w16(DS, arena::movement::var::Y, y);
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    m.mem.w16(DS, 0x0151, 1);
+    seeded(a);
+    a.compose();
+    super::super::super::talk_turn(a);
+    for act in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the talk ended early");
+        match *act {
+            Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
+            Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
+        }
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the talk still asking");
+    seen.push(state(a));
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -1324,6 +1367,16 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 5, |_| false);
             used(a, 3);
             frames(a, d, seen, 60, |_| false);
+        })),
+        "playtalkwhere" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_WHERE_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
+        "playtalkpalace" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_PALACE_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
         })),
         "playstore" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1968,8 +2021,8 @@ fn the_state_as_the_original_leaves_it() {
 /// automap and the character sheet opened mid-fight, the sheet's
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
-/// quest's informant paid in a tavern).
-const BUSY: [&str; 36] = ["playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+/// quest's informant paid in a tavern, a townsperson asked the way).
+const BUSY: [&str; 38] = ["playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -2059,8 +2112,12 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// playuselist and playbook (the book's names sorted by 0000:0B9C; 2542:
 /// 06F8 keeps the page in bank [1032] as the frame's input step finds
 /// it: the drawing's rows 0..146, before the compass and C3A2's clear,
-/// over the interface).
-const BUSY_STATE: [&str; 41] = ["playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+/// over the interface), and a townsperson's "Where is" in playtalkwhere
+/// and playtalkpalace (1194:DF7F's lists of kind 9 through
+/// `list_window`, A872 the DI each caller leaves: E037's two short of
+/// the talk menu's table, E0A7's the sorted names'; the page the list
+/// keeps the screen shown, its picture left on it).
+const BUSY_STATE: [&str; 43] = ["playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

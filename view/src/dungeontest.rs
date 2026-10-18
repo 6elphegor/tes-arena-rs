@@ -121,6 +121,7 @@ fn looted_here(a: &mut App, _d: &mut Driver) {
         camp: false,
         shop: None,
         loot: Some([0x0F01, 0, DS, square]),
+        talk: false,
         key: false,
         tick: 0,
         right: false,

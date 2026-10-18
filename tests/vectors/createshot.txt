@@ -79,6 +79,24 @@ createshot | emptyname | 6 | key:0d@0000:A195 | c7c3ceb55cdb9b8b | e7a843e801b94
 createshot | emptyname | 7 | key:46@3159:10E2 | d2c3c68b9d606068 | e7a843e801b942b4
 createshot | emptyname | 8 | buffered:0d@1194:5545 | 386dbbcfb1f4188b | 6c1d8428b606b30f
 createshot | emptyname | 9 | end@3159:00B9 | 48bb7a3f1d578e9d | 6c1d8428b606b30f
+createshot | scrolledclass | script | S,down,down,down,down,down,down,down,down,enter,type:Ria,enter,F,enter
+createshot | scrolledclass | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
+createshot | scrolledclass | 1 | held:150@3159:0889 | d25af477c900ffe7 | e7a843e801b942b4
+createshot | scrolledclass | 2 | held:150@3159:0889 | 1bf18bbbba02f3fa | e7a843e801b942b4
+createshot | scrolledclass | 3 | held:150@3159:0889 | bf6c8a77bde7a710 | e7a843e801b942b4
+createshot | scrolledclass | 4 | held:150@3159:0889 | e6808bdfa56bc150 | e7a843e801b942b4
+createshot | scrolledclass | 5 | held:150@3159:0889 | cb8f90800ba7e646 | e7a843e801b942b4
+createshot | scrolledclass | 6 | held:150@3159:0889 | d481e7158670764a | e7a843e801b942b4
+createshot | scrolledclass | 7 | held:150@3159:0889 | d0c178b745c7c463 | e7a843e801b942b4
+createshot | scrolledclass | 8 | held:150@3159:0889 | b6c6c85512aefa4a | e7a843e801b942b4
+createshot | scrolledclass | 9 | held:0d@3159:092B | 72606049f38329a4 | e7a843e801b942b4
+createshot | scrolledclass | 10 | key:52@0000:A195 | 1ef8fdd680bb6843 | e7a843e801b942b4
+createshot | scrolledclass | 11 | key:69@0000:A195 | 855d4b5a56bc127f | e7a843e801b942b4
+createshot | scrolledclass | 12 | key:61@0000:A195 | 2548413780c15f96 | e7a843e801b942b4
+createshot | scrolledclass | 13 | key:0d@0000:A195 | 997c354c038c1933 | e7a843e801b942b4
+createshot | scrolledclass | 14 | key:46@3159:10E2 | d2c3c68b9d606068 | e7a843e801b942b4
+createshot | scrolledclass | 15 | buffered:0d@1194:5545 | 96ba2f82c28b947d | 6c1d8428b606b30f
+createshot | scrolledclass | 16 | end@3159:00B9 | 48bb7a3f1d578e9d | 6c1d8428b606b30f
 createshot | select | script | S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175
 createshot | select | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | select | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
