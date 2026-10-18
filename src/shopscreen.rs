@@ -141,6 +141,14 @@ impl Machine {
         Some(())
     }
 
+    /// Whether the draw page ([A900], from [A8FE] 0) is the game's own heap
+    /// block, as a loaded game's is: a game the port starts without one
+    /// keeps A000h there over its heap's blocks, where the screens' page
+    /// writes would break the heap.
+    pub fn page_is_block(&self) -> bool {
+        self.mem.r16(DS, 0xA8FE) == 0 && self.heap_block_used(self.mem.r16(DS, 0xA900), 0xFA0)
+    }
+
     /// 1194:5496: on entering a shop, the colours (`dac`, the VGA's, 6-bit
     /// values) read to 9A6E (0000:6E3C), the page written to SCREENSV.$$2
     /// (A69E) and the clip the whole screen (9A98: 0, 0, 140h x C8h).

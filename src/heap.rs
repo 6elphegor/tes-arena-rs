@@ -250,6 +250,23 @@ impl Machine {
         (self.mem.r16(seg, off.wrapping_add(2)), self.mem.r16(seg, off))
     }
 
+    /// Whether the data at `seg` is an in-use block of the list of at least
+    /// `paras` paragraphs (its header the paragraph before), for a front
+    /// end writing into a buffer the game's words name.
+    pub fn heap_block_used(&self, seg: u16, paras: u16) -> bool {
+        let (mut ds, mut si) = self.heap_far(DS, FIRST);
+        for _ in 0..0x10000 {
+            if (ds | si) == 0 {
+                return false;
+            }
+            if ds.wrapping_add(1) == seg && si == 0 {
+                return self.mem.r8(ds, FLAGS) & 1 != 0 && self.mem.r16(ds, SIZE) >= paras;
+            }
+            (ds, si) = self.heap_far(ds, si.wrapping_add(NEXT));
+        }
+        false
+    }
+
     /// 2294:11F2. Checks the heap list: every header must have a non-zero
     /// size under 0x6000 paragraphs, zero offsets in both links and a
     /// flags byte of 0 or 1. False where the original stops at an int3.

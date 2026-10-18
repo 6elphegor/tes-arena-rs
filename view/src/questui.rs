@@ -73,10 +73,11 @@ impl<'a> HaggleTalk<'a> {
         HaggleTalk { talk, said: Vec::new(), kind: 0, prompt: "Your offer?".into(), files: None }
     }
 
-    /// With the game's files: the pictures loaded and drawn into the page
-    /// as the original's (`Machine::shop_picture`).
-    pub(crate) fn with_files(mut self, files: Files) -> Self {
-        self.files = Some(files);
+    /// With the game's files and its page its own (`paged`): the pictures
+    /// loaded and drawn into the page as the original's
+    /// (`Machine::shop_picture`), the dialogs' state kept (`shown`).
+    pub(crate) fn with_files(mut self, files: Files, paged: bool) -> Self {
+        self.files = paged.then_some(files);
         self
     }
 
@@ -154,8 +155,10 @@ impl HaggleIo for HaggleTalk<'_> {
     }
     fn shown(&mut self, m: &mut Machine, si: u16) {
         m.split_lines(si);
-        m.shop_dialog(si);
-        m.shop_strip_back();
+        if self.files.is_some() {
+            m.shop_dialog(si);
+            m.shop_strip_back();
+        }
     }
     fn say(&mut self, m: &mut Machine, si: u16, kind: u8) {
         // Its line breaks made spaces (1194:84C3), then broken by 49FF
@@ -196,7 +199,7 @@ impl QuestHooks for QuestFront<'_, '_> {
     /// 1194:4B8E: the picture named at DS:`si` shown (the informant's,
     /// 132F), behind the turn as the shops' pictures are.
     fn picture(&mut self, m: &mut Machine, si: u16) {
-        if m.shop_picture(&mut self.1, si).is_none() {
+        if m.page_is_block() && m.shop_picture(&mut self.1, si).is_none() {
             eprintln!("the quest's picture did not load: {}", arena::giveup::describe());
         }
         let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
@@ -254,7 +257,7 @@ impl QuestHooks for QuestFront<'_, '_> {
         if t.ask_menu(menu) == 0 { 0 } else { 1 }
     }
     fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
-        let mut io = HaggleTalk::new(self.0.talk.as_deref_mut()).with_files(self.1.clone());
+        let mut io = HaggleTalk::new(self.0.talk.as_deref_mut()).with_files(self.1.clone(), m.page_is_block());
         let r = m.haggle(files, &mut io, price, per, 0x1E, 0x28, 0, mode, 0)?;
         Some(r == Haggle::NoDeal)
     }

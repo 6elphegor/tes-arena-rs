@@ -90,14 +90,13 @@ impl Machine {
         // 5938: the panel's picture into bank 17h at the frame's start and
         // drawn (0000:56C8 with BX 14h).
         self.map_bank(0x17, 0);
-        let width = self.panel_load(files, panel)?;
+        self.panel_load(files, panel)?;
         // 594A: the bank before the list mapped; the record filled, +2B
         // DL as the panel's drawing leaves DX (3C0h for each panel the
         // shops show, measured against the original; kind 8's F0h set
         // before it is lost).
         let a894 = self.mem.r16(DS, 0xA894);
         self.map_bank(a894, 0);
-        let _ = width;
         let dl = 0xC0u8;
         self.mem.w16(DS, record + 0x22, si);
         self.mem.w16(DS, record + 0x24, ds);
@@ -141,8 +140,8 @@ impl Machine {
 
     /// 0000:56C8 with BX 14h: the picture named at DS:`si` loaded to the
     /// frame's start (0000:742C), its header's words to A836..A83C, drawn
-    /// into the page (582C; its colours not taken: bit 10h). Its width.
-    fn panel_load(&mut self, files: &mut Files, si: u16) -> Option<u16> {
+    /// into the page (582C; its colours not taken: bit 10h).
+    fn panel_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
         let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         self.file_load(files, si, frame, 0)?;
         for k in 0..4u16 {
@@ -150,7 +149,7 @@ impl Machine {
             self.mem.w16(DS, 0xA836 + 2 * k, v);
         }
         self.page_image(frame, 0);
-        Some(self.mem.r16(frame, 4))
+        Some(())
     }
 
     /// 3159:06A0: the window library's list over the record at
@@ -185,7 +184,7 @@ impl Machine {
         let (foff, fseg) = (self.mem.r16(DS, 0xB034), self.mem.r16(DS, 0xB036));
         let height = self.mem.r8(fseg, foff) as u16;
         self.mem.w16(DS, ROW_HEIGHT, height);
-        let rows = if height == 0 { return crate::giveup::original("3159:0789: a font of no height (a divide by 0)") } else { (r16(self, 0x1E) & 0xFFFF) / height };
+        let rows = if height == 0 { return crate::giveup::original("3159:0789: a font of no height (a divide by 0)") } else { r16(self, 0x1E) / height };
         if rows > 0xFF {
             return crate::giveup::original("3159:0789: the rows overflow AL (a divide overflow)");
         }
@@ -199,7 +198,7 @@ impl Machine {
         }
         // 07B4: what the lines' box covers kept on the heap (8F2A, DI
         // FFFEh).
-        let lines = self.page_rect_heap(x_of(self, seg, rec), bx, bw, bh)?;
+        let lines = self.page_rect_heap(r16(self, 0x18), bx, bw, bh)?;
         self.mem.w16(seg, rec + 0x49, 0);
         self.mem.w16(seg, rec + 0x4B, lines);
         // 0C75: the scroll bar's background kept and its knob made.
@@ -330,9 +329,4 @@ impl Machine {
         self.mem.w16(DS, 0xA8FC, 1);
         Some(seg)
     }
-}
-
-/// The lines' box's x (+18).
-fn x_of(m: &Machine, seg: u16, rec: u16) -> u16 {
-    m.mem.r16(seg, rec + 0x18)
 }

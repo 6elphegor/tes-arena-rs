@@ -34,7 +34,8 @@ const NEW_OLD: u16 = 0x1346;
 /// the equipment store, 7 the mages' guild), as the talk enters it
 /// (`TalkHooks::shop`).
 pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
-    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new() };
+    let paged = m.page_is_block();
+    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new(), paged };
     let r = match kind {
         5 => m.temple(files, &mut ui),
         4 => m.tavern_shop(files, &mut ui),
@@ -117,6 +118,9 @@ struct ShopFront<'a, 'b> {
     picture: u16,
     /// Files the guild wrote (its stock), for the game's files after.
     written: Vec<(Vec<u8>, Vec<u8>)>,
+    /// The draw page is the game's own block (`Machine::page_is_block`):
+    /// the screens' state that writes into it is kept as the original's.
+    paged: bool,
 }
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a
@@ -158,7 +162,7 @@ impl ShopFront<'_, '_> {
         // the tiles' blocks, the banner's words: `Machine::shop_banner`).
         if m.shop_screen(&mut self.files, 0x12EB).is_none() || m.shop_banner(&mut self.files, si).is_none() {
             eprintln!("the shop's screen did not load: {}", arena::giveup::describe());
-        } else {
+        } else if self.paged {
             // 4CA1..4CBE: the name drawn centred on x A0h at row 3 (4 in
             // [102C]'s font), in the font as yet unfreed.
             let row = if m.mem.r16(DS, 0xB036) == m.mem.r16(DS, 0x102C) { 4 } else { 3 };
@@ -266,7 +270,9 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         if let Some(t) = self.talk() {
             t.strip_message(m, si);
         }
-        m.shop_message(si);
+        if self.paged {
+            m.shop_message(si);
+        }
     }
     fn banner(&mut self, m: &mut Machine, si: u16) {
         self.show_banner(m, si);
@@ -275,18 +281,25 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         self.show_picture(m, si);
     }
     fn screen_saved(&mut self, m: &mut Machine, files: &mut Files) {
+        // Only for a page that is the game's own block (`paged`): a game
+        // started without one has heap blocks where [A900] points.
+        if !self.paged {
+            return;
+        }
         // The page as the last frame left it (the screen last shown), which
         // the shop's screen is drawn over and its lists keep.
         if let Some(shown) = self.front.shown {
-            let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+            let seg = m.mem.r16(DS, 0xA900);
             for (i, &b) in shown.iter().take(0xFA00).enumerate() {
-                m.mem.w8(seg, off.wrapping_add(i as u16), b);
+                m.mem.w8(seg, i as u16, b);
             }
         }
         m.shop_screen_saved(files, self.front.dac.as_ref());
     }
     fn screen_back(&mut self, m: &mut Machine, files: &mut Files) {
-        m.shop_screen_back(files);
+        if self.paged {
+            m.shop_screen_back(files);
+        }
     }
     fn buffer_freed(&mut self, m: &mut Machine) {
         m.buffer_free();
@@ -297,9 +310,13 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         }
     }
     fn gold_left(&mut self, m: &mut Machine) {
-        m.shop_strip_save();
+        if self.paged {
+            m.shop_strip_save();
+        }
         m.gold_left();
-        m.page_text_centred(arena::shops::GOLD_LINE, 0xA0, 0x9C);
+        if self.paged {
+            m.page_text_centred(arena::shops::GOLD_LINE, 0xA0, 0x9C);
+        }
         let text = m.mem.cstr(DS, arena::shops::GOLD_LINE).to_vec();
         // Once a question is left unanswered the turn is shown as it was.
         if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
@@ -307,7 +324,9 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         }
     }
     fn strip_back(&mut self, m: &mut Machine) {
-        m.shop_strip_back();
+        if self.paged {
+            m.shop_strip_back();
+        }
         if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
             b.gold = None;
         }
@@ -322,14 +341,19 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         let ax = self.dialog_answer(m, kind, si, di);
         // The game's state round the answer (`Machine::shop_dialog`), the
         // strip put back after it (4F34, 4F55, 4F84: 5FC0).
-        if si != 0 {
-            m.shop_dialog(si);
+        if self.paged {
+            if si != 0 {
+                m.shop_dialog(si);
+            }
+            m.shop_strip_back();
         }
-        m.shop_strip_back();
         ax
     }
     fn list(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
         let pick = self.list_pick(m, si, cx, di);
+        if !self.paged {
+            return pick;
+        }
         // The game's state round the pick (`Machine::list_window`: the
         // screen kept in the load bank, the panel, the window's record).
         let kind = m.list_kind;
@@ -373,7 +397,7 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
     }
     fn haggle(&mut self, m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         let (quality, mood) = (m.mem.r8(DS, 0x13CA), m.mem.r8(DS, 0x13CB));
-        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone());
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone(), self.paged);
         match m.haggle(&mut self.files, &mut io, eax, per, quality, mood, 0, mode, name) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (eax, true),
@@ -458,7 +482,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     /// the dialogue's EMS bank and puts the stock's back (8665), so the
     /// stock in bank 18h is kept.
     fn haggle(&mut self, m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
-        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone());
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone(), self.paged);
         match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 2, 0x1A4C) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (price, true),
@@ -555,7 +579,7 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
-        m.tavern_room_haggle(files, &mut HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(files.clone()))
+        m.tavern_room_haggle(files, &mut HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(files.clone(), self.paged))
     }
     /// 1194:CED7: the main quest's informant.
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
