@@ -433,16 +433,18 @@ impl Machine {
             self.mem.w8(es, di.wrapping_add(i), 0);
         }
         self.key_flush();
-        self.prompt_box(text, (ax & 0xFF00, bx), es, screen)
+        self.prompt_box(text, (ax & 0xFF00, bx), es, screen)?;
+        let v = self.mem.r16(DS, 0x102C);
+        self.mem.w16(DS, 0xB036, v);
+        Some(())
     }
 
     /// 965A with CX 7, DX 0Ah, DI FFFEh as 1194:4800 and 5C34 call it,
-    /// then 1044 the background's segment (DX) and [102C] into B036.
+    /// then 1044 the background's segment (DX). (4800 then selects
+    /// ARENAFNT, 482B; 5C34 leaves the font its caller chose.)
     fn prompt_box(&mut self, text: (u16, u16), at: (u16, u16), es: u16, screen: Option<&[u8]>) -> Option<()> {
         let (seg, _) = self.message_box(text, at, 7, 0x0A, (es, 0xFFFE), (0, 0), screen)?;
         self.mem.w16(DS, 0x1044, seg);
-        let v = self.mem.r16(DS, 0x102C);
-        self.mem.w16(DS, 0xB036, v);
         Some(())
     }
 

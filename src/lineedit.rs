@@ -326,11 +326,16 @@ impl Machine {
         Some(false)
     }
 
-    /// 0000:A096 on: the keys flushed (7112) and the screen's block freed
-    /// (6C36; putting the screen back, A0AE, is the front end's). The
-    /// text is DS:`TEXT` as the field left it.
+    /// 0000:A096 on: the keys flushed (7112), the field drawn once more
+    /// (A0AE: the screen put back, 59A4, and the text drawn at X, Y, 9E0A;
+    /// the pixels the front end's, the text's state, `text_state_far`,
+    /// the game's) and the screen's block freed (6C36). The text is
+    /// DS:`TEXT` as the field left it.
     pub fn edit_close(&mut self) {
         self.key_flush();
+        let (x, y) = (self.mem.r16(DS, var::X), self.mem.r16(DS, var::Y));
+        let text = (self.mem.r16(DS, var::TEXT_SEG), self.mem.r16(DS, var::TEXT));
+        self.text_state_far(x, y, text);
         let seg = self.mem.r16(DS, var::KEPT + 2);
         self.heap_free(seg);
     }
