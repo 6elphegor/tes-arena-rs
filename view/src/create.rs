@@ -298,6 +298,9 @@ pub struct Creation {
     pics: Pics,
     fonts: Fonts,
     name: String,
+    /// The name's field was ended empty and the name asked again
+    /// (1194:2789), for the input's film.
+    asked_again: bool,
     /// The text colour now (9288).
     colour: u8,
     /// The movie playing (Intro, Vision, Ending).
@@ -547,7 +550,7 @@ impl Creation {
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -628,7 +631,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
     }
 
     /// Back on the main menu (a load that failed).
@@ -855,6 +858,14 @@ impl Creation {
             Up::Prompt if now != Up::Prompt => {
                 let (under, _) = self.shot(m, false);
                 film.dissolve(m, &under, FULL);
+            }
+            // Asked again (1194:2789 -> 2711): 5C34's box taken away, the
+            // page under it dissolved in (5CBD), then the new box's
+            // dissolve (5C9F).
+            Up::Prompt if std::mem::take(&mut self.asked_again) => {
+                let (under, _) = self.shot(m, false);
+                film.dissolve(m, &under, FULL);
+                film.dissolve(m, &after, FULL);
             }
             _ => {}
         }
@@ -1085,7 +1096,7 @@ impl Creation {
                 // The typing given to the game's own editor, then 5C34's
                 // box put away (`named_closed`, its dissolve's steps the
                 // film's); 1194:2789: nothing typed (01AD 0) asks again
-                // (the dissolves out and in again not played, as before).
+                // (the box dissolved out and the new one in: the film's).
                 if crate::field::replay(&mut engine.m, &live.field, &live.look, live.keys()) != Some(true) {
                     eprintln!("the name's field gave up: {}", arena::giveup::describe());
                 }
@@ -1094,6 +1105,7 @@ impl Creation {
                 engine.m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
                 let text = live.text();
                 if text.is_empty() {
+                    self.asked_again = true;
                     self.name_asked(engine)
                 } else {
                     self.name = String::from_utf8_lossy(&text).into_owned();
