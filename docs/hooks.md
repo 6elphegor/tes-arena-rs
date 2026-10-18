@@ -61,6 +61,7 @@ the original routine:
 | `AreaHooks::wild_setup` | src/transit.rs:98 | 217B:0084 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_setup` (wild vectors) |
 | `AreaHooks::world_free` | src/transit.rs:175 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
 | `AreaHooks::world_screen` | src/transit.rs:171 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`; the screens' fades are the window's (areafade.txt) |
+| `AutomapScreenHooks::palette` | src/automapscreen.rs:20 | 0000:6E3C | overridden | the view: automap.rs Colours | faithful: the window's colours as the VGA's (playautomap's state) |
 | `CastHooks::message_box` | src/cast.rs:42 | 1194:59C8 | overridden | the view: panels.rs Said | present: the cast's box in the equipment page (screens.txt) |
 | `CelestialHooks::draw` | src/celestial.rs:35 | 0000:E4D2 | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `CelestialHooks::moon_phase` | src/celestial.rs:31 | 0000:E6CB | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |

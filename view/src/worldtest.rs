@@ -1578,7 +1578,7 @@ fn the_state_as_the_original_leaves_it() {
 /// automap and the character sheet opened mid-fight, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 15] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant"];
+const BUSY: [&str; 17] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1590,11 +1590,15 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
-/// The busy cases whose state is compared: all but playscreens, whose
-/// screens the view shows with its own state (the original's automap and
-/// character sheet save the screen to temporary files, 1AEA, 1AF7, 1B47;
-/// fade with the timer's ticks, 0151; and leave their palettes, 99A3,
-/// A3A3, and scratch, 1044, 10A8, 12A4: not ported).
+/// The busy cases whose state is compared. Not yet: playscreens and
+/// playsheet, whose character sheet (1194:0CF8) the view shows with its
+/// own state (its paper doll made in bank 1Fh and kept in TEMPSAVE.$$$,
+/// 1194:158F; the portrait in bank 17h, 2462; the colours read, A3A3;
+/// the numbers' scratch, 1044, 10A8, 12A4: not ported); the store, the
+/// guild and the informant, whose shops' screens the view lays out itself
+/// (the list windows, 1194:5734 and 3159; the strip's dialog, 4E88; the
+/// strip saved in bank 18h, 5F8C; the pictures in bank 1Fh: not ported;
+/// the banner is, `Machine::shop_banner`).
 const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
