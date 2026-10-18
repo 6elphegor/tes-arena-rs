@@ -901,6 +901,29 @@ fn case(name: &str) -> Option<Case> {
             seen.push(state(a));
             frames_reading(a, d, seen, 12);
         })),
+        "playquickcast" => (Place::Dungeon, Box::new(|a: &mut App| {
+            // gen_worldframes.py's `last_spell`: Wizard's Fire (the book's
+            // seventh) the spell picked last.
+            a.engine.m.mem.w8(DS, 0x5CAE, 6);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // Shift+C (2542:056A): the last spell again without the list,
+            // its target clicked at the view's centre.
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+            assert!(a.panel.is_none(), "no list with a Shift");
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+            // (The harness's click puts the mouse at 160, 100; the window's
+            // click is the cursor's point, the mouse 4 up and left of it.)
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 9, |_| false);
+            frames(a, d, seen, 40, |_| false);
+        })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
@@ -1931,7 +1954,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 34] = ["playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 35] = ["playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -2015,8 +2038,10 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// 1044 and drawn, the page kept in LOG.$$$: `Machine::log_open`,
 /// `log_turn`, `log_close`), and camping for two hours in playcamp
 /// (2542:01E6, the camp's menu, the hours typed and counted down to
-/// "done": 1194:424E, 46BF, 456F).
-const BUSY_STATE: [&str; 37] = ["playcamp", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+/// "done": 1194:424E, 46BF, 456F), and the last spell cast again by
+/// Shift+C in playquickcast (2542:056A without the list:
+/// `Machine::spellbook_last`).
+const BUSY_STATE: [&str; 38] = ["playquickcast", "playcamp", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

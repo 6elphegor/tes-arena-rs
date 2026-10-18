@@ -923,6 +923,17 @@ pub fn book_cast(engine: &mut arena::engine::Engine, line: usize, said: &mut Sai
     }
 }
 
+/// The spellbook's last spell cast again without the list (C with a
+/// Shift, or the right button's release `right`: `Machine::spellbook_last`,
+/// 29CF:071F); false where the list is to come up instead.
+pub fn book_cast_last(engine: &mut arena::engine::Engine, right: bool, said: &mut Said) -> bool {
+    let Some(n) = engine.m.spellbook_last(right) else { return false };
+    if engine.m.cast_spell(&mut engine.files, said, n).is_none() {
+        eprintln!("the cast gave up: {}", arena::giveup::describe());
+    }
+    true
+}
+
 /// The scroll of the list (FIRST_LINE) moved by `d` lines, kept in range.
 pub fn scroll(m: &mut Machine, d: i32) {
     let n = item_lines(m).last().map_or(0, |l| l.slot as i32 + 1);

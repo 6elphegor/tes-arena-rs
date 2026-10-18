@@ -295,6 +295,16 @@ KEY_C = 0x2E
 KEY_R = 0x13
 KEY_2 = 0x03
 KEY_ENTER = 0x1C
+# The left Shift (C with it: the last spell again, 2542:057D).
+KEY_LSHIFT = 0x2A
+
+
+def last_spell(spell):
+    """The spellbook's line `spell` picked last (5CAE), as its list's
+    pick leaves it (2542:05A6)."""
+    def put(a):
+        a.mu.mem_write(a.lin(a.ds, 0x5CAE), bytes([spell]))
+    return put
 
 
 def crowded_square(a):
@@ -628,6 +638,12 @@ CASES = {
     # minutes, 1194:456F) to "done" (its box read with Space).
     'playcamp': ('wild', at_hour(12, 0x100), [((), (), 2, None), ((KEY_R,), (), 1, None, [], {'script': [('keys', [KEY_C]), ('keys', [KEY_2]), ('keys', [KEY_ENTER])]}),
                                              ((), (KEY_R,), 12, None, [], {'script': [('keys', [KEY_SPACE])]})]),
+    # Shift+C (2542:056A with C and a Shift held, 057D..0594): the last
+    # spell picked (`last_spell`: Wizard's Fire, the book's seventh) cast
+    # again without the list (29CF:071F), its target clicked at the
+    # view's centre; forty frames of its flight.
+    'playquickcast': ('dungeon', last_spell(WIZARDS_FIRE), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
+                                                          ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 40, None)]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # `locked_door`'s door with a lock of level 1, picking armed
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the

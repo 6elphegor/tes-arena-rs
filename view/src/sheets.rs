@@ -329,8 +329,11 @@ pub enum BarAction {
     WorldMap,
     /// The status box (2542:04B1): its text as lines.
     Status(Vec<Vec<crate::hud::Span>>),
-    /// The spellbook (2542:026D -> 056A).
-    Spells,
+    /// The spellbook (2542:026D -> 056A), with the right button's release
+    /// as 7925 holds it where 056A reads it (the bar's right click; the
+    /// C key's turn as the last poll left it): with it, or C held with a
+    /// Shift, the last spell again (`Machine::spellbook_last`).
+    Spells(bool),
     /// The logbook (2542:02A3).
     Log,
     /// The items with an effect (2542:034D).
@@ -364,7 +367,7 @@ pub fn bar_click(m: &mut Machine, files: &mut arena::bsa::Files, x: i32, y: i32,
         3 => status(m),
         // 026D: unless the spellbook is barred (5CA bit 8).
         4 if m.mem.r16(DS, 0x05CA) & 8 != 0 => BarAction::None,
-        4 => BarAction::Spells,
+        4 => BarAction::Spells(right),
         5 => BarAction::Log,
         6 => BarAction::Use,
         7 => BarAction::Camp,
@@ -395,7 +398,7 @@ pub fn menu_action(m: &mut Machine, key: MenuKey) -> Option<BarAction> {
     Some(match key {
         MenuKey::Options => return None,
         MenuKey::None | MenuKey::Ready | MenuKey::Pickpocket | MenuKey::TouchCast | MenuKey::Compass => BarAction::None,
-        MenuKey::Spellbook => BarAction::Spells,
+        MenuKey::Spellbook => BarAction::Spells(m.mem.r8(DS, arena::controls::var::RELEASED_RIGHT) != 0),
         MenuKey::Status => status(m),
         MenuKey::Use => BarAction::Use,
         MenuKey::Automap => BarAction::Automap,

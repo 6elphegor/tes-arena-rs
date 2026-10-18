@@ -2384,7 +2384,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                         st.map = true;
                     }
                     Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
-                    Some(sheets::BarAction::Spells) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
+                    Some(sheets::BarAction::Spells(_)) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
                     Some(sheets::BarAction::Log) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
                     Some(sheets::BarAction::Sheet) => st.panel = Some(panels::Panel::Sheet),
                     Some(a) => println!("bar {n}: {a:?}"),
@@ -4367,7 +4367,15 @@ impl App {
                 })
             }
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
-            sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
+            // 056A: the last spell again (C with a Shift, or the right
+            // button's release), else the book's list.
+            sheets::BarAction::Spells(right) => {
+                let mut said = panels::Said::default();
+                if !panels::book_cast_last(&mut self.engine, right, &mut said) {
+                    self.panel = Some(panels::Panel::Spellbook(Default::default()));
+                }
+                self.boxes.extend(said.boxes);
+            }
             // 27E3:0088: the screen faded out in 8 steps first.
             sheets::BarAction::Log => self.fade_open(8, 0, |a| {
                 a.log_begin();
