@@ -1,6 +1,6 @@
-//! The shops' list windows as the game's state sees them: 1194:5734 (the
-//! screen kept in the load bank, the panel's picture, the window's record
-//! filled) and the window library's list (3159:06A0: its record's words,
+//! The list windows as the game's state sees them: 1194:5734 (the screen
+//! kept in the load bank, the panel's picture or a list's own title and
+//! picture, the window's record filled) and the window library's list (3159:06A0: its record's words,
 //! its buffers on the heap, its last drawing's scratch).
 //!
 //! The record (DS:`tmpl`, 55h bytes, five of them from 5006) holds four
@@ -55,8 +55,12 @@ impl Machine {
     /// 1194:5734: a list of kind `kind` (AX) of `cx` strings at `ds`:`si`,
     /// its title at `ds`:`di` (A872, written with the caller's DS), the
     /// line picked `pick` (the library's loop's answer; FFFFh none).
-    /// Returns AX as the original leaves it. None where the port gives up
-    /// (a kind not ported, no room on the heap).
+    /// Kinds 0..5, 7, 8 and Bh (any past Bh is 1's) are the shops' panels
+    /// over the records at 5006 and 50B0; 6 (the creation's classes), 9
+    /// ("Where is", with a picture) and Ah (a room, a cure) draw their own
+    /// titles. Returns AX as the original leaves it. None where the port
+    /// gives up (no room on the heap; kind 9's picture packed or cut by
+    /// the clip).
     pub fn list_window(&mut self, files: &mut Files, kind: u16, (ds, si): (u16, u16), cx: u16, di: u16, pick: u16) -> Option<u16> {
         self.mem.w16(ds, 0xA872, di);
         let flags = self.mem.r8(DS, FLAGS);
@@ -541,7 +545,8 @@ impl Machine {
     }
 
     /// 3159:0BCA: the record's pick `ax` (+39), its routine at +2F called
-    /// where it changes.
+    /// where it changes. (No record the game fills has one: 5006, 505B,
+    /// 50B0, 5105, 515A and 5AF4 keep +2F 0; 0BDF isn't ported.)
     fn list_pick(&mut self, seg: u16, rec: u16, ax: u16) -> Option<()> {
         if self.mem.r16(seg, rec + 0x39) == ax {
             return Some(());
