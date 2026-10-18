@@ -48,6 +48,10 @@ pub enum Answer {
     /// The travel map shown on the way out of a dungeon (26F7:0000): the
     /// game as its screen ended, and its carry.
     Travel(World, bool),
+    /// A screen a menu key (2542:0100) or the bar's button (2542:00BA)
+    /// opened inside the frame, closed: the game as it ended, which the
+    /// rest of the frame goes on from.
+    Screen(World),
 }
 
 /// The game and its files at a point of a turn: where the travel map
@@ -95,6 +99,9 @@ pub enum Need {
     /// The travel map, from the game as the way out of a dungeon showed
     /// it (26F7:0000 with 1A81 set).
     Travel(World),
+    /// The screen a menu key or the bar's button asked for, from the game
+    /// as the frame asked it (`Talk::screen`).
+    Screen(crate::sheets::Taken, World),
 }
 
 /// What a typed field's caller shows around it.
@@ -155,7 +162,8 @@ pub struct Talk {
     /// with the right button.
     pub bar: Option<(i32, i32, bool)>,
     /// The screen a menu key (2542:0100) or the bar's button left the
-    /// window to open after the frame.
+    /// window to open after the frame (the travel map and the options
+    /// screen; the others are `Talk::screen`'s).
     pub taken: Option<crate::sheets::Taken>,
 }
 
@@ -428,6 +436,26 @@ impl Talk {
 }
 
 impl Talk {
+    /// The screen `t` a menu key (2542:0100, from the frame body at
+    /// 0000:4952) or the bar's button (2542:00BA, from the input step)
+    /// opens inside the frame: its answer (the game as the screen ended,
+    /// taken on: the rest of the frame runs after it, as the original's
+    /// does when the handler returns), or the question left.
+    pub fn screen(&mut self, m: &mut Machine, files: &mut arena::bsa::Files, t: crate::sheets::Taken) {
+        if self.need.is_some() {
+            return;
+        }
+        match self.answers.front() {
+            Some(Answer::Screen(w)) => {
+                m.clone_from(&w.0 .0);
+                files.clone_from(&w.0 .1);
+                self.answers.pop_front();
+                self.since_answer.clear();
+            }
+            _ => self.need = Some(Need::Screen(t, World(Box::new((m.clone(), files.clone()))))),
+        }
+    }
+
     /// 26F7:0000 on the way out of a dungeon: the travel map's answer
     /// (the game as it ended taken on, its carry), or the question left
     /// (stay: no journey made).

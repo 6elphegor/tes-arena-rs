@@ -298,7 +298,8 @@ pub fn draw_log(screen: &mut Screen, log: &LogBook) {
 
 /// The screen a frame's menu key (2542:0100, in the frame body) or a
 /// click on the bar (2542:00BA, in its input step) asks for, which the
-/// window opens after that frame.
+/// window opens inside that frame (`dialog::Talk::screen`; the travel map
+/// and the options screen after it).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Taken {
     /// A bar button's (or the menu key's with its handler).

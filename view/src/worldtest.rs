@@ -177,6 +177,9 @@ thread_local! {
     static BASE_HEAP: std::cell::RefCell<Vec<(u16, u16, u8)>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The files as `played`'s load left them (savetest's).
     static BASE_FILES: std::cell::RefCell<Option<Disk>> = const { std::cell::RefCell::new(None) };
+    /// The case ends with its play's last frame (gen_worldframes.py's
+    /// `ends`): no last frame run again after it.
+    static ENDS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[path = "savetest.rs"]
@@ -270,11 +273,12 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     a.fade_old = None;
     setup(&mut a);
     let mut seen = vec![state(&a)];
+    ENDS.with(|e| e.set(false));
     play(&mut a, &mut d, &mut seen);
     // The harness's last frame, run again with the page's writes watched
     // (gen_worldframes.py `play`): the page it leaves is the case's. (The
     // guild's case runs none, nor a game ended or back at the main menu.)
-    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 && a.creation.is_none() {
+    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 && a.creation.is_none() && !ENDS.with(|e| e.get()) {
         d.frame(&mut a);
     }
     Some((a, seen, save))
@@ -725,12 +729,23 @@ fn used(a: &mut App, index: u16) {
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said { listless: true, ..Default::default() });
 }
 
+/// A left click at (x, y) of the 320 x 200 screen whose release isn't
+/// read: the button held as the case ends, as the harness's last click's
+/// is (the screen it ends taken it at its press).
+fn held_click(a: &mut App, x: i32, y: i32) {
+    a.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
+    a.input(In::Button { button: MouseButton::Left, down: true });
+}
+
 /// The window's fades played out at once: the original's screens fade
 /// inside the frame that opens them, which the harness's timer doesn't
 /// count; the window's queue would hold back the next frames instead.
 fn faded(a: &mut App) {
     a.fade.clear();
     a.fade_old = None;
+    // (A screen inside a frame ended: the frame's rest, as the tick
+    // runs it once the fade is over.)
+    a.screen_ended();
 }
 
 /// gen_worldframes.py's `shopping`: a slot free (`room`), each item worn
@@ -1089,6 +1104,18 @@ fn case(name: &str) -> Option<Case> {
             seen.push(state(a));
             frames(a, d, seen, 10, |_| false);
         })),
+        "playbarjump" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            frames(a, d, seen, 1, |_| false);
+            // The crossed swords clicked with J held: the frame that takes
+            // the click on the bar makes no jump (2826:00CB on 02E2's carry).
+            a.input(In::Key { code: KeyCode::KeyJ, down: true, text: None });
+            let (x, y) = crate::sheets::bar_centre(0);
+            d.click(a, x, y, MouseButton::Left);
+            seen.push(state(a));
+            a.input(In::Key { code: KeyCode::KeyJ, down: false, text: None });
+            frames(a, d, seen, 5, |_| false);
+        })),
         "playlogbar" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             frames(a, d, seen, 1, |_| false);
@@ -1134,6 +1161,43 @@ fn case(name: &str) -> Option<Case> {
             // The frame that took the key (or the button) ends with its screen.
             seen.push(state(a));
             frames(a, d, seen, 10, |_| false);
+        })),
+        // The screens a menu key opens inside the frame, each case ending
+        // with that frame (gen_worldframes.py's `ends`): the screen closed,
+        // then the rest of the frame's body run after it.
+        "playsheetend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::F1, down: true, text: None });
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            ENDS.with(|e| e.set(true));
+        })),
+        "playlogend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Key { code: KeyCode::KeyL, down: true, text: Some("l".into()) });
+            faded(a);
+            d.click(a, 0xA0, 0x60, MouseButton::Left);
+            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            held_click(a, 0x110, 0xBC);
+            faded(a);
+            ENDS.with(|e| e.set(true));
+        })),
+        "playautomapend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("m".into()) });
+            held_click(a, 0x100, 0xB0);
+            faded(a);
+            ENDS.with(|e| e.set(true));
+        })),
+        "playbookend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.compose();
+            a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("c".into()) });
+            d.click(a, 0xF0, 0xA0, MouseButton::Right);
+            assert!(a.panel.is_none(), "a right click leaves the list");
+            ENDS.with(|e| e.set(true));
         })),
         "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -2140,7 +2204,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 41] = ["playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 46] = ["playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2248,7 +2312,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 46] = ["playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 51] = ["playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

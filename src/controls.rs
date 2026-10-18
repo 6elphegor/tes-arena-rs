@@ -171,9 +171,9 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
         Some(())
     }
     /// 2542:00BA: a click on the interface bar (from `player_steer`, the
-    /// front end's click there, if one is waiting).
-    fn bar_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// front end's click there, if one is waiting); whether one was.
+    fn bar_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
+        Some(false)
     }
     /// 217B:0265: the wilderness moves its chunks when the player
     /// crosses one.
@@ -408,8 +408,12 @@ impl Machine {
         }
         // Where the classic controls take a click on the interface bar
         // (2826:02E2, `pick_region`, after the moves): the front end's, if
-        // one is waiting.
-        hooks.bar_click(self, files)?;
+        // one is waiting. With the cursor on the bar the original's
+        // controls end there (2826:00CB on 02E2's carry, to 018A): no click in the
+        // centre, no jump.
+        if hooks.bar_click(self, files)? {
+            return Some(());
+        }
         // Where the classic controls' centre handler takes a left click
         // (2826:00F6..0128, after the moves): the front end's click, if one
         // is waiting, in this frame's input step as the original's.
