@@ -106,6 +106,9 @@ const ITEM_HEADER: u16 = 0x12A8;
 /// first's row.
 pub type PanelWait<'a> = dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) + 'a;
 
+/// What 223A's DI runs after its lines are shown (`list_panel_then`).
+type PanelThen<'a> = dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) -> Option<()> + 'a;
+
 /// What the front end gives a turn of the equipment page's loop (5DE2):
 /// a key typed (its character) or a left click (x, y).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -557,7 +560,7 @@ impl Machine {
 
     /// `list_panel_text` with `then` its DI's routine after the lines are
     /// shown (5E21, CALL DI; 5536 the wait, 2325 "Drop what?"'s loop).
-    fn list_panel_then(&mut self, si: u16, cx: u16, bx: u16, dl: u8, then: &mut dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) -> Option<()>) -> Option<()> {
+    fn list_panel_then(&mut self, si: u16, cx: u16, bx: u16, dl: u8, then: &mut PanelThen<'_>) -> Option<()> {
         self.select_font(0x102C);
         let top = bx;
         let mut lines = Vec::new();
