@@ -137,6 +137,12 @@ fn field(m: &mut Machine, seed: u32) -> Option<Option<(u64, u64)>> {
     let field = Field { x, y, click: cx, max: mx, seg, off, w, h };
     let ended = m.line_edit(&field, &keys)?;
     assert!(ended, "the keys end with Enter");
+    // The generator stubs the text's drawing (9E0A), so the end's redraw
+    // (A0A0) leaves ADB6 and ADB8 as they were.
+    for o in [0xADB6, 0xADB8] {
+        let v = before.mem.r16(DS, o);
+        m.mem.w16(DS, o, v);
+    }
     let mut d = changes(&before, m, DS);
     d.extend(changes(&before, m, TEXT_SEG));
     let heap = (0..(HEAP.1 - HEAP.0) as u32 * 16).map(|i| m.mem.r8(HEAP.0 + (i >> 4) as u16, (i & 15) as u16));

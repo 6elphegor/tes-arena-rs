@@ -67,8 +67,11 @@ pub trait MenuHooks {
         m.mem.w8(DS, BUTTONS, 0);
     }
     /// 0000:9AE6 (`text` false) and 9AF8 (true): a font's record (AX)
-    /// made current for boxes and texts.
-    fn font(&mut self, _m: &mut Machine, _ax: u16, _text: bool) {}
+    /// made current for boxes and texts. By default as the original does
+    /// it (`Machine::font_selected`).
+    fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
+        m.font_selected(ax, text);
+    }
     /// 0000:5C86: EMS bank `bank` mapped (by default `Machine::ems_map`).
     fn map_bank(&mut self, m: &mut Machine, bank: u16) {
         m.ems_map(bank);

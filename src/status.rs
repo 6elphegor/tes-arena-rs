@@ -112,12 +112,14 @@ impl Machine {
         )
     }
 
-    /// 2542:04B1..0515: the status box's text, `status_text`, then the
-    /// player's conditions after it (`status_conditions` at its NUL; the
-    /// font calls 0000:9AE6/9AF8 between them are the front end's).
-    /// Returns the offset of the NUL.
+    /// 2542:04B1..0515: the status box's text, `status_text`, then
+    /// ARENAFNT ([102C], 0000:9AE6) and the tiles [1036] (9AF8) selected,
+    /// then the player's conditions after it (`status_conditions` at its
+    /// NUL). Returns the offset of the NUL.
     pub fn status_box(&mut self) -> u16 {
         let end = self.status_text();
+        self.select_font(0x102C);
+        self.select_tiles(0x1036);
         self.status_conditions(end)
     }
 

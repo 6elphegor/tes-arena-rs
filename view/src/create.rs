@@ -1082,10 +1082,19 @@ impl Creation {
                 if !live.ended() {
                     return self.stage = Stage::Name(prompt, live);
                 }
-                // 1194:2789: nothing typed (01AD 0) asks again.
+                // The typing given to the game's own editor, then 5C34's
+                // box put away (`named_closed`, its dissolve's steps the
+                // film's); 1194:2789: nothing typed (01AD 0) asks again
+                // (the dissolves out and in again not played, as before).
+                if crate::field::replay(&mut engine.m, &live.field, &live.look, live.keys()) != Some(true) {
+                    eprintln!("the name's field gave up: {}", arena::giveup::describe());
+                }
+                let seed = engine.m.mem.r16(DS, crate::film::DISSOLVE_SEED);
+                engine.m.named_closed();
+                engine.m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
                 let text = live.text();
                 if text.is_empty() {
-                    Stage::Name(prompt, self.name_field(engine))
+                    self.name_asked(engine)
                 } else {
                     self.name = String::from_utf8_lossy(&text).into_owned();
                     let ask = self.menu(&mut engine.m, (DATA, 0x3614), &[], 0x3F85, 0x3F88, FontId::A);
@@ -1346,31 +1355,29 @@ impl Creation {
         Stage::ClassYes(ask, class)
     }
 
-    /// The class chosen (1194:2668..2674), then the name asked (2711:
-    /// 3276:35F8 with the class's name, in FONT_A).
+    /// The class chosen (1194:2668..2674), then the name asked (2711).
     fn class_chosen(&mut self, engine: &mut Engine, class: u8) -> Stage {
         if engine.m.class_chosen(class).is_none() {
             eprintln!("the class's weapon could not be made");
         }
-        let (cs, co) = Self::class_of(&engine.m, class);
+        self.name_asked(engine)
+    }
+
+    /// 1194:2711..2786: the prompt made at 1044 (3276:35F8 with the
+    /// class's name, in FONT_A: `Machine::creation_name_prompt`) and
+    /// 5C34's box round it as the game's state has it (`named_shown`; BX,
+    /// an offset on the original's stack, 0: the field writes it over;
+    /// its dissolve's steps the film's, `input`), the field opened on a
+    /// copy of the game.
+    fn name_asked(&mut self, engine: &mut Engine) -> Stage {
         let m = &mut engine.m;
-        m.sprintf((DS, BUF), (DATA, 0x35F8), &[Arg::Str(cs, co)]);
-        // 2731..2776: the text's last character (its CR) made room, two
-        // for each letter the class's name is short of ten, less four,
-        // then the CR again; then 5C34's box text (4FBC: the field's
-        // line of room under it).
-        let mut text = m.mem.cstr(DS, BUF).to_vec();
-        let short = 10 - m.mem.cstr(cs, co).len() as i32;
-        let pad = if short == 0 { 0 } else { (2 * short - 4).max(0) as usize };
-        if pad != 0 {
-            text.pop();
-            text.extend(std::iter::repeat_n(b' ', pad));
-            text.push(b'\r');
-        }
-        for (i, &b) in text.iter().chain(&[0]).enumerate() {
-            m.mem.w8(DS, BUF + i as u16, b);
-        }
+        m.creation_name_prompt();
         let prompt = hud::lines(crate::field::prompt_5c30(m, DS, BUF).as_bytes(), self.colour);
+        let seed = m.mem.r16(DS, crate::film::DISSOLVE_SEED);
+        if m.named_shown((DS, BUF), 0, None).is_none() {
+            eprintln!("the name's box gave up: {}", arena::giveup::describe());
+        }
+        m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
         Stage::Name(prompt, self.name_field(engine))
     }
 

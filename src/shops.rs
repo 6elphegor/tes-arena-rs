@@ -132,6 +132,13 @@ impl Machine {
         self.mem.w16(DS, 0xB036, v);
     }
 
+    /// 0000:9AE6 (`tiles` false: AX to B036, the font) and 9AF8 (true: to
+    /// B038, the boxes' tiles). 9AF8 stores through whatever DS its caller
+    /// has, DGROUP at every call ported.
+    pub fn font_selected(&mut self, ax: u16, tiles: bool) {
+        self.mem.w16(DS, if tiles { 0xB038 } else { 0xB036 }, ax);
+    }
+
     /// 1194:42EE with AX the word at DS:`at` (`font`): before a message
     /// box, the font selected, the tiles at 1036 and the colour 60h.
     pub fn message_fonts(&mut self, at: u16) {

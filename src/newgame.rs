@@ -390,6 +390,43 @@ impl Machine {
         Some(())
     }
 
+    /// 1194:2711..2783: the name's prompt made at 1044 for 5C34
+    /// (`Machine::named_shown` with AX 3Ch, CX 12h, DI 01AD; the field,
+    /// `lineedit::fields::creation_name`, then `named_closed`; 2789 asks
+    /// again while 01AD is empty). 1044 cleared for 7Dh dwords, FONT_A
+    /// ([1026]) selected (0000:9AE6), then 3276:35F8 formatted there with
+    /// the class's name (2686:0645). Its length is taken by 9CB0 from
+    /// DGROUP at the name's offset whatever its segment (a player's is
+    /// DGROUP's); ten less it, twice, less four (none at ten, none below
+    /// nothing) is the room kept at 110C, and that many spaces replace the
+    /// text's last character before a CR and a NUL.
+    pub fn creation_name_prompt(&mut self) {
+        for i in 0..0x7D * 4 {
+            self.mem.w8(DS, 0x1044 + i, 0);
+        }
+        self.select_font(0x1026);
+        let (seg, off) = self.class_name(DS, PLAYER);
+        let len = self.mem.cstr(DS, off).len() as u16;
+        let mut cx = 10u16.wrapping_sub(len);
+        if cx != 0 {
+            cx = cx.wrapping_add(cx).wrapping_sub(4);
+            if cx & 0x8000 != 0 {
+                cx = 0;
+            }
+        }
+        self.mem.w16(DS, 0x110C, cx);
+        let end = self.sprintf((DS, 0x1044), (DATA, 0x35F8), &[crate::format::Arg::Str(seg, off)]);
+        if cx != 0 {
+            let mut di = end.wrapping_sub(1);
+            for _ in 0..cx {
+                self.mem.w8(DS, di, b' ');
+                di = di.wrapping_add(1);
+            }
+            self.mem.w8(DS, di, 0x0D);
+            self.mem.w8(DS, di.wrapping_add(1), 0);
+        }
+    }
+
     /// 2791 and 2711's results: the sex (0 male, 1 female) and the name
     /// (up to 12h characters, then a NUL), as the player gave them.
     pub fn name_and_sex(&mut self, name: &[u8], sex: u8) {
