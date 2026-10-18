@@ -274,6 +274,8 @@ KEY_ESC = 0x01
 KEY_N = 0x31
 KEY_PAD_PLUS = 0x4E
 KEY_MINUS = 0x0C
+KEY_D = 0x20
+KEY_Y = 0x15
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
 
@@ -640,6 +642,14 @@ CASES = {
     # clicked again (its item, worn, taken off: 1AFB, the page drawn
     # again, 23B1) between N and Esc.
     'playequipwear': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                 ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                         ((), (KEY_F1,), 10, None)]),
+    # An item dropped from the equipment page: as playequip, the third
+    # line clicked (marked, 1194:1C5E), D (3276:57D8's fourth record,
+    # 17D8: "Do you wish to drop the ...?", 48E9's menu) answered Y (the
+    # item dropped where the player stands, 18F6, the page drawn again)
+    # between N and Esc.
+    'playequipdrop': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
                                                                                                  ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                          ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the

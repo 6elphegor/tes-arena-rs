@@ -3703,6 +3703,7 @@ impl App {
         let mut cast = None;
         let mut page = false;
         let mut back: Option<Option<u8>> = None;
+        let mut sheet_drop = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
@@ -3749,8 +3750,22 @@ impl App {
                     };
                     if let Some(yes) = answer {
                         inv.asking = None;
-                        panels::drop_answer(m, yes, &mut said);
+                        if inv.from_sheet && self.sheet_run.is_some() {
+                            let typed = match code {
+                                KeyCode::KeyY => Some(b'y'),
+                                KeyCode::KeyN => Some(b'n'),
+                                KeyCode::Escape => Some(0x1B),
+                                KeyCode::Enter | KeyCode::NumpadEnter => Some(0x0D),
+                                _ => None,
+                            };
+                            sheet_drop = Some((Some(b'd'), Some((yes, typed))));
+                        } else {
+                            panels::drop_answer(m, yes, &mut said);
+                        }
                     }
+                } else if inv.from_sheet && self.sheet_run.is_some() && code == KeyCode::KeyD {
+                    // The drop button's key (3276:57D8's fourth record).
+                    sheet_drop = Some((Some(b'd'), None));
                 } else if inv.from_sheet && self.sheet_run.is_some() && matches!(code, KeyCode::NumpadAdd | KeyCode::Equal | KeyCode::Minus | KeyCode::NumpadSubtract) {
                     // The arrows' keys, '+' and '-' (3276:57D8's second and
                     // third records): the game's state's own handlers.
@@ -3817,6 +3832,9 @@ impl App {
         if page {
             self.equipment_page(Some(b'n'));
         }
+        if let Some((key, answer)) = sheet_drop {
+            self.sheet_drop_asked(key, answer);
+        }
         if let Some(key) = back {
             self.equipment_back(key);
         }
@@ -3843,6 +3861,67 @@ impl App {
             }
             a.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() }));
         });
+    }
+
+    /// D or the Drop button on the sheet's own equipment page
+    /// (`Machine::sheet_equipment_drop`), `key` typed (`d`) or None for a
+    /// click. Without `answer` it runs first on a copy: a question it
+    /// asks comes back (its text) for the window to put up, the game left
+    /// as it was until it is answered; with one (or without a question)
+    /// it is the game's.
+    fn sheet_drop(&mut self, key: Option<u8>, answer: Option<(bool, Option<u8>)>) -> Option<Vec<u8>> {
+        let screen = self.assets.shown.clone();
+        if answer.is_none() {
+            let (mut m, mut f) = (self.engine.m.clone(), self.engine.files.clone());
+            let mut asked = None;
+            let _ = m.sheet_equipment_drop(&mut f, key, Some(&screen), &mut |p| {
+                asked = Some(p.mem.cstr(arena::mem::DS, arena::use_item::var::DROP_TEXT).to_vec());
+                1
+            });
+            if asked.is_some() {
+                return asked;
+            }
+        }
+        let (pick, typed) = match answer {
+            Some((yes, typed)) => (if yes { 0 } else { 1 }, typed),
+            None => (1, None),
+        };
+        let e = &mut self.engine;
+        if e.m.sheet_equipment_drop(&mut e.files, key, Some(&screen), &mut |m| {
+            // The answer's key read by the menu's pick (3159:10BE).
+            if let Some(c) = typed {
+                m.ring_typed(c);
+            }
+            pick
+        }).is_none() {
+            eprintln!("the drop button gave up: {}", arena::giveup::describe());
+        }
+        None
+    }
+
+    /// `sheet_drop`, its question put up on the inventory.
+    fn sheet_drop_asked(&mut self, key: Option<u8>, answer: Option<(bool, Option<u8>)>) {
+        const RING: std::ops::Range<u16> = 0xAC46..0xACB5;
+        let mut key = key;
+        if answer.is_some() {
+            let kept = match self.panel.as_mut() {
+                Some(panels::Panel::Inventory(inv)) => inv.drop_ring.take(),
+                _ => None,
+            };
+            if let Some((ring, k)) = kept {
+                for (at, b) in RING.zip(ring) {
+                    self.engine.m.mem.w8(arena::mem::DS, at, b);
+                }
+                key = k;
+            }
+        }
+        if let Some(text) = self.sheet_drop(key, answer) {
+            let ring: Vec<u8> = RING.map(|at| self.engine.m.mem.r8(arena::mem::DS, at)).collect();
+            if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
+                inv.asking = Some((text, 0));
+                inv.drop_ring = Some((ring, key));
+            }
+        }
     }
 
     /// The sheet's equipment page left by its exit, `key` typed (Esc) or
@@ -3890,6 +3969,7 @@ impl App {
         let mut said = panels::Said::default();
         let mut cast = None;
         let mut back = false;
+        let mut sheet_drop = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page up (1194:51D1): the click its question
@@ -3925,7 +4005,11 @@ impl App {
                     let i = ((y - ey) / lh.max(1)) as usize;
                     if x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < 2 {
                         inv.asking = None;
-                        panels::drop_answer(&mut self.engine.m, i == 0, &mut said);
+                        if inv.from_sheet && self.sheet_run.is_some() {
+                            sheet_drop = Some((None, Some((i == 0, None))));
+                        } else {
+                            panels::drop_answer(&mut self.engine.m, i == 0, &mut said);
+                        }
                     }
                 } else if let Some(b) = panels::button_at(x, y) {
                     match b {
@@ -3935,6 +4019,7 @@ impl App {
                             inv.bare = false;
                             panels::spells_button(&mut self.engine.m, &mut said)
                         }
+                        panels::Button::Drop if inv.from_sheet && self.sheet_run.is_some() => sheet_drop = Some((None, None)),
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
                 } else if let Some(d) = panels::arrow_at(x, y).filter(|_| inv.from_sheet && self.sheet_run.is_some()) {
@@ -3997,6 +4082,9 @@ impl App {
                 _ => {}
             },
             None => {}
+        }
+        if let Some((key, answer)) = sheet_drop {
+            self.sheet_drop_asked(key, answer);
         }
         if back {
             self.equipment_back(None);

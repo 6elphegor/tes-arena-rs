@@ -383,6 +383,41 @@ impl Machine {
         Some(())
     }
 
+    /// D or the Drop button (3276:57D8's fourth record, 1194:17D8), `key`
+    /// its key typed (None, a click): the drop button's rules
+    /// (`drop_button`), its question the yes-or-no menu (48E9: 020E with
+    /// the text at 1044 and the entries at 4B63, `menu_boxes` over
+    /// `screen` and `menu_closed`, `pick` the front end's answer, 0 yes);
+    /// a drop draws the page again (1CF0's 23B1). Its refusals' boxes
+    /// (223A: no room, a quest's item, "Drop what?") aren't ported.
+    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16) -> Option<()> {
+        use crate::use_item::DropButton;
+        self.equipment_turn(key, 3);
+        let mut failed = false;
+        let r = self.drop_button_drawn(
+            &mut |m| {
+                let Some(boxes) = m.menu_boxes(crate::use_item::var::DROP_TEXT, 0x4B63, screen) else {
+                    failed = true;
+                    return false;
+                };
+                let answer = if boxes.is_some() { pick(m) } else { 0xFFFF };
+                m.menu_closed(boxes.as_ref());
+                answer == 0
+            },
+            &mut |m| m.equipment_drawn(files),
+        )?;
+        if failed {
+            return None;
+        }
+        match r {
+            DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat => crate::giveup::not_ported("1194:223A: the drop button's refusal in the page"),
+            DropButton::Nothing | DropButton::Dropped => {
+                self.equipment_turn_end();
+                Some(())
+            }
+        }
+    }
+
     /// 1194:1C5E: the line a click at row `y` marks (1296): of the lines
     /// shown (129D and 126C, or the spells' 50A; at most seven) the first
     /// whose bottom (3Dh, then each 0Bh lower) is at or below it, plus
