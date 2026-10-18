@@ -78,8 +78,9 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
     let archive = Rc::new(archive::Archive::open(dir));
     hud::init_style(&archive, &engine.m);
     let mut c = create::Creation::new(&mut engine, archive, dir, world::palette(dir));
-    // The intro and the title passed: the main menu.
-    for inp in create::parse_script("enter,enter") {
+    // The intro's movie skipped and the rest of it left (Esc at the
+    // title): the main menu.
+    for inp in create::parse_script("enter,esc") {
         c.input(&mut engine, inp);
     }
     engine.m.mem.w32(arena::mem::DS, arena::random::SEED, SEED);

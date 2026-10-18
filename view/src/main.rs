@@ -1688,12 +1688,38 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         map: false,
         creation,
         creation_engine: None,
+        title_engine: None,
         movie_at: Instant::now(),
         fade: Default::default(),
         fade_ms: 0,
         fade_old: None,
         ending: false,
         blackout: false,
+    }
+}
+
+/// The program's main back to its menu on a copy of `engine` as a game's
+/// end or the options screen's New leaves it (0000:109B..1114,
+/// `Machine::title_menu`; the screens are creation's own); None where
+/// the port can't follow it.
+fn title_engine(engine: &Engine) -> Option<Engine> {
+    let mut e = Engine::new(engine.m.clone(), engine.files.clone());
+    match e.m.title_menu(&mut e.files, &mut arena::title::NoTitleHooks) {
+        Some(()) => Some(e),
+        None => {
+            eprintln!("the way back to the menu gave up: {}", arena::giveup::describe());
+            None
+        }
+    }
+}
+
+/// The main menu's Load on the title's state (0000:117E): the song
+/// stopped, the game set up (21EE:016C), PAL.COL's colours read to 929E
+/// (7534); then the load menu (25FD:0242, `saveui`).
+fn title_load_setup(e: &mut Engine) {
+    e.m.music_stop();
+    if e.m.game_setup(&mut arena::start::SetupPort(&mut e.files)).is_none() || e.m.colours_load(&mut e.files, 0x1304, 0x929E).is_none() {
+        eprintln!("the title's Load's set-up gave up: {}", arena::giveup::describe());
     }
 }
 
@@ -3003,6 +3029,12 @@ struct App {
     /// level's points, a copy of the state the game asked in (the turn
     /// replays with the clicks).
     creation_engine: Option<Engine>,
+    /// The game's state as the program's main leaves it at its menu
+    /// after a game's end or the options screen's New (`title_engine`:
+    /// 0000:109B..1114, `Machine::title_menu`): the menu's Load goes on
+    /// from it (`open_saveui`). Creation's Start still begins on START.MIF
+    /// loaded afresh.
+    title_engine: Option<Engine>,
     /// When the screens' movie last advanced.
     movie_at: Instant,
     /// A screen opening as the original opens it (`fade_open`): the
@@ -3069,6 +3101,7 @@ impl App {
         match outcome {
             create::Outcome::Play => {
                 self.creation = None;
+                self.title_engine = None;
                 newgame::play(&mut self.engine);
                 self.run = arena::transit::Run::Start;
                 self.assets = Assets::new(&self.dir, &mut self.engine);
@@ -3096,9 +3129,6 @@ impl App {
         }
     }
 
-    /// The game over (5B1 bit 100h): the farewell's vision, then the main
-    /// menu, on a fresh engine (the start dungeon loaded, as a new game
-    /// or a load begins from the program's own state).
     /// The game over (0000:0CE9..0D3E): the world's colours, as last
     /// shown, faded to black in 8 steps over it (1194:55B2, the window's
     /// fade tinting the world), then the farewell (`game_over`).
@@ -3113,8 +3143,12 @@ impl App {
     }
 
     /// The farewell after the fade (`game_ending`): the screen cleared,
-    /// the vision played, then the main menu.
+    /// the vision played, then the intro and the main menu, creation's on
+    /// a fresh engine (the start dungeon loaded, as a new game begins),
+    /// the game's own state as the program's main takes it back to its
+    /// menu kept for the menu's Load (`title_engine`).
     fn game_over(&mut self) {
+        self.title_engine = title_engine(&self.engine);
         let archive = self.assets.archive.clone();
         let mut c = create::Creation::ending(&mut self.engine, archive, &self.dir, self.assets.palette, None);
         c.faded();
@@ -3513,7 +3547,14 @@ impl App {
             self.say("No save directory (--save-dir).");
             return;
         };
-        let (ui, e) = saveui::SaveUi::open(kind, &self.engine, &dir, &self.assets.archive);
+        let base = match (kind, self.title_engine.as_mut()) {
+            (saveui::Kind::TitleLoad, Some(e)) => {
+                title_load_setup(e);
+                &*e
+            }
+            _ => &self.engine,
+        };
+        let (ui, e) = saveui::SaveUi::open(kind, base, &dir, &self.assets.archive);
         self.saveui = Some(ui);
         self.saveui_ended(e);
     }
@@ -3547,6 +3588,7 @@ impl App {
                 match r {
                     Ok(run) => {
                         self.engine = engine;
+                        self.title_engine = None;
                         self.creation = None;
                         self.run = run;
                         self.assets = Assets::new(&self.dir, &mut self.engine);
@@ -3575,8 +3617,13 @@ impl App {
             }
             saveui::Ended::Left(engine, msg) => {
                 // The game goes on as the menu left it (a load menu left
-                // has deleted log.64, re*.64 and in*.64).
-                self.engine = *engine;
+                // has deleted log.64, re*.64 and in*.64); the title's, from
+                // the main menu after a game's end, kept for its Load.
+                if title && self.title_engine.is_some() {
+                    self.title_engine = Some(*engine);
+                } else {
+                    self.engine = *engine;
+                }
                 if let Some(m) = msg {
                     self.say(&m);
                 }
@@ -3621,6 +3668,7 @@ impl App {
                 self.saveui_under = under;
             }
             arena::options::OptionsEnd::NewGame => {
+                self.title_engine = title_engine(&self.engine);
                 let archive = self.assets.archive.clone();
                 let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
                 let mut fresh = world::load(&self.dir, "START.MIF");

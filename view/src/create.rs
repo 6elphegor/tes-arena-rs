@@ -31,13 +31,15 @@
 //! - the vision (1194:D459 with text 578h): VISION.FLC playing (`flc`)
 //!   with its text three lines at a time, then the game.
 //!
-//! Before it, as the original starts (0000:10C9): INTRO.FLC (0000:125C),
-//! TITLE.IMG, then the main menu (MENU.IMG, 0000:10FA: its regions at
-//! 3276:6300, keys L, S and E: Load, Start a new game, Exit). The opening
-//! story on SCROLL.FLC (0000:1323) isn't played. At a game's end
-//! (`Creation::ending`) the farewell's vision (text 57Ah on VISION.FLC, or
-//! 57Bh on JAGAR.FLC while F77 is set: 0000:0D01..0D3E), then the main
-//! menu again. On a level gained (`Creation::level_up`) the attribute
+//! Before it, as the original starts (0000:10C9): the intro (1246:
+//! INTRO.FLC, TITLE.IMG for 4 s, QUOTE.IMG for 6 s, SCROLL.FLC and
+//! SCROLL01..03.IMG; a key ends a wait, Esc the rest; its fades and
+//! dissolves aren't drawn), then the main menu (MENU.IMG, 0000:10FA: its
+//! regions at 3276:6300, keys L, S and E: Load, Start a new game, Exit).
+//! At a game's end (`Creation::ending`) the farewell's vision (text 57Ah
+//! on VISION.FLC, or 57Bh on JAGAR.FLC while F77 is set: 0000:0D01..0D3E),
+//! then the intro and the main menu again (109B, 10C9), as after the
+//! options screen's New. On a level gained (`Creation::level_up`) the attribute
 //! screen alone, its clicks kept for the turn to replay (1194:122C).
 //!
 //! The boxes (0000:965A from 1194:59CC and 5C34), the menus (1194:020E:
@@ -218,9 +220,16 @@ enum Stage {
     /// (the movie), then INTRO01..09.IMG (`pic` 1..9, its picture and
     /// the colours the movie left) for 350 screen refreshes each (5 s at
     /// 70 Hz, 0000:13BF); a key ends it all (ACB6). Then `next`, the
-    /// class's first question, made at the Start.
-    Story { pic: u8, ms: u32, img: Option<Box<(Image, [[u8; 4]; 256])>>, next: Box<Stage> },
-    Title,
+    /// class's first question, made at the Start. With `scrolls` the
+    /// intro's end before the menu (0000:12E3..131B): SCROLL.FLC, then
+    /// SCROLL01..03.IMG for 4A6h, 4A6h and 1A4h refreshes (`SCROLL_MS`),
+    /// a key ending the movie or a picture's wait, Esc them all.
+    Story { pic: u8, ms: u32, img: Option<Box<(Image, [[u8; 4]; 256])>>, next: Box<Stage>, scrolls: bool },
+    /// The intro's TITLE.IMG (0000:1269), for 118h refreshes (`TITLE_MS`)
+    /// or until a key; then QUOTE.IMG (12BC) for 1A4h, Esc ending the
+    /// intro there; the milliseconds shown.
+    Title(u32),
+    Quote(u32),
     MainMenu,
     Done,
 }
@@ -236,6 +245,12 @@ pub enum Outcome {
     /// A level's points spent, by these clicks.
     Spent(Vec<Click>),
 }
+
+/// The intro's waits (0000:13BF: 118h, 1A4h and 4D94's 4A6h, 4A6h, 1A4h
+/// screen refreshes at 70 Hz) in milliseconds.
+const TITLE_MS: u32 = 0x118 * 1000 / 70;
+const QUOTE_MS: u32 = 0x1A4 * 1000 / 70;
+const SCROLL_MS: [u32; 3] = [0x4A6 * 1000 / 70, 0x4A6 * 1000 / 70, 0x1A4 * 1000 / 70];
 
 /// The main menu's regions (3276:6300, three: Load, Start, Exit; their
 /// keys at +59h).
@@ -305,8 +320,9 @@ pub struct Creation {
     colour: u8,
     /// The movie playing (Intro, Vision, Ending).
     movie: Option<Movie>,
-    /// TITLE.IMG and MENU.IMG, in their own colours.
+    /// TITLE.IMG, QUOTE.IMG and MENU.IMG, in their own colours.
     title: Option<(Image, [[u8; 4]; 256])>,
+    quote: Option<(Image, [[u8; 4]; 256])>,
     menu_pic: Option<(Image, [[u8; 4]; 256])>,
     /// On a level gained: the clicks so far.
     level_up: Option<Vec<Click>>,
@@ -338,7 +354,7 @@ impl Creation {
     pub fn song(&self) -> Option<u16> {
         use arena::music::var::*;
         Some(match self.stage {
-            Stage::Intro | Stage::Title | Stage::MainMenu => PERCNTRO,
+            Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::MainMenu | Stage::Story { scrolls: true, .. } => PERCNTRO,
             Stage::Story { .. } => EVLINTRO,
             Stage::Vision | Stage::Ending => VISION,
             Stage::Done => return None,
@@ -550,8 +566,9 @@ impl Creation {
             cel: None,
         };
         let title = image_with_palette(m, &archive, "TITLE.IMG");
+        let quote = image_with_palette(m, &archive, "QUOTE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -561,7 +578,8 @@ impl Creation {
 
     /// A game over (5B1 bit 100h): the farewell's vision (0000:0CE9..0D3E:
     /// text 57Bh on JAGAR.FLC in colour F5h while F77 is set, else 57Ah on
-    /// VISION.FLC in 2Fh; none when F77 is 9), then the main menu. The
+    /// VISION.FLC in 2Fh; none when F77 is 9), then the program's main
+    /// back to its menu through the intro (0000:109B, 10C9). The
     /// vision (1194:D459) first fades the screen as the game left it
     /// (`shown`, in the game's colours; none: a cleared one) to black in
     /// 8 steps (55B6) and clears it (55D9), then plays the movie.
@@ -572,11 +590,9 @@ impl Creation {
         let (text, flc, colour) = if f77 != 0 { (0x57B, "JAGAR.FLC", 0xF5) } else { (0x57A, "VISION.FLC", 0x2F) };
         let lines = if f77 != 9 { vision_text(engine, text, colour) } else { Vec::new() };
         let mut c = Creation::new(engine, archive, dir, game);
-        c.movie = None;
-        c.stage = Stage::MainMenu;
         if f77 != 9 {
-            c.movie = Movie::new(&c.archive, flc, lines);
-            if c.movie.is_some() {
+            if let Some(mv) = Movie::new(&c.archive, flc, lines) {
+                c.movie = Some(mv);
                 c.stage = Stage::Ending;
                 let black = [[0, 0, 0, 0xFF]; 256];
                 let mut film = Film::new(shown.map_or_else(|| vec![0; W * H], <[u8]>::to_vec), game);
@@ -599,13 +615,11 @@ impl Creation {
         }
     }
 
-    /// The main menu, as the program's outer loop comes back to it after
-    /// the options screen's New (0000:109B with 5CA bit 8000h): no intro.
+    /// The main menu, as the program's main comes back to it after the
+    /// options screen's New (0000:109B with 5CA bit 8000h): through the
+    /// intro (10C9) as at the start.
     pub fn main_menu(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
-        let mut c = Creation::new(engine, archive, dir, game);
-        c.movie = None;
-        c.stage = Stage::MainMenu;
-        c
+        Creation::new(engine, archive, dir, game)
     }
 
     /// A level gained (1194:1034): the attribute screen (1194:122C) over
@@ -632,7 +646,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
     }
 
     /// Back on the main menu (a load that failed).
@@ -641,9 +655,43 @@ impl Creation {
         self.stage = Stage::MainMenu;
     }
 
-    /// After the intro: the title (a key or click), else the menu.
-    fn after_intro(&self) -> Stage {
-        if self.title.is_some() { Stage::Title } else { Stage::MainMenu }
+    /// After the intro's movie: the title, else what follows it.
+    fn after_intro(&mut self) -> Stage {
+        if self.title.is_some() { Stage::Title(0) } else { self.after_title() }
+    }
+
+    /// After the title: the quote, else what follows it.
+    fn after_title(&mut self) -> Stage {
+        if self.quote.is_some() { Stage::Quote(0) } else { self.scroll_story() }
+    }
+
+    /// After the quote (0000:12D4): SCROLL.FLC and the scrolls, then the
+    /// menu.
+    fn scroll_story(&mut self) -> Stage {
+        self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
+        if self.movie.is_none() {
+            return Stage::MainMenu;
+        }
+        Stage::Story { pic: 0, ms: 0, img: None, next: Box::new(Stage::MainMenu), scrolls: true }
+    }
+
+    /// The title's and the quote's time passing (0000:13BF's waits).
+    fn title_time(&mut self, ms: u32) {
+        match &mut self.stage {
+            Stage::Title(t) => {
+                *t += ms;
+                if *t >= TITLE_MS {
+                    self.stage = self.after_title();
+                }
+            }
+            Stage::Quote(t) => {
+                *t += ms;
+                if *t >= QUOTE_MS {
+                    self.stage = self.scroll_story();
+                }
+            }
+            _ => {}
+        }
     }
 
     /// How it ended, once it has: the game to play, Load or Exit picked,
@@ -677,29 +725,32 @@ impl Creation {
         }
         self.movie_over();
         self.story(ms);
+        self.title_time(ms);
     }
 
-    /// The opening story's pictures: each for 5 s, in the colours the
-    /// movie left, then the next stage.
+    /// The opening story's pictures: each for 5 s (the scrolls each for
+    /// its `SCROLL_MS`), in the colours the movie left, then the next
+    /// stage.
     fn story(&mut self, ms: u32) {
-        let Stage::Story { pic, ms: shown, img, .. } = &mut self.stage else { return };
+        let Stage::Story { pic, ms: shown, img, scrolls, .. } = &mut self.stage else { return };
         if *pic == 0 {
             return;
         }
         *shown += ms;
-        if *shown < 5000 {
+        let (count, wait) = if *scrolls { (3, SCROLL_MS[*pic as usize - 1]) } else { (9, 5000) };
+        if *shown < wait {
             return;
         }
         *shown = 0;
         *pic += 1;
-        if *pic > 9 {
+        if *pic > count {
             if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
                 self.stage = *next;
             }
             return;
         }
         let pal = img.as_ref().map(|b| b.1).unwrap_or([[0; 4]; 256]);
-        *img = intro_pic(&self.archive, *pic, pal).map(Box::new);
+        *img = story_pic(&self.archive, *scrolls, *pic, pal).map(Box::new);
     }
 
     /// The next screen when the movie is over.
@@ -711,19 +762,29 @@ impl Creation {
             // The movie over: its colours stay for the pictures.
             let pal = self.movie.as_ref().map(|m| m.flc.palette).unwrap_or([[0; 4]; 256]);
             self.movie = None;
-            if let Stage::Story { pic, img, .. } = &mut self.stage {
+            if let Stage::Story { pic, img, scrolls, .. } = &mut self.stage {
                 *pic = 1;
-                *img = intro_pic(&self.archive, 1, pal).map(Box::new);
+                *img = story_pic(&self.archive, *scrolls, 1, pal).map(Box::new);
             }
             return;
         }
         let next = match self.stage {
-            Stage::Intro => self.after_intro(),
-            Stage::Ending => Stage::MainMenu,
-            Stage::Vision => Stage::Done,
+            Stage::Intro => {
+                self.movie = None;
+                self.after_intro()
+            }
+            Stage::Ending => {
+                // The farewell over: the program's main back to its menu
+                // through the intro (0000:10C9).
+                self.movie = crate::flc::Movie::new(&self.archive, "INTRO.FLC", Vec::new());
+                if self.movie.is_some() { Stage::Intro } else { self.after_intro() }
+            }
+            Stage::Vision => {
+                self.movie = None;
+                Stage::Done
+            }
             _ => return,
         };
-        self.movie = None;
         self.stage = next;
     }
 
@@ -964,6 +1025,21 @@ impl Creation {
             }
             return;
         }
+        if let Stage::Story { scrolls: true, pic, .. } = self.stage {
+            // The intro's scrolls: a key ends the movie (0000:65C8) or the
+            // picture's wait (13BF), Esc them all (12F0, 1314: ACB6).
+            if !matches!(inp, Input::Up | Input::Down | Input::Esc) {
+                if pic == 0 {
+                    if let Some(mv) = &mut self.movie {
+                        mv.over = true;
+                    }
+                    self.movie_over();
+                } else {
+                    self.story(u32::MAX >> 1);
+                }
+                return;
+            }
+        }
         if let Stage::Story { .. } = self.stage {
             // A key ends the whole story (0000:1314, 137F: ACB6).
             if !matches!(inp, Input::Up | Input::Down) {
@@ -989,9 +1065,17 @@ impl Creation {
         }
         let stage = std::mem::replace(&mut self.stage, Stage::Done);
         self.stage = match stage {
-            Stage::Title => match inp {
-                Input::Up | Input::Down => Stage::Title,
-                _ => Stage::MainMenu,
+            // A key ends the wait (0000:13BF); Esc held ends the intro
+            // (12CD: ACB6).
+            Stage::Title(t) => match inp {
+                Input::Up | Input::Down => Stage::Title(t),
+                Input::Esc => Stage::MainMenu,
+                _ => self.after_title(),
+            },
+            Stage::Quote(t) => match inp {
+                Input::Up | Input::Down => Stage::Quote(t),
+                Input::Esc => Stage::MainMenu,
+                _ => self.scroll_story(),
             },
             Stage::MainMenu => {
                 let key = |m: &Machine, i: u16| m.mem.r8(DATA, MENU_REGIONS + i * REGION + 0x59);
@@ -1014,7 +1098,7 @@ impl Creation {
                         self.colour = COLOUR_A;
                         let next = Box::new(Stage::Method(self.method(&mut engine.m)));
                         self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
-                        Stage::Story { pic: 0, ms: 0, img: None, next }
+                        Stage::Story { pic: 0, ms: 0, img: None, next, scrolls: false }
                     }
                     Some(_) => {
                         self.outcome = Some(Outcome::Exit);
@@ -1773,7 +1857,8 @@ impl Creation {
         }
         if self.boxes.is_empty() {
             let pic = match &self.stage {
-                Stage::Title => self.title.as_ref(),
+                Stage::Title(_) => self.title.as_ref(),
+                Stage::Quote(_) => self.quote.as_ref(),
                 Stage::MainMenu => self.menu_pic.as_ref(),
                 Stage::Story { img, .. } => img.as_deref(),
                 _ => None,
@@ -1983,8 +2068,8 @@ impl Creation {
 
 /// INTROnn.IMG (`n` 1..9; the digit at 4DD7 counted up, 0000:137B),
 /// shown in the colours `pal`.
-fn intro_pic(archive: &Archive, n: u8, pal: [[u8; 4]; 256]) -> Option<(Image, [[u8; 4]; 256])> {
-    let d = archive.read(&format!("INTRO0{n}.IMG"))?;
+fn story_pic(archive: &Archive, scrolls: bool, n: u8, pal: [[u8; 4]; 256]) -> Option<(Image, [[u8; 4]; 256])> {
+    let d = archive.read(&if scrolls { format!("SCROLL0{n}.IMG") } else { format!("INTRO0{n}.IMG") })?;
     crate::interface::image(&d).map(|(i, _)| (i, pal))
 }
 
