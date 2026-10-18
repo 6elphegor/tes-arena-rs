@@ -5,8 +5,8 @@
 //! A swing (0000:3988, driven by the mouse) lands on every actor in
 //! reach in front of the player (`swing_hits`): people die at once
 //! (`strike_person`), others take a blow (`strike_actor`). A swing that
-//! reaches no actor hits the wall ahead (0000:3D43, not ported: doors,
-//! locks and crime). Not ported: the sound (23BA:002A) and the text a
+//! reaches no actor hits the wall ahead (0000:3D43: doors, locks and
+//! crime, `Machine::bash` in weapon.rs). Not ported: the sound (23BA:002A) and the text a
 //! quest target says when giving up (0000:9AE6, 9CA0, 2DA2:000A,
 //! 1194:59C8), which only shows a message.
 
@@ -78,7 +78,7 @@ impl Machine {
     /// struck, people (slots before 0C57) by `strike_person`. Nothing
     /// happens when the player is not above the floor (C3D2 <= 0).
     /// Returns false when the swing reached no actor: the original then
-    /// hits the wall ahead (0000:3D43, not ported). None where a strike
+    /// hits the wall ahead (0000:3D43, `Machine::bash`). None where a strike
     /// faults or hangs.
     pub fn swing_hits(&mut self) -> Option<bool> {
         self.mem.w16(DS, svar::HITS, 0);
