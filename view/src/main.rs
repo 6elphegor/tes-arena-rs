@@ -1283,14 +1283,14 @@ impl Assets {
             self.moons = [day, (day + 0xE) & 0x1F];
             let mut cd = CelestialDraw { sheet: &self.sheet, focal, moons: &mut self.moons, out: Vec::new() };
             // The view's own pass, not the game's (whose drawing ran E41A
-            // on its copy): what it leaves in DGROUP is put back, its bank
-            // mapped back first. Left, its PHASE_DAY kept the engine's
-            // `moon_phases` from making a new day's moons.
-            let mapped = engine.m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED);
-            let kept = engine.m.mem.segment(arena::mem::DS).to_vec();
-            let ok = engine.m.celestial(&mut cd).is_some();
-            engine.m.ems_map(mapped >> 2);
-            engine.m.mem.segment_mut(arena::mem::DS).copy_from_slice(&kept);
+            // on its copy): run on a copy of the machine, so nothing it
+            // writes is left. Left, its PHASE_DAY kept the engine's
+            // `moon_phases` from making a new day's moons; and its writes,
+            // even put back, counted as the machine's since the drawing
+            // (`Memory::drawn_written`), which ended the drawing's own
+            // there (the moons' places, E042: the last outdoor frame's
+            // lost on going indoors).
+            let ok = engine.m.clone().celestial(&mut cd).is_some();
             if ok {
                 bodies = cd.out;
             }

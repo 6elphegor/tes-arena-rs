@@ -36,8 +36,7 @@ fn frames_until(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize,
     for _ in 0..n {
         a.compose();
         d.frame(a);
-        seen.push(state(a));
-        if a.waiting() {
+        seen.push(state(a));        if a.waiting() {
             d.key(a, KeyCode::Space, Some(" "));
         }
         if until(a) {
@@ -123,6 +122,35 @@ fn building(row: u16, col: u16, heading: u16, back: Option<u16>) -> Case {
     )
 }
 
+/// gen_areaplay.py's WILD_SOUTH: the up arrow held till the window moves
+/// (12 frames at most), the player put back before the next quarter
+/// (`then`), let go for a frame. (The harness's next step sees the top of
+/// the frame again, after `then`: the place it was put.)
+fn wild_south(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, then: impl FnOnce(&mut App)) {
+    let o = origin(a);
+    key(a, KeyCode::ArrowUp, true);
+    frames_until(a, d, seen, 12, |a| origin(a) != o);
+    then(a);
+    *seen.last_mut().unwrap() = state(a);
+    key(a, KeyCode::ArrowUp, false);
+    frames_until(a, d, seen, 1, |_| false);
+}
+
+/// gen_areaplay.py's `before_entrance`: on the square south of WILD065's
+/// entrance (row 49, column 12), 20h into it, facing north, the last
+/// place the same.
+fn before_entrance(a: &mut App) {
+    let m = &mut a.engine.m;
+    let (x, y) = ((12 << 7) + 0x40, (50 << 7) + 0x20);
+    for o in [0xC3D0, 0xBA62, 0x0600] {
+        m.mem.w16(DS, o, x);
+    }
+    for o in [0xC3D4, 0xBA66, 0x0602] {
+        m.mem.w16(DS, o, y);
+    }
+    m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
+}
+
 pub(super) fn transit_case(name: &str) -> Option<Case> {
     Some(match name {
         "transitstairs" => (
@@ -164,6 +192,41 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
         "transitstore" => building(3, 108, 0, None),
         "transitpalace" => building(8, 124, 0x80, Some(0)),
         "transitguild" => building(95, 52, 0x100, Some(0)),
+        "travelfast" => (
+            Place::Street,
+            Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                frames_until(a, d, seen, 2, |_| false);
+                // Shift+M: the travel map; High Rock, the place nearest
+                // (200, 100), its journey's box read, Travel.
+                key(a, KeyCode::ShiftLeft, true);
+                d.key(a, KeyCode::KeyM, Some("M"));
+                key(a, KeyCode::ShiftLeft, false);
+                for (x, y) in [(70, 45), (200, 100), (200, 100), (62, 180)] {
+                    d.click(a, x, y, MouseButton::Left);
+                }
+                for _ in 0..100 {
+                    if a.travel.is_none() {
+                        break;
+                    }
+                    d.wait(a, 100);
+                }
+                assert!(a.travel.is_none(), "the journey ends the travel map");
+                frames_until(a, d, seen, 4, |_| false);
+            }),
+        ),
+        "wilddungeon" => (
+            Place::Wild,
+            Box::new(|a: &mut App| wild_at(a, None, Some(0x2FF8), 0)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                wild_south(a, d, seen, |a| wild_at(a, None, Some(0x2FF8), 0));
+                wild_south(a, d, seen, |a| wild_at(a, None, Some(0x2FF8), 0));
+                wild_south(a, d, seen, before_entrance);
+                frames_until(a, d, seen, 2, |_| false);
+                click_leaving(a, d, seen, 10);
+                frames_until(a, d, seen, 3, |_| false);
+            }),
+        ),
         _ => return None,
     })
 }
@@ -240,4 +303,18 @@ fn into_the_palace_and_out_as_the_original() {
 #[test]
 fn into_the_mages_guild_and_out_as_the_original() {
     transit("transitguild");
+}
+
+/// Fast travel from the street (Shift+M, High Rock, Wind Keep, Travel):
+/// the journey's days, the village entered, its welcome read.
+#[test]
+fn fast_travel_as_the_original() {
+    transit("travelfast");
+}
+
+/// WILD065's entrance (trigger 8) clicked after three crossings south:
+/// the wilderness's dungeon entered (217B:04DC, 0000:08EC).
+#[test]
+fn into_a_wilderness_dungeon_as_the_original() {
+    transit("wilddungeon");
 }

@@ -574,6 +574,12 @@ class ScreenArena(DosArena):
         done = [0]
         def tick(mu, addr, size, _):
             self.w16(0x0151, (self.r16(0x0151) + 1) & 0xFFFF)
+            # The BIOS's count (0040:006C) with it: the game's timer
+            # interrupt goes on to the BIOS's at the same rate, so on the
+            # hardware the two advance together (`Engine::tick`). Read by
+            # 0000:9D60, the seed of a place's quests (1194:9358).
+            bios = struct.unpack('<I', bytes(mu.mem_read(0x46C, 4)))[0]
+            mu.mem_write(0x46C, struct.pack('<I', (bios + 1) & 0xFFFFFFFF))
         def top(mu, addr, size, _):
             if each is not None:
                 each(self)
