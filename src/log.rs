@@ -3,8 +3,10 @@
 //! Time is counted in minutes from the start of 3E 389: a year is 360
 //! days of 1440 minutes, in twelve months of 30 days. A log entry is "&",
 //! a date line ending in CR LF, the text, then " *". It is appended to
-//! LOG.nn (27E3:0060..0087), the oldest entry dropped first once the log
-//! reaches 2000 bytes (27E3:0169..01AA; `Machine::log_add`).
+//! LOG.nn (27E3:0060..0087). Once the log reaches 2000 bytes the game
+//! means to drop its oldest entry first (27E3:0169..01AA), but writes the
+//! shorter log to a path DOS refuses, so the log only grows
+//! (`Machine::log_add`).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -188,9 +190,12 @@ impl Machine {
     /// and what follows its first '*' written to a new file (0000:9DD2);
     /// the bank before put back. Bug kept: the new file's name is the
     /// path built from the log's path (25FD:0844 given SI as the first
-    /// call left it), "C:\ARENA_CD\C:\ARENA_CD\log.nn", which the
-    /// port's files, like the harness's, take by its last component, the
-    /// log itself. None where the read gives up.
+    /// call left it), "C:\ARENA_CD\C:\ARENA_CD\log.nn", which DOS refuses
+    /// (error 3, path not found: its third component's name ends at the
+    /// ':', `Files::path_error`). So the create fails, nothing is written
+    /// and the log is never trimmed: it only grows. The failure goes
+    /// unchecked (01A3 goes on). None where the read gives up, or where
+    /// 9DD2's 0000:74E5 would call its hook (not ported).
     fn log_trim(&mut self, files: &mut Files) -> Option<()> {
         self.log_name();
         let path = self.save_path(NAME);
@@ -208,7 +213,9 @@ impl Machine {
         }
         let n = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE).wrapping_sub(di);
         let twice = self.save_path(path);
-        self.file_write(files, twice, seg, di, n);
+        if self.file_write(files, twice, seg, di, n) == 0 && self.error_hook_set() {
+            return crate::giveup::not_ported("0000:9DD2: the trimmed log's create refused, the error hook set");
+        }
         self.map_bank(old, 1);
         Some(())
     }

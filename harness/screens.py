@@ -205,7 +205,13 @@ class ScreenArena(DosArena):
             if f is None:
                 return self._dos_device(ah, h)
             if not isinstance(f[0], bytearray):
-                return False
+                if len(f) < 3:
+                    return False
+                # A game directory's file opened and written to (as the
+                # logbook's LOG.nn): from here on it is a file written,
+                # its bytes the directory's (never written on disk).
+                f[0] = self.written[f[2]] = bytearray(f[0])
+                self.deleted.discard(f[2])
             n = self._reg('cx')
             data = bytes(self.mu.mem_read(self.lin(self._reg('ds'), self._reg('dx')), n))
             f[0][f[1]:f[1] + n] = data
@@ -287,7 +293,7 @@ class ScreenArena(DosArena):
             return
         if intno == 0x21 and os.environ.get('SCREENS_DEBUG') == '2':
             print('int21 ax=%04X bx=%04X cx=%04X dx=%04X' % (ax, self._reg('bx'), self._reg('cx'), self._reg('dx')), file=sys.stderr)
-        if intno == 0x21 and self._dos_write():
+        if intno == 0x21 and (self._bad_path() or self._dos_write()):
             return
         if intno == 0x21:
             ah = ax >> 8

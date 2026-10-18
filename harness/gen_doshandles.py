@@ -13,6 +13,11 @@ case from that state a script of the game's own file calls, far-called:
   read N                 0000:6BEC, CX N, DS:SI the EMS frame
   close                  0000:6742
   copy FROM TO           25FD:056F, SI 1044 (FROM), DI 1051 (TO)
+  log TEXT               27E3:000E (near), SI 1044 (TEXT): the logbook's
+                         entry added to LOG.nn (nn the slot, 64 here),
+                         its trim tried first where the log holds 2000
+                         bytes or more (to the path DOS refuses)
+  file NAME              no call: the file NAME as written so far
 
 One line a case:
 
@@ -22,7 +27,8 @@ SCRIPT the calls joined by `; `, RESULTS one per call joined by `; `: an
 open's CS:6837; a seek's DX:AX; a read's AX and the frame's first AX
 bytes' digest (when AX is no more than asked for); a close's AX and
 carry; a copy's 126C, 126E, A836, A838, the four counts at 5F5C.., and
-the destination as written (length and digest). A call that waits for
+the destination as written (length and digest); a log's AX; a file's
+length and digest as written, or `-`. A call that waits for
 the keyboard (DOS reading CON) is `waits`, and ends the case.
 """
 import os
@@ -43,6 +49,12 @@ CASES = [
     ('copy-there', 'miss NOSUCH.A; close; copy LOG.01 LOG.99'),
     ('copy-con', 'copy NOSUCH.C NOSUCH.99'),
     ('con-read', 'miss NOSUCH.A; read 10'),
+    # The logbook: LOG.64 made and an entry added; then a log of 2000
+    # bytes or more (the save's LOG.01, 801h bytes), whose trim's create
+    # DOS refuses (error 3), so it only grows; the next entry too.
+    ('log-new', 'log Found the first piece.; file LOG.64'),
+    ('log-full', 'miss NOSUCH.A; close; copy LOG.01 LOG.64; log Found the second piece.; file LOG.64'),
+    ('log-twice', 'miss NOSUCH.A; close; copy LOG.01 LOG.64; log One.; log Two.; file LOG.64'),
 ]
 
 
@@ -76,6 +88,13 @@ def step(a, op):
         dst = a.written.get(w[2])
         written = '-' if dst is None else '%x/%x' % (len(dst), fnv(bytes(dst)))
         return ' '.join('%x' % v for v in words + counts) + ' ' + written
+    if w[0] == 'log':
+        a.mu.mem_write(a.lin(a.ds, 0x1044), op[4:].encode() + b'\0')
+        assert a.run_screen(0x27E3, 0x000E, dict(si=0x1044), near=True) is None
+        return '%x' % a._reg('ax')
+    if w[0] == 'file':
+        f = a.written.get(w[1])
+        return '-' if f is None else '%x/%x' % (len(f), fnv(bytes(f)))
     raise ValueError(op)
 
 
