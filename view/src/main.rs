@@ -1335,16 +1335,6 @@ impl Assets {
     }
 }
 
-/// Whether a click at row `y` on the equipment page's items' list marks
-/// a quest's line with the staff's pieces held, which 1194:1F56 counts
-/// into the DI its callers leave (not ported): the view's own then.
-fn staff_line(m: &arena::machine::Machine, y: i32) -> bool {
-    let r8 = |o| m.mem.r8(arena::mem::DS, o);
-    let lines = r8(0x129D) as i32 + m.mem.r16(arena::mem::DS, 0x126C) as i32;
-    let row = (0..lines.min(7)).find(|&i| y <= 0x3D + 0x0B * i);
-    r8(0x0F77) != 0 && row.is_some_and(|i| r8(0x1297).wrapping_add(i as u8) >= r8(0x129D))
-}
-
 /// Timer ticks an animation frame lasts.
 const ANIMATE: usize = 4;
 
@@ -4078,23 +4068,35 @@ impl App {
                     }
                 } else if let Some(d) = panels::arrow_at(x, y) {
                     panels::arrow(&mut self.engine.m, &self.engine.files, d);
-                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0 && !staff_line(&self.engine.m, y) {
+                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() {
                     // The sheet's own page: the list's record's handler
                     // (1194:1AC6); a right click describes the line it
                     // marks (1988). What the list's panel shows (223A)
-                    // waits there for a click or a key (5536).
+                    // waits there for a click or a key (5536). A spell's
+                    // line marked already opens its page (1B3C), which
+                    // waits for clicks of its own (51D1).
                     let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
                     let mut wait = |_: &mut arena::machine::Machine, lines: &[(Vec<u8>, u8)], top: u16| {
                         shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
                     };
                     let e = &mut self.engine;
-                    let gave_up = if right {
-                        e.m.sheet_equipment_describe(&mut e.files, &mut said, y as u16, &mut wait).is_none()
+                    let done = if right {
+                        e.m.sheet_equipment_describe(&mut e.files, &mut said, y as u16, &mut wait)
                     } else {
-                        e.m.sheet_equipment_click(&mut e.files, &mut said, y as u16, &mut wait).is_none()
+                        e.m.sheet_equipment_click(&mut e.files, &mut said, y as u16, &mut wait)
                     };
-                    if gave_up {
-                        eprintln!("the list's click gave up: {}", arena::giveup::describe());
+                    match done {
+                        None => eprintln!("the list's click gave up: {}", arena::giveup::describe()),
+                        Some(false) => {
+                            // The spell's page sets its colours (68D7).
+                            self.fade_open(0, 1, move |s| {
+                                if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
+                                    inv.page = panels::SpellPage::open_sheet(&mut s.engine.m, &mut s.engine.files);
+                                }
+                            });
+                            return;
+                        }
+                        Some(true) => {}
                     }
                     if let Some((lines, top)) = shown {
                         inv.info = Some(lines);

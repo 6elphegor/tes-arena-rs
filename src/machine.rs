@@ -54,11 +54,15 @@ pub struct Machine {
     /// them), for the tests; a copy of the machine run again (a dialog's
     /// turn) takes it back with the rest.
     pub rows_drawn: Option<Vec<[u16; 11]>>,
+    /// DI as the equipment page's last handler left it, which its button
+    /// loop (1194:5CF4) keeps for the next (1F56 counts the quests' lines
+    /// into DS:DI): None where the port doesn't know it.
+    pub page_di: Option<u16>,
 }
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn } = self;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn, page_di } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -72,6 +76,7 @@ impl Clone for Machine {
             music_status: *music_status,
             rows_made: *rows_made,
             rows_drawn: rows_drawn.clone(),
+            page_di: *page_di,
             gave_up: *gave_up,
             list_kind: *list_kind,
         }
@@ -81,7 +86,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn } = source;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn, page_di } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -96,6 +101,7 @@ impl Clone for Machine {
         self.list_kind = *list_kind;
         self.rows_made = *rows_made;
         self.rows_drawn.clone_from(rows_drawn);
+        self.page_di = *page_di;
     }
 }
 
@@ -103,7 +109,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None, list_kind: 0, rows_made: None, rows_drawn: None }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None, list_kind: 0, rows_made: None, rows_drawn: None, page_di: None }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so

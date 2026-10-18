@@ -35,10 +35,11 @@
 //!   marked, worn or taken off, a quest's line's note; a right click's
 //!   description, 1988), the arrows (1A4A, 1A94), Drop (17D8) and Spells
 //!   (2365, the spells' list 1D5C). What they say goes in the list's
-//!   panel (223A), the wait there the front end's. Not ported: a quest's
-//!   line marked with the staff's pieces held (1F56, whose count takes
-//!   DI as 1DC8 leaves it), "Drop what?" (18CA, 223A with the caller's
-//!   DI) and the spell's page from the spells' list (1B3C).
+//!   panel (223A), the wait there the front end's. A marked spell's line
+//!   clicked again opens its page (1B3C: `sheet_spell_page`). Not
+//!   ported: "Drop what?" (18CA, with no line marked: 223A's wait the
+//!   list's own loop again, 2325, where a line clicked is the one
+//!   dropped).
 //! - The world given back (A6B5): the buffer block, the planes read back
 //!   from TEMPSAVE.$$$, the renderer's buffers (A561), SCREENSV.$$2, the
 //!   mouse's box (53AE), the row tables (DA8E) and outdoors the sky's
@@ -328,7 +329,7 @@ impl Machine {
 
     /// After a handler that leaves the loop going: its next turn's start
     /// (5D12..5D1E), B7C6 0 and the keys flushed before its wait.
-    fn equipment_turn_end(&mut self) {
+    pub(crate) fn equipment_turn_end(&mut self) {
         self.mem.w16(DS, LOOP_MATCH, 0);
         self.key_flush();
     }
@@ -371,8 +372,9 @@ impl Machine {
     /// the weapon's class made again (731A) and the page drawn again
     /// (23B1). A quest's line marked already, clicked again, says so in
     /// the list's panel (1B6F: 1BE0, 223A; `wait` the front end's wait
-    /// for a click or a key, 5536). The spells' page (129A 0) isn't
-    /// ported.
+    /// for a click or a key, 5536). On the spells' list (129A 0) the line
+    /// marked already opens its spell's page (1B3C): false, the caller
+    /// runs `sheet_spell_page`; true otherwise.
     pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
         self.equipment_turn(None, 0);
         if self.mem.r8(DS, 0x1299) != 0 {
@@ -383,7 +385,9 @@ impl Machine {
         let mark = self.mem.r8(DS, 0x1296);
         if mark != 0xFF && mark == old {
             if self.mem.r8(DS, 0x129A) == 0 {
-                return crate::giveup::not_ported("1194:1B3C: the spell's page from the equipment page's list");
+                // 1B3C: the spell's page, which ends the turn
+                // (`sheet_spell_page`, the caller's).
+                return Some(false);
             }
             if self.mem.r16(DS, 0x1270) != 0 {
                 // 1B6F: 748E (its kind, which 1BE0 doesn't read with
@@ -421,8 +425,8 @@ impl Machine {
     /// `wait` the front end's wait for a click or a key). A right click
     /// never puts an item on (1AF4). With another list up the page's loop
     /// is left (not ported); on the spells' list a line marked already
-    /// opens its page (1B3C, not ported).
-    pub fn sheet_equipment_describe(&mut self, files: &mut Files, hooks: &mut dyn crate::text::TextHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<()> {
+    /// opens its page (1B3C): false, the caller runs `sheet_spell_page`.
+    pub fn sheet_equipment_describe(&mut self, files: &mut Files, hooks: &mut dyn crate::text::TextHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
         self.equipment_turn(None, 0);
         if self.mem.r8(DS, 0x1299) != 0 {
             return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
@@ -440,10 +444,11 @@ impl Machine {
         }
         let mark = self.mem.r8(DS, 0x1296);
         if mark != 0xFF && mark == old && self.mem.r8(DS, 0x129A) == 0 {
-            return crate::giveup::not_ported("1194:1B3C: the spell's page from the equipment page's list");
+            // 1B3C, as a left click's (`sheet_spell_page`, the caller's).
+            return Some(false);
         }
         self.equipment_turn_end();
-        Some(())
+        Some(true)
     }
 
     /// 1194:1988: the marked line described in the list's panel: 12B2 0,
@@ -492,6 +497,7 @@ impl Machine {
             }
             let it = ITEMS.wrapping_add((mark as u16).wrapping_mul(SLOT));
             if self.item_info(files, hooks, it)? {
+                self.page_di = None;
                 let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
                 self.mem.w8(DS, LOOP_FLAGS, f);
                 self.select_font(0x102C);
@@ -521,6 +527,9 @@ impl Machine {
     /// 0, 8Fh; ABh by 2Ch, as 1738 kept it), the bank before mapped
     /// again, and the page shown.
     fn list_panel_text(&mut self, si: u16, cx: u16, bx: u16, dl: u8, wait: &mut PanelWait<'_>) {
+        // (Its callers here, 1A0A, 1C0A, 1815, 1981, give it DI 5536, its
+        // wait, which it keeps for theirs: `page_di`.)
+        self.page_di = Some(0x5536);
         self.select_font(0x102C);
         let top = bx;
         let mut lines = Vec::new();
@@ -622,8 +631,7 @@ impl Machine {
     /// the first shown (1297); none (FFh) below them or with no lines. A
     /// new mark puts the list's background back and draws the list again
     /// (21C2, 1DC8). Then 1270 and 1272 0, and a mark past the items is a
-    /// quest's line (1270 1; 1F56, ported only with no staff pieces, F77
-    /// 0). Returns the line's number (DX) for the click's equipping.
+    /// quest's line (1270 1; 1F56, `staff_line`). Returns the line's number (DX) for the click's equipping.
     fn list_mark(&mut self, files: &mut Files, y: u16) -> Option<u16> {
         let mut cx = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
         if self.mem.r8(DS, 0x129A) == 0 {
@@ -645,16 +653,40 @@ impl Machine {
         self.mem.w16(DS, 0x1272, 0);
         if self.mem.r8(DS, 0x1296) >= self.mem.r8(DS, 0x129D) {
             self.mem.w16(DS, 0x1270, 1);
-            if self.mem.r8(DS, 0x0F77) != 0 {
-                return crate::giveup::not_ported("1194:1F56: a quest's line marked with the staff's pieces held");
-            }
+            self.staff_line(files)?;
         }
         Some(dx)
     }
 
+    /// 1194:1F56: with the staff's pieces held (F77), the quests' lines
+    /// counted again (126C: A206 and 2433:083D into DS:DI, 1272 0) and
+    /// the marked line the staff's (1272 1) when it is the last: the
+    /// count plus the items' (in AL alone) one past the mark. Its DI is
+    /// the one the page's loop carries (`page_di`): a new mark's 1DC8
+    /// left it at 1044h (1EB8, the quests' lines drawn), but the same
+    /// line clicked again after a description or a note in the list's
+    /// panel finds 5536h, their 223A's, and the lines go over DGROUP
+    /// there (bug kept). Both leave DI as they found it.
+    fn staff_line(&mut self, files: &mut Files) -> Option<()> {
+        if self.mem.r8(DS, 0x0F77) == 0 {
+            return Some(());
+        }
+        let Some(di) = self.page_di else {
+            return crate::giveup::not_ported("1194:1F56: its DI as a handler the port doesn't follow left it");
+        };
+        self.mem.w16(DS, 0x1272, 0);
+        let n = self.quest_lines_counted_at(files, di)?;
+        let al = (n as u8).wrapping_add(self.mem.r8(DS, 0x129D));
+        let ax = n & 0xFF00 | al as u16;
+        if ax == self.mem.r8(DS, 0x1296) as u16 + 1 {
+            self.mem.w16(DS, 0x1272, 1);
+        }
+        Some(())
+    }
+
     /// 1194:21C2: the list's background (0Ch, 2Fh; 92h by 58h) put back
     /// from bank 4 at C350h (599C), the bank mapped before put back.
-    fn list_back(&mut self) {
+    pub(crate) fn list_back(&mut self) {
         let old = self.map_bank(4, 0);
         if self.page_is_block() {
             let frame = self.mem.r16(DS, FRAME);
@@ -665,7 +697,7 @@ impl Machine {
 
     /// 1194:1DC8 with SI the list 129A picks: the player's items (212h)
     /// or the spells (50Bh).
-    fn list_again(&mut self, files: &mut Files) -> Option<()> {
+    pub(crate) fn list_again(&mut self, files: &mut Files) -> Option<()> {
         self.equipment_list(files)
     }
 
@@ -726,9 +758,14 @@ impl Machine {
 
     /// 1194:A206 and 2433:083D into 1044, their lines counted at 126C.
     fn quest_lines_counted(&mut self, files: &mut Files) -> Option<u16> {
+        self.quest_lines_counted_at(files, NUMBER)
+    }
+
+    /// `quest_lines_counted` into DS:`di`.
+    fn quest_lines_counted_at(&mut self, files: &mut Files, di: u16) -> Option<u16> {
         use crate::questitems::var::COUNT;
         self.mem.w16(DS, COUNT, 0);
-        let more = self.quest_item_names(files, NUMBER)?;
+        let more = self.quest_item_names(files, di)?;
         let n = self.mem.r16(DS, COUNT).wrapping_add(more);
         self.mem.w16(DS, COUNT, n);
         Some(n)
@@ -825,6 +862,8 @@ impl Machine {
                 self.page_text_at(x, y, (DS, NUMBER));
             }
         }
+        // (DI as 76B4's drawing leaves it, which the port doesn't follow.)
+        self.page_di = None;
         Some(())
     }
 
@@ -841,6 +880,9 @@ impl Machine {
         self.mem.w16(DS, 0x1270, 0);
         self.mem.w16(DS, 0x1272, 0);
         self.select_font(0x102E);
+        // (Its DI after: 1044h where it draws the quests' lines, 1EB8;
+        // else as its drawing leaves it, which the port doesn't follow.)
+        self.page_di = None;
         if self.mem.r8(DS, 0x129A) == 0 {
             self.sheet_spell_list();
             self.select_font(0x102C);
@@ -889,6 +931,7 @@ impl Machine {
             ax = ax.wrapping_add(1);
         }
         if self.mem.r16(DS, LIST_SHOWN) != 7 {
+            self.page_di = Some(NUMBER);
             let n = self.quest_lines_counted(files)?;
             if n != 0 {
                 self.mem.w8(DS, 0x9288, 0xA0);

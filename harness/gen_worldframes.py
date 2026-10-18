@@ -681,6 +681,24 @@ CASES = {
     'playequipdescribe': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('rclick', 0x40, 0x42), ('click', 0x40, 0x42),
                                                                                                      ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                              ((), (KEY_F1,), 10, None)]),
+    # The staff's quest line on the equipment page: as playequip, the list
+    # moved on to its end ('+' 34 times: the save's 40 items and one
+    # quest's line), the last line (the staff's pieces, F77) clicked
+    # (marked, 1194:1C5E, its count made again, 1F56), right-clicked
+    # (1F56 again and described, 1988: "You currently have ...", 223A),
+    # the click its wait takes, clicked again (1B6F: "This item is
+    # needed...", 223A) and the click that wait takes, between N and Esc.
+    'playequipstaff': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N])] + [('keys', [KEY_PAD_PLUS])] * 34 + [
+        ('click', 0x40, 0x7A), ('rclick', 0x40, 0x7A), ('click', 0x40, 0x42), ('click', 0x40, 0x7A), ('click', 0x40, 0x42), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                          ((), (KEY_F1,), 10, None)]),
+    # A spell's page from the equipment page: as playequip, S (the
+    # spells' list, 1194:2365), its second line clicked (marked, 1C5E)
+    # and clicked again (1B3C: the spell's page, 51D1), the page's Exit
+    # (its loop's 8FC4; the list drawn again, 21C2, 1DC8), between N and
+    # Esc.
+    'playequipspellpage': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_S]), ('click', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                      ('click', 0x120, 0xC0), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                              ((), (KEY_F1,), 10, None)]),
     # No room to drop on the equipment page: the player's square (CB90)
     # given a byte in the plane at [D806] before F1, so the sheet's
     # 1194:5F13 finds no room (5E0 bit 20h); as playequip, D (17D8: "There is no room...",
