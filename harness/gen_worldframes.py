@@ -276,6 +276,13 @@ KEY_PAD_PLUS = 0x4E
 KEY_MINUS = 0x0C
 KEY_D = 0x20
 KEY_Y = 0x15
+KEY_S = 0x1F
+
+
+def crowded_square(a):
+    """The player's square (CB90) given a byte in the plane at [D806],
+    which 1194:5F13 takes for no room."""
+    a.mu.mem_write(a.lin(a.r16(0xD806), a.r16(0xCB90)), bytes([1]))
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
 
@@ -652,6 +659,28 @@ CASES = {
     'playequipdrop': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
                                                                                                  ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                          ((), (KEY_F1,), 10, None)]),
+    # The equipment page's Spells button: as playequip, S (3276:57D8's
+    # sixth record, 1194:2365: the caster's list turned to the spells,
+    # 1D5C), '+' (that list one line on), S (back to the items) between
+    # N and Esc.
+    'playequipspells': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_S]), ('keys', [KEY_PAD_PLUS]),
+                                                                                                   ('keys', [KEY_S]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                           ((), (KEY_F1,), 10, None)]),
+    # An item described on the equipment page: as playequip, the second
+    # line right-clicked (1194:1AC6 with AFF9 2: marked, 1C5E, then
+    # described in the list's panel, 1988, 223A), the click its wait
+    # takes (5536), between N and Esc.
+    'playequipdescribe': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('rclick', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                     ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                             ((), (KEY_F1,), 10, None)]),
+    # No room to drop on the equipment page: the player's square (CB90)
+    # given a byte in the plane at [D806] before F1, so the sheet's
+    # 1194:5F13 finds no room (5E0 bit 20h); as playequip, D (17D8: "There is no room...",
+    # 1962, in the list's panel, 223A) and the click its wait takes
+    # (5536) between N and Esc.
+    'playequipnoroom': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'do': crowded_square, 'script': [('keys', [KEY_N]), ('keys', [KEY_D]), ('click', 0x40, 0x42),
+                                                                                                                         ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                                   ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
     # frames, the Ring of Shielding used (the list's fourth: its spell

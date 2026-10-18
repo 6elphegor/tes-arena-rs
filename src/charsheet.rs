@@ -30,9 +30,15 @@
 //!   drawn (23B1): the doll, the name, race, class and level, the list of
 //!   the items and the quests' lines (1DC8), the armour's classes (76B4).
 //!   Its own buttons' loop (5CF4 over 3276:57D8's six) with B7C4 bit 4;
-//!   its exit (the fifth, Esc) goes back to the stats' page (0D8E). Its
-//!   other buttons (the list, the arrows, Drop, Spells) are the front
-//!   end's, through the inventory's ports (`use_item.rs`).
+//!   its exit (the fifth, Esc) goes back to the stats' page (0D8E). The
+//!   others are the original's handlers: the list's clicks (1AC6: a line
+//!   marked, worn or taken off, a quest's line's note; a right click's
+//!   description, 1988), the arrows (1A4A, 1A94), Drop (17D8) and Spells
+//!   (2365, the spells' list 1D5C). What they say goes in the list's
+//!   panel (223A), the wait there the front end's. Not ported: a quest's
+//!   line marked with the staff's pieces held (1F56, whose count takes
+//!   DI as 1DC8 leaves it), "Drop what?" (18CA, 223A with the caller's
+//!   DI) and the spell's page from the spells' list (1B3C).
 //! - The world given back (A6B5): the buffer block, the planes read back
 //!   from TEMPSAVE.$$$, the renderer's buffers (A561), SCREENSV.$$2, the
 //!   mouse's box (53AE), the row tables (DA8E) and outdoors the sky's
@@ -93,6 +99,11 @@ const WORN: u16 = 0x129D;
 const ITEM_COLOUR: u16 = 0x12A4;
 const ITEM_STEPS: u16 = 0x12A6;
 const ITEM_HEADER: u16 = 0x12A8;
+/// The front end's wait (1194:5536, after 5E21) while the list's panel
+/// shows its lines (1194:223A): each line's text and colour, and the
+/// first's row.
+pub type PanelWait<'a> = dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) + 'a;
+
 /// The scratch the numbers are made in (1044) and the colours (929E).
 const NUMBER: u16 = 0x1044;
 const SCRATCH: u16 = 0x929E;
@@ -358,19 +369,11 @@ impl Machine {
     /// marked already, clicked again, puts its item on or takes it off
     /// (1AFB: `equip_click`, its refusals' boxes 1BE0 and 1B78 `hooks`'),
     /// the weapon's class made again (731A) and the page drawn again
-    /// (23B1). A quest's line marked already, clicked again (1B6F: 748E,
-    /// 1BE0's box), isn't ported: Some(false), the game left untouched,
-    /// for the front end's own; nor is the spells' page (129A 0).
-    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16) -> Option<bool> {
-        let mut cx = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
-        if self.mem.r8(DS, 0x129A) == 0 {
-            cx = self.mem.r8(DS, 0x050A) as u16;
-        }
-        let row = (0..cx.min(7)).find(|&i| y <= 0x3D + 0x0B * i);
-        let marked = row.map(|r| (r as u8).wrapping_add(self.mem.r8(DS, 0x1297)));
-        if marked.is_some_and(|m| m == self.mem.r8(DS, 0x1296) && m >= self.mem.r8(DS, 0x129D)) {
-            return Some(false);
-        }
+    /// (23B1). A quest's line marked already, clicked again, says so in
+    /// the list's panel (1B6F: 1BE0, 223A; `wait` the front end's wait
+    /// for a click or a key, 5536). The spells' page (129A 0) isn't
+    /// ported.
+    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
         self.equipment_turn(None, 0);
         if self.mem.r8(DS, 0x1299) != 0 {
             return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
@@ -383,7 +386,25 @@ impl Machine {
                 return crate::giveup::not_ported("1194:1B3C: the spell's page from the equipment page's list");
             }
             if self.mem.r16(DS, 0x1270) != 0 {
-                return crate::giveup::not_ported("1194:1B6F: a quest's line clicked again (748E, 1BE0)");
+                // 1B6F: 748E (its kind, which 1BE0 doesn't read with
+                // 1270 set), then 1BE0: "This item is needed..."'s text
+                // (3276:5A90) copied to 1044 (1BCE) and shown in the
+                // list's panel (223A) in A0h at row A0h.
+                let mut si = 0x5A90u16;
+                let mut di = NUMBER;
+                loop {
+                    let c = self.mem.r8(DATA, si);
+                    self.mem.w8(DS, di, c);
+                    if c == 0 {
+                        break;
+                    }
+                    si = si.wrapping_add(1);
+                    di = di.wrapping_add(1);
+                }
+                self.mem.w8(DS, 0x9288, 0xA0);
+                self.list_panel_text(NUMBER, 1, 0xA0, 0xA0, wait);
+                self.equipment_turn_end();
+                return Some(true);
             }
             if self.equip_click(hooks, slot)? == crate::use_item::Equip::Toggled {
                 self.equipment_drawn(files)?;
@@ -393,14 +414,152 @@ impl Machine {
         Some(true)
     }
 
+    /// A right click on the equipment page's list (3276:57D8's first
+    /// record, 1194:1AC6, with AFF9 2) at row `y`: the line under it
+    /// marked (1C5E), and the items' list's marked line described
+    /// (1CEC: 1988, `item_described`; `hooks` a special item's own box,
+    /// `wait` the front end's wait for a click or a key). A right click
+    /// never puts an item on (1AF4). With another list up the page's loop
+    /// is left (not ported); on the spells' list a line marked already
+    /// opens its page (1B3C, not ported).
+    pub fn sheet_equipment_describe(&mut self, files: &mut Files, hooks: &mut dyn crate::text::TextHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<()> {
+        self.equipment_turn(None, 0);
+        if self.mem.r8(DS, 0x1299) != 0 {
+            return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
+        }
+        let old = self.mem.r8(DS, 0x1296);
+        // (1C5E describes only from a line: below them it returns first.)
+        let mut cx = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
+        if self.mem.r8(DS, 0x129A) == 0 {
+            cx = self.mem.r8(DS, 0x050A) as u16;
+        }
+        let hit = (0..cx.min(7)).any(|i| y <= 0x3D + 0x0B * i);
+        self.list_mark(files, y)?;
+        if hit && self.mem.r8(DS, 0x129A) != 0 {
+            self.item_described(files, hooks, wait)?;
+        }
+        let mark = self.mem.r8(DS, 0x1296);
+        if mark != 0xFF && mark == old && self.mem.r8(DS, 0x129A) == 0 {
+            return crate::giveup::not_ported("1194:1B3C: the spell's page from the equipment page's list");
+        }
+        self.equipment_turn_end();
+        Some(())
+    }
+
+    /// 1194:1988: the marked line described in the list's panel: 12B2 0,
+    /// 12B0 3 (the lines), 9288 FEh, TEENYFNT ([102E]). A quest's line
+    /// (1270): "This item is needed..." (3276:5AF3) copied to 1044, or
+    /// with the staff's pieces (1272) "You currently have %d piece(s)..."
+    /// (5B36 with F77), 12B2 1. Else, with items (129D their count, 7472)
+    /// and a line marked, its item's description (7CBA, `item_info`)
+    /// unless a special item's own box (the carry) took it. Then [12B0]
+    /// lines in the list's panel (223A) from row 90h (95h unless four),
+    /// the first in 55h unless 12B2, the rest FEh; AFF9 2, B7C4 bit 1
+    /// off and ARENAFNT ([102C]) again.
+    fn item_described(&mut self, files: &mut Files, hooks: &mut dyn crate::text::TextHooks, wait: &mut PanelWait<'_>) -> Option<()> {
+        use crate::use_item::info;
+        self.mem.w16(DS, info::ARGS, 0);
+        self.mem.w16(DS, info::LINES, 3);
+        self.mem.w8(DS, 0x9288, 0xFE);
+        self.select_font(0x102E);
+        if self.mem.r16(DS, 0x1270) != 0 {
+            self.mem.w16(DS, info::ARGS, 1);
+            if self.mem.r16(DS, 0x1272) != 0 {
+                let pieces = self.mem.r8(DS, 0x0F77) as u16;
+                self.sprintf((DS, NUMBER), (DATA, 0x5B36), &[crate::format::Arg::Int(pieces)]);
+            } else {
+                let mut si = 0x5AF3u16;
+                let mut di = NUMBER;
+                loop {
+                    let c = self.mem.r8(DATA, si);
+                    self.mem.w8(DS, di, c);
+                    if c == 0 {
+                        break;
+                    }
+                    si = si.wrapping_add(1);
+                    di = di.wrapping_add(1);
+                }
+            }
+        } else {
+            let (n, _) = self.count_items(DS, ITEMS);
+            if n == 0 {
+                return Some(());
+            }
+            self.mem.w8(DS, WORN, n as u8);
+            let mark = self.mem.r8(DS, 0x1296);
+            if mark == 0xFF {
+                return Some(());
+            }
+            let it = ITEMS.wrapping_add((mark as u16).wrapping_mul(SLOT));
+            if self.item_info(files, hooks, it)? {
+                let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+                self.mem.w8(DS, LOOP_FLAGS, f);
+                self.select_font(0x102C);
+                return Some(());
+            }
+        }
+        let lines = self.mem.r16(DS, info::LINES);
+        let y = if lines == 4 { 0x90 } else { 0x95 };
+        if self.mem.r16(DS, info::ARGS) == 0 {
+            self.mem.w8(DS, 0x9288, 0x55);
+        }
+        self.list_panel_text(NUMBER, lines, y, 0xFE, wait);
+        self.mem.w8(DS, 0xAFF9, 2);
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        self.select_font(0x102C);
+        Some(())
+    }
+
+    /// 1194:223A: `cx` lines of the text at DS:`si` in the list's panel:
+    /// ARENAFNT ([102C]); each line's CR (looked for in its first 1F4h
+    /// bytes) made a NUL and the line drawn centred on x 55h at row `bx`
+    /// (0000:5364), 0Bh lower each, in 9288 (the caller's for the first,
+    /// `dl` after). The page shown (9466); the wait for the buttons'
+    /// release (5E21) and for a click or a key (DI 5536) are `wait`'s.
+    /// Then the panel's message place put back from bank [1032] (599C:
+    /// 0, 8Fh; ABh by 2Ch, as 1738 kept it), the bank before mapped
+    /// again, and the page shown.
+    fn list_panel_text(&mut self, si: u16, cx: u16, bx: u16, dl: u8, wait: &mut PanelWait<'_>) {
+        self.select_font(0x102C);
+        let top = bx;
+        let mut lines = Vec::new();
+        let (mut si, mut bx) = (si, bx);
+        for _ in 0..cx {
+            let mut di = si;
+            for _ in 0..0x1F4 {
+                let c = self.mem.r8(DS, di);
+                di = di.wrapping_add(1);
+                if c == 0x0D {
+                    break;
+                }
+            }
+            self.mem.w8(DS, di.wrapping_sub(1), 0);
+            lines.push((self.mem.cstr(DS, si).to_vec(), self.mem.r8(DS, 0x9288)));
+            let w = self.text_width(si);
+            si = self.page_text_at(0x55u16.wrapping_sub(w >> 1), bx, (DS, si));
+            bx = bx.wrapping_add(0x0B);
+            self.mem.w8(DS, 0x9288, dl);
+        }
+        wait(self, &lines, top);
+        let bank = self.mem.r16(DS, 0x1032);
+        let old = self.map_bank(bank, 0);
+        if self.page_is_block() {
+            let frame = self.mem.r16(DS, FRAME);
+            self.page_rect_put((frame, 0), 0, 0x8F, 0xAB, 0x2C);
+        }
+        self.map_bank(old, 0);
+    }
+
     /// D or the Drop button (3276:57D8's fourth record, 1194:17D8), `key`
     /// its key typed (None, a click): the drop button's rules
     /// (`drop_button`), its question the yes-or-no menu (48E9: 020E with
     /// the text at 1044 and the entries at 4B63, `menu_boxes` over
     /// `screen` and `menu_closed`, `pick` the front end's answer, 0 yes);
-    /// a drop draws the page again (1CF0's 23B1). Its refusals' boxes
-    /// (223A: no room, a quest's item, "Drop what?") aren't ported.
-    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16) -> Option<()> {
+    /// a drop draws the page again (1CF0's 23B1). Its refusals (no room,
+    /// a quest's item) are said in the list's panel (223A, `wait` the
+    /// front end's); "Drop what?" (18CA) isn't ported.
+    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>) -> Option<()> {
         use crate::use_item::DropButton;
         self.equipment_turn(key, 3);
         let mut failed = false;
@@ -420,12 +579,41 @@ impl Machine {
             return None;
         }
         match r {
-            DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat => crate::giveup::not_ported("1194:223A: the drop button's refusal in the page"),
+            DropButton::NoRoom | DropButton::CantDrop => {
+                // 1962, 17FB: the refusal's text (at 1044) in the list's
+                // panel (223A) in A0h at row A0h, DI 5536: the wait.
+                self.list_panel_text(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xA0, wait);
+                self.equipment_turn_end();
+                Some(())
+            }
+            // 18CA: its 223A takes DI as the drop's callers leave it.
+            DropButton::DropWhat => crate::giveup::not_ported("1194:18E7: \"Drop what?\" in the page (223A with the caller's DI)"),
             DropButton::Nothing | DropButton::Dropped => {
                 self.equipment_turn_end();
                 Some(())
             }
         }
+    }
+
+    /// S or the Spells button (3276:57D8's sixth record, 1194:2365), `key`
+    /// its key typed (None, a click): a caster (1A9 bit 20h) turns the
+    /// list to the spells' (129A flipped) or back to the items', the
+    /// first line marked and shown first, and the page drawn again (23B1);
+    /// anyone else gets the box of 3276:5AD7 (1194:59CC, `message_shown`
+    /// over `screen`).
+    pub fn sheet_equipment_spells(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>) -> Option<()> {
+        self.equipment_turn(key, 5);
+        if self.mem.r8(DS, 0x01A9) & 0x20 != 0 {
+            let v = self.mem.r8(DS, 0x129A) ^ 1;
+            self.mem.w8(DS, 0x129A, v);
+            self.mem.w8(DS, 0x1296, 0);
+            self.mem.w8(DS, 0x1297, 0);
+            self.equipment_drawn(files)?;
+        } else {
+            self.message_shown((DATA, 0x5AD7), screen)?;
+        }
+        self.equipment_turn_end();
+        Some(())
     }
 
     /// 1194:1C5E: the line a click at row `y` marks (1296): of the lines
@@ -475,13 +663,45 @@ impl Machine {
         self.map_bank(old, 0);
     }
 
-    /// 1194:1DC8 with SI the player's items (129A 1); the spells' list
-    /// (SI 50Bh) isn't ported.
+    /// 1194:1DC8 with SI the list 129A picks: the player's items (212h)
+    /// or the spells (50Bh).
     fn list_again(&mut self, files: &mut Files) -> Option<()> {
-        if self.mem.r8(DS, 0x129A) == 0 {
-            return crate::giveup::not_ported("1194:1DC8 with the spells' list (SI 50Bh)");
-        }
         self.equipment_list(files)
+    }
+
+    /// 1194:1D5C: the spells' list (129A 0), the spells' numbers at 50Bh
+    /// ([50A] of them): up to seven lines from [1297] (from 9Fh on, A0h
+    /// less it), each at (0Eh, 32h + 0Bh a line) in 53h, the marked one
+    /// ([1296]) boxed first in A0h (22AF), its name (29CF:0650) at 1044.
+    fn sheet_spell_list(&mut self) {
+        let n = self.mem.r8(DS, 0x050A) as u16;
+        if n == 0 {
+            return;
+        }
+        let first = self.mem.r8(DS, 0x1297);
+        let mut cx = n;
+        if cx >= 7 {
+            cx = 7;
+            if first >= 0x9F {
+                cx = 0xA0u8.wrapping_sub(first) as u16;
+            }
+        }
+        let (mut ax, mut bx) = (first as u16, 0x32u16);
+        let mut si = 0x050Bu16.wrapping_add(first as u16);
+        for _ in 0..cx {
+            self.mem.w8(DS, 0x9288, 0x53);
+            if self.mem.r8(DS, 0x1296) == ax as u8 {
+                self.mem.w8(DS, 0x9288, 0xA0);
+                self.line_box(bx);
+                self.mem.w8(DS, 0x9288, 0x53);
+            }
+            let spell = self.mem.r8(DS, si);
+            self.spell_name_copy(spell, NUMBER);
+            self.page_text_at(0x0E, bx, (DS, NUMBER));
+            si = si.wrapping_add(1);
+            bx = bx.wrapping_add(0x0B);
+            ax = ax.wrapping_add(1);
+        }
     }
 
     /// 1194:16E0: the equipment page made: the clothes' names (1D22), no
@@ -621,6 +841,11 @@ impl Machine {
         self.mem.w16(DS, 0x1270, 0);
         self.mem.w16(DS, 0x1272, 0);
         self.select_font(0x102E);
+        if self.mem.r8(DS, 0x129A) == 0 {
+            self.sheet_spell_list();
+            self.select_font(0x102C);
+            return Some(());
+        }
         let first = self.mem.r8(DS, 0x1297) as u16;
         let mut cx = 7u16;
         if first + 7 > 0x28 {

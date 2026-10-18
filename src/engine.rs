@@ -647,6 +647,8 @@ impl Engine {
         m.buffer_block_alloc()?;
         m.draw_buffers_alloc()?;
         m.light_table_make()?;
+        // A523: the row tables made (DA8E), before the INF's ceiling.
+        m.rows_keep();
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             m.info_load(&mut self.files, info)?;

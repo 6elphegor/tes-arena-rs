@@ -25,6 +25,13 @@ left it (`screen`):
   stateems | NAME | <count> <offsets' digest> | <digest>
   screen | NAME | <page digest> <palette digest> <mask digest>
 
+and, where a box opens in a frame over that frame's drawing (0000:8F2A
+keeping what it covers: the palace's audience), the 3D view's rows of
+the page (the first 92h) as the first such box finds them, the frame's
+number the track's:
+
+  boxview | NAME | <frame> <digest>
+
 With --dump DIR, each case's NAME.ds/.ems (as it ends) and NAME.ds0/
 .ems0 (as it starts) for worldtest's state reports (game data: never
 commit them).
@@ -36,7 +43,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, fnv
 from unicorn import UC_HOOK_CODE
-from screens import ScreenArena
+from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 import gen_worldframes as w
 
@@ -165,7 +172,17 @@ def main():
             places[where] = {'dungeon': gd.dungeon, 'street': w.street, 'wild': w.wild}[where](a, base)
         print(name, file=sys.stderr)
         tracks = []
-        full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
+        boxed = []
+
+        def box(*_):
+            if not boxed:
+                seg = a.r16(PAGE_SEG_FIELD)
+                boxed.append((len(tracks) - 1, fnv(bytes(a.mu.mem_read(a.lin(seg, 0), 0x92 * 320)))))
+        hook = a.mu.hook_add(UC_HOOK_CODE, box, None, a.lin(LOAD_SEG, 0x8F2A), a.lin(LOAD_SEG, 0x8F2A))
+        try:
+            full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
+        finally:
+            a.mu.hook_del(hook)
         for t in tracks:
             out.write(t)
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
@@ -174,6 +191,8 @@ def main():
         ems = b''.join(a.ems_bank(b) for b in range(0x20))
         out.write(w.state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
+        for frame, digest in boxed:
+            out.write(f'boxview | {name} | {frame} {digest:x}\n')
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('ds', after), ('ems', ems), ('ds0', a.pre_state[0]), ('ems0', a.pre_state[1]),
