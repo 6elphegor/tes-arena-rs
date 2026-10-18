@@ -37,7 +37,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from dos import DosArena
-from emu import Fault, LOAD_SEG, STUB_SEG
+from emu import Fault, LOAD_SEG, STUB_SEG, mine
 
 EXE, GAME, OUT = sys.argv[1:4]
 SKIP = int(sys.argv[4]) if len(sys.argv) > 4 else 0
@@ -47,10 +47,12 @@ done = 0
 
 
 def skip():
-    """True for cases an interrupted run already wrote."""
+    """True for cases an interrupted run already wrote, or another shard's
+    (every case's settings are drawn either way, so the cases don't change)."""
     global done
     done += 1
-    return done <= SKIP
+    n, total = done - 1, TOTAL
+    return done <= SKIP or not mine(n, total)
 
 BUFFER_SEG, MAP2_PRESET = 0x8800, 0x8000
 PLANE_VARS = (0xCCD0, 0xD806, 0xD748, 0x9030)
@@ -102,6 +104,7 @@ def digests(before):
 cases = [(n, 0xFF) for n in MIFS]
 cases += [(rng.choice(MIFS), rng.choice([0, 1, 2, 3, 5, 0x40])) for _ in range(200)]
 cases += [(b'NOSUCH.MIF', 0xFF), (b'', 0xFF)]
+TOTAL = len(cases) + 40 + 60  # single loads, whole cities, reloads
 for name, override in cases:
     fresh()
     flags = rng.choice([0, 0x200, rng.getrandbits(16)])
