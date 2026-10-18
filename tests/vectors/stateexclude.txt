@@ -15,6 +15,8 @@ af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at D
 a876 a878 the spell's description's SP (1194:6DD2), kept across its sprintf (6E1F): the port has no stack (a stand-in, FFD0h)
 7865 7867 the repairs' price text's SP (1194:CCFD), kept for its way out: the port has no stack
 7921 7923 the logbook's pages' SP (27E3:02DF), kept for their way out (03D1): the port has no stack
+6cc2 6cc4 1194:9462's SP, kept and never read: the port has no stack
+a8c4 a8c5 the travel map's passes (26F7:06F0): as many as its loop runs, at the machine's speed (the harness's at its script's polls)
 9740 974e the polygon drawer's own stack (DS:974E down): its calls' return addresses and the image's segment (1000h higher in the harness) it pushes
 fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver)
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
@@ -35,6 +37,7 @@ cd54 cd56 the segment of the hook at CD52 (0000:0B48)
 5b18 5b1a the bar's list's record at 5AF4's texts' segment (+24, 2542:0704): DGROUP's
 5b37 5b39 the record at 5AF4's lines' drawing's segment (+43, from B800: the image's, 3159:076F)
 b80c b80e the list window's record's segment (B80A's far pointer: DGROUP's)
+b7d6 b7d8 the window's regions' list's segment (B7D4's far pointer, 3159:04C9: the image's 3276h)
 1282 1284 the spell's page's record's segment (1280's far pointer, 1194:5205: the image's 3276h)
 1234 1236 the spell's description's third word pushed (from 122E, 1194:6D87): playequipspellpage's spell's %s's segment, DGROUP's
 1258 1259 AH as 1194:AFD9's callers leave it, kept by 27CE:0040: DGROUP's segment's high byte

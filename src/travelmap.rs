@@ -93,8 +93,10 @@ pub trait TravelHooks: ClockHooks {
     fn bank(&mut self, m: &mut Machine, bank: u16) {
         m.ems_map(bank);
     }
-    /// 1194:4D74: the screen's bank `bx` shown.
-    fn show_bank(&mut self, _m: &mut Machine, _bx: u16) {}
+    /// 1194:4D74: the screen's bank `bx` shown (`Machine::screen_bank`).
+    fn show_bank(&mut self, m: &mut Machine, bx: u16) {
+        m.screen_bank(bx);
+    }
     /// 1194:2E69: the journey's days (`Machine::travel_days`, which leaves
     /// them at 1927 too).
     fn days(&mut self, m: &mut Machine, files: &mut Files) -> Option<u16> {

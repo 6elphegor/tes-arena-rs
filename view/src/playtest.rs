@@ -966,7 +966,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     use winit::keyboard::KeyCode;
                     let archive = st.assets.archive.clone();
                     let here = engine.m.mem.cstr(DS, 0x0A22).to_vec();
-                    match crate::travel::Travel::open(&mut engine, &archive) {
+                    match crate::travel::Travel::open(&mut engine, &archive, None) {
                         Ok(mut t) => {
                             *counts.entry("travel opened").or_default() += 1;
                             // On the world map: the current province's

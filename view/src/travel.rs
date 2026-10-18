@@ -77,11 +77,6 @@ const REGIONS: [(i32, i32, i32, i32); 10] = [
     (279, 188, 37, 11),
 ];
 
-/// A province map's buttons (DATA:7164's regions: x, y, width, height).
-const SEARCH: (i32, i32, i32, i32) = (34, 167, 18, 28);
-const TRAVEL: (i32, i32, i32, i32) = (53, 167, 18, 28);
-const EXIT: (i32, i32, i32, i32) = (72, 167, 18, 29);
-
 /// The location records' lists (19h bytes each).
 const CITIES: u16 = 0x1445;
 const TOWNS: u16 = 0x150D;

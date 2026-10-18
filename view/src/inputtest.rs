@@ -872,7 +872,7 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     let mut b = app(&dir, &start);
     Driver::new(&mut b);
     let archive = b.assets.archive.clone();
-    let mut t = Some(travel::Travel::open(&mut b.engine, &archive).unwrap_or_else(|_| panic!("it opens")));
+    let mut t = Some(travel::Travel::open(&mut b.engine, &archive, Some(&b.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))).unwrap_or_else(|_| panic!("it opens")));
     t.as_mut().unwrap().click(&mut b.engine, &archive, px, py, false);
     t.as_mut().unwrap().click(&mut b.engine, &archive, 135, 58, false);
     same(&a, &b, "the place clicked, and Travel::click");
