@@ -3704,6 +3704,7 @@ impl App {
         let mut page = false;
         let mut back: Option<Option<u8>> = None;
         let mut sheet_drop = None;
+        let mut sheet_spells = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
@@ -3766,6 +3767,9 @@ impl App {
                 } else if inv.from_sheet && self.sheet_run.is_some() && code == KeyCode::KeyD {
                     // The drop button's key (3276:57D8's fourth record).
                     sheet_drop = Some((Some(b'd'), None));
+                } else if inv.from_sheet && self.sheet_run.is_some() && code == KeyCode::KeyS {
+                    // The Spells button's key (3276:57D8's sixth record).
+                    sheet_spells = true;
                 } else if inv.from_sheet && self.sheet_run.is_some() && matches!(code, KeyCode::NumpadAdd | KeyCode::Equal | KeyCode::Minus | KeyCode::NumpadSubtract) {
                     // The arrows' keys, '+' and '-' (3276:57D8's second and
                     // third records): the game's state's own handlers.
@@ -3832,6 +3836,9 @@ impl App {
         if page {
             self.equipment_page(Some(b'n'));
         }
+        if sheet_spells {
+            self.sheet_spells(Some(b's'));
+        }
         if let Some((key, answer)) = sheet_drop {
             self.sheet_drop_asked(key, answer);
         }
@@ -3897,6 +3904,26 @@ impl App {
             eprintln!("the drop button gave up: {}", arena::giveup::describe());
         }
         None
+    }
+
+    /// S or the Spells button on the sheet's own equipment page
+    /// (`Machine::sheet_equipment_spells`), `key` typed (`s`) or None for
+    /// a click: a caster's list turned to the spells or back; anyone
+    /// else's box (3276:5AD7) put up.
+    fn sheet_spells(&mut self, key: Option<u8>) {
+        let screen = self.assets.shown.clone();
+        let caster = self.engine.m.mem.r8(arena::mem::DS, 0x01A9) & 0x20 != 0;
+        let e = &mut self.engine;
+        if e.m.sheet_equipment_spells(&mut e.files, key, Some(&screen)).is_none() {
+            eprintln!("the spells button gave up: {}", arena::giveup::describe());
+        }
+        if !caster {
+            let t = self.engine.m.mem.cstr(arena::mem::DATA, 0x5AD7).to_vec();
+            self.boxes.push_back(hud::lines(&t, 0x0F));
+        }
+        if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
+            inv.bare = false;
+        }
     }
 
     /// `sheet_drop`, its question put up on the inventory.
@@ -3970,6 +3997,7 @@ impl App {
         let mut cast = None;
         let mut back = false;
         let mut sheet_drop = None;
+        let mut sheet_spells = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page up (1194:51D1): the click its question
@@ -4015,6 +4043,7 @@ impl App {
                     match b {
                         panels::Button::Exit if inv.from_sheet => back = true,
                         panels::Button::Exit => self.panel = None,
+                        panels::Button::Spellbook if inv.from_sheet && self.sheet_run.is_some() => sheet_spells = true,
                         panels::Button::Spellbook => {
                             inv.bare = false;
                             panels::spells_button(&mut self.engine.m, &mut said)
@@ -4099,6 +4128,9 @@ impl App {
                 _ => {}
             },
             None => {}
+        }
+        if sheet_spells {
+            self.sheet_spells(None);
         }
         if let Some((key, answer)) = sheet_drop {
             self.sheet_drop_asked(key, answer);

@@ -428,6 +428,27 @@ impl Machine {
         }
     }
 
+    /// S or the Spells button (3276:57D8's sixth record, 1194:2365), `key`
+    /// its key typed (None, a click): a caster (1A9 bit 20h) turns the
+    /// list to the spells' (129A flipped) or back to the items', the
+    /// first line marked and shown first, and the page drawn again (23B1);
+    /// anyone else gets the box of 3276:5AD7 (1194:59CC, `message_shown`
+    /// over `screen`).
+    pub fn sheet_equipment_spells(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>) -> Option<()> {
+        self.equipment_turn(key, 5);
+        if self.mem.r8(DS, 0x01A9) & 0x20 != 0 {
+            let v = self.mem.r8(DS, 0x129A) ^ 1;
+            self.mem.w8(DS, 0x129A, v);
+            self.mem.w8(DS, 0x1296, 0);
+            self.mem.w8(DS, 0x1297, 0);
+            self.equipment_drawn(files)?;
+        } else {
+            self.message_shown((DATA, 0x5AD7), screen)?;
+        }
+        self.equipment_turn_end();
+        Some(())
+    }
+
     /// 1194:1C5E: the line a click at row `y` marks (1296): of the lines
     /// shown (129D and 126C, or the spells' 50A; at most seven) the first
     /// whose bottom (3Dh, then each 0Bh lower) is at or below it, plus
@@ -475,13 +496,45 @@ impl Machine {
         self.map_bank(old, 0);
     }
 
-    /// 1194:1DC8 with SI the player's items (129A 1); the spells' list
-    /// (SI 50Bh) isn't ported.
+    /// 1194:1DC8 with SI the list 129A picks: the player's items (212h)
+    /// or the spells (50Bh).
     fn list_again(&mut self, files: &mut Files) -> Option<()> {
-        if self.mem.r8(DS, 0x129A) == 0 {
-            return crate::giveup::not_ported("1194:1DC8 with the spells' list (SI 50Bh)");
-        }
         self.equipment_list(files)
+    }
+
+    /// 1194:1D5C: the spells' list (129A 0), the spells' numbers at 50Bh
+    /// ([50A] of them): up to seven lines from [1297] (from 9Fh on, A0h
+    /// less it), each at (0Eh, 32h + 0Bh a line) in 53h, the marked one
+    /// ([1296]) boxed first in A0h (22AF), its name (29CF:0650) at 1044.
+    fn sheet_spell_list(&mut self) {
+        let n = self.mem.r8(DS, 0x050A) as u16;
+        if n == 0 {
+            return;
+        }
+        let first = self.mem.r8(DS, 0x1297);
+        let mut cx = n;
+        if cx >= 7 {
+            cx = 7;
+            if first >= 0x9F {
+                cx = 0xA0u8.wrapping_sub(first) as u16;
+            }
+        }
+        let (mut ax, mut bx) = (first as u16, 0x32u16);
+        let mut si = 0x050Bu16.wrapping_add(first as u16);
+        for _ in 0..cx {
+            self.mem.w8(DS, 0x9288, 0x53);
+            if self.mem.r8(DS, 0x1296) == ax as u8 {
+                self.mem.w8(DS, 0x9288, 0xA0);
+                self.line_box(bx);
+                self.mem.w8(DS, 0x9288, 0x53);
+            }
+            let spell = self.mem.r8(DS, si);
+            self.spell_name_copy(spell, NUMBER);
+            self.page_text_at(0x0E, bx, (DS, NUMBER));
+            si = si.wrapping_add(1);
+            bx = bx.wrapping_add(0x0B);
+            ax = ax.wrapping_add(1);
+        }
     }
 
     /// 1194:16E0: the equipment page made: the clothes' names (1D22), no
@@ -621,6 +674,11 @@ impl Machine {
         self.mem.w16(DS, 0x1270, 0);
         self.mem.w16(DS, 0x1272, 0);
         self.select_font(0x102E);
+        if self.mem.r8(DS, 0x129A) == 0 {
+            self.sheet_spell_list();
+            self.select_font(0x102C);
+            return Some(());
+        }
         let first = self.mem.r8(DS, 0x1297) as u16;
         let mut cx = 7u16;
         if first + 7 > 0x28 {

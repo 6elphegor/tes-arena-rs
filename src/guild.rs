@@ -1127,7 +1127,7 @@ impl Machine {
 
     /// 29CF:0650: spell `al`'s name (3276:34h + 55h × number; 2AB4h for
     /// numbers from 80h, less 80h) copied to DS:`di`; DI past its NUL.
-    fn spell_name_copy(&mut self, al: u8, mut di: u16) -> u16 {
+    pub(crate) fn spell_name_copy(&mut self, al: u8, mut di: u16) -> u16 {
         let (base, n) = if al & 0x80 != 0 { (0x2AB4u16, al & 0x7F) } else { (0x34, al) };
         let mut si = base.wrapping_add((n as u16).wrapping_mul(0x55));
         loop {

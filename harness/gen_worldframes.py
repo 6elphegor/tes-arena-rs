@@ -276,6 +276,7 @@ KEY_PAD_PLUS = 0x4E
 KEY_MINUS = 0x0C
 KEY_D = 0x20
 KEY_Y = 0x15
+KEY_S = 0x1F
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
 
@@ -652,6 +653,13 @@ CASES = {
     'playequipdrop': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
                                                                                                  ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                          ((), (KEY_F1,), 10, None)]),
+    # The equipment page's Spells button: as playequip, S (3276:57D8's
+    # sixth record, 1194:2365: the caster's list turned to the spells,
+    # 1D5C), '+' (that list one line on), S (back to the items) between
+    # N and Esc.
+    'playequipspells': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_S]), ('keys', [KEY_PAD_PLUS]),
+                                                                                                   ('keys', [KEY_S]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                           ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
     # frames, the Ring of Shielding used (the list's fourth: its spell
