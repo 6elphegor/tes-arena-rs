@@ -516,22 +516,17 @@ impl Travel {
             return;
         }
         if let Some(Asking::List(menu, typed)) = &mut self.asking {
-            // The right button leaves the list (none picked); a line
-            // clicked is marked, the marked line clicked picked (5734).
-            if right {
+            // The right button leaves the list, none picked (its record's
+            // 4000h, 3159:096D): the search ends there (26F7:0B00, 03A7).
+            // The arrows, the track and the lines as 3159:0834 takes them
+            // (`hud::list_click`): a line clicked is marked, the marked
+            // line clicked picked (5734).
+            let pick = if right { Some(0xFFFF) } else { hud::list_click(menu, x, y).map(|i| i.min(menu.entries.len().saturating_sub(1)) as u16) };
+            if let Some(pick) = pick {
                 let typed = typed.clone();
                 self.asking = None;
-                self.search(engine, typed, 0xFFFF);
-                return;
+                self.search(engine, typed, Some(pick));
             }
-            let Some(i) = hud::custom::game_list_pick(menu, x, y) else { return };
-            if i != menu.selected {
-                menu.selected = i;
-                return;
-            }
-            let typed = typed.clone();
-            self.asking = None;
-            self.search(engine, typed, i as u16);
             return;
         }
         // The name's field: the right button ends it (A172).
@@ -687,16 +682,17 @@ impl Travel {
     }
 
     /// The search (26F7:03A4) with the name `typed`; its list's pick `pick`
-    /// (FFFFh: none). Run on a copy first: if the list is asked and not
-    /// yet answered, it is shown instead.
-    fn search(&mut self, engine: &mut Engine, typed: Vec<EditKey>, pick: u16) {
+    /// (FFFFh: none, the list left), None: not yet asked. Run on a copy
+    /// first: if the list is asked and not yet answered, it is shown
+    /// instead.
+    fn search(&mut self, engine: &mut Engine, typed: Vec<EditKey>, pick: Option<u16>) {
         let mut copy = engine.m.clone();
         let mut scratch = Vec::new();
         let mut h = Self::hooks(&mut scratch, &engine.files);
         h.typed = typed.clone();
         h.pick = 0xFFFF;
         let _ = copy.travel_search(&mut engine.files.clone(), &mut h);
-        if let (Some(names), 0xFFFF) = (h.listed.take(), pick) {
+        if let (Some(names), None) = (h.listed.take(), pick) {
             let entries = names.iter().map(|n| hud::lines(n.as_bytes(), 0x0F).into_iter().flatten().collect()).collect();
             self.asking = Some(Asking::List(hud::list_menu(&copy, Vec::new(), entries), typed));
             return;
@@ -704,7 +700,7 @@ impl Travel {
         let screen = self.page(engine, self.at);
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         h.typed = typed;
-        h.pick = pick;
+        h.pick = pick.unwrap_or(0xFFFF);
         h.screen = screen;
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
             eprintln!("the search gave up: {}", arena::giveup::describe());
@@ -729,6 +725,11 @@ impl Travel {
         self.label_held = true;
     }
 
+    /// Whether the search's list of places is up.
+    pub fn listing(&self) -> bool {
+        matches!(self.asking, Some(Asking::List(..)))
+    }
+
     /// Whether the search's name is being typed (the keys, pressed and
     /// let go, are `field_key`'s).
     pub fn typing(&self) -> bool {
@@ -749,13 +750,15 @@ impl Travel {
             if live.ended() {
                 let typed = live.keys().to_vec();
                 self.asking = None;
-                self.search(engine, typed, 0xFFFF);
+                self.search(engine, typed, None);
             }
         }
     }
 
-    /// A key: Esc as Exit (a list: left); S the search, T or Enter
-    /// travels.
+    /// A key: on the world map Esc as Exit (its region's key, 1Bh,
+    /// 3159:0171); a province's map's regions and buttons have none, so
+    /// no key does anything there. A list's keys as 3159:06A0 takes them
+    /// (`hud::list_key`; Enter picks the line marked, Esc leaves).
     pub fn key(&mut self, engine: &mut Engine, code: winit::keyboard::KeyCode, _text: Option<&str>) {
         use winit::keyboard::KeyCode;
         if self.done.is_some() {
@@ -763,11 +766,26 @@ impl Travel {
         }
         match &mut self.asking {
             Some(Asking::Name(_)) => {}
-            Some(Asking::List(..)) => {
-                if code == KeyCode::Escape {
-                    self.asking = None;
-                    self.pass(engine, false);
-                }
+            Some(Asking::List(menu, typed)) => {
+                let key = match code {
+                    KeyCode::ArrowUp => hud::ListKey::Up,
+                    KeyCode::ArrowDown => hud::ListKey::Down,
+                    KeyCode::PageUp => hud::ListKey::PageUp,
+                    KeyCode::PageDown => hud::ListKey::PageDown,
+                    KeyCode::Home => hud::ListKey::Home,
+                    KeyCode::End => hud::ListKey::End,
+                    // Enter (ACD1) picks the line marked; Esc leaves, none
+                    // picked, and the search ends there (26F7:0B00).
+                    KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Escape => {
+                        let pick = if code == KeyCode::Escape { 0xFFFF } else { menu.selected.min(menu.entries.len().saturating_sub(1)) as u16 };
+                        let typed = typed.clone();
+                        self.asking = None;
+                        self.search(engine, typed, Some(pick));
+                        return;
+                    }
+                    _ => return,
+                };
+                hud::list_key(menu, key);
             }
             // Its keys (4B60: Y, N); Esc none.
             Some(Asking::Question(..)) => {
@@ -780,12 +798,11 @@ impl Travel {
                 self.asking = None;
                 self.travel_answered(engine, Some(answer));
             }
-            None => match code {
-                KeyCode::Escape => self.exit(engine),
-                KeyCode::KeyT | KeyCode::Enter if self.shown.is_some() => self.travel(engine),
-                KeyCode::KeyS if self.shown.is_some() => self.ask_name(engine),
-                _ => {}
-            },
+            None => {
+                if code == KeyCode::Escape && self.shown.is_none() {
+                    self.end(engine);
+                }
+            }
         }
     }
 

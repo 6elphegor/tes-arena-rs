@@ -845,8 +845,11 @@ pub const BAR_LIST: u16 = 0xFFFF;
 /// puts it) and its record's text area and scroll track (x, y, w, h).
 struct ListKind {
     panel: Option<crate::interface::Image>,
-    area: (i32, i32, i32, i32),
-    track: (i32, i32, i32, i32),
+    area: Rect,
+    track: Rect,
+    /// The up and down arrows (the record's +0 and +8), a line each.
+    up: Rect,
+    down: Rect,
     /// How a line's last part is drawn: the record's flags (+20h) pick
     /// the line's routine (3159:0718, the table at B7FE: 0000:9E06 at the
     /// area's x plus one, 5364 centred on its middle with 1000h, 9370
@@ -870,15 +873,16 @@ enum Align {
 }
 
 /// The records 1194:5734 gives 3159:06A0 (DGROUP 5006, 505B, 50B0, 5105,
-/// 515A): the text area (+18h: x, y, w, h), the scroll track (+10h) and
-/// the flags (+20h).
-type ListRecord = ((i32, i32, i32, i32), (i32, i32, i32, i32), u16);
-const RECORD_5006: ListRecord = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000);
-const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000);
-const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000);
-const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0);
-const RECORD_5AF4: ListRecord = ((0xDE, 0x99, 0x54, 0x2A), (0xD1, 0xA1, 7, 0x1A), 0x4000);
+/// 515A): the text area (+18h: x, y, w, h), the scroll track (+10h), the
+/// flags (+20h) and the up and down arrows (+0, +8).
+type Rect = (i32, i32, i32, i32);
+type ListRecord = (Rect, Rect, u16, Rect, Rect);
+const RECORD_5006: ListRecord = ((0x54, 0x21, 0x96, 0x3C), (0x44, 0x1E, 6, 0x3C), 0x4000, (0x42, 0x13, 9, 9), (0x42, 0x5C, 9, 9));
+const RECORD_505B: ListRecord = ((0x54, 0x2D, 0x96, 0x34), (0x44, 0x1E, 6, 0x3C), 0x4000, (0x42, 0x13, 9, 9), (0x42, 0x5C, 9, 9));
+const RECORD_50B0: ListRecord = ((0x1C, 0x1B, 0x109, 0x4C), (0x0D, 0x14, 6, 0x52), 0x6000, (0x0A, 0x08, 0x0C, 0x0C), (0x0A, 0x63, 0x0C, 0x0C));
+const RECORD_5105: ListRecord = ((0x48, 0x13, 0xBA, 0x52), (0x37, 0x11, 9, 0x54), 0x4000, (0x35, 0x06, 0x0C, 0x0B), (0x35, 0x65, 0x0C, 0x0B));
+const RECORD_515A: ListRecord = ((0x54, 0x2D, 0x96, 0x42), (0x42, 0x1E, 6, 0x50), 0, (0x40, 0x13, 9, 9), (0x40, 0x72, 9, 9));
+const RECORD_5AF4: ListRecord = ((0xDE, 0x99, 0x54, 0x2A), (0xD1, 0xA1, 7, 0x1A), 0x4000, (0xCF, 0x97, 0x0A, 8), (0xCF, 0xBD, 0x0A, 8));
 
 /// The table at BA0E (DGROUP B80E) the list's picked line is recoloured
 /// through (3159:0BE4 with 0000:9D84): the identity but for the pairs at
@@ -910,9 +914,9 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     // (the lines' colour); kinds 3 and 5 set the record's 4000h (it has
     // it), kinds 6 and 10 draw the caller's title.
     let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
-        let (area, track, flags) = rec;
+        let (area, track, flags, up, down) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
-        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, last, colour, title, leaves: flags & 0x4000 != 0 }
+        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, up, down, last, colour, title, leaves: flags & 0x4000 != 0 }
     };
     let kinds = vec![
         kind("POPUP.IMG", RECORD_5006, 0xFD, None),
@@ -1264,6 +1268,177 @@ fn line_clicked(st: &Style, menu: &Menu, font: &Font, x: i32, y: i32) -> Option<
     Some(top + below)
 }
 
+/// The scroll track's thumb's height (3159:0C93): the whole track `th`
+/// while every one of the `n` lines fits in the `rows`, else the track
+/// over the lines times the rows, the remainder's share added, at least 3.
+fn thumb_height(th: i32, n: i32, rows: i32) -> i32 {
+    if n > rows { (th / n * rows + th % n * rows / n).max(3) } else { th }
+}
+
+/// A key a list takes (3159:06A0: the arrows, PgUp, PgDn, Home, End by
+/// their keys' states at ACFD, AD05, ACFE, AD06, ACFC, AD04).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListKey {
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+    Home,
+    End,
+}
+
+/// How many lines the list `menu` shows (3159:0778); without the game's
+/// style, all of them.
+fn list_rows(menu: &Menu) -> usize {
+    match STYLE.get() {
+        Some(st) => list_rows_in(st, menu, list_font(st, menu)).1,
+        None => menu.entries.len().max(1),
+    }
+}
+
+/// The list `menu`'s first line shown (`Menu::top`, or as low as shows
+/// the line marked).
+pub fn list_first(menu: &Menu) -> usize {
+    let rows = list_rows(menu);
+    menu.top.unwrap_or_else(|| (menu.selected + 1).saturating_sub(rows).min(menu.entries.len().saturating_sub(rows)))
+}
+
+/// 3159:0E68: the list's first line shown set to `top`, the line marked
+/// kept among the `rows` shown.
+fn list_show(menu: &mut Menu, top: usize, rows: usize) {
+    menu.top = Some(top);
+    if menu.selected < top {
+        menu.selected = top;
+    } else if menu.selected > top + rows - 1 {
+        menu.selected = top + rows - 1;
+    }
+}
+
+/// The key `key` on the list `menu`: its line marked (`selected`) and
+/// first line shown (`top`, set from here on) moved as 3159:06A0 moves
+/// them. Up (09C2) and Down (09E8) move the mark a line, and the lines
+/// a line where it would leave them (Down not past the last, nor the
+/// lines once the last shows); PgUp (08E7) shows the lines a page less
+/// one above, the first of them marked; PgDn (08A3) shows the lines a
+/// page less one below, but no lower than with the last at the foot
+/// (then the last marked); Home (090D) and End (0914) mark the first and
+/// the last, shown as high and as low as they go.
+pub fn list_key(menu: &mut Menu, key: ListKey) {
+    let rows = list_rows(menu);
+    list_key_in(menu, key, rows);
+}
+
+/// `list_key` with `rows` lines shown.
+fn list_key_in(menu: &mut Menu, key: ListKey, rows: usize) {
+    let n = menu.entries.len();
+    if n == 0 {
+        return;
+    }
+    let top = menu.top.unwrap_or_else(|| (menu.selected + 1).saturating_sub(rows).min(n.saturating_sub(rows)));
+    menu.top = Some(top);
+    let sel = menu.selected;
+    // 08BB: the last line's foot at the area's foot, or at the top while
+    // they all fit (the last marked).
+    let lowest = |menu: &mut Menu, want: usize| {
+        if n < rows {
+            menu.selected = n - 1;
+            list_show(menu, 0, rows);
+        } else if want > n - rows {
+            menu.selected = n - 1;
+            list_show(menu, n - rows, rows);
+        } else {
+            list_show(menu, want, rows);
+        }
+    };
+    match key {
+        ListKey::Up => {
+            if sel == 0 {
+                return;
+            }
+            menu.selected = sel - 1;
+            if sel - 1 < top {
+                list_show(menu, top - 1, rows);
+            }
+        }
+        ListKey::Down => {
+            let next = if sel + 1 >= n { sel } else { sel + 1 };
+            if next < top + rows {
+                menu.selected = next;
+            } else if top + rows < n {
+                menu.selected = next;
+                list_show(menu, top + 1, rows);
+            }
+        }
+        ListKey::PageDown => lowest(menu, top + rows - 1),
+        ListKey::PageUp => {
+            let t = (top + 1).saturating_sub(rows);
+            menu.selected = t;
+            list_show(menu, t, rows);
+        }
+        ListKey::Home => {
+            menu.selected = 0;
+            list_show(menu, 0, rows);
+        }
+        ListKey::End => {
+            menu.selected = n - 1;
+            lowest(menu, n.saturating_sub(rows));
+        }
+    }
+}
+
+/// The up and down arrows' boxes (x, y, w, h) of a list of kind `kind`.
+pub fn list_arrows(kind: u16) -> Option<(Rect, Rect)> {
+    let st = STYLE.get()?;
+    let k = list_kind(st, &Menu { kind, list: true, ..Default::default() });
+    Some((k.up, k.down))
+}
+
+/// A left click at (x, y) on the list `menu` (3159:0834: the record's
+/// regions in order, their right and bottom edges in): the up or down
+/// arrow moves as its key does (09C2, 09E8); the scroll track (0D95)
+/// puts the thumb's middle at y, kept to the track, and shows the lines
+/// from its share of the track (0DCE: in 1/1024ths, times one more than
+/// the lines, no lower than with the last at the foot); a line (0A1D,
+/// `line_clicked`) not marked is marked, the line marked is picked: its
+/// index, which may be past the lines (the callers' bounds have it).
+pub fn list_click(menu: &mut Menu, x: i32, y: i32) -> Option<usize> {
+    let st = STYLE.get()?;
+    let kind = list_kind(st, menu);
+    let inside = |r: Rect| x >= r.0 && x <= r.0 + r.2 && y >= r.1 && y <= r.1 + r.3;
+    if inside(kind.up) {
+        list_key(menu, ListKey::Up);
+        return None;
+    }
+    if inside(kind.down) {
+        list_key(menu, ListKey::Down);
+        return None;
+    }
+    let font = list_font(st, menu);
+    let (_, rows) = list_rows_in(st, menu, font);
+    if inside(kind.track) {
+        let (_, ty, tw, th) = kind.track;
+        if tw == 0 || menu.entries.is_empty() {
+            return None;
+        }
+        let n = menu.entries.len() as i32;
+        let h = thumb_height(th, n, rows as i32);
+        let at = (y - h / 2).max(ty).min(ty + th - h);
+        let share = (((at - ty) as i64) << 10) / th as i64;
+        let t = ((share * (n as i64 + 1)) >> 10) as usize;
+        let t = if n as usize >= rows { t.min(n as usize - rows) } else { t };
+        menu.top = Some(list_first(menu));
+        list_show(menu, t, rows);
+        return None;
+    }
+    let line = line_clicked(st, menu, font, x, y)?;
+    menu.top = Some(list_first(menu));
+    if line == menu.selected {
+        return Some(line);
+    }
+    menu.selected = line;
+    None
+}
+
 /// `hud`'s texts in the game's style: its boxes (0000:965A), menus
 /// (3159:0F2A), lists (3159:06A0 with 2F26:2E12) and prompts.
 fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
@@ -1479,7 +1654,7 @@ fn draw_list_in(screen: &mut Screen, st: &Style, menu: &Menu, font: &Font, title
     let n = menu.entries.len() as i32;
     let rows_n = rows as i32;
     let (tx, ty, tw, th) = kind.track;
-    let h = if n > rows_n { (th / n * rows_n + th % n * rows_n / n).max(3) } else { th };
+    let h = thumb_height(th, n, rows_n);
     let y = if n > rows_n && top as i32 == n - rows_n {
         ty + th - h
     } else if n > 0 {
@@ -1746,6 +1921,35 @@ mod tests {
         t.dialog_lines(&lines[..3]);
         assert_eq!(t.boxes.len(), 1);
         assert_ne!(t.boxes[0].last(), Some(&more_line()));
+    }
+
+    /// 3159:06A0's keys on 10 lines, 4 shown: the mark and the first
+    /// line shown.
+    #[test]
+    fn a_lists_keys_move_its_mark_and_lines_as_the_originals() {
+        let entries: Vec<Vec<Span>> = (0..10).map(|i| vec![Span { colour: 0, text: i.to_string(), font: Default::default(), code: None }]).collect();
+        let at = |sel: usize, top: usize, key: ListKey| {
+            let mut m = Menu { entries: entries.clone(), list: true, selected: sel, top: Some(top), ..Default::default() };
+            list_key_in(&mut m, key, 4);
+            (m.selected, m.top.unwrap())
+        };
+        use ListKey::*;
+        assert_eq!(at(0, 0, Up), (0, 0), "Up stops at the first");
+        assert_eq!(at(2, 1, Up), (1, 1));
+        assert_eq!(at(3, 3, Up), (2, 2), "Up past the top scrolls a line");
+        assert_eq!(at(2, 0, Down), (3, 0));
+        assert_eq!(at(3, 0, Down), (4, 1), "Down past the foot scrolls a line");
+        assert_eq!(at(9, 6, Down), (9, 6), "Down stops at the last");
+        assert_eq!(at(1, 0, PageDown), (3, 3), "PgDn: a page less one, the mark kept among them");
+        assert_eq!(at(5, 5, PageDown), (9, 6), "PgDn no lower than the last at the foot, the last marked");
+        assert_eq!(at(8, 6, PageUp), (3, 3), "PgUp: a page less one up, its first marked");
+        assert_eq!(at(3, 2, PageUp), (0, 0));
+        assert_eq!(at(7, 5, Home), (0, 0));
+        assert_eq!(at(2, 0, End), (9, 6));
+        // Fewer lines than rows: they stay at the top.
+        let mut m = Menu { entries: entries[..3].to_vec(), list: true, selected: 0, top: Some(0), ..Default::default() };
+        list_key_in(&mut m, PageDown, 4);
+        assert_eq!((m.selected, m.top), (2, Some(0)));
     }
 
     /// 98A0 keeps a code's colour byte in the line 66F6 measures: '`'

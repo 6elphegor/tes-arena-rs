@@ -400,6 +400,90 @@ fn a_list_takes_two_clicks_and_leaves_by_the_right_button() {
     same(&a, &b, "the list left by the right button and --picks 1,-1");
 }
 
+/// The store's weapons list (its lines repeated) scrolled as 3159:06A0
+/// scrolls it: Down past
+/// the foot moves the lines a line, Up back short of the top leaves
+/// them, so a click on the first row shown is the line shown there, not
+/// the one the mark would put there; the arrows' boxes move as the keys,
+/// End, PgUp and Home as theirs.
+#[test]
+fn a_scrolled_list_clicks_the_line_shown() {
+    let Some(dir) = game_dir() else { return };
+    let gold = |app: &mut App| app.engine.m.mem.w32(arena::mem::DS, 0x05C2, 5000);
+    let weapons = || {
+        let mut a = app(&dir, &Start::default());
+        gold(&mut a);
+        let mut d = Driver::new(&mut a);
+        shop_turn(&mut a, 6);
+        // Buy, then weapons (`a_store_list_line_clicked_as_by_script`).
+        for step in 0..2 {
+            let (x, y) = entry_at(&a, 0).unwrap_or_else(|| panic!("entry 0 at step {step}"));
+            d.click(&mut a, x, y, MouseButton::Left);
+            while !a.boxes.is_empty() {
+                d.key(&mut a, KeyCode::Enter, None);
+            }
+        }
+        // Its lines repeated to 20 as shown, so that they scroll (the
+        // pick below, line 1, is one of the store's own).
+        if let Some(dialog::Need::Menu(m)) = a.pending.as_mut().map(|p| &mut p.need) {
+            assert!(m.list, "the weapons' list");
+            let lines = m.entries.clone();
+            while m.entries.len() < 20 {
+                m.entries.extend(lines.iter().cloned());
+            }
+        }
+        let n = menu(&a).filter(|l| l.list).expect("the weapons' list").entries.len();
+        (a, d, n)
+    };
+    let (mut a, mut d, n) = weapons();
+    let mut downs = 0;
+    while a.list_top == 0 && downs < n {
+        d.key(&mut a, KeyCode::ArrowDown, None);
+        downs += 1;
+    }
+    assert!(a.list_top == 1, "{n} lines: they scroll once the mark passes the foot ({downs} downs)");
+    assert_eq!(a.selected, downs, "the mark on the line come up");
+    for _ in 0..downs - 2 {
+        d.key(&mut a, KeyCode::ArrowUp, None);
+    }
+    assert_eq!((a.selected, a.list_top), (2, 1), "up short of the top: the lines stay");
+    // The first row shown is line 1: clicked, marked; clicked again,
+    // picked.
+    let (x, y) = entry_at(&a, 1).expect("line 1 on the first row");
+    let (_, y2) = entry_at(&a, 2).expect("line 2 on the second row");
+    assert!(y < y2, "line 1 shown above line 2");
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert_eq!(a.selected, 1, "the row's line marked");
+    d.click(&mut a, x, y, MouseButton::Left);
+    while !a.boxes.is_empty() {
+        d.key(&mut a, KeyCode::Enter, None);
+    }
+    let mut b = app(&dir, &Start { picks: "0,0,1", ..Default::default() });
+    gold(&mut b);
+    Driver::new(&mut b);
+    shop_turn(&mut b, 6);
+    while !b.boxes.is_empty() {
+        b.boxes.pop_front();
+    }
+    same(&a, &b, "the scrolled list's line 1 clicked twice and --picks 0,0,1");
+    // The arrows (the record's +0 and +8) move as Up and Down; End marks
+    // the last at the foot, PgUp a page less one up, Home the first.
+    let (mut a, mut d, _) = weapons();
+    let kind = menu(&a).map(|m| m.kind).unwrap();
+    let (up, down) = hud::list_arrows(kind).expect("the list's arrows");
+    d.click(&mut a, down.0 + 1, down.1 + 1, MouseButton::Left);
+    assert_eq!(a.selected, 1, "the down arrow");
+    d.click(&mut a, up.0 + 1, up.1 + 1, MouseButton::Left);
+    assert_eq!(a.selected, 0, "the up arrow");
+    d.key(&mut a, KeyCode::End, None);
+    assert_eq!((a.selected, a.list_top), (n - 1, n - downs), "End");
+    d.key(&mut a, KeyCode::PageUp, None);
+    let t = (n - downs + 1).saturating_sub(downs);
+    assert_eq!((a.selected, a.list_top), (t, t), "PgUp");
+    d.key(&mut a, KeyCode::Home, None);
+    assert_eq!((a.selected, a.list_top), (0, 0), "Home");
+}
+
 /// The start's day (1st of Morning Star) is the New Life Festival: in a
 /// town by day the frame shows its message once (2DA2:111C's holiday,
 /// 05E0 bit 100h); frames until it is up, then it is read.
@@ -984,6 +1068,51 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     assert!(welcome.contains("You have arrived in The City-State of Shornhelm"), "the welcome: {welcome:?}");
     let here = String::from_utf8_lossy(a.engine.m.mem.cstr(arena::mem::DS, 0x0A22)).into_owned();
     assert_eq!(here, "Shornhelm", "the location record");
+}
+
+/// A province's map: its regions and buttons have no keys (MAPBTNS's
+/// regions' +59h are all 20h, which 3159:0171 passes over), so Esc, T,
+/// S and Enter do nothing there; Esc is the world map's Exit's key
+/// (1Bh). The search's list left by the right button or Esc ends the
+/// search (26F7:0B00 with FFFFh, 03A7), not asked again.
+#[test]
+fn a_province_map_takes_no_keys_and_its_list_leaves() {
+    let Some(dir) = game_dir() else { return };
+    let start = Start { level: "CITY:0:0", ..Default::default() };
+    let open = || {
+        let mut a = app(&dir, &start);
+        let mut d = Driver::new(&mut a);
+        a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+        d.key(&mut a, KeyCode::KeyM, Some("M"));
+        a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+        let (px, py) = travel::province_point(&a.engine.m, a.engine.m.mem.r8(arena::mem::DS, 0x0A46));
+        d.click(&mut a, px, py, MouseButton::Left);
+        assert!(a.travel.as_ref().is_some_and(|t| t.shown().is_some()), "the province's map");
+        (a, d)
+    };
+    let (mut a, mut d) = open();
+    let (b, _) = open();
+    for (code, text) in [(KeyCode::Escape, None), (KeyCode::KeyT, Some("t")), (KeyCode::KeyS, Some("s")), (KeyCode::Enter, None)] {
+        d.key(&mut a, code, text);
+        assert!(a.travel.as_ref().is_some_and(|t| t.shown().is_some() && !t.typing()), "{code:?} does nothing on the province's map");
+    }
+    same(&a, &b, "the province's map after Esc, T, S and Enter");
+    // Search (its region at 22h,A7h): a name no place starts lists them
+    // all; the right button leaves the list, and Esc does the same.
+    for leave in [true, false] {
+        let (mut a, mut d) = open();
+        d.click(&mut a, 0x22 + 4, 0xA7 + 4, MouseButton::Left);
+        assert!(a.travel.as_ref().is_some_and(|t| t.typing()), "the search's name asked");
+        d.key(&mut a, KeyCode::KeyQ, Some("q"));
+        d.key(&mut a, KeyCode::Enter, None);
+        assert!(a.travel.as_ref().is_some_and(|t| t.listing()), "the places listed");
+        if leave {
+            d.click(&mut a, 5, 5, MouseButton::Right);
+        } else {
+            d.key(&mut a, KeyCode::Escape, None);
+        }
+        assert!(a.travel.as_ref().is_some_and(|t| !t.listing() && !t.typing() && t.shown().is_some()), "the list left, the province's map back (right button: {leave})");
+    }
 }
 
 /// The user's save (ARENA_SAVE), copied to a scratch folder so nothing

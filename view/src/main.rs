@@ -1663,6 +1663,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         box_backdrop: None,
         boxes: Default::default(),
         selected: 0,
+        list_top: 0,
         arrowed: false,
         live: None,
         status: None,
@@ -2975,6 +2976,9 @@ struct App {
     box_backdrop: Option<shopui::Backdrop>,
     boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
     selected: usize,
+    /// A list's first line shown (3159:06A0's +3Bh, 0 as it comes up,
+    /// 0718), moved with `selected` by `hud::list_key`, `list_click`.
+    list_top: usize,
     /// The arrows or the wheel moved `selected` since the menu came up:
     /// only then is its entry marked (the original marks none).
     arrowed: bool,
@@ -3309,6 +3313,7 @@ impl App {
         if let Some(need) = talk.need {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
+            self.list_top = 0;
             self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
@@ -4733,6 +4738,10 @@ impl App {
                 Some(dialog::Need::Menu(m)) => {
                     let mut m = m.clone();
                     m.selected = self.selected.min(m.entries.len().saturating_sub(1));
+                    if m.list {
+                        m.selected = self.selected;
+                        m.top = Some(self.list_top);
+                    }
                     // A menu's boxes mark no entry until the arrows move.
                     if !m.list && !self.arrowed {
                         m.selected = usize::MAX;
@@ -4763,11 +4772,24 @@ impl App {
         match &p.need {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
+                let list_key = match code {
+                    KeyCode::ArrowUp => Some(hud::ListKey::Up),
+                    KeyCode::ArrowDown => Some(hud::ListKey::Down),
+                    KeyCode::PageUp => Some(hud::ListKey::PageUp),
+                    KeyCode::PageDown => Some(hud::ListKey::PageDown),
+                    KeyCode::Home => Some(hud::ListKey::Home),
+                    KeyCode::End => Some(hud::ListKey::End),
+                    _ => None,
+                };
                 match code {
-                    // A list's arrows stop at its ends (3159:09C2, 09E8);
-                    // a menu's (the view's own) go round.
-                    KeyCode::ArrowUp if menu.list => self.selected = self.selected.saturating_sub(1),
-                    KeyCode::ArrowDown if menu.list => self.selected = (self.selected + 1).min(n - 1),
+                    // A list's keys move its mark and its lines as
+                    // 3159:06A0 does (`hud::list_key`); a menu's arrows
+                    // (the view's own) go round.
+                    _ if menu.list && list_key.is_some() => {
+                        if let Some(k) = list_key {
+                            self.list_moved(|m| hud::list_key(m, k));
+                        }
+                    }
                     KeyCode::ArrowUp => {
                         self.selected = (self.selected + n - 1) % n;
                         self.arrowed = true;
@@ -4899,23 +4921,32 @@ impl App {
             self.answer(dialog::Answer::Click(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16));
             return;
         }
+        // A list (1194:5734): its arrows, track and lines as 3159:0834
+        // takes them (`hud::list_click`): a line clicked is marked, the
+        // line marked clicked picked (its first marked as it comes up).
+        // A line past the lines (the box's part row, scrolled to the
+        // end) is marked as it is, and picked as the last (5988).
+        if let Some(n) = self.menu_asked().filter(|m| m.list).map(|m| m.entries.len()) {
+            let mut picked = None;
+            self.list_moved(|m| picked = hud::list_click(m, x, y));
+            if let Some(i) = picked {
+                self.answer(dialog::Answer::Pick(i.min(n.saturating_sub(1)) as u16));
+            }
+            return;
+        }
         let hud = self.hud();
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
-            // A list (1194:5734) marks the line clicked; the line marked
-            // clicked is picked (its first marked as it comes up).
-            // A line past the lines (the box's part row, scrolled to the
-            // end) is marked as it is, and picked as the last (5988).
-            let lines = self.menu_asked().filter(|m| m.list).map(|m| m.entries.len());
-            if let Some(n) = lines {
-                if i != self.selected {
-                    self.selected = i;
-                    return;
-                }
-                self.answer(dialog::Answer::Pick(i.min(n.saturating_sub(1)) as u16));
-                return;
-            }
             self.answer(dialog::Answer::Pick(i as u16));
         }
+    }
+
+    /// The list asked, as shown (its line marked and first line shown),
+    /// given to `f`; what `f` leaves marked and shown kept.
+    fn list_moved(&mut self, f: impl FnOnce(&mut hud::Menu)) {
+        let Some(mut m) = self.hud().menu.filter(|m| m.list) else { return };
+        f(&mut m);
+        self.selected = m.selected;
+        self.list_top = hud::list_first(&m);
     }
 }
 
@@ -4978,6 +5009,14 @@ impl App {
             In::Wheel(dy) => {
                 if self.boxes.is_empty() {
                     if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
+                        if m.list {
+                            // A list's line moved as by its arrows.
+                            let k = if dy > 0.0 { hud::ListKey::Up } else { hud::ListKey::Down };
+                            if dy != 0.0 {
+                                self.list_moved(|m| hud::list_key(m, k));
+                            }
+                            return;
+                        }
                         let n = m.entries.len().max(1);
                         self.selected = if dy > 0.0 { (self.selected + n - 1) % n } else if dy < 0.0 { (self.selected + 1) % n } else { self.selected };
                         self.arrowed = true;
