@@ -659,8 +659,9 @@ fn swinging(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
     a.input(In::Button { button: MouseButton::Right, down: false });
 }
 
-/// The A key held for a frame (the weapon readied), let go.
-fn ready(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+/// The A key held for a frame (the weapon readied), let go: its press
+/// runs the frame that takes it.
+fn ready(a: &mut App, seen: &mut Vec<[u16; 5]>) {
     a.input(In::Key { code: KeyCode::KeyA, down: true, text: Some("a".into()) });
     seen.push(state(a));
     a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
@@ -891,7 +892,7 @@ fn case(name: &str) -> Option<Case> {
             brought(a, 1, 1, 0x180);
             captured(a);
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
-            ready(a, d, seen);
+            ready(a, seen);
             frames(a, d, seen, 30, |_| false);
             swinging(a, d, seen, 200);
             frames(a, d, seen, 20, |_| false);
