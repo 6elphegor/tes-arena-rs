@@ -48,7 +48,8 @@
 //!   (9B4E), SCREENSV.$$2 read back (A7A0), the clip the whole screen and
 //!   0D39 bit 80h: the interface made again.
 //!
-//! The SPs kept at 12C6 and 7921 are left out (the port has no stack).
+//! The SP kept at 12C6 is the one the original leaves there by the menu
+//! key's way in; the pages' at 7921 is left out (the port has no stack).
 //! The pixels (drawn only where the page is the game's own heap block,
 //! `Machine::page_is_block`), the fades (5E3E), the cursor's drawing and
 //! the page's showing (9466) are the front end's.
@@ -78,6 +79,8 @@ pub mod var {
     pub const PICTURE: u16 = 0x5CA2;
 }
 
+/// The SP 27E3:009C keeps.
+const LOG_SP: u16 = 0x12C6;
 /// The colours' copy (0000:6E3C at 2542:02A7) and the black ones.
 const PALETTE: u16 = 0x9A6E;
 const SCRATCH: u16 = 0x929E;
@@ -164,6 +167,10 @@ impl Machine {
         self.cursor_hidden();
         let bank = self.mem.r16(DS, 0x1030);
         let inner = self.map_bank(bank, 0);
+        // 009C: SP kept at 12C6 for the way out (a word the shops use for
+        // their own after): the world loop's stack as the frame's menu
+        // keys call 2542:02A3 (measured: 5FD0h).
+        self.mem.w16(DS, LOG_SP, 0x5FD0);
         self.select_font(0x102C);
         self.select_tiles(0x1034);
         let mut run = LogRun { inner, outer, at: At::After };
