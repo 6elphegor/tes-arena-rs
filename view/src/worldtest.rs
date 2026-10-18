@@ -1103,6 +1103,28 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             frames(a, d, seen, 11, |_| false);
         })),
+        "playequipdropwhat" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequipdrop, the third line dropped (no line marked
+            // after, 1194:1924), D again ("Drop what?", 18CA, its loop
+            // 2325), the second line clicked (the loop left, the line
+            // marked), its question answered Y.
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            d.click(a, 0x40, 0x4D, MouseButton::Left);
+            d.key(a, KeyCode::KeyD, Some("d"));
+            d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::KeyD, Some("d"));
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::KeyY, Some("y"));
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playequipnoroom" => (
             Place::Dungeon,
             Box::new(|_: &mut App| {}),
@@ -1780,7 +1802,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 26] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage"];
+const BUSY: [&str; 27] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage", "playequipdropwhat"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1848,11 +1870,13 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// 17D8: `sheet_equipment_scroll`, `sheet_equipment_click`,
 /// `sheet_equipment_drop`), and the staff's quest line marked, described
 /// and clicked again in playequipstaff (1F56 into the DI the page's loop
-/// carries, 5536h after a description: `page_di`). Not playequipspellpage:
-/// the spell's page itself (51D1, its screen kept at 51B8 and its drawing
-/// 68D7, the front end's) leaves texts at 1044 and EMS bytes the engine's
-/// doesn't.
-const BUSY_STATE: [&str; 24] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff"];
+/// carries, 5536h after a description: `page_di`), and the spell's page
+/// opened from the spells' list and left in playequipspellpage (51D1: its
+/// screen's state, 68D7's, the effects' texts at 1044 and CHARSPEL.IMG in
+/// bank [1032]: `Machine::sm_screen`), and "Drop what?" with no line
+/// marked in playequipdropwhat (18CA: its loop, 2325, left by a line's
+/// click that marks it, the drop over again: `drop_what_loop`).
+const BUSY_STATE: [&str; 26] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage", "playequipdropwhat"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

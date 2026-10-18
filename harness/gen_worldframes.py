@@ -667,6 +667,17 @@ CASES = {
     'playequipdrop': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
                                                                                                  ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                          ((), (KEY_F1,), 10, None)]),
+    # "Drop what?" on the equipment page: as playequipdrop, the third line
+    # dropped (which leaves no line marked: 1194:1924), then D again
+    # (17D8 with 1296 FFh: 18CA, "Drop what?" in the list's panel, 223A
+    # with DI 2325: the page's loop over its first five records, 1299
+    # set), the second line clicked (1AC6 leaves that loop; 2325 marks
+    # the line, 1C5E), its question (17D8 again) answered Y, between N
+    # and Esc.
+    'playequipdropwhat': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
+                                                                                                     ('keys', [KEY_D]), ('click', 0x40, 0x42), ('keys', [KEY_Y]),
+                                                                                                     ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                             ((), (KEY_F1,), 10, None)]),
     # The equipment page's Spells button: as playequip, S (3276:57D8's
     # sixth record, 1194:2365: the caster's list turned to the spells,
     # 1D5C), '+' (that list one line on), S (back to the items) between

@@ -538,8 +538,33 @@ impl Machine {
 
     /// 1194:68D7: the screen (its numbers written as it draws them).
     fn sm_draw(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) -> Option<()> {
+        self.sm_screen(files, false)?;
+        hooks.screen(self);
+        Some(())
+    }
+
+    /// 1194:68D7's state: with `picture`, its picture (5778, or 5785 with
+    /// 101D FFh, or 5792 with 1001 FFh: SPELLMKR.IMG, BUYSPELL.IMG,
+    /// CHARSPEL.IMG) loaded into bank [1032] and drawn (5C86, 56C8 with BX
+    /// 4), the bank before mapped again; the spellmaker's leaves it to the
+    /// front end. The name's background kept (8F26 into [A890]) and the
+    /// texts' drawing (9E06) are the front end's.
+    pub(crate) fn sm_screen(&mut self, files: &mut Files, picture: bool) -> Option<()> {
         self.sm_no_element();
         self.mem.w8(DS, COLOUR, 0xA0);
+        if picture {
+            let si = if self.sg8(0x101D) == 0xFF {
+                0x5785
+            } else if self.sg8(0x1001) == 0xFF {
+                0x5792
+            } else {
+                0x5778
+            };
+            let bank = self.mem.r16(DS, 0x1032);
+            let old = self.map_bank(bank, 0);
+            self.sheet_image_here(files, si)?;
+            self.map_bank(old, 0);
+        }
         self.sm_effects_list(files)?;
         // The gold (75B0) and the level (7052).
         let gold = self.mem.r32(DS, GOLD);
@@ -557,7 +582,6 @@ impl Machine {
         self.sm_itoa(bx, BUF);
         let f = self.sg16(0xA902) & 0xFFFE;
         self.mem.w16(DS, 0xA902, f);
-        hooks.screen(self);
         Some(())
     }
 

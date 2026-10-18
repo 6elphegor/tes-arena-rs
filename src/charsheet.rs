@@ -36,10 +36,11 @@
 //!   description, 1988), the arrows (1A4A, 1A94), Drop (17D8) and Spells
 //!   (2365, the spells' list 1D5C). What they say goes in the list's
 //!   panel (223A), the wait there the front end's. A marked spell's line
-//!   clicked again opens its page (1B3C: `sheet_spell_page`). Not
-//!   ported: "Drop what?" (18CA, with no line marked: 223A's wait the
-//!   list's own loop again, 2325, where a line clicked is the one
-//!   dropped).
+//!   clicked again opens its page (1B3C: `sheet_spell_page`). Drop with
+//!   no line marked says "Drop what?" (18CA): 223A's wait is then the
+//!   page's own loop again over its first five records (2325), where a
+//!   line clicked is marked and the drop starts over (`drop_what_loop`;
+//!   D within it, the drop within the drop, isn't ported).
 //! - The world given back (A6B5): the buffer block, the planes read back
 //!   from TEMPSAVE.$$$, the renderer's buffers (A561), SCREENSV.$$2, the
 //!   mouse's box (53AE), the row tables (DA8E) and outdoors the sky's
@@ -104,6 +105,21 @@ const ITEM_HEADER: u16 = 0x12A8;
 /// shows its lines (1194:223A): each line's text and colour, and the
 /// first's row.
 pub type PanelWait<'a> = dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) + 'a;
+
+/// What 223A's DI runs after its lines are shown (`list_panel_then`).
+type PanelThen<'a> = dyn FnMut(&mut Machine, &[(Vec<u8>, u8)], u16) -> Option<()> + 'a;
+
+/// What the front end gives a turn of the equipment page's loop (5DE2):
+/// a key typed (its character) or a left click (x, y).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PageInput {
+    Key(u8),
+    Click(u16, u16),
+}
+
+/// The equipment page's buttons (3276:57D8: 62h bytes each; x, y, width
+/// and height words, the key at +59h, the handler at +5Eh).
+const PAGE_BUTTONS: u16 = 0x57D8;
 
 /// The scratch the numbers are made in (1044) and the colours (929E).
 const NUMBER: u16 = 0x1044;
@@ -344,6 +360,13 @@ impl Machine {
     /// its key typed, None a click.
     pub fn sheet_equipment_scroll(&mut self, files: &mut Files, key: Option<u8>, on: bool) -> Option<()> {
         self.equipment_turn(key, if on { 1 } else { 2 });
+        self.equipment_scrolled(files, on)?;
+        self.equipment_turn_end();
+        Some(())
+    }
+
+    /// 1194:1A4A (`on`) or 1A94: the arrows' handlers.
+    fn equipment_scrolled(&mut self, files: &mut Files, on: bool) -> Option<()> {
         let first = self.mem.r8(DS, 0x1297);
         let moved = if on {
             let mut ax = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
@@ -359,7 +382,6 @@ impl Machine {
             self.list_back();
             self.list_again(files)?;
         }
-        self.equipment_turn_end();
         Some(())
     }
 
@@ -530,6 +552,15 @@ impl Machine {
         // (Its callers here, 1A0A, 1C0A, 1815, 1981, give it DI 5536, its
         // wait, which it keeps for theirs: `page_di`.)
         self.page_di = Some(0x5536);
+        let _ = self.list_panel_then(si, cx, bx, dl, &mut |m, lines, top| {
+            wait(m, lines, top);
+            Some(())
+        });
+    }
+
+    /// `list_panel_text` with `then` its DI's routine after the lines are
+    /// shown (5E21, CALL DI; 5536 the wait, 2325 "Drop what?"'s loop).
+    fn list_panel_then(&mut self, si: u16, cx: u16, bx: u16, dl: u8, then: &mut PanelThen<'_>) -> Option<()> {
         self.select_font(0x102C);
         let top = bx;
         let mut lines = Vec::new();
@@ -550,7 +581,7 @@ impl Machine {
             bx = bx.wrapping_add(0x0B);
             self.mem.w8(DS, 0x9288, dl);
         }
-        wait(self, &lines, top);
+        then(self, &lines, top)?;
         let bank = self.mem.r16(DS, 0x1032);
         let old = self.map_bank(bank, 0);
         if self.page_is_block() {
@@ -558,6 +589,7 @@ impl Machine {
             self.page_rect_put((frame, 0), 0, 0x8F, 0xAB, 0x2C);
         }
         self.map_bank(old, 0);
+        Some(())
     }
 
     /// D or the Drop button (3276:57D8's fourth record, 1194:17D8), `key`
@@ -567,41 +599,113 @@ impl Machine {
     /// `screen` and `menu_closed`, `pick` the front end's answer, 0 yes);
     /// a drop draws the page again (1CF0's 23B1). Its refusals (no room,
     /// a quest's item) are said in the list's panel (223A, `wait` the
-    /// front end's); "Drop what?" (18CA) isn't ported.
-    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>) -> Option<()> {
+    /// front end's). With no line marked, "Drop what?" (18CA) is said
+    /// there (in FEh at row A0h, `wait` shown it) and its DI, 2325, runs
+    /// the page's loop over its first five records with 1299 set, `what`
+    /// the front end's inputs (`drop_what_loop`); a line marked by it
+    /// starts the drop over (18F3).
+    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
         use crate::use_item::DropButton;
         self.equipment_turn(key, 3);
-        let mut failed = false;
-        let r = self.drop_button_drawn(
-            &mut |m| {
-                let Some(boxes) = m.menu_boxes(crate::use_item::var::DROP_TEXT, 0x4B63, screen) else {
-                    failed = true;
-                    return false;
-                };
-                let answer = if boxes.is_some() { pick(m) } else { 0xFFFF };
-                m.menu_closed(boxes.as_ref());
-                answer == 0
-            },
-            &mut |m| m.equipment_drawn(files),
-        )?;
-        if failed {
-            return None;
-        }
-        match r {
-            DropButton::NoRoom | DropButton::CantDrop => {
-                // 1962, 17FB: the refusal's text (at 1044) in the list's
-                // panel (223A) in A0h at row A0h, DI 5536: the wait.
-                self.list_panel_text(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xA0, wait);
-                self.equipment_turn_end();
-                Some(())
+        loop {
+            let mut failed = false;
+            let r = self.drop_button_drawn(
+                &mut |m| {
+                    let Some(boxes) = m.menu_boxes(crate::use_item::var::DROP_TEXT, 0x4B63, screen) else {
+                        failed = true;
+                        return false;
+                    };
+                    let answer = if boxes.is_some() { pick(m) } else { 0xFFFF };
+                    m.menu_closed(boxes.as_ref());
+                    answer == 0
+                },
+                &mut |m| m.equipment_drawn(files),
+            )?;
+            if failed {
+                return None;
             }
-            // 18CA: its 223A takes DI as the drop's callers leave it.
-            DropButton::DropWhat => crate::giveup::not_ported("1194:18E7: \"Drop what?\" in the page (223A with the caller's DI)"),
-            DropButton::Nothing | DropButton::Dropped => {
-                self.equipment_turn_end();
-                Some(())
+            match r {
+                DropButton::NoRoom | DropButton::CantDrop => {
+                    // 1962, 17FB: the refusal's text (at 1044) in the list's
+                    // panel (223A) in A0h at row A0h, DI 5536: the wait.
+                    self.list_panel_text(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xA0, wait);
+                }
+                DropButton::DropWhat => {
+                    // 18CA: the text in FEh at row A0h (the colour after
+                    // FEh too), DI 2325 (kept after: `page_di`).
+                    self.list_panel_then(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xFE, &mut |m, lines, top| {
+                        wait(m, lines, top);
+                        m.drop_what_loop(files, what)
+                    })?;
+                    self.page_di = Some(0x2325);
+                    if self.mem.r8(DS, 0x1296) != 0xFF {
+                        continue;
+                    }
+                }
+                DropButton::Nothing | DropButton::Dropped => {}
             }
+            self.equipment_turn_end();
+            return Some(());
         }
+    }
+
+    /// 1194:2325, "Drop what?"'s DI: 1299 1 (another list up) and the
+    /// page's loop (5CF4) over 3276:57D8's first five records, `what`
+    /// each turn's input: the list's (a click on it, or Space: 1AC6,
+    /// which with 1299 set waits for the buttons' release and leaves,
+    /// 3159:0006), the arrows' ('+', '-': `equipment_scrolled`, the loop
+    /// going on) and the exit's (Esc: leaves, B7C6 4); the drop's (D: 17D8
+    /// over again, within) isn't ported. Then no line marked, and unless
+    /// it was the exit the line under the cursor marked (1C5E: the
+    /// click's row; a key's, the cursor's at 8F94); 1299 0, B7C4 bit 0
+    /// off.
+    fn drop_what_loop(&mut self, files: &mut Files, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
+        self.mem.w8(DS, 0x1299, 1);
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        let y = loop {
+            // 5D18, 5DE2: B7C6 0, the keys flushed, the input read.
+            self.mem.w16(DS, LOOP_MATCH, 0);
+            self.key_flush();
+            let input = what(self);
+            if let PageInput::Key(k) = input {
+                self.ring_typed(k);
+            }
+            // 5D24..5D39: each record in turn, its key (a letter made a
+            // capital, 5D75) or its rectangle (5D8D, edges included).
+            let hit = (0..5u16).find(|&i| {
+                let r = PAGE_BUTTONS.wrapping_add(0x62 * i);
+                match input {
+                    PageInput::Key(k) => k != 0 && k.to_ascii_uppercase() == self.mem.r8(DATA, r.wrapping_add(0x59)),
+                    PageInput::Click(x, y) => {
+                        let w = |o: u16| self.mem.r16(DATA, r.wrapping_add(o));
+                        x >= w(0) && y >= w(2) && x <= w(0).wrapping_add(w(4)) && y <= w(2).wrapping_add(w(6))
+                    }
+                }
+            });
+            let Some(rec) = hit else { continue };
+            self.mem.w16(DS, LOOP_MATCH, rec);
+            match rec {
+                0 | 4 => {
+                    let f = self.mem.r8(DS, LOOP_FLAGS) | 1;
+                    self.mem.w8(DS, LOOP_FLAGS, f);
+                    break match input {
+                        PageInput::Click(_, y) => y,
+                        PageInput::Key(_) => self.mem.r16(DS, 0x8F94),
+                    };
+                }
+                1 | 2 => self.equipment_scrolled(files, rec == 1)?,
+                _ => return crate::giveup::not_ported("1194:17D8 within the loop of \"Drop what?\" (the drop over again, within)"),
+            }
+        };
+        self.mem.w8(DS, 0x1296, 0xFF);
+        if self.mem.r16(DS, LOOP_MATCH) != 4 {
+            self.list_mark(files, y)?;
+        }
+        self.mem.w8(DS, 0x1299, 0);
+        let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        Some(())
     }
 
     /// S or the Spells button (3276:57D8's sixth record, 1194:2365), `key`
@@ -1112,7 +1216,7 @@ impl Machine {
     /// 0000:56C8 with BX 4 or 14h: the picture named at DS:`si` loaded to
     /// the EMS frame's start (742C), its header's words to A836..A83C,
     /// drawn into the page (582C).
-    fn sheet_image_here(&mut self, files: &mut Files, si: u16) -> Option<()> {
+    pub(crate) fn sheet_image_here(&mut self, files: &mut Files, si: u16) -> Option<()> {
         let frame = self.mem.r16(DS, FRAME);
         self.file_load(files, si, frame, 0)?;
         for k in 0..4u16 {

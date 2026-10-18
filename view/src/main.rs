@@ -331,6 +331,15 @@ impl arena::hooks::StairsHooks for Front<'_> {
         }
     }
 }
+/// How the sheet's drop came out (`App::sheet_drop`): a question asked
+/// (its text), "Drop what?" waiting in its loop (its lines and their first
+/// row), or done.
+enum SheetDrop {
+    Asked(Vec<u8>),
+    Waiting((Vec<(String, u8)>, u16)),
+    Done,
+}
+
 impl ControlHooks for Front<'_> {
     /// The window's click, in the frame's input step where the original
     /// takes it (after that frame's actors): the mouse put 4 up and left
@@ -3718,6 +3727,23 @@ impl App {
                     self.page_answer(page, a);
                     return;
                 }
+                // "Drop what?" waits in its loop (1194:2325, 5DE2): the
+                // keys of its first five records, the list's (Space), the
+                // arrows', the drop's and the exit's.
+                if inv.drop_what.is_some() && inv.asking.is_none() {
+                    let c = match code {
+                        KeyCode::Space => Some(b' '),
+                        KeyCode::NumpadAdd | KeyCode::Equal => Some(b'+'),
+                        KeyCode::Minus | KeyCode::NumpadSubtract => Some(b'-'),
+                        KeyCode::KeyD => Some(b'd'),
+                        KeyCode::Escape => Some(0x1B),
+                        _ => None,
+                    };
+                    if let Some(c) = c {
+                        self.sheet_drop_what(arena::charsheet::PageInput::Key(c));
+                    }
+                    return;
+                }
                 // An item's description waits for a key or a click
                 // (1194:5536: ACB0 or AFF9), which does nothing more.
                 if inv.info.take().is_some() {
@@ -3872,21 +3898,37 @@ impl App {
 
     /// D or the Drop button on the sheet's own equipment page
     /// (`Machine::sheet_equipment_drop`), `key` typed (`d`) or None for a
-    /// click. Without `answer` it runs first on a copy: a question it
-    /// asks comes back (its text) for the window to put up, the game left
-    /// as it was until it is answered; with one (or without a question)
-    /// it is the game's.
-    fn sheet_drop(&mut self, key: Option<u8>, answer: Option<(bool, Option<u8>)>) -> Option<Vec<u8>> {
+    /// click, `inputs` what "Drop what?"'s loop (2325) has taken since.
+    /// Without `answer` it runs first on a copy: a question it asks comes
+    /// back (its text) for the window to put up, and "Drop what?" waiting
+    /// for more than `inputs` comes back (its lines), the game left as it
+    /// was until it is answered; with one (or with neither) it is the
+    /// game's.
+    fn sheet_drop(&mut self, key: Option<u8>, answer: Option<(bool, Option<u8>)>, inputs: &[arena::charsheet::PageInput]) -> SheetDrop {
+        use arena::charsheet::PageInput;
         let screen = self.assets.shown.clone();
+        let lines_of = |lines: &[(Vec<u8>, u8)], top: u16| (lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top);
         if answer.is_none() {
             let (mut m, mut f) = (self.engine.m.clone(), self.engine.files.clone());
             let mut asked = None;
+            let mut shown = None;
+            let mut waiting = false;
+            let mut next = inputs.iter().copied();
             let _ = m.sheet_equipment_drop(&mut f, key, Some(&screen), &mut |p| {
                 asked = Some(p.mem.cstr(arena::mem::DS, arena::use_item::var::DROP_TEXT).to_vec());
                 1
-            }, &mut |_, _, _| {});
-            if asked.is_some() {
-                return asked;
+            }, &mut |_, lines, top| shown = Some(lines_of(lines, top)), &mut |_| {
+                // Past the inputs: the loop left by its exit (Esc) on the copy.
+                next.next().unwrap_or_else(|| {
+                    waiting = true;
+                    PageInput::Key(0x1B)
+                })
+            });
+            if waiting {
+                return SheetDrop::Waiting(shown.unwrap_or_default());
+            }
+            if let Some(text) = asked {
+                return SheetDrop::Asked(text);
             }
         }
         let (pick, typed) = match answer {
@@ -3897,22 +3939,23 @@ impl App {
         // A refusal said in the list's panel (223A) waits there for a
         // click or a key (5536).
         let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
+        let mut next = inputs.iter().copied();
         if e.m.sheet_equipment_drop(&mut e.files, key, Some(&screen), &mut |m| {
             // The answer's key read by the menu's pick (3159:10BE).
             if let Some(c) = typed {
                 m.ring_typed(c);
             }
             pick
-        }, &mut |_, lines, top| {
-            shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
-        }).is_none() {
+        }, &mut |_, lines, top| shown = Some(lines_of(lines, top)), &mut |_| next.next().unwrap_or(PageInput::Key(0x1B))).is_none() {
             eprintln!("the drop button gave up: {}", arena::giveup::describe());
         }
         if let (Some((lines, top)), Some(panels::Panel::Inventory(inv))) = (shown, self.panel.as_mut()) {
-            inv.info = Some(lines);
-            inv.info_y = Some(top as i32);
+            if inputs.is_empty() {
+                inv.info = Some(lines);
+                inv.info_y = Some(top as i32);
+            }
         }
-        None
+        SheetDrop::Done
     }
 
     /// S or the Spells button on the sheet's own equipment page
@@ -3935,11 +3978,16 @@ impl App {
         }
     }
 
-    /// `sheet_drop`, its question put up on the inventory.
+    /// `sheet_drop`, its question put up on the inventory, or "Drop
+    /// what?"'s lines while its loop waits (`Inventory::drop_what`).
     fn sheet_drop_asked(&mut self, key: Option<u8>, answer: Option<(bool, Option<u8>)>) {
         const RING: std::ops::Range<u16> = 0xAC46..0xACB5;
         let mut key = key;
-        if answer.is_some() {
+        let inputs = match self.panel.as_ref() {
+            Some(panels::Panel::Inventory(inv)) => inv.drop_what.clone().unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        if answer.is_some() || !inputs.is_empty() {
             let kept = match self.panel.as_mut() {
                 Some(panels::Panel::Inventory(inv)) => inv.drop_ring.take(),
                 _ => None,
@@ -3951,13 +3999,37 @@ impl App {
                 key = k;
             }
         }
-        if let Some(text) = self.sheet_drop(key, answer) {
-            let ring: Vec<u8> = RING.map(|at| self.engine.m.mem.r8(arena::mem::DS, at)).collect();
-            if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
-                inv.asking = Some((text, 0));
-                inv.drop_ring = Some(Box::new((ring, key)));
+        let run = self.sheet_drop(key, answer, &inputs);
+        let ring: Vec<u8> = RING.map(|at| self.engine.m.mem.r8(arena::mem::DS, at)).collect();
+        if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
+            match run {
+                SheetDrop::Asked(text) => {
+                    inv.asking = Some((text, 0));
+                    inv.drop_ring = Some(Box::new((ring, key)));
+                    inv.drop_what = (!inputs.is_empty()).then_some(inputs);
+                }
+                SheetDrop::Waiting((lines, top)) => {
+                    inv.info = Some(lines);
+                    inv.info_y = Some(top as i32);
+                    inv.drop_ring = Some(Box::new((ring, key)));
+                    inv.drop_what = Some(inputs);
+                }
+                SheetDrop::Done => inv.drop_what = None,
             }
         }
+    }
+
+    /// An input while "Drop what?" waits on the sheet's own page (its
+    /// loop's, 1194:2325): the drop run again with it after the others.
+    fn sheet_drop_what(&mut self, input: arena::charsheet::PageInput) {
+        if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
+            inv.info = None;
+            inv.info_y = None;
+            if let Some(inputs) = inv.drop_what.as_mut() {
+                inputs.push(input);
+            }
+        }
+        self.sheet_drop_asked(None, None);
     }
 
     /// The sheet's equipment page left by its exit, `key` typed (Esc) or
@@ -4020,6 +4092,12 @@ impl App {
                     if let Some(a) = answer {
                         self.page_answer(page, a);
                     }
+                    return;
+                }
+                // "Drop what?" waits in its loop (1194:2325): a click of
+                // either button, on its records' rectangles or not.
+                if inv.drop_what.is_some() && inv.asking.is_none() {
+                    self.sheet_drop_what(arena::charsheet::PageInput::Click(x as u16, y as u16));
                     return;
                 }
                 // An item's description waits for a click (1194:5536),
