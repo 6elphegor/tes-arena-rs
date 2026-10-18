@@ -1746,6 +1746,45 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
+/// Each case's drawings make their row tables from what the original's
+/// did (the `rows` lines: the inputs as the last 0000:DA8E found them,
+/// which the tables keep while the state changes on, `render::rows_read`
+/// and `Machine::rows_note` at each of DA8E's callers), in every case of
+/// worldframes.txt and areaplay.txt the view plays. (ARENA_CASE: that
+/// case alone.)
+#[test]
+fn the_row_tables_made_as_the_original_makes_them() {
+    let only = std::env::var("ARENA_CASE").ok();
+    let mut bad = Vec::new();
+    for path in [VECTORS, areaplaytest::AREAPLAY] {
+        let text = std::fs::read_to_string(path).expect(path);
+        for f in text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).filter(|f| f.len() == 3 && f[0] == "rows") {
+            let name = f[1];
+            if only.as_deref().is_some_and(|o| o != name) {
+                continue;
+            }
+            let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };
+            let Some((mut a, _)) = played(place, |a| {
+                setup(a);
+                a.engine.m.rows_drawn = Some(Vec::new());
+            }, play) else { return };
+            let drawn = a.engine.m.rows_drawn.take().unwrap();
+            if only.is_some() {
+                for (i, v) in drawn.iter().enumerate() {
+                    eprintln!("{name} rows#{} {}", i + 1, v.iter().map(|w| format!("{w:x}")).collect::<Vec<_>>().join(" "));
+                }
+            }
+            let digest = fnv(drawn.iter().flat_map(|v| v.iter().flat_map(|w| w.to_le_bytes())));
+            let got = format!("{} {digest:x}", drawn.len());
+            if got != f[2] {
+                eprintln!("{name}: the drawings' row tables differ from the original's: {got} against {}", f[2]);
+                bad.push(name.to_string());
+            }
+        }
+    }
+    assert!(bad.is_empty(), "the row tables differ from the original's in {bad:?}");
+}
+
 /// The busy cases whose state is compared, the store's and the guild's
 /// shopping among them (the shops' screens as the engine's: 1194:5496 and
 /// 54B3, the list windows 1194:5734 and 3159:06A0, the strip 5F8C/5FC0,

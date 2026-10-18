@@ -42,16 +42,23 @@ pub struct Machine {
     /// give-up the port can't say that of (something not ported). For
     /// reports only: nothing in the game reads it.
     pub gave_up: Option<&'static str>,
-    /// The row tables' inputs as an area's entry made them (0000:A523's
-    /// DA8E, `rows_keep`), for the first drawing after it: the INF sets
-    /// the ceiling's height (D80C) after them, and the original draws that
-    /// frame before its physics make the tables again.
-    pub rows_entry: Option<Vec<(u16, u16)>>,
+    /// The row tables' inputs as the last 0000:DA8E made them
+    /// (`rows_note`, at each of its callers): the drawing builds its copy's
+    /// tables from these, as the original draws with the tables it last
+    /// made, whatever has changed since (the INF's ceiling after an
+    /// area's entry, the height a climb clamps after making them). None
+    /// before any: the drawing's from the state then.
+    pub rows_made: Option<[u16; 11]>,
+    /// With a list, each drawing's row tables' inputs added to it
+    /// (`render::rows_read`, as gen_worldframes.py's `rows` lines have
+    /// them), for the tests; a copy of the machine run again (a dialog's
+    /// turn) takes it back with the rest.
+    pub rows_drawn: Option<Vec<[u16; 11]>>,
 }
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_entry } = self;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -63,7 +70,8 @@ impl Clone for Machine {
             sound_names: sound_names.clone(),
             songs: songs.clone(),
             music_status: *music_status,
-            rows_entry: rows_entry.clone(),
+            rows_made: *rows_made,
+            rows_drawn: rows_drawn.clone(),
             gave_up: *gave_up,
             list_kind: *list_kind,
         }
@@ -73,7 +81,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_entry } = source;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, sound_names, songs, music_status, gave_up, list_kind, rows_made, rows_drawn } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -86,7 +94,8 @@ impl Clone for Machine {
         self.music_status = *music_status;
         self.gave_up = *gave_up;
         self.list_kind = *list_kind;
-        self.rows_entry.clone_from(rows_entry);
+        self.rows_made = *rows_made;
+        self.rows_drawn.clone_from(rows_drawn);
     }
 }
 
@@ -94,7 +103,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None, list_kind: 0, rows_entry: None }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None, list_kind: 0, rows_made: None, rows_drawn: None }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so

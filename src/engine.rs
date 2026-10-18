@@ -217,6 +217,12 @@ fn world_hook(m: &mut Machine, files: &mut Files, hooks: &mut dyn EngineHooks, s
     }
     match (at, m.mem.r32(DS, at)) {
         (0xC3A4, 0x47FD) => {
+            // 47FD keeps its return address (A8EF's, A8F9 in the world
+            // loop's segment) at 127A for its stack's check. Its segment
+            // word, 127C, is the controls' refresh (2826:018A, `REFRESH`),
+            // never 0 on a PC, so the next input step makes the row tables
+            // again: as the harness loads the image, 1000h.
+            m.mem.w32(DS, 0x127A, 0x1000_A8F9);
             m.actors_update(files)?;
             m.projectiles_update()
         }
@@ -362,6 +368,10 @@ impl Engine {
             m.moving_lights();
         }
         m.mem.w8(DS, STAGE, 3);
+        if m.rows_drawn.is_some() {
+            let v = crate::render::rows_read(m);
+            m.rows_drawn.as_mut().unwrap().push(v);
+        }
         if let Some(page) = self.page.as_mut() {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
@@ -648,7 +658,7 @@ impl Engine {
         m.draw_buffers_alloc()?;
         m.light_table_make()?;
         // A523: the row tables made (DA8E), before the INF's ceiling.
-        m.rows_keep();
+        m.rows_note();
         let info = m.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             m.info_load(&mut self.files, info)?;
