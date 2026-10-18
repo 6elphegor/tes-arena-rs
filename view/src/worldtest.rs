@@ -883,6 +883,24 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 24, |_| false);
         })),
+        "playcamp" => (Place::Wild, Box::new(|a: &mut App| at_hour(a, 12, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // Camping (R, 2542:01E6): its menu answered C (camp for a
+            // while), the hours typed (2, Enter: 1194:46BF); the rest's
+            // frames count them down to "done", its box read with Space.
+            // (R asks for the camp before the next frame, whose turn waits
+            // on the menu and the hours; answered, that frame goes on.)
+            a.compose();
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+            assert!(a.pending.is_some(), "R asks how to rest");
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.key(a, KeyCode::Digit2, Some("2"));
+            d.key(a, KeyCode::Enter, None);
+            assert!(a.pending.is_none(), "the hours answered");
+            seen.push(state(a));
+            frames_reading(a, d, seen, 12);
+        })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
@@ -1913,7 +1931,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 33] = ["playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 34] = ["playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1995,8 +2013,10 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// logbook paged and left in playlog (2542:02A3, 27E3:0088: the log read
 /// into bank [1030], its lines split there, each page's lines copied to
 /// 1044 and drawn, the page kept in LOG.$$$: `Machine::log_open`,
-/// `log_turn`, `log_close`).
-const BUSY_STATE: [&str; 36] = ["playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+/// `log_turn`, `log_close`), and camping for two hours in playcamp
+/// (2542:01E6, the camp's menu, the hours typed and counted down to
+/// "done": 1194:424E, 46BF, 456F).
+const BUSY_STATE: [&str; 37] = ["playcamp", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

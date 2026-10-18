@@ -290,6 +290,11 @@ KEY_S = 0x1F
 KEY_L = 0x26
 KEY_U = 0x16
 KEY_C = 0x2E
+# R (2542:01E6: camping, 1194:424E), the digit 2 and Enter (the hours
+# typed, 1194:4800).
+KEY_R = 0x13
+KEY_2 = 0x03
+KEY_ENTER = 0x1C
 
 
 def crowded_square(a):
@@ -617,6 +622,12 @@ CASES = {
     # encounters (1194:887A) until enemies come and end it ("Enemies are
     # nearby", the box read with Space), then what came comes on.
     'playrest': ('wild', resting(0x100), [((), (), 300, None, [], {'script': [('keys', [KEY_SPACE])]})]),
+    # Camping (R, 2542:01E6) in the wilderness at noon: the camp's menu
+    # (1194:020E) answered C (camp for a while), the hours typed (2,
+    # Enter: 1194:46BF), then the rest's frames count them down (each 20
+    # minutes, 1194:456F) to "done" (its box read with Space).
+    'playcamp': ('wild', at_hour(12, 0x100), [((), (), 2, None), ((KEY_R,), (), 1, None, [], {'script': [('keys', [KEY_C]), ('keys', [KEY_2]), ('keys', [KEY_ENTER])]}),
+                                             ((), (KEY_R,), 12, None, [], {'script': [('keys', [KEY_SPACE])]})]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # `locked_door`'s door with a lock of level 1, picking armed
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the

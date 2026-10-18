@@ -723,17 +723,12 @@ impl arena::rest::RestHooks for Front<'_> {
         Front::menu(self, m, si, bx, di)
     }
     /// 1194:46BF's 4800: the prompt's box, the field at FCh, 44h in
-    /// ARENAFNT.DAT ([102C]) and colour 60h. The box's state as the game
-    /// has it round the field (`Machine::prompt_shown`, `prompt_closed`),
-    /// after 46BF's font and tiles ([102C] into B036, [1036] into B038:
-    /// 9AE6, 9AF8, which the port leaves to the front end).
+    /// ARENAFNT.DAT ([102C], which 46BF selected) and colour 60h. The
+    /// box's state as the game has it round the field
+    /// (`Machine::prompt_shown`, `prompt_closed`).
     fn type_hours(&mut self, m: &mut arena::machine::Machine) {
         if let Some(t) = self.talk.as_deref_mut() {
             use arena::mem::DS;
-            for (to, from) in [(0xB036u16, 0x102Cu16), (0xB038, 0x1036)] {
-                let v = m.mem.r16(DS, from);
-                m.mem.w16(DS, to, v);
-            }
             let typed = arena::rest::var::TYPED;
             if m.prompt_shown((DS, REST_PROMPT), (0xFC, 0x44), (DS, typed), 3, self.drawn.as_deref().or(self.shown)).is_none() {
                 eprintln!("the prompt's box gave up: {}", arena::giveup::describe());
