@@ -526,6 +526,10 @@ pub struct Said {
     /// The screen as last shown, for a list that keeps the page (the bar's,
     /// 2542:06F8).
     pub screen: Option<Vec<u8>>,
+    /// The pick given straight to the use button's code, without its list
+    /// (as gen_worldframes.py's `used` calls 24FA:0AFE, 1194:7AE7 and
+    /// 29CF:07C3).
+    pub listless: bool,
 }
 
 impl Said {
@@ -573,6 +577,9 @@ impl arena::use_item::UseHooks for Said {
     /// the line the player picked (FFFFh: left).
     fn pick(&mut self, m: &mut Machine, count: u16) -> u16 {
         let pick = self.pick.take().unwrap_or(0xFFFF);
+        if self.listless {
+            return pick;
+        }
         m.bar_list(self.screen.as_deref(), (DS, arena::use_item::var::USABLE_NAMES), count, pick).unwrap_or_else(|| {
             eprintln!("the use list gave up: {}", arena::giveup::describe());
             0xFFFF

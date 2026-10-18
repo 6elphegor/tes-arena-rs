@@ -713,7 +713,7 @@ fn wounded_with_potion(a: &mut App) {
 /// the view's use button uses it (`panels::use_pick`).
 fn used(a: &mut App, index: u16) {
     let e = &mut a.engine;
-    crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
+    crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said { listless: true, ..Default::default() });
 }
 
 /// The window's fades played out at once: the original's screens fade

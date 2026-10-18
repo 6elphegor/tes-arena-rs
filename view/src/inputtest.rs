@@ -629,9 +629,11 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     setup(&mut b);
     let mut db = Driver::new(&mut b);
     db.frame(&mut b);
-    let mut said = panels::Said::default();
-    panels::cast(&mut b.engine, 0, &mut said);
-    same(&a, &b, "spell 0 clicked and panels::cast(0)");
+    // The list's run with its first line picked (`book_cast`: the page
+    // kept as shown, the line read back through 0B9C's order) and the cast.
+    let mut said = panels::Said { screen: Some(b.assets.shown.clone()), ..Default::default() };
+    panels::book_cast(&mut b.engine, 0, &mut said);
+    same(&a, &b, "spell 0 clicked and panels::book_cast(0)");
     // Its target clicked in the view: the same click as the script's.
     d.click(&mut a, 164, 74, MouseButton::Left);
     d.frames(&mut a, 2);
