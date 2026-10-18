@@ -1,0 +1,4 @@
+load | bsa | CLOUD01.IMG | f000:0 0 | 1044+b 8fa8+1 8faa+2 9176+5 917c+1 917e+3 9184+2 9194+2 9198+3 919c+2 a908+2 a90c+2 | 6ba936101e5d9721 | 0 936a397403d4a04c
+load | save | CITYDATA.01 | f000:0 0 | 1044+b 8fa8+1 8faa+2 a908+2 a90c+2 | 271643f599da24ef | 0 c2bae8f51bf0a54c
+load | two | CLOUD01.IMG,CLOUD02.IMG | f000:0 0 f000:d9d 0 | 1044+b 8fa8+1 8faa+2 9176+5 917e+3 9184+2 9194+2 9198+3 919c+2 a908+2 a90c+2 | 31531db05877b1e | 0 1d51278e2627f26b
+load | missing | NOSUCH.IMG | 0:0 1 | 1044+a a908+2 | 3d7aa4032200d10 | 3c c2c7779eab642c15
