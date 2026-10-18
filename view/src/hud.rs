@@ -1437,7 +1437,7 @@ fn draw_list_in(screen: &mut Screen, st: &Style, menu: &Menu, font: &Font, title
     let y = if n > rows_n && top as i32 == n - rows_n {
         ty + th - h
     } else if n > 0 {
-        ty + (((top as i64) << 10) * th as i64 / n as i64 >> 10) as i32
+        ty + ((((top as i64) << 10) * th as i64 / n as i64) >> 10) as i32
     } else {
         ty
     };
