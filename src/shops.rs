@@ -100,6 +100,11 @@ pub trait ShopHooks {
     /// screen, the interface made again by the next frame
     /// (`Machine::shop_screen_back`).
     fn screen_back(&mut self, _m: &mut Machine, _files: &mut crate::bsa::Files) {}
+    /// 1194:5E49 before a shop's menu: the buffer at [BA54] freed
+    /// (`Machine::buffer_free`).
+    fn buffer_freed(&mut self, _m: &mut Machine) {}
+    /// 1194:5E54 after it: the buffer made again (`Machine::buffer_make`).
+    fn buffer_made(&mut self, _m: &mut Machine) {}
 }
 
 /// `ShopHooks` that do nothing (every menu left at once).

@@ -152,9 +152,18 @@ impl HaggleIo for HaggleTalk<'_> {
             b.picture = Some(name);
         }
     }
+    fn shown(&mut self, m: &mut Machine, si: u16) {
+        m.split_lines(si);
+        m.shop_dialog(si);
+        m.shop_strip_back();
+    }
     fn say(&mut self, m: &mut Machine, si: u16, kind: u8) {
-        // Its line breaks made spaces (1194:84C3), then broken by 49FF.
+        // Its line breaks made spaces (1194:84C3), then broken by 49FF
+        // (in the game's memory too, as the original leaves it).
         self.said = wrap_49ff(m.mem.cstr(DS, si));
+        if m.line_wrap(si).is_none() {
+            eprintln!("the haggle's line's wrap gave up: {}", arena::giveup::describe());
+        }
         self.kind = kind;
         let p = String::from_utf8_lossy(m.mem.cstr(DS, OFFER_PROMPT)).trim().to_string();
         if !p.is_empty() {

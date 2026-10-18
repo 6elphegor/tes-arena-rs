@@ -31,6 +31,7 @@ cd54 cd56 the segment of the hook at CD52 (0000:0B48)
 517e 5180 the record at 515A's texts' segment (+24)
 519d 519f the record at 515A's lines' drawing's segment
 b80c b80e the list window's record's segment (B80A's far pointer: DGROUP's)
+1258 1259 AH as 1194:AFD9's callers leave it, kept by 27CE:0040: DGROUP's segment's high byte
 068a 068c a far pointer to the player's record (01A4) at 0688: its segment DGROUP's
 0d5e 0d60 the spell target list's first entry's segment (0D5C: DGROUP's for the player, 29CF:0145's cast at the player)
 7dbb 7dbc the flags a cast waiting for its target saves (7DBA): its high byte AH, the spells' segment's (3276h) left by the lookup (29CF:00FA)

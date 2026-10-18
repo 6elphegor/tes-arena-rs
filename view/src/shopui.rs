@@ -288,6 +288,14 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn screen_back(&mut self, m: &mut Machine, files: &mut Files) {
         m.shop_screen_back(files);
     }
+    fn buffer_freed(&mut self, m: &mut Machine) {
+        m.buffer_free();
+    }
+    fn buffer_made(&mut self, m: &mut Machine) {
+        if m.buffer_make().is_none() {
+            eprintln!("the buffer at BA54 found no room: {}", arena::giveup::describe());
+        }
+    }
     fn gold_left(&mut self, m: &mut Machine) {
         m.shop_strip_save();
         m.gold_left();
@@ -414,6 +422,8 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
         self.show_banner(m, 0x6F11);
     }
     fn stock_file(&mut self, m: &mut Machine, name: u16) -> Option<Vec<u8>> {
+        // Its path built as the original opens it (25FD:0844).
+        m.save_path(name);
         let name = m.mem.cstr(DS, name).to_vec();
         if let Some((_, b)) = self.written.iter().rev().find(|(n, _)| n.eq_ignore_ascii_case(&name)) {
             return Some(b.clone());
@@ -421,6 +431,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
         self.files.data(&name).map(|d| d.to_vec())
     }
     fn stock_write(&mut self, m: &mut Machine, name: u16, bytes: &[u8]) {
+        m.save_path(name);
         let name = m.mem.cstr(DS, name).to_vec();
         self.files.store(&name, bytes.to_vec());
         self.written.push((name, bytes.to_vec()));

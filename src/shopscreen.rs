@@ -166,6 +166,23 @@ impl Machine {
         self.mem.w8(DS, 0x0D39, f);
     }
 
+    /// 1194:5E49: the buffer at [BA54] freed (0000:6C32 with its segment,
+    /// BA56).
+    pub fn buffer_free(&mut self) {
+        let seg = self.mem.r16(DS, 0xBA56);
+        self.heap_free(seg);
+    }
+
+    /// 1194:5E54: [CB8E] bytes taken from the heap (0000:51E2), their far
+    /// pointer at BA54. None where the heap has no room.
+    pub fn buffer_make(&mut self) -> Option<()> {
+        let n = self.mem.r16(DS, 0xCB8E);
+        let (seg, off) = self.heap_alloc_bytes(n)?;
+        self.mem.w16(DS, 0xBA54, off);
+        self.mem.w16(DS, 0xBA56, seg);
+        Some(())
+    }
+
     /// 0000:9A98 with AX 0, BX 0, CX 140h, DX C8h: the clip the whole
     /// screen.
     fn clip_whole(&mut self) {

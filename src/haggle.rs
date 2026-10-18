@@ -90,6 +90,8 @@ pub mod var {
     /// shown, and its colour.
     pub const LINE: u16 = 0x929E;
     pub const SHOWN: u16 = 0x987A;
+    /// The offer's prompt (1194:80F7).
+    pub const PROMPT: u16 = 0x65CA;
     pub const SHOWN_COLOUR: u16 = 0x137E;
     /// What the input routine (1194:4E88) is asked for: 0 a key, 1 a
     /// menu choice, 2 typed text.
@@ -137,6 +139,12 @@ pub trait HaggleIo {
     /// each answer, its yes and no (YESNO, 132F) for a confirmation and
     /// for the menu at a price of 1.
     fn picture(&mut self, _m: &mut Machine, _si: u16) {}
+    /// 1194:4E54 and 4E88 after the answer asked of the dialog: the line
+    /// at DS:`si` (SHOWN, or the offer's prompt 65CA) split in place
+    /// (137E 3: `Machine::split_lines`) and its state as the dialog leaves
+    /// it (`Machine::shop_dialog`, the strip put back: 5FC0). The drawing
+    /// is the front end's; by default nothing.
+    fn shown(&mut self, _m: &mut Machine, _si: u16) {}
 }
 
 /// The haggle's pictures (DGROUP): NEGOTBUT.IMG and YESNO.IMG.
@@ -254,6 +262,7 @@ impl Machine {
                 self.mem.w8(DS, SHOWN_COLOUR, 3);
                 self.mem.w8(DS, INPUT_KIND, 2);
                 io.type_offer(self)?;
+                io.shown(self, PROMPT);
                 if self.mem.r8(DS, TYPED) == 0 {
                     return Some(Haggle::NoDeal);
                 }
@@ -467,6 +476,7 @@ impl Machine {
         self.haggle_say(files, io, kind)?;
         self.haggle_ask(1);
         let c = io.menu()?;
+        io.shown(self, SHOWN);
         Some(if one && c == 1 { 2 } else { c })
     }
 
@@ -483,10 +493,12 @@ impl Machine {
         self.mem.w8(DS, SHOWN_COLOUR, 3);
         if informant {
             io.key()?;
+            io.shown(self, SHOWN);
             io.picture(self, NEGOTBUT);
             return Some(true);
         }
         let yes = io.menu()? == 0;
+        io.shown(self, SHOWN);
         io.picture(self, NEGOTBUT);
         Some(yes)
     }
@@ -498,6 +510,7 @@ impl Machine {
         self.haggle_say(files, io, kind)?;
         self.haggle_ask(0);
         io.key()?;
+        io.shown(self, SHOWN);
         io.picture(self, NEGOTBUT);
         Some(())
     }

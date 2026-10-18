@@ -261,12 +261,14 @@ impl Machine {
             self.guild_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
+                hooks.buffer_freed(self);
                 // 1194:A78E: FONT_A and the tiles at 1036 selected.
                 self.select_font(font::A);
                 self.select_tiles(0x1036);
                 let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
                 let (bx, di) = if caster { (KEYS, ENTRIES) } else { (KEYS_PLAIN, ENTRIES_PLAIN) };
                 let pick = hooks.menu(self, MENU_TITLE, bx, di);
+                hooks.buffer_made(self);
                 if (pick as i16) < 0 {
                     break;
                 }
