@@ -371,7 +371,7 @@ impl Engine {
                 let now = if mapped { m.mem.r8(m.mem.r16(DS, crate::mif::var::BUFFER_SEG), i) } else { m.ems.get(bank as usize).map_or(0, |b| b[i as usize]) };
                 now == before
             });
-            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote);
             for (o, before, after) in ems {
                 self.page_ems_wrote.insert(o, (before, after));
             }

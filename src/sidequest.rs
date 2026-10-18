@@ -1175,7 +1175,7 @@ impl Machine {
         self.sq_at_place(|m| {
             m.mem.w8(DS, TEXT_FLAG2, 0);
             hooks.text_at(m, files, 2, 0x929E)?;
-            hooks.log_entry(m, 0x929E);
+            hooks.log_entry(m, files, 0x929E)?;
             Some(())
         })?;
         let si = self.sq16(CURRENT);
@@ -1192,8 +1192,9 @@ impl Machine {
     /// `QuestHooks::informant_haggle`); a deal tells the next dungeon
     /// (CFAF) and marks it told. With no days left the informant is gone
     /// (bits 1, 2 and 3 cleared). AB2 is 0 meanwhile, FFh after. The
-    /// carry: set when it isn't the informant.
-    pub fn quest_informant(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
+    /// carry: set when it isn't the informant. DI `di` is the caller's,
+    /// kept by the haggle (65AB).
+    pub fn quest_informant(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks, di: u16) -> Option<bool> {
         let f = self.sq8(0x0FE6);
         if self.sq16(0x05C8) & 0x4000 != 0 || f & 4 != 0 || f & 2 == 0 || self.sq_talker() != self.sq16(0x0FDE) {
             self.mem.w8(DS, 0x0AB2, 0xFF);
@@ -1212,7 +1213,7 @@ impl Machine {
             let per = crate::scale::to100(self.sq8(0x01D3) as i16) as u16;
             let mode = if self.sq8(0x0FE6) & 8 != 0 { 6 } else { 5 };
             let price = self.sq16(0x0FEE) as u32;
-            hooks.informant_haggle(self, files, price, per, mode)?
+            hooks.informant_haggle(self, files, price, per, mode, di)?
         };
         if !no_deal {
             let f = self.sq8(0x0FE6) | 8 | 4;
@@ -1422,7 +1423,7 @@ impl Machine {
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.mem.w8(DS, TEXT_FLAG, 0);
         hooks.text_at(self, files, 2, 0x1044)?;
-        hooks.log_entry(self, 0x1044);
+        hooks.log_entry(self, files, 0x1044)?;
         self.mem.w32(DS, 0x929E, u32::from_le_bytes(*b"%amn"));
         self.mem.w8(DS, 0x92A2, 0);
         hooks.substitute(self, files, 0x929E)?;
@@ -1566,7 +1567,7 @@ impl Machine {
             self.mem.w8(DS, TEXT_FLAG2, 0);
             self.mem.w8(DS, TEXT_FLAG, 0);
             hooks.text_at(self, files, 2, 0x1044)?;
-            hooks.log_entry(self, 0x1044);
+            hooks.log_entry(self, files, 0x1044)?;
             return Some(());
         }
         let question = if self.sq8(0x0F7B) != 0 {
@@ -1597,7 +1598,7 @@ impl Machine {
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.mem.w8(DS, TEXT_FLAG, 0);
         hooks.text_at(self, files, 2, 0x1044)?;
-        hooks.log_entry(self, 0x1044);
+        hooks.log_entry(self, files, 0x1044)?;
         self.mem.w8(DS, 0x0F79, 1);
         self.mem.w8(DS, 0x0F78, 1);
         self.quest_say(files, hooks, self.quest_texts() + 1)?;

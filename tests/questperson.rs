@@ -43,8 +43,9 @@ impl QuestHooks for Log {
     fn entry_save(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) {
         self.log.extend([5, si, 0x19, m.mem.r16(DS, 0x129E)]);
     }
-    fn log_entry(&mut self, _m: &mut Machine, si: u16) {
+    fn log_entry(&mut self, _m: &mut Machine, _files: &mut Files, si: u16) -> Option<()> {
         self.log.extend([6, si]);
+        Some(())
     }
     fn menu(&mut self, _m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
         self.log.extend([7, si, bx, di]);

@@ -1539,6 +1539,27 @@ fn state_ems_in(path: &str, name: &str, c: Case) {
     let after = grab(&a).1;
     let changed: Vec<usize> = (0..after.len()).filter(|&i| before[i] != after[i]).collect();
     let got = (changed.len(), fnv(changed.iter().flat_map(|&i| (i as u32).to_le_bytes())), fnv(changed.iter().map(|&i| after[i])));
+    // (With ARENA_SCREENS holding gen_worldframes.py's dumps: the runs of
+    // bytes, bank and offset, that end otherwise or change only on one
+    // side.)
+    if got != want {
+        let dumps = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from);
+        if let Some((orig0, orig)) = dumps.and_then(|d| Some((std::fs::read(d.join(format!("{name}.ems0"))).ok()?, std::fs::read(d.join(format!("{name}.ems"))).ok()?))) {
+            let odd: Vec<usize> = (0..after.len().min(orig.len())).filter(|&i| (orig0[i] != orig[i] || before[i] != after[i]) && orig[i] != after[i]).collect();
+            let mut runs: Vec<(usize, usize)> = Vec::new();
+            for &i in &odd {
+                match runs.last_mut() {
+                    Some((s, n)) if *s + *n == i => *n += 1,
+                    _ => runs.push((i, 1)),
+                }
+            }
+            eprintln!("{name}: stateems: {} bytes otherwise: {}", odd.len(), runs.iter().take(40).map(|&(s, n)| format!("{:02x}:{:04x}+{n:x}", s >> 16, s & 0xFFFF)).collect::<Vec<_>>().join(" "));
+            for &(s, n) in runs.iter().take(4) {
+                let hx = |v: &[u8]| v.iter().map(|b| format!("{b:02x}")).collect::<String>();
+                eprintln!("  {:02x}:{:04x}: original {} -> {}, here {} -> {}", s >> 16, s & 0xFFFF, hx(&orig0[s..s + n]), hx(&orig[s..s + n]), hx(&before[s..s + n]), hx(&after[s..s + n]));
+            }
+        }
+    }
     assert_eq!(got, want, "{name}: the EMS banks' changes differ from the original's ({} bytes changed here)", changed.len());
 }
 
@@ -1595,14 +1616,15 @@ fn busy_play_goes_as_the_originals() {
 /// The busy cases whose state is compared, the store's and the guild's
 /// shopping among them (the shops' screens as the engine's: 1194:5496 and
 /// 54B3, the list windows 1194:5734 and 3159:06A0, the strip 5F8C/5FC0,
-/// the dialogs 4E88 and messages 4D31, the texts drawn into the page).
+/// the dialogs 4E88 and messages 4D31, the texts drawn into the page),
+/// and the informant's (the logbook's entry appended to LOG.nn, its
+/// oldest dropped through bank 1Fh: `Machine::log_add`).
 /// Not yet: playscreens and playsheet, whose character sheet (1194:0CF8)
 /// the view shows with its own state (its paper doll made in bank 1Fh and
 /// kept in TEMPSAVE.$$$, 1194:158F; the portrait in bank 17h, 2462; the
 /// colours read, A3A3; the numbers' scratch, 1044, 10A8, 12A4: not
-/// ported); the informant, whose logbook entry is appended to LOG.nn
-/// (27E3:0060.., its path and its texts made in bank 1Fh: not ported).
-const BUSY_STATE: [&str; 13] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild"];
+/// ported).
+const BUSY_STATE: [&str; 14] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
@@ -1618,6 +1640,17 @@ fn busy_play_leaves_the_state_as_the_original() {
             state_load_case(name);
         }
     }
+}
+
+/// The case ARENA_STATE_CASE names, while working on it: its DGROUP from
+/// the case's start and from the load, and its EMS banks (nothing
+/// without it).
+#[test]
+fn one_case_leaves_the_state_as_the_original() {
+    let Ok(name) = std::env::var("ARENA_STATE_CASE") else { return };
+    state_case(&name);
+    state_load_case(&name);
+    state_ems_case(&name);
 }
 
 /// Each busy case's frames change the EMS banks as the original's do
