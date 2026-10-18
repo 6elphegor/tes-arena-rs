@@ -662,7 +662,7 @@ fn swinging(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
 /// The A key held for a frame (the weapon readied), let go.
 fn ready(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
     a.input(In::Key { code: KeyCode::KeyA, down: true, text: Some("a".into()) });
-    frames(a, d, seen, 1, |_| false);
+    seen.push(state(a));
     a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
 }
 
@@ -935,7 +935,6 @@ fn case(name: &str) -> Option<Case> {
             // on the menu and the hours; answered, that frame goes on.)
             a.compose();
             d.key(a, KeyCode::KeyR, Some("r"));
-            d.frame(a);
             assert!(a.pending.is_some(), "R asks how to rest");
             d.key(a, KeyCode::KeyC, Some("c"));
             d.key(a, KeyCode::Digit2, Some("2"));
@@ -955,7 +954,7 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
             a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
             assert!(a.panel.is_none(), "no list with a Shift");
-            frames(a, d, seen, 1, |_| false);
+            seen.push(state(a));
             a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
             a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
             // (The harness's click puts the mouse at 160, 100; the window's
@@ -1019,11 +1018,13 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::KeyM, Some("m"));
             d.click(a, 0x100, 0xB0, MouseButton::Left);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 31, |_| false);
+            seen.push(state(a));
+            frames(a, d, seen, 30, |_| false);
         })),
         "playautomap" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1033,7 +1034,9 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::KeyM, Some("m"));
             d.click(a, 0x100, 0xB0, MouseButton::Left);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playlog" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1049,7 +1052,9 @@ fn case(name: &str) -> Option<Case> {
             assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "the first Exit ends only the pages' loop");
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playlogbar" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1064,7 +1069,9 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
-            frames(a, d, seen, 10, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 9, |_| false);
         })),
         "playuselist" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1077,7 +1084,9 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0xF0, 0xBD, MouseButton::Left);
             d.click(a, 0xF0, 0xBD, MouseButton::Left);
             assert!(a.panel.is_none(), "the potion picked");
-            frames(a, d, seen, 61, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 60, |_| false);
         })),
         "playbook" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1089,14 +1098,18 @@ fn case(name: &str) -> Option<Case> {
             assert!(matches!(a.panel, Some(crate::panels::Panel::Spellbook(_))), "C opens the spellbook");
             d.click(a, 0xF0, 0xA0, MouseButton::Right);
             assert!(a.panel.is_none(), "a right click leaves the list");
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequip" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1110,7 +1123,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipscroll" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1127,7 +1142,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipwear" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1143,7 +1160,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipdrop" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1160,7 +1179,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipspells" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1177,7 +1198,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipdescribe" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1194,7 +1217,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipstaff" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1219,7 +1244,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipclash" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1241,7 +1268,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipcantuse" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1263,7 +1292,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipspellpage" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1284,7 +1315,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipdropwhat" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1306,7 +1339,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipdropin" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1333,7 +1368,9 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playequipnoroom" => (
             Place::Dungeon,
@@ -1358,7 +1395,9 @@ fn case(name: &str) -> Option<Case> {
                 faded(a);
                 d.key(a, KeyCode::Escape, None);
                 faded(a);
-                frames(a, d, seen, 11, |_| false);
+                // The frame that took the key (or the button) ends with its screen.
+                seen.push(state(a));
+                frames(a, d, seen, 10, |_| false);
             }),
         ),
         "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {

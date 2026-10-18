@@ -150,6 +150,13 @@ pub struct Talk {
     /// The screen faded to black on the way into a building (1194:55B2,
     /// the trigger's way in 0000:4118): the area's change starts black.
     pub blackout: bool,
+    /// A click on the interface bar waiting for the frame's input step
+    /// (2826:02E2, 2542:00BA): where on the 320 x 200 screen, and whether
+    /// with the right button.
+    pub bar: Option<(i32, i32, bool)>,
+    /// The screen a menu key (2542:0100) or the bar's button left the
+    /// window to open after the frame.
+    pub taken: Option<crate::sheets::Taken>,
 }
 
 /// The game's text at DS:`at`, as lines.

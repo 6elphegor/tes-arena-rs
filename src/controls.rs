@@ -170,7 +170,8 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
     fn look(&mut self, _m: &mut Machine, _ax: u16) -> Option<()> {
         Some(())
     }
-    /// 2542:00BA: a click on the interface bar.
+    /// 2542:00BA: a click on the interface bar (from `player_steer`, the
+    /// front end's click there, if one is waiting).
     fn bar_click(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
@@ -405,6 +406,10 @@ impl Machine {
         } else {
             self.mem.w16(DS, SPEED, 0);
         }
+        // Where the classic controls take a click on the interface bar
+        // (2826:02E2, `pick_region`, after the moves): the front end's, if
+        // one is waiting.
+        hooks.bar_click(self, files)?;
         // Where the classic controls' centre handler takes a left click
         // (2826:00F6..0128, after the moves): the front end's click, if one
         // is waiting, in this frame's input step as the original's.
