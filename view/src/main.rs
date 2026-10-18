@@ -1654,6 +1654,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         slot,
         panel: None,
         sheet_run: None,
+        log_run: None,
         ring_kept: false,
         travel: None,
         saveui: None,
@@ -2940,6 +2941,9 @@ struct App {
     /// The character sheet's run up (`Machine::sheet_open`): B7C4 as it
     /// found it, for `sheet_close`.
     sheet_run: Option<u8>,
+    /// The logbook's run up (`Machine::log_open`), for its loop's turns
+    /// and `log_close`.
+    log_run: Option<arena::logbook::LogRun>,
     /// The ring of keys as the sheet's end left it (its loop's flush and
     /// the key read, `Machine::sheet_close`): not forgotten again as the
     /// screen goes (`ring_screen`).
@@ -3116,7 +3120,10 @@ impl App {
     /// left in it. Called before each input and after each tick, so a
     /// screen's beginning is seen before the next key.
     fn ring_screen(&mut self) {
-        let now = self.screen_up();
+        // (The logbook neither forgets the ring nor reads it: 27E3:01FC
+        // asks only Esc's key down, so the key that opened it stays.)
+        let log = matches!(self.panel, Some(panels::Panel::Log(_))) && self.pending.is_none() && self.boxes.is_empty();
+        let now = if log { self.ring_screen } else { self.screen_up() };
         if std::mem::take(&mut self.ring_kept) && now.is_none() {
             self.ring_screen = now;
             return;
@@ -3731,6 +3738,7 @@ impl App {
         let mut back: Option<Option<u8>> = None;
         let mut sheet_drop = None;
         let mut sheet_spells = false;
+        let mut log_poll = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
@@ -3868,12 +3876,13 @@ impl App {
                 KeyCode::KeyK => self.sheet_end(None),
                 _ => {}
             },
-            Some(panels::Panel::Log(log)) => match code {
-                KeyCode::Escape | KeyCode::KeyL => self.panel = None,
-                _ if log.page + 1 < log.pages.len() => log.page += 1,
-                _ => {}
-            },
+            // 27E3:01FC reads no keys but Esc down (ACB6, which the key
+            // interrupt has set already).
+            Some(panels::Panel::Log(_)) => log_poll = code == KeyCode::Escape,
             None => {}
+        }
+        if log_poll {
+            self.log_turn(0);
         }
         if page {
             self.equipment_page(Some(b'n'));
@@ -4123,6 +4132,7 @@ impl App {
         let mut back = false;
         let mut sheet_drop = None;
         let mut sheet_spells = false;
+        let mut log_poll = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page up (1194:51D1): the click its question
@@ -4267,12 +4277,11 @@ impl App {
                 Some(sheets::SheetClick::Done) => self.sheet_end(None),
                 None => {}
             },
-            Some(panels::Panel::Log(log)) => match sheets::log_click(x, y) {
-                Some(true) => self.panel = None,
-                Some(false) if log.page + 1 < log.pages.len() => log.page += 1,
-                _ => {}
-            },
+            Some(panels::Panel::Log(_)) => log_poll = true,
             None => {}
+        }
+        if log_poll {
+            self.log_turn(if right { 2 } else { 1 });
         }
         if sheet_spells {
             self.sheet_spells(None);
@@ -4348,7 +4357,10 @@ impl App {
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
             sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
             // 27E3:0088: the screen faded out in 8 steps first.
-            sheets::BarAction::Log => self.fade_open(8, 0, |a| a.panel = Some(panels::Panel::Log(sheets::open_log(&a.engine.m, &a.engine.files)))),
+            sheets::BarAction::Log => self.fade_open(8, 0, |a| {
+                a.log_begin();
+                a.panel = Some(panels::Panel::Log(sheets::open_log(&a.engine.m, &a.engine.files)));
+            }),
             // 2542:066A: no list without an item to use (127C 0).
             sheets::BarAction::Use => {
                 let names = panels::usable_names(&self.engine.m);
@@ -4501,6 +4513,55 @@ impl App {
         self.sheet_run = e.m.sheet_open(&mut e.files, Some(&dac));
         if self.sheet_run.is_none() {
             eprintln!("the character sheet gave up: {}", arena::giveup::describe());
+        }
+    }
+
+    /// The logbook's run in the game's state (2542:02A3..02FD, 27E3:0088
+    /// to its loop: `Machine::log_open`), the colours read as shown.
+    fn log_begin(&mut self) {
+        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let e = &mut self.engine;
+        self.log_run = e.m.log_open(&mut e.files, Some(&dac), 0);
+        if self.log_run.is_none() {
+            eprintln!("the logbook gave up: {}", arena::giveup::describe());
+        }
+    }
+
+    /// A turn of the logbook's loop (27E3:01FC: `Machine::log_turn`), the
+    /// mouse read with `buttons` new at the cursor: the next page turned,
+    /// the pages' loop ended or the screen left (`log_end`).
+    fn log_turn(&mut self, buttons: u8) {
+        let Some(mut run) = self.log_run else { return };
+        let (x, y) = self.screen_point();
+        let e = &mut self.engine;
+        let turn = e.m.log_turn(&mut e.files, &mut run, buttons, x as u16, y as u16, false);
+        self.log_run = Some(run);
+        match turn {
+            arena::logbook::LogTurn::Page => {
+                if let Some(panels::Panel::Log(log)) = self.panel.as_mut() {
+                    log.page += 1;
+                }
+            }
+            arena::logbook::LogTurn::Left => self.log_end(),
+            arena::logbook::LogTurn::PrintFailed(left) => {
+                self.say("Error while printing....");
+                if left {
+                    self.log_end();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The logbook left (`Machine::log_close`). The buttons its last read
+    /// left in AFF9 (the click that left) are the next frame's read's
+    /// (0000:8FC4: let go by then), which the view's frames don't make.
+    fn log_end(&mut self) {
+        self.panel = None;
+        if let Some(run) = self.log_run.take() {
+            let e = &mut self.engine;
+            e.m.log_close(&mut e.files, run);
+            e.m.mem.w8(arena::mem::DS, arena::controls::var::BUTTONS, 0);
         }
     }
 
@@ -4748,7 +4809,14 @@ impl App {
         }
         match ev {
             In::Resized(w, h) => self.size = (w, h),
-            In::Cursor(x, y) => self.cursor = (x, y),
+            In::Cursor(x, y) => {
+                self.cursor = (x, y);
+                // A button the logbook's loop has seen stays seen (AFF9 or'd
+                // in, 27E3:0216): the cursor moved is read as a click there.
+                if matches!(self.panel, Some(panels::Panel::Log(_))) && self.engine.m.log_buttons_held() {
+                    self.log_turn(0);
+                }
+            }
             // The wheel moves a menu's or a list's entry, as Up and Down do
             // (a list scrolls to keep it shown).
             In::Wheel(dy) => {

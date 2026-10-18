@@ -654,6 +654,11 @@ impl Machine {
         self.dos_write(files, h, seg, off, n)
     }
 
+    /// `file_put` on handle `h` (1194:5187's writes to PRN, handle 4).
+    pub(crate) fn file_put_on(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {
+        self.dos_write(files, h, seg, off, n)
+    }
+
     /// DOS write (40h) of `n` bytes from `seg`:`off` on handle `h`: AX,
     /// the count (a device takes them all), or 6 where nothing is open.
     fn dos_write(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {

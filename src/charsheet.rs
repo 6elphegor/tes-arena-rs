@@ -1196,7 +1196,7 @@ impl Machine {
     /// 0000:9E06: the text at `seg`:`si` drawn at (`x`, `y`) (into the page
     /// where it is the game's own block, else its state alone:
     /// `Machine::text_state`); SI past its NUL.
-    fn page_text_at(&mut self, x: u16, y: u16, (seg, si): (u16, u16)) -> u16 {
+    pub(crate) fn page_text_at(&mut self, x: u16, y: u16, (seg, si): (u16, u16)) -> u16 {
         if self.page_is_block() {
             self.page_text((seg, si), x, y);
         } else {
@@ -1212,7 +1212,7 @@ impl Machine {
     /// 1194:55B6: the colours at 929E black (the fade to them, 5E3E, the
     /// front end's) and the page cleared (55D9: 9426; the screen's own
     /// clearing the front end's).
-    fn sheet_black(&mut self) {
+    pub(crate) fn sheet_black(&mut self) {
         for i in 0..0x300u16 {
             self.mem.w8(DS, SCRATCH + i, 0);
         }

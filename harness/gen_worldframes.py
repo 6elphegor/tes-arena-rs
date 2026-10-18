@@ -285,6 +285,8 @@ KEY_MINUS = 0x0C
 KEY_D = 0x20
 KEY_Y = 0x15
 KEY_S = 0x1F
+# L (2542:02A3: the logbook, 27E3:0088).
+KEY_L = 0x26
 
 
 def crowded_square(a):
@@ -639,6 +641,12 @@ CASES = {
     # character sheet, left with Esc), ten frames.
     'playautomap': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                                        ((), (KEY_M,), 10, None)]),
+    # The logbook: two frames, L held a frame (2542:02A3, 27E3:0088), a
+    # click off its buttons twice (27E3:01FC: the next page, 03A6), Exit
+    # (107h..127h, B4h..C3h) twice: the first only ends the pages' loop
+    # (03A9 to 03CB), the loop after them (0137) asks again; ten frames.
+    'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
+                                   ((), (KEY_L,), 10, None)]),
     'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                      ((), (KEY_F1,), 10, None)]),
     # The sheet's equipment page: two frames, F1 held a frame (the sheet),
