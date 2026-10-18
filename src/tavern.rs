@@ -210,6 +210,7 @@ impl Machine {
         self.mem.w8(DS, 0x137F, 4);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
             hooks.files(self, files);
+            hooks.screen_saved(self, files);
             self.tavern_enter(files, hooks)?;
             loop {
                 // 1194:B975: FONT_A and the tiles at 1036 selected.
@@ -235,6 +236,7 @@ impl Machine {
         hooks.room_file(self, files);
         self.mem.w8(DS, 0x137F, 0xFF);
         self.mem.w16(DS, 0xA91A, saved);
+        hooks.screen_back(self, files);
         Some(())
     }
 

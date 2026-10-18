@@ -101,6 +101,13 @@ fn take_font(m: &mut Machine, kept: Option<(u32, Vec<u8>)>) {
 /// question's answer): Some(true) once it ended, Some(false) where the
 /// keys ran out (left open), None where the original faults or hangs.
 pub fn replay(m: &mut Machine, field: &Field, look: &Look, keys: &[EditKey]) -> Option<bool> {
+    // The characters as the key interrupt left them in the ring and the
+    // editor's passes read them (`Machine::ring_typed`).
+    for &k in keys {
+        if let EditKey::Key(c) = k {
+            m.ring_typed(c);
+        }
+    }
     let kept = put_font(m, look);
     let r = m.line_edit(field, keys);
     take_font(m, kept);

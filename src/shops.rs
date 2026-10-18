@@ -93,6 +93,18 @@ pub trait ShopHooks {
     fn quests(&mut self, m: &mut Machine, files: &mut crate::bsa::Files) -> Option<()> {
         m.quests_talk(files, &mut crate::quest::NoQuestHooks)
     }
+    /// 1194:5496 on entering: the colours read, the screen saved, the clip
+    /// the whole screen (`Machine::shop_screen_saved`).
+    fn screen_saved(&mut self, _m: &mut Machine, _files: &mut crate::bsa::Files) {}
+    /// 1194:54B3 on leaving: the screen read back, the clip the whole
+    /// screen, the interface made again by the next frame
+    /// (`Machine::shop_screen_back`).
+    fn screen_back(&mut self, _m: &mut Machine, _files: &mut crate::bsa::Files) {}
+    /// 1194:5E49 before a shop's menu: the buffer at [BA54] freed
+    /// (`Machine::buffer_free`).
+    fn buffer_freed(&mut self, _m: &mut Machine) {}
+    /// 1194:5E54 after it: the buffer made again (`Machine::buffer_make`).
+    fn buffer_made(&mut self, _m: &mut Machine) {}
 }
 
 /// `ShopHooks` that do nothing (every menu left at once).
@@ -645,6 +657,7 @@ impl Machine {
     fn temple_body(&mut self, files: &mut crate::bsa::Files, hooks: &mut dyn ShopHooks) -> Option<()> {
         let a91a = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 5);
+        hooks.screen_saved(self, files);
         // 1194:C65F.
         self.mem.w32(DS, 0x929E, 0x6D65_7425);
         self.mem.w16(DS, 0x92A2, 0);
@@ -671,6 +684,7 @@ impl Machine {
         }
         self.mem.w8(DS, SHOP, 0xFF);
         self.mem.w16(DS, 0xA91A, a91a);
+        hooks.screen_back(self, files);
         let f = self.mem.r8(DS, 0x0D39) | 0x80;
         self.mem.w8(DS, 0x0D39, f);
         self.mem.w8(DS, HOLIDAY, 0xFF);

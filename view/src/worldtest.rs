@@ -809,6 +809,9 @@ const GUILD_SCRIPT: [Act; 8] = [
 /// `kind`) run as its keeper's click runs them, between frames, `script`
 /// answering them; the turn's frame after them counted as the case's next.
 fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, script: &[Act]) {
+    // The screen as the window last showed it (the page the shop's screen
+    // is drawn over: `Front::shown`), as a shown window has it.
+    a.compose();
     super::super::super::shop_turn(a, kind);
     for act in script {
         assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");
@@ -1589,16 +1592,17 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
-/// The busy cases whose state is compared. Not yet: playscreens and
-/// playsheet, whose character sheet (1194:0CF8) the view shows with its
-/// own state (its paper doll made in bank 1Fh and kept in TEMPSAVE.$$$,
-/// 1194:158F; the portrait in bank 17h, 2462; the colours read, A3A3;
-/// the numbers' scratch, 1044, 10A8, 12A4: not ported); the store, the
-/// guild and the informant, whose shops' screens the view lays out itself
-/// (the list windows, 1194:5734 and 3159; the strip's dialog, 4E88; the
-/// strip saved in bank 18h, 5F8C; the pictures in bank 1Fh: not ported;
-/// the banner is, `Machine::shop_banner`).
-const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse"];
+/// The busy cases whose state is compared, the store's and the guild's
+/// shopping among them (the shops' screens as the engine's: 1194:5496 and
+/// 54B3, the list windows 1194:5734 and 3159:06A0, the strip 5F8C/5FC0,
+/// the dialogs 4E88 and messages 4D31, the texts drawn into the page).
+/// Not yet: playscreens and playsheet, whose character sheet (1194:0CF8)
+/// the view shows with its own state (its paper doll made in bank 1Fh and
+/// kept in TEMPSAVE.$$$, 1194:158F; the portrait in bank 17h, 2462; the
+/// colours read, A3A3; the numbers' scratch, 1044, 10A8, 12A4: not
+/// ported); the informant, whose logbook entry is appended to LOG.nn
+/// (27E3:0060.., its path and its texts made in bank 1Fh: not ported).
+const BUSY_STATE: [&str; 13] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
@@ -1606,7 +1610,13 @@ const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreat
 fn busy_play_leaves_the_state_as_the_original() {
     for name in BUSY_STATE {
         state_case(name);
-        state_load_case(name);
+        // (Not the store's from the load: the test's way in, `into`'s door
+        // trigger with no hooks, keeps no automap (0000:368E), so the path
+        // buffers' last (1AEB) is CITYDATA.64's where the original's is
+        // AUTOMAP.64's; the shop's own frames are compared above.)
+        if name != "playstore" {
+            state_load_case(name);
+        }
     }
 }
 

@@ -222,6 +222,9 @@ struct Front<'a> {
     /// A left click in the view waiting for the frame's input step
     /// (`ControlHooks::take_click`): where on the 320 x 200 screen.
     click: Option<(i32, i32)>,
+    /// The colours on the screen (`Assets::dac`), as the VGA's 6-bit
+    /// values: what the shops read on entering (1194:5496).
+    dac: Option<[[u8; 3]; 256]>,
 }
 
 impl Front<'_> {
@@ -1701,7 +1704,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: None };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: None, dac: None };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
@@ -1711,7 +1714,8 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click };
+    let dac = assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }

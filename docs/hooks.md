@@ -147,10 +147,11 @@ the original routine:
 | `GuildHooks::stock_file` | src/guild.rs:83 | 25FD:0844, 0000:600C, 67C4 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::stock_list` | src/guild.rs:93 | 1194:5734 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::stock_write` | src/guild.rs:88 | 1194:A82D | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `HaggleIo::expand` | src/haggle.rs:127 | 2DA2:000A | port | the default runs the port | |
-| `HaggleIo::picture` | src/haggle.rs:139 | 1194:4B8E | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
-| `HaggleIo::say` | src/haggle.rs:134 | 1194:49FF | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
-| `HaggleIo::type_offer` | src/haggle.rs:118 | 1194:810D, 4E88 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::expand` | src/haggle.rs:129 | 2DA2:000A | port | the default runs the port | |
+| `HaggleIo::picture` | src/haggle.rs:141 | 1194:4B8E | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::say` | src/haggle.rs:136 | 1194:49FF | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::shown` | src/haggle.rs:147 | 1194:4E54, 4E88, 5FC0 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's dialogs' state as the original's (worldframes.txt's playstore and playguild state lines) |
+| `HaggleIo::type_offer` | src/haggle.rs:120 | 1194:810D, 4E88 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
 | `LevelUpHooks::keep_screen` | src/levelup.rs:75 | 1194:158F | present | the screen kept to CHARSHET.$$$ | |
 | `LevelUpHooks::message_box` | src/levelup.rs:88 | 1194:59CC | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `LevelUpHooks::restore` | src/levelup.rs:90 | 0000:541E, A6B5 | present | the game's screen back | |
@@ -281,6 +282,8 @@ the original routine:
 | `SaveHooks::palette` | src/save_write.rs:59 | 0000:6E3C | overridden | the view: main.rs SaveDir<'_> | present: the window's palette for the save's |
 | `SaveHooks::write` | src/save_write.rs:56 |  | overridden | the view: main.rs SaveDir<'_> | faithful: the save's files written (save vectors); SAVEGAME's screen bytes black, the window's picture not being the game's |
 | `ShopHooks::banner` | src/shops.rs:42 | 1194:4B60 and 4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::buffer_freed` | src/shops.rs:105 | 1194:5E49 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::buffer_made` | src/shops.rs:107 | 1194:5E54 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
 | `ShopHooks::dialog` | src/shops.rs:64 | 1194:4E88 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::dialog_at` | src/shops.rs:69 |  | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::expand` | src/shops.rs:79 | 2DA2:000A | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
@@ -291,6 +294,8 @@ the original routine:
 | `ShopHooks::picture` | src/shops.rs:47 | 1194:4B8E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::quest_check` | src/shops.rs:88 | 1194:D961 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::quests` | src/shops.rs:93 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::screen_back` | src/shops.rs:102 | 1194:54B3 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::screen_saved` | src/shops.rs:98 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
 | `ShopHooks::strip_back` | src/shops.rs:56 | 1194:5FC0 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `SkyHooks::bolt` | src/skyobj.rs:52 | 0000:78A8 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `SkyHooks::draw_dfa` | src/skyobj.rs:46 | 0000:5652 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |

@@ -422,6 +422,27 @@ impl Machine {
         self.mem.w16(DS, var::WRITE, var::RING);
     }
 
+    /// The character `c` typed: put in the ring as the key interrupt puts
+    /// a key's (0000:7253..7273), then read back as the editor's pass
+    /// reads it (713C), for a front end whose editor is given the
+    /// characters themselves.
+    pub fn ring_typed(&mut self, c: u8) {
+        let mut bx = self.mem.r16(DS, var::WRITE);
+        if bx == var::RING_END {
+            bx = var::RING;
+        }
+        self.mem.w8(DS, bx, c);
+        bx = bx.wrapping_add(1);
+        if bx == self.mem.r16(DS, var::READ) {
+            self.mem.w16(DS, var::FULL, 0xFFFF);
+        } else {
+            self.mem.w16(DS, var::WRITE, bx);
+            let n = self.mem.r16(DS, var::COUNT);
+            self.mem.w16(DS, var::COUNT, n.wrapping_add(1));
+        }
+        self.key_read();
+    }
+
     /// 0000:713C: the next character typed, or 0.
     pub fn key_read(&mut self) -> u8 {
         let n = self.mem.r16(DS, var::COUNT);

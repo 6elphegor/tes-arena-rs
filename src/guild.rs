@@ -257,15 +257,18 @@ impl Machine {
             self.mem.w8(DS, SHOP, 7);
             let bank = self.map_bank(0x18, 0);
             self.mem.w16(DS, SAVED_BANK, bank);
+            hooks.screen_saved(self, files);
             self.guild_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
+                hooks.buffer_freed(self);
                 // 1194:A78E: FONT_A and the tiles at 1036 selected.
                 self.select_font(font::A);
                 self.select_tiles(0x1036);
                 let caster = self.mem.r8(DS, 0x01A9) & 0x20 != 0;
                 let (bx, di) = if caster { (KEYS, ENTRIES) } else { (KEYS_PLAIN, ENTRIES_PLAIN) };
                 let pick = hooks.menu(self, MENU_TITLE, bx, di);
+                hooks.buffer_made(self);
                 if (pick as i16) < 0 {
                     break;
                 }
@@ -290,6 +293,7 @@ impl Machine {
         self.mem.w8(DS, SHOP, 0xFF);
         self.stock_save(hooks);
         self.mem.w8(DS, HOLIDAY, 0xFF);
+        hooks.screen_back(self, files);
         let bank = self.mem.r16(DS, SAVED_BANK);
         self.map_bank(bank, 0);
         Some(())

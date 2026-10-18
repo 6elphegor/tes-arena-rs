@@ -20,6 +20,10 @@ const MENU_RT: u16 = 0x4AE5;
 pub const BANNER_FONT: u16 = 0x102A;
 /// The banner's name's width in FONT_C (4C1D).
 pub const BANNER_WIDTH: u16 = 0x12BC;
+/// Where 1194:5496 reads the colours (9A6E, 300h bytes).
+pub const PALETTE: u16 = 0x9A6E;
+/// The page's rows' offsets (a word a row).
+const ROWS: u16 = 0xA6A0;
 
 impl Machine {
     /// 0000:742C with DI FFFEh: the file named at DS:`name` loaded whole
@@ -135,6 +139,254 @@ impl Machine {
         let f = self.mem.r16(DS, BANNER_FONT);
         self.font_free(f);
         Some(())
+    }
+
+    /// Whether the draw page ([A900], from [A8FE] 0) is the game's own heap
+    /// block, as a loaded game's is: a game the port starts without one
+    /// keeps A000h there over its heap's blocks, where the screens' page
+    /// writes would break the heap.
+    pub fn page_is_block(&self) -> bool {
+        self.mem.r16(DS, 0xA8FE) == 0 && self.heap_block_used(self.mem.r16(DS, 0xA900), 0xFA0)
+    }
+
+    /// 1194:5496: on entering a shop, the colours (`dac`, the VGA's, 6-bit
+    /// values) read to 9A6E (0000:6E3C), the page written to SCREENSV.$$2
+    /// (A69E) and the clip the whole screen (9A98: 0, 0, 140h x C8h).
+    /// (None: the colours left as they are, for a front end without them.)
+    pub fn shop_screen_saved(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>) {
+        for (i, c) in dac.iter().flat_map(|d| d.iter()).enumerate() {
+            for (k, &v) in c.iter().enumerate() {
+                self.mem.w8(DS, PALETTE.wrapping_add((i * 3 + k) as u16), v);
+            }
+        }
+        self.screen_save(files);
+        self.clip_whole();
+    }
+
+    /// 1194:54B3: on leaving a shop, SCREENSV.$$2 read back into the page
+    /// (A7A0), the clip the whole screen (9A98) and 0D39 bit 80h set: the
+    /// next frame makes the interface again (`interface_setup`). The
+    /// page's showing (9466) is the front end's.
+    pub fn shop_screen_back(&mut self, files: &mut Files) {
+        self.screen_restore(files);
+        self.clip_whole();
+        let f = self.mem.r8(DS, 0x0D39) | 0x80;
+        self.mem.w8(DS, 0x0D39, f);
+    }
+
+    /// 1194:5E49: the buffer at [BA54] freed (0000:6C32 with its segment,
+    /// BA56).
+    pub fn buffer_free(&mut self) {
+        let seg = self.mem.r16(DS, 0xBA56);
+        self.heap_free(seg);
+    }
+
+    /// 1194:5E54: [CB8E] bytes taken from the heap (0000:51E2), their far
+    /// pointer at BA54. None where the heap has no room.
+    pub fn buffer_make(&mut self) -> Option<()> {
+        let n = self.mem.r16(DS, 0xCB8E);
+        let (seg, off) = self.heap_alloc_bytes(n)?;
+        self.mem.w16(DS, 0xBA54, off);
+        self.mem.w16(DS, 0xBA56, seg);
+        Some(())
+    }
+
+    /// 0000:9A98 with AX 0, BX 0, CX 140h, DX C8h: the clip the whole
+    /// screen.
+    fn clip_whole(&mut self) {
+        for (o, v) in [(0xA91Eu16, 0x140u16), (0xA91C, 0xC8), (0xA914, 0), (0xA916, 0), (0xA918, 0x13F), (0xA91A, 0xC7)] {
+            self.mem.w16(DS, o, v);
+        }
+    }
+
+    /// 0000:9E0A: the text at `seg`:`si` drawn into the draw page ([A900])
+    /// from (`x`, `y`) in colour [9288] and the font at [B034]: ADB6 the x
+    /// (moved on by each glyph's width, a space by the first glyph's and
+    /// one), ADB8 the row. Bytes under 20h are passed over; each glyph's
+    /// rows are words, their bits from the top the pixels set.
+    pub fn page_text(&mut self, (seg, si): (u16, u16), x: u16, y: u16) {
+        self.mem.w16(DS, 0xADB6, x);
+        self.mem.w16(DS, 0xADB8, y);
+        let row = self.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y)));
+        let page = self.mem.r16(DS, 0xA900);
+        let (foff, fseg) = (self.mem.r16(DS, 0xB034), self.mem.r16(DS, 0xB036));
+        let colour = self.mem.r8(DS, 0x9288);
+        let mut at = si;
+        loop {
+            let c = self.mem.r8(seg, at);
+            at = at.wrapping_add(1);
+            if c == 0 {
+                break;
+            }
+            let al = c.wrapping_sub(0x20);
+            if al == 0 {
+                let w = self.mem.r8(fseg, foff.wrapping_add(1)) as u16 + 1;
+                let v = self.mem.r16(DS, 0xADB6).wrapping_add(w);
+                self.mem.w16(DS, 0xADB6, v);
+                continue;
+            }
+            if (al as i8) < 0 {
+                continue;
+            }
+            let g = al.wrapping_sub(1) as u16;
+            let h = self.mem.r8(fseg, foff) as u16;
+            let w = self.mem.r8(fseg, foff.wrapping_add(g).wrapping_add(1)) as u16;
+            let mut src = foff.wrapping_add((g.wrapping_mul(2) as u8 as u16).wrapping_mul(h)).wrapping_add(0x5F);
+            let mut di = row.wrapping_add(self.mem.r16(DS, 0xADB6));
+            for _ in 0..h {
+                let mut bits = self.mem.r16(fseg, src);
+                src = src.wrapping_add(2);
+                for k in 0..w {
+                    if bits & 0x8000 != 0 {
+                        self.mem.w8(page, di.wrapping_add(k), colour);
+                    }
+                    bits <<= 1;
+                }
+                di = di.wrapping_add(0x140);
+            }
+            let v = self.mem.r16(DS, 0xADB6).wrapping_add(w);
+            self.mem.w16(DS, 0xADB6, v);
+        }
+    }
+
+    /// 0000:5368: the text at DS:`si` drawn centred on x `ax` at row `bx`
+    /// (its width, 0000:66F6, halved off: `page_text`).
+    pub fn page_text_centred(&mut self, si: u16, ax: u16, bx: u16) {
+        let w = self.text_width(si);
+        self.page_text((DS, si), ax.wrapping_sub(w >> 1), bx);
+    }
+
+    /// 1194:5F8C: the strip under the shop's menu (0Bh, 91h; 12Ah by 1Fh)
+    /// kept in bank 18h at [9030]:7530 (0000:8F2A: A8FC 0, the rows from
+    /// the page), the bank before mapped again.
+    pub fn shop_strip_save(&mut self) {
+        let old = self.map_bank(0x18, 0);
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        self.page_rect_save((frame, 0x7530), 0x0B, 0x91, 0x12A, 0x1F);
+        self.map_bank(old, 0);
+    }
+
+    /// 1194:5FC0: the strip 5F8C kept put back into the page (0000:599C)
+    /// from bank 18h, the bank before mapped again. The page's showing
+    /// (9466) and the wait for the buttons' release (5E21) are the front
+    /// end's.
+    pub fn shop_strip_back(&mut self) {
+        let old = self.map_bank(0x18, 0);
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        self.page_rect_put((frame, 0x7530), 0x0B, 0x91, 0x12A, 0x1F);
+        self.map_bank(old, 0);
+    }
+
+    /// 1194:4D31: a message with the text at DS:`si`: [102E]'s font
+    /// selected (9AE6), the strip kept (5F8C), the text drawn in colour C0h
+    /// at (23h, 91h) and, after the player's click (the front end's), the
+    /// strip put back (5FC0).
+    pub fn shop_message(&mut self, si: u16) {
+        self.select_font(crate::shops::font::TEENY);
+        self.shop_strip_save();
+        self.mem.w8(DS, 0x9288, 0xC0);
+        self.page_text((DS, si), 0x23, 0x91);
+        self.shop_strip_back();
+    }
+
+    /// 1194:4E88's state: the dialog's lines (LINES of them, 0FF5, each
+    /// ending at a NUL from DS:`si`, as 1194:4E54 split them, [137E] to a
+    /// page: 4E54's BX the pages) drawn page by page in [102E]'s font and
+    /// colour C0h from (20h, 91h), 9 rows apart, each page's strip kept
+    /// first (5F8C): A872 the lines, A87E the lines drawn on the page. A
+    /// page with more after it ends with "...More" (4B1B, colour 4Bh at
+    /// (11Dh, A9h)) and, after the player's click, its strip put back
+    /// (5FC0) and A87E 0. The answer (kind [13D3]: 0 a click, 1 yes or
+    /// no, 6001; 2 a number typed, 9EE5) is the front end's; the strip is
+    /// put back after it (5FC0).
+    pub fn shop_dialog(&mut self, si: u16) {
+        let lines = self.mem.r16(DS, 0x0FF5);
+        let per = self.mem.r8(DS, 0x137E) as u16;
+        let mut pages = 1u16;
+        for k in 1..lines {
+            if per != 0 && k % per == 0 {
+                pages += 1;
+            }
+        }
+        self.mem.w16(DS, 0xA872, lines);
+        self.mem.w16(DS, 0xA87E, 0);
+        // The registers as 4E95 leaves them: CX the pages, BX the lines.
+        let (mut cx, mut bx) = (pages, lines);
+        let mut si = si;
+        loop {
+            // 4E97
+            let mut dx = 0x91u16;
+            let pushed = cx;
+            self.shop_strip_save();
+            let mut c = bx;
+            let more = loop {
+                if self.mem.r16(DS, 0xA87E) == 3 {
+                    break Some(c);
+                }
+                let v = self.mem.r16(DS, 0xA87E).wrapping_add(1);
+                self.mem.w16(DS, 0xA87E, v);
+                self.select_font(crate::shops::font::TEENY);
+                self.mem.w8(DS, 0x9288, 0xC0);
+                self.page_text((DS, si), 0x20, dx);
+                si = si.wrapping_add(self.mem.cstr(DS, si).len() as u16 + 1);
+                dx = dx.wrapping_add(9);
+                c = c.wrapping_sub(1);
+                if c == 0 {
+                    // 4ED0: the page's lines done; another page?
+                    let left = pushed.wrapping_sub(1);
+                    if left < 1 {
+                        break None;
+                    }
+                    break Some(left);
+                }
+            };
+            let Some(left) = more else { break };
+            // 4ED8: "...More", the click, the strip back; 4F11.
+            self.mem.w8(DS, 0x9288, 0x4B);
+            self.page_text((DS, 0x4B1B), 0x11D, 0xA9);
+            self.mem.w8(DS, 0x9288, 0xC0);
+            self.shop_strip_back();
+            self.mem.w16(DS, 0xA87E, 0);
+            bx = left;
+            cx = pushed.wrapping_sub(1);
+            if cx == 0 {
+                break;
+            }
+        }
+    }
+
+    /// 0000:8F2A with DI not FFFFh or FFFEh: the page's `w` by `h` box at
+    /// (`x`, `y`) copied row by row to `es`:`di` (A8FC 0). The page is
+    /// [8F9C]'s where the far pointer at 8F9A is set, else [A900]'s.
+    pub fn page_rect_save(&mut self, (es, di): (u16, u16), x: u16, y: u16, w: u16, h: u16) {
+        self.mem.w16(DS, 0xA8FC, 0);
+        let page = if self.mem.r32(DS, 0x8F9A) != 0 { self.mem.r16(DS, 0x8F9C) } else { self.mem.r16(DS, 0xA900) };
+        let mut src = self.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        let mut dst = di;
+        for _ in 0..h {
+            for k in 0..w {
+                let b = self.mem.r8(page, src.wrapping_add(k));
+                self.mem.w8(es, dst.wrapping_add(k), b);
+            }
+            dst = dst.wrapping_add(w);
+            src = src.wrapping_add(0x140);
+        }
+    }
+
+    /// 0000:599C: `w` by `h` bytes from `ds`:`si` put into the page
+    /// ([A900]) at (`x`, `y`), row by row.
+    pub fn page_rect_put(&mut self, (ds, si): (u16, u16), x: u16, y: u16, w: u16, h: u16) {
+        let page = self.mem.r16(DS, 0xA900);
+        let mut dst = self.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        let mut src = si;
+        for _ in 0..h {
+            for k in 0..w {
+                let b = self.mem.r8(ds, src.wrapping_add(k));
+                self.mem.w8(page, dst.wrapping_add(k), b);
+            }
+            src = src.wrapping_add(w);
+            dst = dst.wrapping_add(0x140);
+        }
     }
 
     /// 1194:4B8E: the picture named at DS:`si` loaded high (A872), put at
