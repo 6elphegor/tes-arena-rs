@@ -1415,7 +1415,7 @@ impl Machine {
             }
             // %tan: 6D49.
             0x0D68 => Res::Str(DS, 0x6D49),
-            // %tem: a temple's name (in a city by 3EB1, not ported).
+            // %tem: a temple's name (in a city by its place's entry, 3EB1).
             0x0D8C => self.text_temple(c)?,
             // %tg: the quest's target kind (+2Eh); 1248 (in 3276) cleared.
             0x0E9E => {
@@ -1450,7 +1450,9 @@ impl Machine {
                 c.dx = c.dx.wrapping_sub(1);
                 Res::Str(DS, 0x8A44)
             }
-            _ => return crate::giveup::not_ported("3276:91F6: a text code not ported"),
+            // (Every routine the letter tree at 3276:7686 leads to is one
+            // of the above: no other is reached.)
+            _ => return crate::giveup::not_ported("2DA2: a text code's routine the letter tree doesn't lead to"),
         })
     }
 

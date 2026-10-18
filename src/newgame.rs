@@ -201,6 +201,24 @@ impl Machine {
         self.ng_fill(0x0652, 0xC, 0xC5);
     }
 
+    /// 1194:2512..251C, after `newgame_reset`: FONT_C.DAT (its name at
+    /// 3EF2) loaded whole (0000:7504) to [102A], the class list's title's
+    /// font.
+    pub fn creation_font(&mut self, files: &mut Files) {
+        let seg = self.font_load(files, 0x3EF2);
+        self.mem.w16(DS, 0x102A, seg);
+    }
+
+    /// 1194:2536..2542, the class chosen (1194:25B9, by the questions or
+    /// the list): FONT_C ([102A]) freed (0000:930A: its word in the fonts'
+    /// table cleared, its block freed) and the colour EEh (9288) for the
+    /// name's prompt.
+    pub fn class_done(&mut self) {
+        let seg = self.mem.r16(DS, 0x102A);
+        self.font_free(seg);
+        self.mem.w8(DS, 0x9288, 0xEE);
+    }
+
     /// 1194:D327: the main quest's state started over: AB2 FFh, its 13h
     /// bytes from FDD zeroed, FE4 FFh. (Also the frame's debug keys Alt+F5,
     /// ACED and ACF4, which then say "Artifact Quest now possible.")

@@ -525,8 +525,9 @@ impl Creation {
     /// Creation started (1194:24A6..2512: the state cleared) at its first
     /// question, how the class is chosen.
     pub fn new(engine: &mut Engine, archive: Rc<Archive>, dir: &Path, game: [[u8; 4]; 256]) -> Creation {
+        engine.m.newgame_reset();
+        engine.m.creation_font(&mut engine.files);
         let m = &mut engine.m;
-        m.newgame_reset();
         let font = |n: &str| Font::load(&archive, n).unwrap_or_else(|| panic!("{n}"));
         let fonts = Fonts { a: font("FONT_A.DAT"), c: font("FONT_C.DAT"), arena: font("ARENAFNT.DAT"), teeny: font("TEENYFNT.DAT") };
         let pics = Pics {
@@ -1009,6 +1010,7 @@ impl Creation {
                         // creation (1194:2498), which starts from a cleared
                         // state (1194:24A6).
                         engine.m.newgame_reset();
+                        engine.m.creation_font(&mut engine.files);
                         self.colour = COLOUR_A;
                         let next = Box::new(Stage::Method(self.method(&mut engine.m)));
                         self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
@@ -1074,7 +1076,15 @@ impl Creation {
             },
             Stage::List(mut ask) => match self.ask_input(&mut ask, inp) {
                 Some(i) if (i as usize) < 18 => {
-                    let class = engine.m.mem.r8(DS, LIST_ORDER + i);
+                    // 1194:2678 as the game's state has it (`class_list`:
+                    // the names made, the list's state, the class read
+                    // back through 2AEE). (A line past the six first shown
+                    // the view scrolls to itself: the library's loop's
+                    // scrolling, +3B, isn't the port's.)
+                    let class = engine.m.class_list(&mut engine.files, i).unwrap_or_else(|| {
+                        eprintln!("the class list gave up: {}", arena::giveup::describe());
+                        engine.m.mem.r8(DS, LIST_ORDER + i)
+                    });
                     self.class_chosen(engine, class)
                 }
                 _ => Stage::List(ask),
@@ -1372,6 +1382,8 @@ impl Creation {
         if engine.m.class_chosen(class).is_none() {
             eprintln!("the class's weapon could not be made");
         }
+        // 1194:2536: FONT_C freed, the colour EEh.
+        engine.m.class_done();
         self.name_asked(engine)
     }
 
