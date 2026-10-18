@@ -258,6 +258,10 @@ pub struct Inventory {
     /// (`Machine::sheet_equipment_drop`'s pick), as the original's does;
     /// and the drop's key (None, its button clicked).
     pub drop_ring: Option<Box<(Vec<u8>, Option<u8>)>>,
+    /// On the sheet's own page, "Drop what?" up (1194:18CA) or its
+    /// question after: the inputs its loop (2325) has taken, the drop run
+    /// again from its start with them (`App::sheet_drop`).
+    pub drop_what: Option<Vec<arena::charsheet::PageInput>>,
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,
