@@ -89,19 +89,16 @@ const NEAREST_REC: u16 = 0xA8BA;
 /// and the known-only switch.
 const SCAN: [u16; 4] = [0xA8BC, NEAREST_REC, 0xA8B6, 0x1294];
 
-fn inside(r: (i32, i32, i32, i32), x: i32, y: i32) -> bool {
-    x >= r.0 && x <= r.0 + r.2 && y >= r.1 && y <= r.1 + r.3
-}
-
-/// A point of the world map whose click opens province `p`'s map: inside
-/// its region (DATA:6D90) and no earlier one's, as the regions are tried
-/// in order.
-pub fn province_point(p: u8) -> (i32, i32) {
+/// A point of the world map whose click opens province `p`'s map, the
+/// world map's window up in `m`: inside its region (DATA:6D90) with its
+/// mask's bit set and in no later region's (3159:019A keeps the last).
+pub fn province_point(m: &Machine, p: u8) -> (i32, i32) {
     let r = REGIONS[p as usize];
+    let mut m = m.clone();
     (r.1..=r.1 + r.3)
         .flat_map(|y| (r.0..=r.0 + r.2).map(move |x| (x + r.2 / 2 - r.0, y)))
         .map(|(dx, y)| (r.0 + dx % (r.2 + 1), y))
-        .find(|&(x, y)| REGIONS.iter().position(|&q| inside(q, x, y)) == Some(p as usize))
+        .find(|&(x, y)| m.travel_world_region(x as u16, y as u16) == Some(p as u16))
         .expect("a point of the province's own")
 }
 

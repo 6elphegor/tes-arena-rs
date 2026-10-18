@@ -974,7 +974,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             let (x, y) = if dice.below(3) == 0 {
                                 (dice.below(320) as i32, dice.below(200) as i32)
                             } else {
-                                crate::travel::province_point(engine.m.mem.r8(DS, 0x0A46))
+                                crate::travel::province_point(&engine.m, engine.m.mem.r8(DS, 0x0A46))
                             };
                             t.click(&mut engine, &archive, x, y, false);
                             let (x, y) = (10 + dice.below(300) as i32, 5 + dice.below(155) as i32);

@@ -859,7 +859,7 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     d.key(&mut a, KeyCode::KeyM, Some("M"));
     a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
     assert!(a.travel.is_some(), "Shift+M opens the travel map");
-    let (px, py) = travel::province_point(a.engine.m.mem.r8(arena::mem::DS, 0x0A46));
+    let (px, py) = travel::province_point(&a.engine.m, a.engine.m.mem.r8(arena::mem::DS, 0x0A46));
     d.click(&mut a, px, py, MouseButton::Left);
     // A click on the map picks the nearest place: the journey's box.
     d.click(&mut a, 135, 58, MouseButton::Left);
@@ -1818,7 +1818,7 @@ fn the_stairs_out_show_the_travel_map() {
     // Again, and a journey made: the dungeon left for the place.
     walk(&mut a, &mut d);
     assert!(a.travel.is_some(), "asked again on the stairs");
-    let (px, py) = travel::province_point(a.engine.m.mem.r8(DS, 0x0A46));
+    let (px, py) = travel::province_point(&a.engine.m, a.engine.m.mem.r8(DS, 0x0A46));
     d.click(&mut a, px, py, MouseButton::Left);
     d.click(&mut a, 135, 58, MouseButton::Left);
     assert!(!a.boxes.is_empty(), "the journey's box");
