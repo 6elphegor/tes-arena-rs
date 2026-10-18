@@ -182,7 +182,10 @@ LISTS = [
 # 1194:2678 (near) whole, creation's class list, FONT_C loaded at [102A]
 # as creation has it: (name, line) the line clicked (twice where it isn't
 # the first) among the six first shown.
-CLASSLISTS = [('first', 0), ('second', 1), ('sixth', 5)]
+# (name, the row clicked among the six shown, the clicks on the list's
+# down arrow before: each moves the pick on a line, 3159:09E8, and past
+# the rows shown scrolls the lines a line, 0E68).
+CLASSLISTS = [('first', 0, 0), ('second', 1, 0), ('sixth', 5, 0), ('seventh', 5, 6), ('scrolled', 2, 8), ('last', 5, 20)]
 
 
 def stack_bx(a, at):
@@ -439,14 +442,22 @@ def main():
         out.write(f'list | {name} | {kind:x} {place:x} {font:x} | {title.hex()} | {",".join(e.hex() for e in lines)} | '
                   f'{act} | {pick:x} | {a.r16(0x8FA8):x} {page:x} | {state_line(a, d0, MOUSE | CURSOR | TEXTS)}\n')
         out.flush()
-    for name, line in CLASSLISTS:
+    for name, line, downs in CLASSLISTS:
         start(name)
         assert a.run_screen(0, 0x7504, dict(si=0x4B03)) is None, f'{name}: FONT_C waited'
         a.w16(0x102A, a.mu.reg_read(UC_X86_REG_AX))
         rec = LIST_RECORDS[6]
         bx_, by, bw, _ = (a.r16(rec + 0x18 + 2 * k) for k in range(4))
         height = a.mu.mem_read(a.lin(a.r16(0x1026), a.r16(0xB034)), 1)[0]
-        a.script = [('click', bx_ + bw // 2, by + line * height + height // 2)] * (1 if line == 0 else 2)
+        # The down arrow's box (+8: x, y, w, h) clicked `downs` times: the
+        # pick on to `mark`, the first line shown the one six before it;
+        # then the row's line, taken at once if it is the pick, else marked
+        # by the first click and taken by the second.
+        ax_, ay_, aw_, ah_ = (a.r16(rec + 0x8 + 2 * k) for k in range(4))
+        mark = min(downs, 17)
+        top = max(0, mark - 5)
+        a.script = ([('click', ax_ + aw_ // 2, ay_ + ah_ // 2)] * downs
+                    + [('click', bx_ + bw // 2, by + line * height + height // 2)] * (1 if top + line == mark else 2))
         d0 = a.seg_bytes(a.ds)
         r = a.run_screen(0x1194, 0x2678, {}, near=True)
         assert r is None, f'{name}: the class list waited {r}'
@@ -460,7 +471,9 @@ def main():
             a.w16(rec + 0x43, 0)
         if dump:
             open(os.path.join(dump, f'class-{name}.dgroup'), 'wb').write(a.seg_bytes(a.ds))
-        out.write(f'classlist | {name} | {line:x} | {cls:x} | {a.r16(0x8FA8):x} {page:x} | {state_line(a, d0, MOUSE | CURSOR | TEXTS)}\n')
+        assert a.r16(rec + 0x3B) == top, f'{name}: the first line shown {a.r16(rec + 0x3B):x}'
+        at = f'{line:x}' if not top else f'{top + line:x},{top:x}'
+        out.write(f'classlist | {name} | {at} | {cls:x} | {a.r16(0x8FA8):x} {page:x} | {state_line(a, d0, MOUSE | CURSOR | TEXTS)}\n')
         out.flush()
     out.close()
 

@@ -62,6 +62,14 @@ impl Machine {
     /// gives up (no room on the heap; kind 9's picture packed or cut by
     /// the clip).
     pub fn list_window(&mut self, files: &mut Files, kind: u16, (ds, si): (u16, u16), cx: u16, di: u16, pick: u16) -> Option<u16> {
+        self.list_window_scrolled(files, kind, (ds, si), cx, di, pick, 0)
+    }
+
+    /// `list_window`, the library's loop having scrolled its lines to
+    /// first show line `top` (+3B) before the pick (`pick` among all
+    /// the lines).
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_window_scrolled(&mut self, files: &mut Files, kind: u16, (ds, si): (u16, u16), cx: u16, di: u16, pick: u16, top: u16) -> Option<u16> {
         self.mem.w16(ds, 0xA872, di);
         let flags = self.mem.r8(DS, FLAGS);
         self.mem.w8(DS, FLAGS, 0);
@@ -170,7 +178,7 @@ impl Machine {
         self.mem.w8(DS, record + 0x2C, 0xF9);
         self.mem.w8(DS, record + 0x2D, 0xF2);
         self.mem.w8(DS, record + 0x2E, 0xF5);
-        let ax = self.window_list((DS, record), pick)?;
+        let ax = self.window_list((DS, record), pick, top)?;
         // 5988: a pick past the count (or none) the last line's.
         let mut al = ax as u8;
         let count = cx as u8;
@@ -221,7 +229,7 @@ impl Machine {
             }
             None => self.page_copy(true),
         }
-        let ax = self.window_list((DS, BAR), pick)?;
+        let ax = self.window_list((DS, BAR), pick, 0)?;
         self.map_bank(bank, 0);
         self.page_copy(false);
         let f = self.mem.r16(DS, 0xA902) & 0xFFFE;
@@ -457,9 +465,9 @@ impl Machine {
     }
 
     /// 3159:06A0: the window library's list over the record at
-    /// `seg`:`rec` (B80A), the line `pick` picked among the lines first
-    /// shown (FFFFh: left). AX: the record's pick (+39).
-    fn window_list(&mut self, (seg, rec): (u16, u16), pick: u16) -> Option<u16> {
+    /// `seg`:`rec` (B80A), its lines scrolled to first show line `top`,
+    /// the line `pick` picked (FFFFh: left). AX: the record's pick (+39).
+    fn window_list(&mut self, (seg, rec): (u16, u16), pick: u16, top: u16) -> Option<u16> {
         let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
         self.mem.w16(DS, RECORD, rec);
         self.mem.w16(DS, RECORD + 2, seg);
@@ -528,6 +536,12 @@ impl Machine {
         }
         // 07C6: the first line picked (0BCA: no routine at +2F here).
         self.list_pick(seg, rec, 0)?;
+        // The loop's scrolling (the arrows' 09C2 and 09E8, the keys' and
+        // the bar's, each through 0E68) as it leaves the record: the first
+        // line shown, the pick kept among the lines shown, the knob.
+        if top != 0 {
+            self.list_scrolled(seg, rec, top)?;
+        }
         // The loop: the line clicked picked (0A1D, 0BCA), the last
         // drawing (0A58) and the end (07D3, 710E).
         self.mem.w8(DS, SCROLLED, 0);
@@ -542,6 +556,45 @@ impl Machine {
         self.list_end(seg, rec);
         self.key_flush();
         Some(ax)
+    }
+
+    /// 3159:0E68: the record's first line shown (+3B) made `ax`, the pick
+    /// moved into the lines shown (0BCA: to the first, or the last), and
+    /// the knob placed (0E11): at the first line's share of the bar's
+    /// height (in 1/1024ths, from the bar's y, +12), or at the bar's foot
+    /// with the last lines shown; changed, it is drawn (0CFF: 9288 and
+    /// the texts' ADB6/ADB8 as its lines leave them, the front end's
+    /// pixels; the loop's last drawing, 0A58, sets 9288 again).
+    fn list_scrolled(&mut self, seg: u16, rec: u16, ax: u16) -> Option<()> {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        self.mem.w16(seg, rec + 0x3B, ax);
+        let last = ax.wrapping_add(r16(self, 0x37)).wrapping_sub(1);
+        if r16(self, 0x39) < ax {
+            self.list_pick(seg, rec, ax)?;
+        } else if r16(self, 0x39) > last {
+            self.list_pick(seg, rec, last)?;
+        }
+        if r16(self, 0x14) == 0 {
+            return Some(());
+        }
+        let total = r16(self, 0x3D) as u64;
+        if total == 0 {
+            return crate::giveup::original("3159:0E35: no lines (a divide by 0)");
+        }
+        let q = (((ax as u64) << 10) * r16(self, 0x16) as u64) / total;
+        if q > 0xFFFF_FFFF {
+            return crate::giveup::original("3159:0E35: the knob's place overflows EAX (a divide overflow)");
+        }
+        let y = (((q as u32) >> 10) as u16).wrapping_add(r16(self, 0x12));
+        if r16(self, 0x4F) != y {
+            let y = if ax == r16(self, 0x3D).wrapping_sub(r16(self, 0x37)) {
+                r16(self, 0x12).wrapping_add(r16(self, 0x16)).wrapping_sub(r16(self, 0x53))
+            } else {
+                y
+            };
+            self.mem.w16(seg, rec + 0x4F, y);
+        }
+        Some(())
     }
 
     /// 3159:0BCA: the record's pick `ax` (+39), its routine at +2F called

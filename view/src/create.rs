@@ -1077,11 +1077,10 @@ impl Creation {
             Stage::List(mut ask) => match self.ask_input(&mut ask, inp) {
                 Some(i) if (i as usize) < 18 => {
                     // 1194:2678 as the game's state has it (`class_list`:
-                    // the names made, the list's state, the class read
-                    // back through 2AEE). (A line past the six first shown
-                    // the view scrolls to itself: the library's loop's
-                    // scrolling, +3B, isn't the port's.)
-                    let class = engine.m.class_list(&mut engine.files, i).unwrap_or_else(|| {
+                    // the names made, the list's state scrolled as the
+                    // view's, its first line shown the library's +3B, the
+                    // class read back through 2AEE).
+                    let class = engine.m.class_list(&mut engine.files, i, ask.top as u16).unwrap_or_else(|| {
                         eprintln!("the class list gave up: {}", arena::giveup::describe());
                         engine.m.mem.r8(DS, LIST_ORDER + i)
                     });

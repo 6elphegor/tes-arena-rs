@@ -386,10 +386,11 @@ impl Machine {
     /// 5 bits the name's place in the list at 2A62, 5585) copied one after
     /// another to 1044 (9CA0); B7C4 cleared, FONT_C ([102A]) selected, the
     /// list of kind 6 over them under the title at 3F56 (1194:5734,
-    /// `list_window`: `pick` the line the library's loop takes), then
-    /// FONT_B ([102C]) selected. Returns the class picked: 2AEE's byte at
-    /// the pick (AX whole, as BX). None where the list gives up.
-    pub fn class_list(&mut self, files: &mut Files, pick: u16) -> Option<u8> {
+    /// `list_window_scrolled`: `pick` the line the library's loop takes,
+    /// `top` the first line it leaves shown), then FONT_B ([102C])
+    /// selected. Returns the class picked: 2AEE's byte at the pick (AX
+    /// whole, as BX). None where the list gives up.
+    pub fn class_list(&mut self, files: &mut Files, pick: u16, top: u16) -> Option<u8> {
         self.sheet_image(files, 0x3ED9)?;
         let mut di = 0x1044u16;
         for k in 0..0x12u16 {
@@ -407,7 +408,7 @@ impl Machine {
         }
         self.mem.w8(DS, 0xB7C4, 0);
         self.select_font(0x102A);
-        let ax = self.list_window(files, 6, (DS, 0x1044), 0x12, 0x3F56, pick)?;
+        let ax = self.list_window_scrolled(files, 6, (DS, 0x1044), 0x12, 0x3F56, pick, top)?;
         let class = self.mem.r8(DS, 0x2AEEu16.wrapping_add(ax));
         self.select_font(0x102C);
         Some(class)
