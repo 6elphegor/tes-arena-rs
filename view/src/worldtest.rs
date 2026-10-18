@@ -859,15 +859,14 @@ fn case(name: &str) -> Option<Case> {
 fn the_3d_view_drawn_as_the_original_draws_it() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     let only = std::env::var("ARENA_CASE").ok();
-    for name in ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild", "playcap", "playfog", "playghost"] {
-        if only.as_deref().is_some_and(|o| o != name) {
-            continue;
-        }
+    let all = ["playdungeon", "playdown", "playcrypt", "playstreet", "playsky", "playnight", "playwild", "playcap", "playfog", "playghost"];
+    // (ARENA_CASE: that case alone, gen_areaplay.py's too.)
+    for name in only.as_deref().map_or(all.to_vec(), |o| vec![o]) {
         let (Ok(full), Ok(mask)) = (std::fs::read(dump.join(format!("{name}.full"))), std::fs::read(dump.join(format!("{name}.mask")))) else {
             eprintln!("{name}: no dump");
             continue;
         };
-        let (place, setup, play) = case(name).unwrap();
+        let (place, setup, play) = case(name).or_else(|| areaplaytest::transit_case(name)).unwrap();
         let Some((a, _)) = played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);
             setup(a)

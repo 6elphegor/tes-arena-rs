@@ -237,9 +237,14 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
     // may not have begun from: the first frame after a load. And the
     // scratch flat record, D7DE, whole: 0000:D18E sets its frame count
     // only for a flat that animates, so the next frame's drawing, or a
-    // click's copy of it to 3D96 (2294:047B), finds the last one's.)
+    // click's copy of it to 3D96 (2294:047B), finds the last one's. And
+    // the light along a face, A85E (8.8) and its step A860, and the shades
+    // a column is drawn with, BAE6 and BAE8: a lit face sets them, but
+    // outdoors by day (C398 bit 8000h) nothing steps the light, so a side
+    // face's first shades (0000:BE02..BE2D) come of the last lit frame's
+    // A85E, and a frame that draws no lit face keeps its BAE6/BAE8.)
     let mut left = Vec::new();
-    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D)] {
+    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D), (0xA85E, 0xA862), (0xBAE6, 0xBAEA)] {
         for o in from..to {
             left.push((o, r.m.mem.r8(DS, o)));
         }

@@ -216,19 +216,28 @@ struct Front<'a> {
     /// The screen as last shown (`Assets::shown`): the page at the frame's
     /// start.
     shown: Option<&'a [u8]>,
+    /// The screen as the frame's drawing leaves the page (`drawn`): its 3D
+    /// view this frame's, the rest `shown`'s; None till the frame draws.
+    drawn: Option<Vec<u8>>,
     /// A left click in the view waiting for the frame's input step
     /// (`ControlHooks::take_click`): where on the 320 x 200 screen.
     click: Option<(i32, i32)>,
 }
 
 impl Front<'_> {
+    /// The screen a box covers as it opens: the page as the frame's drawing
+    /// left it, or before the frame draws the one last shown.
+    fn box_screen(&self) -> Option<&[u8]> {
+        self.drawn.as_deref().or(self.shown)
+    }
+
     /// 1194:59C8: a message box with the text at DS:`si`, shown (`show`)
     /// and what it leaves in the game's state (`Machine::message_shown`:
     /// the box laid out, its background kept, the dissolve, put away
     /// after the player's click unless 5E0 bit 800h).
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         self.show(m, si);
-        if m.message_shown((arena::mem::DS, si), self.shown).is_none() {
+        if m.message_shown((arena::mem::DS, si), self.box_screen()).is_none() {
             eprintln!("the message box gave up: {}", arena::giveup::describe());
         }
     }
@@ -249,7 +258,7 @@ impl Front<'_> {
     fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
         use arena::mem::DS;
         let colour = m.mem.r8(DS, 0x9288);
-        let Some(boxes) = m.menu_boxes(si, di, self.shown) else {
+        let Some(boxes) = m.menu_boxes(si, di, self.box_screen()) else {
             eprintln!("the menu gave up: {}", arena::giveup::describe());
             return 0xFFFF;
         };
@@ -703,7 +712,7 @@ impl arena::rest::RestHooks for Front<'_> {
                 m.mem.w16(DS, to, v);
             }
             let typed = arena::rest::var::TYPED;
-            if m.prompt_shown((DS, REST_PROMPT), (0xFC, 0x44), (DS, typed), 3, self.shown).is_none() {
+            if m.prompt_shown((DS, REST_PROMPT), (0xFC, 0x44), (DS, typed), 3, self.drawn.as_deref().or(self.shown)).is_none() {
                 eprintln!("the prompt's box gave up: {}", arena::giveup::describe());
                 return;
             }
@@ -732,6 +741,9 @@ impl arena::rest::RestHooks for Front<'_> {
     }
 }
 
+/// The 3D view's rows on the page, above the interface's bar (the clip's
+/// bottom, A91A, 92h).
+const VIEW_ROWS: usize = 0x92;
 /// "How many hours do you wish to rest?" (DGROUP), which 1194:4800 shows.
 const REST_PROMPT: u16 = 0x4984;
 impl EngineHooks for Front<'_> {
@@ -752,6 +764,17 @@ impl EngineHooks for Front<'_> {
             if let Some(light) = self.light.as_deref_mut() {
                 m.fog_step(light);
             }
+        }
+    }
+    /// The page the frame drew: the 3D view's rows (above the interface)
+    /// over the screen last shown, as the original's page holds them from
+    /// then in the frame (its interface; none of the view's HUD).
+    fn drawn(&mut self, _m: &mut arena::machine::Machine, page: &[u8]) {
+        if let Some(shown) = self.shown {
+            let mut s = shown.to_vec();
+            let n = (VIEW_ROWS * 320).min(s.len()).min(page.len());
+            s[..n].copy_from_slice(&page[..n]);
+            self.drawn = Some(s);
         }
     }
     /// Only with the view's own GPU world (no engine page: --gpu-world),
@@ -1678,7 +1701,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), click: None };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: None };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
@@ -1688,7 +1711,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), click: input.click };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }

@@ -81,6 +81,11 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     fn rain(&mut self, _m: &mut Machine) {}
     /// 0000:A7B4: the frame's picture put on the screen (shaken by CB68).
     fn present(&mut self, _m: &mut Machine) {}
+    /// The page as the frame's drawing left it (its 3D view, the snow's or
+    /// the rain's drops), before the physics: what the page holds for
+    /// what runs from there in the frame (a click's box saving the screen
+    /// it covers, 0000:8F2A, saves this frame's view, not the last).
+    fn drawn(&mut self, _m: &mut Machine, _page: &[u8]) {}
 }
 
 /// The world loop's stage (BA4B), which it marks as it goes.
@@ -495,6 +500,9 @@ impl Engine {
             }
         }
         m.mem.w8(DS, STAGE, 0x0A);
+        if let Some(page) = self.page.as_deref() {
+            hooks.drawn(m, page);
+        }
         // A3AA..A3BE: the physics from the real position.
         copy_words(m, 0xBA62, X, 3);
         if !hooks.step(m, Step::Physics) {
