@@ -379,31 +379,8 @@ fn the_crypt_of_hearts_first_text_as_the_original_draws_it() {
 /// on: not armed, the lock's words on the message line.
 #[test]
 fn a_locked_door_clicked_as_the_original_answers_it() {
-    world_case(
-        "playlock",
-        Place::Crypt,
-        |a| {
-            at_square(a, 13, 4, 0);
-            let m = &mut a.engine.m;
-            let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
-            let rec = arena::movement::var::LOCKS + 3 * n as u16;
-            m.mem.w16(DS, rec, 0x0E04);
-            m.mem.w8(DS, rec + 2, 5);
-            m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
-        },
-        |a, d, seen| {
-            frames(a, d, seen, 2, |_| false);
-            // Down for the frame whose controls read it, then up, as the
-            // original's mouse reads give it (its controls act on the
-            // next frame's).
-            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
-            a.input(In::Button { button: MouseButton::Left, down: true });
-            frames(a, d, seen, 1, |_| false);
-            a.input(In::Button { button: MouseButton::Left, down: false });
-            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
-            frames(a, d, seen, 1, |_| false);
-        },
-    );
+    let (place, setup, play) = case("playlock").unwrap();
+    world_case("playlock", place, setup, play);
 }
 
 /// The view's world drawn offscreen at 320 x 200 (as `shot` draws it),
@@ -921,6 +898,26 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 40, |_| false);
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 10, |_| false);
+        })),
+        "playlock" => (Place::Crypt, Box::new(|a: &mut App| {
+            at_square(a, 13, 4, 0);
+            let m = &mut a.engine.m;
+            let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+            let rec = arena::movement::var::LOCKS + 3 * n as u16;
+            m.mem.w16(DS, rec, 0x0E04);
+            m.mem.w8(DS, rec + 2, 5);
+            m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // Down for the frame whose controls read it, then up, as the
+            // original's mouse reads give it (its controls act on the
+            // next frame's).
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+            frames(a, d, seen, 1, |_| false);
         })),
         "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
         "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
@@ -1926,7 +1923,12 @@ fn the_row_tables_made_as_the_original_makes_them() {
     assert!(bad.is_empty(), "the row tables differ from the original's in {bad:?}");
 }
 
-/// The busy cases whose state is compared, the store's and the guild's
+/// The busy cases whose state is compared, with the shorter ones whose
+/// state only these checks cover: the volcano seen near and far (its
+/// image loaded into the sky's bank, 292B:029A), the lightning's bolt
+/// (2294:05A6: the y it reads from the image an earlier frame's drawing
+/// left, `Engine::page_ems_prior`), the fog's first frame, the ghost and
+/// the locked door clicked; the store's and the guild's
 /// shopping among them (the shops' screens as the engine's: 1194:5496 and
 /// 54B3, the list windows 1194:5734 and 3159:06A0, the strip 5F8C/5FC0,
 /// the dialogs 4E88 and messages 4D31, the texts drawn into the page),
@@ -1949,7 +1951,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// bank [1032]: `Machine::sm_screen`), and "Drop what?" with no line
 /// marked in playequipdropwhat (18CA: its loop, 2325, left by a line's
 /// click that marks it, the drop over again: `drop_what_loop`).
-const BUSY_STATE: [&str; 29] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 35] = ["playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
