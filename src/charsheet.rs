@@ -1221,7 +1221,7 @@ impl Machine {
 
     /// 0000:9426: the page ([A8FE], FA00h bytes) cleared unless A902 bit
     /// 4 (here only where the page is the game's own block).
-    fn page_clear(&mut self) {
+    pub(crate) fn page_clear(&mut self) {
         if self.mem.r16(DS, 0xA902) & 4 != 0 || !self.page_is_block() {
             return;
         }

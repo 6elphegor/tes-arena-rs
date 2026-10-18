@@ -1398,6 +1398,18 @@ fn case(name: &str) -> Option<Case> {
             m.player_dies();
             d.frame(a);
         })),
+        "playtitle" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // `playdeath`, then gen_worldframes.py's `titled`: the program's
+            // main on to its menu's wait (`Machine::title_menu`, 0000:109B..
+            // 1114).
+            let m = &mut a.engine.m;
+            m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+            m.player_dies();
+            d.frame(a);
+            let e = &mut a.engine;
+            e.m.title_menu(&mut e.files, &mut arena::title::NoTitleHooks).expect("the way back to the menu");
+        })),
         "playguild" => (Place::Loaded, Box::new(|a: &mut App| {
             room(a);
             seeded(a);
@@ -2172,6 +2184,27 @@ fn a_death_leaves_the_state_as_the_original() {
     state_case("playdeath");
     state_load_case("playdeath");
     state_ems_case("playdeath");
+}
+
+/// The player killed (`playdeath`), then the program's main back to its
+/// menu (`playtitle`: 0000:109B..1114, `Machine::title_menu`: the intro's
+/// movies and pictures read, MENU.IMG drawn): DGROUP from the case's
+/// start and from the load, the EMS banks, and the page the menu waits
+/// on, as the original leaves them at the menu's wait.
+#[test]
+fn a_death_goes_back_to_the_menu_as_the_original() {
+    let (place, setup, play) = case("playtitle").unwrap();
+    let Some((a, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playtitle"), "playtitle: the player's frames differ from the original's");
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("screen | playtitle | ")).expect("a screen line");
+    assert_eq!(format!("{:x}", fnv(page)), want.split(' ').next().unwrap(), "playtitle: the menu's page differs from the original's");
+    state_case("playtitle");
+    state_load_case("playtitle");
+    state_ems_case("playtitle");
 }
 
 /// The screens opened in play whose state is the engine's
