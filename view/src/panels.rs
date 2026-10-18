@@ -257,7 +257,7 @@ pub struct Inventory {
     /// interrupt puts after it, goes in after the menu's flush instead
     /// (`Machine::sheet_equipment_drop`'s pick), as the original's does;
     /// and the drop's key (None, its button clicked).
-    pub drop_ring: Option<(Vec<u8>, Option<u8>)>,
+    pub drop_ring: Option<Box<(Vec<u8>, Option<u8>)>>,
     /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
     /// back to the sheet.
     pub from_sheet: bool,

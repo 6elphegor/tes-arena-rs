@@ -358,9 +358,19 @@ impl Machine {
     /// marked already, clicked again, puts its item on or takes it off
     /// (1AFB: `equip_click`, its refusals' boxes 1BE0 and 1B78 `hooks`'),
     /// the weapon's class made again (731A) and the page drawn again
-    /// (23B1). A quest's line (1270) or the spells' page (129A 0) aren't
-    /// ported past the mark.
-    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16) -> Option<()> {
+    /// (23B1). A quest's line marked already, clicked again (1B6F: 748E,
+    /// 1BE0's box), isn't ported: Some(false), the game left untouched,
+    /// for the front end's own; nor is the spells' page (129A 0).
+    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16) -> Option<bool> {
+        let mut cx = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
+        if self.mem.r8(DS, 0x129A) == 0 {
+            cx = self.mem.r8(DS, 0x050A) as u16;
+        }
+        let row = (0..cx.min(7)).find(|&i| y <= 0x3D + 0x0B * i);
+        let marked = row.map(|r| (r as u8).wrapping_add(self.mem.r8(DS, 0x1297)));
+        if marked.is_some_and(|m| m == self.mem.r8(DS, 0x1296) && m >= self.mem.r8(DS, 0x129D)) {
+            return Some(false);
+        }
         self.equipment_turn(None, 0);
         if self.mem.r8(DS, 0x1299) != 0 {
             return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
@@ -380,7 +390,7 @@ impl Machine {
             }
         }
         self.equipment_turn_end();
-        Some(())
+        Some(true)
     }
 
     /// D or the Drop button (3276:57D8's fourth record, 1194:17D8), `key`
