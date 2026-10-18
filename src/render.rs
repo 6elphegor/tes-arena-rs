@@ -221,8 +221,6 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
         }
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
-    // (The entry's row tables serve this drawing alone.)
-    m.rows_entry = None;
     for (o, w) in prior.iter().enumerate() {
         let o = o as u16;
         if let Some((before, after)) = *w {
@@ -3794,21 +3792,16 @@ impl Soft {
         self.s16(0xCD84, floor);
         self.s16(0xCD7E, 0);
         self.s16(0xCD80, ceiling);
-        // DA8E's tables, as the last made them: an area's first frame
-        // the entry's (`rows_entry`), any other the state's now (the
-        // physics and the controls made them at the last frame's end).
-        match self.m.rows_entry.take() {
-            Some(kept) => {
-                let now: Vec<(u16, u16)> = kept.iter().map(|&(o, _)| (o, self.g16(o))).collect();
-                for &(o, v) in &kept {
-                    self.s16(o, v);
-                }
-                self.row_tables();
-                for (o, v) in now {
-                    self.s16(o, v);
-                }
-            }
-            None => self.row_tables(),
+        // DA8E's tables, as the last made them (`rows_made`): their
+        // inputs then, put back after.
+        let made = rows_used(&self.m);
+        let now = ROW_INPUTS.map(|o| self.g16(o));
+        for (&o, &v) in ROW_INPUTS.iter().zip(&made) {
+            self.s16(o, v);
+        }
+        self.row_tables();
+        for (&o, &v) in ROW_INPUTS.iter().zip(&now) {
+            self.s16(o, v);
         }
     }
 
@@ -3818,13 +3811,34 @@ impl Soft {
     }
 }
 
+/// What 0000:DA8E makes the row tables from: the flags (of C398 it reads
+/// bits 4000h and 40h, of C39A bit 8), the eye's height, the horizon's
+/// rows, the view's scales, its left edge, the heading and the ceiling's
+/// height.
+const ROW_INPUTS: [u16; 11] = [0xC398, 0xC39A, 0xC3D2, 0xC3A2, 0xC3D8, 0xCCF6, 0xCCF4, 0xC3D6, LEFT, 0xC3DA, 0xD80C];
+
+/// The inputs the next drawing makes its row tables from: those the
+/// last DA8E made them from (`Machine::rows_made`), or with none the
+/// state's now.
+pub fn rows_used(m: &Machine) -> [u16; 11] {
+    m.rows_made.unwrap_or_else(|| ROW_INPUTS.map(|o| m.mem.r16(DS, o)))
+}
+
+/// `rows_used` as gen_worldframes.py's `rows` lines have them: of the
+/// flags only the bits DA8E reads.
+pub fn rows_read(m: &Machine) -> [u16; 11] {
+    let mut v = rows_used(m);
+    v[0] &= 0x4040;
+    v[1] &= 8;
+    v
+}
+
 impl Machine {
-    /// 0000:A523's DA8E, an area's entry: the row tables' inputs kept
-    /// (`rows_entry`) for the first frame's drawing, which the original
-    /// does with the tables made here, before the INF's ceiling (D80C).
-    pub fn rows_keep(&mut self) {
-        const INPUTS: [u16; 11] = [0xC398, 0xC39A, 0xC3D2, 0xC3A2, 0xC3D8, 0xCCF6, 0xCCF4, 0xC3D6, LEFT, 0xC3DA, 0xD80C];
-        self.rows_entry = Some(INPUTS.iter().map(|&o| (o, self.mem.r16(DS, o))).collect());
+    /// A call of 0000:DA8E: the inputs it makes the row tables from noted
+    /// (`rows_made`), which the drawings after it build theirs from (the
+    /// tables are in the drawing's buffers, which only its copy has).
+    pub fn rows_note(&mut self) {
+        self.rows_made = Some(ROW_INPUTS.map(|o| self.mem.r16(DS, o)));
     }
 
     /// 0000:DA8E: the floor's row table at CD82 (each row below the
@@ -3832,6 +3846,7 @@ impl Machine {
     /// then DB78 the ceiling's at CD7E. Each keeps its distance's
     /// product at A836, A838 (DAC3, DBCA).
     pub fn row_tables(&mut self) {
+        self.rows_note();
         let g = |m: &Machine, o: u16| m.mem.r16(DS, o);
         if g(self, 0xC398) & 0x4000 != 0 {
             return;

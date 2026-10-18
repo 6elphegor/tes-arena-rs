@@ -524,9 +524,9 @@ impl Machine {
 
     /// 0000:F7B5..F7F5 (and F85E..F89E). After the level's planes and
     /// chunks are reloaded (`level_change`), the player turns round and
-    /// the new level's INF, if one was loaded, is loaded. The view update
-    /// (0000:DA8E) and the wait for the mouse buttons to be released
-    /// (8FC8) are skipped; the wait leaves BX the cursor's y, kept within
+    /// the new level's INF, if one was loaded, is loaded, the row tables
+    /// made between (0000:DA8E, `rows_note`). The wait for the mouse
+    /// buttons to be released (8FC8) is skipped; it leaves BX the cursor's y, kept within
     /// its limits (8F94, 8F78..8F7A), which the next candidate's test
     /// reads (`regs`). Then the hook C3B8: a dungeon's level entered
     /// (`value::LEVEL_ENTERED`, `Machine::level_entered`; the view's
@@ -539,6 +539,8 @@ impl Machine {
         self.mem.w16(DS, W_A850, 0xFFFE);
         let h = self.mem.r16(DS, HEADING).wrapping_add(0x100) & 0x1FF;
         self.mem.w16(DS, HEADING, h);
+        // F7D3 (F87C): the row tables made before the INF's ceiling.
+        self.rows_note();
         let info = self.mem.r16(DS, crate::info::var::INFO_PTR);
         if info != 0 {
             self.info_load(files, info)?;
@@ -605,7 +607,11 @@ impl Machine {
             h = h.wrapping_add(0x12);
         }
         self.mem.w16(DS, HEIGHT, h);
-        // (0000:DA8E, the view update when above 0, is not ported.)
+        // F9A5: the row tables made above 0, before the height is held
+        // at 3Ch (the drawings after build theirs from the height before).
+        if (h as i16) > 0 {
+            self.rows_note();
+        }
         if (h as i16) >= LOW {
             self.mem.w16(DS, HEIGHT, 0x3C);
             self.mem.w8(DS, CLIMB, 6);
@@ -617,8 +623,8 @@ impl Machine {
     }
 
     /// 0000:F57C. The player's physics each frame: the climb countdown,
-    /// a pending view refresh (C398 bit 0x2000, the view is the
-    /// renderer's), then, when the input hook (C3B4) is set, the input
+    /// a pending view refresh (C398 bit 0x2000: the row tables made,
+    /// `rows_note`), then, when the input hook (C3B4) is set, the input
     /// and movement step and the fall (`fall_step`). A trigger left in
     /// CB6A goes to the transition hook (C3AC) when that is set (the
     /// view window is saved and restored around it, 0000:A606/A5D1, for
@@ -634,6 +640,8 @@ impl Machine {
         let f = self.mem.r16(DS, MAP_FLAGS);
         if f & 0x2000 != 0 {
             self.mem.w16(DS, MAP_FLAGS, f & !0x2000);
+            // F595.
+            self.rows_note();
         }
         if !self.hook_set(INPUT_HOOK) {
             return Some(());
@@ -660,6 +668,8 @@ impl Machine {
         self.mem.w16(DS, W_A850, 0xFFFE);
         let h = self.mem.r16(DS, HEADING).wrapping_add(0x100) & 0x1FF;
         self.mem.w16(DS, HEADING, h);
+        // F606.
+        self.rows_note();
         Some(())
     }
 
@@ -670,8 +680,8 @@ impl Machine {
     /// -50 and -1 by the level's flags, bobbing on the way). Falling
     /// moves down by E8BE, doubling every other frame, not while
     /// levitating (C398 bit 0x200), climbing or with level flag 0x8000;
-    /// landing low pulls the player off the square's edges. The view
-    /// refreshes (0000:DA8E) are the renderer's.
+    /// landing low pulls the player off the square's edges. Each change of
+    /// height makes the row tables (0000:DA8E, `rows_note`).
     pub fn fall_step(&mut self) {
         let f = self.mem.r16(DS, LEVEL_FLAGS) & !0x10;
         self.mem.w16(DS, LEVEL_FLAGS, f);
@@ -748,6 +758,8 @@ impl Machine {
                         self.mem.w16(DS, at, (v & 0xFF80).wrapping_add(e));
                     }
                 }
+                // FAD6.
+                self.rows_note();
                 return;
             }
         }
@@ -755,6 +767,8 @@ impl Machine {
         let target = self.mem.r16(DS, FLOOR);
         if self.mem.r16(DS, HEIGHT) != target {
             self.mem.w16(DS, HEIGHT, target);
+            // FAE7.
+            self.rows_note();
             self.mem.w16(DS, FALL, 4);
         }
         if !wet {

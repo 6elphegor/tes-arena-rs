@@ -152,6 +152,7 @@ def main():
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     a = ScreenArena(EXE, GAME, SAVE)
+    w.rows_watch(a)
     a.start()
     base = a.snapshot()
     loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
@@ -193,6 +194,7 @@ def main():
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         for frame, digest in boxed:
             out.write(f'boxview | {name} | {frame} {digest:x}\n')
+        out.write(w.rows_line(a, name))
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('ds', after), ('ems', ems), ('ds0', a.pre_state[0]), ('ems0', a.pre_state[1]),

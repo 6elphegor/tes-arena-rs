@@ -20,9 +20,10 @@
 //! (8F92, 8F94, in 320 x 200 pixels) and the buttons (AFF9: bit 0 left,
 //! bit 1 right) with `set_mouse`, and the keys (one byte per scan code
 //! at ACB5) with `set_key`. The cursor drawing (0000:541E, 77EC), the
-//! stat bars' pixels (2901:00A8: their state is `ControlHooks::bars`)
-//! and the view refreshes (0000:DA8A) are the renderer's. The Logitech CyberMan (2F26, when 8BEC is set) is not
-//! ported.
+//! and the stat bars' pixels (2901:00A8: their state is
+//! `ControlHooks::bars`) are the renderer's; the view refreshes
+//! (0000:DA8A) note the row tables' inputs (`Machine::rows_note`). The
+//! Logitech CyberMan (2F26, when 8BEC is set) is not ported.
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -305,6 +306,8 @@ impl Machine {
         }
         if self.mem.r16(DS, REFRESH) != 0 {
             self.mem.w16(DS, REFRESH, 0);
+            // 0198: the row tables made (0000:DA8A).
+            self.rows_note();
         }
         self.input_tail(files, hooks)
     }
@@ -500,6 +503,8 @@ impl Machine {
             self.mem.w16(DS, HEIGHT, ceiling);
         }
         self.mem.w16(DS, REFRESH, 0);
+        // 02A5.
+        self.rows_note();
         let heading = self.mem.r16(DS, HEADING);
         let speed = (self.mem.r16(DS, SPEED) as u8 as u16 * self.mem.r8(DS, 0x01CD) as u16) >> 7;
         self.walk(files, hooks, speed, heading)?;
@@ -842,6 +847,8 @@ impl Machine {
         }
         self.mem.w16(DS, HEADING, h & 0x1FF);
         self.mem.w16(DS, REFRESH, 0);
+        // 06F4 (074A): the row tables made.
+        self.rows_note();
     }
 
     /// 2826:0D20. Walking at `speed` towards `heading`, unless held (5B1

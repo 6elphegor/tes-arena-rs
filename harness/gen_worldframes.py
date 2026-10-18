@@ -79,6 +79,14 @@ The colours at each wait for the retrace on the way, when they change
 more than once, as gen_screens.py's:
 
   screenfade | NAME | <count> | <digest>
+
+What each of the case's drawings (0000:A31D, its first stage) made its
+row tables from: the inputs as the last call of 0000:DA8E found them
+(`rows_watch`; the tables stay as that made them until the next, the
+state since changed or not), each as eleven words (ROW_INPUTS, of the
+flags only the bits DA8E reads), their digest:
+
+  rows | NAME | <drawings> <digest>
 """
 import os
 import struct
@@ -673,6 +681,24 @@ CASES = {
     'playequipdescribe': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('rclick', 0x40, 0x42), ('click', 0x40, 0x42),
                                                                                                      ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                              ((), (KEY_F1,), 10, None)]),
+    # The staff's quest line on the equipment page: as playequip, the list
+    # moved on to its end ('+' 34 times: the save's 40 items and one
+    # quest's line), the last line (the staff's pieces, F77) clicked
+    # (marked, 1194:1C5E, its count made again, 1F56), right-clicked
+    # (1F56 again and described, 1988: "You currently have ...", 223A),
+    # the click its wait takes, clicked again (1B6F: "This item is
+    # needed...", 223A) and the click that wait takes, between N and Esc.
+    'playequipstaff': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N])] + [('keys', [KEY_PAD_PLUS])] * 34 + [
+        ('click', 0x40, 0x7A), ('rclick', 0x40, 0x7A), ('click', 0x40, 0x42), ('click', 0x40, 0x7A), ('click', 0x40, 0x42), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                          ((), (KEY_F1,), 10, None)]),
+    # A spell's page from the equipment page: as playequip, S (the
+    # spells' list, 1194:2365), its second line clicked (marked, 1C5E)
+    # and clicked again (1B3C: the spell's page, 51D1), the page's Exit
+    # (its loop's 8FC4; the list drawn again, 21C2, 1DC8), between N and
+    # Esc.
+    'playequipspellpage': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_S]), ('click', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                      ('click', 0x120, 0xC0), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                              ((), (KEY_F1,), 10, None)]),
     # No room to drop on the equipment page: the player's square (CB90)
     # given a byte in the plane at [D806] before F1, so the sheet's
     # 1194:5F13 finds no room (5E0 bit 20h); as playequip, D (17D8: "There is no room...",
@@ -802,8 +828,56 @@ def track_line(a, name, frame):
     return f'track | {name} | {" ".join(f"{v:x}" for v in vals)}\n'
 
 
+ROW_INPUTS = (0xC398, 0xC39A, 0xC3D2, 0xC3A2, 0xC3D8, 0xCCF6, 0xCCF4, 0xC3D6, 0xA914, 0xC3DA, 0xD80C)
+
+
+def row_inputs(a):
+    """What 0000:DA8E makes the row tables from now: the flags (of C398
+    only bits 4000h and 40h, of C39A bit 8, all it reads), the eye's
+    height, the horizon's rows, the view's scales, its left edge, the
+    heading and the ceiling's height."""
+    v = [a.r16(o) for o in ROW_INPUTS]
+    v[0] &= 0x4040
+    v[1] &= 8
+    return v
+
+
+def rows_watch(a):
+    """Each call of 0000:DA8E noted (`a.rows_made`, its inputs) and each
+    drawing (0000:A31D) given the last's (`a.rows_drawn`); a snapshot
+    keeps the last call's, a restore brings it back."""
+    a.rows_made = None
+    a.rows_drawn = []
+    kept = []
+
+    def made(*_):
+        a.rows_made = row_inputs(a)
+
+    def drawn(*_):
+        a.rows_drawn.append(a.rows_made if a.rows_made is not None else row_inputs(a))
+    a.mu.hook_add(UC_HOOK_CODE, made, None, a.lin(LOAD_SEG, 0xDA8E), a.lin(LOAD_SEG, 0xDA8E))
+    a.mu.hook_add(UC_HOOK_CODE, drawn, None, a.lin(LOAD_SEG, 0xA31D), a.lin(LOAD_SEG, 0xA31D))
+    snapshot, restore = a.snapshot, a.restore
+
+    def snapshot_rows():
+        snap = snapshot()
+        kept.append((snap, a.rows_made))
+        return snap
+
+    def restore_rows(snap):
+        restore(snap)
+        a.rows_made = next((made for s, made in kept if s is snap), None)
+    a.snapshot, a.restore = snapshot_rows, restore_rows
+
+
+def rows_line(a, name):
+    drawn = a.rows_drawn
+    return f'rows | {name} | {len(drawn)} {fnv(b"".join(struct.pack("<11H", *v) for v in drawn)):x}\n'
+
+
 def run_case(a, at, name, setup, steps, tracks):
     a.restore(at)
+    a.rows_drawn = []
     a.waits = set()
     a.script = []
     a.clicks = []
@@ -947,6 +1021,7 @@ def main():
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     a = ScreenArena(EXE, GAME, SAVE)
+    rows_watch(a)
     a.start()
     base = a.snapshot()
     loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
@@ -993,6 +1068,7 @@ def main():
             out.write(t)
         if len(seen) > 1:
             out.write(f'screenfade | {name} | {len(seen)} | {fnv(b"".join(struct.pack("<Q", fnv(d)) for d in seen)):x}\n')
+        out.write(rows_line(a, name))
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(state_line(name, a.pre_state[0], after, skip))
         out.write(state_line(name, loaded, after, skip_load, 'stateload'))

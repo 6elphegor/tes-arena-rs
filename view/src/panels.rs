@@ -294,6 +294,9 @@ pub enum PageAnswer {
 #[derive(Clone, Debug)]
 pub struct SpellPage {
     start: crate::dialog::Snapshot,
+    /// Opened from the sheet's equipment page (`Machine::sheet_spell_page`:
+    /// its loop's turn ended after), not the view's own.
+    sheet: bool,
     answers: Vec<PageAnswer>,
     pub shown: crate::dialog::Snapshot,
     pub asking: Option<(Vec<u8>, usize)>,
@@ -301,7 +304,7 @@ pub struct SpellPage {
     pub pages: usize,
     /// The name's field asked (1194:65FD), when that is what waits: the
     /// field, its look and the game as it asked it.
-    pub typing: Option<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>,
+    pub typing: Option<Box<(arena::lineedit::Field, crate::field::Look, crate::dialog::Snapshot)>>,
 }
 
 /// The page's questions answered from `answers`; the first one without
@@ -378,21 +381,23 @@ impl arena::spellpage::SpellPageHooks for Replay {
 impl SpellPage {
     /// The page run from its start with the answers; None once it has
     /// been left (the game then `m`'s, the files `files`').
-    fn run(start: &Machine, files: &mut arena::bsa::Files, answers: &[PageAnswer], m: &mut Machine) -> Option<SpellPage> {
+    fn run(start: &Machine, sheet: bool, files: &mut arena::bsa::Files, answers: &[PageAnswer], m: &mut Machine) -> Option<SpellPage> {
         let mut game = start.clone();
         let mut fs = files.clone();
         let mut r = Replay { answers: answers.iter().cloned().collect(), waiting: false, shown: None, asking: None, pages: 0, typing: None };
-        if game.spell_page(&mut fs, &mut r).is_none() {
+        let left = if sheet { game.sheet_spell_page(&mut fs, &mut r) } else { game.spell_page(&mut fs, &mut r) };
+        if left.is_none() {
             eprintln!("the spell's page gave up: {}", arena::giveup::describe());
         }
         match r.shown {
             Some(shown) if r.waiting => Some(SpellPage {
                 start: crate::dialog::Snapshot(Box::new(start.clone())),
+                sheet,
                 answers: answers.to_vec(),
                 shown: crate::dialog::Snapshot(Box::new(shown)),
                 asking: r.asking.map(|t| (t, 0)),
                 pages: r.pages,
-                typing: r.typing,
+                typing: r.typing.map(Box::new),
             }),
             _ => {
                 *m = game;
@@ -430,14 +435,21 @@ impl SpellPage {
     /// 1194:1B3C: the marked spell's page opened.
     pub fn open(m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
         let start = m.clone();
-        SpellPage::run(&start, files, &[], m)
+        SpellPage::run(&start, false, files, &[], m)
+    }
+
+    /// 1194:1B3C from the sheet's equipment page's list
+    /// (`Machine::sheet_spell_page`).
+    pub fn open_sheet(m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
+        let start = m.clone();
+        SpellPage::run(&start, true, files, &[], m)
     }
 
     /// An answer given: the page as it now stands, None once left.
     pub fn answer(self, a: PageAnswer, m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
         let mut answers = self.answers;
         answers.push(a);
-        SpellPage::run(&self.start.0, files, &answers, m)
+        SpellPage::run(&self.start.0, self.sheet, files, &answers, m)
     }
 }
 

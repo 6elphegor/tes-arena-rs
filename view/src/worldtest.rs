@@ -1057,6 +1057,52 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             frames(a, d, seen, 11, |_| false);
         })),
+        "playequipstaff" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequip, the list moved to its end ('+' 34 times), its
+            // last line, the staff's quest line (F77), clicked (marked,
+            // 1194:1C5E, counted again, 1F56), right-clicked (described,
+            // 1988) and the click the panel's wait takes (5536), clicked
+            // again (1B6F) and that wait's click.
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            for _ in 0..34 {
+                d.key(a, KeyCode::NumpadAdd, Some("+"));
+            }
+            d.click(a, 0x40, 0x7A, MouseButton::Left);
+            d.click(a, 0x40, 0x7A, MouseButton::Right);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.click(a, 0x40, 0x7A, MouseButton::Left);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playequipspellpage" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // As playequip, the spells' list (S, 1194:2365), its second
+            // line clicked (marked, 1C5E) and clicked again (its page,
+            // 1B3C, 51D1), the page's Exit (the list drawn again).
+            d.key(a, KeyCode::F1, None);
+            faded(a);
+            d.key(a, KeyCode::KeyN, Some("n"));
+            faded(a);
+            d.key(a, KeyCode::KeyS, Some("s"));
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            d.click(a, 0x40, 0x42, MouseButton::Left);
+            faded(a);
+            d.click(a, 0x120, 0xC0, MouseButton::Left);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
         "playequipnoroom" => (
             Place::Dungeon,
             Box::new(|_: &mut App| {}),
@@ -1734,7 +1780,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 24] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom"];
+const BUSY: [&str; 26] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1744,6 +1790,45 @@ fn busy_play_goes_as_the_originals() {
         let Some((_, seen)) = played(place, setup, play) else { return };
         assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
     }
+}
+
+/// Each case's drawings make their row tables from what the original's
+/// did (the `rows` lines: the inputs as the last 0000:DA8E found them,
+/// which the tables keep while the state changes on, `render::rows_read`
+/// and `Machine::rows_note` at each of DA8E's callers), in every case of
+/// worldframes.txt and areaplay.txt the view plays. (ARENA_CASE: that
+/// case alone.)
+#[test]
+fn the_row_tables_made_as_the_original_makes_them() {
+    let only = std::env::var("ARENA_CASE").ok();
+    let mut bad = Vec::new();
+    for path in [VECTORS, areaplaytest::AREAPLAY] {
+        let text = std::fs::read_to_string(path).expect(path);
+        for f in text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).filter(|f| f.len() == 3 && f[0] == "rows") {
+            let name = f[1];
+            if only.as_deref().is_some_and(|o| o != name) {
+                continue;
+            }
+            let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };
+            let Some((mut a, _)) = played(place, |a| {
+                setup(a);
+                a.engine.m.rows_drawn = Some(Vec::new());
+            }, play) else { return };
+            let drawn = a.engine.m.rows_drawn.take().unwrap();
+            if only.is_some() {
+                for (i, v) in drawn.iter().enumerate() {
+                    eprintln!("{name} rows#{} {}", i + 1, v.iter().map(|w| format!("{w:x}")).collect::<Vec<_>>().join(" "));
+                }
+            }
+            let digest = fnv(drawn.iter().flat_map(|v| v.iter().flat_map(|w| w.to_le_bytes())));
+            let got = format!("{} {digest:x}", drawn.len());
+            if got != f[2] {
+                eprintln!("{name}: the drawings' row tables differ from the original's: {got} against {}", f[2]);
+                bad.push(name.to_string());
+            }
+        }
+    }
+    assert!(bad.is_empty(), "the row tables differ from the original's in {bad:?}");
 }
 
 /// The busy cases whose state is compared, the store's and the guild's
@@ -1761,8 +1846,13 @@ fn busy_play_goes_as_the_originals() {
 /// in playequipscroll, playequipwear and playequipdrop (the arrows, the
 /// list's click and the drop with its question: 1194:1A4A, 1A94, 1AC6,
 /// 17D8: `sheet_equipment_scroll`, `sheet_equipment_click`,
-/// `sheet_equipment_drop`).
-const BUSY_STATE: [&str; 23] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom"];
+/// `sheet_equipment_drop`), and the staff's quest line marked, described
+/// and clicked again in playequipstaff (1F56 into the DI the page's loop
+/// carries, 5536h after a description: `page_di`). Not playequipspellpage:
+/// the spell's page itself (51D1, its screen kept at 51B8 and its drawing
+/// 68D7, the front end's) leaves texts at 1044 and EMS bytes the engine's
+/// doesn't.
+const BUSY_STATE: [&str; 24] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

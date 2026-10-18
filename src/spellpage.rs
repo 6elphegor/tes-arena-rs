@@ -92,14 +92,30 @@ impl SpellPageHooks for NoSpellPageHooks {}
 
 impl Machine {
     /// 1194:1B3C: the marked spell's page (51D1), then the list's top and
-    /// mark 0 and B038 from 103A.
+    /// mark 0, the list's background put back and the list drawn again
+    /// (21C2, 1DC8 with the spells' 50Bh) and B038 from 103A.
     pub fn spell_page(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks) -> Option<()> {
         let mark = self.mem.r8(DS, var::MARK);
         self.spell_page_run(files, hooks, mark)?;
         self.mem.w8(DS, var::TOP, 0);
         self.mem.w8(DS, var::MARK, 0);
+        self.list_back();
+        self.list_again(files)?;
+        // 1B63: 5E21's wait for the buttons' release, which leaves AFF9 0
+        // after the page's last click.
+        self.mem.w8(DS, 0xAFF9, 0);
         let font = self.mem.r16(DS, 0x103A);
         self.mem.w16(DS, 0xB038, font);
+        Some(())
+    }
+
+    /// `spell_page` as the equipment page's list's click runs it (its
+    /// handler 1AC6 left there, `sheet_equipment_click` and
+    /// `sheet_equipment_describe` answering false): then the page's loop
+    /// on to its next turn.
+    pub fn sheet_spell_page(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks) -> Option<()> {
+        self.spell_page(files, hooks)?;
+        self.equipment_turn_end();
         Some(())
     }
 

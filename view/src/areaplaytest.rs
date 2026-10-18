@@ -10,7 +10,7 @@
 
 use super::*;
 
-const AREAPLAY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/areaplay.txt");
+pub(super) const AREAPLAY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/areaplay.txt");
 
 /// The area played: its run and the place's id (A4C), which a change of
 /// area changes.

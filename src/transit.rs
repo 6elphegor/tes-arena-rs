@@ -828,7 +828,7 @@ impl crate::engine::Engine {
         m.light_table_make()?;
         // A523: the row tables made (DA8E), before the INF sets the
         // ceiling's height (the first frame draws the ceiling with these).
-        m.rows_keep();
+        m.rows_note();
         // A526..A532: the clip put back (A606) around the entry hook, the
         // window set again after it (A5D1).
         m.clip_back();
