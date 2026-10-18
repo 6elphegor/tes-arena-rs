@@ -100,7 +100,9 @@ fn volcanic(a: &mut App, heading: u16, dx: u16, dy: u16) {
     m.mem.w16(DS, 0x0A4A, 0x34 + dy);
     m.mem.w8(DS, OBJECT_COUNT, 0);
     m.mem.w8(DS, CLOUD_COUNT, 0);
-    arena::light::LightHooks::sky_objects(&mut a.assets.light, &mut a.engine.m);
+    // (Made now with their files, as the generator calls 2294:08B9 in its
+    // setup, not deferred to the frame's loads as `LightState` asks.)
+    crate::sky_objects_made(&mut a.engine.m, &mut a.engine.files);
     a.engine.m.mem.w16(DS, arena::movement::var::HEADING, heading);
 }
 

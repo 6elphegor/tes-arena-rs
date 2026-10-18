@@ -281,6 +281,10 @@ pub struct Engine {
     /// The EMS bytes the drawing has changed on its copy, likewise (the
     /// bank times 10000h plus the offset: `page_ems`).
     pub page_ems_wrote: std::collections::HashMap<u32, (u8, u8)>,
+    /// `page_ems_wrote` as it stood before the last frame's drawing: the
+    /// EMS that drawing started from (`render::draw`'s `prior_ems`), for
+    /// a front end's own pass standing in for the drawing's sky hook.
+    pub page_ems_prior: std::collections::HashMap<u32, (u8, u8)>,
     /// The creatures' flats the last page's drawing reached
     /// (`render::Creature`, CF96), for the hook CD56 on the machine.
     pub page_creatures: Vec<crate::render::Creature>,
@@ -295,7 +299,7 @@ const DRAWN_BITS: [u16; 4] = [0xC398, 0xC399, 0xCCCA, 0xCCCB];
 
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
-        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_ems_wrote: Default::default(), page_creatures: Vec::new(), walked: None }
+        Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_ems_wrote: Default::default(), page_ems_prior: Default::default(), page_creatures: Vec::new(), walked: None }
     }
 
     /// The BIOS timer advances `n` ticks (18.2 a second).
@@ -396,7 +400,8 @@ impl Engine {
                 let now = if mapped { m.mem.r8(m.mem.r16(DS, crate::mif::var::BUFFER_SEG), i) } else { m.ems.get(bank as usize).map_or(0, |b| b[i as usize]) };
                 now == before
             });
-            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote);
+            self.page_ems_prior = self.page_ems_wrote.clone();
+            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote, &self.page_ems_prior);
             for (o, before, after) in ems {
                 self.page_ems_wrote.insert(o, (before, after));
             }
