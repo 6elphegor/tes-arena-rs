@@ -382,6 +382,18 @@ impl Engine {
                 // holds the machine's there now, not an earlier frame's.
                 self.page_wrote[o as usize] = (before != after).then_some((before, after));
             }
+            // The bank the drawing left mapped is the machine's from here:
+            // the original's draws on the machine, and what runs after it in
+            // the frame (a way out's 2433:0199 keeping the bank mapped)
+            // finds that bank in the frame.
+            let mapped = crate::level::var::EMS_MAPPED;
+            let byte = |o: u16| self.page_wrote[o as usize].map_or(m.mem.r8(DS, o), |(_, after)| after);
+            let drawn = byte(mapped) as u16 | (byte(mapped + 1) as u16) << 8;
+            if drawn != m.mem.r16(DS, mapped) {
+                m.ems_map(drawn >> 2);
+                self.page_wrote[mapped as usize] = None;
+                self.page_wrote[mapped as usize + 1] = None;
+            }
         }
         // A322: the drawing's set-up (0000:D4B4, the floor's half).
         if !hooks.step(m, Step::DrawSetup(0x140)) {
@@ -490,6 +502,9 @@ impl Engine {
         }
         copy_words(m, X, 0xBA62, 3);
         if r(m, MAP_FLAGS) & 0x80 != 0 {
+            // Left in the physics (a door, a gate): what the machine wrote
+            // since the drawing is its own as at a frame's end.
+            self.after_drawing();
             return Some(Frame::Left);
         }
         m.mem.w8(DS, STAGE, 0x0B);
@@ -570,6 +585,12 @@ impl Engine {
     pub fn world_loop_start(&mut self) {
         self.m.view_window();
         clip_back(&mut self.m);
+        self.world_loop_kept();
+    }
+
+    /// 0000:A2A3: the player's position kept (BA62), which each frame's
+    /// physics start from.
+    pub fn world_loop_kept(&mut self) {
         copy_words(&mut self.m, X, 0xBA62, 3);
     }
 

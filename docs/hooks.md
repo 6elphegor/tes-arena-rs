@@ -81,6 +81,7 @@ the original routine:
 | `ControlHooks::look` | src/controls.rs:158 | 2826:0C15 | elsewhere | the view looks from its own right click (`look_at`) | |
 | `ControlHooks::message_box` | src/controls.rs:155 | 1194:42EA, 59C8 | present | the box drawn; front ends with a screen override it | |
 | `ControlHooks::spell_counters` | src/controls.rs:172 | 2826:0BB2 | elsewhere | drawn by the view's HUD from DC0/DC2 | |
+| `ControlHooks::take_click` | src/controls.rs:152 | 2826:0128 | overridden | the view: main.rs Front<'_> | faithful: the window's click taken in the frame's input step, after the frame's actors, as the classic controls' centre handler takes it (`view_click`; areaplay vectors) |
 | `ControlHooks::wall_trigger` | src/controls.rs:145 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `ControlHooks::wild_recentre` | src/controls.rs:167 | 217B:0265 | overridden | the view: main.rs Front<'_> | faithful: `wild_shift` (wild vectors) |
 | `DungeonPicHooks::click` | src/dungeonpic.rs:46 | 1194:564D | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |

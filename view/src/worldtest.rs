@@ -11,7 +11,12 @@ const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/wor
 
 /// The case's track: per frame, level, x, height, y, heading.
 fn track(name: &str) -> Vec<[u16; 5]> {
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    track_in(VECTORS, name)
+}
+
+/// `track` from the vectors at `path`.
+fn track_in(path: &str, name: &str) -> Vec<[u16; 5]> {
+    let text = std::fs::read_to_string(path).expect(path);
     text.lines()
         .map(|l| l.split(" | ").collect::<Vec<_>>())
         .filter(|f| f.len() == 3 && f[0] == "track" && f[1] == name)
@@ -162,6 +167,9 @@ thread_local! {
 
 #[path = "savetest.rs"]
 mod savetest;
+
+#[path = "areaplaytest.rs"]
+mod areaplaytest;
 
 /// The heap's blocks from the first header (DGROUP 0157): segment, size,
 /// flags.
@@ -731,10 +739,11 @@ fn case(name: &str) -> Option<Case> {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playghostclick" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
-            // The harness's click is read by the next frame's controls
-            // (its input step, after that frame's drawing): the window's
-            // turn takes it before a frame, as that step's.
-            frames(a, d, seen, 2, |_| false);
+            // The harness's click: the button seen down by its step's first
+            // frame's controls, let go (the click, 2826:0D85) by the next's;
+            // the window's click is taken by the input step of the frame
+            // after the one it came before (`TurnIn::click`).
+            frames(a, d, seen, 1, |_| false);
             // The harness's mouse at (160, 100): the click 4 on (CB60).
             a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
@@ -1032,7 +1041,8 @@ fn the_state_measured_against_the_originals() {
             eprintln!("{name}: no dump of the start");
             continue;
         };
-        let (place, setup, play) = case(name).unwrap();
+        // (Or gen_areaplay.py's: their dumps beside these.)
+        let (place, setup, play) = case(name).or_else(|| areaplaytest::transit_case(name)).unwrap();
         let pre = std::cell::RefCell::new(None);
         let Some((a, _)) = played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);
@@ -1302,8 +1312,13 @@ fn state_load_case(name: &str) {
 }
 
 fn state_compared(name: &str, from_load: bool) {
+    state_compared_in(VECTORS, name, from_load, case(name).unwrap());
+}
+
+/// `state_compared` against the vectors at `path`, the case `c`.
+fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let kind = if from_load { "stateload" } else { "state" };
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let text = std::fs::read_to_string(path).expect(path);
     let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == kind && f[1] == name) else {
         panic!("{name}: no {kind} line");
     };
@@ -1315,7 +1330,7 @@ fn state_compared(name: &str, from_load: bool) {
     }
     let digest = u64::from_str_radix(f[3], 16).unwrap();
     let skip = if from_load { state_load_excluded() } else { state_excluded() };
-    let (place, setup, play) = case(name).unwrap();
+    let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);
@@ -1340,19 +1355,32 @@ fn state_compared(name: &str, from_load: bool) {
     };
     assert!(extra.is_empty(), "{name}: the frames changed what the original's don't: {}", hx(&extra));
     let unchanged: Vec<usize> = (0..0x10000).filter(|&i| want[i] && before[i] == after[i]).collect();
+    // (With ARENA_SCREENS holding gen_worldframes.py's or gen_areaplay.py's
+    // dumps: the offsets of the changes whose bytes end otherwise.)
+    if got != digest {
+        if let Some(orig) = std::env::var("ARENA_SCREENS").ok().and_then(|d| std::fs::read(PathBuf::from(d).join(format!("{name}.ds"))).ok()) {
+            let off: Vec<usize> = (0..0x10000).filter(|&i| want[i] && orig[i] != after[i]).collect();
+            eprintln!("{name}: {kind}: ending otherwise: {}", off.iter().map(|i| format!("{i:04x} {:02x}/{:02x}", orig[*i], after[*i])).collect::<Vec<_>>().join(", "));
+        }
+    }
     assert_eq!(got, digest, "{name}: the state differs from the original's (of its changes, unchanged here: {})", hx(&unchanged));
 }
 
 /// Each case's frames change the EMS banks 0..1Fh as the original's do
 /// (`stateems` lines: the same bytes changed, to the same values).
 fn state_ems_case(name: &str) {
-    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    state_ems_in(VECTORS, name, case(name).unwrap());
+}
+
+/// `state_ems_case` against the vectors at `path`, the case `c`.
+fn state_ems_in(path: &str, name: &str, c: Case) {
+    let text = std::fs::read_to_string(path).expect(path);
     let Some(f) = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 4 && f[0] == "stateems" && f[1] == name) else {
         panic!("{name}: no stateems line");
     };
     let (count, offs) = f[2].split_once(' ').unwrap();
     let want = (usize::from_str_radix(count, 16).unwrap(), u64::from_str_radix(offs, 16).unwrap(), u64::from_str_radix(f[3], 16).unwrap());
-    let (place, setup, play) = case(name).unwrap();
+    let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);

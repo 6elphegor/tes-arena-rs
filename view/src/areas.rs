@@ -451,6 +451,13 @@ impl arena::hooks::StairsHooks for Kept {
 
 /// there or the port can't follow (reported).
 pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
+    engine.area_watch();
+    let next = next_watched(engine, dir, run);
+    engine.area_watched();
+    next
+}
+
+fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let mut files = std::mem::take(&mut engine.files);
     let r = {
         let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None };
