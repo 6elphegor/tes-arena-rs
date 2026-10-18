@@ -103,6 +103,8 @@ pub enum Input {
     Up,
     Down,
     Click(i32, i32),
+    /// The right button pressed (a menu's Esc, 3159:10D6).
+    Right,
     /// Time passing, in milliseconds (a movie's frames).
     Wait(u32),
     /// A key (its scan code) pressed or let go, while the name is typed
@@ -111,7 +113,7 @@ pub enum Input {
 }
 
 /// `--create`'s steps: a character (`G`), `enter`, `esc`, `back`, `up`,
-/// `down`, `type:TEXT` (its characters), `click:X:Y`, `wait:MS` (time for
+/// `down`, `right` (the right button), `type:TEXT` (its characters), `click:X:Y`, `wait:MS` (time for
 /// a movie), comma-separated.
 pub fn parse_script(s: &str) -> Vec<Input> {
     let mut out = Vec::new();
@@ -122,6 +124,7 @@ pub fn parse_script(s: &str) -> Vec<Input> {
             "back" => out.push(Input::Back),
             "up" => out.push(Input::Up),
             "down" => out.push(Input::Down),
+            "right" => out.push(Input::Right),
             _ => {
                 if let Some(text) = t.strip_prefix("type:") {
                     out.extend(text.bytes().map(Input::Char));
@@ -1019,6 +1022,11 @@ impl Creation {
     }
 
     fn input_inner(&mut self, engine: &mut Engine, inp: Input) {
+        // The right button is taken by the menus and lists alone.
+        let asking = matches!(self.stage, Stage::Method(_) | Stage::ClassYes(..) | Stage::List(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_));
+        if inp == Input::Right && (!asking || !self.boxes.is_empty()) {
+            return;
+        }
         if !self.boxes.is_empty() {
             if matches!(inp, Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..)) {
                 self.boxes.pop_front();
@@ -1793,7 +1801,11 @@ impl Creation {
                 ask.moved = true;
             }
             Input::Enter => return Some(ask.sel as u16),
-            Input::Esc => return Some(0xFFFF),
+            // Esc and the right button leave a menu (1194:020E's 0F2A,
+            // flags 4006h); the classes' list (515A, no flag 4000h)
+            // waits on.
+            Input::Esc | Input::Right if ask.rows == 0 => return Some(0xFFFF),
+            Input::Esc | Input::Right => {}
             Input::Char(c) => {
                 let c = c.to_ascii_uppercase();
                 if let Some(i) = ask.keys.iter().position(|&k| k.to_ascii_uppercase() == c) {
@@ -1802,12 +1814,21 @@ impl Creation {
             }
             Input::Click(x, y) => {
                 let f = self.fonts.get(ask.font);
+                // A list's line clicked is marked (3159:0A1D), the line
+                // marked clicked picked (0A41); the first is marked as it
+                // comes up. Past the lines (the box's part row) the last
+                // is picked (5988).
                 if ask.rows != 0 {
-                    return hud::custom::list_pick(&self.fonts.a, &self.list_menu(ask), x, y).map(|i| i as u16);
+                    let i = hud::custom::list_pick(&self.fonts.a, &self.list_menu(ask), x, y)?;
+                    if i != ask.sel {
+                        ask.sel = i;
+                        return None;
+                    }
+                    return Some(i.min(n.saturating_sub(1)) as u16);
                 }
                 let tiles = self.tiles(Back::Start)?;
                 let (_, rects) = hud::custom::menu_rects(tiles, f, &ask.title, &ask.entries);
-                return rects.iter().position(|r| (r.0..r.0 + r.2).contains(&x) && (r.1..r.1 + r.3).contains(&y)).map(|i| i as u16);
+                return hud::custom::menu_entry(&rects, y).map(|i| i as u16);
             }
             Input::Back | Input::Wait(_) | Input::Key(..) => {}
         }
@@ -1830,7 +1851,7 @@ impl Creation {
     /// The list `ask` as 1194:5734 shows the classes' (2678: kind 6,
     /// POPUP2.IMG, its title drawn by 5734).
     fn list_menu(&self, ask: &Ask) -> hud::Menu {
-        hud::Menu { title: ask.title.clone(), entries: ask.entries.clone(), keys: Vec::new(), selected: ask.sel, list: true, kind: 6, font: None }
+        hud::Menu { title: ask.title.clone(), entries: ask.entries.clone(), keys: Vec::new(), selected: ask.sel, list: true, kind: 6, font: None, top: Some(ask.top) }
     }
 
     /// The layer drawn: the screen behind, the stage, a box waiting.

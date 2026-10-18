@@ -253,7 +253,7 @@ impl QuestHooks for QuestFront<'_, '_> {
             t.lines_box(lines);
             return 0;
         }
-        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: 0, font: None };
+        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: hud::WINDOW_YES_NO, font: None, top: None };
         if t.ask_menu(menu) == 0 { 0 } else { 1 }
     }
     fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8, di: u16) -> Option<bool> {

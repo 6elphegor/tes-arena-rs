@@ -3827,11 +3827,13 @@ impl App {
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
-                // Delete question takes its keys too (020E: Y, N at 4B60).
+                // Delete question takes its keys too (020E: Y, N at 4B60;
+                // Esc leaves it).
                 if let Some(page) = inv.page.clone() {
                     let a = match code {
                         KeyCode::KeyY if page.asking.is_some() => panels::PageAnswer::Confirm(0),
                         KeyCode::KeyN if page.asking.is_some() => panels::PageAnswer::Confirm(1),
+                        KeyCode::Escape if page.asking.is_some() => panels::PageAnswer::Confirm(0xFFFF),
                         _ => return,
                     };
                     self.page_answer(page, a);
@@ -4246,6 +4248,9 @@ impl App {
                 // waits for, or the Delete question's yes or no.
                 if let Some(page) = inv.page.clone() {
                     let answer = match &page.asking {
+                        // Its Delete question (020E): the right button
+                        // leaves it, as Esc.
+                        Some(_) if right => Some(panels::PageAnswer::Confirm(0xFFFF)),
                         Some(_) => page.menu_pick(&self.assets.archive, x, y).map(|i| panels::PageAnswer::Confirm(i as u16)),
                         None if !right => Some(panels::PageAnswer::Click(x as u16, y as u16)),
                         None => None,
@@ -4276,13 +4281,16 @@ impl App {
                         panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
                     }
                 } else if let Some((text, _)) = &inv.asking {
+                    // The drop's yes or no (020E): the entry by the click's
+                    // y (`menu_entry`); the right button leaves it, as Esc.
                     let menu = panels::drop_menu(text, 0);
                     let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
-                    let i = ((y - ey) / lh.max(1)) as usize;
-                    if x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < 2 {
+                    let rects: Vec<_> = (0..2).map(|i| (ex - 3, ey + i * lh, ew + 6, lh)).collect();
+                    let pick = if right { Some((1, Some(0x1B))) } else { hud::custom::menu_entry(&rects, y).map(|i| (i, None)) };
+                    if let Some((i, typed)) = pick {
                         inv.asking = None;
                         if inv.from_sheet && self.sheet_run.is_some() {
-                            sheet_drop = Some((None, Some((i == 0, None))));
+                            sheet_drop = Some((None, Some((i == 0, typed))));
                         } else {
                             panels::drop_answer(&mut self.engine.m, i == 0, &mut said);
                         }
@@ -4370,7 +4378,10 @@ impl App {
             }
             Some(p @ (panels::Panel::Spellbook(_) | panels::Panel::Use(..))) => {
                 let hud = hud::Hud { menu: p.bar_list(&self.engine.m), ..Default::default() };
-                if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
+                // (A line past the lines, the box's part row scrolled to
+                // the end, picks nothing here: 2542:06F8 has no 5988.)
+                let n = hud.menu.as_ref().map_or(0, |m| m.entries.len());
+                if let Some(i) = hud::menu_pick(&self.font, &hud, x, y).filter(|&i| i < n) {
                     let marked = match p {
                         panels::Panel::Spellbook(book) => &mut book.selected,
                         panels::Panel::Use(_, sel) => sel,
@@ -4752,6 +4763,10 @@ impl App {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
                 match code {
+                    // A list's arrows stop at its ends (3159:09C2, 09E8);
+                    // a menu's (the view's own) go round.
+                    KeyCode::ArrowUp if menu.list => self.selected = self.selected.saturating_sub(1),
+                    KeyCode::ArrowDown if menu.list => self.selected = (self.selected + 1).min(n - 1),
                     KeyCode::ArrowUp => {
                         self.selected = (self.selected + n - 1) % n;
                         self.arrowed = true;
@@ -4761,10 +4776,13 @@ impl App {
                         self.arrowed = true;
                     }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
-                        let s = self.selected as u16;
+                        let s = self.selected.min(n - 1) as u16;
                         self.answer(dialog::Answer::Pick(s));
                     }
-                    KeyCode::Escape => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    // Esc leaves a list as the right button does, where it
+                    // does (`hud::leaves`).
+                    KeyCode::Escape if !menu.list || hud::leaves(menu) => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    KeyCode::Escape => {}
                     _ => {
                         let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
                         let up = c.to_ascii_uppercase();
@@ -4860,6 +4878,14 @@ impl App {
         }
     }
 
+    /// The menu or list the game waits on, if any.
+    fn menu_asked(&self) -> Option<&hud::Menu> {
+        match self.pending.as_ref().map(|p| &p.need) {
+            Some(dialog::Need::Menu(m)) => Some(m),
+            _ => None,
+        }
+    }
+
     /// A click while the game waits: a box read, or a menu's entry picked.
     fn dialog_click(&mut self) {
         if !self.boxes.is_empty() {
@@ -4876,9 +4902,15 @@ impl App {
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
             // A list (1194:5734) marks the line clicked; the line marked
             // clicked is picked (its first marked as it comes up).
-            let list = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Menu(m)) if m.list);
-            if list && i != self.selected {
-                self.selected = i;
+            // A line past the lines (the box's part row, scrolled to the
+            // end) is marked as it is, and picked as the last (5988).
+            let lines = self.menu_asked().filter(|m| m.list).map(|m| m.entries.len());
+            if let Some(n) = lines {
+                if i != self.selected {
+                    self.selected = i;
+                    return;
+                }
+                self.answer(dialog::Answer::Pick(i.min(n.saturating_sub(1)) as u16));
                 return;
             }
             self.answer(dialog::Answer::Pick(i as u16));
@@ -4978,12 +5010,18 @@ impl App {
                     }
                 }
             }
-            // The options screen up: its clicks (the left button's) and
-            // "Are you sure ?"'s keys (`options`).
+            // The options screen up: its clicks (the left button's),
+            // "Are you sure ?"'s keys and right button (`options`).
             In::Button { down: true, button: MouseButton::Left } if self.options.is_some() && self.saveui.is_none() => {
                 let (x, y) = self.screen_point();
                 if let Some(ui) = &mut self.options {
                     let e = ui.click(x, y, &self.font);
+                    self.options_ended(e);
+                }
+            }
+            In::Button { down: true, button: MouseButton::Right } if self.options.is_some() && self.saveui.is_none() => {
+                if let Some(ui) = &mut self.options {
+                    let e = ui.right();
                     self.options_ended(e);
                 }
             }
@@ -5023,6 +5061,8 @@ impl App {
                 if down && button == MouseButton::Left {
                     let (x, y) = self.screen_point();
                     self.creation_input(create::Input::Click(x, y));
+                } else if down && button == MouseButton::Right {
+                    self.creation_input(create::Input::Right);
                 }
             }
             In::Key { code, down, text } if self.creation.is_some() => {
@@ -5067,6 +5107,17 @@ impl App {
                 self.travel_input(|t, e, a| t.click(e, a, x, y, button == MouseButton::Right));
             }
             In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
+            // The right button on a menu leaves it (3159:10D6), and on a
+            // list whose record has flag 4000h (3159:095F), nothing
+            // picked; the classes' list (kind 6) waits on.
+            // The dialog's buttons take either button's click (1194:6001).
+            In::Button { down: true, button: MouseButton::Right } if self.waiting() && self.boxes.is_empty() && self.menu_asked().is_some() => {
+                if self.menu_asked().is_some_and(|m| m.kind == hud::DIALOG_BUTTONS) {
+                    self.dialog_click();
+                } else if self.menu_asked().is_some_and(hud::leaves) {
+                    self.answer(dialog::Answer::Pick(0xFFFF));
+                }
+            }
             In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),
             // The search's name typed on the map: its keys, pressed and
             // let go, to the game's editor.

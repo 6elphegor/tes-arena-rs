@@ -245,6 +245,12 @@ fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, 
 /// 88h, B5h, E2h).
 pub const DIALOG_BUTTONS: u16 = 0xFFFE;
 
+/// `Menu::kind` of a quest's yes or no in its text's window (1194:4E88
+/// by `QuestHooks::dialog`), which the view asks as a column of boxes:
+/// not 1194:020E's menu, so neither its right button nor its clicks by
+/// y.
+pub const WINDOW_YES_NO: u16 = 0xFFFD;
+
 /// A `DIALOG_BUTTONS` question: `lines` (the text 4E54 split, at most
 /// three shown) and the buttons' names.
 pub fn dialog_buttons(lines: &[&[u8]], buttons: &[&str]) -> Menu {
@@ -257,6 +263,7 @@ pub fn dialog_buttons(lines: &[&[u8]], buttons: &[&str]) -> Menu {
         list: false,
         kind: DIALOG_BUTTONS,
         font: None,
+        top: None,
     }
 }
 
@@ -725,6 +732,10 @@ pub struct Menu {
     /// menu's or the list's lines are drawn in; None (the view's own
     /// questions): FONT_A, a list TEENYFNT.
     pub font: Option<GameFont>,
+    /// A list's first line shown where its asker keeps it (the library's
+    /// +3Bh, scrolled by its arrows); None: as low as shows the line
+    /// marked.
+    pub top: Option<usize>,
 }
 
 /// A list 1194:5734 asks (its kind `Machine::list_kind`): its title and
@@ -732,7 +743,7 @@ pub struct Menu {
 /// draws them in.
 pub fn list_menu(m: &arena::machine::Machine, title: Vec<Vec<Span>>, entries: Vec<Vec<Span>>) -> Menu {
     let font = GameFont::selected(m);
-    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind, font: Some(font) }
+    Menu { title: in_font(title, font), entries: in_font(entries, font), keys: Vec::new(), selected: 0, list: true, kind: m.list_kind, font: Some(font), top: None }
 }
 
 /// The font a list is drawn in: its lines' (`list_menu`); the bar's lists
@@ -846,6 +857,9 @@ struct ListKind {
     /// A title 5734 draws itself (kinds 6 and 10: 0000:5364 centred on
     /// x A0h at this row, in this colour), from the caller's DI.
     title: Option<(i32, u8)>,
+    /// The record's flag 4000h: the right button or Esc leaves the list
+    /// (3159:096D), nothing picked.
+    leaves: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -898,7 +912,7 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     let kind = |name: &str, rec: ListRecord, colour: u8, title: Option<(i32, u8)>| {
         let (area, track, flags) = rec;
         let last = if flags & 0x2000 != 0 { Align::Right } else if flags & 0x1000 != 0 { Align::Centre } else { Align::Left };
-        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, last, colour, title }
+        ListKind { panel: (!name.is_empty()).then(|| crate::panels::load_image(archive, m, name)).flatten(), area, track, last, colour, title, leaves: flags & 0x4000 != 0 }
     };
     let kinds = vec![
         kind("POPUP.IMG", RECORD_5006, 0xFD, None),
@@ -1035,14 +1049,18 @@ pub mod custom {
 
     /// The list's line under (x, y) (the area's lines shown).
     pub fn list_pick(font: &Font, menu: &Menu, x: i32, y: i32) -> Option<usize> {
-        let st = STYLE.get()?;
-        let (top, rows) = list_rows_in(st, menu, font);
-        let a = list_kind(st, menu).area;
-        if !(x >= a.0 && x < a.0 + a.2 && y >= a.1 && y < a.1 + a.3) {
-            return None;
-        }
-        let i = top + ((y - a.1 - 1).max(0) / font.h as i32) as usize;
-        (i < menu.entries.len() && i < top + rows).then_some(i)
+        line_clicked(STYLE.get()?, menu, font, x, y)
+    }
+
+    /// The entry of a menu (1194:020E's 3159:0F2A) a left click at y
+    /// picks, its boxes `entries` (x, y, w, h): the mouse kept to the
+    /// entries' boxes (10B5, 0000:53AA: from the first's top to the
+    /// last's foot less two), the last entry whose box's top is at or
+    /// above it (1164), wherever across.
+    pub fn menu_entry(entries: &[(i32, i32, i32, i32)], y: i32) -> Option<usize> {
+        let (first, last) = (entries.first()?, entries.last()?);
+        let y = y.min(last.1 + last.3 - 2).max(first.1);
+        entries.iter().rposition(|r| r.1 <= y)
     }
 
     /// A list in its own font (`list_menu`'s, as the window's lists
@@ -1181,16 +1199,11 @@ fn menu_title(st: &Style, menu: &Menu) -> Vec<Vec<Span>> {
     out
 }
 
-/// A list's first line shown and how many fit (3159:0778: the area's
-/// height over the font's, B7F4).
-fn list_rows(st: &Style, menu: &Menu) -> (usize, usize) {
-    list_rows_in(st, menu, list_font(st, menu))
-}
-
-/// `list_rows` in the font `font`.
+/// A list's first line shown and how many fit in the font `font`
+/// (3159:0778: the area's height over the font's, B7F4).
 fn list_rows_in(st: &Style, menu: &Menu, font: &Font) -> (usize, usize) {
     let rows = (list_kind(st, menu).area.3 / font.h as i32).max(1) as usize;
-    let top = (menu.selected + 1).saturating_sub(rows).min(menu.entries.len().saturating_sub(rows));
+    let top = menu.top.unwrap_or_else(|| (menu.selected + 1).saturating_sub(rows).min(menu.entries.len().saturating_sub(rows)));
     (top, rows)
 }
 
@@ -1200,22 +1213,55 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
     if menu.kind == DIALOG_BUTTONS {
         return dialog_button_at(menu, x, y);
     }
-    let inside = |r: (i32, i32, i32, i32)| x >= r.0 && x < r.0 + r.2 && y >= r.1 && y < r.1 + r.3;
     let Some(st) = STYLE.get() else {
         let (ex, ey, lh, ew) = menu_layout(font, menu);
         let i = ((y - ey) / lh.max(1)) as usize;
         return (x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < menu.entries.len()).then_some(i);
     };
     if menu.list {
-        let (top, rows) = list_rows(st, menu);
-        let area = list_kind(st, menu).area;
-        if !inside(area) {
-            return None;
-        }
-        let i = top + ((y - area.1 - 1).max(0) / list_font(st, menu).h as i32) as usize;
-        return (i < menu.entries.len() && i < top + rows).then_some(i);
+        return line_clicked(st, menu, list_font(st, menu), x, y);
     }
-    menu_boxes(st, menu, hud).1.iter().position(|&r| inside(r))
+    let boxes = menu_boxes(st, menu, hud).1;
+    if menu.kind == WINDOW_YES_NO {
+        return boxes.iter().position(|r| x >= r.0 && x < r.0 + r.2 && y >= r.1 && y < r.1 + r.3);
+    }
+    custom::menu_entry(&boxes, y)
+}
+
+/// Whether the right button or Esc leaves the list `menu` (its record's
+/// flag 4000h, 3159:096D: every record but the classes' at 515A, kind
+/// 6); a menu (1194:020E's 0F2A, flags 4006h) always leaves; the
+/// dialog's buttons (1194:6001: either button clicks) and a quest's
+/// window never.
+pub fn leaves(menu: &Menu) -> bool {
+    if matches!(menu.kind, DIALOG_BUTTONS | WINDOW_YES_NO) && !menu.list {
+        return false;
+    }
+    if !menu.list {
+        return true;
+    }
+    match STYLE.get() {
+        Some(st) => list_kind(st, menu).leaves,
+        None => menu.kind != 6,
+    }
+}
+
+/// The line a click at (x, y) picks in the list `menu` in the font `font`
+/// (3159:0834 and 0A1D): inside the lines' box (+18h, its right and
+/// bottom edges in), the first line shown and one more for each line's
+/// foot (the box's y and the font's height for each of the lines but
+/// one) above y, however many rows show, so that the box's empty foot
+/// picks the last line. It may be past the lines (scrolled to the end,
+/// the box's part row clicked): the callers' bounds have it.
+fn line_clicked(st: &Style, menu: &Menu, font: &Font, x: i32, y: i32) -> Option<usize> {
+    let (top, _) = list_rows_in(st, menu, font);
+    let a = list_kind(st, menu).area;
+    if !(x >= a.0 && x <= a.0 + a.2 && y >= a.1 && y <= a.1 + a.3) {
+        return None;
+    }
+    let h = font.h as i32;
+    let below = (1..menu.entries.len() as i32).filter(|&k| y > a.1 + k * h).count();
+    Some(top + below)
 }
 
 /// `hud`'s texts in the game's style: its boxes (0000:965A), menus
@@ -1654,6 +1700,17 @@ impl Overlay {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_menu_click_is_its_entry_by_height() {
+        // Three boxes 10 high from y 50 (0F2A's records: x, y, w, h).
+        let boxes = [(100, 50, 40, 10), (100, 60, 40, 10), (100, 70, 40, 10)];
+        let at = |y| custom::menu_entry(&boxes, y);
+        assert_eq!(at(0), Some(0), "kept to the first box's top");
+        assert_eq!((at(59), at(60), at(69), at(70)), (Some(0), Some(1), Some(1), Some(2)));
+        assert_eq!(at(199), Some(2), "kept to the last box's foot");
+        assert_eq!(custom::menu_entry(&[], 60), None);
+    }
 
     #[test]
     fn lines_split_colours_and_breaks() {

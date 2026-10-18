@@ -145,6 +145,15 @@ impl OptionsUi {
         self.replay()
     }
 
+    /// The right button: "Are you sure ?" left (FFFFh, 3159:10D6) while
+    /// it is up; the screen itself takes the left button's clicks alone.
+    pub fn right(&mut self) -> Ended {
+        if self.confirm.is_none() {
+            return Ended::Open;
+        }
+        self.answer(0xFFFF)
+    }
+
     /// A key: "Are you sure ?"'s Y, N, Esc (FFFFh) while it is up. The
     /// screen itself takes no keys (Esc gives 564D's FFFFh, which no box
     /// holds).
