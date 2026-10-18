@@ -304,6 +304,141 @@ impl Machine {
         Some(())
     }
 
+    /// A turn of the equipment page's loop (5CF4 over 3276:57D8) up to
+    /// the handler of record `rec`: the keys flushed, `key` typed (None,
+    /// a click), the records before it passed over (B7C6).
+    fn equipment_turn(&mut self, key: Option<u8>, rec: u16) {
+        self.key_flush();
+        if let Some(k) = key {
+            self.ring_typed(k);
+        }
+        self.mem.w16(DS, LOOP_MATCH, rec);
+    }
+
+    /// After a handler that leaves the loop going: its next turn's start
+    /// (5D12..5D1E), B7C6 0 and the keys flushed before its wait.
+    fn equipment_turn_end(&mut self) {
+        self.mem.w16(DS, LOOP_MATCH, 0);
+        self.key_flush();
+    }
+
+    /// The equipment page's arrows: '+' (3276:57D8's second record,
+    /// 1194:1A4A; `on`) shows the list one line on while the items and the
+    /// quests' lines (129D, 126C; the spells' count at 50A on their page)
+    /// leave seven or more, unless the last seven are shown already; '-'
+    /// (the third, 1A94) one back unless at the first. A move puts the
+    /// list's background back (21C2) and draws the list again (1DC8;
+    /// 0000:6BDE's ten waits for the retrace between, no state). `key`
+    /// its key typed, None a click.
+    pub fn sheet_equipment_scroll(&mut self, files: &mut Files, key: Option<u8>, on: bool) -> Option<()> {
+        self.equipment_turn(key, if on { 1 } else { 2 });
+        let first = self.mem.r8(DS, 0x1297);
+        let moved = if on {
+            let mut ax = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
+            if self.mem.r8(DS, 0x129A) == 0 {
+                ax = self.mem.r8(DS, 0x050A) as u16;
+            }
+            ax >= 7 && first != ax.wrapping_sub(7) as u8
+        } else {
+            first != 0
+        };
+        if moved {
+            self.mem.w8(DS, 0x1297, if on { first.wrapping_add(1) } else { first.wrapping_sub(1) });
+            self.list_back();
+            self.list_again(files)?;
+        }
+        self.equipment_turn_end();
+        Some(())
+    }
+
+    /// A left click on the equipment page's list (3276:57D8's first
+    /// record, 1194:1AC6) at row `y`: with another list up (1299) the
+    /// page's loop is left (3159:0006), which the port doesn't take;
+    /// else the line under it marked (1C5E, `list_mark`). The line
+    /// marked already, clicked again, puts its item on or takes it off
+    /// (1AFB: `equip_click`, its refusals' boxes 1BE0 and 1B78 `hooks`'),
+    /// the weapon's class made again (731A) and the page drawn again
+    /// (23B1). A quest's line (1270) or the spells' page (129A 0) aren't
+    /// ported past the mark.
+    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16) -> Option<()> {
+        self.equipment_turn(None, 0);
+        if self.mem.r8(DS, 0x1299) != 0 {
+            return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
+        }
+        let old = self.mem.r8(DS, 0x1296);
+        let slot = self.list_mark(files, y)?;
+        let mark = self.mem.r8(DS, 0x1296);
+        if mark != 0xFF && mark == old {
+            if self.mem.r8(DS, 0x129A) == 0 {
+                return crate::giveup::not_ported("1194:1B3C: the spell's page from the equipment page's list");
+            }
+            if self.mem.r16(DS, 0x1270) != 0 {
+                return crate::giveup::not_ported("1194:1B6F: a quest's line clicked again (748E, 1BE0)");
+            }
+            if self.equip_click(hooks, slot)? == crate::use_item::Equip::Toggled {
+                self.equipment_drawn(files)?;
+            }
+        }
+        self.equipment_turn_end();
+        Some(())
+    }
+
+    /// 1194:1C5E: the line a click at row `y` marks (1296): of the lines
+    /// shown (129D and 126C, or the spells' 50A; at most seven) the first
+    /// whose bottom (3Dh, then each 0Bh lower) is at or below it, plus
+    /// the first shown (1297); none (FFh) below them or with no lines. A
+    /// new mark puts the list's background back and draws the list again
+    /// (21C2, 1DC8). Then 1270 and 1272 0, and a mark past the items is a
+    /// quest's line (1270 1; 1F56, ported only with no staff pieces, F77
+    /// 0). Returns the line's number (DX) for the click's equipping.
+    fn list_mark(&mut self, files: &mut Files, y: u16) -> Option<u16> {
+        let mut cx = (self.mem.r8(DS, 0x129D) as u16).wrapping_add(self.mem.r16(DS, 0x126C));
+        if self.mem.r8(DS, 0x129A) == 0 {
+            cx = self.mem.r8(DS, 0x050A) as u16;
+        }
+        let shown = cx.min(7);
+        let Some(row) = (0..shown).find(|&i| y <= 0x3D + 0x0B * i) else {
+            self.mem.w8(DS, 0x1296, 0xFF);
+            return Some(shown);
+        };
+        let dl = (row as u8).wrapping_add(self.mem.r8(DS, 0x1297));
+        let dx = dl as u16;
+        if self.mem.r8(DS, 0x1296) != dl {
+            self.mem.w8(DS, 0x1296, dl);
+            self.list_back();
+            self.list_again(files)?;
+        }
+        self.mem.w16(DS, 0x1270, 0);
+        self.mem.w16(DS, 0x1272, 0);
+        if self.mem.r8(DS, 0x1296) >= self.mem.r8(DS, 0x129D) {
+            self.mem.w16(DS, 0x1270, 1);
+            if self.mem.r8(DS, 0x0F77) != 0 {
+                return crate::giveup::not_ported("1194:1F56: a quest's line marked with the staff's pieces held");
+            }
+        }
+        Some(dx)
+    }
+
+    /// 1194:21C2: the list's background (0Ch, 2Fh; 92h by 58h) put back
+    /// from bank 4 at C350h (599C), the bank mapped before put back.
+    fn list_back(&mut self) {
+        let old = self.map_bank(4, 0);
+        if self.page_is_block() {
+            let frame = self.mem.r16(DS, FRAME);
+            self.page_rect_put((frame, 0xC350), 0x0C, 0x2F, 0x92, 0x58);
+        }
+        self.map_bank(old, 0);
+    }
+
+    /// 1194:1DC8 with SI the player's items (129A 1); the spells' list
+    /// (SI 50Bh) isn't ported.
+    fn list_again(&mut self, files: &mut Files) -> Option<()> {
+        if self.mem.r8(DS, 0x129A) == 0 {
+            return crate::giveup::not_ported("1194:1DC8 with the spells' list (SI 50Bh)");
+        }
+        self.equipment_list(files)
+    }
+
     /// 1194:16E0: the equipment page made: the clothes' names (1D22), no
     /// other list (1299 0, 1270, 1272 0), the quests' lines counted at
     /// 126C (A206 and 2433:083D into 1044), the own items' list (129A 1)

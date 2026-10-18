@@ -3751,6 +3751,14 @@ impl App {
                         inv.asking = None;
                         panels::drop_answer(m, yes, &mut said);
                     }
+                } else if inv.from_sheet && self.sheet_run.is_some() && matches!(code, KeyCode::NumpadAdd | KeyCode::Equal | KeyCode::Minus | KeyCode::NumpadSubtract) {
+                    // The arrows' keys, '+' and '-' (3276:57D8's second and
+                    // third records): the game's state's own handlers.
+                    let on = matches!(code, KeyCode::NumpadAdd | KeyCode::Equal);
+                    let e = &mut self.engine;
+                    if e.m.sheet_equipment_scroll(&mut e.files, Some(if on { b'+' } else { b'-' }), on).is_none() {
+                        eprintln!("the list's arrow gave up: {}", arena::giveup::describe());
+                    }
                 } else {
                     match code {
                         KeyCode::Escape | KeyCode::KeyI if inv.from_sheet => back = Some((code == KeyCode::Escape).then_some(0x1B)),
@@ -3929,8 +3937,21 @@ impl App {
                         }
                         panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
                     }
+                } else if let Some(d) = panels::arrow_at(x, y).filter(|_| inv.from_sheet && self.sheet_run.is_some()) {
+                    // The sheet's own page: its arrows' records' handlers.
+                    let e = &mut self.engine;
+                    if e.m.sheet_equipment_scroll(&mut e.files, None, d > 0).is_none() {
+                        eprintln!("the list's arrow gave up: {}", arena::giveup::describe());
+                    }
                 } else if let Some(d) = panels::arrow_at(x, y) {
                     panels::arrow(&mut self.engine.m, &self.engine.files, d);
+                } else if panels::line_at(x, y).is_some() && !right && inv.from_sheet && self.sheet_run.is_some() && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0 {
+                    // The sheet's own page: the list's record's handler
+                    // (1194:1AC6).
+                    let e = &mut self.engine;
+                    if e.m.sheet_equipment_click(&mut e.files, &mut said, y as u16).is_none() {
+                        eprintln!("the list's click gave up: {}", arena::giveup::describe());
+                    }
                 } else if panels::line_at(x, y).is_some() {
                     if panels::opens_page(&self.engine.m, y, right) {
                         // The spell's page sets its colours (68D7).
