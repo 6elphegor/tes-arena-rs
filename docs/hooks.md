@@ -383,6 +383,10 @@ the original routine:
 | `TravelHooks::resource` | src/travelmap.rs:87 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
 | `TravelHooks::screen` | src/travelmap.rs:85 |  | present | a fade | |
 | `TravelHooks::show_bank` | src/travelmap.rs:93 | 1194:4D74 | present | a screen bank shown | |
+| `TitleHooks::fade_out` | src/title.rs:72 | 1194:55B2 | present | the screen faded out; the view's creation screens draw the intro | |
+| `TitleHooks::movie_frame` | src/title.rs:68 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
+| `TitleHooks::picture` | src/title.rs:77 | 0000:5828 | present | a picture shown, faded or dissolved in | |
+| `TitleHooks::wait` | src/title.rs:80 | 0000:13BF | present | the intro's waits; none ended by a key | |
 | `TriggerHooks::artifact_audience` | src/trigger.rs:100 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port and its box |
 | `TriggerHooks::blackout` | src/trigger.rs:106 | 1194:55B2 | overridden | the view: main.rs Front<'_>, screentest.rs DoorHooks | present: the fade the window plays (areafade.txt) |
 | `TriggerHooks::enter_city` | src/trigger.rs:125 | 0000:4EFD and 946A | present | the view's window and the screen cleared | |
