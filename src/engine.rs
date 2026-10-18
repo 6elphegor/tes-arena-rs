@@ -417,6 +417,18 @@ impl Engine {
                 // holds the machine's there now, not an earlier frame's.
                 self.page_wrote[o as usize] = (before != after).then_some((before, after));
             }
+            // The fog's step (2294:0B01) runs in the drawing's set-up
+            // (0000:D4B4 at A322, the sky's hook), on the machine in the
+            // original and before any more of the frame: its flags, the
+            // daylight's off (C398 bit 8000h, which the near lights read,
+            // 0000:E12E) and the fog's on or off (C39A bit 20h, which the
+            // next set-up's sky reads, D502), are the machine's.
+            for (o, bit) in [(0xC399u16, 0x80u8), (0xC39A, 0x20)] {
+                let Some((_, after)) = self.page_wrote[o as usize] else { continue };
+                let b = (m.mem.r8(DS, o) & !bit) | (after & bit);
+                m.mem.w8(DS, o, b);
+                self.page_wrote[o as usize] = (b != after).then_some((b, after));
+            }
             m.mem.watch_drawn();
             // The bank the drawing left mapped is the machine's from here:
             // the original's draws on the machine, and what runs after it in

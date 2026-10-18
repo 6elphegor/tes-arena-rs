@@ -141,6 +141,9 @@ impl crate::transit::AreaHooks for Exit<'_> {
     fn ask_leave(&mut self, m: &mut Machine, files: &mut Files) -> bool {
         self.0.ask_leave(m, files)
     }
+    fn map_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        self.0.map_keep(m, files);
+    }
     /// 292B:095E, as the stairs keep a level's states.
     fn automap(&mut self, m: &mut Machine, files: &mut Files) {
         self.0.automap_keep(m, files);

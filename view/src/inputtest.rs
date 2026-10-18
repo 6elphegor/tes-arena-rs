@@ -1035,6 +1035,8 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     // The same through the scripted path's calls (`--do travel,tclick`).
     let mut b = app(&dir, &start);
     Driver::new(&mut b);
+    // (The frame that takes the button, as the key's.)
+    b.step();
     let archive = b.assets.archive.clone();
     let mut t = Some(travel::Travel::open(&mut b.engine, &archive, Some(&b.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))).unwrap_or_else(|_| panic!("it opens")));
     t.as_mut().unwrap().click(&mut b.engine, &archive, px, py, false);
@@ -1055,6 +1057,9 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     t.as_mut().unwrap().skip_journey();
     travel::after(&mut t, &mut b.engine, &mut Vec::new(), true);
     assert!(t.is_none());
+    // The area left with the screen (the end of the frame that took the
+    // button), no frame more.
+    assert!(b.area_left());
     same(&a, &b, "Travel clicked, and Travel::click");
     // The next turns arrive: the town's welcome reads the arrival.
     let mut welcome = String::new();

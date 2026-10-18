@@ -47,6 +47,8 @@ the original routine:
 | `AreaHooks::leave_interior` | src/transit.rs:123 | 1194:D55F and 2433:0199 | port | the default runs the port | |
 | `AreaHooks::leave_screen` | src/transit.rs:119 |  | present | the screens shown on the way out; the view draws its own | |
 | `AreaHooks::location` | src/transit.rs:92 | 1194:3AE8 | overridden | the view: areas.rs Areas<'_> | faithful: `city_location` (city vectors) |
+| `AreaHooks::map_keep` | src/transit.rs:121 | 0000:4564..4568 | overridden | the engine: Exit<'_> | faithful: `map_keep` with the stairs' hooks' colours |
+| `AreaHooks::map_given_back` | src/transit.rs:128 | 0000:457C..4586, 45A4..45A9 | port | the default runs the port (`view_window`, `world_back`); the transit vectors' stub counts it | |
 | `AreaHooks::mouse_wait` | src/transit.rs:146 | 0000:8FC4 | present | waiting for the buttons up; input only | |
 | `AreaHooks::normal_lgt` | src/transit.rs:89 | 0000:742C | overridden | the view: areas.rs Areas<'_> | faithful: NORMAL.LGT loaded as 0000:742C loads it |
 | `AreaHooks::restore_level` | src/transit.rs:151 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
@@ -324,6 +326,7 @@ the original routine:
 | `StairsHooks::level_piles` | src/hooks.rs:55 | 2433:0000 | port | the default runs the port | |
 | `StairsHooks::level_screen` | src/hooks.rs:60 | 0000:368E | overridden | the view: areas.rs Kept, main.rs Front<'_> | faithful: `automap_keep`, `automap_load` (playdown) |
 | `StairsHooks::light_table` | src/hooks.rs:40 | 2294:0B8A | overridden | the view: main.rs Front<'_> | faithful: NORMAL.LGT's table (playdown exact) |
+| `StairsHooks::map_keep` | src/hooks.rs:70 | 0000:4564..4568 | overridden | the view: main.rs Front<'_> | faithful: `map_keep` with the screen's colours (A39E) |
 | `StairsHooks::quest_level` | src/hooks.rs:50 | 1194:9FAC | port | the default runs the port | |
 | `StoreHooks::armor_lines` | src/store.rs:123 | 1194:F204 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `StoreHooks::greeting` | src/store.rs:106 | 1194:4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |

@@ -109,11 +109,25 @@ pub trait AreaHooks {
     fn automap(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 26F7:0000, the travel map shown on the way out of a dungeon (1A81
     /// set: from anywhere): its carry (a journey made, or another place
-    /// chosen) whether to leave (the view saved and put back around it,
-    /// 0000:A611/A606/A5D1, and redrawn after, A6B5, 2542:0446). The
-    /// default stays.
+    /// chosen) whether to leave. The world kept before it and given back
+    /// after are `map_keep`'s and `map_given_back`'s; the screens redrawn
+    /// after (9426, 9466) and the palette (2542:0446) the front end's.
+    /// The default stays.
     fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
+    }
+    /// 0000:4564..4568, before that map: the world kept (A611, A606:
+    /// `Machine::map_keep`, A39E left as it is).
+    fn map_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        m.map_keep(files, None);
+    }
+    /// 0000:457C..4586 or 45A4..45A9, after that map: the view's window
+    /// (A5D1, `Machine::view_window`) and the world given back (A6B5,
+    /// `Machine::world_back`). None where it can't be (the heap,
+    /// TEMPSAVE.$$$).
+    fn map_given_back(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.view_window();
+        m.world_back(files)
     }
     /// The screen after leaving (0000:9426, 9466).
     fn leave_screen(&mut self, _m: &mut Machine) {}
@@ -624,8 +638,10 @@ impl Machine {
     /// - 0000:4537 (interiors, dungeons): the automap kept (with the
     ///   level one more meanwhile); an interior, the wilderness's dungeon
     ///   (5C8 bit 80h) or one entered by a trigger (5C8 bit 4000h, now
-    ///   clear) is left; otherwise the player is asked (`ask_leave`), and
-    ///   on yes C994 is set, the screens shown and the area left;
+    ///   clear) is left; otherwise the world is kept (0000:A611, A606:
+    ///   `map_keep`) and the player asked (`ask_leave`), then the world
+    ///   given back (A5D1, A6B5: `map_given_back`), and on yes, with C994
+    ///   set before that, the screens shown and the area left;
     /// - 0000:44BD (the wilderness's dungeons): left, 1194:D55F and
     ///   2433:0199.
     ///
@@ -643,13 +659,17 @@ impl Machine {
                     if f & 0x4000 != 0 {
                         self.and16(0x05C8, 0xBFFF);
                     } else {
+                        hooks.map_keep(self, files);
                         self.mem.w8(DS, 0x1A81, 1);
                         let leave = hooks.ask_leave(self, files);
                         self.mem.w8(DS, 0x1A81, 0);
+                        if leave {
+                            self.mem.w8(DS, 0xC994, 1);
+                        }
+                        hooks.map_given_back(self, files)?;
                         if !leave {
                             return Some(());
                         }
-                        self.mem.w8(DS, 0xC994, 1);
                         hooks.leave_screen(self);
                         hooks.leave_dungeon(self);
                     }

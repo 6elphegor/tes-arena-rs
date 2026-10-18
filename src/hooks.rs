@@ -64,6 +64,12 @@ pub trait StairsHooks {
     fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
     }
+    /// 0000:4564..4568, before that map: the world kept (A611, A606:
+    /// `Machine::map_keep`), the colours A611 reads (6E3C, to A39E) the
+    /// screen's. By default A39E is left as it is.
+    fn map_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        m.map_keep(files, None);
+    }
 }
 
 /// `StairsHooks` that do nothing.
