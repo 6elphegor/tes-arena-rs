@@ -3884,7 +3884,7 @@ impl App {
             let _ = m.sheet_equipment_drop(&mut f, key, Some(&screen), &mut |p| {
                 asked = Some(p.mem.cstr(arena::mem::DS, arena::use_item::var::DROP_TEXT).to_vec());
                 1
-            });
+            }, &mut |_, _, _| {});
             if asked.is_some() {
                 return asked;
             }
@@ -3894,14 +3894,23 @@ impl App {
             None => (1, None),
         };
         let e = &mut self.engine;
+        // A refusal said in the list's panel (223A) waits there for a
+        // click or a key (5536).
+        let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
         if e.m.sheet_equipment_drop(&mut e.files, key, Some(&screen), &mut |m| {
             // The answer's key read by the menu's pick (3159:10BE).
             if let Some(c) = typed {
                 m.ring_typed(c);
             }
             pick
+        }, &mut |_, lines, top| {
+            shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
         }).is_none() {
             eprintln!("the drop button gave up: {}", arena::giveup::describe());
+        }
+        if let (Some((lines, top)), Some(panels::Panel::Inventory(inv))) = (shown, self.panel.as_mut()) {
+            inv.info = Some(lines);
+            inv.info_y = Some(top as i32);
         }
         None
     }

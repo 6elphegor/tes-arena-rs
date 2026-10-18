@@ -550,9 +550,10 @@ impl Machine {
     /// (`drop_button`), its question the yes-or-no menu (48E9: 020E with
     /// the text at 1044 and the entries at 4B63, `menu_boxes` over
     /// `screen` and `menu_closed`, `pick` the front end's answer, 0 yes);
-    /// a drop draws the page again (1CF0's 23B1). Its refusals' boxes
-    /// (223A: no room, a quest's item, "Drop what?") aren't ported.
-    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16) -> Option<()> {
+    /// a drop draws the page again (1CF0's 23B1). Its refusals (no room,
+    /// a quest's item) are said in the list's panel (223A, `wait` the
+    /// front end's); "Drop what?" (18CA) isn't ported.
+    pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>) -> Option<()> {
         use crate::use_item::DropButton;
         self.equipment_turn(key, 3);
         let mut failed = false;
@@ -572,7 +573,15 @@ impl Machine {
             return None;
         }
         match r {
-            DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat => crate::giveup::not_ported("1194:223A: the drop button's refusal in the page"),
+            DropButton::NoRoom | DropButton::CantDrop => {
+                // 1962, 17FB: the refusal's text (at 1044) in the list's
+                // panel (223A) in A0h at row A0h, DI 5536: the wait.
+                self.list_panel_text(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xA0, wait);
+                self.equipment_turn_end();
+                Some(())
+            }
+            // 18CA: its 223A takes DI as the drop's callers leave it.
+            DropButton::DropWhat => crate::giveup::not_ported("1194:18E7: \"Drop what?\" in the page (223A with the caller's DI)"),
             DropButton::Nothing | DropButton::Dropped => {
                 self.equipment_turn_end();
                 Some(())
