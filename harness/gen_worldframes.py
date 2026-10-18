@@ -421,33 +421,49 @@ def killed(a):
     a.call_far(0x2686, 0x02B4)
 
 
-def died(a):
+def died(a, vision=0):
     """From the world loop's end (0000:A45D, on the world's stack as
     `area_ended` goes on from it) through the outer loop (0CAD) to its
     death's way out (0CE1..0D43: the clip the screen, the ending's text
     picked, 1194:D459's vision unless F77 is 9, the save's), stopped at its
     RET (0D43), before the program's main takes the game back to its menu
-    (0000:10B0, 108B)."""
+    (0000:10B0, 108B). With `vision` the timer (0151) ticks at each read
+    of it, as `titled` has it: the vision's movie's frames wait on it;
+    and as the movie begins (2294:0700) that many clicks are queued at the
+    screen's centre, its pages clicked through (the reads of the mouse
+    before it, the world's way out's, take none)."""
+    # The dying frame's tick: the harness ticks the timer (0151) at the
+    # frame's waits for it (0000:A428, A43D), which a frame that ends the
+    # world loop leaves before; the timer ticks all the same, before the
+    # outer loop goes on (the view's frames tick before the frame; the
+    # vision's movie makes it 0 again).
+    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
     ss, sp, words = a.world_stack
     a.mu.mem_write(a.lin(ss, sp), words)
     saved = a.stub(location=False)
     at = a.lin(LOAD_SEG, 0x0D43)
+    t = a.lin(a.ds, 0x0151)
 
     def out(mu, addr, size, _):
         a.waiting = ('died',)
         mu.emu_stop()
-    h = a.mu.hook_add(UC_HOOK_CODE, out, None, at, at)
+
+    def tick(mu, access, addr, size, value, _):
+        a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+    def clicks(mu, addr, size, _):
+        a.clicks = [(160, 100)] * vision
+    hooks = [a.mu.hook_add(UC_HOOK_CODE, out, None, at, at)]
+    if vision:
+        hooks.append(a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1))
+        movie = a.lin(LOAD_SEG + 0x2294, 0x0700)
+        hooks.append(a.mu.hook_add(UC_HOOK_CODE, clicks, None, movie, movie))
     try:
-        r = a.run_screen(0, 0xA45D, stack=(ss, sp))
+        r = a.run_screen(0, 0xA45D, stack=(ss, sp), count=3_000_000_000)
     finally:
-        a.mu.hook_del(h)
+        for h in hooks:
+            a.mu.hook_del(h)
         a.unstub(saved)
     assert r == ('died',), f'the death went on to {r}'
-    # The dying frame's tick: the harness ticks the timer (0151) at the
-    # frame's waits for it (0000:A428, A43D), which a frame that ends the
-    # world loop leaves before; the timer ticks all the same (the view's
-    # frames tick before the frame).
-    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
 
 
 # The main menu's wait for its regions (0000:1114: 1194:5CF4).
@@ -529,6 +545,19 @@ def shopping(a):
 def guild_shopping(a):
     gs.room(a)
     gs.seeded(a)
+
+
+def newgame(a):
+    """The options screen's New (its handler, 2542:0627, as a click on it
+    runs it): FCE 0, the area left (C398 bit 80h) with 5CA bit 8000h for
+    the outer loop, the working slot's log and files deleted."""
+    assert a.run_screen(0x2542, 0x0627, near=True) is None
+
+
+def farewell(a):
+    """The main quest at its third stage (F77 3), so a death plays the
+    farewell vision (1194:D459, VISION.FLC with text 57Bh)."""
+    a.mu.mem_write(a.lin(a.ds, 0x0F77), bytes([3]))
 
 
 def informant(a):
@@ -881,6 +910,15 @@ CASES = {
     # 0000:109B, 10B0, 108B, 10C9: the intro's movies and pictures, then
     # MENU.IMG), stopped at the menu's wait for its regions.
     'playtitle': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'title': True})]),
+    # The options screen's New between frames (`newgame`), then the frame
+    # that ends the world loop for it, the outer loop's way out (0CDF, as
+    # `died` stops at its RET, 0D43) and the program's main back to its
+    # menu (`titled`).
+    'playnew': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': newgame, 'dies': True, 'title': True})]),
+    # The same death at the main quest's third stage (`farewell`): the
+    # vision (1194:D459) on the way out, its pages clicked through
+    # (`vision`: a click at the screen's centre for each).
+    'playfarewell': ('dungeon', farewell, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'vision': 8})]),
     # In the mages' guild the load leaves (`guild`), a slot free and
     # seeded: two frames, a potion bought (GUILD_SCRIPT), thirty frames.
     # In the town's first tavern with the main quest's informant there
@@ -1102,7 +1140,19 @@ def play(a, name, steps, tracks):
             # (`dies`: the frames end the world loop, the player dead: the
             # outer loop's death followed, `died`; the case ends there.)
             assert why == ('ended',), f'{name}: stopped by {why}'
-            died(a)
+            # (`vision`: the farewell's pages clicked through, `died`, and
+            # the install's speech served, SPEECH\\nnnn_mmX.VOC, as
+            # gen_dream.py serves it: without it the movie's player copies
+            # FFDCh bytes from the bank into a stale buffer (2F75:00DC) and
+            # the heap fails.)
+            names = dict(a.names)
+            speech = os.path.join(a.game_dir, 'SPEECH')
+            if opts.get('vision') and os.path.isdir(speech):
+                a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
+            try:
+                died(a, opts.get('vision', 0))
+            finally:
+                a.names = names
             if opts.get('title'):
                 titled(a)
             page = a.page()

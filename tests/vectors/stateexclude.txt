@@ -21,6 +21,7 @@ a8c4 a8c5 the travel map's passes (26F7:06F0): as many as its loop runs, at the 
 fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver)
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
 061c 061e the message's segment (061A's far pointer)
+914c 914e the segment of the movies' frames' hook (914A, 2294:0739's 2294:076C: the image's, 1000h higher in the harness)
 cd34 cd36 the segment of the hook the areas set at CD32 (0000:0B22..: the image's, 1000h higher in the harness)
 cd50 cd52 the segment of the way out's hook (CD4E, 0000:0B3C)
 cd54 cd56 the segment of the hook at CD52 (0000:0B48)

@@ -37,10 +37,17 @@ pub struct Areas<'a> {
 const RECORD: u16 = 0x0A22;
 
 impl AreaHooks for Areas<'_> {
-    /// 1194:D459, the ending: its animation (SI, DI name it) isn't
-    /// shown; its text (AX) is put on the message line by `next`.
-    fn ending(&mut self, _m: &mut Machine, ax: u16, _si: u16, _di: u16) {
+    /// 1194:D459, the ending: the speech run as the game's state sees it
+    /// (`Machine::vision`), its pages clicked through; what it shows is
+    /// creation's ending's (`Creation::ending`), its text printed by
+    /// `next`.
+    fn ending(&mut self, m: &mut Machine, ax: u16, si: u16, di: u16) {
         self.ending = Some(ax);
+        let Some(files) = self.files.as_deref_mut() else { return };
+        if m.vision(files, &mut arena::vision::ClickThrough::default(), None, ax, si, di).is_none() {
+            eprintln!("the farewell's speech gave up: {}", arena::giveup::describe());
+            self.failed = true;
+        }
     }
 
     /// 292B:095E: the main quest dungeon's level's locks and triggers
@@ -480,26 +487,25 @@ fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
             }
             Run::End => {
                 // The game is over: the ending's text (TEXT 137A, through
-                // 1194:A374) on the message line, shown while its
-                // countdown runs (061A, 061E). Written where the original's
-                // 1194:D459 writes it, a heap block of BB8h bytes (0:9CD2):
-                // the farewell is longer than any DGROUP buffer (one at
-                // 19DE ran over the slot bytes 1A6C and 1A80).
+                // 1194:A374) printed, written on a copy of the game (the
+                // speech, `Areas::ending`, wrote it to its own block, freed
+                // since), a heap block of BB8h bytes as 1194:D459 takes.
                 if let (Some(ax), Some(files)) = (h.ending, h.files.as_deref_mut()) {
-                    if let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) {
-                        m.mem.w16(DS, arena::text::var::TEXT, ax);
-                        if m.text(files, &mut arena::text::NoTextHooks, 2, seg, off).is_some() {
-                            let text = String::from_utf8_lossy(m.mem.cstr(seg, off)).replace('\r', "\n");
-                            println!("{text}");
-                            m.mem.w16(DS, 0x061A, off);
-                            m.mem.w16(DS, 0x061C, seg);
-                            m.mem.w16(DS, 0x061E, 0x7FFF);
+                    let mut c = m.clone();
+                    let mut f = files.clone();
+                    if let Some((seg, off)) = c.heap_alloc_bytes(0xBB8) {
+                        c.mem.w16(DS, arena::text::var::TEXT, ax);
+                        if c.text(&mut f, &mut arena::text::NoTextHooks, 2, seg, off).is_some() {
+                            println!("{}", String::from_utf8_lossy(c.mem.cstr(seg, off)).replace('\r', "\n"));
                         }
                     }
                 }
                 eprintln!("the game has ended");
                 None
             }
+            // The options screen's New (5CA bit 8000h): the outer loop's
+            // way out (0000:0CDF), the program's main on to its menu.
+            Run::Quit => None,
             other => {
                 eprintln!("the next area isn't followed yet: {other:?}");
                 None

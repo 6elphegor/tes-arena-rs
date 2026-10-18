@@ -145,6 +145,18 @@ impl Machine {
         self.mem.w16(DS, at, x);
     }
 
+    /// 2542:0627, New: FCE 0, the area left (C398 bit 80h) with 5CA bit
+    /// 8000h for the outer loop, the working slot's log and files deleted
+    /// (1194:4D91 on each pattern).
+    pub fn options_new(&mut self, files: &mut Files, hooks: &mut dyn OptionsHooks) {
+        self.mem.w16(DS, 0x0FCE, 0);
+        self.opt_or16(crate::movement::var::MAP_FLAGS, 0x80);
+        self.opt_or16(0x05CA, 0x8000);
+        for si in [LOG_WORKING, RE_WORKING, IN_WORKING] {
+            hooks.delete_matching(self, files, si);
+        }
+    }
+
     /// 2542:000A. The options screen; see the module's notes. None where
     /// the original returns into its pushed registers (the CyberMan's
     /// button) or a handler isn't one of the table's.
@@ -188,12 +200,7 @@ impl Machine {
                 hooks.hide(self);
                 let ended = match handler {
                     0x0627 => {
-                        self.mem.w16(DS, 0x0FCE, 0);
-                        self.opt_or16(crate::movement::var::MAP_FLAGS, 0x80);
-                        self.opt_or16(0x05CA, 0x8000);
-                        for si in [LOG_WORKING, RE_WORKING, IN_WORKING] {
-                            hooks.delete_matching(self, files, si);
-                        }
+                        self.options_new(files, hooks);
                         Some(OptionsEnd::NewGame)
                     }
                     0x061E => {
