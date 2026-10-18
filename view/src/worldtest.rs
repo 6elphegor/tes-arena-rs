@@ -1537,6 +1537,14 @@ fn state_ems_in(path: &str, name: &str, c: Case) {
     }, play) else { return };
     let before = pre.into_inner().unwrap();
     let after = grab(&a).1;
+    // (With ARENA_STATE_DUMP naming a directory: the banks here before and
+    // after, and DGROUP after, to compare with gen_worldframes.py's dumps.)
+    if let Ok(d) = std::env::var("ARENA_STATE_DUMP") {
+        let d = PathBuf::from(d);
+        let _ = std::fs::write(d.join(format!("{name}.port.ems0")), &before);
+        let _ = std::fs::write(d.join(format!("{name}.port.ems")), &after);
+        let _ = std::fs::write(d.join(format!("{name}.port.ds")), grab(&a).0);
+    }
     let changed: Vec<usize> = (0..after.len()).filter(|&i| before[i] != after[i]).collect();
     let got = (changed.len(), fnv(changed.iter().flat_map(|&i| (i as u32).to_le_bytes())), fnv(changed.iter().map(|&i| after[i])));
     // (With ARENA_SCREENS holding gen_worldframes.py's dumps: the runs of
@@ -1648,9 +1656,13 @@ fn busy_play_leaves_the_state_as_the_original() {
 #[test]
 fn one_case_leaves_the_state_as_the_original() {
     let Ok(name) = std::env::var("ARENA_STATE_CASE") else { return };
-    state_case(&name);
-    state_load_case(&name);
-    state_ems_case(&name);
+    // (All three run, each one's failure reported, before the test fails.)
+    let failed: Vec<&str> = [("state", state_case as fn(&str)), ("stateload", state_load_case), ("stateems", state_ems_case)]
+        .into_iter()
+        .filter(|(_, check)| std::panic::catch_unwind(|| check(&name)).is_err())
+        .map(|(kind, _)| kind)
+        .collect();
+    assert!(failed.is_empty(), "{name}: {} differ", failed.join(", "));
 }
 
 /// Each busy case's frames change the EMS banks as the original's do
