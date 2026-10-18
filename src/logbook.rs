@@ -39,10 +39,14 @@
 //!   On the bottom row (B4h..C3h): Print (25h..4Ch), Exit (107h..127h).
 //! - Print (0272): nothing with no text in the frame; else each of the
 //!   [FF5] lines (DS the frame's: what 4E54 left there) written to PRN
-//!   (handle 4, 1194:5187) with a CR LF, then a form feed (78D4): the
-//!   screen left. A write that falls short: the page read back, "Error
-//!   while printing...." centred on (A0h, 50h) in FONT_A, 10h, and the
-//!   wait for a key (1194:5532, the front end's); the screen left too.
+//!   (handle 4, 1194:5187) with an LF CR (1194:54D2), then a form feed
+//!   (78D4): the screen left. Bugs kept: the lines' loop is a LOOP, so
+//!   it writes one line at least and 10000h with [FF5] 0; the form feed's
+//!   write isn't checked. DOS's PRN is cooked, so a write stops at a ^Z
+//!   (`Machine::file_put_on`). A line's write that falls short (a ^Z in
+//!   it): the page read back, "Error while printing...." centred on
+//!   (A0h, 50h) in FONT_A, 10h, and the wait for a key (1194:5532, the
+//!   front end's); the screen left too.
 //! - The end (27E3:013C, 2542:0302..034C): bank [1030]'s before mapped
 //!   again, then the bank 2542 kept, 929E cleared, the colours set from it
 //!   (9B4E), SCREENSV.$$2 read back (A7A0), the clip the whole screen and
@@ -363,8 +367,8 @@ impl Machine {
     pub fn log_turn(&mut self, files: &mut Files, run: &mut LogRun, buttons: u8, x: u16, y: u16, esc: bool) -> LogTurn {
         let done = self.log_poll(files, buttons, x, y, esc);
         match (run.at, done) {
-            (_, Poll::Waiting) => LogTurn::Waiting,
-            (At::Pages { si, lines, pages }, Poll::Next) => {
+            (_, LogPoll::Waiting) => LogTurn::Waiting,
+            (At::Pages { si, lines, pages }, LogPoll::Next) => {
                 // 03AB: the cursor taken as gone, the page read back.
                 let f = self.mem.r16(DS, 0xA902) & 0xFFFE;
                 self.mem.w16(DS, 0xA902, f);
@@ -380,7 +384,7 @@ impl Machine {
                 run.at = self.log_pages(files, si, lines, pages);
                 LogTurn::Page
             }
-            (At::Pages { .. }, Poll::Print(false)) => {
+            (At::Pages { .. }, LogPoll::Print(false)) => {
                 run.at = At::After;
                 self.mem.w8(DS, BUTTONS, 0);
                 LogTurn::PrintFailed(false)
@@ -395,8 +399,8 @@ impl Machine {
                 }
                 LogTurn::PagesEnded
             }
-            (At::After, Poll::Next) => LogTurn::Waiting,
-            (At::After, Poll::Print(false)) => LogTurn::PrintFailed(true),
+            (At::After, LogPoll::Next) => LogTurn::Waiting,
+            (At::After, LogPoll::Print(false)) => LogTurn::PrintFailed(true),
             (At::After, _) => LogTurn::Left,
         }
     }
@@ -407,8 +411,10 @@ impl Machine {
         self.mem.r8(DS, BUTTONS) != 0
     }
 
-    /// 27E3:01FC's body for one read of the mouse.
-    fn log_poll(&mut self, files: &mut Files, buttons: u8, x: u16, y: u16, esc: bool) -> Poll {
+    /// 27E3:01FC's body for one read of the mouse: `buttons` (8FC4's)
+    /// or'd into AFF9 at (`x`, `y`), `esc` whether Esc is down (also
+    /// ACB6).
+    pub fn log_poll(&mut self, files: &mut Files, buttons: u8, x: u16, y: u16, esc: bool) -> LogPoll {
         self.cursor_hidden();
         let held = self.mem.r8(DS, BUTTONS) | buttons;
         self.mem.w8(DS, BUTTONS, held);
@@ -416,24 +422,24 @@ impl Machine {
         self.mem.w16(DS, MOUSE_Y, y);
         self.cursor_drawn();
         if esc || self.mem.r8(DS, ESC_DOWN) != 0 {
-            return Poll::Exit;
+            return LogPoll::Exit;
         }
         if held == 0 {
-            return Poll::Waiting;
+            return LogPoll::Waiting;
         }
         if !(0xB4..=0xC3).contains(&y) || !(0x25..=0x127).contains(&x) {
-            return Poll::Next;
+            return LogPoll::Next;
         }
         if x <= 0x4C {
             return match self.log_print(files) {
-                Some(ok) => Poll::Print(ok),
-                None => Poll::Next,
+                Some(ok) => LogPoll::Print(ok),
+                None => LogPoll::Next,
             };
         }
         if x >= 0x107 {
-            return Poll::Exit;
+            return LogPoll::Exit;
         }
-        Poll::Next
+        LogPoll::Next
     }
 
     /// 27E3:0272..02D6: Print. None with no text in the frame (the turn
@@ -444,9 +450,10 @@ impl Machine {
         if self.mem.r8(frame, 0) == 0 {
             return None;
         }
-        let count = self.mem.r16(frame, var::COUNT);
+        // A LOOP: one line at least, and a count of 0 is 10000h of them.
+        let mut count = self.mem.r16(frame, var::COUNT);
         let mut si = 0u16;
-        for _ in 0..count {
+        loop {
             if !self.log_print_line(files, (frame, si)) {
                 self.log_print_failed(files);
                 return Some(false);
@@ -455,16 +462,19 @@ impl Machine {
                 si = si.wrapping_add(1);
             }
             si = si.wrapping_add(1);
+            count = count.wrapping_sub(1);
+            if count == 0 {
+                break;
+            }
         }
-        if !self.log_print_line(files, (DS, var::FORM_FEED)) {
-            self.log_print_failed(files);
-            return Some(false);
-        }
+        // The form feed's write isn't checked (02A4: STC whatever it did).
+        self.log_print_line(files, (DS, var::FORM_FEED));
         Some(true)
     }
 
     /// 1194:5187: the text at `seg`:`si` written to handle 4 (PRN), then
-    /// CR LF; whether both writes took all their bytes.
+    /// LF CR; whether both writes took all their bytes (the second only
+    /// tried after the first did).
     fn log_print_line(&mut self, files: &mut Files, (seg, si): (u16, u16)) -> bool {
         let mut end = si;
         while self.mem.r8(seg, end) != 0 {
@@ -484,12 +494,17 @@ impl Machine {
     }
 
     /// 27E3:0400: LOG.$$$ read back into the page ([A900]:0, FA00h bytes).
+    /// Opened by 0000:67C4, which goes on after a missing file: then the
+    /// read and the close are on handle 2, DOS's error code (CON at first,
+    /// whose read waits for the keyboard; see `Dos`). The pages always
+    /// write the file first, so only a turn with none written meets that.
     fn log_page_back(&mut self, files: &mut Files) {
         let path = self.save_path(var::PAGE_FILE);
-        if self.file_open(files, path).is_some() {
-            let page = self.mem.r16(DS, 0xA900);
-            self.file_read(files, page, 0, 0xFA00);
+        if self.file_open_or_device(files, path).is_none() {
+            return;
         }
+        let page = self.mem.r16(DS, 0xA900);
+        self.file_read(files, page, 0, 0xFA00);
         self.file_close(files);
     }
 
@@ -524,10 +539,16 @@ impl Machine {
     }
 }
 
-/// What a read of the mouse in 01FC came to.
-enum Poll {
+/// What a read of the mouse in 01FC came to (`Machine::log_poll`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LogPoll {
+    /// Nothing held (01FC reads again).
     Waiting,
+    /// A click off the buttons, or Print with no text (CF clear).
     Next,
+    /// Exit or Esc (CF set).
     Exit,
+    /// Print (CF set): whether every line's write went in (false: "Error
+    /// while printing...." up, the wait for a key next, 1194:5532).
     Print(bool),
 }

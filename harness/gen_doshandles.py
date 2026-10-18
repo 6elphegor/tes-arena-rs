@@ -18,6 +18,13 @@ case from that state a script of the game's own file calls, far-called:
                          its trim tried first where the log holds 2000
                          bytes or more (to the path DOS refuses)
   file NAME              no call: the file NAME as written so far
+  print N TEXT           27E3:01FC (near), the
+                         logbook's turn, with a click on Print (30h, BCh)
+                         and the frame ([9030]) holding TEXT's lines (split
+                         at `/`, each NUL-ended, `^Z` a 1Ah, `-` no text)
+                         and N (hex) at its 0FF5, the lines' count as
+                         1194:4E54 leaves it: Print (0272), each line to
+                         PRN with an LF CR, then a form feed
 
 One line a case:
 
@@ -28,8 +35,11 @@ open's CS:6837; a seek's DX:AX; a read's AX and the frame's first AX
 bytes' digest (when AX is no more than asked for); a close's AX and
 carry; a copy's 126C, 126E, A836, A838, the four counts at 5F5C.., and
 the destination as written (length and digest); a log's AX; a file's
-length and digest as written, or `-`. A call that waits for
-the keyboard (DOS reading CON) is `waits`, and ends the case.
+length and digest as written, or `-`; a print's carry (0 with no text,
+1 printed) or `waits` (a write fell short, "Error while printing...."
+up and its wait for a click or key, 1194:5536), then the bytes PRN took
+(length and digest). A call that waits for the keyboard (DOS reading
+CON) is `waits`, and ends the case.
 """
 import os
 import struct
@@ -55,6 +65,21 @@ CASES = [
     ('log-new', 'log Found the first piece.; file LOG.64'),
     ('log-full', 'miss NOSUCH.A; close; copy LOG.01 LOG.64; log Found the second piece.; file LOG.64'),
     ('log-twice', 'miss NOSUCH.A; close; copy LOG.01 LOG.64; log One.; log Two.; file LOG.64'),
+    # The logbook's Print: nothing with no text; the lines and a form
+    # feed; one line at least whatever the count; a count of 0 as 10000h
+    # (the LOOP), the walk going on through the frame past the text; a ^Z
+    # in a line, which ends DOS's write to the cooked PRN short: "Error
+    # while printing....", the page read back from LOG.$$$ (a copy of the
+    # log standing in for the page the pages wrote) and the wait; a ^Z
+    # leading a line, nothing of it taken, with no LOG.$$$: the read back
+    # is from CON, on handle 2.
+    ('print-none', 'print 1 -'),
+    ('print-lines', 'print 3 First line./Second./&Third'),
+    ('print-short', 'print 1 One./Two./Three.'),
+    ('print-zero', 'miss NOSUCH.A; close; copy LOG.01 LOG.$$$; print 0 One./Two.'),
+    ('print-ctrlz', 'miss NOSUCH.A; close; copy LOG.01 LOG.$$$; print 3 Fine./Bad^Zline./Never.'),
+    ('print-ctrlz-first', 'print 2 ^ZAt once./Never.'),
+    ('print-twice', 'print 2 One./Two.; print 1 Three.'),
 ]
 
 
@@ -92,6 +117,21 @@ def step(a, op):
         a.mu.mem_write(a.lin(a.ds, 0x1044), op[4:].encode() + b'\0')
         assert a.run_screen(0x27E3, 0x000E, dict(si=0x1044), near=True) is None
         return '%x' % a._reg('ax')
+    if w[0] == 'print':
+        frame = a.r16(0x9030)
+        text = op.split(' ', 2)[2]
+        body = b'' if text == '-' else b''.join(t.replace('^Z', '\x1a').encode() + b'\0' for t in text.split('/'))
+        a.mu.mem_write(a.lin(frame, 0), body + b'\0')
+        a.w16(0x0FF5, int(w[1], 16), seg=frame)
+        before = len(a.printed)
+        a.clicks, a.buttons, a.mouse = [(0x30, 0xBC)], 0, (0x30, 0xBC)
+        a.waits = {(0, 0x8FC4)}
+        r = a.run_screen(0x27E3, 0x01FC, near=True)
+        a.waits = set()
+        a.clicks = []
+        got = bytes(a.printed[before:])
+        how = 'waits' if r is not None else '%d' % (a.mu.reg_read(a.UC_EFLAGS) & 1)
+        return '%s %x/%x' % (how, len(got), fnv(got))
     if w[0] == 'file':
         f = a.written.get(w[1])
         return '-' if f is None else '%x/%x' % (len(f), fnv(bytes(f)))

@@ -7,6 +7,7 @@
 mod common;
 
 use arena::bsa::Files;
+use arena::logbook::LogPoll;
 use arena::machine::Machine;
 use arena::mem::DS;
 use std::path::PathBuf;
@@ -65,6 +66,33 @@ fn step(m: &mut Machine, fs: &mut Files, op: &str) -> Option<String> {
             m.log_add(fs, 0x1044).expect("the log");
             format!("3e{:02x}", (len(fs) - before) & 0xFF)
         }
+        // The logbook's turn with a click on Print: the frame holding the
+        // lines (`/` between, `^Z` a 1Ah, `-` none) and N at its 0FF5.
+        "print" => {
+            let frame = m.mem.r16(DS, 0x9030);
+            let text = op.splitn(3, ' ').nth(2).unwrap();
+            let mut body = Vec::new();
+            if text != "-" {
+                for t in text.split('/') {
+                    body.extend(t.replace("^Z", "\x1a").bytes());
+                    body.push(0);
+                }
+            }
+            body.push(0);
+            for (i, &b) in body.iter().enumerate() {
+                m.mem.w8(frame, i as u16, b);
+            }
+            m.mem.w16(frame, 0x0FF5, u16::from_str_radix(w[1], 16).unwrap());
+            let before = fs.printed().len();
+            let how = match m.log_poll(fs, 1, 0x30, 0xBC, false) {
+                LogPoll::Next => "0",
+                LogPoll::Print(true) => "1",
+                LogPoll::Print(false) => "waits",
+                p => panic!("{op}: {p:?}"),
+            };
+            let got = &fs.printed()[before..];
+            format!("{how} {:x}/{:x}", got.len(), fnv(got.iter().copied()))
+        }
         "file" => fs.written(w[1].as_bytes()).map_or("-".to_string(), |d| format!("{:x}/{:x}", d.len(), fnv(d.iter().copied()))),
         _ => panic!("{op}"),
     };
@@ -113,5 +141,5 @@ fn the_handles_as_dos_gives_them() {
         assert_eq!(got.join("; "), f[3], "{}: {}", f[1], f[2]);
         n += 1;
     }
-    assert!(n >= 12, "{n} cases");
+    assert!(n >= 19, "{n} cases");
 }

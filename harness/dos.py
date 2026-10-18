@@ -114,6 +114,8 @@ class DosArena(Arena):
         # handle, the device's name), `dev_pos` each device's position.
         self.devices = {0: 'CON', 1: 'CON', 2: 'CON', 3: 'AUX', 4: 'PRN'}
         self.dev_pos = {'CON': 0, 'AUX': 0, 'PRN': 0}
+        # What the program wrote to PRN, the printer taken as ready.
+        self.printed = bytearray()
         # With this set, the devices and closed handles act as in DOS
         # (`_dos_device`). Code that goes on after a failed open uses
         # handle 2, the open's error code ("file not found"), and closes
@@ -256,8 +258,14 @@ class DosArena(Arena):
         - A read of 0 bytes returns at once, on a device too (DOS_READ's
           "no bytes to read - fast return"). More from CON waits for a
           line typed at the keyboard ($STD_CON_STRING_INPUT): not given
-          here, the run faults there (as would a write, which CON would
-          show and PRN print).
+          here, the run faults there (as would a write to CON or AUX).
+        - A write to PRN: DOS's devices are cooked (the program never
+          makes one raw), so it takes the bytes one at a time up to the
+          first ^Z, which ends the write (DISK.ASM's WRTDEV); AX the count
+          taken, the position moved by it (AddRec), the bytes kept in
+          `printed`. The printer is taken as ready: one that isn't has
+          DOS ask the critical error handler, which the game answers
+          Retry always (21EE:03D9), so it would wait there.
         - A seek: $LSEEK has no case for devices, the position is the
           device's file's, its size 0.
         - A close frees the handle ($Close frees it even with CON's other
@@ -280,6 +288,14 @@ class DosArena(Arena):
             p = self.dev_pos[dev] = (base + off) & 0xffffffff
             self._wreg('ax', p)
             self._wreg('dx', p >> 16)
+        elif ah == 0x40 and dev == 'PRN':
+            n = self._reg('cx')
+            data = bytes(self.mu.mem_read(self.lin(self._reg('ds'), self._reg('dx')), n))
+            took = data.find(b'\x1a')
+            took = n if took < 0 else took
+            self.printed += data[:took]
+            self.dev_pos[dev] = (self.dev_pos[dev] + took) & 0xffffffff
+            self._wreg('ax', took)
         elif ah == 0x3E:
             del self.devices[h]
         else:
@@ -305,13 +321,14 @@ class DosArena(Arena):
     def snapshot(self):
         ems = self.ems and dict(self.ems, banks=dict(self.ems['banks']))
         return (bytes(self.mu.mem_read(0, 0x110000)), dict((h, list(f)) for h, f in self.handles.items()), ems,
-                (dict(self.devices), dict(self.dev_pos)))
+                (dict(self.devices), dict(self.dev_pos), bytes(self.printed)))
 
     def restore(self, snap):
         self.mu.mem_write(0, snap[0])
         self.handles = dict((h, list(f)) for h, f in snap[1].items())
         self.ems = snap[2] and dict(snap[2], banks=dict(snap[2]['banks']))
         self.devices, self.dev_pos = dict(snap[3][0]), dict(snap[3][1])
+        self.printed = bytearray(snap[3][2])
 
     def new_handle(self, name, taken=()):
         """The handle an open or create of `name` gets: DOS's lowest free
