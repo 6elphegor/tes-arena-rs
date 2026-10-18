@@ -21,8 +21,8 @@
 //!
 //! Creatures and people cast through `actor_cast` (29CF:0145).
 //!
-//! Not ported: a spell effect that launches a projectile from the player
-//! (kind 17 with flag 0x80, 29CF:0270), which returns None.
+//! A spell effect that launches a projectile from the player (kind 17
+//! with flag 0x80, 29CF:0270) is `light_missile`.
 
 use crate::character::{field, PLAYER};
 use crate::effects::Applied;

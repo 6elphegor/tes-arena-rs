@@ -1329,6 +1329,12 @@ impl Assets {
             let seg = m.mem.r16(arena::mem::DS, arena::mif::var::BUFFER_SEG);
             (m.mem.r16(arena::mem::DS, arena::level::var::EMS_MAPPED), seg, m.mem.segment(seg).to_vec(), m.ems.clone())
         };
+        // On the EMS the drawing started from (`Engine::page_ems_prior`):
+        // the earlier drawings' changes there, the bolt's y 2294:05A6 never
+        // puts back, which it reads into DGROUP.
+        if engine.page.is_some() {
+            arena::render::ems_prior_onto(&mut engine.m, &engine.page_ems_prior);
+        }
         let drawn = engine.m.sky_draw(&mut draw).is_some();
         engine.m.ems_map(mapped >> 2);
         engine.m.ems = banks;

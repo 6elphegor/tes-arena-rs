@@ -221,6 +221,27 @@ impl Machine {
         None
     }
 
+    /// Byte `off` of bank `page` as the program sees it (the frame's when
+    /// it is mapped), and the same byte written.
+    pub fn ems_byte(&self, page: u16, off: u16) -> u8 {
+        if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
+            return self.mem.r8(self.mem.r16(DS, BUFFER_SEG), off);
+        }
+        self.ems.get(page as usize).map_or(0, |b| b[off as usize])
+    }
+
+    pub fn ems_byte_put(&mut self, page: u16, off: u16, v: u8) {
+        if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
+            let frame = self.mem.r16(DS, BUFFER_SEG);
+            self.mem.w8(frame, off, v);
+            return;
+        }
+        if self.ems.len() <= page as usize {
+            self.ems.resize(page as usize + 1, std::sync::Arc::new(vec![0; 0x10000]));
+        }
+        std::sync::Arc::make_mut(&mut self.ems[page as usize])[off as usize] = v;
+    }
+
     /// Bank `page` as the program sees it: the frame when it is mapped.
     pub fn ems_bank(&self, page: u16) -> Vec<u8> {
         if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {

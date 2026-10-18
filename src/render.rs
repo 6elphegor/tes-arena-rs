@@ -143,6 +143,29 @@ pub type EmsWrote = (u32, u8, u8);
 
 /// The EMS bytes `after` (the drawing's copy) holds otherwise than
 /// `before` (the machine): of the banks either has mapped or holds apart.
+/// The earlier drawings' EMS changes (`prior_ems`) put on `copy` where
+/// `m`'s byte is still the one they started from.
+pub fn ems_prior(m: &Machine, copy: &mut Machine, prior_ems: &std::collections::HashMap<u32, (u8, u8)>) {
+    for (&o, &(before, after)) in prior_ems {
+        let (b, i) = ((o >> 16) as u16, (o & 0xFFFF) as u16);
+        if m.ems_byte(b, i) == before {
+            copy.ems_byte_put(b, i, after);
+        }
+    }
+}
+
+/// `ems_prior` onto `m` itself.
+pub fn ems_prior_onto(m: &mut Machine, prior_ems: &std::collections::HashMap<u32, (u8, u8)>) {
+    let put: Vec<(u16, u16, u8)> = prior_ems
+        .iter()
+        .filter(|&(&o, &(before, _))| m.ems_byte((o >> 16) as u16, (o & 0xFFFF) as u16) == before)
+        .map(|(&o, &(_, after))| ((o >> 16) as u16, (o & 0xFFFF) as u16, after))
+        .collect();
+    for (b, i, v) in put {
+        m.ems_byte_put(b, i, v);
+    }
+}
+
 fn ems_changes(before: &Machine, after: &Machine) -> Vec<EmsWrote> {
     let mapped = |m: &Machine| (m.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2) as usize;
     let n = before.ems.len().max(after.ems.len());
@@ -211,9 +234,12 @@ const OWN_BUFFERS: [(u16, u16); 2] = [(0xCCC2, 0xCCC4), (0xCD7E, 0xCD8A)];
 /// writes, `prior` (by offset, the byte before and after), where the
 /// machine's byte is still the one they started from: the original draws
 /// on the machine, so what one frame's drawing leaves (a clipped vertex's
-/// unwritten byte, 0000:87F1) the next finds.
+/// unwritten byte, 0000:87F1) the next finds. Likewise the EMS bytes
+/// they changed, `prior_ems` (by bank times 10000h plus the offset): the
+/// lightning's bolt image's y, which 2294:05A6 sets and never puts back,
+/// is what the next frame's reads.
 #[allow(clippy::type_complexity)]
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)>]) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked, Vec<EmsWrote>) {
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)>], prior_ems: &std::collections::HashMap<u32, (u8, u8)>) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked, Vec<EmsWrote>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
@@ -229,6 +255,7 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
             }
         }
     }
+    ems_prior(m, &mut r.m, prior_ems);
     r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
