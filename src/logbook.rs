@@ -48,8 +48,9 @@
 //!   (9B4E), SCREENSV.$$2 read back (A7A0), the clip the whole screen and
 //!   0D39 bit 80h: the interface made again.
 //!
-//! The SP kept at 12C6 is the one the original leaves there by the menu
-//! key's way in; the pages' at 7921 is left out (the port has no stack).
+//! The SP kept at 12C6 is the one the original leaves there by its way
+//! in: the menu key's (L) or the bar's scroll button's, a word deeper;
+//! the pages' at 7921 is left out (the port has no stack).
 //! The pixels (drawn only where the page is the game's own heap block,
 //! `Machine::page_is_block`), the fades (5E3E), the cursor's drawing and
 //! the page's showing (9466) are the front end's.
@@ -144,9 +145,10 @@ pub enum LogTurn {
 impl Machine {
     /// 2542:02A3..02FD and 27E3:0088 up to its loop's first wait: the
     /// logbook opened (`dac` the VGA's colours, 6-bit, for 9A6E, None
-    /// leaves them; `buttons` the mouse's as 8FC4 reads them then). None
-    /// where LOGBOOK.IMG can't be read.
-    pub fn log_open(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>, buttons: u8) -> Option<LogRun> {
+    /// leaves them; `buttons` the mouse's as 8FC4 reads them then;
+    /// `from_bar` by the bar's scroll button, not the L key). None where
+    /// LOGBOOK.IMG can't be read.
+    pub fn log_open(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>, buttons: u8, from_bar: bool) -> Option<LogRun> {
         for (i, c) in dac.iter().flat_map(|d| d.iter()).enumerate() {
             for (k, &v) in c.iter().enumerate() {
                 self.mem.w8(DS, PALETTE.wrapping_add((i * 3 + k) as u16), v);
@@ -169,8 +171,9 @@ impl Machine {
         let inner = self.map_bank(bank, 0);
         // 009C: SP kept at 12C6 for the way out (a word the shops use for
         // their own after): the world loop's stack as the frame's menu
-        // keys call 2542:02A3 (measured: 5FD0h).
-        self.mem.w16(DS, LOG_SP, 0x5FD0);
+        // keys call 2542:02A3 (measured: 5FD0h), or as the bar's click
+        // calls it through 06CE's table (5FCEh).
+        self.mem.w16(DS, LOG_SP, if from_bar { 0x5FCE } else { 0x5FD0 });
         self.select_font(0x102C);
         self.select_tiles(0x1034);
         let mut run = LogRun { inner, outer, at: At::After };

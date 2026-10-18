@@ -2385,7 +2385,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                     Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
                     Some(sheets::BarAction::Spells(_)) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
-                    Some(sheets::BarAction::Log) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
+                    Some(sheets::BarAction::Log(_)) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
                     Some(sheets::BarAction::Sheet) => st.panel = Some(panels::Panel::Sheet),
                     Some(a) => println!("bar {n}: {a:?}"),
                     None => {}
@@ -3728,7 +3728,7 @@ impl App {
         use winit::keyboard::KeyCode;
         let mut said = panels::Said::default();
         if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
-            said.screen = Some(self.assets.shown.clone());
+            said.screen = Some(self.list_page());
         }
         let m = &mut self.engine.m;
         let mut cast = None;
@@ -4125,6 +4125,20 @@ impl App {
         }
     }
 
+    /// The page a list in the bar's corner keeps (2542:06F8, from the
+    /// frame's input step): the frame's drawing's rows, 0..146 (row 146
+    /// as the drawing leaves it, before C3A2's clear; no compass yet,
+    /// 0000:4D7C comes after), over the interface as shown. Without the
+    /// engine's page, the screen as shown.
+    fn list_page(&self) -> Vec<u8> {
+        let mut s = self.assets.shown.clone();
+        if let (Some(page), true) = (&self.engine.page, self.engine.page_gaps.is_empty()) {
+            let n = ((VIEW_ROWS + 1) * 320).min(s.len()).min(page.len());
+            s[..n].copy_from_slice(&page[..n]);
+        }
+        s
+    }
+
     /// A click with a panel up (`right`: the right button): an inventory
     /// line's item put on or off, or selected; the use list's entry used;
     /// the spellbook's entry cast.
@@ -4132,7 +4146,7 @@ impl App {
         let (x, y) = self.screen_point();
         let mut said = panels::Said::default();
         if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
-            said.screen = Some(self.assets.shown.clone());
+            said.screen = Some(self.list_page());
         }
         let mut cast = None;
         let mut back = false;
@@ -4377,8 +4391,8 @@ impl App {
                 self.boxes.extend(said.boxes);
             }
             // 27E3:0088: the screen faded out in 8 steps first.
-            sheets::BarAction::Log => self.fade_open(8, 0, |a| {
-                a.log_begin();
+            sheets::BarAction::Log(from_bar) => self.fade_open(8, 0, move |a| {
+                a.log_begin(from_bar);
                 a.panel = Some(panels::Panel::Log(sheets::open_log(&a.engine.m, &a.engine.files)));
             }),
             // 2542:066A: no list without an item to use (127C 0).
@@ -4537,11 +4551,12 @@ impl App {
     }
 
     /// The logbook's run in the game's state (2542:02A3..02FD, 27E3:0088
-    /// to its loop: `Machine::log_open`), the colours read as shown.
-    fn log_begin(&mut self) {
+    /// to its loop: `Machine::log_open`), the colours read as shown;
+    /// `from_bar` by the bar's scroll button.
+    fn log_begin(&mut self, from_bar: bool) {
         let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         let e = &mut self.engine;
-        self.log_run = e.m.log_open(&mut e.files, Some(&dac), 0);
+        self.log_run = e.m.log_open(&mut e.files, Some(&dac), 0, from_bar);
         if self.log_run.is_none() {
             eprintln!("the logbook gave up: {}", arena::giveup::describe());
         }

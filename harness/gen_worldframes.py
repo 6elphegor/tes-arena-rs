@@ -675,6 +675,12 @@ CASES = {
     # click off its buttons twice (27E3:01FC: the next page, 03A6), Exit
     # (107h..127h, B4h..C3h) twice: the first only ends the pages' loop
     # (03A9 to 03CB), the loop after them (0137) asks again; ten frames.
+    # The logbook by the bar's scroll button (2542:06CE's table, 02A3):
+    # two frames, the button clicked (down at the next frame's read of
+    # the mouse, up at the one after: the bar's click), a click off its
+    # buttons, Exit twice; as playlog, but the SP kept at 12C6 a word
+    # deeper.
+    'playlogbar': ('dungeon', None, [((), (), 2, None), ((), (), 11, None, [(131, 186)], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]})]),
     'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
                                    ((), (KEY_L,), 10, None)]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth

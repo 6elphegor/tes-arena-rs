@@ -523,8 +523,8 @@ pub struct Said {
     /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
     /// not in a box.
     pub panel: Option<String>,
-    /// The screen as last shown, for a list that keeps the page (the bar's,
-    /// 2542:06F8).
+    /// The page as the frame's input step finds it, for a list that keeps
+    /// it (the bar's, 2542:06F8: `App::list_page`).
     pub screen: Option<Vec<u8>>,
     /// The pick given straight to the use button's code, without its list
     /// (as gen_worldframes.py's `used` calls 24FA:0AFE, 1194:7AE7 and

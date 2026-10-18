@@ -130,9 +130,11 @@ impl Machine {
     /// put back (541E), bank [1032] mapped and the page kept in it, the
     /// list (3159:06A0), the bank mapped again and the page put back,
     /// A902 bit 0 off. Returns AX, the record's pick. `screen`: the page
-    /// as the front end last showed it (the port's page holds no frame's
-    /// pixels), kept in the bank in its place. The page's showing (9466)
-    /// is the front end's. None where the list gives up.
+    /// as the frame's input step finds it, from the front end (the
+    /// port's page holds no frame's pixels: the drawing's rows over the
+    /// interface, before the compass), kept in the bank in its place. The
+    /// page's showing (9466) is the front end's. None where the list gives
+    /// up.
     pub fn bar_list(&mut self, screen: Option<&[u8]>, (seg, si): (u16, u16), cx: u16, pick: u16) -> Option<u16> {
         const BAR: u16 = 0x5AF4;
         self.mem.w16(DS, BAR + 0x22, si);

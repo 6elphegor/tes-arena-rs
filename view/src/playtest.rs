@@ -1037,7 +1037,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             st.boxes = vec![lines];
                             *counts.entry("status").or_default() += 1;
                         }
-                        Some(crate::sheets::BarAction::Log) => {
+                        Some(crate::sheets::BarAction::Log(_)) => {
                             let _ = crate::sheets::open_log(&engine.m, &engine.files);
                             *counts.entry("logbook").or_default() += 1;
                         }

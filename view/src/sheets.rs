@@ -334,8 +334,9 @@ pub enum BarAction {
     /// C key's turn as the last poll left it): with it, or C held with a
     /// Shift, the last spell again (`Machine::spellbook_last`).
     Spells(bool),
-    /// The logbook (2542:02A3).
-    Log,
+    /// The logbook (2542:02A3); true by the bar's scroll button (its
+    /// stack a word deeper than the L key's: 12C6).
+    Log(bool),
     /// The items with an effect (2542:034D).
     Use,
     /// Camping (2542:01E6 -> 1194:424E).
@@ -368,7 +369,7 @@ pub fn bar_click(m: &mut Machine, files: &mut arena::bsa::Files, x: i32, y: i32,
         // 026D: unless the spellbook is barred (5CA bit 8).
         4 if m.mem.r16(DS, 0x05CA) & 8 != 0 => BarAction::None,
         4 => BarAction::Spells(right),
-        5 => BarAction::Log,
+        5 => BarAction::Log(true),
         6 => BarAction::Use,
         7 => BarAction::Camp,
         // 00BE, as F1: a touch spell waiting is cast on the player first.
@@ -404,7 +405,7 @@ pub fn menu_action(m: &mut Machine, key: MenuKey) -> Option<BarAction> {
         MenuKey::Automap => BarAction::Automap,
         MenuKey::TravelMap => BarAction::WorldMap,
         MenuKey::Sheet => BarAction::Sheet,
-        MenuKey::Log => BarAction::Log,
+        MenuKey::Log => BarAction::Log(false),
         MenuKey::Camp => BarAction::Camp,
     })
 }
