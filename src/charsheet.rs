@@ -117,6 +117,24 @@ pub enum PageInput {
     Click(u16, u16),
 }
 
+/// `equip_click`'s refusals as the page's click (1AFB) takes them: the
+/// item and its category (1BE0's) or the clashing kind's base (1B78's),
+/// said in the list's panel by the page itself.
+#[derive(Default)]
+struct Refusal {
+    cant_use: Option<(u16, u16)>,
+    clash: Option<u16>,
+}
+
+impl crate::use_item::UseHooks for Refusal {
+    fn cant_use(&mut self, _m: &mut Machine, si: u16, cat: u16) {
+        self.cant_use = Some((si, cat));
+    }
+    fn clash(&mut self, _m: &mut Machine, _si: u16, base: u16) {
+        self.clash = Some(base);
+    }
+}
+
 /// The equipment page's buttons (3276:57D8: 62h bytes each; x, y, width
 /// and height words, the key at +59h, the handler at +5Eh).
 const PAGE_BUTTONS: u16 = 0x57D8;
@@ -390,18 +408,31 @@ impl Machine {
     /// page's loop is left (3159:0006), which the port doesn't take;
     /// else the line under it marked (1C5E, `list_mark`). The line
     /// marked already, clicked again, puts its item on or takes it off
-    /// (1AFB: `equip_click`, its refusals' boxes 1BE0 and 1B78 `hooks`'),
+    /// (1AFB: `equip_click`, its refusals said in the list's panel: 1BE0,
+    /// `cant_equip_said`, and 1B78, `one_only_said`),
     /// the weapon's class made again (731A) and the page drawn again
     /// (23B1). A quest's line marked already, clicked again, says so in
     /// the list's panel (1B6F: 1BE0, 223A; `wait` the front end's wait
     /// for a click or a key, 5536). On the spells' list (129A 0) the line
     /// marked already opens its spell's page (1B3C): false, the caller
     /// runs `sheet_spell_page`; true otherwise.
-    pub fn sheet_equipment_click(&mut self, files: &mut Files, hooks: &mut dyn crate::use_item::UseHooks, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
+    pub fn sheet_equipment_click(&mut self, files: &mut Files, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
         self.equipment_turn(None, 0);
         if self.mem.r8(DS, 0x1299) != 0 {
             return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
         }
+        if !self.equipment_list_click(files, y, wait)? {
+            return Some(false);
+        }
+        self.equipment_turn_end();
+        Some(true)
+    }
+
+    /// 1194:1AD6..1BCD, the list's left click with no other list up: the
+    /// line marked, and the line marked already clicked again (its item
+    /// put on or taken off, a refusal or a quest's line said in the
+    /// list's panel); false for a spell's line marked already (1B3C).
+    fn equipment_list_click(&mut self, files: &mut Files, y: u16, wait: &mut PanelWait<'_>) -> Option<bool> {
         let old = self.mem.r8(DS, 0x1296);
         let slot = self.list_mark(files, y)?;
         let mark = self.mem.r8(DS, 0x1296);
@@ -416,27 +447,24 @@ impl Machine {
                 // 1270 set), then 1BE0: "This item is needed..."'s text
                 // (3276:5A90) copied to 1044 (1BCE) and shown in the
                 // list's panel (223A) in A0h at row A0h.
-                let mut si = 0x5A90u16;
-                let mut di = NUMBER;
-                loop {
-                    let c = self.mem.r8(DATA, si);
-                    self.mem.w8(DS, di, c);
-                    if c == 0 {
-                        break;
-                    }
-                    si = si.wrapping_add(1);
-                    di = di.wrapping_add(1);
-                }
+                self.text_copied((DATA, 0x5A90), NUMBER);
                 self.mem.w8(DS, 0x9288, 0xA0);
                 self.list_panel_text(NUMBER, 1, 0xA0, 0xA0, wait);
-                self.equipment_turn_end();
                 return Some(true);
             }
-            if self.equip_click(hooks, slot)? == crate::use_item::Equip::Toggled {
-                self.equipment_drawn(files)?;
+            let mut refused = Refusal::default();
+            match self.equip_click(&mut refused, slot)? {
+                crate::use_item::Equip::Toggled => self.equipment_drawn(files)?,
+                crate::use_item::Equip::CantUse => {
+                    let (si, cat) = refused.cant_use.unwrap_or_default();
+                    self.cant_equip_said(si, cat, wait);
+                }
+                crate::use_item::Equip::Clash => {
+                    let base = refused.clash.unwrap_or_default();
+                    self.one_only_said(base, wait);
+                }
             }
         }
-        self.equipment_turn_end();
         Some(true)
     }
 
@@ -539,6 +567,56 @@ impl Machine {
         Some(())
     }
 
+    /// 1194:1B6F..1B76 then 1BE0 for an item the class can't use (1B1F):
+    /// 9288 FEh; for an accessory or a stack (748E's 2 or more, `cat`) or
+    /// an item whose word at +6 is 0, "This item can't be equipped."
+    /// (3276:5A90, copied to 1044 by 1BCE); otherwise "%ss cannot equip
+    /// this item." (3276:3BEB) made at 1044 with the class's name (the
+    /// thief's own at 3E82 for class 0Ah, CX as 1B10 left it; else
+    /// 2686:0645's, `class_name`). Either in the list's panel (223A) in
+    /// A0h at row A0h, DI 5536: the wait.
+    fn cant_equip_said(&mut self, si: u16, cat: u16, wait: &mut PanelWait<'_>) {
+        self.mem.w8(DS, 0x9288, 0xFE);
+        if cat >= 2 || self.mem.r16(DS, si.wrapping_add(6)) == 0 {
+            self.text_copied((DATA, 0x5A90), NUMBER);
+        } else {
+            let class = (self.mem.r8(DS, crate::character::PLAYER + crate::character::field::CLASS) & 0x1F) as u16;
+            let (seg, at) = if class == 0x0A { (DS, 0x3E82) } else { self.class_name(DS, crate::character::PLAYER) };
+            self.sprintf((DS, NUMBER), (DATA, 0x3BEB), &[crate::format::Arg::Str(seg, at)]);
+        }
+        self.mem.w8(DS, 0x9288, 0xA0);
+        self.list_panel_text(NUMBER, 1, 0xA0, 0xA0, wait);
+    }
+
+    /// 1194:1B78 for an accessory clashing with one worn (1B24): its type's
+    /// base (7596, `base`) names it in the rings' list (3BA0:1DD1; the
+    /// bracelets' at 2028 with 12A0 set; 559F), "You can only equip one
+    /// %s." (3276:5A74) made at 1044 and said in the list's panel (223A)
+    /// in A0h at row A0h, DI 5536: the wait.
+    fn one_only_said(&mut self, base: u16, wait: &mut PanelWait<'_>) {
+        let list = if self.mem.r16(DS, 0x12A0) != 0 { 0x2028 } else { 0x1DD1 };
+        let at = self.skip_strings(DS, list, base);
+        self.sprintf((DS, NUMBER), (DATA, 0x5A74), &[crate::format::Arg::Str(DS, at)]);
+        self.mem.w8(DS, 0x9288, 0xA0);
+        self.list_panel_text(NUMBER, 1, 0xA0, 0xA0, wait);
+    }
+
+    /// 0000:9CA0 (as 1BCE calls it): the text at `from` copied to DS:`to`
+    /// with its NUL.
+    fn text_copied(&mut self, from: (u16, u16), to: u16) {
+        let (seg, mut si) = from;
+        let mut di = to;
+        loop {
+            let c = self.mem.r8(seg, si);
+            self.mem.w8(DS, di, c);
+            if c == 0 {
+                break;
+            }
+            si = si.wrapping_add(1);
+            di = di.wrapping_add(1);
+        }
+    }
+
     /// 1194:223A: `cx` lines of the text at DS:`si` in the list's panel:
     /// ARENAFNT ([102C]); each line's CR (looked for in its first 1F4h
     /// bytes) made a NUL and the line drawn centred on x 55h at row `bx`
@@ -602,11 +680,19 @@ impl Machine {
     /// front end's). With no line marked, "Drop what?" (18CA) is said
     /// there (in FEh at row A0h, `wait` shown it) and its DI, 2325, runs
     /// the page's loop over its first five records with 1299 set, `what`
-    /// the front end's inputs (`drop_what_loop`); a line marked by it
-    /// starts the drop over (18F3).
+    /// the front end's inputs (`drop_what_loop`, whose D runs this again
+    /// within); a line marked by it starts the drop over (18F3).
     pub fn sheet_equipment_drop(&mut self, files: &mut Files, key: Option<u8>, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
-        use crate::use_item::DropButton;
         self.equipment_turn(key, 3);
+        self.equipment_dropped(files, screen, pick, wait, what)?;
+        self.equipment_turn_end();
+        Some(())
+    }
+
+    /// 1194:17D8, the drop button's handler, as the page's loop or "Drop
+    /// what?"'s loop within (D there) calls it.
+    fn equipment_dropped(&mut self, files: &mut Files, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
+        use crate::use_item::DropButton;
         loop {
             let mut failed = false;
             let r = self.drop_button_drawn(
@@ -635,7 +721,7 @@ impl Machine {
                     // FEh too), DI 2325 (kept after: `page_di`).
                     self.list_panel_then(crate::use_item::var::DROP_TEXT, 1, 0xA0, 0xFE, &mut |m, lines, top| {
                         wait(m, lines, top);
-                        m.drop_what_loop(files, what)
+                        m.drop_what_loop(files, screen, pick, wait, what)
                     })?;
                     self.page_di = Some(0x2325);
                     if self.mem.r8(DS, 0x1296) != 0xFF {
@@ -644,27 +730,30 @@ impl Machine {
                 }
                 DropButton::Nothing | DropButton::Dropped => {}
             }
-            self.equipment_turn_end();
             return Some(());
         }
     }
 
     /// 1194:2325, "Drop what?"'s DI: 1299 1 (another list up) and the
-    /// page's loop (5CF4) over 3276:57D8's first five records, `what`
-    /// each turn's input: the list's (a click on it, or Space: 1AC6,
-    /// which with 1299 set waits for the buttons' release and leaves,
-    /// 3159:0006), the arrows' ('+', '-': `equipment_scrolled`, the loop
-    /// going on) and the exit's (Esc: leaves, B7C6 4); the drop's (D: 17D8
-    /// over again, within) isn't ported. Then no line marked, and unless
-    /// it was the exit the line under the cursor marked (1C5E: the
-    /// click's row; a key's, the cursor's at 8F94); 1299 0, B7C4 bit 0
-    /// off.
-    fn drop_what_loop(&mut self, files: &mut Files, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
+    /// page's loop (5CF4: B7C4 bit 0 off, then turns until a handler sets
+    /// it) over 3276:57D8's first five records, `what` each turn's input
+    /// (5D18, 5DE2: B7C6 0, the keys flushed, the input read; a key put in
+    /// the ring whether a record takes it or not). The list's record
+    /// (a click on it, or Space: 1AC6) with 1299 set waits for the
+    /// buttons' release and leaves (3159:0006); with 1299 clear, as a drop
+    /// within leaves it, it is the list's click (`equipment_list_click`).
+    /// The arrows' ('+', '-': `equipment_scrolled`) go on; the drop's (D:
+    /// 17D8 within, `equipment_dropped`, itself saying "Drop what?" with
+    /// this loop again while no line is marked) goes on unless it left
+    /// B7C4 bit 0 set; the exit's (Esc, 3159:0006) leaves. Then no line
+    /// marked, and unless the record that left was the exit's (B7C6 4)
+    /// the line under the cursor marked (1C5E: the click's row; a key's,
+    /// the cursor's at 8F94); 1299 0, B7C4 bit 0 off.
+    fn drop_what_loop(&mut self, files: &mut Files, screen: Option<&[u8]>, pick: &mut dyn FnMut(&mut Machine) -> u16, wait: &mut PanelWait<'_>, what: &mut dyn FnMut(&mut Machine) -> PageInput) -> Option<()> {
         self.mem.w8(DS, 0x1299, 1);
         let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
         self.mem.w8(DS, LOOP_FLAGS, f);
         let y = loop {
-            // 5D18, 5DE2: B7C6 0, the keys flushed, the input read.
             self.mem.w16(DS, LOOP_MATCH, 0);
             self.key_flush();
             let input = what(self);
@@ -672,7 +761,8 @@ impl Machine {
                 self.ring_typed(k);
             }
             // 5D24..5D39: each record in turn, its key (a letter made a
-            // capital, 5D75) or its rectangle (5D8D, edges included).
+            // capital, 5D75) or its rectangle (5D8D, edges included); B7C6
+            // counts the records passed over.
             let hit = (0..5u16).find(|&i| {
                 let r = PAGE_BUTTONS.wrapping_add(0x62 * i);
                 match input {
@@ -683,19 +773,34 @@ impl Machine {
                     }
                 }
             });
-            let Some(rec) = hit else { continue };
+            let Some(rec) = hit else {
+                self.mem.w16(DS, LOOP_MATCH, 5);
+                continue;
+            };
             self.mem.w16(DS, LOOP_MATCH, rec);
+            let row = match input {
+                PageInput::Click(_, y) => y,
+                PageInput::Key(_) => self.mem.r16(DS, 0x8F94),
+            };
             match rec {
-                0 | 4 => {
+                0 if self.mem.r8(DS, 0x1299) != 0 => {
                     let f = self.mem.r8(DS, LOOP_FLAGS) | 1;
                     self.mem.w8(DS, LOOP_FLAGS, f);
-                    break match input {
-                        PageInput::Click(_, y) => y,
-                        PageInput::Key(_) => self.mem.r16(DS, 0x8F94),
-                    };
+                }
+                0 => {
+                    if !self.equipment_list_click(files, row, wait)? {
+                        return crate::giveup::not_ported("1194:1B3C within the loop of \"Drop what?\" (a spell's page)");
+                    }
                 }
                 1 | 2 => self.equipment_scrolled(files, rec == 1)?,
-                _ => return crate::giveup::not_ported("1194:17D8 within the loop of \"Drop what?\" (the drop over again, within)"),
+                3 => self.equipment_dropped(files, screen, pick, wait, what)?,
+                _ => {
+                    let f = self.mem.r8(DS, LOOP_FLAGS) | 1;
+                    self.mem.w8(DS, LOOP_FLAGS, f);
+                }
+            }
+            if self.mem.r8(DS, LOOP_FLAGS) & 1 != 0 {
+                break row;
             }
         };
         self.mem.w8(DS, 0x1296, 0xFF);
