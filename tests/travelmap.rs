@@ -44,8 +44,9 @@ impl TravelHooks for Log {
     fn bank(&mut self, _m: &mut Machine, bank: u16) {
         self.put(&[4, bank as u32]);
     }
-    fn resource(&mut self, _m: &mut Machine, si: u16, bx: u16) {
+    fn resource(&mut self, _m: &mut Machine, _files: &mut Files, si: u16, bx: u16) -> Option<()> {
         self.put(&[5, si as u32, bx as u32]);
+        Some(())
     }
     fn days(&mut self, m: &mut Machine, _files: &mut Files) -> Option<u16> {
         m.mem.w16(DS, 0x1927, self.stored);
@@ -55,8 +56,9 @@ impl TravelHooks for Log {
     fn show_bank(&mut self, _m: &mut Machine, bx: u16) {
         self.put(&[7, bx as u32]);
     }
-    fn animation(&mut self, _m: &mut Machine) {
+    fn animation(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.put(&[8]);
+        Some(())
     }
     fn animation_frame(&mut self, _m: &mut Machine, frame: u8) {
         self.put(&[9, frame as u32]);

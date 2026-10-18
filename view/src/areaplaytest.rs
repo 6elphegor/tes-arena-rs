@@ -346,16 +346,18 @@ fn fast_travel_frames_as_the_original() {
 }
 
 /// Open: the state fast travel leaves. The journey, the date, the
-/// village and its errand (seeded from the BIOS's ticks) are the
-/// original's; what differs is the screen's own: the world kept and put
-/// back around it (0000:A5CD, A6B5: the level's file through 25FD:0844,
-/// BA54, BA6C, the window BA4C..BA52, C994 cleared at A708, the palette
-/// buffer), the travel map's window and its last pass (B7C6.., A8B6..A8BD,
-/// A8C4, 8F92, 6AC9, 6CC2, 7A4A), and its pictures in EMS (banks 0, 6,
-/// 12h, 15h, 18h; the view draws its own). The view's 3D drawing state
-/// D498.. is written where the original's isn't.
+/// village and its errand (seeded from the BIOS's ticks), the world kept
+/// and put back around the screen (0000:A611, A5CD, A6B5), the screen's
+/// windows (3159), resources and last pass and its files in EMS (banks
+/// 0, 12h, 15h, 18h) are the original's. What differs is in the village,
+/// in its fog by night (F81): the fog's step (2294:0B01) sets C39A bit
+/// 20h on the drawing's copy, which the frame's own writes there then
+/// lose, so the view draws (the people's column lists D498.., the sky's
+/// bank 6, the 3D view under the welcome) where the original's fills
+/// the view; C8ED (0000:E14B), and the faces unpacked into bank 19h
+/// (292B:048F) where the original's bank stays empty.
 #[test]
-#[ignore = "the travel map's own state and the world's keeping around it (0000:A5CD, A6B5) aren't the original's"]
+#[ignore = "in the village's fog the drawing's C39A bit 20h is lost to the frame's writes (2294:0B01), and the faces' bank 19h isn't the original's"]
 fn fast_travel_as_the_original() {
     transit("travelfast");
 }

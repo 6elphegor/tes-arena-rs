@@ -76,6 +76,7 @@ pub mod savemenu;
 pub mod travel;
 pub mod travelmap;
 pub mod weather;
+pub mod window;
 pub mod weapon;
 pub mod wild;
 pub mod scale;

@@ -2168,7 +2168,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // a click on it at (X, Y), a key (esc, enter, s, t, a letter).
             let archive = st.assets.archive.clone();
             if step == "travel" {
-                match travel::Travel::open(&mut engine, &archive) {
+                match travel::Travel::open(&mut engine, &archive, Some(&st.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))) {
                     Ok(t) => st.travel = Some(t),
                     Err(b) => st.boxes = vec![b],
                 }
@@ -3707,7 +3707,8 @@ impl App {
     /// The map button (Shift+M, its right click): the travel map, or the
     /// box refusing it.
     fn open_travel(&mut self) {
-        match travel::Travel::open(&mut self.engine, &self.assets.archive) {
+        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        match travel::Travel::open(&mut self.engine, &self.assets.archive, Some(&dac)) {
             Ok(t) => {
                 // 26F7:0000: the screen faded out in 8 steps, the map's
                 // colours faded in in 6.
