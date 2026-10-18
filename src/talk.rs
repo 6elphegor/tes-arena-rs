@@ -111,8 +111,10 @@ pub trait TalkHooks: TextHooks {
     fn text(&mut self, _m: &mut Machine, _files: &mut Files, _mode: u16) -> Option<bool> {
         Some(false)
     }
-    /// 1194:5734: a list of `cx` strings at `si`. The pick (FFFFh: none).
-    fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
+    /// 1194:5734: a list (kind `Machine::list_kind`) of `cx` strings at
+    /// `si`, DI `di` as the caller leaves it (the title's pointer 5734
+    /// writes to A872). The pick (FFFFh: none).
+    fn list(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16, _cx: u16, _di: u16) -> u16 {
         0xFFFF
     }
     /// 23F1:00A3: the way to square (`x`, `y`) told: the place's name at
@@ -673,13 +675,14 @@ impl Machine {
         true
     }
 
-    /// A list shown with the window's buffer freed, LIST kept.
-    fn show_list(&mut self, hooks: &mut dyn TalkHooks, si: u16, cx: u16) -> Option<u16> {
+    /// A list shown with the window's buffer freed, LIST kept; DI `di`
+    /// as the caller leaves it.
+    fn show_list(&mut self, files: &mut Files, hooks: &mut dyn TalkHooks, si: u16, cx: u16, di: u16) -> Option<u16> {
         self.window_free();
         let list = self.g16(LIST);
         // AX 9h: the list's kind (1194:5734).
         self.list_kind = 0x9;
-        let ax = hooks.list(self, si, cx);
+        let ax = hooks.list(self, files, si, cx, di);
         self.mem.w16(DS, LIST, list);
         self.window_alloc()?;
         Some(ax)
@@ -696,10 +699,12 @@ impl Machine {
                 di = self.copy_string(DS, s, di);
             }
             let s = self.skip_strings(DS, 0x1C7E, self.g8(0x0F77) as u16);
-            self.copy_string(DS, s, di);
+            // DI past the quest's place's NUL (0000:9CA0's), as E003 leaves
+            // it for the list.
+            let di = self.copy_string(DS, s, di);
             self.mem.w16(DS, QUEST_ENTRY, 9);
             self.mem.w16(DS, LIST, BUFFER);
-            let ax = self.show_list(hooks, BUFFER, 10)?;
+            let ax = self.show_list(files, hooks, BUFFER, 10, di)?;
             if (ax as i16) < 0 {
                 return Some(Flow::End);
             }
@@ -710,7 +715,9 @@ impl Machine {
             ax
         } else {
             self.mem.w16(DS, LIST, base);
-            self.show_list(hooks, base, 9)?
+            // DI as the talk's menu leaves it (1194:020E's walk over its
+            // table at 8536, 022C..023C, ends two short of it), E037's.
+            self.show_list(files, hooks, base, 9, 0x8536 - 2)?
         };
         if (pick as i16) < 0 {
             return Some(Flow::End);
@@ -962,7 +969,8 @@ impl Machine {
         let list_at = self.g16(LIST);
         let di = self.sort_names(list_at, cx);
         self.mem.w16(DS, LIST, list_at);
-        let ax = self.show_list(hooks, di, cx)?;
+        // E095: SI the sorted names (DI as 0000:0B9C leaves it), DI the same.
+        let ax = self.show_list(files, hooks, di, cx, di)?;
         if (ax as i16) < 0 {
             return Some(Flow::End);
         }

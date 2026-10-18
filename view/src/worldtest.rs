@@ -132,6 +132,10 @@ enum Place {
     Store,
     /// The town's first tavern, in as the store.
     Tavern,
+    /// The street with the guild left from the seed SEED
+    /// (gen_worldframes.py's `people`): its townspeople placed the same
+    /// on both sides.
+    People,
 }
 
 /// From the guild to the street, then into the level `name` the way the
@@ -248,6 +252,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
         Place::Fogged => into_named(&mut a, b"40516921.MIF"),
         Place::Street => area_left(&mut a),
+        Place::People => {
+            seeded(&mut a);
+            area_left(&mut a)
+        }
         Place::WetStreet | Place::SnowStreet => {
             // gen_worldframes.py's `weathered`: the zone's weather (A5A
             // + the zone at A51) rain (2) or snow (3) as the guild is left.
@@ -803,6 +811,33 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
     seen.push(state(a));
 }
 
+/// gen_worldframes.py's TALK_WHERE_SCRIPT: "Where is", its first line,
+/// the sorted list's first line, the way's box clicked away, then the
+/// menu's Goodbye.
+const TALK_WHERE_SCRIPT: [(i32, i32); 5] = [(0xA0, 0x65), (100, 23), (100, 23), (0xA0, 0x60), (0xA0, 0x95)];
+
+/// gen_worldframes.py's `talked`: the first townsperson clicked with the
+/// player on their square (gen_screens.py's `beside`: the timer 0151 at
+/// TALK_TICKS), the seed SEED, and the click run between frames
+/// (`talk_turn`), `script` answering it.
+fn talked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[(i32, i32)]) {
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
+    m.mem.w16(DS, arena::movement::var::X, x);
+    m.mem.w16(DS, arena::movement::var::Y, y);
+    m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
+    m.mem.w16(DS, 0x0151, 1);
+    seeded(a);
+    a.compose();
+    super::super::super::talk_turn(a);
+    for &(x, y) in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the talk ended early");
+        d.click(a, x, y, MouseButton::Left);
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the talk still asking");
+    seen.push(state(a));
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -1324,6 +1359,11 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 5, |_| false);
             used(a, 3);
             frames(a, d, seen, 60, |_| false);
+        })),
+        "playtalkwhere" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_WHERE_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
         })),
         "playstore" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);

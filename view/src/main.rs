@@ -610,10 +610,26 @@ impl arena::text::TextHooks for Front<'_> {
 /// Clicking on people and things: the way told is a note; the lists
 /// ("Where is", kind 9) asked through `dialog`.
 impl arena::talk::TalkHooks for Front<'_> {
-    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
-        match self.talk.as_deref_mut() {
+    /// The pick asked through `dialog`; the game's state round it
+    /// (`Machine::list_window`: the screen kept in the load bank, the
+    /// picture, the window's record) where the page is the game's own
+    /// block.
+    fn list(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16, cx: u16, di: u16) -> u16 {
+        let pick = match self.talk.as_deref_mut() {
             Some(t) => t.list(m, si, cx, ""),
-            None => 0xFFFF,
+            None => return 0xFFFF,
+        };
+        if !m.page_is_block() {
+            return pick;
+        }
+        let kind = m.list_kind;
+        let seg = m.list_segment(kind);
+        match m.list_window(files, kind, (seg, si), cx, di, pick) {
+            Some(ax) => ax,
+            None => {
+                eprintln!("the list's state gave up: {}", arena::giveup::describe());
+                pick
+            }
         }
     }
     /// 23F1:00A3: the place's name noted on the automap at its square,
@@ -1696,6 +1712,9 @@ struct TurnIn {
     /// AX, SI, its segment and BX as a click passes them (a debugging aid
     /// and the screen check's way in, as `shop` is).
     loot: Option<[u16; 4]>,
+    /// The click (1194:DB6C) run before the frame with the person or
+    /// thing at CLICKED (the state check's way in, as `shop` is).
+    talk: bool,
     key: bool,
     tick: usize,
     right: bool,
@@ -1746,6 +1765,12 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     if let Some(kind) = input.shop {
         if shopui::shop(&mut hooks, &mut engine.m, &mut engine.files, kind).is_none() {
             eprintln!("the shop gave up: {}", arena::giveup::describe());
+        }
+    }
+    if input.talk {
+        use arena::frame::FrameHooks;
+        if hooks.actor_click(&mut engine.m, &mut engine.files).is_none() {
+            eprintln!("the click gave up: {}", arena::giveup::describe());
         }
     }
     if let Some([ax, si, seg, bx]) = input.loot {
@@ -1992,6 +2017,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         camp: std::mem::take(&mut st.camp),
         shop: st.shop.take(),
         loot: None,
+        talk: false,
         key: false,
         tick: st.frames * 4,
         right: std::mem::take(&mut st.right),
@@ -3155,6 +3181,7 @@ impl App {
             camp: std::mem::take(&mut self.camp),
             shop: None,
             loot: None,
+            talk: false,
             key: std::mem::take(&mut self.key),
             tick,
             right: self.keys.swing,
@@ -4423,6 +4450,7 @@ impl App {
             camp: false,
             shop: None,
             loot: None,
+            talk: false,
             key: false,
             tick: 0,
             right: false,

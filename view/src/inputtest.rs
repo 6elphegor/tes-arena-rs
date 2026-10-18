@@ -379,6 +379,28 @@ fn a_click_on_a_menu_entry_picks_it() {
     same(&a, &b, "entry 0 clicked and --picks 0");
 }
 
+/// A turn running the click (1194:DB6C) on what CLICKED holds before
+/// its frame, from the window's own turn (`App::turn`).
+fn talk_turn(app: &mut App) {
+    let before = copy(&app.engine);
+    let input = TurnIn {
+        click: None,
+        intent: Default::default(),
+        clicked: false,
+        camp: false,
+        shop: None,
+        loot: None,
+        talk: true,
+        key: false,
+        tick: 0,
+        right: false,
+        drag: (0, 0),
+        aspect: 1.6,
+        note: None,
+    };
+    app.turn(before, input, Vec::new(), true);
+}
+
 /// A turn running a shop of building kind `kind`, as `--do shop:KIND`
 /// does, from the window's own turn (`App::turn`).
 fn shop_turn(app: &mut App, kind: u8) {
@@ -390,6 +412,7 @@ fn shop_turn(app: &mut App, kind: u8) {
         camp: false,
         shop: Some(kind),
         loot: None,
+        talk: false,
         key: false,
         tick: 0,
         right: false,

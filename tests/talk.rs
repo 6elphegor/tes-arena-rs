@@ -69,7 +69,7 @@ impl TalkHooks for Script {
         }
         Some(true)
     }
-    fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
+    fn list(&mut self, _m: &mut Machine, _files: &mut Files, si: u16, cx: u16, _di: u16) -> u16 {
         self.log.extend([4, si, cx]);
         take(&self.lists, &mut self.n[1], 0xFFFF)
     }

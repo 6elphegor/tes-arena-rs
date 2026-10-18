@@ -470,6 +470,20 @@ def serviced(seg, off, script):
     return do
 
 
+def talked(script):
+    """The first townsperson clicked with the player on their square
+    (gen_screens.py's `beside`), the seed SEED, and the click run as the
+    frame runs it (1194:DB6C, from 0000:49D1) between frames, `script`
+    answering its waits (`serviced`)."""
+    run = serviced(0x1194, 0xDB6C, script)
+
+    def do(a):
+        gs.beside(a)
+        gs.seeded(a)
+        run(a)
+    return do
+
+
 def shopping(a):
     """A slot of the player's free (gen_screens.py's `room`), each item
     worn to half (`worn`) and the seed gen_screens.py's SEED (`seeded`):
@@ -521,6 +535,7 @@ STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x
 # his words paged ("...More" twice), his price accepted, the rest of his
 # words paged to the tavern's menu; its Exit.
 INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
+TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
 
@@ -813,6 +828,11 @@ CASES = {
     # (`shopping`): two frames, the store's services (`serviced`): a
     # weapon bought, an item sold, one repaired (STORE_SCRIPT), thirty
     # frames on.
+    # A townsperson talked to: "Where is" (its box at 5Dh..74h), its
+    # first line (the places of its first kind; the lines' box at 48h,
+    # 13h, 9 rows high), 1194:E087's sorted list's first line (the way
+    # told, its box clicked away), then the menu's Goodbye.
+    'playtalkwhere': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_WHERE_SCRIPT)})]),
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
     # The dungeon, two frames, the player killed (`killed`) and the frame
     # that ends the world loop for it, the outer loop's death followed to
@@ -860,6 +880,16 @@ def street(a, base):
     """The snapshot of the game in the street, the guild left (the
     outer loop's next area the city, 5E6 0)."""
     a.restore(base)
+    assert a.area_ended() == ('world',), 'the guild not left'
+    return a.snapshot()
+
+
+def people(a, base):
+    """`street`, the guild left from the seed SEED (gen_screens.py's
+    'people'): the townspeople the street's arrival places (0000:45B2,
+    1793) the same on both sides."""
+    a.restore(base)
+    gs.seeded(a)
     assert a.area_ended() == ('world',), 'the guild not left'
     return a.snapshot()
 
@@ -1145,7 +1175,7 @@ def main():
             continue
         if where not in places:
             places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
-                             'store': building('store'), 'tavern': building('tavern'), 'guild': guild}[where](a, base)
+                             'people': people, 'store': building('store'), 'tavern': building('tavern'), 'guild': guild}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
