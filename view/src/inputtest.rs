@@ -1965,7 +1965,9 @@ fn the_options_screen_by_esc() {
     assert!(a.options.is_none() && a.quit, "Yes: the program ends");
 }
 
-/// The options screen's New: the main menu (5CA bit 8000h's outer loop).
+/// The options screen's New: the area left, and with the next frame the
+/// world loop's end and the outer loop's way out (5CA bit 8000h) bring up
+/// the main menu.
 #[test]
 fn the_options_screens_new_goes_to_the_main_menu() {
     let Some(dir) = game_dir() else { return };
@@ -1974,7 +1976,9 @@ fn the_options_screens_new_goes_to_the_main_menu() {
     d.frame(&mut a);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x20, 0x80, MouseButton::Left);
-    assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
+    assert!(a.options.is_none() && a.creation.is_none(), "New: the game goes on to the frame's end");
+    d.frame(&mut a);
+    assert!(a.creation.is_some(), "New: the main menu after the frame");
 }
 
 /// A creature's flat (bit 2 of its map word's high byte) ahead of the
