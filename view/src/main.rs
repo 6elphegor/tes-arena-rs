@@ -1335,6 +1335,16 @@ impl Assets {
     }
 }
 
+/// Whether a click at row `y` on the equipment page's items' list marks
+/// a quest's line with the staff's pieces held, which 1194:1F56 counts
+/// into the DI its callers leave (not ported): the view's own then.
+fn staff_line(m: &arena::machine::Machine, y: i32) -> bool {
+    let r8 = |o| m.mem.r8(arena::mem::DS, o);
+    let lines = r8(0x129D) as i32 + m.mem.r16(arena::mem::DS, 0x126C) as i32;
+    let row = (0..lines.min(7)).find(|&i| y <= 0x3D + 0x0B * i);
+    r8(0x0F77) != 0 && row.is_some_and(|i| r8(0x1297).wrapping_add(i as u8) >= r8(0x129D))
+}
+
 /// Timer ticks an animation frame lasts.
 const ANIMATE: usize = 4;
 
@@ -4068,7 +4078,7 @@ impl App {
                     }
                 } else if let Some(d) = panels::arrow_at(x, y) {
                     panels::arrow(&mut self.engine.m, &self.engine.files, d);
-                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0 {
+                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() && self.engine.m.mem.r8(arena::mem::DS, 0x129A) != 0 && !staff_line(&self.engine.m, y) {
                     // The sheet's own page: the list's record's handler
                     // (1194:1AC6); a right click describes the line it
                     // marks (1988). What the list's panel shows (223A)
