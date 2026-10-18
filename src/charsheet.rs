@@ -212,12 +212,7 @@ impl Machine {
         if self.mem.r16(DS, 0x05E0) & 0x200 == 0 {
             self.sheet_keep(files)?;
         }
-        // 2462: the equipment's frames into bank 17h (left mapped).
-        let n = self.mem.r8(DS, 0x01AB).wrapping_add(b'0');
-        self.mem.w8(DS, EQUIP, n);
-        self.map_bank(0x17, 0);
-        let frame = self.mem.r16(DS, FRAME);
-        self.file_load(files, EQUIP, frame, 0)?;
+        self.equip_frames(files)?;
         self.mem.w16(DS, SHEET, 1);
         self.select_font(0x102C);
         self.select_tiles(0x103A);
@@ -743,7 +738,7 @@ impl Machine {
 
     /// 1194:1D22: the clothes' names by sex and class (SHIRT's two
     /// letters, the trousers' and the helmet's first).
-    fn sheet_clothes(&mut self) {
+    pub fn sheet_clothes(&mut self) {
         let bl = if self.mem.r8(DS, PLAYER + 5) & 0x20 != 0 { b'r' } else { b's' };
         let al = if self.mem.r8(DS, PLAYER + 7) != 0 { b'f' } else { b'm' };
         self.mem.w8(DS, SHIRT, al);
@@ -763,14 +758,16 @@ impl Machine {
         }
         self.sheet_image(files, PANTS)?;
         let n = self.mem.r8(DS, WORN) as u16;
+        // (Each picture 5CD9 draws leaves DI 0; each item's DI goes on to
+        // the next: `sheet_item`.)
         if let Some(si) = self.worn_find(2, 0, n) {
-            self.sheet_item(files, si)?;
+            self.sheet_item(files, si, 0)?;
         }
         self.sheet_image(files, SHIRT)?;
-        let mut si = ITEMS;
+        let (mut si, mut di) = (ITEMS, 0);
         for _ in 0..self.mem.r8(DS, WORN) {
             if self.mem.r8(DS, si.wrapping_add(0x0E)) & 0x80 != 0 && !(self.mem.r8(DS, si) == 2 && self.item_category(DS, si) == 0) {
-                self.sheet_item(files, si)?;
+                di = self.sheet_item(files, si, di)?;
             }
             si = si.wrapping_add(SLOT);
         }
@@ -806,15 +803,28 @@ impl Machine {
         }
     }
 
-    /// 1194:1F8D: the worn item at DS:`si` on the doll: its frame in bank
-    /// 17h (5CCC: weapons by type, the armour's by type and kind, 21A8;
-    /// none for kind 2), drawn as it is or, coloured (+0Eh bit 1, its
-    /// colour +10h at 12A4), its header copied to 12A8 and its frame to
-    /// 929E and recoloured through bank 4 (20BF: bank 4's first C350h
-    /// bytes cleared, the frame drawn there and mapped through the
-    /// colours; that drawing the front end's); a helmet (type 5, kind 0)
-    /// then for the classes that show one (2020).
-    fn sheet_item(&mut self, files: &mut Files, si: u16) -> Option<()> {
+    /// 1194:2462: the equipment's frames (nEQUIP.CIF, n the player's +7)
+    /// loaded into bank 17h, left mapped.
+    pub fn equip_frames(&mut self, files: &mut Files) -> Option<()> {
+        let n = self.mem.r8(DS, 0x01AB).wrapping_add(b'0');
+        self.mem.w8(DS, EQUIP, n);
+        self.map_bank(0x17, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        self.file_load(files, EQUIP, frame, 0)?;
+        Some(())
+    }
+
+    /// 1194:1F8D: the worn item at DS:`si` on the doll, bank 17h mapped
+    /// (`equip_frames`): its frame there (5CCC: weapons by type, the
+    /// armour's by type and kind, 21A8; none for kind 2), drawn as it is
+    /// or, coloured (+0Eh bit 1, its colour +10h at 12A4), its header
+    /// copied to 12A8 and its frame to 929E and recoloured through bank 4
+    /// (`item_coloured`); after any but a coloured one, a helmet (type 5,
+    /// kind 0) by the race (`sheet_helmet`). `di` is DI as 1F8D finds it,
+    /// which race 7's helmet loads its picture at; DI after it (C350h
+    /// after a coloured one, 929Eh after races 1, 3 and 4's helmet, else
+    /// as it was).
+    pub fn sheet_item(&mut self, files: &mut Files, si: u16, di: u16) -> Option<u16> {
         let colour = if self.mem.r8(DS, si.wrapping_add(0x0E)) & 1 != 0 { self.mem.r8(DS, si.wrapping_add(0x10)) as i8 as i16 as u16 } else { 0xFFFF };
         self.mem.w16(DS, ITEM_COLOUR, colour);
         let ty = self.mem.r8(DS, si);
@@ -846,32 +856,189 @@ impl Machine {
                     let b = self.mem.r8(frame, img.wrapping_add(i));
                     self.mem.w8(DS, SCRATCH.wrapping_add(i), b);
                 }
-                // 20BF.
-                let old = self.map_bank(4, 0);
-                let frame = self.mem.r16(DS, FRAME);
-                for i in 0..0xC350u16 {
-                    self.mem.w8(frame, i, 0);
-                }
-                self.mem.w32(DS, 0x8F9A, 0);
-                for i in 0..0x100u16 {
-                    self.mem.w8(DS, SCRATCH + i, i as u8);
-                }
-                self.mem.w16(DS, ITEM_STEPS, 0);
-                self.map_bank(old, 0);
-                return Some(());
+                // (No helmet after a coloured item: 201C's RET.)
+                return self.item_coloured().map(|_| 0xC350);
             }
             if self.page_is_block() {
                 self.page_image(frame, img);
             }
         }
         if self.mem.r8(DS, si) == 5 && self.item_category(DS, si) == 0 {
-            // 2020: by the class (1A8): 7, the helmet's picture by its kind.
-            let class = self.mem.r8(DS, 0x01A8);
-            if class == 7 {
-                return crate::giveup::not_ported("1194:20B0: a helmet's picture for class 7 (0000:56C8 with BX 7)");
-            }
-            let _ = files;
+            return self.sheet_helmet(files, si, di);
         }
+        Some(di)
+    }
+
+    /// 1194:20BF: the worn item's frame copied to 929E recoloured: bank 4
+    /// mapped and its first C350h bytes cleared, the frame unpacked to
+    /// its start (5828 with [8F9C] the EMS frame: `image_capture`), 929E
+    /// made a table of each colour to itself but from 938C the item's
+    /// colours: 13 from 3EA0's byte for its colour, or for colour 2 seven
+    /// then 80h..84h (12A6 counting the second part); the bank's C350h
+    /// bytes mapped through the table and its first [12ACh] x [12AEh]
+    /// drawn at (12A8, 12AA), 0s left out (5B04, where the page is the
+    /// game's own block); the bank before mapped again.
+    fn item_coloured(&mut self) -> Option<()> {
+        let old = self.map_bank(4, 0);
+        let frame = self.mem.r16(DS, FRAME);
+        for i in 0..0xC350u16 {
+            self.mem.w8(frame, i, 0);
+        }
+        self.mem.w16(DS, 0x8F9C, frame);
+        self.image_capture(DS, SCRATCH)?;
+        self.mem.w32(DS, 0x8F9A, 0);
+        for i in 0..0x100u16 {
+            self.mem.w8(DS, SCRATCH + i, i as u8);
+        }
+        let colour = self.mem.r16(DS, ITEM_COLOUR);
+        self.mem.w16(DS, ITEM_STEPS, 0);
+        let mut al = self.mem.r8(DS, 0x3EA0u16.wrapping_add(colour));
+        let mut di = 0x938Cu16;
+        let mut cx = 0x0Du16;
+        if colour == 2 {
+            self.mem.w16(DS, ITEM_STEPS, 1);
+            cx = 7;
+        }
+        loop {
+            for _ in 0..cx {
+                self.mem.w8(DS, di, al);
+                di = di.wrapping_add(1);
+                al = al.wrapping_add(1);
+            }
+            if self.mem.r16(DS, ITEM_STEPS) == 0 {
+                break;
+            }
+            cx = 5;
+            al = 0x80;
+            let v = self.mem.r16(DS, ITEM_STEPS).wrapping_sub(1);
+            self.mem.w16(DS, ITEM_STEPS, v);
+            if colour != 2 {
+                break;
+            }
+        }
+        for i in 0..0xC350u16 {
+            let b = self.mem.r8(frame, i);
+            let c = self.mem.r8(DS, SCRATCH.wrapping_add(b as u16));
+            self.mem.w8(frame, i, c);
+        }
+        if self.page_is_block() {
+            let r = |m: &Self, o: u16| m.mem.r16(DS, ITEM_HEADER + o);
+            let (x, y, w, h) = (r(self, 0), r(self, 2), r(self, 4), r(self, 6));
+            let page = self.mem.r16(DS, 0xA900);
+            let mut di = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+            let mut si = 0u16;
+            for _ in 0..h {
+                for k in 0..w {
+                    let b = self.mem.r8(frame, si);
+                    si = si.wrapping_add(1);
+                    if b != 0 {
+                        self.mem.w8(page, di.wrapping_add(k), b);
+                    }
+                }
+                di = di.wrapping_add(0x140);
+            }
+        }
+        self.map_bank(old, 0);
+        Some(())
+    }
+
+    /// 0000:5828 with the far pointer at 8F9A set: the image whose header
+    /// is at seg:off unpacked to [8F9C]:[8F9A] rather than drawn (flags 1
+    /// runs, 8 LZHUF, 4 LZSS; an unpacked one writes nothing). Flags 2
+    /// draws by runs (5B9A), not ported here.
+    fn image_capture(&mut self, seg: u16, off: u16) -> Option<()> {
+        let flags = self.mem.r16(seg, off.wrapping_add(8));
+        let (bs, bo) = (self.mem.r16(DS, 0x8F9C), self.mem.r16(DS, 0x8F9A));
+        if flags & 1 != 0 {
+            self.rle_unpack(seg, off, bs, bo)?;
+        } else if flags & 2 != 0 {
+            return crate::giveup::not_ported("0000:5897: an image by runs to the capture buffer (5B9A)");
+        } else if flags & 8 != 0 {
+            let len = self.mem.r16(seg, off.wrapping_add(0xA));
+            self.mif_decompress(seg, off.wrapping_add(0xC), bs, bo, len)?;
+        } else if flags & 4 != 0 {
+            self.lzss_unpack(seg, off.wrapping_add(0xA), bs, bo)?;
+        }
+        Some(())
+    }
+
+    /// 1194:2020: a worn helmet (type 5, kind 0) by the race at 1A8:
+    /// 7, the helmet's own picture by its armour's kind (20B0: the digit
+    /// of mliz?.img, 5CD9); 1, 3 and 4, the head's colours remapped (929E
+    /// a table of each colour to itself but the 1Eh at 3276:5750's places
+    /// from the race's list at 3276:576E) over (F4h, 13h; 13h by 17h), or
+    /// a woman's (ECh, 12h; Fh by Fh) on the page (9D84, where the page is
+    /// the game's own block); others nothing.
+    fn sheet_helmet(&mut self, files: &mut Files, si: u16, di: u16) -> Option<u16> {
+        let race = self.mem.r8(DS, PLAYER + 4) as u16;
+        match race {
+            7 => {
+                let k = self.armor_kind(DS, si) as u8;
+                self.mem.w8(DS, HELMET + 4, k.wrapping_add(b'0'));
+                self.helmet_picture(files, di)?;
+                Some(di)
+            }
+            1 | 3 | 4 => {
+                let list = self.mem.r16(DATA, 0x576E + race * 2);
+                for i in 0..0x100u16 {
+                    self.mem.w8(DS, SCRATCH + i, i as u8);
+                }
+                for k in 0..0x1Eu16 {
+                    let at = self.mem.r8(DATA, 0x5750 + k) as u16;
+                    let b = self.mem.r8(DATA, list.wrapping_add(k));
+                    self.mem.w8(DS, SCRATCH.wrapping_add(at), b);
+                }
+                let (x, y, w, h) = if self.mem.r8(DS, PLAYER + 7) != 0 { (0xEC, 0x12, 0x0F, 0x0F) } else { (0xF4, 0x13, 0x13, 0x17) };
+                if self.page_is_block() {
+                    let page = self.mem.r16(DS, 0xA900);
+                    let mut di = self.mem.r16(DS, 0xA6A0u16 + 2 * y).wrapping_add(x);
+                    for _ in 0..h {
+                        for k in 0..w {
+                            let b = self.mem.r8(page, di.wrapping_add(k));
+                            let c = self.mem.r8(DS, SCRATCH.wrapping_add(b as u16));
+                            self.mem.w8(page, di.wrapping_add(k), c);
+                        }
+                        di = di.wrapping_add(0x140);
+                    }
+                }
+                Some(SCRATCH)
+            }
+            _ => Some(di),
+        }
+    }
+
+    /// 1194:5CD9 with BX 7 (from 20B0): bank [1030] mapped and 0000:56C8
+    /// with BX 7: bit 2 keeps the caller's ES:DI, so the picture named at
+    /// HELMET is loaded into DGROUP at `di` (over whatever is there: from
+    /// the doll's loop DGROUP's start), its header's words to A836..A83C;
+    /// bit 1 keeps what it covers: a heap block (9CD6) of its width times
+    /// its height plus 8 at A83E (EAX: 0, the segment), the header's four
+    /// words and the page's rows there (8F2A), never freed; then the
+    /// picture drawn (582C, where the page is the game's own block). Its
+    /// colours (9B56) are the VGA's. The bank before mapped again.
+    fn helmet_picture(&mut self, files: &mut Files, di: u16) -> Option<()> {
+        let bank = self.mem.r16(DS, 0x1030);
+        let old = self.map_bank(bank, 0);
+        self.file_load(files, HELMET, DS, di)?;
+        let h: Vec<u16> = (0..4u16).map(|k| self.mem.r16(DS, di.wrapping_add(2 * k))).collect();
+        for (k, &v) in h.iter().enumerate() {
+            self.mem.w16(DS, 0xA836 + 2 * k as u16, v);
+        }
+        let (x, y, w, hh) = (h[0], h[1], h[2], h[3]);
+        let seg = self.heap_alloc_high(w.wrapping_mul(hh).wrapping_add(8))?;
+        if seg == 0 {
+            return crate::giveup::original("0000:573C: no room for the helmet's background: the original writes it at 0:0");
+        }
+        self.mem.w16(DS, 0xA83E, 0);
+        self.mem.w16(DS, 0xA840, seg);
+        for (k, &v) in h.iter().enumerate() {
+            self.mem.w16(seg, 2 * k as u16, v);
+        }
+        self.page_rect_save((seg, 8), x, y, w, hh);
+        if self.page_is_block() {
+            self.page_image(DS, di);
+        }
+        self.map_bank(old, 0);
         Some(())
     }
 
