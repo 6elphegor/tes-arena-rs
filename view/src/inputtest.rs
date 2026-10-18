@@ -877,12 +877,13 @@ fn creation_by_keys_and_clicks_as_by_script() {
     let mut b = made(make());
     Driver::new(&mut b);
     // The intro's movie skipped, the rest of it left (Esc at the title),
-    // Start; the opening story skipped;
+    // Start; the opening story's movie skipped, then the story (Esc at
+    // its first picture);
     // "Select" the class; on the classes' list (kind 6, the record at
     // 515A: no flag 4000h) the right button and Esc do nothing, a click
     // marks the second class (FONT_A's 11 rows from the box's y 2Dh) and
     // a second click picks it; the name; the gender.
-    let script = "enter,esc,S,esc,S,right,esc,click:94:62,click:94:62,type:Ria,enter,F";
+    let script = "enter,esc,S,esc,esc,S,right,esc,click:94:62,click:94:62,type:Ria,enter,F";
     let typing = |app: &App| app.creation.as_ref().is_some_and(|c| c.typing());
     for (i, inp) in create::parse_script(script).into_iter().enumerate() {
         match inp {
@@ -906,10 +907,10 @@ fn creation_by_keys_and_clicks_as_by_script() {
         b.creation_input(inp);
         // The list waits through the right button, Esc and the first
         // click; the second asks the name.
-        if (5..=7).contains(&i) {
+        if (6..=8).contains(&i) {
             assert!(!typing(&a), "step {i} ({inp:?}): the classes' list still up");
         }
-        if i == 8 {
+        if i == 9 {
             assert!(typing(&a), "the second click on the marked class picks it");
         }
         let (Some(ca), Some(cb)) = (a.creation.as_ref(), b.creation.as_ref()) else { panic!("creation ended early at step {i}") };

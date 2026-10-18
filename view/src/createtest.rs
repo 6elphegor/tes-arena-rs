@@ -85,13 +85,15 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
     }
     engine.m.mem.w32(arena::mem::DS, arena::random::SEED, SEED);
     engine.m.load_rng();
-    // The dissolve's generator as the generator's start leaves it.
-    engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
-    // Start, the opening story passed.
-    for inp in create::parse_script("S,esc") {
+    // Start, the opening story passed (Esc ends its movie, then the
+    // story at its first picture).
+    for inp in create::parse_script("S,esc,esc") {
         c.input(&mut engine, inp);
     }
     c.settle();
+    // The dissolve's generator as the generator's start leaves it (the
+    // story's first picture dissolved in has stepped it).
+    engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
     (engine, c)
 }
 
@@ -214,3 +216,151 @@ fn creation_animates_as_the_original() {
     }
     assert!(wrong.is_empty(), "{} of {checked} transitions differ from the original's: {}", wrong.len(), wrong.join(", "));
 }
+
+const INTRO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/introframes.txt");
+
+/// A run of harness/gen_introframes.py: its keys (as `Input`s) and each
+/// state the original showed (screen and colours digests; the waits for
+/// the retrace and the timer's ticks it was seen at), the dissolve's
+/// generator at its end.
+struct IntroRun {
+    name: String,
+    keys: Vec<create::Input>,
+    states: Vec<(u64, u64, u32, u32)>,
+    seed: u16,
+}
+
+fn intro_runs() -> Vec<IntroRun> {
+    let text = std::fs::read_to_string(INTRO).expect("tests/vectors/introframes.txt");
+    let mut out: Vec<IntroRun> = Vec::new();
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(" | ").collect();
+        match f.as_slice() {
+            ["introframes", name, "script", keys] => {
+                let keys = keys.split(',').filter(|k| *k != "-").map(|k| if k.starts_with("1b@") { create::Input::Esc } else { create::Input::Enter }).collect();
+                out.push(IntroRun { name: name.to_string(), keys, states: Vec::new(), seed: 0 });
+            }
+            ["introframes", _, "end", seed] => out.last_mut().expect("a script line").seed = u16::from_str_radix(seed, 16).expect("a seed"),
+            ["introframes", _, _, s, c, r, t] => {
+                let h = |v: &str| u64::from_str_radix(v, 16).expect("a digest");
+                out.last_mut().expect("a script line").states.push((h(s), h(c), r.parse().expect("retraces"), t.parse().expect("ticks")));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The intro (0000:10C9 on to the main menu: the movies, the pictures
+/// faded in and held, the scrolls dissolved in, each change through the
+/// fade to black; MENU.IMG's colours set), and the opening story after
+/// the menu's Start (1323), frame by frame against the original's
+/// (harness/gen_introframes.py): each state in turn, and how long it
+/// shows (a wait for the retrace `RETRACE_MS`, a timer tick
+/// `flc::TICK_MS`; the view's time passing a millisecond at a time).
+/// The keys are taken while the original took them (in the state the
+/// original's first differs from its run without keys, and the next):
+/// how long those states show is the player's. The dissolve's generator
+/// ends as the original's.
+#[test]
+fn the_intro_plays_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let palette = world::palette(&dir);
+    let runs = intro_runs();
+    assert!(!runs.is_empty());
+    let none = |story: bool| runs.iter().find(|r| r.name == if story { "story" } else { "none" }).expect("the runs without keys");
+    let mut wrong = Vec::new();
+    for run in &runs {
+        let story = run.name.starts_with("story");
+        // The states the keys are pressed in: where this run first
+        // differs from the one without keys, and (a wait's key keeps the
+        // states in step) where it differs next; a movie's frame there (a
+        // key seen after the next frame is read, shown) the one before.
+        let plain = none(story);
+        let mut at = Vec::new();
+        for (i, (a, b)) in run.states.iter().zip(&plain.states).enumerate() {
+            if at.len() < run.keys.len() && a != b {
+                at.push(if b.3 > 0 { i - 1 } else { i });
+                if a.0 != b.0 || a.1 != b.1 {
+                    break;
+                }
+            }
+        }
+        assert_eq!(at.len(), run.keys.len(), "{}: where its keys are taken", run.name);
+        let mut engine = world::load(&dir, "START.MIF");
+        let archive = Rc::new(archive::Archive::open(&dir));
+        hud::init_style(&archive, &engine.m);
+        let mut c = create::Creation::new(&mut engine, archive, &dir, palette);
+        engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
+        if story {
+            // The menu (the intro passed), then Start.
+            for inp in create::parse_script("enter,esc") {
+                c.input(&mut engine, inp);
+            }
+            c.settle();
+            c.input(&mut engine, create::Input::Char(b'S'));
+            engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);
+        }
+        // Each state the view shows and for how long (ms).
+        let mut seen: Vec<(u64, u64, u32)> = Vec::new();
+        let mut phase = None;
+        let mut keys = run.keys.iter().zip(&at).peekable();
+        for _ in 0..200_000 {
+            if c.phase() != phase.unwrap_or_default() || phase.is_none() {
+                phase = Some(c.phase());
+                let (idx, dac) = drawn(&c, &engine.m, palette);
+                let st = (fnv(idx.iter().map(|&i| i as u8)), fnv(dac.iter().copied()));
+                if seen.last().is_none_or(|l| (l.0, l.1) != st) {
+                    seen.push((st.0, st.1, 0));
+                }
+            }
+            seen.last_mut().expect("a state").2 += 1;
+            // A key in its state, half its time on (the run's own).
+            let from = seen.iter().position(|s| (s.0, s.1) == (run.states[1].0, run.states[1].1));
+            if let (Some(&(&inp, &k)), Some(from)) = (keys.peek(), from) {
+                let (i, want) = (seen.len() - 1 - from + 1, &run.states[k]);
+                if i == k && (seen[seen.len() - 1].0, seen[seen.len() - 1].1) == (want.0, want.1) && seen[seen.len() - 1].2 >= (want.2 * RETRACE + want.3 * TICK) / 2 {
+                    c.input(&mut engine, inp);
+                    keys.next();
+                    phase = None;
+                }
+            }
+            if from.is_some_and(|f| seen.len() - f >= run.states.len() + 1) {
+                break;
+            }
+            c.advance(&mut engine.m, 1);
+        }
+        // From the movie's first frame (the screen before it is each
+        // one's own).
+        let Some(from) = seen.iter().position(|s| (s.0, s.1) == (run.states[1].0, run.states[1].1)) else {
+            wrong.push(format!("{}: its first frame not shown", run.name));
+            continue;
+        };
+        let view = &seen[from..];
+        let want = &run.states[1..];
+        if let Some(i) = want.iter().zip(view).position(|(w, v)| (w.0, w.1) != (v.0, v.1)).or((view.len() < want.len()).then_some(view.len())) {
+            wrong.push(format!("{}: state {} differs ({} shown, {} wanted)", run.name, i + 1, view.len(), want.len()));
+            continue;
+        }
+        // How long each shows, but the last (the run's end) and those the
+        // keys came in.
+        for (i, (w, v)) in want.iter().zip(view).enumerate().take(want.len() - 1) {
+            if at.contains(&(i + 1)) {
+                continue;
+            }
+            let ms = w.2 * RETRACE + w.3 * TICK;
+            if v.2.abs_diff(ms) > 2 {
+                wrong.push(format!("{}: state {} shows {} ms, the original's {ms} ({} retraces, {} ticks)", run.name, i + 1, v.2, w.2, w.3));
+                break;
+            }
+        }
+        let seed = engine.m.mem.r16(arena::mem::DS, 0x4B8E);
+        if seed != run.seed {
+            wrong.push(format!("{}: the dissolve's generator {seed:04x}, the original's {:04x}", run.name, run.seed));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("; "));
+}
+
+const RETRACE: u32 = crate::film::RETRACE_MS;
+const TICK: u32 = crate::flc::TICK_MS;

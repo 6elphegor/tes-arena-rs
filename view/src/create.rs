@@ -33,8 +33,10 @@
 //!
 //! Before it, as the original starts (0000:10C9): the intro (1246:
 //! INTRO.FLC, TITLE.IMG for 4 s, QUOTE.IMG for 6 s, SCROLL.FLC and
-//! SCROLL01..03.IMG; a key ends a wait, Esc the rest; its fades and
-//! dissolves aren't drawn), then the main menu (MENU.IMG, 0000:10FA: its
+//! SCROLL01..03.IMG, each change through its fade to black, the pictures
+//! faded in and the scrolls dissolved in, frame by frame as the original
+//! shows them, `createtest`; a key ends a movie or a wait, Esc held the
+//! rest), then the main menu (MENU.IMG, 0000:10FA: its
 //! regions at 3276:6300, keys L, S and E: Load, Start a new game, Exit).
 //! At a game's end (`Creation::ending`) the farewell's vision (text 57Ah
 //! on VISION.FLC, or 57Bh on JAGAR.FLC while F77 is set: 0000:0D01..0D3E),
@@ -220,13 +222,15 @@ enum Stage {
     Vision,
     Ending,
     /// The opening story after the menu's Start (0000:1323): SCROLL.FLC
-    /// (the movie), then INTRO01..09.IMG (`pic` 1..9, its picture and
-    /// the colours the movie left) for 350 screen refreshes each (5 s at
-    /// 70 Hz, 0000:13BF); a key ends it all (ACB6). Then `next`, the
-    /// class's first question, made at the Start. With `scrolls` the
-    /// intro's end before the menu (0000:12E3..131B): SCROLL.FLC, then
-    /// SCROLL01..03.IMG for 4A6h, 4A6h and 1A4h refreshes (`SCROLL_MS`),
-    /// a key ending the movie or a picture's wait, Esc them all.
+    /// (the movie), then INTRO01..09.IMG (`pic` 1..9: the page with its
+    /// picture over what the screen showed, in the colours the movie
+    /// left), each dissolved in (1393: 1194:4FF7) and held for 15Eh
+    /// passes (`STORY_MS`, 0000:13BF); then to black (138D: 55B2) and
+    /// `next`, the class's first question, made at the Start. With
+    /// `scrolls` the intro's end before the menu (0000:12E3..131B):
+    /// SCROLL.FLC, then SCROLL01..03.IMG held 4A6h, 4A6h and 1A4h passes
+    /// (`SCROLL_MS`). A key ends the movie or a picture's wait, Esc held
+    /// the story (`take_key`).
     Story { pic: u8, ms: u32, img: Option<Box<(Image, [[u8; 4]; 256])>>, next: Box<Stage>, scrolls: bool },
     /// The intro's TITLE.IMG (0000:1269), for 118h refreshes (`TITLE_MS`)
     /// or until a key; then QUOTE.IMG (12BC) for 1A4h, Esc ending the
@@ -250,10 +254,40 @@ pub enum Outcome {
 }
 
 /// The intro's waits (0000:13BF: 118h, 1A4h and 4D94's 4A6h, 4A6h, 1A4h
-/// screen refreshes at 70 Hz) in milliseconds.
-const TITLE_MS: u32 = 0x118 * 1000 / 70;
-const QUOTE_MS: u32 = 0x1A4 * 1000 / 70;
-const SCROLL_MS: [u32; 3] = [0x4A6 * 1000 / 70, 0x4A6 * 1000 / 70, 0x1A4 * 1000 / 70];
+/// passes, each a wait for the retrace) in milliseconds; the opening
+/// story's pictures' (4DA0's, 15Eh each).
+const TITLE_MS: u32 = 0x118 * RETRACE_MS;
+const QUOTE_MS: u32 = 0x1A4 * RETRACE_MS;
+const SCROLL_MS: [u32; 3] = [0x4A6 * RETRACE_MS, 0x4A6 * RETRACE_MS, 0x1A4 * RETRACE_MS];
+const STORY_MS: u32 = 0x15E * RETRACE_MS;
+const BLACK: Dac = [[0, 0, 0, 0xFF]; 256];
+
+/// 1194:55B2: the colours taken to black in 8 (55B6's 5E3E), the screen
+/// cleared (55D9).
+fn fade_black(film: &mut Film) {
+    film.fade(&BLACK, 8);
+    film.vga.fill(0);
+}
+
+/// A picture drawn on the cleared page (5828: its rectangle copied).
+fn pic_page(p: &(Image, Dac)) -> Vec<u8> {
+    let mut page = vec![0; W * H];
+    pic_over(&mut page, &p.0);
+    page
+}
+
+/// The picture `i` drawn over `page` (582C: its rectangle copied, its 0s
+/// too).
+fn pic_over(page: &mut [u8], i: &Image) {
+    for y in 0..i.h {
+        for x in 0..i.w {
+            let (px, py) = (i.x + x as i32, i.y + y as i32);
+            if (0..W as i32).contains(&px) && (0..H as i32).contains(&py) {
+                page[py as usize * W + px as usize] = i.px[y * i.w + x];
+            }
+        }
+    }
+}
 
 /// The main menu's regions (3276:6300, three: Load, Start, Exit; their
 /// keys at +59h).
@@ -575,7 +609,12 @@ impl Creation {
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
-        c.stage = if c.movie.is_some() { Stage::Intro } else { c.after_intro() };
+        // The movie's first frame after a wait for the retrace over the
+        // screen as it was (0000:6620's 9B9B; here a black one).
+        let mut film = Film::new(vec![0; W * H], BLACK);
+        film.wait();
+        c.stage = if c.movie.is_some() { Stage::Intro } else { c.after_intro(&mut film) };
+        c.film = film.frames.into();
         c
     }
 
@@ -658,41 +697,130 @@ impl Creation {
         self.stage = Stage::MainMenu;
     }
 
-    /// After the intro's movie: the title, else what follows it.
-    fn after_intro(&mut self) -> Stage {
-        if self.title.is_some() { Stage::Title(0) } else { self.after_title() }
+    /// The screen's change from what it shows now: `f` adds its frames to
+    /// the film from there (the machine's dissolve generator stepping) and
+    /// gives the stage after it.
+    fn change(&mut self, m: &mut Machine, f: impl FnOnce(&mut Self, &mut Film, &mut Machine) -> Stage) {
+        let (shown, dac) = self.shot(m, true);
+        let mut film = Film::new(shown, dac);
+        self.stage = f(self, &mut film, m);
+        self.film.extend(film.frames);
     }
 
-    /// After the title: the quote, else what follows it.
-    fn after_title(&mut self) -> Stage {
-        if self.quote.is_some() { Stage::Quote(0) } else { self.scroll_story() }
+    /// After the intro's movie (0000:1264): to black (55B2), TITLE.IMG
+    /// drawn, shown and its colours faded in in 12 (1269..1292: 5828,
+    /// 9466, 5E3E); else what follows it.
+    fn after_intro(&mut self, film: &mut Film) -> Stage {
+        fade_black(film);
+        match &self.title {
+            Some(t) => {
+                film.whole(&pic_page(t));
+                film.fade(&t.1, 12);
+                Stage::Title(0)
+            }
+            None => self.after_title(film),
+        }
     }
 
-    /// After the quote (0000:12D4): SCROLL.FLC and the scrolls, then the
-    /// menu.
-    fn scroll_story(&mut self) -> Stage {
+    /// After the title (12B7): to black, QUOTE.IMG drawn, shown and its
+    /// colours faded in in 12 (12BC: 56C8 with BX 64h, its 946A and
+    /// 5E50); else what follows it.
+    fn after_title(&mut self, film: &mut Film) -> Stage {
+        fade_black(film);
+        match &self.quote {
+            Some(q) => {
+                film.whole(&pic_page(q));
+                film.fade(&q.1, 12);
+                Stage::Quote(0)
+            }
+            None => self.scroll_story(film),
+        }
+    }
+
+    /// After the quote (0000:12D4): SCROLL.FLC, its first frame after a
+    /// wait for the retrace (9B9B), and the scrolls; else the intro's end.
+    fn scroll_story(&mut self, film: &mut Film) -> Stage {
         self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
         if self.movie.is_none() {
-            return Stage::MainMenu;
+            return self.intro_end(film);
         }
+        film.wait();
         Stage::Story { pic: 0, ms: 0, img: None, next: Box::new(Stage::MainMenu), scrolls: true }
     }
 
-    /// The title's and the quote's time passing (0000:13BF's waits).
-    fn title_time(&mut self, ms: u32) {
+    /// The intro's end (131D): to black (55B2); then the menu (10E2..1100:
+    /// the page cleared, MENU.IMG drawn, shown, 946A, and its colours set,
+    /// 9B56).
+    fn intro_end(&mut self, film: &mut Film) -> Stage {
+        fade_black(film);
+        if let Some(p) = &self.menu_pic {
+            film.whole(&pic_page(p));
+            film.colours(&p.1);
+        }
+        Stage::MainMenu
+    }
+
+    /// The title's and the quote's waits (0000:13BF) passing once their
+    /// change has played.
+    fn title_time(&mut self, m: &mut Machine, ms: u32) {
+        if !self.film.is_empty() {
+            return;
+        }
         match &mut self.stage {
             Stage::Title(t) => {
                 *t += ms;
                 if *t >= TITLE_MS {
-                    self.stage = self.after_title();
+                    self.change(m, |c, f, _| c.after_title(f));
                 }
             }
             Stage::Quote(t) => {
                 *t += ms;
                 if *t >= QUOTE_MS {
-                    self.stage = self.scroll_story();
+                    self.change(m, |c, f, _| c.scroll_story(f));
                 }
             }
+            _ => {}
+        }
+    }
+
+    /// A key or click in the intro or the opening story (the arrows
+    /// aren't keys here), the change playing passed first as on every
+    /// screen here (the original takes a key pressed in a fade at the
+    /// next poll, the fade played out).
+    fn intro_key(&mut self, m: &mut Machine, inp: Input) {
+        if matches!(inp, Input::Up | Input::Down) {
+            return;
+        }
+        self.settle();
+        self.take_key(m, inp);
+    }
+
+    /// A key (or click) taken where the intro polls, Esc as held on there:
+    /// - a movie ends (`Movie::cut`: a key after the frame it was reading,
+    ///   a click at the one shown), its keys waited up and flushed (6697):
+    ///   Esc no more than a key;
+    /// - a wait (13BF) ends; a key is flushed (13ED); Esc, held, is left
+    ///   in the buffer and ends the intro or the story at its next test
+    ///   (12CD, 12F0, 1314; 137F), a wait before it ending at its first
+    ///   poll (the title's Esc: the quote faded in and out again).
+    fn take_key(&mut self, m: &mut Machine, inp: Input) {
+        let esc = inp == Input::Esc;
+        match self.stage {
+            Stage::Intro | Stage::Story { pic: 0, .. } => {
+                if let Some(mv) = &mut self.movie {
+                    mv.cut(matches!(inp, Input::Click(..) | Input::Right));
+                }
+                self.movie_over(m);
+            }
+            Stage::Title(_) if esc => self.change(m, |c, f, _| match c.after_title(f) {
+                Stage::Quote(_) => c.intro_end(f),
+                s => s,
+            }),
+            Stage::Title(_) => self.change(m, |c, f, _| c.after_title(f)),
+            Stage::Quote(_) if esc => self.change(m, |c, f, _| c.intro_end(f)),
+            Stage::Quote(_) => self.change(m, |c, f, _| c.scroll_story(f)),
+            Stage::Story { .. } if esc => self.change(m, |c, f, _| c.story_end(f)),
+            Stage::Story { .. } => self.story_next(m),
             _ => {}
         }
     }
@@ -710,9 +838,11 @@ impl Creation {
         }
     }
 
-    /// Time passing (milliseconds) for the movie playing: its frames; at
-    /// its end (no text: once through) the next screen.
-    pub fn advance(&mut self, ms: u32) {
+    /// Time passing (milliseconds): the change's frames, then the movie
+    /// playing (at its end, with no text, once through, the next screen)
+    /// and the intro's waits; `m` the machine whose dissolve generator
+    /// the intro's dissolves step.
+    pub fn advance(&mut self, m: &mut Machine, ms: u32) {
         // The change's frames, one a retrace (70 a second).
         self.film_ms += ms;
         while !self.film.is_empty() && self.film_ms >= RETRACE_MS {
@@ -726,69 +856,89 @@ impl Creation {
         if let (Some(mv), true) = (&mut self.movie, self.film.is_empty()) {
             mv.advance(ms);
         }
-        self.movie_over();
-        self.story(ms);
-        self.title_time(ms);
+        self.movie_over(m);
+        self.story(m, ms);
+        self.title_time(m, ms);
     }
 
-    /// The opening story's pictures: each for 5 s (the scrolls each for
-    /// its `SCROLL_MS`), in the colours the movie left, then the next
-    /// stage.
-    fn story(&mut self, ms: u32) {
-        let Stage::Story { pic, ms: shown, img, scrolls, .. } = &mut self.stage else { return };
-        if *pic == 0 {
+    /// The story's pictures' waits passing once their change has played.
+    fn story(&mut self, m: &mut Machine, ms: u32) {
+        let Stage::Story { pic, ms: shown, scrolls, .. } = &mut self.stage else { return };
+        if *pic == 0 || !self.film.is_empty() {
             return;
         }
         *shown += ms;
-        let (count, wait) = if *scrolls { (3, SCROLL_MS[*pic as usize - 1]) } else { (9, 5000) };
-        if *shown < wait {
-            return;
+        let wait = if *scrolls { SCROLL_MS[*pic as usize - 1] } else { STORY_MS };
+        if *shown >= wait {
+            self.story_next(m);
         }
-        *shown = 0;
-        *pic += 1;
-        if *pic > count {
-            if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
-                self.stage = *next;
-            }
-            return;
-        }
-        let pal = img.as_ref().map(|b| b.1).unwrap_or([[0; 4]; 256]);
-        *img = story_pic(&self.archive, *scrolls, *pic, pal).map(Box::new);
     }
 
-    /// The next screen when the movie is over.
-    fn movie_over(&mut self) {
+    /// The story's next picture (1393): loaded, drawn on the page over
+    /// what the screen shows (582C), dissolved in (1194:4FF7, the whole
+    /// screen) and shown (946A), in the colours the movie left; after the
+    /// last, its end.
+    fn story_next(&mut self, m: &mut Machine) {
+        let Stage::Story { pic, scrolls, .. } = self.stage else { return };
+        let n = pic + 1;
+        if n > if scrolls { 3 } else { 9 } {
+            return self.change(m, |c, f, _| c.story_end(f));
+        }
+        self.change(m, |c, f, m| {
+            let mut page = f.vga.clone();
+            if let Some((i, _)) = story_pic(&c.archive, scrolls, n, f.dac) {
+                pic_over(&mut page, &i);
+            }
+            f.dissolve(m, &page, FULL);
+            let Stage::Story { next, .. } = std::mem::replace(&mut c.stage, Stage::Done) else { unreachable!() };
+            let img = Some(Box::new((Image { x: 0, y: 0, w: W, h: H, px: page }, f.dac)));
+            Stage::Story { pic: n, ms: 0, img, next, scrolls }
+        });
+    }
+
+    /// The story's end: to black (55B2: 131D, 138D); the intro's then the
+    /// menu (`intro_end`), the opening story's its `next`.
+    fn story_end(&mut self, film: &mut Film) -> Stage {
+        let Stage::Story { next, scrolls, .. } = std::mem::replace(&mut self.stage, Stage::Done) else { return Stage::Done };
+        if scrolls {
+            return self.intro_end(film);
+        }
+        fade_black(film);
+        *next
+    }
+
+    /// The next screen when the movie is over (from the frame it shows).
+    fn movie_over(&mut self, m: &mut Machine) {
         if !self.movie.as_ref().is_some_and(|m| m.over) {
             return;
         }
-        if let Stage::Story { pic: 0, .. } = self.stage {
-            // The movie over: its colours stay for the pictures.
-            let pal = self.movie.as_ref().map(|m| m.flc.palette).unwrap_or([[0; 4]; 256]);
-            self.movie = None;
-            if let Stage::Story { pic, img, scrolls, .. } = &mut self.stage {
-                *pic = 1;
-                *img = story_pic(&self.archive, *scrolls, 1, pal).map(Box::new);
-            }
-            return;
-        }
-        let next = match self.stage {
-            Stage::Intro => {
+        match self.stage {
+            Stage::Story { pic: 0, .. } => {
+                self.story_next(m);
                 self.movie = None;
-                self.after_intro()
             }
-            Stage::Ending => {
-                // The farewell over: the program's main back to its menu
-                // through the intro (0000:10C9).
-                self.movie = crate::flc::Movie::new(&self.archive, "INTRO.FLC", Vec::new());
-                if self.movie.is_some() { Stage::Intro } else { self.after_intro() }
-            }
+            Stage::Intro => self.change(m, |c, f, _| {
+                c.movie = None;
+                c.after_intro(f)
+            }),
+            // The farewell over: the program's main back to its menu
+            // through the intro (0000:10C9), its first frame after a wait
+            // over the farewell's last.
+            Stage::Ending => self.change(m, |c, f, _| {
+                c.movie = crate::flc::Movie::new(&c.archive, "INTRO.FLC", Vec::new());
+                if c.movie.is_some() {
+                    f.wait();
+                    Stage::Intro
+                } else {
+                    c.after_intro(f)
+                }
+            }),
             Stage::Vision => {
                 self.movie = None;
-                Stage::Done
+                self.stage = Stage::Done;
             }
-            _ => return,
-        };
-        self.stage = next;
+            _ => {}
+        }
     }
 
     /// Whether creation is over (the game to be started).
@@ -850,7 +1000,26 @@ impl Creation {
     ///   set (0000:57DD).
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
         if let Input::Wait(ms) = inp {
-            return self.advance(ms);
+            return self.advance(&mut engine.m, ms);
+        }
+        if self.boxes.is_empty() && matches!(self.stage, Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::Story { .. }) {
+            return self.intro_key(&mut engine.m, inp);
+        }
+        if self.boxes.is_empty() && matches!(self.stage, Stage::MainMenu) {
+            // A pick (0000:1114): to black (111A: 55B2), the opening
+            // story's movie's first frame after a wait for the retrace.
+            self.settle();
+            let (shown, dac) = self.shot(&engine.m, true);
+            self.input_inner(engine, inp);
+            if self.outcome.is_some() || !matches!(self.stage, Stage::MainMenu) {
+                let mut film = Film::new(shown, dac);
+                fade_black(&mut film);
+                if self.movie.is_some() {
+                    film.wait();
+                }
+                self.film = film.frames.into();
+            }
+            return;
         }
         self.settle();
         let was = self.up();
@@ -1021,6 +1190,23 @@ impl Creation {
         self.film.iter().map(|(px, dac)| (px.clone(), dac.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect())).collect()
     }
 
+    /// What decides the screen through the intro and the story (the
+    /// change's frames left, the movie's frame, the stage, the picture):
+    /// it draws alike while this stays the same.
+    #[cfg(test)]
+    pub fn phase(&self) -> (usize, Option<u32>, u8, u8) {
+        let (stage, pic) = match &self.stage {
+            Stage::Intro => (1, 0),
+            Stage::Title(_) => (2, 0),
+            Stage::Quote(_) => (3, 0),
+            Stage::Story { pic, .. } => (4, *pic),
+            Stage::MainMenu => (5, 0),
+            Stage::Ending => (6, 0),
+            _ => (0, 0),
+        };
+        (self.film.len(), self.movie.as_ref().map(|m| m.flc.shown), stage, pic)
+    }
+
     fn input_inner(&mut self, engine: &mut Engine, inp: Input) {
         // The right button is taken by the menus and lists alone.
         let asking = matches!(self.stage, Stage::Method(_) | Stage::ClassYes(..) | Stage::List(_) | Stage::Gender(_) | Stage::ProvinceYes(..) | Stage::Choose(_));
@@ -1033,58 +1219,17 @@ impl Creation {
             }
             return;
         }
-        if let Stage::Story { scrolls: true, pic, .. } = self.stage {
-            // The intro's scrolls: a key ends the movie (0000:65C8) or the
-            // picture's wait (13BF), Esc them all (12F0, 1314: ACB6).
-            if !matches!(inp, Input::Up | Input::Down | Input::Esc) {
-                if pic == 0 {
-                    if let Some(mv) = &mut self.movie {
-                        mv.over = true;
-                    }
-                    self.movie_over();
-                } else {
-                    self.story(u32::MAX >> 1);
-                }
-                return;
-            }
-        }
-        if let Stage::Story { .. } = self.stage {
-            // A key ends the whole story (0000:1314, 137F: ACB6).
-            if !matches!(inp, Input::Up | Input::Down) {
-                self.movie = None;
-                if let Stage::Story { next, .. } = std::mem::replace(&mut self.stage, Stage::Done) {
-                    self.stage = *next;
-                }
-            }
-            return;
-        }
-        if matches!(self.stage, Stage::Intro | Stage::Vision | Stage::Ending) {
-            // A key the next lines (or, the intro, its end).
+        if matches!(self.stage, Stage::Vision | Stage::Ending) {
+            // A key the next lines, or the end.
             if let Some(mv) = &mut self.movie {
                 if !matches!(inp, Input::Up | Input::Down) {
-                    if matches!(self.stage, Stage::Intro) {
-                        mv.over = true
-                    } else {
-                        mv.key()
-                    }
+                    mv.key()
                 }
             }
-            return self.movie_over();
+            return self.movie_over(&mut engine.m);
         }
         let stage = std::mem::replace(&mut self.stage, Stage::Done);
         self.stage = match stage {
-            // A key ends the wait (0000:13BF); Esc held ends the intro
-            // (12CD: ACB6).
-            Stage::Title(t) => match inp {
-                Input::Up | Input::Down => Stage::Title(t),
-                Input::Esc => Stage::MainMenu,
-                _ => self.after_title(),
-            },
-            Stage::Quote(t) => match inp {
-                Input::Up | Input::Down => Stage::Quote(t),
-                Input::Esc => Stage::MainMenu,
-                _ => self.scroll_story(),
-            },
             Stage::MainMenu => {
                 let key = |m: &Machine, i: u16| m.mem.r8(DATA, MENU_REGIONS + i * REGION + 0x59);
                 let pick = match inp {
@@ -1296,7 +1441,7 @@ impl Creation {
                 Some(_) => self.roll(engine),
             },
             Stage::Face => self.face_input(engine, inp),
-            s @ (Stage::Intro | Stage::Vision | Stage::Ending | Stage::Story { .. }) => s,
+            s @ (Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::Vision | Stage::Ending | Stage::Story { .. }) => s,
             Stage::Done => Stage::Done,
         };
     }

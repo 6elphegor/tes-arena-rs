@@ -866,7 +866,7 @@ fn the_automap_as_the_original_draws_it() {
 fn area_left(a: &mut App) {
     let v = a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) | 0x80;
     a.engine.m.mem.w16(DS, arena::movement::var::MAP_FLAGS, v);
-    a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the next area");
+    a.run = areas::next(&mut a.engine, &a.dir, a.run, None).expect("the next area");
     a.assets = Assets::new(&a.dir, &mut a.engine);
     a.remake_renderer();
     a.last = Some(arena::engine::Frame::Running);
@@ -923,7 +923,7 @@ fn a_gate_leads_out_as_the_original() {
         m.mem.w16(DS, arena::controls::var::PICKED, gate[1] << 8 | gate[0] << 1);
         m.wall_trigger(&mut a.engine.files, &mut DoorHooks::default()).expect("the gate's trigger");
         assert!(a.engine.m.mem.r16(DS, arena::movement::var::MAP_FLAGS) & 0x80 != 0, "{city}: the gate at {gate:?} led nowhere");
-        a.run = areas::next(&mut a.engine, &a.dir, a.run).expect("the wilderness");
+        a.run = areas::next(&mut a.engine, &a.dir, a.run, None).expect("the wilderness");
         let m = &a.engine.m;
         let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
         let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
@@ -1829,7 +1829,7 @@ fn the_vision_at_the_end_as_the_original_shows_it() {
                 }
                 seen.push(st);
             }
-            c.advance(1);
+            c.advance(&mut a.engine.m, 1);
             ms += 1;
         }
         let first = seen.iter().zip(&want).position(|(v, o)| v != o);

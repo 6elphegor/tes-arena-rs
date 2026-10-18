@@ -2194,7 +2194,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         st.assets.level(engine);
     }
     if out.frame? == arena::engine::Frame::Left {
-        let next = areas::next(engine, dir, *run);
+        let next = areas::next(engine, dir, *run, None);
         if next.is_none() && engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
             // The ending's text is on the message line; the farewell's
             // vision and the main menu come up.
@@ -2310,7 +2310,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // time passing for its movie (`ui:ms:N`).
             if let Some((c, e)) = &mut st.ui {
                 match t.strip_prefix("ms:") {
-                    Some(ms) => c.advance(ms.parse().expect("--do ui:ms:N")),
+                    Some(ms) => c.advance(&mut e.m, ms.parse().expect("--do ui:ms:N")),
                     None => {
                         for inp in create::parse_script(t) {
                             c.input(e, inp);
@@ -4757,7 +4757,8 @@ impl App {
     /// On to the next area (`areas::next`), its assets made afresh;
     /// whether there is one.
     fn area_next(&mut self) -> bool {
-        let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) else { return false };
+        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let Some(run) = areas::next(&mut self.engine, &self.dir, self.run, Some(dac)) else { return false };
         self.run = run;
         self.assets = Assets::new(&self.dir, &mut self.engine);
         self.remake_renderer();
@@ -5504,7 +5505,7 @@ impl App {
             }
         }
         if let Some(c) = &mut self.creation {
-            c.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            c.advance(&mut self.engine.m, now.duration_since(self.movie_at).as_millis() as u32);
             self.creation_outcome();
         }
         self.creation_music();

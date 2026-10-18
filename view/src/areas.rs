@@ -31,6 +31,9 @@ pub struct Areas<'a> {
     /// The game ended (the player died, or the main quest is over): its
     /// text's number (1194:D459's AX).
     pub ending: Option<u16>,
+    /// The colours on the screen (the DAC, 6-bit) as the outer loop
+    /// runs, for what 1194:D459 reads of them (6E38 to 9A6E).
+    pub dac: Option<[[u8; 3]; 256]>,
 }
 
 /// The location record the view's cities use (as `world::city_load`).
@@ -44,7 +47,7 @@ impl AreaHooks for Areas<'_> {
     fn ending(&mut self, m: &mut Machine, ax: u16, si: u16, di: u16) {
         self.ending = Some(ax);
         let Some(files) = self.files.as_deref_mut() else { return };
-        if m.vision(files, &mut arena::vision::ClickThrough::default(), None, ax, si, di).is_none() {
+        if m.vision(files, &mut arena::vision::ClickThrough::default(), self.dac.as_ref(), ax, si, di).is_none() {
             eprintln!("the farewell's speech gave up: {}", arena::giveup::describe());
             self.failed = true;
         }
@@ -328,7 +331,7 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
     let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
     let mut copy = e.files.clone();
-    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None, dac: None };
     let r = e.m.game_load(&mut e.files, slot, h);
     let failed = h.failed;
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
@@ -456,18 +459,19 @@ impl arena::hooks::StairsHooks for Kept {
     }
 }
 
-/// there or the port can't follow (reported).
-pub fn next(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
+/// there or the port can't follow (reported). `dac`: the colours on the
+/// screen (6-bit), for the ending's read of them (`Areas::dac`).
+pub fn next(engine: &mut Engine, dir: &Path, run: Run, dac: Option<[[u8; 3]; 256]>) -> Option<Run> {
     engine.area_watch();
-    let next = next_watched(engine, dir, run);
+    let next = next_watched(engine, dir, run, dac);
     engine.area_watched();
     next
 }
 
-fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
+fn next_watched(engine: &mut Engine, dir: &Path, run: Run, dac: Option<[[u8; 3]; 256]>) -> Option<Run> {
     let mut files = std::mem::take(&mut engine.files);
     let r = {
-        let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None };
+        let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None, dac };
         let m = &mut engine.m;
         m.world_leave(h);
         m.world_end(h);
@@ -514,7 +518,7 @@ fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     let mut copy = files.clone();
     engine.files = files;
     let next = r?;
-    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None, dac: None };
     if engine.world_enter(h).is_none() || h.failed {
         // Kept noted (peek, not describe's take), so the caller can tell
         // the original's own fault from the port's.
