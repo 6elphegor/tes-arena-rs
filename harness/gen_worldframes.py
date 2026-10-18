@@ -272,6 +272,10 @@ KEY_F1 = 0x3B
 KEY_ESC = 0x01
 # N (the sheet's equipment page, 3276:52B0's first record).
 KEY_N = 0x31
+KEY_PAD_PLUS = 0x4E
+KEY_MINUS = 0x0C
+KEY_D = 0x20
+KEY_Y = 0x15
 # The automap's loop asks the mouse by the near entry (0000:2DB8: 8FC8).
 AUTOMAP_READ = (0, 0x8FC8)
 
@@ -627,6 +631,27 @@ CASES = {
     # the sheet), Esc (the sheet left), ten frames.
     'playequip': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
                                      ((), (KEY_F1,), 10, None)]),
+    # The equipment page's list scrolled: as playequip, with '+' twice
+    # (the keypad's: 3276:57D8's second record, 1194:1A4A, the lines one
+    # on) and '-' once (the third, 1A94, one back) between N and Esc.
+    'playequipscroll': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('keys', [KEY_PAD_PLUS]), ('keys', [KEY_PAD_PLUS]),
+                                                                                                   ('keys', [KEY_MINUS]), ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                           ((), (KEY_F1,), 10, None)]),
+    # The equipment page's list clicked: as playequip, the second line
+    # clicked (3276:57D8's first record, 1194:1AC6: marked, 1C5E) and
+    # clicked again (its item, worn, taken off: 1AFB, the page drawn
+    # again, 23B1) between N and Esc.
+    'playequipwear': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x42), ('click', 0x40, 0x42),
+                                                                                                 ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                         ((), (KEY_F1,), 10, None)]),
+    # An item dropped from the equipment page: as playequip, the third
+    # line clicked (marked, 1194:1C5E), D (3276:57D8's fourth record,
+    # 17D8: "Do you wish to drop the ...?", 48E9's menu) answered Y (the
+    # item dropped where the player stands, 18F6, the page drawn again)
+    # between N and Esc.
+    'playequipdrop': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_N]), ('click', 0x40, 0x4D), ('keys', [KEY_D]), ('keys', [KEY_Y]),
+                                                                                                 ('keys', [KEY_ESC]), ('keys', [KEY_ESC])]}),
+                                         ((), (KEY_F1,), 10, None)]),
     # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
     # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
     # frames, the Ring of Shielding used (the list's fourth: its spell

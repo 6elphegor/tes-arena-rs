@@ -68,6 +68,17 @@ createshot | rename | 22 | key:41@0000:A195 | 48504e8e5a06b76c | ef6ad023fa2b8c2
 createshot | rename | 23 | key:6c@0000:A195 | 8d68ae7783f5720f | ef6ad023fa2b8c2b
 createshot | rename | 24 | key:0d@0000:A195 | d08b448c8ff70774 | ef6ad023fa2b8c2b
 createshot | rename | 25 | end@1194:5DF6 | 37fe6036ad8a5a0 | ef6ad023fa2b8c2b
+createshot | emptyname | script | S,enter,enter,type:Ria,enter,F,enter
+createshot | emptyname | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
+createshot | emptyname | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4
+createshot | emptyname | 2 | key:0d@0000:A195 | 66558afe4b33e97b | e7a843e801b942b4
+createshot | emptyname | 3 | key:52@0000:A195 | 66558afe4b33e97b | e7a843e801b942b4
+createshot | emptyname | 4 | key:69@0000:A195 | d1acfb618828bb57 | e7a843e801b942b4
+createshot | emptyname | 5 | key:61@0000:A195 | c9e465dba5080e0e | e7a843e801b942b4
+createshot | emptyname | 6 | key:0d@0000:A195 | c7c3ceb55cdb9b8b | e7a843e801b942b4
+createshot | emptyname | 7 | key:46@3159:10E2 | d2c3c68b9d606068 | e7a843e801b942b4
+createshot | emptyname | 8 | buffered:0d@1194:5545 | 386dbbcfb1f4188b | 6c1d8428b606b30f
+createshot | emptyname | 9 | end@3159:00B9 | 48bb7a3f1d578e9d | 6c1d8428b606b30f
 createshot | select | script | S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175
 createshot | select | 0 | key:53@3159:10E2 | e4c9d82113635ae0 | e7a843e801b942b4
 createshot | select | 1 | held:0d@3159:092B | d25af477c900ffe7 | e7a843e801b942b4

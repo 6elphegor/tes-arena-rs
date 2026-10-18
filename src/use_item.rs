@@ -575,9 +575,19 @@ impl Machine {
     /// range; the copy is no longer worn and lands on the floor
     /// (`drop_to_floor`). Returns whether an item was dropped.
     pub fn drop_item(&mut self) -> bool {
+        self.drop_item_drawn(&mut |m| {
+            m.player_armor_class();
+            Some(())
+        }) == Some(true)
+    }
+
+    /// `drop_item` with `drawn` for 1CF0's redraw of the screen (23B1,
+    /// whose 7719 makes the armour class again) after the line count is
+    /// taken again. None where `drawn` gives up.
+    pub fn drop_item_drawn(&mut self, drawn: &mut dyn FnMut(&mut Machine) -> Option<()>) -> Option<bool> {
         let index = self.mem.r8(DS, SELECTED);
         if index == 0xFF {
-            return false;
+            return Some(false);
         }
         let si = PLAYER_SLOTS.wrapping_add((index as u16).wrapping_mul(SLOT_SIZE));
         self.mem.w8(DS, DROPPED_INDEX, index);
@@ -591,7 +601,7 @@ impl Machine {
                 al = self.count_items(DS, PLAYER_SLOTS).0 as u8;
             }
             self.mem.w8(DS, LAST_COUNT, al);
-            self.player_armor_class();
+            drawn(self)?;
         }
         let ax = (self.mem.r8(DS, LAST_COUNT) as u16).wrapping_add(self.mem.r16(DS, LINES)).wrapping_sub(7);
         if self.mem.r8(DS, FIRST_LINE) >= ax as u8 {
@@ -603,7 +613,7 @@ impl Machine {
         let f = self.mem.r8(DS, DROPPED.wrapping_add(item::FLAGS)) & 0x7F;
         self.mem.w8(DS, DROPPED.wrapping_add(item::FLAGS), f);
         self.drop_to_floor(DROPPED);
-        true
+        Some(true)
     }
 
     /// 1194:5F13, before the character sheet (2542:00E5): whether an
@@ -652,6 +662,14 @@ impl Machine {
     /// and starts over if an item was selected meanwhile; the port
     /// returns. None where the item's name gives up.
     pub fn drop_button(&mut self, ask: &mut dyn FnMut(&mut Machine) -> bool) -> Option<DropButton> {
+        self.drop_button_drawn(ask, &mut |m| {
+            m.player_armor_class();
+            Some(())
+        })
+    }
+
+    /// `drop_button` with `drawn` the redraw after a drop (`drop_item_drawn`).
+    pub fn drop_button_drawn(&mut self, ask: &mut dyn FnMut(&mut Machine) -> bool, drawn: &mut dyn FnMut(&mut Machine) -> Option<()>) -> Option<DropButton> {
         let colour = |m: &mut Machine, c: u8| m.mem.w8(DS, 0x9288, c);
         if self.mem.r16(DS, PLAYER_FLAGS) & NO_ROOM != 0 {
             colour(self, 0xFE);
@@ -673,7 +691,7 @@ impl Machine {
             self.drop_text(text::LOST);
             let yes = ask(self);
             self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x102C));
-            return Some(if yes { self.drop_selected() } else { DropButton::Nothing });
+            return if yes { self.drop_selected(drawn) } else { Some(DropButton::Nothing) };
         }
         let (count, _) = self.count_items(DS, PLAYER_SLOTS);
         if count == 0 {
@@ -691,17 +709,17 @@ impl Machine {
         self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x1026));
         let yes = ask(self);
         self.mem.w16(DS, 0xB036, self.mem.r16(DS, 0x102C));
-        Some(if yes { self.drop_selected() } else { DropButton::Nothing })
+        if yes { self.drop_selected(drawn) } else { Some(DropButton::Nothing) }
     }
 
     /// 1194:18F6 from the drop button: the selected item dropped, or with
     /// none "Drop what?".
-    fn drop_selected(&mut self) -> DropButton {
+    fn drop_selected(&mut self, drawn: &mut dyn FnMut(&mut Machine) -> Option<()>) -> Option<DropButton> {
         if self.mem.r8(DS, SELECTED) == 0xFF {
-            return self.drop_what();
+            return Some(self.drop_what());
         }
-        self.drop_item();
-        DropButton::Dropped
+        self.drop_item_drawn(drawn)?;
+        Some(DropButton::Dropped)
     }
 
     /// 1194:18CA: "Drop what?" in the colour FEh.
