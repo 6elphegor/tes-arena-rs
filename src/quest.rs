@@ -63,8 +63,12 @@ pub trait QuestHooks {
     /// 1194:A374 with AX 2: text number TEXT (with its flag TEXT_FLAG)
     /// written to the buffer at 1044.
     fn text(&mut self, _m: &mut Machine) {}
-    /// 0000:9AE6 (`font` 0) and 9AF8 (1): the text's fonts, AX the font.
-    fn font(&mut self, _m: &mut Machine, _which: u8, _ax: u16) {}
+    /// 0000:9AE6 (`which` 0) and 9AF8 (1): the text's fonts, AX the font.
+    /// By default as the original does it: AX to B036 or B038
+    /// (`Machine::font_selected`).
+    fn font(&mut self, m: &mut Machine, which: u8, ax: u16) {
+        m.font_selected(ax, which != 0);
+    }
     /// 1194:59CC: the message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:2E18: province `province`'s data loaded to PROVINCE_DATA

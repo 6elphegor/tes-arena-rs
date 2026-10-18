@@ -61,8 +61,11 @@ use var::*;
 /// What the screen leaves to the front end.
 pub trait OptionsHooks {
     /// 0000:9AE6 (`text` false) and 9AF8 (true): a font's record (AX)
-    /// made current.
-    fn font(&mut self, _m: &mut Machine, _ax: u16, _text: bool) {}
+    /// made current. By default as the original does it
+    /// (`Machine::font_selected`).
+    fn font(&mut self, m: &mut Machine, ax: u16, text: bool) {
+        m.font_selected(ax, text);
+    }
     /// 23F1:0145: the automap written (by default `Machine::automap_write`).
     fn automap_write(&mut self, m: &mut Machine, files: &mut Files) {
         m.automap_write(files);
