@@ -101,6 +101,7 @@ pub mod talk;
 pub mod tavern;
 pub mod text;
 pub mod textbox;
+pub mod title;
 pub mod transit;
 pub mod trigger;
 pub mod use_item;

@@ -313,6 +313,15 @@ class ScreenArena(DosArena):
                 self._wreg('cx', 1994)
                 self._wreg('dx', 0x0101)
                 return
+            if ah == 0x36:
+                # The disk's free space (the main menu's check, 1194:54D4,
+                # warns under 5M): 8 sectors of 512 bytes a cluster, 8000h
+                # of FFFFh clusters free (128M).
+                self._wreg('ax', 8)
+                self._wreg('bx', 0x8000)
+                self._wreg('cx', 0x200)
+                self._wreg('dx', 0xFFFF)
+                return
             self.unhandled = ('int21', ax >> 8)
         if intno == 0x1A and ax >> 8 == 0:
             self.timer += 1

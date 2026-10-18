@@ -715,9 +715,10 @@ fn creation_by_keys_and_clicks_as_by_script() {
     // `--create` gives them (`Creation::input`).
     let mut b = made(make());
     Driver::new(&mut b);
-    // The intro skipped, the title, Start; the opening story skipped;
+    // The intro's movie skipped, the rest of it left (Esc at the title),
+    // Start; the opening story skipped;
     // "Select" the class; the list's first class; the name; the gender.
-    let script = "enter,enter,S,esc,S,enter,type:Ria,enter,F";
+    let script = "enter,esc,S,esc,S,enter,type:Ria,enter,F";
     for (i, inp) in create::parse_script(script).into_iter().enumerate() {
         match inp {
             create::Input::Enter => d.key(&mut a, KeyCode::Enter, None),
@@ -1594,7 +1595,8 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.to_path_buf()), 0, false);
     let mut d = Driver::new(&mut b);
     d.key(&mut b, KeyCode::Enter, None);
-    d.key(&mut b, KeyCode::Enter, None);
+    // (The intro's movie skipped, the rest of it left: Esc at the title.)
+    d.key(&mut b, KeyCode::Escape, None);
     d.key(&mut b, KeyCode::KeyL, Some("L"));
     assert!(b.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
     let mut shot = hud::Screen::new(b.assets.palette);
@@ -1609,6 +1611,40 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     d.click(&mut b, 160, 4 + 3 * 14 + 3, MouseButton::Left);
     assert!(b.saveui.is_none() && b.creation.is_none(), "loaded and playing");
     assert_eq!(at(&b.engine), saved, "where it was saved");
+}
+
+/// The player killed (health 0, 2686:02B4): the world faded out, no
+/// farewell (the save's F77 is 9), the program's main back to its menu
+/// on the game's own state (`App::title_engine`: 0000:109B..1114) with
+/// the intro playing (10C9); its movie skipped and the rest left (Esc),
+/// the menu's Load (117E: the set-up on that state) and slot 1's row:
+/// the game loaded and playing.
+#[test]
+fn a_death_then_the_menus_load() {
+    use arena::mem::DS;
+    let Some(dir) = game_dir() else { return };
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return;
+    };
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    a.engine.m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+    a.engine.m.player_dies();
+    d.frame(&mut a);
+    d.wait(&mut a, 2000);
+    assert!(a.creation.is_some(), "the menu's screens are up");
+    assert!(a.title_engine.is_some(), "the title's state is kept");
+    assert_eq!(a.title_engine.as_ref().unwrap().m.mem.r8(DS, arena::title::var::SCROLL_DIGIT), b'4', "the intro's scrolls counted (4DCB)");
+    d.key(&mut a, KeyCode::Enter, None);
+    d.key(&mut a, KeyCode::Escape, None);
+    d.key(&mut a, KeyCode::KeyL, Some("L"));
+    assert!(a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
+    d.click(&mut a, 160, 4 + 14 + 3, MouseButton::Left);
+    assert!(a.saveui.is_none() && a.creation.is_none() && a.title_engine.is_none(), "loaded and playing");
+    assert_eq!(a.engine.m.mem.r16(DS, 0x05B1) & 0x100, 0, "the player alive again");
+    d.frame(&mut a);
 }
 
 /// Esc in play: the options screen (2542:000A). Its arrows change the

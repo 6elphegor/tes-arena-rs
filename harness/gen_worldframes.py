@@ -94,7 +94,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, STUB_SEG, fnv
-from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
+from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
@@ -448,6 +448,39 @@ def died(a):
     # world loop leaves before; the timer ticks all the same (the view's
     # frames tick before the frame).
     a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+
+
+# The main menu's wait for its regions (0000:1114: 1194:5CF4).
+MENU_WAIT = 0x1114
+
+
+def titled(a):
+    """From the death's RET (`died`), the program's main on (0000:10AE's
+    jump to 109B: 5B1 bit 100h, so 10B0 and 108B) through its menu's
+    screens (10C9: the intro, 1246, then MENU.IMG) to the menu's wait
+    for its regions (MENU_WAIT), with no input: the movies and pictures
+    each run their course. Run from 109B on a stack of its own (the
+    load's stack under the world's isn't main's). The timer (0151)
+    ticks at each read of it (the movies' frames wait on it); the songs
+    left out as everywhere (2F9F:001F)."""
+    saved = a.stub(location=False)
+    t = a.lin(a.ds, 0x0151)
+
+    def tick(mu, access, addr, size, value, _):
+        a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+
+    def menu(mu, addr, size, _):
+        a.waiting = ('menu',)
+        mu.emu_stop()
+    hooks = [a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1),
+             a.mu.hook_add(UC_HOOK_CODE, menu, None, a.lin(LOAD_SEG, MENU_WAIT), a.lin(LOAD_SEG, MENU_WAIT))]
+    try:
+        r = a.run_screen(0, 0x109B, near=True, count=3_000_000_000)
+    finally:
+        for h in hooks:
+            a.mu.hook_del(h)
+        a.unstub(saved)
+    assert r == ('menu',), f'the way to the menu stopped by {r}'
 
 
 def serviced(seg, off, script):
@@ -844,6 +877,10 @@ CASES = {
     # its way back to the program's menu (`died`; the save's F77 is 9: no
     # vision).
     'playdeath': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True})]),
+    # The same death, then the program's main back to its menu (`titled`:
+    # 0000:109B, 10B0, 108B, 10C9: the intro's movies and pictures, then
+    # MENU.IMG), stopped at the menu's wait for its regions.
+    'playtitle': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'title': True})]),
     # In the mages' guild the load leaves (`guild`), a slot free and
     # seeded: two frames, a potion bought (GUILD_SCRIPT), thirty frames.
     # In the town's first tavern with the main quest's informant there
@@ -1066,6 +1103,8 @@ def play(a, name, steps, tracks):
             # outer loop's death followed, `died`; the case ends there.)
             assert why == ('ended',), f'{name}: stopped by {why}'
             died(a)
+            if opts.get('title'):
+                titled(a)
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         if why == ('ended',) and opts.get('leaves'):
