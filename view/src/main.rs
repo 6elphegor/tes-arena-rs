@@ -2194,7 +2194,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         st.assets.level(engine);
     }
     if out.frame? == arena::engine::Frame::Left {
-        let next = areas::next(engine, dir, *run, None);
+        let next = areas::next(engine, dir, *run);
         if next.is_none() && engine.m.mem.r16(arena::mem::DS, 0x05B1) & 0x100 != 0 {
             // The ending's text is on the message line; the farewell's
             // vision and the main menu come up.
@@ -4757,8 +4757,7 @@ impl App {
     /// On to the next area (`areas::next`), its assets made afresh;
     /// whether there is one.
     fn area_next(&mut self) -> bool {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
-        let Some(run) = areas::next(&mut self.engine, &self.dir, self.run, Some(dac)) else { return false };
+        let Some(run) = areas::next(&mut self.engine, &self.dir, self.run) else { return false };
         self.run = run;
         self.assets = Assets::new(&self.dir, &mut self.engine);
         self.remake_renderer();
