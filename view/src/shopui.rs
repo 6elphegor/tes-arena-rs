@@ -158,6 +158,11 @@ impl ShopFront<'_, '_> {
         // the tiles' blocks, the banner's words: `Machine::shop_banner`).
         if m.shop_screen(&mut self.files, 0x12EB).is_none() || m.shop_banner(&mut self.files, si).is_none() {
             eprintln!("the shop's screen did not load: {}", arena::giveup::describe());
+        } else {
+            // 4CA1..4CBE: the name drawn centred on x A0h at row 3 (4 in
+            // [102C]'s font), in the font as yet unfreed.
+            let row = if m.mem.r16(DS, 0xB036) == m.mem.r16(DS, 0x102C) { 4 } else { 3 };
+            m.page_text_centred(si, 0xA0, row);
         }
         let title = m.mem.cstr(DS, si).to_vec();
         if let Some(t) = self.talk() {
@@ -165,55 +170,9 @@ impl ShopFront<'_, '_> {
         }
     }
 
-    /// A picture (1194:4B8E, its name at DS:`si`) on the shop's screen.
-    fn show_picture(&mut self, m: &mut Machine, si: u16) {
-        if m.shop_picture(&mut self.files, si).is_none() {
-            eprintln!("the shop's picture did not load: {}", arena::giveup::describe());
-        }
-        self.picture = si;
-        let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
-        if let Some(b) = self.talk().and_then(|t| t.backdrop.as_mut()) {
-            b.picture = Some(name);
-        }
-    }
-}
-
-impl arena::shops::ShopHooks for ShopFront<'_, '_> {
-    fn message(&mut self, m: &mut Machine, si: u16) {
-        // 4D31 leaves its font ([102E]: B036) and colour selected.
-        let font = m.mem.r16(DS, 0x102E);
-        m.mem.w16(DS, 0xB036, font);
-        m.mem.w8(DS, 0x9288, 0xC0);
-        if let Some(t) = self.talk() {
-            t.strip_message(m, si);
-        }
-    }
-    fn banner(&mut self, m: &mut Machine, si: u16) {
-        self.show_banner(m, si);
-    }
-    fn picture(&mut self, m: &mut Machine, si: u16) {
-        self.show_picture(m, si);
-    }
-    fn gold_left(&mut self, m: &mut Machine) {
-        m.gold_left();
-        let text = m.mem.cstr(DS, arena::shops::GOLD_LINE).to_vec();
-        // Once a question is left unanswered the turn is shown as it was.
-        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
-            b.gold = Some(text);
-        }
-    }
-    fn strip_back(&mut self, _m: &mut Machine) {
-        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
-            b.gold = None;
-        }
-    }
-    fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
-        self.front.menu(m, si, bx, di)
-    }
-    fn dialog(&mut self, m: &mut Machine, kind: u8, di: u16) -> u16 {
-        self.dialog_at(m, kind, 0, di)
-    }
-    fn dialog_at(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
+    /// The answer to a dialog (1194:4E88) of kind `kind`, its text at
+    /// DS:`si`, a number typed into DS:`di`, as the window's turn gives it.
+    fn dialog_answer(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
         let lines = if si != 0 { split_text(m, si) } else { Vec::new() };
         let raw = if si != 0 { split_raw(m, si) } else { Vec::new() };
         match kind {
@@ -267,9 +226,12 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             }
         }
     }
-    fn list(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
-        // Kinds 6 and 10 draw the text at DI as their title (1194:5734
-        // keeps it at A872 for 0000:5364); the others don't read it.
+
+    /// The line the player picks from a list (its kind `m.list_kind`), as
+    /// the window's turn answers it (FFFFh: none). Kinds 6 and 10 draw
+    /// the text at DI as their title (1194:5734 keeps it at A872 for
+    /// 0000:5364); the others don't read it.
+    fn list_pick(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
         let title = if di != 0 && matches!(m.list_kind, 6 | 0xA) { String::from_utf8_lossy(m.mem.cstr(DS, di)).into_owned() } else { String::new() };
         if let Some(entries) = self.lines.take() {
             let title = if title.is_empty() { Vec::new() } else { crate::hud::lines(title.as_bytes(), 0x0F) };
@@ -282,6 +244,94 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         match self.talk() {
             Some(t) => t.list(m, si, cx, &title),
             None => 0xFFFF,
+        }
+    }
+
+    /// A picture (1194:4B8E, its name at DS:`si`) on the shop's screen.
+    fn show_picture(&mut self, m: &mut Machine, si: u16) {
+        if m.shop_picture(&mut self.files, si).is_none() {
+            eprintln!("the shop's picture did not load: {}", arena::giveup::describe());
+        }
+        self.picture = si;
+        let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
+        if let Some(b) = self.talk().and_then(|t| t.backdrop.as_mut()) {
+            b.picture = Some(name);
+        }
+    }
+}
+
+impl arena::shops::ShopHooks for ShopFront<'_, '_> {
+    fn message(&mut self, m: &mut Machine, si: u16) {
+        // 4D31 leaves its font ([102E]: B036) and colour selected.
+        if let Some(t) = self.talk() {
+            t.strip_message(m, si);
+        }
+        m.shop_message(si);
+    }
+    fn banner(&mut self, m: &mut Machine, si: u16) {
+        self.show_banner(m, si);
+    }
+    fn picture(&mut self, m: &mut Machine, si: u16) {
+        self.show_picture(m, si);
+    }
+    fn screen_saved(&mut self, m: &mut Machine, files: &mut Files) {
+        // The page as the last frame left it (the screen last shown), which
+        // the shop's screen is drawn over and its lists keep.
+        if let Some(shown) = self.front.shown {
+            let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+            for (i, &b) in shown.iter().take(0xFA00).enumerate() {
+                m.mem.w8(seg, off.wrapping_add(i as u16), b);
+            }
+        }
+        m.shop_screen_saved(files, self.front.dac.as_ref());
+    }
+    fn screen_back(&mut self, m: &mut Machine, files: &mut Files) {
+        m.shop_screen_back(files);
+    }
+    fn gold_left(&mut self, m: &mut Machine) {
+        m.shop_strip_save();
+        m.gold_left();
+        m.page_text_centred(arena::shops::GOLD_LINE, 0xA0, 0x9C);
+        let text = m.mem.cstr(DS, arena::shops::GOLD_LINE).to_vec();
+        // Once a question is left unanswered the turn is shown as it was.
+        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
+            b.gold = Some(text);
+        }
+    }
+    fn strip_back(&mut self, m: &mut Machine) {
+        m.shop_strip_back();
+        if let Some(b) = self.talk().filter(|t| t.need.is_none()).and_then(|t| t.backdrop.as_mut()) {
+            b.gold = None;
+        }
+    }
+    fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {
+        self.front.menu(m, si, bx, di)
+    }
+    fn dialog(&mut self, m: &mut Machine, kind: u8, di: u16) -> u16 {
+        self.dialog_at(m, kind, 0, di)
+    }
+    fn dialog_at(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
+        let ax = self.dialog_answer(m, kind, si, di);
+        // The game's state round the answer (`Machine::shop_dialog`), the
+        // strip put back after it (4F34, 4F55, 4F84: 5FC0).
+        if si != 0 {
+            m.shop_dialog(si);
+        }
+        m.shop_strip_back();
+        ax
+    }
+    fn list(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
+        let pick = self.list_pick(m, si, cx, di);
+        // The game's state round the pick (`Machine::list_window`: the
+        // screen kept in the load bank, the panel, the window's record).
+        let kind = m.list_kind;
+        let seg = m.list_segment(kind);
+        match m.list_window(&mut self.files, kind, (seg, si), cx, di, pick) {
+            Some(ax) => ax,
+            None => {
+                eprintln!("the list's state gave up: {}", arena::giveup::describe());
+                pick
+            }
         }
     }
     /// 1194:D961 on entering: the main quest's person, if the stage's is
@@ -315,7 +365,7 @@ impl arena::store::StoreHooks for ShopFront<'_, '_> {
     }
     fn haggle(&mut self, m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         let (quality, mood) = (m.mem.r8(DS, 0x13CA), m.mem.r8(DS, 0x13CB));
-        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut());
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone());
         match m.haggle(&mut self.files, &mut io, eax, per, quality, mood, 0, mode, name) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (eax, true),
@@ -397,7 +447,7 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
     /// the dialogue's EMS bank and puts the stock's back (8665), so the
     /// stock in bank 18h is kept.
     fn haggle(&mut self, m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
-        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut());
+        let mut io = HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(self.files.clone());
         match m.haggle(&mut self.files, &mut io, price, per, quality as u8, factor as u8, 0, 2, 0x1A4C) {
             Some(Haggle::Deal(p)) => (p, false),
             _ => (price, true),
@@ -494,7 +544,7 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     /// The room's price (1391) haggled over with the innkeeper (1194:C14E).
     fn haggle(&mut self, m: &mut Machine, files: &mut Files) -> Option<(u32, bool)> {
-        m.tavern_room_haggle(files, &mut HaggleTalk::new(self.front.talk.as_deref_mut()))
+        m.tavern_room_haggle(files, &mut HaggleTalk::new(self.front.talk.as_deref_mut()).with_files(files.clone()))
     }
     /// 1194:CED7: the main quest's informant.
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {

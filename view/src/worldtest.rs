@@ -809,6 +809,9 @@ const GUILD_SCRIPT: [Act; 8] = [
 /// `kind`) run as its keeper's click runs them, between frames, `script`
 /// answering them; the turn's frame after them counted as the case's next.
 fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, script: &[Act]) {
+    // The screen as the window last showed it (the page the shop's screen
+    // is drawn over: `Front::shown`), as a shown window has it.
+    a.compose();
     super::super::super::shop_turn(a, kind);
     for act in script {
         assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");

@@ -80,6 +80,7 @@ pub mod scale;
 pub mod shop;
 pub mod shops;
 pub mod shopscreen;
+pub mod listwindow;
 pub mod sidequest;
 pub mod sky;
 pub mod skyobj;

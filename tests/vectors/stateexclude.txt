@@ -11,6 +11,8 @@ cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 127a 127e 0000:47FD's return address kept on the stack's check
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
 1024 1026 the haggle's SP (1194:8467), kept for its way out (84A4, 84AC): the port has no stack
+65a8 65aa the haggle's SP on entering (1194:8020), kept for its way out: the port has no stack
+7865 7867 the repairs' price text's SP (1194:CCFD), kept for its way out: the port has no stack
 9740 974e the polygon drawer's own stack (DS:974E down): its calls' return addresses and the image's segment (1000h higher in the harness) it pushes
 fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver)
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):
@@ -18,6 +20,17 @@ fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver
 cd34 cd36 the segment of the hook the areas set at CD32 (0000:0B22..: the image's, 1000h higher in the harness)
 cd50 cd52 the segment of the way out's hook (CD4E, 0000:0B3C)
 cd54 cd56 the segment of the hook at CD52 (0000:0B48)
+502a 502c the list window record at 5006's texts' segment (+24, 1194:595F): DGROUP's for texts there
+5049 504b the record at 5006's lines' drawing's segment (+43, from B800: the image's, 3159:076F)
+5054 5056 the record at 505B's texts' segment (+24)
+5073 5075 the record at 505B's lines' drawing's segment
+50d4 50d6 the record at 50B0's texts' segment (+24)
+50f3 50f5 the record at 50B0's lines' drawing's segment
+5129 512b the record at 5105's texts' segment (+24)
+5148 514a the record at 5105's lines' drawing's segment
+517e 5180 the record at 515A's texts' segment (+24)
+519d 519f the record at 515A's lines' drawing's segment
+b80c b80e the list window's record's segment (B80A's far pointer: DGROUP's)
 068a 068c a far pointer to the player's record (01A4) at 0688: its segment DGROUP's
 0d5e 0d60 the spell target list's first entry's segment (0D5C: DGROUP's for the player, 29CF:0145's cast at the player)
 7dbb 7dbc the flags a cast waiting for its target saves (7DBA): its high byte AH, the spells' segment's (3276h) left by the lookup (29CF:00FA)

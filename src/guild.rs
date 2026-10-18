@@ -257,6 +257,7 @@ impl Machine {
             self.mem.w8(DS, SHOP, 7);
             let bank = self.map_bank(0x18, 0);
             self.mem.w16(DS, SAVED_BANK, bank);
+            hooks.screen_saved(self, files);
             self.guild_enter(files, hooks)?;
             loop {
                 self.map_bank(0x18, 0);
@@ -290,6 +291,7 @@ impl Machine {
         self.mem.w8(DS, SHOP, 0xFF);
         self.stock_save(hooks);
         self.mem.w8(DS, HOLIDAY, 0xFF);
+        hooks.screen_back(self, files);
         let bank = self.mem.r16(DS, SAVED_BANK);
         self.map_bank(bank, 0);
         Some(())

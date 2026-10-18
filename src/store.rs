@@ -252,6 +252,7 @@ impl Machine {
         let saved = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 6);
         if self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x680F) == 0 {
+            hooks.screen_saved(self, files);
             let bank = self.map_bank(0x18, 0);
             self.mem.w16(DS, BANK, bank);
             self.store_enter(files, hooks)?;
@@ -283,6 +284,7 @@ impl Machine {
         self.mem.w8(DS, SHOP, 0xFF);
         self.mem.w8(DS, HOLIDAY, 0xFF);
         self.mem.w16(DS, 0xA91A, saved);
+        hooks.screen_back(self, files);
         let bank = self.mem.r16(DS, BANK);
         self.map_bank(bank, 0);
         Some(())
@@ -487,7 +489,9 @@ impl Machine {
         let lines = if weapons { 0x0FA0 } else { 0x2710 };
         // AX: 1 the weapons' list (1194:F7E9), 2 the armour's (F866).
         self.list_kind = if weapons { 1 } else { 2 };
-        let pick = hooks.list(self, lines, n, 0);
+        // DI as 1194:F142 or F204 leaves it: the lines' end (12CB, 12CD).
+        let di = self.mem.r16(DS, if weapons { 0x12CB } else { 0x12CD });
+        let pick = hooks.list(self, lines, n, di);
         if (pick as i16) < 0 {
             // 1194:F954
             hooks.strip_back(self);
