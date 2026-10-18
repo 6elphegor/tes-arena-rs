@@ -33,6 +33,8 @@ cd54 cd56 the segment of the hook at CD52 (0000:0B48)
 5148 514a the record at 5105's lines' drawing's segment
 517e 5180 the record at 515A's texts' segment (+24)
 519d 519f the record at 515A's lines' drawing's segment
+5b18 5b1a the bar's list's record at 5AF4's texts' segment (+24, 2542:0704): DGROUP's
+5b37 5b39 the record at 5AF4's lines' drawing's segment (+43, from B800: the image's, 3159:076F)
 b80c b80e the list window's record's segment (B80A's far pointer: DGROUP's)
 1282 1284 the spell's page's record's segment (1280's far pointer, 1194:5205: the image's 3276h)
 1234 1236 the spell's description's third word pushed (from 122E, 1194:6D87): playequipspellpage's spell's %s's segment, DGROUP's

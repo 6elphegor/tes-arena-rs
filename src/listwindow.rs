@@ -122,6 +122,47 @@ impl Machine {
         Some(ax)
     }
 
+    /// 2542:06F8 (24FA:0B78 the same): the list in the bar's corner over
+    /// the record at 5AF4 of `cx` strings at `seg`:`si` (the use list's,
+    /// the spellbook's), the line `pick` picked (the library's loop's
+    /// answer; FFFFh none): the record's texts and colours (+22..+2E:
+    /// FDh, FEh, F9h, F2h, F5h), TEENYFNT ([102E]) selected, the cursor
+    /// put back (541E), bank [1032] mapped and the page kept in it, the
+    /// list (3159:06A0), the bank mapped again and the page put back,
+    /// A902 bit 0 off. Returns AX, the record's pick. `screen`: the page
+    /// as the front end last showed it (the port's page holds no frame's
+    /// pixels), kept in the bank in its place. The page's showing (9466)
+    /// is the front end's. None where the list gives up.
+    pub fn bar_list(&mut self, screen: Option<&[u8]>, (seg, si): (u16, u16), cx: u16, pick: u16) -> Option<u16> {
+        const BAR: u16 = 0x5AF4;
+        self.mem.w16(DS, BAR + 0x22, si);
+        self.mem.w16(DS, BAR + 0x24, seg);
+        self.mem.w16(DS, BAR + 0x26, cx);
+        for (o, v) in [(0x28u16, 0xFDu8), (0x2B, 0xFE), (0x2C, 0xF9), (0x2D, 0xF2), (0x2E, 0xF5)] {
+            self.mem.w8(DS, BAR + o, v);
+        }
+        self.select_font(0x102E);
+        let f = self.mem.r16(DS, 0xA902) & 0xFFFE;
+        self.mem.w16(DS, 0xA902, f);
+        let bank = self.mem.r16(DS, 0x1032);
+        self.map_bank(bank, 0);
+        match screen {
+            Some(px) => {
+                let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+                for (i, &b) in px.iter().take(0xFA00).enumerate() {
+                    self.mem.w8(frame, i as u16, b);
+                }
+            }
+            None => self.page_copy(true),
+        }
+        let ax = self.window_list((DS, BAR), pick)?;
+        self.map_bank(bank, 0);
+        self.page_copy(false);
+        let f = self.mem.r16(DS, 0xA902) & 0xFFFE;
+        self.mem.w16(DS, 0xA902, f);
+        Some(ax)
+    }
+
     /// The page ([A8FE], FA00h bytes) to the frame's start (`to_frame`), or
     /// back.
     fn page_copy(&mut self, to_frame: bool) {

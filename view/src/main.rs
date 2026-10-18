@@ -3732,6 +3732,9 @@ impl App {
     fn panel_key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) {
         use winit::keyboard::KeyCode;
         let mut said = panels::Said::default();
+        if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
+            said.screen = Some(self.assets.shown.clone());
+        }
         let m = &mut self.engine.m;
         let mut cast = None;
         let mut page = false;
@@ -3858,7 +3861,12 @@ impl App {
             Some(panels::Panel::Use(names, sel)) => {
                 let n = names.len().max(1);
                 match code {
-                    KeyCode::Escape | KeyCode::KeyU => self.panel = None,
+                    // The library's loop left with nothing picked: the list's
+                    // state made all the same (FFFFh).
+                    KeyCode::Escape => {
+                        self.panel = None;
+                        panels::use_pick(m, &mut self.engine.files, 0xFFFF, &mut said);
+                    }
                     KeyCode::ArrowUp => *sel = (*sel + n - 1) % n,
                     KeyCode::ArrowDown => *sel = (*sel + 1) % n,
                     KeyCode::Enter | KeyCode::NumpadEnter => {
@@ -4128,6 +4136,9 @@ impl App {
     fn panel_click(&mut self, right: bool) {
         let (x, y) = self.screen_point();
         let mut said = panels::Said::default();
+        if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
+            said.screen = Some(self.assets.shown.clone());
+        }
         let mut cast = None;
         let mut back = false;
         let mut sheet_drop = None;
@@ -4254,6 +4265,12 @@ impl App {
             }
             // A line of the list in the bar's corner clicked (2542:06F8):
             // a line not marked is marked; the line marked is picked.
+            // A right click leaves the list (5AF4's flag 4000h), nothing
+            // picked.
+            Some(panels::Panel::Use(..)) if right => {
+                self.panel = None;
+                panels::use_pick(&mut self.engine.m, &mut self.engine.files, 0xFFFF, &mut said);
+            }
             Some(p @ (panels::Panel::Spellbook(_) | panels::Panel::Use(..))) => {
                 let hud = hud::Hud { menu: p.bar_list(&self.engine.m), ..Default::default() };
                 if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {

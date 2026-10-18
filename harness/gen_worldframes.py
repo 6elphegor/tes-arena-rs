@@ -285,8 +285,11 @@ KEY_MINUS = 0x0C
 KEY_D = 0x20
 KEY_Y = 0x15
 KEY_S = 0x1F
-# L (2542:02A3: the logbook, 27E3:0088).
+# L (2542:02A3: the logbook, 27E3:0088), U (034D: the use list), C
+# (026D: the spellbook).
 KEY_L = 0x26
+KEY_U = 0x16
+KEY_C = 0x2E
 
 
 def crowded_square(a):
@@ -647,6 +650,13 @@ CASES = {
     # (03A9 to 03CB), the loop after them (0137) asks again; ten frames.
     'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
                                    ((), (KEY_L,), 10, None)]),
+    # The use list (U, 2542:034D): wounded with a potion in the fifth
+    # line (`wounded_with_potion`), two frames, U held a frame: the list
+    # in the bar's corner (066A, 06F8: 3159:06A0 over 5AF4), its fifth
+    # line clicked twice (marked, then picked), the potion drunk; sixty
+    # frames.
+    'playuselist': ('dungeon', wounded_with_potion, [((), (), 2, None), ((KEY_U,), (), 1, None, [], {'script': [('click', 0xF0, 0xBD), ('click', 0xF0, 0xBD)]}),
+                                                      ((), (KEY_U,), 60, None)]),
     'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                      ((), (KEY_F1,), 10, None)]),
     # The sheet's equipment page: two frames, F1 held a frame (the sheet),

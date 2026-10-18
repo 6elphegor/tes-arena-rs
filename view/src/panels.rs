@@ -534,6 +534,9 @@ pub struct Said {
     /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
     /// not in a box.
     pub panel: Option<String>,
+    /// The screen as last shown, for a list that keeps the page (the bar's,
+    /// 2542:06F8).
+    pub screen: Option<Vec<u8>>,
 }
 
 impl Said {
@@ -577,8 +580,14 @@ impl arena::text::TextHooks for Said {
 }
 
 impl arena::use_item::UseHooks for Said {
-    fn pick(&mut self, _m: &mut Machine, _count: u16) -> u16 {
-        self.pick.take().unwrap_or(0xFFFF)
+    /// 24FA:0B78: the list in the bar's corner (`Machine::bar_list`) with
+    /// the line the player picked (FFFFh: left).
+    fn pick(&mut self, m: &mut Machine, count: u16) -> u16 {
+        let pick = self.pick.take().unwrap_or(0xFFFF);
+        m.bar_list(self.screen.as_deref(), (DS, arena::use_item::var::USABLE_NAMES), count, pick).unwrap_or_else(|| {
+            eprintln!("the use list gave up: {}", arena::giveup::describe());
+            0xFFFF
+        })
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         let t = m.mem.cstr(DS, si).to_vec();
