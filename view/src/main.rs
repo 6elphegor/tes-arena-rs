@@ -2142,7 +2142,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // a click on it at (X, Y), a key (esc, enter, s, t, a letter).
             let archive = st.assets.archive.clone();
             if step == "travel" {
-                match travel::Travel::open(&mut engine, &archive) {
+                match travel::Travel::open(&mut engine, &archive, Some(&st.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))) {
                     Ok(t) => st.travel = Some(t),
                     Err(b) => st.boxes = vec![b],
                 }

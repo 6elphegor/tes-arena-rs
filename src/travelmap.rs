@@ -83,8 +83,12 @@ pub trait TravelHooks: ClockHooks {
     /// The palette faded to the buffer at 929E (0000:5E3E, 9426; 1194:55B2
     /// after its buffer is cleared).
     fn screen(&mut self, _m: &mut Machine) {}
-    /// 0000:56C8: the resource named at DS:`si` loaded (BX `bx`).
-    fn resource(&mut self, _m: &mut Machine, _si: u16, _bx: u16) {}
+    /// 0000:56C8: the picture named at DS:`si` loaded (BX `bx`; by
+    /// default its state, `Machine::picture_to_frame`, the drawing the
+    /// front end's). None where it gives up.
+    fn resource(&mut self, m: &mut Machine, files: &mut Files, si: u16, bx: u16) -> Option<()> {
+        m.picture_to_frame(files, si, bx)
+    }
     /// 0000:5C86: EMS bank `bank` mapped (`Machine::ems_map`).
     fn bank(&mut self, m: &mut Machine, bank: u16) {
         m.ems_map(bank);
@@ -96,8 +100,13 @@ pub trait TravelHooks: ClockHooks {
     fn days(&mut self, m: &mut Machine, files: &mut Files) -> Option<u16> {
         m.travel_days(files)
     }
-    /// 1194:2F69's file load: the travel animation (named at 4096) to 902E.
-    fn animation(&mut self, _m: &mut Machine) {}
+    /// 1194:2F69's file load: the travel animation (named at 4096) to
+    /// the EMS frame at [902E] (0000:7428), bank 15h mapped. None where
+    /// it can't be loaded.
+    fn animation(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        let (seg, off) = (m.mem.r16(DS, 0x9030), m.mem.r16(DS, 0x902E));
+        m.file_load(files, 0x4096, seg, off).map(|_| ())
+    }
     /// 0000:5526 then 9466: frame `frame` of the travel animation drawn.
     fn animation_frame(&mut self, _m: &mut Machine, _frame: u8) {}
     /// 0000:142D: `minutes` minutes pass. False to have the game's clock
@@ -343,7 +352,7 @@ impl Machine {
             self.travel_screen_clear(hooks);
             let bank = self.tm16(0x929E);
             hooks.bank(self, bank);
-            hooks.resource(self, 0x6C35, 0x24);
+            hooks.resource(self, files, 0x6C35, 0x24)?;
             let f = self.tm16(0x05C8) | 0x20;
             self.mem.w16(DS, 0x05C8, f);
             let ax = hooks.days(self, files)?;
@@ -420,7 +429,7 @@ impl Machine {
             self.mem.w16(DS, DAYS, 0x7D0);
         }
         hooks.bank(self, 0x15);
-        hooks.animation(self);
+        hooks.animation(self, files)?;
         self.mem.w8(DS, ANIM_FRAME, 0);
         let days = self.tm16(DAYS);
         for _ in 0..days {

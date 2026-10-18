@@ -51,7 +51,7 @@ use arena::bsa::Files;
 use arena::engine::Engine;
 use arena::lineedit::EditKey;
 use arena::machine::Machine;
-use arena::mapscreen::{MapHooks, MapStart};
+use arena::mapscreen::{MapHooks, MapRegion, MapStart};
 use arena::mem::DS;
 use arena::travelmap::TravelHooks;
 
@@ -175,6 +175,8 @@ pub struct Travel {
     parch: Option<hud::Tiles>,
     /// Where the cursor last was over the map (the label's place).
     label_at: std::cell::Cell<Option<(i32, i32)>>,
+    /// Where the screen was last clicked (8F92, 8F94 for its passes).
+    at: (u16, u16),
     /// The label kept where it was: the search's screen (5E1D's copy,
     /// taken as its name is asked) put back after the list (0000:710E),
     /// until the map's next click.
@@ -226,17 +228,26 @@ struct Hooks<'a> {
     /// The province whose main quest's dungeon was reached (292B:0362's
     /// AX, `MapHooks::quest_dungeon`): its picture to show.
     quest: Option<u16>,
+    /// The page as the screen's pass left it (`Travel::page`), which a
+    /// box keeps what it covers of (1194:59C8).
+    screen: Option<Vec<u8>>,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
 
 impl TravelHooks for Hooks<'_> {
+    /// 1194:59C8: the box shown, and what it leaves in the game's state
+    /// (`Machine::message_shown`: what it covers of the page kept in bank
+    /// 18h, put away after the player's click).
     fn message_box(&mut self, m: &mut Machine, seg: u16, si: u16) {
         let lines = hud::lines(m.mem.cstr(seg, si), 0x0F);
         for l in &lines {
             println!("{}", hud::plain(l));
         }
         self.boxes.push(lines);
+        if m.message_shown((seg, si), self.screen.as_deref()).is_none() {
+            eprintln!("the message box gave up: {}", arena::giveup::describe());
+        }
     }
     /// 1194:48DB: the question (unwell: "Considering your condition...")
     /// asked as a menu (`Asking::Question`); not yet answered, staying.
@@ -300,23 +311,25 @@ impl MapHooks for Hooks<'_> {
 
 impl Travel {
     /// The map button pressed (2542:03DC): refused, its box; else the
-    /// screen's start (26F7:0000) on the world map.
-    pub fn open(engine: &mut Engine, archive: &crate::archive::Archive) -> Result<Travel, Lines> {
+    /// world kept (2542:0400, `Machine::map_keep`, `dac` the colours on
+    /// the screen) and the screen's start (26F7:0000) on the world map.
+    pub fn open(engine: &mut Engine, archive: &crate::archive::Archive, dac: Option<&[[u8; 3]; 256]>) -> Result<Travel, Lines> {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
         }
+        engine.m.map_keep(&mut engine.files, dac);
         Ok(Travel::begin(engine, archive, boxes))
     }
 
@@ -330,8 +343,12 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false };
-        let start = m.travel_map_begin(&mut h);
+        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
+        // The window's colours read from black (1194:55B2's fade before).
+        let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
+            eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
+            MapStart { id: m.mem.r8(DS, 0x0A4C), kind: m.mem.r8(DS, 0x0A47), province: m.mem.r8(DS, 0x0A46) }
+        });
         let raw = |name: &str, w: usize, h: usize| archive.read(name).map(|d| Image { x: 0, y: 0, w, h, px: d });
         // The window it runs (3159:000C on DATA:6C56) is the world map's:
         // TAMRIEL.MNU, its provinces' regions at 6D90, the current one
@@ -358,6 +375,7 @@ impl Travel {
             parch: hud::Tiles::load(archive, "PARCH.CIF", 20, 20),
             label_at: std::cell::Cell::new(None),
             label_held: false,
+            at: (0, 0),
             mapblink: archive.read("MAPBLINK.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             horse: dfa(archive, "HORSE.DFA"),
             journey: Vec::new(),
@@ -372,23 +390,85 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false }
+        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None }
     }
 
-    /// 26F7:0176: province `p`'s map (its data loaded, `travel_province`).
+    /// 26F7:0176: province `p`'s map (its data loaded and its window
+    /// opened, `Machine::travel_province_open`).
     fn show_province(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, p: u8) {
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
-        if engine.m.travel_map_province(&mut engine.files, &mut h, p).is_none() {
-            eprintln!("the province's data didn't load");
+        if engine.m.travel_province_open(&mut engine.files, &mut h, p, None).is_none() {
+            eprintln!("the province's map gave up: {}", arena::giveup::describe());
         }
         self.province = PICTURES.get(p as usize).and_then(|n| crate::create::image_with_palette(&engine.m, archive, n));
         self.shown = Some(p);
     }
 
-    /// The screen's end: the carry kept (`done`).
-    fn end(&mut self, engine: &mut Engine) {
+    /// 26F7:0218: the province's window ended (its Exit, or a journey
+    /// made), the world map's window back (`Machine::
+    /// travel_province_close`); true where the world's loop ends too (a
+    /// journey made), after its pass (3159:0085's 019A, the cursor where
+    /// it was).
+    fn province_close(&mut self, engine: &mut Engine) -> bool {
+        self.shown = None;
+        match engine.m.travel_province_close(&mut engine.files, None) {
+            Some(ended) => {
+                if ended {
+                    engine.m.travel_world_region(self.at.0, self.at.1);
+                }
+                ended
+            }
+            None => {
+                eprintln!("the province's map's end gave up: {}", arena::giveup::describe());
+                true
+            }
+        }
+    }
+
+    /// The page as a pass of the province's map leaves it, the cursor at
+    /// `at` (`draw` with nothing asked): what a box opened from its
+    /// handlers covers.
+    fn page(&self, engine: &Engine, (x, y): (u16, u16)) -> Option<Vec<u8>> {
+        let font = self.menu_font()?;
+        let mut screen = Screen::new([[0, 0, 0, 0xFF]; 256]);
+        let mut m = engine.m.clone();
+        let held = self.label_at.get();
+        self.draw(&mut screen, font, &mut m, x as i32, y as i32);
+        self.label_at.set(held);
+        Some(screen.indices().iter().map(|&c| c as u8).collect())
+    }
+
+    /// A pass of the province's window's loop (3159:0078..0085: 019A,
+    /// then its routine 26F7:0625, `Machine::travel_click`) with the
+    /// cursor where it was last clicked and the left button down
+    /// (`down`) or not: the nearest place, and with the button a pick
+    /// and its journey's box.
+    fn pass(&mut self, engine: &mut Engine, down: bool) {
+        use arena::controls::var::{BUTTONS, MOUSE_X, MOUSE_Y};
+        let screen = self.page(engine, self.at);
+        let m = &mut engine.m;
+        m.mem.w16(DS, MOUSE_X, self.at.0);
+        m.mem.w16(DS, MOUSE_Y, self.at.1);
+        m.window_regions();
+        let b = m.mem.r8(DS, BUTTONS);
+        m.mem.w8(DS, BUTTONS, down as u8);
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
-        let carry = engine.m.travel_map_end(&mut h, self.start);
+        h.screen = screen;
+        if m.travel_click(&mut engine.files, &mut h).is_none() {
+            eprintln!("the map's pass gave up: {}", arena::giveup::describe());
+        }
+        m.mem.w8(DS, BUTTONS, b);
+    }
+
+    /// The screen's end: the province's window ended first where it is
+    /// up, then the world's (`Machine::travel_map_close`); the carry kept
+    /// (`done`).
+    fn end(&mut self, engine: &mut Engine) {
+        if self.shown.is_some() {
+            self.province_close(engine);
+        }
+        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let carry = engine.m.travel_map_close(&mut h, self.start);
         let quest = h.quest;
         self.done = Some(carry);
         self.picture = quest.map(|ax| Picture::drawn(engine, ax));
@@ -469,33 +549,30 @@ impl Travel {
             return;
         }
         self.label_held = false;
+        self.at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        // 3159:019A: the region under the cursor (its mask's pixel), and
+        // 00F3: the right button as Esc (the world map's Exit's key, 1Bh;
+        // a province's regions have none), the left a region's handler.
         let Some(_) = self.shown else {
-            match REGIONS.iter().position(|&r| inside(r, x, y)) {
-                Some(9) => self.end(engine),
-                Some(p) => self.show_province(engine, archive, p as u8),
-                None => {}
+            let region = engine.m.travel_world_region(self.at.0, self.at.1);
+            match (right, region) {
+                (true, _) | (false, Some(9)) => self.end(engine),
+                (false, Some(p)) => self.show_province(engine, archive, p as u8),
+                (false, None) => {}
             }
             return;
         };
-        if inside(EXIT, x, y) {
-            self.exit(engine);
-        } else if inside(TRAVEL, x, y) {
-            self.travel(engine);
-        } else if inside(SEARCH, x, y) {
-            self.ask_name(engine);
-        } else {
+        if right {
+            // Nothing has the key; the pass after, the button let go.
+            self.pass(engine, false);
+            return;
+        }
+        match engine.m.travel_province_region(self.at.0, self.at.1) {
+            MapRegion::Exit => self.exit(engine),
+            MapRegion::Travel => self.travel(engine),
+            MapRegion::Search => self.ask_name(engine),
             // 26F7:0625 with the button down (AFF9).
-            use arena::controls::var::{BUTTONS, MOUSE_X, MOUSE_Y};
-            let m = &mut engine.m;
-            m.mem.w16(DS, MOUSE_X, x.clamp(0, 319) as u16);
-            m.mem.w16(DS, MOUSE_Y, y.clamp(0, 199) as u16);
-            let b = m.mem.r8(DS, BUTTONS);
-            m.mem.w8(DS, BUTTONS, if right { 2 } else { 1 });
-            let mut h = Self::hooks(&mut self.boxes, &engine.files);
-            if m.travel_click(&mut engine.files, &mut h).is_none() {
-                eprintln!("the click gave up: {}", arena::giveup::describe());
-            }
-            m.mem.w8(DS, BUTTONS, b);
+            MapRegion::Map => self.pass(engine, true),
         }
     }
 
@@ -515,11 +592,13 @@ impl Travel {
         self.done.is_none().then_some(self.shown)
     }
 
-    /// Exit: the province's map to the world map; the world map ends the
-    /// screen.
+    /// Exit (3159:0006): the province's map, after its pass, to the world
+    /// map; the world map ends the screen.
     fn exit(&mut self, engine: &mut Engine) {
         if self.shown.is_some() {
-            self.shown = None;
+            engine.m.window_close();
+            self.pass(engine, false);
+            self.province_close(engine);
         } else {
             self.end(engine);
         }
@@ -560,6 +639,8 @@ impl Travel {
         if ok.is_none() || failed {
             eprintln!("the journey gave up: {}", arena::giveup::describe());
         }
+        // The handler's pass after it (the button let go, 3159:0432).
+        self.pass(engine, false);
         if engine.m.mem.r16(DS, 0x12A2) != 0 {
             self.end(engine);
         }
@@ -626,12 +707,16 @@ impl Travel {
             self.asking = Some(Asking::List(hud::list_menu(&copy, Vec::new(), entries), typed));
             return;
         }
+        let screen = self.page(engine, self.at);
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         h.typed = typed;
         h.pick = pick;
+        h.screen = screen;
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
             eprintln!("the search gave up: {}", arena::giveup::describe());
         }
+        // The handler's pass after it.
+        self.pass(engine, false);
     }
 
     /// The search's name asked: the game's editor opened on a copy of the
@@ -687,6 +772,7 @@ impl Travel {
             Some(Asking::List(..)) => {
                 if code == KeyCode::Escape {
                     self.asking = None;
+                    self.pass(engine, false);
                 }
             }
             // Its keys (4B60: Y, N); Esc none.
@@ -858,15 +944,17 @@ impl Travel {
 
 /// After an input to the travel map (or a frame): its boxes to `boxes`;
 /// ended and the journey's frames played, it goes, its carry returned:
-/// opened by the map `button`, the area left on the carry
-/// (`Machine::map_button_done`, 2542:0411); else (`Travel::forced`) the
-/// caller's.
+/// opened by the map `button`, the area left on the carry and the world
+/// given back (`Machine::map_button_after`, 2542:0411); else
+/// (`Travel::forced`) the caller's.
 pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<Lines>, button: bool) -> Option<bool> {
     let t = travel.as_mut()?;
     boxes.extend(t.take_boxes());
     let carry = t.done.filter(|_| !t.journeying() && t.picture.is_none())?;
     if button {
-        engine.m.map_button_done(carry);
+        if engine.m.map_button_after(&mut engine.files, carry).is_none() {
+            eprintln!("the world given back gave up: {}", arena::giveup::describe());
+        }
     }
     *travel = None;
     Some(carry)
