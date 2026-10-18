@@ -943,10 +943,8 @@ pub fn after(travel: &mut Option<Travel>, engine: &mut Engine, boxes: &mut Vec<L
     let t = travel.as_mut()?;
     boxes.extend(t.take_boxes());
     let carry = t.done.filter(|_| !t.journeying() && t.picture.is_none())?;
-    if button {
-        if engine.m.map_button_after(&mut engine.files, carry).is_none() {
-            eprintln!("the world given back gave up: {}", arena::giveup::describe());
-        }
+    if button && engine.m.map_button_after(&mut engine.files, carry).is_none() {
+        eprintln!("the world given back gave up: {}", arena::giveup::describe());
     }
     *travel = None;
     Some(carry)
