@@ -130,9 +130,11 @@ impl Machine {
     /// put back (541E), bank [1032] mapped and the page kept in it, the
     /// list (3159:06A0), the bank mapped again and the page put back,
     /// A902 bit 0 off. Returns AX, the record's pick. `screen`: the page
-    /// as the front end last showed it (the port's page holds no frame's
-    /// pixels), kept in the bank in its place. The page's showing (9466)
-    /// is the front end's. None where the list gives up.
+    /// as the frame's input step finds it, from the front end (the
+    /// port's page holds no frame's pixels: the drawing's rows over the
+    /// interface, before the compass), kept in the bank in its place. The
+    /// page's showing (9466) is the front end's. None where the list gives
+    /// up.
     pub fn bar_list(&mut self, screen: Option<&[u8]>, (seg, si): (u16, u16), cx: u16, pick: u16) -> Option<u16> {
         const BAR: u16 = 0x5AF4;
         self.mem.w16(DS, BAR + 0x22, si);
@@ -168,8 +170,8 @@ impl Machine {
     /// picked (FFFFh none; `screen` as `bar_list`'s), and the spell picked
     /// kept at 5CAE. Returns the spell's number for the cast (29CF:071F,
     /// `Machine::cast_spell`), None where nothing was picked. (Shift+C,
-    /// the last spell again without the list, is not this.) None outside
-    /// where the list gives up.
+    /// the last spell again without the list, is `spellbook_last`.) None
+    /// outside where the list gives up.
     pub fn spellbook_list(&mut self, files: &mut Files, screen: Option<&[u8]>, pick: u16) -> Option<Option<u8>> {
         const BOOK: u16 = 0x01A4 + 0x367;
         self.mem.w8(DS, 0x100E, 9);
@@ -180,6 +182,32 @@ impl Machine {
         }
         self.mem.w8(DS, 0x5CAE, ax as u8);
         Some(Some(self.mem.r8(DS, BOOK.wrapping_add(ax))))
+    }
+
+    /// 2542:056A..059B (24FA:09EA the same) without the list: 100E 9; with
+    /// C held and a Shift (the key table at ACB5: 2Eh with 2Ah or 36h), or
+    /// the right button's release (7925, which the caller gives as 2826's
+    /// poll leaves it where the bar's click is taken: `released_right`),
+    /// the spell picked last (5CAE) again unless none (FFh). Every caller
+    /// leaves AH 0 (the C key's AX 2Eh from 05B8, the bar's AX the click's
+    /// x, 5Bh..72h), so the pick is 5CAE alone: kept at 5CAE and its
+    /// spell's number returned for the cast (29CF:071F). None: the list is
+    /// asked for (`spellbook_list`).
+    pub fn spellbook_last(&mut self, released_right: bool) -> Option<u8> {
+        const BOOK: u16 = 0x01A4 + 0x367;
+        use crate::controls::var::KEYS;
+        self.mem.w8(DS, 0x100E, 9);
+        let held = |m: &Machine, scan: u16| m.mem.r8(DS, KEYS + scan) != 0;
+        let shifted = held(self, 0x2E) && (held(self, 0x2A) || held(self, 0x36));
+        if !shifted && !released_right {
+            return None;
+        }
+        let al = self.mem.r8(DS, 0x5CAE);
+        if al == 0xFF {
+            return None;
+        }
+        self.mem.w8(DS, 0x5CAE, al);
+        Some(self.mem.r8(DS, BOOK.wrapping_add(al as u16)))
     }
 
     /// 29CF:060B: the names of the `cx` spells numbered at DS:`si` copied

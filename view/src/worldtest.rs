@@ -883,6 +883,47 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 24, |_| false);
         })),
+        "playcamp" => (Place::Wild, Box::new(|a: &mut App| at_hour(a, 12, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // Camping (R, 2542:01E6): its menu answered C (camp for a
+            // while), the hours typed (2, Enter: 1194:46BF); the rest's
+            // frames count them down to "done", its box read with Space.
+            // (R asks for the camp before the next frame, whose turn waits
+            // on the menu and the hours; answered, that frame goes on.)
+            a.compose();
+            d.key(a, KeyCode::KeyR, Some("r"));
+            d.frame(a);
+            assert!(a.pending.is_some(), "R asks how to rest");
+            d.key(a, KeyCode::KeyC, Some("c"));
+            d.key(a, KeyCode::Digit2, Some("2"));
+            d.key(a, KeyCode::Enter, None);
+            assert!(a.pending.is_none(), "the hours answered");
+            seen.push(state(a));
+            frames_reading(a, d, seen, 12);
+        })),
+        "playquickcast" => (Place::Dungeon, Box::new(|a: &mut App| {
+            // gen_worldframes.py's `last_spell`: Wizard's Fire (the book's
+            // seventh) the spell picked last.
+            a.engine.m.mem.w8(DS, 0x5CAE, 6);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // Shift+C (2542:056A): the last spell again without the list,
+            // its target clicked at the view's centre.
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+            assert!(a.panel.is_none(), "no list with a Shift");
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+            // (The harness's click puts the mouse at 160, 100; the window's
+            // click is the cursor's point, the mouse 4 up and left of it.)
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 9, |_| false);
+            frames(a, d, seen, 40, |_| false);
+        })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
@@ -966,6 +1007,21 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
             frames(a, d, seen, 11, |_| false);
+        })),
+        "playlogbar" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            frames(a, d, seen, 1, |_| false);
+            // The bar's scroll button (2542:06CE's table, 02A3): the
+            // logbook, its SP at 12C6 a word deeper than the L key's; a
+            // click off its buttons, Exit twice.
+            d.click(a, 131, 186, MouseButton::Left);
+            faded(a);
+            assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "the scroll button opens the logbook");
+            d.click(a, 0xA0, 0x60, MouseButton::Left);
+            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            faded(a);
+            frames(a, d, seen, 10, |_| false);
         })),
         "playuselist" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -1913,7 +1969,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern).
-const BUSY: [&str; 33] = ["playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 36] = ["playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1995,8 +2051,16 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// logbook paged and left in playlog (2542:02A3, 27E3:0088: the log read
 /// into bank [1030], its lines split there, each page's lines copied to
 /// 1044 and drawn, the page kept in LOG.$$$: `Machine::log_open`,
-/// `log_turn`, `log_close`).
-const BUSY_STATE: [&str; 36] = ["playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+/// `log_turn`, `log_close`), and camping for two hours in playcamp
+/// (2542:01E6, the camp's menu, the hours typed and counted down to
+/// "done": 1194:424E, 46BF, 456F), and the last spell cast again by
+/// Shift+C in playquickcast (2542:056A without the list:
+/// `Machine::spellbook_last`), and the use list's and the spellbook's in
+/// playuselist and playbook (the book's names sorted by 0000:0B9C; 2542:
+/// 06F8 keeps the page in bank [1032] as the frame's input step finds
+/// it: the drawing's rows 0..146, before the compass and C3A2's clear,
+/// over the interface).
+const BUSY_STATE: [&str; 41] = ["playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
@@ -2027,25 +2091,6 @@ fn one_case_leaves_the_state_as_the_original() {
         .map(|(kind, _)| kind)
         .collect();
     assert!(failed.is_empty(), "{name}: {} differ", failed.join(", "));
-}
-
-/// The cases whose DGROUP is the original's from their start and from
-/// the load, but not their EMS: the use list and the spellbook
-/// (playuselist, playbook, the book's names sorted by 0000:0B9C: 2542:06F8
-/// keeps the page in bank [1032], which the port takes from the screen
-/// the view composed, `Machine::bar_list`'s `screen`; the view's frame
-/// differs from the original's page in the compass and in the row under
-/// the view, 146, which the view clears after the drawing where the
-/// original's drawing covers it).
-const BUSY_STATE_DGROUP: [&str; 2] = ["playuselist", "playbook"];
-
-/// `BUSY_STATE_DGROUP`'s cases leave DGROUP as the original's do.
-#[test]
-fn busy_play_leaves_dgroup_as_the_original() {
-    for name in BUSY_STATE_DGROUP {
-        state_case(name);
-        state_load_case(name);
-    }
 }
 
 /// Each busy case's frames change the EMS banks as the original's do

@@ -523,8 +523,8 @@ pub struct Said {
     /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
     /// not in a box.
     pub panel: Option<String>,
-    /// The screen as last shown, for a list that keeps the page (the bar's,
-    /// 2542:06F8).
+    /// The page as the frame's input step finds it, for a list that keeps
+    /// it (the bar's, 2542:06F8: `App::list_page`).
     pub screen: Option<Vec<u8>>,
     /// The pick given straight to the use button's code, without its list
     /// (as gen_worldframes.py's `used` calls 24FA:0AFE, 1194:7AE7 and
@@ -921,6 +921,17 @@ pub fn book_cast(engine: &mut arena::engine::Engine, line: usize, said: &mut Sai
         Some(None) => {}
         None => eprintln!("the spellbook's list gave up: {}", arena::giveup::describe()),
     }
+}
+
+/// The spellbook's last spell cast again without the list (C with a
+/// Shift, or the right button's release `right`: `Machine::spellbook_last`,
+/// 29CF:071F); false where the list is to come up instead.
+pub fn book_cast_last(engine: &mut arena::engine::Engine, right: bool, said: &mut Said) -> bool {
+    let Some(n) = engine.m.spellbook_last(right) else { return false };
+    if engine.m.cast_spell(&mut engine.files, said, n).is_none() {
+        eprintln!("the cast gave up: {}", arena::giveup::describe());
+    }
+    true
 }
 
 /// The scroll of the list (FIRST_LINE) moved by `d` lines, kept in range.

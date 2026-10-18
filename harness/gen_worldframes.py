@@ -290,6 +290,21 @@ KEY_S = 0x1F
 KEY_L = 0x26
 KEY_U = 0x16
 KEY_C = 0x2E
+# R (2542:01E6: camping, 1194:424E), the digit 2 and Enter (the hours
+# typed, 1194:4800).
+KEY_R = 0x13
+KEY_2 = 0x03
+KEY_ENTER = 0x1C
+# The left Shift (C with it: the last spell again, 2542:057D).
+KEY_LSHIFT = 0x2A
+
+
+def last_spell(spell):
+    """The spellbook's line `spell` picked last (5CAE), as its list's
+    pick leaves it (2542:05A6)."""
+    def put(a):
+        a.mu.mem_write(a.lin(a.ds, 0x5CAE), bytes([spell]))
+    return put
 
 
 def crowded_square(a):
@@ -617,6 +632,18 @@ CASES = {
     # encounters (1194:887A) until enemies come and end it ("Enemies are
     # nearby", the box read with Space), then what came comes on.
     'playrest': ('wild', resting(0x100), [((), (), 300, None, [], {'script': [('keys', [KEY_SPACE])]})]),
+    # Camping (R, 2542:01E6) in the wilderness at noon: the camp's menu
+    # (1194:020E) answered C (camp for a while), the hours typed (2,
+    # Enter: 1194:46BF), then the rest's frames count them down (each 20
+    # minutes, 1194:456F) to "done" (its box read with Space).
+    'playcamp': ('wild', at_hour(12, 0x100), [((), (), 2, None), ((KEY_R,), (), 1, None, [], {'script': [('keys', [KEY_C]), ('keys', [KEY_2]), ('keys', [KEY_ENTER])]}),
+                                             ((), (KEY_R,), 12, None, [], {'script': [('keys', [KEY_SPACE])]})]),
+    # Shift+C (2542:056A with C and a Shift held, 057D..0594): the last
+    # spell picked (`last_spell`: Wizard's Fire, the book's seventh) cast
+    # again without the list (29CF:071F), its target clicked at the
+    # view's centre; forty frames of its flight.
+    'playquickcast': ('dungeon', last_spell(WIZARDS_FIRE), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
+                                                          ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 40, None)]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # `locked_door`'s door with a lock of level 1, picking armed
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
@@ -648,6 +675,12 @@ CASES = {
     # click off its buttons twice (27E3:01FC: the next page, 03A6), Exit
     # (107h..127h, B4h..C3h) twice: the first only ends the pages' loop
     # (03A9 to 03CB), the loop after them (0137) asks again; ten frames.
+    # The logbook by the bar's scroll button (2542:06CE's table, 02A3):
+    # two frames, the button clicked (down at the next frame's read of
+    # the mouse, up at the one after: the bar's click), a click off its
+    # buttons, Exit twice; as playlog, but the SP kept at 12C6 a word
+    # deeper.
+    'playlogbar': ('dungeon', None, [((), (), 2, None), ((), (), 11, None, [(131, 186)], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]})]),
     'playlog': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
                                    ((), (KEY_L,), 10, None)]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth

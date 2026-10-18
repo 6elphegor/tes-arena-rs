@@ -98,7 +98,8 @@ pub trait RestHooks: ClockHooks {
         0xFFFF
     }
     /// 1194:4800: the hours typed (up to 3 characters, NUL-terminated)
-    /// into DS:TYPED, which is zeroed before. Nothing typed ends the rest.
+    /// into DS:TYPED, which is zeroed before, the font and tiles 46BF
+    /// selects selected. Nothing typed ends the rest.
     fn type_hours(&mut self, _m: &mut Machine) {}
     /// 1194:59C8 (59CC): a message box with the text at DS:`si`.
     fn message(&mut self, _m: &mut Machine, _si: u16) {}
@@ -454,7 +455,11 @@ impl Machine {
     /// down, after an hour's healing at once.
     fn rest_hours(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> Option<()> {
         let n = loop {
+            // 46BF: ARENAFNT.DAT ([102C]) and the tiles [1036] selected
+            // (0000:9AE6, 9AF8) round the field's zeroing.
+            self.select_font(crate::shops::font::ARENA);
             self.mem.w32(DS, TYPED, 0);
+            self.select_tiles(0x1036);
             self.mem.w8(DS, COLOUR, 0x60);
             hooks.type_hours(self);
             if self.r_g8(TYPED) == 0 {
