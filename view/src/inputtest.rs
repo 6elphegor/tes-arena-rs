@@ -629,9 +629,11 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     setup(&mut b);
     let mut db = Driver::new(&mut b);
     db.frame(&mut b);
-    let mut said = panels::Said::default();
-    panels::cast(&mut b.engine, 0, &mut said);
-    same(&a, &b, "spell 0 clicked and panels::cast(0)");
+    // The list's run with its first line picked (`book_cast`: the page
+    // kept as shown, the line read back through 0B9C's order) and the cast.
+    let mut said = panels::Said { screen: Some(b.assets.shown.clone()), ..Default::default() };
+    panels::book_cast(&mut b.engine, 0, &mut said);
+    same(&a, &b, "spell 0 clicked and panels::book_cast(0)");
     // Its target clicked in the view: the same click as the script's.
     d.click(&mut a, 164, 74, MouseButton::Left);
     d.frames(&mut a, 2);
@@ -1049,7 +1051,10 @@ fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
     assert!(!a.captured, "no click on the sheet captured the mouse");
 }
 
-/// The logbook by L and by the scroll; a click turns its page, Exit leaves.
+/// The logbook by L and by the scroll, run by the game's loop
+/// (`Machine::log_open`, `log_turn`): Esc leaves; with pages, a click off
+/// the buttons turns one, and Exit ends the pages' loop first and leaves
+/// on the second click (27E3:03A9, 0137).
 #[test]
 fn the_logbook_by_l_and_the_scroll() {
     let Some(dir) = game_dir() else { return };
@@ -1059,20 +1064,20 @@ fn the_logbook_by_l_and_the_scroll() {
     let Some(panels::Panel::Log(log)) = &a.panel else { panic!("L opens the logbook") };
     let want = sheets::open_log(&a.engine.m, &a.engine.files);
     assert_eq!((log.missing, log.pages.len()), (want.missing, want.pages.len()), "the slot's log, as sheets::open_log reads it");
+    assert!(a.log_run.is_some(), "the game's logbook run up");
     d.key(&mut a, KeyCode::Escape, None);
-    assert!(a.panel.is_none(), "Esc leaves");
+    assert!(a.panel.is_none() && a.log_run.is_none(), "Esc leaves");
     let (x, y) = sheets::bar_centre(5);
     d.click(&mut a, x, y, MouseButton::Left);
     assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "the scroll opens the logbook");
-    // A page of the logbook turned by a click (when there is one more).
-    if let Some(panels::Panel::Log(log)) = a.panel.as_mut() {
-        log.pages = vec![vec![(false, "a".into())]; 2];
-        log.missing = false;
+    if a.log_run.is_some_and(|r| r.paging()) {
+        d.click(&mut a, 160, 100, MouseButton::Left);
+        assert!(matches!(&a.panel, Some(panels::Panel::Log(l)) if l.page == 1), "a click turns the page");
+        d.click(&mut a, 0x110, 0xB8, MouseButton::Left);
+        assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "Exit ends the pages' loop alone");
     }
-    d.click(&mut a, 160, 100, MouseButton::Left);
-    assert!(matches!(&a.panel, Some(panels::Panel::Log(l)) if l.page == 1), "a click turns the page");
     d.click(&mut a, 0x110, 0xB8, MouseButton::Left);
-    assert!(a.panel.is_none(), "Exit leaves");
+    assert!(a.panel.is_none() && a.log_run.is_none(), "Exit leaves");
 }
 
 /// The automap by M and by the map's button, centred on the player as

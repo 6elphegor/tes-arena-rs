@@ -43,6 +43,7 @@ pub mod load;
 pub mod light;
 pub mod lineedit;
 pub mod log;
+pub mod logbook;
 pub mod look;
 pub mod loot;
 pub mod loot_window;

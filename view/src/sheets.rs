@@ -16,8 +16,8 @@
 //!   colour 10h, after the '&', 8 rows lower, the line after it 16 on; the
 //!   others in 49h. "More..." at (10Eh, AAh) in 0Fh while pages remain.
 //!   No file: "Your logbook is empty." centred on (A0h, 64h) in FONT_A,
-//!   61h. Its buttons (27E3:01FC, rows B4h..C3h): Print (x 25h..4Ch, not
-//!   done here) and Exit (x 107h..127h); a click elsewhere turns the page.
+//!   61h. Its loop (27E3:01FC: the clicks, Print, Exit, the pages' end)
+//!   is the game's (`Machine::log_turn`); the pages drawn here follow it.
 
 use crate::archive::Archive;
 use crate::hud::{Font, Screen};
@@ -294,21 +294,6 @@ pub fn draw_log(screen: &mut Screen, log: &LogBook) {
     if log.page + 1 < log.pages.len() {
         screen.text_plain(f, 0x10E, 0xAA, "More...", 0x0F);
     }
-}
-
-/// What a click on the logbook does (27E3:01FC): rows B4h..C3h, x
-/// 25h..4Ch Print (None here), x 107h..127h Exit (true); elsewhere the
-/// next page (false).
-pub fn log_click(x: i32, y: i32) -> Option<bool> {
-    if (0xB4..=0xC3).contains(&y) && (0x25..=0x127).contains(&x) {
-        if x <= 0x4C {
-            return None;
-        }
-        if x >= 0x107 {
-            return Some(true);
-        }
-    }
-    Some(false)
 }
 
 /// The interface bar's buttons (2542:06CE's table at DGROUP 5BD2: x0, y0,

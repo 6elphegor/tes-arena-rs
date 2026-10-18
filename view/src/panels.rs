@@ -210,17 +210,6 @@ fn book_names(m: &Machine) -> Vec<Vec<u8>> {
         .collect()
 }
 
-/// The book's entry for the spellbook's line `line` picked (29CF:0642):
-/// the order table written as 0B9C writes it, then read at the line.
-pub fn book_pick(m: &mut Machine, line: usize) -> usize {
-    if let Some(order) = book_order(&book_names(m)) {
-        for (k, &o) in order.iter().enumerate() {
-            m.mem.w8(DS, 0x1044 + k as u16, o);
-        }
-    }
-    m.mem.r8(DS, 0x1044 + line as u16) as usize
-}
-
 /// `--do learn:N`: spell N of the spell files put in the player's book,
 /// for trying the spellbook (not how the game teaches spells: the mages'
 /// guild sells them).
@@ -534,6 +523,13 @@ pub struct Said {
     /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
     /// not in a box.
     pub panel: Option<String>,
+    /// The screen as last shown, for a list that keeps the page (the bar's,
+    /// 2542:06F8).
+    pub screen: Option<Vec<u8>>,
+    /// The pick given straight to the use button's code, without its list
+    /// (as gen_worldframes.py's `used` calls 24FA:0AFE, 1194:7AE7 and
+    /// 29CF:07C3).
+    pub listless: bool,
 }
 
 impl Said {
@@ -577,8 +573,17 @@ impl arena::text::TextHooks for Said {
 }
 
 impl arena::use_item::UseHooks for Said {
-    fn pick(&mut self, _m: &mut Machine, _count: u16) -> u16 {
-        self.pick.take().unwrap_or(0xFFFF)
+    /// 24FA:0B78: the list in the bar's corner (`Machine::bar_list`) with
+    /// the line the player picked (FFFFh: left).
+    fn pick(&mut self, m: &mut Machine, count: u16) -> u16 {
+        let pick = self.pick.take().unwrap_or(0xFFFF);
+        if self.listless {
+            return pick;
+        }
+        m.bar_list(self.screen.as_deref(), (DS, arena::use_item::var::USABLE_NAMES), count, pick).unwrap_or_else(|| {
+            eprintln!("the use list gave up: {}", arena::giveup::describe());
+            0xFFFF
+        })
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         let t = m.mem.cstr(DS, si).to_vec();
@@ -897,6 +902,24 @@ pub fn cast(engine: &mut arena::engine::Engine, sel: usize, said: &mut Said) {
         if engine.m.cast_spell(&mut engine.files, said, s.index).is_none() {
             eprintln!("the cast gave up: {}", arena::giveup::describe());
         }
+    }
+}
+
+/// The spellbook's list left with line `line` picked (`usize::MAX`:
+/// nothing; `Machine::spellbook_list`, its screen `said`'s) and the spell
+/// cast (29CF:071F); a spell with a target then waits for a click in the
+/// view, which aims it.
+pub fn book_cast(engine: &mut arena::engine::Engine, line: usize, said: &mut Said) {
+    let pick = if line == usize::MAX { 0xFFFF } else { line as u16 };
+    let screen = said.screen.take();
+    match engine.m.spellbook_list(&mut engine.files, screen.as_deref(), pick) {
+        Some(Some(n)) => {
+            if engine.m.cast_spell(&mut engine.files, said, n).is_none() {
+                eprintln!("the cast gave up: {}", arena::giveup::describe());
+            }
+        }
+        Some(None) => {}
+        None => eprintln!("the spellbook's list gave up: {}", arena::giveup::describe()),
     }
 }
 
