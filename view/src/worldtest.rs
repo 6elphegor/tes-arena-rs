@@ -1085,7 +1085,9 @@ fn case(name: &str) -> Option<Case> {
             assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "Print ends only the pages' loop");
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
-            frames(a, d, seen, 11, |_| false);
+            // The frame that took the key (or the button) ends with its screen.
+            seen.push(state(a));
+            frames(a, d, seen, 10, |_| false);
         })),
         "playlogbar" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
