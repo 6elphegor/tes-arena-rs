@@ -536,6 +536,7 @@ STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x
 # words paged to the tavern's menu; its Exit.
 INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
 TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
 
@@ -833,6 +834,10 @@ CASES = {
     # 13h, 9 rows high), 1194:E087's sorted list's first line (the way
     # told, its box clicked away), then the menu's Goodbye.
     'playtalkwhere': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_WHERE_SCRIPT)})]),
+    # "Where is" and its fourth line, the palace (marked by the first
+    # click, taken by the second: 3159:0A1D; the way told at once,
+    # 1194:E0DE): the list's DI, A872, as the talk's menu left it.
+    'playtalkpalace': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_PALACE_SCRIPT)})]),
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
     # The dungeon, two frames, the player killed (`killed`) and the frame
     # that ends the world loop for it, the outer loop's death followed to

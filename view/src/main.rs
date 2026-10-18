@@ -622,15 +622,27 @@ impl arena::talk::TalkHooks for Front<'_> {
         if !m.page_is_block() {
             return pick;
         }
+        // The page as it stands (the screen a box covers: `box_screen`) is
+        // the game's page block, which the list keeps in the load bank.
+        let page = m.mem.r16(arena::mem::DS, 0xA900);
+        if let Some(s) = self.box_screen().map(|s| s[..0xFA00].to_vec()) {
+            for (i, b) in s.into_iter().enumerate() {
+                m.mem.w8(page, i as u16, b);
+            }
+        }
         let kind = m.list_kind;
         let seg = m.list_segment(kind);
-        match m.list_window(files, kind, (seg, si), cx, di, pick) {
+        let ax = match m.list_window(files, kind, (seg, si), cx, di, pick) {
             Some(ax) => ax,
             None => {
                 eprintln!("the list's state gave up: {}", arena::giveup::describe());
                 pick
             }
-        }
+        };
+        // The page as the list leaves it (its picture drawn, the lines'
+        // box not put back: 5105's flags), which what follows covers.
+        self.drawn = Some((0..0xFA00u16).map(|i| m.mem.r8(page, i)).collect());
+        ax
     }
     /// 23F1:00A3: the place's name noted on the automap at its square,
     /// as the original notes the way told (and a place looked at).
