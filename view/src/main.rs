@@ -1719,6 +1719,10 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
 /// the port can't follow it.
 fn title_engine(engine: &Engine) -> Option<Engine> {
     let mut e = Engine::new(engine.m.clone(), engine.files.clone());
+    // The drawing's writes, done on its copy, carried as the machine's
+    // (`Engine::page_state`).
+    e.page_wrote = engine.page_wrote.clone();
+    e.page_ems_wrote = engine.page_ems_wrote.clone();
     match e.m.title_menu(&mut e.files, &mut arena::title::NoTitleHooks) {
         Some(()) => Some(e),
         None => {
@@ -1735,6 +1739,20 @@ fn title_load_setup(e: &mut Engine) {
     e.m.music_stop();
     if e.m.game_setup(&mut arena::start::SetupPort(&mut e.files)).is_none() || e.m.colours_load(&mut e.files, 0x1304, 0x929E).is_none() {
         eprintln!("the title's Load's set-up gave up: {}", arena::giveup::describe());
+    }
+}
+
+/// The key a list takes (3159:06A0: the arrows, PgUp, PgDn, Home, End).
+fn list_key_of(code: winit::keyboard::KeyCode) -> Option<hud::ListKey> {
+    use winit::keyboard::KeyCode;
+    match code {
+        KeyCode::ArrowUp => Some(hud::ListKey::Up),
+        KeyCode::ArrowDown => Some(hud::ListKey::Down),
+        KeyCode::PageUp => Some(hud::ListKey::PageUp),
+        KeyCode::PageDown => Some(hud::ListKey::PageDown),
+        KeyCode::Home => Some(hud::ListKey::Home),
+        KeyCode::End => Some(hud::ListKey::End),
+        _ => None,
     }
 }
 
@@ -3391,6 +3409,10 @@ impl App {
                     if self.area_left() {
                         return;
                     }
+                    if self.engine.m.mem.r16(arena::mem::DS, 0x05CA) & 0x8000 != 0 {
+                        self.new_game_menu();
+                        return;
+                    }
                 }
                 None => eprintln!("the frame ended: None ({})", arena::giveup::describe()),
             }
@@ -3644,6 +3666,23 @@ impl App {
         self.saveui = None;
     }
 
+    /// The options screen's New, once the frame after it left the area
+    /// and the outer loop went its way out (`areas::next`, 5CA bit
+    /// 8000h): the intro and the main menu, creation's on a fresh engine
+    /// (the start dungeon loaded, as a new game begins), the game's own
+    /// state as the program's main takes it back to its menu kept for the
+    /// menu's Load (`title_engine`).
+    fn new_game_menu(&mut self) {
+        self.title_engine = title_engine(&self.engine);
+        let archive = self.assets.archive.clone();
+        let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
+        let mut fresh = world::load(&self.dir, "START.MIF");
+        fresh.files.disk_from(&self.engine.files);
+        self.engine = fresh;
+        self.creation = Some(c);
+        self.movie_at = Instant::now();
+    }
+
     /// Esc: the options screen opened on the engine (`options`).
     fn open_options(&mut self) {
         let (ui, e) = options::OptionsUi::open(&self.engine, &self.assets.archive);
@@ -3676,16 +3715,10 @@ impl App {
                 self.open_saveui(saveui::Kind::Load);
                 self.saveui_under = under;
             }
-            arena::options::OptionsEnd::NewGame => {
-                self.title_engine = title_engine(&self.engine);
-                let archive = self.assets.archive.clone();
-                let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
-                let mut fresh = world::load(&self.dir, "START.MIF");
-                fresh.files.disk_from(&self.engine.files);
-                self.engine = fresh;
-                self.creation = Some(c);
-                self.movie_at = Instant::now();
-            }
+            // New left the area (C398 bit 80h, 5CA bit 8000h): the next
+            // frame ends the world loop, and the outer loop's way out
+            // takes the game to the main menu (`new_game_menu`).
+            arena::options::OptionsEnd::NewGame => {}
             arena::options::OptionsEnd::Quit => self.quit = true,
         }
     }
@@ -3949,19 +3982,26 @@ impl App {
                     }
                 }
             }
-            Some(panels::Panel::Spellbook(book)) => {
-                let n = panels::spells(m).len().max(1);
+            Some(p @ panels::Panel::Spellbook(_)) => {
                 match code {
                     // The library's loop left with nothing picked (FFFFh).
                     KeyCode::Escape => cast = Some(usize::MAX),
-                    KeyCode::ArrowUp => book.selected = (book.selected + n - 1) % n,
-                    KeyCode::ArrowDown => book.selected = (book.selected + 1) % n,
-                    KeyCode::Enter | KeyCode::NumpadEnter => cast = Some(book.selected),
-                    _ => {}
+                    KeyCode::Enter | KeyCode::NumpadEnter => {
+                        if let panels::Panel::Spellbook(book) = p {
+                            cast = Some(book.selected);
+                        }
+                    }
+                    // The list's keys as 3159:06A0 takes them.
+                    _ => {
+                        if let Some(k) = list_key_of(code) {
+                            p.bar_list_key(m, k);
+                        }
+                    }
                 }
             }
-            Some(panels::Panel::Use(names, sel)) => {
-                let n = names.len().max(1);
+            Some(p @ panels::Panel::Use(..)) => {
+                let panels::Panel::Use(_, sel, _) = p else { unreachable!() };
+                let sel = *sel;
                 match code {
                     // The library's loop left with nothing picked: the list's
                     // state made all the same (FFFFh).
@@ -3969,14 +4009,16 @@ impl App {
                         self.panel = None;
                         panels::use_pick(m, &mut self.engine.files, 0xFFFF, &mut said);
                     }
-                    KeyCode::ArrowUp => *sel = (*sel + n - 1) % n,
-                    KeyCode::ArrowDown => *sel = (*sel + 1) % n,
                     KeyCode::Enter | KeyCode::NumpadEnter => {
-                        let pick = *sel as u16;
+                        let pick = sel as u16;
                         self.panel = None;
                         panels::use_pick(m, &mut self.engine.files, pick, &mut said);
                     }
-                    _ => {}
+                    _ => {
+                        if let Some(k) = list_key_of(code) {
+                            p.bar_list_key(m, k);
+                        }
+                    }
                 }
             }
             Some(panels::Panel::Sheet) => match code {
@@ -4401,7 +4443,7 @@ impl App {
                 if let Some(i) = hud::menu_pick(&self.font, &hud, x, y).filter(|&i| i < n) {
                     let marked = match p {
                         panels::Panel::Spellbook(book) => &mut book.selected,
-                        panels::Panel::Use(_, sel) => sel,
+                        panels::Panel::Use(_, sel, _) => sel,
                         _ => unreachable!(),
                     };
                     if *marked != i {
@@ -4520,7 +4562,7 @@ impl App {
             sheets::BarAction::Use => {
                 let names = panels::usable_names(&self.engine.m);
                 if !names.is_empty() {
-                    self.panel = Some(panels::Panel::Use(names, 0));
+                    self.panel = Some(panels::Panel::Use(names, 0, 0));
                 }
             }
             sheets::BarAction::Camp => self.camp = true,
@@ -4807,15 +4849,7 @@ impl App {
         match &p.need {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
-                let list_key = match code {
-                    KeyCode::ArrowUp => Some(hud::ListKey::Up),
-                    KeyCode::ArrowDown => Some(hud::ListKey::Down),
-                    KeyCode::PageUp => Some(hud::ListKey::PageUp),
-                    KeyCode::PageDown => Some(hud::ListKey::PageDown),
-                    KeyCode::Home => Some(hud::ListKey::Home),
-                    KeyCode::End => Some(hud::ListKey::End),
-                    _ => None,
-                };
+                let list_key = list_key_of(code);
                 match code {
                     // A list's keys move its mark and its lines as
                     // 3159:06A0 does (`hud::list_key`); a menu's arrows

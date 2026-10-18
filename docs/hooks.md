@@ -38,7 +38,7 @@ the original routine:
 | `AreaHooks::build_dungeon` | src/transit.rs:102 | 2294:0ED4 and 0000:28BC | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_create` with the seed (dungeon vectors) |
 | `AreaHooks::city_screen` | src/transit.rs:106 | 2294:11F2 | present | 2294:11F2 is the heap check (int3 on a bad heap); nothing to keep | |
 | `AreaHooks::ems_free` | src/transit.rs:166 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
-| `AreaHooks::ending` | src/transit.rs:87 | 1194:D459 | overridden | the view: areas.rs Areas<'_> | elsewhere: the window shows the farewell's vision (`Creation::ending`, vision.txt frame by frame); the message line is only the scripted runs' |
+| `AreaHooks::ending` | src/transit.rs:87 | 1194:D459 | overridden | the view: areas.rs Areas<'_> | faithful: `Machine::vision` (its pages clicked through, `ClickThrough`); the window shows the farewell's vision (`Creation::ending`, vision.txt frame by frame) |
 | `AreaHooks::entered` | src/transit.rs:180 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
 | `AreaHooks::hands` | src/transit.rs:159 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
 | `AreaHooks::hook_2631` | src/transit.rs:162 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
@@ -390,6 +390,10 @@ the original routine:
 | `TitleHooks::movie_frame` | src/title.rs:68 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
 | `TitleHooks::picture` | src/title.rs:77 | 0000:5828 | present | a picture shown, faded or dissolved in | |
 | `TitleHooks::wait` | src/title.rs:80 | 0000:13BF | present | the intro's waits; none ended by a key | |
+| `VisionHooks::fade_out` | src/vision.rs:107 | 1194:55B2 | present | the screen faded out; the view's ending shows the vision | |
+| `VisionHooks::frame` | src/vision.rs:102 | 0000:618F | present | the speech's movie's frame drawn and shown | |
+| `VisionHooks::line` | src/vision.rs:105 | 0000:5364 | present | a line of the speech's page drawn | |
+| `VisionHooks::mouse` | src/vision.rs:97 | 0000:9012 | overridden | the view: vision.rs ClickThrough | elsewhere: a click at each page, as the vectors' run clicks; by default no button, the place kept |
 | `TriggerHooks::artifact_audience` | src/trigger.rs:100 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port and its box |
 | `TriggerHooks::blackout` | src/trigger.rs:106 | 1194:55B2 | overridden | the view: main.rs Front<'_>, screentest.rs DoorHooks | present: the fade the window plays (areafade.txt) |
 | `TriggerHooks::enter_city` | src/trigger.rs:125 | 0000:4EFD and 946A | present | the view's window and the screen cleared | |

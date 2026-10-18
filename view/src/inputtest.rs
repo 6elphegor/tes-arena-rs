@@ -1075,6 +1075,41 @@ fn the_travel_map_by_shift_m_and_clicks_as_by_script() {
     assert_eq!(here, "Shornhelm", "the location record");
 }
 
+/// The spellbook in the bar's corner keeps its first line shown as
+/// 3159:06A0's record does: Up on the first line and Down on the last
+/// stay (they don't go round), End marks the last with the lines as low
+/// as they go, Home the first.
+#[test]
+fn the_spellbook_keys_stop_at_its_ends() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
+    let c = a.engine.m.mem.r8(arena::mem::DS, 0x01A9) | 0x20;
+    a.engine.m.mem.w8(arena::mem::DS, 0x01A9, c);
+    let f = a.engine.m.mem.r16(arena::mem::DS, 0x05CA) & !8;
+    a.engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+    for k in 0..8 {
+        panels::learn(&mut a.engine.m, k);
+    }
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyC, None);
+    let book = |a: &App| match &a.panel {
+        Some(panels::Panel::Spellbook(b)) => (b.selected, b.top),
+        _ => panic!("the spellbook is up"),
+    };
+    let n = panels::spells(&a.engine.m).len();
+    assert!(n > 4, "more spells than the corner shows ({n})");
+    d.key(&mut a, KeyCode::ArrowUp, None);
+    assert_eq!(book(&a), (0, 0), "Up on the first line stays");
+    d.key(&mut a, KeyCode::End, None);
+    let (sel, top) = book(&a);
+    assert!(sel == n - 1 && top > 0, "End: the last marked, the lines scrolled ({sel}, {top})");
+    d.key(&mut a, KeyCode::ArrowDown, None);
+    assert_eq!(book(&a), (sel, top), "Down on the last line stays");
+    d.key(&mut a, KeyCode::Home, None);
+    assert_eq!(book(&a), (0, 0), "Home");
+}
+
 /// A province's map: its regions and buttons have no keys (MAPBTNS's
 /// regions' +59h are all 20h, which 3159:0171 passes over), so Esc, T,
 /// S and Enter do nothing there; Esc is the world map's Exit's key
@@ -1935,7 +1970,9 @@ fn the_options_screen_by_esc() {
     assert!(a.options.is_none() && a.quit, "Yes: the program ends");
 }
 
-/// The options screen's New: the main menu (5CA bit 8000h's outer loop).
+/// The options screen's New: the area left, and with the next frame the
+/// world loop's end and the outer loop's way out (5CA bit 8000h) bring up
+/// the main menu.
 #[test]
 fn the_options_screens_new_goes_to_the_main_menu() {
     let Some(dir) = game_dir() else { return };
@@ -1944,7 +1981,9 @@ fn the_options_screens_new_goes_to_the_main_menu() {
     d.frame(&mut a);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x20, 0x80, MouseButton::Left);
-    assert!(a.options.is_none() && a.creation.is_some(), "New: the main menu");
+    assert!(a.options.is_none() && a.creation.is_none(), "New: the game goes on to the frame's end");
+    d.frame(&mut a);
+    assert!(a.creation.is_some(), "New: the main menu after the frame");
 }
 
 /// A creature's flat (bit 2 of its map word's high byte) ahead of the

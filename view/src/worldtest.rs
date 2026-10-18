@@ -273,8 +273,8 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     play(&mut a, &mut d, &mut seen);
     // The harness's last frame, run again with the page's writes watched
     // (gen_worldframes.py `play`): the page it leaves is the case's. (The
-    // guild's case runs none.)
-    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 {
+    // guild's case runs none, nor a game ended or back at the main menu.)
+    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 && a.creation.is_none() {
         d.frame(&mut a);
     }
     Some((a, seen, save))
@@ -1073,7 +1073,7 @@ fn case(name: &str) -> Option<Case> {
             // which keeps the screen as shown in bank [1032].
             a.compose();
             d.key(a, KeyCode::KeyU, Some("u"));
-            assert!(matches!(&a.panel, Some(crate::panels::Panel::Use(n, _)) if n.len() > 4), "U opens the use list");
+            assert!(matches!(&a.panel, Some(crate::panels::Panel::Use(n, _, _)) if n.len() > 4), "U opens the use list");
             d.click(a, 0xF0, 0xBD, MouseButton::Left);
             d.click(a, 0xF0, 0xBD, MouseButton::Left);
             assert!(a.panel.is_none(), "the potion picked");
@@ -1393,6 +1393,30 @@ fn case(name: &str) -> Option<Case> {
             // gen_worldframes.py's `killed`: health 0, 2686:02B4; the
             // frame that ends the world loop for it, and the view's way on
             // (`App::area_next`: the outer loop's death, 0000:0CE1..0D43).
+            let m = &mut a.engine.m;
+            m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+            m.player_dies();
+            d.frame(a);
+        })),
+        "playnew" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // gen_worldframes.py's `newgame`: the options screen's New
+            // (2542:0627, `Machine::options_new`); the frame that ends the
+            // world loop for it, the outer loop's way out and the program's
+            // main back to its menu (`App::new_game_menu`, its copy of the
+            // game kept for the menu's Load, `title_engine`), whose state
+            // the case leaves.
+            let e = &mut a.engine;
+            e.m.options_new(&mut e.files, &mut arena::options::NoOptionsHooks);
+            d.frame(a);
+            a.engine = a.title_engine.take().expect("the way back to the menu");
+        })),
+        "playfarewell" => (Place::Dungeon, Box::new(|a: &mut App| a.engine.m.mem.w8(DS, 0x0F77, 3)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // `playdeath` at the main quest's third stage (gen_worldframes.py's
+            // `farewell`, F77 3): the outer loop's death plays the farewell's
+            // vision (1194:D459, `Machine::vision`), its pages clicked
+            // through.
             let m = &mut a.engine.m;
             m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
             m.player_dies();
@@ -2205,6 +2229,42 @@ fn a_death_goes_back_to_the_menu_as_the_original() {
     state_case("playtitle");
     state_load_case("playtitle");
     state_ems_case("playtitle");
+}
+
+/// The options screen's New (`playnew`: 2542:0627, then the frame that
+/// ends the world loop, the outer loop's way out and the program's main
+/// back to its menu, 0000:109B..1114): DGROUP from the case's start and
+/// from the load, the EMS banks, and the page the menu waits on, as the
+/// original leaves them at the menu's wait.
+#[test]
+fn new_goes_back_to_the_menu_as_the_original() {
+    let (place, setup, play) = case("playnew").unwrap();
+    let Some((a, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playnew"), "playnew: the player's frames differ from the original's");
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("screen | playnew | ")).expect("a screen line");
+    assert_eq!(format!("{:x}", fnv(page)), want.split(' ').next().unwrap(), "playnew: the menu's page differs from the original's");
+    state_case("playnew");
+    state_load_case("playnew");
+    state_ems_case("playnew");
+}
+
+/// A death at the main quest's third stage (`playfarewell`: F77 3, so
+/// the outer loop's death plays the farewell's vision, 1194:D459, with
+/// the install's speech, its pages clicked through): DGROUP from the
+/// case's start and from the load, and the EMS banks, as the original
+/// leaves them at the death's RET (0000:0D43).
+#[test]
+fn a_death_plays_the_farewell_as_the_original() {
+    let (place, setup, play) = case("playfarewell").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playfarewell"), "playfarewell: the player's frames differ from the original's");
+    state_case("playfarewell");
+    state_load_case("playfarewell");
+    state_ems_case("playfarewell");
 }
 
 /// The screens opened in play whose state is the engine's

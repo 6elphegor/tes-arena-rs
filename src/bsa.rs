@@ -217,6 +217,14 @@ impl Files {
     pub fn new(dir: &Path) -> std::io::Result<Self> {
         let mut files = Self { names: HashMap::new(), bsa: None, dos: Dos::default(), written: HashMap::new(), deleted: Default::default() };
         files.add_dir(dir)?;
+        // The install's speech (SPEECH\nnnn_mmX.VOC, 2F75:000A and 023F
+        // open them by that path), by their names as the rest; a name the
+        // game's directory has stays its own.
+        if let Ok(rd) = std::fs::read_dir(dir.join("SPEECH")) {
+            for e in rd.flatten() {
+                files.names.entry(e.file_name().to_string_lossy().to_uppercase().into_bytes()).or_insert(e.path());
+            }
+        }
         Ok(files)
     }
 
@@ -855,6 +863,14 @@ impl Machine {
     pub fn file_open_handle(&mut self, files: &mut Files, name: u16) -> Option<u16> {
         let (handle, found) = self.file_open_any(files, name)?;
         found.then_some(handle)
+    }
+
+    /// A handle its routine keeps itself (`file_open_handle`'s) made the
+    /// one the port's file calls work on again, as its DOS calls pass it
+    /// (the movies' reads, 0000:618F, after other files opened and closed
+    /// meanwhile).
+    pub(crate) fn file_on(&mut self, files: &mut Files, h: u16) {
+        files.dos.cur = h;
     }
 
     /// The part of 67C4 and 6B26 they share: (handle, found).

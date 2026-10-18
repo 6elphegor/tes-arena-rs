@@ -291,7 +291,7 @@ impl Machine {
 
     /// 0000:618F's reads: the frame's 10h-byte head into the buffer, and
     /// each chunk's head and bytes (`size` for a copy chunk, 10h).
-    fn movie_frame_read(&mut self, files: &mut Files, buf: u16, size: u16) {
+    pub(crate) fn movie_frame_read(&mut self, files: &mut Files, buf: u16, size: u16) {
         self.file_read(files, buf, 0, 0x10);
         let chunks = self.mem.r16(buf, 6);
         for _ in 0..chunks {

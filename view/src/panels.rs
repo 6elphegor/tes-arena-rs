@@ -229,8 +229,9 @@ pub enum Panel {
     /// The logbook (`sheets`).
     Log(crate::sheets::LogBook),
     /// The bar's use button (2542:034D): the items with an effect, a list
-    /// in the bar's corner (2542:066A) and the line picked.
-    Use(Vec<String>, usize),
+    /// in the bar's corner (2542:066A), the line picked and the first line
+    /// shown (3159:06A0's record +39h and +3Bh, both 0 as it comes up).
+    Use(Vec<String>, usize, usize),
 }
 
 /// The inventory: the use list when it is up (the names, the line
@@ -455,6 +456,8 @@ impl SpellPage {
 pub struct Spellbook {
     /// The line picked (3159:06A0's, from the first).
     pub selected: usize,
+    /// The first line shown (the list's record +3Bh, 0 as it comes up).
+    pub top: usize,
 }
 
 impl Panel {
@@ -469,13 +472,13 @@ impl Panel {
     /// spell names (29CF:060B, each the record's name as 0654 copies it)
     /// or the items' (066A, 13h at most), the line picked.
     pub fn bar_list(&self, m: &Machine) -> Option<crate::hud::Menu> {
-        let (names, selected) = match self {
+        let (names, selected, top) = match self {
             Panel::Spellbook(book) => {
                 let names = book_names(m);
                 let order = book_order(&names).unwrap_or_else(|| (0..names.len() as u8).collect());
-                (order.iter().map(|&o| String::from_utf8_lossy(&names[o as usize]).into_owned()).collect(), book.selected)
+                (order.iter().map(|&o| String::from_utf8_lossy(&names[o as usize]).into_owned()).collect(), book.selected, book.top)
             }
-            Panel::Use(names, sel) => (names.clone(), *sel),
+            Panel::Use(names, sel, top) => (names.clone(), *sel, *top),
             _ => return None,
         };
         Some(crate::hud::Menu {
@@ -486,8 +489,22 @@ impl Panel {
             list: true,
             kind: crate::hud::BAR_LIST,
             font: None,
-            top: None,
+            top: Some(top),
         })
+    }
+
+    /// A key on the spellbook or the use list: its line marked and first
+    /// line shown moved as 3159:06A0 moves them (`hud::list_key`: the
+    /// arrows stop at the ends).
+    pub fn bar_list_key(&mut self, m: &Machine, key: crate::hud::ListKey) {
+        let Some(mut menu) = self.bar_list(m) else { return };
+        crate::hud::list_key(&mut menu, key);
+        let top = menu.top.unwrap_or(0);
+        match self {
+            Panel::Spellbook(book) => (book.selected, book.top) = (menu.selected, top),
+            Panel::Use(_, sel, t) => (*sel, *t) = (menu.selected, top),
+            _ => {}
+        }
     }
 }
 

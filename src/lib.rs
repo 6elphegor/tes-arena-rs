@@ -106,3 +106,4 @@ pub mod title;
 pub mod transit;
 pub mod trigger;
 pub mod use_item;
+pub mod vision;
