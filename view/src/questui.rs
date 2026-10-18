@@ -256,9 +256,9 @@ impl QuestHooks for QuestFront<'_, '_> {
         let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: 0, font: None };
         if t.ask_menu(menu) == 0 { 0 } else { 1 }
     }
-    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
+    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8, di: u16) -> Option<bool> {
         let mut io = HaggleTalk::new(self.0.talk.as_deref_mut()).with_files(self.1.clone(), m.page_is_block());
-        let r = m.haggle(files, &mut io, price, per, 0x1E, 0x28, 0, mode, 0)?;
+        let r = m.haggle(files, &mut io, price, per, 0x1E, 0x28, 0, mode, di)?;
         Some(r == Haggle::NoDeal)
     }
     fn audience(&mut self, m: &mut Machine, files: &mut Files, part: u8) -> Option<()> {

@@ -18,6 +18,9 @@ pub struct Memory {
     /// While tracking (`track`), DGROUP's offsets written, a bit each;
     /// empty otherwise.
     written: Vec<u64>,
+    /// While watching for the drawing (`watch_drawn`), DGROUP's offsets
+    /// written, as `written` keeps them; empty otherwise.
+    drawn: Vec<u64>,
     /// While watching the EMS frame (`watch_frame`), the bytes written
     /// there, by the bank mapped as each was written.
     frame: Option<FrameWatch>,
@@ -34,7 +37,7 @@ struct FrameWatch {
 
 impl Clone for Memory {
     fn clone(&self) -> Self {
-        Self { bytes: self.bytes.clone(), written: self.written.clone(), frame: self.frame.clone() }
+        Self { bytes: self.bytes.clone(), written: self.written.clone(), drawn: self.drawn.clone(), frame: self.frame.clone() }
     }
 
     /// Copied into this memory's own allocation: no fresh megabyte to
@@ -42,6 +45,7 @@ impl Clone for Memory {
     fn clone_from(&mut self, source: &Self) {
         self.bytes.clone_from(&source.bytes);
         self.written.clone_from(&source.written);
+        self.drawn.clone_from(&source.drawn);
         self.frame.clone_from(&source.frame);
     }
 }
@@ -54,7 +58,7 @@ impl Memory {
     pub fn new(image: &Image) -> Self {
         let mut bytes = vec![0u8; SIZE];
         bytes[..image.bytes.len()].copy_from_slice(&image.bytes);
-        Self { bytes, written: Vec::new(), frame: None }
+        Self { bytes, written: Vec::new(), drawn: Vec::new(), frame: None }
     }
 
     pub fn r8(&self, seg: u16, off: u16) -> u8 {
@@ -72,10 +76,15 @@ impl Memory {
     pub fn w8(&mut self, seg: u16, off: u16, v: u8) {
         let at = lin(seg, off);
         self.bytes[at] = v;
-        if !self.written.is_empty() {
+        if !self.written.is_empty() || !self.drawn.is_empty() {
             let o = at.wrapping_sub(lin(DS, 0));
             if o < 0x10000 {
-                self.written[o >> 6] |= 1 << (o & 63);
+                if !self.written.is_empty() {
+                    self.written[o >> 6] |= 1 << (o & 63);
+                }
+                if !self.drawn.is_empty() {
+                    self.drawn[o >> 6] |= 1 << (o & 63);
+                }
             }
         }
         if let Some(f) = &mut self.frame {
@@ -109,6 +118,18 @@ impl Memory {
     /// forgotten.
     pub fn track(&mut self) {
         self.written = vec![0; 0x10000 / 64];
+    }
+
+    /// DGROUP's writes watched from now for the next drawing
+    /// (`drawn_written`), beside and apart from `track`'s.
+    pub fn watch_drawn(&mut self) {
+        self.drawn = vec![0; 0x10000 / 64];
+    }
+
+    /// DGROUP's offsets written since `watch_drawn`, and the watch ended.
+    pub fn drawn_written(&mut self) -> Vec<u16> {
+        let d = std::mem::take(&mut self.drawn);
+        (0..d.len() * 64).filter(|&o| d[o >> 6] >> (o & 63) & 1 != 0).map(|o| o as u16).collect()
     }
 
     /// Writes no longer tracked.

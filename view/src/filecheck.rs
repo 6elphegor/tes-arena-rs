@@ -41,6 +41,18 @@ pub(super) fn files_now(a: &App, dir: &Path) -> Disk {
     Disk { files: out, deleted }
 }
 
+impl Disk {
+    /// The file `name` as `from` has it: one the view writes after the
+    /// original's stop, running on past a box the original waits at.
+    pub(super) fn kept(mut self, from: &Disk, name: &str) -> Self {
+        match from.files.get(name) {
+            Some(d) => self.files.insert(name.to_string(), d.clone()),
+            None => self.files.remove(name),
+        };
+        self
+    }
+}
+
 /// The files of `after` made or changed since `before`, as the vectors
 /// hold them: SAVEGAME's ceiling plane (after the screen, the palette,
 /// the level's block and two planes), which the original takes from

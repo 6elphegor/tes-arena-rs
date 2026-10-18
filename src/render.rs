@@ -190,6 +190,12 @@ impl Lgts {
     }
 }
 
+/// The words naming the buffers each drawing's copy makes itself on its
+/// own heap (`Soft::setup`: the light table CCC2, the lights' and rows'
+/// tables CD7E..CD89), which its next copy, starting from the machine's
+/// heap, doesn't have: not laid over it (`draw`'s `prior`).
+const OWN_BUFFERS: [(u16, u16); 2] = [(0xCCC2, 0xCCC4), (0xCD7E, 0xCD8A)];
+
 /// The view drawn from the machine's state at the start of the frame's
 /// drawing stages (before 0000:A322): the page, the pixels it drew
 /// written over `under` (the last page), and the paths not ported. Of
@@ -201,8 +207,13 @@ impl Lgts {
 /// fourth
 /// the creatures' flats it reached (`Soft::creatures`), in order; the
 /// sixth the EMS bytes it changed on its copy (`EmsWrote`).
+/// The copy starts from the machine with the earlier frames' drawing's
+/// writes, `prior` (by offset, the byte before and after), where the
+/// machine's byte is still the one they started from: the original draws
+/// on the machine, so what one frame's drawing leaves (a clipped vertex's
+/// unwritten byte, 0000:87F1) the next finds.
 #[allow(clippy::type_complexity)]
-pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked, Vec<EmsWrote>) {
+pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)>]) -> (Vec<u8>, Vec<&'static str>, Vec<Wrote>, Vec<Creature>, Walked, Vec<EmsWrote>) {
     if let Ok(p) = std::env::var("ARENA_RENDER_DUMP") {
         // The first frame's (a file there already is kept).
         if !std::path::Path::new(&p).exists() {
@@ -210,11 +221,18 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         }
     }
     let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
+    for (o, w) in prior.iter().enumerate() {
+        let o = o as u16;
+        if let Some((before, after)) = *w {
+            if m.mem.r8(DS, o) == before && !OWN_BUFFERS.iter().any(|&(a, b)| (a..b).contains(&o)) {
+                r.m.mem.w8(DS, o, after);
+            }
+        }
+    }
     r.m.mem.track();
     r.page.resize(0x10000, 0);
     r.stages();
     r.page.truncate(64000);
-    let wrote = r.m.mem.written_offsets().into_iter().map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     m.mem.w8(DS, 0xD813, r.m.mem.r8(DS, 0xD813));
     // The rows 78A8 compiled, which stay at ROW_CODE for the game to read
     // after (the save menu's names where NAMES.DAT doesn't load).
@@ -231,6 +249,8 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts) -> (Vec<u8>, Vec<&'stati
         // textures' copy put back (A483) and a click's wall.
         m.mem.w8(DS, 0xCB5B, r.m.mem.r8(DS, 0xCB5B));
     }
+    // (After what is put back: the machine's own there now.)
+    let wrote = r.m.mem.written_offsets().into_iter().map(|o| (o, m.mem.r8(DS, o), r.m.mem.r8(DS, o))).collect();
     // (CD14 and CCCA too, the last square the walk took and its offset:
     // the machine's walk, `view_begin`, puts the walk's resets there, F830h
     // and FFFFh, which the copy, started from the machine's last bytes,

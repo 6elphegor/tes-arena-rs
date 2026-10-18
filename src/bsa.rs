@@ -330,6 +330,12 @@ impl Files {
         !self.deleted.contains(&base) && (self.written.contains_key(&base) || self.names.contains_key(&base))
     }
 
+    /// The size of a loose file of that name, where one exists (DOS find
+    /// first's, at the DTA's +1Ah).
+    pub fn found_size(&self, name: &[u8]) -> Option<u32> {
+        self.exists(name).then(|| self.read_loose(name).map_or(0, |d| d.len() as u32))
+    }
+
     fn base(name: &[u8]) -> &[u8] {
         name.rsplit(|&c| c == b'\\' || c == b':').next().unwrap_or(name)
     }

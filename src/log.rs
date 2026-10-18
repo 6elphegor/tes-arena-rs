@@ -2,11 +2,11 @@
 //!
 //! Time is counted in minutes from the start of 3E 389: a year is 360
 //! days of 1440 minutes, in twelve months of 30 days. A log entry is "&",
-//! a date line ending in CR LF, the text, then " *". Appending to the
-//! file (27E3:0060..0087) and dropping the oldest entry once the log
-//! reaches 2000 bytes (27E3:0169..01E2, through a temporary log.$$$) are
-//! file writes and are not ported.
+//! a date line ending in CR LF, the text, then " *". It is appended to
+//! LOG.nn (27E3:0060..0087), the oldest entry dropped first once the log
+//! reaches 2000 bytes (27E3:0169..01AA; `Machine::log_add`).
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -21,6 +21,13 @@ const SUFFIXES: u16 = 0x4FE6;
 const TEEN_SUFFIX: u16 = 0x5003;
 /// The entry buffer.
 pub const ENTRY: u16 = 0x9A6E;
+
+/// The log's name, "log." (its digits made at the '.', 27E3:01E3).
+pub const NAME: u16 = 0x78D6;
+/// The bank the log is read into to drop its oldest entry.
+const BANK: u16 = 0x1030;
+/// The EMS frame's segment.
+const FRAME: u16 = 0x9030;
 
 const YEAR_MINUTES: u32 = 360 * 1440;
 const FIRST_YEAR: u16 = 389;
@@ -122,5 +129,87 @@ impl Machine {
             }
         }
         di.wrapping_sub(1).wrapping_sub(ENTRY)
+    }
+
+    /// 27E3:000E. The text at DS:`text` added to the logbook: LOG.nn made
+    /// empty where there is none, its oldest entry dropped where it holds
+    /// 2000 bytes or more (`log_trim`), the entry made (`log_entry`) and
+    /// appended (0060..0087: opened, 0000:67C4, sought to its end, the
+    /// entry written, closed). None where the open gives up.
+    pub fn log_add(&mut self, files: &mut Files, text: u16) -> Option<()> {
+        if self.log_full(files) {
+            self.log_trim(files)?;
+        }
+        let n = self.log_entry(text);
+        self.log_name();
+        let path = self.save_path(NAME);
+        self.file_open(files, path)?;
+        self.file_seek(files, 2, 0);
+        self.file_put(files, DS, ENTRY, n);
+        self.file_close(files);
+        Some(())
+    }
+
+    /// 27E3:01E3. The save's digits (1A6C, tens then units) written after
+    /// the first '.' of the log's name (searched over at most 10 bytes).
+    fn log_name(&mut self) {
+        let mut di = NAME;
+        for _ in 0..10 {
+            let c = self.mem.r8(DS, di);
+            di = di.wrapping_add(1);
+            if c == b'.' {
+                break;
+            }
+        }
+        let slot = self.mem.r8(DS, 0x1A6C);
+        self.mem.w8(DS, di, b'0' + slot / 10);
+        self.mem.w8(DS, di.wrapping_add(1), b'0' + slot % 10);
+    }
+
+    /// 27E3:01AB. Whether the log holds 2000 bytes or more (DOS find
+    /// first, 0000:600C, its size); where there is none it is made empty
+    /// (0000:677A, 6742; its path built again) and isn't.
+    fn log_full(&mut self, files: &mut Files) -> bool {
+        self.log_name();
+        let path = self.save_path(NAME);
+        match files.found_size(self.mem.cstr(DS, path)) {
+            Some(size) => size >= 2000,
+            None => {
+                let path = self.save_path(NAME);
+                self.file_create(files, path);
+                self.file_close(files);
+                false
+            }
+        }
+    }
+
+    /// 27E3:0169..01AA. The log's oldest entry dropped: the bank at 1030
+    /// mapped (0000:5C86), the log read whole into the frame (0000:7428),
+    /// and what follows its first '*' written to a new file (0000:9DD2);
+    /// the bank before put back. Bug kept: the new file's name is the
+    /// path built from the log's path (25FD:0844 given SI as the first
+    /// call left it), "C:\ARENA_CD\C:\ARENA_CD\log.nn", which the
+    /// port's files, like the harness's, take by its last component, the
+    /// log itself. None where the read gives up.
+    fn log_trim(&mut self, files: &mut Files) -> Option<()> {
+        self.log_name();
+        let path = self.save_path(NAME);
+        let bank = self.mem.r16(DS, BANK);
+        let old = self.map_bank(bank, 0);
+        let seg = self.mem.r16(DS, FRAME);
+        self.file_load(files, path, seg, 0)?;
+        let mut di = 0u16;
+        for _ in 0..0xFFFF {
+            let c = self.mem.r8(seg, di);
+            di = di.wrapping_add(1);
+            if c == b'*' {
+                break;
+            }
+        }
+        let n = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE).wrapping_sub(di);
+        let twice = self.save_path(path);
+        self.file_write(files, twice, seg, di, n);
+        self.map_bank(old, 1);
+        Some(())
     }
 }

@@ -117,9 +117,10 @@ impl arena::shops::ShopHooks for Talk {
     }
 }
 impl arena::tavern::TavernHooks for Talk {
-    /// 1194:CED7, the informant, his price accepted.
+    /// 1194:CED7, the informant, his price accepted (DI as the
+    /// greeting's banner leaves it).
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        let r = m.quest_informant(files, &mut Quests);
+        let r = m.quest_informant(files, &mut Quests, 0xFFFE);
         println!("    [informant] {}", match r {
             Some(true) => "not the informant here",
             Some(false) => "the informant talked to",
@@ -151,8 +152,8 @@ impl arena::haggle::HaggleIo for Accept {
 struct Quests;
 
 impl arena::quest::QuestHooks for Quests {
-    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
-        let r = m.haggle(files, &mut Accept, price, per, 0x1E, 0x28, 0, mode, 0)?;
+    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8, di: u16) -> Option<bool> {
+        let r = m.haggle(files, &mut Accept, price, per, 0x1E, 0x28, 0, mode, di)?;
         println!("    [informant's haggle, mode {mode}, price {price}] {r:?}");
         Some(r == arena::haggle::Haggle::NoDeal)
     }

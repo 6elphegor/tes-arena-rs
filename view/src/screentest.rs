@@ -172,7 +172,13 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
         }
         _ => {}
     }
-    assert!(!check_files(&a, name, "screen", &before, &files_now(&a, &save)), "{name}: the files it wrote differ from the original's");
+    // (The ruler's offer taken: the original stops at the box of its
+    // text (the quest's text_shown, which waits), before the logbook's
+    // entry after it (27E3:000A); the view's text doesn't wait, and the
+    // entry is appended to LOG.64 by the time it stops.)
+    let after = files_now(&a, &save);
+    let after = if name == "palaceaccept" { after.kept(&before, "LOG.64") } else { after };
+    assert!(!check_files(&a, name, "screen", &before, &after), "{name}: the files it wrote differ from the original's");
 }
 
 /// The colours the screen's opening showed (`App::fade`, each different

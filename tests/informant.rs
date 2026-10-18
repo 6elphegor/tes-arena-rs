@@ -37,10 +37,11 @@ impl QuestHooks for Log {
     fn entry_save(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) {
         self.log.extend([5, si, 0x19, m.mem.r16(DS, 0x129E)]);
     }
-    fn log_entry(&mut self, _m: &mut Machine, si: u16) {
+    fn log_entry(&mut self, _m: &mut Machine, _files: &mut Files, si: u16) -> Option<()> {
         self.log.extend([6, si]);
+        Some(())
     }
-    fn informant_haggle(&mut self, _m: &mut Machine, _files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
+    fn informant_haggle(&mut self, _m: &mut Machine, _files: &mut Files, price: u32, per: u16, mode: u8, _di: u16) -> Option<bool> {
         self.log.extend([10, price as u16, (price >> 16) as u16, per, mode as u16]);
         Some(self.cf)
     }
@@ -165,7 +166,7 @@ fn matches_original() {
         m.load_rng();
         let before = m.clone();
         let mut hooks = Log { log: Vec::new(), cf, answer };
-        let Some(carry) = m.quest_informant(&mut fs, &mut hooks) else {
+        let Some(carry) = m.quest_informant(&mut fs, &mut hooks, 0) else {
             assert_eq!(f[2], "stuck", "{line}");
             stuck += 1;
             continue;

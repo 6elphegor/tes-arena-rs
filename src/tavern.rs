@@ -61,9 +61,11 @@ pub trait TavernHooks: ShopHooks {
     fn files(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:C12A: the innkeeper's greeting (2DA2's %nt).
     fn greeting(&mut self, _m: &mut Machine) {}
-    /// 1194:CED7: the main quest's informant (`Machine::quest_informant`).
+    /// 1194:CED7: the main quest's informant (`Machine::quest_informant`),
+    /// DI FFFEh as the greeting's banner leaves it (4BFF: its last load,
+    /// 0000:7428 with DI FFFEh, which the drawing after keeps).
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quest_informant(files, &mut crate::quest::NoQuestHooks).map(|_| ())
+        m.quest_informant(files, &mut crate::quest::NoQuestHooks, 0xFFFE).map(|_| ())
     }
     /// 1194:8F1E: the quests the talk ends or offers (`Machine::quests_talk`).
     fn quests_talk(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {

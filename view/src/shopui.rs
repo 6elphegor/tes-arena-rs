@@ -158,9 +158,16 @@ impl ShopFront<'_, '_> {
 
     /// The shop's screen and name (1194:4B60, 4BFF), behind what follows.
     fn show_banner(&mut self, m: &mut Machine, si: u16) {
+        let screen = m.shop_screen(&mut self.files, 0x12EB).is_some();
+        self.show_name(m, si, screen);
+    }
+
+    /// The shop's name (1194:4BFF) on the screen 4B60 drew (`screen`:
+    /// whether it loaded).
+    fn show_name(&mut self, m: &mut Machine, si: u16, screen: bool) {
         // The game's state as the two leave it (the page, the font's and
         // the tiles' blocks, the banner's words: `Machine::shop_banner`).
-        if m.shop_screen(&mut self.files, 0x12EB).is_none() || m.shop_banner(&mut self.files, si).is_none() {
+        if !screen || m.shop_banner(&mut self.files, si).is_none() {
             eprintln!("the shop's screen did not load: {}", arena::giveup::describe());
         } else if self.paged {
             // 4CA1..4CBE: the name drawn centred on x A0h at row 3 (4 in
@@ -566,13 +573,15 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     fn files(&mut self, m: &mut Machine, files: &mut arena::bsa::Files) {
         m.room_files_expire(files);
     }
-    /// 1194:C12A: "%nt " made at 929E (2DA2:000A), the tavern's name, on
-    /// its banner (4BFF).
+    /// 1194:C01B, C12A: the screen (4B60), then "%nt " made at 929E
+    /// (2DA2:000A, its buffer in the bank 4B60 left mapped before its
+    /// own), the tavern's name, on its banner (4BFF).
     fn greeting(&mut self, m: &mut Machine) {
+        let screen = m.shop_screen(&mut self.files, 0x12EB).is_some();
         m.mem.w32(DS, 0x929E, 0x2074_6E25);
         m.mem.w16(DS, 0x92A2, 0);
         arena::shops::ShopHooks::expand(self, m, 0x929E);
-        self.show_banner(m, 0x929E);
+        self.show_name(m, 0x929E, screen);
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);
@@ -583,7 +592,7 @@ impl arena::tavern::TavernHooks for ShopFront<'_, '_> {
     }
     /// 1194:CED7: the main quest's informant.
     fn quest(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.quest_informant(files, &mut QuestFront(&mut *self.front, files.clone())).map(|_| ())
+        m.quest_informant(files, &mut QuestFront(&mut *self.front, files.clone()), 0xFFFE).map(|_| ())
     }
     /// 1194:8F1E: the quests the talk ends or offers.
     fn quests_talk(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {

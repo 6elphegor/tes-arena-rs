@@ -283,6 +283,10 @@ pub struct Engine {
     walked: Option<crate::render::Walked>,
 }
 
+/// The flags the frame sets and clears bits of (C398, CCCA), whose
+/// drawing's bits the machine's read-modify-write keeps in the original.
+const DRAWN_BITS: [u16; 4] = [0xC398, 0xC399, 0xCCCA, 0xCCCB];
+
 impl Engine {
     pub fn new(m: Machine, files: Files) -> Self {
         Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_ems_wrote: Default::default(), page_creatures: Vec::new(), walked: None }
@@ -362,6 +366,17 @@ impl Engine {
             // The moons' phases for a new day, which the drawing's E41A
             // loads from their files (its copy has none).
             m.moon_phases(files)?;
+            // What the machine wrote since the last drawing (`watch_drawn`)
+            // is its own: the earlier drawings' bytes there are gone in the
+            // original, even where the machine wrote the byte they started
+            // from, and this drawing doesn't find them (`render::draw`'s
+            // `prior`). Not the flags the frame sets and clears bits of
+            // (`after_drawing`).
+            for o in m.mem.drawn_written() {
+                if !DRAWN_BITS.contains(&o) {
+                    self.page_wrote[o as usize] = None;
+                }
+            }
             // An EMS byte the machine has written since the drawing changed
             // it on its copy is the machine's (as `page_wrote`'s are).
             self.page_ems_wrote.retain(|&o, &mut (before, _)| {
@@ -371,7 +386,7 @@ impl Engine {
                 let now = if mapped { m.mem.r8(m.mem.r16(DS, crate::mif::var::BUFFER_SEG), i) } else { m.ems.get(bank as usize).map_or(0, |b| b[i as usize]) };
                 now == before
             });
-            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files));
+            let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote);
             for (o, before, after) in ems {
                 self.page_ems_wrote.insert(o, (before, after));
             }
@@ -387,6 +402,7 @@ impl Engine {
                 // holds the machine's there now, not an earlier frame's.
                 self.page_wrote[o as usize] = (before != after).then_some((before, after));
             }
+            m.mem.watch_drawn();
             // The bank the drawing left mapped is the machine's from here:
             // the original's draws on the machine, and what runs after it in
             // the frame (a way out's 2433:0199 keeping the bank mapped)
@@ -568,12 +584,11 @@ impl Engine {
     /// worked on its own bytes, without the drawing's bits, which the
     /// original's kept.
     fn after_drawing(&mut self) {
-        const BITS: [u16; 4] = [0xC398, 0xC399, 0xCCCA, 0xCCCB];
         if self.page.is_none() {
             return;
         }
         for o in self.m.mem.written_offsets() {
-            if !BITS.contains(&o) {
+            if !DRAWN_BITS.contains(&o) {
                 self.page_wrote[o as usize] = None;
             }
         }

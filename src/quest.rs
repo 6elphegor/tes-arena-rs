@@ -89,10 +89,10 @@ pub trait QuestHooks {
     fn entry_save(&mut self, m: &mut Machine, files: &mut Files, si: u16) {
         let _ = m.city_save_entry(files, si);
     }
-    /// 27E3:000A: the text at DS:`si` added to the logbook: the entry made
-    /// (`Machine::log_entry`), then the file's appends (not ported).
-    fn log_entry(&mut self, m: &mut Machine, si: u16) {
-        m.log_entry(si);
+    /// 27E3:000A: the text at DS:`si` added to the logbook, LOG.nn
+    /// (`Machine::log_add`).
+    fn log_entry(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<()> {
+        m.log_add(files, si)
     }
     /// 1194:1034 when the main quest ends (0FDD 8Eh), CX left by the
     /// text's box: the mouse's column (0000:9012 halves INT 33h's CX), so
@@ -145,12 +145,13 @@ pub trait QuestHooks {
     /// 1194:8020 in modes 5 and 6 (`Machine::haggle`): the main quest's
     /// informant haggled with over `price` (0FEE), the player's
     /// personality `per` (1194:5B07 of 1D3), quality 1Eh, mood 28h. The
-    /// carry: no deal. DL and DI at the call (1194:CF8B) are what earlier
-    /// code left; they only name things in modes 1, 2 and 4's lines but
-    /// are kept at 6598 and 65AB: taken as 0. By default the player walks
-    /// away (`haggle::Leave`); a front end answers for the player.
-    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8) -> Option<bool> {
-        let r = m.haggle(files, &mut crate::haggle::Leave, price, per, 0x1E, 0x28, 0, mode, 0)?;
+    /// carry: no deal. DL and DI at the call (1194:CF8B) only name things
+    /// in modes 1, 2 and 4's lines but are kept at 6598 and 65AB: DL 0
+    /// (5B07's DX), DI `di`, what the caller of CED7 left. By default the
+    /// player walks away (`haggle::Leave`); a front end answers for the
+    /// player.
+    fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8, di: u16) -> Option<bool> {
+        let r = m.haggle(files, &mut crate::haggle::Leave, price, per, 0x1E, 0x28, 0, mode, di)?;
         Some(r == crate::haggle::Haggle::NoDeal)
     }
     /// 0000:7428 with ES:DI the EMS frame (9030):0: the file named at
@@ -577,8 +578,7 @@ impl Machine {
         let province = self.mem.r8(DS, NEXT_PROVINCE) as u16;
         self.quest_dungeon_entry(files, hooks, province, 4, ax, 0x929E)?;
         self.mem.w16(DS, TEXT, 0x1F7);
-        self.quest_log_text(hooks);
-        Some(())
+        self.quest_log_text(files, hooks)
     }
 
     /// 26F7:0C0A with its I/O as hooks: province `province` loaded, the
@@ -607,11 +607,11 @@ impl Machine {
 
     /// 1194:CF93. Text TEXT written to 1044 (A374, mode 2) and logged
     /// (27E3:000A).
-    fn quest_log_text(&mut self, hooks: &mut dyn QuestHooks) {
+    fn quest_log_text(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         self.mem.w8(DS, TEXT_FLAG2, 0);
         self.mem.w8(DS, TEXT_FLAG, 0);
         hooks.text(self);
-        hooks.log_entry(self, 0x1044);
+        hooks.log_entry(self, files, 0x1044)
     }
 
     /// 1194:D198. Unless at the last step (the step of piece 8Eh), text
