@@ -1112,7 +1112,7 @@ impl Machine {
     /// 0000:56C8 with BX 4 or 14h: the picture named at DS:`si` loaded to
     /// the EMS frame's start (742C), its header's words to A836..A83C,
     /// drawn into the page (582C).
-    fn sheet_image_here(&mut self, files: &mut Files, si: u16) -> Option<()> {
+    pub(crate) fn sheet_image_here(&mut self, files: &mut Files, si: u16) -> Option<()> {
         let frame = self.mem.r16(DS, FRAME);
         self.file_load(files, si, frame, 0)?;
         for k in 0..4u16 {

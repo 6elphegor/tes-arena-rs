@@ -1848,11 +1848,11 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// 17D8: `sheet_equipment_scroll`, `sheet_equipment_click`,
 /// `sheet_equipment_drop`), and the staff's quest line marked, described
 /// and clicked again in playequipstaff (1F56 into the DI the page's loop
-/// carries, 5536h after a description: `page_di`). Not playequipspellpage:
-/// the spell's page itself (51D1, its screen kept at 51B8 and its drawing
-/// 68D7, the front end's) leaves texts at 1044 and EMS bytes the engine's
-/// doesn't.
-const BUSY_STATE: [&str; 24] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff"];
+/// carries, 5536h after a description: `page_di`), and the spell's page
+/// opened from the spells' list and left in playequipspellpage (51D1: its
+/// screen's state, 68D7's, the effects' texts at 1044 and CHARSPEL.IMG in
+/// bank [1032]: `Machine::sm_screen`).
+const BUSY_STATE: [&str; 25] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipspellpage"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

@@ -7,8 +7,10 @@
 //! at 50B, times 55h), copied to 57E6; 68A3 also takes 528h bytes of the
 //! heap for the name's background (A890, kept at 12BC and freed before
 //! the next page and at the end) and sets the level the costs divide by
-//! (A898, A89A: the player's plus one). Its clicks (8F92, 8F94 when AFF9
-//! says a button):
+//! (A898, A89A: the player's plus one). Its screen (68D7) leaves what
+//! the spellmaker's does (`sm_screen`: the effects' texts at 1044, their
+//! arguments from 122E, the numbers at 929E) and CHARSPEL.IMG in bank
+//! [1032]. Its clicks (8F92, 8F94 when AFF9 says a button):
 //! - the name (45h..83h, 30h..39h): typed over (1194:65FD into 581A) and
 //!   copied to the record's name (+34h); both spells' files written
 //!   (29CF:06F5, the 2A80h bytes from DATA:0; 06CB, the player's AA0h
@@ -122,7 +124,7 @@ impl Machine {
     /// 1194:51D1 with AL `mark`.
     fn spell_page_run(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks, mark: u8) -> Option<()> {
         self.mem.w16(DS, var::BLOCK, 0);
-        self.spell_page_show(hooks, mark)?;
+        self.spell_page_show(files, hooks, mark)?;
         loop {
             let (b, x, y) = hooks.click(self);
             self.mem.w8(DS, 0xAFF9, b);
@@ -150,7 +152,7 @@ impl Machine {
                     continue;
                 }
                 self.mem.w8(DS, var::MARK, m - 1);
-                self.spell_page_show(hooks, m - 1)?;
+                self.spell_page_show(files, hooks, m - 1)?;
                 continue;
             } else if x <= 0xCD {
                 continue;
@@ -171,7 +173,7 @@ impl Machine {
                     continue;
                 }
                 self.mem.w8(DS, var::MARK, m.wrapping_add(1));
-                self.spell_page_show(hooks, m.wrapping_add(1))?;
+                self.spell_page_show(files, hooks, m.wrapping_add(1))?;
                 continue;
             }
             // 1194:53B5.
@@ -182,8 +184,9 @@ impl Machine {
         }
     }
 
-    /// 1194:51E6: spell `mark` of the list shown (68A3).
-    fn spell_page_show(&mut self, hooks: &mut dyn SpellPageHooks, mark: u8) -> Option<()> {
+    /// 1194:51E6: spell `mark` of the list shown (68A3, its screen's
+    /// state `sm_screen` with CHARSPEL.IMG in bank [1032]).
+    fn spell_page_show(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks, mark: u8) -> Option<()> {
         self.mem.w8(DS, var::MARK, mark);
         self.mem.w8(DS, var::SHOWN, mark);
         let n = self.mem.r8(DS, var::LIST.wrapping_add(mark as u16)) as u16;
@@ -205,6 +208,7 @@ impl Machine {
         let level = (self.mem.r8(DS, 0x01AA) as u16).wrapping_add(1);
         self.mem.w16(DS, crate::spellmaker::var::PLAYER, level);
         self.mem.w16(DS, crate::spellmaker::var::LEVEL, level);
+        self.sm_screen(files, true)?;
         hooks.page(self);
         self.mem.w16(DS, var::BLOCK, seg);
         self.mem.w8(DS, var::OWN, 0);

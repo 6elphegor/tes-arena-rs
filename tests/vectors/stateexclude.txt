@@ -12,6 +12,7 @@ cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
 1024 1026 the haggle's SP (1194:8467), kept for its way out (84A4, 84AC): the port has no stack
 65a8 65aa the haggle's SP on entering (1194:8020), kept for its way out: the port has no stack
+a876 a878 the spell's description's SP (1194:6DD2), kept across its sprintf (6E1F): the port has no stack (a stand-in, FFD0h)
 7865 7867 the repairs' price text's SP (1194:CCFD), kept for its way out: the port has no stack
 9740 974e the polygon drawer's own stack (DS:974E down): its calls' return addresses and the image's segment (1000h higher in the harness) it pushes
 fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver)
@@ -31,6 +32,8 @@ cd54 cd56 the segment of the hook at CD52 (0000:0B48)
 517e 5180 the record at 515A's texts' segment (+24)
 519d 519f the record at 515A's lines' drawing's segment
 b80c b80e the list window's record's segment (B80A's far pointer: DGROUP's)
+1282 1284 the spell's page's record's segment (1280's far pointer, 1194:5205: the image's 3276h)
+1234 1236 the spell's description's third word pushed (from 122E, 1194:6D87): playequipspellpage's spell's %s's segment, DGROUP's
 1258 1259 AH as 1194:AFD9's callers leave it, kept by 27CE:0040: DGROUP's segment's high byte
 068a 068c a far pointer to the player's record (01A4) at 0688: its segment DGROUP's
 0d5e 0d60 the spell target list's first entry's segment (0D5C: DGROUP's for the player, 29CF:0145's cast at the player)
