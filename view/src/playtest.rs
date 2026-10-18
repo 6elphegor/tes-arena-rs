@@ -1024,12 +1024,13 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     let (x, y) = crate::sheets::bar_centre(dice.below(9) as usize);
                     match crate::sheets::bar_click(&mut engine.m, &mut engine.files, x, y, dice.below(4) == 0) {
                         Some(crate::sheets::BarAction::Automap) => {
-                            crate::automap::open(&mut engine, &archive);
+                            crate::automap::open(&mut engine, st.assets.dac(), (x, y));
                             for _ in 0..1 + dice.below(4) {
                                 engine.m.automap_view_button(dice.below(5) as u16);
                                 engine.m.automap_origin();
+                                crate::automap::redraw(&mut engine);
                             }
-                            crate::automap::close(&mut engine.m);
+                            crate::automap::close(&mut engine);
                             *counts.entry("automap").or_default() += 1;
                         }
                         Some(crate::sheets::BarAction::Status(lines)) => {
@@ -1049,7 +1050,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                 if left == 11 && crate::automap::notes_here(&engine.m) {
                     let archive = st.assets.archive.clone();
                     crate::sheets::pics(&archive, &engine.m);
-                    crate::automap::open(&mut engine, &archive);
+                    crate::automap::open(&mut engine, st.assets.dac(), (160, 100));
                     st.note = Some((dice.below(320) as u16, dice.below(150) as u16));
                     map_open = true;
                     *counts.entry("notes").or_default() += 1;
@@ -1243,7 +1244,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
         alive = turn(&mut engine, st, run, intent, name, n);
         // The note's turn done (its click on the map), the screen left.
         if std::mem::take(&mut map_open) {
-            crate::automap::close(&mut engine.m);
+            crate::automap::close(&mut engine);
         }
     }
     let result = if st.over {

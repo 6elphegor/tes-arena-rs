@@ -153,7 +153,12 @@ impl ShopFront<'_, '_> {
     }
 
     /// The shop's screen and name (1194:4B60, 4BFF), behind what follows.
-    fn show_banner(&mut self, m: &Machine, si: u16) {
+    fn show_banner(&mut self, m: &mut Machine, si: u16) {
+        // The game's state as the two leave it (the page, the font's and
+        // the tiles' blocks, the banner's words: `Machine::shop_banner`).
+        if m.shop_screen(&mut self.files, 0x12EB).is_none() || m.shop_banner(&mut self.files, si).is_none() {
+            eprintln!("the shop's screen did not load: {}", arena::giveup::describe());
+        }
         let title = m.mem.cstr(DS, si).to_vec();
         if let Some(t) = self.talk() {
             t.backdrop = Some(Backdrop { title, picture: None, gold: None });
@@ -161,7 +166,10 @@ impl ShopFront<'_, '_> {
     }
 
     /// A picture (1194:4B8E, its name at DS:`si`) on the shop's screen.
-    fn show_picture(&mut self, m: &Machine, si: u16) {
+    fn show_picture(&mut self, m: &mut Machine, si: u16) {
+        if m.shop_picture(&mut self.files, si).is_none() {
+            eprintln!("the shop's picture did not load: {}", arena::giveup::describe());
+        }
         self.picture = si;
         let name = String::from_utf8_lossy(m.mem.cstr(DS, si)).to_ascii_uppercase();
         if let Some(b) = self.talk().and_then(|t| t.backdrop.as_mut()) {

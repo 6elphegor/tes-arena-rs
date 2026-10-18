@@ -75,57 +75,50 @@ pub fn draw_pointer(screen: &mut hud::Screen, x: i32, y: i32) {
     screen.blit(x, y - p.h as i32, p.w, p.h, &p.px, hud::H as i32 - 1);
 }
 
-/// The table of the files loaded whole as fonts (0000:7508 puts each
-/// one's segment in its first free word, 930E frees only one found
-/// there): eight words.
-const FONTS: u16 = 0x91AC;
-/// FONT_S.DAT's segment while the screen is up (2D6C).
-const FONT_S: u16 = 0xA86C;
+/// The game's colours (the window's DAC) read as 0000:6E3C reads them.
+struct Colours([[u8; 4]; 256]);
 
-/// The automap screen opened (0000:2CFE..2D2E, `automap_screen_open`),
-/// its font made the current one.
-pub fn open(engine: &mut arena::engine::Engine, archive: &crate::archive::Archive) {
-    engine.m.automap_screen_open(&mut engine.files);
-    select_font(&mut engine.m, archive);
-}
+impl arena::mapnotes::NoteHooks for Colours {}
 
-/// The automap screen left (0000:2EAA..2EC5): FONT_S.DAT's block freed
-/// (930E, only where the fonts' table holds it) and the game's font
-/// (102C) the current one again (9AEA).
-pub fn close(m: &mut Machine) {
-    let seg = m.mem.r16(DS, FONT_S);
-    if let Some(i) = (0..8).find(|i| m.mem.r16(DS, FONTS + 2 * i) == seg) {
-        m.mem.w16(DS, FONTS + 2 * i, 0);
-        m.heap_free(seg);
-    }
-    let v = m.mem.r16(DS, 0x102C);
-    m.mem.w16(DS, arena::mapnotes::var::FONT + 2, v);
-}
-
-/// The automap screen's font made the current one, as the screen does
-/// (0000:2D66: 7508 loads FONT_S.DAT whole into a block of its own, kept
-/// at A86C and in the fonts' table; its redraw selects it, 3035 calling
-/// 9AEA, which sets the far pointer B034's segment): the file put in a
-/// heap block of the engine's, so the notes' hit test (0000:66F6's
-/// widths) measures as the original's does. With the table full 7508
-/// gives 0.
-fn select_font(m: &mut Machine, archive: &crate::archive::Archive) {
-    let Some(d) = archive.read("FONT_S.DAT") else { return };
-    let seg = match (0..8).find(|i| m.mem.r16(DS, FONTS + 2 * i) == 0) {
-        Some(i) => {
-            let paras = (d.len().div_ceil(16)).min(0xFFFF) as u16;
-            let Some((seg, _)) = m.heap_alloc(paras) else { return };
-            for (i, &b) in d.iter().enumerate().take(0xFFFF) {
-                m.mem.w8(seg, i as u16, b);
+impl arena::automapscreen::AutomapScreenHooks for Colours {
+    fn palette(&mut self, m: &mut Machine, di: u16) {
+        for (i, c) in self.0.iter().enumerate() {
+            for (k, v) in c.iter().take(3).enumerate() {
+                m.mem.w8(DS, di.wrapping_add((i * 3 + k) as u16), v >> 2);
             }
-            m.mem.w16(DS, FONTS + 2 * i, seg);
-            seg
         }
-        None => 0,
-    };
-    m.mem.w16(DS, FONT_S, seg);
-    m.mem.w16(DS, arena::mapnotes::var::FONT, 0);
-    m.mem.w16(DS, arena::mapnotes::var::FONT + 2, seg);
+    }
+}
+
+/// The automap screen opened (0000:2CFE..2DB4, `automap_screen_begin`:
+/// the screen saved, `dac` the colours it reads, its fonts (FONT_S.DAT
+/// whole at A86C, the notes' hit test measuring in it), pictures and
+/// buffer, the map drawn into the page) and its loop's first turn, the
+/// mouse at `at` (`automap_screen_turn`).
+pub fn open(engine: &mut arena::engine::Engine, dac: [[u8; 4]; 256], at: (i32, i32)) {
+    let e = engine;
+    if e.m.automap_screen_begin(&mut e.files, &mut Colours(dac)).is_none() {
+        eprintln!("the automap screen did not start: {}", arena::giveup::describe());
+    }
+    e.m.automap_screen_turn(at.0 as u16, at.1 as u16, true);
+}
+
+/// A turn of the screen's loop, the mouse at `at` (a click's).
+pub fn turn(m: &mut Machine, at: (i32, i32)) {
+    m.automap_screen_turn(at.0 as u16, at.1 as u16, false);
+}
+
+/// The map drawn again after a button or a note (2E75..2E78, 2EA1..2EA4).
+pub fn redraw(engine: &mut arena::engine::Engine) {
+    let e = engine;
+    e.m.automap_screen_draw(&mut e.files, &mut Colours([[0; 4]; 256]));
+}
+
+/// The automap screen left (0000:2EAA..2F0F, `automap_screen_end`): its
+/// fonts and blocks freed, the game's font (102C) the current one again.
+pub fn close(engine: &mut arena::engine::Engine) {
+    let e = engine;
+    e.m.automap_screen_end(&mut e.files);
 }
 
 /// Whether the screen has notes here: not where 5E6 is 4, nor in the

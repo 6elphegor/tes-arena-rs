@@ -5,11 +5,12 @@
 ba60 ba62 the frame's tick (BA60): the harness's timer ticks at each read of it
 884a 884c the minute's tick (884A, 0000:4BC8: the ticks then): the view's frames tick before the frame, the harness's at its waits after, one less at the clock (the minutes come on the same frames)
 8f92 8f96 the mouse's place: the harness's mouse reads 160, 100; the view's controls don't read it
-7a4a 7a5a the cursor's record (2826:00xx): the classic controls' regions; the view's are its own
+7a48 7a5a the cursor's record (2826:00xx): the classic controls' regions; the view's are its own (7A48, its x, FFFFh again at each frame's start, 2826:0002, but a frame that ends the world loop leaves it)
 acb4 acb5 the key interrupt's last key (0000:71F2): the view sets its keys' table
 cb92 cb94 the square under the cursor (the drawing's, from the mouse)
 127a 127e 0000:47FD's return address kept on the stack's check
 af8b af8f the polygon drawer's caller's SS:SP (85AE's move to its own stack at DS:974E): the port has no stack
+1024 1026 the haggle's SP (1194:8467), kept for its way out (84A4, 84AC): the port has no stack
 9740 974e the polygon drawer's own stack (DS:974E down): its calls' return addresses and the image's segment (1000h higher in the harness) it pushes
 fff2 fff4 the harness's count of the sounds' calls (2F9F:001F stubbed: no driver)
 # Segments stored as data (the harness loads the program 1000h paragraphs on, and the heaps part):

@@ -2291,10 +2291,10 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             }
             "map" => {
                 if st.map {
-                    automap::close(&mut engine.m);
+                    automap::close(&mut engine);
                 } else {
                     sheets::pics(&st.assets.archive, &engine.m);
-                    automap::open(&mut engine, &st.assets.archive);
+                    automap::open(&mut engine, st.assets.dac(), (160, 100));
                 }
                 st.map = !st.map;
             }
@@ -2329,7 +2329,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                 let (x, y) = sheets::bar_centre(n as usize);
                 match sheets::bar_click(&mut engine.m, &mut engine.files, x, y, false) {
                     Some(sheets::BarAction::Automap) if !st.map => {
-                        automap::open(&mut engine, &st.assets.archive);
+                        automap::open(&mut engine, st.assets.dac(), (x, y));
                         st.map = true;
                     }
                     Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
@@ -3952,7 +3952,7 @@ impl App {
     /// the world drawn and faded in to its colours (999E) in 12.
     fn close_automap(&mut self) {
         self.fade_open(12, 12, |a| {
-            automap::close(&mut a.engine.m);
+            automap::close(&mut a.engine);
             a.map = false;
         });
     }
@@ -3964,10 +3964,15 @@ impl App {
             sheets::BarAction::WorldMap => self.open_travel(),
             // 0000:2D3E..2DAE: the screen faded out in 12 steps, the
             // automap drawn and faded in in 12.
-            sheets::BarAction::Automap => self.fade_open(12, 12, |a| {
-                automap::open(&mut a.engine, &a.assets.archive);
-                a.map = true;
-            }),
+            sheets::BarAction::Automap => {
+                // The mouse where the screen's loop first reads it (the view's
+                // centre while the window holds it).
+                let at = if self.captured { (160, 100) } else { self.screen_point() };
+                self.fade_open(12, 12, move |a| {
+                    automap::open(&mut a.engine, a.assets.dac(), at);
+                    a.map = true;
+                })
+            }
             sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
             sheets::BarAction::Spells => self.panel = Some(panels::Panel::Spellbook(Default::default())),
             // 27E3:0088: the screen faded out in 8 steps first.
@@ -4482,11 +4487,15 @@ impl App {
             // The automap screen up: its buttons and its exit (0000:2E30).
             In::Button { down: true, .. } if self.map => {
                 let (x, y) = self.screen_point();
+                // The loop's turn that reads the click (0000:2DB8: the pen
+                // drawn where it is).
+                automap::turn(&mut self.engine.m, (x, y));
                 if automap::exit_at(x, y) {
                     self.close_automap();
                 } else if let Some(b) = automap::button_at(x, y) {
                     self.engine.m.automap_view_button(b);
                     self.engine.m.automap_origin();
+                    automap::redraw(&mut self.engine);
                 } else if automap::notes_here(&self.engine.m) {
                     self.note_turn(x, y);
                 }

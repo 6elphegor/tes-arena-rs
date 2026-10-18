@@ -122,6 +122,14 @@ enum Place {
     Capped,
     /// The main quest dungeon 40516921.MIF, with fog.
     Fogged,
+    /// The guild the load leaves, played on as the other places are
+    /// (gen_worldframes.py's `guild`).
+    Loaded,
+    /// The town's first equipment store, in at its door from the street
+    /// (gen_worldframes.py's `building`).
+    Store,
+    /// The town's first tavern, in as the store.
+    Tavern,
 }
 
 /// From the guild to the street, then into the level `name` the way the
@@ -228,7 +236,11 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
     BASE_FILES.with(|b| *b.borrow_mut() = Some(files_now(&a, &save)));
     match place {
-        Place::Guild => {}
+        Place::Guild | Place::Loaded => {}
+        // (The building's words on the way in, 191F, taken as read, as
+        // gen_worldframes.py's `building` takes them.)
+        Place::Store => into(&mut a, 0x1008),
+        Place::Tavern => into(&mut a, 0x1AB5),
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -252,7 +264,7 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     // The harness's last frame, run again with the page's writes watched
     // (gen_worldframes.py `play`): the page it leaves is the case's. (The
     // guild's case runs none.)
-    if !matches!(place, Place::Guild) {
+    if !matches!(place, Place::Guild) && a.engine.m.mem.r16(DS, 0x05B1) & 0x100 == 0 {
         d.frame(&mut a);
     }
     Some((a, seen, save))
@@ -725,6 +737,90 @@ fn used(a: &mut App, index: u16) {
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said::default());
 }
 
+/// The window's fades played out at once: the original's screens fade
+/// inside the frame that opens them, which the harness's timer doesn't
+/// count; the window's queue would hold back the next frames instead.
+fn faded(a: &mut App) {
+    a.fade.clear();
+    a.fade_old = None;
+}
+
+/// gen_worldframes.py's `shopping`: a slot free (`room`), each item worn
+/// to half (`worn`), the seed gen_screens.py's SEED (`seeded`).
+fn shopping(a: &mut App) {
+    room(a);
+    worn(a);
+    seeded(a);
+}
+
+fn seeded(a: &mut App) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
+    a.engine.m.rng.seed = SEED;
+}
+
+/// A step of gen_worldframes.py's STORE_SCRIPT or GUILD_SCRIPT: a click
+/// at (x, y), or a key typed.
+enum Act {
+    Click(i32, i32),
+    Key(KeyCode, &'static str),
+}
+
+/// gen_worldframes.py's ACCEPT and MORE.
+const ACCEPT: Act = Act::Click(110, 133);
+const MORE: Act = Act::Click(297, 172);
+
+/// gen_worldframes.py's STORE_SCRIPT: a weapon bought, an item sold, one
+/// repaired, the store left.
+const STORE_SCRIPT: [Act; 17] = [
+    Act::Click(0xA0, 0x43), Act::Click(0xA0, 0x65), Act::Click(0x70, 0x26), Act::Click(0x70, 0x26), MORE, ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0x5B), Act::Click(0x80, 0x25), Act::Click(0xA0, 0x69), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0x73), Act::Click(0x70, 0x26), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's `informant`: the main quest's informant in this
+/// tavern, offered but not met, ten days and 100 gold; the seed SEED.
+fn informant(a: &mut App) {
+    let m = &mut a.engine.m;
+    let w = m.mem.r16(DS, arena::sidequest::var::TALKER);
+    m.mem.w8(DS, 0x0FDD, 0x0F);
+    m.mem.w16(DS, 0x0FDE, w & 0xFF00 | (w & 0xFF) >> 1);
+    let province = m.mem.r8(DS, 0x0A46);
+    m.mem.w8(DS, 0x0FE3, province);
+    m.mem.w8(DS, 0x0FE6, 2);
+    let now = m.mem.r32(DS, 0x05CC);
+    m.mem.w32(DS, 0x0FE9, now);
+    m.mem.w8(DS, 0x0FED, 10);
+    m.mem.w16(DS, 0x0FEE, 100);
+    seeded(a);
+}
+
+/// gen_worldframes.py's INFORMANT_SCRIPT: the informant's words paged, his
+/// price accepted, the rest paged to the tavern's menu, its Exit.
+const INFORMANT_SCRIPT: [Act; 8] = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, Act::Click(0xA0, 0xA3)];
+
+/// gen_worldframes.py's GUILD_SCRIPT: a potion bought, the guild left.
+const GUILD_SCRIPT: [Act; 8] = [
+    Act::Click(0xA0, 0x46), Act::Click(0xA0, 0x59), Act::Click(0x70, 0x26), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's `serviced`: the building's services (869F's
+/// `kind`) run as its keeper's click runs them, between frames, `script`
+/// answering them; the turn's frame after them counted as the case's next.
+fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, script: &[Act]) {
+    super::super::super::shop_turn(a, kind);
+    for act in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");
+        match *act {
+            Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
+            Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
+        }
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the services still asking");
+    seen.push(state(a));
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -831,12 +927,34 @@ fn case(name: &str) -> Option<Case> {
             // The automap (M) opened and left by its exit (0000:2E30), the
             // character sheet (F1) with Esc, each in the frame after (the
             // original's frame body opens them: 2542:0100).
+            // The harness's mouse at the view's centre, where the screen's loop
+            // first reads it.
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
             d.key(a, KeyCode::KeyM, Some("m"));
             d.click(a, 0x100, 0xB0, MouseButton::Left);
+            faded(a);
             frames(a, d, seen, 11, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
+            faded(a);
             frames(a, d, seen, 31, |_| false);
+        })),
+        "playautomap" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The harness's mouse at the view's centre, where the screen's loop
+            // first reads it.
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::KeyM, Some("m"));
+            d.click(a, 0x100, 0xB0, MouseButton::Left);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
+        })),
+        "playsheet" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            d.key(a, KeyCode::F1, None);
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            frames(a, d, seen, 11, |_| false);
         })),
         "playuse" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -844,6 +962,34 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 5, |_| false);
             used(a, 3);
             frames(a, d, seen, 60, |_| false);
+        })),
+        "playstore" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 6, &STORE_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playinformant" => (Place::Tavern, Box::new(informant), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &INFORMANT_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playdeath" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // gen_worldframes.py's `killed`: health 0, 2686:02B4; the
+            // frame that ends the world loop for it, and the view's way on
+            // (`App::area_next`: the outer loop's death, 0000:0CE1..0D43).
+            let m = &mut a.engine.m;
+            m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+            m.player_dies();
+            d.frame(a);
+        })),
+        "playguild" => (Place::Loaded, Box::new(|a: &mut App| {
+            room(a);
+            seeded(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 7, &GUILD_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
         })),
         _ => return None,
     })
@@ -1429,8 +1575,10 @@ fn the_state_as_the_original_leaves_it() {
 /// casting, the wilderness's night encounter, the stairs taken mid-fight,
 /// a rest ended by enemies, a lock picked and its door walked through,
 /// water swum in and levitated over, a potion and a ring used, the
-/// automap and the character sheet opened mid-fight).
-const BUSY: [&str; 12] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens"];
+/// automap and the character sheet opened mid-fight, a store's buying,
+/// selling and repairing, a potion bought in the mages' guild, the main
+/// quest's informant paid in a tavern).
+const BUSY: [&str; 17] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet"];
 
 /// Each busy case's player, frame by frame, as the original's.
 #[test]
@@ -1442,11 +1590,15 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
-/// The busy cases whose state is compared: all but playscreens, whose
-/// screens the view shows with its own state (the original's automap and
-/// character sheet save the screen to temporary files, 1AEA, 1AF7, 1B47;
-/// fade with the timer's ticks, 0151; and leave their palettes, 99A3,
-/// A3A3, and scratch, 1044, 10A8, 12A4: not ported).
+/// The busy cases whose state is compared. Not yet: playscreens and
+/// playsheet, whose character sheet (1194:0CF8) the view shows with its
+/// own state (its paper doll made in bank 1Fh and kept in TEMPSAVE.$$$,
+/// 1194:158F; the portrait in bank 17h, 2462; the colours read, A3A3;
+/// the numbers' scratch, 1044, 10A8, 12A4: not ported); the store, the
+/// guild and the informant, whose shops' screens the view lays out itself
+/// (the list windows, 1194:5734 and 3159; the strip's dialog, 4E88; the
+/// strip saved in bank 18h, 5F8C; the pictures in bank 1Fh: not ported;
+/// the banner is, `Machine::shop_banner`).
 const BUSY_STATE: [&str; 11] = ["playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
@@ -1464,6 +1616,40 @@ fn busy_play_leaves_the_state_as_the_original() {
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
     for name in BUSY_STATE {
+        state_ems_case(name);
+    }
+}
+
+/// The player killed in the dungeon (`playdeath`): the frame that ends the
+/// world loop, then the outer loop's death (0000:0CE1..0D43, the save's
+/// F77 9: no vision) as the view takes it on (`App::area_next`): the
+/// player's frames, DGROUP from the case's start and from the load, and
+/// the EMS banks, as the original leaves them at the death's RET.
+#[test]
+fn a_death_leaves_the_state_as_the_original() {
+    let (place, setup, play) = case("playdeath").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playdeath"), "playdeath: the player's frames differ from the original's");
+    state_case("playdeath");
+    state_load_case("playdeath");
+    state_ems_case("playdeath");
+}
+
+/// The screens opened in play whose state is the engine's
+/// (`playautomap`: the automap screen, 0000:2CFE..2F0F, run as
+/// `automap_screen_begin`, its loop's turns and `automap_screen_end`).
+const SCREENS_STATE: [&str; 1] = ["playautomap"];
+
+/// Each screen's case: the player's frames, DGROUP from the case's start
+/// and from the load, and the EMS banks, as the original leaves them.
+#[test]
+fn the_screens_leave_the_state_as_the_original() {
+    for name in SCREENS_STATE {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+        state_case(name);
+        state_load_case(name);
         state_ems_case(name);
     }
 }

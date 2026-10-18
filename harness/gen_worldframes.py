@@ -90,6 +90,7 @@ from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
+import gen_screens as gs
 
 UP = 0x48
 # The world loop's stages (BA4B) that draw the 3D view.
@@ -371,6 +372,118 @@ def message_up(a):
     return a.r16(0x061E) != 0
 
 
+def killed(a):
+    """The player's health 0 and 2686:02B4 run, as a blow that kills runs
+    it (2EBD:04D6 on the player): 5B1 bit 100h, the area left (C398 bit
+    80h), the effects and spells on the player cleared."""
+    a.w16(0x01A4 + 0x59, 0)
+    a.call_far(0x2686, 0x02B4)
+
+
+def died(a):
+    """From the world loop's end (0000:A45D, on the world's stack as
+    `area_ended` goes on from it) through the outer loop (0CAD) to its
+    death's way out (0CE1..0D43: the clip the screen, the ending's text
+    picked, 1194:D459's vision unless F77 is 9, the save's), stopped at its
+    RET (0D43), before the program's main takes the game back to its menu
+    (0000:10B0, 108B)."""
+    ss, sp, words = a.world_stack
+    a.mu.mem_write(a.lin(ss, sp), words)
+    saved = a.stub(location=False)
+    at = a.lin(LOAD_SEG, 0x0D43)
+
+    def out(mu, addr, size, _):
+        a.waiting = ('died',)
+        mu.emu_stop()
+    h = a.mu.hook_add(UC_HOOK_CODE, out, None, at, at)
+    try:
+        r = a.run_screen(0, 0xA45D, stack=(ss, sp))
+    finally:
+        a.mu.hook_del(h)
+        a.unstub(saved)
+    assert r == ('died',), f'the death went on to {r}'
+    # The dying frame's tick: the harness ticks the timer (0151) at the
+    # frame's waits for it (0000:A428, A43D), which a frame that ends the
+    # world loop leaves before; the timer ticks all the same (the view's
+    # frames tick before the frame).
+    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+
+
+def serviced(seg, off, script):
+    """A building's services run as its keeper's click runs them (the
+    table at 869F: 1194:F48E the equipment store's, A73E the mages'
+    guild's), between frames, its waits for input (the mouse's read,
+    0000:8FC4) answered by `script` as gen_screens.py's are, until it
+    returns."""
+    def do(a):
+        a.waits = {MOUSE_READ}
+        a.script = list(script)
+        try:
+            assert a.run_screen(seg, off) is None, 'the services still waiting'
+        finally:
+            a.waits = set()
+            a.script = []
+        # The mouse back at the view's centre, where the view's controls
+        # take it to be (the classic controls' centre region, 2826:00F0).
+        a.mouse = (160, 100)
+    return do
+
+
+def shopping(a):
+    """A slot of the player's free (gen_screens.py's `room`), each item
+    worn to half (`worn`) and the seed gen_screens.py's SEED (`seeded`):
+    what the store's buying, selling and repairing need."""
+    gs.room(a)
+    gs.worn(a)
+    gs.seeded(a)
+
+
+def guild_shopping(a):
+    gs.room(a)
+    gs.seeded(a)
+
+
+def informant(a):
+    """The main quest's informant in this tavern, as a rumour's offer
+    leaves one (1194:CD9A): the step Rajhin's ring's (0FDD 0Fh), the
+    informant the person talked to here (0FDE: the building's door
+    square, 0FD2, its column halved, as 1194:CED7 compares it), the
+    dungeons' province this one (0FE3: 0A46), the informant offered but
+    not yet met (0FE6 2), met today (0FE9 the time, 5CC) with ten days
+    (0FED) and a price of 100 gold (0FEE); the seed SEED."""
+    w = a.r16(0x0FD2)
+    a.mu.mem_write(a.lin(a.ds, 0x0FDD), bytes([0x0F]))
+    a.w16(0x0FDE, w & 0xFF00 | (w & 0xFF) >> 1)
+    a.mu.mem_write(a.lin(a.ds, 0x0FE3), bytes(a.mu.mem_read(a.lin(a.ds, 0x0A46), 1)))
+    a.mu.mem_write(a.lin(a.ds, 0x0FE6), bytes([2]))
+    a.mu.mem_write(a.lin(a.ds, 0x0FE9), bytes(a.mu.mem_read(a.lin(a.ds, 0x05CC), 4)))
+    a.mu.mem_write(a.lin(a.ds, 0x0FED), bytes([10]))
+    a.w16(0x0FEE, 100)
+    gs.seeded(a)
+
+
+# The haggle's Accept and the deal's Yes (NEGOTBUT.IMG's first button:
+# 1194:6001's at 59h..88h, 7Fh..8Bh), and its strip's "...More".
+ACCEPT = ('click', 110, 133)
+MORE = ('click', 297, 172)
+# The store's menu (1194:F48E): Buy, then Weapons and its first line
+# twice (marked, then haggled: "...More", Accept, Yes); Sell, its first
+# line (worn: "still want to sell it?" Yes, 0A0h, 69h), Accept, Yes;
+# Repair, its first line, Yes and the words after; Exit.
+STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x26), ('click', 0x70, 0x26), MORE, ACCEPT, ACCEPT,
+                ('click', 0xA0, 0x5B), ('click', 0x80, 0x25), ('click', 0xA0, 0x69), ACCEPT, ACCEPT,
+                ('click', 0xA0, 0x73), ('click', 0x70, 0x26), ACCEPT, ACCEPT,
+                ('click', 0xA0, 0xA3)]
+# The mages' guild's menu (1194:A73E): Buy, Potions, the first line, how
+# many typed (1, Enter), Accept, Yes; Exit.
+# The tavern's keeper (1194:B93C) with the informant here (`informant`):
+# his words paged ("...More" twice), his price accepted, the rest of his
+# words paged to the tavern's menu; its Exit.
+INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
+GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
+                ('click', 0xA0, 0xA3)]
+
+
 # The main quest's Crypt of Hearts: its .MIF (whose INFO names
 # crypt1.inf).
 CRYPT = b'41649375.MIF'
@@ -492,9 +605,6 @@ CASES = {
     # (2826:0042).
     'playlevitate': ('crypt', levitating(at_square(21, 7, 0)), [((UP,), (), 30, None), ((), (UP,), 30, None)]),
     # Wounded with a potion (`wounded_with_potion`): two frames, the
-    # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
-    # frames, the Ring of Shielding used (the list's fourth: its spell
-    # cast on the player, its charge spent), sixty frames on.
     # A creature brought (`brought`) and fought off by standing: twenty
     # frames, then M held a frame (the automap, 2542:045A, left by a click
     # on its exit, 0000:2E30: F0h..120h, A4h..BBh), ten frames, F1 held a
@@ -503,9 +613,64 @@ CASES = {
     'playscreens': ('dungeon', brought(1), [((), (), 20, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                                             ((), (KEY_M,), 10, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
                                             ((), (KEY_F1,), 30, None)]),
+    # The two screens alone: in the dungeon, two frames, M held a frame
+    # (the automap, left by its exit), ten frames; F1 held a frame (the
+    # character sheet, left with Esc), ten frames.
+    'playautomap': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
+                                       ((), (KEY_M,), 10, None)]),
+    'playsheet': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}),
+                                     ((), (KEY_F1,), 10, None)]),
+    # Wounded with a potion of healing (`wounded_with_potion`): two frames, the
+    # potion drunk (the use list's fifth: 29CF:0869 heals 25), five
+    # frames, the Ring of Shielding used (the list's fourth: its spell
+    # cast on the player, its charge spent), sixty frames on.
     'playuse': ('dungeon', wounded_with_potion, [((), (), 2, None), ((), (), 5, None, [], {'do': used(4)}),
                                                  ((), (), 60, None, [], {'do': used(3)})]),
+    # In the town's first equipment store (`building`), set up to shop
+    # (`shopping`): two frames, the store's services (`serviced`): a
+    # weapon bought, an item sold, one repaired (STORE_SCRIPT), thirty
+    # frames on.
+    'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
+    # The dungeon, two frames, the player killed (`killed`) and the frame
+    # that ends the world loop for it, the outer loop's death followed to
+    # its way back to the program's menu (`died`; the save's F77 is 9: no
+    # vision).
+    'playdeath': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True})]),
+    # In the mages' guild the load leaves (`guild`), a slot free and
+    # seeded: two frames, a potion bought (GUILD_SCRIPT), thirty frames.
+    # In the town's first tavern with the main quest's informant there
+    # (`informant`): two frames, the keeper's services (the informant
+    # first, 1194:CED7: his price haggled and accepted, the dungeon told),
+    # thirty frames.
+    'playinformant': ('tavern', informant, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_SCRIPT)})]),
+    'playguild': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_SCRIPT)})]),
 }
+
+
+def guild(a, base):
+    """The mages' guild as the load leaves it (the save's place)."""
+    a.restore(base)
+    return a.snapshot()
+
+
+def building(where):
+    """The snapshot of the game in the town's first `where` (gen_screens.py's
+    PLACES: its entry list and count), in at its door from the street as
+    gen_screens.py's `place` goes in, its words on the way in read."""
+    def enter(a, base):
+        a.restore(base)
+        assert a.area_ended() == ('world',), 'the guild not left'
+        at, count = gs.PLACES[where]
+        assert a.r16(count), f'no {where} in the town'
+        sq = a.r16(a.r16(at), seg=a.r16(at + 2))
+        door = (sq & 0xFF00) | ((sq & 0xFF) << 1)
+        assert a.enter(door) == ('world',), f'the {where} not entered'
+        # The building's words on the way in (191F, which its first frame
+        # shows in a box waiting for a click, 0000:4903) taken as read, as
+        # gen_screens.py's screens take them.
+        a.mu.mem_write(a.lin(a.ds, 0x191F), b'\0')
+        return a.snapshot()
+    return enter
 
 
 def street(a, base):
@@ -630,6 +795,13 @@ def play(a, name, steps, tracks):
         if let_go:
             a.keys_held(let_go, down=False)
         why, _ = a.world_frames(n, until=until, each=each)
+        if opts.get('dies'):
+            # (`dies`: the frames end the world loop, the player dead: the
+            # outer loop's death followed, `died`; the case ends there.)
+            assert why == ('ended',), f'{name}: stopped by {why}'
+            died(a)
+            page = a.page()
+            return page, page, bytes([1]) * 64000, bytes(a.dac)
         if why == ('ended',) and opts.get('leaves'):
             # The area left in the step's frame (a door, a gate): the
             # outer loop on into the next (`area_next`, its boxes on the
@@ -639,6 +811,14 @@ def play(a, name, steps, tracks):
             assert why == ('world',), f'{name}: the next area stopped by {why}'
             continue
         assert why == ('frames',), f'{name}: stopped by {why}'
+        if any(act[0] in ('click', 'rclick') for act in opts.get('script', [])):
+            # A screen's clicks done, the mouse back at the view's centre,
+            # where the view's controls take it to be (2826:00F0); the
+            # last click's release, which the screen left for the next
+            # read, the screen's (the window gives the screen whole clicks).
+            a.mouse = (160, 100)
+            a.clicks = []
+            a.buttons = 0
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
         frame[0] -= 1
@@ -732,7 +912,8 @@ def main():
         if only and name not in only:
             continue
         if where not in places:
-            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED)}[where](a, base)
+            places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
+                             'store': building('store'), 'tavern': building('tavern'), 'guild': guild}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
