@@ -170,6 +170,8 @@ fn matches_original() {
         eprintln!("skipping: no game directory");
         return;
     };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let (mut n, mut stuck, mut ambushed) = (0, 0, 0);
     for line in include_str!("vectors/ambush.txt").lines() {
         let f: Vec<&str> = line.split(" | ").collect();

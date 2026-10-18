@@ -1,6 +1,8 @@
 //! A file's copy (25FD:056F, `Machine::file_copy`) against the original's
 //! (harness/gen_filecopy.py), with its source there and missing: from the
-//! game as the start and set-up leave it, what the copy changed in
+//! game as the start and set-up leave it, with a missing file opened and
+//! closed (DOS's handle 2 freed, as the game's first missing file frees
+//! it; tests/doshandles.rs has the copies before), what the copy changed in
 //! DGROUP, the destination as written and the EMS banks. Needs ARENA_SAVE
 //! (the files copied are the save's).
 mod common;
@@ -36,6 +38,11 @@ fn the_copies_as_the_original_makes_them() {
     base.mem.w8(DS, 0x1A80, 0x40);
     base.mem.w8(DS, 0x1A6C, 0x40);
     base.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the set-up");
+    for (i, &b) in b"NOSUCH.A\0".iter().enumerate() {
+        base.mem.w8(DS, 0x1044 + i as u16, b);
+    }
+    base.file_open_or_device(&mut files, 0x1044).expect("the open");
+    base.file_close(&mut files);
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
     let mut n = 0;
     for l in text.lines() {

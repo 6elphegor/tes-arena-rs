@@ -314,7 +314,9 @@ fn matches_original() {
         |_| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into(),
         |p| std::path::Path::new(&p).parent().unwrap().to_string_lossy().into_owned(),
     ));
-    let Ok(files) = Files::new(&dir) else { return };
+    let Ok(mut files) = Files::new(&dir) else { return };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let mut base = Machine::new(&img);
     base.mem.w16(DS, 0xD806, WSEG);
     base.mem.w16(DS, 0x9030, FSEG);
@@ -463,7 +465,9 @@ fn a_store_given_up_leaves_as_it_ends() {
         |_| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into(),
         |p| std::path::Path::new(&p).parent().unwrap().to_string_lossy().into_owned(),
     ));
-    let Ok(files) = Files::new(&dir) else { return };
+    let Ok(mut files) = Files::new(&dir) else { return };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let mut base = Machine::new(&img);
     base.mem.w16(DS, 0xD806, WSEG);
     base.mem.w16(DS, 0x9030, FSEG);

@@ -52,11 +52,12 @@ class MemDos(DosArena):
         raw = bytes(self.mu.mem_read(lin, 128)).split(b'\0')[0].decode('latin1')
         return raw.replace(':', '\\').split('\\')[-1].upper()
 
+    def new_handle(self, name, taken=()):
+        # One table: the files held here and the game directory's.
+        return super().new_handle(name, set(taken) | set(self.mh))
+
     def _new_handle(self):
-        h = 5
-        while h in self.handles or h in self.mh:
-            h += 1
-        return h
+        return self.new_handle(None)
 
     def _dos(self):
         ah = self._reg('ax') >> 8

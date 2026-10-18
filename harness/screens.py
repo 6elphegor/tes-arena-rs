@@ -202,7 +202,9 @@ class ScreenArena(DosArena):
         if ah == 0x40:
             h = self._reg('bx')
             f = self.handles.get(h)
-            if f is None or not isinstance(f[0], bytearray):
+            if f is None:
+                return self._dos_device(ah, h)
+            if not isinstance(f[0], bytearray):
                 return False
             n = self._reg('cx')
             data = bytes(self.mu.mem_read(self.lin(self._reg('ds'), self._reg('dx')), n))

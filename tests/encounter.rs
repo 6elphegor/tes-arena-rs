@@ -166,6 +166,8 @@ fn matches_original() {
         eprintln!("skipping: {} not found", dir.display());
         return;
     };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     for line in include_str!("vectors/encounter.txt").lines().take(std::env::var("ENCOUNTER_N").map_or(usize::MAX, |v| v.parse().unwrap())) {
         let f: Vec<&str> = line.split(" | ").collect();

@@ -70,7 +70,9 @@ fn matches_original() {
         |_| concat!(env!("CARGO_MANIFEST_DIR"), "/../ESarena").into(),
         |p| std::path::Path::new(&p).parent().unwrap().to_string_lossy().into_owned(),
     ));
-    let Ok(files) = Files::new(&dir) else { return };
+    let Ok(mut files) = Files::new(&dir) else { return };
+    // GLOBAL.BSA's handle, 5, taken as the generator's stand-in has it.
+    files.bsa_handle_taken();
     let base = Machine::new(&img);
     let (mut n, mut bad) = (0, Vec::new());
     for line in include_str!("vectors/roomfile.txt").lines() {

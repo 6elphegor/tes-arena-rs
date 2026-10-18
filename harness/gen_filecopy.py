@@ -3,9 +3,13 @@ with its source there and missing.
 
 Usage: gen_filecopy.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT
 
-The game started and set up as gen_programstart.py has it, then for each
-case from that state: the names written at DGROUP 1044 (from) and 1051
-(to) and 056F far-called with SI 1044, DI 1051. One line a case:
+The game started and set up as gen_programstart.py has it, then a
+missing file opened and closed (0000:67C4, 6742) as the game's first
+missing file (in a title load, a flat) leaves DOS's handles: CON's 2
+closed, free for the next file (gen_doshandles.py has the copies before
+that, from CON). Then for each case from that state: the names written at
+DGROUP 1044 (from) and 1051 (to) and 056F far-called with SI 1044, DI
+1051. One line a case:
 
   copy | NAME | FROM | TO | <runs> | <digest> | <written> | <ems>
 
@@ -40,6 +44,9 @@ def main():
     a.mu.mem_write(a.lin(a.ds, 0x1A6C), b'\x40')
     assert a.run_screen(0x21EE, 0x016C) is None, 'the setup waited'
     a.unstub(saved)
+    a.mu.mem_write(a.lin(a.ds, 0x1044), b'NOSUCH.A\0')
+    assert a.run_screen(0, 0x67C4, dict(si=0x1044)) is None
+    assert a.run_screen(0, 0x6742) is None
     snap = a.snapshot()
     out = open(OUT, 'w')
     for name, src, dst in CASES:
