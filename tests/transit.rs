@@ -65,14 +65,19 @@ impl AreaHooks for Hooks {
     fn automap(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         count(m, 0xFFFA);
     }
-    fn ask_leave(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
+    fn map_keep(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
         count(m, 0xFFFC);
         count(m, 0xFFFE);
+    }
+    fn ask_leave(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
         count(m, 0xFFA0);
-        count(m, 0xFFA2);
-        count(m, 0xFFA4);
         count(m, 0xFFAA);
         m.mem.r8(DS, 0xFFDE) & 1 != 0
+    }
+    fn map_given_back(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        count(m, 0xFFA2);
+        count(m, 0xFFA4);
+        Some(())
     }
     fn leave_screen(&mut self, m: &mut Machine) {
         count(m, 0xFFA6);

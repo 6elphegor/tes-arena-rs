@@ -64,11 +64,11 @@ pub trait StairsHooks {
     fn ask_leave(&mut self, _m: &mut Machine, _files: &mut Files) -> bool {
         false
     }
-    /// The colours on the screen (the VGA's 6-bit values) that the world's
-    /// keeping before that map reads (0000:A611's 6E3C, to A39E). None:
-    /// A39E left as it is.
-    fn screen_colours(&mut self) -> Option<[[u8; 3]; 256]> {
-        None
+    /// 0000:4564..4568, before that map: the world kept (A611, A606:
+    /// `Machine::map_keep`), the colours A611 reads (6E3C, to A39E) the
+    /// screen's. By default A39E is left as it is.
+    fn map_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        m.map_keep(files, None);
     }
 }
 

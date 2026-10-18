@@ -330,8 +330,9 @@ impl arena::hooks::StairsHooks for Front<'_> {
             None => false,
         }
     }
-    fn screen_colours(&mut self) -> Option<[[u8; 3]; 256]> {
-        self.dac
+    /// The colours A611 reads: the screen's.
+    fn map_keep(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        m.map_keep(files, self.dac.as_ref());
     }
 }
 /// How the sheet's drop came out (`App::sheet_drop`): a question asked
