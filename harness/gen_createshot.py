@@ -70,6 +70,10 @@ SCRIPTS = [
     # Enter on the name's empty field (1194:2789: asked again, the box
     # dissolved out and the new one in), then a name.
     ('emptyname', 'S,enter,enter,type:Ria,enter,F,enter'),
+    # The class list's down arrow held eight times (3159:09E8: the pick on
+    # a line each, the lines scrolled past the sixth, 0E68), the ninth
+    # class taken by Enter.
+    ('scrolledclass', 'S,' + 'down,' * 8 + 'enter,type:Ria,enter,F,enter'),
     ('select', 'S,enter,type:Ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,'
                'click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:41:50,click:10:175,S,enter,click:240:20,click:240:20,click:10:175'),
 ]
@@ -86,6 +90,9 @@ def parse(script):
             out.append(('key', 0x1B))
         elif t == 'back':
             out.append(('key', 0x08))
+        elif t in ('up', 'down'):
+            # The arrows, held (no character: 100h over their scan codes).
+            out.append(('key', ARROWS[t]))
         elif t.startswith('type:'):
             out.extend(('key', ord(c)) for c in t[5:])
         elif t.startswith('click:'):
@@ -102,6 +109,8 @@ def parse(script):
 SCANS = {0x1B: 0x01, 0x0D: 0x1C, 0x08: 0x0E, 0x20: 0x39}
 SCANS.update({ord(c): sc for row, first in (('QWERTYUIOP', 0x10), ('ASDFGHJKL', 0x1E), ('ZXCVBNM', 0x2C), ('1234567890', 0x02))
               for sc, c in enumerate(row, first)})
+ARROWS = {'up': 0x148, 'down': 0x150}
+SCANS.update({k: k & 0xFF for k in ARROWS.values()})
 HELD = 0xACB5
 # The keyboard buffer's count of keys (0000:7138 reads it, and loops that
 # wait for any key).

@@ -1425,13 +1425,22 @@ fn draw_list_in(screen: &mut Screen, st: &Style, menu: &Menu, font: &Font, title
         screen.remap(area.0, y, area.2, fh, &picked_table());
     }
     // The thumb (3159:0C93 sizes it: the whole track while every line
-    // fits, else its share, at least 3; 0CFF draws it): filled in F5h,
-    // then by 0000:7334's lines the left edge and the bottom in F9h, the
-    // right edge and the top in F2h.
-    let n = menu.entries.len();
+    // fits, else the track over the lines times the rows, the remainder's
+    // share added, at least 3; 0E11 places it at the first line's share of
+    // the track in 1/1024ths, or at its foot with the last lines shown;
+    // 0CFF draws it): filled in F5h, then by 0000:7334's lines the left
+    // edge and the bottom in F9h, the right edge and the top in F2h.
+    let n = menu.entries.len() as i32;
+    let rows_n = rows as i32;
     let (tx, ty, tw, th) = kind.track;
-    let h = if n > rows { (th * rows as i32 / n as i32).max(3) } else { th };
-    let y = if n > rows { ty + (th - h) * top as i32 / (n - rows) as i32 } else { ty };
+    let h = if n > rows_n { (th / n * rows_n + th % n * rows_n / n).max(3) } else { th };
+    let y = if n > rows_n && top as i32 == n - rows_n {
+        ty + th - h
+    } else if n > 0 {
+        ty + (((top as i64) << 10) * th as i64 / n as i64 >> 10) as i32
+    } else {
+        ty
+    };
     screen.fill(tx, y, tw, h, 0xF5, 0xFF);
     screen.fill(tx, y, 1, h, 0xF9, 0xFF);
     screen.fill(tx, y + h - 1, tw, 1, 0xF9, 0xFF);
