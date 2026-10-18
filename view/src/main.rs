@@ -228,6 +228,21 @@ struct Front<'a> {
 }
 
 impl Front<'_> {
+    /// 2542:01E6: camping's checks and its rest begun (`Machine::camp`),
+    /// its menu and hours asked as the turn's questions.
+    fn camp(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        if m.camp(files, self).is_none() {
+            eprintln!("camping gave up: {}", arena::giveup::describe());
+        }
+    }
+
+    /// The screen the frame leaves the window to open (`Talk::taken`).
+    fn taken(&mut self, taken: Option<sheets::Taken>) {
+        if let (Some(t), Some(talk)) = (taken, self.talk.as_deref_mut()) {
+            talk.taken = Some(t);
+        }
+    }
+
     /// The screen a box covers as it opens: the page as the frame's drawing
     /// left it, or before the frame draws the one last shown.
     fn box_screen(&self) -> Option<&[u8]> {
@@ -366,6 +381,24 @@ impl ControlHooks for Front<'_> {
         m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
         m.view_click(files, self)
     }
+    /// 2542:00BA: the window's click on the bar, in the frame's input step
+    /// where the original takes it (after that frame's actors and
+    /// drawing): its button's handler (`sheets::bar_click`), camping's in
+    /// place; a screen it asks for is the window's after the frame
+    /// (`Talk::taken`).
+    fn bar_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        let Some((x, y, right)) = self.talk.as_deref_mut().and_then(|t| t.bar.take()) else { return Some(()) };
+        let taken = match sheets::bar_click(m, files, x, y, right) {
+            None | Some(sheets::BarAction::None) => None,
+            Some(sheets::BarAction::Camp) => {
+                self.camp(m, files);
+                None
+            }
+            Some(a) => Some(sheets::Taken::Action(a)),
+        };
+        self.taken(taken);
+        Some(())
+    }
     /// 2826:0008: the stat bars' state (`bars_state`; the window draws
     /// them itself).
     fn bars(&mut self, m: &mut arena::machine::Machine) {
@@ -493,6 +526,27 @@ impl arena::mapnotes::NoteHooks for Front<'_> {
     }
 }
 impl arena::frame::FrameHooks for Front<'_> {
+    /// 2542:0100, the menu keys, where the frame body asks them (0000:4952:
+    /// after the frame's actors, drawing and physics, before the rest of
+    /// its body): what only changes the game's state done there (the
+    /// weapon readied, picking armed, a touch spell cast, the compass),
+    /// camping's in place (2542:01E6); a screen is the window's after the
+    /// frame (`Talk::taken`).
+    fn menu_keys(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        use arena::menukeys::{MenuKey, NoMenuKeyHooks};
+        let key = m.menu_keys(files, &mut NoMenuKeyHooks).unwrap_or(MenuKey::None);
+        let taken = match key {
+            MenuKey::None | MenuKey::Ready | MenuKey::Pickpocket | MenuKey::TouchCast | MenuKey::Compass => None,
+            MenuKey::Camp => {
+                self.camp(m, files);
+                None
+            }
+            MenuKey::Options => Some(sheets::Taken::Options),
+            k => sheets::menu_action(m, k).map(sheets::Taken::Action),
+        };
+        self.taken(taken);
+        Some(())
+    }
     fn interface(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.interface_setup(files, self)
     }
@@ -1662,6 +1716,9 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         clicked: false,
         click_point: None,
         queued_click: None,
+        queued_bar: None,
+        released: Vec::new(),
+        menu_held: Vec::new(),
         look_click: false,
         right_drag: 0.0,
         ring_screen: None,
@@ -1798,6 +1855,9 @@ struct TurnIn {
     /// A left click in the view at this point of the 320 x 200 screen,
     /// taken in the frame's input step (`Front::take_click`).
     click: Option<(i32, i32)>,
+    /// A click on the bar's button at this point (and whether the right
+    /// button's), taken in the frame's input step (`Front::bar_click`).
+    bar: Option<(i32, i32, bool)>,
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -2095,6 +2155,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         drag: std::mem::take(&mut st.drag),
         aspect: 1.6,
         note: st.note.take(),
+        bar: None,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     st.audio.before(&mut engine.m);
@@ -2977,6 +3038,17 @@ struct App {
     click_point: Option<(i32, i32)>,
     /// The click taken: the next frame's input step takes it (`TurnIn::click`).
     queued_click: Option<(i32, i32)>,
+    /// A click on the bar's button: the frame it runs takes it in its
+    /// input step (`TurnIn::bar`).
+    queued_bar: Option<(i32, i32, bool)>,
+    /// The keys let go while a turn waits on its question: its run again
+    /// starts from the game before them, so they are let go again once it
+    /// stands.
+    released: Vec<u8>,
+    /// The menu keys pressed that no frame has seen yet (none could run:
+    /// a fade, a screen up), and whether let go since: held for the game
+    /// till the next frame asks for them, as a key held to it would be.
+    menu_held: Vec<(u8, bool)>,
     /// A right click in the view (the button let go with less of a drag
     /// than a swing needs, 0000:3C9F's 40h): looking at the square under
     /// the centre (2826:0C15) after the next frame; the drag so far.
@@ -3271,6 +3343,7 @@ impl App {
             aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
             note: None,
             click: self.queued_click.take(),
+            bar: self.queued_bar.take(),
         };
         // The engine before the turn, for a question to run it again: into
         // the last standing turn's copy, its allocations reused.
@@ -3282,6 +3355,12 @@ impl App {
             None => copy(&self.engine),
         };
         self.turn(before, input, Vec::new(), true);
+        // The menu keys held for it seen: those let go, let go now.
+        for (scan, gone) in std::mem::take(&mut self.menu_held) {
+            if gone {
+                self.let_go(scan);
+            }
+        }
         // A click now is the next frame's: its input step takes it (as the
         // original's controls read the mouse), after that frame's actors.
         if !self.waiting() && std::mem::take(&mut self.click) {
@@ -3303,7 +3382,7 @@ impl App {
         if !fresh {
             copy_into(&mut self.engine, &before);
         }
-        let mut talk = dialog::Talk { answers, ..Default::default() };
+        let mut talk = dialog::Talk { answers, bar: input.bar, ..Default::default() };
         self.audio.before(&mut self.engine.m);
         self.music.before(&mut self.engine.m);
         let ticks = self.engine.frame_ticks() as u32;
@@ -3395,6 +3474,10 @@ impl App {
         }
         // The turn stands: its copy is the next turn's to fill.
         self.spare = Some(before);
+        for scan in std::mem::take(&mut self.released) {
+            self.key_up(scan);
+        }
+        let taken = talk.taken.take();
         print_message(&self.engine, &mut self.message);
         self.effect = out.effect.clone();
         if out.level_changed {
@@ -3417,6 +3500,9 @@ impl App {
                 None => eprintln!("the frame ended: None ({})", arena::giveup::describe()),
             }
             self.last = frame;
+        }
+        if let Some(t) = taken {
+            self.open_taken(t);
         }
     }
 
@@ -3826,6 +3912,16 @@ impl App {
             return;
         }
         if let (true, Some(carry)) = (forced, carry) {
+            // The key that ended the screen is the screen's: the turn runs
+            // again at once, while it is down, so its latch is set (as
+            // 2542:05B8 sets it), and the frame's body after the screen
+            // doesn't take it for a menu key (the player's would be let
+            // go by then).
+            for scan in 1..0x80u16 {
+                if self.engine.m.mem.r8(arena::mem::DS, arena::controls::var::KEYS + scan) != 0 {
+                    self.engine.m.key_pressed(scan);
+                }
+            }
             let world = dialog::World(Box::new((self.engine.m.clone(), self.engine.files.clone())));
             self.answer(dialog::Answer::Travel(world, carry));
         }
@@ -4483,33 +4579,47 @@ impl App {
         self.boxes.extend(said.boxes);
     }
 
-    /// A click on the interface bar (`sheets::bar_click`).
+    /// A click on the interface bar: on a button (2542:06CE's table), the
+    /// frame run now takes it in its input step (`Front::bar_click`) and
+    /// the screen it asks for opens after it (`open_taken`); whether on a
+    /// button.
     fn bar(&mut self, x: i32, y: i32, right: bool) -> bool {
-        sheets::pics(&self.assets.archive, &self.engine.m);
-        let Some(a) = sheets::bar_click(&mut self.engine.m, &mut self.engine.files, x, y, right) else { return false };
-        self.bar_action(a);
+        if sheets::bar_button(x, y).is_none() {
+            return false;
+        }
+        self.queued_bar = Some((x, y, right));
+        self.step();
         true
     }
 
-    /// A menu key pressed: the menu keys' check (2542:0100,
-    /// `Machine::menu_keys`) run on the engine, and the screen the key it
-    /// took asks for opened, the mouse let go for it, as the bar's button
-    /// with the same handler opens it.
-    fn menu_key(&mut self) {
-        use arena::menukeys::{MenuKey, NoMenuKeyHooks};
-        let key = self.engine.m.menu_keys(&mut self.engine.files, &mut NoMenuKeyHooks).unwrap_or(MenuKey::None);
-        if matches!(key, MenuKey::None | MenuKey::Ready | MenuKey::Pickpocket | MenuKey::TouchCast | MenuKey::Compass | MenuKey::Camp) {
-            if let Some(a) = sheets::menu_action(&mut self.engine.m, key) {
-                self.bar_action(a);
-            }
-            return;
-        }
+    /// The screen a frame's menu key (2542:0100) or bar button asked for
+    /// opened, the mouse let go for it.
+    fn open_taken(&mut self, t: sheets::Taken) {
         self.release();
         sheets::pics(&self.assets.archive, &self.engine.m);
-        match sheets::menu_action(&mut self.engine.m, key) {
-            Some(a) => self.bar_action(a),
-            None => self.open_options(),
+        match t {
+            sheets::Taken::Action(a) => self.bar_action(a),
+            sheets::Taken::Options => self.open_options(),
         }
+    }
+
+    /// A key let go (`key_up`), and again after the turn waiting on its
+    /// question runs again.
+    fn let_go(&mut self, scan: u8) {
+        self.key_up(scan);
+        if self.pending.is_some() {
+            self.released.push(scan);
+        }
+    }
+
+    /// A key let go: through the key interrupt (0000:718A), its latch
+    /// (2542:05B8) cleared too, as the original's next frame asking for
+    /// it clears it, so its next press is taken.
+    fn key_up(&mut self, scan: u8) {
+        if self.engine.m.key_event(scan | 0x80).is_none() {
+            eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
+        }
+        self.engine.m.key_pressed(scan as u16);
     }
 
     /// The automap screen left (0000:2EC8..2EF2): faded out in 12 steps,
@@ -4525,13 +4635,7 @@ impl App {
     fn bar_action(&mut self, a: sheets::BarAction) {
         match a {
             sheets::BarAction::None => {}
-            // The frame that takes the button first: its hook C3A8 runs
-            // the menu keys (0000:4952, 2542:0100) and the button's
-            // 2542:040A after the frame's actors, drawing and physics.
-            sheets::BarAction::WorldMap => {
-                self.step();
-                self.open_travel();
-            }
+            sheets::BarAction::WorldMap => self.open_travel(),
             // 0000:2D3E..2DAE: the screen faded out in 12 steps, the
             // automap drawn and faded in in 12.
             sheets::BarAction::Automap => {
@@ -4593,6 +4697,7 @@ impl App {
             drag: (0, 0),
             aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
             note: Some((x as u16, y as u16)),
+            bar: None,
         };
         self.turn(before, input, Vec::new(), true);
     }
@@ -4706,18 +4811,6 @@ impl App {
         if out > 0 {
             self.fade_old = Some(before);
         }
-    }
-
-    /// The character sheet (K, the view's: the portrait without its
-    /// touch cast).
-    fn open_sheet(&mut self) {
-        sheets::pics(&self.assets.archive, &self.engine.m);
-        // As the portrait does before its sheet (1194:5F13).
-        self.engine.m.drop_place();
-        self.fade_open(8, 0, |a| {
-            a.sheet_begin();
-            a.panel = Some(panels::Panel::Sheet)
-        });
     }
 
     /// The sheet's run in the game's state (2542:00E0..00F0, 1194:0CF8
@@ -5055,11 +5148,14 @@ impl App {
         // it, so its next press is taken.
         if let In::Key { code, down, .. } = ev {
             if let Some(scan) = interface::scan_code(code) {
-                if self.engine.m.key_event(if down { scan } else { scan | 0x80 }).is_none() {
-                    eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
-                }
-                if !down {
-                    self.engine.m.key_pressed(scan as u16);
+                if down {
+                    if self.engine.m.key_event(scan).is_none() {
+                        eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
+                    }
+                } else if let Some(h) = self.menu_held.iter_mut().find(|h| h.0 == scan) {
+                    h.1 = true;
+                } else {
+                    self.let_go(scan);
                 }
             }
         }
@@ -5320,10 +5416,23 @@ impl App {
                     self.key = true;
                 }
                 // (The key went through the key interrupt above.) A menu
-                // key's press runs the menu keys' check (2542:0100) at once.
+                // key's press runs the frame that takes it now: its body
+                // asks the menu keys (2542:0100, `Front::menu_keys`) after
+                // its actors, drawing and physics, and the screen the key
+                // asks for opens after it.
                 let scan = interface::scan_code(code);
-                if down && !resting && scan.is_some_and(interface::is_menu_key) {
-                    self.menu_key();
+                if let (true, false, Some(scan)) = (down, resting, scan.filter(|&s| interface::is_menu_key(s))) {
+                    if !self.menu_held.iter().any(|h| h.0 == scan) {
+                        self.menu_held.push((scan, false));
+                    }
+                    self.step();
+                }
+                // The view's K and Q: the bar's portrait and its crossed
+                // swords, as a click on them.
+                if down && matches!(code, KeyCode::KeyK | KeyCode::KeyQ) {
+                    let (x, y) = sheets::bar_centre(if code == KeyCode::KeyK { 8 } else { 0 });
+                    self.bar(x, y, false);
+                    return;
                 }
                 let alt = self.engine.m.mem.r8(arena::mem::DS, arena::controls::var::KEYS + 0x38) != 0;
                 let k = &mut self.keys;
@@ -5341,8 +5450,6 @@ impl App {
                     KeyCode::KeyF if down => world::summon(&mut self.engine),
                     KeyCode::KeyE if down => self.click = true,
                     KeyCode::KeyI if down => self.toggle_panel(true),
-                    KeyCode::KeyK if down => self.open_sheet(),
-                    KeyCode::KeyQ if down => interface::ready(&mut self.engine.m),
                     // The view's quick save and load of slot --slot (the
                     // game's menus are the options screen's Save and
                     // Load); Alt+F5 is the game's debug key.

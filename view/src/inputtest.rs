@@ -241,6 +241,13 @@ fn as_far_as(b: &mut App, a: &App) {
 }
 
 /// Frames until the game asks (at most `n`).
+/// The fade playing ended: a click on the bar or a menu key waits for
+/// the frame after it.
+fn faded(a: &mut App) {
+    a.fade.clear();
+    a.fade_old = None;
+}
+
 fn until_asked(d: &mut Driver, app: &mut App, n: usize) -> bool {
     for _ in 0..n {
         if app.pending.is_some() {
@@ -547,6 +554,7 @@ fn talk_turn(app: &mut App) {
         drag: (0, 0),
         aspect: 1.6,
         note: None,
+        bar: None,
     };
     app.turn(before, input, Vec::new(), true);
 }
@@ -569,6 +577,7 @@ fn shop_turn(app: &mut App, kind: u8) {
         drag: (0, 0),
         aspect: 1.6,
         note: None,
+        bar: None,
     };
     app.turn(before, input, Vec::new(), true);
 }
@@ -637,8 +646,8 @@ fn camping_with_typed_hours_as_by_script() {
     let mut b = app(&dir, &start("0,t2"));
     let mut db = Driver::new(&mut b);
     db.frame(&mut b);
+    // (R's frame takes it, the camp asked and answered from the picks.)
     db.key(&mut b, KeyCode::KeyR, None);
-    db.frame(&mut b);
     same(&a, &b, "camping for 2 hours by keys and by --picks 0,t2");
     // The rest runs on in the frames that follow, alike.
     d.frames(&mut a, 30);
@@ -801,6 +810,8 @@ fn spellbook_by_c_and_a_targeted_cast_by_clicks() {
     let mut b = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
     setup(&mut b);
     let mut db = Driver::new(&mut b);
+    db.frame(&mut b);
+    // The frame that took C.
     db.frame(&mut b);
     // The list's run with its first line picked (`book_cast`: the page
     // kept as shown, the line read back through 0B9C's order) and the cast.
@@ -1305,6 +1316,7 @@ fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "its exit comes back to the sheet");
     d.key(&mut a, KeyCode::Escape, None);
     assert!(a.panel.is_none(), "Esc leaves the sheet");
+    faded(&mut a);
     // By the mouse: the portrait, the next page's button, the equipment's
     // Exit, the sheet's Done.
     let (x, y) = sheets::bar_centre(8);
@@ -1339,6 +1351,7 @@ fn the_logbook_by_l_and_the_scroll() {
     assert!(a.log_run.is_some(), "the game's logbook run up");
     d.key(&mut a, KeyCode::Escape, None);
     assert!(a.panel.is_none() && a.log_run.is_none(), "Esc leaves");
+    faded(&mut a);
     let (x, y) = sheets::bar_centre(5);
     d.click(&mut a, x, y, MouseButton::Left);
     assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "the scroll opens the logbook");
@@ -1384,6 +1397,7 @@ fn the_automap_by_m_and_the_map_button() {
     assert_eq!(at(&a.engine.m), at(&b), "the left button");
     d.click(&mut a, 260, 175, MouseButton::Left);
     assert!(!a.map, "Exit leaves");
+    faded(&mut a);
     let (x, y) = sheets::bar_centre(1);
     d.click(&mut a, x, y, MouseButton::Left);
     assert!(a.map, "the map's button opens it");
@@ -1470,12 +1484,13 @@ fn each_bar_button_as_the_original_wires_it() {
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 1);
     assert!(a.map, "the map");
-    // 2, the hand: picking armed.
+    // 2, the hand: picking armed (`pilfer_arm`: 5CA bit 0, its message
+    // at 5B5C), in the frame's input step: the frame's body counts its
+    // message down once after (0000:0511).
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 2);
-    let (mut b, _) = fresh();
-    b.engine.m.pilfer_arm();
-    same(&a, &b, "the hand and pilfer_arm");
+    let m = &a.engine.m;
+    assert_eq!((m.mem.r16(DS, 0x05CA) & 1, m.mem.r16(DS, 0x061A), m.mem.r16(DS, 0x061E)), (1, 0x5B5C, 0xFFFC), "the hand arms picking");
     // 3, the status: its box, status_text's text.
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 3);
@@ -1520,7 +1535,9 @@ fn each_bar_button_as_the_original_wires_it() {
     // 7, the campfire: camping asked, as R.
     let (mut a, mut d) = fresh();
     click(&mut a, &mut d, 7);
-    assert!(a.camp, "camp");
+    // Camping run (2542:01E6) in the frame that takes the click: asked, or
+    // as at the start refused by its checks ("You can't camp here.").
+    assert!(a.pending.is_some() || a.boxes.iter().any(|x| text(x).contains("camp")), "camp");
     // 8, the portrait: the sheet (00BE: the player named).
     let (mut a, mut d) = fresh();
     named(&mut a);
@@ -1622,6 +1639,7 @@ fn a_note_added_on_the_automap_by_a_click_and_keys() {
     }
     // Changed after the save (Y), then loaded: X again.
     let x = edited.iter().find(|n| n.2 == "X").unwrap().clone();
+    faded(&mut a);
     d.key(&mut a, KeyCode::KeyM, None);
     d.click(&mut a, x.0 as i32 + 1, x.1 as i32 + 1, MouseButton::Left);
     d.key(&mut a, KeyCode::Delete, None);
@@ -2190,10 +2208,15 @@ fn each_original_menu_key_as_its_handler() {
         d.click(a, x, y, if right { MouseButton::Right } else { MouseButton::Left });
     };
     // A: the weapon readied (0137), as the swords (0486); again, put away.
+    // (The swords are taken in the frame's input step, before its body's
+    // weapon step, 0000:3C4C; A in the body after it: the hands' frame,
+    // 1947, a step behind.)
     let (mut a, mut d) = fresh();
     let (mut b, mut db) = fresh();
     press(&mut d, &mut a, KeyCode::KeyA, false);
     bar(&mut b, &mut db, 0, false);
+    assert_eq!(a.engine.m.mem.r16(DS, arena::weapon::var::FRAME), 0x1E, "A in the frame's body, after its weapon step");
+    a.engine.m.mem.w16(DS, arena::weapon::var::FRAME, b.engine.m.mem.r16(DS, arena::weapon::var::FRAME));
     same(&a, &b, "A and the swords");
     assert!(a.engine.m.mem.r16(DS, 0x05E0) & 0x10 != 0, "A readies");
     press(&mut d, &mut a, KeyCode::KeyA, false);
@@ -2217,6 +2240,10 @@ fn each_original_menu_key_as_its_handler() {
     let (mut b, mut db) = fresh();
     press(&mut d, &mut a, KeyCode::KeyP, false);
     bar(&mut b, &mut db, 2, false);
+    // (P in the frame's body after its message's countdown, 0000:0511;
+    // the hand in its input step before it.)
+    assert_eq!(a.engine.m.mem.r16(DS, 0x061E), b.engine.m.mem.r16(DS, 0x061E).wrapping_add(1), "P after the countdown");
+    a.engine.m.mem.w16(DS, 0x061E, b.engine.m.mem.r16(DS, 0x061E));
     same(&a, &b, "P and the hand");
     assert!(a.engine.m.mem.r16(DS, 0x05CA) & 1 != 0, "P arms picking");
     // F8: the compass (01C5: 5C8 bit 2000h).
@@ -2225,8 +2252,11 @@ fn each_original_menu_key_as_its_handler() {
     press(&mut d, &mut a, KeyCode::F8, false);
     assert_eq!(a.engine.m.mem.r16(DS, 0x05C8), was ^ 0x2000, "F8 flips the compass");
     // C: the spellbook (026D), unless 5CA bit 8 (set for classes that
-    // don't cast, as the view's bare start's player).
+    // don't cast, as the view's bare start's player: a caster's, class bit
+    // 20h, as C's frame bars it before its menu keys, 292B:032A).
     let (mut a, mut d) = fresh();
+    let c = a.engine.m.mem.r8(DS, 0x01A9) | 0x20;
+    a.engine.m.mem.w8(DS, 0x01A9, c);
     let f = a.engine.m.mem.r16(DS, 0x05CA) & !8;
     a.engine.m.mem.w16(DS, 0x05CA, f);
     press(&mut d, &mut a, KeyCode::KeyC, false);
@@ -2276,7 +2306,7 @@ fn each_original_menu_key_as_its_handler() {
     assert!(matches!(a.panel, Some(panels::Panel::Log(_))), "L opens the logbook");
     let (mut a, mut d) = fresh();
     press(&mut d, &mut a, KeyCode::KeyR, false);
-    assert!(a.camp, "R asks for camping");
+    assert!(a.pending.is_some() || a.boxes.iter().any(|x| text(x).contains("camp")), "R camps (or is refused) in the frame that takes it");
     // Esc: the options screen (000A).
     let (mut a, mut d) = fresh();
     press(&mut d, &mut a, KeyCode::Escape, false);

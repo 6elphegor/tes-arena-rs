@@ -296,6 +296,17 @@ pub fn draw_log(screen: &mut Screen, log: &LogBook) {
     }
 }
 
+/// The screen a frame's menu key (2542:0100, in the frame body) or a
+/// click on the bar (2542:00BA, in its input step) asks for, which the
+/// window opens after that frame.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Taken {
+    /// A bar button's (or the menu key's with its handler).
+    Action(BarAction),
+    /// Esc: the options screen (2542:000A).
+    Options,
+}
+
 /// The interface bar's buttons (2542:06CE's table at DGROUP 5BD2: x0, y0,
 /// x1, y1 and a handler in 2542), by their icons.
 const BAR: [(i32, i32, i32, i32); 9] = [
@@ -345,11 +356,17 @@ pub enum BarAction {
     Sheet,
 }
 
+/// Which bar button holds (x, y) of the 320 x 200 screen: the first, as
+/// 06CE looks them up.
+pub fn bar_button(x: i32, y: i32) -> Option<usize> {
+    BAR.iter().position(|&(x0, y0, x1, y1)| x >= x0 && x <= x1 && y >= y0 && y <= y1)
+}
+
 /// The bar button at (x, y) of the 320 x 200 screen (the first that
 /// holds it, as 06CE looks them up) and its action; `right` the right
 /// button (7924 clear: the map's world map).
 pub fn bar_click(m: &mut Machine, files: &mut arena::bsa::Files, x: i32, y: i32, right: bool) -> Option<BarAction> {
-    let i = BAR.iter().position(|&(x0, y0, x1, y1)| x >= x0 && x <= x1 && y >= y0 && y <= y1)?;
+    let i = bar_button(x, y)?;
     Some(match i {
         0 => {
             // 0486: as the menu keys' 'A' (2542:0137).

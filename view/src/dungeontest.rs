@@ -128,6 +128,7 @@ fn looted_here(a: &mut App, _d: &mut Driver) {
         drag: (0, 0),
         aspect: 1.6,
         note: None,
+        bar: None,
     };
     a.turn(before, input, Vec::new(), true);
     assert!(a.pending.is_some(), "the piles listed");

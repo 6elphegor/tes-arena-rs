@@ -658,7 +658,7 @@ fn the_use_list_with_a_line_picked_as_the_original_draws_it() {
 /// Esc: the options screen (2542:000A), drawn alone.
 #[test]
 fn the_options_screen_as_the_original_draws_it() {
-    screen("options", |a, d| d.key(a, KeyCode::Escape, None), options_layer);
+    screen("options", |a, _| options_open(a), options_layer);
 }
 
 /// The options screen drawn alone, with what it asks over it.
@@ -673,9 +673,15 @@ fn options_layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
 /// Esc, then the options screen's button at (x, y) clicked (the table at
 /// 5C2C), as gen_screens.py's script clicks it.
 fn options_click(a: &mut App, d: &mut Driver, x: i32, y: i32) {
-    d.key(a, KeyCode::Escape, None);
-    assert!(a.options.is_some(), "the options screen");
+    options_open(a);
     d.click(a, x, y, MouseButton::Left);
+}
+
+/// The options screen opened as the harness runs it (2542:000A called
+/// alone), not by Esc, which runs the frame that takes the key first.
+fn options_open(a: &mut App) {
+    a.open_taken(sheets::Taken::Options);
+    assert!(a.options.is_some(), "the options screen");
 }
 
 /// The options screen and the save menu over it, drawn alone: the menu's
@@ -825,7 +831,10 @@ fn camping_refused_with_enemies_near_as_the_original_draws_it() {
         "campenemies",
         |a, d| {
             a.engine.m.mem.w16(DS, 0x0FFB, 1);
-            d.key(a, KeyCode::KeyR, Some("r"));
+            // As the harness runs it (2542:01E6 alone, over the screen
+            // shown): the turn's camping before its frame, not R's, which
+            // the frame takes after its drawing.
+            a.camp = true;
             d.frame(a);
         },
         over,
@@ -1607,6 +1616,7 @@ fn looted(a: &mut App, _d: &mut Driver) {
         drag: (0, 0),
         aspect: 1.6,
         note: None,
+        bar: None,
     };
     a.turn(before, input, Vec::new(), true);
     assert!(a.pending.is_some(), "the piles listed");
