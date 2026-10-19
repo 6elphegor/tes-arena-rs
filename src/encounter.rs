@@ -268,7 +268,7 @@ impl Machine {
             return crate::giveup::not_ported("0000:3F0C: a guards hook not ported");
         }
         // 3F10 / 3F3F: STPTHIEF.VOC or HALT.VOC (23BA:012B).
-        self.sound_file(if hook == 0x3F0C { 0x1A97 } else { 0x1A8E });
+        self.sound_file(files, if hook == 0x3F0C { 0x1A97 } else { 0x1A8E })?;
         self.calm_everyone();
         self.guards_arrive(files, hooks)
     }

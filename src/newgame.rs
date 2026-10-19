@@ -53,6 +53,8 @@ pub mod var {
     /// The file of answer counts to classes, and the questions'.
     pub const CLASSES_DAT: u16 = 0x40F8;
     pub const QUESTION_TXT: u16 = 0x411E;
+    /// The sound played at each answer (BURST5.VOC, 23BA:0183's name).
+    pub const ANSWER_SOUND: u16 = 0x4167;
     /// The attribute screen: the attribute picked (0..7), the arrows'
     /// middle line, the points left and the points rolled; the mouse's y.
     pub const PICKED: u16 = 0x1296;
@@ -954,12 +956,15 @@ impl Machine {
     }
 
     /// `class_quiz`'s start (222C:0000..0008, 222C:0185): the seed kept at
-    /// 12A8, the counts cleared, QUESTION.TXT loaded into bank 4 (the
-    /// frame with EMS off), its far pointer at QUESTIONS.
+    /// 12A8, the answers' sound (BURST5.VOC) loaded and readied
+    /// (23BA:0183, `sound_quiz_load`), the counts cleared, QUESTION.TXT
+    /// loaded into bank 4 (the frame with EMS off), its far pointer at
+    /// QUESTIONS.
     pub fn quiz_begin(&mut self, files: &mut Files) -> Option<()> {
         self.store_rng();
         let seed = self.mem.r32(DS, crate::random::SEED);
         self.mem.w32(DS, 0x12A8, seed);
+        self.sound_quiz_load(files, ANSWER_SOUND)?;
         self.mem.w8(DS, ASKED_COUNT, 0);
         self.mem.w16(DS, COUNTS, 0);
         self.mem.w8(DS, COUNTS + 2, 0);
@@ -1003,16 +1008,24 @@ impl Machine {
         self.mem.w8(frame, p.wrapping_sub(1), cut);
         self.mem.w16(DS, ANSWER, a.min(2) as u16);
         self.quiz_count(a.min(2) as u16);
+        // 222C:011F: the answers' sound played (23BA:014A).
+        self.sound_quiz_play();
     }
 
     /// `class_quiz`'s end: the class (`quiz_class`, through bank 5, the
-    /// bank mapped before restored).
+    /// bank mapped before restored); then (222C:016E) the answers' sound
+    /// stopped and its block given back (23BA:01A4, `sound_quiz_free`)
+    /// and bank [1030] mapped.
     pub fn quiz_end(&mut self, files: &mut Files) -> Option<u8> {
         let prev = self.ng16(0x8FA8) >> 2;
         self.ems_map(5);
         let class = self.quiz_class(files);
         self.ems_map(prev);
-        class
+        let class = class?;
+        self.sound_quiz_free();
+        let bank = self.ng16(0x1030);
+        self.ems_map(bank);
+        Some(class)
     }
 
     /// Creation from the player's choices, in the original's order:

@@ -39,8 +39,9 @@ impl LootHooks for Script {
     fn text(&mut self, m: &mut Machine, mode: u16) {
         self.log.extend([2, m.mem.r16(DS, 0x137A), mode]);
     }
-    fn sound(&mut self, _m: &mut Machine, si: u16) {
+    fn sound(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16) -> Option<()> {
         self.log.extend([3, si]);
+        Some(())
     }
     fn list(&mut self, _m: &mut Machine, si: u16, cx: u16, _di: u16) -> u16 {
         self.log.extend([4, si, cx]);

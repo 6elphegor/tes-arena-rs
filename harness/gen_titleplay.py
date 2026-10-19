@@ -64,16 +64,17 @@ CREATION = ([('click', 160, 120), ('keys', [S]), ('click', 94, 51), ('click', 94
 # movie (its release read after it, on the way into the game).
 VISION_CLICKS = 11
 
+# `creationsound`: `creation` with ARENA.BAT's sound driver loaded as
+# main's command line loads it (`program_start`'s `sound`), the vision's
+# speech played through it, its pages turned as its parts end.
 CASES = {
     'startload': [('click', 160, 30), ('click', 160, 21)],
     'creation': CREATION,
+    'creationsound': CREATION,
 }
 
-# Run only when named: `creation` with ARENA.BAT's sound driver loaded as
-# main's command line loads it (`program_start`'s `sound`), the vision's
-# speech played through it. (Its run doesn't yet reach the start
-# dungeon: still being looked into.)
-NAMED_ONLY = {'creationsound': CREATION}
+# Run only when named (none now).
+NAMED_ONLY = {}
 
 # Where main's frame is made (its far call's return, its BP, argc 1).
 FRAME = (0x9000, 0xFF00)

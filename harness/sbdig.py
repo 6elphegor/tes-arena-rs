@@ -107,6 +107,10 @@ class Blaster:
         self.pending = False
         self.irq_hook = None
         self.calls = []
+        # The 7Ch calls' return addresses hooked (`called`), and those
+        # whose answer is still to be read.
+        self.answer_hooks = {}
+        self.answer_due = set()
         self.a = None
 
     # --- the card's ports --------------------------------------------------
@@ -324,6 +328,8 @@ class Blaster:
         self.a = a
         a.blaster = self
         mu = a.mu
+        self.answer_hooks = {}
+        self.answer_due = set()
         self.hooks = [mu.hook_add(UC_HOOK_MEM_READ, lambda *_: self.tick(), None, a.lin(a.ds, 0x0151), a.lin(a.ds, 0x0151))]
         for off, fn in (AIL_CALLS | MORE_CALLS if self.more else AIL_CALLS).items():
             at = a.lin(LOAD_SEG + AIL_SEG, off)
@@ -350,6 +356,8 @@ class Blaster:
         a = self.a
         for h in self.hooks:
             a.mu.hook_del(h)
+        self.answer_hooks = {}
+        self.answer_due = set()
         if self.irq_hook is not None:
             a.mu.hook_del(self.irq_hook)
             self.irq_hook = None
@@ -372,13 +380,21 @@ class Blaster:
         elif fn == '81':
             self.calls.append(f'81:{words[3]:x}')
         elif fn == '7C':
-            # The answer read where the call returns.
+            # The answer read where the call returns: a hook there made
+            # once and kept (`answer_at`), as unicorn only drops a deleted
+            # hook when the run returns, so one made and deleted for each
+            # call would pile up over a long run (the visions' thousands
+            # of polls), every instruction walking them.
             at = ret[0] * 16 + ret[1]
-            def answered(mu, addr, size, _):
-                self.calls.append(f'7C={mu.reg_read(UC_X86_REG_AX):x}')
-                trace(f'tick {self.ticks} status {mu.reg_read(UC_X86_REG_AX):x}')
-                mu.hook_del(h[0])
-            h = [mu.hook_add(UC_HOOK_CODE, answered, None, at, at)]
+            self.answer_due.add(at)
+            if at not in self.answer_hooks:
+                def answered(mu, addr, size, at):
+                    if at in self.answer_due:
+                        self.answer_due.discard(at)
+                        self.calls.append(f'7C={mu.reg_read(UC_X86_REG_AX):x}')
+                        trace(f'tick {self.ticks} status {mu.reg_read(UC_X86_REG_AX):x}')
+                self.answer_hooks[at] = mu.hook_add(UC_HOOK_CODE, answered, at, at, at)
+                self.hooks.append(self.answer_hooks[at])
         else:
             self.calls.append(fn)
         trace(f'tick {self.ticks} AIL {fn} from {ret[0]:04X}:{ret[1]:04X}')
