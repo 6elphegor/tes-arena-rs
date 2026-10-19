@@ -119,8 +119,13 @@ impl Machine {
         let frame = self.mem.r16(DS, 0x9030);
         let seen: Vec<u8> = (0..0x10000u32).map(|i| self.mem.r8(frame, i as u16)).collect();
         self.automap_squares(&|o| seen[o as usize], &mut page);
-        for (i, &b) in page.iter().enumerate() {
-            self.mem.w8(page_seg, i as u16, b);
+        // Not over a heap's blocks: a game the port starts without a page
+        // block has A000h there (`page_is_block`; a playtest's notes from
+        // CITY:1:2 broke the heap's chain).
+        if self.page_is_block() {
+            for (i, &b) in page.iter().enumerate() {
+                self.mem.w8(page_seg, i as u16, b);
+            }
         }
         self.map_bank(self.mem.r16(DS, 0x1030), 0);
         let wild = self.mem.r16(DS, 0xC398) & 4 != 0 && self.mem.r16(DS, 0xC39A) & 0x200 != 0;
