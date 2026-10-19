@@ -492,6 +492,24 @@ def pile_ahead(a):
     gs.seeded(a)
 
 
+def chest_ahead(a):
+    """Row 0Bh, column 2Ah, facing north (heading 0), near the square's far
+    edge (Y +70h), with the level's locked chest (its flat C93B on the
+    walls plane, 8000h + it) two squares on: within the click's reach
+    (E6h, 292B:06DC) and drawn high enough for the view's middle, where a
+    click is a click (2826:00F0); an Open spell waiting at its surest
+    (0DC4 7D0h, 292B:0743's 0000:414E); a slot of the player's free, the
+    seed fixed."""
+    at_square(0xB, 0x2A, 0)(a)
+    for base in (0xC3D0, 0xBA62):
+        a.w16(base + 4, (0xB << 7) + 0x70)
+    chest = a.mu.mem_read(a.lin(a.ds, 0xC93B), 1)[0]
+    a.w16(0x0D54, 0x8000 | chest, seg=a.r16(0xD806))
+    a.w16(0x0DC4, 0x7D0)
+    gs.room(a)
+    gs.seeded(a)
+
+
 def message_up(a):
     """The message line's time set (061E)."""
     return a.r16(0x061E) != 0
@@ -980,6 +998,12 @@ CASES = {
     # A pile of treasure ahead (`pile_ahead`) clicked two frames on: the
     # square's piles made and listed, two taken, the list left; five
     # frames after.
+    # A locked chest ahead (`chest_ahead`) clicked two frames on: opened by
+    # the waiting spell (292B:0743: CHEST_OPEN on the map, "Open" and the
+    # chest's sound), then clicked again: its piles made and listed
+    # (292B:07FB), two taken, the list left; five frames after.
+    'playchest': ('dungeon', chest_ahead, [((), (), 2, None), ((), (), 4, None, [(160, 100)]),
+                                           ((), (), 10, None, [(160, 100)], {'script': PILE_SCRIPT}), ((), (), 5, None)]),
     'playpile': ('dungeon', pile_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': PILE_SCRIPT}), ((), (), 5, None)]),
     'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
     'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
@@ -1457,6 +1481,19 @@ def written_line(a, name):
     return f'written | {name} | {" ".join(got)}\n' if got else ''
 
 
+# The cases whose doors, locks or chests change the walls plane, which
+# neither DGROUP nor the EMS banks hold: its words (the level's width by
+# its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
+WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest')
+
+
+def walls_line(a, name):
+    """The walls plane as the case left it: its size and digest."""
+    seg, w, d = a.r16(0xD806), a.r16(0xC357), a.r16(0xC359)
+    data = bytes(a.mu.mem_read(a.lin(seg, 0), w * d * 2))
+    return f'walls | {name} | {len(data):x} {fnv(data):x}\n'
+
+
 def run_case(a, at, name, setup, steps, tracks):
     a.restore(at)
     a.rows_drawn = []
@@ -1701,6 +1738,8 @@ def main():
         out.write(state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(written_line(a, name))
+        if name in WALLS_CASES:
+            out.write(walls_line(a, name))
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')

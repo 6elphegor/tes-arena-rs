@@ -645,6 +645,13 @@ impl arena::frame::FrameHooks for Front<'_> {
         }
         m.actor_click(files, self)
     }
+    /// 0000:0511: the message line drawn on the frame's page (`drawn`),
+    /// where the boxes and lists a click opens find it.
+    fn message_draw(&mut self, m: &mut arena::machine::Machine) {
+        if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
+            i.message_on(page, m);
+        }
+    }
     /// 1194:4635: a frame of rest, while resting.
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.rest_frame(files, self)

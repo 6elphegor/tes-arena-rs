@@ -317,6 +317,25 @@ impl Interface {
         }
     }
 
+    /// 0000:0511's drawing on the frame's page: the message line (the
+    /// text at [061A]) centred on x A0h at row 14h in ARENAFNT ([102C]),
+    /// in 70h, then one pixel right in 9Fh, as the HUD draws it.
+    pub(crate) fn message_on(&mut self, page: &mut [u8], m: &Machine) {
+        let Some(f) = crate::hud::game_font(crate::hud::GameFont::Arena) else { return };
+        let (seg, off) = (m.mem.r16(DS, 0x061C), m.mem.r16(DS, 0x061A));
+        let text = String::from_utf8_lossy(m.mem.cstr(seg, off)).into_owned();
+        let mut screen = Screen::new([[0; 4]; 256]);
+        screen.underlay(page);
+        let x = 0xA0 - (f.width(&text) as i32 >> 1);
+        screen.text_plain(f, x, 0x14, &text, 0x70);
+        screen.text_plain(f, x + 1, 0x14, &text, 0x9F);
+        for (p, &c) in page.iter_mut().zip(screen.indices()) {
+            if c < 0x100 {
+                *p = c as u8;
+            }
+        }
+    }
+
     /// 0000:396E: the boat's prow (BOATPROL.IMG, `Machine::board_boat`) as
     /// loaded at offset [902E] of EMS bank [C8F4], at its header's place.
     pub(crate) fn boat_prow(&mut self, screen: &mut Screen, m: &Machine) {
