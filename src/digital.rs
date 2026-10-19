@@ -190,13 +190,14 @@ impl Machine {
 
     /// The bytes of a VOC file at `seg`:`off` whose heap block's data
     /// starts at `seg` (the header the paragraph before: +8 its size in
-    /// paragraphs, +0Ah bit 0 in use): its header's size (+14h) and each
+    /// paragraphs, +0Ah bit 0 in use) and runs short of 4E20h bytes (not
+    /// the sound buffer): its header's size (+14h) and each
     /// block's (a type, a 24-bit length) to and with the type-0 end, no
     /// further than the heap block. 10000h for anything else.
     fn voc_bytes(&self, seg: u16, off: u16) -> u32 {
         let head = seg.wrapping_sub(1);
         let (size, flags) = (self.mem.r16(head, 8) as u32, self.mem.r16(head, 0xA));
-        if flags & 1 == 0 || size == 0 {
+        if flags & 1 == 0 || size == 0 || (size * 16).saturating_sub(off as u32) >= 0x4E20 {
             return 0x10000;
         }
         let end = size * 16;

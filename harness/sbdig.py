@@ -82,8 +82,9 @@ SOUND_BUFFER_BYTES = 0x4E20
 
 
 def heap_block_bytes(mu, seg, off):
-    """For a whole VOC file at `seg`:`off` in a heap block of its own (the
-    class quiz's, played from its block, 23BA:014A): its bytes, the
+    """For a whole VOC file at `seg`:`off` in a heap block of its own
+    shorter than the digest's 4E20h (the class quiz's, played from its
+    block, 23BA:014A; not the sound buffer, 4E20h long): its bytes, the
     header's size (+14h) and each block's (a type, a 24-bit length) to
     and with the type-0 end, no further than the heap block whose data
     starts at `seg` (its header the paragraph before: +8 its size in
@@ -91,7 +92,7 @@ def heap_block_bytes(mu, seg, off):
     and memory the port keeps elsewhere. 10000h for anything else (the
     sound buffer, its samples copied in)."""
     size, flags = struct.unpack('<HH', bytes(mu.mem_read((seg - 1) * 16 + 8, 4)))
-    if not flags & 1 or size == 0:
+    if not flags & 1 or size == 0 or size * 16 - off >= SOUND_BUFFER_BYTES:
         return 0x10000
     end = size * 16
     base = seg * 16
