@@ -100,15 +100,16 @@ impl Machine {
     /// 23BA:002A. Sound `ax` at square `cx`: nothing with sound off, for
     /// FFh, or for a footstep (0, 1) when they are muted; a footstep in
     /// water is the swimming sound. The square is kept (AT); a number
-    /// without a slot (FFh) plays nothing. With the driver idle the
-    /// sound's priority is kept (PRIORITY) and it is played at the volume
-    /// of 23BA:00E8 (queued in `sounds`). None where the volume's divide
-    /// overflows (a volume percent past 100h / 1.27), as the original
-    /// faults.
-    ///
-    /// The slot's record at 44F0 (its handle FFFFh: not loaded) and the
-    /// driver's calls are the front end's: here the record is taken as
-    /// loaded.
+    /// without a slot (FFh) plays nothing, nor a slot whose record at
+    /// RECORDS has no bank (FFFFh: its file not loaded). The driver is
+    /// asked what it is doing (7Ch, `digital_status`): while it plays
+    /// (2) the sound is dropped. Else the sound's priority is kept
+    /// (PRIORITY), its bank mapped (0000:5C86), its sample (the record's
+    /// far pointer and length) copied to the driver's buffer (BUFFER) in
+    /// whole dwords, the buffer played (7Bh, from its start) at the volume
+    /// of 23BA:00E8 (81h) and started (7Dh); the sound is queued for the
+    /// front end (`sounds`). None where the volume's divide overflows (a
+    /// volume percent past 100h / 1.27), as the original faults.
     pub fn sound_at(&mut self, ax: u16, cx: u16) -> Option<()> {
         if self.mem.r16(DS, ENABLED) == 0 || ax as u8 == 0xFF {
             return Some(());
@@ -125,13 +126,38 @@ impl Machine {
         self.mem.w16(DS, AT, cx);
         let priority = self.mem.r8(DS, PRIORITIES.wrapping_add(ax));
         let slot = self.mem.r8(DS, SLOTS.wrapping_add(ax));
-        if slot == 0xFF || self.sound_busy {
+        if slot == 0xFF {
+            return Some(());
+        }
+        let record = RECORDS.wrapping_add(slot as u16 * 8);
+        let bank = self.mem.r16(DS, record);
+        if bank == 0xFFFF || self.digital_status() == 2 {
             return Some(());
         }
         self.mem.w8(DS, PRIORITY, priority);
+        self.ems_map(bank);
+        let dwords = self.mem.r16(DS, record + 6).wrapping_add(3) >> 2;
+        let (doff, dseg) = (self.mem.r16(DS, BUFFER), self.mem.r16(DS, BUFFER + 2));
+        let (soff, sseg) = (self.mem.r16(DS, record + 2), self.mem.r16(DS, record + 4));
+        for i in 0..dwords.wrapping_mul(4) {
+            let b = self.mem.r8(sseg, soff.wrapping_add(i));
+            self.mem.w8(dseg, doff.wrapping_add(i), b);
+        }
+        self.digital_play_voc(dseg, doff);
         let volume = self.sound_volume()?;
+        self.digital_call(|_| format!("81:{volume:x}"));
+        self.digital_call(|_| "7D".to_string());
         self.sounds.push(Played::Number(Sound { number: ax, slot, priority, volume }));
         Some(())
+    }
+
+    /// 23BA:000C. The sound stopped: the driver asked what it is doing
+    /// (7Ch), and told to stop (7Eh) while it plays (2). (Sound on or
+    /// not: with no driver registered the AIL answers 0.)
+    pub fn sound_stop(&mut self) {
+        if self.digital_status() == 2 {
+            self.digital_call(|_| "7E".to_string());
+        }
     }
 
     /// `sound_at` at the player's square (CB90), as most callers ask.
@@ -205,6 +231,10 @@ impl Machine {
         let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
         let _ = self.file_load_or_carry(files, si, frame, FIGHT_SOUND_AT)?;
         let size = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE);
+        // 01E5: AIL 85h, the sample formatted by the driver (the front
+        // end's).
+        let handle = self.mem.r16(DS, crate::digital::var::HANDLE);
+        self.digital_call(|_| format!("85:{handle:x}:{frame:x}:{FIGHT_SOUND_AT:x}"));
         for (i, w) in [0x15, FIGHT_SOUND_AT, frame, size].into_iter().enumerate() {
             self.mem.w16(DS, FILE_SLOT + 2 * i as u16, w);
         }
@@ -301,8 +331,15 @@ impl Machine {
             soff = soff.wrapping_add(1);
             doff = doff.wrapping_add(1);
         }
-        // FFD:0D4C (AIL 85h, the sample readied by the driver): the
-        // front end's.
+        // 02C6: AIL 85h, the sample formatted by the driver (the front
+        // end's). The copy left DS the buffer's segment (02BB), so the
+        // sample's far pointer (DS:DI+2) and the handle (DS:EB91) are read
+        // from the buffer, not DGROUP: the driver is handed whatever the
+        // file's bytes there are (zeros for a short file: the handle 0,
+        // the VOC at 0:0).
+        let handle = self.mem.r16(seg, crate::digital::var::HANDLE);
+        let (poff, pseg) = (self.mem.r16(seg, di.wrapping_add(2)), self.mem.r16(seg, di.wrapping_add(4)));
+        self.digital_call(|_| format!("85:{handle:x}:{pseg:x}:{poff:x}"));
         Some(())
     }
 }

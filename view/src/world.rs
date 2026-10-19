@@ -103,6 +103,21 @@ fn heap(m: &mut Machine) {
 /// `game_setup`). A save loaded from here (`areas::load_game_title`) is
 /// the title's Load's.
 pub fn boot(dir: &Path) -> Engine {
+    boot_in(dir, None)
+}
+
+/// `boot` with ARENA.BAT's sound driver (-Ssbpdig.adv -IOS220 -IRQS7
+/// -DMAS1: the name at 3827, the I/O port, IRQ and DMA channel at 386A,
+/// 386C, 386E, as main's command line leaves them, 1194:066A) loaded as
+/// that command line loads it, after the working slot's files (076D,
+/// `Machine::sound_driver_main`), `driver` answering for it: the
+/// level's sounds are then loaded (23BA:0217) and played (23BA:002A)
+/// with sound on.
+pub fn boot_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -> Engine {
+    boot_in(dir, Some(driver))
+}
+
+fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -> Engine {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
     let mut m = Machine::new(&image);
     let mut files = Files::new(dir).expect("game directory");
@@ -112,6 +127,15 @@ pub fn boot(dir: &Path) -> Engine {
     m.mem.w16(DS, 0xCB8A, frame);
     m.working_slot_main();
     m.working_files_fresh(&mut files);
+    if let Some(driver) = driver {
+        for (i, &b) in b"SBPDIG.ADV\0".iter().enumerate() {
+            m.mem.w8(DS, arena::digital::var::NAME + i as u16, b);
+        }
+        for (k, v) in [0x220u16, 7, 1].into_iter().enumerate() {
+            m.mem.w16(DS, arena::digital::var::SETTINGS + 2 * k as u16, v);
+        }
+        m.sound_driver_main(&mut files, driver).expect("the sound driver's load");
+    }
     m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the game's set-up");
     m.store_rng();
     Engine::new(m, files)

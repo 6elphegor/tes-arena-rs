@@ -38,11 +38,15 @@ struct Start<'a> {
     save_dir: Option<PathBuf>,
     /// A saved game loaded at the start (`--load`): its folder and slot.
     load: Option<(PathBuf, u8)>,
+    /// The sound driver loaded at the program's start (`world::boot_sound`,
+    /// answered as SBPDIG.ADV answers its load: `Sbpdig`), the original's
+    /// answers to the load's sounds this replay's.
+    sound: Option<arena::digital::Replay>,
 }
 
 impl Default for Start<'_> {
     fn default() -> Self {
-        Start { level: "CITY:8:0", hour: Some(12), at: None, picks: "", new_game: None, save_dir: None, load: None }
+        Start { level: "CITY:8:0", hour: Some(12), at: None, picks: "", new_game: None, save_dir: None, load: None, sound: None }
     }
 }
 
@@ -50,7 +54,15 @@ fn app(dir: &Path, s: &Start) -> App {
     // A save loaded from the title: the game as the original reaches its
     // title (`world::boot`), no level of the view's own.
     let title = s.load.is_some() && s.new_game.is_none();
-    let mut engine = if title { world::boot(dir) } else { world::load(dir, s.level) };
+    let mut engine = match &s.sound {
+        Some(replay) if title => {
+            let mut e = world::boot_sound(dir, &mut Sbpdig::default());
+            e.m.digital = Some(replay.clone());
+            e
+        }
+        _ if title => world::boot(dir),
+        _ => world::load(dir, s.level),
+    };
     let mut run = match s.new_game {
         Some(spec) => {
             newgame::start(&mut engine, spec);
@@ -80,6 +92,35 @@ fn app(dir: &Path, s: &Start) -> App {
         engine.world_loop_start();
     }
     make_app(dir.to_path_buf(), engine, run, None, dialog::parse_answers(s.picks), s.save_dir.clone(), 0, false)
+}
+
+/// SBPDIG.ADV's answers to its load (2F9F:0364): the first handle (0),
+/// its descriptor at offset 73h of its image (function 64h returns
+/// CS:0073), the device found; the sounds' calls are the machine's
+/// replay's (`Machine::digital`).
+#[derive(Default)]
+struct Sbpdig {
+    image: u16,
+}
+
+impl arena::digital::DigitalDriver for Sbpdig {
+    fn register(&mut self, _m: &mut arena::machine::Machine, seg: u16, _off: u16) -> u16 {
+        self.image = seg;
+        0
+    }
+    fn describe(&mut self, _m: &mut arena::machine::Machine, _handle: u16) -> (u16, u16) {
+        (self.image, 0x73)
+    }
+    fn detect(&mut self, _m: &mut arena::machine::Machine, _h: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) -> u16 {
+        1
+    }
+    fn init(&mut self, _m: &mut arena::machine::Machine, _h: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) {}
+    fn play_voc(&mut self, _m: &mut arena::machine::Machine, _h: u16, _seg: u16, _off: u16, _block: u16) {}
+    fn start(&mut self, _m: &mut arena::machine::Machine, _h: u16) {}
+    fn status(&mut self, _m: &mut arena::machine::Machine, _h: u16) -> u16 {
+        0
+    }
+    fn stop(&mut self, _m: &mut arena::machine::Machine, _h: u16) {}
 }
 
 /// The inputs and the time, as the window gives them: a 960 x 600 window,

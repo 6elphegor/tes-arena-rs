@@ -66,8 +66,10 @@ use var::*;
 
 /// What loading a game leaves to the front end and to code not ported.
 pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
-    /// 23BA:000C: the sound stopped.
-    fn sound_off(&mut self, _m: &mut Machine) {}
+    /// 23BA:000C: the sound stopped (`Machine::sound_stop`).
+    fn sound_off(&mut self, m: &mut Machine) {
+        m.sound_stop();
+    }
     /// 0000:600C: whether the file at DS:`path` exists (DOS find first).
     /// The default asks `files`.
     fn exists(&mut self, m: &mut Machine, files: &mut Files, path: u16) -> bool {

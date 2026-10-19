@@ -68,6 +68,10 @@ AIL_SEG = 0x0FFD
 # The AIL's entries the game calls the digital driver through: the
 # function each jumps to the driver for.
 AIL_CALLS = {0x0D46: '7B', 0x0D58: '7D', 0x0D52: '7C', 0x0D5E: '7E'}
+# And with `Blaster(more=True)` (the sounds' cases, gen_soundplay.py): 85h
+# a VOC file formatted (23BA:0217's, 01C7's) and 81h the volume set
+# (23BA:002A's).
+MORE_CALLS = {0x0D4C: '85', 0x0D70: '81'}
 # The digital driver's sound buffer, as 2F75:00DC hands it: FFDCh bytes.
 BUFFER_BYTES = 0xFFDC
 
@@ -75,8 +79,9 @@ BUFFER_BYTES = 0xFFDC
 class Blaster:
     """The card (see the module); `attach` it to a SoundArena."""
 
-    def __init__(self, base=0x220, irq=7):
+    def __init__(self, base=0x220, irq=7, more=False):
         self.base, self.irq = base, irq
+        self.more = more
         self.read = []
         self.reset = 0
         self.cmd, self.args, self.need = None, [], 0
@@ -316,10 +321,26 @@ class Blaster:
         a.blaster = self
         mu = a.mu
         self.hooks = [mu.hook_add(UC_HOOK_MEM_READ, lambda *_: self.tick(), None, a.lin(a.ds, 0x0151), a.lin(a.ds, 0x0151))]
-        for off, fn in AIL_CALLS.items():
+        for off, fn in (AIL_CALLS | MORE_CALLS if self.more else AIL_CALLS).items():
             at = a.lin(LOAD_SEG + AIL_SEG, off)
             self.hooks.append(mu.hook_add(UC_HOOK_CODE, self.called, fn, at, at))
         mu.ctl_flush_tb()
+
+    # The card's state, for a snapshot's (`kept`) and its restore
+    # (`kept_back`): the run's ticks and the calls recorded too.
+    KEPT = ('read', 'reset', 'cmd', 'args', 'need', 'tc', 'hs_block', 'mixer', 'mixer_sel', 'dma', 'flip',
+            'dma_base', 'dma_cur', 'mask', 'ocw3', 'in_service', 'ticks', 'playing', 'pending', 'calls',
+            'in_service_seen')
+
+    def kept(self):
+        import copy
+        return {k: copy.deepcopy(getattr(self, k)) for k in self.KEPT if hasattr(self, k)}
+
+    def kept_back(self, kept):
+        import copy
+        for k, v in kept.items():
+            setattr(self, k, copy.deepcopy(v))
+        self.consider()
 
     def detach(self):
         a = self.a
@@ -340,6 +361,12 @@ class Blaster:
             off, seg, block = words[3], words[4], words[5]
             data = bytes(mu.mem_read(seg * 16 + off, BUFFER_BYTES))
             self.calls.append(f'7B:{block:x}:{fnv(data):x}')
+        elif fn == '85':
+            # The handle and the far pointer as pushed (23BA:02C6 pushes
+            # them from the sound buffer's segment, the copy's DS).
+            self.calls.append(f'85:{words[2]:x}:{words[4]:x}:{words[3]:x}')
+        elif fn == '81':
+            self.calls.append(f'81:{words[3]:x}')
         elif fn == '7C':
             # The answer read where the call returns.
             at = ret[0] * 16 + ret[1]
@@ -373,6 +400,40 @@ class SoundArena(ScreenArena):
     has one (`blaster`), else as ScreenArena's: without one, the same."""
 
     blaster = None
+    # `start(sound=True)`: the driver loaded at the program's start.
+    driver_at_start = False
+
+    def start(self, slot=1, sound=False):
+        """ScreenArena's start; with `sound` ARENA.BAT's sound driver
+        named (`driver_named`) and loaded as the program's main loads it, after
+        its working slot's files (1194:066A's 076D after 25FD:0219: here
+        the start's 0219, before the set-up, 21EE:016C, and the load), on
+        a Blaster (`more`): the level's sounds then loaded with sound on
+        (23BA:0217) and played (23BA:002A)."""
+        self.driver_at_start = sound
+        super().start(slot)
+
+    def snapshot(self):
+        # A Blaster attached at the start (`more`) kept with the snapshot:
+        # each case from a place begins with the card as the place left
+        # it (what it plays, its ticks), and records only its own calls.
+        b = self.blaster
+        return (super().snapshot(), b.kept() if b is not None and b.more else None)
+
+    def restore(self, snap):
+        base, kept = snap
+        super().restore(base)
+        if kept is not None and self.blaster is not None:
+            self.blaster.kept_back(kept)
+
+    def run_screen(self, seg, off, *args, **kw):
+        r = super().run_screen(seg, off, *args, **kw)
+        if self.driver_at_start and (seg, off) == (0x25FD, 0x0219):
+            self.driver_at_start = False
+            driver_named(self)
+            Blaster(more=True).attach(self)
+            driver_loaded(self)
+        return r
 
     def press(self, keys, up=False):
         if keys is DRIVER_LOAD:
@@ -390,6 +451,15 @@ class SoundArena(ScreenArena):
             self.blaster.port_out(port, value)
             return
         return super()._out(mu, port, size, value, ud)
+
+
+def driver_named(a):
+    """ARENA.BAT's sound driver as the command line leaves it
+    (-Ssbpdig.adv -IOS220 -IRQS7 -DMAS1: 3827, 386A, 386C, 386E)."""
+    a.mu.mem_write(a.lin(a.ds, 0x3827), b'SBPDIG.ADV\0')
+    a.w16(0x386A, 0x220)
+    a.w16(0x386C, 7)
+    a.w16(0x386E, 1)
 
 
 def driver_loaded(a):

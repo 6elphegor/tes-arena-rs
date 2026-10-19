@@ -68,6 +68,18 @@ pub trait DigitalDriver {
     fn stop(&mut self, m: &mut Machine, handle: u16);
 }
 
+/// The digital driver replayed for the game's sounds (segment 23BA: the
+/// AIL calls 23BA:002A and the others make), a test's from the original
+/// driver's (gen_soundplay.py's `driver` lines): its status answers
+/// (7Ch) taken in turn, and every call the sounds make kept in the
+/// lines' form (`7C=3`, `7B:ffff:DIGEST` the FFDCh bytes of the buffer
+/// played, `81:VOLUME`, `7D`, `7E`, `85:HANDLE:SEG:OFF`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Replay {
+    pub answers: std::collections::VecDeque<u16>,
+    pub calls: Vec<String>,
+}
+
 /// The AIL with no driver registered: each call into one returns 0
 /// (0FFD:053C finds no table; a registration of something not a driver
 /// FFFFh).
@@ -93,6 +105,48 @@ impl DigitalDriver for NoDriver {
 }
 
 impl Machine {
+    /// 0FFD:0D52 (7Ch), as the sounds ask it: what the driver is doing.
+    /// Replayed, the original's next answer (0 with none left); else 2
+    /// (playing) while the front end plays a sound (`sound_busy`), 3
+    /// (done) when not.
+    pub fn digital_status(&mut self) -> u16 {
+        match &mut self.digital {
+            Some(r) => {
+                let a = r.answers.pop_front().unwrap_or(0);
+                r.calls.push(format!("7C={a:x}"));
+                a
+            }
+            None => {
+                if self.sound_busy {
+                    2
+                } else {
+                    3
+                }
+            }
+        }
+    }
+
+    /// A call the sounds make into the driver with no answer they read
+    /// (7Bh, 81h, 7Dh, 7Eh, 85h): kept with a replay; the playing itself
+    /// is the front end's (`sounds`).
+    pub fn digital_call(&mut self, call: impl FnOnce(&Machine) -> String) {
+        if self.digital.is_some() {
+            let c = call(self);
+            if let Some(r) = &mut self.digital {
+                r.calls.push(c);
+            }
+        }
+    }
+
+    /// 0FFD:0D46 (7Bh) kept: the VOC file at `seg`:`off` played from its
+    /// start (block FFFFh), its FFDCh bytes' digest as the lines have it.
+    pub fn digital_play_voc(&mut self, seg: u16, off: u16) {
+        self.digital_call(|m| {
+            let h = (0..0xFFDCu16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ m.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3));
+            format!("7B:ffff:{h:x}")
+        });
+    }
+
     /// Whether a sound driver is loaded (2294:0770: the dword at 8F62).
     pub fn digital_loaded(&self) -> bool {
         self.mem.r32(DS, IMAGE) != 0
