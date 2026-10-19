@@ -55,6 +55,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     fn interface(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    /// 292B:0341..0358 (in `no_spells`): NOSPELL.IMG loaded to DS:1044 and
+    /// put into the page over the spells button (`no_spells_picture`).
+    fn no_spells_picture(&mut self, m: &mut Machine, files: &mut Files) {
+        m.no_spells_picture(files);
+    }
     /// 0000:5011: an effect's words counted down and drawn
     /// (`Machine::effect_words`: the front end draws what it returns in
     /// [102C]'s font centred at x A0h, 0Bh above the view's foot, C3A2,
@@ -286,7 +291,7 @@ impl Machine {
         }
         // 0000:492C: 292B:032A, the bar's spells barred for a class
         // without bit 20h.
-        self.no_spells(files)?;
+        self.no_spells(files, hooks);
         self.weapon_change(files, hooks)?;
         self.weapon_frame(files, hooks)?;
         self.level_text_frame(hooks);
@@ -834,7 +839,7 @@ impl Machine {
         self.weather_drops()?;
         let f = self.mem.r16(DS, 0x05CA) & !8;
         self.mem.w16(DS, 0x05CA, f);
-        self.no_spells(files)?;
+        self.no_spells(files, hooks);
         // 4E41..4E7B, the bar's texts and pictures (their pixels the front
         // end's): the font from 102E (9AEA: B036); the player's name
         // (1194:4BC8 with SI 1A4) copied to 1044, cut at its first space,
@@ -860,18 +865,25 @@ impl Machine {
     /// bit 8 set): NOSPELL.IMG (named at 7CFA) loaded whole to DS:1044
     /// (7428) and its 19h by 13h bytes put into the page at (5Bh, B1h),
     /// over the bar's spells button (599C; only where the page is the
-    /// game's own block). None where the file doesn't load.
-    pub(crate) fn no_spells(&mut self, files: &mut Files) -> Option<()> {
+    /// game's own block). The load's carry isn't looked at (292B:0349):
+    /// a file that doesn't load leaves 1044 as it was, drawn all the same.
+    pub(crate) fn no_spells(&mut self, files: &mut Files, hooks: &mut dyn FrameHooks) {
         if self.mem.r8(DS, 0x01A9) & 0x20 != 0 || self.mem.r16(DS, 0x05CA) & 8 != 0 {
-            return Some(());
+            return;
         }
         let f = self.mem.r16(DS, 0x05CA) | 8;
         self.mem.w16(DS, 0x05CA, f);
-        self.file_load(files, 0x7CFA, DS, 0x1044)?;
+        hooks.no_spells_picture(self, files);
+    }
+
+    /// 292B:0341..0358: NOSPELL.IMG (7CFA) loaded whole to DS:1044 (7428)
+    /// and put into the page at (5Bh, B1h), 19h by 13h (599C; where the
+    /// page is the game's own block).
+    pub fn no_spells_picture(&mut self, files: &mut Files) {
+        let _ = self.file_load(files, 0x7CFA, DS, 0x1044);
         if self.page_is_block() {
             self.page_rect_put((DS, 0x1044), 0x5B, 0xB1, 0x19, 0x13);
         }
-        Some(())
     }
 
     /// 0000:4E81 with SI `si` (a person's record; nothing with its name,
