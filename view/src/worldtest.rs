@@ -3142,7 +3142,6 @@ fn a_new_game_from_the_menu_as_the_original() {
 /// parts end), every call into the driver as the original's, and the game
 /// then as the original's.
 #[test]
-#[ignore = "titleplay.txt has no creationsound lines yet (gen_titleplay.py's run with the driver doesn't finish)"]
 fn a_new_game_with_sound_on_as_the_original() {
     new_game_from_the_menu("creationsound", Some(titleplay_replay("creationsound")));
 }
