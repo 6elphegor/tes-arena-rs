@@ -1565,6 +1565,17 @@ fn main() {
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);
+    // random1.mif is the dungeon builder's chunk file, not a level: the
+    // original names it once (DGROUP 6540, read only at 0000:29A3), where
+    // 299F copies its levels into a dungeon's grid of chunks and walls the
+    // map's edges in (`dun_border`). Loaded whole as a level (0000:E87C's
+    // planes cleared to 0), a chunk's open edges let the player walk off
+    // the map, which the original never meets (a playtest of seed 17
+    // there walked off it 44 times).
+    if args[2].eq_ignore_ascii_case("RANDOM1.MIF") {
+        eprintln!("RANDOM1.MIF is the dungeon builder's chunk file, which the game never plays as a level; a wilderness dungeon is reached through a city's gate (the playtest's PT_FOCUS=dungeon)");
+        std::process::exit(2);
+    }
     let started = Instant::now();
     // A save loaded as the program starts: the game as the original reaches
     // its title (`world::boot`), no level of the view's own.
