@@ -222,20 +222,20 @@ the original routine:
 | `MenuKeyHooks::cyber_button` | src/menukeys.rs:96 | 2F26:04E2 | original | no CyberMan: never down | |
 | `MenuKeyHooks::cyber_buttons` | src/menukeys.rs:100 | 2F26:03ED | original | no CyberMan: none | |
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
-| `NewGameHooks::creation_done` | src/newgame.rs:152 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
-| `NewGameHooks::faded` | src/newgame.rs:141 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
-| `NewGameHooks::game_screen` | src/newgame.rs:156 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `NewGameHooks::hands` | src/newgame.rs:161 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
-| `NewGameHooks::level_flats` | src/newgame.rs:166 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
-| `NewGameHooks::message_box` | src/newgame.rs:101 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
-| `NewGameHooks::palette` | src/newgame.rs:131 | 1194:1695 | present | the attribute screen's palette | |
-| `NewGameHooks::parchment_drop` | src/newgame.rs:135 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
-| `NewGameHooks::resources` | src/newgame.rs:159 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
-| `NewGameHooks::roll_picture` | src/newgame.rs:115 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
-| `NewGameHooks::roll_screen` | src/newgame.rs:124 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
-| `NewGameHooks::sheet_keep` | src/newgame.rs:146 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
-| `NewGameHooks::spells` | src/newgame.rs:163 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
-| `NewGameHooks::stats_screen` | src/newgame.rs:109 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
+| `NewGameHooks::creation_done` | src/newgame.rs:173 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
+| `NewGameHooks::faded` | src/newgame.rs:162 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
+| `NewGameHooks::game_screen` | src/newgame.rs:177 | 2294:11F2 | present | 2294:11F2, the heap check | |
+| `NewGameHooks::hands` | src/newgame.rs:182 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
+| `NewGameHooks::level_flats` | src/newgame.rs:187 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
+| `NewGameHooks::message_box` | src/newgame.rs:122 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
+| `NewGameHooks::palette` | src/newgame.rs:152 | 1194:1695 | present | the attribute screen's palette | |
+| `NewGameHooks::parchment_drop` | src/newgame.rs:156 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
+| `NewGameHooks::resources` | src/newgame.rs:180 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::roll_picture` | src/newgame.rs:136 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
+| `NewGameHooks::roll_screen` | src/newgame.rs:145 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
+| `NewGameHooks::sheet_keep` | src/newgame.rs:167 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
+| `NewGameHooks::spells` | src/newgame.rs:184 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
+| `NewGameHooks::stats_screen` | src/newgame.rs:130 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
 | `NoteHooks::restore` | src/mapnotes.rs:60 | 0000:3698 | present | the screen region put back | |
@@ -435,6 +435,9 @@ the original routine:
 | `WeaponHooks::hands` | src/weapon.rs:66 | 0000:3B8E | port | the default runs the port (`hands_draw`: the bow's frame or the weapon's picture drawn on the page, the hands' bank mapped; worldframes `playsheetready`'s SCREENSV.$$2) | |
 | `WeaponHooks::prow` | src/weapon.rs:71 | 0000:395E..397C | port | the default runs the port (`prow_draw`: the boat's prow drawn on the page) | |
 | `WeaponHooks::fire_bow` | src/weapon.rs:76 | 29CF:037F | port | the default runs the port | |
+| `WeaponHooks::surrender` | src/weapon.rs:81 | 2AA1:0819..083B | port | the default runs the port (`surrender_text`), then `surrender_box` | |
+| `WeaponHooks::surrender_box` | src/weapon.rs:87 | 1194:59C8 | overridden | the view's `Front` shows the box (`message_shown`) | faithful: playsurrender's DGROUP and EMS |
+| `KillHooks::surrender` | src/strike.rs:498 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; a kill by a spell's effect or the clock's (`NoKillHooks`) leaves the words unsaid | faithful for swings (playsurrender); left for spell and effect kills |
 | `WeaponHooks::wall_trigger` | src/weapon.rs:57 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |

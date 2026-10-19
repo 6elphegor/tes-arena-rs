@@ -46,7 +46,7 @@ fn matches_original() {
         }
         m.load_rng();
         let before = m.clone();
-        let got = m.strike_actor(si).map(|()| {
+        let got = m.strike_actor(si, &mut arena::strike::NoKillHooks).map(|()| {
             m.store_rng();
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))

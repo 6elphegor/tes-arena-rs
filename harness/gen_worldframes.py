@@ -608,6 +608,56 @@ def corpse_items(a):
     gs.room(a)
 
 
+def surrendering(a):
+    """A person of class 0 (type 18h) brought as `brought` brings one, and
+    the first side quest (0E6E) made a kind-1 quest at stage 4 naming that
+    class (+2Fh 18h, 1194:A1D1), with 5CA bit 40h (a quest target being
+    fought, 25CA:0271): fought below half its HP it gives up (2AA1:07A4)
+    and says so (0819: [102C]'s font, 82E6 copied to 1044, its codes
+    made, 1194:59C8)."""
+    brought(0x18)(a)
+    seg, rec = a.r16(0x1042), a.r16(0x0C57 + 0x12)
+    a.w16(rec + 0x40D, a.r16(rec + 0x40D, seg=seg) & ~0x1000, seg=seg)
+    a.mu.mem_write(a.lin(seg, rec + 5), bytes([a.mu.mem_read(a.lin(seg, rec + 5), 1)[0] & 0xE0]))
+    q = 0x0E6E
+    a.w16(q + 4, (a.r16(q + 4) & ~0x0EC0) | 0x0840)
+    a.mu.mem_write(a.lin(a.ds, q + 0x2F), b'\x18')
+    a.w16(0x05CA, a.r16(0x05CA) | 0x40)
+
+
+def ruled(script):
+    """The palace's ruler clicked (gen_screens.py's `ruler`: a map flat of
+    the palace's first kind, the seed SEED) and the click run as the
+    frame runs it (1194:DB6C) between frames, `script` answering its
+    waits (`serviced`): the palace's quests (1194:8F1E from DCE1)."""
+    run = serviced(0x1194, 0xDB6C, script)
+
+    def do(a):
+        gs.ruler(a)
+        run(a)
+    return do
+
+
+def quest_under_way(reached):
+    """The save's palace quest (QUESTS 0E6E's first: stage 1, given here,
+    leading to place 6, 7095 gold) taken on (kind 1 in +4's bits 6-7) and
+    leading here (+24h the location, 0A4C): `reached` false, its goal
+    the town's first tavern's keeper (+14h's low word that building's
+    door square, 0FD2, its column halved, as 1194:8F99 compares it);
+    true, the goal reached and back at its giver (+4 bit 20h: the palace,
+    +10h AAAAh)."""
+    def setup(a):
+        q = 0x0E6E
+        w = (a.r16(q + 4) & ~0x00E0) | 0x0040 | (0x20 if reached else 0)
+        a.w16(q + 4, w)
+        a.mu.mem_write(a.lin(a.ds, q + 0x24), bytes(a.mu.mem_read(a.lin(a.ds, 0x0A4C), 1)))
+        if not reached:
+            t = a.r16(0x0FD2)
+            a.w16(q + 0x14, t & 0xFF00 | (t & 0xFF) >> 1)
+        gs.seeded(a)
+    return setup
+
+
 def pile_ahead(a):
     """At row 0Bh, column 2Ah, facing the square beyond it (heading 0),
     whose floor byte is given flat 7 (the INF's third item flat, C934:
@@ -796,13 +846,14 @@ def serviced(seg, off, script):
     0000:8FC4) answered by `script` as gen_screens.py's are, until it
     returns."""
     def do(a):
+        # (A step's own script, for its frames, kept; else none after.)
+        kept = (a.waits, a.script) if a.script else (set(), [])
         a.waits = {MOUSE_READ}
         a.script = list(script)
         try:
             assert a.run_screen(seg, off) is None, 'the services still waiting'
         finally:
-            a.waits = set()
-            a.script = []
+            a.waits, a.script = kept
         # The mouse back at the view's centre, where the view's controls
         # take it to be (the classic controls' centre region, 2826:00F0).
         a.mouse = (160, 100)
@@ -1048,7 +1099,10 @@ TEMPLE_CURE_SCRIPT = [('click', 0xA0, 0x67), ('click', 0x60, 0x32), ('click', 0x
 TEMPLE_BLESS_SCRIPT = [('click', 0xA0, 0x4F)] + [('keys', [k]) for k in (0x02, 0x0B, 0x0B, 0x1C)] + [('click', 0xA0, 0x60), ('click', 0xA0, 0x97)]
 # The tavern's menu (1194:B93C): Drinks, the first line (bought and drunk:
 # "You finish the ..." clicked away); Exit.
-TAVERN_DRINK_SCRIPT = [('click', 0xA0, 0x43), ('click', 0x70, 0x26), ('click', 0xA0, 0x60), ('click', 0xA0, 0xA3)]
+PALACE_ACCEPT_SCRIPT = [('click', 0xA0, 0x6E), ('click', 0xA0, 0x90), ('click', 0xA0, 0x60)]
+QUEST_REACHED_SCRIPT = [('click', 0xA0, 0x60), ('click', 0xA0, 0xA3)]
+QUEST_REWARD_SCRIPT = [('click', 0xA0, 0x60), ('click', 0xA0, 0x60)]
+TAVERN_DRINK_SCRIPT =[('click', 0xA0, 0x43), ('click', 0x70, 0x26), ('click', 0xA0, 0x60), ('click', 0xA0, 0xA3)]
 # Get a Room as gen_screens.py's `tavernroomtaken` takes it (the Single,
 # a day typed, the price accepted, the deal confirmed), then the menu
 # without its rooms left by its Exit (the third box).
@@ -1234,7 +1288,14 @@ CASES = {
     # shown in a box, clicked away; five frames after. Then the same with
     # the corpse given two items and no gold (`corpse_items`): both
     # taken, the second with no room left.
-    'playloot': ('dungeon', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    # The surrender's box (1194:59C8): the swing's right button let go
+    # (its loop at 59E5 waits for that: an `rclick` with it held), then a
+    # click for its wait (1194:5536), at the mouse's place; the step's
+    # frames after go on with no button held.
+    'playsurrender': ('dungeon', surrendering, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
+                                                ((), (), 200, None, [], dict(SWINGING, script=[('rclick', 160, 100), ('click', 160, 100)])),
+                                                ((), (), 20, None, [], LET_GO)]),
+    'playloot': ('dungeon', brought(1), FIGHT +[((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playlootitems': ('dungeon', brought(1), FIGHT + [((), (), 1, None, [], {'do': corpse_items}),
                                                       ((), (), 10, None, [(160, 100)], {'script': LOOT_ITEMS_SCRIPT}), ((), (), 5, None)]),
     # A pile of treasure ahead (`pile_ahead`) clicked two frames on: the
@@ -1592,6 +1653,15 @@ CASES = {
     # (1194:B93C), thirty frames.
     'playtaverndrink': ('tavern', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, TAVERN_DRINK_SCRIPT)})]),
     'playtavernroom': ('tavern', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, TAVERN_ROOM_SCRIPT)})]),
+    # The save's palace quest through its stages in real frames: offered
+    # by the palace's ruler and taken on (PALACE_ACCEPT_SCRIPT); under way
+    # with its goal the first tavern's keeper, met as the tavern's
+    # services begin (1194:C012's 8F1E: 8F99 marks it reached, its text
+    # 2Eh); reached, its reward at the ruler (9041: gold, experience).
+    # (`script` on the step: a box the next frame shows clicked away.)
+    'playpalaceaccept': ('palace', None, [((), (), 2, None), ((), (), 30, None, [], {'do': ruled(PALACE_ACCEPT_SCRIPT), 'script': [('click', 0xA0, 0x60)] * 3})]),
+    'playquestreached': ('tavern', quest_under_way(False), [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, QUEST_REACHED_SCRIPT), 'script': [('click', 0xA0, 0x60)] * 3})]),
+    'playquestreward': ('palace', quest_under_way(True), [((), (), 2, None), ((), (), 30, None, [], {'do': ruled(QUEST_REWARD_SCRIPT), 'script': [('click', 0xA0, 0x60)] * 3})]),
 }
 
 
@@ -1619,6 +1689,17 @@ def building(where):
         a.mu.mem_write(a.lin(a.ds, 0x191F), b'\0')
         return a.snapshot()
     return enter
+
+
+def palace(a, base):
+    """The snapshot of the game in the town's palace (gen_screens.py's
+    'palace': in at the first square whose wall's trigger is the
+    palace's), its words on the way in read."""
+    a.restore(base)
+    assert a.area_ended() == ('world',), 'the guild not left'
+    assert a.enter(gs.palace_door(a)) == ('world',), 'the palace not entered'
+    a.mu.mem_write(a.lin(a.ds, 0x191F), b'\0')
+    return a.snapshot()
 
 
 def street(a, base):
@@ -2011,7 +2092,8 @@ def main():
             continue
         if where not in places:
             places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
-                             'people': people, 'store': building('store'), 'tavern': building('tavern'), 'temple': building('temple'), 'guild': guild}[where](a, base)
+                             'people': people, 'store': building('store'), 'tavern': building('tavern'), 'temple': building('temple'), 'guild': guild,
+                             'palace': palace}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []

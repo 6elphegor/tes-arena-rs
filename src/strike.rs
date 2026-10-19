@@ -7,9 +7,8 @@
 //! (`strike_person`), others take a blow (`strike_actor`). A swing that
 //! reaches no actor hits the wall ahead (0000:3D43: doors, locks and
 //! crime, `Machine::bash` in weapon.rs). The sounds (23BA:002A) are
-//! played as the original plays them. Not ported: the text a quest target
-//! says when giving up (0000:9AE6, 9CA0, 2DA2:000A, 1194:59C8), which only
-//! shows a message.
+//! played as the original plays them. A quest target giving up says so
+//! (`surrender_text`, then the front end's box: `KillHooks`).
 
 use crate::character::{field, PLAYER};
 use crate::combat::{var, Gear, Ptr};
@@ -61,6 +60,9 @@ pub mod svar {
     pub const MESSAGE: u16 = 0x061A;
     pub const MESSAGE_TIME: u16 = 0x061E;
     pub const CRITICAL_TEXT: u16 = 0x7C10;
+    /// A quest target's words on giving up, and where they are made.
+    pub const SURRENDER: u16 = 0x82E6;
+    pub const SURRENDER_LINE: u16 = 0x1044;
 }
 
 /// Actor slot fields used here.
@@ -81,7 +83,7 @@ impl Machine {
     /// Returns false when the swing reached no actor: the original then
     /// hits the wall ahead (0000:3D43, `Machine::bash`). None where a strike
     /// faults or hangs.
-    pub fn swing_hits(&mut self) -> Option<bool> {
+    pub fn swing_hits(&mut self, kill: &mut dyn KillHooks) -> Option<bool> {
         self.mem.w16(DS, svar::HITS, 0);
         if self.mem.r16(DS, svar::HEIGHT) as i16 <= 0 {
             return Some(true);
@@ -113,7 +115,7 @@ impl Machine {
             if si < svar::CREATURE_ACTORS {
                 self.strike_person(si, 0)?;
             } else {
-                self.strike_actor(si)?;
+                self.strike_actor(si, kill)?;
             }
         }
         Some(self.mem.r16(DS, svar::HITS) != 0)
@@ -172,18 +174,18 @@ impl Machine {
     /// slot). It works out whether the player is behind the actor
     /// (0000:3D17, from the heading to the actor's target pointer), but
     /// the `xor ax, ax` before its JAE clears that carry: AX is always 0.
-    pub fn strike_actor(&mut self, si: u16) -> Option<()> {
+    pub fn strike_actor(&mut self, si: u16, kill: &mut dyn KillHooks) -> Option<()> {
         self.mem.w16(DS, var::ATTACKER, PLAYER);
         let rec = self.mem.r16(DS, si + f::RECORD);
         self.mem.w16(DS, var::DEFENDER, rec);
-        self.player_attack(0, si)
+        self.player_attack(0, si, kill)
     }
 
     /// 2AA1:0000. The player (DGROUP 1400 = 01A4) hits the record at 1402
     /// in the creature segment, shown by actor slot `slot`. A weapon that
     /// can't hurt a special creature (see `combat::special_low`) only
     /// makes a sound. None where the original faults or hangs.
-    pub fn player_attack(&mut self, arg: u16, slot: u16) -> Option<()> {
+    pub fn player_attack(&mut self, arg: u16, slot: u16, kill: &mut dyn KillHooks) -> Option<()> {
         self.mem.w16(DS, svar::ARG, arg);
         self.mem.w16(DS, svar::SLOT, slot);
         let location = self.hit_location()?;
@@ -250,7 +252,7 @@ impl Machine {
         self.mem.w16(def.seg, hp_at, hp);
         let has_84 = find(self, 0x84).is_some();
         self.vampiric_heal(damage, has_84);
-        self.kill_check(def.seg, def.off)?;
+        self.kill_check(def.seg, def.off, kill)?;
         self.mem.w16(DS, svar::COOLDOWN, 0x14);
         Some(())
     }
@@ -295,20 +297,20 @@ impl Machine {
     /// (other than type 17h) whose maximum HP is still above 0. Returns
     /// whether the player was given experience (CF). None where the
     /// original hangs.
-    pub fn kill_check(&mut self, seg: u16, rec: u16) -> Option<bool> {
+    pub fn kill_check(&mut self, seg: u16, rec: u16, kill: &mut dyn KillHooks) -> Option<bool> {
         self.end_timed_flag();
         if self.mem.r16(seg, rec.wrapping_add(field::HP)) as i16 > 0 {
-            self.quest_yield(seg, rec)?;
+            self.quest_yield(seg, rec, kill)?;
             return Some(false);
         }
-        if self.quest_yield(seg, rec)? {
+        if self.quest_yield(seg, rec, kill)? {
             return Some(false);
         }
         let xp = self.record_dies(seg, rec)?;
         let flags = self.mem.r16(seg, rec.wrapping_add(field::FLAGS));
         if flags & 0x80 != 0 && self.mem.r8(seg, rec.wrapping_add(field::RACE)) != 0x17 {
             if self.mem.r16(seg, rec.wrapping_add(field::MAX_HP)) as i16 > 0 {
-                self.quest_yield(seg, rec)?;
+                self.quest_yield(seg, rec, kill)?;
                 return Some(false);
             }
             self.clear_effects_on(seg, rec);
@@ -413,9 +415,9 @@ impl Machine {
     /// 2AA1:07A4. A person being fought as a quest target (05CA bit 0x40)
     /// gives up below half its maximum HP, if a quest at stage 4 names
     /// its class (1194:A1D1): it hands over an item (1194:3829), the
-    /// quest is marked, its effects end and its actor turns peaceful
-    /// (flag 0x4000). CF.
-    fn quest_yield(&mut self, seg: u16, rec: u16) -> Option<bool> {
+    /// quest is marked, its effects end, its actor turns peaceful (flag
+    /// 0x4000) and it says so (0819: `KillHooks::surrender`). CF.
+    fn quest_yield(&mut self, seg: u16, rec: u16, kill: &mut dyn KillHooks) -> Option<bool> {
         if self.mem.r16(DS, svar::FLAGS_5CA) & 0x40 == 0
             || self.mem.r16(seg, rec.wrapping_add(field::FLAGS)) & field::FLAG_CREATURE != 0
         {
@@ -438,6 +440,8 @@ impl Machine {
         let a = self.actor_of(rec)?;
         let fl = self.mem.r16(DS, a + f::FLAGS) | 0x4000;
         self.mem.w16(DS, a + f::FLAGS, fl);
+        // 2AA1:0819..083B: its words.
+        kill.surrender(self)?;
         Some(true)
     }
 
@@ -486,6 +490,42 @@ impl Machine {
     }
 }
 
+/// What a kill leaves to the front end.
+pub trait KillHooks {
+    /// 2AA1:0819..083B: a quest target giving up says so: its words made
+    /// (`Machine::surrender_text`) and shown in a message box at 1044
+    /// (1194:59C8). By default nothing (the words need the game's files).
+    fn surrender(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+}
+
+/// `KillHooks` that leave the words unsaid.
+pub struct NoKillHooks;
+
+impl KillHooks for NoKillHooks {}
+
+impl Machine {
+    /// 2AA1:0819..0833: a quest target's words on giving up: [102C]'s font
+    /// selected (0000:9AE6), "%nc gives up his fight, ..." (82E6) copied
+    /// to 1044 (9CA0) and its codes made (2DA2:000A). The box (59C8) is
+    /// the caller's. None where the codes give up.
+    pub fn surrender_text(&mut self, files: &mut crate::bsa::Files, hooks: &mut dyn crate::text::TextHooks) -> Option<()> {
+        self.select_font(crate::shops::font::ARENA);
+        let mut i = 0u16;
+        loop {
+            let c = self.mem.r8(DS, svar::SURRENDER.wrapping_add(i));
+            self.mem.w8(DS, svar::SURRENDER_LINE.wrapping_add(i), c);
+            if c == 0 {
+                break;
+            }
+            i = i.wrapping_add(1);
+        }
+        self.expand(files, hooks, DS, svar::SURRENDER_LINE)?;
+        Some(())
+    }
+}
+
 /// The game's handlers for the effects engine: the kill handler, player
 /// death and the blood flash of a reflected spell.
 pub struct GameHooks;
@@ -494,7 +534,7 @@ impl FxHooks for GameHooks {
     /// 2AA1:06A0. Where the original would hang (no actor slot for a
     /// dying creature, see `kill_check`) this reports no kill.
     fn vitals_changed(&mut self, m: &mut Machine, seg: u16, rec: u16) -> bool {
-        m.kill_check(seg, rec).unwrap_or(false)
+        m.kill_check(seg, rec, &mut NoKillHooks).unwrap_or(false)
     }
 
     fn player_died(&mut self, m: &mut Machine) {

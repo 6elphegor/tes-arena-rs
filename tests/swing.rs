@@ -70,7 +70,7 @@ fn matches_original() {
         spread(&mut m, &mut s, corpse);
         m.load_rng();
         let before = m.clone();
-        let got = m.swing_hits().map(|reached| {
+        let got = m.swing_hits(&mut arena::strike::NoKillHooks).map(|reached| {
             m.store_rng();
             // The original goes on to the wall (stubbed) when nothing was hit.
             assert_eq!(reached, m.mem.r16(DS, 0x67DA) != 0 || m.mem.r16(DS, 0xC3D2) as i16 <= 0);

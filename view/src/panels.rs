@@ -1240,7 +1240,7 @@ pub fn corpse(engine: &mut arena::engine::Engine) -> bool {
         m.mem.w16(DS, si + 4, (y + h.cos() * 128.0) as u16);
         let rec = m.mem.r16(DS, si + 0x12);
         m.mem.w16(seg, rec + arena::character::field::HP, 0);
-        return m.kill_check(seg, rec).is_some();
+        return m.kill_check(seg, rec, &mut arena::strike::NoKillHooks).is_some();
     }
     false
 }
