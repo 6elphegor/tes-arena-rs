@@ -540,7 +540,9 @@ impl Machine {
     /// line's first; not modelled. The bytes before LINE are the far
     /// pointer 3BA0:929E in the program's data (929A..929D: 9Eh 92h A0h
     /// 3Bh, then 9299 0, the scan's end), which only 0000:5F6D reads and
-    /// nothing writes: no '%' is ever there.
+    /// nothing writes: no '%' is ever there. (Watched in the harness through
+    /// the store's haggles, buying and selling with offers typed: no write
+    /// after the start, and those bytes at every message.)
     fn haggle_say(&mut self, files: &mut Files, io: &mut impl HaggleIo, kind: u8) -> Option<()> {
         if matches!(self.mem.r8(DS, MODE), 5 | 6) {
             return self.haggle_say_informant(files, io, kind);

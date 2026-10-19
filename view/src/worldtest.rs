@@ -916,9 +916,27 @@ fn shopping(a: &mut App) {
 }
 
 fn seeded(a: &mut App) {
-    a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
-    a.engine.m.rng.seed = SEED;
+    seeded_with(a, SEED);
 }
+
+fn seeded_with(a: &mut App, seed: u32) {
+    a.engine.m.mem.w32(DS, arena::random::SEED, seed);
+    a.engine.m.rng.seed = seed;
+}
+
+/// gen_worldframes.py's `stealing`: a slot free, the seed `seed`.
+fn stealing(seed: u32) -> impl Fn(&mut App) {
+    move |a: &mut App| {
+        room(a);
+        seeded_with(a, seed);
+    }
+}
+
+/// gen_screens.py's STEAL_SEED and gen_worldframes.py's STEAL_QUIET: the
+/// store's lockpicking roll succeeds; it fails and the guards' roll
+/// doesn't call them.
+const STEAL_SEED: u32 = 0x2F6E_1A36;
+const STEAL_QUIET: u32 = 0x2F6E_1A48;
 
 /// A step of gen_worldframes.py's STORE_SCRIPT or GUILD_SCRIPT: a click
 /// at (x, y), or a key typed.
@@ -949,6 +967,35 @@ const STORE_SCRIPT: [Act; 17] = [
     Act::Click(0xA0, 0x73), Act::Click(0x70, 0x26), ACCEPT, ACCEPT,
     Act::Click(0xA0, 0xA3),
 ];
+
+/// gen_worldframes.py's OFFER: the haggle's second button.
+const OFFER: Act = Act::Click(160, 133);
+
+/// gen_worldframes.py's STORE_HAGGLE_SCRIPT: an armour bought for 14 (5
+/// refused, 13 countered), the store left.
+const STORE_HAGGLE_SCRIPT: [Act; 16] = [
+    Act::Click(0xA0, 0x43), Act::Click(0xA0, 0x7D), Act::Click(0x70, 0x26), Act::Click(0x70, 0x26), MORE, OFFER,
+    Act::Key(KeyCode::Digit5, "5"), Act::Key(KeyCode::Enter, ""), MORE,
+    Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Digit3, "3"), Act::Key(KeyCode::Enter, ""), MORE, ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's STORE_SELL_HAGGLE_SCRIPT: an item sold for 16 (25
+/// refused, 17 countered), the store left.
+const STORE_SELL_HAGGLE_SCRIPT: [Act; 15] = [
+    Act::Click(0xA0, 0x5B), Act::Click(0x80, 0x25), Act::Click(0xA0, 0x69), OFFER,
+    Act::Key(KeyCode::Digit2, "2"), Act::Key(KeyCode::Digit5, "5"), Act::Key(KeyCode::Enter, ""), MORE,
+    Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Digit7, "7"), Act::Key(KeyCode::Enter, ""), MORE, ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
+/// gen_worldframes.py's STEAL_SCRIPT: Steal, its message clicked away,
+/// Exit.
+const STEAL_SCRIPT: [Act; 3] = [Act::Click(0xA0, 0x8B), Act::Click(160, 100), Act::Click(0xA0, 0xA3)];
+
+/// gen_worldframes.py's STEAL_CAUGHT_SCRIPT: Steal and its message; the
+/// guards called, the store left.
+const STEAL_CAUGHT_SCRIPT: [Act; 2] = [Act::Click(0xA0, 0x8B), Act::Click(160, 100)];
 
 /// gen_worldframes.py's `informant`: the main quest's informant in this
 /// tavern, offered but not met, ten days and 100 gold; the seed SEED.
@@ -1093,8 +1140,8 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
     // is drawn over: `Front::shown`), as a shown window has it.
     a.compose();
     super::super::super::shop_turn(a, kind);
-    for step in script {
-        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");
+    for (i, step) in script.iter().enumerate() {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early, before step {i}");
         act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the services still asking");
@@ -1979,6 +2026,24 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 6, &STORE_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playstorehaggle" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 6, &STORE_HAGGLE_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playstoresellhaggle" => (Place::Store, Box::new(shopping), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 6, &STORE_SELL_HAGGLE_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playstorestolen" | "playstorefailed" | "playstorecaught" => {
+            let seed = match name { "playstorestolen" => STEAL_SEED, "playstorefailed" => STEAL_QUIET, _ => SEED };
+            (Place::Store, Box::new(stealing(seed)), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                frames(a, d, seen, 2, |_| false);
+                serviced(a, d, seen, 6, if seed == SEED { &STEAL_CAUGHT_SCRIPT[..] } else { &STEAL_SCRIPT[..] });
+                frames(a, d, seen, 29, |_| false);
+            }))
+        }
         "playinformant" => (Place::Tavern, Box::new(informant), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             serviced(a, d, seen, 4, &INFORMANT_SCRIPT);
@@ -2828,7 +2893,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 70] = ["playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 75] = ["playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2938,7 +3003,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 75] = ["playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 80] = ["playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's

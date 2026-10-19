@@ -721,6 +721,16 @@ def guild_shopping(a):
     gs.seeded(a)
 
 
+def stealing(seed):
+    """A slot of the player's free and the seed `seed`, from which the
+    store's lockpicking roll (1194:FCC6) and the guards' roll after a
+    failure go one way or the other."""
+    def setup(a):
+        gs.room(a)
+        gs.seeded(a, seed)
+    return setup
+
+
 def temple_hurt(a):
     """The player at half health (gen_screens.py's `hurt`), seeded: what
     the temple's Heal needs."""
@@ -835,6 +845,36 @@ STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x
                 ('click', 0xA0, 0x5B), ('click', 0x80, 0x25), ('click', 0xA0, 0x69), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0x73), ('click', 0x70, 0x26), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
+# The haggle's second button (NEGOTBUT.IMG's middle one, 1194:6001's to
+# B5h): an offer typed.
+OFFER = ('click', 160, 133)
+
+
+def typed(digits):
+    """An offer typed in the haggle's field: its digits' scan codes, then
+    Enter."""
+    return [('keys', [0x0B if c == '0' else 0x01 + int(c)]) for c in digits] + [('keys', [0x1C])]
+
+
+# Buy, Armor and its first line twice (15 gold, the limit 12): an offer
+# of 5, under the limit, refused (1194:82AC, its line paged); 13, between
+# them, countered at 14 (822F; its line paged); that price accepted and
+# the deal confirmed (Yes); Exit.
+STORE_HAGGLE_SCRIPT = ([('click', 0xA0, 0x43), ('click', 0xA0, 0x7D), ('click', 0x70, 0x26), ('click', 0x70, 0x26), MORE, OFFER]
+                       + typed('5') + [MORE] + typed('13') + [MORE, ACCEPT, ACCEPT, ('click', 0xA0, 0xA3)])
+# Sell, its first line (15 offered, the limit 18), Yes to the worn
+# item's question: 25 asked, past the limit, refused; 17 asked,
+# countered at 16 (selling's counter: the middle less one, at most the
+# first offer); accepted and confirmed; Exit.
+STORE_SELL_HAGGLE_SCRIPT = ([('click', 0xA0, 0x5B), ('click', 0x80, 0x25), ('click', 0xA0, 0x69), OFFER]
+                            + typed('25') + [MORE] + typed('17') + [MORE, ACCEPT, ACCEPT, ('click', 0xA0, 0xA3)])
+# Steal (the box at 83h..9Ah), its message clicked away, Exit; caught,
+# the store left with the guards called (no Exit).
+STEAL_SCRIPT = [('click', 0xA0, 0x8B), ('click', 160, 100), ('click', 0xA0, 0xA3)]
+STEAL_CAUGHT_SCRIPT = STEAL_SCRIPT[:2]
+# A seed the store's lockpicking roll fails from without the guards'
+# roll calling them.
+STEAL_QUIET = 0x2F6E_1A48
 # The mages' guild's menu (1194:A73E): Buy, Potions, the first line, how
 # many typed (1, Enter), Accept, Yes; Exit.
 # The tavern's keeper (1194:B93C) with the informant here (`informant`):
@@ -1320,6 +1360,19 @@ CASES = {
     'playtalkquestplace': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_QUEST_SCRIPT)})]),
     'playtalkbar': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_BAR_SCRIPT)})]),
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
+    # The store's haggles with offers typed: an armour bought after a
+    # refusal and a counter (STORE_HAGGLE_SCRIPT), an item sold the same
+    # way (STORE_SELL_HAGGLE_SCRIPT); thirty frames on.
+    'playstorehaggle': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_HAGGLE_SCRIPT)})]),
+    'playstoresellhaggle': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SELL_HAGGLE_SCRIPT)})]),
+    # The store's Steal (STEAL_SCRIPT): from STEAL_SEED the lockpicking
+    # roll succeeds (a record of its lists made an item in the free slot);
+    # from STEAL_QUIET it fails and the guards' roll doesn't call them;
+    # from gen_screens.py's SEED it fails and they are called (0000:3F6E,
+    # 3EBE: 191D set, the people gone, the store left); thirty frames on.
+    'playstorestolen': ('store', stealing(gs.STEAL_SEED), [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STEAL_SCRIPT)})]),
+    'playstorefailed': ('store', stealing(STEAL_QUIET), [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STEAL_SCRIPT)})]),
+    'playstorecaught': ('store', stealing(gs.SEED), [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STEAL_CAUGHT_SCRIPT)})]),
     # The dungeon, two frames, the player killed (`killed`) and the frame
     # that ends the world loop for it, the outer loop's death followed to
     # its way back to the program's menu (`died`; the save's F77 is 9: no
