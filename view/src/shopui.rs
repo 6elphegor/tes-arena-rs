@@ -522,11 +522,21 @@ impl arena::guild::GuildHooks for ShopFront<'_, '_> {
             None => (1, 0x120, 0xC0),
         }
     }
-    /// The spellmaker (1194:6064 with SI the player), its clicks, lists
-    /// and name answered through `dialog` (`LiveMaker`); its screen is
-    /// drawn behind its questions (`Talk::maker`).
+    /// The spellmaker as the guild's menu runs it (1194:A80D): the world
+    /// kept (0000:A611, `Machine::world_keep`, with the screen's colours),
+    /// A902 bit 0 cleared, 6064 with SI the player, its clicks, lists and
+    /// name answered through `dialog` (`LiveMaker`; its screen drawn behind
+    /// its questions, `Talk::maker`), A902 bit 0 cleared again, the world
+    /// given back (A6B5, `Machine::world_back`).
     fn spellmaker(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        let dac = self.front.dac;
+        m.world_keep(files, dac.as_ref());
+        let f = m.mem.r16(DS, 0xA902) & 0xFFFE;
+        m.mem.w16(DS, 0xA902, f);
         let r = m.spellmaker(files, &mut LiveMaker { front: &mut *self.front }, 0x01A4);
+        let f = m.mem.r16(DS, 0xA902) & 0xFFFE;
+        m.mem.w16(DS, 0xA902, f);
+        let r = r.and_then(|()| m.world_back(files));
         if let Some(t) = self.talk() {
             if t.need.is_none() {
                 t.maker = None;
@@ -552,10 +562,19 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
         }
         arena::spellmaker::NoSpellmakerHooks.click(m, form)
     }
-    fn list(&mut self, m: &mut Machine, si: u16, cx: u16) -> u16 {
-        match self.front.talk.as_deref_mut() {
-            Some(t) => t.list(m, si, cx, ""),
-            None => 0xFFFF,
+    /// The pick asked through `dialog`, the list's loop run over its reads
+    /// (`Machine::list_window`) as the talk's lists are; where the port
+    /// doesn't know the DI the list stores (A872), the pick alone.
+    fn list(&mut self, m: &mut Machine, files: &mut Files, si: u16, cx: u16, di: Option<u16>) -> u16 {
+        match di {
+            Some(di) => arena::talk::TalkHooks::list(&mut *self.front, m, files, si, cx, di),
+            None => {
+                eprintln!("the spellmaker's list: DI not known, the list's state not run");
+                match self.front.talk.as_deref_mut() {
+                    Some(t) => t.list(m, si, cx, ""),
+                    None => 0xFFFF,
+                }
+            }
         }
     }
     fn menu(&mut self, m: &mut Machine, si: u16, bx: u16, di: u16) -> u16 {

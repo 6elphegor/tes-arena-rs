@@ -992,6 +992,15 @@ fn act(a: &mut App, d: &mut Driver, act: &Act) {
     }
 }
 
+/// gen_worldframes.py's SPELLMAKER_SCRIPT: the guild's Spellmaker, the
+/// spell named "zap", Damage Health added with its first field raised
+/// once, bought, its box clicked away, the spellmaker's Exit, the guild's.
+const SPELLMAKER_SCRIPT: [Act; 16] = [
+    Act::Click(0xA0, 0x74), Act::Click(0x80, 0x34), Act::Key(KeyCode::KeyZ, "z"), Act::Key(KeyCode::KeyA, "a"), Act::Key(KeyCode::KeyP, "p"), Act::Key(KeyCode::Enter, ""),
+    Act::Click(0x20, 0x4B), Act::Click(100, 74), Act::Click(100, 74), Act::Click(100, 38), Act::Click(142, 71), Act::Click(230, 143),
+    Act::Click(0xD8, 0xC0), Act::Click(0xA0, 0x60), Act::Click(0x128, 0xC0), Act::Click(0xA0, 0xA3),
+];
+
 /// gen_worldframes.py's ACCEPT and MORE.
 const ACCEPT: Act = Act::Click(110, 133);
 const MORE: Act = Act::Click(297, 172);
@@ -2398,6 +2407,11 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 7, &GUILD_BAR_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playspellmaker" => (Place::Loaded, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 7, &SPELLMAKER_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
         "playlevelup" => (Place::Dungeon, Box::new(levelled), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             // The next frame's minute tick (gen_worldframes.py's
@@ -3100,7 +3114,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 87] = ["playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY: [&str; 88] = ["playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3210,7 +3224,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 92] = ["playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY_STATE: [&str; 93] = ["playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's

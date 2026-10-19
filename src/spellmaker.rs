@@ -57,6 +57,17 @@ use crate::machine::Machine;
 use crate::mem::{DATA, DS};
 
 /// What the spellmaker leaves to the front end.
+/// The record of the lists of kind 3 (1194:577F), which 5734 leaves in DI
+/// at its end.
+const LIST_RECORD: u16 = 0x5006;
+
+/// DI as a menu (1194:020E) with its entries' table at `table` leaves it
+/// whatever is picked: walked to the table's end, then back down past its
+/// first entry pushing them (022C..0241); 3159:0F2A and the rest keep it.
+const fn menu_di(table: u16) -> u16 {
+    table.wrapping_sub(2)
+}
+
 pub trait SpellmakerHooks {
     /// 1194:5651: the next click on the screen, (x, y) (AX, BX), on the
     /// main screen or on the form whose record is at DATA:`form`. By
@@ -72,10 +83,23 @@ pub trait SpellmakerHooks {
             }
         }
     }
-    /// 1194:5734: a list of `cx` strings at DS:`si`. The pick (FFFFh:
-    /// none).
-    fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
+    /// 1194:5734: a list of `cx` strings at DS:`si`, DI `di` as its
+    /// caller left it (the list stores it at A872; None where the port
+    /// doesn't know it). The pick (FFFFh: none).
+    fn list(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16, _cx: u16, _di: Option<u16>) -> u16 {
         0xFFFF
+    }
+    /// Whether 68D7 loads its picture (SPELLMKR.IMG, 5778) into bank [1032]
+    /// itself (`Machine::sm_screen`'s `picture`): by default as the port
+    /// does it.
+    fn picture(&self) -> bool {
+        true
+    }
+    /// 0000:9AE6 (`tiles` false: the font, B036) or 9AF8 (true: the boxes'
+    /// tiles, B038) with AX `ax`: by default as the port does them
+    /// (`Machine::font_selected`).
+    fn font_selected(&mut self, m: &mut Machine, ax: u16, tiles: bool) {
+        m.font_selected(ax, tiles);
     }
     /// 1194:020E: a menu, its title at `si`, its keys at `bx`, its
     /// entries' table at `di`. The pick (FFFFh: none).
@@ -251,6 +275,11 @@ impl Machine {
         let r = self.resource_add(files, CURSOR_FILE, 3, 3)?;
         self.mem.w16(DS, CURSORS, r);
         held.1 = Some(r);
+        // 60A9: 9AF8 with AX still 756C's (the cursors' resource), then the
+        // font [102C] (9AE6).
+        hooks.font_selected(self, r, true);
+        let font = self.mem.r16(DS, 0x102C);
+        hooks.font_selected(self, font, false);
         self.sm_draw(files, hooks)?;
         loop {
             let (ax, bx) = self.sm_click(hooks, None);
@@ -538,16 +567,30 @@ impl Machine {
 
     /// 1194:68D7: the screen (its numbers written as it draws them).
     fn sm_draw(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) -> Option<()> {
-        self.sm_screen(files, false)?;
+        self.sm_screen(files, hooks.picture())?;
         hooks.screen(self);
+        // DI at the casting cost's NUL, where its 7052 left it (69E5: the
+        // texts' drawing after it, 5585 and 9466 keep DI).
+        let n = self.mem.cstr(DS, BUF).len() as u16;
+        self.spellmaker_di = Some(BUF.wrapping_add(n));
         Some(())
+    }
+
+    /// 1194:5734 with AX 3 (its record 5006), DI `di` as its caller left
+    /// it: the list asked (`SpellmakerHooks::list`); DI at the record after
+    /// it, as 5734's end pops it.
+    fn sm_list(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks, si: u16, cx: u16, di: Option<u16>) -> u16 {
+        self.list_kind = 0x3;
+        let ax = hooks.list(self, files, si, cx, di);
+        self.spellmaker_di = Some(LIST_RECORD);
+        ax
     }
 
     /// 1194:68D7's state: with `picture`, its picture (5778, or 5785 with
     /// 101D FFh, or 5792 with 1001 FFh: SPELLMKR.IMG, BUYSPELL.IMG,
     /// CHARSPEL.IMG) loaded into bank [1032] and drawn (5C86, 56C8 with BX
-    /// 4), the bank before mapped again; the spellmaker's leaves it to the
-    /// front end. The name's background kept (8F26 into [A890]) and the
+    /// 4), the bank before mapped again; the spellmaker's as its hook
+    /// says (`SpellmakerHooks::picture`). The name's background kept (8F26 into [A890]) and the
     /// texts' drawing (9E06) are the front end's.
     pub(crate) fn sm_screen(&mut self, files: &mut Files, picture: bool) -> Option<()> {
         self.sm_no_element();
@@ -814,6 +857,9 @@ impl Machine {
     fn sm_name(&mut self, hooks: &mut dyn SpellmakerHooks) {
         self.mem.w8(DS, COLOUR, 0xA0);
         hooks.type_name(self, NAME);
+        // DI past the field's background (83h by 9 bytes) the editor puts
+        // back from DI 0.
+        self.spellmaker_di = Some(0x83 * 9);
     }
 
     /// 1194:663D: the effects' menu.
@@ -829,6 +875,7 @@ impl Machine {
         self.mem.w8(DS, 0x59C1, b);
         loop {
             let pick = hooks.menu(self, 0x59A1, 0x59B1, 0x59B5);
+            self.spellmaker_di = Some(menu_di(0x59B5));
             if (pick as i16) < 0 {
                 return Some(());
             }
@@ -876,9 +923,9 @@ impl Machine {
                 }
                 si
             } else {
-                // AX 3h: the list's kind (1194:5734).
-                self.list_kind = 0x3;
-                let ax = hooks.list(self, TEXT, bp);
+                // AX 3h: the list's kind (1194:5734); DI at the NUL
+                // written after the names (66D9, 66FE).
+                let ax = self.sm_list(files, hooks, TEXT, bp, Some(di));
                 if (ax as i16) < 0 {
                     return Some(());
                 }
@@ -903,13 +950,13 @@ impl Machine {
 
     /// 1194:6798: the slot's effect chosen (655E), then edited.
     fn sm_choose(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) -> Option<()> {
-        self.sm_pick_effect(hooks);
+        self.sm_pick_effect(files, hooks);
         self.sm_edit(files, hooks)
     }
 
     /// 1194:655E: the slot's effect, its kind and sub-kind picked from
     /// lists of those allowed; nothing picked empties the slot.
-    fn sm_pick_effect(&mut self, hooks: &mut dyn SpellmakerHooks) {
+    fn sm_pick_effect(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) {
         self.sm_allowed();
         // 1194:7251: the allowed effects' names listed.
         let (mut si, mut di, mut dx) = (EFFECT_NAMES, LIST_NAMES, LIST_INDEX);
@@ -932,9 +979,9 @@ impl Machine {
             }
         }
         self.mem.w8(DS, di, 0);
-        // AX 3h: the list's kind (1194:5734).
-        self.list_kind = 0x3;
-        let mut ax = hooks.list(self, LIST_NAMES, dx - LIST_INDEX);
+        // AX 3h: the list's kind (1194:5734); DI past the NUL its STOSB
+        // wrote (727D, 728A).
+        let mut ax = self.sm_list(files, hooks, LIST_NAMES, dx - LIST_INDEX, Some(di.wrapping_add(1)));
         if (ax as i16) >= 0 {
             ax = self.sg8(LIST_INDEX.wrapping_add(ax)) as u16;
         }
@@ -954,9 +1001,9 @@ impl Machine {
         if list == 0 {
             return;
         }
-        // AX 3h: the list's kind (1194:5734).
-        self.list_kind = 0x3;
-        let ax = hooks.list(self, list, cx);
+        // AX 3h: the list's kind (1194:5734); DI the record the list
+        // before left it at (5734's end pops it: kind 3's 5006).
+        let ax = self.sm_list(files, hooks, list, cx, Some(LIST_RECORD));
         if (ax as i16) < 0 {
             empty(self);
             return;
@@ -972,9 +1019,9 @@ impl Machine {
         } else {
             return;
         };
-        // AX 3h: the list's kind (1194:5734).
-        self.list_kind = 0x3;
-        let ax = hooks.list(self, s, n);
+        // AX 3h: the list's kind (1194:5734); DI as the list before left
+        // it.
+        let ax = self.sm_list(files, hooks, s, n, Some(LIST_RECORD));
         let v = (ax as u8) | ((n as u8) << 4);
         self.mem.w8(DS, SUBKINDS.wrapping_add(slot), v);
     }
@@ -1046,6 +1093,9 @@ impl Machine {
     /// 1194:6105: an effect's form, its record at DATA:`form`.
     fn sm_form(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks, form: u16) -> Option<()> {
         self.mem.w8(DS, COLOUR, 0xFF);
+        // 610F: the font [102C] (9AE6).
+        let font = self.mem.r16(DS, 0x102C);
+        hooks.font_selected(self, font, false);
         self.mem.w16(DS, FORM, form);
         self.mem.w16(DS, FIELDS, SPELL);
         self.sm_keep_screen();
@@ -1371,9 +1421,9 @@ impl Machine {
         }
         let cx = 5u16.wrapping_sub(dx);
         let si = self.skip_strings_at(TARGET_NAMES, dx);
-        // AX 3h: the list's kind (1194:5734).
-        self.list_kind = 0x3;
-        let ax = hooks.list(self, si, cx);
+        // AX 3h: the list's kind (1194:5734); DI past the effects' lowest
+        // targets 6B14 walked (5A84, three words).
+        let ax = self.sm_list(files, hooks, si, cx, Some(0x5A8A));
         if (ax as i16) < 0 {
             return Some(());
         }
@@ -1386,10 +1436,11 @@ impl Machine {
         if self.sm_no_element() {
             return Some(());
         }
+        // AX 3h: the list's kind (1194:5734); DI as the last step left it
+        // (6B9D keeps it).
         self.mem.w8(DS, 0x568C, 0);
-        // AX 3h: the list's kind (1194:5734).
-        self.list_kind = 0x3;
-        let ax = hooks.list(self, ELEMENT_NAMES, 5);
+        let di = self.spellmaker_di;
+        let ax = self.sm_list(files, hooks, ELEMENT_NAMES, 5, di);
         self.mem.w8(DS, 0x568C, b'N');
         if (ax as i16) < 0 {
             return Some(());
@@ -1400,7 +1451,9 @@ impl Machine {
 
     /// 1194:6A6C: "Are you sure ?" (48E6), then a new spell.
     fn sm_new(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) -> Option<()> {
-        if hooks.menu(self, 0x4B50, 0x4B60, 0x4B63) != 0 {
+        let pick = hooks.menu(self, 0x4B50, 0x4B60, 0x4B63);
+        self.spellmaker_di = Some(menu_di(0x4B63));
+        if pick != 0 {
             return Some(());
         }
         self.sm_clear();
@@ -1412,6 +1465,10 @@ impl Machine {
         let say = |m: &mut Machine, hooks: &mut dyn SpellmakerHooks, si: u16| {
             m.mem.w8(DS, COLOUR, 0xD6);
             hooks.message_box(m, si);
+            // 59CC's end: in a building (5E6 4), unless 5E0 bit 800h, the
+            // frame's first 4000h bytes filled from [902E] (5A5C..5A65), DI
+            // past them; elsewhere as its other calls leave it, unknown.
+            m.spellmaker_di = (m.mem.r16(DS, 0x05E0) & 0x800 == 0 && m.mem.r8(DS, 0x05E6) == 4).then(|| m.mem.r16(DS, 0x902E).wrapping_add(0x4000));
         };
         if self.sg8(NAME) == 0 {
             say(self, hooks, NEED_NAME);

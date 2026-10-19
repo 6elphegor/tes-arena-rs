@@ -5106,3 +5106,45 @@ screen | playlightout | c3a3edd22d2d6dd7 a97a4bafd992e4ed df87cca47c2f5ed6
 creatures | playlightout | b4043daa78e1f54a 4a6a3b1b4e085651
 view3d | playlightout | cd1e679c1c79e96c
 view3d1 | playlightout | f9e0f64ef279e5fe
+track | playspellmaker | 0 0 6e4 3c 3b2 71
+track | playspellmaker | 1 0 6e4 3c 3b2 71
+track | playspellmaker | 2 0 6e4 3c 3b2 71
+track | playspellmaker | 3 0 6e4 3c 3b2 71
+track | playspellmaker | 4 0 6e4 3c 3b2 71
+track | playspellmaker | 5 0 6e4 3c 3b2 71
+track | playspellmaker | 6 0 6e4 3c 3b2 71
+track | playspellmaker | 7 0 6e4 3c 3b2 71
+track | playspellmaker | 8 0 6e4 3c 3b2 71
+track | playspellmaker | 9 0 6e4 3c 3b2 71
+track | playspellmaker | a 0 6e4 3c 3b2 71
+track | playspellmaker | b 0 6e4 3c 3b2 71
+track | playspellmaker | c 0 6e4 3c 3b2 71
+track | playspellmaker | d 0 6e4 3c 3b2 71
+track | playspellmaker | e 0 6e4 3c 3b2 71
+track | playspellmaker | f 0 6e4 3c 3b2 71
+track | playspellmaker | 10 0 6e4 3c 3b2 71
+track | playspellmaker | 11 0 6e4 3c 3b2 71
+track | playspellmaker | 12 0 6e4 3c 3b2 71
+track | playspellmaker | 13 0 6e4 3c 3b2 71
+track | playspellmaker | 14 0 6e4 3c 3b2 71
+track | playspellmaker | 15 0 6e4 3c 3b2 71
+track | playspellmaker | 16 0 6e4 3c 3b2 71
+track | playspellmaker | 17 0 6e4 3c 3b2 71
+track | playspellmaker | 18 0 6e4 3c 3b2 71
+track | playspellmaker | 19 0 6e4 3c 3b2 71
+track | playspellmaker | 1a 0 6e4 3c 3b2 71
+track | playspellmaker | 1b 0 6e4 3c 3b2 71
+track | playspellmaker | 1c 0 6e4 3c 3b2 71
+track | playspellmaker | 1d 0 6e4 3c 3b2 71
+track | playspellmaker | 1e 0 6e4 3c 3b2 71
+track | playspellmaker | 1f 0 6e4 3c 3b2 71
+track | playspellmaker | 20 0 6e4 3c 3b2 71
+screenfade | playspellmaker | 63 | 3acbf1edc224b84
+rows | playspellmaker | 33 4d93d6efe660ce3a
+state | playspellmaker | 151+1 50a+1 52a+1 5c2+2 5cb+1 1012+1 102a+2 104c+2f 122e+1 1230+1 1232+1 1236+1 12be+1 12c7+2 12cc+1 1391+2 1395+a 13a0+b 13c8+5 1951+2e 1aea+1 1af7+8 1b00+3 1b48+b 5028+2 502c+1 502e+1 5031+4 503d+1 5043+1 5045+1 5047+2 504d+2 5051+3 5055+1 5057+1 5059+1 528f+7 5298+5 529e+a 580c+1 580f+3 58af+1 58b1+1 58b5+2 5a84+1 627a+2 651c+2 6fbe+7 7033+2 7036+4 7f1e+2 91d8+1 91da+2 9a73+1 9a75+1 9a78+3 9a7d+1 9a7f+3 9a83+39 9abd+1 9ac0+1 9ac3+1 9ac5+2 9ac8+2 9acb+2 9ace+5a 9b2a+1 9b2d+1f 9b4d+2 9b50+3c 9b8d+3 9b91+2 9b94+2 9b97+2 9b9a+2f 9bca+1e 9be9+2 9bec+21 9c0f+1 9c11+38 9c4b+1 9c4f+1 9c52+7c 9ccf+1d 9ced+1d 9d0b+2 9d0e+2e 9d3e+21 9d61+6 9d68+6 a3a3+1 a3a5+1 a3a8+3 a3ad+1 a3af+3 a3b3+39 a3ed+1 a3f0+1 a3f3+1 a3f5+2 a3f8+2 a3fb+2 a3fe+5a a45a+1 a45d+1f a47d+2 a480+3c a4bd+3 a4c1+2 a4c4+2 a4c7+2 a4ca+2f a4fa+1e a519+2 a51c+21 a53f+1 a541+38 a57b+1 a57f+1 a582+7c a5ff+1d a61d+1d a63b+2 a63e+2e a66e+21 a691+6 a698+6 a872+1 a874+1 a878+1 a87a+3 a87e+3 a882+1 a884+1 a888+2 a890+5 a898+1 a89a+4 a932+1 ac4c+4 b53e+1 b7f0+2 b7f4+1 b7f6+8 b80a+2 ba4b+2 ba50+2 ba56+2 ba6c+1 ba89+1 ba8c+2 ba91+6 ba9b+4 baa0+1 baa2+6 baaa+1 baad+2 bab0+1 bab8+1 baba+1 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 baff+4 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c40f+1 c8ed+2 cb37+2 cca4+1 cca6+1 ccbc+1 ccbe+1 ccca+2 ccd0+2 cd00+1 cd02+2 cd08+7 cd10+1 cd12+3 cd78+2 cd7c+2 cd8c+2 cd90+2 cd96+1 cd98+1 cd9a+1 cd9c+2 d742+1 d744+1 d746+1 d7aa+1 d7ac+1 d7ae+5 d7b4+4 d7ba+3 d7c0+d d7ce+4 d7d6+6 d7dd+3 d7e2+2 d7ea+3 d7ee+1 d802+1 d804+1 d806+2 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 eee6+2 | 12c0ab42e890cce9
+stateload | playspellmaker | 151+1 50a+1 52a+1 5c2+2 5cb+1 1012+1 102a+2 104c+2f 122e+1 1230+1 1232+1 1236+1 12be+1 12c7+2 12cc+1 1391+2 1395+a 13a0+b 13c8+5 1951+2e 1aea+1 1af7+8 1b00+3 1b48+b 5028+2 502c+1 502e+1 5031+4 503d+1 5043+1 5045+1 5047+2 504d+2 5051+3 5055+1 5057+1 5059+1 528f+7 5298+5 529e+a 580c+1 580f+3 58af+1 58b1+1 58b5+2 5a84+1 627a+2 651c+2 6fbe+7 7033+2 7036+4 7f1e+2 91d8+1 91da+2 91f6+4 9a73+1 9a75+1 9a78+3 9a7d+1 9a7f+3 9a83+39 9abd+1 9ac0+1 9ac3+1 9ac5+2 9ac8+2 9acb+2 9ace+5a 9b2a+1 9b2d+1f 9b4d+2 9b50+3c 9b8d+3 9b91+2 9b94+2 9b97+2 9b9a+2f 9bca+1e 9be9+2 9bec+21 9c0f+1 9c11+38 9c4b+1 9c4f+1 9c52+7c 9ccf+1d 9ced+1d 9d0b+2 9d0e+2e 9d3e+21 9d61+6 9d68+6 a3a3+1 a3a5+1 a3a8+3 a3ad+1 a3af+3 a3b3+39 a3ed+1 a3f0+1 a3f3+1 a3f5+2 a3f8+2 a3fb+2 a3fe+5a a45a+1 a45d+1f a47d+2 a480+3c a4bd+3 a4c1+2 a4c4+2 a4c7+2 a4ca+2f a4fa+1e a519+2 a51c+21 a53f+1 a541+38 a57b+1 a57f+1 a582+7c a5ff+1d a61d+1d a63b+2 a63e+2e a66e+21 a691+6 a698+6 a872+1 a874+1 a878+1 a87a+3 a87e+3 a882+1 a884+1 a888+2 a890+5 a898+1 a89a+4 a932+1 ac4c+4 b53e+1 b7f0+2 b7f4+1 b7f6+8 b80a+2 ba4b+2 ba50+2 ba6c+1 ba89+1 ba8c+2 ba91+6 ba9b+4 baa0+1 baa2+6 baaa+1 baad+2 bab0+1 bab8+1 baba+1 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 baff+4 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c40f+1 c8ed+2 cb37+2 cca4+1 cca6+1 ccbc+1 ccbe+1 ccca+2 cd00+1 cd02+2 cd08+7 cd10+1 cd12+3 cd96+1 cd98+1 cd9a+1 cd9c+2 d742+1 d744+1 d746+1 d7aa+1 d7ac+1 d7ae+5 d7b4+4 d7ba+3 d7c0+d d7ce+4 d7d6+6 d7dd+3 d7e2+2 d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 eee6+2 | 8d2057147bee5283
+stateems | playspellmaker | 49125 b5a05234482546ef | 2203f632d80aa3b1
+screen | playspellmaker | 59afeb14759697d7 a97a4bafd992e4ed df87cca47c2f5ed6
+written | playspellmaker | GL09.64:26:b04e87ff7b1217b1 SCREENSV.$$2:fa00:d8db6aa183f75b62 SPELLS.64:aa0:9f08d5415a603255 TEMPSAVE.$$$:18000:f3701202cd89dfb8
+view3d | playspellmaker | e5499e9067177f3e
+view3d1 | playspellmaker | 4fbfadd0a08562d9

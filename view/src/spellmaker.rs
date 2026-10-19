@@ -103,7 +103,7 @@ impl SpellmakerHooks for Maker {
             }
         }
     }
-    fn list(&mut self, _m: &mut Machine, _si: u16, cx: u16) -> u16 {
+    fn list(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, _si: u16, cx: u16, _di: Option<u16>) -> u16 {
         self.picks.pop_front().map_or(0xFFFF, |v| v % cx.max(1))
     }
     fn menu(&mut self, _m: &mut Machine, _si: u16, _bx: u16, _di: u16) -> u16 {

@@ -1019,6 +1019,17 @@ TALK_BAR_SCRIPT = [('click', 0xA0, 0x65), ('click', 59, 80), ('click', 58, 10), 
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
+# The guild's Spellmaker (its menu's third, 1194:A80D: 6064 with SI the
+# player): the spell's name clicked (5711's first region) and "zap" typed
+# (Z, A, P, Enter: 65FD); the effects (the second region, 663D): the list's
+# fifth line, Damage, clicked twice (marked, taken), its sub-kinds' first,
+# Health, marked as the list comes up, clicked once; the form's first
+# field's up arrow once (1194:6105), its Exit; "Buy Spell" (6BD7: the spell
+# into the player's first empty slot, the spells' file written), its box
+# clicked away; the spellmaker's Exit; the guild's.
+SPELLMAKER_SCRIPT = [('click', 0xA0, 0x74), ('click', 0x80, 0x34), ('keys', [0x2C]), ('keys', [0x1E]), ('keys', [0x19]), ('keys', [0x1C]),
+                     ('click', 0x20, 0x4B), ('click', 100, 74), ('click', 100, 74), ('click', 100, 38), ('click', 142, 71), ('click', 230, 143),
+                     ('click', 0xD8, 0xC0), ('click', 0xA0, 0x60), ('click', 0x128, 0xC0), ('click', 0xA0, 0xA3)]
 # As GUILD_SCRIPT, the potions' list scrolled by its bar first (3159:0D95:
 # the knob's middle at the click, the lines shown from its share of the
 # bar, the line marked kept among them), the top line then clicked twice
@@ -1568,6 +1579,8 @@ CASES = {
     'playinformantpaid': ('tavern', informant_owed, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_PAID_SCRIPT)})]),
     'playguild': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_SCRIPT)})]),
     'playguildbar': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_BAR_SCRIPT)})]),
+    # The same, a spell made and bought (SPELLMAKER_SCRIPT).
+    'playspellmaker': ('guild', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, SPELLMAKER_SCRIPT)})]),
     # In the town's first temple: two frames, a service (the keeper's
     # click, 1194:C258), thirty frames. Heal with the player hurt
     # (`temple_hurt`), Cure with a disease (`diseased`), Bless with a
