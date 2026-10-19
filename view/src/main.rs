@@ -3751,7 +3751,18 @@ impl App {
                 let r = if title { areas::load_game_title(&mut engine, &game, &dir, slot) } else { areas::load_game(&mut engine, &game, &dir, slot) };
                 match r {
                     Ok(run) => {
-                        self.engine = engine;
+                        if title {
+                            self.engine = engine;
+                        } else {
+                            // In play the load changes only what it
+                            // loads: the page and what the frame's drawing
+                            // wrote before the screen (the drawing's
+                            // record, `Engine::page_wrote`) stay, as the
+                            // original's DGROUP keeps them where the load
+                            // doesn't write.
+                            self.engine.m = engine.m;
+                            self.engine.files = engine.files;
+                        }
                         self.title_engine = None;
                         self.creation = None;
                         self.run = run;
@@ -3833,17 +3844,17 @@ impl App {
         let under = self.options.take();
         // The game as the screen left it, on this engine (its page and the
         // drawing's record of what it wrote kept). The keys went to this
-        // engine while the screen was up: their state is taken on, the
-        // latches of those let go cleared.
+        // engine while the screen was up: their state is taken on (the
+        // key interrupt's table, ACB5), their latches (9208) left as the
+        // frame's menu keys set them: a key let go has its latch cleared
+        // by the next check that asks it (2542:05D1), not at the screen's
+        // end.
         let keys = arena::controls::var::KEYS;
         let held: Vec<u8> = (0..0x80u16).map(|scan| self.engine.m.mem.r8(arena::mem::DS, keys + scan)).collect();
         self.engine.m.clone_from(&engine.m);
         self.engine.files.clone_from(&engine.files);
         for (scan, &down) in held.iter().enumerate().skip(1) {
             self.engine.m.mem.w8(arena::mem::DS, keys + scan as u16, down);
-            if down == 0 {
-                self.engine.m.key_pressed(scan as u16);
-            }
         }
         match end {
             arena::options::OptionsEnd::Resume => {}
