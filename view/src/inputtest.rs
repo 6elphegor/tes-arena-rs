@@ -1529,6 +1529,13 @@ fn each_bar_button_as_the_original_wires_it() {
     let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
     let first = want.split(['\r', '\n']).find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
     assert!(!first.is_empty() && got.contains(&first), "the status box: {got:?} / {want:?}");
+    // Its loop (2542:0530..0569) leaves only on a click or Esc held:
+    // Enter and Space leave it up.
+    d.key(&mut a, KeyCode::Enter, None);
+    d.key(&mut a, KeyCode::Space, Some(" "));
+    assert_eq!(a.boxes.len(), 1, "Enter and Space leave the status box up");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.boxes.is_empty(), "Esc closes the status box");
     // 3 with a condition: poisoned (+40Dh bit 2) is listed after the
     // text (2686:005E), the same text status_box makes.
     let (mut a, mut d) = fresh();

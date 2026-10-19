@@ -346,9 +346,6 @@ At the time of writing:
     4BFF) is drawn behind their questions, with the pictures 4B8E puts
     on it (the haggles' NEGOTBUT and YESNO, the temple's and the
     repairs' YESNO, the guild's and the tavern's).
-  - Typed fields (0000:9EE9) sit where the view places them, not at the
-    callers' own places (the rest's at FCh,44h; 1194:CCCD's at F8h,62h),
-    and their cursor stays at the text's end.
 - **Sound:** the music runs the game's own FM driver ported (its register
   writes the original's); it has not been listened to by a person, and
   there is no SoundFont fallback.

@@ -1778,6 +1778,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         log_run: None,
         ring_kept: false,
         ring_box_kept: false,
+        status_box: false,
         travel: None,
         saveui: None,
         saveui_under: None,
@@ -3166,6 +3167,10 @@ struct App {
     /// and Esc's key alone, forgetting no keys typed, so the ring isn't
     /// forgotten as it comes up (`ring_screen`).
     ring_box_kept: bool,
+    /// The status box is the box up: its loop (2542:0530..0569) leaves
+    /// only on a click or on Esc's key held, so Enter and Space don't read
+    /// it as they read the game's other boxes.
+    status_box: bool,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
     /// The save or load menu up (`saveui`: the options screen's Save and
@@ -4775,6 +4780,7 @@ impl App {
                 })
             }
             sheets::BarAction::Status(lines) => {
+                self.status_box = self.boxes.is_empty();
                 self.boxes.push_back(lines);
                 self.ring_box_kept = true;
             }
@@ -5063,7 +5069,8 @@ impl App {
     fn dialog_key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) {
         use winit::keyboard::KeyCode;
         if !self.boxes.is_empty() {
-            if matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape) {
+            let keys = matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space) && !self.status_box;
+            if keys || code == KeyCode::Escape {
                 self.box_read();
             }
             return;
@@ -5184,6 +5191,7 @@ impl App {
 
     fn box_read(&mut self) {
         self.boxes.pop_front();
+        self.status_box = false;
         if self.boxes.is_empty() {
             self.box_backdrop = None;
         }
