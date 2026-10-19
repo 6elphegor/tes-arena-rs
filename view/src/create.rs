@@ -1883,7 +1883,7 @@ impl Creation {
     /// The attributes rolled (1194:2AC7; the first time its note).
     fn roll(&mut self, engine: &mut Engine) -> Stage {
         self.colour = COLOUR_B;
-        if engine.m.creation_roll(&mut Hooks { boxes: &mut self.boxes }).is_none() {
+        if engine.m.creation_roll(&mut engine.files, &mut Hooks { boxes: &mut self.boxes }).is_none() {
             eprintln!("the attributes could not be rolled");
         }
         Stage::Stats
@@ -1915,8 +1915,20 @@ impl Creation {
                 }
                 return Stage::Stats;
             }
-            // 1194:2CD0: "Which dost thou choose?", in FONT_A.
+            // The points' loop left (122F's 1241..1249), then 1194:2CD0:
+            // "Which dost thou choose?", in FONT_A.
+            m.points_screen_end();
             Stage::Choose(c.menu(m, (DATA, 0x3A43), &[], 0x3F9C, 0x3F9F, FontId::A))
+        };
+        // The arrows' handler as the points' loop runs it (1194:138E whole,
+        // the stats' texts made again where a click took); a level's are
+        // replayed on the game that way after (`attribute_arrow`).
+        let arrow = |c: &Self, m: &mut Machine, y: u16| {
+            if c.level_up.is_some() {
+                m.creation_arrow(y);
+            } else {
+                m.attribute_arrow(y);
+            }
         };
         let record = |c: &mut Self, k: Click| {
             if let Some(v) = &mut c.level_up {
@@ -1937,7 +1949,7 @@ impl Creation {
             Input::Up | Input::Down => {
                 let mid = m.mem.r8(DS, arena::newgame::var::ARROWS) as u16;
                 let y = if inp == Input::Up { mid } else { mid + 1 };
-                m.creation_arrow(y);
+                arrow(self, m, y);
                 record(self, Click::Arrow(y));
                 Stage::Stats
             }
@@ -1949,7 +1961,7 @@ impl Creation {
                     Stage::Stats
                 }
                 Some(9) => {
-                    m.creation_arrow(y as u16);
+                    arrow(self, m, y as u16);
                     record(self, Click::Arrow(y as u16));
                     Stage::Stats
                 }
@@ -2035,7 +2047,10 @@ impl Creation {
                 self.show_face(m);
                 Stage::Face
             }
-            Some(1) => self.finish(engine),
+            Some(1) => {
+                m.face_done();
+                self.finish(engine)
+            }
             _ => Stage::Face,
         }
     }
@@ -2043,9 +2058,8 @@ impl Creation {
     /// The face kept (2C72), creation's end (257B..25B7), then the vision
     /// (0000:113E..115D: text 578h through 1194:D459).
     fn finish(&mut self, engine: &mut Engine) -> Stage {
-        let m = &mut engine.m;
-        m.face_chosen();
-        m.creation_end(&mut arena::newgame::NoNewGameHooks);
+        engine.m.face_chosen();
+        engine.m.creation_end(&mut engine.files, &mut arena::newgame::NoNewGameHooks);
         self.colour = 0x2F;
         // The vision's text for the screen, made on a copy of the game as
         // 1194:D45D makes it (its block, A374 mode 2): the game's own run
