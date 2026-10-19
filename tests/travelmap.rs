@@ -71,10 +71,10 @@ impl TravelHooks for Log {
         self.put(&[11, p as u32]);
         Some(())
     }
-    fn location(&mut self, _m: &mut Machine, id: u16) {
+    fn location(&mut self, _m: &mut Machine, _files: &mut Files, id: u16) {
         self.put(&[12, id as u32]);
     }
-    fn dungeon_location(&mut self, _m: &mut Machine, id: u16, bx: u16) {
+    fn dungeon_location(&mut self, _m: &mut Machine, _files: &mut Files, id: u16, bx: u16) {
         self.put(&[13, id as u32, bx as u32]);
     }
     fn arrival_log(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<bool> {

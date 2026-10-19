@@ -250,6 +250,22 @@ impl Files {
         self.deleted = other.deleted.clone();
     }
 
+    /// The files `after` wrote or deleted since it was `before` (a copy
+    /// a front end's hook worked on while the engine kept its own), the
+    /// same done here: the disk is one, whichever copy wrote it.
+    pub fn disk_merged(&mut self, before: &Files, after: &Files) {
+        for (k, v) in &after.written {
+            if before.written.get(k).is_none_or(|b| !Rc::ptr_eq(b, v) && b[..] != v[..]) {
+                self.written.insert(k.clone(), v.clone());
+                self.deleted.remove(k);
+            }
+        }
+        for k in after.deleted.difference(&before.deleted) {
+            self.written.remove(k);
+            self.deleted.insert(k.clone());
+        }
+    }
+
     /// The bytes the game wrote to PRN so far.
     pub fn printed(&self) -> &[u8] {
         &self.printed

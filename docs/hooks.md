@@ -382,9 +382,9 @@ the original routine:
 | `TravelHooks::bank` | src/travelmap.rs:89 | 0000:5C86 | port | the default runs the port | |
 | `TravelHooks::close` | src/travelmap.rs:147 | 3159:0006 | present | the map's window closed | |
 | `TravelHooks::days` | src/travelmap.rs:96 | 1194:2E69 | port | the default runs the port | |
-| `TravelHooks::dungeon_location` | src/travelmap.rs:116 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location` |
+| `TravelHooks::dungeon_location` | src/travelmap.rs:129 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
 | `TravelHooks::journey_stub` | src/travelmap.rs:143 |  | stub | a test's stand-in | |
-| `TravelHooks::location` | src/travelmap.rs:114 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location` |
+| `TravelHooks::location` | src/travelmap.rs:127 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
 | `TravelHooks::message_box` | src/travelmap.rs:78 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
 | `TravelHooks::pick_stub` | src/travelmap.rs:138 |  | stub | a test's stand-in | |
 | `TravelHooks::province` | src/travelmap.rs:110 | 1194:2E14 / 2E18 | port | the default runs the port | |

@@ -342,9 +342,12 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
     let screen = e.m.mem.r8(DS, arena::save::var::NO_SCREEN);
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, 1);
     let mut copy = e.files.clone();
+    let before = e.files.clone();
     let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
     let r = e.m.game_load(&mut e.files, slot, h);
     let failed = h.failed;
+    // What the hooks wrote on their copy is on the one disk too.
+    e.files.disk_merged(&before, &copy);
     e.m.mem.w8(DS, arena::save::var::NO_SCREEN, screen);
     match r {
         Some(arena::load::Loaded::Done) if !failed => {}
@@ -528,10 +531,15 @@ fn next_watched(engine: &mut Engine, dir: &Path, run: Run) -> Option<Run> {
     // shift (the wilderness's first blocks) reads a copy of them (cheap:
     // their contents are shared).
     let mut copy = files.clone();
+    let before = files.clone();
     engine.files = files;
     let next = r?;
     let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
-    if engine.world_enter(h).is_none() || h.failed {
+    let entered = engine.world_enter(h).is_some() && !h.failed;
+    // What the hooks wrote on their copy is on the one disk too (a
+    // shore's climate keeps the frame in TMP2.$$$, 1194:3DF2).
+    engine.files.disk_merged(&before, &copy);
+    if !entered {
         // Kept noted (peek, not describe's take), so the caller can tell
         // the original's own fault from the port's.
         eprintln!("entering the area gave up: {}", arena::giveup::peek().map_or_else(|| "no reason noted".to_string(), |g| g.to_string()));

@@ -233,7 +233,6 @@ fn dfa(archive: &crate::archive::Archive, name: &str) -> Vec<Image> {
 /// dungeon's, 3B0C, with its climate), the search's name and list pick.
 struct Hooks<'a> {
     boxes: &'a mut Vec<Lines>,
-    files: Files,
     typed: Vec<EditKey>,
     pick: u16,
     listed: Option<Vec<String>>,
@@ -278,9 +277,9 @@ impl TravelHooks for Hooks<'_> {
         self.asked = true;
         self.answer.unwrap_or(0xFFFF)
     }
-    fn location(&mut self, m: &mut Machine, id: u16) {
+    fn location(&mut self, m: &mut Machine, files: &mut Files, id: u16) {
         let ax = if m.mem.r8(DS, 0x0A46) == 8 { 0x100 } else { id };
-        if m.city_location(&mut self.files, DS, 0x0A22, ax).is_none() {
+        if m.city_location(files, DS, 0x0A22, ax).is_none() {
             self.failed = true;
         }
     }
@@ -290,10 +289,10 @@ impl TravelHooks for Hooks<'_> {
         }
         self.frames.push(frame);
     }
-    fn dungeon_location(&mut self, m: &mut Machine, id: u16, _bx: u16) {
+    fn dungeon_location(&mut self, m: &mut Machine, files: &mut Files, id: u16, _bx: u16) {
         let (x, y) = (m.mem.r16(DS, 0x193E), m.mem.r16(DS, 0x1940));
         let p = m.mem.r8(DS, SHOWN);
-        let ok = m.city_climate(&mut self.files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c));
+        let ok = m.city_climate(files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c));
         if ok.is_none() {
             self.failed = true;
         }
@@ -343,14 +342,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -369,7 +368,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
         // The window's colours read from black (1194:55B2's fade before).
         let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
             eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
@@ -421,14 +420,14 @@ impl Travel {
         std::mem::take(&mut self.boxes)
     }
 
-    fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None }
+    fn hooks<'a>(boxes: &'a mut Vec<Lines>) -> Hooks<'a> {
+        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded and its window
     /// opened, `Machine::travel_province_open`).
     fn show_province(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, p: u8) {
-        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let mut h = Self::hooks(&mut self.boxes);
         if engine.m.travel_province_open(&mut engine.files, &mut h, p, None).is_none() {
             eprintln!("the province's map gave up: {}", arena::giveup::describe());
         }
@@ -489,7 +488,7 @@ impl Travel {
         let b = m.mem.r8(DS, BUTTONS);
         m.mem.w8(DS, BUTTONS, down as u8);
         let shown = self.boxes.len();
-        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let mut h = Self::hooks(&mut self.boxes);
         h.screen = screen;
         if m.travel_click(&mut engine.files, &mut h).is_none() {
             eprintln!("the map's pass gave up: {}", arena::giveup::describe());
@@ -508,7 +507,7 @@ impl Travel {
         if self.shown.is_some() {
             self.province_close(engine);
         }
-        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let mut h = Self::hooks(&mut self.boxes);
         let carry = engine.m.travel_map_close(&mut h, self.start);
         let quest = h.quest;
         self.done = Some(carry);
@@ -649,7 +648,7 @@ impl Travel {
     fn travel(&mut self, engine: &mut Engine) {
         let mut copy = engine.m.clone();
         let mut scratch = Vec::new();
-        let mut h = Self::hooks(&mut scratch, &engine.files);
+        let mut h = Self::hooks(&mut scratch);
         let _ = copy.travel_go(&mut engine.files.clone(), &mut h);
         if h.asked {
             let m = &engine.m;
@@ -668,7 +667,7 @@ impl Travel {
     /// The journey made, the question's answer `answer` (0 Yes, 1 No,
     /// FFFFh none) given if asked.
     fn travel_answered(&mut self, engine: &mut Engine, answer: Option<u16>) {
-        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let mut h = Self::hooks(&mut self.boxes);
         h.answer = answer;
         let ok = engine.m.travel_go(&mut engine.files, &mut h);
         let failed = h.failed;
@@ -822,7 +821,7 @@ impl Travel {
     fn search(&mut self, engine: &mut Engine, typed: Vec<EditKey>, pick: Option<u16>) {
         let mut copy = engine.m.clone();
         let mut scratch = Vec::new();
-        let mut h = Self::hooks(&mut scratch, &engine.files);
+        let mut h = Self::hooks(&mut scratch);
         h.typed = typed.clone();
         h.pick = 0xFFFF;
         let _ = copy.travel_search(&mut engine.files.clone(), &mut h);
@@ -832,7 +831,7 @@ impl Travel {
             return;
         }
         let screen = self.page(engine, self.at);
-        let mut h = Self::hooks(&mut self.boxes, &engine.files);
+        let mut h = Self::hooks(&mut self.boxes);
         h.typed = typed;
         h.pick = pick.unwrap_or(0xFFFF);
         h.screen = screen;
