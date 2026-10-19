@@ -307,7 +307,7 @@ pub fn run_of(m: &Machine) -> Run {
 /// sounds hook is cleared after, as the view has no sound. Returns the
 /// loaded area's run, or what went wrong.
 pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
-    load_game_as(engine, dir, save, slot, false)
+    load_game_as(engine, dir, save, slot, false, false)
 }
 
 /// A saved game loaded from the title screen's Load (0000:119D sets 5C8
@@ -315,10 +315,20 @@ pub fn load_game(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Resu
 /// (`Machine::title_load`: the world loop entered afresh, the rebuild run
 /// as the 3D mode's hook).
 pub fn load_game_title(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
-    load_game_as(engine, dir, save, slot, true)
+    load_game_as(engine, dir, save, slot, true, true)
 }
 
-fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: bool) -> Result<Run, String> {
+/// The main menu's Load (0000:117E, its load menu's pick): the title's
+/// way (`load_game_title`), PAL.COL read to 929E before it
+/// (`Machine::title_load_setup`) and not again after, so 929E ends as
+/// the level's INF left it, as the original's does. (`load_game_title`
+/// reads it after, as screens.py's `start` has the game the worldframes
+/// cases begin from.)
+pub fn load_game_menu(engine: &mut Engine, dir: &Path, save: &Path, slot: u8) -> Result<Run, String> {
+    load_game_as(engine, dir, save, slot, true, false)
+}
+
+fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: bool, colours: bool) -> Result<Run, String> {
     NEW_GAME.with(|n| n.set(false));
     let mut e = Engine::new(engine.m.clone(), engine.files.clone());
     if title {
@@ -344,7 +354,7 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
     }
     // The load menu's way back (1194:5E87): PAL.COL read into 929E
     // (0000:7534), the screen's colours set from it.
-    if title {
+    if colours {
         e.m.colours_load(&mut e.files, 0x1304, 0x929E);
     }
     let run = run_of(&e.m);

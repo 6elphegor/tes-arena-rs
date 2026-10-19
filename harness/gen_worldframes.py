@@ -101,6 +101,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, STUB_SEG, fnv
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
+import unicorn.x86_const as x86
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 import gen_screens as gs
@@ -488,7 +489,7 @@ def died(a, vision=0):
 MENU_WAIT = 0x1114
 
 
-def titled(a):
+def titled(a, at=0x109B, stack=None, regs=None):
     """From the death's RET (`died`), the program's main on (0000:10AE's
     jump to 109B: 5B1 bit 100h, so 10B0 and 108B) through its menu's
     screens (10C9: the intro, 1246, then MENU.IMG) to the menu's wait
@@ -496,7 +497,9 @@ def titled(a):
     each run their course. Run from 109B on a stack of its own (the
     load's stack under the world's isn't main's). The timer (0151)
     ticks at each read of it (the movies' frames wait on it); the songs
-    left out as everywhere (2F9F:001F)."""
+    left out as everywhere (2F9F:001F). With `at`, `stack` and `regs`
+    from elsewhere in main on its own frame (gen_titleplay.py's program
+    start, 0000:1059)."""
     saved = a.stub(location=False)
     t = a.lin(a.ds, 0x0151)
 
@@ -504,17 +507,63 @@ def titled(a):
         a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
 
     def menu(mu, addr, size, _):
+        # The registers there kept for `menu_picked` (ES:SI the regions,
+        # CX their count; main's frame and stack).
+        a.menu_regs = {r: mu.reg_read(getattr(x86, 'UC_X86_REG_' + r.upper()))
+                       for r in ('eax', 'ebx', 'ecx', 'edx', 'esi', 'edi', 'ebp', 'es', 'ss', 'sp')}
         a.waiting = ('menu',)
         mu.emu_stop()
     hooks = [a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1),
              a.mu.hook_add(UC_HOOK_CODE, menu, None, a.lin(LOAD_SEG, MENU_WAIT), a.lin(LOAD_SEG, MENU_WAIT))]
     try:
-        r = a.run_screen(0, 0x109B, near=True, count=3_000_000_000)
+        r = a.run_screen(0, at, regs=regs, near=stack is None, stack=stack, count=3_000_000_000)
     finally:
         for h in hooks:
             a.mu.hook_del(h)
         a.unstub(saved)
     assert r == ('menu',), f'the way to the menu stopped by {r}'
+
+
+def menu_picked(a, script):
+    """From the menu's wait (`titled`, its registers kept), the program's
+    main on with `script` answering its waits for input (`run_screen`'s:
+    the menu's regions, 1194:5CF4; the load menu, 25FD:0242) until a
+    world loop is about to run its first frame (0000:A2AC: the title's
+    Load, 117E, into the loaded game), its stack kept for the frames
+    after (`area_next`'s). The timer (0151) doesn't tick here: nothing on
+    the way waits on it, and its one read (0000:4684, a title load's
+    copy to 884A) then takes it as the menu found it, as the port's
+    menu, which takes no time, leaves it."""
+    saved = a.stub(location=False)
+
+    def world(mu, addr, size, _):
+        a.world_stack = a.stack_kept()
+        a.waiting = ('world',)
+        mu.emu_stop()
+    at = a.lin(LOAD_SEG, 0xA2AC)
+    hooks = [a.mu.hook_add(UC_HOOK_CODE, world, None, at, at)]
+    regs = dict(a.menu_regs)
+    stack = (regs.pop('ss'), regs.pop('sp'))
+    a.waits = {MOUSE_READ}
+    a.script = list(script)
+    try:
+        r = a.run_screen(0, MENU_WAIT, regs=regs, stack=stack, count=3_000_000_000)
+    finally:
+        for h in hooks:
+            a.mu.hook_del(h)
+        a.unstub(saved)
+        a.waits = set()
+        a.script = []
+    assert r == ('world',), f'the menu went on to {r}'
+    a.menu_loaded = True
+
+
+def interface_digest(page):
+    """The interface's rows of the page (146 on) as a load from the menu
+    leaves them, the HUD's portrait, name and bars (columns 14..80) zeroed:
+    what of the page is the engine's there (worldtest's
+    `title_load_case`; the rest is the load menu's picture)."""
+    return fnv(bytes(0 if 14 <= i % 320 <= 80 else page[i] for i in range(146 * 320, 64000)))
 
 
 def serviced(seg, off, script):
@@ -1032,6 +1081,13 @@ CASES = {
     # 0000:109B, 10B0, 108B, 10C9: the intro's movies and pictures, then
     # MENU.IMG), stopped at the menu's wait for its regions.
     'playtitle': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'title': True})]),
+    # playtitle, then the menu's Load (its region clicked: 0000:117E, the song stopped, the
+    # game set up, 21EE:016C, the page cleared, PAL.COL's colours; the load
+    # menu, 25FD:0242) and slot 1's row picked: the game loaded the
+    # title's way (5C8 bit 4), stopped as its world loop is about to run
+    # its first frame (`menu_picked`).
+    'playtitleload': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'title': True,
+                                                                                    'menu': [('click', 160, 30), ('click', 160, 21)]})]),
     # The options screen's New between frames (`newgame`), then the frame
     # that ends the world loop for it, the outer loop's way out (0CDF, as
     # `died` stops at its RET, 0D43) and the program's main back to its
@@ -1226,6 +1282,7 @@ def run_case(a, at, name, setup, steps, tracks):
     a.clicks = []
     a.mouse = (160, 100)
     a.buttons = 0
+    a.menu_loaded = False
     if setup:
         setup(a)
     # The state the frames start from (for the state comparison's
@@ -1292,6 +1349,10 @@ def play(a, name, steps, tracks):
                 a.names = names
             if opts.get('title'):
                 titled(a)
+            if 'menu' in opts:
+                # (`menu`: the menu's inputs after `title`, on to the
+                # loaded game's first frame, `menu_picked`.)
+                menu_picked(a, opts['menu'])
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         clicked = any(act[0] in ('click', 'rclick') for act in opts.get('script', []))
@@ -1454,6 +1515,8 @@ def main():
         ems = b''.join(a.ems_bank(b) for b in range(0x20))
         out.write(state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
+        if a.menu_loaded:
+            out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
         # The 3D pixels from row 1 on: the topmost row of a ceiling reads
         # past its row table (DB78's last entry, the next heap block's

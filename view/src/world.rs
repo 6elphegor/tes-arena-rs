@@ -117,6 +117,21 @@ pub fn boot(dir: &Path) -> Engine {
     Engine::new(m, files)
 }
 
+/// The game as the original reaches its main menu's wait from the
+/// program's start (21EE:0000, then main from 0000:1059 with no
+/// arguments: `Machine::program_main`, the intro's movies and pictures run
+/// to their ends with no input): the state the menu's Load and New go on
+/// from (`App::title_engine`). None where the port can't follow it.
+pub fn title(dir: &Path) -> Option<Engine> {
+    let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).ok()?).ok()?;
+    let mut m = Machine::new(&image);
+    let mut files = Files::new(dir).ok()?;
+    m.memory_init()?;
+    m.program_start(&mut files, &mut arena::start::PortStart)?;
+    m.program_main(&mut files, &mut arena::title::NoTitleHooks)?;
+    Some(Engine::new(m, files))
+}
+
 /// Loads `level` (a .MIF) from the game in `dir` into an engine and
 /// enters it, as examples/play.rs does.
 pub fn load(dir: &Path, level: &str) -> Engine {

@@ -101,6 +101,59 @@ impl Machine {
         }
         let v = self.mem.r16(DS, 0x05CA) & 0x7FFF;
         self.mem.w16(DS, 0x05CA, v);
+        self.menu_screens(files, hooks)
+    }
+
+    /// 0000:1059..1089, main after the program's start (21EE:0000) with
+    /// no arguments, then on to its menu's wait (108B..1114,
+    /// `menu_screens`): the working slot (1194:3A51 with no "STA=" in the
+    /// environment), its digits and files (25FD:022A), the game's own
+    /// files copied to it (0219), and location 23h's record built at
+    /// 0A22 (1194:3AE8: the Imperial City's, 100h, for province 8; 3B84,
+    /// `city_location`). None where a file doesn't load or a path isn't
+    /// ported.
+    pub fn program_main(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
+        self.working_slot_main();
+        self.working_files_delete(files);
+        self.working_files_fresh(files);
+        if self.mem.r8(DS, 0x0A47) == 3 {
+            return crate::giveup::not_ported("1194:3AEF: a dungeon's location record at the program's start (3B0C)");
+        }
+        let id = if self.mem.r8(DS, 0x0A22 + 0x24) == 8 { 0x100 } else { 0x23 };
+        self.city_location(files, DS, 0x0A22, id)?;
+        self.menu_screens(files, hooks)
+    }
+
+    /// 1194:5CF4 (from 0000:1114) as the main menu's pick leaves it: B7C6
+    /// the region's index (0 Load, 1 Start, 2 Exit; counted as the
+    /// regions are tried, 5D34), and B7C4 bit 1, cleared as the loop
+    /// begins, set by the region's handler (3159:0006), which ends it.
+    /// The input's own state (the mouse's, the keys') is the front end's.
+    pub fn main_menu_pick(&mut self, region: u16) {
+        self.mem.w16(DS, 0xB7C6, region);
+        let v = self.mem.r8(DS, 0xB7C4) | 1;
+        self.mem.w8(DS, 0xB7C4, v);
+    }
+
+    /// 0000:117E..11A2, the main menu's Load before its load menu
+    /// (25FD:0242): the song stopped (2F9F:0438), the game set up
+    /// (21EE:016C), the page cleared (942A; shown, 946A, the front end's),
+    /// PAL.COL's colours read to 929E (7534; set, 9B56, the front end's),
+    /// 5C8 bit 4 set (the load the title's). None where a file doesn't
+    /// load or a path isn't ported.
+    pub fn title_load_setup(&mut self, files: &mut Files) -> Option<()> {
+        self.music_stop();
+        self.game_setup(&mut crate::start::SetupPort(files))?;
+        self.page_clear();
+        self.colours_load(files, 0x1304, 0x929E)?;
+        let v = self.mem.r16(DS, 0x05C8) | 4;
+        self.mem.w16(DS, 0x05C8, v);
+        Some(())
+    }
+
+    /// 0000:108B..1114: the texts' segment the EMS frame's, then the
+    /// menu's screens (10C9, see the module) up to its wait.
+    fn menu_screens(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
         let frame = self.mem.r16(DS, 0x9030);
         self.mem.w16(DS, 0xCB8A, frame);
         self.clip_whole();
