@@ -1680,6 +1680,12 @@ fn main() {
         engine.page = Some(vec![0; 64000]);
     }
     let mut app = make_app(dir, engine, run, creation, answers, save_dir, slot, play);
+    if create_script.is_some() && app.creation.is_some() {
+        // The menu's Load goes on from the game as the original's program
+        // start leaves it at the menu (`world::title`), not the start
+        // dungeon creation draws over.
+        app.title_engine = world::title(&app.dir);
+    }
     if let Some((turns, setup)) = bench {
         bench::run(&mut app, turns, &setup, started);
         return;
@@ -3254,7 +3260,7 @@ impl App {
             }
             create::Outcome::Load => {
                 // The load menu from the title (`saveui`), then the
-                // title-screen load (`areas::load_game_title`).
+                // title-screen load (`areas::load_game_menu`).
                 if self.save_dir.is_some() {
                     self.open_saveui(saveui::Kind::TitleLoad);
                 } else {
@@ -3742,7 +3748,7 @@ impl App {
 
     /// Slot `slot` of `dir` loaded on `engine`, the load menu's copy of
     /// the machine (in play `areas::load_game`, from the title
-    /// `load_game_title`), with the drawing of the engine it stands in
+    /// `load_game_menu`), with the drawing of the engine it stands in
     /// for, which the load carries on (`Engine::keep_drawing`) and a load
     /// that fails gives back.
     fn load_slot(&mut self, engine: &mut Engine, dir: &std::path::Path, slot: u8, title: bool) -> Result<arena::transit::Run, String> {
@@ -3752,7 +3758,7 @@ impl App {
             _ => &mut self.engine,
         };
         engine.keep_drawing(under);
-        let r = if title { areas::load_game_title(engine, &game, dir, slot) } else { areas::load_game(engine, &game, dir, slot) };
+        let r = if title { areas::load_game_menu(engine, &game, dir, slot) } else { areas::load_game(engine, &game, dir, slot) };
         if r.is_err() {
             let under = match (title, self.title_engine.as_mut()) {
                 (true, Some(t)) => t,
@@ -3778,7 +3784,7 @@ impl App {
 
     /// What the menu's last input ended in: still open, a slot to save
     /// (`save_to` on the engine after the menu), a slot to load
-    /// (in play `areas::load_game`, from the title `load_game_title`), or
+    /// (in play `areas::load_game`, from the title `load_game_menu`), or
     /// the menu left (a title's back to the main menu).
     fn saveui_ended(&mut self, e: saveui::Ended) {
         let Some(kind) = self.saveui.as_ref().map(|u| u.kind) else { return };

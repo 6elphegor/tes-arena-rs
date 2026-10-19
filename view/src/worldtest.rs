@@ -2529,6 +2529,66 @@ fn the_menus_load_after_a_death_as_the_original() {
     title_load_case("playtitleload");
 }
 
+/// tests/vectors/titleplay.txt (gen_titleplay.py): games begun from the
+/// program's own start.
+const TITLEPLAY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/titleplay.txt");
+
+/// The app as `--create` starts it (creation's main menu over the start
+/// dungeon, the title's state the original's program start leaves at the
+/// menu, `world::title`) with the save copy as its save folder, and its
+/// driver; None without the game or the save.
+fn started_at_menu() -> Option<(App, Driver, Scratch)> {
+    let dir = game_dir()?;
+    let Some(save) = save_copy() else {
+        eprintln!("skipping: no ARENA_SAVE");
+        return None;
+    };
+    let mut engine = world::load(&dir, "START.MIF");
+    let archive = Rc::new(archive::Archive::open(&dir));
+    let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
+    let mut a = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(save.to_path_buf()), 0, false);
+    a.title_engine = world::title(&dir);
+    assert!(a.title_engine.is_some(), "the program's start to its menu");
+    let d = Driver::new(&mut a);
+    Some((a, d, save))
+}
+
+/// `name`'s line of TITLEPLAY against the app's game: DGROUP whole (the
+/// harness's form, loadexclude.txt's offsets left out: `load_canonical`),
+/// the EMS banks whole, and the interface's rows of the page (as
+/// `title_load_case`'s).
+fn titleplay_compared(name: &str, a: &App) {
+    let text = std::fs::read_to_string(TITLEPLAY).expect(TITLEPLAY);
+    let want: Vec<&str> = text.lines().find_map(|l| l.strip_prefix(&format!("titleplay | {name} | "))).expect("a titleplay line").split(' ').collect();
+    let (ds, ems) = grab(a);
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let rows: Vec<u8> = (146 * 320..64000).map(|i| if (14..=80).contains(&(i % 320)) { 0 } else { page[i] }).collect();
+    if let Ok(d) = std::env::var("ARENA_STATE_DUMP") {
+        let d = PathBuf::from(d);
+        let _ = std::fs::write(d.join(format!("{name}.port.ds")), load_canonical(&a.dir, &ds));
+        let _ = std::fs::write(d.join(format!("{name}.port.ems")), &ems);
+    }
+    assert_eq!(format!("{:x}", fnv(load_canonical(&a.dir, &ds))), want[0], "{name}: DGROUP differs from the original's");
+    assert_eq!(format!("{:x}", fnv(ems)), want[1], "{name}: the EMS banks differ from the original's");
+    assert_eq!(format!("{:x}", fnv(rows)), want[2], "{name}: the interface differs from the original's");
+}
+
+/// The program started, its main on to the menu (`world::title`), the
+/// menu's Load (`startload`: its pick, 117E's set-up, the load menu) and
+/// slot 1's row: the game loaded the title's way, where its world loop is
+/// about to run its first frame, as the original's.
+#[test]
+fn the_menus_load_at_the_start_as_the_original() {
+    let Some((mut a, mut d, _save)) = started_at_menu() else { return };
+    a.open_saveui(crate::saveui::Kind::TitleLoad);
+    assert!(a.saveui.is_some(), "the title's load menu");
+    d.click(&mut a, 160, 21, MouseButton::Left);
+    assert!(a.saveui.is_none() && a.title_engine.is_none() && a.creation.is_none(), "loaded");
+    titleplay_compared("startload", &a);
+}
+
 /// A case that ends where a game the title's Load loaded is about to run
 /// its first frame: its track, DGROUP from the case's start and from the
 /// load, the EMS banks, and the interface's rows of the page (see
