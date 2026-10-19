@@ -72,8 +72,8 @@ pub trait DigitalDriver {
 /// AIL calls 23BA:002A and the others make), a test's from the original
 /// driver's (gen_soundplay.py's `driver` lines): its status answers
 /// (7Ch) taken in turn, and every call the sounds make kept in the
-/// lines' form (`7C=3`, `7B:ffff:DIGEST` the FFDCh bytes of the buffer
-/// played, `81:VOLUME`, `7D`, `7E`, `85:HANDLE:SEG:OFF`).
+/// lines' form (`7C=3`, `7B:ffff:DIGEST` the buffer played, its 4E20h
+/// bytes, `81:VOLUME`, `7D`, `7E`, `85:HANDLE:SEG:OFF`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Replay {
     pub answers: std::collections::VecDeque<u16>,
@@ -138,11 +138,12 @@ impl Machine {
         }
     }
 
-    /// 0FFD:0D46 (7Bh) kept: the VOC file at `seg`:`off` played from its
-    /// start (block FFFFh), its FFDCh bytes' digest as the lines have it.
+    /// 0FFD:0D46 (7Bh) kept: the sound buffer at `seg`:`off` played from
+    /// its start (block FFFFh), the digest of its 4E20h bytes (its size,
+    /// 21EE:000E) as the lines have it.
     pub fn digital_play_voc(&mut self, seg: u16, off: u16) {
         self.digital_call(|m| {
-            let h = (0..0xFFDCu16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ m.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3));
+            let h = (0..0x4E20u16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ m.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3));
             format!("7B:ffff:{h:x}")
         });
     }

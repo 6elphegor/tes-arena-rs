@@ -3395,7 +3395,12 @@ fn the_sounds_play_as_the_original() {
         }
         SOUND_CASE.with(|c| *c.borrow_mut() = Some(name.into()));
         let (place, setup, play) = case(name).unwrap();
-        let Some((a, seen)) = played(place, setup, play) else {
+        // (On a page, as the state's comparison has it: the frames' drawing
+        // runs, as the original's.)
+        let Some((a, seen)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a);
+        }, play) else {
             SOUND_CASE.with(|c| c.borrow_mut().take());
             return;
         };

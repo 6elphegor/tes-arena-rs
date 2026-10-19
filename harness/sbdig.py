@@ -70,10 +70,14 @@ AIL_SEG = 0x0FFD
 AIL_CALLS = {0x0D46: '7B', 0x0D58: '7D', 0x0D52: '7C', 0x0D5E: '7E'}
 # And with `Blaster(more=True)` (the sounds' cases, gen_soundplay.py): 85h
 # a VOC file formatted (23BA:0217's, 01C7's) and 81h the volume set
-# (23BA:002A's).
+# (23BA:002A's); 7Bh's digest then the buffer's own (SOUND_BUFFER_BYTES).
 MORE_CALLS = {0x0D4C: '85', 0x0D70: '81'}
 # The digital driver's sound buffer, as 2F75:00DC hands it: FFDCh bytes.
 BUFFER_BYTES = 0xFFDC
+# The buffer's own size (21EE:000E allocates 4E20h bytes; the speech's
+# FFDCh run on into the next heap block, the screen's page): `more`'s 7Bh
+# digests it (23BA:002A's samples are copied into it).
+SOUND_BUFFER_BYTES = 0x4E20
 
 
 class Blaster:
@@ -359,7 +363,7 @@ class Blaster:
         ret = (words[1], words[0])
         if fn == '7B':
             off, seg, block = words[3], words[4], words[5]
-            data = bytes(mu.mem_read(seg * 16 + off, BUFFER_BYTES))
+            data = bytes(mu.mem_read(seg * 16 + off, SOUND_BUFFER_BYTES if self.more else BUFFER_BYTES))
             self.calls.append(f'7B:{block:x}:{fnv(data):x}')
         elif fn == '85':
             # The handle and the far pointer as pushed (23BA:02C6 pushes
