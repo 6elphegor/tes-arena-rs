@@ -95,6 +95,12 @@ pub trait SpellmakerHooks {
     fn picture(&self) -> bool {
         true
     }
+    /// Whether 68D7 keeps the name's background (8F26 into [A890]) and
+    /// draws its texts (9E06) on the game's page (`Machine::sm_screen`'s
+    /// `texts`): by default as the port does them.
+    fn texts(&self) -> bool {
+        true
+    }
     /// 0000:9AE6 (`tiles` false: the font, B036) or 9AF8 (true: the boxes'
     /// tiles, B038) with AX `ax`: by default as the port does them
     /// (`Machine::font_selected`).
@@ -116,7 +122,7 @@ pub trait SpellmakerHooks {
     fn screen(&mut self, _m: &mut Machine) {}
     /// An effect's form shown (1194:6105), its record at DATA:`form`.
     fn form(&mut self, _m: &mut Machine, _form: u16) {}
-    /// 29CF:06CB's write (25FD:0844, 0000:9DD2): the spells' file named
+    /// 29CF:06CB's write (0000:9DD2, after its path is made): the spells' file named
     /// at DS:`name` with DATA:2A80's AA0h bytes.
     fn spells_write(&mut self, m: &mut Machine, files: &mut Files, name: u16) {
         m.file_write(files, name, DATA, var::SPELLS, 0xAA0);
@@ -567,7 +573,7 @@ impl Machine {
 
     /// 1194:68D7: the screen (its numbers written as it draws them).
     fn sm_draw(&mut self, files: &mut Files, hooks: &mut dyn SpellmakerHooks) -> Option<()> {
-        self.sm_screen(files, hooks.picture())?;
+        self.sm_screen(files, hooks.picture(), hooks.texts())?;
         hooks.screen(self);
         // DI at the casting cost's NUL, where its 7052 left it (69E5: the
         // texts' drawing after it, 5585 and 9466 keep DI).
@@ -590,9 +596,16 @@ impl Machine {
     /// 101D FFh, or 5792 with 1001 FFh: SPELLMKR.IMG, BUYSPELL.IMG,
     /// CHARSPEL.IMG) loaded into bank [1032] and drawn (5C86, 56C8 with BX
     /// 4), the bank before mapped again; the spellmaker's as its hook
-    /// says (`SpellmakerHooks::picture`). The name's background kept (8F26 into [A890]) and the
-    /// texts' drawing (9E06) are the front end's.
-    pub(crate) fn sm_screen(&mut self, files: &mut Files, picture: bool) -> Option<()> {
+    /// says (`SpellmakerHooks::picture`). With `texts`, the name's
+    /// background kept (8F26: 83h by 9 at (45h, 30h) into [A890]) and the
+    /// texts drawn (9E06, into the page where it is the game's own block):
+    /// the effects (`sm_effects_list`), the name at (45h, 2Fh) (30h with
+    /// 1001 FFh), the element at (F4h, 30h), the gold at (F0h, 17h), the
+    /// player's name at (2Dh, 17h), the level at (2Eh, 21h), the cost
+    /// doubled at (FAh, 21h), the casting cost at (104h, 3Bh) and the
+    /// target at (32h, 3Bh); the spellmaker's as its hook says
+    /// (`SpellmakerHooks::texts`).
+    pub(crate) fn sm_screen(&mut self, files: &mut Files, picture: bool, texts: bool) -> Option<()> {
         self.sm_no_element();
         self.mem.w8(DS, COLOUR, 0xA0);
         if picture {
@@ -608,13 +621,29 @@ impl Machine {
             self.sheet_image_here(files, si)?;
             self.map_bank(old, 0);
         }
-        self.sm_effects_list(files)?;
+        let text = |m: &mut Machine, x: u16, y: u16, si: u16| {
+            if texts {
+                m.page_text_at(x, y, (DS, si));
+            }
+        };
+        if texts {
+            let back = self.sg16(NAME_BACK);
+            self.page_rect_save((back, 0), 0x45, 0x30, 0x83, 9);
+        }
+        self.sm_effects_list(files, texts)?;
+        let y = if self.sg8(0x1001) == 0xFF { 0x30 } else { 0x2F };
+        text(self, 0x45, y, NAME);
+        let element = self.skip_strings_at(0x566F, self.sg8(ELEMENT) as u16);
+        text(self, 0xF4, 0x30, element);
         // The gold (75B0) and the level (7052).
         let gold = self.mem.r32(DS, GOLD);
         self.mem.w32(DS, BUF, gold);
         self.dun_ultoa(gold, BUF);
+        text(self, 0xF0, 0x17, BUF);
+        text(self, 0x2D, 0x17, 0x01AD);
         let level = self.sg16(LEVEL);
         self.sm_itoa(level, BUF);
+        text(self, 0x2E, 0x21, BUF);
         let (ax, bx) = if self.sg8(0x1001) == 0xFF || self.sg8(0x101D) == 0xFF {
             let ax = self.sg16(COST);
             (ax, ax / self.sg16(LEVEL).max(1))
@@ -622,7 +651,11 @@ impl Machine {
             self.sm_cost()
         };
         self.sm_itoa(ax.wrapping_add(ax), BUF);
+        text(self, 0xFA, 0x21, BUF);
         self.sm_itoa(bx, BUF);
+        text(self, 0x104, 0x3B, BUF);
+        let target = self.skip_strings_at(TARGET_NAMES, self.sg8(TARGET) as u16);
+        text(self, 0x32, 0x3B, target);
         let f = self.sg16(0xA902) & 0xFFFE;
         self.mem.w16(DS, 0xA902, f);
         Some(())
@@ -639,8 +672,10 @@ impl Machine {
     }
 
     /// 1194:6C97: the effects listed with their descriptions (A874 the
-    /// line; 585B each in turn, then put back).
-    fn sm_effects_list(&mut self, files: &mut Files) -> Option<()> {
+    /// line; 585B each in turn, then put back), with `texts` each line
+    /// drawn at x 12h (9E06): the effect's name, then its description's
+    /// lines from 1044.
+    fn sm_effects_list(&mut self, files: &mut Files, texts: bool) -> Option<()> {
         self.mem.w16(DS, 0xA874, 0x52);
         let saved = self.slot();
         self.mem.w16(DS, SLOT, 0);
@@ -649,6 +684,10 @@ impl Machine {
             let e = self.sg8(si) as u16;
             if e != 0xFF {
                 self.sm_effect_name(si, BUF);
+                if texts {
+                    let y = self.sg16(0xA874);
+                    self.page_text_at(0x12, y, (DS, BUF));
+                }
                 let y = self.sg16(0xA874).wrapping_add(0xA);
                 self.mem.w16(DS, 0xA874, y);
                 let mut bx = self.sg16(0x5471u16.wrapping_add(e.wrapping_add(e)));
@@ -657,6 +696,31 @@ impl Machine {
                     bx = self.sg8(bx.wrapping_add(k)) as u16;
                 }
                 let lines = self.sm_description(files, bx)?;
+                if texts {
+                    if lines == 0 {
+                        return crate::giveup::original("1194:6CF1: a description of no lines draws 65536 of them");
+                    }
+                    // Each line drawn, then the next found past its NUL
+                    // (6D07: at most 3E8h bytes on).
+                    let mut at = 0x1044u16;
+                    for _ in 0..lines {
+                        let y = self.sg16(0xA874);
+                        self.page_text_at(0x12, y, (DS, at));
+                        self.mem.w16(DS, 0xA874, y.wrapping_add(0xA));
+                        let mut k = 0u16;
+                        while k < 0x3E8 {
+                            let b = self.sg8(at);
+                            at = at.wrapping_add(1);
+                            k += 1;
+                            if b == 0 {
+                                break;
+                            }
+                        }
+                    }
+                    let s = self.slot().wrapping_add(1);
+                    self.mem.w16(DS, SLOT, s);
+                    continue;
+                }
                 // A line each (0: 65536 of them), the line moving 0Ah.
                 let n = if lines == 0 { 0x10000u32 } else { lines as u32 };
                 let y = self.sg16(0xA874).wrapping_add((n * 0xA) as u16);
@@ -1507,10 +1571,12 @@ impl Machine {
         self.mem.w32(DS, GOLD, gold);
         say(self, hooks, INSCRIBED);
         // 29CF:06CB: the spells' file named by the slot (1A6C's digits at
-        // 7F1E) and written.
+        // 7F1E), its path made (25FD:0844, which flips the paths' toggle)
+        // and written (9DD2).
         let slot_no = self.sg8(0x1A6C);
         self.mem.w8(DS, 0x7F1E, b'0' + slot_no / 10);
         self.mem.w8(DS, 0x7F1F, b'0' + slot_no % 10);
+        self.save_path(0x7F17);
         hooks.spells_write(self, files, 0x7F17);
         self.sm_clear();
         self.sm_draw(files, hooks)

@@ -817,6 +817,31 @@ fn chest_ahead(a: &mut App) {
     seeded(a);
 }
 
+/// gen_worldframes.py's `open_ahead(brought(1))`: `fought`, then the walls
+/// plane cleared for three rows north of the player's square, a column
+/// either side.
+fn fought_in_the_open(a: &mut App) {
+    fought(a);
+    let m = &mut a.engine.m;
+    let (col, row) = (m.mem.r16(DS, arena::movement::var::X) >> 7, m.mem.r16(DS, arena::movement::var::Y) >> 7);
+    let walls = m.mem.r16(DS, 0xD806);
+    for r in row + 1..row + 4 {
+        for c in col - 1..col + 2 {
+            m.mem.w16(walls, (r << 8) + (c << 1), 0);
+        }
+    }
+}
+
+/// gen_worldframes.py's `chest_picking`:`chest_ahead`'s chest with no Open
+/// spell waiting and picking armed (5CA bit 0) instead.
+fn chest_picking(a: &mut App) {
+    chest_ahead(a);
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, 0x0DC4, 0);
+    let f = m.mem.r16(DS, 0x05CA);
+    m.mem.w16(DS, 0x05CA, f | 1);
+}
+
 /// A step of gen_worldframes.py's with a click at the view's centre and
 /// `script` for its waits, `n` frames in all: the button down for the
 /// first frame, let go for the next; the frame that takes the click (the
@@ -1494,6 +1519,18 @@ fn case(name: &str) -> Option<Case> {
             clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::RClick(0x60, 0x25)]);
             frames(a, d, seen, 5, |_| false);
         })),
+        "playchestpick" => (Place::Dungeon, Box::new(chest_picking), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The click that tries the lock (292B:0743, 1194:53F9), 4 on
+            // as the harness's lands (CB60).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 7, |_| false);
+        })),
+        "playlootwild" => (Place::Wild, Box::new(fought), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, false))),
+        "playlootstreet" => (Place::Street, Box::new(fought_in_the_open), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, false))),
         "playpile" => (Place::Dungeon, Box::new(pile_ahead), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::RClick(0x60, 0x25)]);
@@ -3114,7 +3151,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 88] = ["playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY: [&str; 91] = ["playchestpick", "playlootwild", "playlootstreet", "playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3224,16 +3261,13 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-/// (playspellmaker's state is left out: its track, the files it writes and
-/// the spell made match, but DGROUP's 1B47 and bank 1Fh's copy of the page
-/// don't: the spellmaker's texts (9E06) are drawn by the front end, not on
-/// the game's page, which the bank keeps.)
-const BUSY_STATE: [&str; 92] = ["playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+/// (playspellmaker's EMS banks are left out: `EMS_LEFT_OUT`.)
+const BUSY_STATE: [&str; 96] = ["playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
 /// WALLS_CASES).
-const WALLS_CASES: [&str; 7] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playopen"];
+const WALLS_CASES: [&str; 8] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playchestpick", "playopen"];
 
 /// Those cases leave the walls plane ([D806], the level's width by its
 /// depth in words, C357, C359) as the original's do: the riddle's door
@@ -3321,10 +3355,18 @@ fn one_case_leaves_the_state_as_the_original() {
 /// (`state_ems_case`).
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
-    for name in BUSY_STATE {
+    for name in BUSY_STATE.into_iter().filter(|n| !EMS_LEFT_OUT.contains(n)) {
         state_ems_case(name);
     }
 }
+
+/// Busy cases whose DGROUP is compared but not their EMS banks:
+/// playspellmaker's bank 1Fh keeps the page as the effect's form finds it
+/// (1194:6B6A), and on the original's page by then are the effects
+/// list's window (1194:5734's box and lines, x 59h..E5h from row 54h)
+/// and the name the line editor drew (9EE5 at (45h, 30h)), both drawn
+/// by the front end here, not on the game's page.
+const EMS_LEFT_OUT: [&str; 1] = ["playspellmaker"];
 
 /// The player killed in the dungeon (`playdeath`): the frame that ends the
 /// world loop, then the outer loop's death (0000:0CE1..0D43, the save's

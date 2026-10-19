@@ -222,7 +222,7 @@ impl Machine {
         let level = (self.mem.r8(DS, 0x01AA) as u16).wrapping_add(1);
         self.mem.w16(DS, crate::spellmaker::var::PLAYER, level);
         self.mem.w16(DS, crate::spellmaker::var::LEVEL, level);
-        self.sm_screen(files, true)?;
+        self.sm_screen(files, true, true)?;
         hooks.page(self);
         self.mem.w16(DS, var::BLOCK, seg);
         self.mem.w8(DS, var::OWN, 0);
