@@ -72,6 +72,15 @@ const VILLAGES: u16 = 0x15D5;
 const DUNGEONS: u16 = 0x1765;
 const RECORD: u16 = 0x19;
 
+/// A province map's marker as 26F7:071F draws it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Marker {
+    /// A dungeon's: the 16h by 11h box at (x, y) remapped (9D84).
+    Remap(u16, u16),
+    /// The picture at seg:si, its header's place set (5828).
+    Picture(u16, u16),
+}
+
 /// What the travel map leaves to the front end.
 pub trait TravelHooks: ClockHooks {
     /// 1194:5E1D then 59C8: a message box with the text at `seg`:`si`.
@@ -108,6 +117,20 @@ pub trait TravelHooks: ClockHooks {
     fn animation(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         let (seg, off) = (m.mem.r16(DS, 0x9030), m.mem.r16(DS, 0x902E));
         m.file_load(files, 0x4096, seg, off).map(|_| ())
+    }
+    /// 26F7:0676..06CE: the nearest place's name labelled over it on the
+    /// page, `above` rows up (`Machine::travel_label`).
+    fn label(&mut self, m: &mut Machine, above: u16) {
+        m.travel_label(above);
+    }
+    /// 26F7:071F's drawing: a dungeon's box remapped (9D84,
+    /// `Machine::marker_remap`) or the marker's picture drawn at the place
+    /// its header was given (5828, `Machine::page_image`).
+    fn marker(&mut self, m: &mut Machine, marker: Marker) {
+        match marker {
+            Marker::Remap(x, y) => m.marker_remap(x, y),
+            Marker::Picture(seg, si) => m.page_image(seg, si),
+        }
     }
     /// 0000:5526 then 9466: frame `frame` of the travel animation drawn.
     fn animation_frame(&mut self, _m: &mut Machine, _frame: u8) {}

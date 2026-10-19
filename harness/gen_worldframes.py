@@ -457,6 +457,52 @@ def locked_door(a):
     a.mu.mem_write(a.lin(a.ds, 0xC6E4), bytes([n + 1]))
 
 
+def bowed(a):
+    """The player's equipped weapon (the first of the forty slots at 0212h,
+    13h bytes each, whose flags, +0Eh, have 80h, equipped, and the
+    weapon's category, (flags & 0Ch) >> 2 = 1) made a short bow (type 10h:
+    a base type past 0Fh, class 6), and the weapon class (0D49) made 6 as
+    1194:7316 would make it: the frame's 3C4C loads the bow's hands."""
+    for i in range(40):
+        at = 0x0212 + 0x13 * i
+        f = a.mu.mem_read(a.lin(a.ds, at + 0x0E), 1)[0]
+        if f & 0xC0 == 0xC0 and (f & 0x0C) >> 2 == 1:
+            a.mu.mem_write(a.lin(a.ds, at), b'\x10')
+            break
+    else:
+        raise AssertionError('no weapon equipped')
+    a.mu.mem_write(a.lin(a.ds, 0x0D49), b'\x06')
+
+
+# The keys held (0652, 0Ch bytes, C5h none): the first and the fifth.
+KEYS_HELD = bytes([1, 5]) + bytes([0xC5] * 10)
+
+
+def keyed(a):
+    """The player holding KEYS_HELD: 0000:4D2F draws each."""
+    a.mu.mem_write(a.lin(a.ds, 0x0652), KEYS_HELD)
+
+
+# An effect's words (1405, up to 23h bytes) and their count (1428).
+EFFECT_WORDS = b'You feel better.\0'
+
+
+def worded(a):
+    """An effect's words up (EFFECT_WORDS at 1405, their count 0Fh at
+    1428, as an effect leaves them): 0000:5011 draws them over the view's
+    foot each frame."""
+    a.mu.mem_write(a.lin(a.ds, 0x1405), EFFECT_WORDS)
+    a.mu.mem_write(a.lin(a.ds, 0x1428), b'\x0f')
+
+
+def boated(a):
+    """gen_screens.py's `boatprow`: a boat's record at FFE0h at the
+    player's place, boarded (2294:0DD0, SI FFE0h): BOATPROL.IMG in the
+    hands' bank, 5CA bit 10h, the prow drawn each frame (0000:395E)."""
+    gs.boat(a)
+    a.call_far(0x2294, 0x0DD0, esi=0xFFE0)
+
+
 def riddle_door(a):
     """gen_screens.py's `riddled` on the player's square, and one of the
     level's triggers (C624, C6E4 of them: the square, the trigger's
@@ -1134,6 +1180,17 @@ CASES = {
     # drawing it as playfight's): the hands drawn into the page (0000:38CE's
     # 3B8E) which the sheet saves to SCREENSV.$$2 (A611).
     'playsheetready': ('dungeon', None, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # The sheet opened while the interface draws what no other case
+    # saves: the bow readied (`bowed`), the casting hands a frame after
+    # Wizard's Fire's target is clicked, the boat's prow (`boated`, in the
+    # street), two keys held (`keyed`), the crypt's text (as playcrypt
+    # walks to it), an effect's words (`worded`).
+    'playbowsheet': ('dungeon', bowed, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playcastsheet': ('dungeon', casting(1, WIZARDS_FIRE), [((), (), 2, None), ((), (), 3, None, [(160, 100)]), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playboatsheet': ('street', boated, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playkeyssheet': ('dungeon', keyed, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playtextsheet': ('crypt', facing(0x100), [((UP,), (), 20, text_shown), ((KEY_F1,), (UP,), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    'playeffectsheet': ('dungeon', worded, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
     'playlogend': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)], 'ends': True})]),
     'playautomapend': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}, 'ends': True})]),
     'playbookend': ('dungeon', None, [((), (), 2, None), ((KEY_C,), (), 1, None, [], {'script': [('rclick', 0xF0, 0xA0)], 'ends': True})]),
@@ -1155,6 +1212,12 @@ CASES = {
     # the frame Esc opened the screen in, which runs on to its end.
     'playoptionsload': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('up', [KEY_ESC]), ('click', 96, 132), ('click', 160, 21)], 'ends': True})]),
     'playmapend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # playmapend with the search (gen_screens.py's worldsearchgo): High
+    # Rock's map, Search (43, 175), a name none starts (z, Enter), the
+    # province's places listed (1194:5734, kind 8) and its second line
+    # (Daggerfall) clicked twice, the journey's box read (a click), the
+    # province left (Exit, 80, 180) and the world map by Esc.
+    'playsearchend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('click', 70, 45), ('click', 43, 175), ('keys', [0x2C]), ('keys', [KEY_ENTER]), ('click', 110, 46), ('click', 110, 46), ('click', 110, 46), ('click', 80, 180), ('keys', [KEY_ESC])], 'ends': True})]),
     'playjourneyend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL + [('keys', [KEY_SPACE])] * 4, 'leaves': True, 'ends': True})]),
     'playnewend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 32, 132)], 'dies': True, 'title': True})]),
     # The first level's up stairs (row 10, column 42: byte 1Dh) walked

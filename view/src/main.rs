@@ -424,6 +424,15 @@ impl ControlHooks for Front<'_> {
         m.wild_shift(files, &mut arena::wild::PortWild)
     }
 }
+/// The game's draw page ([A900], FA00h bytes), where it is the game's own
+/// block: it holds what the original's does (the 3D view, the interface,
+/// the hands, compass and message line the engine draws), which the boxes
+/// and lists cover. None where the page isn't (the view's composition
+/// stands in).
+fn game_page(m: &arena::machine::Machine) -> Option<Vec<u8>> {
+    let seg = m.mem.r16(arena::mem::DS, 0xA900);
+    m.page_is_block().then(|| m.mem.segment(seg)[..0xFA00].to_vec())
+}
 impl arena::weapon::WeaponHooks for Front<'_> {
     /// A building broken into by the swing.
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -644,7 +653,9 @@ impl arena::frame::FrameHooks for Front<'_> {
     /// compass (4D7C, from 4957) drawn, which the boxes and lists a click
     /// opens cover.
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
-        if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
+        if let Some(page) = game_page(m) {
+            self.drawn = Some(page);
+        } else if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
             i.frame_body_on(page, m);
         }
         m.actor_click(files, self)
@@ -652,10 +663,15 @@ impl arena::frame::FrameHooks for Front<'_> {
     /// 0000:0511: the message line drawn on the frame's page (`drawn`),
     /// where the boxes and lists a click opens find it.
     fn message_draw(&mut self, m: &mut arena::machine::Machine) {
-        if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
-            i.message_on(page, m);
+        if game_page(m).is_none() {
+            if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
+                i.message_on(page, m);
+            }
         }
         m.message_line_draw();
+        if let Some(page) = game_page(m) {
+            self.drawn = Some(page);
+        }
     }
     /// 1194:4635: a frame of rest, while resting.
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
@@ -907,7 +923,13 @@ impl EngineHooks for Front<'_> {
     /// comes after the frame body's screens and clicks) over the screen
     /// last shown, as the original's page holds them from then in the
     /// frame (its interface; none of the view's HUD).
-    fn drawn(&mut self, _m: &mut arena::machine::Machine, page: &[u8]) {
+    fn drawn(&mut self, m: &mut arena::machine::Machine, page: &[u8]) {
+        // The game's own page holds the original's (`page_view_put` has
+        // just put the view there, over its interface).
+        if let Some(p) = game_page(m) {
+            self.drawn = Some(p);
+            return;
+        }
         if let Some(shown) = self.shown {
             let mut s = shown.to_vec();
             let n = ((VIEW_ROWS + 1) * 320).min(s.len()).min(page.len());

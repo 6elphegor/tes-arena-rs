@@ -222,20 +222,20 @@ the original routine:
 | `MenuKeyHooks::cyber_button` | src/menukeys.rs:96 | 2F26:04E2 | original | no CyberMan: never down | |
 | `MenuKeyHooks::cyber_buttons` | src/menukeys.rs:100 | 2F26:03ED | original | no CyberMan: none | |
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
-| `NewGameHooks::creation_done` | src/newgame.rs:150 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
-| `NewGameHooks::faded` | src/newgame.rs:139 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
-| `NewGameHooks::game_screen` | src/newgame.rs:154 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `NewGameHooks::hands` | src/newgame.rs:159 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
-| `NewGameHooks::level_flats` | src/newgame.rs:164 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
-| `NewGameHooks::message_box` | src/newgame.rs:99 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
-| `NewGameHooks::palette` | src/newgame.rs:129 | 1194:1695 | present | the attribute screen's palette | |
-| `NewGameHooks::parchment_drop` | src/newgame.rs:133 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
-| `NewGameHooks::resources` | src/newgame.rs:157 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
-| `NewGameHooks::roll_picture` | src/newgame.rs:113 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
-| `NewGameHooks::roll_screen` | src/newgame.rs:122 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
-| `NewGameHooks::sheet_keep` | src/newgame.rs:144 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
-| `NewGameHooks::spells` | src/newgame.rs:161 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
-| `NewGameHooks::stats_screen` | src/newgame.rs:107 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
+| `NewGameHooks::creation_done` | src/newgame.rs:152 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
+| `NewGameHooks::faded` | src/newgame.rs:141 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
+| `NewGameHooks::game_screen` | src/newgame.rs:156 | 2294:11F2 | present | 2294:11F2, the heap check | |
+| `NewGameHooks::hands` | src/newgame.rs:161 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
+| `NewGameHooks::level_flats` | src/newgame.rs:166 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
+| `NewGameHooks::message_box` | src/newgame.rs:101 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
+| `NewGameHooks::palette` | src/newgame.rs:131 | 1194:1695 | present | the attribute screen's palette | |
+| `NewGameHooks::parchment_drop` | src/newgame.rs:135 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
+| `NewGameHooks::resources` | src/newgame.rs:159 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::roll_picture` | src/newgame.rs:115 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
+| `NewGameHooks::roll_screen` | src/newgame.rs:124 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
+| `NewGameHooks::sheet_keep` | src/newgame.rs:146 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
+| `NewGameHooks::spells` | src/newgame.rs:163 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
+| `NewGameHooks::stats_screen` | src/newgame.rs:109 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
 | `NoteHooks::restore` | src/mapnotes.rs:60 | 0000:3698 | present | the screen region put back | |
@@ -380,26 +380,28 @@ the original routine:
 | `TextHooks::menu` | src/text.rs:54 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `TextHooks::message_box` | src/text.rs:43 | 1194:59CC | overridden | the view: main.rs Front<'_>, panels.rs Said | present: the game's box (screens.txt) |
 | `TextHooks::message_box_far` | src/text.rs:47 | 1194:59CC | overridden | the view: panels.rs Said | present: the special item's box (screens.txt) |
-| `TravelHooks::advance` | src/travelmap.rs:116 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `TravelHooks::animation` | src/travelmap.rs:108 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
-| `TravelHooks::animation_frame` | src/travelmap.rs:113 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
-| `TravelHooks::arrival_delete` | src/travelmap.rs:141 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::arrival_log` | src/travelmap.rs:132 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
-| `TravelHooks::arrival_text` | src/travelmap.rs:137 | 1194:A36C | port | the default runs the port | |
-| `TravelHooks::arrival_write` | src/travelmap.rs:146 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::bank` | src/travelmap.rs:93 | 0000:5C86 | port | the default runs the port | |
-| `TravelHooks::close` | src/travelmap.rs:160 | 3159:0006 | present | the map's window closed | |
-| `TravelHooks::days` | src/travelmap.rs:102 | 1194:2E69 | port | the default runs the port | |
-| `TravelHooks::dungeon_location` | src/travelmap.rs:129 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
-| `TravelHooks::journey_stub` | src/travelmap.rs:156 |  | stub | a test's stand-in | |
-| `TravelHooks::location` | src/travelmap.rs:127 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
-| `TravelHooks::message_box` | src/travelmap.rs:78 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
-| `TravelHooks::pick_stub` | src/travelmap.rs:151 |  | stub | a test's stand-in | |
-| `TravelHooks::province` | src/travelmap.rs:121 | 1194:2E14 / 2E18 | port | the default runs the port | |
-| `TravelHooks::question` | src/travelmap.rs:80 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
-| `TravelHooks::resource` | src/travelmap.rs:89 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
-| `TravelHooks::screen` | src/travelmap.rs:85 |  | present | a fade | |
-| `TravelHooks::show_bank` | src/travelmap.rs:97 | 1194:4D74 | present | a screen bank shown | |
+| `TravelHooks::advance` | src/travelmap.rs:139 | 0000:142D | stub | false: the game's clock runs the minutes | |
+| `TravelHooks::animation` | src/travelmap.rs:117 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
+| `TravelHooks::animation_frame` | src/travelmap.rs:136 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
+| `TravelHooks::arrival_delete` | src/travelmap.rs:164 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::arrival_log` | src/travelmap.rs:155 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
+| `TravelHooks::arrival_text` | src/travelmap.rs:160 | 1194:A36C | port | the default runs the port | |
+| `TravelHooks::arrival_write` | src/travelmap.rs:169 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::bank` | src/travelmap.rs:102 | 0000:5C86 | port | the default runs the port | |
+| `TravelHooks::close` | src/travelmap.rs:183 | 3159:0006 | present | the map's window closed | |
+| `TravelHooks::days` | src/travelmap.rs:111 | 1194:2E69 | port | the default runs the port | |
+| `TravelHooks::dungeon_location` | src/travelmap.rs:152 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
+| `TravelHooks::journey_stub` | src/travelmap.rs:179 |  | stub | a test's stand-in | |
+| `TravelHooks::label` | src/travelmap.rs:123 | 26F7:0676 | port | the default runs the port | |
+| `TravelHooks::location` | src/travelmap.rs:150 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
+| `TravelHooks::marker` | src/travelmap.rs:129 | 26F7:071F | port | the default runs the port | |
+| `TravelHooks::message_box` | src/travelmap.rs:87 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
+| `TravelHooks::pick_stub` | src/travelmap.rs:174 |  | stub | a test's stand-in | |
+| `TravelHooks::province` | src/travelmap.rs:144 | 1194:2E14 / 2E18 | port | the default runs the port | |
+| `TravelHooks::question` | src/travelmap.rs:89 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
+| `TravelHooks::resource` | src/travelmap.rs:98 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
+| `TravelHooks::screen` | src/travelmap.rs:94 |  | present | a fade | |
+| `TravelHooks::show_bank` | src/travelmap.rs:106 | 1194:4D74 | present | a screen bank shown | |
 | `TitleHooks::fade_out` | src/title.rs:79 | 1194:55B2 | present | the screen faded out; the view's creation screens draw the intro | |
 | `TitleHooks::movie_frame` | src/title.rs:75 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
 | `TitleHooks::picture` | src/title.rs:84 | 0000:5828 | present | a picture shown, faded or dissolved in | |

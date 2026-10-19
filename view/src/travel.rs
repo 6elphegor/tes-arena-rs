@@ -199,6 +199,10 @@ pub struct Travel {
     /// picture and its places' icons, 26F7:01CD), where the page is the
     /// heap's block.
     pub province_page: Option<Vec<u8>>,
+    /// The page as the province shown opened (what 26F7:01CD keeps in
+    /// bank 4 and each pass copies back, 062E): what the window draws
+    /// over, not the page as the last pass's label left it.
+    kept: Option<Vec<u8>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -437,6 +441,7 @@ impl Travel {
             up_ms: 0,
             boxed_over: None,
             province_page: None,
+            kept: None,
         }
     }
 
@@ -456,12 +461,15 @@ impl Travel {
         if engine.m.travel_province_open(&mut engine.files, &mut h, p, None).is_none() {
             eprintln!("the province's map gave up: {}", arena::giveup::describe());
         }
-        if self.province_page.is_none() && engine.m.page_is_block() {
-            let seg = engine.m.mem.r16(DS, 0xA900);
-            self.province_page = Some(engine.m.mem.segment(seg)[..64000].to_vec());
+        self.kept = engine.m.page_is_block().then(|| engine.m.mem.segment(engine.m.mem.r16(DS, 0xA900))[..64000].to_vec());
+        if self.province_page.is_none() {
+            self.province_page = self.kept.clone();
         }
         self.province = PICTURES.get(p as usize).and_then(|n| crate::create::image_with_palette(&engine.m, archive, n));
         self.shown = Some(p);
+        // The province's loop's first pass (3159:0078..0085: 019A, then
+        // 26F7:0625), before any input: bank 4 mapped, the page put back.
+        self.pass(engine, false);
     }
 
     /// 26F7:0218: the province's window ended (its Exit, or a journey
@@ -1115,6 +1123,7 @@ impl Travel {
             }
             return;
         };
+        let page = page.and(self.kept.clone());
         if let Some((img, pal)) = &self.province {
             screen.set_palette(*pal);
             if let Some(page) = &page {
