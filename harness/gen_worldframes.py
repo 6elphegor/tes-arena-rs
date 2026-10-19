@@ -341,6 +341,76 @@ def last_spell(spell):
     return put
 
 
+# The game's spells (3276:0000, 55h bytes a spell, by number): Light
+# (2: an effect of kind 11h on the caster), Open (9, kind 13h: the next
+# lock clicked), Heal (13: kind 0Ch sub-kind 1), Silence (31: a touch,
+# kind 15h). The save's book (the player's +366h, the count, and +367h,
+# the numbers) holds 61, 62 and the player's own (80h on) only.
+LIGHT = 2
+OPEN = 9
+HEAL = 13
+SILENCE = 31
+
+
+def known(spell):
+    """Spell number `spell` added to the end of the player's book (+366h
+    one more, +367h + the old count the number) and its line the spell
+    picked last (`last_spell`): Shift+C casts it (2542:057D's 5CAE, its
+    number from the book's line)."""
+    def put(a):
+        n = a.mu.mem_read(a.lin(a.ds, 0x01A4 + 0x366), 1)[0]
+        a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x367 + n), bytes([spell]))
+        a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x366), bytes([n + 1]))
+        last_spell(n)(a)
+    return put
+
+
+def healing(a):
+    """The player's health down to 40h (+59h) and Heal the spell picked
+    last (`known`)."""
+    a.w16(0x01A4 + 0x59, 0x40)
+    known(HEAL)(a)
+
+
+def opening(a):
+    """`locked_door`'s door (a lock of level 5), Open the spell picked
+    last."""
+    locked_door(a)
+    known(OPEN)(a)
+
+
+def silencing(a):
+    """A creature (type 1) brought a square north (`brought`), Silence
+    the spell picked last."""
+    brought(1, ahead=0x100)(a)
+    known(SILENCE)(a)
+
+
+def cast_now(spell):
+    """Spell `spell` of the spellbook cast as its pick casts it (29CF:
+    071F, as `casting`), one on the caster: it takes effect at once."""
+    def put(a):
+        a._setup([0, STUB_SEG], {'eax': spell, 'esi': 0x1A4})
+        a.mu.reg_write(UC_X86_REG_FS, a.ds)
+        a._run(0x29CF, 0x071F, STUB_SEG, 0, count=10_000_000)
+        assert not a.r16(0x0620), 'the spell waiting for a target'
+    return put
+
+
+def light_ending(a):
+    """Light cast (`cast_now`), then the timer of each of the player's
+    spell flags it left set (05BE; the flag's word in the table at
+    [1020], four bytes a flag) put at 1 minute: the next minute tick
+    (`minute_due`, the step's) counts it out and ends the light."""
+    cast_now(LIGHT)(a)
+    flags = a.r16(0x05BE)
+    assert flags, 'Light set no flag'
+    off, seg = a.r16(0x1020), a.r16(0x1022)
+    for i in range(16):
+        if flags & (1 << i):
+            a.mu.mem_write(a.lin(seg, off + 4 * i), struct.pack('<H', 1))
+
+
 def crowded_square(a):
     """The player's square (CB90) given a byte in the plane at [D806],
     which 1194:5F13 takes for no room."""
@@ -1122,6 +1192,22 @@ CASES = {
     # view's centre; forty frames of its flight.
     'playquickcast': ('dungeon', last_spell(WIZARDS_FIRE), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
                                                           ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 40, None)]),
+    # Spells on the caster, cast as playquickcast casts (Shift+C, the
+    # spell picked last): Heal with the player hurt (`healing`), Light
+    # (its effect on the 3D view's light); twenty and forty frames after.
+    'playheal': ('dungeon', healing, [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 20, None)]),
+    'playlight': ('dungeon', known(LIGHT), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 40, None)]),
+    # Open (`opening`) cast at `locked_door`'s door, the door clicked at
+    # the view's centre; twenty frames of it opening.
+    'playopen': ('crypt', opening, [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
+                                    ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 20, None)]),
+    # Silence (`silencing`), a touch, cast at the creature a square ahead,
+    # its target clicked at the view's centre; twenty frames after.
+    'playsilence': ('dungeon', silencing, [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
+                                           ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 20, None)]),
+    # Light cast with a minute left (`light_ending`): two frames, then the
+    # minute tick (`minute_due`) ends it; ten frames.
+    'playlightout': ('dungeon', light_ending, [((), (), 2, None), ((), (), 10, None, [], {'do': minute_due})]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # `locked_door`'s door with a lock of level 1, picking armed
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
@@ -1670,7 +1756,7 @@ def written_line(a, name):
 # The cases whose doors, locks or chests change the walls plane, which
 # neither DGROUP nor the EMS banks hold: its words (the level's width by
 # its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
-WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest')
+WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playopen')
 
 
 def walls_line(a, name):
@@ -1678,6 +1764,23 @@ def walls_line(a, name):
     seg, w, d = a.r16(0xD806), a.r16(0xC357), a.r16(0xC359)
     data = bytes(a.mu.mem_read(a.lin(seg, 0), w * d * 2))
     return f'walls | {name} | {len(data):x} {fnv(data):x}\n'
+
+
+# The spell cases, whose effects land outside DGROUP and the EMS banks
+# (`creatures_line`).
+SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout')
+
+
+def creatures_line(a, name):
+    """What the spells write outside DGROUP and the EMS banks: the eight
+    active creatures' records (0C57's entries, 1Ch bytes each: +12h the
+    record's offset in the creature segment [1042], 41Eh bytes a record),
+    and the timed spell flags' table ([1020]: 40h bytes for the player,
+    then for each active creature)."""
+    seg = a.r16(0x1042)
+    recs = b''.join(bytes(a.mu.mem_read(a.lin(seg, a.r16(0x0C57 + 0x1C * k + 0x12)), 0x41E)) for k in range(8))
+    table = bytes(a.mu.mem_read(a.lin(a.r16(0x1022), a.r16(0x1020)), 9 * 0x40))
+    return f'creatures | {name} | {fnv(recs):x} {fnv(table):x}\n'
 
 
 def run_case(a, at, name, setup, steps, tracks):
@@ -1931,6 +2034,8 @@ def main():
         out.write(written_line(a, name))
         if name in WALLS_CASES:
             out.write(walls_line(a, name))
+        if name in SPELL_CASES:
+            out.write(creatures_line(a, name))
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
