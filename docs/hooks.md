@@ -380,26 +380,28 @@ the original routine:
 | `TextHooks::menu` | src/text.rs:54 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `TextHooks::message_box` | src/text.rs:43 | 1194:59CC | overridden | the view: main.rs Front<'_>, panels.rs Said | present: the game's box (screens.txt) |
 | `TextHooks::message_box_far` | src/text.rs:47 | 1194:59CC | overridden | the view: panels.rs Said | present: the special item's box (screens.txt) |
-| `TravelHooks::advance` | src/travelmap.rs:116 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `TravelHooks::animation` | src/travelmap.rs:108 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
-| `TravelHooks::animation_frame` | src/travelmap.rs:113 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
-| `TravelHooks::arrival_delete` | src/travelmap.rs:141 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::arrival_log` | src/travelmap.rs:132 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
-| `TravelHooks::arrival_text` | src/travelmap.rs:137 | 1194:A36C | port | the default runs the port | |
-| `TravelHooks::arrival_write` | src/travelmap.rs:146 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::bank` | src/travelmap.rs:93 | 0000:5C86 | port | the default runs the port | |
-| `TravelHooks::close` | src/travelmap.rs:160 | 3159:0006 | present | the map's window closed | |
-| `TravelHooks::days` | src/travelmap.rs:102 | 1194:2E69 | port | the default runs the port | |
-| `TravelHooks::dungeon_location` | src/travelmap.rs:129 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
-| `TravelHooks::journey_stub` | src/travelmap.rs:156 |  | stub | a test's stand-in | |
-| `TravelHooks::location` | src/travelmap.rs:127 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
-| `TravelHooks::message_box` | src/travelmap.rs:78 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
-| `TravelHooks::pick_stub` | src/travelmap.rs:151 |  | stub | a test's stand-in | |
-| `TravelHooks::province` | src/travelmap.rs:121 | 1194:2E14 / 2E18 | port | the default runs the port | |
-| `TravelHooks::question` | src/travelmap.rs:80 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
-| `TravelHooks::resource` | src/travelmap.rs:89 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
-| `TravelHooks::screen` | src/travelmap.rs:85 |  | present | a fade | |
-| `TravelHooks::show_bank` | src/travelmap.rs:97 | 1194:4D74 | present | a screen bank shown | |
+| `TravelHooks::advance` | src/travelmap.rs:139 | 0000:142D | stub | false: the game's clock runs the minutes | |
+| `TravelHooks::animation` | src/travelmap.rs:117 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
+| `TravelHooks::animation_frame` | src/travelmap.rs:136 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
+| `TravelHooks::arrival_delete` | src/travelmap.rs:164 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::arrival_log` | src/travelmap.rs:155 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
+| `TravelHooks::arrival_text` | src/travelmap.rs:160 | 1194:A36C | port | the default runs the port | |
+| `TravelHooks::arrival_write` | src/travelmap.rs:169 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::bank` | src/travelmap.rs:102 | 0000:5C86 | port | the default runs the port | |
+| `TravelHooks::close` | src/travelmap.rs:183 | 3159:0006 | present | the map's window closed | |
+| `TravelHooks::days` | src/travelmap.rs:111 | 1194:2E69 | port | the default runs the port | |
+| `TravelHooks::dungeon_location` | src/travelmap.rs:152 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
+| `TravelHooks::journey_stub` | src/travelmap.rs:179 |  | stub | a test's stand-in | |
+| `TravelHooks::label` | src/travelmap.rs:123 | 26F7:0676 | port | the default runs the port | |
+| `TravelHooks::location` | src/travelmap.rs:150 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
+| `TravelHooks::marker` | src/travelmap.rs:129 | 26F7:071F | port | the default runs the port | |
+| `TravelHooks::message_box` | src/travelmap.rs:87 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
+| `TravelHooks::pick_stub` | src/travelmap.rs:174 |  | stub | a test's stand-in | |
+| `TravelHooks::province` | src/travelmap.rs:144 | 1194:2E14 / 2E18 | port | the default runs the port | |
+| `TravelHooks::question` | src/travelmap.rs:89 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
+| `TravelHooks::resource` | src/travelmap.rs:98 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
+| `TravelHooks::screen` | src/travelmap.rs:94 |  | present | a fade | |
+| `TravelHooks::show_bank` | src/travelmap.rs:106 | 1194:4D74 | present | a screen bank shown | |
 | `TitleHooks::fade_out` | src/title.rs:79 | 1194:55B2 | present | the screen faded out; the view's creation screens draw the intro | |
 | `TitleHooks::movie_frame` | src/title.rs:75 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
 | `TitleHooks::picture` | src/title.rs:84 | 0000:5828 | present | a picture shown, faded or dissolved in | |
