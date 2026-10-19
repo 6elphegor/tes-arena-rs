@@ -479,8 +479,8 @@ impl arena::clock::ClockHooks for Front<'_> {
     fn exhaustion_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         Front::message_box(self, m, si);
     }
-    fn level_up_screen(&mut self, m: &mut arena::machine::Machine, levels: u16) -> Option<()> {
-        arena::levelup::level_up_around(m, levels, self)
+    fn level_up_screen(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, levels: u16) -> Option<()> {
+        arena::levelup::level_up_around(m, files, levels, self)
     }
     /// 1194:99F8: the quests' deadlines by the day, their texts in boxes
     /// (`questui::QuestFront`).
@@ -502,6 +502,10 @@ impl arena::clock::ClockHooks for Front<'_> {
     }
 }
 impl arena::levelup::LevelUpHooks for Front<'_> {
+    /// The colours A611 reads: the screen's.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.dac
+    }
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         Front::message_box(self, m, si);
     }

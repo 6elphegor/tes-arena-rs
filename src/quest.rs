@@ -101,7 +101,7 @@ pub trait QuestHooks {
     /// 1194:1034 when the main quest ends (0FDD 8Eh), CX left by the
     /// text's box: the mouse's column (0000:9012 halves INT 33h's CX), so
     /// `Machine::level_up_screen(MOUSE_X)`.
-    fn finale(&mut self, _m: &mut Machine) {}
+    fn finale(&mut self, _m: &mut Machine, _files: &mut Files) {}
     /// 1194:42EA, before the message box of 19DE's "Your inventory is
     /// full.": the fonts selected (0000:9AE6 with AX, from 1026, and 9AF8
     /// with 1036: the front end's) and the colour 9288 60h.
@@ -528,7 +528,7 @@ impl Machine {
             self.mem.w8(DS, TEXT_FLAG, 0);
             hooks.text_shown(self);
             self.mem.w8(DS, STEP, LAST_PIECE);
-            hooks.finale(self);
+            hooks.finale(self, files);
             self.mem.w8(DS, NEXT_PROVINCE, 0xFF);
             let f = self.mem.r8(DS, FLAGS) & 0xFB;
             self.mem.w8(DS, FLAGS, f);

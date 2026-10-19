@@ -387,7 +387,7 @@ impl Talk {
                 for c in clicks {
                     match c {
                         Click::Select(r) => m.creation_select(r),
-                        Click::Arrow(y) => m.creation_arrow(y),
+                        Click::Arrow(y) => m.attribute_arrow(y),
                         Click::Name(n) => {
                             for (i, &b) in n.iter().enumerate() {
                                 m.mem.w8(DS, 0x01AD + i as u16, b);

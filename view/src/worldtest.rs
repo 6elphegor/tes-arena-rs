@@ -837,6 +837,44 @@ const TAVERN_ROOM_SCRIPT: [Act; 7] = [
     Act::Click(0x70, 0x85), Act::Click(0x70, 0x85), Act::Click(0xA0, 0x87),
 ];
 
+/// gen_worldframes.py's `levelled`: a level's worth of experience for
+/// the save's level 22 (LEVEL_XP), 5CA bit 100h set as a gain sets it.
+fn levelled(a: &mut App) {
+    let m = &mut a.engine.m;
+    let xp = m.mem.r32(DS, 0x05AD).wrapping_add(9_750_000);
+    m.mem.w32(DS, 0x05AD, xp);
+    let f = m.mem.r16(DS, 0x05CA) | 0x100;
+    m.mem.w16(DS, 0x05CA, f);
+}
+
+/// gen_worldframes.py's `minute_due`: the clock's last minute (884A) 90
+/// ticks back, so the next frame's minute tick runs.
+fn minute_due(a: &mut App) {
+    let m = &mut a.engine.m;
+    let t = m.mem.r16(DS, 0x0151).wrapping_sub(0x5A);
+    m.mem.w16(DS, 0x884A, t);
+}
+
+/// The frame whose minute tick gains the level, gen_worldframes.py's
+/// LEVEL_SCRIPT answering it: the notice clicked away, on the attribute
+/// screen each line picked and its arrows' upper half clicked six times,
+/// then the button; the turn's frame counted as the case's next.
+fn levelled_frame(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    d.frame(a);
+    assert!(!a.boxes.is_empty(), "the level's notice");
+    d.click(a, 0xA0, 0x60, MouseButton::Left);
+    assert!(a.creation.is_some(), "the attribute screen up for the level's points");
+    for r in 0..8 {
+        d.click(a, 10, 54 + 8 * r, MouseButton::Left);
+        for _ in 0..6 {
+            d.click(a, 40, 0x32 + 8 * r, MouseButton::Left);
+        }
+    }
+    d.click(a, 10, 175, MouseButton::Left);
+    assert!(a.creation.is_none() && a.pending.is_none() && a.boxes.is_empty(), "the level-up still asking");
+    seen.push(state(a));
+}
+
 /// gen_worldframes.py's `temple_hurt`: the player at half health, seeded.
 fn temple_hurt(a: &mut App) {
     let m = &mut a.engine.m;
@@ -1736,6 +1774,15 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 7, &GUILD_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playlevelup" => (Place::Dungeon, Box::new(levelled), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The next frame's minute tick (gen_worldframes.py's
+            // `minute_due`) brings up the level's notice and the attribute
+            // screen inside it (1194:1034): LEVEL_SCRIPT's clicks.
+            minute_due(a);
+            levelled_frame(a, d, seen);
+            frames(a, d, seen, 9, |_| false);
+        })),
         "playtempleheal" => (Place::Temple, Box::new(temple_hurt), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             serviced(a, d, seen, 5, &TEMPLE_HEAL_SCRIPT);
@@ -2379,7 +2426,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 55] = ["playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 56] = ["playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2487,7 +2534,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 60] = ["playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 61] = ["playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
