@@ -760,10 +760,14 @@ impl Creation {
         m.main_menu_pick(1);
         m.screen_faded();
         let esc = m.mem.r8(DS, arena::title::var::ESC_HELD);
+        // The dissolves' generator (4B8E) was stepped by the screen's own
+        // dissolves as the pictures came (`Film::dissolve`): kept so.
+        let generator = m.mem.r16(DS, 0x4B8E);
         if m.story(&mut engine.files, &mut StoryReplay { run: &run, waits: 0 }).is_none() {
             eprintln!("the opening story gave up: {}", arena::giveup::describe());
         }
         engine.m.mem.w8(DS, arena::title::var::ESC_HELD, esc);
+        engine.m.mem.w16(DS, 0x4B8E, generator);
         engine.m.newgame_reset();
         engine.m.creation_font(&mut engine.files);
         if let Stage::Method(_) = self.stage {
