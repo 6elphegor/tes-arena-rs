@@ -237,7 +237,7 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                 // The journey's days, each as the screen shows it.
                 if let Some(t) = a.travel.as_mut() {
                     let mut m = a.engine.m.clone();
-                    let seen = t.journey_seen(&a.font, &mut m).into_iter().map(|(px, dac)| (fnv(px.into_iter()), fnv(dac.into_iter()))).collect();
+                    let seen = t.journey_seen(&a.font, &mut m).into_iter().map(|(px, dac)| (fnv(px), fnv(dac))).collect();
                     JOURNEY.set(seen);
                 }
                 for _ in 0..100 {
