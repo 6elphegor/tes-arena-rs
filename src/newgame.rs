@@ -97,12 +97,22 @@ const ARROWS_Y: u16 = 0x5312 + 0x372 + 2;
 pub trait NewGameHooks {
     /// 1194:59CC: a message box with the text at `seg`:`si`.
     fn message_box(&mut self, _m: &mut Machine, _seg: u16, _si: u16) {}
-    /// 1194:0DC7: the stats screen drawn (also counting the items, 129D,
-    /// and naming the clothes' images by sex and class: 1194:16AA). By
-    /// default the clothes' names (1D22, `sheet_clothes`); the drawing is
-    /// the front end's.
-    fn stats_screen(&mut self, m: &mut Machine) {
-        m.sheet_clothes();
+    /// 1194:0DC7: the stats screen: CHARSHET.$$$ loaded into bank [1030]
+    /// and drawn over the page (1647, `sheet_back`), then the doll (16AA,
+    /// `sheet_doll`: the clothes' names by sex and class, the worn items
+    /// counted, 129D, the face, the trousers and the clothes, each loaded
+    /// into bank [1030] and drawn). Their pixels land where the page is
+    /// the heap's block. (Where a file is missing the reason is noted,
+    /// `giveup`.)
+    fn stats_screen(&mut self, m: &mut Machine, files: &mut Files) {
+        let _ = m.sheet_back(files).and_then(|_| m.sheet_doll(files));
+    }
+    /// 1194:5CD9 with BX 10h in the roll: the picture named at DS:`si`
+    /// (CHARSTAT.IMG at 2ADD, BONUS.IMG at 2B9B) loaded into bank [1030]
+    /// and drawn (`sheet_image`; its colours and showing the front end's).
+    fn roll_picture(&mut self, m: &mut Machine, files: &mut Files, si: u16) {
+        // (Where it gives up the reason is noted, `giveup`.)
+        let _ = m.sheet_image(files, si);
     }
     /// 1194:2B42..2B52, in the roll before the stats screen: the page's
     /// corner kept in bank [1032] (12BE, `corner_kept`; 1299 cleared
@@ -577,8 +587,13 @@ impl Machine {
         let dest = self.mem.r16(DS, 0xA900);
         let mut px: Vec<u8> = (0..64000u32).map(|i| self.mem.r8(dest, i as u16)).collect();
         crate::render::image_page(self, &mut px, seg, 0);
-        for (i, &b) in px.iter().enumerate() {
-            self.mem.w8(dest, i as u16, b);
+        // (As `page_image`: a page that is no heap block, A000h in a game
+        // the port starts itself, keeps its bytes; the EMS frame made the
+        // page takes them.)
+        if dest == self.mem.r16(DS, 0x9030) || self.page_is_block() {
+            for (i, &b) in px.iter().enumerate() {
+                self.mem.w8(dest, i as u16, b);
+            }
         }
         self.heap_free(seg);
         Some(())
@@ -652,6 +667,104 @@ impl Machine {
         Some(r as u8)
     }
 
+    /// 1194:2557..256D and 2A69..2A89, between the province's texts and
+    /// the first roll: the colours black and the page cleared (55B6, the
+    /// fade the front end's); the sheet kept (158F: the body drawn and the
+    /// page written to CHARSHET.$$$, the face to SAVEFACE.$$$); the page
+    /// cleared, the boxes' tiles [103A] (9AF8) and FONT_B ([102C], 9AE6);
+    /// then the attribute screen's start: the page cleared, the body drawn
+    /// again (161A with BX 50h: by a heap block from the top, 56C8 with BX
+    /// bit 2 clear, as `picture_heap_drawn`), its head's corner (DAh, 0;
+    /// 4Ah x 37h)
+    /// kept in bank 1's frame (2A9D: 8F26), the page cleared and the
+    /// colours black again (55B2), D49 9. None where a file can't be read.
+    pub fn creation_attributes_begin(&mut self, files: &mut Files) -> Option<()> {
+        self.sheet_black();
+        self.sheet_keep(files)?;
+        self.page_clear();
+        self.select_tiles(0x103A);
+        self.select_font(0x102C);
+        self.page_clear();
+        let si = self.body_name();
+        self.picture_heap_drawn(files, si)?;
+        let old = self.map_bank(1, 0);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.page_rect_save((frame, 0), 0xDA, 0, 0x4A, 0x37);
+        self.map_bank(old, 0);
+        self.page_clear();
+        self.sheet_black();
+        self.mem.w8(DS, 0x0D49, 9);
+        Some(())
+    }
+
+    /// 1194:2945..2970, the province accepted: in the text made at 1044
+    /// (from 3276:36EC) a woman's "his home" made "her home": the eight
+    /// bytes at 3F1E sought from 1044 over 3E8h places (9C56), the three
+    /// at 3F27 copied where they matched (7702), or at 1044 + 3E8h where
+    /// nothing did (the loop's end, bug kept).
+    pub fn creation_her_home(&mut self) {
+        if self.ng8(PLAYER + rec::SEX) == 0 {
+            return;
+        }
+        let mut di = 0x1044u16;
+        for _ in 0..0x3E8 {
+            if (0..8u16).all(|k| self.mem.r8(DS, di.wrapping_add(k)) == self.mem.r8(DS, 0x3F1E + k)) {
+                break;
+            }
+            di = di.wrapping_add(1);
+        }
+        for k in 0..3u16 {
+            let b = self.mem.r8(DS, 0x3F27 + k);
+            self.mem.w8(DS, di.wrapping_add(k), b);
+        }
+    }
+
+    /// 1194:2A00..2A5F, after the province's text was made at 1044
+    /// (29DE..29FD: text 581h + the province, wrapped at 28h): the colour
+    /// EEh, the boxes' tiles [1038] (9AF8) and the font [102C] (9AE6); the
+    /// text moved on 13h bytes (7732, 1EDh of them) and "Know ye this
+    /// also:\r" (3EAA, 13h bytes) put before it; in the text its line
+    /// feeds made spaces (49DF) and the text wrapped again at 137E (49FF);
+    /// then every line feed of the whole a CR (49DF), and its NUL a CR
+    /// with a NUL after (2A51..2A5F). None where the wrap gives up.
+    pub fn creation_known_layout(&mut self) -> Option<()> {
+        self.mem.w8(DS, COLOUR, 0xEE);
+        self.select_tiles(0x1038);
+        self.select_font(0x102C);
+        let moved: Vec<u8> = (0..0x1EDu16).map(|i| self.mem.r8(DS, 0x1044 + i)).collect();
+        for (i, &b) in moved.iter().enumerate() {
+            self.mem.w8(DS, 0x1057 + i as u16, b);
+        }
+        for i in 0..0x13u16 {
+            let b = self.mem.r8(DS, 0x3EAA + i);
+            self.mem.w8(DS, 0x1044 + i, b);
+        }
+        // 1194:49DF: AL made BL up to the text's NUL.
+        let replace = |m: &mut Machine, si: u16, al: u8, bl: u8| {
+            let mut si = si;
+            while m.mem.r8(DS, si) != 0 {
+                if m.mem.r8(DS, si) == al {
+                    m.mem.w8(DS, si, bl);
+                }
+                si = si.wrapping_add(1);
+            }
+        };
+        replace(self, 0x1057, 0x0A, 0x20);
+        self.line_wrap(0x1057)?;
+        replace(self, 0x1044, 0x0A, 0x0D);
+        let mut di = 0x1044u16;
+        for _ in 0..0x200 {
+            let b = self.mem.r8(DS, di);
+            di = di.wrapping_add(1);
+            if b == 0 {
+                break;
+            }
+        }
+        self.mem.w8(DS, di.wrapping_sub(1), 0x0D);
+        self.mem.w8(DS, di, 0);
+        Some(())
+    }
+
     /// 1194:28F6, 289B and 28E1: the province picked on the map (0..8)
     /// is the race; the portrait rolled (1194:35FF); that byte is the
     /// location the player comes from (its province and a place in it),
@@ -693,15 +806,17 @@ impl Machine {
         self.mem.w16(DS, POINTS_ROLLED, 0x19);
         self.roll_starting_gold()?;
         self.mem.w8(DS, COLOUR, 0xFE);
+        hooks.roll_picture(self, files, 0x3DE2);
         let v = self.ng8(SCREEN) | 4;
         self.mem.w8(DS, SCREEN, v);
         self.mem.w8(DS, PLAYER + rec::LEVEL, 0);
         self.mem.w8(DS, ARROWS, 0x34);
         self.create_player_stats()?;
+        hooks.roll_picture(self, files, 0x3DFC);
         let p = crate::dice::dice(&mut self.rng, 0x19)?;
         self.mem.w8(DS, POINTS, p as u8);
         hooks.roll_screen(self, files);
-        hooks.stats_screen(self);
+        hooks.stats_screen(self, files);
         if self.ng8(NOTED) == 0 {
             hooks.palette(self);
             self.mem.w8(DS, NOTED, 1);

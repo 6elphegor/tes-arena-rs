@@ -31,7 +31,7 @@ impl NewGameHooks for Log {
     fn message_box(&mut self, _m: &mut Machine, _seg: u16, si: u16) {
         self.0.extend([1, si]);
     }
-    fn stats_screen(&mut self, _m: &mut Machine) {
+    fn stats_screen(&mut self, _m: &mut Machine, _files: &mut Files) {
         self.0.push(2);
     }
     fn palette(&mut self, _m: &mut Machine) {
@@ -42,10 +42,11 @@ impl NewGameHooks for Log {
     }
     // The resource's drop, the fade and the sheet's keeping return at once
     // in the vectors (0000:9326, 1194:55B6, 158F stubbed).
-    fn roll_screen(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {}
+    fn roll_screen(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    fn roll_picture(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16) {}
     fn parchment_drop(&mut self, _m: &mut Machine) {}
     fn faded(&mut self, _m: &mut Machine) {}
-    fn sheet_keep(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {}
+    fn sheet_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
     fn game_screen(&mut self, _m: &mut Machine) {
         self.0.push(5);
     }

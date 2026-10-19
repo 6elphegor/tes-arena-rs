@@ -1125,6 +1125,69 @@ impl Creation {
         self.boxes.push_back(Boxed { lines, font, back });
     }
 
+    /// 1194:59CC whole on the game, for a box the original shows here:
+    /// the text at `text` laid out in its box (bank 18h mapped, 965A with
+    /// CX 4007h, DX 5, centred), what it covers kept at [902E] from the
+    /// page under it (`back`, as this screen draws it), the keys flushed,
+    /// and once taken the background put back (933C). The dissolves'
+    /// generator is the film's (it steps it as it plays them).
+    fn game_box(&self, m: &mut Machine, text: (u16, u16), back: Back) {
+        let mut s = Screen::new(self.pics.game);
+        self.draw_back(&mut s, m, back);
+        let under: Vec<u8> = s.indices().iter().map(|&i| i as u8).collect();
+        let seed = m.mem.r16(DS, crate::film::DISSOLVE_SEED);
+        m.key_flush();
+        if m.message_wait_box(text, Some(&under)).is_none() {
+            eprintln!("a box gave up: {}", arena::giveup::describe());
+        }
+        m.message_box_closed();
+        m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
+    }
+
+    /// A key creation's screens take, as the game's key interrupt has it
+    /// (0000:718A, `key_event`: its make and its break): the state of the
+    /// key and the last key pressed (ACB4), and its character put in the
+    /// ring (AC4C..). Each screen flushes the ring around its read (710E:
+    /// the menus, the boxes, the window's loop), so each such key is the
+    /// ring's first character, read and flushed. Letters are their keys
+    /// unshifted (a script's "S" is the S key), other characters the key
+    /// the keyboard's tables give them (Shift held for the shifted table).
+    fn key_to_game(m: &mut Machine, inp: Input) {
+        use arena::lineedit::var::{LAYOUT, PLAIN, SHIFTED};
+        let layout = match m.mem.r8(DS, LAYOUT) {
+            1 => 1,
+            2 => 2,
+            _ => 0,
+        };
+        let find = |m: &Machine, t: u16, c: u8| (1..0x80u8).find(|&s| m.mem.r8(DS, t + s as u16) == c);
+        let (scan, shift) = match inp {
+            Input::Enter => (0x1C, false),
+            Input::Esc => (0x01, false),
+            Input::Back => (0x0E, false),
+            Input::Up => (0x48, false),
+            Input::Down => (0x50, false),
+            Input::Char(c) => match find(m, PLAIN[layout], c.to_ascii_lowercase()) {
+                Some(s) => (s, false),
+                None => match find(m, SHIFTED[layout], c) {
+                    Some(s) => (s, true),
+                    None => return,
+                },
+            },
+            _ => return,
+        };
+        m.key_flush();
+        if shift {
+            let _ = m.key_event(0x2A);
+        }
+        let _ = m.key_event(scan);
+        let _ = m.key_event(scan | 0x80);
+        if shift {
+            let _ = m.key_event(0xAA);
+        }
+        m.key_read();
+        m.key_flush();
+    }
+
     /// A key or click, and the screen's change played as the original
     /// shows it (`Film`):
     /// - a menu answered (1194:020E): it was drawn on the screen alone,
@@ -1143,6 +1206,10 @@ impl Creation {
         self.story_ran(engine);
         if let Input::Wait(ms) = inp {
             return self.advance(&mut engine.m, ms);
+        }
+        let creating = matches!(self.stage, Stage::Method(_) | Stage::Quiz { .. } | Stage::ClassYes(..) | Stage::List(_) | Stage::Gender(_) | Stage::Map | Stage::ProvinceYes(..) | Stage::Stats | Stage::Choose(_) | Stage::Face);
+        if creating && self.level_up.is_none() && !self.typing() {
+            Self::key_to_game(&mut engine.m, inp);
         }
         if inp == Input::Key(0x01, false) {
             // Esc let go (the window's, outside the name's typing only this).
@@ -1854,7 +1921,12 @@ impl Creation {
     fn map_screen(&mut self, engine: &mut Engine) -> Stage {
         let m = &mut engine.m;
         let (cs, co) = m.class_name(DS, PLAYER);
+        // 2837..2868: in colour EEh and FONT_A ([1026]), the box on the
+        // game.
+        m.mem.w8(DS, 0x9288, 0xEE);
         let l = self.say(m, (DATA, 0x362A), &[Arg::Str(DS, NAME), Arg::Str(cs, co)]);
+        m.select_font(0x1026);
+        self.game_box(m, (DS, BUF), Back::Map);
         self.push_box(l, FontId::A, Back::Map);
         Stage::Map
     }
@@ -1882,6 +1954,11 @@ impl Creation {
         let (ps, po) = Self::nth(m, PROVINCES, p);
         let (rs, ro) = Self::nth(m, RACES, p);
         m.sprintf((DS, BUF), (DATA, 0x36EC), &[Arg::Str(cs, co), Arg::Str(DS, NAME), Arg::Str(ps, po), Arg::Str(rs, ro)]);
+        // 2945..297E on the game: "her home" for a woman, FONT_B
+        // ([102C]), the box.
+        m.creation_her_home();
+        m.select_font(0x102C);
+        self.game_box(m, (DS, BUF), Back::Map);
         let mut first = m.mem.cstr(DS, BUF).to_vec();
         // 1194:2945..2970: "his home" becomes "her home" for a woman.
         if m.mem.r8(DS, SEX) != 0 {
@@ -1905,6 +1982,12 @@ impl Creation {
                 // 2A51..2A5F: the text ended by a CR (its last line
                 // centred too).
                 known.push(b'\r');
+                // 2A00..2A65 on the game: the text laid out at 1044 as the
+                // original lays it out, then its box.
+                if engine.m.creation_known_layout().is_none() {
+                    eprintln!("the province's text's wrap gave up: {}", arena::giveup::describe());
+                }
+                self.game_box(&mut engine.m, (DS, BUF), Back::Map);
             }
             None => eprintln!("the province's text could not be made"),
         }
@@ -1914,17 +1997,31 @@ impl Creation {
         let adj = (DATA, m.skip_strings(DATA, 0x38D4, class as u16));
         let (cs, co) = m.class_name(DS, PLAYER);
         let l = self.say(m, (DATA, 0x3742), &[Arg::Str(adj.0, adj.1), Arg::Str(cs, co)]);
+        // 29BA..29D9 on the game: each box in FONT_B ([102C]).
+        m.select_font(0x102C);
+        self.game_box(m, (DS, BUF), Back::Map);
         self.push_box(l, FontId::Arena, Back::Map);
+        m.select_font(0x102C);
+        self.game_box(m, (DATA, 0x3780), Back::Map);
         let l = hud::lines(engine.m.mem.cstr(DATA, 0x3780), colour);
         self.push_box(l, FontId::Arena, Back::Map);
+        // 2557..256D and the attribute screen's start (2A69..2A89).
+        if engine.m.creation_attributes_begin(&mut engine.files).is_none() {
+            eprintln!("the attribute screen's start gave up: {}", arena::giveup::describe());
+        }
         self.roll(engine)
     }
 
-    /// The attributes rolled (1194:2AC7; the first time its note).
+    /// The attributes rolled (1194:2AC7; the first time its note, 2B6F..
+    /// 2B7D, on the game too, over the attribute screen).
     fn roll(&mut self, engine: &mut Engine) -> Stage {
         self.colour = COLOUR_B;
+        let noted = engine.m.mem.r8(DS, arena::newgame::var::NOTED) != 0;
         if engine.m.creation_roll(&mut engine.files, &mut Hooks { boxes: &mut self.boxes }).is_none() {
             eprintln!("the attributes could not be rolled");
+        }
+        if !noted && engine.m.mem.r8(DS, arena::newgame::var::NOTED) != 0 {
+            self.game_box(&mut engine.m, (DATA, 0x37C5), Back::Stats);
         }
         Stage::Stats
     }
@@ -2017,6 +2114,10 @@ impl Creation {
     /// (FACES1r.CIF, FACESF1r.CIF while creating), from the first.
     fn face_screen(&mut self, engine: &mut Engine) -> Stage {
         let m = &mut engine.m;
+        // 2BCB..2BE1 on the game: FONT_B ([102C]), colour FEh, the box.
+        m.select_font(0x102C);
+        m.mem.w8(DS, 0x9288, 0xFE);
+        self.game_box(m, (DATA, 0x3824), Back::Stats);
         let l = hud::lines(m.mem.cstr(DATA, 0x3824), COLOUR_B);
         self.push_box(l, FontId::Arena, Back::Stats);
         let name = format!("{}1{}.CIF", if m.mem.r8(DS, SEX) != 0 { "FACESF" } else { "FACES" }, m.mem.r8(DS, RACE));
