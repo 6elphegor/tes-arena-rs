@@ -1692,7 +1692,7 @@ fn case(name: &str) -> Option<Case> {
             at_square(a, 9, 0x7C, 0x80);
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            clicked_with(a, d, seen, 3, &[Act::Click(0xA0, 0x60)]);
+            clicked_with(a, d, seen, 3, &[Act::Click(160, 100)]);
             frames(a, d, seen, 3, |_| false);
         })),
         // The house picked (picking armed, the seed SEED) and in (the area

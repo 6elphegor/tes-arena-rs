@@ -1311,8 +1311,10 @@ CASES = {
     # The palace's door (its trigger 13: a wall of kind 0Ah with bit 100h,
     # the hit test's, 0000:B1AD) clicked from the west at ten at night: the
     # palace closed (1194:4FB8, kind 1), "closed" in a box (0000:4054's
-    # 88D0) clicked away; three frames after.
-    'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 3, None)]),
+    # 88D0) clicked away where the door was (the box's release left for
+    # the next frame's controls, 2826:0A4C, which the window doesn't give:
+    # at the same place, CB60 the same); three frames after.
+    'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)]}), ((), (), 3, None)]),
     # The house with picking armed (`armed`, the seed SEED): the lock
     # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area
     # left, `leaves`); three frames in the house.
