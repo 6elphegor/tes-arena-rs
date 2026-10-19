@@ -360,6 +360,8 @@ fn load_game_as(engine: &mut Engine, dir: &Path, save: &Path, slot: u8, title: b
         }
     };
     TAIL.with(|t| t.set(tail));
+    // The 3D view drawn on as before the load, over the last page.
+    e.keep_drawing(engine);
     *engine = e;
     Ok(run)
 }

@@ -302,6 +302,20 @@ impl Engine {
         Self { m, files, page: None, page_gaps: Vec::new(), page_wrote: vec![None; 0x10000], page_ems_wrote: Default::default(), page_ems_prior: Default::default(), page_creatures: Vec::new(), walked: None }
     }
 
+    /// The drawing's own state taken over from `from`, the engine this
+    /// one replaces, its machine copied from `from`'s: the page the next
+    /// frame draws over, and the bytes its copies wrote (`page_wrote`,
+    /// `page_ems_wrote`), which the original, drawing on the machine,
+    /// still holds where nothing has written them since (the machine's
+    /// writes since the last drawing, a load's among them, are dropped
+    /// from them at the next, as every frame's are).
+    pub fn keep_drawing(&mut self, from: &mut Engine) {
+        self.page = from.page.take();
+        self.page_wrote = std::mem::take(&mut from.page_wrote);
+        self.page_ems_wrote = std::mem::take(&mut from.page_ems_wrote);
+        self.page_ems_prior = std::mem::take(&mut from.page_ems_prior);
+    }
+
     /// The BIOS timer advances `n` ticks (18.2 a second).
     pub fn tick(&mut self, n: u16) {
         let t = self.m.mem.r16(DS, crate::frame::var::TICKS).wrapping_add(n);
