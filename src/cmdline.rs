@@ -347,7 +347,7 @@ impl Machine {
         }
     }
 
-    /// 0000:9C5E: ds:`si` against es:`di`, a..z taken as A..Z (nothing
+    /// 0000:9C5E (its body 0000:9C62): ds:`si` against es:`di`, a..z taken as A..Z (nothing
     /// else), up to `cx`
     /// characters or a NUL in both: the same (ZF).
     fn names_match(&self, ds: u16, mut si: u16, es: u16, mut di: u16, mut cx: u16) -> bool {

@@ -34,10 +34,10 @@ tables built in code, overlay-style dispatch) can be missing from
 "reachable"; routine sizes count decoded instruction bytes only (data
 inside code is not counted); a routine "ported" may be ported in part
 (its doc names what is left as hooks); addresses claimed in the port
-that fall in no routine the graph found: 8
-({'ported': 8}), a measure of what the graph misses; and routines the
+that fall in no routine the graph found: 12
+({'ported': 8, 'hook': 4}), a measure of what the graph misses; and routines the
 port names as entries that the graph alone did not reach, added as roots:
-194 routines came in with them.
+204 routines came in with them.
 
 "Likely ported inline" marks an uncovered routine whose distinctive
 constants (immediates and addresses of 100h and more) show as hex literals
@@ -53,24 +53,24 @@ drawing): the renderer's internals mostly land there.
 
 | | routines | bytes |
 |---|---:|---:|
-| reachable | 2509 | 197875 |
-| ported (in whole or part) | 2110 | 171535 |
-| hooks (front end's) | 30 | 1206 |
-| the view's own version | 59 | 5228 |
-| not covered: game state or undetermined | 50 | 5771 |
-| &nbsp;&nbsp;of which likely ported inline in a caller | 23 | 2387 |
-| &nbsp;&nbsp;of which open | 27 | 3384 |
-| not covered: presentation / I/O / hardware | 260 | 14135 |
+| reachable | 2519 | 198012 |
+| ported (in whole or part) | 2142 | 173906 |
+| hooks (front end's) | 32 | 1422 |
+| the view's own version | 55 | 4251 |
+| not covered: game state or undetermined | 46 | 5618 |
+| &nbsp;&nbsp;of which likely ported inline in a caller | 26 | 2501 |
+| &nbsp;&nbsp;of which open | 20 | 3117 |
+| not covered: presentation / I/O / hardware | 244 | 12815 |
 
 By segment:
 
 | segment | routines | bytes | covered | covered bytes |
 |---|---:|---:|---:|---:|
-| 0000 | 786 | 65955 | 639 | 54336 |
-| 0FFD | 63 | 2085 | 2 | 12 |
-| 1194 | 879 | 64068 | 828 | 61617 |
+| 0000 | 790 | 66035 | 650 | 54804 |
+| 0FFD | 63 | 2085 | 3 | 87 |
+| 1194 | 884 | 64120 | 841 | 62268 |
 | 217B | 18 | 1834 | 16 | 1697 |
-| 21EE | 9 | 951 | 5 | 714 |
+| 21EE | 9 | 951 | 7 | 896 |
 | 222C | 24 | 1592 | 17 | 1290 |
 | 2294 | 45 | 4661 | 45 | 4661 |
 | 23BA | 9 | 813 | 6 | 688 |
@@ -87,7 +87,7 @@ By segment:
 | 27E3 | 17 | 1070 | 16 | 1028 |
 | 2826 | 38 | 4037 | 38 | 4037 |
 | 2901 | 6 | 672 | 6 | 672 |
-| 292B | 25 | 2394 | 25 | 2394 |
+| 292B | 26 | 2399 | 26 | 2399 |
 | 29CF | 38 | 3487 | 38 | 3487 |
 | 2AA1 | 33 | 2517 | 33 | 2517 |
 | 2B39 | 2 | 6721 | 1 | 6068 |
@@ -96,7 +96,7 @@ By segment:
 | 2EBD | 30 | 1678 | 30 | 1678 |
 | 2F26 | 17 | 1251 | 4 | 221 |
 | 2F75 | 5 | 663 | 5 | 663 |
-| 2F9F | 6 | 1278 | 3 | 941 |
+| 2F9F | 6 | 1278 | 5 | 1170 |
 | 3065 | 10 | 1759 | 10 | 1759 |
 | 3159 | 39 | 4288 | 26 | 3644 |
 
@@ -109,16 +109,11 @@ the uncovered code reachable from them.
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | what it is | evidence |
 |---|---:|---:|---|---|---|
 | 2F26:03FD | 72 | 462 / 9 | 3159:06A0 (hud.rs, inputtest.rs, listwindow.rs) |  | vars 8F38 8BEC |
-| 1194:00A4 | 35 | 65 / 2 | 2F26:000E (start.rs) |  |  |
-| 1194:0051 | 22 | 63 / 2 | 1194:0067 (start.rs) |  |  |
+| 0000:64F0 | 86 | 374 / 6 | 0000:654A (create.rs, flc.rs, title.rs) |  | vars A836 A838 |
 | 3159:0BA1 | 13 | 41 / 2 | 3159:0A58 (hud.rs, listwindow.rs) |  |  |
 | 3159:02B2 | 29 | 29 / 1 | 3159:033D, 3159:0494 (main.rs, mapscreen.rs, travel.rs) |  | vars BA0E |
-| 0000:5E0F | 29 | 29 / 1 | 0000:5DA0 (start.rs) |  |  |
-| 1194:51B8 | 25 | 25 / 1 | 1194:51D1 (main.rs, panels.rs, spellpage.rs) |  | files spelbook.$$$; vars A8FE |
 | 0000:B81E | 23 | 23 / 1 | 0000:B7DC (render.rs) |  | vars C3C6 A900 |
-| 1194:53E3 | 22 | 22 / 1 | 1194:51E6, 1194:5271, 1194:52DB (panels.rs, spellpage.rs) |  | files spelbook.$$$; vars A8FE |
 | 1194:2451 | 17 | 17 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  |  |
-| 0000:5E2C | 17 | 17 / 1 | 0000:5DA0 (start.rs) |  |  |
 | 3159:0483 | 16 | 16 / 1 | 3159:046E (window.rs) |  |  |
 | 0000:9D74 | 4 | 15 / 2 | 3159:0F2A (create.rs, dialog.rs, hud.rs) |  |  |
 | 1194:1687 | 14 | 14 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  | files saveface.$$$ |
@@ -152,16 +147,11 @@ first; candidates, not findings:
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | evidence |
 |---|---:|---:|---|---|
 | 2F26:03FD | 72 | 462 / 9 | 3159:06A0 (hud.rs, inputtest.rs, listwindow.rs) | vars 8F38 8BEC |
-| 1194:00A4 | 35 | 65 / 2 | 2F26:000E (start.rs) |  |
-| 1194:0051 | 22 | 63 / 2 | 1194:0067 (start.rs) |  |
+| 0000:64F0 | 86 | 374 / 6 | 0000:654A (create.rs, flc.rs, title.rs) | vars A836 A838 |
 | 3159:0BA1 | 13 | 41 / 2 | 3159:0A58 (hud.rs, listwindow.rs) |  |
 | 3159:02B2 | 29 | 29 / 1 | 3159:033D, 3159:0494 (main.rs, mapscreen.rs, travel.rs) | vars BA0E |
-| 0000:5E0F | 29 | 29 / 1 | 0000:5DA0 (start.rs) |  |
-| 1194:51B8 | 25 | 25 / 1 | 1194:51D1 (main.rs, panels.rs, spellpage.rs) | files spelbook.$$$; vars A8FE |
 | 0000:B81E | 23 | 23 / 1 | 0000:B7DC (render.rs) | vars C3C6 A900 |
-| 1194:53E3 | 22 | 22 / 1 | 1194:51E6, 1194:5271, 1194:52DB (panels.rs, spellpage.rs) | files spelbook.$$$; vars A8FE |
 | 1194:2451 | 17 | 17 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  |
-| 0000:5E2C | 17 | 17 / 1 | 0000:5DA0 (start.rs) |  |
 | 3159:0483 | 16 | 16 / 1 | 3159:046E (window.rs) |  |
 | 0000:9D74 | 4 | 15 / 2 | 3159:0F2A (create.rs, dialog.rs, hud.rs) |  |
 | 1194:1687 | 14 | 14 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) | files saveface.$$$ |
@@ -172,12 +162,11 @@ Uncovered routines whose offset appears bare (no segment) in a comment
 of a port file that names their segment. Such a mention is as often a
 routine ported inline as one deliberately left out ("stubbed: ...") or a
 variable that happens to share the number, so they are not counted as
-ported; 125 to check, largest first:
+ported; 127 to check, largest first:
 
 | routine | bytes | files |
 |---|---:|---|
 | 0000:7A2B | 527 | render.rs |
-| 1194:066A | 326 | panels.rs |
 | 0000:9546 | 275 | render.rs |
 | 0000:DB78 | 209 | render.rs, worldtest.rs |
 | 1194:0F08 | 208 | charsheet.rs, create.rs |
@@ -186,17 +175,19 @@ ported; 125 to check, largest first:
 | 1194:0E86 | 130 | charsheet.rs |
 | 0000:91F2 | 129 | random.rs, start.rs |
 | 3159:00F3 | 126 | window.rs |
-| 1194:124A | 116 | cityinfo.rs |
 | 25FD:05A5 | 109 | bsa.rs |
 | 2542:0205 | 104 | menukeys.rs |
 | 222C:034C | 101 | create.rs |
+| 0000:64F0 | 86 | vision.rs |
 | 0000:9B04 | 73 | start.rs |
+| 1194:2902 | 67 | create.rs |
 | 0000:B2E5 | 66 | render.rs |
 | 222C:04E5 | 64 | create.rs |
 | 0000:2FFD | 63 | automapscreen.rs |
 | 0000:B2A7 | 62 | render.rs |
 | 0000:942A | 59 | title.rs |
 | 1194:5DE2 | 59 | charsheet.rs, main.rs |
+| 1194:1354 | 58 | levelup.rs, newgame.rs |
 | 0000:9A34 | 57 | hud.rs |
 | 3159:09E8 | 53 | hud.rs, listwindow.rs |
 | 1194:2A69 | 52 | create.rs, newgame.rs |
@@ -205,14 +196,13 @@ ported; 125 to check, largest first:
 | 0000:5B08 | 48 | listwindow.rs |
 | 0000:5422 | 46 | frame.rs, title.rs |
 | 0000:567A | 46 | render.rs |
+| 0000:73E6 | 44 | charsheet.rs |
 | 0000:59A4 | 42 | lineedit.rs, listwindow.rs, mapnotes.rs |
 | 1194:2A9D | 42 | create.rs |
 | 1194:2C96 | 42 | create.rs |
 | 27E3:03D6 | 42 | logbook.rs |
-| 0000:9C62 | 41 | lineedit.rs, mapscreen.rs, travel.rs, travelmap.rs |
 | 0000:A49C | 41 | load.rs |
-| 0000:1393 | 40 | create.rs |
-| 1194:12BE | 40 | guild.rs, tavern.rs |
+| 1194:149D | 40 | newgame.rs |
 | 1194:1F30 | 38 | charsheet.rs |
 | 0000:9A9C | 36 | frame.rs |
 | 0000:C0CE | 35 | render.rs |
@@ -223,20 +213,22 @@ ported; 125 to check, largest first:
 | 1194:000A | 30 | inputtest.rs, main.rs, menukeys.rs |
 | 3159:0BAE | 28 | listwindow.rs |
 | 222C:04BC | 27 | create.rs |
-| 1194:51B8 | 25 | spellpage.rs, transit.rs |
+| 1194:51B8 | 25 | transit.rs |
 | 1194:55D9 | 25 | create.rs, dungeonpic.rs, travelmap.rs |
+| 1194:5634 | 25 | levelup.rs |
 | 1194:5D75 | 24 | charsheet.rs |
 | 1194:53E3 | 22 | spellpage.rs |
 | 1194:2451 | 17 | charsheet.rs, doll.rs |
-| 2F9F:000D | 17 | music.rs |
 | 0000:3815 | 16 | automap.rs |
 | 3159:0483 | 16 | mapscreen.rs |
+| 1194:12E6 | 15 | newgame.rs |
 | 1194:0FFB | 12 | encounter.rs, frame.rs, levelup.rs, screentest.rs, sidequest.rs, weapon.rs |
 | 0000:37F7 | 10 | automap.rs |
 | 0000:3801 | 10 | automap.rs |
 | 0000:380B | 10 | automap.rs |
 | 0000:6BE2 | 9 | field.rs, lineedit.rs |
 | 1194:0000 | 6 | bsa.rs, hooks.rs, machine.rs, save.rs, transit.rs |
+| 0000:5998 | 4 | newgame.rs |
 | 0000:6028 | 4 | tavern.rs |
 | 0000:67A2 | 4 | bsa.rs |
 | 0000:77EC | 4 | controls.rs, guild.rs, logbook.rs, store.rs |
@@ -251,14 +243,11 @@ signs found. Evidence: files named, DGROUP variables most touched.
 
 | routine | bytes | class | callers | what it is | evidence |
 |---|---:|---|---|---|---|
-| 0000:0118 | 57 | I/O (read) | 0000:0000 | C startup: the PSP command tail split into argv [I/O] |  |
 | 0000:016B | 32 | DOS I/O | 0000:0000 |  |  |
 | 0000:01A8 | 18 | DOS I/O | 0000:01FD |  |  |
-| 0000:01BA | 67 | DOS I/O | 0000:0000 |  |  |
 | 0000:01FD | 30 | DOS I/O, BIOS | 0000:0000 |  | vars 9289 |
 | 0000:021B | 45 | DOS I/O | 0000:01FD |  |  |
 | 0000:0B89 | 19 | I/O (read) | 0000:0936, 0000:0997, 0000:09FA | the light table's file (NORMAL.LGT, si 1A6D) loaded to 3AAC:0240 (LightHooks::lgt) [I/O] |  |
-| 0000:1393 | 40 | presentation (read) | 0000:1246, 0000:1323 | an image loaded and drawn full screen, then shown [presentation] | vars 902E |
 | 0000:1849 | 11 | drawing? | 0000:17F9, 25CA:0000 |  |  |
 | 0000:2FFD | 63 | likely inline | 0000:2F10 |  | vars 9288 A868 05E6 A86E |
 | 0000:37F7 | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved down 80h (126E) [presentation] | vars 126E |
@@ -269,7 +258,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:4F72 | 159 | presentation (read) | 0000:4ACD, 0000:4B02 | the walls plane copied 80h x 80h into a buffer (A900) for a map image [presentation?] | vars C3D0 C3D4 A900 D806 |
 | 0000:5104 | 54 | drawing (read) | 0000:481E | rain/snow drops drawn over the view (F81 bit 2, not full daylight) [drawing] | vars A91A 0F81 C398 C3A2 |
 | 0000:51D3 | 11 | I/O (read) | 1194:4943, 2F9F:01BF, 3065:0D2D | a far C-style wrapper of the heap allocator 0000:51EC [I/O] |  |
-| 0000:5422 | 46 | presentation (read) | 0000:10C9, 0000:4DD6, 0000:541E (+1) | saved screen region restored (A902 bit 0) [presentation] | vars A902 8F8C 8F8E 8F90 |
+| 0000:5422 | 46 | presentation (read) | 0000:10C9, 0000:117E, 0000:4DD6 (+2) | saved screen region restored (A902 bit 0) [presentation] | vars A902 8F8C 8F8E 8F90 |
 | 0000:54AB | 122 | drawing? | 0000:5458 |  | vars 8F8E 8F90 8F92 8F96 |
 | 0000:552E | 267 | under a hook | 0000:5526 |  | vars A918 A91A A916 A914 |
 | 0000:567A | 46 | drawing? | 0000:5656 |  |  |
@@ -283,13 +272,14 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:5D4E | 4 | driver (read) | 21EE:01ED | EMS handle freed at the program's end (int 67h 45h), thunk of 5D52 [driver] |  |
 | 0000:5D52 | 30 | driver (read) | 0000:01FD, 0000:5D4E | EMS handle freed at the program's end (int 67h 45h) [driver] | vars 8FA6 9038 902A |
 | 0000:5D99 | 7 | under a hook | 0000:5CCE |  |  |
-| 0000:5E0F | 29 | game | 0000:5DA0 |  |  |
-| 0000:5E2C | 17 | game | 0000:5DA0 |  |  |
+| 0000:5E0F | 29 | hardware (read) | 0000:5DA0 | EMS: a bank's 4 logical pages mapped into the frame (int 67h AH 44h) for 0000:5DA0's set-up; the harness's and the port's EMS stand in for the set-up (memory_init) [hardware] |  |
+| 0000:5E2C | 17 | hardware (read) | 0000:5DA0 | EMS: the page map saved (int 67h AX 4E00h) into the bank's buffer (9036's far pointers), the driver's own format; stood in for by the bank's number (harness/dos.py enable_ems) [hardware] |  |
 | 0000:5F9A | 73 | BIOS | 0000:8FC8 |  | vars 9144 9136 AFF9 9138 |
 | 0000:6010 | 19 | DOS I/O | 0000:600C |  |  |
 | 0000:6028 | 4 | thunk to front end | 1194:4F89, 1194:C0B1, 25FD:062D (+1) |  |  |
 | 0000:602C | 11 | DOS I/O | 0000:6028 |  |  |
 | 0000:6154 | 55 | likely inline | 0000:654A |  | vars A69E |
+| 0000:64F0 | 86 | game | 0000:654A |  | vars A836 A838 |
 | 0000:6746 | 27 | DOS I/O | 0000:31FE, 0000:3276, 0000:32FE (+9) |  |  |
 | 0000:6766 | 20 | DOS I/O | 0000:299F, 0000:603C, 0000:6154 (+6) |  |  |
 | 0000:67A2 | 4 | thunk to front end | 25FD:056F |  |  |
@@ -310,9 +300,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:6DE0 | 16 | DOS I/O | 0000:31FE, 0000:3276, 0000:3546 (+3) |  |  |
 | 0000:6DF0 | 4 | thunk to front end | 25FD:05A5 |  |  |
 | 0000:6DF4 | 9 | DOS I/O | 0000:6DF0 |  |  |
-| 0000:6E02 | 4 | thunk to front end | 21EE:0314 |  |  |
 | 0000:6E06 | 5 | DOS I/O | 0000:6E02 |  |  |
-| 0000:6F8C | 4 | thunk to front end | 1194:066A, 21EE:0000, 21EE:01ED |  |  |
 | 0000:6F90 | 41 | DOS I/O, BIOS | 0000:6F8C |  | vars 9289 A902 A920 |
 | 0000:70D8 | 49 | hardware | 0000:9B04 |  |  |
 | 0000:7158 | 45 | DOS I/O | 0000:6F06 |  |  |
@@ -343,25 +331,23 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:9026 | 220 | input (read) | 0000:8FC8 | input device handler (B028): keyboard state into AFF1..AFF9 [input] | vars B000 B002 AFF3 AFF4 |
 | 0000:9102 | 240 | input (read) | 0000:8FC8, 0000:9026 | input device handler (B028): keys to movement AFF1/AFF2 [input] | vars AFF2 AFF1 AFF9 AFF0 |
 | 0000:91F2 | 129 | hardware | 0000:9026, 0000:9273 |  | vars AFFB AFFC AFFD AFFE |
-| 0000:9273 | 108 | game | 0000:9B04 |  | vars B004 B006 B008 B00A |
+| 0000:9273 | 108 | hardware (read) | 0000:9B04 | the joystick's centre read (port 201h through 91F2) for 9B04 with AL 2; the program's one call of 9B00 (21EE:0000) passes AL 1: never run [hardware] | vars B004 B006 B008 B00A |
 | 0000:92DF | 42 | hardware | 0000:9273 |  | vars AFFA |
 | 0000:932A | 17 | I/O (read) | 0000:9326 | a resource slot freed (count 91BC) [I/O] | vars 91BC |
 | 0000:9340 | 48 | presentation (read) | 0000:933C | a window's saved background put back [presentation] |  |
 | 0000:9370 | 4 | presentation (read) | 1194:6410, 3159:0AE2 | a far entry of 0000:9374 [presentation] |  |
 | 0000:9374 | 15 | presentation (read) | 0000:9370 | a text drawn right-aligned [presentation] |  |
-| 0000:942A | 59 | presentation (read) | 0000:10C9, 0000:618F, 0000:9426 | the screen buffer cleared [presentation] | vars A902 A8FE 928A 928E |
+| 0000:942A | 59 | presentation (read) | 0000:10C9, 0000:117E, 0000:618F (+1) | the screen buffer cleared [presentation] | vars A902 A8FE 928A 928E |
 | 0000:94B1 | 61 | drawing | 0000:946A, 0000:94F2 |  |  |
 | 0000:94F2 | 76 | drawing | 0000:94EE |  | vars B032 A900 A902 |
 | 0000:9546 | 275 | likely inline | 0000:78A8 |  |  |
 | 0000:9A0C | 40 | likely inline | 0000:9A08 |  | vars A83A A83C A846 A84C |
 | 0000:9A34 | 57 | under a hook | 0000:9727 |  | vars A854 A856 A900 B038 |
-| 0000:9A9C | 36 | presentation (read) | 0000:10C9, 0000:4DD6, 0000:9A98 | clip window A914..A91E set (the view's own clip) [presentation] | vars A91E A91C A914 A916 |
+| 0000:9A9C | 36 | presentation (read) | 0000:10C9, 0000:117E, 0000:4DD6 (+1) | clip window A914..A91E set (the view's own clip) [presentation] | vars A91E A91C A914 A916 |
 | 0000:9AC4 | 34 | drawing? | 0000:9AC0 |  | vars 8F96 8F98 |
 | 0000:9B04 | 73 | likely inline | 0000:9B00 |  | vars B03A B028 B030 |
 | 0000:9B9B | 30 | hardware | 0000:654A |  |  |
 | 0000:9BBA | 22 | driver (read) | 2F9F:001F | a far C-style wrapper of a string copy (the music driver's) [driver] |  |
-| 0000:9C5E | 4 | under a hook | 21EE:0314 |  |  |
-| 0000:9C62 | 41 | under a hook | 0000:9C5E |  |  |
 | 0000:9C8C | 20 | driver (read) | 2F9F:001F | a far C-style wrapper of a string routine (the music driver's) [driver] |  |
 | 0000:9CC6 | 11 | driver (read) |  | a far C-style wrapper (the music driver's) [driver] |  |
 | 0000:9D74 | 4 | game | 3159:0F2A |  |  |
@@ -384,7 +370,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:C3A6 | 277 | drawing? |  |  | vars A844 A84C CD97 A838 |
 | 0000:C3AA | 3 | decode artefact |  | data in the hooks' table decoded as code [artefact] |  |
 | 0000:C3AE | 269 | drawing? |  |  | vars A844 A84C CD97 A838 |
-| 0000:C3BA | 257 | drawing? |  |  | vars CD97 A84C A844 A838 |
 | 0000:CD2C | 8 | decode artefact |  | the renderer's code decoded from the middle of an instruction [artefact] |  |
 | 0000:CD30 | 4 | presentation (read) | 0000:CC63, 0000:CD6C | renderer |  |
 | 0000:CD34 | 95 | renderer (read) | 0000:CC63, 0000:CD6C | renderer (CCF8 wall sides, CB37) | vars CCF8 CB37 D742 C398 |
@@ -397,7 +382,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:DF2F | 115 | presentation (read) | 0000:D4B4 | renderer's pattern fill [presentation] | vars A916 A914 CD8C C3D8 |
 | 0000:FEF8 | 46 | drawing? | 0000:ED0D, 0000:FEF4 |  |  |
 | 0000:FF26 | 78 | likely inline | 0000:B2E5, 0000:B358 |  | vars E8FE A918 A914 AF83 |
-| 0000:FF74 | 95 | game | 0000:FF26 |  | vars A836 C3D0 C3D4 C3DA |
+| 0000:FF74 | 95 | presentation (read) | 0000:FF26 | the deferred lists' (0000:FF26) visibility test, A836 1; under 7C51's deferred drawing, never reached in the 3D mode (render-gaps) [presentation] | vars A836 C3D0 C3D4 C3DA |
 | 0FFD:03C4 | 27 | hardware | 0FFD:03FD, 0FFD:0452, 0FFD:0480 (+1) |  |  |
 | 0FFD:03D7 | 1 | under a hook | 0FFD:03C4 |  |  |
 | 0FFD:03DF | 30 | hardware | 0FFD:03FD, 0FFD:0452, 0FFD:0480 |  |  |
@@ -420,8 +405,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0FFD:06FE | 75 | driver (read) | 0FFD:0A66 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0749 | 141 | drawing? | 0FFD:0A11 |  |  |
 | 0FFD:07CC | 1 | under a hook | 0FFD:0749 |  |  |
-| 0FFD:07D6 | 75 | drawing? | 1194:07DF |  |  |
-| 0FFD:0817 | 1 | under a hook | 0FFD:07D6 |  |  |
+| 0FFD:0817 | 1 | driver (read) | 0FFD:07D6 | the AIL's IRET handler, reached from its start-up (0FFD:07D6, which clears the AIL's own state in its code segment and installs it): the driver interface's own [driver] |  |
 | 0FFD:0821 | 101 | driver (read) | 2F9F:001F, 2F9F:01BF, 2F9F:04A0 | sound/music driver interface [driver] |  |
 | 0FFD:087B | 1 | driver (read) | 0FFD:0821 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0886 | 169 | driver (read) | 0FFD:0C49 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
@@ -462,25 +446,18 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:0000 | 6 | decode artefact | 1194:8020, 1194:9462, 1194:9D64 | the bytes before the segment's first routine, decoded from a near call to 0 [artefact] |  |
 | 1194:000A | 30 | DOS I/O | 1194:0067, 1194:00A4, 1194:0142 (+1) |  | vars 019A |
 | 1194:0028 | 41 | DOS I/O | 1194:0051 |  |  |
-| 1194:0051 | 22 | game | 1194:0067 |  |  |
-| 1194:00A4 | 35 | game | 2F26:000E |  |  |
+| 1194:0051 | 22 | hardware (read) | 1194:0067 | the CyberMan's driver looked for: each interrupt vector's target past 3 bytes compared with "SpaceWare (R)" (1194:0028, DGROUP 170); none without its driver, as src/start.rs's 8BEC 0 has it [hardware] |  |
+| 1194:00A4 | 35 | hardware (read) | 2F26:000E | the CyberMan's driver started (its interrupt [19A], AL 20h): only once one is found [hardware] |  |
 | 1194:00EA | 88 | hardware (read) | 1194:0142, 1194:01E9 | the CyberMan's buttons read [hardware] | vars ACB7 ACB8 ACB9 ACBA |
 | 1194:0142 | 137 | hardware (read) | 2F26:00F2, 2F26:0214, 2F26:02A1 (+4) | the CyberMan's motion read [hardware] |  |
 | 1194:01CB | 30 | hardware (read) | 1194:0142 | the CyberMan's motion scaled [hardware] |  |
 | 1194:01E9 | 36 | hardware (read) | 2F26:00A9, 2F26:03ED, 2F26:0445 | the CyberMan's state read [hardware] |  |
 | 1194:0282 | 16 | presentation (read) | 1194:020E | the menu window's frame drawn [presentation] |  |
-| 1194:066A | 326 | DOS I/O | 0000:102E |  | vars 3827 37EB 37E9 |
-| 1194:07B1 | 29 | under a hook | 1194:066A |  |  |
-| 1194:07CE | 17 | under a hook | 1194:066A |  |  |
-| 1194:07DF | 17 | under a hook | 1194:066A |  | vars 37EA |
 | 1194:0E53 | 51 | likely inline | 1194:0DE1 |  | vars 05C8 |
 | 1194:0E86 | 130 | likely inline | 1194:0DE1 |  | vars 05C8 |
 | 1194:0F08 | 208 | likely inline | 1194:0DE1 |  |  |
 | 1194:0FFB | 12 | game | 1194:0F08 |  |  |
-| 1194:124A | 116 | under a hook | 1194:122C |  | files bonus.img, charstat.img; vars 9686 9288 B7C4 1299 |
-| 1194:12BE | 40 | presentation (read) | 1194:124A, 1194:2AFA | the character sheet's picture drawn [presentation] | vars 1032 9030 |
 | 1194:12E6 | 15 | presentation (read) | 1194:124A, 1194:138E, 1194:1528 (+1) | a value drawn at (5Ch, 71h) [UI] | vars 129C |
-| 1194:12F5 | 95 | presentation (read) | 1194:124A, 1194:157E | the character sheet's page drawn [presentation] | files updown.img; vars 9030 1032 1297 |
 | 1194:1354 | 58 | presentation (read) | 1194:12F5, 1194:138E, 1194:14C5 (+1) | character creation arrows drawn [presentation] | vars 1032 9030 |
 | 1194:149D | 40 | presentation (read) | 1194:138E, 1194:1528 | the character sheet's picture put back [presentation] | vars 1032 9030 |
 | 1194:157E | 13 | presentation (read) | 1194:2AFA | the character sheet's values shown (12E6/12F5 draw, DE1) [UI] |  |
@@ -490,13 +467,12 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:1F30 | 38 | likely inline | 1194:1DC8 |  |  |
 | 1194:2315 | 16 | presentation (read) | 1194:17D8, 1194:18F6, 1194:1988 | the selected inventory line's slot [presentation] | vars 1296 |
 | 1194:2451 | 17 | game | 1194:23E5 |  |  |
-| 1194:28EC | 10 | presentation (read) |  | the window library's state for the creation screen [presentation] | files noexit.img |
-| 1194:2A69 | 52 | presentation (read) | 1194:2536 | creation's attribute screen loop around the ported rolls/checks (2AC7, 2CD0, 2D28) [UI] | vars 0D49 |
+| 1194:2902 | 67 | likely inline | 1194:2536 |  | vars 01A8 1026 |
+| 1194:2A69 | 52 | presentation (read) | 1194:2557 | creation's attribute screen loop around the ported rolls/checks (2AC7, 2CD0, 2D28) [UI] | vars 0D49 |
 | 1194:2A9D | 42 | presentation (read) | 1194:2A69 | the creation's attribute screen's picture [presentation] | vars 9030 |
 | 1194:2C96 | 42 | under a hook | 1194:2BC5 |  | vars 9030 |
-| 1194:2CC0 | 16 | presentation (read) |  | a window closed [presentation] | vars B7C4 1298 |
-| 1194:51B8 | 25 | game | 1194:51D1 |  | files spelbook.$$$; vars A8FE |
-| 1194:53E3 | 22 | game | 1194:51E6, 1194:5271, 1194:52DB |  | files spelbook.$$$; vars A8FE |
+| 1194:51B8 | 25 | likely inline | 1194:51D1 |  | files spelbook.$$$; vars A8FE |
+| 1194:53E3 | 22 | likely inline | 1194:51E6, 1194:5271, 1194:52DB |  | files spelbook.$$$; vars A8FE |
 | 1194:55D5 | 4 | thunk to front end | 0000:41A4 |  |  |
 | 1194:55D9 | 25 | drawing | 1194:55B6, 1194:55D5 |  |  |
 | 1194:5634 | 25 | presentation (read) | 1194:0E53, 1194:0E86, 1194:0F08 (+2) | a number drawn [presentation] |  |
@@ -513,9 +489,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 217B:0621 | 97 | likely inline | 217B:05C2 |  | vars C3D0 0608 A838 C3D4 |
 | 217B:0708 | 40 | drawing | 217B:0189 |  | vars A900 9288 |
 | 21EE:02CA | 40 | drawing | 21EE:028A |  | vars 1036 102C 9288 A900 |
-| 21EE:0314 | 143 | DOS I/O | 0000:102E |  | vars A836 |
-| 21EE:03A3 | 39 | DOS I/O | 0000:102E |  |  |
-| 21EE:03CA | 15 | DOS I/O | 0000:102E, 0000:109B, 21EE:01ED |  |  |
+| 21EE:03CA | 15 | DOS I/O | 0000:102E, 0000:1059, 0000:108B (+1) |  |  |
 | 222C:016E | 23 | presentation (read) | 222C:0000 | the class quiz's screen set up (font, sound) [presentation] | vars 102C 1030 |
 | 222C:02C0 | 20 | presentation (read) |  | the class quiz's screen freed [presentation] | vars 40F0 |
 | 222C:034C | 101 | presentation (read) | 222C:025A | the class quiz's question drawn [presentation] | vars 1296 1294 A900 40F2 |
@@ -545,9 +519,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2F26:03FD | 72 | game | 3159:06A0 |  | vars 8F38 8BEC |
 | 2F26:0445 | 107 | input (read) | 0000:2DB5 | key handling [input] | vars 8F37 8F36 8BEC 126C |
 | 2F26:04B0 | 50 | input (read) | 2826:0002, 2826:0042 | key handling [input] | vars 8BEC CCBA 7A46 |
-| 2F9F:000D | 17 | driver (read) | 2294:04F5 | the music driver's call [driver] | vars EB00 EB93 |
-| 2F9F:0364 | 212 | under a hook | 1194:066A |  | vars EB95 EB91 8F64 8F62 |
-| 2F9F:04A0 | 108 | driver (read) | 0000:102E, 0000:109B, 21EE:01ED | music shutdown: its buffers freed (6C26) and the driver stopped (0FFD:0821) [driver] | vars 8F5E 8F60 8F62 8F64 |
+| 2F9F:04A0 | 108 | driver (read) | 0000:108B, 21EE:01ED | music shutdown: its buffers freed (6C26) and the driver stopped (0FFD:0821) [driver] | vars 8F5E 8F60 8F62 8F64 |
 | 3159:00F3 | 126 | likely inline | 3159:000C |  | vars AFF9 B7C6 B7C4 B7D4 |
 | 3159:02B2 | 29 | game | 3159:033D, 3159:0494 |  | vars BA0E |
 | 3159:02CF | 29 | game | 3159:033D, 3159:0403 |  | vars BA12 |

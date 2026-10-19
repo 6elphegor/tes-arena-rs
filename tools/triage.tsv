@@ -427,3 +427,10 @@
 0000:5D52	driver	EMS handle freed at the program's end (int 67h 45h)
 2542:0380	trivial	the bar's map button: 7924 set the automap (045A), else the world map (03BF) (the view's sheets.rs bar_click, as menukeys' MenuKey)
 2542:0486	trivial	the bar's weapon button: ready_weapon's test and toggle (menukeys.rs ready_weapon)
+1194:0051	hardware	the CyberMan's driver looked for: each interrupt vector's target past 3 bytes compared with "SpaceWare (R)" (1194:0028, DGROUP 170); none without its driver, as src/start.rs's 8BEC 0 has it
+1194:00A4	hardware	the CyberMan's driver started (its interrupt [19A], AL 20h): only once one is found
+0000:5E0F	hardware	EMS: a bank's 4 logical pages mapped into the frame (int 67h AH 44h) for 0000:5DA0's set-up; the harness's and the port's EMS stand in for the set-up (memory_init)
+0000:5E2C	hardware	EMS: the page map saved (int 67h AX 4E00h) into the bank's buffer (9036's far pointers), the driver's own format; stood in for by the bank's number (harness/dos.py enable_ems)
+0000:9273	hardware	the joystick's centre read (port 201h through 91F2) for 9B04 with AL 2; the program's one call of 9B00 (21EE:0000) passes AL 1: never run
+0000:FF74	presentation	the deferred lists' (0000:FF26) visibility test, A836 1; under 7C51's deferred drawing, never reached in the 3D mode (render-gaps)
+0FFD:0817	driver	the AIL's IRET handler, reached from its start-up (0FFD:07D6, which clears the AIL's own state in its code segment and installs it): the driver interface's own

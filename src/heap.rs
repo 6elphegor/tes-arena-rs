@@ -24,7 +24,9 @@ pub mod var {
     pub const FIRST: u16 = 0x0157;
     /// Top of memory (paragraph), from startup.
     pub const TOP: u16 = 0x015D;
-    /// Non-zero when startup shrinks the DOS block (not ported).
+    /// Non-zero when startup shrinks the DOS block (int 21h AH 4Ah to
+    /// the heap's top less this, 0000:00DF). 0 in the image, and no
+    /// instruction of the program writes it: the shrink never runs.
     pub const SHRINK: u16 = 0x002B;
     /// Free paragraphs, kept loosely: an exact fit subtracts the size,
     /// a split the size plus the new header, a free the size plus one
@@ -53,13 +55,13 @@ impl Machine {
     /// 0000:00CC (startup): one free block from the first header to
     /// 3 paragraphs short of TOP. `start` is the first header's segment
     /// (DGROUP 0159; offset 0157 stays as the image has it). None where
-    /// startup would shrink its DOS block (not ported).
+    /// startup would shrink its DOS block: never, SHRINK being 0 always.
     pub fn heap_init(&mut self, start: u16, top: u16) -> Option<()> {
         self.mem.w16(DS, FIRST + 2, start);
         self.mem.w16(DS, TOP, top);
         let paras = top.wrapping_sub(start).wrapping_sub(3);
         if self.mem.r16(DS, SHRINK) != 0 {
-            return crate::giveup::not_ported("0000:00CC: startup shrinking its DOS block: not ported");
+            return crate::giveup::not_ported("0000:00CC: startup shrinking its DOS block (SHRINK is 0 in every run of the original): not ported");
         }
         let (seg, off) = self.heap_far(DS, FIRST);
         for i in 0..4 {

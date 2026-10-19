@@ -29,14 +29,26 @@ are logged and return at once; so is a message printed (int 21h AH 9h,
 by its offset). A case's PSP is at segment 8F00h and its environment at
 8E00h, outside the image and the heap in the harness and the port alike.
 
+The program's own start (`c_start`, 0000:0000 to main; `main_head`,
+0000:102E to its call of 21EE:0000) runs from the entry with DOS's and
+the BIOS's answers modelled: the version, the interrupt table (each
+vector a stand-in, `vector`), the ticks and midnight's flag, the
+screen's attribute; the DTA's setting logged. It stops at main's call of
+21EE:0000 (main), main's quitting after the CD-ROM check (quit) or the
+start-up's for want of memory (memory).
+
 Lines:
   args | n | tail | carry | log | runs | digest | psp
   cd | n | drive cds first ax bx | env | carry | log | runs | digest
+  start | n | top version cx dx al attr | drive cds first ax bx | tail | env | stop | log | runs | digest | heap | psp | midnight
 
 `tail` and `env` hex; `log` comma-separated: startup, sound:NAME,
 music:NAME (hex), video, print:OFF; `runs` the DGROUP bytes the case
-changed (start+length, hex) and `digest` theirs after (FNV-1a); `psp`
-the digest of the PSP's 100h bytes after.
+changed (start+length, hex) and `digest` theirs after (FNV-1a; main's
+error handler's segment A906 taken 1000h lower, as the port's unrelocated
+image has it; from the stack's segment on left out); `psp` the digest of the PSP's
+100h bytes after, `heap` the first header's 11 bytes, `midnight` the
+BIOS's byte 0040:0070.
 """
 import os
 import random
@@ -47,7 +59,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from emu import fnv, LOAD_SEG
 from dos import DosArena
 from unicorn import UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EFLAGS, UC_X86_REG_SP, UC_X86_REG_SS
+from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_EFLAGS, UC_X86_REG_IP, UC_X86_REG_SP, UC_X86_REG_SS
 
 PSP, ENV = 0x8F00, 0x8E00
 AIL_STARTUP = (0x0FFD, 0x07D6)
@@ -61,6 +73,7 @@ class CmdArena(DosArena):
         super().__init__(exe, game)
         self.log = []
         self.cd = None
+        self.start = None
         for at, what in ((AIL_STARTUP, 'startup'), (SOUND_LOAD, 'sound'), (MUSIC_LOAD, 'music'), (VIDEO, 'video')):
             lin = self.lin(LOAD_SEG + at[0], at[1])
             self.mu.mem_write(lin, b'\xcb')
@@ -77,6 +90,9 @@ class CmdArena(DosArena):
 
     def _intr(self, mu, intno, u):
         ah = self._reg('ax') >> 8
+        st = self.start
+        if st is not None and self._start_int(intno, ah, st):
+            return
         if intno == 0x21 and ah == 0x09:
             self.log.append(f'print:{self._reg("dx"):x}')
             return
@@ -95,6 +111,36 @@ class CmdArena(DosArena):
                 self._wreg('bx', self.cd['bx'])
                 return
         super()._intr(mu, intno, u)
+
+    def _start_int(self, intno, ah, st):
+        """DOS's and the BIOS's answers to the start-up: the version, the
+        interrupt table (`vector`), the ticks, the screen's attribute."""
+        if intno == 0x21 and ah == 0x30:
+            self._wreg('ax', st['version'])
+        elif intno == 0x21 and ah == 0x35:
+            n = self._reg('ax') & 0xFF
+            off, seg = struct.unpack('<HH', bytes(self.mu.mem_read(4 * n, 4)))
+            self._wreg('bx', off)
+            self._wreg('es', seg)
+        elif intno == 0x21 and ah == 0x25:
+            n = self._reg('ax') & 0xFF
+            self.mu.mem_write(4 * n, struct.pack('<HH', self._reg('dx'), self._reg('ds')))
+        elif intno == 0x21 and ah == 0x1A:
+            self.log.append(f'dta:{(self._reg("ds") - LOAD_SEG) & 0xFFFF:x}:{self._reg("dx"):x}')
+        elif intno == 0x1A and ah == 0:
+            self._wreg('cx', st['cx'])
+            self._wreg('dx', st['dx'])
+            self._wreg('ax', (self._reg('ax') & 0xFF00) | st['al'])
+        elif intno == 0x10 and ah == 8:
+            self._wreg('ax', st['attr'] << 8 | 0x20)
+        else:
+            return False
+        return True
+
+
+def vector(n):
+    """The interrupt table's stand-in vectors (segment high)."""
+    return (0x0F00 + n) << 16 | (n * 0x111) & 0xFFFF
 
 
 def runs_digest(d0, d1):
@@ -143,6 +189,82 @@ def cd_case(a, cd, env):
     a.cd = None
     head = f'{cd["drive"]:x} {cd["cds"]:x} {cd["first"]:x} {cd["ax"]:x} {cd["bx"]:x}'
     return f'{head} | {env.hex()} | {carry(a)} | {",".join(a.log) or "-"} | {runs} | {digest}'
+
+
+STOPS = {0x1051: 'main', 0x10C2: 'quit', 0x0248: 'memory'}
+STACK = ((0x4A8F - 0x3BA0) * 16, 0x10000)
+
+
+def start_case(a, st, cd, tail, env):
+    """The program from its entry 0000:0000, loaded at LOAD_SEG with its
+    PSP at PSP (its top of memory `top`, its environment ENV) and its
+    stack where the header puts it (SS 4A8Fh past the load, SP 80h), up
+    to main's call of 21EE:0000 (0000:1051), main's quitting after the
+    CD-ROM check (10C2) or the start-up's for want of memory (0248)."""
+    for n in range(0x100):
+        a.mu.mem_write(4 * n, struct.pack('<I', vector(n)))
+    a.mu.mem_write(a.lin(PSP, 0), bytes(0x100))
+    a.w16(2, st['top'], seg=PSP)
+    a.w16(0x2C, ENV, seg=PSP)
+    a.mu.mem_write(a.lin(PSP, 0x80), bytes([len(tail)]) + tail + b'\r')
+    a.mu.mem_write(a.lin(ENV, 0), bytes(0x200))
+    a.mu.mem_write(a.lin(ENV, 0), env)
+    a.start, a.cd, a.log = st, cd, []
+    d0 = a.seg_bytes(a.ds)
+    stopped = []
+
+    def stop(mu, addr, size, what):
+        stopped.append(what)
+        mu.emu_stop()
+    hooks = [a.mu.hook_add(UC_HOOK_CODE, stop, begin=a.lin(LOAD_SEG, off), end=a.lin(LOAD_SEG, off), user_data=what)
+             for off, what in STOPS.items()]
+    a._setup([], dict(ds=PSP, es=PSP, ss=LOAD_SEG + 0x4A8F, sp=0x80))
+    a.mu.reg_write(UC_X86_REG_CS, LOAD_SEG)
+    a.mu.reg_write(UC_X86_REG_IP, 0)
+    a.fault = None
+    a.mu.emu_start(a.lin(LOAD_SEG, 0), 0xFFFFF, count=20_000_000)
+    for h in hooks:
+        a.mu.hook_del(h)
+    assert a.fault is None and stopped, f'the start ran off: fault {a.fault}'
+    a.start = a.cd = None
+    d1 = bytearray(a.seg_bytes(a.ds))
+    # main's error handler's segment (0000:11DA's), 1000h lower as the port's.
+    w = struct.unpack_from('<H', d1, 0xA906)[0]
+    struct.pack_into('<H', d1, 0xA906, (w - LOAD_SEG) & 0xFFFF if d0[0xA906:0xA908] != d1[0xA906:0xA908] else w)
+    # The stack (SS 4A8Fh, SP from 80h to C10h: DGROUP EEF0h..FAFFh) holds
+    # the start-up's and main's frames, not the game's state; past it the
+    # heap's first header (the `heap` field), in the harness's DGROUP
+    # window only (its image is 1000h higher).
+    d1[STACK[0]:STACK[1]] = d0[STACK[0]:STACK[1]]
+    runs, digest = runs_digest(d0, d1)
+    first = a.r16(0x159)
+    heap = bytes(a.mu.mem_read(a.lin(first, 0), 11)).hex() if stopped[0] != 'memory' else '-'
+    psp = f'{fnv(bytes(a.mu.mem_read(a.lin(PSP, 0), 0x100))):x}'
+    bios = a.mu.mem_read(a.lin(0x40, 0x70), 1)[0]
+    head = ' '.join(f'{st[k]:x}' for k in ('top', 'version', 'cx', 'dx', 'al', 'attr'))
+    cdh = ' '.join(f'{cd[k]:x}' for k in ('drive', 'cds', 'first', 'ax', 'bx'))
+    return (f'{head} | {cdh} | {tail.hex()} | {env.hex()} | {stopped[0]} | {",".join(a.log) or "-"} | '
+            f'{runs} | {digest} | {heap} | {psp} | {bios:x}')
+
+
+def starts(r):
+    ok = dict(drive=3, cds=1, first=3, ax=0, bx=0)
+    plain = b'COMSPEC=C:\\COMMAND.COM\0PATH=C:\\DOS\0\0'
+    bat = b'-Ssbpdig.adv -IOS220 -IRQS7 -DMAS1 -Msbp1fm.adv -IOM220'
+    base = dict(top=0xA000, version=0x0005, cx=0x0012, dx=0x3456, al=0, attr=7)
+    yield base, ok, b'', plain
+    yield dict(base, al=1, version=0x1406), ok, bat, b'ARENADATA=D:\\ARENA\0\0'
+    yield base, dict(ok, cds=0), b'', plain
+    yield base, dict(ok, drive=2, ax=0, bx=0xADAD), bat, plain
+    yield dict(base, top=0x5B00), ok, b'', plain
+    yield dict(base, top=0x5B50), ok, b'', plain
+    yield dict(base, top=0x5B4F), ok, b'', plain
+    for _ in range(12):
+        st = dict(top=r.choice([0xA000, 0x9FC0, 0x8000, 0xFFFF, 0x5C00]), version=r.randrange(0x10000),
+                  cx=r.randrange(0x18), dx=r.randrange(0x10000), al=r.choice([0, 0, 1, 0x80]), attr=r.randrange(0x100))
+        cd = dict(drive=r.randrange(5), cds=r.choice([0, 1, 1, 2]), first=r.randrange(5),
+                  ax=r.choice([0, 1]), bx=r.choice([0xADAD, 0]))
+        yield st, cd, r.choice([b'', bat, b'  -X ', b'a b c']), r.choice([plain, b'ARENADATA=E:\\X\0\0', b'\0\0'])
 
 
 # The options ARENA.BAT's set-ups pass, and the others the parser tells.
@@ -262,6 +384,9 @@ def main():
             a.restore(base)
             out.write(f'cd | {n} | {cd_case(a, cd, env)}\n')
             n += 1
+    for n, (st, cd, tail, env) in enumerate(starts(r)):
+        a.restore(base)
+        out.write(f'start | {n} | {start_case(a, st, cd, tail, env)}\n')
     out.close()
 
 
