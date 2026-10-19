@@ -327,15 +327,16 @@ the original routine:
 | `SpellPageHooks::type_name` | src/spellpage.rs:80 | 1194:65FD | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
 | `SpellPageHooks::write` | src/spellpage.rs:90 | 25FD:0844, 0000:9DD2 | port | the default runs the port | |
 | `SpellmakerHooks::click` | src/spellmaker.rs:75 | 1194:5651 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
-| `SpellmakerHooks::font_selected` | src/spellmaker.rs:101 | 0000:9AE6, 9AF8 | port | the default runs the port (`font_selected`); tests/spellmaker.rs turns it off as gen_spellmaker.py stubs them | fixed: 6064's and the form's font (B036) and tiles (B038) were never selected, so the lists' rows were 11 high, not 9 |
+| `SpellmakerHooks::font_selected` | src/spellmaker.rs:107 | 0000:9AE6, 9AF8 | port | the default runs the port (`font_selected`); tests/spellmaker.rs turns it off as gen_spellmaker.py stubs them | fixed: 6064's and the form's font (B036) and tiles (B038) were never selected, so the lists' rows were 11 high, not 9 |
 | `SpellmakerHooks::picture` | src/spellmaker.rs:95 | 1194:68D7 | port | the default loads 68D7's picture into bank [1032] (`sm_screen`); tests/spellmaker.rs turns it off as gen_spellmaker.py stubs 541E and 56C8 | fixed: SPELLMKR.IMG wasn't loaded into bank 12h |
-| `SpellmakerHooks::form` | src/spellmaker.rs:118 |  | present | an effect's form shown | |
+| `SpellmakerHooks::texts` | src/spellmaker.rs:101 | 1194:68D7, 6C97 | port | the default keeps the name's background (8F26) and draws 68D7's texts (9E06) on the game's page (`sm_screen`); tests/spellmaker.rs turns it off as gen_spellmaker.py stubs 8F26 and 9E06 | fixed: the texts were the front end's, never on the game's page |
+| `SpellmakerHooks::form` | src/spellmaker.rs:124 |  | present | an effect's form shown | |
 | `SpellmakerHooks::list` | src/spellmaker.rs:89 | 1194:5734 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
-| `SpellmakerHooks::menu` | src/spellmaker.rs:106 | 1194:020E | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
-| `SpellmakerHooks::message_box` | src/spellmaker.rs:111 | 1194:59CC | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
-| `SpellmakerHooks::screen` | src/spellmaker.rs:116 |  | overridden | the view: spellmaker.rs Maker | present: the spellmaker's (screens.txt) |
-| `SpellmakerHooks::spells_write` | src/spellmaker.rs:121 | 29CF:06CB | port | the default runs the port | |
-| `SpellmakerHooks::type_name` | src/spellmaker.rs:114 | 0000:9EE5 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
+| `SpellmakerHooks::menu` | src/spellmaker.rs:112 | 1194:020E | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
+| `SpellmakerHooks::message_box` | src/spellmaker.rs:117 | 1194:59CC | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
+| `SpellmakerHooks::screen` | src/spellmaker.rs:122 |  | overridden | the view: spellmaker.rs Maker | present: the spellmaker's (screens.txt) |
+| `SpellmakerHooks::spells_write` | src/spellmaker.rs:128 | 29CF:06CB | port | the default runs the port (the path, 25FD:0844, then the write); tests/spellmaker.rs logs it as gen_spellmaker.py stubs both | fixed: the path wasn't made, so the paths' toggle (1AEA) was a flip behind and the guild's stock was named in the other buffer (DGROUP 1B47) |
+| `SpellmakerHooks::type_name` | src/spellmaker.rs:120 | 0000:9EE5 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
 | `StairsHooks::ask_leave` | src/hooks.rs:64 | 26F7:0000 | overridden | the view: main.rs Front<'_> | faithful: the travel map (travelmap vectors, dungeonscreens) |
 | `StairsHooks::automap_keep` | src/hooks.rs:43 | 292B:095E | overridden | the view: areas.rs Kept, main.rs Front<'_> | faithful: `states_keep` |
 | `StairsHooks::automap_load` | src/hooks.rs:46 | 292B:09AC | overridden | the view: areas.rs Kept, main.rs Front<'_> | faithful: `states_load` |
