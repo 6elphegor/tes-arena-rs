@@ -820,6 +820,11 @@ CASES = {
     # world loop, the outer loop's way out and main back to its menu (as
     # playnew, which runs the handler between frames).
     'playoptionsend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 288, 132)], 'ends': True})]),
+    # The options screen's Load (2542:061E, the load menu 25FD:0242), Esc
+    # let go first (held, the menu's click, 1194:564D, takes it as Esc and
+    # leaves), slot 1 (the save's own game) taken: the load returns into
+    # the frame Esc opened the screen in, which runs on to its end.
+    'playoptionsload': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('up', [KEY_ESC]), ('click', 96, 132), ('click', 160, 21)], 'ends': True})]),
     'playmapend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
     'playjourneyend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL + [('keys', [KEY_SPACE])] * 4, 'leaves': True, 'ends': True})]),
     'playnewend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 32, 132)], 'dies': True, 'title': True})]),

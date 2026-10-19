@@ -232,6 +232,7 @@ stateload | travelfast | 151+1 5c9+1 5cb+4 5d2+1 5d6+1 5da+1 5e6+1 a20+1 a22+a a
 stateems | travelfast | 825d1 a54d33a46c79d339 | 923b3b76b9de5001
 screen | travelfast | 2437d0cc0d18398a bfc2a8a6ad1c1a8f df87cca47c2f5ed6
 boxview | travelfast | 2 3b3a664f2c6e5649
+provincepage | travelfast | a30f0d5269c4cd24
 rows | travelfast | 7 c3aec45e3a251684
 track | wilddungeon | 0 0 1b94 3c 2ff8 0
 track | wilddungeon | 1 0 1b94 3c 2ffb 0

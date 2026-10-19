@@ -46,7 +46,7 @@ use crate::mem::DS;
 
 mod poly;
 mod sky;
-pub use sky::image_page;
+pub use sky::{clipped_page, image_page};
 
 /// The rows' offsets on the page (A6A0, a word a row).
 const ROWS: u16 = 0xA6A0;

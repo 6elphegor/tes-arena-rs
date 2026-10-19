@@ -1995,19 +1995,31 @@ fn the_options_screen_by_esc() {
     let mut script = Clicks(clicks.iter().rev().map(|&(x, y)| (x as u16, y as u16)).collect());
     assert_eq!(b.m.options_screen(&mut b.files, &mut script), Some(arena::options::OptionsEnd::Resume));
     assert_eq!(v(&a.engine.m), v(&b.m), "as the port's screen with the same clicks");
-    // The sound's and the music's up arrows: up by one each.
+    // The sound's and the music's up arrows: up by one each. (A frame
+    // first, as play has between the screens: its menu keys find Esc let
+    // go and clear its latch, 2542:05D1, which the screen's Esc left set;
+    // a box it shows read.)
+    let between = |a: &mut App, d: &mut Driver| {
+        d.frame(a);
+        while !a.boxes.is_empty() {
+            d.key(a, KeyCode::Space, Some(" "));
+        }
+    };
+    between(&mut a, &mut d);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x30, 0x50, MouseButton::Left);
     d.click(&mut a, 0x80, 0x50, MouseButton::Left);
     d.click(&mut a, 0x120, 0x80, MouseButton::Left);
     assert_eq!(v(&a.engine.m), (s0.saturating_sub(1), m0, 15), "the up arrows");
     // Load: the load menu.
+    between(&mut a, &mut d);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0x60, 0x80, MouseButton::Left);
     assert!(a.options.is_none() && a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::Load), "Load: the load menu");
     d.key(&mut a, KeyCode::Escape, None);
     assert!(a.saveui.is_none(), "the load menu left");
     // Exit: "Are you sure ?"; No stays, Yes quits.
+    between(&mut a, &mut d);
     d.key(&mut a, KeyCode::Escape, None);
     d.click(&mut a, 0xE0, 0x80, MouseButton::Left);
     assert!(a.options.as_ref().is_some_and(|u| u.confirm.is_some()), "Exit asks");

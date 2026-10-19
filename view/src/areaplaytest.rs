@@ -39,6 +39,9 @@ thread_local! {
     /// map's journey box): the frame it opened in and that screen's first
     /// 92h rows, for `boxview` in place of the frame's view.
     static BOXED: std::cell::Cell<Option<(usize, u64)>> = const { std::cell::Cell::new(None) };
+    /// The game's page as the first province's map opened left it
+    /// (`Travel::province_page`), for `provincepage`.
+    static PROVINCE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
 
 /// `n` frames as gen_areaplay.py's steps play them, a box read with Space
@@ -224,6 +227,9 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                     if let Some(p) = a.travel.as_ref().and_then(|t| t.boxed_over.as_ref()) {
                         BOXED.set(Some((frame, fnv(p[..0x92 * 320].iter().copied()))));
                     }
+                    if let Some(p) = a.travel.as_ref().and_then(|t| t.province_page.as_ref()) {
+                        PROVINCE.set(Some(fnv(p.iter().copied())));
+                    }
                 }
                 for _ in 0..100 {
                     if a.travel.is_none() {
@@ -280,6 +286,15 @@ fn transit(name: &str) {
         );
         let view = BOXED.take().filter(|&(f, _)| f == frame).map(|(_, v)| v).or_else(|| VIEWS.with(|v| v.borrow().get(frame).copied().flatten()));
         assert_eq!(view, Some(digest), "{name}: the 3D view the box opens over (frame {frame}) differs from the original's");
+    }
+    // The province's map as its picture and its places' icons leave the
+    // game's page (26F7:01CD), the first opened.
+    for f in text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).filter(|f| f.len() == 3 && f[0] == "provincepage" && f[1] == name) {
+        let digest = u64::from_str_radix(f[2], 16).unwrap();
+        let (place, setup, play) = transit_case(name).unwrap();
+        PROVINCE.set(None);
+        played(place, setup, play);
+        assert_eq!(PROVINCE.take(), Some(digest), "{name}: the province's map's page differs from the original's");
     }
     state_compared_in(AREAPLAY, name, false, transit_case(name).unwrap());
     state_compared_in(AREAPLAY, name, true, transit_case(name).unwrap());
@@ -369,6 +384,8 @@ fn fast_travel_frames_as_the_original() {
 /// off, C39A bit 20h on) the machine's, so the near lights are made
 /// (0000:E12E, C8ED) and the next frames' sky left out (D502). The
 /// journey's box opens over the province's map (`Travel::boxed_over`).
+/// The province's map's page, its picture and its places' icons drawn by
+/// the game (0000:56C8, 26F7:0268), is the original's.
 #[test]
 fn fast_travel_as_the_original() {
     transit("travelfast");

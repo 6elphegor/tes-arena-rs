@@ -33,6 +33,12 @@ number the track's:
 
   boxview | NAME | <frame> <digest>
 
+and, where a province's map opens (26F7:0176), the page as its picture
+and its places' icons leave it (26F7:01CD, before its copy to bank 4),
+the first such:
+
+  provincepage | NAME | <digest>
+
 With --dump DIR, each case's NAME.ds/.ems (as it ends) and NAME.ds0/
 .ems0 (as it starts) for worldtest's state reports (game data: never
 commit them).
@@ -228,10 +234,18 @@ def main():
                 seg = a.r16(PAGE_SEG_FIELD)
                 boxed.append((len(tracks) - 1, fnv(bytes(a.mu.mem_read(a.lin(seg, 0), 0x92 * 320)))))
         hook = a.mu.hook_add(UC_HOOK_CODE, box, None, a.lin(LOAD_SEG, 0x8F2A), a.lin(LOAD_SEG, 0x8F2A))
+        province = []
+
+        def drawn(*_):
+            if not province:
+                seg = a.r16(PAGE_SEG_FIELD)
+                province.append(fnv(bytes(a.mu.mem_read(a.lin(seg, 0), 64000))))
+        hook2 = a.mu.hook_add(UC_HOOK_CODE, drawn, None, a.lin(LOAD_SEG + 0x26F7, 0x01CD), a.lin(LOAD_SEG + 0x26F7, 0x01CD))
         try:
             full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
         finally:
             a.mu.hook_del(hook)
+            a.mu.hook_del(hook2)
         for t in tracks:
             out.write(t)
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
@@ -242,6 +256,8 @@ def main():
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         for frame, digest in boxed:
             out.write(f'boxview | {name} | {frame} {digest:x}\n')
+        for digest in province:
+            out.write(f'provincepage | {name} | {digest:x}\n')
         out.write(w.rows_line(a, name))
         if dump:
             os.makedirs(dump, exist_ok=True)

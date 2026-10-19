@@ -536,6 +536,12 @@ class ScreenArena(DosArena):
                         # each (`press`) from the wait, then on.
                         self.pressed = act[1]
                         mu.emu_stop()
+                    elif act[0] == 'up':
+                        # Keys held let go (their break codes alone), as
+                        # `keys` runs them, then on.
+                        self.pressed = act[1]
+                        self.let_go = True
+                        mu.emu_stop()
                     return
                 self.waiting = ('call', w)
                 mu.emu_stop()
@@ -552,7 +558,8 @@ class ScreenArena(DosArena):
                     break
                 keys, self.pressed = self.pressed, None
                 cs, ip = mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP)
-                self.press(keys)
+                self.press(keys, up=getattr(self, 'let_go', False))
+                self.let_go = False
                 start = self.lin(cs, ip)
         finally:
             for h in hooks:
@@ -645,15 +652,16 @@ class ScreenArena(DosArena):
     # The registers a key's interrupt leaves as it found them.
     KEPT = ('ax', 'bx', 'cx', 'dx', 'si', 'di', 'bp', 'sp', 'ss', 'ds', 'es', 'fs', 'gs', 'eflags', 'cs', 'ip')
 
-    def press(self, scans):
+    def press(self, scans, up=False):
         """Each scan code given to the key interrupt (0000:718A from its
         port's read, 71BB, to 72B2: the PIC's end left out, as
-        gen_lineedit.py runs it) pressed and then let go, on the stack
-        under the game's, the game's registers kept round it."""
+        gen_lineedit.py runs it) pressed and then let go (with `up` only
+        let go), on the stack under the game's, the game's registers kept
+        round it."""
         mu = self.mu
         kept = {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in self.KEPT}
         for scan in scans:
-            for code in (scan, scan | 0x80):
+            for code in ((scan | 0x80,) if up else (scan, scan | 0x80)):
                 sp = (kept['sp'] - 0x200) & 0xFFFF
                 mu.mem_write(self.lin(kept['ss'], sp), struct.pack('<H', code | code << 8))
                 for r, v in dict(ss=kept['ss'], sp=sp, ds=self.ds, es=self.ds).items():
