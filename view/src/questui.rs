@@ -211,9 +211,9 @@ impl QuestHooks for QuestFront<'_, '_> {
     /// text's box left: its last wait for the buttons' release polls the
     /// mouse (0000:9012, INT 33h AX 3, CX halved), so the screen rolls
     /// the cursor's column (8F92) times before 0FDD 8Eh sets 32h points.
-    fn finale(&mut self, m: &mut Machine) {
+    fn finale(&mut self, m: &mut Machine, files: &mut Files) {
         let levels = m.mem.r16(DS, arena::controls::var::MOUSE_X);
-        if m.level_up_screen(levels, &mut *self.0).is_none() {
+        if m.level_up_screen(levels, files, &mut *self.0).is_none() {
             eprintln!("the finale's level-up gave up: {}", arena::giveup::describe());
         }
     }

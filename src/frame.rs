@@ -153,7 +153,7 @@ impl ClockHooks for NoFrameHooks {
     fn exhausted(&mut self, _m: &mut Machine) -> Option<bool> {
         Some(false)
     }
-    fn level_up_screen(&mut self, _m: &mut Machine, _levels: u16) -> Option<()> {
+    fn level_up_screen(&mut self, _m: &mut Machine, _files: &mut Files, _levels: u16) -> Option<()> {
         Some(())
     }
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {

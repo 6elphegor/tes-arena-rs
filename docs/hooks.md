@@ -73,7 +73,7 @@ the original routine:
 | `ClockHooks::encounter_minute` | src/clock.rs:73 | 1194:86F2 | overridden | the view: main.rs Front<'_> | faithful: `quest_ambush` (ambush vectors); its fight's music is `FightHooks::fight_music`'s |
 | `ClockHooks::exhausted` | src/clock.rs:80 | 2901:0014 | original | Some(true): the port's `exhaustion` runs | |
 | `ClockHooks::exhaustion_box` | src/clock.rs:85 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
-| `ClockHooks::level_up_screen` | src/clock.rs:94 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt) |
+| `ClockHooks::level_up_screen` | src/clock.rs:94 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt, worldframes playlevelup) |
 | `ClockHooks::quests_daily` | src/clock.rs:54 | 1194:99F8 | overridden | the view: main.rs Front<'_> | faithful: `quests_daily` with its texts (hooktest) |
 | `ClockHooks::quests_hourly` | src/clock.rs:60 | 1194:98E8 | overridden | the view: main.rs Front<'_> | faithful: `quests_hourly` with its texts (hooktest) |
 | `ClockHooks::view_cleared` | src/clock.rs:88 | 0000:4EFD | present | the view filled with 9288's colour, which the port sets | |
@@ -154,12 +154,17 @@ the original routine:
 | `HaggleIo::say` | src/haggle.rs:136 | 1194:49FF | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
 | `HaggleIo::shown` | src/haggle.rs:147 | 1194:4E54, 4E88, 5FC0 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's dialogs' state as the original's (worldframes.txt's playstore and playguild state lines) |
 | `HaggleIo::type_offer` | src/haggle.rs:120 | 1194:810D, 4E88 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
-| `LevelUpHooks::keep_screen` | src/levelup.rs:75 | 1194:158F | present | the screen kept to CHARSHET.$$$ | |
-| `LevelUpHooks::message_box` | src/levelup.rs:88 | 1194:59CC | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
-| `LevelUpHooks::restore` | src/levelup.rs:90 | 0000:541E, A6B5 | present | the game's screen back | |
-| `LevelUpHooks::screen` | src/levelup.rs:78 |  | present | the screen drawn | |
-| `LevelUpHooks::sound` | src/levelup.rs:71 | 23BA:012B | port | the default runs the port | |
-| `LevelUpHooks::spend` | src/levelup.rs:83 | 1194:122C | overridden | the view: main.rs Front<'_> | faithful: answered on the attribute screen, `spend_in_turn` without one (screens.txt) |
+| `LevelUpHooks::body` | src/levelup.rs:119 | 1194:2462 | port | the default runs the port (`equip_frames`); the stubbed levelup vectors stub it | |
+| `LevelUpHooks::dac` | src/levelup.rs:94 | 0000:6E3C | overridden | the view: main.rs Front<'_> | faithful: the colours shown, as the travel map's keep reads them (worldframes playlevelup) |
+| `LevelUpHooks::keep_screen` | src/levelup.rs:106 | 1194:158F | port | the default runs the port (`sheet_keep`) | |
+| `LevelUpHooks::message_box` | src/levelup.rs:141 | 1194:59CC | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
+| `LevelUpHooks::points_screen` | src/levelup.rs:124 | 1194:124A | port | the default runs the port (`Machine::points_screen`) | |
+| `LevelUpHooks::points_screen_end` | src/levelup.rs:136 | 1194:1241 | port | the default runs the port (`Machine::points_screen_end`) | |
+| `LevelUpHooks::restore` | src/levelup.rs:144 | 0000:541E, A6B5 | port | the default runs the port (`world_back`) | |
+| `LevelUpHooks::screen` | src/levelup.rs:112 | 0000:9A98, 9426, 1194:55B2 | port | the default runs the port (the clip, the page cleared, 929E black; the fade the front end's) | |
+| `LevelUpHooks::sound` | src/levelup.rs:89 | 23BA:012B | port | the default runs the port | |
+| `LevelUpHooks::spend` | src/levelup.rs:132 | 1194:122C | overridden | the view: main.rs Front<'_> | faithful: answered on the attribute screen, the clicks replayed (`attribute_arrow`), `spend_in_turn` without one (worldframes playlevelup, screens.txt) |
+| `LevelUpHooks::world_keep` | src/levelup.rs:99 | 0000:541E, A611 | port | the default runs the port (`world_keep`, the colours `dac`) | |
 | `LightHooks::fog_fill` | src/light.rs:63 | 0000:9A6E | overridden | the view: main.rs LightState | faithful: the fill colour kept for the page (playfog) |
 | `LightHooks::fog_light_table` | src/light.rs:60 | 2294:0C36 | overridden | the view: main.rs LightState | faithful: FOG.LGT's table (playfogfirst) |
 | `LightHooks::lgt` | src/light.rs:57 | 0000:7428 | overridden | the view: main.rs LightState, world.rs Lgt<'_> | faithful: the .LGT loaded |

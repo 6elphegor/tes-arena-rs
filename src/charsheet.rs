@@ -1234,7 +1234,7 @@ impl Machine {
     /// 1194:158F: the body drawn on the cleared page and the page written
     /// to CHARSHET.$$$ (with bank 5 mapped first), the face written to
     /// SAVEFACE.$$$; 5E0 bit 200h set: kept.
-    fn sheet_keep(&mut self, files: &mut Files) -> Option<()> {
+    pub(crate) fn sheet_keep(&mut self, files: &mut Files) -> Option<()> {
         let bank = self.mem.r16(DS, 0x1030);
         let old = self.map_bank(bank, 0);
         let page = self.mem.r16(DS, 0xA900);
@@ -1349,7 +1349,7 @@ impl Machine {
 
     /// 1194:1647: CHARSHET.$$$ loaded into bank [1030] and drawn over
     /// the page (5B04, its 0s left out), the bank before mapped again.
-    fn sheet_back(&mut self, files: &mut Files) -> Option<()> {
+    pub(crate) fn sheet_back(&mut self, files: &mut Files) -> Option<()> {
         let bank = self.mem.r16(DS, 0x1030);
         let old = self.map_bank(bank, 0);
         let path = self.save_path(CHARSHET);
@@ -1372,7 +1372,7 @@ impl Machine {
     /// 1194:1695: CHARSHT.COL's colours read to 929E (0000:7530: a file
     /// of other than 300h bytes its colours past an 8-byte header, made
     /// 6-bit); their setting (9B4E) the front end's.
-    fn sheet_colours(&mut self, files: &mut Files) -> Option<()> {
+    pub(crate) fn sheet_colours(&mut self, files: &mut Files) -> Option<()> {
         let n = self.file_load(files, COLOURS, DS, SCRATCH).map(|_| self.mem.r16(DS, crate::bsa::var::OPEN_SIZE))?;
         if n != 0x300 {
             for i in 0..0x300u16 {
@@ -1388,7 +1388,7 @@ impl Machine {
     /// helmet (type 5, kind 0) is worn (1687: SAVEFACE.$$$), the trousers,
     /// a worn shirt's item (type 2, kind 0: 2187) under the shirt, then
     /// each worn item of the first [129D] slots but such shirts (2451).
-    fn sheet_doll(&mut self, files: &mut Files) -> Option<()> {
+    pub(crate) fn sheet_doll(&mut self, files: &mut Files) -> Option<()> {
         self.sheet_clothes();
         self.doll_drawn(files)
     }
@@ -1705,7 +1705,7 @@ impl Machine {
     /// numbers (+39h, 16 words) scaled and divided in place for their
     /// texts and put back from their copy at 10A8 (0F08). Their drawing
     /// is the front end's.
-    fn sheet_texts(&mut self) {
+    pub(crate) fn sheet_texts(&mut self) {
         let gold = self.mem.r32(DS, 0x05C2);
         self.dun_ultoa(gold, SCRATCH);
         let raw = self.mem.r16(DS, 0x05C8) & 0x10 != 0;

@@ -91,8 +91,8 @@ pub trait ClockHooks {
     /// with the text segment B038 set from 103A around it (0000:9AF8) and
     /// from 1036 after. By default its points are spent in turn
     /// (`levelup::NoLevelUpHooks`); front ends show it.
-    fn level_up_screen(&mut self, m: &mut Machine, levels: u16) -> Option<()> {
-        crate::levelup::level_up_around(m, levels, &mut crate::levelup::NoLevelUpHooks)
+    fn level_up_screen(&mut self, m: &mut Machine, files: &mut Files, levels: u16) -> Option<()> {
+        crate::levelup::level_up_around(m, files, levels, &mut crate::levelup::NoLevelUpHooks)
     }
 }
 
@@ -238,7 +238,7 @@ impl Machine {
         let busy = self.mem.r8(DS, 0x05E6) == 4 && self.mem.r8(DS, 0x137F) != 0xFF;
         if !busy && self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x1013) == 0 && self.mem.r16(DS, 0x05CA) & 0x100 != 0 {
             if let Some(n) = self.level_up()? {
-                hooks.level_up_screen(self, n)?;
+                hooks.level_up_screen(self, files, n)?;
             }
         }
         if self.mem.r16(DS, 0x05C8) & 0x20 != 0 {
@@ -343,7 +343,7 @@ impl ClockHooks for NoClockHooks {
     fn exhausted(&mut self, _m: &mut Machine) -> Option<bool> {
         Some(false)
     }
-    fn level_up_screen(&mut self, _m: &mut Machine, _levels: u16) -> Option<()> {
+    fn level_up_screen(&mut self, _m: &mut Machine, _files: &mut Files, _levels: u16) -> Option<()> {
         Some(())
     }
     fn encounter(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {

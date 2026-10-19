@@ -46,7 +46,22 @@ pub mod var {
     pub const COLOUR: u16 = 0x9288;
     pub const TEXT_B036: u16 = 0xB036;
     pub const TEXT_B038: u16 = 0xB038;
+    /// The window loop's flags (bit 4: no waits for the buttons'
+    /// release).
+    pub const LOOP_FLAGS: u16 = 0xB7C4;
 }
+
+/// The EMS frame's segment.
+const FRAME: u16 = 0x9030;
+/// "charstat.img", "bonus.img", "updown.img".
+const CHARSTAT: u16 = 0x3DE2;
+const BONUS: u16 = 0x3DFC;
+const UPDOWN: u16 = 0x3E06;
+/// Where UPDOWN.IMG is loaded in bank [1032].
+const ARROWS_PIC: u16 = 0x67B9;
+/// The attribute screen's arrows region's y (its record in the region
+/// table at 3276:5312, record 9).
+const ARROWS_Y: u16 = 0x5312 + 0x372 + 2;
 use var::*;
 
 /// How many collapses may be nested (each in the hour of the one
@@ -64,30 +79,72 @@ const ATTRS: u16 = PLAYER + 0x29;
 const BASE: u16 = PLAYER + 0x31;
 const ITEMS: u16 = 0x0212;
 
-/// What the level-up screen leaves to the front end.
+/// What the level-up screen leaves to the front end, and the game's own
+/// steps around it that the stubbed vectors (harness/gen_levelup.py) stub:
+/// those default to the game's (`Machine::world_keep`, `sheet_keep`,
+/// `equip_frames`, `world_back`).
 pub trait LevelUpHooks {
     /// 23BA:012B: the sound named at DS:`si` played (the notice's
     /// FANFARE1.VOC).
     fn sound(&mut self, m: &mut Machine, si: u16) {
         m.sound_file(si);
     }
-    /// 1194:158F: the screen kept (CHARSHET.$$$), unless 5E0 bit 200h.
-    fn keep_screen(&mut self, _m: &mut Machine) {}
-    /// The screen drawn: 0000:541E, A611, the view filled (9A98), 9426,
-    /// the palette black (1194:55B2), the body's picture (2462).
-    fn screen(&mut self, _m: &mut Machine) {}
-    /// 1194:122C: the player spends the points (POINTS) on the attributes
-    /// (at the player's +29h, percent), as on the creation's screen
-    /// (`Machine::creation_select`, `creation_arrow`). By default they go
-    /// to the attributes in turn, one at a time.
+    /// The colours shown (6-bit), which A611 reads to A39E; None leaves
+    /// A39E as it is.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
+    }
+    /// 0000:541E, A611: the cursor hidden and the world kept
+    /// (`Machine::world_keep`, the colours `dac`).
+    fn world_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        let dac = self.dac();
+        m.cursor_hidden();
+        m.world_keep(files, dac.as_ref());
+    }
+    /// 1194:158F: the screen kept (CHARSHET.$$$, SAVEFACE.$$$:
+    /// `Machine::sheet_keep`), unless 5E0 bit 200h.
+    fn keep_screen(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.sheet_keep(files)
+    }
+    /// 0000:9A98 (the clip the whole screen), 9426 (the page cleared) and
+    /// 1194:55B2 (the colours at 929E black, the page cleared again; the
+    /// fade to them is the front end's).
+    fn screen(&mut self, m: &mut Machine) {
+        m.clip_whole();
+        m.page_clear();
+        m.sheet_black();
+    }
+    /// 1194:2462: the equipment's frames loaded into bank 17h
+    /// (`Machine::equip_frames`), for the body the screen draws.
+    fn body(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.equip_frames(files)
+    }
+    /// 1194:124A: the attribute screen set up for the points
+    /// (`Machine::points_screen`).
+    fn points_screen(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.points_screen(files)
+    }
+    /// 1194:122C's loop (5CF4 over the regions at 3276:5312): the player
+    /// spends the points (POINTS) on the attributes (at the player's +29h,
+    /// percent), as on the creation's screen (`Machine::creation_select`,
+    /// `creation_arrow`). By default they go to the attributes in turn,
+    /// one at a time.
     fn spend(&mut self, m: &mut Machine) {
         spend_in_turn(m);
+    }
+    /// 1194:1241..1249: the loop left (`Machine::points_screen_end`).
+    fn points_screen_end(&mut self, m: &mut Machine) {
+        m.points_screen_end();
     }
     /// 1194:59CC: a message box with the text at DS:`si` (4F25 the
     /// level's notice, 3E17 points left to spend).
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 0000:541E, A6B5: the game's screen back.
-    fn restore(&mut self, _m: &mut Machine) {}
+    /// 0000:541E, A6B5: the cursor hidden and the world given back
+    /// (`Machine::world_back`). None where it gives up.
+    fn restore(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.cursor_hidden();
+        m.world_back(files)
+    }
 }
 
 /// `LevelUpHooks` that show nothing and spend the points in turn.
@@ -106,7 +163,7 @@ pub fn spend_in_turn(m: &mut Machine) {
                 return;
             }
             m.creation_select(region);
-            m.creation_arrow(0);
+            m.attribute_arrow(0);
         }
         if m.mem.r8(DS, POINTS) == before {
             return;
@@ -116,10 +173,10 @@ pub fn spend_in_turn(m: &mut Machine) {
 
 /// 2686:0319..0331: B038 set from 103A (0000:9AF8), the level-up screen
 /// (`Machine::level_up_screen`), then B038 from 1036.
-pub fn level_up_around(m: &mut Machine, levels: u16, hooks: &mut dyn LevelUpHooks) -> Option<()> {
+pub fn level_up_around(m: &mut Machine, files: &mut Files, levels: u16, hooks: &mut dyn LevelUpHooks) -> Option<()> {
     let v = m.mem.r16(DS, 0x103A);
     m.mem.w16(DS, TEXT_B038, v);
-    m.level_up_screen(levels, hooks)?;
+    m.level_up_screen(levels, files, hooks)?;
     let v = m.mem.r16(DS, 0x1036);
     m.mem.w16(DS, TEXT_B038, v);
     Some(())
@@ -146,8 +203,8 @@ impl Machine {
     /// above; 0 counts 65536). Fatigue (201) and spell points (20A) are as
     /// they were after it. If the base attributes' first eight bytes are
     /// all FFh (1194:11C6) only health is made full. None where a roll
-    /// faults.
-    pub fn level_up_screen(&mut self, levels: u16, hooks: &mut dyn LevelUpHooks) -> Option<()> {
+    /// faults or a hook gives up.
+    pub fn level_up_screen(&mut self, levels: u16, files: &mut Files, hooks: &mut dyn LevelUpHooks) -> Option<()> {
         let (sp, fatigue) = (self.l16(0x020A), self.l16(0x0201));
         let finale = self.l8(0x0FDD) == 0x8E;
         self.mem.w16(DS, FINALE, finale as u16);
@@ -161,17 +218,18 @@ impl Machine {
             self.mem.w16(DS, 0x020A, sp);
             return Some(());
         }
+        hooks.world_keep(self, files);
         if self.l16(0x05E0) & 0x200 == 0 {
-            hooks.keep_screen(self);
+            hooks.keep_screen(self, files)?;
         }
         self.worn_off();
         self.copy8(ATTRS, OLD_ATTRS);
         crate::scale::attrs_to100(&mut self.mem, BASE, BASE, 8);
         self.copy8(BASE, ATTRS);
-        hooks.screen(self);
         self.mem.w16(DS, SHEET, 1);
         let f = self.l16(0x05C8) | 0x10;
         self.mem.w16(DS, 0x05C8, f);
+        hooks.screen(self);
         let points_were = self.l16(POINTS);
         let mut bx = 0u16;
         let n = if levels == 0 { 0x10000 } else { levels as u32 };
@@ -183,6 +241,7 @@ impl Machine {
         self.mem.w16(DS, POINTS_ROLLED, bx);
         let v = self.l16(0x102C);
         self.mem.w16(DS, TEXT_B036, v);
+        hooks.body(self, files)?;
         if finale {
             self.mem.w8(DS, POINTS, 0x32);
             self.mem.w16(DS, POINTS_ROLLED, 0x32);
@@ -201,7 +260,9 @@ impl Machine {
             if room >> 8 == 0 && (room as u8) < self.l8(POINTS) {
                 self.mem.w8(DS, POINTS, room as u8);
             }
+            hooks.points_screen(self, files)?;
             hooks.spend(self);
+            hooks.points_screen_end(self);
             self.mem.w8(DS, OFFERED, 1);
             if self.l8(POINTS) == 0 {
                 break;
@@ -227,10 +288,71 @@ impl Machine {
         self.mem.w16(DS, 0x05C8, f);
         self.mem.w16(DS, SHEET, 0);
         self.mem.w16(DS, 0xCD00, 0xFFFF);
-        hooks.restore(self);
+        hooks.restore(self, files)?;
         self.mem.w16(DS, 0x0201, fatigue);
         self.mem.w16(DS, 0x020A, sp);
         Some(())
+    }
+
+    /// 1194:124A..12BD. The attribute screen for the points, its game's
+    /// side: the buttons' release waited for (5E21, the front end's), the
+    /// cursor hidden (541E), the colour FEh, B7C4 bit 4 set (the loop's
+    /// no waits for the release); on its first pass (1299 0) only, the
+    /// screen made: 1297 38h and 1296 0, CHARSTAT.IMG and BONUS.IMG drawn
+    /// (5CD9 with BX 10h, `sheet_image`), the page's top left A7h x 9Fh
+    /// kept in bank [1032] (12BE: 8F26), the page cleared (9426), the two
+    /// pictures again round the stats' texts (0DE1), the points' number
+    /// (12E6: 5634, its drawing the front end's), the arrows (12F5:
+    /// UPDOWN.IMG into bank [1032] at 67B9, the page under them, 8 x 48h
+    /// at (26h, 30h), kept in bank 5, 1297 38h, their region at y 30h;
+    /// 1354 draws them), the sheet (0DC7: 541E, CHARSHET.$$$ under the
+    /// page, 1647, and the doll, 16AA, 9686 kept round it) and
+    /// CHARSHT.COL's colours (1695). None where a file is missing or the
+    /// heap has no room.
+    pub fn points_screen(&mut self, files: &mut Files) -> Option<()> {
+        self.cursor_hidden();
+        self.mem.w8(DS, COLOUR, 0xFE);
+        let f = self.l8(LOOP_FLAGS) | 4;
+        self.mem.w8(DS, LOOP_FLAGS, f);
+        if self.l8(OFFERED) != 0 {
+            return Some(());
+        }
+        self.mem.w8(DS, 0x1297, 0x38);
+        self.mem.w8(DS, 0x1296, 0);
+        self.sheet_image(files, CHARSTAT)?;
+        self.sheet_image(files, BONUS)?;
+        let bank = self.l16(0x1032);
+        let frame = self.l16(FRAME);
+        let old = self.map_bank(bank, 0);
+        self.page_rect_save((frame, 0), 0, 0, 0xA7, 0x9F);
+        self.map_bank(old, 0);
+        self.page_clear();
+        self.sheet_image(files, CHARSTAT)?;
+        self.sheet_texts();
+        self.sheet_image(files, BONUS)?;
+        let old = self.map_bank(bank, 0);
+        self.file_load(files, UPDOWN, frame, ARROWS_PIC)?;
+        self.map_bank(5, 0);
+        self.page_rect_save((frame, 0), 0x26, 0x30, 8, 0x48);
+        self.map_bank(old, 0);
+        self.mem.w8(DS, 0x1297, 0x38);
+        self.mem.w16(crate::mem::DATA, ARROWS_Y, 0x30);
+        let rolled = self.l16(POINTS_ROLLED);
+        self.cursor_hidden();
+        self.sheet_back(files)?;
+        self.sheet_doll(files)?;
+        self.mem.w16(DS, POINTS_ROLLED, rolled);
+        self.sheet_colours(files)
+    }
+
+    /// 1194:1241..1249: the loop (5CF4) left by its first region, the
+    /// button (B7C6 0, its handler 3159:0006 setting B7C4 bit 0), B7C4 bit
+    /// 4 clear again, the buttons' release waited for (5E21, the front
+    /// end's).
+    pub fn points_screen_end(&mut self) {
+        self.mem.w16(DS, crate::newgame::var::REGION, 0);
+        let f = (self.l8(LOOP_FLAGS) | 1) & !4;
+        self.mem.w8(DS, LOOP_FLAGS, f);
     }
 
     /// 1194:5E33. The level's notice: its sound, then (1194:42EE) the

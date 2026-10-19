@@ -589,6 +589,19 @@ impl Machine {
         self.player_derived_stats();
     }
 
+    /// 1194:138E whole, its game's side: the arrows clicked
+    /// (`creation_arrow`) and, where that took (a point spent or given
+    /// back, the derived stats made), the stats' texts made again (0DE1,
+    /// `sheet_texts`); the page put back from bank [1032] (149D), the
+    /// points' number (12E6) and the arrows (1354) are drawn.
+    pub fn attribute_arrow(&mut self, y: u16) {
+        let points = self.ng8(POINTS);
+        self.creation_arrow(y);
+        if self.ng8(POINTS) != points {
+            self.sheet_texts();
+        }
+    }
+
     /// A click on the attribute screen.
     pub fn creation_click(&mut self, click: Click) {
         match click {

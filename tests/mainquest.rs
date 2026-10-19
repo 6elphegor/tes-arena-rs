@@ -127,7 +127,7 @@ impl QuestHooks for Log {
         self.0.extend([6, si]);
         Some(())
     }
-    fn finale(&mut self, _m: &mut Machine) {
+    fn finale(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {
         self.0.extend([7]);
     }
     fn inventory_full(&mut self, _m: &mut Machine, ax: u16) {

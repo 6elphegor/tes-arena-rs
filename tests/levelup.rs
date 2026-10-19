@@ -28,8 +28,21 @@ impl LevelUpHooks for Stubs {
     fn sound(&mut self, m: &mut Machine, _si: u16) {
         inc(m, 0xFFE2);
     }
-    fn keep_screen(&mut self, m: &mut Machine) {
+    fn world_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    fn keep_screen(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         inc(m, 0xFFE4);
+        Some(())
+    }
+    fn screen(&mut self, _m: &mut Machine) {}
+    fn body(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn points_screen(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn points_screen_end(&mut self, _m: &mut Machine) {}
+    fn restore(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
     }
     /// SPEND: nothing the first time, then all the points on the
     /// attribute FFDC names.
@@ -63,8 +76,8 @@ impl ClockHooks for Stubs {
         inc(m, 0xFFE8);
     }
     /// A level gained in the hour: the screen with the same stubs.
-    fn level_up_screen(&mut self, m: &mut Machine, levels: u16) -> Option<()> {
-        arena::levelup::level_up_around(m, levels, self)
+    fn level_up_screen(&mut self, m: &mut Machine, files: &mut Files, levels: u16) -> Option<()> {
+        arena::levelup::level_up_around(m, files, levels, self)
     }
 }
 
@@ -203,7 +216,7 @@ fn run() {
         m.load_rng();
         let before = m.clone();
         let got = if op == 0 {
-            m.level_up_screen(cx, &mut Stubs)
+            m.level_up_screen(cx, &mut Files::default(), &mut Stubs)
         } else {
             m.fatigue_minute(&mut Files::default(), &mut Stubs)
         };

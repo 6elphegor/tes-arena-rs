@@ -658,6 +658,25 @@ def farewell(a):
     a.mu.mem_write(a.lin(a.ds, 0x9A6E), bytes((i * 7 + 1) & 0x3F for i in range(0x300)))
 
 
+def levelled(a):
+    """Experience gained (the player's +409h, 05AD, by LEVEL_XP: a
+    level's worth for the save's level 22), 5CA bit 100h set as the gain sets it (2686:0182), so
+    the next minute tick (0000:1644, `minute_due`) checks the level
+    (2686:02D8) and brings up the level-up screen (1194:1034) inside its
+    frame."""
+    xp = a.r16(0x05AD) | a.r16(0x05AF) << 16
+    xp = (xp + LEVEL_XP) & 0xFFFFFFFF
+    a.w16(0x05AD, xp & 0xFFFF)
+    a.w16(0x05AF, xp >> 16)
+    a.w16(0x05CA, a.r16(0x05CA) | 0x100)
+
+
+def minute_due(a):
+    """The clock's last minute (884A) 90 ticks back: the next frame's
+    minute tick runs."""
+    a.w16(0x884A, (a.r16(0x0151) - 0x5A) & 0xFFFF)
+
+
 def informant(a):
     """The main quest's informant in this tavern, as a rumour's offer
     leaves one (1194:CD9A): the step Rajhin's ring's (0FDD 0Fh), the
@@ -726,7 +745,14 @@ CRYPT = b'41649375.MIF'
 
 # name: (where, set-up, [(keys held, keys let go, frames, until[, clicks])...]):
 # the clicks (x, y) are queued for the mouse's reads before the frames.
+LEVEL_XP = 9_750_000
+# The level's notice clicked away (1194:5E33), then on the attribute
+# screen (1194:122C, the regions at 3276:5312) each line picked and its
+# arrows' upper half clicked six times (a level's 3..6 points; once none
+# are left a click does nothing, 1194:138E), then the button (region 0).
+LEVEL_SCRIPT = [('click', 0xA0, 0x60)] + [act for r in range(8) for act in [('click', 10, 54 + 8 * r)] + [('click', 40, 0x32 + 8 * r)] * 6] + [('click', 10, 175)]
 CASES = {
+    'playlevelup': ('dungeon', levelled, [((), (), 2, None), ((), (), 10, None, [], {'do': minute_due, 'script': LEVEL_SCRIPT})]),
     # The dungeon's first frames, nothing held: the interface and the
     # compass as play draws them.
     'playdungeon': ('dungeon', None, [((), (), 3, None)]),

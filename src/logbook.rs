@@ -524,7 +524,7 @@ impl Machine {
 
     /// 0000:541E's state: A902 bit 0 off (the cursor's background put
     /// back, the front end's).
-    fn cursor_hidden(&mut self) {
+    pub(crate) fn cursor_hidden(&mut self) {
         let f = self.mem.r16(DS, 0xA902);
         if f & 1 != 0 {
             self.mem.w16(DS, 0xA902, f & 0xFFFE);

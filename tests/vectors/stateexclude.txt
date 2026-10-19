@@ -27,8 +27,6 @@ cd50 cd52 the segment of the way out's hook (CD4E, 0000:0B3C)
 cd54 cd56 the segment of the hook at CD52 (0000:0B48)
 502a 502c the list window record at 5006's texts' segment (+24, 1194:595F): DGROUP's for texts there
 5049 504b the record at 5006's lines' drawing's segment (+43, from B800: the image's, 3159:076F)
-5054 5056 the record at 505B's texts' segment (+24)
-5073 5075 the record at 505B's lines' drawing's segment
 507f 5081 the record at 505B's texts' segment (+24 from 505B: the temple's cure list, the tavern's rooms)
 509e 50a0 the record at 505B's lines' drawing's segment (+43 from 505B)
 50d4 50d6 the record at 50B0's texts' segment (+24)
