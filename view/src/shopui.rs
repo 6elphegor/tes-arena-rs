@@ -400,9 +400,10 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
 }
 
 impl arena::store::StoreHooks for ShopFront<'_, '_> {
-    /// The store's name ("%en " made) on its banner.
+    /// The store's name ("%en " made, after the screen: 1194:FA06) on
+    /// its banner.
     fn greeting(&mut self, m: &mut Machine, si: u16) {
-        self.show_banner(m, si);
+        self.show_name(m, si, self.screen);
     }
     fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.front.message_box(m, si);

@@ -10,8 +10,8 @@
 //! their files.
 //!
 //! - The set-up (1194:FA03): the shop's scratch cleared (1194:FDDD), the
-//!   greeting ("%en " expanded, `ShopHooks::expand`, and shown,
-//!   `StoreHooks::greeting`), the quests' check (`ShopHooks::quests`),
+//!   screen (`ShopHooks::shop_screen`), the greeting ("%en " expanded,
+//!   `ShopHooks::expand`, and shown, `StoreHooks::greeting`), the quests' check (`ShopHooks::quests`),
 //!   today a holiday for this shop or not (13C9), the files' names made
 //!   from the place's seed (1194:FBA2: the seed's digits and ".64", the
 //!   first two letters "eq" for the stock, "re" for the repairs, each
@@ -102,7 +102,8 @@ use crate::shops::ShopHooks;
 
 /// What the store leaves to the front end, besides `ShopHooks`.
 pub trait StoreHooks: ShopHooks {
-    /// 1194:4BFF: the greeting at DS:`si` shown.
+    /// 1194:4BFF: the greeting at DS:`si` shown, on the screen
+    /// `ShopHooks::shop_screen` drew.
     fn greeting(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:59CC: a message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
@@ -317,6 +318,9 @@ impl Machine {
             self.mem.w8(DS, SCRATCH.wrapping_add(i), 0);
         }
         self.mem.w8(DS, 0x717F, 0);
+        // 1194:FA06: the screen (4B60), then "%en " made and on the
+        // banner (4BFF), as the temple's.
+        hooks.shop_screen(self);
         self.mem.w32(DS, text::GREETING, 0x206E_6525);
         self.mem.w8(DS, text::GREETING + 4, 0);
         hooks.expand(self, text::GREETING);
