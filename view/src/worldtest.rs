@@ -3032,6 +3032,13 @@ const TITLEPLAY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/t
 /// menu, `world::title`) with the save copy as its save folder, and its
 /// driver; None without the game or the save.
 fn started_at_menu() -> Option<(App, Driver, Scratch)> {
+    started_at_menu_with(None)
+}
+
+/// `started_at_menu`, with `sound` the sound driver loaded where main's
+/// command line loads it (`world::title_sound`), the original's answers
+/// its calls' (`Machine::digital`) from there on.
+fn started_at_menu_with(sound: Option<arena::digital::Replay>) -> Option<(App, Driver, Scratch)> {
     let dir = game_dir()?;
     let Some(save) = save_copy() else {
         eprintln!("skipping: no ARENA_SAVE");
@@ -3041,7 +3048,13 @@ fn started_at_menu() -> Option<(App, Driver, Scratch)> {
     let archive = Rc::new(archive::Archive::open(&dir));
     let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
     let mut a = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(save.to_path_buf()), 0, false);
-    a.title_engine = world::title(&dir);
+    a.title_engine = match sound {
+        Some(r) => world::title_sound(&dir, &mut arena::digital::Replayed).map(|mut e| {
+            e.m.digital = Some(r);
+            e
+        }),
+        None => world::title(&dir),
+    };
     assert!(a.title_engine.is_some(), "the program's start to its menu");
     let d = Driver::new(&mut a);
     Some((a, d, save))
@@ -3096,7 +3109,42 @@ fn the_menus_load_at_the_start_as_the_original() {
 /// there in a new game), all 32 EMS banks and the interface.
 #[test]
 fn a_new_game_from_the_menu_as_the_original() {
-    let Some((mut a, _d, _save)) = started_at_menu() else { return };
+    new_game_from_the_menu("creation", None);
+}
+
+/// The same with ARENA.BAT's sound driver loaded as main's command line
+/// loads it (gen_titleplay.py's `creationsound`): creation's vision's
+/// speech played through it, no button pressed (its pages turned as its
+/// parts end), every call into the driver as the original's, and the game
+/// then as the original's.
+#[test]
+#[ignore = "titleplay.txt has no creationsound lines yet (gen_titleplay.py's run with the driver doesn't finish)"]
+fn a_new_game_with_sound_on_as_the_original() {
+    new_game_from_the_menu("creationsound", Some(titleplay_replay("creationsound")));
+}
+
+/// TITLEPLAY's `driver` line for `name`, its runs spelt out.
+fn titleplay_calls(name: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(TITLEPLAY).expect(TITLEPLAY);
+    let line = text.lines().find_map(|l| l.strip_prefix(&format!("driver | {name} | "))).unwrap_or_else(|| panic!("{name}: a driver line"));
+    line.split(' ').filter(|w| !w.is_empty()).flat_map(|w| {
+        let (c, n) = w.split_once('*').map_or((w, 1), |(c, n)| (c, n.parse().unwrap()));
+        std::iter::repeat_n(c.to_string(), n)
+    }).collect()
+}
+
+/// The original driver's answers to `name`'s status calls, in turn.
+fn titleplay_replay(name: &str) -> arena::digital::Replay {
+    let answers = titleplay_calls(name).iter().filter_map(|c| c.strip_prefix("7C=")).map(|v| u16::from_str_radix(v, 16).unwrap()).collect();
+    arena::digital::Replay { answers, calls: Vec::new() }
+}
+
+/// The menu's New on the program's start's game, `name`'s character made
+/// and its vision run, against TITLEPLAY's `name` (and with `sound` its
+/// calls into the driver).
+fn new_game_from_the_menu(name: &str, sound: Option<arena::digital::Replay>) {
+    let with_sound = sound.is_some();
+    let Some((mut a, _d, _save)) = started_at_menu_with(sound) else { return };
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
     let wait_until = |a: &mut App, done: &dyn Fn(&App) -> bool, what: &str| {
         for _ in 0..20_000 {
@@ -3132,7 +3180,15 @@ fn a_new_game_from_the_menu_as_the_original() {
         a.creation_input(create::Input::Wait(50));
     }
     assert!(a.creation.is_none(), "the game not started: {:?}", stage(&a));
-    titleplay_compared("creation", &a, &[0xA83C]);
+    if with_sound {
+        let got = a.engine.m.digital.as_ref().expect("the replay").calls.clone();
+        let want = titleplay_calls(name);
+        if let Some(i) = (0..want.len().max(got.len())).find(|&i| want.get(i) != got.get(i)) {
+            let around = |v: &[String]| v[i.saturating_sub(3)..(i + 3).min(v.len())].join(" ");
+            panic!("{name}: the calls into the sound driver differ from the original's at {i} of {}: {} against the original's {}", want.len(), around(&got), around(&want));
+        }
+    }
+    titleplay_compared(name, &a, &[0xA83C]);
 }
 
 /// A case that ends where a game the title's Load loaded is about to run

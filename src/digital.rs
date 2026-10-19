@@ -80,6 +80,38 @@ pub struct Replay {
     pub calls: Vec<String>,
 }
 
+/// The driver as the machine's replay answers it (`Machine::digital`):
+/// the speech's calls kept and answered as the sounds' are, its 7Bh with
+/// the buffer's first 4E20h bytes' digest. (Its load's calls, which the
+/// replay doesn't answer, are SBPDIG.ADV's: the first handle, its
+/// descriptor at 73h, the device found.)
+pub struct Replayed;
+
+impl DigitalDriver for Replayed {
+    fn register(&mut self, _m: &mut Machine, _seg: u16, _off: u16) -> u16 {
+        0
+    }
+    fn describe(&mut self, m: &mut Machine, _handle: u16) -> (u16, u16) {
+        (m.mem.r16(DS, IMAGE + 2), 0x73)
+    }
+    fn detect(&mut self, _m: &mut Machine, _handle: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) -> u16 {
+        1
+    }
+    fn init(&mut self, _m: &mut Machine, _handle: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) {}
+    fn play_voc(&mut self, m: &mut Machine, _handle: u16, seg: u16, off: u16, block: u16) {
+        m.digital_call(|m| format!("7B:{block:x}:{:x}", m.digital_digest(seg, off)));
+    }
+    fn start(&mut self, m: &mut Machine, _handle: u16) {
+        m.digital_call(|_| "7D".to_string());
+    }
+    fn status(&mut self, m: &mut Machine, _handle: u16) -> u16 {
+        m.digital_status()
+    }
+    fn stop(&mut self, m: &mut Machine, _handle: u16) {
+        m.digital_call(|_| "7E".to_string());
+    }
+}
+
 /// The AIL with no driver registered: each call into one returns 0
 /// (0FFD:053C finds no table; a registration of something not a driver
 /// FFFFh).
@@ -142,10 +174,13 @@ impl Machine {
     /// its start (block FFFFh), the digest of its 4E20h bytes (its size,
     /// 21EE:000E) as the lines have it.
     pub fn digital_play_voc(&mut self, seg: u16, off: u16) {
-        self.digital_call(|m| {
-            let h = (0..0x4E20u16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ m.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3));
-            format!("7B:ffff:{h:x}")
-        });
+        self.digital_call(|m| format!("7B:ffff:{:x}", m.digital_digest(seg, off)));
+    }
+
+    /// The digest the replay's 7Bh lines give a buffer at `seg`:`off`:
+    /// its first 4E20h bytes (the sound buffer's size, 21EE:000E).
+    pub fn digital_digest(&self, seg: u16, off: u16) -> u64 {
+        (0..0x4E20u16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ self.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3))
     }
 
     /// Whether a sound driver is loaded (2294:0770: the dword at 8F62).

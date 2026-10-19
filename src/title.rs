@@ -119,6 +119,14 @@ impl Machine {
     /// `city_location`). None where a file doesn't load or a path isn't
     /// ported.
     pub fn program_main(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
+        self.program_main_driven(files, hooks, None)
+    }
+
+    /// `program_main` with a sound driver named (3827, as main's command
+    /// line leaves it) loaded where that command line loads it, after the
+    /// location (1194:066A's 076D, `sound_driver_main`), `driver`
+    /// answering its load.
+    pub fn program_main_driven(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks, driver: Option<&mut dyn crate::digital::DigitalDriver>) -> Option<()> {
         self.working_slot_main();
         self.working_files_delete(files);
         self.working_files_fresh(files);
@@ -127,6 +135,9 @@ impl Machine {
         }
         let id = if self.mem.r8(DS, 0x0A22 + 0x24) == 8 { 0x100 } else { 0x23 };
         self.city_location(files, DS, 0x0A22, id)?;
+        if let Some(driver) = driver {
+            self.sound_driver_main(files, driver)?;
+        }
         self.menu_screens(files, hooks)
     }
 

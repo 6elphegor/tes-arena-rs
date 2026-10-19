@@ -106,10 +106,8 @@ pub fn boot(dir: &Path) -> Engine {
     boot_in(dir, None)
 }
 
-/// `boot` with ARENA.BAT's sound driver (-Ssbpdig.adv -IOS220 -IRQS7
-/// -DMAS1: the name at 3827, the I/O port, IRQ and DMA channel at 386A,
-/// 386C, 386E, as main's command line leaves them, 1194:066A) loaded as
-/// that command line loads it, after the working slot's files (076D,
+/// `boot` with ARENA.BAT's sound driver (`arena_bat_sound`) loaded as
+/// main's command line loads it, after the working slot's files (076D,
 /// `Machine::sound_driver_main`), `driver` answering for it: the
 /// level's sounds are then loaded (23BA:0217) and played (23BA:002A)
 /// with sound on.
@@ -128,12 +126,7 @@ fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -
     m.working_slot_main();
     m.working_files_fresh(&mut files);
     if let Some(driver) = driver {
-        for (i, &b) in b"SBPDIG.ADV\0".iter().enumerate() {
-            m.mem.w8(DS, arena::digital::var::NAME + i as u16, b);
-        }
-        for (k, v) in [0x220u16, 7, 1].into_iter().enumerate() {
-            m.mem.w16(DS, arena::digital::var::SETTINGS + 2 * k as u16, v);
-        }
+        arena_bat_sound(&mut m);
         m.sound_driver_main(&mut files, driver).expect("the sound driver's load");
     }
     m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the game's set-up");
@@ -147,13 +140,38 @@ fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -
 /// to their ends with no input): the state the menu's Load and New go on
 /// from (`App::title_engine`). None where the port can't follow it.
 pub fn title(dir: &Path) -> Option<Engine> {
+    title_in(dir, None)
+}
+
+/// `title` with ARENA.BAT's sound driver loaded where main's command line
+/// loads it (`Machine::program_main_driven`, as `boot_sound`).
+pub fn title_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -> Option<Engine> {
+    title_in(dir, Some(driver))
+}
+
+fn title_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -> Option<Engine> {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).ok()?).ok()?;
     let mut m = Machine::new(&image);
     let mut files = Files::new(dir).ok()?;
     m.memory_init()?;
     m.program_start(&mut files, &mut arena::start::PortStart)?;
-    m.program_main(&mut files, &mut arena::title::NoTitleHooks)?;
+    if driver.is_some() {
+        arena_bat_sound(&mut m);
+    }
+    m.program_main_driven(&mut files, &mut arena::title::NoTitleHooks, driver)?;
     Some(Engine::new(m, files))
+}
+
+/// ARENA.BAT's sound driver as main's command line leaves it
+/// (-Ssbpdig.adv -IOS220 -IRQS7 -DMAS1, 1194:066A): its name at 3827, the
+/// I/O port, IRQ and DMA channel at 386A, 386C, 386E.
+fn arena_bat_sound(m: &mut Machine) {
+    for (i, &b) in b"SBPDIG.ADV\0".iter().enumerate() {
+        m.mem.w8(DS, arena::digital::var::NAME + i as u16, b);
+    }
+    for (k, v) in [0x220u16, 7, 1].into_iter().enumerate() {
+        m.mem.w16(DS, arena::digital::var::SETTINGS + 2 * k as u16, v);
+    }
 }
 
 /// Loads `level` (a .MIF) from the game in `dir` into an engine and
