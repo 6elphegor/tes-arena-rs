@@ -283,15 +283,20 @@ the original routine:
 | `QuestHooks::text_at` | src/quest.rs:136 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
 | `QuestHooks::text_shown` | src/quest.rs:85 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port and its box |
 | `QuestHooks::travel` | src/quest.rs:120 | 1194:2E69 | port | the default runs the port | |
-| `RestHooks::advance` | src/rest.rs:130 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `RestHooks::dream` | src/rest.rs:109 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
-| `RestHooks::hours_text` | src/rest.rs:107 | 1194:4659 / 452F | overridden | the view: main.rs Front<'_> | present: drawn as 1194:4659 draws it (screens.txt) |
+| `RestHooks::advance` | src/rest.rs:166 | 0000:142D | stub | false: the game's clock runs the minutes | |
+| `RestHooks::dac` | src/rest.rs:113 | 6E3C, 6E38 | overridden | the view: main.rs Front<'_> (the screen's colours) | |
+| `RestHooks::dream_back` | src/rest.rs:136 | 0000:A6B5, 2542:0446 | port | the default runs the port (`world_back`, `colours_read` of DS:1304; the colours' setting the front end's); tests/rest.rs: none (gen_rest.py's stubs) | |
+| `RestHooks::dream_black` | src/rest.rs:130 | 1194:55B2 | port | the default runs the port (`sheet_black`); tests/rest.rs: none | |
+| `RestHooks::dream_keep` | src/rest.rs:118 | 0000:A611 | port | the default runs the port (`world_keep`, the colours `dac`); tests/rest.rs: none | |
+| `RestHooks::dream_screen` | src/rest.rs:142 | 0000:9A98, 9AE6 | port | the default runs the port (`clip_whole`, [1026]'s font); tests/rest.rs: none | |
+| `RestHooks::dream` | src/rest.rs:124 | 1194:D45D | overridden | the default runs the port (`Machine::vision`, its pages clicked through); the view: main.rs Front<'_> (its movie shown, the game's vision run; worldframes' playdream) | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
+| `RestHooks::hours_text` | src/rest.rs:108 | 1194:4659 / 452F | overridden | the default runs the port (`rest_hours_draw`: on the game's page); the view: main.rs Front<'_> (the port, and its status line) | present: drawn as 1194:4659 draws it (screens.txt; SCREENSV.$$2 in playdream) |
 | `RestHooks::menu` | src/rest.rs:97 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `RestHooks::message` | src/rest.rs:105 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
-| `RestHooks::room_file` | src/rest.rs:121 | 1194:BA91 | port | the default runs the port | |
-| `RestHooks::room_load` | src/rest.rs:116 | 1194:C04C | port | the default runs the port | |
-| `RestHooks::screen` | src/rest.rs:126 |  | present | the screen redrawn after the rest | |
-| `RestHooks::sky` | src/rest.rs:111 | 2294:0341 | port | the default runs the port | |
+| `RestHooks::room_file` | src/rest.rs:157 | 1194:BA91 | port | the default runs the port | |
+| `RestHooks::room_load` | src/rest.rs:152 | 1194:C04C | port | the default runs the port | |
+| `RestHooks::screen` | src/rest.rs:162 |  | present | the screen redrawn after the rest | |
+| `RestHooks::sky` | src/rest.rs:147 | 2294:0341 | port | the default runs the port | |
 | `RestHooks::type_hours` | src/rest.rs:103 | 1194:4800 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors); the prompt's box state round it (`prompt_shown`, `prompt_closed`; msgbox vectors) |
 | `SaveHooks::delete` | src/save_write.rs:53 | 0000:9DC6 | overridden | the view: main.rs SaveDir<'_> | faithful: the file deleted |
 | `SaveHooks::palette` | src/save_write.rs:59 | 0000:6E3C | overridden | the view: main.rs SaveDir<'_> | present: the window's palette for the save's |
