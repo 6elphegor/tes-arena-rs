@@ -17,10 +17,14 @@ into it. Here the driver's own code runs, on the card as it sees it:
   interrupt at once, E0h/E4h/E8h its test registers;
 - the mixer at base+4/base+5 (a register store; register 0Eh bit 1
   stereo);
-- the DMA controller's registers (kept, unused: a transfer's length is the
-  DSP's) and the PICs' masks (0x21, 0xA1), end-of-interrupt (0x20, 0xA0)
-  and in-service register (OCW3 0Bh, then a read: the driver checks it
-  for a spurious IRQ 7, its 0000:057B).
+- the DMA controller (8237: the flip-flop shared by the 16-bit
+  registers' low and high bytes, cleared at port 0Ch; each channel's base
+  address and count, written to its current ones too; the current ones
+  read back; at a transfer's end the count gone past 0 to FFFFh, as the
+  driver's handler reads it to tell its IRQ from a spurious one, 057B; a
+  transfer's length is the DSP's) and the PICs' masks (0x21, 0xA1),
+  end-of-interrupt (0x20, 0xA0) and in-service register (OCW3 0Bh, then
+  a read).
 
 A transfer of N bytes lasts N * (256 - time constant) microseconds (a
 byte each 256 - TC us, stereo or not). Time is the timer's ticks as the
@@ -40,7 +44,9 @@ recorded for the port's tests (`Blaster.calls`): 7Bh the VOC file played
 (its far pointer, the block, and the digest of the FFDCh bytes there),
 7Dh started, 7Ch the status asked and answered, 7Eh stopped.
 """
+import os
 import struct
+import sys
 
 from emu import LOAD_SEG, STUB_SEG, fnv
 from screens import ScreenArena
@@ -51,6 +57,13 @@ from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_IP, UC_X86_REG_SS, UC_X8
 # 1193182 / 65536 ticks a second: a tick in microseconds is 65536e6 /
 # 1193182.
 TICK_NUM, TICK_DEN = 65536 * 1_000_000, 1193182
+# SBDIG_DEBUG=1: the card's doings on stderr.
+DEBUG = bool(os.environ.get('SBDIG_DEBUG'))
+
+
+def trace(*args):
+    if DEBUG:
+        print('sbdig', *args, file=sys.stderr)
 AIL_SEG = 0x0FFD
 # The AIL's entries the game calls the digital driver through: the
 # function each jumps to the driver for.
@@ -71,6 +84,10 @@ class Blaster:
         self.hs_block = 0
         self.mixer, self.mixer_sel = {}, 0
         self.dma = {}
+        self.flip = 0
+        self.dma_base = [[0, 0] for _ in range(4)]
+        self.dma_cur = [[0, 0] for _ in range(4)]
+        self.channel = 1
         self.mask = {0x21: 0xB8, 0xA1: 0xFF}
         self.ocw3 = {0x20: 0x0A, 0xA0: 0x0A}
         self.in_service = 0
@@ -90,6 +107,26 @@ class Blaster:
         return b <= port < b + 0x10 or port in (0x20, 0x21, 0xA0, 0xA1) or port < 0x10 or 0x81 <= port <= 0x8F
 
     def port_in(self, port):
+        v = self._port_in(port)
+        self.io_trace(f'in  {port:03X} -> {v:02X}')
+        return v
+
+    def io_trace(self, what):
+        if DEBUG and self.in_service_seen:
+            if what == getattr(self, '_last_io', None):
+                self._io_repeats += 1
+                return
+            if getattr(self, '_io_repeats', 0):
+                trace(f'  (x{self._io_repeats + 1})')
+            self._last_io, self._io_repeats = what, 0
+            self._io_lines = getattr(self, '_io_lines', 0) + 1
+            if self._io_lines < 400:
+                cs, ip = self.a.mu.reg_read(UC_X86_REG_CS), self.a.mu.reg_read(UC_X86_REG_IP)
+                trace(f'  {cs:04X}:{ip:04X} {what}')
+
+    in_service_seen = False
+
+    def _port_in(self, port):
         b = self.base
         if port == b + 0x0A:
             return self.read.pop(0) if self.read else 0xFF
@@ -107,9 +144,16 @@ class Blaster:
             if self.ocw3[port] == 0x0B:
                 return (1 << self.irq) & 0xFF if port == 0x20 and self.in_service else 0
             return 0
+        if port < 8:
+            ch, which = port >> 1, port & 1
+            v = self.dma_cur[ch][which]
+            byte = (v >> (8 * self.flip)) & 0xFF
+            self.flip ^= 1
+            return byte
         return self.dma.get(port, 0)
 
     def port_out(self, port, value):
+        self.io_trace(f'out {port:03X} <- {value & 0xFF:02X}')
         b, value = self.base, value & 0xFF
         if port == b + 0x06:
             if value & 1:
@@ -139,6 +183,15 @@ class Blaster:
             elif value & 0x18 == 0x08:
                 self.ocw3[port] = value
             return
+        if port < 8:
+            ch, which = port >> 1, port & 1
+            shift = 8 * self.flip
+            for regs in (self.dma_base, self.dma_cur):
+                regs[ch][which] = regs[ch][which] & ~(0xFF << shift) | value << shift
+            self.flip ^= 1
+            return
+        if port == 0x0C:
+            self.flip = 0
         self.dma[port] = value
 
     def dsp(self, value):
@@ -157,6 +210,7 @@ class Blaster:
         self.command(value, [])
 
     def command(self, cmd, args):
+        trace(f'tick {self.ticks} DSP {cmd:02X}', ' '.join(f'{x:02X}' for x in args))
         if cmd == 0xE1:
             self.read += [3, 2]
         elif cmd == 0xE0:
@@ -197,6 +251,7 @@ class Blaster:
 
     def start(self, count, auto):
         end = self.end_after(count)
+        trace(f'tick {self.ticks} transfer {count:x} bytes tc {self.tc} ends {end} auto {auto}')
         self.playing = (end, count if auto else None)
         if end is None:
             self.ended()
@@ -208,12 +263,16 @@ class Blaster:
 
     def ended(self):
         _, block = self.playing
+        # The DMA channel's count gone past 0 (an auto-init's reloaded).
+        ch = self.channel
+        self.dma_cur[ch][1] = self.dma_base[ch][1] if block is not None else 0xFFFF
         self.playing = None if block is None else (self.end_after(block), block)
         self.raise_irq()
 
     # --- the interrupt -------------------------------------------------------
 
     def raise_irq(self):
+        trace(f'tick {self.ticks} IRQ raised, mask {self.mask[0x21]:02X} in service {self.in_service}')
         self.pending = True
         self.consider()
 
@@ -242,8 +301,11 @@ class Blaster:
         mu.reg_write(UC_X86_REG_EFLAGS, fl & ~0x300)
         mu.reg_write(UC_X86_REG_CS, vec[1])
         mu.reg_write(UC_X86_REG_IP, vec[0])
+        trace(f'tick {self.ticks} IRQ taken at {cs:04X}:{ip:04X} to {vec[1]:04X}:{vec[0]:04X}')
         self.pending = False
         self.in_service = 1
+        if vec[0] == 0x0639:
+            self.in_service_seen = True
         mu.hook_del(self.irq_hook)
         self.irq_hook = None
 
@@ -283,10 +345,12 @@ class Blaster:
             at = ret[0] * 16 + ret[1]
             def answered(mu, addr, size, _):
                 self.calls.append(f'7C={mu.reg_read(UC_X86_REG_AX):x}')
+                trace(f'tick {self.ticks} status {mu.reg_read(UC_X86_REG_AX):x}')
                 mu.hook_del(h[0])
             h = [mu.hook_add(UC_HOOK_CODE, answered, None, at, at)]
         else:
             self.calls.append(fn)
+        trace(f'tick {self.ticks} AIL {fn} from {ret[0]:04X}:{ret[1]:04X}')
 
     def calls_line(self, name):
         """The calls, runs of the same one counted (7C=2*30)."""
