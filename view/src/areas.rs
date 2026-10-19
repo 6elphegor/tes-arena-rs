@@ -33,6 +33,11 @@ pub struct Areas<'a> {
     pub ending: Option<u16>,
 }
 
+/// The speech's hooks with no button ever pressed.
+struct NoClicks;
+
+impl arena::vision::VisionHooks for NoClicks {}
+
 /// The location record the view's cities use (as `world::city_load`).
 const RECORD: u16 = 0x0A22;
 
@@ -55,7 +60,17 @@ impl AreaHooks for Areas<'_> {
         self.ending = Some(ax);
         let Some(files) = self.files.as_deref_mut() else { return };
         let dac: [[u8; 3]; 256] = std::array::from_fn(|i| std::array::from_fn(|k| m.mem.r8(arena::mem::DS, 0x929E + (i * 3 + k) as u16)));
-        if m.vision(files, &mut arena::vision::ClickThrough::default(), Some(&dac), ax, si, di).is_none() {
+        let mut speech = SPEECH.with(|s| s.borrow_mut().take());
+        let r = match speech.as_mut() {
+            Some(Speech { driver, clicks }) => {
+                let d = driver.as_mut();
+                let mut hooks: Box<dyn arena::vision::VisionHooks> = if *clicks { Box::new(arena::vision::ClickThrough::default()) } else { Box::new(NoClicks) };
+                m.sound_driver_main(files, d).and_then(|_| m.vision_driven(files, hooks.as_mut(), d, Some(&dac), ax, si, di))
+            }
+            None => m.vision(files, &mut arena::vision::ClickThrough::default(), Some(&dac), ax, si, di),
+        };
+        SPEECH.with(|s| *s.borrow_mut() = speech);
+        if r.is_none() {
             eprintln!("the farewell's speech gave up: {}", arena::giveup::describe());
             self.failed = true;
         }
@@ -403,6 +418,19 @@ thread_local! {
     static NEW_GAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Whose run's end follows the world loop going (`Tail`).
     static TAIL: std::cell::Cell<Tail> = const { std::cell::Cell::new(Tail::Current) };
+    /// A sound driver for the ending's speech (`Areas::ending`), which the
+    /// view itself never loads: set by the tests that play it through one
+    /// (worldtest's `playfarewellsound`).
+    pub static SPEECH: std::cell::RefCell<Option<Speech>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The ending's speech through a sound driver: loaded as main loads it
+/// (1194:076D, `Machine::sound_driver_main`) as the ending begins, the
+/// speech played through it (`Machine::vision_driven`); its pages clicked
+/// through (`ClickThrough`) with `clicks`, else no button pressed.
+pub struct Speech {
+    pub driver: Box<dyn arena::digital::DigitalDriver>,
+    pub clicks: bool,
 }
 
 /// What follows the world loop going when its area ends: the run that

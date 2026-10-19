@@ -1029,6 +1029,32 @@ impl Machine {
         (n != 0).then_some((seg, off)).or_else(|| crate::giveup::error("0000:7428: an empty file, or no room to read it"))
     }
 
+    /// 0000:7428 with DI FFFFh: the whole file named at DS:`name` loaded
+    /// into a heap block of its size, taken after the size is found
+    /// (0000:51EC); its (segment, offset). None as `file_load`'s, or where
+    /// the heap has no room (51EC's segment 0: nothing read, then 74E5).
+    pub fn file_load_alloc(&mut self, files: &mut Files, name: u16) -> Option<(u16, u16)> {
+        self.file_open_handle(files, name)?;
+        let size = self.file_seek(files, 2, 0);
+        if size > 0xFFFF {
+            self.file_close(files);
+            return crate::giveup::error("0000:7428: a file of 64 KiB or more");
+        }
+        self.mem.w16(DS, OPEN_SIZE, size as u16);
+        self.file_seek(files, 0, 0);
+        let (seg, off) = self.heap_alloc_bytes(size as u16)?;
+        let n = if seg != 0 { self.file_read(files, seg, off, size as u16) } else { 0 };
+        self.file_close(files);
+        if n == 0 {
+            // 74C4: the block given back (6C36) before 74E5.
+            if seg != 0 {
+                self.heap_free(seg);
+            }
+            return crate::giveup::error("0000:7428: an empty file, or no room for it");
+        }
+        Some((seg, off))
+    }
+
     /// 0000:7428 with DI FFFDh: the whole file named at DS:`name` loaded
     /// into EMS, its size (OPEN_SIZE) allocated there first (0000:5C26,
     /// which maps the bank); its (segment, offset), the segment the
