@@ -91,6 +91,10 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
         c.input(&mut engine, inp);
     }
     c.settle(&mut engine.m);
+    // Creation from 1194:24A6 on the game as it is, as the generator runs
+    // the original's: not the menu's pick and the story's state, which
+    // play gives the game (`Creation::begin_at_creation`).
+    c.begin_at_creation(&mut engine);
     // The dissolve's generator as the generator's start leaves it (the
     // story's first picture dissolved in has stepped it).
     engine.m.mem.w16(arena::mem::DS, 0x4B8E, DISSOLVE_SEED);

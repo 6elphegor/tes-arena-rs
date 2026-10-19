@@ -775,6 +775,24 @@ impl Creation {
         }
     }
 
+    /// Creation begun on the game as it is, from 1194:24A6, as
+    /// harness/gen_createshot.py runs the original's (the program's start,
+    /// then 24A6 straight): the menu's pick and the opening story the
+    /// screens showed leave nothing in the game's state (the story's
+    /// would: its movie's buffer at A69E, which the parchment's unrolling
+    /// reads before its row table), only creation's start (`story_ran`'s
+    /// last part).
+    pub fn begin_at_creation(&mut self, engine: &mut Engine) {
+        if self.story_run.take().is_none() {
+            return;
+        }
+        engine.m.newgame_reset();
+        engine.m.creation_font(&mut engine.files);
+        if let Stage::Method(_) = self.stage {
+            self.stage = Stage::Method(self.method(&mut engine.m));
+        }
+    }
+
     /// Back on the main menu (a load that failed).
     pub fn back_to_menu(&mut self) {
         self.outcome = None;
