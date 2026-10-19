@@ -178,9 +178,41 @@ impl Machine {
     }
 
     /// The digest the replay's 7Bh lines give a buffer at `seg`:`off`:
-    /// its first 4E20h bytes (the sound buffer's size, 21EE:000E).
+    /// its first 4E20h bytes (the sound buffer's size, 21EE:000E); for a
+    /// whole VOC file in a heap block of its own (the class quiz's, played
+    /// from its block, 23BA:014A) no further than the file's end
+    /// (`voc_bytes`), past which lie the block's padding and memory kept
+    /// elsewhere (harness/sbdig.py's `heap_block_bytes`).
     pub fn digital_digest(&self, seg: u16, off: u16) -> u64 {
-        (0..0x4E20u16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ self.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3))
+        let n = self.voc_bytes(seg, off).min(0x4E20);
+        (0..n as u16).fold(0xcbf2_9ce4_8422_2325u64, |h, i| (h ^ self.mem.r8(seg, off.wrapping_add(i)) as u64).wrapping_mul(0x100_0000_01b3))
+    }
+
+    /// The bytes of a VOC file at `seg`:`off` whose heap block's data
+    /// starts at `seg` (the header the paragraph before: +8 its size in
+    /// paragraphs, +0Ah bit 0 in use): its header's size (+14h) and each
+    /// block's (a type, a 24-bit length) to and with the type-0 end, no
+    /// further than the heap block. 10000h for anything else.
+    fn voc_bytes(&self, seg: u16, off: u16) -> u32 {
+        let head = seg.wrapping_sub(1);
+        let (size, flags) = (self.mem.r16(head, 8) as u32, self.mem.r16(head, 0xA));
+        if flags & 1 == 0 || size == 0 {
+            return 0x10000;
+        }
+        let end = size * 16;
+        let at = |i: u32| self.mem.r8(seg.wrapping_add((i >> 4) as u16), (i & 0xF) as u16);
+        let base = off as u32;
+        if (0..19).map(|i| at(base + i)).ne(b"Creative Voice File".iter().copied()) {
+            return 0x10000;
+        }
+        let mut p = base + (at(base + 0x14) as u32 | (at(base + 0x15) as u32) << 8);
+        while p < end {
+            if at(p) == 0 {
+                return p + 1 - base;
+            }
+            p += 4 + (at(p + 1) as u32 | (at(p + 2) as u32) << 8 | (at(p + 3) as u32) << 16);
+        }
+        end.saturating_sub(base)
     }
 
     /// Whether a sound driver is loaded (2294:0770: the dword at 8F62).

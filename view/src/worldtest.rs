@@ -3266,6 +3266,15 @@ fn a_new_game_by_the_questions_as_the_original() {
     new_game_from_the_menu("creationquiz", QUIZ, None);
 }
 
+/// The questions with ARENA.BAT's sound driver loaded
+/// (`creationquizsound`): BURST5.VOC readied for the driver (23BA:0183's
+/// 85h), played at each answer (014A), stopped at the end (01A4), then
+/// the vision's speech; every call into the driver as the original's.
+#[test]
+fn a_new_game_by_the_questions_with_sound_on_as_the_original() {
+    new_game_from_the_menu("creationquizsound", QUIZ, Some(titleplay_replay("creationquizsound")));
+}
+
 /// The class from the list: S, Acrobat (its first line) clicked twice.
 const LISTED: &str = "S,click:94:51,click:94:51";
 
