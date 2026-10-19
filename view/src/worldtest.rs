@@ -700,6 +700,136 @@ fn picking(a: &mut App, level: u8) {
     m.mem.w16(DS, 0x05CA, f);
 }
 
+/// gen_worldframes.py's `riddle_door`: gen_screens.py's `riddled` on the
+/// player's square (the text at FF00h in the level's texts' bank), and a
+/// trigger at square 0101h, number 1, its wall a shut door (B000h), the
+/// square's entry F000h.
+fn riddle_door(a: &mut App) {
+    use arena::squares::var as sq;
+    let m = &mut a.engine.m;
+    let bank = m.mem.r8(DS, sq::TEXT_BANK) as u16;
+    m.ems_map(bank);
+    let seg = m.mem.r16(DS, 0x9030);
+    for (i, &c) in b"What burns?\r:fire\r:flame\0`C\r".iter().enumerate() {
+        m.mem.w8(seg, 0xFF00 + i as u16, c);
+    }
+    let here = m.mem.r16(DS, 0xCB90);
+    for (at, v) in [(sq::SHOWN, 0xFF00), (sq::RIDDLE_AT, 0xFF00), (sq::ANSWERS_AT, 0xFF0C), (sq::WRONG_AT, 0xFF00), (sq::RIGHT_AT, 0), (sq::RIDDLE_A, 1), (sq::RIDDLE_B, 2), (sq::SHOWN_SQUARE, here)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w8(DS, sq::SHOWN_TIME, 0x28);
+    m.mem.w8(DS, arena::riddle::var::TRIGGER_COUNT, 1);
+    m.mem.w16(DS, arena::riddle::var::TRIGGERS, 0x0101);
+    m.mem.w8(DS, arena::riddle::var::TRIGGERS + 2, 1);
+    m.mem.w16(DS, sq::ENTRY, 0xF000);
+    let walls = m.mem.r16(DS, 0xD806);
+    m.mem.w16(walls, 0x0102, 0xB000);
+}
+
+/// gen_worldframes.py's `corpse_items`: the corpse (the actor at 0C57,
+/// its record [+12h] in the segment [1042]) given no gold and the
+/// player's first item in its first two slots; a slot of the player's
+/// free.
+fn corpse_items(a: &mut App) {
+    let m = &mut a.engine.m;
+    let seg = m.mem.r16(DS, 0x1042);
+    let rec = m.mem.r16(DS, 0x0C57 + 0x12);
+    m.mem.w16(seg, rec + 0x407, 0);
+    for k in 0..2 * 0x13u16 {
+        let b = m.mem.r8(DS, 0x0212 + k % 0x13);
+        m.mem.w8(seg, rec + 0x6E + k, b);
+    }
+    room(a);
+}
+
+/// gen_worldframes.py's `pile_ahead`: at row 0Bh, column 2Ah facing the
+/// square beyond (heading 0), its floor byte flat 7 (a pile of
+/// treasure); a slot of the player's free, seeded.
+fn pile_ahead(a: &mut App) {
+    at_square(a, 0xB, 0x2A, 0);
+    let m = &mut a.engine.m;
+    let floor = m.mem.r16(DS, 0xCCD0);
+    m.mem.w8(floor, 0x0C54, 7);
+    room(a);
+    seeded(a);
+}
+
+/// A step of gen_worldframes.py's with a click at the view's centre and
+/// `script` for its waits, `n` frames in all: the button down for the
+/// first frame, let go for the next; the frame that takes the click (the
+/// loot window, 1194:DB6C) waits on the window's boxes and lists, which
+/// `script` answers, and goes on.
+fn clicked_with(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, script: &[Act]) {
+    // The harness's mouse at (160, 100): the click 4 on (CB60), as
+    // playghostclick's; the mouse let go first (after a fight's swings the
+    // captured mouse clicks where they left it, not where the harness's
+    // click puts it).
+    a.release();
+    a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+    a.input(In::Button { button: MouseButton::Left, down: true });
+    frames(a, d, seen, 1, |_| false);
+    a.input(In::Button { button: MouseButton::Left, down: false });
+    let mut used = 1;
+    loop {
+        assert!(used < n, "the click asked nothing");
+        // The screen as the window last showed it (the page a box or a
+        // list covers: `Front::shown`), as a shown window has it.
+        a.compose();
+        d.frame(a);
+        used += 1;
+        if a.pending.is_some() || !a.boxes.is_empty() {
+            break;
+        }
+        seen.push(state(a));
+    }
+    for step in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the window ended early");
+        act(a, d, step);
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the window still asking");
+    seen.push(state(a));
+    frames(a, d, seen, n - used, |_| false);
+}
+
+/// playfight's set-up: the creature brought, the mouse captured.
+fn fought(a: &mut App) {
+    brought(a, 1, 1, 0x180);
+    captured(a);
+}
+
+/// playfight's frames, then its corpse clicked (gen_worldframes.py's
+/// playloot: the gold's box clicked away), or (`items`, playlootitems)
+/// the corpse given two items first (`corpse_items`), both taken.
+fn looted(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, items: bool) {
+    ready(a, seen);
+    frames(a, d, seen, 30, |_| false);
+    swinging(a, d, seen, 200);
+    frames(a, d, seen, 20, |_| false);
+    if items {
+        corpse_items(a);
+        frames(a, d, seen, 1, |_| false);
+        clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::Click(0xA0, 0x60)]);
+    } else {
+        clicked_with(a, d, seen, 10, &[Act::Click(0xA0, 0x60)]);
+    }
+    frames(a, d, seen, 5, |_| false);
+}
+
+/// gen_worldframes.py's LOOT_LINE: the loot list's first line.
+const LOOT_LINE: Act = Act::Click(0x60, 0x25);
+
+/// The riddle's frame: shown and its answer asked (0000:0550, 292B:05A2),
+/// `answer` typed and Enter, the frame going on; ten frames after.
+fn riddle_played(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, answer: &str) {
+    d.frame(a);
+    assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+    super::super::super::type_text(d, a, answer);
+    d.key(a, KeyCode::Enter, None);
+    assert!(a.pending.is_none(), "the riddle answered");
+    seen.push(state(a));
+    frames(a, d, seen, 10, |_| false);
+}
+
 /// gen_worldframes.py's `levitating`: spell flag 80h (05BE), its timer
 /// 30 minutes.
 fn levitating(a: &mut App) {
@@ -768,7 +898,17 @@ fn seeded(a: &mut App) {
 /// at (x, y), or a key typed.
 enum Act {
     Click(i32, i32),
+    RClick(i32, i32),
     Key(KeyCode, &'static str),
+}
+
+/// `act` done as the window does it.
+fn act(a: &mut App, d: &mut Driver, act: &Act) {
+    match *act {
+        Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
+        Act::RClick(x, y) => d.click(a, x, y, MouseButton::Right),
+        Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
+    }
 }
 
 /// gen_worldframes.py's ACCEPT and MORE.
@@ -898,12 +1038,9 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
     // is drawn over: `Front::shown`), as a shown window has it.
     a.compose();
     super::super::super::shop_turn(a, kind);
-    for act in script {
+    for step in script {
         assert!(a.pending.is_some() || !a.boxes.is_empty(), "the services ended early");
-        match *act {
-            Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
-            Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
-        }
+        act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the services still asking");
     seen.push(state(a));
@@ -950,12 +1087,9 @@ fn talked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act])
     seeded(a);
     a.compose();
     super::super::super::talk_turn(a);
-    for act in script {
+    for step in script {
         assert!(a.pending.is_some() || !a.boxes.is_empty(), "the talk ended early");
-        match *act {
-            Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
-            Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
-        }
+        act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the talk still asking");
     seen.push(state(a));
@@ -1097,6 +1231,15 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 10, |_| false);
         })),
+        "playloot" => (Place::Dungeon, Box::new(fought), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, false))),
+        "playlootitems" => (Place::Dungeon, Box::new(fought), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, true))),
+        "playpile" => (Place::Dungeon, Box::new(pile_ahead), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::RClick(0x60, 0x25)]);
+            frames(a, d, seen, 5, |_| false);
+        })),
+        "playriddleright" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "fire"))),
+        "playriddlewrong" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "water"))),
         "playlock" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 13, 4, 0);
             let m = &mut a.engine.m;
@@ -2477,7 +2620,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 58] = ["playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 63] = ["playloot", "playlootitems", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2587,7 +2730,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 63] = ["playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 68] = ["playloot", "playlootitems", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

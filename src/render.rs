@@ -289,9 +289,11 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
     // a column is drawn with, BAE6 and BAE8: a lit face sets them, but
     // outdoors by day (C398 bit 8000h) nothing steps the light, so a side
     // face's first shades (0000:BE02..BE2D) come of the last lit frame's
-    // A85E, and a frame that draws no lit face keeps its BAE6/BAE8.)
+    // A85E, and a frame that draws no lit face keeps its BAE6/BAE8. And
+    // A840, the last packed flat's buffer (0000:C3DB), which a list the
+    // frame's click opens takes for its DL: 1194:5734's record +2Bh.)
     let mut left = Vec::new();
-    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D), (0xA85E, 0xA862), (0xBAE6, 0xBAEA)] {
+    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D), (0xA85E, 0xA862), (0xBAE6, 0xBAEA), (0xA840, 0xA842)] {
         for o in from..to {
             left.push((o, r.m.mem.r8(DS, o)));
         }
@@ -2769,6 +2771,12 @@ impl Soft {
         self.m.ems_map(bank);
         let si = self.g16(0xD0B8u16.wrapping_add(si4));
         let es = self.g16(0x9030);
+        // C2FA..C306: the flat's data (A840, A84A) in the frame (A842,
+        // A848).
+        self.s16(0xA842, es);
+        self.s16(0xA848, es);
+        self.s16(0xA840, si);
+        self.s16(0xA84A, si);
         let Some(cx) = self.place(x, y, z, true) else { return };
         let (w, h) = (self.m.mem.r16(es, si + 6), self.m.mem.r16(es, si + 8));
         let (ax, bx) = self.project(w, h, cx);
@@ -2789,6 +2797,9 @@ impl Soft {
         self.s16(0xA84C, bx);
         let (doff, dseg) = (self.g16(0xBA54), self.g16(0xBA56));
         self.unpack(es, si, bp, dseg, doff);
+        // C3D3..C3DB: the frame unpacked (BA54) is what is drawn.
+        self.s16(0xA842, dseg);
+        self.s16(0xA840, doff);
         let (shoff, shseg) = self.flat_light();
         self.s16(0xCD9A, h);
         self.s16(0xCD98, w);
