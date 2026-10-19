@@ -122,9 +122,11 @@ pub trait SpellmakerHooks {
     fn screen(&mut self, _m: &mut Machine) {}
     /// An effect's form shown (1194:6105), its record at DATA:`form`.
     fn form(&mut self, _m: &mut Machine, _form: u16) {}
-    /// 29CF:06CB's write (0000:9DD2, after its path is made): the spells' file named
-    /// at DS:`name` with DATA:2A80's AA0h bytes.
+    /// 29CF:06CB's path and write (25FD:0844, which flips the paths'
+    /// toggle, then 0000:9DD2): the spells' file named at DS:`name` with
+    /// DATA:2A80's AA0h bytes.
     fn spells_write(&mut self, m: &mut Machine, files: &mut Files, name: u16) {
+        m.save_path(name);
         m.file_write(files, name, DATA, var::SPELLS, 0xAA0);
     }
 }
@@ -1571,12 +1573,10 @@ impl Machine {
         self.mem.w32(DS, GOLD, gold);
         say(self, hooks, INSCRIBED);
         // 29CF:06CB: the spells' file named by the slot (1A6C's digits at
-        // 7F1E), its path made (25FD:0844, which flips the paths' toggle)
-        // and written (9DD2).
+        // 7F1E), its path made and written (`SpellmakerHooks::spells_write`).
         let slot_no = self.sg8(0x1A6C);
         self.mem.w8(DS, 0x7F1E, b'0' + slot_no / 10);
         self.mem.w8(DS, 0x7F1F, b'0' + slot_no % 10);
-        self.save_path(0x7F17);
         hooks.spells_write(self, files, 0x7F17);
         self.sm_clear();
         self.sm_draw(files, hooks)
