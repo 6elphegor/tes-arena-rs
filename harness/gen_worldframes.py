@@ -427,6 +427,19 @@ def locked_door(a):
     a.mu.mem_write(a.lin(a.ds, 0xC6E4), bytes([n + 1]))
 
 
+def riddle_door(a):
+    """gen_screens.py's `riddled` on the player's square, and one of the
+    level's triggers (C624, C6E4 of them: the square, the trigger's
+    number) at square 0101h, number 1 (the right answer's, 7C68), its wall
+    a door (B000h, shut), the square's entry (3D44) F000h (which a right
+    answer clears): inputtest's `riddle_answered`."""
+    gs.riddled(a)
+    a.mu.mem_write(a.lin(a.ds, 0xC6E4), bytes([1]))
+    a.mu.mem_write(a.lin(a.ds, 0xC624), struct.pack('<HB', 0x0101, 1))
+    a.w16(0x3D44, 0xF000)
+    a.w16(0x0102, 0xB000, seg=a.r16(0xD806))
+
+
 def message_up(a):
     """The message line's time set (061E)."""
     return a.r16(0x061E) != 0
@@ -737,6 +750,10 @@ TAVERN_DRINK_SCRIPT = [('click', 0xA0, 0x43), ('click', 0x70, 0x26), ('click', 0
 # without its rooms left by its Exit (the third box).
 TAVERN_ROOM_SCRIPT = [('click', 0xA0, 0x5B), ('click', 0x80, 0x31), ('keys', [0x02, 0x1C]), ('click', 0x70, 0x85),
                       ('click', 0x70, 0x85), ('click', 0xA0, 0x87)]
+# A riddle's answer typed (292B:05A2's field, 0000:9EE5), a key a wait,
+# and Enter: "fire" (its first answer: right) and "water" (wrong).
+RIDDLE_RIGHT_SCRIPT = [('keys', [k]) for k in (0x21, 0x17, 0x13, 0x12, KEY_ENTER)]
+RIDDLE_WRONG_SCRIPT = [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13, KEY_ENTER)]
 
 
 # The main quest's Crypt of Hearts: its .MIF (whose INFO names
@@ -870,6 +887,13 @@ CASES = {
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
     # door opens; then the up arrow held through it and let go.
     'playpick': ('crypt', picking(1), [((), (), 2, None), ((), (), 20, None, [(160, 100)]), ((UP,), (), 40, None), ((), (UP,), 10, None)]),
+    # A riddle on the player's square (`riddle_door`): the first frame
+    # shows it and asks its answer (0000:0550, 292B:05A2), typed and
+    # Enter: right, the trigger's door opened (its wall's bit 200h, the
+    # wall's sound) and the square's entry cleared; wrong, the riddle's
+    # text shown again. Ten frames after.
+    'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
+    'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
     # The crypt's water (row 22, columns 6..10) walked into from the
     # square north of it (row 21, column 7), facing it (heading 0): the
     # player sinks (0000:F9C4's water), swims and bobs (C39A bit 10h,

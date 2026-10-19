@@ -700,6 +700,44 @@ fn picking(a: &mut App, level: u8) {
     m.mem.w16(DS, 0x05CA, f);
 }
 
+/// gen_worldframes.py's `riddle_door`: gen_screens.py's `riddled` on the
+/// player's square (the text at FF00h in the level's texts' bank), and a
+/// trigger at square 0101h, number 1, its wall a shut door (B000h), the
+/// square's entry F000h.
+fn riddle_door(a: &mut App) {
+    use arena::squares::var as sq;
+    let m = &mut a.engine.m;
+    let bank = m.mem.r8(DS, sq::TEXT_BANK) as u16;
+    m.ems_map(bank);
+    let seg = m.mem.r16(DS, 0x9030);
+    for (i, &c) in b"What burns?\r:fire\r:flame\0`C\r".iter().enumerate() {
+        m.mem.w8(seg, 0xFF00 + i as u16, c);
+    }
+    let here = m.mem.r16(DS, 0xCB90);
+    for (at, v) in [(sq::SHOWN, 0xFF00), (sq::RIDDLE_AT, 0xFF00), (sq::ANSWERS_AT, 0xFF0C), (sq::WRONG_AT, 0xFF00), (sq::RIGHT_AT, 0), (sq::RIDDLE_A, 1), (sq::RIDDLE_B, 2), (sq::SHOWN_SQUARE, here)] {
+        m.mem.w16(DS, at, v);
+    }
+    m.mem.w8(DS, sq::SHOWN_TIME, 0x28);
+    m.mem.w8(DS, arena::riddle::var::TRIGGER_COUNT, 1);
+    m.mem.w16(DS, arena::riddle::var::TRIGGERS, 0x0101);
+    m.mem.w8(DS, arena::riddle::var::TRIGGERS + 2, 1);
+    m.mem.w16(DS, sq::ENTRY, 0xF000);
+    let walls = m.mem.r16(DS, 0xD806);
+    m.mem.w16(walls, 0x0102, 0xB000);
+}
+
+/// The riddle's frame: shown and its answer asked (0000:0550, 292B:05A2),
+/// `answer` typed and Enter, the frame going on; ten frames after.
+fn riddle_played(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, answer: &str) {
+    d.frame(a);
+    assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
+    super::super::super::type_text(d, a, answer);
+    d.key(a, KeyCode::Enter, None);
+    assert!(a.pending.is_none(), "the riddle answered");
+    seen.push(state(a));
+    frames(a, d, seen, 10, |_| false);
+}
+
 /// gen_worldframes.py's `levitating`: spell flag 80h (05BE), its timer
 /// 30 minutes.
 fn levitating(a: &mut App) {
@@ -1097,6 +1135,8 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
             frames(a, d, seen, 10, |_| false);
         })),
+        "playriddleright" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "fire"))),
+        "playriddlewrong" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "water"))),
         "playlock" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 13, 4, 0);
             let m = &mut a.engine.m;
@@ -2447,7 +2487,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 56] = ["playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 58] = ["playriddleright", "playriddlewrong", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2555,7 +2595,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 61] = ["playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 63] = ["playriddleright", "playriddlewrong", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
