@@ -996,6 +996,77 @@ def minute_due(a):
     a.w16(0x884A, (a.r16(0x0151) - 0x5A) & 0xFFFF)
 
 
+# The disease `midnight` gives (2EBD:0573's id, 10 and up).
+DISEASE_ID = 10
+
+
+def midnight(a):
+    """A minute to midnight (`at_hour` 23:59) facing north (heading 0), the
+    player given disease DISEASE_ID as a creature's bite gives it (2EBD:0573,
+    AX the id, DS:SI the player's record 01A4) with the seed fixed for its
+    rolls, and its slot (0660, 3Ch each, its kind at +3Ah) counted to its
+    pulse (phase A's count at +0 put at 1): the next minute tick
+    (`minute_due`) passes midnight, a new day (0000:1607: the quests, the
+    weather, the sky's day and its moons), the hour (1622), and the disease's
+    daily pulse (2EBD:028A)."""
+    at_hour(23, 0, minute=59)(a)
+    gs.seeded(a)
+    a.call_far(0x2EBD, 0x0573, eax=DISEASE_ID, esi=0x01A4)
+    for i in range(16):
+        s = 0x0660 + 0x3C * i
+        if a.mu.mem_read(a.lin(a.ds, s + 0x3A), 1)[0] == DISEASE_ID and a.r16(s + 0x28) == 0x01A4:
+            a.w16(s, 1)
+            break
+    else:
+        raise AssertionError('the disease took no slot')
+
+
+def dawning(a):
+    """A minute to six in the morning (`at_hour` 5:59) facing north: the next
+    minute ticks (`minute_due`, each step's) bring the sky's time to 100h,
+    where the outdoor light starts stepping up (0000:0390's ramp, 100h..110h)."""
+    at_hour(5, 0, minute=59)(a)
+
+
+def on_holiday(a):
+    """Noon on gen_screens.py's HOLIDAY_DAY of the save's year (`gs.holiday`:
+    the clock, the frame counter CCBC past 3, seeded), the hour and minute
+    and the sky's time set to match (`at_hour`), facing north: the frame's
+    holiday message (0000:49D9's 2DA2:111C, once: 5E0 bit 100h) is due."""
+    gs.holiday(a)
+    at_hour(12, 0)(a)
+
+
+def store_closed(a):
+    """Ten at night (`night`), the player in the street square beside the
+    town's first store's door (gen_screens.py's PLACES: its entry list),
+    at that square's edge, facing the door: a click at the view's middle
+    picks the door's wall, whose trigger (0000:43B1, 4054) finds the store
+    closed at this hour (1194:4FB8) and puts the lock's message on the
+    message line (2433's 0000:402F, `locked_message`)."""
+    at, count = gs.PLACES['store']
+    assert a.r16(count), 'no store in the town'
+    sq = a.r16(a.r16(at), seg=a.r16(at + 2))
+    row, col = sq >> 8, sq & 0xFF
+    walls = a.r16(0xD806)
+    # (heading, the neighbour's row and column, the nudge toward the door):
+    # the first neighbour with no wall (empty, or only a flat: the
+    # store's sign stands before its door)
+    for heading, r, c, dx, dz in ((0, row - 1, col, 0, 0x30), (0x200, row + 1, col, 0, -0x30),
+                                  (0x100, row, col - 1, 0x30, 0), (0x300, row, col + 1, -0x30, 0)):
+        v = a.r16((r << 8) + (c << 1), seg=walls)
+        if v == 0 or v & 0x8000:
+            break
+    else:
+        raise AssertionError('the store\'s door has no open square beside it')
+    at_square(r, c, heading)(a)
+    for base in (0xC3D0, 0xBA62):
+        a.w16(base, (a.r16(base) + dx) & 0xFFFF)
+        a.w16(base + 4, (a.r16(base + 4) + dz) & 0xFFFF)
+    night(heading)(a)
+    gs.seeded(a)
+
+
 def informant_owed(a):
     """`informant`, met before and his price agreed (0FE6 bit 0): he is
     paid for rather than haggled with (1194:CED7 -> D019)."""
@@ -1193,6 +1264,22 @@ CASES = {
     # The same at ten at night (`night`): the frame's light turns to the
     # night's (0000:0390) and the next frames are drawn by it.
     'playnight': ('street', night(0), [((), (), 3, None)]),
+    # The street a minute to midnight with a disease due its pulse
+    # (`midnight`): two frames, then the minute tick (`minute_due`) passes
+    # midnight: the new day, the hour, the disease's pulse; six frames.
+    'playmidnight': ('street', midnight, [((), (), 2, None), ((), (), 6, None, [], {'do': minute_due})]),
+    # The street a minute to six in the morning (`dawning`): three minute
+    # ticks two frames apart, the sky's time reaching 100h, the outdoor
+    # light starting to rise.
+    'playdawn': ('street', dawning, [((), (), 2, None), ((), (), 2, None, [], {'do': minute_due}),
+                                     ((), (), 2, None, [], {'do': minute_due}), ((), (), 2, None, [], {'do': minute_due})]),
+    # The street at noon on a holiday (`on_holiday`): the frame's holiday
+    # message box (1194:59C8 through 0000:49D9) clicked away; three frames.
+    'playholiday': ('street', on_holiday, [((), (), 3, None, [], {'script': [('click', 0xA0, 0x60)]})]),
+    # The town's first store's door at ten at night (`store_closed`): two
+    # frames, then the door clicked: closed, its lock's words on the
+    # message line; six frames.
+    'playstoreclosed': ('street', store_closed, [((), (), 2, None), ((), (), 6, None, [(160, 100)])]),
     # Out of the city's gate into the wilderness (`wild`), its first
     # frames, nothing held: the wild's 3D view (fields, the sky).
     'playwild': ('wild', None, [((), (), 3, None)]),
