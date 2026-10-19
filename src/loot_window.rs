@@ -53,9 +53,10 @@ use crate::mem::DS;
 pub trait LootHooks {
     /// 1194:59CC: a message box with the text at DS:`si`.
     fn message_box(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 1194:5734: a list of `cx` strings at DS:`si`. The pick (FFFFh:
-    /// none).
-    fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
+    /// 1194:5734 (through 5730): a list of `cx` strings at DS:`si`, its
+    /// title at DS:`di` (A872: DI as the window's loop left it). The pick
+    /// (FFFFh: none).
+    fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16, _di: u16) -> u16 {
         0xFFFF
     }
     /// 1194:A374 (through A36C): text number TEXT (137A) shown (`mode`
@@ -146,8 +147,6 @@ const PLAYER: u16 = 0x01A4;
 const PLAYER_ITEMS: u16 = 0x0212;
 /// The player's strength (current).
 const STRENGTH: u16 = 0x01CD;
-/// The window colour the message boxes take (1194:42EE).
-const COLOUR: u16 = 0x9288;
 
 impl Machine {
     /// 0000:5C86 with BX `page`: bank `page` mapped (`ems_map`); returns
@@ -194,16 +193,10 @@ impl Machine {
         }
     }
 
-    /// 1194:42EE (through 42EA): the fonts set (the front end's) and the
-    /// window colour 60h.
-    fn window_colour(&mut self) {
-        self.mem.w8(DS, COLOUR, 0x60);
-    }
-
-    /// 2433:0738: a message box (the fonts, 1194:42EA) with the text at
-    /// `si`.
+    /// 2433:0738: a message box (the fonts, 1194:42EA with [1026]) with the
+    /// text at `si`.
     fn loot_message(&mut self, hooks: &mut dyn LootHooks, si: u16) {
-        self.window_colour();
+        self.message_fonts(0x1026);
         hooks.message_box(self, si);
     }
 
@@ -282,7 +275,7 @@ impl Machine {
         }
         let dx = bx.wrapping_add(s >> 1);
         if ax > dx {
-            self.window_colour();
+            self.message_fonts(0x1026);
             hooks.message_box(self, 0x4B33);
             return Some(true);
         }
@@ -535,7 +528,9 @@ impl Machine {
         let (seg, rec) = (self.mem.r16(DS, REC_SEG), self.mem.r16(DS, REC));
         let (ns, no) = self.class_name(seg, rec);
         self.sprintf((DS, 0x1044), (DS, 0x4C70), &[Arg::Str(ns, no)]);
-        self.loot_message(hooks, 0x1044);
+        // 0BC9: 42EA with [102C], then the box (not 0738's [1026]).
+        self.message_fonts(0x102C);
+        hooks.message_box(self, 0x1044);
     }
 
     /// 2433:0AFF: the corpse's list: the names of the occupied slots at
@@ -573,7 +568,9 @@ impl Machine {
         // the list's kind (1194:5734).
         self.select_font(0x102E);
         self.list_kind = 0xB;
-        let pick = hooks.list(self, 0x1044, bx);
+        // DI the names' end, as 0BE4 left it for the last (13ED).
+        let di = self.mem.r16(DS, NAMES_AT);
+        let pick = hooks.list(self, 0x1044, bx, di);
         if (pick as i16) < 0 {
             return Some(true);
         }
@@ -601,7 +598,7 @@ impl Machine {
             let g = self.mem.r32(DS, GOLD).wrapping_add(gold as u32);
             self.mem.w32(DS, GOLD, g);
             self.sprintf((DS, 0x9686), (DS, 0x4CFA), &[Arg::Int(gold)]);
-            self.window_colour();
+            self.message_fonts(0x102C);
             hooks.message_box(self, 0x9686);
             self.mem.w8(DS, GOLD_SHOWN, 1);
         }
@@ -636,7 +633,7 @@ impl Machine {
             self.mem.w16(DS, 0x061E, 0x1E);
             return Some(());
         }
-        self.window_colour();
+        self.message_fonts(0x102C);
         hooks.message_box(self, 0x7979);
         Some(())
     }
@@ -757,6 +754,7 @@ impl Machine {
             self.mem.w16(DS, LIST_AT, 0x9302);
             let frame = self.mem.r16(DS, FRAME_SEG);
             let mut bx = 0u16;
+            let mut last = false;
             for i in 0..TABLE_LEN {
                 let si = TABLE + i * PILE_SIZE;
                 for k in 0..PILE_SIZE {
@@ -772,6 +770,7 @@ impl Machine {
                     let di = self.copy_str(DS, name, DS, di);
                     self.mem.w16(DS, LIST_AT, di);
                     bx = bx.wrapping_add(1);
+                    last = i == TABLE_LEN - 1;
                 }
             }
             if bx == 0 {
@@ -783,7 +782,13 @@ impl Machine {
             // (06C4): the list's kind (1194:5734).
             self.select_font(0x102E);
             self.list_kind = 0xB;
-            let pick = hooks.list(self, 0x9302, bx);
+            // DI the pile's copy (4BF6, 0661) as each entry left it; the
+            // table's last entry at the square leaves what the name's
+            // routines (2433:0152) left it, which isn't ported.
+            if last {
+                return crate::giveup::not_ported("2433:068F: DI as the last entry's name left it");
+            }
+            let pick = hooks.list(self, 0x9302, bx, PILE);
             if (pick as i16) < 0 {
                 return Some(());
             }

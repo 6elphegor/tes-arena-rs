@@ -333,6 +333,9 @@ KEY_A = 0x1E
 # each frame: a swing (0000:3C9F) begun whenever the last has ended.
 SWINGING = {'buttons': 2, 'drag': (0, 0x60)}
 LET_GO = {'buttons': 0}
+# playfight's steps: the weapon readied, the creature waited for, swung
+# at till it falls, let go.
+FIGHT = [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None), ((), (), 200, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]
 
 
 def wild_edge(a):
@@ -438,6 +441,29 @@ def riddle_door(a):
     a.mu.mem_write(a.lin(a.ds, 0xC624), struct.pack('<HB', 0x0101, 1))
     a.w16(0x3D44, 0xF000)
     a.w16(0x0102, 0xB000, seg=a.r16(0xD806))
+
+
+def corpse_items(a):
+    """After the fight, its corpse (the actor at 0C57: its record [+12h]
+    in the segment [1042]) given no gold (+407h) and the player's first
+    item twice in its first two slots (+6Eh, 13h bytes each), and a slot
+    of the player's free (gen_screens.py's `room`)."""
+    seg, rec = a.r16(0x1042), a.r16(0x0C57 + 0x12)
+    a.w16(rec + 0x407, 0, seg=seg)
+    item = bytes(a.mu.mem_read(a.lin(a.ds, 0x0212), 0x13))
+    a.mu.mem_write(a.lin(seg, rec + 0x6E), item + item)
+    gs.room(a)
+
+
+def pile_ahead(a):
+    """At row 0Bh, column 2Ah, facing the square beyond it (heading 0),
+    whose floor byte is given flat 7 (the INF's third item flat, C934:
+    a pile of treasure, 292B:07FB), a slot of the player's free, the seed
+    fixed (`seeded`: the piles' rolls, 2433:0000)."""
+    at_square(0xB, 0x2A, 0)(a)
+    a.mu.mem_write(a.lin(a.r16(0xCCD0), 0x0C54), bytes([7]))
+    gs.room(a)
+    gs.seeded(a)
 
 
 def message_up(a):
@@ -754,6 +780,18 @@ TAVERN_ROOM_SCRIPT = [('click', 0xA0, 0x5B), ('click', 0x80, 0x31), ('keys', [0x
 # and Enter: "fire" (its first answer: right) and "water" (wrong).
 RIDDLE_RIGHT_SCRIPT = [('keys', [k]) for k in (0x21, 0x17, 0x13, 0x12, KEY_ENTER)]
 RIDDLE_WRONG_SCRIPT = [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13, KEY_ENTER)]
+# The loot window's list (1194:5734 with kind Bh: record 5006, its lines
+# from 54h, 21h), its first line clicked: marked as the list comes up, a
+# click takes it.
+LOOT_LINE = ('click', 0x60, 0x25)
+# A corpse's gold box clicked away (2433:0748; no items: the window ends).
+LOOT_GOLD_SCRIPT = [('click', 0xA0, 0x60)]
+# A corpse's two items (`corpse_items`) taken one after the other, the
+# second finding no room: its box clicked away.
+LOOT_ITEMS_SCRIPT = [LOOT_LINE, LOOT_LINE, ('click', 0xA0, 0x60)]
+# The square's piles made (2433:0000) and listed (2433:0637): two taken,
+# the list left with the right button.
+PILE_SCRIPT = [LOOT_LINE, LOOT_LINE, ('rclick', 0x60, 0x25)]
 
 
 # The main quest's Crypt of Hearts: its .MIF (whose INFO names
@@ -892,6 +930,18 @@ CASES = {
     # Enter: right, the trigger's door opened (its wall's bit 200h, the
     # wall's sound) and the square's entry cleared; wrong, the riddle's
     # text shown again. Ten frames after.
+    # playfight's kill, then its corpse clicked at the view's centre
+    # (1194:DB6C, 292B:06DC, 2433:0583 through 7B16): the gold it rolled
+    # shown in a box, clicked away; five frames after. Then the same with
+    # the corpse given two items and no gold (`corpse_items`): both
+    # taken, the second with no room left.
+    'playloot': ('dungeon', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    'playlootitems': ('dungeon', brought(1), FIGHT + [((), (), 1, None, [], {'do': corpse_items}),
+                                                      ((), (), 10, None, [(160, 100)], {'script': LOOT_ITEMS_SCRIPT}), ((), (), 5, None)]),
+    # A pile of treasure ahead (`pile_ahead`) clicked two frames on: the
+    # square's piles made and listed, two taken, the list left; five
+    # frames after.
+    'playpile': ('dungeon', pile_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': PILE_SCRIPT}), ((), (), 5, None)]),
     'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
     'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
     # The crypt's water (row 22, columns 6..10) walked into from the

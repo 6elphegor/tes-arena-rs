@@ -1137,7 +1137,11 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
                 (((v & 0xFF) + base) as usize, 0.0)
             } else if fb != 0 {
                 let top = if v != 0 && v & 0x8000 == 0 && (v >> 8) as u8 != v as u8 { m.move_wall_height(v).0 as i16 as f32 } else { 0.0 };
-                ((fb as u16 - 1 + base) as usize, top)
+                // Its low byte less 1 only over a platform (the square's
+                // word positive), as the drawing takes it (0000:CFBA, the
+                // floor's flat, `render::flat_square`).
+                let raised = (v as i16) > 0;
+                ((fb as u16 - raised as u16 + base) as usize, top)
             } else {
                 continue;
             };

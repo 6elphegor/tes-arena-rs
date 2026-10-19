@@ -42,7 +42,7 @@ impl LootHooks for Script {
     fn sound(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([3, si]);
     }
-    fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
+    fn list(&mut self, _m: &mut Machine, si: u16, cx: u16, _di: u16) -> u16 {
         self.log.extend([4, si, cx]);
         let v = take(&self.lists, &mut self.n[0], 0xFFFF);
         if v == 0xFFFF { v } else { v % cx.max(1) }

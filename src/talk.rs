@@ -1334,8 +1334,12 @@ impl Machine {
         let (x, y) = (self.g16(si), self.g16(si.wrapping_add(4)));
         let sq = square_at(x, y);
         if al != self.g8(ITEM_FLATS + 1) {
+            // 292B:086C: FS isn't set on this way: it is the walls'
+            // segment ([D806]) as the frame leaves it before 1194:DB6C,
+            // which the loot window keeps as the record's (12C2).
             let ax = 0x0F00 | (self.flat_of(si) & 0xFF);
-            hooks.loot(self, files, ax, si, DS, sq)?;
+            let fs = self.g16(MAP);
+            hooks.loot(self, files, ax, si, fs, sq)?;
             return Some(true);
         }
         let key = (((y >> 7) as u8 as u16) << 8) | ((x >> 7) & 0xFF);

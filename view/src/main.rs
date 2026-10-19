@@ -225,6 +225,9 @@ struct Front<'a> {
     /// The colours on the screen (`Assets::dac`), as the VGA's 6-bit
     /// values: what the shops read on entering (1194:5496).
     dac: Option<[[u8; 3]; 256]>,
+    /// The interface's pictures (`Assets::interface`), for the hands and
+    /// the compass the frame body draws on the page before the click.
+    interface: Option<&'a mut interface::Interface>,
 }
 
 impl Front<'_> {
@@ -632,8 +635,14 @@ impl arena::frame::FrameHooks for Front<'_> {
             self.show(m, 0x1044);
         }
     }
-    /// 1194:DB6C with the view's own talk hooks.
+    /// 1194:DB6C with the view's own talk hooks, on the page as the frame
+    /// body leaves it by then: the hands (0000:38CE, from 493A) and the
+    /// compass (4D7C, from 4957) drawn, which the boxes and lists a click
+    /// opens cover.
     fn actor_click(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
+            i.frame_body_on(page, m);
+        }
         m.actor_click(files, self)
     }
     /// 1194:4635: a frame of rest, while resting.
@@ -768,11 +777,10 @@ impl arena::loot_window::LootHooks for LootFront<'_, '_> {
             eprintln!("the text gave up: {}", arena::giveup::describe());
         }
     }
-    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16) -> u16 {
-        match self.0.talk.as_deref_mut() {
-            Some(t) => t.list(m, si, cx, ""),
-            None => 0xFFFF,
-        }
+    /// 1194:5734 with kind Bh: the pick through `dialog` and the game's
+    /// state round it (`Machine::list_window`), as the talk's lists.
+    fn list(&mut self, m: &mut arena::machine::Machine, si: u16, cx: u16, di: u16) -> u16 {
+        arena::talk::TalkHooks::list(&mut *self.0, m, &mut self.1, si, cx, di)
     }
     /// 1194:D986: the eighth piece, the staff made whole
     /// (`Machine::staff_end`): its scenes through `EndFront`.
@@ -878,12 +886,14 @@ impl EngineHooks for Front<'_> {
         }
     }
     /// The page the frame drew: the 3D view's rows (above the interface)
-    /// over the screen last shown, as the original's page holds them from
-    /// then in the frame (its interface; none of the view's HUD).
+    /// and the row under them as the drawing leaves it (0000:4CC0's clear
+    /// comes after the frame body's screens and clicks) over the screen
+    /// last shown, as the original's page holds them from then in the
+    /// frame (its interface; none of the view's HUD).
     fn drawn(&mut self, _m: &mut arena::machine::Machine, page: &[u8]) {
         if let Some(shown) = self.shown {
             let mut s = shown.to_vec();
-            let n = (VIEW_ROWS * 320).min(s.len()).min(page.len());
+            let n = ((VIEW_ROWS + 1) * 320).min(s.len()).min(page.len());
             s[..n].copy_from_slice(&page[..n]);
             self.drawn = Some(s);
         }
@@ -1908,7 +1918,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         // The automap screen is up: the world waits (no frame).
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_X, x);
         engine.m.mem.w16(DS, arena::mapnotes::var::CLICK_Y, y);
-        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: None, dac: None };
+        let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: false, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: None, dac: None, interface: Some(&mut assets.interface) };
         if engine.m.note_click(&mut engine.files, &mut hooks).is_none() {
             eprintln!("the note met a fault of the original's");
         }
@@ -1919,7 +1929,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
     let dac = assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
-    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac) };
+    let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac), interface: Some(&mut assets.interface) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
     }

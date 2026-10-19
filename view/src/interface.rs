@@ -198,36 +198,7 @@ impl Interface {
     /// The interface for the machine's state, drawn on `screen` (under the
     /// texts), the name in `font`.
     pub fn draw(&mut self, screen: &mut Screen, font: &crate::hud::Font, m: &Machine) {
-        use arena::weapon::var::{CAST_FRAME, CLASS, FRAME, RELOAD, SHOWN};
-        let level = m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS);
-        let casting = (m.mem.r8(DS, CAST_FRAME) as i8) >= 0;
-        // The hands: casting, the bow, or the weapon (3B8E).
-        if casting {
-            self.cast_hands(screen, m);
-        } else if m.mem.r16(DS, 0x0620) == 0 && level & 0x10 == 0 && m.mem.r8(DS, SHOWN) != 6 && m.mem.r16(DS, 0x05CA) & 0x10 != 0 {
-            // In the boat (0000:395E): its prow, as boarding loaded it.
-            self.boat_prow(screen, m);
-        } else if m.mem.r16(DS, 0x0620) == 0 && (level & 0x10 == 0 || level & 0x4000 != 0) && m.mem.r16(DS, 0x05CA) & 0x10 == 0 && (m.mem.r8(DS, CLASS) as i8) >= 0 {
-            let shown = m.mem.r8(DS, SHOWN);
-            let mut frame = m.mem.r16(DS, FRAME);
-            let out = m.mem.r16(DS, 0x05E0) & 0x10 != 0;
-            if shown == 6 {
-                if out && m.mem.r8(DS, RELOAD) == 0 {
-                    if let Some(f) = self.cfa("ARROWHLF.CFA").cloned() {
-                        let (x, y) = cfa_place(&self.archive, "ARROWHLF.CFA");
-                        screen.blit(x, y, f.w, f.h, &f.frames[0], 0x93);
-                    }
-                }
-            } else if (shown as i8) >= 0 && (out || frame >= 0x1E) {
-                if (7..=9).contains(&shown) && frame >= 0x1E {
-                    frame -= 0x14;
-                }
-                let name = listed(m, 0x674E, shown as u16);
-                if let Some(img) = self.cif(&name).get(frame as usize) {
-                    screen.blit(img.x, img.y, img.w, img.h, &img.px, 0x93);
-                }
-            }
-        }
+        self.hands(screen, m);
         // The row under the view (C3A2) cleared, as each frame clears it
         // (0000:4CC0..4CDA).
         let below = m.mem.r16(DS, 0xC3A2) as i32;
@@ -275,7 +246,46 @@ impl Interface {
             screen.fill(x, 168, 4, 26 - full, 0, 0xFF);
             screen.fill(x, 168 + 26 - full, 4, full, c, 0xFF);
         }
-        // The compass (4D7C).
+        self.compass(screen, m);
+    }
+
+    /// The hands as the frame draws them (0000:38CE's 3B8E; casting
+    /// 29CF:0A28; the boat's prow 395E).
+    pub(crate) fn hands(&mut self, screen: &mut Screen, m: &Machine) {
+        use arena::weapon::var::{CAST_FRAME, CLASS, FRAME, RELOAD, SHOWN};
+        let level = m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS);
+        let casting = (m.mem.r8(DS, CAST_FRAME) as i8) >= 0;
+        // The hands: casting, the bow, or the weapon (3B8E).
+        if casting {
+            self.cast_hands(screen, m);
+        } else if m.mem.r16(DS, 0x0620) == 0 && level & 0x10 == 0 && m.mem.r8(DS, SHOWN) != 6 && m.mem.r16(DS, 0x05CA) & 0x10 != 0 {
+            // In the boat (0000:395E): its prow, as boarding loaded it.
+            self.boat_prow(screen, m);
+        } else if m.mem.r16(DS, 0x0620) == 0 && (level & 0x10 == 0 || level & 0x4000 != 0) && m.mem.r16(DS, 0x05CA) & 0x10 == 0 && (m.mem.r8(DS, CLASS) as i8) >= 0 {
+            let shown = m.mem.r8(DS, SHOWN);
+            let mut frame = m.mem.r16(DS, FRAME);
+            let out = m.mem.r16(DS, 0x05E0) & 0x10 != 0;
+            if shown == 6 {
+                if out && m.mem.r8(DS, RELOAD) == 0 {
+                    if let Some(f) = self.cfa("ARROWHLF.CFA").cloned() {
+                        let (x, y) = cfa_place(&self.archive, "ARROWHLF.CFA");
+                        screen.blit(x, y, f.w, f.h, &f.frames[0], 0x93);
+                    }
+                }
+            } else if (shown as i8) >= 0 && (out || frame >= 0x1E) {
+                if (7..=9).contains(&shown) && frame >= 0x1E {
+                    frame -= 0x14;
+                }
+                let name = listed(m, 0x674E, shown as u16);
+                if let Some(img) = self.cif(&name).get(frame as usize) {
+                    screen.blit(img.x, img.y, img.w, img.h, &img.px, 0x93);
+                }
+            }
+        }
+    }
+
+    /// The compass (0000:4D7C, while 5C8 bit 2000h and not 1013).
+    fn compass(&self, screen: &mut Screen, m: &Machine) {
         if m.mem.r16(DS, 0x05C8) & 0x2000 != 0 && m.mem.r8(DS, 0x1013) == 0 {
             if let Some(s) = &self.slider {
                 let at = ((m.mem.r16(DS, arena::movement::var::HEADING).wrapping_add(0xE0) & 0x1FF) >> 1) as usize;
@@ -288,6 +298,21 @@ impl Interface {
             }
             if let Some(img) = &self.compass {
                 screen.blit(img.x, img.y, img.w, img.h, &img.px, 199);
+            }
+        }
+    }
+
+    /// What the frame body draws on the game's page (320 by 200, a byte a
+    /// pixel) before the actors' click (1194:DB6C, from 0000:49D1): the
+    /// hands (493A) and the compass (4957).
+    pub(crate) fn frame_body_on(&mut self, page: &mut [u8], m: &Machine) {
+        let mut screen = Screen::new([[0; 4]; 256]);
+        screen.underlay(page);
+        self.hands(&mut screen, m);
+        self.compass(&mut screen, m);
+        for (p, &c) in page.iter_mut().zip(screen.indices()) {
+            if c < 0x100 {
+                *p = c as u8;
             }
         }
     }
