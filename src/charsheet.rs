@@ -405,8 +405,10 @@ impl Machine {
 
     /// A left click on the equipment page's list (3276:57D8's first
     /// record, 1194:1AC6) at row `y`: with another list up (1299) the
-    /// page's loop is left (3159:0006), which the port doesn't take;
-    /// else the line under it marked (1C5E, `list_mark`). The line
+    /// page's loop is left (3159:0006), which the port doesn't take (it
+    /// can't be: the page's setup clears 1299, 16E0, and only "Drop
+    /// what?"'s loop sets it, which takes its list's record itself,
+    /// `drop_what_loop`); else the line under it marked (1C5E, `list_mark`). The line
     /// marked already, clicked again, puts its item on or takes it off
     /// (1AFB: `equip_click`, its refusals said in the list's panel: 1BE0,
     /// `cant_equip_said`, and 1B78, `one_only_said`),
@@ -788,6 +790,8 @@ impl Machine {
                     self.mem.w8(DS, LOOP_FLAGS, f);
                 }
                 0 => {
+                    // (A spell's page, 1B3C, can't be: "Drop what?" is only
+                    // said on the own items' list, 129A 1, `drop_button`.)
                     if !self.equipment_list_click(files, row, wait)? {
                         return crate::giveup::not_ported("1194:1B3C within the loop of \"Drop what?\" (a spell's page)");
                     }
