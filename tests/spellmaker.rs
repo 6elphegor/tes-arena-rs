@@ -89,6 +89,10 @@ impl SpellmakerHooks for Script {
     fn picture(&self) -> bool {
         false
     }
+    /// It stubs 8F26 and 9E06 too.
+    fn texts(&self) -> bool {
+        false
+    }
     fn list(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16, cx: u16, _di: Option<u16>) -> u16 {
         self.log.extend([2, si as u32, cx as u32]);
         let v = self.lists.get(self.n[1]).copied().unwrap_or(0xFFFF);

@@ -687,6 +687,28 @@ def chest_ahead(a):
     gs.seeded(a)
 
 
+def open_ahead(put):
+    """`put`, then the walls plane cleared for three rows north of the
+    player's square, a column either side (the street's buildings out
+    of the way of a creature `brought` there)."""
+    def both(a):
+        put(a)
+        col, row = a.r16(0xC3D0) >> 7, a.r16(0xC3D4) >> 7
+        for r in range(row + 1, row + 4):
+            for c in range(col - 1, col + 2):
+                a.w16((r << 8) + (c << 1), 0, seg=a.r16(0xD806))
+    return both
+
+
+def chest_picking(a):
+    """`chest_ahead`'s chest with no Open spell waiting (0DC4 0) and
+    picking armed instead (5CA bit 0): the click tries the lock (292B:0743
+    through 1194:53F9)."""
+    chest_ahead(a)
+    a.w16(0x0DC4, 0)
+    a.w16(0x05CA, a.r16(0x05CA) | 1)
+
+
 def message_up(a):
     """The message line's time set (061E)."""
     return a.r16(0x061E) != 0
@@ -1308,6 +1330,13 @@ CASES = {
     'playchest': ('dungeon', chest_ahead, [((), (), 2, None), ((), (), 4, None, [(160, 100)]),
                                            ((), (), 10, None, [(160, 100)], {'script': PILE_SCRIPT}), ((), (), 5, None)]),
     'playpile': ('dungeon', pile_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': PILE_SCRIPT}), ((), (), 5, None)]),
+    # The same chest with picking armed and no spell: the click tries the
+    # lock (1194:53F9's roll), "Success..." or "Failure..." for 15 frames.
+    'playchestpick': ('dungeon', chest_picking, [((), (), 2, None), ((), (), 8, None, [(160, 100)])]),
+    # playloot's fight and corpse outside: in the wilderness and in the
+    # street (the corpse's record in the segment [1042] either way).
+    'playlootwild': ('wild', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    'playlootstreet': ('street', open_ahead(brought(1)), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
     'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
     # The crypt two squares north of its diagonal wall at row 8, column 3
@@ -1850,7 +1879,7 @@ def written_line(a, name):
 # The cases whose doors, locks or chests change the walls plane, which
 # neither DGROUP nor the EMS banks hold: its words (the level's width by
 # its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
-WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playopen')
+WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen')
 
 
 def walls_line(a, name):
