@@ -2332,9 +2332,13 @@ fn each_original_menu_key_as_its_handler() {
     press(&mut d, &mut a, KeyCode::KeyP, false);
     bar(&mut b, &mut db, 2, false);
     // (P in the frame's body after its message's countdown, 0000:0511;
-    // the hand in its input step before it.)
+    // the hand in its input step before it, its message's line drawn that
+    // frame: 9E0A's place and row, ADB6 and ADB8.)
     assert_eq!(a.engine.m.mem.r16(DS, 0x061E), b.engine.m.mem.r16(DS, 0x061E).wrapping_add(1), "P after the countdown");
     a.engine.m.mem.w16(DS, 0x061E, b.engine.m.mem.r16(DS, 0x061E));
+    for o in [0xADB6, 0xADB8] {
+        a.engine.m.mem.w16(DS, o, b.engine.m.mem.r16(DS, o));
+    }
     same(&a, &b, "P and the hand");
     assert!(a.engine.m.mem.r16(DS, 0x05CA) & 1 != 0, "P arms picking");
     // F8: the compass (01C5: 5C8 bit 2000h).

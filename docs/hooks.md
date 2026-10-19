@@ -31,38 +31,38 @@ the original routine:
 
 | Hook | Where | Original | Verdict | Note | Override |
 |---|---|---|---|---|---|
-| `AreaHooks::ask_leave` | src/transit.rs:115 | 26F7:0000 | overridden | the engine: Exit<'_> | faithful: the engine's `Exit` runs the travel map's port (travelmap vectors) |
+| `AreaHooks::ask_leave` | src/transit.rs:116 | 26F7:0000 | overridden | the engine: Exit<'_> | faithful: the engine's `Exit` runs the travel map's port (travelmap vectors) |
 | `AreaHooks::automap` | src/transit.rs:109 | 292B:095E | overridden | the view: areas.rs Areas<'_> | faithful: `states_keep` (states vectors) |
-| `AreaHooks::border` | src/transit.rs:149 | 0000:3503 | overridden | the view: areas.rs Areas<'_> | faithful: `automap_load` (automap vectors) |
+| `AreaHooks::border` | src/transit.rs:163 | 0000:3503 | overridden | the view: areas.rs Areas<'_> | faithful: `automap_load` (automap vectors) |
 | `AreaHooks::build_city` | src/transit.rs:96 | 1194:0292 | overridden | the view: areas.rs Areas<'_> | faithful: `mif_build_city` (city vectors) |
 | `AreaHooks::build_dungeon` | src/transit.rs:102 | 2294:0ED4 and 0000:28BC | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_create` with the seed (dungeon vectors) |
 | `AreaHooks::city_screen` | src/transit.rs:106 | 2294:11F2 | present | 2294:11F2 is the heap check (int3 on a bad heap); nothing to keep | |
-| `AreaHooks::ems_free` | src/transit.rs:166 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
+| `AreaHooks::ems_free` | src/transit.rs:180 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
 | `AreaHooks::ending` | src/transit.rs:87 | 1194:D459 | overridden | the view: areas.rs Areas<'_> | faithful: `Machine::vision` (its pages clicked through, `ClickThrough`); the window shows the farewell's vision (`Creation::ending`, vision.txt frame by frame) |
-| `AreaHooks::entered` | src/transit.rs:180 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
-| `AreaHooks::hands` | src/transit.rs:159 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
-| `AreaHooks::hook_2631` | src/transit.rs:162 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
-| `AreaHooks::hook_2974` | src/transit.rs:139 | 0000:2974 | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_first_level` (dungeon vectors) |
-| `AreaHooks::leave_dungeon` | src/transit.rs:129 | 2433:0199 | port | the default runs the port | |
-| `AreaHooks::leave_interior` | src/transit.rs:123 | 1194:D55F and 2433:0199 | port | the default runs the port | |
-| `AreaHooks::leave_screen` | src/transit.rs:119 |  | present | the screens shown on the way out; the view draws its own | |
+| `AreaHooks::entered` | src/transit.rs:196 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
+| `AreaHooks::hands` | src/transit.rs:173 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
+| `AreaHooks::hook_2631` | src/transit.rs:176 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
+| `AreaHooks::hook_2974` | src/transit.rs:153 | 0000:2974 | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_first_level` (dungeon vectors) |
+| `AreaHooks::leave_dungeon` | src/transit.rs:143 | 2433:0199 | port | the default runs the port | |
+| `AreaHooks::leave_interior` | src/transit.rs:137 | 1194:D55F and 2433:0199 | port | the default runs the port | |
+| `AreaHooks::leave_screen` | src/transit.rs:133 |  | present | the screens shown on the way out; the view draws its own | |
 | `AreaHooks::location` | src/transit.rs:92 | 1194:3AE8 | overridden | the view: areas.rs Areas<'_> | faithful: `city_location` (city vectors) |
 | `AreaHooks::map_keep` | src/transit.rs:121 | 0000:4564..4568 | overridden | the engine: Exit<'_> | faithful: `map_keep` with the stairs' hooks' colours |
 | `AreaHooks::map_given_back` | src/transit.rs:128 | 0000:457C..4586, 45A4..45A9 | port | the default runs the port (`view_window`, `world_back`); the transit vectors' stub counts it | |
-| `AreaHooks::mouse_wait` | src/transit.rs:146 | 0000:8FC4 | present | waiting for the buttons up; input only | |
+| `AreaHooks::mouse_wait` | src/transit.rs:160 | 0000:8FC4 | present | waiting for the buttons up; input only | |
 | `AreaHooks::normal_lgt` | src/transit.rs:89 | 0000:742C | overridden | the view: areas.rs Areas<'_> | faithful: NORMAL.LGT loaded as 0000:742C loads it |
-| `AreaHooks::restore_level` | src/transit.rs:151 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
-| `AreaHooks::sky` | src/transit.rs:137 | 0000:464A | overridden | the view: areas.rs Areas<'_> | faithful: `area_sky` with the game's loads (`file_load_ems`, 7428 with DI FFFDh), else PAL.COL to 929E; was the assets' own after the entry, with the view's reads |
-| `AreaHooks::slots_usable` | src/transit.rs:154 | 25CA:01E6 | port | the default runs the port | |
-| `AreaHooks::spawn` | src/transit.rs:134 | 0000:1793 | overridden | the view: areas.rs Areas<'_> | faithful: `spawn_actors` (actors vectors) |
+| `AreaHooks::restore_level` | src/transit.rs:165 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
+| `AreaHooks::sky` | src/transit.rs:151 | 0000:464A | overridden | the view: areas.rs Areas<'_> | faithful: `area_sky` with the game's loads (`file_load_ems`, 7428 with DI FFFDh), else PAL.COL to 929E; was the assets' own after the entry, with the view's reads |
+| `AreaHooks::slots_usable` | src/transit.rs:168 | 25CA:01E6 | port | the default runs the port | |
+| `AreaHooks::spawn` | src/transit.rs:148 | 0000:1793 | overridden | the view: areas.rs Areas<'_> | faithful: `spawn_actors` (actors vectors) |
 | `AreaHooks::sync` | src/transit.rs:82 | 2F9F:0438 | port | the default runs the port | |
 | `AreaHooks::townsfolk_graphics` | src/transit.rs:104 | 0000:17F9 | overridden | the view: areas.rs Areas<'_> | faithful: `townsfolk_load` (actors vectors; playsky exact) |
 | `AreaHooks::weather` | src/transit.rs:94 | 0000:0F05 | overridden | the view: areas.rs Areas<'_> | faithful: `weather_set` (state tests in rain and snow) |
 | `AreaHooks::wild_done` | src/transit.rs:100 | 217B:04DC | overridden | the view: areas.rs Areas<'_> | faithful: `wild_done` |
-| `AreaHooks::wild_empty` | src/transit.rs:142 | 217B:0184 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_shift`, `wild_quarter_ok` (wild vectors; playwild) |
+| `AreaHooks::wild_empty` | src/transit.rs:156 | 217B:0184 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_shift`, `wild_quarter_ok` (wild vectors; playwild) |
 | `AreaHooks::wild_setup` | src/transit.rs:98 | 217B:0084 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_setup` (wild vectors) |
-| `AreaHooks::world_free` | src/transit.rs:175 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
-| `AreaHooks::world_screen` | src/transit.rs:171 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`; the screens' fades are the window's (areafade.txt) |
+| `AreaHooks::world_free` | src/transit.rs:189 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
+| `AreaHooks::world_screen` | src/transit.rs:185 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`, then the view cleared in the page (4EFD, `view_clear`: the farewell's SCREENSV.$$2, worldframes `playfarewell`); the screens' fades are the window's (areafade.txt) |
 | `AutomapScreenHooks::palette` | src/automapscreen.rs:20 | 0000:6E3C | overridden | the view: automap.rs Colours | faithful: the window's colours as the VGA's (playautomap's state) |
 | `CastHooks::message_box` | src/cast.rs:42 | 1194:59C8 | overridden | the view: panels.rs Said | present: the cast's box in the equipment page (screens.txt) |
 | `CelestialHooks::draw` | src/celestial.rs:35 | 0000:E4D2 | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -73,20 +73,20 @@ the original routine:
 | `ClockHooks::encounter_minute` | src/clock.rs:73 | 1194:86F2 | overridden | the view: main.rs Front<'_> | faithful: `quest_ambush` (ambush vectors); its fight's music is `FightHooks::fight_music`'s |
 | `ClockHooks::exhausted` | src/clock.rs:80 | 2901:0014 | original | Some(true): the port's `exhaustion` runs | |
 | `ClockHooks::exhaustion_box` | src/clock.rs:85 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
-| `ClockHooks::level_up_screen` | src/clock.rs:94 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt, worldframes playlevelup) |
+| `ClockHooks::level_up_screen` | src/clock.rs:96 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt, worldframes playlevelup) |
 | `ClockHooks::quests_daily` | src/clock.rs:54 | 1194:99F8 | overridden | the view: main.rs Front<'_> | faithful: `quests_daily` with its texts (hooktest) |
 | `ClockHooks::quests_hourly` | src/clock.rs:60 | 1194:98E8 | overridden | the view: main.rs Front<'_> | faithful: `quests_hourly` with its texts (hooktest) |
-| `ClockHooks::view_cleared` | src/clock.rs:88 | 0000:4EFD | present | the view filled with 9288's colour, which the port sets | |
-| `ControlHooks::bars` | src/controls.rs:138 | 2826:0008, 2901:00A8 | overridden | the view: main.rs Front<'_> | fixed: the controls skipped the bars as drawing, but they leave 126C (their last x, which a flat brought to life writes over at 25CA:02F3) and 9288; now `bars_state` at 2826:0008 (playswim) |
+| `ClockHooks::view_cleared` | src/clock.rs:88 | 0000:4EFD | port | the view filled with 9288's colour, which the port sets, in the page (`view_clear`) | |
+| `ControlHooks::bars` | src/controls.rs:139 | 2826:0008, 2901:00A8 | overridden | the view: main.rs Front<'_> | fixed: the controls skipped the bars as drawing, but they leave 126C (their last x, which a flat brought to life writes over at 25CA:02F3) and 9288; now `bars_draw` at 2826:0008, the bars drawn into the page too (playswim; the pages the screens save, SCREENSV.$$2) |
 | `ControlHooks::bar_click` | src/controls.rs:175 | 2542:00BA | overridden | the view: main.rs Front<'_> | faithful: the window's click on a bar button taken in the frame's input step (`player_steer`, where the classic controls' 2826:02E2 takes it), its handler run there (camping's too); the screen it asks for run inside the frame (`Talk::screen`: the turn stops there, the screen opens on the game as it asked, and the turn runs again as it ends with the game it left, the rest of the frame after it), but the travel map and the options screen after the frame; whether a click was taken (a click on the bar ends the controls there, 2826:00CB: no jump) (busy worldframes cases, playbarjump) |
-| `ControlHooks::cast_at_target` | src/controls.rs:151 | 29CF:0000 | port | the default runs the port | |
-| `ControlHooks::floor_pick` | src/controls.rs:138 | 2826:0B52 | port | fixed by this audit: answered no floor, so wall and floor spells never took (`Machine::floor_pick`, 3000 vectors) | |
-| `ControlHooks::look` | src/controls.rs:158 | 2826:0C15 | elsewhere | the view looks from its own right click (`look_at`) | |
-| `ControlHooks::message_box` | src/controls.rs:155 | 1194:42EA, 59C8 | present | the box drawn; front ends with a screen override it | |
-| `ControlHooks::spell_counters` | src/controls.rs:172 | 2826:0BB2 | elsewhere | drawn by the view's HUD from DC0/DC2 | |
-| `ControlHooks::take_click` | src/controls.rs:152 | 2826:0128 | overridden | the view: main.rs Front<'_> | faithful: the window's click taken in the frame's input step, after the frame's actors, as the classic controls' centre handler takes it (`view_click`; areaplay vectors) |
-| `ControlHooks::wall_trigger` | src/controls.rs:145 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
-| `ControlHooks::wild_recentre` | src/controls.rs:167 | 217B:0265 | overridden | the view: main.rs Front<'_> | faithful: `wild_shift` (wild vectors) |
+| `ControlHooks::cast_at_target` | src/controls.rs:163 | 29CF:0000 | port | the default runs the port | |
+| `ControlHooks::floor_pick` | src/controls.rs:143 | 2826:0B52 | port | fixed by this audit: answered no floor, so wall and floor spells never took (`Machine::floor_pick`, 3000 vectors) | |
+| `ControlHooks::look` | src/controls.rs:170 | 2826:0C15 | elsewhere | the view looks from its own right click (`look_at`) | |
+| `ControlHooks::message_box` | src/controls.rs:167 | 1194:42EA, 59C8 | present | the box drawn; front ends with a screen override it | |
+| `ControlHooks::spell_counters` | src/controls.rs:185 | 2826:0BB2 | elsewhere | drawn by the view's HUD from DC0/DC2 | |
+| `ControlHooks::take_click` | src/controls.rs:153 | 2826:0128 | overridden | the view: main.rs Front<'_> | faithful: the window's click taken in the frame's input step, after the frame's actors, as the classic controls' centre handler takes it (`view_click`; areaplay vectors) |
+| `ControlHooks::wall_trigger` | src/controls.rs:157 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
+| `ControlHooks::wild_recentre` | src/controls.rs:180 | 217B:0265 | overridden | the view: main.rs Front<'_> | faithful: `wild_shift` (wild vectors) |
 | `DungeonPicHooks::click` | src/dungeonpic.rs:46 | 1194:564D | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |
 | `DungeonPicHooks::fade` | src/dungeonpic.rs:34 | 1194:55B2 | present | a fade; the view fades through `Film` | |
 | `DungeonPicHooks::line` | src/dungeonpic.rs:39 | 0000:5364 | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |
@@ -118,29 +118,30 @@ the original routine:
 | `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
 | `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
 | `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
-| `FrameHooks::actor_click` | src/frame.rs:100 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
-| `FrameHooks::area_music` | src/frame.rs:110 | 2294:04F5 | port | the default runs the port | |
-| `FrameHooks::automap_mark` | src/frame.rs:105 | 0000:3491 | port | the default runs the port | |
+| `FrameHooks::actor_click` | src/frame.rs:109 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
+| `FrameHooks::area_music` | src/frame.rs:119 | 2294:04F5 | port | the default runs the port | |
+| `FrameHooks::automap_mark` | src/frame.rs:114 | 0000:3491 | port | the default runs the port | |
 | `FrameHooks::effect_words` | src/frame.rs:67 | 0000:5011 | overridden | the view: main.rs Front<'_> | faithful: `effect_words`, drawn as 5011 draws them (hooktest) |
 | `FrameHooks::faces` | src/frame.rs:69 | 0000:4C86, 292B:0530 | overridden | the view: main.rs Front<'_> | faithful: `faces_draw` (faces vectors) |
-| `FrameHooks::guards_arrive` | src/frame.rs:94 |  | port | the default runs the port | |
+| `FrameHooks::guards_arrive` | src/frame.rs:103 |  | port | the default runs the port | |
 | `FrameHooks::interface` | src/frame.rs:55 | 0000:4C83, 4DD6 | overridden | the view: main.rs Front<'_> | faithful: `interface_setup` (state tests) |
 | `FrameHooks::no_spells_picture` | src/frame.rs:60 | 292B:0341..0358 | port | the default runs the port (`no_spells_picture`); the frame vectors stub 7428 and 599C | fixed: NOSPELL.IMG was neither loaded to 1044 nor drawn (titleplay creation) |
-| `FrameHooks::key_d327` | src/frame.rs:136 | 1194:D327 | port | the default runs the port | |
-| `FrameHooks::level_text_draw` | src/frame.rs:81 | 0000:05B5 | overridden | the view: main.rs Front<'_> | present: the level's text drawn by the window, ADB8 left as 9E0A leaves it (riddle screens) |
-| `FrameHooks::message_draw` | src/frame.rs:86 | 0000:0511 | overridden | the view: main.rs Front<'_> | present: the message line drawn on the frame's page before the click, which the boxes and lists a click opens keep (worldframes `playchest`: bank 1Fh) |
-| `FrameHooks::menu_keys` | src/frame.rs:122 | 2542:0100 | overridden | the view: main.rs Front<'_> | faithful: `Machine::menu_keys` in the frame's body (0000:4952), its switches and camping (2542:01E6) done there; the screen a key asks for run inside the body (`Talk::screen`), the rest of the frame after it, but the travel map and the options screen after the frame (busy worldframes cases, the `...end` cases ending with that frame) |
+| `FrameHooks::key_d327` | src/frame.rs:145 | 1194:D327 | port | the default runs the port | |
+| `FrameHooks::level_text_draw` | src/frame.rs:81 | 0000:05B5 | overridden | the view: main.rs Front<'_> | faithful: `level_text_lines`, the lines drawn on the game's page (DGROUP 929E the line's copy, ADB8 left as 9E0A leaves it: riddle screens); the window's are its layer's |
+| `FrameHooks::message_draw` | src/frame.rs:89 | 0000:0511 | overridden | the view: main.rs Front<'_> | faithful: the message line drawn on the window's frame page before the click, which the boxes and lists a click opens keep (worldframes `playchest`: bank 1Fh), and on the game's (`message_line_draw`) |
+| `FrameHooks::keys` | src/frame.rs:93 | 0000:4D2F | port | the default runs the port (`keys_draw`: the keys held drawn on the page) | |
+| `FrameHooks::menu_keys` | src/frame.rs:131 | 2542:0100 | overridden | the view: main.rs Front<'_> | faithful: `Machine::menu_keys` in the frame's body (0000:4952), its switches and camping (2542:01E6) done there; the screen a key asks for run inside the body (`Talk::screen`), the rest of the frame after it, but the travel map and the options screen after the frame (busy worldframes cases, the `...end` cases ending with that frame) |
 | `FrameHooks::message_box` | src/frame.rs:73 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
 | `FrameHooks::message_box_number` | src/frame.rs:75 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port then its box (entry boxes in screens.txt) |
-| `FrameHooks::outdoor_light` | src/frame.rs:151 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | faithful: `outdoor_light` with its loads made inside it (`LightNow`), in the frame body where the original runs it; was the view's after the frame, so a title load's first frame lost its relight (savefiles.txt `loadframe` lines) |
+| `FrameHooks::outdoor_light` | src/frame.rs:160 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | faithful: `outdoor_light` with its loads made inside it (`LightNow`), in the frame body where the original runs it; was the view's after the frame, so a title load's first frame lost its relight (savefiles.txt `loadframe` lines) |
 | `FrameHooks::projectile_lights_end` | src/frame.rs:71 | 292B:000E | overridden | the view: main.rs Front<'_> | faithful: `projectile_lights_end` |
-| `FrameHooks::quest_carry` | src/frame.rs:127 | 0000:4D00 | port | the default runs the port | |
-| `FrameHooks::rest` | src/frame.rs:143 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
-| `FrameHooks::riddle` | src/frame.rs:90 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
-| `FrameHooks::sky_colours` | src/frame.rs:155 | 0000:4C7E, 2294:0428 | overridden | the view: main.rs Front<'_> | faithful: `sky_colours`, `sky_colours_load` in the frame body (was after the frame) |
-| `FrameHooks::town_welcome` | src/frame.rs:134 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
-| `FrameHooks::townsfolk_graphics` | src/frame.rs:118 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
-| `FrameHooks::weapon_graphics` | src/frame.rs:114 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
+| `FrameHooks::quest_carry` | src/frame.rs:136 | 0000:4D00 | port | the default runs the port | |
+| `FrameHooks::rest` | src/frame.rs:152 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
+| `FrameHooks::riddle` | src/frame.rs:99 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
+| `FrameHooks::sky_colours` | src/frame.rs:164 | 0000:4C7E, 2294:0428 | overridden | the view: main.rs Front<'_> | faithful: `sky_colours`, `sky_colours_load` in the frame body (was after the frame) |
+| `FrameHooks::town_welcome` | src/frame.rs:143 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
+| `FrameHooks::townsfolk_graphics` | src/frame.rs:127 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
+| `FrameHooks::weapon_graphics` | src/frame.rs:123 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
 | `FxHooks::spell_reflected` | src/effects.rs:172 | 0000:27E5 | overridden | the engine: GameHooks | faithful: the engine's |
 | `GuildHooks::click` | src/guild.rs:108 |  | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::haggle` | src/guild.rs:100 | 1194:8020 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
@@ -309,7 +310,7 @@ the original routine:
 | `ShopHooks::quest_check` | src/shops.rs:88 | 1194:D961 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::quests` | src/shops.rs:93 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::screen_back` | src/shops.rs:102 | 1194:54B3 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
-| `ShopHooks::screen_saved` | src/shops.rs:98 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::screen_saved` | src/shops.rs:98 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | fixed: it wrote the window's own screen into the page first, its condition picture drawn from the afflictions as they are; the page is now the game's as the frame left it (worldframes playtemplecure's SCREENSV.$$2), for a game whose page is its own block |
 | `ShopHooks::shop_screen` | src/shops.rs:42 | 1194:4B60 | overridden | the view: shopui.rs ShopFront<'_, '_> | faithful: `shop_screen`, before the temple's name is made (playtempleheal's EMS) |
 | `ShopHooks::strip_back` | src/shops.rs:56 | 1194:5FC0 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `SkyHooks::bolt` | src/skyobj.rs:52 | 0000:78A8 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -348,7 +349,7 @@ the original routine:
 | `StoreHooks::repair_instead` | src/store.rs:128 | 1194:C6AC | stub | None: the repairs run | |
 | `StoreHooks::text` | src/store.rs:133 | 1194:A374 | port | the default runs the port | |
 | `StoreHooks::weapon_lines` | src/store.rs:119 | 1194:F142 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TalkHooks::dungeon_entrance` | src/talk.rs:195 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `wild_dungeon_entry` |
+| `TalkHooks::dungeon_entrance` | src/talk.rs:195 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `view_clear`, then `wild_dungeon_entry` |
 | `TalkHooks::expand` | src/talk.rs:135 | 2DA2:000A | stub | None: the port's `expand` runs | |
 | `TalkHooks::list` | src/talk.rs:115 | 1194:5734 | overridden | the view: main.rs Front<'_> | present: the game's list (screens.txt) |
 | `TalkHooks::loot` | src/talk.rs:125 | 1194:7B16 | overridden | the view: main.rs Front<'_> | faithful: `loot_window` (lootwin vectors, screens.txt) |
@@ -427,7 +428,9 @@ the original routine:
 | `UseHooks::message_box` | src/use_item.rs:143 | 1194:59C8 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
 | `UseHooks::pick` | src/use_item.rs:139 | 24FA:0B78 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
 | `WeaponHooks::building_closed` | src/weapon.rs:62 | 1194:4FB8 | port | the default runs the port | |
-| `WeaponHooks::fire_bow` | src/weapon.rs:67 | 29CF:037F | port | the default runs the port | |
+| `WeaponHooks::hands` | src/weapon.rs:66 | 0000:3B8E | port | the default runs the port (`hands_draw`: the bow's frame or the weapon's picture drawn on the page, the hands' bank mapped; worldframes `playsheetready`'s SCREENSV.$$2) | |
+| `WeaponHooks::prow` | src/weapon.rs:71 | 0000:395E..397C | port | the default runs the port (`prow_draw`: the boat's prow drawn on the page) | |
+| `WeaponHooks::fire_bow` | src/weapon.rs:76 | 29CF:037F | port | the default runs the port | |
 | `WeaponHooks::wall_trigger` | src/weapon.rs:57 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |

@@ -42,6 +42,16 @@ impl WeaponHooks for Hooks {
         count(m, 0xFFF6);
         Some(())
     }
+    /// The generator's 0000:3B8E is a RET.
+    fn hands(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+    /// The generator's 0000:5C8A is a RET: the prow drawn (582C) with the
+    /// bank as it was.
+    fn prow(&mut self, m: &mut Machine) {
+        let (off, seg) = (m.mem.r16(DS, 0x902E), m.mem.r16(DS, 0x9030));
+        m.page_image(seg, off);
+    }
 }
 
 impl ClockHooks for Hooks {
@@ -108,6 +118,12 @@ impl FrameHooks for Hooks {
     }
     fn level_text_draw(&mut self, m: &mut Machine) {
         count(m, 0xFFD0);
+    }
+    /// The generator's 0000:5368 is a RET.
+    fn message_draw(&mut self, _m: &mut Machine) {}
+    /// The generator's 0000:4D2F is a RET.
+    fn keys(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
     }
     fn riddle(&mut self, m: &mut Machine) {
         count(m, 0xFFD2);

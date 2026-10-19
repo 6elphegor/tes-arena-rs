@@ -77,13 +77,22 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// the EMS frame) drawn: its lines (to a CR, a `%` code the player's
     /// name at 01AD, a line ending in `:` the riddle's last), each centred
     /// (x A0h) from the view's bottom (C3A2) less its height (3D40), 0Ah
-    /// apart, in the font at 102C and colour F0h.
-    fn level_text_draw(&mut self, _m: &mut Machine) {}
+    /// apart, in the font at 102C and colour F0h (`Machine::level_text_lines`).
+    fn level_text_draw(&mut self, m: &mut Machine) {
+        m.level_text_lines();
+    }
     /// 0000:0511: the message line (the text at [061A], while 061E
     /// counts down) drawn on the page, before the click (1194:DB6C) and
     /// the compass (4D7C): centred on x A0h at row 14h in the font at
-    /// 102C, in colour 70h, then one pixel right in 9Fh.
-    fn message_draw(&mut self, _m: &mut Machine) {}
+    /// 102C, in colour 70h, then one pixel right in 9Fh
+    /// (`Machine::message_line_draw`).
+    fn message_draw(&mut self, m: &mut Machine) {
+        m.message_line_draw();
+    }
+    /// 0000:4D2F: the keys held drawn on the page (`Machine::keys_draw`).
+    fn keys(&mut self, m: &mut Machine) -> Option<()> {
+        m.keys_draw()
+    }
     /// 292B:05A2: the riddle's answer asked (typed under the text: 1044
     /// cleared, `lineedit::fields::riddle`) and looked for
     /// (`Machine::riddle_answered`); by default not asked.
@@ -299,12 +308,15 @@ impl Machine {
         self.no_spells(files, hooks);
         self.weapon_change(files, hooks)?;
         self.weapon_frame(files, hooks)?;
+        // 0000:493D: the keys held (4D2F).
+        hooks.keys(self)?;
         self.level_text_frame(hooks);
         // 0000:0511: the message's countdown (and its drawing's colour
-        // and font, 9288 and B036).
+        // and font, 9288 and B036), its line drawn (`message_draw`).
         let t = self.mem.r16(DS, 0x061E);
         if t != 0 {
             self.mem.w16(DS, 0x061E, t - 1);
+            self.mem.w8(DS, 0x9288, 0x70);
             let v = self.mem.r16(DS, 0x102C);
             self.mem.w16(DS, 0xB036, v);
             hooks.message_draw(self);
@@ -321,6 +333,8 @@ impl Machine {
             }
         }
         hooks.menu_keys(self, files)?;
+        // 0000:4957: the compass (4D7C).
+        self.compass_draw();
         // Debug keys: F2 shows the player's square, F3 cycles 5E4's
         // flash mode.
         if self.key_pressed(0x3C) {
@@ -413,6 +427,8 @@ impl Machine {
         hooks.projectile_lights_end(self);
         let v = self.mem.r16(DS, 0x0D37);
         self.mem.w16(DS, 0xC394, v);
+        // 4CC6..4CDA: the row under the view cleared.
+        self.view_row_clear();
         let f = self.mem.r16(DS, 0x05CA) & !0x200;
         self.mem.w16(DS, 0x05CA, f);
         Some(())
@@ -749,15 +765,16 @@ impl Machine {
 
 impl Machine {
     /// 0000:5011, each frame: unless a level's text is up (3C82), an
-    /// effect's words (1405, `effects::var::MESSAGE_TEXT`) are drawn (the
-    /// words returned) and their count (1428) goes down; at 0 the words
-    /// are cleared (23h bytes).
+    /// effect's words (1405, `effects::var::MESSAGE_TEXT`) are drawn
+    /// (`effect_words_draw`; the words returned) and their count (1428)
+    /// goes down; at 0 the words are cleared (23h bytes).
     pub fn effect_words(&mut self) -> Option<Vec<u8>> {
         use crate::effects::var::{MESSAGE, MESSAGE_TEXT};
         if self.mem.r8(DS, 0x3C82) != 0 || self.mem.r8(DS, MESSAGE_TEXT) == 0 {
             return None;
         }
         let text = self.mem.cstr(DS, MESSAGE_TEXT).to_vec();
+        self.effect_words_draw();
         let n = self.mem.r8(DS, MESSAGE).wrapping_sub(1);
         self.mem.w8(DS, MESSAGE, n);
         if n == 0 {
@@ -846,24 +863,28 @@ impl Machine {
         let f = self.mem.r16(DS, 0x05CA) & !8;
         self.mem.w16(DS, 0x05CA, f);
         self.no_spells(files, hooks);
-        // 4E41..4E7B, the bar's texts and pictures (their pixels the front
-        // end's): the font from 102E (9AEA: B036); the player's name
+        // 4E41..4E7B, the bar's texts and pictures, drawn into the page
+        // (`interface`): the font from 102E (9AEA: B036); the player's name
         // (1194:4BC8 with SI 1A4) copied to 1044, cut at its first space,
-        // colour F0h (9288), drawn at (11h, 9Ah) (`text_state`); 12BA
-        // cleared, the condition's picture (4E81, `status_picture_load`)
-        // and the face (1194:2D5C, `portrait_load`) at (0Eh, A6h); the font
-        // from 102C; the page shown (946A); the bars (2901:00A8,
-        // `bars_state`).
+        // colour F0h (9288), drawn at (11h, 9Ah) (9E06); 12BA cleared, the
+        // condition's picture (4E81, `status_picture_load`) and the face
+        // (1194:2D5C, `portrait_load`) at (0Eh, A6h); the font from 102C;
+        // the page shown (946A, the front end's); the bars (2901:00A8,
+        // `bars_draw`).
         let v = self.mem.r16(DS, 0x102E);
         self.mem.w16(DS, 0xB036, v);
         self.name_text(0x01A4);
-        self.text_state(0x11, 0x9A, 0x1044);
+        if self.page_is_block() {
+            self.page_text((DS, 0x1044), 0x11, 0x9A);
+        } else {
+            self.text_state(0x11, 0x9A, 0x1044);
+        }
         self.mem.w16(DS, 0x12BA, 0);
         self.status_picture_load(files, 0x01A4)?;
         self.portrait_load(files, 0x01A4, 0x0E, 0xA6)?;
         let v = self.mem.r16(DS, 0x102C);
         self.mem.w16(DS, 0xB036, v);
-        self.bars_state();
+        self.bars_draw();
         Some(())
     }
 
@@ -894,9 +915,11 @@ impl Machine {
 
     /// 0000:4E81 with SI `si` (a person's record; nothing with its name,
     /// +9, empty): the condition's picture STATUS.CIF (named at 8856) read
-    /// into the frame ([9030]:0) with the load bank ([1030]) mapped, and
-    /// the bank mapped before put back. Which of its pictures, and its
-    /// drawing, are the front end's.
+    /// into the frame ([9030]:0) with the load bank ([1030]) mapped, its
+    /// picture drawn (0000:3C94's, 582C), and the bank mapped before put
+    /// back. The picture: 4 with a spell on (2686:0270's carry), 1 with
+    /// +40D bit 1, 2 with bit 2 or 20h, 3 with health (+59) at most a
+    /// tenth of its maximum (+5B), the last that holds; else 0.
     pub fn status_picture_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
         if self.mem.r8(DS, si.wrapping_add(9)) == 0 {
             return Some(());
@@ -904,8 +927,27 @@ impl Machine {
         let old = self.mem.r16(DS, crate::level::var::EMS_MAPPED) >> 2;
         let bank = self.mem.r16(DS, 0x1030);
         self.ems_map(bank);
+        let flags = self.mem.r16(DS, si.wrapping_add(0x40D));
+        let mut cx = 0u16;
+        if si == crate::character::PLAYER && self.spell_on_player() {
+            cx = 4;
+        }
+        if flags & 1 != 0 {
+            cx = 1;
+        }
+        if flags & 2 != 0 || flags & 0x20 != 0 {
+            cx = 2;
+        }
+        if self.mem.r16(DS, si.wrapping_add(0x59)) <= self.mem.r16(DS, si.wrapping_add(0x5B)) / 10 {
+            cx = 3;
+        }
         let frame = self.mem.r16(DS, 0x9030);
         self.file_load(files, 0x8856, frame, 0)?;
+        let mut at = 0u16;
+        for _ in 0..cx {
+            at = at.wrapping_add(self.mem.r16(frame, at.wrapping_add(0xA))).wrapping_add(0xC);
+        }
+        self.page_image(frame, at);
         self.ems_map(old);
         Some(())
     }
@@ -916,9 +958,9 @@ impl Machine {
     /// '1' with 12BA set, else '0'; the race, +4, written in before the
     /// '.' by 0000:7024) and read into the frame with bank 17h mapped
     /// (0000:7428); then with bank 17h mapped again its picture +6Bh
-    /// found (5CCC) and, BX not FFFFh, its place set to (`x`, `y`); its
-    /// drawing (5828) is the front end's. The bank mapped before is put
-    /// back each time.
+    /// found (5CCC) and, BX not FFFFh, its place set to (`x`, `y`), and
+    /// drawn (5828, `page_image`). The bank mapped before is put back
+    /// each time.
     pub fn portrait_load(&mut self, files: &mut Files, si: u16, x: u16, y: u16) -> Option<()> {
         use crate::level::var::EMS_MAPPED;
         let name = if self.mem.r8(DS, si.wrapping_add(7)) != 0 { 0x3F09u16 } else { 0x3EFD };
@@ -955,6 +997,7 @@ impl Machine {
             self.mem.w16(frame, at, x);
             self.mem.w16(frame, at.wrapping_add(2), y);
         }
+        self.page_image(frame, at);
         self.ems_map(old);
         Some(())
     }

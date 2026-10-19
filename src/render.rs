@@ -46,7 +46,7 @@ use crate::mem::DS;
 
 mod poly;
 mod sky;
-pub use sky::{clipped_page, image_page};
+pub use sky::{clipped_page, image_page, whole_page};
 
 /// The rows' offsets on the page (A6A0, a word a row).
 const ROWS: u16 = 0xA6A0;
@@ -3131,6 +3131,19 @@ pub fn scaler_rows(m: &mut Machine, x: u16, y: u16, dw: u16, dh: u16, shade_seg:
         let shaded = shade_seg != 0 || (bpp != 8 && map_seg != 0);
         compile_rows(m, light, cx, cw, fx, xs, flags, w, bpp, shaded);
     }
+}
+
+/// 0000:78A8 whole for a draw outside the 3D view's (the hands): its row
+/// compiled as `scaler_rows` compiles it, and its pixels drawn into `page`
+/// (64 KiB, the draw page's segment). The arguments as pushed: the
+/// place, the size drawn, the shade, the source's size, its flags, the
+/// source, its bits a pixel and its colours. False where 9546 would read
+/// the code segment's colours (not ported).
+#[allow(clippy::too_many_arguments)]
+pub fn scaler_page(m: &mut Machine, page: &mut [u8], x: u16, y: u16, dw: u16, dh: u16, shade: (u16, u16), w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) -> bool {
+    scaler_rows(m, x, y, dw, dh, shade.0, w, h, flags, bpp, map.0);
+    let mut odd = 0;
+    blit_rows(m, page, x, y, dw, dh, shade, w, h, flags, src, bpp, map, &mut odd)
 }
 
 /// Where 78A8 has the row compiled and calls it: DGROUP 929E (79BF,

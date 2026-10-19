@@ -39,6 +39,7 @@ pub mod inventory;
 pub mod item;
 pub mod faces;
 pub mod imgpack;
+pub mod interface;
 pub mod level;
 pub mod levelup;
 pub mod load;

@@ -558,6 +558,9 @@ impl Engine {
         }
         m.mem.w8(DS, STAGE, 0x0A);
         if let Some(page) = self.page.as_deref() {
+            // The drawing's page is the original's draw page: its 3D view
+            // there, for what the screens save of it (`page_view_put`).
+            m.page_view_put(page);
             hooks.drawn(m, page);
         }
         // A3AA..A3BE: the physics from the real position.

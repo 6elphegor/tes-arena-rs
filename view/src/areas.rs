@@ -246,12 +246,14 @@ impl AreaHooks for Areas<'_> {
         }
     }
 
-    /// After the world loop: the area's automap written back (23F1:013C);
-    /// the screens' fades aren't the view's.
+    /// After the world loop: the area's automap written back (23F1:013C),
+    /// then the view cleared in the game's page (4EFD); the screens'
+    /// fades aren't the view's.
     fn world_screen(&mut self, m: &mut Machine) {
         if let Some(files) = self.files.as_deref_mut() {
             m.automap_keep(files);
         }
+        m.view_clear();
     }
 
     /// 0000:17F9 (`Machine::townsfolk_load`).

@@ -187,7 +187,7 @@ impl Machine {
         if own {
             self.music_stop();
             // 0000:4EFD: the view filled with colour 0.
-            self.mem.w8(DS, 0x9288, 0);
+            self.view_clear();
             // 25FD:051F: in an interior (5E6 4) the building's song.
             if self.mem.r8(DS, 0x05E6) == 4 {
                 self.music_start(self.mem.r16(DS, crate::music::var::BUILDING_SONG));

@@ -84,8 +84,10 @@ pub trait ClockHooks {
     /// fight, 7B2F drowned, 7AE0 collapsed).
     fn exhaustion_box(&mut self, _m: &mut Machine, _si: u16) {}
     /// 0000:4EFD's fill (9A72): the view filled with colour 0 (9288,
-    /// which the port sets).
-    fn view_cleared(&mut self, _m: &mut Machine) {}
+    /// which the port sets) in the page (`Machine::view_clear`).
+    fn view_cleared(&mut self, m: &mut Machine) {
+        m.view_clear();
+    }
     /// 2686:0319..0331: the level-up screen (1194:1034,
     /// `Machine::level_up_screen`), after `levels` levels were gained,
     /// with the text segment B038 set from 103A around it (0000:9AF8) and
