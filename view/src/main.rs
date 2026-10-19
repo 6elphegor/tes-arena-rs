@@ -1777,6 +1777,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         sheet_run: None,
         log_run: None,
         ring_kept: false,
+        ring_box_kept: false,
         travel: None,
         saveui: None,
         saveui_under: None,
@@ -3161,6 +3162,10 @@ struct App {
     /// the key read, `Machine::sheet_close`): not forgotten again as the
     /// screen goes (`ring_screen`).
     ring_kept: bool,
+    /// The status box up: its loop (2542:0530..0569) waits on the mouse
+    /// and Esc's key alone, forgetting no keys typed, so the ring isn't
+    /// forgotten as it comes up (`ring_screen`).
+    ring_box_kept: bool,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
     /// The save or load menu up (`saveui`: the options screen's Save and
@@ -3349,6 +3354,10 @@ impl App {
         let log = matches!(self.panel, Some(panels::Panel::Log(_))) && self.pending.is_none() && self.boxes.is_empty();
         let now = if log { self.ring_screen } else { self.screen_up() };
         if std::mem::take(&mut self.ring_kept) && now.is_none() {
+            self.ring_screen = now;
+            return;
+        }
+        if now == Some(true) && std::mem::take(&mut self.ring_box_kept) {
             self.ring_screen = now;
             return;
         }
@@ -4031,8 +4040,10 @@ impl App {
             // again at once, while it is down, so its latch is set (as
             // 2542:05B8 sets it), and the frame's body after the screen
             // doesn't take it for a menu key (the player's would be let
-            // go by then).
-            for scan in 1..0x80u16 {
+            // go by then). Only the menu keys' latches: the frame asks no
+            // other's (an arrow held into the stairs keeps its own).
+            use arena::menukeys::key;
+            for scan in [key::ESC, key::A, key::C, key::P, key::S, key::U, key::M, key::F1, key::F8, key::L, key::R] {
                 if self.engine.m.mem.r8(arena::mem::DS, arena::controls::var::KEYS + scan) != 0 {
                     self.engine.m.key_pressed(scan);
                 }
@@ -4763,7 +4774,10 @@ impl App {
                     a.map = true;
                 })
             }
-            sheets::BarAction::Status(lines) => self.boxes.push_back(lines),
+            sheets::BarAction::Status(lines) => {
+                self.boxes.push_back(lines);
+                self.ring_box_kept = true;
+            }
             // 056A: the last spell again (C with a Shift, or the right
             // button's release), else the book's list.
             sheets::BarAction::Spells(right) => {

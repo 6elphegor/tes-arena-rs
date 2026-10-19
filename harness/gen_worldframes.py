@@ -216,6 +216,26 @@ def brought(ty, level=1, ahead=0x180, heading=0):
     return put
 
 
+def exit_stairs(a):
+    """South of the first level's up stairs facing them (the dungeon's
+    start square), the ways back from the way out's travel map (0000:457C,
+    45A4) counted from here for `exit_asked`."""
+    at_square(11, 42, 0x100)(a)
+    if not hasattr(a, 'exits_back'):
+        a.exits_back = 0
+        def back(*_):
+            a.exits_back += 1
+        for o in (0x457C, 0x45A4):
+            a.mu.hook_add(UC_HOOK_CODE, back, None, a.lin(LOAD_SEG, o), a.lin(LOAD_SEG, o))
+    a.exits_mark = a.exits_back
+
+
+def exit_asked(a):
+    """The way out's travel map shown and the world given back after it
+    (the frame it was in run to its end: the next frame's top)."""
+    return a.exits_back != a.exits_mark
+
+
 def stairs_fight(a):
     """South of the first level's down stairs facing them (`playdown`'s
     place), a creature (type 1) brought two squares behind."""
@@ -949,6 +969,16 @@ CASES = {
     'playmapend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
     'playjourneyend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL + [('keys', [KEY_SPACE])] * 4, 'leaves': True, 'ends': True})]),
     'playnewend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 32, 132)], 'dies': True, 'title': True})]),
+    # The first level's up stairs (row 10, column 42: byte 1Dh) walked
+    # into from the start's square south of them, facing north: the way
+    # out (CD4E, 0000:4537) keeps the world (A611), shows the travel map
+    # (26F7:0000, 1A81 set), Esc on it stays, the world given back (A5D1,
+    # A6B5) and the frame runs on to its end (`exit_asked`).
+    'playexitmapend': ('dungeon', exit_stairs, [((UP,), (), 30, exit_asked, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # The status box (S, 2542:037C -> 04B1) inside its frame, a click
+    # closing it (0530..0569: the buttons let go, then a click or Esc
+    # held), the rest of the frame after it.
+    'playstatusend': ('dungeon', None, [((), (), 2, None), ((KEY_S,), (), 1, None, [], {'script': [('click', 160, 100)], 'ends': True})]),
     # The use list (U, 2542:034D): wounded with a potion in the fifth
     # line (`wounded_with_potion`), two frames, U held a frame: the list
     # in the bar's corner (066A, 06F8: 3159:06A0 over 5AF4), its fifth
