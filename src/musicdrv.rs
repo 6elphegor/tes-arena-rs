@@ -337,7 +337,7 @@ impl Machine {
     /// playing, 2 done): the driver's answer (0DD6) driven, else the
     /// front end's (`music_status`).
     pub fn music_state(&mut self) -> u8 {
-        if !self.music.is_some() {
+        if self.music.is_none() {
             return self.music_status;
         }
         let seq = self.mem.r16(DS, SEQUENCE);

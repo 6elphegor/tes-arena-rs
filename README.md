@@ -260,7 +260,9 @@ image-relative segment:offset in the unpacked ACD.EXE.
   `spellmaker` (1194:6064), `haggle` (1194:8020), `loot_window`
   (2433:0583), `piles` (2433:0000), `quest` (98E8..9CD7, 8F1E, CED7, D593),
   `sidequest` (1194:9358), `log`.
-- **Sound:** `sound` (23BA:002A, 00E8), `music` (2294:04C0, 04F5, 10B6).
+- **Sound:** `sound` (23BA:002A, 00E8), `music` (2294:04C0, 04F5, 10B6),
+  `musicdrv` (2F9F:01BF, 001F, 0438, 000D, 1194:4943: the music driver's
+  wrappers, compared with a driver loaded, harness/gen_musicplay.py).
 
 ## The front end (`view/`)
 
@@ -288,15 +290,15 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2529 reachable routines (198,206 bytes); 2174 ported in whole or
-part (175,540 bytes), counting far thunks to ported code, the handlers
+writing: 2537 reachable routines (198,167 bytes); 2202 ported in whole or
+part (176,634 bytes), counting far thunks to ported code, the handlers
 the port dispatches on by their offsets, and the routines read by hand as
-trivial or inlined (`tools/triage.tsv`); 31 left to the front end as hooks
-and 53 that the view re-implements; 244 presentation, I/O, driver or
+trivial or inlined (`tools/triage.tsv`); 30 left to the front end as hooks
+and 47 that the view re-implements; 230 presentation, I/O, driver or
 hardware routines not ported (the renderer's deferred lists, the menu
 library's remains, the window library's keys and buttons, input waits,
 the sound and CyberMan drivers, the EMS driver's and the joystick's
-calls, decode artefacts); 27 game-state or undetermined routines not
+calls, decode artefacts); 28 game-state or undetermined routines not
 covered by an address (1 of them open, 12 bytes: 1194:0FFB, read by hand
 as part of 0F08; the rest likely ported inside their callers). Every indirect call site is followed or
 explained: the ones no table or pointer heuristic resolves were traced by

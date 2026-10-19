@@ -37,7 +37,7 @@ inside code is not counted); a routine "ported" may be ported in part
 that fall in no routine the graph found: 11
 ({'ported': 7, 'hook': 4}), a measure of what the graph misses; and routines the
 port names as entries that the graph alone did not reach, added as roots:
-214 routines came in with them.
+222 routines came in with them.
 
 "Likely ported inline" marks an uncovered routine whose distinctive
 constants (immediates and addresses of 100h and more) show as hex literals
@@ -53,43 +53,43 @@ drawing): the renderer's internals mostly land there.
 
 | | routines | bytes |
 |---|---:|---:|
-| reachable | 2529 | 198206 |
-| ported (in whole or part) | 2174 | 175540 |
-| hooks (front end's) | 31 | 1210 |
-| the view's own version | 53 | 3839 |
-| not covered: game state or undetermined | 27 | 2513 |
-| &nbsp;&nbsp;of which likely ported inline in a caller | 26 | 2501 |
+| reachable | 2537 | 198167 |
+| ported (in whole or part) | 2202 | 176634 |
+| hooks (front end's) | 30 | 1130 |
+| the view's own version | 47 | 3364 |
+| not covered: game state or undetermined | 28 | 2390 |
+| &nbsp;&nbsp;of which likely ported inline in a caller | 27 | 2378 |
 | &nbsp;&nbsp;of which open | 1 | 12 |
-| not covered: presentation / I/O / hardware | 244 | 15104 |
+| not covered: presentation / I/O / hardware | 230 | 14649 |
 
 By segment:
 
 | segment | routines | bytes | covered | covered bytes |
 |---|---:|---:|---:|---:|
-| 0000 | 790 | 66035 | 655 | 54971 |
+| 0000 | 793 | 66045 | 666 | 55451 |
 | 0FFD | 63 | 2085 | 13 | 636 |
-| 1194 | 885 | 64120 | 844 | 62299 |
+| 1194 | 886 | 64120 | 845 | 62299 |
 | 217B | 18 | 1834 | 16 | 1697 |
 | 21EE | 9 | 951 | 7 | 896 |
-| 222C | 24 | 1592 | 17 | 1290 |
+| 222C | 24 | 1592 | 19 | 1273 |
 | 2294 | 47 | 4667 | 47 | 4667 |
-| 23BA | 9 | 813 | 6 | 688 |
+| 23BA | 10 | 763 | 10 | 763 |
 | 23F1 | 11 | 901 | 11 | 901 |
 | 242A | 4 | 125 | 4 | 125 |
 | 2433 | 52 | 3317 | 51 | 3293 |
 | 24FA | 18 | 1246 | 18 | 1246 |
-| 2542 | 44 | 2297 | 42 | 2174 |
+| 2542 | 45 | 2298 | 43 | 2175 |
 | 25CA | 11 | 817 | 11 | 817 |
 | 25FD | 27 | 2191 | 26 | 2082 |
 | 2686 | 29 | 1805 | 29 | 1805 |
-| 26F7 | 30 | 3428 | 30 | 3428 |
+| 26F7 | 31 | 3428 | 31 | 3428 |
 | 27CE | 6 | 327 | 6 | 327 |
 | 27E3 | 17 | 1070 | 16 | 1028 |
 | 2826 | 38 | 4037 | 38 | 4037 |
 | 2901 | 6 | 672 | 6 | 672 |
 | 292B | 26 | 2399 | 26 | 2399 |
 | 29CF | 38 | 3487 | 38 | 3487 |
-| 2AA1 | 33 | 2517 | 33 | 2517 |
+| 2AA1 | 34 | 2517 | 34 | 2517 |
 | 2B39 | 2 | 6721 | 1 | 6068 |
 | 2CDD | 85 | 3140 | 85 | 3140 |
 | 2DA2 | 93 | 4507 | 93 | 4507 |
@@ -144,12 +144,11 @@ Uncovered routines whose offset appears bare (no segment) in a comment
 of a port file that names their segment. Such a mention is as often a
 routine ported inline as one deliberately left out ("stubbed: ...") or a
 variable that happens to share the number, so they are not counted as
-ported; 123 to check, largest first:
+ported; 132 to check, largest first:
 
 | routine | bytes | files |
 |---|---:|---|
 | 0000:7A2B | 527 | render.rs |
-| 0000:9546 | 275 | render.rs |
 | 0000:DB78 | 209 | render.rs, worldtest.rs |
 | 1194:0F08 | 208 | charsheet.rs, create.rs |
 | 0000:7338 | 174 | charsheet.rs |
@@ -160,7 +159,9 @@ ported; 123 to check, largest first:
 | 3159:00F3 | 126 | window.rs |
 | 25FD:05A5 | 109 | bsa.rs |
 | 2542:0205 | 104 | menukeys.rs |
-| 222C:034C | 101 | create.rs |
+| 0FFD:0821 | 101 | musicdrv.rs |
+| 222C:034C | 101 | create.rs, newgame.rs |
+| 222C:020A | 80 | newgame.rs |
 | 0000:9B04 | 73 | start.rs |
 | 1194:2902 | 67 | create.rs |
 | 0000:B2E5 | 66 | render.rs |
@@ -174,7 +175,6 @@ ported; 123 to check, largest first:
 | 1194:2A69 | 52 | create.rs, newgame.rs |
 | 1194:1A94 | 50 | charsheet.rs, panels.rs, worldtest.rs |
 | 1194:5D8D | 50 | charsheet.rs, panels.rs |
-| 0000:5B08 | 48 | listwindow.rs |
 | 0000:5422 | 46 | frame.rs, title.rs |
 | 0000:567A | 46 | render.rs |
 | 0000:59A4 | 42 | lineedit.rs, listwindow.rs, mapnotes.rs |
@@ -187,7 +187,6 @@ ported; 123 to check, largest first:
 | 0000:9A9C | 36 | frame.rs |
 | 0000:C0CE | 35 | render.rs |
 | 1194:16BD | 35 | charsheet.rs, panels.rs, screentest.rs, sheets.rs |
-| 23BA:01A4 | 35 | attack.rs, projectile.rs, strike.rs, talk.rs |
 | 0000:56A8 | 31 | render.rs |
 | 0000:9B9B | 30 | create.rs |
 | 1194:000A | 30 | inputtest.rs, main.rs, menukeys.rs |
@@ -205,6 +204,17 @@ ported; 123 to check, largest first:
 | 0000:3801 | 10 | automap.rs |
 | 0000:380B | 10 | automap.rs |
 | 0000:6BE2 | 9 | field.rs, lineedit.rs |
+| 0FFD:0D88 | 6 | musicdrv.rs |
+| 0FFD:0D8E | 6 | musicdrv.rs |
+| 0FFD:0D94 | 6 | musicdrv.rs |
+| 0FFD:0D9A | 6 | musicdrv.rs |
+| 0FFD:0DA0 | 6 | musicdrv.rs |
+| 0FFD:0DA6 | 6 | musicdrv.rs |
+| 0FFD:0DAC | 6 | musicdrv.rs |
+| 0FFD:0DC4 | 6 | musicdrv.rs |
+| 0FFD:0DCA | 6 | musicdrv.rs |
+| 0FFD:0DD6 | 6 | musicdrv.rs |
+| 0FFD:0E0C | 6 | musicdrv.rs |
 | 1194:0000 | 6 | bsa.rs, hooks.rs, machine.rs, save.rs, transit.rs |
 | 0000:5998 | 4 | newgame.rs |
 | 0000:6028 | 4 | tavern.rs |
@@ -232,10 +242,8 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:3801 | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved left 80h (126C) [presentation] | vars 126C |
 | 0000:380B | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved right 80h (126C) [presentation] | vars 126C |
 | 0000:3815 | 16 | presentation (read) | 0000:2DB5 | automap screen: the view centred on the player [presentation] | vars C3D0 126C C3D4 126E |
-| 0000:4D2F | 77 | presentation (read) | 0000:481E | the keys held (652, 12 of them) drawn as icons [drawing] | vars 43D4 |
 | 0000:4F72 | 159 | presentation (read) | 0000:4ACD, 0000:4B02 | the walls plane copied 80h x 80h into a buffer (A900) for a map image [presentation?] | vars C3D0 C3D4 A900 D806 |
 | 0000:5104 | 54 | drawing (read) | 0000:481E | rain/snow drops drawn over the view (F81 bit 2, not full daylight) [drawing] | vars A91A 0F81 C398 C3A2 |
-| 0000:51D3 | 11 | I/O (read) | 1194:4943, 2F9F:01BF, 3065:0D2D | a far C-style wrapper of the heap allocator 0000:51EC [I/O] |  |
 | 0000:5422 | 46 | presentation (read) | 0000:10C9, 0000:117E, 0000:4DD6 (+2) | saved screen region restored (A902 bit 0) [presentation] | vars A902 8F8C 8F8E 8F90 |
 | 0000:54AB | 122 | drawing? | 0000:5458 |  | vars 8F8E 8F90 8F92 8F96 |
 | 0000:552E | 267 | under a hook | 0000:5526 |  | vars A918 A91A A916 A914 |
@@ -245,7 +253,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:59A4 | 42 | presentation (read) | 0000:3698, 0000:582C, 0000:5871 (+4) | a rectangle blitted to the screen buffer (A900) [presentation] |  |
 | 0000:59B5 | 31 | presentation (read) | 0000:5422 | a rectangle blitted to the screen buffer (A900) [presentation] |  |
 | 0000:59D8 | 141 | likely inline | 0000:582C, 0000:5871, 0000:618F |  | vars A916 A91A A914 A918 |
-| 0000:5B08 | 48 | presentation (read) | 0000:4D2F, 0000:4D7C, 0000:5458 (+4) | an image blitted with colour 0 transparent (A900) [presentation] |  |
 | 0000:5CCE | 128 | DOS I/O | 0000:5CCA |  | vars 9032 8FA6 9030 |
 | 0000:5D4E | 4 | driver (read) | 21EE:01ED | EMS handle freed at the program's end (int 67h 45h), thunk of 5D52 [driver] |  |
 | 0000:5D52 | 30 | driver (read) | 0000:01FD, 0000:5D4E | EMS handle freed at the program's end (int 67h 45h) [driver] | vars 8FA6 9038 902A |
@@ -263,17 +270,13 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:67A6 | 30 | DOS I/O | 0000:67A2 |  |  |
 | 0000:683A | 124 | DOS I/O | 0000:6BF0, 0000:6C10 |  |  |
 | 0000:6857 | 95 | DOS I/O |  |  |  |
-| 0000:68B6 | 72 | under a hook | 0000:6D36, 0000:6D56 |  | vars 919C 91A0 |
+| 0000:68B6 | 72 | likely inline | 0000:6D36, 0000:6D56 |  | vars 919C 91A0 |
 | 0000:68FE | 48 | DOS I/O | 0000:68B6 |  | vars 9198 9194 919C 91A0 |
-| 0000:6B98 | 11 | presentation (read) | 2F9F:0438 | a delay of CX timer steps, far C-style (music driver's) [presentation] |  |
 | 0000:6BA8 | 25 | hardware | 0000:13BF, 0000:6BE2, 0000:6E3C (+1) |  |  |
 | 0000:6BC5 | 25 | hardware | 0000:13BF, 0000:6BE2 |  |  |
 | 0000:6BE2 | 9 | presentation (read) | 0000:6B98, 0000:6BDE, 0000:9EE9 | a delay loop of timer steps [presentation] |  |
 | 0000:6BF0 | 28 | DOS I/O | 0000:32FE, 0000:33BF, 0000:3546 (+5) |  |  |
-| 0000:6C0C | 4 | thunk to front end | 1194:08DE, 1194:0901, 1194:4943 (+2) |  |  |
-| 0000:6C10 | 21 | DOS I/O | 0000:2A73, 0000:603C, 0000:618F (+11) |  |  |
 | 0000:6D36 | 28 | DOS I/O | 0000:31FE, 0000:3276, 0000:32FE (+5) |  |  |
-| 0000:6D56 | 23 | DOS I/O | 0000:2A54, 0000:2A73, 0000:603C (+10) |  |  |
 | 0000:6DE0 | 16 | DOS I/O | 0000:31FE, 0000:3276, 0000:3546 (+3) |  |  |
 | 0000:6DF0 | 4 | thunk to front end | 25FD:05A5 |  |  |
 | 0000:6DF4 | 9 | DOS I/O | 0000:6DF0 |  |  |
@@ -315,7 +318,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:942A | 59 | presentation (read) | 0000:10C9, 0000:117E, 0000:618F (+1) | the screen buffer cleared [presentation] | vars A902 A8FE 928A 928E |
 | 0000:94B1 | 61 | drawing | 0000:946A, 0000:94F2 |  |  |
 | 0000:94F2 | 76 | drawing | 0000:94EE |  | vars B032 A900 A902 |
-| 0000:9546 | 275 | likely inline | 0000:78A8 |  |  |
 | 0000:9A0C | 40 | likely inline | 0000:9A08 |  | vars A83A A83C A846 A84C |
 | 0000:9A34 | 57 | under a hook | 0000:9727 |  | vars A854 A856 A900 B038 |
 | 0000:9A9C | 36 | presentation (read) | 0000:10C9, 0000:117E, 0000:4DD6 (+1) | clip window A914..A91E set (the view's own clip) [presentation] | vars A91E A91C A914 A916 |
@@ -451,16 +453,11 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 217B:0708 | 40 | drawing | 217B:0189 |  | vars A900 9288 |
 | 21EE:02CA | 40 | drawing | 21EE:028A |  | vars 1036 102C 9288 A900 |
 | 21EE:03CA | 15 | DOS I/O | 0000:102E, 0000:1059, 0000:108B (+1) |  |  |
-| 222C:016E | 23 | presentation (read) | 222C:0000 | the class quiz's screen set up (font, sound) [presentation] | vars 102C 1030 |
-| 222C:02C0 | 20 | presentation (read) |  | the class quiz's screen freed [presentation] | vars 40F0 |
+| 222C:020A | 80 | likely inline | 222C:00EA |  | vars B7C4 B7E4 40EC 40C3 |
 | 222C:034C | 101 | presentation (read) | 222C:025A | the class quiz's question drawn [presentation] | vars 1296 1294 A900 40F2 |
 | 222C:04BC | 27 | presentation (read) | 222C:040B, 222C:045D | the class quiz's scroll redrawn [presentation] | vars 40F2 |
 | 222C:04E5 | 64 | presentation (read) | 222C:040B, 222C:045D | the class quiz's answers drawn [presentation] | vars A900 9288 40F2 40F0 |
 | 222C:0611 | 47 | presentation (read) |  | the class quiz's scroll button (down) [presentation] | vars AFF9 |
-| 222C:066F | 20 | presentation (read) |  | a window closed [presentation] | vars B7C6 129E |
-| 23BA:014A | 57 | driver (read) | 222C:00EA | the sound driver's voices set up [driver] | vars 46F0 8F64 EB91 |
-| 23BA:0183 | 33 | driver (read) | 222C:0185 | a sound file loaded for the driver [driver] | vars 46F0 EB91 |
-| 23BA:01A4 | 35 | driver (read) | 222C:016E | the sound driver's voices freed [driver] | vars EB91 46F2 |
 | 2433:013A | 24 | drawing | 2433:0000 |  | vars 0FF2 9030 |
 | 2542:01F2 | 19 | under a hook | 2542:0205 |  | vars 9288 1036 |
 | 2542:0205 | 104 | under a hook | 2542:01E6 |  | vars 0D48 C39A 1026 0FFB |
@@ -475,7 +472,7 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2F26:00F2 | 201 | input (read) | 2826:0002, 2826:0042 | keyboard/mouse reading (key buffer 8BEC) [input] | vars C39A 01A8 8BEC 8F36 |
 | 2F26:01BB | 14 | hardware (read) | 2F26:003E, 2F26:006F | the Logitech CyberMan 3D controller's driver (segment 2F26) [hardware] | vars 05B1 |
 | 2F26:01C9 | 75 | hardware (read) | 2F26:0214 | the Logitech CyberMan 3D controller's driver (segment 2F26) [hardware] | vars 8F30 8F31 8F32 8F33 |
-| 2F26:0214 | 141 | input (read) | 0000:38CE | key state [input] | vars 05E0 1012 8BEC 8F36 |
+| 2F26:0214 | 141 | input (read) | 0000:395E | key state [input] | vars 05E0 1012 8BEC 8F36 |
 | 2F26:0347 | 166 | BIOS | 2F26:00F2 |  | vars 8F92 8F94 8F74 8F76 |
 | 2F26:03FD | 72 | hardware (read) | 3159:06A0 | the CyberMan's motion in the list loop (3159:06A0), only with one found (8BEC): controls.rs leaves the CyberMan out [hardware] | vars 8F38 8BEC |
 | 2F26:0445 | 107 | input (read) | 0000:2DB5 | key handling [input] | vars 8F37 8F36 8BEC 126C |
