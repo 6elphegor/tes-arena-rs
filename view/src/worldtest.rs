@@ -3319,8 +3319,32 @@ fn the_menus_load_at_the_start_as_the_original() {
 /// there in a new game), all 32 EMS banks and the interface.
 #[test]
 fn a_new_game_from_the_menu_as_the_original() {
-    new_game_from_the_menu("creation", None);
+    new_game_from_the_menu("creation", LISTED, None);
 }
+
+/// The same with the class the questions give (gen_titleplay.py's
+/// `creationquiz`: 222C:0000): G, the instructions' box taken, the ten
+/// questions answered A, B, C in turn from A, the class offered taken
+/// with Y, then the rest as `creation`.
+#[test]
+fn a_new_game_by_the_questions_as_the_original() {
+    new_game_from_the_menu("creationquiz", QUIZ, None);
+}
+
+/// The questions with ARENA.BAT's sound driver loaded
+/// (`creationquizsound`): BURST5.VOC readied for the driver (23BA:0183's
+/// 85h), played at each answer (014A), stopped at the end (01A4), then
+/// the vision's speech; every call into the driver as the original's.
+#[test]
+fn a_new_game_by_the_questions_with_sound_on_as_the_original() {
+    new_game_from_the_menu("creationquizsound", QUIZ, Some(titleplay_replay("creationquizsound")));
+}
+
+/// The class from the list: S, Acrobat (its first line) clicked twice.
+const LISTED: &str = "S,click:94:51,click:94:51";
+
+/// The class by the questions (`a_new_game_by_the_questions_as_the_original`).
+const QUIZ: &str = "G,enter,A,B,C,A,B,C,A,B,C,A,Y";
 
 /// The same with ARENA.BAT's sound driver loaded as main's command line
 /// loads it (gen_titleplay.py's `creationsound`): creation's vision's
@@ -3329,7 +3353,7 @@ fn a_new_game_from_the_menu_as_the_original() {
 /// then as the original's.
 #[test]
 fn a_new_game_with_sound_on_as_the_original() {
-    new_game_from_the_menu("creationsound", Some(titleplay_replay("creationsound")));
+    new_game_from_the_menu("creationsound", LISTED, Some(titleplay_replay("creationsound")));
 }
 
 /// TITLEPLAY's `driver` line for `name`, its runs spelt out.
@@ -3349,9 +3373,10 @@ fn titleplay_replay(name: &str) -> arena::digital::Replay {
 }
 
 /// The menu's New on the program's start's game, `name`'s character made
-/// and its vision run, against TITLEPLAY's `name` (and with `sound` its
-/// calls into the driver).
-fn new_game_from_the_menu(name: &str, sound: Option<arena::digital::Replay>) {
+/// (its class by `class`, the rest as gen_titleplay.py's CREATION) and its
+/// vision run, against TITLEPLAY's `name` (and with `sound` its calls into
+/// the driver).
+fn new_game_from_the_menu(name: &str, class: &str, sound: Option<arena::digital::Replay>) {
     let with_sound = sound.is_some();
     let Some((mut a, _d, _save)) = started_at_menu_with(sound) else { return };
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
@@ -3375,7 +3400,7 @@ fn new_game_from_the_menu(name: &str, sound: Option<arena::digital::Replay>) {
     // The opening story with no input: its movie and nine pictures.
     wait_until(&mut a, &|a| stage(a).is_some_and(|p| p.2 == 0 && p.0 == 0), "the opening story");
     let clicks = std::iter::repeat_n("click:41:50", 16).collect::<Vec<_>>().join(",");
-    let script = format!("S,click:94:51,click:94:51,type:ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,{clicks},click:10:175,S,enter,click:240:20,click:240:20,click:10:175");
+    let script = format!("{class},type:ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,{clicks},click:10:175,S,enter,click:240:20,click:240:20,click:10:175");
     for (i, inp) in create::parse_script(&script).into_iter().enumerate() {
         assert!(a.creation.is_some(), "creation ended early at step {i} ({inp:?})");
         a.creation_input(inp);

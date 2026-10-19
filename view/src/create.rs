@@ -1302,6 +1302,9 @@ impl Creation {
                         film.wait();
                         film.colours(&after_dac);
                     }
+                    // The class the questions gave taken (1194:2643's
+                    // menu), the name's box dissolved in (5C9F).
+                    Up::Prompt => film.dissolve(m, &after, FULL),
                     _ => {}
                 }
             }
@@ -1521,9 +1524,12 @@ impl Creation {
             Stage::Method(mut ask) => match self.ask_input(&mut ask, inp) {
                 None => Stage::Method(ask),
                 Some(0) => {
-                    // 1194:260A: the instructions (in FONT_A), then the
+                    // 1194:260A: the instructions in FONT_A ([1026],
+                    // 9AE6), the box on the game (59CC), then the
                     // questions.
                     let l = hud::lines(engine.m.mem.cstr(DATA, 0x3547), self.colour);
+                    engine.m.select_font(0x1026);
+                    self.game_box(&mut engine.m, (DATA, 0x3547), Back::Start);
                     self.push_box(l, FontId::A, Back::Start);
                     if engine.m.quiz_begin(&mut engine.files).is_none() {
                         eprintln!("QUESTION.TXT could not be loaded");
@@ -1538,7 +1544,9 @@ impl Creation {
             Stage::Quiz { asked, mut roll } => match inp {
                 Input::Char(c) if (b'A'..=b'C').contains(&c.to_ascii_uppercase()) => {
                     let a = c.to_ascii_uppercase() - b'A';
-                    engine.m.quiz_answer(a);
+                    if engine.m.quiz_answer(&mut engine.files, a).is_none() {
+                        eprintln!("the answer's figure gave up: {}", arena::giveup::describe());
+                    }
                     // 222C:010B..012B: the answer's kind counted, its
                     // figure played (2294:0895). The next question's
                     // screen covers it; the class offered after the last
@@ -1780,13 +1788,19 @@ impl Creation {
         self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0 });
     }
 
-    /// The next question (number `asked` from 0), its text's lines.
+    /// The next question (number `asked` from 0): its window on the game
+    /// (`quiz_question`; its dissolve's steps the film's, `input`), its
+    /// text's lines.
     fn next_question(&mut self, engine: &mut Engine, asked: u8) -> Stage {
-        let Some((seg, di)) = engine.m.quiz_question() else {
-            eprintln!("a question could not be found");
+        let seed = engine.m.mem.r16(DS, crate::film::DISSOLVE_SEED);
+        let shown = engine.m.quiz_question(&mut engine.files);
+        engine.m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
+        let Some((_, di)) = shown else {
+            eprintln!("a question could not be found: {}", arena::giveup::describe());
             return self.list(engine);
         };
-        let text = engine.m.mem.cstr(seg, di).to_vec();
+        // The text in bank 4 (the window's routine leaves bank 3 mapped).
+        let text = with_bank(&mut engine.m, 4, |m, frame| m.mem.cstr(frame, di).to_vec());
         Stage::Quiz { asked, roll: self.roll_new(&text) }
     }
 

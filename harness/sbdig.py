@@ -41,7 +41,8 @@ it), and inside them where they have set IF.
 
 The AIL calls the game makes into the driver, and their answers, are
 recorded for the port's tests (`Blaster.calls`): 7Bh the VOC file played
-(its far pointer, the block, and the digest of the FFDCh bytes there),
+(its far pointer, the block, and the digest of the FFDCh bytes there; of
+the 4E20h with `more`, or to the end of the heap block they're in),
 7Dh started, 7Ch the status asked and answered, 7Eh stopped.
 """
 import os
@@ -78,6 +79,33 @@ BUFFER_BYTES = 0xFFDC
 # FFDCh run on into the next heap block, the screen's page): `more`'s 7Bh
 # digests it (23BA:002A's samples are copied into it).
 SOUND_BUFFER_BYTES = 0x4E20
+
+
+def heap_block_bytes(mu, seg, off):
+    """For a whole VOC file at `seg`:`off` in a heap block of its own
+    shorter than the digest's 4E20h (the class quiz's, played from its
+    block, 23BA:014A; not the sound buffer, 4E20h long): its bytes, the
+    header's size (+14h) and each block's (a type, a 24-bit length) to
+    and with the type-0 end, no further than the heap block whose data
+    starts at `seg` (its header the paragraph before: +8 its size in
+    paragraphs, +0Ah bit 0 in use). Past the file lie the block's padding
+    and memory the port keeps elsewhere. 10000h for anything else (the
+    sound buffer, its samples copied in)."""
+    size, flags = struct.unpack('<HH', bytes(mu.mem_read((seg - 1) * 16 + 8, 4)))
+    if not flags & 1 or size == 0 or size * 16 - off >= SOUND_BUFFER_BYTES:
+        return 0x10000
+    end = size * 16
+    base = seg * 16
+    if bytes(mu.mem_read(base + off, 19)) != b'Creative Voice File':
+        return 0x10000
+    at = off + struct.unpack('<H', bytes(mu.mem_read(base + off + 0x14, 2)))[0]
+    while at < end:
+        kind = mu.mem_read(base + at, 1)[0]
+        if kind == 0:
+            return at + 1 - off
+        b = bytes(mu.mem_read(base + at + 1, 3))
+        at += 4 + (b[0] | b[1] << 8 | b[2] << 16)
+    return max(0, end - off)
 
 
 class Blaster:
@@ -371,7 +399,10 @@ class Blaster:
         ret = (words[1], words[0])
         if fn == '7B':
             off, seg, block = words[3], words[4], words[5]
-            data = bytes(mu.mem_read(seg * 16 + off, SOUND_BUFFER_BYTES if self.more else BUFFER_BYTES))
+            n = SOUND_BUFFER_BYTES if self.more else BUFFER_BYTES
+            if self.more:
+                n = min(n, heap_block_bytes(mu, seg, off))
+            data = bytes(mu.mem_read(seg * 16 + off, n))
             self.calls.append(f'7B:{block:x}:{fnv(data):x}')
         elif fn == '85':
             # The handle and the far pointer as pushed (23BA:02C6 pushes

@@ -55,6 +55,27 @@ pub mod var {
     pub const QUESTION_TXT: u16 = 0x411E;
     /// The sound played at each answer (BURST5.VOC, 23BA:0183's name).
     pub const ANSWER_SOUND: u16 = 0x4167;
+    /// The questions' window's record (STARTGAM.MNU), the scroll's
+    /// rollers' files (SCROLL01.DFA, SCROLL02.DFA 0Dh on) and their frames'
+    /// segments (banks 1 and 2), the scroll's bitmap's segment (bank 3's
+    /// frame) and its strings' block's.
+    pub const QUIZ_WINDOW: u16 = 0x4172;
+    pub const ROLLERS_DFA: u16 = 0x4104;
+    pub const ROLLERS: u16 = 0x40F4;
+    pub const BITMAP: u16 = 0x40F2;
+    pub const STRINGS: u16 = 0x40F0;
+    /// The scroll: its strings' count, the last top line it goes to, its
+    /// top line, the rows rolled past it (a row 140h) and the rollers'
+    /// frame (0..15).
+    pub const LINES: u16 = 0x1294;
+    pub const SCROLL_LAST: u16 = 0x1296;
+    pub const SCROLL_LINE: u16 = 0x1298;
+    pub const SCROLL_ROWS: u16 = 0x129A;
+    pub const SCROLL_FRAME: u16 = 0x129C;
+    /// The answers' kinds' figures' names (words, by kind) and colour 0's
+    /// shades by a kind's count less one.
+    pub const FIGURES: u16 = 0x4142;
+    pub const SHADES: u16 = 0x40DA;
     /// The attribute screen: the attribute picked (0..7), the arrows'
     /// middle line, the points left and the points rolled; the mouse's y.
     pub const PICKED: u16 = 0x1296;
@@ -939,62 +960,210 @@ impl Machine {
         self.mem.w8(DS, FACES, v);
     }
 
-    /// The questions asked and answered (222C:0000, its screens and the
-    /// scrolls' images left out): the seed kept at 12A8, the counts
-    /// cleared, QUESTION.TXT loaded into bank 4 (the frame with EMS off);
-    /// ten times a question picked (`quiz_pick`), found (`quiz_find`),
-    /// its answers parsed (`quiz_answers`), the byte cut put back
-    /// (222C:0241) and the answer counted (`quiz_count`); then the class
-    /// (`quiz_class`, through bank 5, the bank mapped before restored).
+    /// The questions asked and answered (222C:0000; the screens' pixels
+    /// the front end's): the start (`quiz_begin`), ten times a question's
+    /// window (`quiz_question`) and its answer (`quiz_answer`), then the
+    /// class (`quiz_end`).
     pub fn class_quiz(&mut self, files: &mut Files, answers: &[u8; 10]) -> Option<u8> {
         self.quiz_begin(files)?;
         for &a in answers {
-            self.quiz_question()?;
-            self.quiz_answer(a);
+            self.quiz_question(files)?;
+            self.quiz_answer(files, a)?;
         }
         self.quiz_end(files)
     }
 
     /// `class_quiz`'s start (222C:0000..0008, 222C:0185): the seed kept at
-    /// 12A8, the answers' sound (BURST5.VOC) loaded and readied
-    /// (23BA:0183, `sound_quiz_load`), the counts cleared, QUESTION.TXT
-    /// loaded into bank 4 (the frame with EMS off), its far pointer at
-    /// QUESTIONS.
+    /// 12A8, FONT_C ([102E], 9AE6), the answers' sound (BURST5.VOC) loaded
+    /// and readied (23BA:0183, `sound_quiz_load`), the counts cleared, the
+    /// colour EEh; QUESTION.TXT loaded into bank 4's frame (its far pointer
+    /// at QUESTIONS), the scroll's rollers SCROLL01.DFA into bank 1's
+    /// (its segment at ROLLERS) and SCROLL02.DFA into bank 2's (at
+    /// ROLLERS + 2), bank 2 left mapped.
     pub fn quiz_begin(&mut self, files: &mut Files) -> Option<()> {
         self.store_rng();
         let seed = self.mem.r32(DS, crate::random::SEED);
         self.mem.w32(DS, 0x12A8, seed);
+        self.select_font(0x102E);
         self.sound_quiz_load(files, ANSWER_SOUND)?;
         self.mem.w8(DS, ASKED_COUNT, 0);
         self.mem.w16(DS, COUNTS, 0);
         self.mem.w8(DS, COUNTS + 2, 0);
+        self.mem.w8(DS, COLOUR, 0xEE);
         self.ems_map(4);
         let frame = self.ng16(0x9030);
         self.mem.w16(DS, QUESTIONS, 0);
         self.mem.w16(DS, QUESTIONS + 2, frame);
         self.file_load(files, QUESTION_TXT, frame, 0)?;
+        for (bank, name, at) in [(1, ROLLERS_DFA, ROLLERS), (2, ROLLERS_DFA + 0xD, ROLLERS + 2)] {
+            self.ems_map(bank);
+            let frame = self.ng16(0x9030);
+            self.mem.w16(DS, at, frame);
+            self.file_load(files, name, frame, 0)?;
+        }
         Some(())
     }
 
-    /// `class_quiz`'s next question (222C:00EA..00F6, 02D4): picked
+    /// `class_quiz`'s next question (222C:00EA..00F6, 020A..0231): picked
     /// (`quiz_pick`), found in bank 4 (`quiz_find`), its position kept at
-    /// SHOWN, its answers parsed (`quiz_answers`). Returns where its text
-    /// is shown from (the frame's segment and the offset past its number),
-    /// to the NUL the parse cut.
-    pub fn quiz_question(&mut self) -> Option<(u16, u16)> {
+    /// SHOWN; then its window: the cursor put back (541E), B7C4 bits 1-2
+    /// and B7E4 set (no fades: no colours read), bank 6's frame the
+    /// window's buffer (4D74), the window on DS:QUIZ_WINDOW opened
+    /// (3159:000C up to its loop: STARTGAM.MNU, its rollers' and answers'
+    /// regions) and its first routine (`quiz_scroll`, 222C:025A). Returns
+    /// where its text is shown from (the frame's segment and the offset
+    /// past its number), to the NUL the parse cut.
+    pub fn quiz_question(&mut self, files: &mut Files) -> Option<(u16, u16)> {
         let q = self.quiz_pick()?;
         self.ems_map(4);
         let frame = self.ng16(0x9030);
         let di = self.quiz_find(q as u16)?;
         self.mem.w16(DS, SHOWN, di);
         self.mem.w16(DS, SHOWN + 2, frame);
-        self.quiz_answers(frame, di);
+        self.cursor_hidden();
+        let f = self.ng8(SCREEN) | 6;
+        self.mem.w8(DS, SCREEN, f);
+        self.mem.w8(DS, crate::window::var::NO_FADE, 1);
+        self.screen_bank(6);
+        self.window_open(files, QUIZ_WINDOW, None)?;
+        self.quiz_scroll()?;
+        self.window_opened();
         Some((frame, di))
     }
 
-    /// The question's answer `a` (0..2, `A`..`C`) given (222C:0240..0258,
-    /// 010B): the byte the parse cut put back, the answer counted.
-    pub fn quiz_answer(&mut self, a: u8) {
+    /// 222C:025A, the question's window's first routine: bank 3's frame
+    /// the scroll's bitmap (its segment at BITMAP), its first 5000h bytes
+    /// cleared (77C8), the scroll at its top (1298, 129A, 129C 0); the
+    /// question's answers parsed (02D4..02DE, `quiz_answers`); its text
+    /// made the scroll's strings (02E6..034B: a block from the heap's top
+    /// of its length and 2 (9CD2), its segment at STRINGS: a LF, the text
+    /// but its last byte, two LFs, each LF then a string's end, their
+    /// count at LINES); the first lines drawn into the bitmap (034C), the
+    /// rollers and the bitmap over the page (03B1, `quiz_scroll_drawn`),
+    /// the screen dissolved in (1194:4FF7). None where the heap has no
+    /// room for the strings (the original writes from 0:0).
+    pub fn quiz_scroll(&mut self) -> Option<()> {
+        self.ems_map(3);
+        let bitmap = self.ng16(0x9030);
+        self.mem.w16(DS, BITMAP, bitmap);
+        for i in 0..0x5000u16 {
+            self.mem.w8(bitmap, i, 0);
+        }
+        for at in [SCROLL_LINE, SCROLL_ROWS, SCROLL_FRAME] {
+            self.mem.w16(DS, at, 0);
+        }
+        self.ems_map(4);
+        let (di, es) = (self.ng16(SHOWN), self.ng16(SHOWN + 2));
+        self.quiz_answers(es, di);
+        self.ems_map(4);
+        let mut len = 0u16;
+        while self.mem.r8(es, di.wrapping_add(len)) != 0 {
+            len = len.wrapping_add(1);
+        }
+        let size = len.wrapping_add(2);
+        let seg = self.heap_alloc_high(size)?;
+        if seg == 0 {
+            return crate::giveup::not_ported("222C:02F4: no room for the question's strings: the original writes from 0:0");
+        }
+        self.mem.w16(DS, STRINGS, seg);
+        self.mem.w8(seg, 0, 0x0A);
+        for i in 0..size {
+            self.mem.w8(seg, 1u16.wrapping_add(i), 0);
+        }
+        for i in 0..len {
+            let b = self.mem.r8(es, di.wrapping_add(i));
+            self.mem.w8(seg, 1u16.wrapping_add(i), b);
+        }
+        self.mem.w8(seg, len, 0x0A);
+        self.mem.w8(seg, len.wrapping_add(1), 0x0A);
+        let (mut p, mut lines) = (0u16, 0u16);
+        loop {
+            for _ in 0..0xFDE8u32 {
+                let b = self.mem.r8(seg, p);
+                p = p.wrapping_add(1);
+                if b == 0x0A {
+                    break;
+                }
+            }
+            if self.mem.r8(seg, p.wrapping_sub(1)) == 0x0A {
+                self.mem.w8(seg, p.wrapping_sub(1), 0);
+                lines = lines.wrapping_add(1);
+            }
+            if p >= size {
+                break;
+            }
+        }
+        self.mem.w16(DS, LINES, lines);
+        // 034C: as many lines as the bitmap shows (at most 8) drawn into it
+        // (9E06 at x 14h, a line every 8 rows, the bitmap the draw page
+        // meanwhile), then the last top line the scroll goes to.
+        let shown = lines.min(8);
+        self.mem.w16(DS, SCROLL_LAST, shown);
+        let page = self.ng16(0xA900);
+        self.ems_map(3);
+        self.mem.w16(DS, 0xA900, bitmap);
+        let mut si = 0u16;
+        for i in 0..shown {
+            self.page_text((seg, si), 0x14, i.wrapping_mul(8));
+            while self.mem.r8(seg, si) != 0 {
+                si = si.wrapping_add(1);
+            }
+            si = si.wrapping_add(1);
+        }
+        self.mem.w16(DS, 0xA900, page);
+        let last = if lines >= 6 { lines.wrapping_sub(7) } else { 0 };
+        self.mem.w16(DS, SCROLL_LAST, last);
+        self.quiz_scroll_drawn();
+        self.dissolve();
+        Some(())
+    }
+
+    /// 222C:03B1: the rollers' frame (129C; 0..7 SCROLL01.DFA's in bank 1,
+    /// 8..15 SCROLL02.DFA's in bank 2) drawn (5526, the front end's), then
+    /// with bank 3 mapped the bitmap's 3C00h bytes from the scroll's row
+    /// (129A) over the page from AA00h, its 0s see-through (where the page
+    /// is the game's block).
+    pub fn quiz_scroll_drawn(&mut self) {
+        let frame = self.ng16(SCROLL_FRAME);
+        self.ems_map(1);
+        if frame >= 8 {
+            self.ems_map(2);
+        }
+        self.ems_map(3);
+        if self.page_is_block() {
+            let (bitmap, page) = (self.ng16(BITMAP), self.ng16(0xA900));
+            let row = self.ng16(SCROLL_ROWS);
+            for i in 0..0x3C00u16 {
+                let b = self.mem.r8(bitmap, row.wrapping_add(i));
+                if b != 0 {
+                    self.mem.w8(page, 0xAA00u16.wrapping_add(i), b);
+                }
+            }
+        }
+    }
+
+    /// The question's answer `a` (0..2, `A`..`C`) given: its region (2 +
+    /// `a`, the key's) found by the window's loop and its handler run
+    /// (222C:066F: the answer at ANSWER, 3159:0006); the loop's end
+    /// (3159:00D0): the window's last routine (222C:02C0: the strings'
+    /// block freed), the masks freed and the keys flushed
+    /// (`window_ended`); then 0233..0253 (B7E4 cleared, bank 4 mapped, the
+    /// byte the parse cut put back, B7C4 bit 2 cleared) and 010B..013A:
+    /// the answer counted (`quiz_count`), its sound played (23BA:014A),
+    /// A902 bits 40h and 400h set and its kind's figure played (2294:0895,
+    /// `movie_play`: WARRIOR.CEL, ROGUE.CEL or MAGE.CEL), colour 0 made
+    /// its count's shade (0149: 929E..92A0, the DAC the front end's).
+    /// None where the figure gives up.
+    pub fn quiz_answer(&mut self, files: &mut Files, a: u8) -> Option<()> {
+        let a = a.min(2) as u16;
+        self.mem.w16(DS, REGION, 2 + a);
+        self.mem.w16(DS, ANSWER, a);
+        self.window_close();
+        let seg = self.ng16(STRINGS);
+        self.heap_free(seg);
+        self.window_ended();
+        self.mem.w8(DS, crate::window::var::NO_FADE, 0);
+        self.ems_map(4);
         let (di, frame) = (self.ng16(SHOWN), self.ng16(SHOWN + 2));
         let mut p = di;
         for _ in 0..0xFDE8u32 {
@@ -1006,22 +1175,34 @@ impl Machine {
         }
         let cut = self.ng8(CUT);
         self.mem.w8(frame, p.wrapping_sub(1), cut);
-        self.mem.w16(DS, ANSWER, a.min(2) as u16);
-        self.quiz_count(a.min(2) as u16);
+        let f = self.ng8(SCREEN) & 0xFB;
+        self.mem.w8(DS, SCREEN, f);
+        self.quiz_count(a);
+        let kind = self.ng8(KINDS.wrapping_add(a)) as u16;
         // 222C:011F: the answers' sound played (23BA:014A).
         self.sound_quiz_play();
+        let v = self.ng16(0xA902) | 0x440;
+        self.mem.w16(DS, 0xA902, v);
+        let name = self.ng16(FIGURES.wrapping_add(kind.wrapping_mul(2)));
+        self.movie_play(files, &mut crate::title::NoTitleHooks, name)?;
+        let count = self.ng8(COUNTS.wrapping_add(kind)) as u16;
+        let shade = self.ng8(SHADES.wrapping_add(count.wrapping_sub(1)));
+        self.mem.w16(DS, 0x929E, 0);
+        self.mem.w8(DS, 0x92A0, shade);
+        Some(())
     }
 
     /// `class_quiz`'s end: the class (`quiz_class`, through bank 5, the
-    /// bank mapped before restored); then (222C:016E) the answers' sound
-    /// stopped and its block given back (23BA:01A4, `sound_quiz_free`)
-    /// and bank [1030] mapped.
+    /// bank mapped before restored); then (222C:016E) FONT_B ([102C],
+    /// 9AE6), the answers' sound stopped and its block given back
+    /// (23BA:01A4, `sound_quiz_free`) and bank [1030] mapped.
     pub fn quiz_end(&mut self, files: &mut Files) -> Option<u8> {
         let prev = self.ng16(0x8FA8) >> 2;
         self.ems_map(5);
         let class = self.quiz_class(files);
         self.ems_map(prev);
         let class = class?;
+        self.select_font(0x102C);
         self.sound_quiz_free();
         let bank = self.ng16(0x1030);
         self.ems_map(bank);

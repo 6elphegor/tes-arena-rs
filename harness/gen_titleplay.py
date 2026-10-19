@@ -13,7 +13,9 @@ The cases (CASES): `startload`, the menu's Load (L: 0000:117E) and slot
 (0000:1130) and one character made through the original's own screens
 (CREATION), then creation's vision (1194:D459, text 578h, its clicks:
 `created`), the game set up (21EE:016C, 25FD:0219) and the start
-dungeon's way in on to its first frame.
+dungeon's way in on to its first frame; `creationquiz`, the same with the
+class the questions give (CREATION_QUIZ, 222C:0000); `creationsound` and
+`creationquizsound`, those two with ARENA.BAT's sound driver loaded.
 
 For each, DGROUP there (the offsets tests/vectors/loadexclude.txt names
 zeroed; the port's in this form: worldtest's `load_canonical`), the EMS
@@ -22,7 +24,7 @@ banks 0..1Fh (64K each, end to end) and the interface's rows of the page
 
   titleplay | NAME | <DGROUP digest> <EMS digest> <interface digest>
 
-and for `creationsound` its calls into the sound driver (sbdig.py's
+and for those with the driver their calls into it (sbdig.py's
 `calls_line`): driver | NAME | ...
 
 With --dump DIR, NAME.ds, NAME.ems and NAME.page (the page whole).
@@ -40,6 +42,7 @@ import gen_worldframes as gw
 
 KEY_L = 0x26
 R, I, A, ENTER, F, Y, S = 0x13, 0x17, 0x1E, 0x1C, 0x21, 0x15, 0x1F
+G, B, C = 0x22, 0x30, 0x2E
 
 # A new game made through the original's screens, each step the answer to
 # one of its waits for input: New (the menu's region at 160,120); the
@@ -59,6 +62,16 @@ CREATION = ([('click', 160, 120), ('keys', [S]), ('click', 94, 51), ('click', 94
             + [('click', 10, 175), ('keys', [S]), ('keys', [ENTER]),
                ('click', 240, 20), ('click', 240, 20), ('click', 10, 175)])
 
+# A new game whose class the questions give (222C:0000): as CREATION, but
+# G, generate, then the instructions' box taken with Enter (1194:260A),
+# the ten questions answered by key (A, B, C in turn from A), and the
+# class offered (1194:261F) taken with Y; then the name on as CREATION.
+QUIZ_ANSWERS = [A, B, C, A, B, C, A, B, C, A]
+CREATION_QUIZ = ([('click', 160, 120), ('keys', [G]), ('keys', [ENTER])]
+                 + [('keys', [k]) for k in QUIZ_ANSWERS]
+                 + [('keys', [Y])]
+                 + CREATION[4:])
+
 # The clicks the vision after creation takes (1194:D459, text 578h): a
 # page turned for each of the first ten, the eleventh's press ending the
 # movie (its release read after it, on the way into the game).
@@ -71,9 +84,11 @@ CASES = {
     'startload': [('click', 160, 30), ('click', 160, 21)],
     'creation': CREATION,
     'creationsound': CREATION,
+    'creationquiz': CREATION_QUIZ,
+    'creationquizsound': CREATION_QUIZ,
 }
 
-# Run only when named (none now).
+# Run only when named.
 NAMED_ONLY = {}
 
 # Where main's frame is made (its far call's return, its BP, argc 1).
