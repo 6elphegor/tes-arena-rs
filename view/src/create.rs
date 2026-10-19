@@ -782,6 +782,7 @@ impl Creation {
     /// would: its movie's buffer at A69E, which the parchment's unrolling
     /// reads before its row table), only creation's start (`story_ran`'s
     /// last part).
+    #[cfg(test)]
     pub fn begin_at_creation(&mut self, engine: &mut Engine) {
         if self.story_run.take().is_none() {
             return;
