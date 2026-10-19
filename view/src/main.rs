@@ -4463,7 +4463,7 @@ impl App {
             match run {
                 SheetDrop::Asked(text, menu) => {
                     inv.asking = Some((text, usize::MAX));
-                    inv.asked_menu = Some(menu);
+                    inv.asked_menu = Some(Box::new(menu));
                     inv.drop_ring = Some(Box::new((ring, key)));
                     inv.drop_what = Some(steps);
                     inv.drop_first = None;

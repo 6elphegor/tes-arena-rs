@@ -245,7 +245,7 @@ pub struct Inventory {
     /// That question as 1194:48E9's 020E shows it (`dialog::menu_at` on
     /// the game as it asked: the text at DROP_TEXT, the keys at 4B60, the
     /// entries at 4B63, its colour and font).
-    pub asked_menu: Option<crate::hud::Menu>,
+    pub asked_menu: Option<Box<crate::hud::Menu>>,
     /// On the sheet's own page, the key interrupt's ring (AC46..ACB4) as
     /// the drop's key left it: the answer's key, which the window's key
     /// interrupt puts after it, goes in after the menu's flush instead
@@ -846,7 +846,7 @@ pub fn drop_press(m: &mut Machine, inv: &mut Inventory, said: &mut Said) {
     match asked {
         Some((text, menu)) => {
             inv.asking = Some((text, usize::MAX));
-            inv.asked_menu = Some(menu);
+            inv.asked_menu = Some(Box::new(menu));
         }
         None => {
             *m = probe;
@@ -876,7 +876,7 @@ fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
 /// `drop_menu`), the entry the arrows marked.
 pub fn drop_question(inv: &Inventory) -> Option<crate::hud::Menu> {
     let (text, sel) = inv.asking.as_ref()?;
-    let mut menu = inv.asked_menu.clone().unwrap_or_else(|| drop_menu(text, 0));
+    let mut menu = inv.asked_menu.as_deref().cloned().unwrap_or_else(|| drop_menu(text, 0));
     menu.selected = *sel;
     Some(menu)
 }
