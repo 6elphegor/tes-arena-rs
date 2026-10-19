@@ -244,7 +244,8 @@ impl Machine {
 
     /// 26F7:0218..0267, the province's window ended (its Exit, or a
     /// journey made: 3159:0006): its loop's end (`window_ended`), the
-    /// world's window put back (3159:0EB6 from 9686), B7C4 bit 1; with a
+    /// world's window put back (3159:0EB6 from 9686), B7C4 bit 1, the
+    /// page cleared (0000:9426); with a
     /// journey made bank 5 mapped and the world's loop to end too
     /// (3159:0006: true); else the world map's window opened again, its
     /// fades on (B7E4 0, the screen's bank 5). None where a file is
@@ -254,6 +255,8 @@ impl Machine {
         self.window_restore(KEPT);
         let f = self.ms8(crate::window::var::FLAGS) | 2;
         self.mem.w8(DS, crate::window::var::FLAGS, f);
+        // 0231: the page cleared (0000:9426).
+        self.page_clear();
         if self.ms16(TRAVELLED) != 0 {
             self.ems_map(5);
             self.window_close();
@@ -512,7 +515,7 @@ impl Machine {
 
     /// 26F7:0625's state, a click on (or the cursor over) a province's
     /// map at (8F92, 8F94): the nearest location (`travel_nearest`); bank 4
-    /// mapped (the screen's copy, 062E); the current place's marker (26F7:071F) when its province is shown; on
+    /// mapped and the screen's copy in it put back on the page (062E); the current place's marker (26F7:071F) when its province is shown; on
     /// a press (AFF9) the nearest chosen and picked (`travel_pick`), and
     /// the journey shown (`travel_journey`) unless refused; the clicks
     /// counted (A8C4), the colour EEh left (9288, after the label's); every fourth with a choice in the shown province,
@@ -521,9 +524,14 @@ impl Machine {
     pub fn travel_click(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks) -> Option<()> {
         let (x, y) = (self.ms16(0x8F92), self.ms16(0x8F94));
         self.travel_nearest(x, y);
-        // 062E..0648: the screen kept in bank 4 copied back (the bank
-        // stays mapped).
+        // 062E..0648: the screen kept in bank 4 copied back to the page
+        // ([A8FE], all 64000 bytes; the bank stays mapped).
         hooks.bank(self, 4);
+        let (poff, pseg, frame) = (self.ms16(0xA8FE), self.ms16(0xA900), self.ms16(0x9030));
+        for i in 0..64000u16 {
+            let b = self.mem.r8(frame, i);
+            self.mem.w8(pseg, poff.wrapping_add(i), b);
+        }
         if self.ms8(SHOWN) == self.ms8(HERE_PROVINCE) {
             let pick = self.ms16(PICK);
             self.mem.w16(DS, PICK, self.ms8(HERE_ID) as u16);
