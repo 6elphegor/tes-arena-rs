@@ -1060,8 +1060,9 @@ impl Machine {
         self.page_text_at(0x80, 0x17, (DS, SCRATCH));
         self.equipment_list(files)?;
         // 76B4 with BX the sex (+7): the armour's classes (7719) at the
-        // places of 5D8D's (5DA9's for a woman) seven (48F5), in 8Ah,
-        // then again one to the left in C3h.
+        // places of DGROUP's 5D8D (5DA9 for a woman) seven (48F5), in
+        // 8Ah, then again one to the left in C3h. (DS is DGROUP here,
+        // from 23E4: the segment 3276h's words there are 0s.)
         let woman = self.mem.r8(DS, PLAYER + 7) != 0;
         self.player_armor_class();
         let table = if woman { 0x5DA9 } else { 0x5D8D };
@@ -1069,8 +1070,8 @@ impl Machine {
             self.mem.w8(DS, 0x9288, colour);
             for i in 0..7u16 {
                 let cx = self.mem.r8(DS, crate::inventory::ARMOR_CLASS + i) as i8 as i16 as u16;
-                let x = self.mem.r16(DATA, table + 4 * i).wrapping_sub(dx);
-                let y = self.mem.r16(DATA, table + 4 * i + 2);
+                let x = self.mem.r16(DS, table + 4 * i).wrapping_sub(dx);
+                let y = self.mem.r16(DS, table + 4 * i + 2);
                 self.sheet_signed(cx, 0);
                 self.page_text_at(x, y, (DS, NUMBER));
             }
@@ -1170,9 +1171,8 @@ impl Machine {
     }
 
     /// 1194:22AF: the box round a selected line at row `bx` (0000:7334's
-    /// four lines from (0Ch, `bx` - 2) by 9Dh and 9Ch, `bx` + 0Ah): the
-    /// state they leave, ADB6 and ADB8 at the last line's end (each line
-    /// starts at them; its pixels are the front end's).
+    /// four lines from (0Ch, `bx` - 2) by 9Dh and 9Ch, `bx` + 0Ah), ADB6
+    /// and ADB8 left at the last line's end (each line starts at them).
     fn line_box(&mut self, bx: u16) {
         let y = bx.wrapping_sub(2);
         self.mem.w16(DS, 0xADB6, 0x0C);
@@ -1187,11 +1187,51 @@ impl Machine {
         self.line_to(0x0C, y);
     }
 
-    /// 0000:7334's state: a line from (ADB6, ADB8) to (`ax`, `bx`) leaves
-    /// them at its end, unless it has no length.
+    /// 0000:7334: a line from (ADB6, ADB8) to (`ax`, `bx`) in [9288],
+    /// drawn from whichever end is higher on the page (the lower y, the
+    /// other where they're level) one pixel a step of the longer axis,
+    /// that many steps (the far end left undrawn; scaled by ADBA / 100h
+    /// where ADBA is at most FFh, 73E6), the shorter axis stepped as the
+    /// error passes 0; then ADB6 and ADB8 at (`ax`, `bx`). A line of no
+    /// length draws nothing and leaves them. (Drawn where the page is the
+    /// game's own block.)
     fn line_to(&mut self, ax: u16, bx: u16) {
-        if self.mem.r16(DS, 0xADB6) == ax && self.mem.r16(DS, 0xADB8) == bx {
+        let (mut cx, mut dx) = (self.mem.r16(DS, 0xADB6), self.mem.r16(DS, 0xADB8));
+        let (mut x, mut y) = (ax, bx);
+        if y >= dx {
+            std::mem::swap(&mut cx, &mut x);
+            std::mem::swap(&mut dx, &mut y);
+        }
+        let dy = dx.wrapping_sub(y);
+        let wide = cx.wrapping_sub(x);
+        if wide == 0 && dy == 0 {
             return;
+        }
+        let back = (wide as i16) < 0;
+        let wide = if back { wide.wrapping_neg() } else { wide };
+        let (major, minor, x_major) = if wide >= dy { (wide, dy, true) } else { (dy, wide, false) };
+        // 73E6.
+        let scale = self.mem.r16(DS, 0xADBA);
+        let mut n = major;
+        if (scale as i16) <= 0xFF {
+            n = ((n as u32 * scale as u32) >> 8) as u16;
+        }
+        if self.page_is_block() {
+            let page = self.mem.r16(DS, 0xA900);
+            let colour = self.mem.r8(DS, 0x9288);
+            let mut di = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+            let step = if back { 0xFFFFu16 } else { 1 };
+            let mut si = major.wrapping_neg();
+            // (LOOP: a count scaled to 0 runs 10000h times.)
+            for _ in 0..if n == 0 { 0x10000 } else { n as u32 } {
+                self.mem.w8(page, di, colour);
+                di = di.wrapping_add(if x_major { step } else { 0x140 });
+                si = si.wrapping_add(minor);
+                if (si as i16) >= 0 {
+                    si = si.wrapping_sub(major);
+                    di = di.wrapping_add(if x_major { 0x140 } else { step });
+                }
+            }
         }
         self.mem.w16(DS, 0xADB6, ax);
         self.mem.w16(DS, 0xADB8, bx);

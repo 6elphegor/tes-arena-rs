@@ -491,9 +491,7 @@ fn walk_on(engine: &mut Engine, dir: &std::path::Path, run: &mut Run) {
 
 /// The travel map's hooks, as the view's: the destination's record built
 /// (1194:3AE8 in full; a dungeon's, 3B0C, with its climate), boxes printed.
-struct Trip {
-    files: Files,
-}
+struct Trip;
 
 impl arena::clock::ClockHooks for Trip {}
 
@@ -501,16 +499,16 @@ impl arena::travelmap::TravelHooks for Trip {
     fn message_box(&mut self, m: &mut Machine, seg: u16, si: u16) {
         println!("    [box] {}", String::from_utf8_lossy(m.mem.cstr(seg, si)).replace('\r', " "));
     }
-    fn location(&mut self, m: &mut Machine, id: u16) {
+    fn location(&mut self, m: &mut Machine, files: &mut Files, id: u16) {
         let ax = if m.mem.r8(DS, 0x0A46) == 8 { 0x100 } else { id };
-        if m.city_location(&mut self.files, DS, 0x0A22, ax).is_none() {
+        if m.city_location(files, DS, 0x0A22, ax).is_none() {
             println!("    the location record could not be built");
         }
     }
-    fn dungeon_location(&mut self, m: &mut Machine, id: u16, _bx: u16) {
+    fn dungeon_location(&mut self, m: &mut Machine, files: &mut Files, id: u16, _bx: u16) {
         let (x, y) = (m.mem.r16(DS, 0x193E), m.mem.r16(DS, 0x1940));
         let p = m.mem.r8(DS, arena::travelmap::var::SHOWN);
-        if m.city_climate(&mut self.files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c)).is_none() {
+        if m.city_climate(files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c)).is_none() {
             println!("    the dungeon's record could not be built");
         }
     }
@@ -533,7 +531,7 @@ fn trip(engine: &mut Engine, dir: &std::path::Path, run: Run, p: u8, i: u8, n: &
     let known = if i < 0x20 { "" } else if f & 2 != 0 { ", known" } else { ", not known" };
     println!("{n}. location {i:#x} of province {p}: {name} at ({x}, {y}), flags {f:02x}{known}");
     m.city_load_province(&mut engine.files, here)?;
-    let mut h = Trip { files: engine.files.clone() };
+    let mut h = Trip;
     let start = m.travel_map_begin(&mut h);
     m.travel_map_province(&mut engine.files, &mut h, p)?;
     m.mem.w16(DS, 0x8F92, x);

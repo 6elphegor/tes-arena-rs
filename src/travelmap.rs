@@ -121,10 +121,12 @@ pub trait TravelHooks: ClockHooks {
     fn province(&mut self, m: &mut Machine, files: &mut Files, p: u8) -> Option<()> {
         m.city_load_province(files, p).map(|_| ())
     }
-    /// 1194:3AE8: the location record of location `id` built.
-    fn location(&mut self, _m: &mut Machine, _id: u16) {}
+    /// 1194:3AE8: the location record of location `id` built (the
+    /// journey's files: a shore's climate keeps the frame in TMP2.$$$,
+    /// 1194:3DF2).
+    fn location(&mut self, _m: &mut Machine, _files: &mut Files, _id: u16) {}
     /// 1194:3B0C: a dungeon's location record built (AX `id`, BX `bx`).
-    fn dungeon_location(&mut self, _m: &mut Machine, _id: u16, _bx: u16) {}
+    fn dungeon_location(&mut self, _m: &mut Machine, _files: &mut Files, _id: u16, _bx: u16) {}
     /// 26F7:08F7: whether the front end made the arrival's text itself;
     /// false (the default) runs `Machine::travel_arrival`.
     fn arrival_log(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<bool> {
@@ -373,12 +375,12 @@ impl Machine {
                 let p = self.tm8(SHOWN);
                 self.mem.w8(DS, HERE_PROVINCE, p);
                 let id = self.tm8(DEST_ID) as u16;
-                hooks.location(self, id);
+                hooks.location(self, files, id);
             } else {
                 let p = self.tm8(SHOWN);
                 hooks.province(self, files, p)?;
                 let (id, bx) = (self.tm8(DEST_ID) as u16, self.tm16(DEST_Y));
-                hooks.dungeon_location(self, id, bx);
+                hooks.dungeon_location(self, files, id, bx);
             }
             if !hooks.arrival_log(self, files)? {
                 self.travel_arrival(files, hooks)?;

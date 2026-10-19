@@ -1260,6 +1260,15 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
             frames(a, d, seen, 1, |_| false);
         })),
+        "playdiagonal" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 6, 3, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playdoormoving" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 3, |_| false);
+        })),
         "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
         "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 21, 7, 0);
@@ -2471,6 +2480,30 @@ fn state_compared(name: &str, from_load: bool) {
     state_compared_in(VECTORS, name, from_load, case(name).unwrap());
 }
 
+/// The files the game wrote, by name.
+fn files_written(f: &arena::bsa::Files) -> std::collections::BTreeMap<String, Vec<u8>> {
+    f.written_names().into_iter().map(|n| (String::from_utf8_lossy(&n).into_owned(), f.written(&n).unwrap().to_vec())).collect()
+}
+
+/// gen_worldframes.py's `written` line from the files before and after:
+/// those created or changed, each its size and digest, deleted ones `-`;
+/// SCREENSV.$$2 left out and TEMPSAVE.$$$'s third plane counted as zeros
+/// where the floor plane's segment `floor` (D748) is 0, as there.
+fn written_line(pre: &std::collections::BTreeMap<String, Vec<u8>>, now: &std::collections::BTreeMap<String, Vec<u8>>, floor: u16) -> String {
+    let names: std::collections::BTreeSet<&String> = pre.keys().chain(now.keys()).filter(|k| *k != "SCREENSV.$$2").collect();
+    names.into_iter().filter_map(|k| match (now.get(k), pre.get(k)) {
+        (None, _) => Some(format!("{k}:-")),
+        (Some(n), was) if was != Some(n) => {
+            let mut d = n.clone();
+            if k == "TEMPSAVE.$$$" && floor == 0 && d.len() > 0x10000 {
+                d[0x10000..].fill(0);
+            }
+            Some(format!("{k}:{:x}:{:x}", d.len(), fnv(d.iter().copied())))
+        }
+        _ => None,
+    }).collect::<Vec<_>>().join(" ")
+}
+
 /// `state_compared` against the vectors at `path`, the case `c`.
 fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let kind = if from_load { "stateload" } else { "state" };
@@ -2488,11 +2521,30 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let skip = if from_load { state_load_excluded() } else { state_excluded() };
     let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
+    let pre_files = std::cell::RefCell::new(std::collections::BTreeMap::new());
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);
         setup(a);
         *pre.borrow_mut() = Some(grab(a).0);
+        *pre_files.borrow_mut() = files_written(&a.engine.files);
     }, play) else { return };
+    // The files the frames wrote, as the original's (gen_worldframes.py's
+    // `written` line; none where it has none).
+    if path == VECTORS && !from_load {
+        let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "written" && f[1] == name).map_or(String::new(), |f| f[2].to_string());
+        let now = files_written(&a.engine.files);
+        let got = written_line(&pre_files.into_inner(), &now, a.engine.m.mem.r16(DS, 0xD748));
+        // (With ARENA_SCREENS holding gen_worldframes.py's dumps, NAME.file.F
+        // the original's: the engine's beside them as NAME.port.F.)
+        if got != want {
+            if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                for (k, v) in &now {
+                    let _ = std::fs::write(PathBuf::from(&d).join(format!("{name}.port.{k}")), v);
+                }
+            }
+        }
+        assert_eq!(got, want, "{name}: the files written differ from the original's");
+    }
     let before = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap().0 } else { pre.into_inner().unwrap() };
     let after = grab(&a).0;
     // (The drawing's own setting up, the original's done before the case
@@ -3029,4 +3081,24 @@ fn the_welcome_keeps_the_screen_as_the_original() {
     assert_eq!(words.join(" "), g[2], "the welcome box's working words (A836..A858, ADB6, ADB8)");
     let line: String = d[0x929E..].iter().take_while(|&&c| c != 0).map(|c| format!("{c:02x}")).collect();
     assert_eq!(line, g[3], "the welcome box's last line (929E)");
+}
+
+
+/// The two faces that never hide a light behind them (0000:B7A9 returns
+/// at once): the crypt's diagonal wall (kind 0Dh, CB37 0Dh) faced from
+/// two squares off (`playdiagonal`), and a door's face as the door moves
+/// (`playdoormoving`: the first face drawn after the walk steps it, C398
+/// bit 1000h, drawn with CCF8 FFFFh). In both a light the rule would
+/// call behind the face is still counted. The track, every pixel of the
+/// 3D view, and DGROUP and EMS from the case's start, as the original's.
+#[test]
+fn faces_that_hide_no_lights_as_the_original() {
+    for name in ["playdiagonal", "playdoormoving"] {
+        let Some((place, setup, play)) = case(name) else { return };
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+        let Some((ok, same)) = soft_view(name) else { return };
+        assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
+        state_case(name);
+    }
 }
