@@ -1808,12 +1808,13 @@ fn title_engine(engine: &Engine) -> Option<Engine> {
     }
 }
 
-/// The main menu's Load on the title's state (0000:117E): the song
-/// stopped, the game set up (21EE:016C), PAL.COL's colours read to 929E
-/// (7534); then the load menu (25FD:0242, `saveui`).
+/// The main menu's Load on the title's state (its pick, 1194:5CF4's
+/// `Machine::main_menu_pick`; 0000:117E, `Machine::title_load_setup`:
+/// the song stopped, the game set up, the page cleared, PAL.COL's colours
+/// read to 929E); then the load menu (25FD:0242, `saveui`).
 fn title_load_setup(e: &mut Engine) {
-    e.m.music_stop();
-    if e.m.game_setup(&mut arena::start::SetupPort(&mut e.files)).is_none() || e.m.colours_load(&mut e.files, 0x1304, 0x929E).is_none() {
+    e.m.main_menu_pick(0);
+    if e.m.title_load_setup(&mut e.files).is_none() {
         eprintln!("the title's Load's set-up gave up: {}", arena::giveup::describe());
     }
 }

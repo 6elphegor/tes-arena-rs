@@ -1684,6 +1684,27 @@ fn case(name: &str) -> Option<Case> {
             let e = &mut a.engine;
             e.m.title_menu(&mut e.files, &mut arena::title::NoTitleHooks).expect("the way back to the menu");
         })),
+        "playtitleload" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // `playtitle` as the app goes it (the world faded out, the
+            // program's main back to its menu on the game's own state,
+            // `App::title_engine`), then the menu's Load (`Outcome::Load`:
+            // 117E's set-up on that state, the load menu) and slot 1's row:
+            // the game loaded the title's way, up to its world loop's first
+            // frame.
+            let m = &mut a.engine.m;
+            m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+            m.player_dies();
+            d.frame(a);
+            d.wait(a, 2000);
+            assert!(a.creation.is_some() && a.title_engine.is_some(), "the menu's screens up on the title's state");
+            a.open_saveui(crate::saveui::Kind::TitleLoad);
+            assert!(a.saveui.is_some(), "the title's load menu");
+            d.click(a, 160, 21, MouseButton::Left);
+            assert!(a.saveui.is_none() && a.title_engine.is_none() && a.creation.is_none(), "loaded");
+            // (The case ends there: no frame after, as the harness's.)
+            ENDS.with(|e| e.set(true));
+        })),
         "playguild" => (Place::Loaded, Box::new(|a: &mut App| {
             room(a);
             seeded(a);
@@ -2492,6 +2513,40 @@ fn a_death_goes_back_to_the_menu_as_the_original() {
     state_case("playtitle");
     state_load_case("playtitle");
     state_ems_case("playtitle");
+}
+
+/// `playtitle`, then the menu's Load (`playtitleload`: its pick, 1194:5CF4;
+/// 0000:117E's set-up on the title's state; the load menu, 25FD:0242;
+/// slot 1): DGROUP from the case's start and from the load and the EMS
+/// banks as the original leaves them where the loaded game's world loop is
+/// about to run its first frame, and the interface the load drew into the
+/// page (its rows from 146 on). The rest of the original's page is the
+/// load menu's picture under its "Kindly waiteth" box, and the portrait,
+/// the name and the bars (columns 14..80) are the HUD's: both the front
+/// end's here (`saveui`, `hud`).
+#[test]
+fn the_menus_load_after_a_death_as_the_original() {
+    title_load_case("playtitleload");
+}
+
+/// A case that ends where a game the title's Load loaded is about to run
+/// its first frame: its track, DGROUP from the case's start and from the
+/// load, the EMS banks, and the interface's rows of the page (see
+/// `the_menus_load_after_a_death_as_the_original`).
+fn title_load_case(name: &str) {
+    let (place, setup, play) = case(name).unwrap();
+    let Some((a, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+    state_ems_case(name);
+    state_case(name);
+    state_load_case(name);
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let rows: Vec<u8> = (146 * 320..64000).map(|i| if (14..=80).contains(&(i % 320)) { 0 } else { page[i] }).collect();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix(&format!("interface | {name} | "))).expect("an interface line");
+    assert_eq!(format!("{:x}", fnv(rows)), want, "{name}: the interface the load drew differs from the original's");
 }
 
 /// The options screen's New (`playnew`: 2542:0627, then the frame that
