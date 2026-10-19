@@ -187,7 +187,10 @@ pub struct Travel {
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
-/// frame of the journey.
+/// frame of the journey. The view's own pace: the original's window loop
+/// (3159:000C) and its days (1194:30F1) neither wait for the retrace nor
+/// read the timer, so they run as fast as the machine does (areaplay's
+/// `journey` lines).
 const TICK_MS: u32 = 55;
 
 /// A .CIF's frames, each by its coding (type 8 through the port's
@@ -694,6 +697,24 @@ impl Travel {
     /// The journey's frames playing.
     pub fn journeying(&self) -> bool {
         !self.journey.is_empty()
+    }
+
+    /// Each day of the journey as the screen shows it (its pixels and its
+    /// 6-bit colours), the frames played or not.
+    #[cfg(test)]
+    pub fn journey_seen(&mut self, font: &Font, m: &mut Machine) -> Vec<(Vec<u8>, Vec<u8>)> {
+        let ms = self.journey_ms;
+        let mut seen = Vec::new();
+        for day in 0..self.journey.len() as u32 {
+            self.journey_ms = day * TICK_MS;
+            let mut screen = Screen::new([[0, 0, 0, 0xFF]; 256]);
+            self.draw(&mut screen, font, m, 0, 0);
+            let px = screen.indices().iter().map(|&c| c as u8).collect();
+            let dac = screen.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+            seen.push((px, dac));
+        }
+        self.journey_ms = ms;
+        seen
     }
 
     /// The journey's frame for the time played (HORSE.DFA's).
