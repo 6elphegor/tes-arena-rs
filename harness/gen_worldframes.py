@@ -890,6 +890,14 @@ CASES = {
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
     # door opens; then the up arrow held through it and let go.
     'playpick': ('crypt', picking(1), [((), (), 2, None), ((), (), 20, None, [(160, 100)]), ((UP,), (), 40, None), ((), (UP,), 10, None)]),
+    # The crypt two squares north of its diagonal wall at row 8, column 3
+    # (kind 0Dh), facing it (heading 0): its faces never hide a light
+    # behind them (0000:B7A9 returns at once for CB37 0Dh).
+    'playdiagonal': ('crypt', at_square(6, 3, 0), [((), (), 3, None)]),
+    # `playpick`'s door clicked open, three frames of it moving: each
+    # frame the first face drawn after the walk steps it (C398 bit 1000h,
+    # 0000:CD89) is drawn with CCF8 FFFFh, which hides no light (B7A9).
+    'playdoormoving': ('crypt', picking(1), [((), (), 2, None), ((), (), 4, None, [(160, 100)])]),
     # The crypt's water (row 22, columns 6..10) walked into from the
     # square north of it (row 21, column 7), facing it (heading 0): the
     # player sinks (0000:F9C4's water), swims and bobs (C39A bit 10h,

@@ -1117,6 +1117,15 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
             frames(a, d, seen, 1, |_| false);
         })),
+        "playdiagonal" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 6, 3, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playdoormoving" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 3, |_| false);
+        })),
         "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
         "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 21, 7, 0);
@@ -2886,4 +2895,24 @@ fn the_welcome_keeps_the_screen_as_the_original() {
     assert_eq!(words.join(" "), g[2], "the welcome box's working words (A836..A858, ADB6, ADB8)");
     let line: String = d[0x929E..].iter().take_while(|&&c| c != 0).map(|c| format!("{c:02x}")).collect();
     assert_eq!(line, g[3], "the welcome box's last line (929E)");
+}
+
+
+/// The two faces that never hide a light behind them (0000:B7A9 returns
+/// at once): the crypt's diagonal wall (kind 0Dh, CB37 0Dh) faced from
+/// two squares off (`playdiagonal`), and a door's face as the door moves
+/// (`playdoormoving`: the first face drawn after the walk steps it, C398
+/// bit 1000h, drawn with CCF8 FFFFh). In both a light the rule would
+/// call behind the face is still counted. The track, every pixel of the
+/// 3D view, and DGROUP and EMS from the case's start, as the original's.
+#[test]
+fn faces_that_hide_no_lights_as_the_original() {
+    for name in ["playdiagonal", "playdoormoving"] {
+        let Some((place, setup, play)) = case(name) else { return };
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+        let Some((ok, same)) = soft_view(name) else { return };
+        assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
+        state_case(name);
+    }
 }

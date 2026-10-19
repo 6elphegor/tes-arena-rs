@@ -558,9 +558,15 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
             let (x1, z1) = (x0 + SQUARE, z0 + SQUARE);
             let v = wall(col, row);
             // The sides of a box from `lo` to `hi` facing open squares.
-            let mut sides = |lo: f32, hi: f32, layer: u32, cull: &dyn Fn(u16) -> bool| {
+            // `lit`: the faces hide lights behind them (a side for the
+            // shader's test, 0000:B7A9), which kinds 0Ah and 0Dh's never
+            // do: B7A9 returns at once for CCF8 FFFFh, which a kind 0Ah's
+            // face is drawn with (D27A after CF20's BA7F 2), and for
+            // CB37 0Dh.
+            let mut sides = |lo: f32, hi: f32, layer: u32, cull: &dyn Fn(u16) -> bool, lit: bool| {
                 let th = 64.0 * (hi - lo) / ceiling.max(1.0);
                 let uv = [[0.0, th], [64.0, th], [64.0, 0.0], [0.0, 0.0]];
+                let side = |s: u32| if lit { side(s) } else { 0 };
                 if !cull(wall(col, row - 1)) {
                     quad([[x1, lo, z0], [x0, lo, z0], [x0, hi, z0], [x1, hi, z0]], uv, layer, 0.85, side(0));
                 }
@@ -579,7 +585,7 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                 if (v >> 8) as u8 == v as u8 {
                     // A solid wall: texture by its low 6 bits.
                     let t = (v & 0x3F) as u32;
-                    sides(0.0, ceiling, t.saturating_sub(1), &solid);
+                    sides(0.0, ceiling, t.saturating_sub(1), &solid, true);
                     has_floor = false;
                 } else {
                     // A raised platform: the box tables give the side and
@@ -588,7 +594,7 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                     let cap = m.mem.r8(DS, arena::info::var::BOX_CAPS + ((v >> 4) & 0xF)) as u32;
                     let (top, bottom) = m.move_wall_height(v);
                     let (lo, hi) = (bottom as i16 as f32, top as i16 as f32);
-                    sides(lo, hi, side.saturating_sub(1), &solid);
+                    sides(lo, hi, side.saturating_sub(1), &solid, true);
                     let uv = [[0.0, 0.0], [64.0, 0.0], [64.0, 64.0], [0.0, 64.0]];
                     quad([[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]], uv, cap.saturating_sub(1), 1.0, 0);
                     quad([[x0, lo, z1], [x1, lo, z1], [x1, lo, z0], [x0, lo, z0]], uv, cap.saturating_sub(1), 0.7, 0);
@@ -597,7 +603,7 @@ pub fn mesh(m: &Machine) -> Vec<Vertex> {
                 // The other wall kinds, drawn as walls for now. Doors
                 // (0Bh) move: `doors`.
                 let t = (v & 0x3F) as u32;
-                sides(0.0, ceiling, t.saturating_sub(1), &|_| false);
+                sides(0.0, ceiling, t.saturating_sub(1), &|_| false, v >> 12 == 9);
             }
             if has_floor {
                 let f = m.mem.r16(floors, at(col as u16, row as u16));

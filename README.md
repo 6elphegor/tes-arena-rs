@@ -330,9 +330,15 @@ At the time of writing:
     (`world::creature_flats_seen`) is kept only for when the engine has no
     page; in play the ported renderer always draws (render-gaps' sweep: no
     fallback in 112,955 frames), so the ray caster's own squares are used.
-  - Lights behind a wall follow the original's rule but are unconfirmed on
-    screen, and its two exceptions (CB37 = 0Dh, CCF8 = FFFFh) aren't
-    modelled; a spell's burst is nudged in front of the wall it hits.
+  - Only the view's own GPU world (`--gpu-world`, or no page): a spell's
+    burst is nudged in front of the wall it hits (the depth buffer would
+    hide it; the original draws a square's objects over its walls), and a
+    door's faces never hide lights behind them (the original's swinging
+    face only, CCF8 FFFFh). Its lights behind walls otherwise follow
+    0000:B7A9, kinds 0Ah and 0Dh's faces excepted as there. The ported
+    renderer has the rule and both exceptions exactly (`playdiagonal`,
+    `playdoormoving`, and the exact 3D views of the night street and the
+    dungeons).
   - The sun and the helmet's head recolour are ported but not yet seen on
     screen.
   - The travel map's texts take the province picture's palette. Its
