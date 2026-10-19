@@ -32,7 +32,11 @@
 //! eviction, ported, never runs).
 //!
 //! Not ported: the beat and bar counters (AIL's queries only; the tempo
-//! meta event and the time signature feed nothing else), the trigger
+//! meta event and the time signature feed nothing else; of the XMIDI
+//! calls the game makes, 2F9F reads back only the state table's and the
+//! timbre cache's sizes (96h to EBA1, 99h to EB9F), the sequence's handle
+//! (97h to EB00), the timbre asked for (9Bh) and the sequence's status
+//! (AEh, 2F9F:000D, src/music.rs), never a count), the trigger
 //! callback (controller 119: the game installs none), the indirect
 //! controller values (controller 115: Arena's songs use none; the game
 //! registers no array), four-operator and OPL3 timbres (sizes 19h; the

@@ -434,3 +434,11 @@ the original routine:
 | `WildHooks::write` | src/wild.rs:74 | 0000:9DD2 | port | the default runs the port | |
 | `StartHooks::video_mode` | src/start.rs:22 | 0000:6F21 | original | INT 10h AH=0Fh's mode before the start's 13h: 3, the text mode DOS leaves (the harness's too) | |
 | `StartHooks::mouse` | src/start.rs:27 | 0000:5384 | original | a mouse driver present (the harness's has one): the pointer's drawing [B02C] chosen (9B04) | |
+| `CommandHooks::ail_startup` | src/cmdline.rs:58 | 0FFD:07D6 | unreached | the AIL started before a driver named on the command line loads; no port path runs the command line in play (the view picks its drivers itself) | |
+| `CommandHooks::sound_driver` | src/cmdline.rs:60 | 2F9F:0364 | unreached | the -S driver loaded and set to the -IOS/-IRQS/-DMAS settings; not run in play (the view's sound is its own) | |
+| `CommandHooks::music_driver` | src/cmdline.rs:62 | 2F9F:01BF | unreached | the -M driver loaded (the FM driver, view/src/fmdrv.rs, is the view's choice); not run in play | |
+| `CommandHooks::video_restore` | src/cmdline.rs:64 | 0000:6F8C | present | the screen given back to DOS before "Bad command line arguments" | |
+| `CommandHooks::print` | src/cmdline.rs:66 | int 21h AH 9 | present | the message printed (DOS's console) | |
+| `CdHooks::print` | src/cmdline.rs:80 | int 21h AH 9 | present | MSCDEX's or the CD-ROM's message printed (DOS's console) | |
+| `CStartHooks::midnight_seen` | src/start.rs:230 | 0000:007D | original | the BIOS's midnight flag 0040:0070 set again after the ticks' read cleared it: the BIOS's data, not the game's | |
+| `CStartHooks::vectors_taken` | src/start.rs:235 | 0000:016B | original | interrupts 0, 8 and 24h taken and the DTA set: DOS's state and the original's own code segment, not DGROUP | |

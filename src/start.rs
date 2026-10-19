@@ -1,7 +1,12 @@
-//! The program's start, as far as the game's state goes: the memory as
-//! the program finds it (the heap over conventional memory, EMS on with
-//! its frame at F000h: `memory_init`, as harness/screens.py's
-//! `init_memory` lays it out), then 21EE:0000 (`program_start`): the sound
+//! The program's start, as far as the game's state goes. From DOS's
+//! hands: the C start-up up to main (0000:0000, `c_start`: the PSP's
+//! words, the stack, the heap over the memory DOS gave, argv) and main's
+//! head up to 21EE:0000 (0000:102E, `main_head`: the CD-ROM check and the
+//! data path, src/cmdline.rs), checked against the original run from its
+//! entry (harness/gen_cmdline.py). The game's own run and its tests start
+//! instead from the memory as harness/screens.py's `init_memory` lays it
+//! out (the heap over conventional memory, EMS on with its frame at
+//! F000h: `memory_init`), then 21EE:0000 (`program_start`): the sound
 //! buffer, the page and the screen's mode, GLOBAL.BSA opened, the EMS
 //! banks, the random seed, the directory's cache, the fonts, the boxes'
 //! tiles, the arrow cursor, the list's recolouring tables.
@@ -211,7 +216,100 @@ impl Machine {
     }
 }
 
+/// What the C start-up (0000:0000) and main's head (0000:102E) ask of
+/// DOS and the BIOS, and the vectors they take (their own code's, which
+/// the port doesn't run).
+pub trait CStartHooks {
+    /// int 21h AH 30h: DOS's version (AL major, AH minor).
+    fn dos_version(&mut self, m: &mut Machine) -> u16;
+    /// int 21h AH 35h: interrupt `n`'s vector (segment high).
+    fn vector(&mut self, m: &mut Machine, n: u8) -> u32;
+    /// int 1Ah AH 0: the BIOS's ticks (CX high, DX low) and AL, non-zero
+    /// when midnight has passed since the last read.
+    fn bios_ticks(&mut self, m: &mut Machine) -> (u16, u16, u8);
+    /// int 10h AH 8 with BH 0: the character's attribute at the cursor.
+    fn screen_attribute(&mut self, m: &mut Machine) -> u8;
+    /// Midnight passed (the ticks' AL): the BIOS's flag 0040:0070 set to
+    /// 1 again, which the read cleared (the BIOS's data, where the port's
+    /// unrelocated image lies).
+    fn midnight_seen(&mut self, _m: &mut Machine) {}
+    /// The vectors and DOS's state set (int 21h AH 25h for interrupts 0
+    /// (0000:0151), 8 (0000:018B, the old kept at 0000:0167) and 24h
+    /// (21EE:03D9, the old kept at 21EE:03DC); AH 1Ah the DTA at
+    /// DGROUP:00D1): the front end's.
+    fn vectors_taken(&mut self, _m: &mut Machine) {}
+}
+
 impl Machine {
+    /// 0000:0000, the C start-up up to main (0000:00C1), the program
+    /// loaded with its PSP at `psp` and its stack segment at `ss` (the
+    /// image's 4A8Fh where it was loaded): DOS's version to 4B, the PSP's
+    /// segment to 49, its environment's (PSP:2Ch) to 47, the top of memory
+    /// (PSP:2) to 15D; interrupts 0, 4, 5 and 6's vectors kept at 2D..3B
+    /// (0000:01BA); the stack [29] bytes (200h at least) with the heap's
+    /// first header past it (159; with less memory than that the original
+    /// quits, 0000:0248); its data 4A50:0..4A8E:0 cleared (DGROUP EB00..
+    /// EEDF); the BIOS's ticks to 4D/4F (midnight passed: 0040:0070 1,
+    /// `midnight_seen`);
+    /// the heap over the rest (0000:00CC); argv (0000:0118); the screen's
+    /// attribute at the cursor to 15F. None where the original quits.
+    pub fn c_start(&mut self, psp: u16, ss: u16, hooks: &mut dyn CStartHooks) -> Option<()> {
+        let version = hooks.dos_version(self);
+        let top = self.mem.r16(psp, 2);
+        let env = self.mem.r16(psp, 0x2C);
+        self.mem.w16(DS, 0x4B, version);
+        self.mem.w16(DS, 0x49, psp);
+        self.mem.w16(DS, 0x47, env);
+        self.mem.w16(DS, crate::heap::var::TOP, top);
+        for (n, at) in [(0u8, 0x2Du16), (4, 0x31), (5, 0x35), (6, 0x39)] {
+            let v = hooks.vector(self, n);
+            self.mem.w32(DS, at, v);
+        }
+        let mut stack = self.mem.r16(DS, 0x29);
+        if stack < 0x200 {
+            stack = 0x200;
+            self.mem.w16(DS, 0x29, stack);
+        }
+        let paras = (stack >> 4) + 1;
+        if top.wrapping_sub(ss) < paras {
+            return crate::giveup::original("0000:0248: not enough memory for the stack: the original quits");
+        }
+        self.mem.w16(DS, crate::heap::var::FIRST + 2, ss.wrapping_add(paras));
+        for i in 0..(0x4A8Eu16 - 0x4A50) * 16 {
+            self.mem.w8(0x4A50, i, 0);
+        }
+        let (cx, dx, midnight) = hooks.bios_ticks(self);
+        self.mem.w16(DS, 0x4D, dx);
+        self.mem.w16(DS, 0x4F, cx);
+        if midnight != 0 {
+            hooks.midnight_seen(self);
+        }
+        let first = self.mem.r16(DS, crate::heap::var::FIRST + 2);
+        self.heap_init(first, top)?;
+        self.argv_split();
+        hooks.vectors_taken(self);
+        let attr = hooks.screen_attribute(self);
+        self.mem.w8(DS, 0x15F, attr);
+        Some(())
+    }
+
+    /// 0000:102E, main up to 21EE:0000 (0000:1051): its stack pointer to
+    /// 1040 (the start-up's top, the [29] bytes', less main's arguments
+    /// and the far call's return), the critical error handler taken
+    /// (21EE:03A3), the CD-ROM check (21EE:0314, `cd_check`: true, the
+    /// carry, and main quits through 0000:10C2), the error handler
+    /// 0000:11DA at A904. False where the check passed.
+    pub fn main_head(&mut self, cd: &mut dyn crate::cmdline::CdHooks) -> bool {
+        let top = ((self.mem.r16(DS, 0x29) >> 4) + 1) << 4;
+        self.mem.w16(DS, 0x1040, top.wrapping_sub(10));
+        if self.cd_check(cd) {
+            return true;
+        }
+        self.mem.w16(DS, 0xA904, 0x11DA);
+        self.mem.w16(DS, 0xA906, 0x0000);
+        false
+    }
+
     /// 2294:01F1: the game's resources (from the set-up, 21EE:016C): four
     /// files whole on the heap (0000:7428 with DI FFFFh: the compass at
     /// [4391], the slider at [438D] as far pointers, offset 0; the arrows'

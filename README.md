@@ -288,16 +288,16 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2509 reachable routines (197,875 bytes); 2110 ported in whole or
-part (171,535 bytes), counting far thunks to ported code, the handlers
+writing: 2519 reachable routines (198,012 bytes); 2142 ported in whole or
+part (173,906 bytes), counting far thunks to ported code, the handlers
 the port dispatches on by their offsets, and the routines read by hand as
-trivial or inlined (`tools/triage.tsv`); 30 left to the front end as hooks
-and 59 that the view re-implements; 260 presentation, I/O, driver or
+trivial or inlined (`tools/triage.tsv`); 32 left to the front end as hooks
+and 55 that the view re-implements; 244 presentation, I/O, driver or
 hardware routines not ported (the renderer's deferred lists, the menu
-library's remains, input waits, the sound and CyberMan drivers, decode
-artefacts); 50 game-state or undetermined routines not covered by an
-address (3.4 KB of them open, the rest likely ported inside their
-callers). Every indirect call site is followed or
+library's remains, input waits, the sound and CyberMan drivers, the EMS
+driver's and the joystick's calls, decode artefacts); 46 game-state or
+undetermined routines not covered by an address (20 of them open, 3.1 KB;
+the rest likely ported inside their callers). Every indirect call site is followed or
 explained: the ones no table or pointer heuristic resolves were traced by
 hand (`INDIRECT` in the tool), 15 with no target in the image (window
 callbacks, code generated at run time, a chained interrupt, a return).
