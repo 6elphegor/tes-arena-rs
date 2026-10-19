@@ -1619,7 +1619,13 @@ fn case(name: &str) -> Option<Case> {
             d.frame(a);
             a.engine = a.title_engine.take().expect("the way back to the menu");
         })),
-        "playfarewell" => (Place::Dungeon, Box::new(|a: &mut App| a.engine.m.mem.w8(DS, 0x0F77, 3)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+        "playfarewell" => (Place::Dungeon, Box::new(|a: &mut App| {
+            // (And 9A6E filled with what the colours D45D reads there aren't.)
+            a.engine.m.mem.w8(DS, 0x0F77, 3);
+            for i in 0..0x300u16 {
+                a.engine.m.mem.w8(DS, 0x9A6E + i, (i * 7 + 1) as u8 & 0x3F);
+            }
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             // `playdeath` at the main quest's third stage (gen_worldframes.py's
             // `farewell`, F77 3): the outer loop's death plays the farewell's

@@ -375,6 +375,13 @@ pub struct Creation {
     film: VecDeque<(Vec<u8>, Dac)>,
     /// Milliseconds into the film's frame.
     film_ms: u32,
+    /// A key pressed in the intro while its change plays (the fades poll
+    /// nothing): in the keyboard's buffer (ACB0) for the wait or movie
+    /// after it, which takes it at its first poll (13BF, 65CD).
+    pending: Option<Input>,
+    /// Esc held (the held keys' table, ACB6): the intro tests it as it
+    /// takes a key (13E2, 12CD), so an Esc let go before then is a key.
+    esc_held: bool,
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -605,7 +612,7 @@ impl Creation {
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let quote = image_with_palette(m, &archive, "QUOTE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -688,7 +695,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0 }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false }
     }
 
     /// Back on the main menu (a load that failed).
@@ -784,14 +791,19 @@ impl Creation {
     }
 
     /// A key or click in the intro or the opening story (the arrows
-    /// aren't keys here), the change playing passed first as on every
-    /// screen here (the original takes a key pressed in a fade at the
-    /// next poll, the fade played out).
+    /// aren't keys here): taken now, or while a change plays left in the
+    /// buffer for the poll after it (`pending`: the fade played out).
     fn intro_key(&mut self, m: &mut Machine, inp: Input) {
         if matches!(inp, Input::Up | Input::Down) {
             return;
         }
-        self.settle();
+        if inp == Input::Esc {
+            self.esc_held = true;
+        }
+        if !self.film.is_empty() {
+            self.pending = Some(inp);
+            return;
+        }
         self.take_key(m, inp);
     }
 
@@ -802,9 +814,13 @@ impl Creation {
     /// - a wait (13BF) ends; a key is flushed (13ED); Esc, held, is left
     ///   in the buffer and ends the intro or the story at its next test
     ///   (12CD, 12F0, 1314; 137F), a wait before it ending at its first
-    ///   poll (the title's Esc: the quote faded in and out again).
+    ///   poll (the title's Esc: the quote faded in, its wait ended by the
+    ///   Esc left in the buffer, out again if Esc is still held then, on
+    ///   to the scroll's movie if not).
+    ///
+    /// An Esc no longer held as it's taken (`esc_held`) is a key.
     fn take_key(&mut self, m: &mut Machine, inp: Input) {
-        let esc = inp == Input::Esc;
+        let esc = inp == Input::Esc && self.esc_held;
         match self.stage {
             Stage::Intro | Stage::Story { pic: 0, .. } => {
                 if let Some(mv) = &mut self.movie {
@@ -812,10 +828,12 @@ impl Creation {
                 }
                 self.movie_over(m);
             }
-            Stage::Title(_) if esc => self.change(m, |c, f, _| match c.after_title(f) {
-                Stage::Quote(_) => c.intro_end(f),
-                s => s,
-            }),
+            Stage::Title(_) if esc => {
+                self.change(m, |c, f, _| c.after_title(f));
+                if matches!(self.stage, Stage::Quote(_)) {
+                    self.pending = Some(Input::Esc);
+                }
+            }
             Stage::Title(_) => self.change(m, |c, f, _| c.after_title(f)),
             Stage::Quote(_) if esc => self.change(m, |c, f, _| c.intro_end(f)),
             Stage::Quote(_) => self.change(m, |c, f, _| c.scroll_story(f)),
@@ -851,6 +869,10 @@ impl Creation {
         }
         if self.film.is_empty() {
             self.film_ms = 0;
+            // A key left in the buffer, taken at the first poll after it.
+            if let Some(inp) = self.pending.take() {
+                self.take_key(m, inp);
+            }
         }
         // The movie after the change (the vision's fade, 1194:D4E1).
         if let (Some(mv), true) = (&mut self.movie, self.film.is_empty()) {
@@ -1002,13 +1024,25 @@ impl Creation {
         if let Input::Wait(ms) = inp {
             return self.advance(&mut engine.m, ms);
         }
+        if inp == Input::Key(0x01, false) {
+            // Esc let go (the window's, outside the name's typing only this).
+            self.esc_held = false;
+            if !self.typing() {
+                return;
+            }
+        }
+        // (A key on one already left: that one taken first, its change
+        // passed, as scripts give their keys one a screen.)
+        if self.pending.is_some() {
+            self.settle(&mut engine.m);
+        }
         if self.boxes.is_empty() && matches!(self.stage, Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::Story { .. }) {
             return self.intro_key(&mut engine.m, inp);
         }
         if self.boxes.is_empty() && matches!(self.stage, Stage::MainMenu) {
             // A pick (0000:1114): to black (111A: 55B2), the opening
             // story's movie's first frame after a wait for the retrace.
-            self.settle();
+            self.settle(&mut engine.m);
             let (shown, dac) = self.shot(&engine.m, true);
             self.input_inner(engine, inp);
             if self.outcome.is_some() || !matches!(self.stage, Stage::MainMenu) {
@@ -1021,7 +1055,7 @@ impl Creation {
             }
             return;
         }
-        self.settle();
+        self.settle(&mut engine.m);
         let was = self.up();
         let was_back = self.back();
         let (before, before_dac) = self.shot(&engine.m, true);
@@ -1177,10 +1211,15 @@ impl Creation {
         (s.indices().iter().map(|&i| i as u8).collect(), *s.palette())
     }
 
-    /// The change playing passed: the screen as it settles.
-    pub fn settle(&mut self) {
-        self.film.clear();
-        self.film_ms = 0;
+    /// The change playing passed: the screen as it settles, a key left
+    /// for the poll after it (`pending`) taken and its change passed too.
+    pub fn settle(&mut self, m: &mut Machine) {
+        loop {
+            self.film.clear();
+            self.film_ms = 0;
+            let Some(inp) = self.pending.take() else { return };
+            self.take_key(m, inp);
+        }
     }
 
     /// Every frame the change will show, in turn: the screen's indices

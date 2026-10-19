@@ -40,11 +40,15 @@ impl AreaHooks for Areas<'_> {
     /// 1194:D459, the ending: the speech run as the game's state sees it
     /// (`Machine::vision`), its pages clicked through; what it shows is
     /// creation's ending's (`Creation::ending`), its text printed by
-    /// `next`.
+    /// `next`. The colours it reads (6E38 to 9A6E) are the DAC as the
+    /// world's way out left it: faded to its buffer (0000:0AFC, 5E3E to
+    /// 929E, which `world_end` cleared), and nothing sets them between
+    /// there and 0D3E.
     fn ending(&mut self, m: &mut Machine, ax: u16, si: u16, di: u16) {
         self.ending = Some(ax);
         let Some(files) = self.files.as_deref_mut() else { return };
-        if m.vision(files, &mut arena::vision::ClickThrough::default(), None, ax, si, di).is_none() {
+        let dac: [[u8; 3]; 256] = std::array::from_fn(|i| std::array::from_fn(|k| m.mem.r8(arena::mem::DS, 0x929E + (i * 3 + k) as u16)));
+        if m.vision(files, &mut arena::vision::ClickThrough::default(), Some(&dac), ax, si, di).is_none() {
             eprintln!("the farewell's speech gave up: {}", arena::giveup::describe());
             self.failed = true;
         }

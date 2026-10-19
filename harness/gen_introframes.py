@@ -29,7 +29,8 @@ generator (4B8E) at the end.
 
 A case's inputs are keys (`KEY@POLL[+HELD]`, the key's character in hex):
 pressed at the POLL-th read of the mouse (0000:8FC8, which each pass of
-the waits and each movie frame makes), its character in the keyboard's
+the waits and each movie frame makes), or with `sN` for POLL as the run's
+N-th state is first seen (in a fade, which reads no mouse), its character in the keyboard's
 buffer (ACB0) until a flush (7112) takes it and the key held (the held
 keys' table at ACB5, by scan code) for HELD waits for the retrace (by
 default 1), or until a loop waits for every key to be let go (0000:66A2,
@@ -63,6 +64,8 @@ CASES = [
     ('titlekey', 0x10C9, [(0x0D, 120, 1)]),
     # Esc in the title's wait, held through the quote (its ACB6 tests).
     ('titleesc', 0x10C9, [(0x1B, 120, 2000)]),
+    # Esc tapped there: let go before the quote's wait tests it (12CD).
+    ('titletap', 0x10C9, [(0x1B, 120, 1)]),
     # Enter, and Esc held, in the quote's wait.
     ('quotekey', 0x10C9, [(0x0D, 500, 1)]),
     ('quoteesc', 0x10C9, [(0x1B, 500, 2000)]),
@@ -73,6 +76,12 @@ CASES = [
     # The opening story: SCROLL.FLC (frames 1..50), INTRO01..09.IMG
     # (their waits 351 reads apart from 51).
     ('story', 0x1323, []),
+    # Keys in a fade (no poll there; pressed as the state is seen): Enter
+    # in TITLE.IMG's fade in (states 94..128), Esc held and Esc tapped
+    # (let go at the next wait for the retrace) in QUOTE.IMG's (154..188).
+    ('titlefade', 0x10C9, [(0x0D, 's110', 1)]),
+    ('quotefadeesc', 0x10C9, [(0x1B, 's170', 2000)]),
+    ('quotefadetap', 0x10C9, [(0x1B, 's170', 1)]),
     # A key in the second picture's wait, Esc held in the fourth's.
     ('storykeys', 0x1323, [(0x0D, 500, 1), (0x1B, 1300, 2000)]),
 ]
@@ -96,7 +105,19 @@ class Run:
             self.states.append([fnv(shown), fnv(pal), 0, 0])
             if os.environ.get('POLLS'):
                 print(len(self.states) - 1, 'at poll', self.polls, file=sys.stderr)
+            if self.keys and self.keys[0][1] == 's%d' % (len(self.states) - 1):
+                self.press()
         self.states[-1][kind] += 1
+
+    def press(self):
+        """The next key pressed: in the buffer, held."""
+        a = self.a
+        k, _, n = self.keys.pop(0)
+        self.let_go()
+        sc = SCANS[k]
+        a.w16(BUFFERED, a.r16(BUFFERED) + 1)
+        a.mu.mem_write(a.lin(a.ds, HELD + sc), b'\x01')
+        self.held = (sc, n)
 
     def retrace(self, mu, addr, size, ud):
         self.sample(2)
@@ -124,12 +145,7 @@ class Run:
         a = self.a
         self.polls += 1
         if self.keys and self.keys[0][1] == self.polls:
-            k, _, n = self.keys.pop(0)
-            self.let_go()
-            sc = SCANS[k]
-            a.w16(BUFFERED, a.r16(BUFFERED) + 1)
-            mu.mem_write(a.lin(a.ds, HELD + sc), b'\x01')
-            self.held = (sc, n)
+            self.press()
         x, y = a.r16(0x8F92), a.r16(0x8F94)
         a.w16(0xAFF9, a.r16(0xAFF9) & 0xFF00)
         ss, sp = mu.reg_read(UC_X86_REG_SS), mu.reg_read(UC_X86_REG_SP)
@@ -171,12 +187,15 @@ def run(a, start, keys):
 
 def main():
     exe, game, out = sys.argv[1:4]
+    only = sys.argv[4:]
     a = machine(exe, game)
     base = a.snapshot()
     with open(out, 'w') as f:
         for name, start, keys in CASES:
+            if only and name not in only:
+                continue
             a.restore(base)
-            f.write('introframes | %s | script | %s\n' % (name, ','.join('%02x@%d+%d' % k for k in keys) or '-'))
+            f.write('introframes | %s | script | %s\n' % (name, ','.join('%02x@%s+%d' % k for k in keys) or '-'))
             r = run(a, start, keys)
             for n, (s, c, rt, tk) in enumerate(r.states):
                 f.write(f'introframes | {name} | {n} | {s:x} | {c:x} | {rt} | {tk}\n')

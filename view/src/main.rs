@@ -5344,6 +5344,10 @@ impl App {
                     return;
                 }
                 if !down {
+                    // (Esc let go: the intro tests it held, `Creation::take_key`.)
+                    if code == KeyCode::Escape {
+                        self.creation_input(create::Input::Key(0x01, false));
+                    }
                     return;
                 }
                 let inp = match code {

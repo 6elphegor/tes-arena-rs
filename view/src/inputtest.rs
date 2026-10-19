@@ -120,6 +120,12 @@ impl Driver {
         app.input(In::Key { code, down: false, text: None });
     }
 
+    /// A key pressed and held (not let go): the intro's Esc, which the
+    /// original tests held after the fades that follow it (12CD).
+    fn hold(&mut self, app: &mut App, code: KeyCode) {
+        app.input(In::Key { code, down: true, text: None });
+    }
+
     /// A click at (x, y) of the 320 x 200 screen.
     fn click(&mut self, app: &mut App, x: i32, y: i32, button: MouseButton) {
         app.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
@@ -894,7 +900,8 @@ fn creation_by_keys_and_clicks_as_by_script() {
     for (i, inp) in create::parse_script(script).into_iter().enumerate() {
         match inp {
             create::Input::Enter => d.key(&mut a, KeyCode::Enter, None),
-            create::Input::Esc => d.key(&mut a, KeyCode::Escape, None),
+            // (Held, as the twin's: `Creation` takes an Esc never let go.)
+            create::Input::Esc => d.hold(&mut a, KeyCode::Escape),
             create::Input::Back => d.key(&mut a, KeyCode::Backspace, None),
             create::Input::Up => d.key(&mut a, KeyCode::ArrowUp, None),
             create::Input::Down => d.key(&mut a, KeyCode::ArrowDown, None),
@@ -911,6 +918,11 @@ fn creation_by_keys_and_clicks_as_by_script() {
             create::Input::Key(..) => {}
         }
         b.creation_input(inp);
+        if inp == create::Input::Esc {
+            // (The window's held keys' table, ACB6 Esc's, as the held Esc
+            // leaves it: the twin is given no keys.)
+            b.engine.m.mem.w8(arena::mem::DS, 0xACB6, a.engine.m.mem.r8(arena::mem::DS, 0xACB6));
+        }
         // The list waits through the right button, Esc and the first
         // click; the second asks the name.
         if (6..=8).contains(&i) {
@@ -1878,8 +1890,9 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.to_path_buf()), 0, false);
     let mut d = Driver::new(&mut b);
     d.key(&mut b, KeyCode::Enter, None);
-    // (The intro's movie skipped, the rest of it left: Esc at the title.)
-    d.key(&mut b, KeyCode::Escape, None);
+    // (The intro's movie skipped, the rest of it left: Esc held at the
+    // title.)
+    d.hold(&mut b, KeyCode::Escape);
     d.key(&mut b, KeyCode::KeyL, Some("L"));
     assert!(b.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
     let mut shot = hud::Screen::new(b.assets.palette);
@@ -1921,7 +1934,7 @@ fn a_death_then_the_menus_load() {
     assert!(a.title_engine.is_some(), "the title's state is kept");
     assert_eq!(a.title_engine.as_ref().unwrap().m.mem.r8(DS, arena::title::var::SCROLL_DIGIT), b'4', "the intro's scrolls counted (4DCB)");
     d.key(&mut a, KeyCode::Enter, None);
-    d.key(&mut a, KeyCode::Escape, None);
+    d.hold(&mut a, KeyCode::Escape);
     d.key(&mut a, KeyCode::KeyL, Some("L"));
     assert!(a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
     d.click(&mut a, 160, 4 + 14 + 3, MouseButton::Left);
