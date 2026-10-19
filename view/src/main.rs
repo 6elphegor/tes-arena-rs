@@ -3812,6 +3812,10 @@ impl App {
         }
         let m = &self.engine.m;
         let lines = hud::in_font(dialog::text_at(m, arena::savemenu::var::WAIT, m.mem.r8(arena::mem::DS, 0x9288)), hud::GameFont::selected(m));
+        // Centred in the clip it's asked in (965A), as play left it: the
+        // 3D view's after a wilderness dungeon's way in.
+        let r = |o: u16| m.mem.r16(arena::mem::DS, o) as i16 as i32;
+        let lines = hud::clipped(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
         hud::compose_over(&mut s, &self.font, &hud::Hud { boxed: Some(lines), ..Default::default() });
         s.indices().iter().map(|&c| c as u8).collect()
     }

@@ -130,6 +130,11 @@ impl Machine {
         self.working_slot_main();
         self.working_files_delete(files);
         self.working_files_fresh(files);
+        // 1194:3AE8's dungeon branch (3AEF, 3B0C for A47 3) can't be taken
+        // here: A47 is 0 in the image, and main's call (0000:106C) comes
+        // before anything writes it (a load sets it, 25FD:182A, and that
+        // load's own call at 183F skips 3AE8 for a dungeon; the city's
+        // way in clears it first, 0000:0D5B). Checked against the image.
         if self.mem.r8(DS, 0x0A47) == 3 {
             return crate::giveup::not_ported("1194:3AEF: a dungeon's location record at the program's start (3B0C)");
         }

@@ -81,6 +81,7 @@ import struct
 from emu import DGROUP, LOAD_SEG, fnv
 from unicorn import UC_HOOK_CODE
 from screens import ScreenArena
+import gen_areaplay as ga
 import gen_dungeonscreens as gd
 import gen_screens as gs
 import gen_worldframes as gw
@@ -106,6 +107,21 @@ CASES = {
     # The Crypt of Hearts, its first text shown (playcrypt): a main
     # quest dungeon's locks kept (292B:095E).
     'savecrypt': ('crypt', gw.facing(0x100), [((UP,), (), 20, gw.text_shown), ((), (UP,), 1, None)]),
+    # The street at night (gen_worldframes.py's playnight).
+    'savenight': gw.CASES['playnight'],
+    # The street past midnight with a disease's pulse due (playmidnight):
+    # the disease, the new day's quests and weather kept.
+    'savemidnight': gw.CASES['playmidnight'],
+    # In the dungeon with Light cast (playlight): the spell's effect and
+    # its timer under way.
+    'savelight': gw.CASES['playlight'],
+    # The palace's quest taken (playpalaceaccept): a side quest under way,
+    # saved in an interior (taverns, temples and stores refuse a save,
+    # 25FD:0002; the guild's is saveguild).
+    'savequest': gw.CASES['playpalaceaccept'],
+    # A dungeon in the wilderness, just entered (gen_areaplay.py's
+    # wilddungeon).
+    'savewilddungeon': ga.CASES['wilddungeon'],
 }
 
 
@@ -134,11 +150,38 @@ def image_segments(exe):
 LEVEL_STATE, LEVEL_BYTES, LEVEL_AT = 0xBB08, 0x0DE7, 0xFA00 + 0x300
 
 
+# SAVEENGN's game state: DGROUP 01A4h, E4Fh bytes, encrypted (25FD:0832:
+# byte i XORed with CX = E4Fh - i rotated right by CX & 15). The words in
+# it that can hold DGROUP's segment as play leaves them
+# (stateexclude.txt's: 061A's message, 0688's player record, 0D5C's spell
+# target), which the harness's DGROUP puts LOAD_SEG paragraphs higher;
+# other segments there (the EMS frame's, 4879h) are the same on both
+# sides.
+ENGINE_STATE, ENGINE_BYTES = 0x01A4, 0x0E4F
+ENGINE_SEGS = (0x061C, 0x068A, 0x0D5E)
+
+
+def engine_key(i):
+    cx = ENGINE_BYTES - i
+    r = cx & 15
+    return ((cx >> r) | (cx << (16 - r))) & 0xFF if r else cx & 0xFF
+
+
 def canonical(segs, name, data, no_ceiling):
     """`data`, the file `name` as the original wrote it, with the image's
     segments in SAVEGAME's level block taken 1000h paragraphs down (the
     port's image sits at 0, the harness's at LOAD_SEG), and with
-    `no_ceiling` the ceiling's plane (low memory) 0s."""
+    `no_ceiling` the ceiling's plane (low memory) 0s; in SAVEENGN, the
+    game state's words holding DGROUP's segment (ENGINE_SEGS) the port's."""
+    if name.startswith('SAVEENGN.') and len(data) >= ENGINE_BYTES:
+        data = bytearray(data)
+        for off in ENGINE_SEGS:
+            i = off - ENGINE_STATE
+            w = (data[i] ^ engine_key(i)) | (data[i + 1] ^ engine_key(i + 1)) << 8
+            if w == DGROUP + LOAD_SEG:
+                w = DGROUP
+                data[i], data[i + 1] = (w & 0xFF) ^ engine_key(i), (w >> 8) ^ engine_key(i + 1)
+        return bytes(data)
     if not name.startswith('SAVEGAME.') or len(data) < LEVEL_AT + LEVEL_BYTES:
         return data
     data = bytearray(data)
@@ -164,7 +207,7 @@ ON = {'storesteal': [('click', 0xA0, 0x64)]}
 # load (`load_line`): the street's and the wilderness's entry (the sky's
 # colours, the dither) is made in the loop's first frame, past where the
 # load stops.
-FRAMES = {'savestreet': 3, 'savewild': 3}
+FRAMES = {'savestreet': 3, 'savewild': 3, 'savenight': 3, 'savemidnight': 3}
 
 
 def load_line(exe, game, save, name, saved, skip, dump=None):
@@ -254,7 +297,8 @@ def main():
     a.start()
     base = a.snapshot()
     loaded = ({k: bytes(v) for k, v in a.written.items()}, set(a.deleted))
-    places = {'guild': lambda a, b: b, 'street': gw.street, 'wild': gw.wild, 'dungeon': gd.dungeon, 'crypt': gw.crypt}
+    places = {'guild': lambda a, b: b, 'street': gw.street, 'wild': gw.wild, 'dungeon': gd.dungeon, 'crypt': gw.crypt,
+              'palace': gw.palace}
     at = {}
     out = open(OUT, 'w', buffering=1)
     for name, (where, setup, steps) in CASES.items():

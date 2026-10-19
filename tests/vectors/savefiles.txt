@@ -94,6 +94,106 @@ save | savecrypt | WILD003.05 0 cbf29ce484222325
 save | savecrypt | WILD004.05 0 cbf29ce484222325
 savedel | savecrypt | 
 loadplace | savecrypt | 19b76141 | ac1dc1af611d2b90
+play | savenight | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savenight | 
+save | savenight | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savenight | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savenight | LOG.05 801 560dadd0d3e0ffa9
+save | savenight | NAMES.DAT 1e0 135b60819fc85484
+save | savenight | SAVEENGN.05 463f f93d3d19f996423f
+save | savenight | SAVEGAME.05 28ae7 ed1ba065132dbe10
+save | savenight | SPELLS.05 aa0 f7dcb810b229e795
+save | savenight | SPELLSG.05 2a80 f218f906c87ea04d
+save | savenight | STATES.05 7080 bb75605fbb712a4b
+save | savenight | WILD001.05 0 cbf29ce484222325
+save | savenight | WILD002.05 0 cbf29ce484222325
+save | savenight | WILD003.05 0 cbf29ce484222325
+save | savenight | WILD004.05 0 cbf29ce484222325
+savedel | savenight | 
+loadplace | savenight | 19b76141 | 8b497a11e52571ce
+loadframe | savenight | 1 | 9516e0983149560d 4fb6878757f85bff
+loadframe | savenight | 2 | e0b0f6eaf45d3958 4fb6878757f85bff
+loadframe | savenight | 3 | bcb129c3bee5cf6b 4fb6878757f85bff
+play | savemidnight | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savemidnight | 
+save | savemidnight | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savemidnight | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savemidnight | LOG.05 801 560dadd0d3e0ffa9
+save | savemidnight | NAMES.DAT 1e0 135b60819fc85484
+save | savemidnight | SAVEENGN.05 463f c433c3a7d6fd8d49
+save | savemidnight | SAVEGAME.05 28ae7 877b874a13eef03e
+save | savemidnight | SPELLS.05 aa0 f7dcb810b229e795
+save | savemidnight | SPELLSG.05 2a80 f218f906c87ea04d
+save | savemidnight | STATES.05 7080 bb75605fbb712a4b
+save | savemidnight | WILD001.05 0 cbf29ce484222325
+save | savemidnight | WILD002.05 0 cbf29ce484222325
+save | savemidnight | WILD003.05 0 cbf29ce484222325
+save | savemidnight | WILD004.05 0 cbf29ce484222325
+savedel | savemidnight | 
+loadplace | savemidnight | 19b76141 | b7820a5a4110f4ab
+loadframe | savemidnight | 1 | 87128aa3121744ac f5a121d65b18afb7
+loadframe | savemidnight | 2 | 9107b9d5c662bc8f f5a121d65b18afb7
+loadframe | savemidnight | 3 | c8b8248a844bb85e f5a121d65b18afb7
+play | savelight | AUTOMAP.64 20040 2d9caedf820b82e9
+play | savelight | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savelight | 
+save | savelight | AUTOMAP.05 20040 e442b5531e499dfa
+save | savelight | AUTOMAP.64 20040 e442b5531e499dfa
+save | savelight | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savelight | LOG.05 801 560dadd0d3e0ffa9
+save | savelight | NAMES.DAT 1e0 135b60819fc85484
+save | savelight | SAVEENGN.05 463f 5386093d000a07f1
+save | savelight | SAVEGAME.05 28ae7 8473cfeab5df1663
+save | savelight | SPELLS.05 aa0 f7dcb810b229e795
+save | savelight | SPELLSG.05 2a80 f218f906c87ea04d
+save | savelight | STATES.05 7080 bb75605fbb712a4b
+save | savelight | WILD001.05 0 cbf29ce484222325
+save | savelight | WILD002.05 0 cbf29ce484222325
+save | savelight | WILD003.05 0 cbf29ce484222325
+save | savelight | WILD004.05 0 cbf29ce484222325
+savedel | savelight | 
+loadplace | savelight | 19b76141 | 897d9f6946466d14
+play | savequest | LOG.64 91e a2be705ffb58ac8f
+play | savequest | TMP2.$$$ fa00 98e7d995733ab27
+playdel | savequest | 
+save | savequest | AUTOMAP.05 20040 7b1d25cc3490e935
+save | savequest | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savequest | LOG.05 91e a2be705ffb58ac8f
+save | savequest | NAMES.DAT 1e0 135b60819fc85484
+save | savequest | SAVEENGN.05 463f f39039bbee94a351
+save | savequest | SAVEGAME.05 28ae7 8795a443f4e7c64f
+save | savequest | SPELLS.05 aa0 f7dcb810b229e795
+save | savequest | SPELLSG.05 2a80 f218f906c87ea04d
+save | savequest | STATES.05 7080 bb75605fbb712a4b
+save | savequest | WILD001.05 0 cbf29ce484222325
+save | savequest | WILD002.05 0 cbf29ce484222325
+save | savequest | WILD003.05 0 cbf29ce484222325
+save | savequest | WILD004.05 0 cbf29ce484222325
+savedel | savequest | 
+loadplace | savequest | 19b76141 | 871db40502811026
+play | savewilddungeon | AUTOMAP.64 20040 550a311c6519143b
+play | savewilddungeon | TMP2.$$$ fa00 9ddbfae4c25ae77f
+play | savewilddungeon | WILD001.RMD 183e 1914c477a5ae59e8
+play | savewilddungeon | WILD002.RMD 1a56 7c67972d0f120f7c
+play | savewilddungeon | WILD003.RMD 1558 d10265bdb9423ea9
+play | savewilddungeon | WILD004.RMD 1046 3119a9ed52265f8d
+playdel | savewilddungeon | 
+save | savewilddungeon | AUTOMAP.05 20040 44e426d32fcc743c
+save | savewilddungeon | AUTOMAP.64 20040 44e426d32fcc743c
+save | savewilddungeon | CITYDATA.05 2b2c 60b03b3f356fd1e4
+save | savewilddungeon | LOG.05 801 560dadd0d3e0ffa9
+save | savewilddungeon | NAMES.DAT 1e0 135b60819fc85484
+save | savewilddungeon | SAVEENGN.05 463f c90fda4b52888177
+save | savewilddungeon | SAVEGAME.05 28ae7 26f622fe75528340
+save | savewilddungeon | SPELLS.05 aa0 f7dcb810b229e795
+save | savewilddungeon | SPELLSG.05 2a80 f218f906c87ea04d
+save | savewilddungeon | STATES.05 7080 bb75605fbb712a4b
+save | savewilddungeon | WILD001.05 183e 1914c477a5ae59e8
+save | savewilddungeon | WILD002.05 1a56 7c67972d0f120f7c
+save | savewilddungeon | WILD003.05 1558 d10265bdb9423ea9
+save | savewilddungeon | WILD004.05 1046 3119a9ed52265f8d
+savedel | savewilddungeon | 
+loadplace | savewilddungeon | 19b76141 | ea7fa88dd0a55c06
 screen | sheet | CHARSHET.$$$ fa00 18f6da19f846c98d
 screen | sheet | SAVEFACE.$$$ 21c 167cdb245601327a
 screen | sheet | SCREENSV.$$2 fa00 dd14fcc6528cab25

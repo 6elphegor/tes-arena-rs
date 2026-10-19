@@ -109,3 +109,35 @@ fn a_save_in_the_crypt_writes_the_originals_files() {
     let (place, setup, play) = case("playcrypt").unwrap();
     save_case("savecrypt", place, setup, play);
 }
+
+#[test]
+fn a_save_at_night_writes_the_originals_files() {
+    let (place, setup, play) = case("playnight").unwrap();
+    save_case("savenight", place, setup, play);
+}
+
+#[test]
+fn a_save_with_a_disease_past_midnight_writes_the_originals_files() {
+    let (place, setup, play) = case("playmidnight").unwrap();
+    save_case("savemidnight", place, setup, play);
+}
+
+#[test]
+fn a_save_with_light_cast_writes_the_originals_files() {
+    let (place, setup, play) = case("playlight").unwrap();
+    save_case("savelight", place, setup, play);
+}
+
+/// In the palace (an interior: taverns, temples and stores refuse a
+/// save, 25FD:0002), its quest taken.
+#[test]
+fn a_save_with_a_quest_taken_writes_the_originals_files() {
+    let (place, setup, play) = case("playpalaceaccept").unwrap();
+    save_case("savequest", place, setup, play);
+}
+
+#[test]
+fn a_save_in_a_wilderness_dungeon_writes_the_originals_files() {
+    let (place, setup, play) = super::areaplaytest::transit_case("wilddungeon").unwrap();
+    save_case("savewilddungeon", place, setup, play);
+}
