@@ -572,6 +572,20 @@ def newgame(a):
     assert a.run_screen(0x2542, 0x0627, near=True) is None
 
 
+def loaded(a):
+    """Slot 1 loaded in play (25FD:028D with AX 1, 5C8 bit 4 clear: the
+    load menu's pick) at the top of a frame, as gen_playload.py loads it,
+    the sounds and the location record's build stubbed likewise."""
+    saved = a.stub()
+    try:
+        a._setup([0, STUB_SEG], {'eax': 1})
+        a._run(0x25FD, 0x028D, STUB_SEG, 0, count=500_000_000)
+    finally:
+        a.unstub(saved)
+    for at in range(0xFFE0, 0x10000, 2):
+        a.w16(at, 0)
+
+
 def farewell(a):
     """The main quest at its third stage (F77 3), so a death plays the
     farewell vision (1194:D459, VISION.FLC with text 57Bh); 9A6E, where
@@ -986,6 +1000,10 @@ CASES = {
     # `died` stops at its RET, 0D43) and the program's main back to its
     # menu (`titled`).
     'playnew': ('dungeon', None, [((), (), 2, None), ((), (), 1, None, [], {'do': newgame, 'dies': True, 'title': True})]),
+    # The street, two frames, slot 1 loaded in play between frames
+    # (`loaded`), then play goes on in the game loaded: its frames drawn
+    # on, over the page the street's left.
+    'playloadplay': ('street', None, [((), (), 2, None), ((), (), 4, None, [], {'do': loaded})]),
     # The same death at the main quest's third stage (`farewell`): the
     # vision (1194:D459) on the way out, its pages clicked through
     # (`vision`: a click at the screen's centre for each).

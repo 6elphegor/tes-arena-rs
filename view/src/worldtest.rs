@@ -1619,6 +1619,20 @@ fn case(name: &str) -> Option<Case> {
             d.frame(a);
             a.engine = a.title_engine.take().expect("the way back to the menu");
         })),
+        "playloadplay" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 1, |_| false);
+            d.frame(a);
+            // gen_worldframes.py's `loaded`: slot 1 loaded in play between
+            // frames, as the load menu's pick loads it (`App::load_slot`
+            // on the menu's copy of the machine, `game_loaded`), before the
+            // next frame's top; play goes on in the game loaded.
+            let dir = a.save_dir.clone().expect("the save folder");
+            let mut e = arena::engine::Engine::new(a.engine.m.clone(), a.engine.files.clone());
+            let run = a.load_slot(&mut e, &dir, 1, false).expect("slot 1 loads in play");
+            a.game_loaded(e, run, 1);
+            seen.push(state(a));
+            frames(a, d, seen, 4, |_| false);
+        })),
         "playfarewell" => (Place::Dungeon, Box::new(|a: &mut App| {
             // (And 9A6E filled with what the colours D45D reads there aren't.)
             a.engine.m.mem.w8(DS, 0x0F77, 3);
@@ -2477,6 +2491,24 @@ fn new_goes_back_to_the_menu_as_the_original() {
     state_case("playnew");
     state_load_case("playnew");
     state_ems_case("playnew");
+}
+
+/// Slot 1 loaded in play between the street's frames (`playloadplay`,
+/// the load menu's pick): the game loaded plays on, its 3D view drawn
+/// over the page the street's left, every pixel, its frames, DGROUP from
+/// the case's start and from the load, and the EMS banks, as the
+/// original's (the engine the load makes keeps the drawing's page and
+/// writes, `Engine::keep_drawing`).
+#[test]
+fn a_load_in_play_plays_on_as_the_original() {
+    let (place, setup, play) = case("playloadplay").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playloadplay"), "playloadplay: the player's frames differ from the original's");
+    let Some((ok, same)) = soft_view("playloadplay") else { return };
+    assert!(ok, "playloadplay: the 3D view after the load differs from the original's ({same:?}% alike)");
+    state_case("playloadplay");
+    state_load_case("playloadplay");
+    state_ems_case("playloadplay");
 }
 
 /// The options screen's New clicked on the screen Esc opens inside the

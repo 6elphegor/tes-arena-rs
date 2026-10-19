@@ -1782,9 +1782,12 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
 fn title_engine(engine: &Engine) -> Option<Engine> {
     let mut e = Engine::new(engine.m.clone(), engine.files.clone());
     // The drawing's writes, done on its copy, carried as the machine's
-    // (`Engine::page_state`).
+    // (`Engine::page_state`), and its page, which a game the menu's Load
+    // loads draws on.
+    e.page = engine.page.clone();
     e.page_wrote = engine.page_wrote.clone();
     e.page_ems_wrote = engine.page_ems_wrote.clone();
+    e.page_ems_prior = engine.page_ems_prior.clone();
     match e.m.title_menu(&mut e.files, &mut arena::title::NoTitleHooks) {
         Some(()) => Some(e),
         None => {
@@ -3283,6 +3286,9 @@ impl App {
         c.faded();
         let mut fresh = world::load(&self.dir, "START.MIF");
         fresh.files.disk_from(&self.engine.files);
+        // The new game's 3D view drawn as the last game's was (its page;
+        // the fresh machine is another's memory, so not its writes).
+        fresh.page = self.engine.page.take();
         self.engine = fresh;
         self.creation = Some(c);
         self.movie_at = Instant::now();
@@ -3722,6 +3728,42 @@ impl App {
         self.saveui_ended(e);
     }
 
+    /// Slot `slot` of `dir` loaded on `engine`, the load menu's copy of
+    /// the machine (in play `areas::load_game`, from the title
+    /// `load_game_title`), with the drawing of the engine it stands in
+    /// for, which the load carries on (`Engine::keep_drawing`) and a load
+    /// that fails gives back.
+    fn load_slot(&mut self, engine: &mut Engine, dir: &std::path::Path, slot: u8, title: bool) -> Result<arena::transit::Run, String> {
+        let game = self.dir.clone();
+        let under = match (title, self.title_engine.as_mut()) {
+            (true, Some(t)) => t,
+            _ => &mut self.engine,
+        };
+        engine.keep_drawing(under);
+        let r = if title { areas::load_game_title(engine, &game, dir, slot) } else { areas::load_game(engine, &game, dir, slot) };
+        if r.is_err() {
+            let under = match (title, self.title_engine.as_mut()) {
+                (true, Some(t)) => t,
+                _ => &mut self.engine,
+            };
+            under.keep_drawing(engine);
+        }
+        r
+    }
+
+    /// The game `load_slot` loaded played on: its area's run, its assets.
+    fn game_loaded(&mut self, engine: Engine, run: arena::transit::Run, slot: u8) {
+        self.engine = engine;
+        self.title_engine = None;
+        self.creation = None;
+        self.run = run;
+        self.assets = Assets::new(&self.dir, &mut self.engine);
+        self.remake_renderer();
+        self.last = Some(arena::engine::Frame::Running);
+        // As the game's menu: play goes on without a word.
+        println!("Loaded slot {slot}.");
+    }
+
     /// What the menu's last input ended in: still open, a slot to save
     /// (`save_to` on the engine after the menu), a slot to load
     /// (in play `areas::load_game`, from the title `load_game_title`), or
@@ -3747,20 +3789,9 @@ impl App {
                 }
             }
             saveui::Ended::Load(mut engine, slot) => {
-                let game = self.dir.clone();
-                let r = if title { areas::load_game_title(&mut engine, &game, &dir, slot) } else { areas::load_game(&mut engine, &game, &dir, slot) };
+                let r = self.load_slot(&mut engine, &dir, slot, title);
                 match r {
-                    Ok(run) => {
-                        self.engine = engine;
-                        self.title_engine = None;
-                        self.creation = None;
-                        self.run = run;
-                        self.assets = Assets::new(&self.dir, &mut self.engine);
-                        self.remake_renderer();
-                        self.last = Some(arena::engine::Frame::Running);
-                        // As the game's menu: play goes on without a word.
-                        println!("Loaded slot {slot}.");
-                    }
+                    Ok(run) => self.game_loaded(engine, run, slot),
                     // An empty slot: the game's message box over the
                     // menu, then its picker again (25FD:028D, 026B).
                     Err(msg) if msg.as_bytes() == engine.m.mem.cstr(arena::mem::DS, arena::load::var::NO_SAVE) => {
@@ -3779,13 +3810,16 @@ impl App {
                     }
                 }
             }
-            saveui::Ended::Left(engine, msg) => {
+            saveui::Ended::Left(mut engine, msg) => {
                 // The game goes on as the menu left it (a load menu left
-                // has deleted log.64, re*.64 and in*.64); the title's, from
-                // the main menu after a game's end, kept for its Load.
-                if title && self.title_engine.is_some() {
+                // has deleted log.64, re*.64 and in*.64), its drawing
+                // carried on; the title's, from the main menu after a
+                // game's end, kept for its Load.
+                if let (true, Some(t)) = (title, self.title_engine.as_mut()) {
+                    engine.keep_drawing(t);
                     self.title_engine = Some(*engine);
                 } else {
+                    engine.keep_drawing(&mut self.engine);
                     self.engine = *engine;
                 }
                 if let Some(m) = msg {
@@ -3811,6 +3845,9 @@ impl App {
         let c = create::Creation::main_menu(&mut self.engine, archive, &self.dir, self.assets.palette);
         let mut fresh = world::load(&self.dir, "START.MIF");
         fresh.files.disk_from(&self.engine.files);
+        // The new game's 3D view drawn as the last game's was (its page;
+        // the fresh machine is another's memory, so not its writes).
+        fresh.page = self.engine.page.take();
         self.engine = fresh;
         self.creation = Some(c);
         self.movie_at = Instant::now();
