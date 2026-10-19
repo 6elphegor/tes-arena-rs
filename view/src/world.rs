@@ -111,6 +111,7 @@ pub fn boot(dir: &Path) -> Engine {
 /// `Machine::sound_driver_main`), `driver` answering for it: the
 /// level's sounds are then loaded (23BA:0217) and played (23BA:002A)
 /// with sound on.
+#[cfg(test)]
 pub fn boot_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -> Engine {
     boot_in(dir, Some(driver))
 }
@@ -145,6 +146,7 @@ pub fn title(dir: &Path) -> Option<Engine> {
 
 /// `title` with ARENA.BAT's sound driver loaded where main's command line
 /// loads it (`Machine::program_main_driven`, as `boot_sound`).
+#[cfg(test)]
 pub fn title_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -> Option<Engine> {
     title_in(dir, Some(driver))
 }

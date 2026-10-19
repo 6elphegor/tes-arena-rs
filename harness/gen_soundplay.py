@@ -18,7 +18,7 @@ from the load on, its place's way in and its frames, answers and all
 own: `loadstate` and `loadems` (the state the load with sound on leaves,
 as gen_worldframes.py's), `driver | load` (the load's calls).
 
-usage: gen_soundplay.py EXE GAME SAVE OUT [CASE...] [--dump DIR]
+Usage: gen_soundplay.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [CASE...]
 """
 import os
 import struct
