@@ -36,6 +36,10 @@ pub enum Click {
 pub enum Answer {
     /// A menu's entry (FFFFh: none, Esc).
     Pick(u16),
+    /// A list's line picked (FFFFh: left), and the mouse's reads and keys
+    /// held that came to it (`arena::listwindow::ListRead`), which the
+    /// list's loop (3159:06A0) is run over.
+    List(u16, Vec<arena::listwindow::ListRead>),
     /// Text typed (a script's): Esc where the field doesn't end on it
     /// (it empties the field), its characters, Enter.
     Text(String),
@@ -161,6 +165,9 @@ pub struct Talk {
     /// (2826:02E2, 2542:00BA): where on the 320 x 200 screen, and whether
     /// with the right button.
     pub bar: Option<(i32, i32, bool)>,
+    /// The reads the last list answered came with (`Answer::List`), for
+    /// its asker to give the game's list (`Machine::list_reads`).
+    pub list_reads: Option<Vec<arena::listwindow::ListRead>>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -314,10 +321,14 @@ impl Talk {
     /// `menu` asked: the next answer, or the question left (FFFFh).
     fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {
-            Some(Answer::Pick(p)) => {
+            Some(Answer::Pick(p) | Answer::List(p, _)) => {
                 // Only an entry shown can be picked (1194:020E, 5734 give
                 // an entry or Esc): an answer past them is Esc.
                 let p = if (*p as usize) < menu.entries.len() { *p } else { 0xFFFF };
+                self.list_reads = match self.answers.front() {
+                    Some(Answer::List(_, r)) => Some(r.clone()),
+                    _ => None,
+                };
                 self.answers.pop_front();
                 self.since_answer.clear();
                 println!("[{}] -> {}", menu.title.iter().map(|l| hud::plain(l)).collect::<Vec<_>>().join(" ").trim(), p as i16);

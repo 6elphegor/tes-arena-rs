@@ -696,13 +696,14 @@ impl arena::talk::TalkHooks for Front<'_> {
     /// picture, the window's record) where the page is the game's own
     /// block.
     fn list(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16, cx: u16, di: u16) -> u16 {
-        let pick = match self.talk.as_deref_mut() {
-            Some(t) => t.list(m, si, cx, ""),
+        let (pick, reads) = match self.talk.as_deref_mut() {
+            Some(t) => (t.list(m, si, cx, ""), t.list_reads.take()),
             None => return 0xFFFF,
         };
         if !m.page_is_block() {
             return pick;
         }
+        m.list_reads = reads;
         // The page as it stands (the screen a box covers: `box_screen`) is
         // the game's page block, which the list keeps in the load bank.
         let page = m.mem.r16(arena::mem::DS, 0xA900);
@@ -1778,6 +1779,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         boxes: Default::default(),
         selected: 0,
         list_top: 0,
+        list_reads: Vec::new(),
         arrowed: false,
         live: None,
         status: None,
@@ -3150,6 +3152,10 @@ struct App {
     /// A list's first line shown (3159:06A0's +3Bh, 0 as it comes up,
     /// 0718), moved with `selected` by `hud::list_key`, `list_click`.
     list_top: usize,
+    /// The mouse's reads and keys a list asked has taken so far, as its
+    /// loop (3159:06A0) would read them (`list_read`); given the game's
+    /// list with its answer (`dialog::Answer::List`).
+    list_reads: Vec<arena::listwindow::ListRead>,
     /// The arrows or the wheel moved `selected` since the menu came up:
     /// only then is its entry marked (the original marks none).
     arrowed: bool,
@@ -3546,6 +3552,7 @@ impl App {
             copy_into(&mut self.engine, &before);
             self.selected = 0;
             self.list_top = 0;
+            self.list_reads.clear();
             self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
@@ -5145,6 +5152,7 @@ impl App {
                     // (the view's own) go round.
                     _ if menu.list && list_key.is_some() => {
                         if let Some(k) = list_key {
+                            self.list_key_read(k);
                             self.list_moved(|m| hud::list_key(m, k));
                         }
                     }
@@ -5156,13 +5164,22 @@ impl App {
                         self.selected = (self.selected + 1) % n;
                         self.arrowed = true;
                     }
+                    KeyCode::Enter | KeyCode::NumpadEnter if menu.list => {
+                        let s = self.selected.min(n - 1) as u16;
+                        self.list_tap(arena::listwindow::list_keys::ENTER.0);
+                        self.list_answer(s);
+                    }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
                         let s = self.selected.min(n - 1) as u16;
                         self.answer(dialog::Answer::Pick(s));
                     }
                     // Esc leaves a list as the right button does, where it
                     // does (`hud::leaves`).
-                    KeyCode::Escape if !menu.list || hud::leaves(menu) => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    KeyCode::Escape if menu.list && hud::leaves(menu) => {
+                        self.list_tap(arena::listwindow::list_keys::ESC.0);
+                        self.list_answer(0xFFFF);
+                    }
+                    KeyCode::Escape if !menu.list => self.answer(dialog::Answer::Pick(0xFFFF)),
                     KeyCode::Escape => {}
                     _ => {
                         let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
@@ -5287,9 +5304,11 @@ impl App {
         // end) is marked as it is, and picked as the last (5988).
         if let Some(n) = self.menu_asked().filter(|m| m.list).map(|m| m.entries.len()) {
             let mut picked = None;
+            self.list_read(1, 0);
+            self.list_read(0, 0);
             self.list_moved(|m| picked = hud::list_click(m, x, y));
             if let Some(i) = picked {
-                self.answer(dialog::Answer::Pick(i.min(n.saturating_sub(1)) as u16));
+                self.list_answer(i.min(n.saturating_sub(1)) as u16);
             }
             return;
         }
@@ -5297,6 +5316,42 @@ impl App {
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
             self.answer(dialog::Answer::Pick(i as u16));
         }
+    }
+
+    /// A read of the mouse as the list's loop makes it (0000:8FC4): its
+    /// `buttons`, the cursor's place on the 320 x 200 screen, the list's
+    /// `keys` held (`arena::listwindow::list_keys`).
+    fn list_read(&mut self, buttons: u8, keys: u8) {
+        let (x, y) = self.screen_point();
+        self.list_reads.push(arena::listwindow::ListRead { buttons, x: x.clamp(0, 319) as u16, y: y.clamp(0, 199) as u16, keys });
+    }
+
+    /// The list's key `bit` pressed and let go: a read with it held, one
+    /// without.
+    fn list_tap(&mut self, bit: u8) {
+        self.list_read(0, bit);
+        self.list_read(0, 0);
+    }
+
+    /// `list_tap` of a list's key (the wheel's are Up and Down).
+    fn list_key_read(&mut self, k: hud::ListKey) {
+        use arena::listwindow::list_keys::*;
+        let bit = match k {
+            hud::ListKey::Up => UP.0,
+            hud::ListKey::Down => DOWN.0,
+            hud::ListKey::PageUp => PGUP.0,
+            hud::ListKey::PageDown => PGDN.0,
+            hud::ListKey::Home => HOME.0,
+            hud::ListKey::End => END.0,
+        };
+        self.list_tap(bit);
+    }
+
+    /// The list's line `pick` answered (FFFFh: left), with the reads that
+    /// came to it.
+    fn list_answer(&mut self, pick: u16) {
+        let reads = std::mem::take(&mut self.list_reads);
+        self.answer(dialog::Answer::List(pick, reads));
     }
 
     /// The list asked, as shown (its line marked and first line shown),
@@ -5382,6 +5437,7 @@ impl App {
                             // A list's line moved as by its arrows.
                             let k = if dy > 0.0 { hud::ListKey::Up } else { hud::ListKey::Down };
                             if dy != 0.0 {
+                                self.list_key_read(k);
                                 self.list_moved(|m| hud::list_key(m, k));
                             }
                             return;
@@ -5527,6 +5583,10 @@ impl App {
             In::Button { down: true, button: MouseButton::Right } if self.waiting() && self.boxes.is_empty() && self.menu_asked().is_some() => {
                 if self.menu_asked().is_some_and(|m| m.kind == hud::DIALOG_BUTTONS) {
                     self.dialog_click();
+                } else if self.menu_asked().is_some_and(|m| m.list && hud::leaves(m)) {
+                    self.list_read(2, 0);
+                    self.list_read(0, 0);
+                    self.list_answer(0xFFFF);
                 } else if self.menu_asked().is_some_and(hud::leaves) {
                     self.answer(dialog::Answer::Pick(0xFFFF));
                 }
