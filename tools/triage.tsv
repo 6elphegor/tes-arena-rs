@@ -434,3 +434,15 @@
 0000:9273	hardware	the joystick's centre read (port 201h through 91F2) for 9B04 with AL 2; the program's one call of 9B00 (21EE:0000) passes AL 1: never run
 0000:FF74	presentation	the deferred lists' (0000:FF26) visibility test, A836 1; under 7C51's deferred drawing, never reached in the 3D mode (render-gaps)
 0FFD:0817	driver	the AIL's IRET handler, reached from its start-up (0FFD:07D6, which clears the AIL's own state in its code segment and installs it): the driver interface's own
+0000:7C51	presentation	the renderer's deferred lists drawn (from 0000:FF26): the 3D mode never fills them (render.rs: B4F5, B358, B23F unreached; page_gaps no hits in play)
+0000:B81E	presentation	the column's stores through the hook at CD8E: the tail of 0000:B7DC, which render.rs ports whole
+1194:0FFB	game	the loop closing 1194:0F08 (each word through 4B0C, stored back), called only from there: charsheet.rs `sheet_texts` ports 0F08 with 0DE1
+2F26:03FD	hardware	the CyberMan's motion in the list loop (3159:06A0), only with one found (8BEC): controls.rs leaves the CyberMan out
+3159:09AA	hardware	a list scrolled a line up for the CyberMan's motion (2F26:03FD only)
+3159:09B6	hardware	a list scrolled a line down for the CyberMan's motion (2F26:03FD only)
+3159:02B2	presentation	a window's button drawn pressed through the recolouring table [BA0E] (0000:9D84)
+3159:02CF	presentation	a window's button drawn back through the recolouring table [BA12] (0000:9D84)
+3159:0321	input	a keyed region's routine (+5Eh) run as its key is pressed (3159:0171) or it is clicked (00F3): the travel map's regions, whose handlers mapscreen.rs ports as the view calls them
+3159:033D	input	a window's button (B7D0's list) pressed: drawn pressed (02B2), held until the mouse lets go (0000:8FC4), drawn back, its routine run: the travel map's buttons, the view's (travel.rs)
+3159:0403	input	a group of toggle buttons (kind 5) given up but the one pressed (02CF): part of 033D's press
+3159:0BA1	presentation	a list's line skipped past its NUL for the next (3159:0A58's lines drawn: the front end's)

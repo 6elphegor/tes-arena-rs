@@ -235,7 +235,11 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     // 4000h, which 0000:48BE clears and which keeps 0000:4767 from making
     // the next level's lights; the fall's floor E8BC, still 0, which
     // drops the player a step on the street's door square).
-    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), ..Default::default() });
+    // With sound on (`SOUND_CASE`, gen_soundplay.py's cases): the driver
+    // loaded at the program's start, its answers the original's, the
+    // load's (`driver | load`) then the case's from its place's way in.
+    let sound = SOUND_CASE.with(|c| c.borrow().clone());
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), sound: sound.as_ref().map(|_| sound_replay("load")), ..Default::default() });
     // The random seed as the harness's game has it after its load: the
     // original seeds it from the BIOS ticks (21EE:0059 -> 0000:6FC2), so
     // a game run in the harness has the seed its clock gives.
@@ -244,6 +248,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     let mut d = Driver::new(&mut a);
     clear(&mut d, &mut a);
     BASE.with(|b| *b.borrow_mut() = Some(grab(&a)));
+    if let Some(name) = &sound {
+        let load = a.engine.m.digital.replace(sound_replay(name)).map(|r| r.calls).unwrap_or_default();
+        LOAD_CALLS.with(|c| *c.borrow_mut() = load);
+    }
     BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
     BASE_FILES.with(|b| *b.borrow_mut() = Some(files_now(&a, &save)));
     match place {
@@ -3034,6 +3042,13 @@ const TITLEPLAY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/t
 /// menu, `world::title`) with the save copy as its save folder, and its
 /// driver; None without the game or the save.
 fn started_at_menu() -> Option<(App, Driver, Scratch)> {
+    started_at_menu_with(None)
+}
+
+/// `started_at_menu`, with `sound` the sound driver loaded where main's
+/// command line loads it (`world::title_sound`), the original's answers
+/// its calls' (`Machine::digital`) from there on.
+fn started_at_menu_with(sound: Option<arena::digital::Replay>) -> Option<(App, Driver, Scratch)> {
     let dir = game_dir()?;
     let Some(save) = save_copy() else {
         eprintln!("skipping: no ARENA_SAVE");
@@ -3043,7 +3058,13 @@ fn started_at_menu() -> Option<(App, Driver, Scratch)> {
     let archive = Rc::new(archive::Archive::open(&dir));
     let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
     let mut a = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(save.to_path_buf()), 0, false);
-    a.title_engine = world::title(&dir);
+    a.title_engine = match sound {
+        Some(r) => world::title_sound(&dir, &mut arena::digital::Replayed).map(|mut e| {
+            e.m.digital = Some(r);
+            e
+        }),
+        None => world::title(&dir),
+    };
     assert!(a.title_engine.is_some(), "the program's start to its menu");
     let d = Driver::new(&mut a);
     Some((a, d, save))
@@ -3098,7 +3119,42 @@ fn the_menus_load_at_the_start_as_the_original() {
 /// there in a new game), all 32 EMS banks and the interface.
 #[test]
 fn a_new_game_from_the_menu_as_the_original() {
-    let Some((mut a, _d, _save)) = started_at_menu() else { return };
+    new_game_from_the_menu("creation", None);
+}
+
+/// The same with ARENA.BAT's sound driver loaded as main's command line
+/// loads it (gen_titleplay.py's `creationsound`): creation's vision's
+/// speech played through it, no button pressed (its pages turned as its
+/// parts end), every call into the driver as the original's, and the game
+/// then as the original's.
+#[test]
+#[ignore = "titleplay.txt has no creationsound lines yet (gen_titleplay.py's run with the driver doesn't finish)"]
+fn a_new_game_with_sound_on_as_the_original() {
+    new_game_from_the_menu("creationsound", Some(titleplay_replay("creationsound")));
+}
+
+/// TITLEPLAY's `driver` line for `name`, its runs spelt out.
+fn titleplay_calls(name: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(TITLEPLAY).expect(TITLEPLAY);
+    let line = text.lines().find_map(|l| l.strip_prefix(&format!("driver | {name} | "))).unwrap_or_else(|| panic!("{name}: a driver line"));
+    line.split(' ').filter(|w| !w.is_empty()).flat_map(|w| {
+        let (c, n) = w.split_once('*').map_or((w, 1), |(c, n)| (c, n.parse().unwrap()));
+        std::iter::repeat_n(c.to_string(), n)
+    }).collect()
+}
+
+/// The original driver's answers to `name`'s status calls, in turn.
+fn titleplay_replay(name: &str) -> arena::digital::Replay {
+    let answers = titleplay_calls(name).iter().filter_map(|c| c.strip_prefix("7C=")).map(|v| u16::from_str_radix(v, 16).unwrap()).collect();
+    arena::digital::Replay { answers, calls: Vec::new() }
+}
+
+/// The menu's New on the program's start's game, `name`'s character made
+/// and its vision run, against TITLEPLAY's `name` (and with `sound` its
+/// calls into the driver).
+fn new_game_from_the_menu(name: &str, sound: Option<arena::digital::Replay>) {
+    let with_sound = sound.is_some();
+    let Some((mut a, _d, _save)) = started_at_menu_with(sound) else { return };
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
     let wait_until = |a: &mut App, done: &dyn Fn(&App) -> bool, what: &str| {
         for _ in 0..20_000 {
@@ -3134,7 +3190,15 @@ fn a_new_game_from_the_menu_as_the_original() {
         a.creation_input(create::Input::Wait(50));
     }
     assert!(a.creation.is_none(), "the game not started: {:?}", stage(&a));
-    titleplay_compared("creation", &a, &[0xA83C]);
+    if with_sound {
+        let got = a.engine.m.digital.as_ref().expect("the replay").calls.clone();
+        let want = titleplay_calls(name);
+        if let Some(i) = (0..want.len().max(got.len())).find(|&i| want.get(i) != got.get(i)) {
+            let around = |v: &[String]| v[i.saturating_sub(3)..(i + 3).min(v.len())].join(" ");
+            panic!("{name}: the calls into the sound driver differ from the original's at {i} of {}: {} against the original's {}", want.len(), around(&got), around(&want));
+        }
+    }
+    titleplay_compared(name, &a, &[0xA83C]);
 }
 
 /// A case that ends where a game the title's Load loaded is about to run
@@ -3324,7 +3388,102 @@ impl arena::digital::DigitalDriver for Shared {
     }
 }
 
+/// gen_soundplay.py's vectors: worldframes cases with the sound driver
+/// loaded at the program's start.
+const SOUND_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/soundplay.txt");
+
+/// The cases gen_soundplay.py runs with sound on: footsteps in water, a
+/// door picked and walked through, a fight, a spell.
+const SOUND_CASES: [&str; 4] = ["playswim", "playpick", "playfight", "playcast"];
+
+/// A `driver` line of SOUND_VECTORS, its runs (`7C=2*3`) spelt out.
+fn sound_calls(name: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(SOUND_VECTORS).expect(SOUND_VECTORS);
+    let line = text.lines().find_map(|l| l.strip_prefix(&format!("driver | {name} | "))).unwrap_or_else(|| panic!("{name}: a driver line"));
+    let mut out = Vec::new();
+    for w in line.split(' ').filter(|w| !w.is_empty()) {
+        let (c, n) = w.split_once('*').map_or((w, 1), |(c, n)| (c, n.parse().unwrap()));
+        out.extend(std::iter::repeat_n(c.to_string(), n));
+    }
+    out
+}
+
+/// The original driver's answers to `name`'s status calls (7Ch), in turn,
+/// for the engine's replay (`Machine::digital`).
+fn sound_replay(name: &str) -> arena::digital::Replay {
+    let answers = sound_calls(name).iter().filter_map(|c| c.strip_prefix("7C=")).map(|v| u16::from_str_radix(v, 16).unwrap()).collect();
+    arena::digital::Replay { answers, calls: Vec::new() }
+}
+
+/// The calls the engine made into the driver (`got`) against the
+/// original's (`name`'s line): the first that differs, and around it.
+fn sound_calls_check(name: &str, got: &[String]) {
+    let want = sound_calls(name);
+    if let Some(i) = (0..want.len().max(got.len())).find(|&i| want.get(i) != got.get(i)) {
+        let around = |v: &[String]| v[i.saturating_sub(3)..(i + 3).min(v.len())].join(" ");
+        panic!("{name}: the calls into the sound driver differ from the original's at {i} of {}: {} against the original's {}", want.len(), around(got), around(&want));
+    }
+}
+
+/// With the sound driver loaded at the program's start (gen_soundplay.py:
+/// `world::boot_sound`), the title's Load leaves the game's state as the
+/// original's (`loadstate`, `loadems`: the level's sound files read into
+/// their EMS banks, 23BA:0217), and makes the original's calls into the
+/// driver (`driver | load`: the sound stopped, 23BA:000C; each file
+/// formatted, 85h, its far pointer and handle read from the sound buffer
+/// as the original's are).
+#[test]
+fn the_load_with_sound_on_as_the_original_leaves_it() {
+    SOUND_CASE.with(|c| *c.borrow_mut() = Some(SOUND_CASES[0].into()));
+    let r = played(Place::Guild, |_| {}, |_, _, _| {});
+    SOUND_CASE.with(|c| c.borrow_mut().take());
+    let Some(_) = r else { return };
+    let (mine, banks) = BASE.with(|b| b.borrow_mut().take()).unwrap();
+    sound_calls_check("load", &LOAD_CALLS.with(|c| c.take()));
+    let text = std::fs::read_to_string(SOUND_VECTORS).expect(SOUND_VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("loadstate | ")).expect("a loadstate line");
+    assert_eq!(format!("{:x}", fnv(load_canonical(&game_dir().unwrap(), &mine))), want, "the state after the load with sound on differs from the original's");
+    let want = text.lines().find_map(|l| l.strip_prefix("loadems | ")).expect("a loadems line");
+    assert_eq!(format!("{:x}", fnv(banks)), want, "the EMS banks after the load with sound on differ from the original's");
+}
+
+/// gen_soundplay.py's cases, with sound on: the player's frames, the
+/// calls into the sound driver (each sound, 23BA:002A: the driver asked,
+/// the sample copied from its bank to the driver's buffer, played at its
+/// volume and started), DGROUP from the case's start and from the load,
+/// and the EMS banks, as the original's. (ARENA_CASE: that case alone.)
+#[test]
+fn the_sounds_play_as_the_original() {
+    let only = std::env::var("ARENA_CASE").ok();
+    for name in SOUND_CASES {
+        if only.as_deref().is_some_and(|o| o != name) {
+            continue;
+        }
+        SOUND_CASE.with(|c| *c.borrow_mut() = Some(name.into()));
+        let (place, setup, play) = case(name).unwrap();
+        // (On a page, as the state's comparison has it: the frames' drawing
+        // runs, as the original's.)
+        let Some((a, seen)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a);
+        }, play) else {
+            SOUND_CASE.with(|c| c.borrow_mut().take());
+            return;
+        };
+        assert_eq!(seen, track_in(SOUND_VECTORS, name), "{name}: the player's frames differ from the original's");
+        sound_calls_check(name, &a.engine.m.digital.as_ref().expect("the replay").calls);
+        state_compared_in(SOUND_VECTORS, name, false, case(name).unwrap());
+        state_compared_in(SOUND_VECTORS, name, true, case(name).unwrap());
+        state_ems_in(SOUND_VECTORS, name, case(name).unwrap());
+        SOUND_CASE.with(|c| c.borrow_mut().take());
+    }
+}
+
 thread_local! {
+    /// The case `played` runs with sound on (gen_soundplay.py's).
+    static SOUND_CASE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// The calls the load made into the driver, with sound on.
+    static LOAD_CALLS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The speech's replay the last case made (`SpeechReplay`).
     static SPEECH_REPLAY: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SpeechReplay>>>> = const { std::cell::RefCell::new(None) };
 }

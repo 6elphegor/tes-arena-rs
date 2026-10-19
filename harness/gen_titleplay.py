@@ -22,6 +22,9 @@ banks 0..1Fh (64K each, end to end) and the interface's rows of the page
 
   titleplay | NAME | <DGROUP digest> <EMS digest> <interface digest>
 
+and for `creationsound` its calls into the sound driver (sbdig.py's
+`calls_line`): driver | NAME | ...
+
 With --dump DIR, NAME.ds, NAME.ems and NAME.page (the page whole).
 """
 import os
@@ -32,6 +35,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ
 from emu import LOAD_SEG, STUB_SEG, fnv
 from screens import ScreenArena
+from sbdig import Blaster, SoundArena, DRIVER_LOAD, driver_named
 import gen_worldframes as gw
 
 KEY_L = 0x26
@@ -65,16 +69,24 @@ CASES = {
     'creation': CREATION,
 }
 
+# Run only when named: `creation` with ARENA.BAT's sound driver loaded as
+# main's command line loads it (`program_start`'s `sound`), the vision's
+# speech played through it. (Its run doesn't yet reach the start
+# dungeon: still being looked into.)
+NAMED_ONLY = {'creationsound': CREATION}
+
 # Where main's frame is made (its far call's return, its BP, argc 1).
 FRAME = (0x9000, 0xFF00)
 
 
-def program_start(a):
+def program_start(a, sound=False):
     """The program as far as its main's menu: 21EE:0000 on the memory as
     `init_memory` leaves it, then main from 0000:1059 on a frame of its
     own (BP at FRAME: the saved BP, the far return to STUB_SEG:0, argc 1)
     to the menu's wait (`titled`), the mouse's cursor left to the front end
-as screens.py's `start` leaves it."""
+    as screens.py's `start` leaves it. With `sound` (a SoundArena) ARENA.BAT's
+    sound driver is loaded where main's command line loads it (1194:066A's
+    076D, before 0000:108B), on a Blaster (sbdig.py's `more`)."""
     a.init_memory()
     assert a.run_screen(0x21EE, 0) is None, 'the start waited'
     # The mouse's cursor neither drawn nor taken away (0000:5458, 5422),
@@ -83,17 +95,34 @@ as screens.py's `start` leaves it."""
     a.code_write(a.lin(LOAD_SEG, 0x5458), b'\xc3')
     ss, sp = FRAME
     a.mu.mem_write(a.lin(ss, sp), struct.pack('<5H', 0, 0, STUB_SEG, 1, 0))
-    gw.titled(a, at=0x1059, stack=(ss, sp), regs={'ebp': sp})
+    hooks = []
+    if sound:
+        def load(mu, addr, size, _):
+            # (Once: the run goes on from 108B itself, `press`'s way.)
+            mu.hook_del(hooks.pop())
+            driver_named(a)
+            Blaster(more=True).attach(a)
+            a.pressed = DRIVER_LOAD
+            mu.emu_stop()
+        at = a.lin(LOAD_SEG, 0x108B)
+        hooks.append(a.mu.hook_add(UC_HOOK_CODE, load, None, at, at))
+    try:
+        gw.titled(a, at=0x1059, stack=(ss, sp), regs={'ebp': sp})
+    finally:
+        for h in hooks:
+            a.mu.hook_del(h)
 
 
-def created(a, script):
+def created(a, script, clicks=VISION_CLICKS):
     """`menu_picked` for a new game: the timer (0151) ticking at each read
     of it, as `titled` has it (the story's pictures and the movies wait on
     it), up to the vision's end (0000:1162): from there into the game it
     stands, as `menu_picked` has it for the title's Load; the install's
     speech served (SPEECH\\nnnn_mmX.VOC, as the farewell's case serves
     it); and as the vision's movie begins (2294:0700) its clicks queued at
-    the screen's centre (VISION_CLICKS), none left by the first frame."""
+    the screen's centre (`clicks`, VISION_CLICKS; none with the sound
+    driver, whose speech turns the pages as its parts end), none left by
+    the first frame."""
     speech = os.path.join(a.game_dir, 'SPEECH')
     if os.path.isdir(speech):
         a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
@@ -105,7 +134,7 @@ def created(a, script):
             a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
 
     def movie(mu, addr, size, _):
-        a.clicks = [(160, 100)] * VISION_CLICKS
+        a.clicks = [(160, 100)] * clicks
 
     def seen(mu, addr, size, _):
         ticking[0] = False
@@ -128,14 +157,15 @@ def main():
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     skip = gw.excluded('loadexclude.txt')
     out = open(OUT, 'w', buffering=1)
-    for name, script in CASES.items():
+    for name, script in (CASES | {n: c for n, c in NAMED_ONLY.items() if n in only}).items():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
-        a = ScreenArena(EXE, GAME, SAVE)
-        program_start(a)
-        if name == 'creation':
-            created(a, script)
+        sound = name.endswith('sound')
+        a = SoundArena(EXE, GAME, SAVE) if sound else ScreenArena(EXE, GAME, SAVE)
+        program_start(a, sound)
+        if name.startswith('creation'):
+            created(a, script, 0 if sound else VISION_CLICKS)
         else:
             gw.menu_picked(a, script)
         # The harness's stubs' counters (FFE0..) zeroed, as `start` does.
@@ -146,6 +176,10 @@ def main():
         page = bytes(a.mu.mem_read(a.lin(a.r16(0xA900), a.r16(0xA8FE)), 64000))
         canon = bytes(0 if i in skip else b for i, b in enumerate(ds))
         out.write(f'titleplay | {name} | {fnv(canon):x} {fnv(ems):x} {gw.interface_digest(page):x}\n')
+        if sound:
+            # The calls into the driver from its load on (sbdig.py's
+            # `calls_line`): the vision's speech's among them.
+            out.write(a.blaster.calls_line(name))
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('ds', ds), ('ems', ems), ('page', page)):

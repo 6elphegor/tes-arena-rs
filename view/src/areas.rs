@@ -458,7 +458,7 @@ pub fn new_game_started() {
 /// A character made from the menu's New, on the game as the program's
 /// start left it at the menu: the rest of 0000:1139..117D
 /// (`Machine::new_game_begun`: creation's vision, its pages clicked
-/// through, the game set up, the working slot's files) and main on into
+/// through, or with a sound driver played through, the game set up, the working slot's files) and main on into
 /// the start dungeon (0C66: its run, 0997, and the world's begin and
 /// entry, 0AA9) up to its first frame. None where the port can't follow
 /// (reported).
@@ -469,7 +469,11 @@ pub fn new_game_from_menu(engine: &mut Engine, dir: &Path) -> Option<Run> {
     let mut files = std::mem::take(&mut engine.files);
     let ok = {
         let m = &mut engine.m;
-        let begun = m.new_game_begun(&mut files, &mut arena::vision::ClickThrough::default()).is_some();
+        // (With a sound driver loaded the speech turns the vision's pages
+        // as its parts end, 2294:076C, and no button is pressed: as the
+        // original's played through. Without, the pages clicked through.)
+        let mut hooks: Box<dyn arena::vision::VisionHooks> = if m.digital_loaded() { Box::new(NoClicks) } else { Box::new(arena::vision::ClickThrough::default()) };
+        let begun = m.new_game_begun(&mut files, hooks.as_mut()).is_some();
         let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None };
         if begun {
             m.start_run(h);

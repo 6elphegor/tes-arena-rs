@@ -278,7 +278,7 @@ impl Machine {
         }
         let f = self.mem.r16(DS, 0x05CA) & !0x4000;
         self.mem.w16(DS, 0x05CA, f);
-        self.area_change();
+        self.area_change()?;
         // 1194:4635: a frame of rest (0000:48C9).
         hooks.rest(self, files)?;
         // Levitation (spell flag 80h) and light (100h, the timed flag's
@@ -434,10 +434,12 @@ impl Machine {
         Some(())
     }
 
-    /// 0000:3F7E. Entering the wild (C39A bit 10h) the flats of kind C942
+    /// 0000:3F7E. Entering water (C39A bit 10h) the flats of kind C942
     /// become C942 + 1 across the map, and back on leaving; entering
-    /// makes a sound unless 5CA bit 4.
-    fn area_change(&mut self) {
+    /// makes the splash (sound 17h at the player's square, 3FB8) unless
+    /// 5CA bit 4. None where the sound's volume overflows
+    /// (`Machine::sound_at`).
+    fn area_change(&mut self) -> Option<()> {
         let area = self.mem.r16(DS, LEVEL_FLAGS);
         let last = self.mem.r16(DS, LAST_AREA);
         let k = self.mem.r8(DS, 0xC942);
@@ -455,7 +457,11 @@ impl Machine {
                 self.swap_flats(k, k.wrapping_add(1));
             }
             self.mem.w16(DS, LAST_AREA, area);
+            if self.mem.r16(DS, 0x05CA) & 4 == 0 {
+                self.sound_here(0x17)?;
+            }
         }
+        Some(())
     }
 
     /// 0000:3FE7. Flats (type 8) with low byte `from` get `to`.

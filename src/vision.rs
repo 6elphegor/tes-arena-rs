@@ -136,6 +136,9 @@ impl Machine {
     /// for 9A6E, None leaves them. None where a block isn't had, a file
     /// doesn't load or a path isn't ported.
     pub fn vision(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, dac: Option<&[[u8; 3]; 256]>, ax: u16, si: u16, di: u16) -> Option<()> {
+        if self.digital.is_some() {
+            return self.vision_driven(files, hooks, &mut crate::digital::Replayed, dac, ax, si, di);
+        }
         self.vision_driven(files, hooks, &mut NoDriver, dac, ax, si, di)
     }
 
@@ -243,7 +246,7 @@ impl Machine {
     /// 0000:6546 as the speech's movie runs it: looping (A902 bit 200h),
     /// the mouse read at each frame, the hook (2294:076C) after each, up to
     /// the frame after which the hook ends it (A902 bit 100h), going round
-    /// as often as it takes (64F0). None where the file is missing or not
+    /// as often as it takes (0000:64F0). None where the file is missing or not
     /// a movie.
     fn vision_play(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, driver: &mut dyn DigitalDriver, name: u16) -> Option<()> {
         let Some(handle) = self.file_open_handle(files, name) else {

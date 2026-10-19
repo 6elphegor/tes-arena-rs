@@ -180,7 +180,7 @@ impl Machine {
     /// CyberMan's poll, 2F26:02A1, nothing without one), then each pass:
     /// the left button down ends it; the right button (020E's flags always
     /// have 4000h) leaves it; a key typed (7138), Esc leaving, others
-    /// made capitals (9D74) and looked for among the entries' keys (one
+    /// made capitals (0000:9D74, 0000:9D78) and looked for among the entries' keys (one
     /// byte each at DS:`bx`, as many as the entries, whatever they hold),
     /// picking that entry; otherwise the mouse read again, the cursor
     /// drawn and put back (5454, 541E; the page shown, 9466, the front
