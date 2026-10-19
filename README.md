@@ -338,7 +338,8 @@ At the time of writing:
   - The travel map's texts take the province picture's palette. Its
     passes and the journey's days go a game tick each: the original's loop
     never waits (no retrace or timer read), so they run as fast as the
-    machine, and the view's tick is its own pace.
+    machine, and the view's tick is its own pace. The fades on either
+    side of the days are the original's, retrace by retrace.
   - Fonts are each screen's own as its routine selects them (B036 set
     through 0000:9AE6); no text in the game's files switches font inline
     (0Ch), so that path isn't drawn.
