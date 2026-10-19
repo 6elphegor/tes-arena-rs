@@ -30,10 +30,13 @@
 //!   into the frame with bank [8F5C] mapped, its first word 0 first, 8F5C
 //!   counted round 4, the part's digits at 8F46..8F47 counted on).
 //! - A part played (00DC): bank [8F5A] mapped; where its first word isn't 0
-//!   FFDCh bytes of it copied to the sound's buffer, the sample started
-//!   (the driver's, here none) and 8F5A counted; at an even 8F5A two more
-//!   parts loaded (023F) and 8F5A kept below 4; bank [1030] mapped again.
-//! - The speech put away (014E): with 8F4E set the sound stopped (23BA:000C),
+//!   FFDCh bytes of it copied to the sound's buffer, handed to the sound
+//!   driver as a VOC file (the AIL's 7Bh, from its start) and started
+//!   (7Dh; with no driver both do nothing) and 8F5A counted; at an even
+//!   8F5A two more parts loaded (023F) and 8F5A kept below 4; bank [1030]
+//!   mapped again; the part's first word returned (AX).
+//! - The speech put away (014E): with 8F4E set the sound stopped (23BA:000C:
+//!   where the driver says it plays, 7Ch's 2, 7Eh),
 //!   VISION.EMS read back (two bytes to 8F41, banks 0..3), bank [8F41]
 //!   shifted right by 4 mapped (bug kept: the bank written was 8FA8's, its
 //!   number times 4), the sound's buffer freed and taken again (4E20h
@@ -46,12 +49,18 @@
 //!   a button down after none (4355 0 to 1) the page turned where three
 //!   lines or more are left (084C: [43CE] past three lines, 43D2 three
 //!   fewer, the text's band cleared, the next part played, 00DC), else the
-//!   movie ended (A902 bit 100h); a button held, the lines drawn.
+//!   movie ended (A902 bit 100h); a button held, the lines drawn. With a
+//!   sound driver loaded (8F62) the speech leads instead: a button down
+//!   ends it; with none, while the driver plays (7Ch's 2) the lines drawn,
+//!   and when it doesn't an odd 8F5A's part played next (00DC; with no
+//!   part left, its first word 0, the movie ended), else the page turned
+//!   where three lines or more are left, or the movie ended.
 //!
 //! The pictures (the movie's frames, the lines, the fades) are the front
 //! end's (`VisionHooks`).
 
 use crate::bsa::Files;
+use crate::digital::{DigitalDriver, NoDriver};
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -127,6 +136,14 @@ impl Machine {
     /// for 9A6E, None leaves them. None where a block isn't had, a file
     /// doesn't load or a path isn't ported.
     pub fn vision(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, dac: Option<&[[u8; 3]; 256]>, ax: u16, si: u16, di: u16) -> Option<()> {
+        self.vision_driven(files, hooks, &mut NoDriver, dac, ax, si, di)
+    }
+
+    /// `vision` with the sound driver's answers `driver`'s (src/digital.rs):
+    /// with one loaded (8F62) its parts are played through it and its pages
+    /// turn as they end (2294:076C).
+    #[allow(clippy::too_many_arguments)]
+    pub fn vision_driven(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, driver: &mut dyn DigitalDriver, dac: Option<&[[u8; 3]; 256]>, ax: u16, si: u16, di: u16) -> Option<()> {
         self.mem.w16(DS, MOVIE, di);
         self.mem.w16(DS, SONG, si);
         self.mem.w16(DS, TEXT_NUMBER, ax);
@@ -163,7 +180,7 @@ impl Machine {
         self.sheet_black();
         let v = self.mem.r16(DS, 0xA902) & 0xFBBF;
         self.mem.w16(DS, 0xA902, v);
-        self.vision_movie(files, hooks, block, lines, self.mem.r16(DS, MOVIE))?;
+        self.vision_movie(files, hooks, driver, block, lines, self.mem.r16(DS, MOVIE))?;
         self.heap_free(self.mem.r16(DS, BLOCK));
         self.mem.w16(DS, 0x0D56, d56);
         self.mem.w16(DS, 0xA91A, a91a);
@@ -201,13 +218,13 @@ impl Machine {
 
     /// 2294:0700: the movie named at DS:`name` with the lines at
     /// `seg`:0 (`count` of them) and the speech (see the module).
-    fn vision_movie(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, seg: u16, count: u16, name: u16) -> Option<()> {
+    fn vision_movie(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, driver: &mut dyn DigitalDriver, seg: u16, count: u16, name: u16) -> Option<()> {
         self.key_flush();
         self.mem.w16(DS, LINES, 0);
         self.mem.w16(DS, LINES + 2, seg);
         self.mem.w16(DS, LINES_LEFT, count);
         self.speech_open(files)?;
-        self.speech_next(files)?;
+        self.speech_next(files, driver)?;
         self.select_font(0x102C);
         self.map_bank(self.mem.r16(DS, 0x1030), 0);
         let frame = self.mem.r16(DS, 0x9030);
@@ -218,9 +235,9 @@ impl Machine {
         self.mem.w16(DS, 0xA902, v);
         let a91a = self.mem.r16(DS, 0xA91A);
         self.mem.w16(DS, 0xA91A, 0xA7);
-        self.vision_play(files, hooks, name)?;
+        self.vision_play(files, hooks, driver, name)?;
         self.mem.w16(DS, 0xA91A, a91a);
-        self.speech_close(files)
+        self.speech_close(files, driver)
     }
 
     /// 0000:6546 as the speech's movie runs it: looping (A902 bit 200h),
@@ -228,7 +245,7 @@ impl Machine {
     /// the frame after which the hook ends it (A902 bit 100h), going round
     /// as often as it takes (64F0). None where the file is missing or not
     /// a movie.
-    fn vision_play(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, name: u16) -> Option<()> {
+    fn vision_play(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, driver: &mut dyn DigitalDriver, name: u16) -> Option<()> {
         let Some(handle) = self.file_open_handle(files, name) else {
             return crate::giveup::not_ported("0000:6143: a movie not found (its error drawn)");
         };
@@ -285,7 +302,7 @@ impl Machine {
             if k != 0 {
                 self.mem.w16(DS, crate::title::var::TIMER, 0);
             }
-            self.vision_page(files, hooks)?;
+            self.vision_page(files, hooks, driver)?;
             if self.mem.r16(DS, 0xA902) & 0x100 != 0 {
                 break;
             }
@@ -297,10 +314,46 @@ impl Machine {
         Some(())
     }
 
-    /// 2294:076C, after each of the movie's frames (no sound driver, 8F62
-    /// 0): see the module.
-    fn vision_page(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks) -> Option<()> {
-        if self.mem.r8(DS, crate::controls::var::BUTTONS) & 3 == 0 {
+    /// 2294:076C, after each of the movie's frames: see the module. With
+    /// a sound driver loaded (8F62) a button down ends the speech (083B),
+    /// and with none down its page waits while the part plays (the
+    /// driver's status 2); when it doesn't, an odd part played next is
+    /// played (00DC: none left, its first word 0, ends it), else the page
+    /// turned where three lines or more are left (084C), or the speech
+    /// ended.
+    fn vision_page(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, driver: &mut dyn DigitalDriver) -> Option<()> {
+        let down = self.mem.r8(DS, crate::controls::var::BUTTONS) & 3 != 0;
+        if self.digital_loaded() {
+            if down {
+                self.vision_end(hooks);
+                return Some(());
+            }
+            let handle = self.mem.r16(DS, crate::digital::var::HANDLE);
+            if driver.status(self, handle) == 2 {
+                self.mem.w8(DS, HELD, 0);
+                self.vision_lines_drawn(hooks);
+                return Some(());
+            }
+            // 0819.
+            if self.mem.r16(DS, PLAYING) & 1 != 0 {
+                if self.speech_next(files, driver)? == 0 {
+                    self.vision_end(hooks);
+                } else {
+                    self.mem.w8(DS, HELD, 0);
+                    self.vision_lines_drawn(hooks);
+                }
+                return Some(());
+            }
+            if self.mem.r8(DS, HELD) != 0 {
+                return Some(());
+            }
+            if self.mem.r16(DS, LINES_LEFT) < 3 {
+                self.vision_end(hooks);
+                return Some(());
+            }
+            return self.vision_turn(files, driver);
+        }
+        if !down {
             self.mem.w8(DS, HELD, 0);
             self.vision_lines_drawn(hooks);
             return Some(());
@@ -311,16 +364,30 @@ impl Machine {
         }
         self.mem.w8(DS, HELD, 1);
         if self.mem.r16(DS, LINES_LEFT) < 3 {
-            if self.mem.r16(DS, 0xA902) & 0x200 == 0 {
-                self.mem.w8(DS, HELD, 0);
-                self.vision_lines_drawn(hooks);
-            } else {
-                let v = self.mem.r16(DS, 0xA902) | 0x100;
-                self.mem.w16(DS, 0xA902, v);
-            }
+            self.vision_end(hooks);
             return Some(());
         }
-        // 084C: past three lines (each scan's count shared, 3E8h).
+        self.vision_turn(files, driver)
+    }
+
+    /// 2294:083B: in the looping movie (A902 bit 200h) the speech ended
+    /// (bit 100h set: the movie ends after this frame), else (07A5) the
+    /// lines drawn.
+    fn vision_end(&mut self, hooks: &mut dyn VisionHooks) {
+        if self.mem.r16(DS, 0xA902) & 0x200 == 0 {
+            self.mem.w8(DS, HELD, 0);
+            self.vision_lines_drawn(hooks);
+        } else {
+            let v = self.mem.r16(DS, 0xA902) | 0x100;
+            self.mem.w16(DS, 0xA902, v);
+        }
+    }
+
+    /// 2294:084C: the page turned, past three lines (each scan's count
+    /// shared, 3E8h), three fewer left; the text's band cleared (9A6E: 0,
+    /// A7h, 140h x 20h, with 9288 0 meanwhile and A91A C7h, the front
+    /// end's); the next part played (00DC, its answer not looked at).
+    fn vision_turn(&mut self, files: &mut Files, driver: &mut dyn DigitalDriver) -> Option<()> {
         let (mut di, seg) = (self.mem.r16(DS, LINES), self.mem.r16(DS, LINES + 2));
         let mut cx = 0x3E8u16;
         for _ in 0..3 {
@@ -336,9 +403,7 @@ impl Machine {
         self.mem.w16(DS, LINES, di);
         let left = self.mem.r16(DS, LINES_LEFT).wrapping_sub(3);
         self.mem.w16(DS, LINES_LEFT, left);
-        // 9A6E: the text's band (0, A7h, 140h x 20h) cleared, 9288 0
-        // meanwhile and A91A C7h.
-        self.speech_next(files)?;
+        self.speech_next(files, driver)?;
         Some(())
     }
 
@@ -423,17 +488,24 @@ impl Machine {
         }
     }
 
-    /// 2F75:00DC: the next part played (see the module).
-    fn speech_next(&mut self, files: &mut Files) -> Option<()> {
+    /// 2F75:00DC: the next part played (see the module): its copy handed
+    /// to the driver (7Bh, from its start) and started (7Dh). Its first
+    /// word (AX: 0 for none).
+    fn speech_next(&mut self, files: &mut Files, driver: &mut dyn DigitalDriver) -> Option<u16> {
         self.map_bank(self.mem.r16(DS, PLAYING), 0);
         let frame = self.mem.r16(DS, 0x9030);
-        if self.mem.r16(frame, 0) != 0 {
+        let first = self.mem.r16(frame, 0);
+        if first != 0 {
             // 7702: to the buffer's segment at offset 0.
             let seg = self.mem.r16(DS, SOUND_BUFFER + 2);
             for i in 0..0xFFDCu16 {
                 let b = self.mem.r8(frame, i);
                 self.mem.w8(seg, i, b);
             }
+            let handle = self.mem.r16(DS, crate::digital::var::HANDLE);
+            let (off, seg) = (self.mem.r16(DS, SOUND_BUFFER), self.mem.r16(DS, SOUND_BUFFER + 2));
+            driver.play_voc(self, handle, seg, off, 0xFFFF);
+            driver.start(self, handle);
             let n = self.mem.r16(DS, PLAYING).wrapping_add(1);
             self.mem.w16(DS, PLAYING, n);
         }
@@ -443,12 +515,17 @@ impl Machine {
             self.mem.w16(DS, PLAYING, n);
         }
         self.map_bank(self.mem.r16(DS, 0x1030), 0);
-        Some(())
+        Some(first)
     }
 
-    /// 2F75:014E: the speech put away (see the module).
-    fn speech_close(&mut self, files: &mut Files) -> Option<()> {
+    /// 2F75:014E: the speech put away (see the module); first the sound
+    /// stopped (23BA:000C: the driver's, where it says it plays).
+    fn speech_close(&mut self, files: &mut Files, driver: &mut dyn DigitalDriver) -> Option<()> {
         if self.mem.r8(DS, SPEECH_ON) != 0 {
+            let handle = self.mem.r16(DS, crate::digital::var::HANDLE);
+            if driver.status(self, handle) == 2 {
+                driver.stop(self, handle);
+            }
             let path = self.save_path(KEEP_FILE);
             self.file_open(files, path)?;
             self.file_read(files, DS, SPEECH_NAME, 2);

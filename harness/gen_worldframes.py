@@ -108,7 +108,8 @@ from emu import LOAD_SEG, STUB_SEG, fnv
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
 import unicorn.x86_const as x86
-from screens import ScreenArena, PAGE_SEG_FIELD
+from screens import PAGE_SEG_FIELD
+from sbdig import Blaster, SoundArena, DRIVER_LOAD
 import gen_dungeonscreens as gd
 import gen_screens as gs
 
@@ -523,17 +524,20 @@ def killed(a):
     a.call_far(0x2686, 0x02B4)
 
 
-def died(a, vision=0):
+def died(a, vision=None, driver=False):
     """From the world loop's end (0000:A45D, on the world's stack as
     `area_ended` goes on from it) through the outer loop (0CAD) to its
     death's way out (0CE1..0D43: the clip the screen, the ending's text
     picked, 1194:D459's vision unless F77 is 9, the save's), stopped at its
     RET (0D43), before the program's main takes the game back to its menu
-    (0000:10B0, 108B). With `vision` the timer (0151) ticks at each read
-    of it, as `titled` has it: the vision's movie's frames wait on it;
-    and as the movie begins (2294:0700) that many clicks are queued at the
-    screen's centre, its pages clicked through (the reads of the mouse
-    before it, the world's way out's, take none)."""
+    (0000:10B0, 108B). With `vision` (a count, 0 too) the timer (0151)
+    ticks at each read of it, as `titled` has it: the vision's movie's
+    frames wait on it; and as the movie begins (2294:0700) that many clicks
+    are queued at the screen's centre, its pages clicked through (the
+    reads of the mouse before it, the world's way out's, take none). With
+    `driver` the sound driver is loaded as the vision begins (1194:D459:
+    sbdig.py's `driver_loaded`, the case's Blaster attached), so the
+    speech plays through it."""
     # The dying frame's tick: the harness ticks the timer (0151) at the
     # frame's waits for it (0000:A428, A43D), which a frame that ends the
     # world loop leaves before; the timer ticks all the same, before the
@@ -554,11 +558,21 @@ def died(a, vision=0):
         a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
     def clicks(mu, addr, size, _):
         a.clicks = [(160, 100)] * vision
+    loads = [driver]
+    def load(mu, addr, size, _):
+        # (Once: the run goes on from D459 itself, `press`'s way.)
+        if loads[0]:
+            loads[0] = False
+            a.pressed = DRIVER_LOAD
+            mu.emu_stop()
     hooks = [a.mu.hook_add(UC_HOOK_CODE, out, None, at, at)]
-    if vision:
+    if vision is not None:
         hooks.append(a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1))
         movie = a.lin(LOAD_SEG + 0x2294, 0x0700)
         hooks.append(a.mu.hook_add(UC_HOOK_CODE, clicks, None, movie, movie))
+    if driver:
+        vision_at = a.lin(LOAD_SEG + 0x1194, 0xD459)
+        hooks.append(a.mu.hook_add(UC_HOOK_CODE, load, None, vision_at, vision_at))
     try:
         r = a.run_screen(0, 0xA45D, stack=(ss, sp), count=3_000_000_000)
     finally:
@@ -739,6 +753,19 @@ def farewell(a):
     the read is seen (the DAC, faded to the cleared 929E, is black)."""
     a.mu.mem_write(a.lin(a.ds, 0x0F77), bytes([3]))
     a.mu.mem_write(a.lin(a.ds, 0x9A6E), bytes((i * 7 + 1) & 0x3F for i in range(0x300)))
+
+
+def farewell_sound(a):
+    """`farewell`, with ARENA.BAT's sound driver named as its command line
+    leaves it (-Ssbpdig.adv -IOS220 -IRQS7 -DMAS1: 3827, 386A, 386C,
+    386E) and a Sound Blaster Pro there (sbdig.py's), for the vision to
+    load it (`died`'s `driver`)."""
+    farewell(a)
+    a.mu.mem_write(a.lin(a.ds, 0x3827), b'SBPDIG.ADV\0')
+    a.w16(0x386A, 0x220)
+    a.w16(0x386C, 7)
+    a.w16(0x386E, 1)
+    Blaster().attach(a)
 
 
 def levelled(a):
@@ -1282,6 +1309,13 @@ CASES = {
     # vision (1194:D459) on the way out, its pages clicked through
     # (`vision`: a click at the screen's centre for each).
     'playfarewell': ('dungeon', farewell, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'vision': 8})]),
+    # The same with the sound driver loaded as the vision begins
+    # (`farewell_sound`, `died`'s `driver`): the speech played through it,
+    # its pages turned as its parts end (2294:076C with 8F62 set), no
+    # click; then with one click, which ends it (2294:0789), the part
+    # playing stopped (2F75:014E's 23BA:000C).
+    'playfarewellsound': ('dungeon', farewell_sound, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'vision': 0, 'driver': True})]),
+    'playfarewellsoundclick': ('dungeon', farewell_sound, [((), (), 2, None), ((), (), 1, None, [], {'do': killed, 'dies': True, 'vision': 1, 'driver': True})]),
     # In the mages' guild the load leaves (`guild`), a slot free and
     # seeded: two frames, a potion bought (GUILD_SCRIPT), thirty frames.
     # In the town's first tavern with the main quest's informant there
@@ -1563,10 +1597,10 @@ def play(a, name, steps, tracks):
             # the heap fails.)
             names = dict(a.names)
             speech = os.path.join(a.game_dir, 'SPEECH')
-            if opts.get('vision') and os.path.isdir(speech):
+            if 'vision' in opts and os.path.isdir(speech):
                 a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
             try:
-                died(a, opts.get('vision', 0))
+                died(a, opts.get('vision'), opts.get('driver', False))
             finally:
                 a.names = names
             if opts.get('title'):
@@ -1680,7 +1714,7 @@ def state_line(name, before, after, skip, kind='state'):
 def main():
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
-    a = ScreenArena(EXE, GAME, SAVE)
+    a = SoundArena(EXE, GAME, SAVE)
     rows_watch(a)
     a.start()
     base = a.snapshot()
@@ -1731,6 +1765,11 @@ def main():
         out.write(rows_line(a, name))
         if a.printed:
             out.write(f'printed | {name} | {len(a.printed):x} {fnv(bytes(a.printed)):x}\n')
+        if a.blaster is not None:
+            # The AIL calls the game made into the sound driver, answers
+            # and all (sbdig.py's `calls_line`), for the port's replay.
+            out.write(a.blaster.calls_line(name))
+            a.blaster.detach()
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(state_line(name, a.pre_state[0], after, skip))
         out.write(state_line(name, loaded, after, skip_load, 'stateload'))

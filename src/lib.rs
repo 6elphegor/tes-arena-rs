@@ -18,6 +18,7 @@ pub mod clock;
 pub mod combat;
 pub mod controls;
 pub mod creature;
+pub mod digital;
 pub mod dice;
 pub mod doordraw;
 pub mod dungeon;

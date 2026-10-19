@@ -1983,6 +1983,40 @@ fn case(name: &str) -> Option<Case> {
             m.player_dies();
             d.frame(a);
         })),
+        "playfarewellsound" | "playfarewellsoundclick" => {
+            let name = name.to_string();
+            (Place::Dungeon, Box::new(|a: &mut App| {
+                // `playfarewell`'s, and gen_worldframes.py's
+                // `farewell_sound`: ARENA.BAT's sound driver named as its
+                // command line leaves it.
+                let m = &mut a.engine.m;
+                m.mem.w8(DS, 0x0F77, 3);
+                for i in 0..0x300u16 {
+                    m.mem.w8(DS, 0x9A6E + i, (i * 7 + 1) as u8 & 0x3F);
+                }
+                for (i, &c) in b"SBPDIG.ADV\0".iter().enumerate() {
+                    m.mem.w8(DS, 0x3827 + i as u16, c);
+                }
+                m.mem.w16(DS, 0x386A, 0x220);
+                m.mem.w16(DS, 0x386C, 7);
+                m.mem.w16(DS, 0x386E, 1);
+            }), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                frames(a, d, seen, 2, |_| false);
+                // `playfarewell` with the sound driver loaded as the ending
+                // begins (`areas::SPEECH`), its answers the original's
+                // driver's (`SpeechReplay`, the case's `driver` line); no
+                // click, or one.
+                let replay = std::rc::Rc::new(std::cell::RefCell::new(SpeechReplay::of(&name)));
+                SPEECH_REPLAY.with(|r| *r.borrow_mut() = Some(replay.clone()));
+                let clicks = name == "playfarewellsoundclick";
+                crate::areas::SPEECH.with(|s| *s.borrow_mut() = Some(crate::areas::Speech { driver: Box::new(Shared(replay)), clicks }));
+                let m = &mut a.engine.m;
+                m.mem.w16(DS, arena::character::PLAYER + arena::character::field::HP, 0);
+                m.player_dies();
+                d.frame(a);
+                crate::areas::SPEECH.with(|s| s.borrow_mut().take());
+            }))
+        }
         "playtitle" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             // `playdeath`, then gen_worldframes.py's `titled`: the program's
@@ -3148,6 +3182,105 @@ fn a_death_plays_the_farewell_as_the_original() {
     state_case("playfarewell");
     state_load_case("playfarewell");
     state_ems_case("playfarewell");
+}
+
+/// The same with the sound driver loaded as the ending begins
+/// (`playfarewellsound`: ARENA.BAT's SBPDIG.ADV, run in the harness on a
+/// Sound Blaster Pro, harness/sbdig.py): the speech played through it, its
+/// pages turned as its parts end, no click; then with one click, which
+/// ends it, the part playing stopped (`playfarewellsoundclick`). The
+/// calls the speech makes into the driver, and its state, as the
+/// original's.
+#[test]
+fn a_death_plays_the_farewell_through_the_sound_driver_as_the_original() {
+    for name in ["playfarewellsound", "playfarewellsoundclick"] {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, setup, play) else { return };
+        let replay = SPEECH_REPLAY.with(|r| r.borrow_mut().take()).expect("the speech replayed");
+        let r = replay.borrow();
+        assert!(r.wrong.is_empty(), "{name}: the speech's calls into the driver differ from the original's: {:?}", r.wrong);
+        assert!(r.calls.is_empty(), "{name}: the original made {} calls more, the first {:?}", r.calls.len(), r.calls.front());
+        assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
+        state_case(name);
+        state_load_case(name);
+        state_ems_case(name);
+    }
+}
+
+/// The original's sound driver's answers to the speech (a case's
+/// `driver` line: gen_worldframes.py's, from SBPDIG.ADV run on a Sound
+/// Blaster Pro, harness/sbdig.py), given back in turn, and each call the
+/// speech makes checked against the original's: 7Bh the VOC file handed
+/// (its block, the digest of the FFDCh bytes there), 7Dh, 7Ch (answered
+/// as the original's driver answered), 7Eh. Its load answered as
+/// SBPDIG.ADV answers it: the first handle (0), its descriptor at offset
+/// 73h of its image (its function 64h returns CS:0073).
+struct SpeechReplay {
+    calls: std::collections::VecDeque<String>,
+    image: u16,
+    wrong: Vec<String>,
+}
+
+impl SpeechReplay {
+    fn of(name: &str) -> SpeechReplay {
+        let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+        let line = text.lines().find_map(|l| l.strip_prefix(&format!("driver | {name} | "))).unwrap_or_else(|| panic!("{name}: a driver line"));
+        let mut calls = std::collections::VecDeque::new();
+        for w in line.split(' ') {
+            let (c, n) = w.split_once('*').map_or((w, 1), |(c, n)| (c, n.parse().unwrap()));
+            for _ in 0..n {
+                calls.push_back(c.to_string());
+            }
+        }
+        SpeechReplay { calls, image: 0, wrong: Vec::new() }
+    }
+
+    /// The original's next call, `made` checked against it (a status
+    /// asked, 7C, against its 7C=answer).
+    fn next(&mut self, made: String) -> Option<String> {
+        let want = self.calls.pop_front();
+        let same = want.as_deref().is_some_and(|w| w == made || (made == "7C" && w.starts_with("7C=")));
+        if !same && self.wrong.len() < 8 {
+            self.wrong.push(format!("{made} where the original made {}", want.as_deref().unwrap_or("none")));
+        }
+        want
+    }
+}
+
+/// A `SpeechReplay` the test keeps a hold of while the speech uses it.
+struct Shared(std::rc::Rc<std::cell::RefCell<SpeechReplay>>);
+
+impl arena::digital::DigitalDriver for Shared {
+    fn register(&mut self, _m: &mut arena::machine::Machine, seg: u16, _off: u16) -> u16 {
+        self.0.borrow_mut().image = seg;
+        0
+    }
+    fn describe(&mut self, _m: &mut arena::machine::Machine, _handle: u16) -> (u16, u16) {
+        (self.0.borrow().image, 0x73)
+    }
+    fn detect(&mut self, _m: &mut arena::machine::Machine, _h: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) -> u16 {
+        1
+    }
+    fn init(&mut self, _m: &mut arena::machine::Machine, _h: u16, _io: u16, _irq: u16, _dma: u16, _drq: u16) {}
+    fn play_voc(&mut self, m: &mut arena::machine::Machine, _h: u16, seg: u16, off: u16, block: u16) {
+        let data = (0..0xFFDCu16).map(|i| m.mem.r8(seg, off.wrapping_add(i)));
+        self.0.borrow_mut().next(format!("7B:{block:x}:{:x}", fnv(data)));
+    }
+    fn start(&mut self, _m: &mut arena::machine::Machine, _h: u16) {
+        self.0.borrow_mut().next("7D".into());
+    }
+    fn status(&mut self, _m: &mut arena::machine::Machine, _h: u16) -> u16 {
+        let want = self.0.borrow_mut().next("7C".into());
+        want.and_then(|w| w.strip_prefix("7C=").map(|v| u16::from_str_radix(v, 16).unwrap())).unwrap_or(0)
+    }
+    fn stop(&mut self, _m: &mut arena::machine::Machine, _h: u16) {
+        self.0.borrow_mut().next("7E".into());
+    }
+}
+
+thread_local! {
+    /// The speech's replay the last case made (`SpeechReplay`).
+    static SPEECH_REPLAY: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SpeechReplay>>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// The screens opened in play whose state is the engine's
