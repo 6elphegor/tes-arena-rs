@@ -202,6 +202,10 @@ pub struct Travel {
 /// `journey` lines).
 const TICK_MS: u32 = 55;
 
+/// Screens as shown, each its pixels and 6-bit colours.
+#[cfg(test)]
+pub type Shown = Vec<(Vec<u8>, Vec<u8>)>;
+
 /// A .CIF's frames, each by its coding (type 8 through the port's
 /// decompressor).
 fn cif(m: &Machine, d: &[u8]) -> Vec<Image> {
@@ -761,7 +765,7 @@ impl Travel {
     /// and after them, the days between (`Travel::journey_seen`): its
     /// pixels and 6-bit colours.
     #[cfg(test)]
-    pub fn journey_fades(&self) -> (Vec<(Vec<u8>, Vec<u8>)>, Vec<(Vec<u8>, Vec<u8>)>) {
+    pub fn journey_fades(&self) -> (Shown, Shown) {
         let six = |f: &(Vec<u8>, crate::film::Dac)| (f.0.clone(), f.1.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect());
         (self.journey_lead.iter().map(six).collect(), self.journey_tail.iter().map(six).collect())
     }

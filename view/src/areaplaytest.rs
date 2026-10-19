@@ -31,6 +31,9 @@ fn key(a: &mut App, code: KeyCode, down: bool) {
     a.input(In::Key { code, down, text: None });
 }
 
+/// Screens' pixels' and colours' digests, in turn.
+type Digests = Vec<(u64, u64)>;
+
 thread_local! {
     /// Each frame's 3D view (the engine's page, its first 92h rows) as
     /// the frame left it, for `boxview`.
@@ -47,7 +50,7 @@ thread_local! {
     static JOURNEY: std::cell::RefCell<Vec<(u64, u64)>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The journey's fades before its days and after them, a retrace each
     /// (their pixels' and colours' digests), for `journeyshow`.
-    static JOURNEY_FADES: std::cell::RefCell<(Vec<(u64, u64)>, Vec<(u64, u64)>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+    static JOURNEY_FADES: std::cell::RefCell<(Digests, Digests)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
 }
 
 /// `n` frames as gen_areaplay.py's steps play them, a box read with Space
