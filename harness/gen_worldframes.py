@@ -45,6 +45,12 @@ whose words are the original's heap's segments, which no other layout has:
 
   view3d1 | NAME | <digest>
 
+and, where the case wrote files, each it created or changed (FILE:-
+deleted), by name (`written_line`: SCREENSV.$$2 left out, TEMPSAVE.$$$'s
+third plane zeros where D748 is 0):
+
+  written | NAME | FILE:<size>:<digest> ...
+
 First, DGROUP as the title's Load leaves it (the offsets
 tests/vectors/loadexclude.txt names zeroed; the port's taken to the
 harness's form, its image's segments 1000h higher: worldtest's
@@ -1338,6 +1344,31 @@ def rows_line(a, name):
     return f'rows | {name} | {len(drawn)} {fnv(b"".join(struct.pack("<11H", *v) for v in drawn)):x}\n'
 
 
+def written_line(a, name):
+    """The files the case wrote (created, or changed from what they held
+    as its frames began), by name, each its size and digest; deleted
+    ones `-`. Empty when it wrote none. Two left as the port can't have
+    them: SCREENSV.$$2, the page as the world was left (0000:A611), whose
+    3D view and HUD the port's front end draws, not the page in memory;
+    and TEMPSAVE.$$$'s third plane where the floor plane's segment (D748)
+    is 0, which A665 then writes from 0000:0000, DOS's interrupt table
+    (zeros here, the program's image in the port's memory): counted as
+    zeros."""
+    got = []
+    for k in sorted(set(a.written) | set(a.pre_written)):
+        if k == 'SCREENSV.$$2':
+            continue
+        now, was = a.written.get(k), a.pre_written.get(k)
+        if now is None:
+            got.append(f'{k}:-')
+        elif was is None or bytes(now) != was:
+            data = bytes(now)
+            if k == 'TEMPSAVE.$$$' and a.r16(0xD748) == 0:
+                data = data[:0x10000] + bytes(len(data[0x10000:]))
+            got.append(f'{k}:{len(data):x}:{fnv(data):x}')
+    return f'written | {name} | {" ".join(got)}\n' if got else ''
+
+
 def run_case(a, at, name, setup, steps, tracks):
     a.restore(at)
     a.rows_drawn = []
@@ -1352,6 +1383,8 @@ def run_case(a, at, name, setup, steps, tracks):
     # The state the frames start from (for the state comparison's
     # changes: worldtest's `state_measured`).
     a.pre_state = (bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), b''.join(a.ems_bank(b) for b in range(0x20)))
+    # The files as the frames start (for the `written` line).
+    a.pre_written = {k: bytes(v) for k, v in a.written.items()}
     def no_cursor(*_):
         a.w16(0x7A48, 0xFFFF)
     cursor = a.mu.hook_add(UC_HOOK_CODE, no_cursor, None, a.lin(LOAD_SEG, CURSOR_DRAW), a.lin(LOAD_SEG, CURSOR_DRAW))
@@ -1579,6 +1612,7 @@ def main():
         ems = b''.join(a.ems_bank(b) for b in range(0x20))
         out.write(state_runs('stateems', name, a.pre_state[1], ems))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
+        out.write(written_line(a, name))
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
@@ -1590,6 +1624,10 @@ def main():
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):
                 open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
+            # The files the case wrote, as NAME.file.FILENAME.
+            for k, v in a.written.items():
+                if bytes(v) != a.pre_written.get(k):
+                    open(os.path.join(dump, f'{name}.file.{k}'), 'wb').write(bytes(v))
             # The game's state as the case leaves it, for the view's state
             # comparison (worldtest's `state_measured`): DGROUP, and the
             # EMS banks 0..1Fh.

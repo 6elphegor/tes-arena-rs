@@ -2337,6 +2337,30 @@ fn state_compared(name: &str, from_load: bool) {
     state_compared_in(VECTORS, name, from_load, case(name).unwrap());
 }
 
+/// The files the game wrote, by name.
+fn files_written(f: &arena::bsa::Files) -> std::collections::BTreeMap<String, Vec<u8>> {
+    f.written_names().into_iter().map(|n| (String::from_utf8_lossy(&n).into_owned(), f.written(&n).unwrap().to_vec())).collect()
+}
+
+/// gen_worldframes.py's `written` line from the files before and after:
+/// those created or changed, each its size and digest, deleted ones `-`;
+/// SCREENSV.$$2 left out and TEMPSAVE.$$$'s third plane counted as zeros
+/// where the floor plane's segment `floor` (D748) is 0, as there.
+fn written_line(pre: &std::collections::BTreeMap<String, Vec<u8>>, now: &std::collections::BTreeMap<String, Vec<u8>>, floor: u16) -> String {
+    let names: std::collections::BTreeSet<&String> = pre.keys().chain(now.keys()).filter(|k| *k != "SCREENSV.$$2").collect();
+    names.into_iter().filter_map(|k| match (now.get(k), pre.get(k)) {
+        (None, _) => Some(format!("{k}:-")),
+        (Some(n), was) if was != Some(n) => {
+            let mut d = n.clone();
+            if k == "TEMPSAVE.$$$" && floor == 0 && d.len() > 0x10000 {
+                d[0x10000..].fill(0);
+            }
+            Some(format!("{k}:{:x}:{:x}", d.len(), fnv(d.iter().copied())))
+        }
+        _ => None,
+    }).collect::<Vec<_>>().join(" ")
+}
+
 /// `state_compared` against the vectors at `path`, the case `c`.
 fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let kind = if from_load { "stateload" } else { "state" };
@@ -2354,11 +2378,30 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     let skip = if from_load { state_load_excluded() } else { state_excluded() };
     let (place, setup, play) = c;
     let pre = std::cell::RefCell::new(None);
+    let pre_files = std::cell::RefCell::new(std::collections::BTreeMap::new());
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);
         setup(a);
         *pre.borrow_mut() = Some(grab(a).0);
+        *pre_files.borrow_mut() = files_written(&a.engine.files);
     }, play) else { return };
+    // The files the frames wrote, as the original's (gen_worldframes.py's
+    // `written` line; none where it has none).
+    if path == VECTORS && !from_load {
+        let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "written" && f[1] == name).map_or(String::new(), |f| f[2].to_string());
+        let now = files_written(&a.engine.files);
+        let got = written_line(&pre_files.into_inner(), &now, a.engine.m.mem.r16(DS, 0xD748));
+        // (With ARENA_SCREENS holding gen_worldframes.py's dumps, NAME.file.F
+        // the original's: the engine's beside them as NAME.port.F.)
+        if got != want {
+            if let Ok(d) = std::env::var("ARENA_SCREENS") {
+                for (k, v) in &now {
+                    let _ = std::fs::write(PathBuf::from(&d).join(format!("{name}.port.{k}")), v);
+                }
+            }
+        }
+        assert_eq!(got, want, "{name}: the files written differ from the original's");
+    }
     let before = if from_load { BASE.with(|b| b.borrow_mut().take()).unwrap().0 } else { pre.into_inner().unwrap() };
     let after = grab(&a).0;
     // (The drawing's own setting up, the original's done before the case

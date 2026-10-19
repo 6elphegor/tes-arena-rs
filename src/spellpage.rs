@@ -29,17 +29,21 @@
 //!   already the last and nothing is shown again, the deleted spell's
 //!   page staying up.
 //!
-//! Exit fades to black (1194:55B2), frees the block and puts the
-//! equipment screen back (the screen kept in SPELBOOK.$$$ at 51B8,
-//! EQUIP.IMG's palette, CHARBK00.IMG); 1B46 then leaves the list's top
-//! and mark at 0 and B038 from 103A, and redraws the list (21C2, 1DC8).
-//! The screen's file and the palette 6E38 keeps at 929E are the front
-//! end's.
+//! The page opens by keeping the screen as it stands in SPELBOOK.$$$
+//! (51B8: the page at [A8FE], FA00h bytes). Exit fades to black
+//! (1194:55B2), frees the block and puts the equipment screen back (53E3:
+//! the page read back from SPELBOOK.$$$; then EQUIP.IMG's palette,
+//! CHARBK00.IMG); 1B46 then leaves the list's top and mark at 0 and B038
+//! from 103A, and redraws the list (21C2, 1DC8). The palettes (6E38's
+//! kept at 929E, EQUIP.IMG's) and CHARBK00.IMG are the front end's.
 
 use crate::bsa::Files;
 use crate::format::Arg;
 use crate::machine::Machine;
 use crate::mem::{DATA, DS};
+
+/// "SPELBOOK.$$$" (DS:4B9D).
+const SPELBOOK: u16 = 0x4B9D;
 
 /// DGROUP variables.
 pub mod var {
@@ -78,7 +82,8 @@ pub trait SpellPageHooks {
     fn confirm(&mut self, _m: &mut Machine, _si: u16) -> u16 {
         1
     }
-    /// 1194:55B2 and 53E3..9466: faded out, the equipment screen back.
+    /// 1194:55B2 and 53CA..9466: faded out, EQUIP.IMG's palette and
+    /// CHARBK00.IMG (the page itself read back by the engine, 53E3).
     fn leave(&mut self, _m: &mut Machine) {}
     /// 25FD:0844, 0000:9DD2: `n` bytes of DATA from `off` written to the
     /// file named at DS:`name`.
@@ -124,6 +129,11 @@ impl Machine {
     /// 1194:51D1 with AL `mark`.
     fn spell_page_run(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks, mark: u8) -> Option<()> {
         self.mem.w16(DS, var::BLOCK, 0);
+        // 51B8: the screen as it stands kept in SPELBOOK.$$$ (the page at
+        // [A8FE], FA00h bytes).
+        let path = self.save_path(SPELBOOK);
+        let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
+        self.file_write(files, path, seg, off, 0xFA00);
         self.spell_page_show(files, hooks, mark)?;
         loop {
             let (b, x, y) = hooks.click(self);
@@ -180,6 +190,10 @@ impl Machine {
             hooks.leave(self);
             let block = self.mem.r16(DS, var::BLOCK);
             self.heap_free(block);
+            // 53E3: the screen read back from SPELBOOK.$$$ into the page.
+            let path = self.save_path(SPELBOOK);
+            let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
+            self.file_load(files, path, seg, off)?;
             return Some(());
         }
     }
