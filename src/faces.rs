@@ -148,9 +148,6 @@ impl Machine {
     pub fn faces_draw(&mut self) {
         self.ems_map(BANK);
         let ems = self.mem.r16(DS, 0x9030);
-        // Not over a heap's blocks: a game the port starts without a page
-        // block has A000h there (`page_is_block`).
-        let paged = self.page_is_block();
         let mut di = 0u16;
         // The places go on with the faces drawn, not with FACES: the
         // n'th face drawn goes at the n'th place.
@@ -173,7 +170,7 @@ impl Machine {
                 for _ in 0..n(w) {
                     let b = self.mem.r8(ems, si);
                     si = si.wrapping_add(1);
-                    if b != 0 && paged {
+                    if b != 0 {
                         self.mem.w8(screen, at, b);
                     }
                     at = at.wrapping_add(1);
