@@ -567,7 +567,18 @@ impl arena::spellmaker::SpellmakerHooks for LiveMaker<'_, '_> {
     /// doesn't know the DI the list stores (A872), the pick alone.
     fn list(&mut self, m: &mut Machine, files: &mut Files, si: u16, cx: u16, di: Option<u16>) -> u16 {
         match di {
-            Some(di) => arena::talk::TalkHooks::list(&mut *self.front, m, files, si, cx, di),
+            Some(di) => {
+                // The screen the list covers is the game's page as 68D7
+                // and the name's field left it (its picture, its texts,
+                // the name typed): the talk's lists take the window's
+                // screen into the page first (`box_screen`), which here
+                // would put back what the window last showed over it.
+                if m.page_is_block() {
+                    let page = m.mem.r16(DS, 0xA900);
+                    self.front.drawn = Some((0..0xFA00u16).map(|i| m.mem.r8(page, i)).collect());
+                }
+                arena::talk::TalkHooks::list(&mut *self.front, m, files, si, cx, di)
+            }
             None => {
                 eprintln!("the spellmaker's list: DI not known, the list's state not run");
                 match self.front.talk.as_deref_mut() {

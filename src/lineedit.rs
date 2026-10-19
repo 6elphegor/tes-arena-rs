@@ -33,9 +33,12 @@
 //! ed with the text's colour (9288): as wide as that character (a space's
 //! width plus one at the end, or past 7Fh), as high as the font less a
 //! row, at the text's width up to it. `Machine::edit_cursor` gives its
-//! place; drawing is the front end's, as are the redraws (A0AE: the
-//! screen put back, the text drawn by 9E0A) and the waits (the arrows'
-//! five retraces, 6BE2; Enter let go, ACD1).
+//! place; drawing it is the front end's, as are the redraws while it is
+//! open (A0AE: the screen put back, the text drawn by 9E0A) and the waits
+//! (the arrows' five retraces, 6BE2; Enter let go, ACD1). The screen kept
+//! as it opens (8F2A) and its last redraw as it closes are the game's, on
+//! the page where it is the game's own block: what the field leaves there
+//! a later keep of the page (1194:6B6A's) holds.
 //!
 //! The key interrupt keeps each key's state (ACB5 + scan: FFh down, 0 up)
 //! and, for a key pressed, puts its character (the tables at A944, with
@@ -202,8 +205,9 @@ impl Machine {
     /// 0000:9EE9 to its first key: the field's registers kept, the cursor
     /// put at the click (A1B9) and the text's length taken (9CB0), the
     /// keys flushed (7112), and the screen's block taken from the heap
-    /// (9CD6; the screen kept in it is the front end's). None where the
-    /// heap's chain is broken.
+    /// (9CD6) and the screen under the field kept in it (8F2A, where the
+    /// page is the game's own block). None where the heap's chain is
+    /// broken.
     pub fn edit_open(&mut self, f: &Field) -> Option<()> {
         self.mem.w16(DS, var::X, f.x);
         self.mem.w16(DS, var::Y, f.y);
@@ -226,6 +230,11 @@ impl Machine {
         let seg = self.heap_alloc_high(f.w.wrapping_mul(f.h))?;
         self.mem.w16(DS, var::KEPT, 0);
         self.mem.w16(DS, var::KEPT + 2, seg);
+        // 9F31..9F45: the screen under the field kept in the block (8F2A),
+        // where the page is the game's own.
+        if self.page_is_block() {
+            self.page_rect_save((seg, 0), f.x, f.y, f.w, f.h);
+        }
         Some(())
     }
 
@@ -328,15 +337,22 @@ impl Machine {
 
     /// 0000:A096 on: the keys flushed (7112), the field drawn once more
     /// (A0AE: the screen put back, 59A4, and the text drawn at X, Y, 9E0A;
-    /// the pixels the front end's, the text's state, `text_state_far`,
-    /// the game's) and the screen's block freed (6C36). The text is
+    /// into the page where it is the game's own block, the text's state
+    /// either way) and the screen's block freed (6C36). The text is
     /// DS:`TEXT` as the field left it.
     pub fn edit_close(&mut self) {
         self.key_flush();
         let (x, y) = (self.mem.r16(DS, var::X), self.mem.r16(DS, var::Y));
         let text = (self.mem.r16(DS, var::TEXT_SEG), self.mem.r16(DS, var::TEXT));
-        self.text_state_far(x, y, text);
         let seg = self.mem.r16(DS, var::KEPT + 2);
+        // A0AE: the kept screen put back (59A4) and the text drawn (9E0A),
+        // on the page where it is the game's own; the text's state either
+        // way (`page_text_at`).
+        if self.page_is_block() {
+            let (w, h) = (self.mem.r16(DS, var::W), self.mem.r16(DS, var::H));
+            self.page_rect_put((seg, 0), x, y, w, h);
+        }
+        self.page_text_at(x, y, text);
         self.heap_free(seg);
     }
 

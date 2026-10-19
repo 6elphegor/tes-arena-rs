@@ -3512,7 +3512,6 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-/// (playspellmaker's EMS banks are left out: `EMS_LEFT_OUT`.)
 const BUSY_STATE: [&str; 104] = ["playmidnight", "playdawn", "playholiday", "playstoreclosed", "playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
@@ -3606,18 +3605,10 @@ fn one_case_leaves_the_state_as_the_original() {
 /// (`state_ems_case`).
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
-    for name in BUSY_STATE.into_iter().filter(|n| !EMS_LEFT_OUT.contains(n)) {
+    for name in BUSY_STATE {
         state_ems_case(name);
     }
 }
-
-/// Busy cases whose DGROUP is compared but not their EMS banks:
-/// playspellmaker's bank 1Fh keeps the page as the effect's form finds it
-/// (1194:6B6A), and on the original's page by then are the effects
-/// list's window (1194:5734's box and lines, x 59h..E5h from row 54h)
-/// and the name the line editor drew (9EE5 at (45h, 30h)), both drawn
-/// by the front end here, not on the game's page.
-const EMS_LEFT_OUT: [&str; 1] = ["playspellmaker"];
 
 /// The player killed in the dungeon (`playdeath`): the frame that ends the
 /// world loop, then the outer loop's death (0000:0CE1..0D43, the save's
