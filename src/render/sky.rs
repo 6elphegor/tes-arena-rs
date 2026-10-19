@@ -236,6 +236,18 @@ pub fn image_page(m: &mut Machine, page: &mut [u8], seg: u16, off: u16) -> Vec<&
     gaps
 }
 
+/// 0000:5A66: `w` x `h` from seg:off drawn into `page` (64 KiB, the
+/// screen's segment) at (`x`, `y`), cut to the view (A914..A91A), its 0s
+/// left out; the paths not ported it met.
+#[allow(clippy::too_many_arguments)]
+pub fn clipped_page(m: &Machine, page: &mut [u8], x: u16, y: u16, w: u16, h: u16, seg: u16, off: u16) -> Vec<&'static str> {
+    let mut gaps = Vec::new();
+    let lgts = super::Lgts::default();
+    let mut out = Out { page, gaps: &mut gaps, lgts: &lgts, table: 0 };
+    clipped(m, &mut out, x, y, w, h, seg, off, true);
+    gaps
+}
+
 /// 0000:9A72: a rectangle `w` x `h` of [9288] at (`x`, `y`).
 fn fill(m: &Machine, out: &mut Out, x: u16, y: u16, w: u16, h: u16) {
     if (h as i16) <= 0 {

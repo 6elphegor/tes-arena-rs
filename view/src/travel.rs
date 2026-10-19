@@ -176,6 +176,10 @@ pub struct Travel {
     /// The page the screen's first box opened over (`page`, the journey's
     /// box at 1194:59C8 keeping what it covers of it).
     pub boxed_over: Option<Vec<u8>>,
+    /// The game's page as the first province's map opened left it (its
+    /// picture and its places' icons, 26F7:01CD), where the page is the
+    /// heap's block.
+    pub province_page: Option<Vec<u8>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -377,6 +381,7 @@ impl Travel {
             journey_ms: 0,
             up_ms: 0,
             boxed_over: None,
+            province_page: None,
         }
     }
 
@@ -395,6 +400,10 @@ impl Travel {
         let mut h = Self::hooks(&mut self.boxes, &engine.files);
         if engine.m.travel_province_open(&mut engine.files, &mut h, p, None).is_none() {
             eprintln!("the province's map gave up: {}", arena::giveup::describe());
+        }
+        if self.province_page.is_none() && engine.m.page_is_block() {
+            let seg = engine.m.mem.r16(DS, 0xA900);
+            self.province_page = Some(engine.m.mem.segment(seg)[..64000].to_vec());
         }
         self.province = PICTURES.get(p as usize).and_then(|n| crate::create::image_with_palette(&engine.m, archive, n));
         self.shown = Some(p);

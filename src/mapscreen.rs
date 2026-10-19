@@ -116,8 +116,9 @@ impl Machine {
 
     /// 0000:56C8 with BX bit 2 (not bit 1): the picture named at
     /// DS:`si` loaded whole to the EMS frame's start (0000:742C), its
-    /// header's x, y, width and height to A836..A83C. Its drawing (582C
-    /// unless BX bit 80h), the page shown (bit 40h) and its colours (set,
+    /// header's x, y, width and height to A836..A83C, and unless BX bit
+    /// 80h drawn from there (582C, where the page is the heap's block:
+    /// `page_is_block`). The page shown (bit 40h) and its colours (set,
     /// or faded to with bit 20h, unless bit 10h) are the front end's.
     /// None where the file can't be loaded, or for another BX.
     pub fn picture_to_frame(&mut self, files: &mut Files, si: u16, bx: u16) -> Option<()> {
@@ -130,20 +131,10 @@ impl Machine {
             let v = self.mem.r16(frame, 2 * k);
             self.mem.w16(DS, 0xA836 + 2 * k, v);
         }
+        if bx & 0x80 == 0 && self.page_is_block() {
+            self.page_image(frame, 0);
+        }
         Some(())
-    }
-
-    /// 0000:7428 with ES:DI the EMS frame's start, bank [1030] mapped
-    /// first (0000:5C86) and the bank before mapped again after: the file
-    /// named at DS:`si` (a picture to draw from there, the front end's).
-    fn map_file_to_frame(&mut self, files: &mut Files, si: u16) -> Option<()> {
-        let old = self.ms16(crate::level::var::EMS_MAPPED) >> 2;
-        let bank = self.ms16(0x1030);
-        self.ems_map(bank);
-        let frame = self.ms16(0x9030);
-        let r = self.file_load(files, si, frame, 0).map(|_| ());
-        self.ems_map(old);
-        r
     }
 
     /// 26F7:0000..00A6 whole: the screen's start (`travel_map_begin`'s
@@ -232,7 +223,14 @@ impl Machine {
     /// loop). None where a file is missing or the heap has no room.
     pub fn travel_province_open(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks, p: u8, dac: Option<&[[u8; 3]; 256]>) -> Option<()> {
         self.travel_map_province(files, hooks, p)?;
+        // 01CD..01E4: bank 4 mapped and the page ([A8FE]) copied whole to
+        // the frame's start.
         self.ems_map(4);
+        let (poff, pseg, frame) = (self.ms16(0xA8FE), self.ms16(0xA900), self.ms16(0x9030));
+        for i in 0..64000u16 {
+            let b = self.mem.r8(pseg, poff.wrapping_add(i));
+            self.mem.w8(frame, i, b);
+        }
         self.window_save(KEPT);
         let f = self.ms8(crate::window::var::FLAGS) | 2;
         self.mem.w8(DS, crate::window::var::FLAGS, f);
@@ -386,38 +384,80 @@ impl Machine {
         hooks.resource(self, files, name, 0x84)?;
         hooks.resource(self, files, name, 4)?;
         // 0268: the icons, each list's picture loaded to the frame (0325,
-        // its segment at 8F9C) and its half size at A8BE, A8C0: the
-        // cities (one in the Imperial province), the known dungeons after
-        // the first, the staff's piece's dungeon from STAFDUNG.CIF where
-        // known, the towns and villages but in the Imperial province.
+        // its segment at 8F9C) and its half size at A8BE, A8C0, and drawn
+        // centred on each of its places: the cities (one in the Imperial
+        // province), the known dungeons after the first, the staff's
+        // piece's dungeon from STAFDUNG.CIF where known (its frame for
+        // the province drawn, 1194:5CC8, 5828), the towns and villages
+        // but in the Imperial province.
         let known = crate::travelmap::var::KNOWN_ONLY;
         self.mem.w16(DS, known, 0);
-        self.map_icons(files, 0x6B80, 0x10, 0x0B)?;
+        let cities = if p == 8 { 1 } else { 8 };
+        self.map_icons(files, 0x6B80, 0x10, 0x0B, cities, crate::travelmap::CITIES)?;
         self.mem.w16(DS, known, 1);
-        self.map_icons(files, 0x6B9E, 0x0E, 0x08)?;
+        self.map_icons(files, 0x6B9E, 0x0E, 0x08, 0x0F, 0x1765 + 0x19)?;
         if self.ms8(0x1765 + 0x18) & 2 != 0 {
             self.mem.w32(DS, 0x8F9A, 0);
-            self.map_file_to_frame(files, 0x6ABC)?;
+            let old = self.ms16(crate::level::var::EMS_MAPPED) >> 2;
+            let bank = self.ms16(0x1030);
+            self.ems_map(bank);
+            let frame = self.ms16(0x9030);
+            let r = self.file_load(files, 0x6ABC, frame, 0);
+            if r.is_some() && self.page_is_block() {
+                let si = self.cif_frame(p as u16);
+                self.page_image(frame, si);
+            }
+            self.ems_map(old);
+            r?;
         }
         self.mem.w16(DS, known, 0);
         if p != 8 {
-            self.map_icons(files, 0x6B89, 0x09, 0x0A)?;
-            self.map_icons(files, 0x6B92, 0x08, 0x08)?;
+            self.map_icons(files, 0x6B89, 0x09, 0x0A, 8, 0x150D)?;
+            self.map_icons(files, 0x6B92, 0x08, 0x08, 0x10, 0x15D5)?;
         }
         self.mem.w32(DS, 0x8F9A, 0);
         Some(())
     }
 
-    /// 26F7:0325's state: the icon named at DS:`si` loaded to the frame
-    /// in bank [1030] (`map_file_to_frame`), the frame's segment at 8F9C,
-    /// half its width `w` and height `h` at A8BE and A8C0.
-    fn map_icons(&mut self, files: &mut Files, si: u16, w: u16, h: u16) -> Option<()> {
-        self.map_file_to_frame(files, si)?;
+    /// 26F7:0325: the icon named at DS:`si` loaded to the frame in bank
+    /// [1030] (0000:7428), the frame's segment at 8F9C, half its width
+    /// `w` and height `h` at A8BE and A8C0; then each of the `n` places'
+    /// records from DS:`di` (19h bytes each) drawn on, unless only the
+    /// known are (1294) and it isn't (bit 2 of its +18h): the picture at
+    /// [8F9A] centred on its +14h, +16h, cut to the clip with its 0s left
+    /// out (0000:5A66, where the page is the heap's block). The bank
+    /// before mapped again.
+    fn map_icons(&mut self, files: &mut Files, si: u16, w: u16, h: u16, n: u16, di: u16) -> Option<()> {
+        let old = self.ms16(crate::level::var::EMS_MAPPED) >> 2;
+        let bank = self.ms16(0x1030);
+        self.ems_map(bank);
         let frame = self.ms16(0x9030);
-        self.mem.w16(DS, 0x8F9C, frame);
-        self.mem.w16(DS, 0xA8BE, w >> 1);
-        self.mem.w16(DS, 0xA8C0, h >> 1);
-        Some(())
+        let r = self.file_load(files, si, frame, 0).map(|_| ());
+        if r.is_some() {
+            self.mem.w16(DS, 0x8F9C, frame);
+            self.mem.w16(DS, 0xA8BE, w >> 1);
+            self.mem.w16(DS, 0xA8C0, h >> 1);
+            let only_known = self.ms16(crate::travelmap::var::KNOWN_ONLY) != 0;
+            if self.page_is_block() {
+                let page_seg = self.ms16(0xA900);
+                let mut page: Vec<u8> = (0..64000u32).map(|i| self.mem.r8(page_seg, i as u16)).collect();
+                let (soff, sseg) = (self.ms16(0x8F9A), self.ms16(0x8F9C));
+                let mut rec = di;
+                for _ in 0..n {
+                    if !only_known || self.ms8(rec.wrapping_add(0x18)) & 2 != 0 {
+                        let x = self.ms16(rec.wrapping_add(0x14)).wrapping_sub(self.ms16(0xA8BE));
+                        let y = self.ms16(rec.wrapping_add(0x16)).wrapping_sub(self.ms16(0xA8C0));
+                        crate::render::clipped_page(self, &mut page, x, y, w, h, sseg, soff);
+                    }
+                    rec = rec.wrapping_add(0x19);
+                }
+                for (i, &b) in page.iter().enumerate() {
+                    self.mem.w8(page_seg, i as u16, b);
+                }
+            }
+        }
+        self.ems_map(old);
+        r
     }
 
     /// 26F7:00CE..013D, the screen's end: the area to run next (5E6) from
