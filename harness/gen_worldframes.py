@@ -470,6 +470,16 @@ def riddle_door(a):
     a.w16(0x0102, 0xB000, seg=a.r16(0xD806))
 
 
+def guards_called(a):
+    """The guards called as a crime seen calls them (0000:3F21's for a
+    theft, the hook 0000:3F3B: HALT.VOC through 23BA:012B, then everyone
+    calmed and the guards brought): their countdown (680F) at 1, so the
+    next frame's 3EFA calls the hook at 67EA (its segment relocated)."""
+    a.mu.mem_write(a.lin(a.ds, 0x680F), b'\x01')
+    a.w16(0x67EA, 0x3F3B)
+    a.w16(0x67EC, LOAD_SEG)
+
+
 def corpse_items(a):
     """After the fight, its corpse (the actor at 0C57: its record [+12h]
     in the segment [1042]) given no gold (+407h) and the player's first
@@ -929,6 +939,11 @@ CASES = {
     # The street outside the guild, its first frames, nothing held: the
     # city's 3D view (0000:D502's outdoor half, the sky).
     'playstreet': ('street', None, [((), (), 3, None)]),
+    # Two frames on the street, then the guards called (`guards_called`):
+    # the next frame's countdown reaches them (0000:3EFA), HALT.VOC played
+    # (23BA:012B), the people calmed and the guards brought; three frames
+    # after.
+    'playguards': ('street', None, [((), (), 2, None), ((), (), 4, None, [], {'do': guards_called})]),
     # The street turned north (heading 0): open sky over the houses, a
     # cloud, a lamp post.
     'playsky': ('street', facing(0), [((), (), 3, None)]),

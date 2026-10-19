@@ -25,8 +25,9 @@ fn inc(m: &mut Machine, at: u16) {
 struct Stubs;
 
 impl LevelUpHooks for Stubs {
-    fn sound(&mut self, m: &mut Machine, _si: u16) {
+    fn sound(&mut self, m: &mut Machine, _files: &mut Files, _si: u16) -> Option<()> {
         inc(m, 0xFFE2);
+        Some(())
     }
     fn world_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
     fn keep_screen(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {

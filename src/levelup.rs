@@ -86,8 +86,8 @@ const ITEMS: u16 = 0x0212;
 pub trait LevelUpHooks {
     /// 23BA:012B: the sound named at DS:`si` played (the notice's
     /// FANFARE1.VOC).
-    fn sound(&mut self, m: &mut Machine, si: u16) {
-        m.sound_file(si);
+    fn sound(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<()> {
+        m.sound_file(files, si)
     }
     /// The colours shown (6-bit), which A611 reads to A39E; None leaves
     /// A39E as it is.
@@ -209,7 +209,7 @@ impl Machine {
         let finale = self.l8(0x0FDD) == 0x8E;
         self.mem.w16(DS, FINALE, finale as u16);
         if !finale {
-            self.level_notice(hooks);
+            self.level_notice(files, hooks)?;
         }
         if self.mem.r32(DS, BASE) == 0xFFFF_FFFF && self.mem.r32(DS, BASE + 4) == 0xFFFF_FFFF {
             let max = self.l16(PLAYER + field::MAX_HP);
@@ -375,14 +375,15 @@ impl Machine {
     /// 1194:5E33. The level's notice: its sound, then (1194:42EE) the
     /// text segments B036 (102C) and B038 (1036) and colour 60h set, and
     /// "You have gained a level of experience!" (4F25) in a box.
-    fn level_notice(&mut self, hooks: &mut dyn LevelUpHooks) {
-        hooks.sound(self, 0x4F18);
+    fn level_notice(&mut self, files: &mut Files, hooks: &mut dyn LevelUpHooks) -> Option<()> {
+        hooks.sound(self, files, 0x4F18)?;
         let v = self.l16(0x102C);
         self.mem.w16(DS, TEXT_B036, v);
         let v = self.l16(0x1036);
         self.mem.w16(DS, TEXT_B038, v);
         self.mem.w8(DS, COLOUR, 0x60);
         hooks.message_box(self, 0x4F25);
+        Some(())
     }
 
     /// 1194:7FD3. The worn items taken off, listed at WORN: as many slots

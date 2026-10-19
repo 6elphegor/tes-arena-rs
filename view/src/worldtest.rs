@@ -1035,6 +1035,15 @@ fn levelled(a: &mut App) {
 
 /// gen_worldframes.py's `minute_due`: the clock's last minute (884A) 90
 /// ticks back, so the next frame's minute tick runs.
+/// gen_worldframes.py's `guards_called`: the guards' countdown (680F) at
+/// 1 and their hook at 67EA 0000:3F3B, as a crime seen leaves them.
+fn guards_called(a: &mut App) {
+    let m = &mut a.engine.m;
+    m.mem.w8(DS, 0x680F, 1);
+    m.mem.w16(DS, 0x67EA, 0x3F3B);
+    m.mem.w16(DS, 0x67EC, 0);
+}
+
 fn minute_due(a: &mut App) {
     let m = &mut a.engine.m;
     let t = m.mem.r16(DS, 0x0151).wrapping_sub(0x5A);
@@ -1192,6 +1201,11 @@ fn case(name: &str) -> Option<Case> {
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playguards" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            guards_called(a);
+            frames(a, d, seen, 4, |_| false);
+        })),
         "playfight" => (Place::Dungeon, Box::new(|a: &mut App| {
             brought(a, 1, 1, 0x180);
             captured(a);
@@ -3393,8 +3407,9 @@ impl arena::digital::DigitalDriver for Shared {
 const SOUND_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/soundplay.txt");
 
 /// The cases gen_soundplay.py runs with sound on: footsteps in water, a
-/// door picked and walked through, a fight, a spell.
-const SOUND_CASES: [&str; 4] = ["playswim", "playpick", "playfight", "playcast"];
+/// door picked and walked through, a fight, a spell, a level gained (its
+/// fanfare, FANFARE1.VOC through 23BA:012B), the guards called (HALT.VOC).
+const SOUND_CASES: [&str; 6] = ["playswim", "playpick", "playfight", "playcast", "playlevelup", "playguards"];
 
 /// A `driver` line of SOUND_VECTORS, its runs (`7C=2*3`) spelt out.
 fn sound_calls(name: &str) -> Vec<String> {

@@ -9,7 +9,9 @@ the driver, 85h) and the frames play the level's sounds (23BA:002A: the
 driver asked whether one is playing, 7Ch; the sound's sample copied from
 its bank to the driver's buffer, played, 7Bh, at its volume, 81h, and
 started, 7Dh). Some of gen_worldframes.py's cases are run so (CASES):
-footsteps, a door, a fight, a spell.
+footsteps, a door, a fight, a spell, a level gained and the guards
+called (their files played by name, 23BA:012B: FANFARE1.VOC and
+HALT.VOC read into the buffer and played over any playing).
 
 Each case's lines are gen_worldframes.py's (`track`, `state`,
 `stateload`, `stateems`), its `driver` line the calls into the driver
@@ -30,7 +32,7 @@ from unicorn import UC_HOOK_CODE
 import gen_worldframes as gw
 
 # The cases run with sound on (gen_worldframes.py's).
-CASES = ['playswim', 'playpick', 'playfight', 'playcast']
+CASES = ['playswim', 'playpick', 'playfight', 'playcast', 'playlevelup', 'playguards']
 
 
 def main():
@@ -62,7 +64,7 @@ def main():
             continue
         where, setup, steps = gw.CASES[name]
         if where not in places:
-            places[where] = {'dungeon': gw.gd.dungeon, 'crypt': gw.crypt}[where](a, base)
+            places[where] = {'dungeon': gw.gd.dungeon, 'crypt': gw.crypt, 'street': gw.street}[where](a, base)
         print(name, file=sys.stderr)
 
         tracks = []

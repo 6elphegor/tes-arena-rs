@@ -1055,6 +1055,46 @@ impl Machine {
         Some((seg, off))
     }
 
+    /// 0000:7428 with DI FFFEh: the whole file named at DS:`name` loaded
+    /// into a heap block of its size from the heap's top (last fit,
+    /// 0000:9CD6, taken after the size is found); its (segment, offset 0),
+    /// or None (the original's 0:0 with carry) where it isn't loaded: the
+    /// file missing, 64 KiB or larger (no block then), or read as 0 bytes
+    /// (the block given back, 6C36), after 0000:74E5. Gives up where 74E5
+    /// would call the error hook (set), or no block fits (9CD6's AX 0 with
+    /// EAX's high half as it was, which 7428 reads into).
+    pub fn file_load_high(&mut self, files: &mut Files, name: u16) -> Option<Option<(u16, u16)>> {
+        let failed = |m: &mut Machine| {
+            if m.mem.r32(DS, ERROR_HOOK) != 0 {
+                return crate::giveup::error("0000:74E5: a file not loaded, the error hook set");
+            }
+            Some(None)
+        };
+        let (_, found) = self.file_open_any(files, name)?;
+        if !found {
+            return failed(self);
+        }
+        let size = self.file_seek(files, 2, 0);
+        if size > 0xFFFF {
+            self.file_close(files);
+            return Some(None);
+        }
+        self.mem.w16(DS, OPEN_SIZE, size as u16);
+        self.file_seek(files, 0, 0);
+        let seg = self.heap_alloc_high(size as u16)?;
+        if seg == 0 {
+            self.file_close(files);
+            return crate::giveup::not_ported("0000:9CD6: no room for the file's block: EAX's high half not known");
+        }
+        let n = self.file_read(files, seg, 0, size as u16);
+        self.file_close(files);
+        if n == 0 {
+            self.heap_free(seg);
+            return failed(self);
+        }
+        Some(Some((seg, 0)))
+    }
+
     /// 0000:7428 with DI FFFDh: the whole file named at DS:`name` loaded
     /// into EMS, its size (OPEN_SIZE) allocated there first (0000:5C26,
     /// which maps the bank); its (segment, offset), the segment the

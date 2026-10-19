@@ -63,8 +63,8 @@ pub trait LootHooks {
     /// 0) or written to a buffer (2).
     fn text(&mut self, _m: &mut Machine, _mode: u16) {}
     /// 23BA:012B: the sound named at DS:`si`.
-    fn sound(&mut self, m: &mut Machine, si: u16) {
-        m.sound_file(si);
+    fn sound(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<()> {
+        m.sound_file(files, si)
     }
     /// 1194:D363: the piece completed (`Machine::complete_staff_piece`);
     /// the carry, true where none was ready (then no text).
@@ -707,7 +707,7 @@ impl Machine {
             for i in 0..12 {
                 self.mem.w8(DS, KEYS + i, 0xC5);
             }
-            hooks.sound(self, 0x4C63);
+            hooks.sound(self, files, 0x4C63)?;
             if self.mem.r8(DS, PIECES) == 8 {
                 self.mem.w8(DS, PIECES, 9);
                 hooks.last_piece(self, files)?;

@@ -50,6 +50,9 @@ pub mod var {
     pub const FILE_SLOT: u16 = 0x45F0;
     /// Where the loader keeps FILE_SLOT while the slots are cleared.
     pub const FILE_SLOT_KEPT: u16 = 0x1044;
+    /// The class quiz's VOC file (23BA:0183), a far pointer into its heap
+    /// block, just past the 64 slots.
+    pub const QUIZ_VOC: u16 = 0x46F0;
     /// The EMS banks the sounds go in: the first and how many.
     pub const BANKS: u16 = 0xC8FC;
     /// The sound driver's buffer (far pointer) and its handle.
@@ -88,13 +91,72 @@ const FIGHT_SOUND_AT: u16 = 0xAFC8;
 
 impl Machine {
     /// 23BA:012B. The sound file named at DS:`si` played (with sound on):
-    /// loaded into the driver's buffer and played over any playing.
-    pub fn sound_file(&mut self, si: u16) {
+    /// read whole into the driver's buffer (BUFFER, 0000:7428; a file not
+    /// loaded leaves the buffer as it was and goes on), then played from
+    /// it as 014A plays (`sound_voc`). The file is queued for the front
+    /// end (`sounds`). None where 7428 would call the error hook.
+    pub fn sound_file(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        if self.mem.r16(DS, ENABLED) == 0 {
+            return Some(());
+        }
+        let (off, seg) = (self.mem.r16(DS, BUFFER), self.mem.r16(DS, BUFFER + 2));
+        if off >= 0xFFFD {
+            return crate::giveup::not_ported("0000:7428: the sound buffer one it allocates");
+        }
+        self.file_load_or_carry(files, si, seg, off)?;
+        self.sound_voc(seg, off);
+        let name = self.mem.cstr(DS, si).to_vec();
+        self.sounds.push(Played::File(name));
+        Some(())
+    }
+
+    /// 23BA:0151 (the tail of 012B and 014A): with sound on, the VOC file
+    /// at `seg`:`off` played over any playing: the driver asked what it
+    /// is doing (7Ch), stopped (7Eh) while it plays (2), the file played
+    /// from its start (7Bh, block FFFFh) and started (7Dh).
+    fn sound_voc(&mut self, seg: u16, off: u16) {
         if self.mem.r16(DS, ENABLED) == 0 {
             return;
         }
-        let name = self.mem.cstr(DS, si).to_vec();
-        self.sounds.push(Played::File(name));
+        if self.digital_status() == 2 {
+            self.digital_call(|_| "7E".to_string());
+        }
+        self.digital_call(|m| format!("7B:ffff:{:x}", m.digital_digest(seg, off)));
+        self.digital_call(|_| "7D".to_string());
+    }
+
+    /// 23BA:014A. The VOC file 0183 loaded (its far pointer at QUIZ_VOC)
+    /// played, as 012B plays its buffer: the class quiz's sound for an
+    /// answer (222C:011F).
+    pub fn sound_quiz_play(&mut self) {
+        let (off, seg) = (self.mem.r16(DS, QUIZ_VOC), self.mem.r16(DS, QUIZ_VOC + 2));
+        self.sound_voc(seg, off);
+    }
+
+    /// 23BA:0183. The VOC file named at DS:`si` loaded whole into a block
+    /// at the heap's top (0000:7428 with DI FFFEh, `file_load_high`), its
+    /// far pointer kept at QUIZ_VOC (0:0 where it isn't loaded) and the
+    /// file formatted by the driver (85h, its handle and the pointer),
+    /// sound on or not: the class quiz's (222C:0190, CHOOSE.VOC).
+    pub fn sound_quiz_load(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        let (seg, off) = self.file_load_high(files, si)?.unwrap_or((0, 0));
+        self.mem.w16(DS, QUIZ_VOC, off);
+        self.mem.w16(DS, QUIZ_VOC + 2, seg);
+        let handle = self.mem.r16(DS, DRIVER);
+        self.digital_call(|_| format!("85:{handle:x}:{seg:x}:{off:x}"));
+        Some(())
+    }
+
+    /// 23BA:01A4. The quiz's sound ended: the driver asked what it is
+    /// doing (7Ch) and stopped (7Eh) while it plays (2), sound on or not,
+    /// and the block 0183 loaded it into given back (0000:6C32 with the
+    /// segment at QUIZ_VOC + 2; 0 does nothing): 222C:0176.
+    pub fn sound_quiz_free(&mut self) {
+        if self.digital_status() == 2 {
+            self.digital_call(|_| "7E".to_string());
+        }
+        let seg = self.mem.r16(DS, QUIZ_VOC + 2);
+        self.heap_free(seg);
     }
 
     /// 23BA:002A. Sound `ax` at square `cx`: nothing with sound off, for
