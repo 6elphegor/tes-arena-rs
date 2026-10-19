@@ -992,6 +992,15 @@ fn act(a: &mut App, d: &mut Driver, act: &Act) {
     }
 }
 
+/// gen_worldframes.py's SPELLMAKER_SCRIPT: the guild's Spellmaker, the
+/// spell named "zap", Damage Health added with its first field raised
+/// once, bought, its box clicked away, the spellmaker's Exit, the guild's.
+const SPELLMAKER_SCRIPT: [Act; 16] = [
+    Act::Click(0xA0, 0x74), Act::Click(0x80, 0x34), Act::Key(KeyCode::KeyZ, "z"), Act::Key(KeyCode::KeyA, "a"), Act::Key(KeyCode::KeyP, "p"), Act::Key(KeyCode::Enter, ""),
+    Act::Click(0x20, 0x4B), Act::Click(100, 74), Act::Click(100, 74), Act::Click(100, 38), Act::Click(142, 71), Act::Click(230, 143),
+    Act::Click(0xD8, 0xC0), Act::Click(0xA0, 0x60), Act::Click(0x128, 0xC0), Act::Click(0xA0, 0xA3),
+];
+
 /// gen_worldframes.py's ACCEPT and MORE.
 const ACCEPT: Act = Act::Click(110, 133);
 const MORE: Act = Act::Click(297, 172);
@@ -1126,6 +1135,66 @@ fn guards_called(a: &mut App) {
     m.mem.w8(DS, 0x680F, 1);
     m.mem.w16(DS, 0x67EA, 0x3F3B);
     m.mem.w16(DS, 0x67EC, 0);
+}
+
+/// gen_worldframes.py's `known`: spell number `spell` added to the end
+/// of the player's book (+366h, +367h) and its line the spell picked
+/// last (5CAE), which Shift+C casts.
+fn known(a: &mut App, spell: u8) {
+    let m = &mut a.engine.m;
+    let n = m.mem.r8(DS, 0x01A4 + 0x366);
+    m.mem.w8(DS, 0x01A4 + 0x367 + n as u16, spell);
+    m.mem.w8(DS, 0x01A4 + 0x366, n + 1);
+    m.mem.w8(DS, 0x5CAE, n);
+}
+
+/// gen_worldframes.py's spell numbers (3276:0000's records).
+const LIGHT: u8 = 2;
+const OPEN: u8 = 9;
+const HEAL: u8 = 13;
+const SILENCE: u8 = 31;
+
+/// gen_worldframes.py's spell cases: two frames, Shift+C (2542:056A: the
+/// spell picked last cast without the list, the frame that took the key
+/// counted), the keys let go and `n` frames, the first of them with the
+/// target clicked at the view's centre when `click` (the harness's click
+/// puts the mouse at 160, 100: the window's click is the cursor's point,
+/// 4 down and right of it), then `after` frames.
+fn quick_cast(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, click: bool, n: usize, after: usize) {
+    frames(a, d, seen, 2, |_| false);
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+    assert!(a.panel.is_none(), "no list with a Shift");
+    seen.push(state(a));
+    a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+    if click {
+        a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+        a.input(In::Button { button: MouseButton::Left, down: true });
+        frames(a, d, seen, 1, |_| false);
+        a.input(In::Button { button: MouseButton::Left, down: false });
+        frames(a, d, seen, n - 1, |_| false);
+    } else {
+        frames(a, d, seen, n, |_| false);
+    }
+    frames(a, d, seen, after, |_| false);
+}
+
+/// gen_worldframes.py's `light_ending`: Light cast (29CF:071F), then the
+/// timer of each spell flag it left set (05BE, the table at [1020]) put
+/// at 1 minute.
+fn light_ending(a: &mut App) {
+    let e = &mut a.engine;
+    e.m.cast_spell(&mut e.files, &mut arena::cast::NoCastHooks, LIGHT).expect("Light cast");
+    assert_eq!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "Light waiting for a target");
+    let flags = e.m.mem.r16(DS, 0x05BE);
+    assert_ne!(flags, 0, "Light set no flag");
+    let (off, seg) = (e.m.mem.r16(DS, 0x1020), e.m.mem.r16(DS, 0x1022));
+    for i in 0..16 {
+        if flags & (1 << i) != 0 {
+            e.m.mem.w16(seg, off + 4 * i, 1);
+        }
+    }
 }
 
 fn minute_due(a: &mut App) {
@@ -1368,6 +1437,32 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Button { button: MouseButton::Left, down: false });
             frames(a, d, seen, 9, |_| false);
             frames(a, d, seen, 40, |_| false);
+        })),
+        // gen_worldframes.py's spell cases (`known`, `quick_cast`).
+        "playheal" => (Place::Dungeon, Box::new(|a: &mut App| {
+            a.engine.m.mem.w16(DS, 0x01A4 + 0x59, 0x40);
+            known(a, HEAL);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 20, 0))),
+        "playlight" => (Place::Dungeon, Box::new(|a: &mut App| known(a, LIGHT)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 40, 0))),
+        "playopen" => (Place::Crypt, Box::new(|a: &mut App| {
+            // `locked_door`'s door, a lock of level 5.
+            at_square(a, 13, 4, 0);
+            let m = &mut a.engine.m;
+            let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+            let rec = arena::movement::var::LOCKS + 3 * n as u16;
+            m.mem.w16(DS, rec, 0x0E04);
+            m.mem.w8(DS, rec + 2, 5);
+            m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+            known(a, OPEN);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, true, 10, 20))),
+        "playsilence" => (Place::Dungeon, Box::new(|a: &mut App| {
+            brought(a, 1, 1, 0x100);
+            known(a, SILENCE);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, true, 10, 20))),
+        "playlightout" => (Place::Dungeon, Box::new(light_ending), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            minute_due(a);
+            frames(a, d, seen, 10, |_| false);
         })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
@@ -2312,6 +2407,11 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 7, &GUILD_BAR_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playspellmaker" => (Place::Loaded, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 7, &SPELLMAKER_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
         "playlevelup" => (Place::Dungeon, Box::new(levelled), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             // The next frame's minute tick (gen_worldframes.py's
@@ -3014,7 +3114,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 82] = ["playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY: [&str; 88] = ["playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3124,12 +3224,16 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 87] = ["playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+/// (playspellmaker's state is left out: its track, the files it writes and
+/// the spell made match, but DGROUP's 1B47 and bank 1Fh's copy of the page
+/// don't: the spellmaker's texts (9E06) are drawn by the front end, not on
+/// the game's page, which the bank keeps.)
+const BUSY_STATE: [&str; 92] = ["playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
 /// WALLS_CASES).
-const WALLS_CASES: [&str; 6] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest"];
+const WALLS_CASES: [&str; 7] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playopen"];
 
 /// Those cases leave the walls plane ([D806], the level's width by its
 /// depth in words, C357, C359) as the original's do: the riddle's door
@@ -3147,6 +3251,45 @@ fn the_walls_left_as_the_original() {
         let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "walls" && f[1] == name).unwrap_or_else(|| panic!("{name}: no walls line"))[2].to_string();
         assert_eq!(got, want, "{name}: the walls plane differs from the original's");
     }
+}
+
+/// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
+/// land outside DGROUP and the EMS banks, so the creature segment and
+/// the timers are compared too.
+const SPELL_CASES: [&str; 5] = ["playheal", "playlight", "playopen", "playsilence", "playlightout"];
+
+/// The spell cases leave the eight active creatures' records (0C57's
+/// entries: +12h the record in the segment at [1042], 41Eh bytes) and
+/// the timed spell flags' table ([1020], 9 x 40h bytes) as the
+/// original's do (gen_worldframes.py's `creatures_line`): the touch
+/// spell's flag on its creature, the timers counting.
+#[test]
+fn the_spells_leave_creatures_and_timers_as_the_original() {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut bad = vec![];
+    for name in SPELL_CASES {
+        let Some((place, setup, play)) = case(name) else { return };
+        // With the engine's page, as the state comparison runs (the
+        // touch's target is what the ported renderer's hit test finds).
+        let Some((a, _)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a)
+        }, play) else { return };
+        let m = &a.engine.m;
+        let seg = m.mem.r16(DS, 0x1042);
+        let recs = (0..8u16).flat_map(|k| {
+            let off = m.mem.r16(DS, 0x0C57 + 0x1C * k + 0x12);
+            (0..0x41Eu16).map(move |i| m.mem.r8(seg, off.wrapping_add(i)))
+        });
+        let (toff, tseg) = (m.mem.r16(DS, 0x1020), m.mem.r16(DS, 0x1022));
+        let table = (0..9 * 0x40u16).map(|i| m.mem.r8(tseg, toff.wrapping_add(i)));
+        let got = format!("{:x} {:x}", fnv(recs), fnv(table));
+        let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "creatures" && f[1] == name).unwrap_or_else(|| panic!("{name}: no creatures line"))[2].to_string();
+        if got != want {
+            bad.push(format!("{name}: {got} against the original's {want}"));
+        }
+    }
+    assert!(bad.is_empty(), "the creatures (first digest) or the spell timers (second) differ from the original's: {bad:#?}");
 }
 
 /// Each busy case's frames leave DGROUP as the original's do, from the

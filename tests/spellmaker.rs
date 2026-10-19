@@ -83,7 +83,13 @@ impl SpellmakerHooks for Script {
         self.log.extend([1, form.unwrap_or(0) as u32, x as u32, y as u32]);
         (x, y)
     }
-    fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
+    /// gen_spellmaker.py stubs 9AE6 and 9AF8, and 541E and 56C8 (the
+    /// picture's load).
+    fn font_selected(&mut self, _m: &mut Machine, _ax: u16, _tiles: bool) {}
+    fn picture(&self) -> bool {
+        false
+    }
+    fn list(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16, cx: u16, _di: Option<u16>) -> u16 {
         self.log.extend([2, si as u32, cx as u32]);
         let v = self.lists.get(self.n[1]).copied().unwrap_or(0xFFFF);
         self.n[1] += 1;
