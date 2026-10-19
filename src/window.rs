@@ -223,7 +223,7 @@ impl Machine {
         self.mem.w8(DS, FLAGS, f);
     }
 
-    /// 3159:046E: the masks' block freed (its segment, where set), B7C4
+    /// 3159:046E: the masks' block freed (its segment, where set: 3159:0483), B7C4
     /// bit 0 and the block's pointer cleared.
     pub fn window_masks_free(&mut self) {
         let seg = self.mem.r16(DS, MASKS.wrapping_add(2));

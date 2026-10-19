@@ -1195,7 +1195,8 @@ impl Machine {
         self.line_to(0x0C, y);
     }
 
-    /// 0000:7334: a line from (ADB6, ADB8) to (`ax`, `bx`) in [9288],
+    /// 0000:7334 (its body 7338, the steps 0000:73E6): a line from
+    /// (ADB6, ADB8) to (`ax`, `bx`) in [9288],
     /// drawn from whichever end is higher on the page (the lower y, the
     /// other where they're level) one pixel a step of the longer axis,
     /// that many steps (the far end left undrawn; scaled by ADBA / 100h
@@ -1452,9 +1453,9 @@ impl Machine {
 
     /// 1194:16AA: the clothes' names by sex (1D22) and the doll (23E5):
     /// bank 17h mapped, the worn items counted (129D), the face unless a
-    /// helmet (type 5, kind 0) is worn (1687: SAVEFACE.$$$), the trousers,
+    /// helmet (type 5, kind 0) is worn (1194:1687: SAVEFACE.$$$), the trousers,
     /// a worn shirt's item (type 2, kind 0: 2187) under the shirt, then
-    /// each worn item of the first [129D] slots but such shirts (2451).
+    /// each worn item of the first [129D] slots but such shirts (1194:2451).
     pub(crate) fn sheet_doll(&mut self, files: &mut Files) -> Option<()> {
         self.sheet_clothes();
         self.doll_drawn(files)

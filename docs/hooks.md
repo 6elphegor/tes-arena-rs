@@ -114,7 +114,7 @@ the original routine:
 | `EngineHooks::step` | src/engine.rs:59 |  | stub | a test's stand-in; false lets the engine run the step | |
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |
 | `FightHooks::fight_graphics` | src/encounter.rs:48 | 0000:1AF9 | port | the default runs the port | |
-| `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's | |
+| `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's (kept with a replay: soundplay vectors) | |
 | `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
 | `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
 | `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
@@ -177,22 +177,22 @@ the original routine:
 | `LightHooks::sky` | src/light.rs:53 | 2294:0341 | overridden | the view: main.rs LightState | faithful: the dither loaded after the frame (playnight, state tests) |
 | `LightHooks::sky_objects` | src/light.rs:48 | 2294:08B9 | overridden | the view: main.rs LightState | faithful: `sky_objects` (playsky exact) |
 | `LightHooks::weather_palette` | src/light.rs:66 | 0000:7534 and 9B56 | elsewhere | PAL.COL's palette: the view sets its palette from its assets | |
-| `LoadHooks::automap_area` | src/load.rs:121 | 0000:3503 | port | the default runs the port | |
-| `LoadHooks::automap_keep` | src/load.rs:81 | 23F1:0178 | port | the default runs the port | |
-| `LoadHooks::citydata` | src/load.rs:93 | 242A:000E | port | the default runs the port | |
-| `LoadHooks::copy_file` | src/load.rs:111 | 25FD:056F | port | the default runs the port | |
-| `LoadHooks::exists` | src/load.rs:73 | 0000:600C | port | the default runs the port | |
-| `LoadHooks::interior_song` | src/load.rs:126 | 25FD:051F | port | the default runs the port | |
-| `LoadHooks::level_automap` | src/load.rs:116 | 292B:09AC | port | the default runs the port | |
-| `LoadHooks::loading` | src/load.rs:85 | 25FD:0803 | present | "Loading..." shown | |
-| `LoadHooks::message` | src/load.rs:78 | 1194:59C8 | elsewhere | the view's save menu shows the empty slot's words (`SaveUi::empty_slot`) | |
-| `LoadHooks::mode_3d` | src/load.rs:132 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
-| `LoadHooks::renderer` | src/load.rs:108 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
-| `LoadHooks::screen` | src/load.rs:101 | 0000:A5D1 | present | the view's screen set up | |
-| `LoadHooks::sky_graphics` | src/load.rs:106 | 0000:E5C9 | overridden | the view: areas.rs Areas<'_> | faithful: `sky_images` where the load runs it (25FD:0417, AA5C); was the assets' own after the load (savefiles.txt `loadplace`) |
-| `LoadHooks::slot_files` | src/load.rs:88 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
-| `LoadHooks::sound_off` | src/load.rs:70 | 23BA:000C | present | the sound stopped | |
-| `LoadHooks::view_update` | src/load.rs:103 | 0000:DA8E | present | the view updated | |
+| `LoadHooks::automap_area` | src/load.rs:123 | 0000:3503 | port | the default runs the port | |
+| `LoadHooks::automap_keep` | src/load.rs:83 | 23F1:0178 | port | the default runs the port | |
+| `LoadHooks::citydata` | src/load.rs:95 | 242A:000E | port | the default runs the port | |
+| `LoadHooks::copy_file` | src/load.rs:113 | 25FD:056F | port | the default runs the port | |
+| `LoadHooks::exists` | src/load.rs:75 | 0000:600C | port | the default runs the port | |
+| `LoadHooks::interior_song` | src/load.rs:128 | 25FD:051F | port | the default runs the port | |
+| `LoadHooks::level_automap` | src/load.rs:118 | 292B:09AC | port | the default runs the port | |
+| `LoadHooks::loading` | src/load.rs:87 | 25FD:0803 | present | "Loading..." shown | |
+| `LoadHooks::message` | src/load.rs:80 | 1194:59C8 | elsewhere | the view's save menu shows the empty slot's words (`SaveUi::empty_slot`) | |
+| `LoadHooks::mode_3d` | src/load.rs:134 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
+| `LoadHooks::renderer` | src/load.rs:110 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
+| `LoadHooks::screen` | src/load.rs:103 | 0000:A5D1 | present | the view's screen set up | |
+| `LoadHooks::sky_graphics` | src/load.rs:108 | 0000:E5C9 | overridden | the view: areas.rs Areas<'_> | faithful: `sky_images` where the load runs it (25FD:0417, AA5C); was the assets' own after the load (savefiles.txt `loadplace`) |
+| `LoadHooks::slot_files` | src/load.rs:90 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
+| `LoadHooks::sound_off` | src/load.rs:70 | 23BA:000C | port | the default runs the port (`sound_stop`: the driver asked, 7Ch, and stopped while it plays, 7Eh; no game state, its calls kept with a replay: soundplay vectors' `driver | load`) | |
+| `LoadHooks::view_update` | src/load.rs:105 | 0000:DA8E | present | the view updated | |
 | `LootHooks::last_piece` | src/loot_window.rs:75 | 1194:D986 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
 | `LootHooks::list` | src/loot_window.rs:58 | 1194:5734 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
 | `LootHooks::message_box` | src/loot_window.rs:55 | 1194:59CC | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
