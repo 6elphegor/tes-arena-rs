@@ -1310,14 +1310,10 @@ impl Machine {
         let mut n = step * 15 + row * 3;
         if row != 1 {
             // Bug kept: DS is the frame here, so 0000:6EEA's RNG is the
-            // one at frame:91F0..91F8, made from the file's bytes, and
-            // stepped there. With its table on (91F0) not followed.
-            if self.mem.r16(frame, 0x91F0) != 0 {
-                return crate::giveup::not_ported("1194:D105: the informant's line with its table on: not followed");
-            }
-            let mut rng = crate::random::ArenaRandom::new(self.mem.r32(frame, 0x91F6));
-            let r = rng.range(0, 3)?;
-            self.mem.w32(frame, 0x91F6, rng.seed);
+            // one at frame:91EE..91F9, made from the file's bytes, and
+            // stepped there: its table (a far pointer at 91EE, on where
+            // 91F0 isn't 0) read and refilled there too.
+            let r = self.cr_range_in(frame, 0, 3)?;
             n = n.wrapping_add(r);
         }
         let si = self.skip_strings(frame, 0, n);

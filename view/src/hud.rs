@@ -245,12 +245,6 @@ fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, 
 /// 88h, B5h, E2h).
 pub const DIALOG_BUTTONS: u16 = 0xFFFE;
 
-/// `Menu::kind` of a quest's yes or no in its text's window (1194:4E88
-/// by `QuestHooks::dialog`), which the view asks as a column of boxes:
-/// not 1194:020E's menu, so neither its right button nor its clicks by
-/// y.
-pub const WINDOW_YES_NO: u16 = 0xFFFD;
-
 /// A `DIALOG_BUTTONS` question: `lines` (the text 4E54 split, at most
 /// three shown) and the buttons' names.
 pub fn dialog_buttons(lines: &[&[u8]], buttons: &[&str]) -> Menu {
@@ -1219,20 +1213,16 @@ pub fn menu_pick(font: &Font, hud: &Hud, x: i32, y: i32) -> Option<usize> {
     if menu.list {
         return line_clicked(st, menu, list_font(st, menu), x, y);
     }
-    let boxes = menu_boxes(st, menu, hud).1;
-    if menu.kind == WINDOW_YES_NO {
-        return boxes.iter().position(|r| x >= r.0 && x < r.0 + r.2 && y >= r.1 && y < r.1 + r.3);
-    }
-    custom::menu_entry(&boxes, y)
+    custom::menu_entry(&menu_boxes(st, menu, hud).1, y)
 }
 
 /// Whether the right button or Esc leaves the list `menu` (its record's
 /// flag 4000h, 3159:096D: every record but the classes' at 515A, kind
 /// 6); a menu (1194:020E's 0F2A, flags 4006h) always leaves; the
-/// dialog's buttons (1194:6001: either button clicks) and a quest's
-/// window never.
+/// dialog's buttons (1194:6001: either button clicks, the shops' and a
+/// quest's) never.
 pub fn leaves(menu: &Menu) -> bool {
-    if matches!(menu.kind, DIALOG_BUTTONS | WINDOW_YES_NO) && !menu.list {
+    if menu.kind == DIALOG_BUTTONS && !menu.list {
         return false;
     }
     if !menu.list {

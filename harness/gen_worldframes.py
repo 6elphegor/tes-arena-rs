@@ -742,6 +742,13 @@ def minute_due(a):
     a.w16(0x884A, (a.r16(0x0151) - 0x5A) & 0xFFFF)
 
 
+def informant_owed(a):
+    """`informant`, met before and his price agreed (0FE6 bit 0): he is
+    paid for rather than haggled with (1194:CED7 -> D019)."""
+    informant(a)
+    a.mu.mem_write(a.lin(a.ds, 0x0FE6), bytes([3]))
+
+
 def informant(a):
     """The main quest's informant in this tavern, as a rumour's offer
     leaves one (1194:CD9A): the step Rajhin's ring's (0FDD 0Fh), the
@@ -779,6 +786,12 @@ STORE_SCRIPT = [('click', 0xA0, 0x43), ('click', 0xA0, 0x65), ('click', 0x70, 0x
 # his words paged ("...More" twice), his price accepted, the rest of his
 # words paged to the tavern's menu; its Exit.
 INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
+# The same informant already haggled with and owed his price (0FE6 bit 0,
+# `informant_owed`): YESNO.IMG and his offer (1194:D019) paged once (4E88's
+# "...More"), Yes on the picture's first button (13D3 1: 1194:6001), his
+# words after paged (three pages, then kind 0's wait for a click, 4F3F),
+# the tavern's menu; its Exit.
+INFORMANT_PAID_SCRIPT = [MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
 TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 95), ('click', 100, 95), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
@@ -1252,6 +1265,7 @@ CASES = {
     # first, 1194:CED7: his price haggled and accepted, the dungeon told),
     # thirty frames.
     'playinformant': ('tavern', informant, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_SCRIPT)})]),
+    'playinformantpaid': ('tavern', informant_owed, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_PAID_SCRIPT)})]),
     'playguild': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_SCRIPT)})]),
     # In the town's first temple: two frames, a service (the keeper's
     # click, 1194:C258), thirty frames. Heal with the player hurt
