@@ -228,7 +228,13 @@ def load_line(exe, game, save, name, saved, skip, dump=None):
         b = ScreenArena(exe, game, tmp)
         b.start(5)
         seed = struct.unpack('<I', b.mu.mem_read(b.lin(b.ds, SEED), 4))[0]
-        ds = bytes(b.mu.mem_read(b.lin(b.ds, 0), 0x10000))
+        ds = bytearray(b.mu.mem_read(b.lin(b.ds, 0), 0x10000))
+        # The game state's words holding DGROUP's segment as the save
+        # brought them back (ENGINE_SEGS), the port's DGROUP.
+        for off in ENGINE_SEGS:
+            if struct.unpack_from('<H', ds, off)[0] == DGROUP + LOAD_SEG:
+                struct.pack_into('<H', ds, off, DGROUP)
+        ds = bytes(ds)
         frames = []
         if name in FRAMES:
             frames = load_frames(b, FRAMES[name])

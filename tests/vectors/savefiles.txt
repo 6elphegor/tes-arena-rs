@@ -120,7 +120,7 @@ save | savemidnight | AUTOMAP.05 20040 7b1d25cc3490e935
 save | savemidnight | CITYDATA.05 2b2c 60b03b3f356fd1e4
 save | savemidnight | LOG.05 801 560dadd0d3e0ffa9
 save | savemidnight | NAMES.DAT 1e0 135b60819fc85484
-save | savemidnight | SAVEENGN.05 463f c433c3a7d6fd8d49
+save | savemidnight | SAVEENGN.05 463f 62a7ee9cd82fe2d9
 save | savemidnight | SAVEGAME.05 28ae7 877b874a13eef03e
 save | savemidnight | SPELLS.05 aa0 f7dcb810b229e795
 save | savemidnight | SPELLSG.05 2a80 f218f906c87ea04d
@@ -130,7 +130,7 @@ save | savemidnight | WILD002.05 0 cbf29ce484222325
 save | savemidnight | WILD003.05 0 cbf29ce484222325
 save | savemidnight | WILD004.05 0 cbf29ce484222325
 savedel | savemidnight | 
-loadplace | savemidnight | 19b76141 | b7820a5a4110f4ab
+loadplace | savemidnight | 19b76141 | 78e41c32d75fcedb
 loadframe | savemidnight | 1 | 87128aa3121744ac f5a121d65b18afb7
 loadframe | savemidnight | 2 | 9107b9d5c662bc8f f5a121d65b18afb7
 loadframe | savemidnight | 3 | c8b8248a844bb85e f5a121d65b18afb7
@@ -142,7 +142,7 @@ save | savelight | AUTOMAP.64 20040 e442b5531e499dfa
 save | savelight | CITYDATA.05 2b2c 60b03b3f356fd1e4
 save | savelight | LOG.05 801 560dadd0d3e0ffa9
 save | savelight | NAMES.DAT 1e0 135b60819fc85484
-save | savelight | SAVEENGN.05 463f 5386093d000a07f1
+save | savelight | SAVEENGN.05 463f 63784a52183b9061
 save | savelight | SAVEGAME.05 28ae7 8473cfeab5df1663
 save | savelight | SPELLS.05 aa0 f7dcb810b229e795
 save | savelight | SPELLSG.05 2a80 f218f906c87ea04d
@@ -152,7 +152,7 @@ save | savelight | WILD002.05 0 cbf29ce484222325
 save | savelight | WILD003.05 0 cbf29ce484222325
 save | savelight | WILD004.05 0 cbf29ce484222325
 savedel | savelight | 
-loadplace | savelight | 19b76141 | 897d9f6946466d14
+loadplace | savelight | 19b76141 | 6aa62e056e83b304
 play | savequest | LOG.64 91e a2be705ffb58ac8f
 play | savequest | TMP2.$$$ fa00 98e7d995733ab27
 playdel | savequest | 
