@@ -86,7 +86,6 @@ const CLASS_NAMES: u16 = 0x2A62;
 const RACES: u16 = 0x2B49;
 const PROVINCES: u16 = 0x2F06;
 /// The region tables (3276), records of 62h bytes: x, y, width, height.
-const MAP_REGIONS: u16 = 0x5B80;
 const STAT_REGIONS: u16 = 0x5312;
 const FACE_REGIONS: u16 = 0x5E90;
 const REGION: u16 = 0x62;
@@ -353,6 +352,9 @@ pub struct Creation {
     /// The name's field was ended empty and the name asked again
     /// (1194:2789), for the input's film.
     asked_again: bool,
+    /// The map's window is up on the game (1194:286B..288E,
+    /// `creation_map_window`), for the clicks on it.
+    map_window: bool,
     /// The text colour now (9288).
     colour: u8,
     /// The movie playing (Intro, Vision, Ending).
@@ -653,7 +655,7 @@ impl Creation {
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let quote = image_with_palette(m, &archive, "QUOTE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -736,7 +738,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false }
     }
 
     /// Whether the menu's Start was picked since last asked: the window
@@ -1373,6 +1375,13 @@ impl Creation {
         if !self.boxes.is_empty() {
             if matches!(inp, Input::Enter | Input::Esc | Input::Char(b' ') | Input::Click(..)) {
                 self.boxes.pop_front();
+                // The map's box taken (1194:2868): its window up.
+                if self.boxes.is_empty() && matches!(self.stage, Stage::Map) && !self.map_window {
+                    if engine.m.creation_map_window(&mut engine.files).is_none() {
+                        eprintln!("the map's window gave up: {}", arena::giveup::describe());
+                    }
+                    self.map_window = true;
+                }
             }
             return;
         }
@@ -1524,13 +1533,21 @@ impl Creation {
                 Some(s) if s < 2 => {
                     let name = self.name.clone();
                     engine.m.name_and_sex(name.as_bytes(), s as u8);
+                    if engine.m.creation_map(&mut engine.files).is_none() {
+                        eprintln!("the map's screen gave up: {}", arena::giveup::describe());
+                    }
                     self.map_screen(engine)
                 }
                 _ => Stage::Gender(ask),
             },
+            // The window's loop (3159:000C): a click on a province's
+            // pixels (019A, the masks) is its handler's (1194:28F6).
             Stage::Map => match inp {
-                Input::Click(x, y) => match self.region(&engine.m, MAP_REGIONS, 8, x, y) {
-                    Some(p) => self.province_clicked(engine, p as u8),
+                Input::Click(x, y) if self.map_window => match engine.m.creation_map_click(x as u16, y as u16) {
+                    Some(p) => {
+                        self.map_window = false;
+                        self.province_clicked(engine, p)
+                    }
                     None => Stage::Map,
                 },
                 _ => Stage::Map,

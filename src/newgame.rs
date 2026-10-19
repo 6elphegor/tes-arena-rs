@@ -529,6 +529,129 @@ impl Machine {
         self.mem.w8(DS, PLAYER + rec::SEX, sex);
     }
 
+    /// 1194:27C2..2836, the map's screen made once the sex is given: the
+    /// colours at 929E black and the page cleared (55B2, its fade the
+    /// front end's), the page cleared again (9426); in bank [1030] the
+    /// frame cleared (77C8) and, the frame made the page meanwhile,
+    /// TAMRIEL.MNU (3EE6) and NOEXIT.IMG (3EC4) each loaded to a heap
+    /// block from its top and drawn there (56C8 with BX 0: 742C with DI
+    /// FFFEh, 5828, the block freed; their colours, 9B56, the VGA's); in
+    /// bank [1032] TAMRIEL.MNU loaded to the frame's start undrawn (BX
+    /// 84h); then the parchment's unrolling (1194:5B58).
+    pub fn creation_map(&mut self, files: &mut Files) -> Option<()> {
+        self.sheet_black();
+        self.page_clear();
+        let frame = self.mem.r16(DS, 0x9030);
+        self.ems_map(self.mem.r16(DS, 0x1030));
+        for i in 0..0xFA00u16 {
+            self.mem.w8(frame, i, 0);
+        }
+        let page = self.mem.r16(DS, 0xA900);
+        for si in [0x3EE6, 0x3EC4] {
+            self.mem.w16(DS, 0xA900, frame);
+            let r = self.picture_heap_drawn(files, si);
+            self.mem.w16(DS, 0xA900, page);
+            r?;
+        }
+        self.ems_map(self.mem.r16(DS, 0x1032));
+        self.picture_to_frame(files, 0x3EE6, 0x84)?;
+        self.ems_map(self.mem.r16(DS, 0x1030));
+        self.parchment_unrolled(files)
+    }
+
+    /// 0000:56C8 with BX 0: the picture named at DS:`si` loaded whole to a
+    /// heap block from its top (742C with DI FFFEh: 9CD6), its header's
+    /// x, y, width and height to A836..A83C, drawn from there into the
+    /// page ([A900]: the EMS frame here, which 5828 writes as it would any
+    /// other), the block freed (6C36: not the frame's). Its colours
+    /// (9B56) are the VGA's. None where the file can't be loaded.
+    fn picture_heap_drawn(&mut self, files: &mut Files, si: u16) -> Option<()> {
+        let seg = self.load_alloc_high(files, si);
+        if seg == 0 {
+            return crate::giveup::not_ported("0000:742C: a picture with no room on the heap, or no file");
+        }
+        for k in 0..4u16 {
+            let v = self.mem.r16(seg, 2 * k);
+            self.mem.w16(DS, 0xA836 + 2 * k, v);
+        }
+        let dest = self.mem.r16(DS, 0xA900);
+        let mut px: Vec<u8> = (0..64000u32).map(|i| self.mem.r8(dest, i as u16)).collect();
+        crate::render::image_page(self, &mut px, seg, 0);
+        for (i, &b) in px.iter().enumerate() {
+            self.mem.w8(dest, i as u16, b);
+        }
+        self.heap_free(seg);
+        Some(())
+    }
+
+    /// 1194:5B58 with SI 3F16, as the state has it: TOP.DFA loaded to the
+    /// frame's start with bank 2 mapped (7428); D6h steps, each the first
+    /// frame's y (+4) set to the step's (FFF1h on), the DFA's frame A896
+    /// drawn (5526) and A896 counted on modulo 10h, the rows the scroll
+    /// has passed copied from bank [1030]'s frame (7702, 94EE); then that
+    /// frame drawn whole over the page (5998) and bank 2 mapped again.
+    /// The page's rows are the front end's but the last drawing's, the
+    /// frame over it whole where the page is the heap's block.
+    fn parchment_unrolled(&mut self, files: &mut Files) -> Option<()> {
+        let frame = self.mem.r16(DS, 0x9030);
+        self.ems_map(2);
+        self.file_load(files, 0x3F16, frame, 0)?;
+        let steps = 0xD6u16;
+        self.mem.w16(frame, 4, 0xFFF1u16.wrapping_add(steps - 1));
+        self.mem.w16(DS, 0xA896, steps & 0xF);
+        self.ems_map(self.mem.r16(DS, 0x1030));
+        if self.page_is_block() {
+            let page = self.mem.r16(DS, 0xA900);
+            for i in 0..64000u16 {
+                let b = self.mem.r8(frame, i);
+                self.mem.w8(page, i, b);
+            }
+        }
+        self.ems_map(2);
+        Some(())
+    }
+
+    /// 1194:286B..288E, the map's window up (after its box, 2837..2868,
+    /// the front end's): the page cleared (9426), bank [1032]'s frame the
+    /// window's buffer (4D74), B7E4 set (the screen black: no colours
+    /// read) and B7C4 bit 1, the window on DS:3FC7 opened (3159:000C up to
+    /// its loop: TAMRIEL.MNU, its eight provinces' regions) and its first
+    /// routine (1194:28EC: NOEXIT.IMG over the exit, 5CD9 with BX 50h).
+    pub fn creation_map_window(&mut self, files: &mut Files) -> Option<()> {
+        self.page_clear();
+        self.screen_bank(self.mem.r16(DS, 0x1032));
+        self.mem.w8(DS, crate::window::var::NO_FADE, 1);
+        let f = self.mem.r8(DS, SCREEN) | 2;
+        self.mem.w8(DS, SCREEN, f);
+        self.window_open(files, 0x3FC7, None)?;
+        self.sheet_image(files, 0x3EC4)?;
+        self.window_opened();
+        Some(())
+    }
+
+    /// The map's window clicked at (`x`, `y`) (8F92, 8F94): the province
+    /// under it (3159:019A, the regions' masks), or None, the window left
+    /// up. A province's handler (1194:28F6) takes the region to the race
+    /// (1A8) and ends the window's loop (3159:0006); its end (00D0..00EA:
+    /// the masks freed, the keys flushed) and 2891..2896 (B7C4 bit 1 and
+    /// B7E4 cleared) follow.
+    pub fn creation_map_click(&mut self, x: u16, y: u16) -> Option<u8> {
+        self.mem.w16(DS, 0x8F92, x);
+        self.mem.w16(DS, MOUSE_Y, y);
+        self.window_regions();
+        let r = self.mem.r16(DS, REGION);
+        if r == 0xFFFF {
+            return None;
+        }
+        self.mem.w8(DS, PLAYER + rec::RACE, r as u8);
+        self.window_close();
+        self.window_ended();
+        let f = self.mem.r8(DS, SCREEN) & 0xFD;
+        self.mem.w8(DS, SCREEN, f);
+        self.mem.w8(DS, crate::window::var::NO_FADE, 0);
+        Some(r as u8)
+    }
+
     /// 1194:28F6, 289B and 28E1: the province picked on the map (0..8)
     /// is the race; the portrait rolled (1194:35FF); that byte is the
     /// location the player comes from (its province and a place in it),

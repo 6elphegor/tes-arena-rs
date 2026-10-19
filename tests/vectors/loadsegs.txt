@@ -3,11 +3,15 @@
 # Most are a far pointer's segment, shifted unless the pointer is null
 # (0:0); `alone` marks a word that holds a segment by itself, shifted
 # unless it is 0 (another writer's).
+517e the class list's record's (515A) texts' segment (+24h: DGROUP, 1194:5734)
+519d the class list's record's lines' drawing's segment (+41h far, copied from the drawings' table by 3159:06A0's set-up)
 8f72 the timer's hook's segment (21EE:028A, 21EE:0024)
 914c the movie frames' hook's segment (914A: 2294:076C, the speech's, 2294:0700; left set after it)
 a90a the open file's name's segment (DGROUP, 0000:6B33)
 a83c alone 1A5C's AX kept: DGROUP, 1A5C's last return (1AF4) for each name after the first (0000:1AF9)
 a846 the message box's text's segment (0000:9663): DGROUP for "Loading..." (25FD:0803)
+b7d6 the window's regions' list's segment (B7D4: 3159:04C9, from the window's record)
+b80c the list's record's segment (B80A: 3159:06A9)
 ba7c the world loop's return's segment (the far pointer at BA7A)
 c3a6 a level hook's segment (C3A4..C3BB: the frame's and the level's far hooks)
 c3aa a level hook's segment

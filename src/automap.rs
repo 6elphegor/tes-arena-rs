@@ -135,14 +135,18 @@ impl Machine {
         }
     }
 
-    /// 0000:67C8 (and 67C4) on the file named at DS:`path`, then closed: its
-    /// name (A908), its size (A90C) or, missing, the BSA looked in and
-    /// the error reported (`file_open_or_device`). Its bytes, where it is
-    /// a file.
+    /// 0000:67C8 (and 67C4) on the file named at DS:`path`: its name
+    /// (A908), its size (A90C) or, missing, the BSA looked in and the
+    /// error reported (`file_open_or_device`). Its bytes, where it is a
+    /// file, closed (the port reads them whole). Missing, nothing is
+    /// closed: 3546 goes on to make it (355D's carry, 677E), and what DOS
+    /// has on handle 2 stays (CON at first).
     fn automap_open(&mut self, files: &mut Files, path: u16) -> Option<std::rc::Rc<[u8]>> {
-        let found = self.file_open_or_device(files, path);
+        if self.file_open_or_device(files, path) != Some(true) {
+            return None;
+        }
         self.file_close(files);
-        if found == Some(true) { files.data(self.mem.cstr(DS, path)) } else { None }
+        files.data(self.mem.cstr(DS, path))
     }
 
     /// 0000:34F1: the map cleared (4000h bytes at the frame).
