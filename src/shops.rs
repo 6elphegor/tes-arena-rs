@@ -36,9 +36,13 @@ use crate::mem::DS;
 pub trait ShopHooks {
     /// 1194:4D31: a message box with the text at DS:`si`.
     fn message(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 1194:4B60 and 4BFF on entering: the shop's screen (MENUSCRN.IMG)
-    /// and its name at DS:`si` on a banner across its top (FONT_C.DAT on
-    /// MENU_CTR.IMG's tiles between MENU_LFT and MENU_RT).
+    /// 1194:4B60 on entering (SI 12EB): the shop's screen (MENUSCRN.IMG,
+    /// read into the load bank), before the name's substitution, whose
+    /// working buffer is in that bank's frame past the picture.
+    fn shop_screen(&mut self, _m: &mut Machine) {}
+    /// 1194:4BFF: the shop's name at DS:`si` on a banner across the
+    /// screen's top (FONT_C.DAT on MENU_CTR.IMG's tiles between MENU_LFT
+    /// and MENU_RT).
     fn banner(&mut self, _m: &mut Machine, _si: u16) {}
     /// 1194:4B8E: the picture named at DS:`si` shown on the shop's screen
     /// (the temple's healing: YESNO.IMG under its question; the store's
@@ -665,7 +669,9 @@ impl Machine {
         let a91a = self.mem.r16(DS, 0xA91A);
         self.mem.w8(DS, SHOP, 5);
         hooks.screen_saved(self, files);
-        // 1194:C65F.
+        // 1194:C65F: the screen (4B60), then "%tem" made and on the
+        // banner (4BFF).
+        hooks.shop_screen(self);
         self.mem.w32(DS, 0x929E, 0x6D65_7425);
         self.mem.w16(DS, 0x92A2, 0);
         hooks.expand(self, 0x929E);

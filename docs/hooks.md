@@ -283,7 +283,7 @@ the original routine:
 | `SaveHooks::delete` | src/save_write.rs:53 | 0000:9DC6 | overridden | the view: main.rs SaveDir<'_> | faithful: the file deleted |
 | `SaveHooks::palette` | src/save_write.rs:59 | 0000:6E3C | overridden | the view: main.rs SaveDir<'_> | present: the window's palette for the save's |
 | `SaveHooks::write` | src/save_write.rs:56 |  | overridden | the view: main.rs SaveDir<'_> | faithful: the save's files written (save vectors); SAVEGAME's screen bytes black, the window's picture not being the game's |
-| `ShopHooks::banner` | src/shops.rs:42 | 1194:4B60 and 4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::banner` | src/shops.rs:46 | 1194:4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::buffer_freed` | src/shops.rs:105 | 1194:5E49 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
 | `ShopHooks::buffer_made` | src/shops.rs:107 | 1194:5E54 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
 | `ShopHooks::dialog` | src/shops.rs:64 | 1194:4E88 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
@@ -298,6 +298,7 @@ the original routine:
 | `ShopHooks::quests` | src/shops.rs:93 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::screen_back` | src/shops.rs:102 | 1194:54B3 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
 | `ShopHooks::screen_saved` | src/shops.rs:98 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::shop_screen` | src/shops.rs:42 | 1194:4B60 | overridden | the view: shopui.rs ShopFront<'_, '_> | faithful: `shop_screen`, before the temple's name is made (playtempleheal's EMS) |
 | `ShopHooks::strip_back` | src/shops.rs:56 | 1194:5FC0 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `SkyHooks::bolt` | src/skyobj.rs:52 | 0000:78A8 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `SkyHooks::draw_dfa` | src/skyobj.rs:46 | 0000:5652 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -395,14 +396,14 @@ the original routine:
 | `VisionHooks::line` | src/vision.rs:105 | 0000:5364 | present | a line of the speech's page drawn | |
 | `VisionHooks::mouse` | src/vision.rs:97 | 0000:9012 | overridden | the view: vision.rs ClickThrough | elsewhere: a click at each page, as the vectors' run clicks; by default no button, the place kept |
 | `TriggerHooks::artifact_audience` | src/trigger.rs:100 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port and its box |
+| `TriggerHooks::automap_write` | src/trigger.rs:110 | 23F1:0145 and 013C | port | the default runs the port | |
 | `TriggerHooks::blackout` | src/trigger.rs:106 | 1194:55B2 | overridden | the view: main.rs Front<'_>, screentest.rs DoorHooks | present: the fade the window plays (areafade.txt) |
-| `TriggerHooks::enter_city` | src/trigger.rs:125 | 0000:4EFD and 946A | present | the view's window and the screen cleared | |
-| `TriggerHooks::enter_dungeon` | src/trigger.rs:127 | 217B:04DC | overridden | the view: main.rs Front<'_> | faithful: `wild_done` |
+| `TriggerHooks::enter_city` | src/trigger.rs:129 | 0000:4EFD and 946A | present | the view's window and the screen cleared | |
+| `TriggerHooks::enter_dungeon` | src/trigger.rs:131 | 217B:04DC | overridden | the view: main.rs Front<'_> | faithful: `wild_done` |
 | `TriggerHooks::guards` | src/trigger.rs:83 | 0000:3EBE | port | the default runs the port | |
-| `TriggerHooks::leave_city` | src/trigger.rs:120 | 217B:027A | port | the default runs the port (`wild_leave_city`; the view's Front<'_> the same) | |
-| `TriggerHooks::leave_interior` | src/trigger.rs:114 | 1194:D55F and 2433:0199 | port | the default runs the port | |
+| `TriggerHooks::leave_city` | src/trigger.rs:123 | 217B:027A | port | the default runs the port (`wild_leave_city`; the view's Front<'_> the same) | |
+| `TriggerHooks::leave_interior` | src/trigger.rs:116 | 1194:D55F and 2433:0199 | port | the default runs the port | |
 | `TriggerHooks::message_box` | src/trigger.rs:77 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
-| `TriggerHooks::music` | src/trigger.rs:108 | 23F1:0178 | elsewhere | the view picks the music each frame (`area_music`) | |
 | `TriggerHooks::palace_audience` | src/trigger.rs:95 | 0000:41A4 | overridden | the view: main.rs Front<'_> | faithful: `emperor_audience` (audience vectors), its movies the window's |
 | `TriggerHooks::sound` | src/trigger.rs:79 | 23BA:002A | port | the default runs the port | |
 | `TriggerHooks::sounds_off` | src/trigger.rs:104 | 2F9F:0438 | present | the sounds stopped | |
