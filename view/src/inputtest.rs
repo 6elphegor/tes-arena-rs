@@ -1155,6 +1155,43 @@ fn the_spellbook_keys_stop_at_its_ends() {
     assert_eq!(book(&a), (0, 0), "Home");
 }
 
+/// The spellbook in the bar's corner shows its loop's state (3159:06A0
+/// over the clicks so far, from a copy of the game as it came up): its
+/// down arrow's box (5AF4+8, 09E8) marks the next line and its up arrow's
+/// (+0, 09C2) the one before, as the game's record has them.
+#[test]
+fn the_spellbook_arrows_move_its_mark_as_the_game_does() {
+    let Some(dir) = game_dir() else { return };
+    let mut a = app(&dir, &Start { at: Some((59, 8, 0)), ..Default::default() });
+    let c = a.engine.m.mem.r8(arena::mem::DS, 0x01A9) | 0x20;
+    a.engine.m.mem.w8(arena::mem::DS, 0x01A9, c);
+    let f = a.engine.m.mem.r16(arena::mem::DS, 0x05CA) & !8;
+    a.engine.m.mem.w16(arena::mem::DS, 0x05CA, f);
+    for k in 0..8 {
+        panels::learn(&mut a.engine.m, k);
+    }
+    let mut d = Driver::new(&mut a);
+    d.frame(&mut a);
+    d.key(&mut a, KeyCode::KeyC, None);
+    let book = |a: &App| match &a.panel {
+        Some(panels::Panel::Spellbook(b)) => (b.selected, b.top),
+        _ => panic!("the spellbook is up"),
+    };
+    assert_eq!(book(&a), (0, 0), "the first line marked as it comes up");
+    let centre = |a: &App, at: u16| {
+        let r = |o: u16| a.engine.m.mem.r16(arena::mem::DS, 0x5AF4 + at + o) as i32;
+        (r(0) + r(4) / 2, r(2) + r(6) / 2)
+    };
+    let (x, y) = centre(&a, 8);
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert_eq!(book(&a).0, 1, "the down arrow marks the second line");
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert_eq!(book(&a).0, 2, "and the third");
+    let (x, y) = centre(&a, 0);
+    d.click(&mut a, x, y, MouseButton::Left);
+    assert_eq!(book(&a).0, 1, "the up arrow the second again");
+}
+
 /// A province's map: its regions and buttons have no keys (MAPBTNS's
 /// regions' +59h are all 20h, which 3159:0171 passes over), so Esc, T,
 /// S and Enter do nothing there; Esc is the world map's Exit's key

@@ -368,6 +368,9 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             return pick;
         }
         m.list_reads = reads;
+        // A list asked: the copy of the game as its loop starts, for the
+        // window to follow the loop.
+        m.list_capture = self.talk().is_some_and(|t| t.need.is_some());
         // The game's state round the pick (`Machine::list_window`: the
         // screen kept in the load bank, the panel, the window's record).
         let kind = m.list_kind;

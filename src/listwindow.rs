@@ -56,13 +56,14 @@ pub struct ListCapture {
 
 impl ListCapture {
     /// The record's line marked (+39, FFFFh none) and first line shown
-    /// (+3B) after the loop's passes over `reads` (its end, or as far as
-    /// they go; as it starts where it gives up), on a copy.
-    pub fn live(&self, reads: &[ListRead]) -> (u16, u16) {
+    /// (+3B) after the loop's passes over `reads` (to its end, or as far
+    /// as they go; as it starts where it gives up), on a copy; and the
+    /// loop's answer where they reach its end (its pick, FFFFh left).
+    pub fn live(&self, reads: &[ListRead]) -> (u16, u16, Option<u16>) {
         let mut m = self.m.clone();
         let (seg, rec) = (self.seg, self.rec);
-        m.list_passes(seg, rec, reads);
-        (m.mem.r16(seg, rec + 0x39), m.mem.r16(seg, rec + 0x3B))
+        let end = m.list_passes(seg, rec, reads);
+        (m.mem.r16(seg, rec + 0x39), m.mem.r16(seg, rec + 0x3B), end)
     }
 }
 
