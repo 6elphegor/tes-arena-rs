@@ -631,6 +631,41 @@ fn night_encounter(a: &mut App, heading: u16) {
     m.store_rng();
 }
 
+/// gen_worldframes.py's `day_encounter`: `night_encounter` a minute before
+/// noon, the hour's encounter roll come up by day.
+fn day_encounter(a: &mut App, heading: u16) {
+    use arena::frame::var::{MINUTE_TICK, TICKS};
+    at_time(a, 11, 59, heading);
+    let m = &mut a.engine.m;
+    let t = m.mem.r16(DS, TICKS).wrapping_sub(0x5B);
+    m.mem.w16(DS, MINUTE_TICK, t);
+    m.rng.seed = ENCOUNTER_SEED;
+    m.store_rng();
+}
+
+/// gen_worldframes.py's `before_door`: at the middle of the square south of
+/// the door at `row`, `col` facing it (heading 0), or north of it facing
+/// it (heading 100h) for a negative `row`; at `hour` if given.
+fn before_door(a: &mut App, row: i16, col: u16, hour: Option<u16>) {
+    if let Some(h) = hour {
+        at_hour(a, h, 0);
+    }
+    if row < 0 {
+        at_square(a, (-row) as u16 + 1, col, 0x100);
+    } else {
+        at_square(a, row as u16 - 1, col, 0);
+    }
+}
+
+/// The harness's click at (`x`, `y`): down for the frame whose controls read
+/// it, then up; the window's cursor 4 on (CB60), where the harness's lands.
+fn door_clicked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, x: f64, y: f64) {
+    a.input(In::Cursor((x + 4.0) * 3.0 + 1.0, (y + 4.0) * 3.0 + 1.0));
+    a.input(In::Button { button: MouseButton::Left, down: true });
+    frames(a, d, seen, 1, |_| false);
+    a.input(In::Button { button: MouseButton::Left, down: false });
+}
+
 /// gen_worldframes.py's ENCOUNTER_SEED: 99B5h (high word 0: a roll of 0)
 /// stepped back once through the LCG (6D002Dh's inverse mod 2^32).
 const ENCOUNTER_SEED: u32 = 0x56AA_ECA9;
@@ -1631,6 +1666,49 @@ fn case(name: &str) -> Option<Case> {
         })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        // gen_worldframes.py's wild-life cases: the noon encounter fought;
+        // doors clicked (`before_door`).
+        "playwildambush" => (Place::Wild, Box::new(|a: &mut App| {
+            day_encounter(a, 0x100);
+            captured(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            ready(a, seen);
+            frames(a, d, seen, 120, |_| false);
+            swinging(a, d, seen, 150);
+            frames(a, d, seen, 20, |_| false);
+        })),
+        "playhouselocked" | "playwildhouse" => {
+            let (place, row, col) = if name == "playhouselocked" { (Place::Street, 95, 47) } else { (Place::Wild, -85, 22) };
+            (place, Box::new(move |a: &mut App| before_door(a, row, col, None)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                frames(a, d, seen, 2, |_| false);
+                door_clicked(a, d, seen, 160.0, 100.0);
+                frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+                frames(a, d, seen, 1, |_| false);
+            }))
+        }
+        // The palace closed at night: its box clicked away.
+        "playpalacenight" => (Place::Street, Box::new(|a: &mut App| {
+            at_hour(a, 22, 0);
+            at_square(a, 9, 0x7C, 0x80);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            clicked_with(a, d, seen, 3, &[Act::Click(0xA0, 0x60)]);
+            frames(a, d, seen, 3, |_| false);
+        })),
+        // The house picked (picking armed, the seed SEED) and in (the area
+        // left, `leaves`); three frames in the house.
+        "playhousepick" => (Place::Street, Box::new(|a: &mut App| {
+            before_door(a, 95, 47, None);
+            let f = a.engine.m.mem.r16(DS, 0x05CA);
+            a.engine.m.mem.w16(DS, 0x05CA, f | 1);
+            seeded(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            let at = a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+            door_clicked(a, d, seen, 160.0, 100.0);
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
+            frames(a, d, seen, 3, |_| false);
+        })),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         "playpick" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -3329,7 +3407,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 95] = ["playchestpick", "playlootwild", "playlootstreet", "playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
+const BUSY: [&str; 100] = ["playwildhouse", "playpalacenight", "playwildambush", "playhouselocked", "playhousepick", "playchestpick", "playlootwild", "playlootstreet", "playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3440,7 +3518,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
 /// (playspellmaker's EMS banks are left out: `EMS_LEFT_OUT`.)
-const BUSY_STATE: [&str; 100] = ["playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
+const BUSY_STATE: [&str; 105] = ["playwildhouse", "playpalacenight", "playwildambush", "playhouselocked", "playhousepick", "playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's

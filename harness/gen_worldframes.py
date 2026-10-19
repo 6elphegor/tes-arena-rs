@@ -709,6 +709,49 @@ def chest_picking(a):
     a.w16(0x05CA, a.r16(0x05CA) | 1)
 
 
+def before_door(row, col, hour=None):
+    """At the middle of the square before the door at `row`, `col` (a wall
+    with a trigger, 0000:43B1), facing it: south of it (row - 1, heading
+    0), or north of it (row + 1, heading 100h) for a negative `row`; the
+    door's corner within the trigger's reach (DCh) either way. At `hour`
+    of the save's day if given (`at_hour`)."""
+    def put(a):
+        if hour is not None:
+            at_hour(hour, 0)(a)
+        if row < 0:
+            at_square(-row + 1, col, 0x100)(a)
+        else:
+            at_square(row - 1, col, 0)(a)
+    return put
+
+
+def palace_door_at_night(a):
+    """West of the palace's door at row 9, column 7Dh facing it (heading
+    80h), at ten at night (`at_hour`)."""
+    at_hour(22, 0)(a)
+    at_square(9, 0x7C, 0x80)(a)
+
+
+def armed(put, seed=None):
+    """`put`, picking armed (5CA bit 0), the seed `seed` (91F6) if given."""
+    def both(a):
+        put(a)
+        a.w16(0x05CA, a.r16(0x05CA) | 1)
+        if seed is not None:
+            a.mu.mem_write(a.lin(a.ds, 0x91F6), struct.pack('<I', seed))
+    return both
+
+
+def day_encounter(heading):
+    """`night_encounter` a minute before noon: the hour's encounter roll
+    come up by day (1194:887A)."""
+    def put(a):
+        at_hour(11, heading, minute=59)(a)
+        a.w16(0x884A, (a.r16(0x0151) - 0x5B) & 0xFFFF)
+        a.mu.mem_write(a.lin(a.ds, 0x91F6), struct.pack('<I', ENCOUNTER_SEED))
+    return put
+
+
 def message_up(a):
     """The message line's time set (061E)."""
     return a.r16(0x061E) != 0
@@ -1253,6 +1296,27 @@ CASES = {
     # (`night_encounter`), stood in: what came comes for the player and
     # strikes.
     'playwildnight': ('wild', night_encounter(0x100), [((), (), 400, None)]),
+    # The same by day (`day_encounter`): the noon hour's encounter roll,
+    # then what came fought: the weapon readied, waited for, swung at
+    # frame on frame (`SWINGING`), let go.
+    'playwildambush': ('wild', day_encounter(0x100), [((KEY_A,), (), 1, None), ((), (KEY_A,), 120, None),
+                                                      ((), (), 150, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]),
+    # A house's door (`before_door`; the town's trigger 6, a plain wall:
+    # houses always closed, 0000:50A9) clicked at the view's middle two
+    # frames on, picking not armed: the lock's words on the message line
+    # (0000:402F's level by the square).
+    'playhouselocked': ('street', before_door(95, 47), [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # A wilderness house's (its trigger 2, a plain wall), the same.
+    'playwildhouse': ('wild', before_door(-85, 22), [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # The palace's door (its trigger 13: a wall of kind 0Ah with bit 100h,
+    # the hit test's, 0000:B1AD) clicked from the west at ten at night: the
+    # palace closed (1194:4FB8, kind 1), "closed" in a box (0000:4054's
+    # 88D0) clicked away; three frames after.
+    'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 3, None)]),
+    # The house with picking armed (`armed`, the seed SEED): the lock
+    # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area
+    # left, `leaves`); three frames in the house.
+    'playhousepick': ('street', armed(before_door(95, 47), gs.SEED), [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'leaves': True}), ((), (), 3, None)]),
     # A creature that casts (type Bh: one spell in its record's list at
     # +366h) six squares down the corridor, stood before: seeing the
     # player it casts (29CF:0145: its spell launched at the player) and
