@@ -451,15 +451,15 @@ impl Machine {
     /// (`impact`); an arrow that hit an actor strikes it (29CF:0568);
     /// any other just loses its light. None where the original faults
     /// or hangs.
-    pub fn projectiles_update(&mut self) -> Option<()> {
+    pub fn projectiles_update(&mut self, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         for i in 0..NSLOTS {
             let si = SLOTS + i * SLOT_SIZE;
-            self.projectile_frame(si)?;
+            self.projectile_frame(si, kill)?;
         }
         Some(())
     }
 
-    fn projectile_frame(&mut self, si: u16) -> Option<()> {
+    fn projectile_frame(&mut self, si: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         if self.mem.r8(DS, si + f::LIFE) == 0 {
             return Some(());
         }
@@ -488,7 +488,7 @@ impl Machine {
                 let y = self.mem.r16(DS, si + f::Y).wrapping_add(dy);
                 self.mem.w16(DS, si + f::Y, y);
                 if let Some(ax) = self.projectile_hits(si) {
-                    return self.projectile_hit(si, ax);
+                    return self.projectile_hit(si, ax, kill);
                 }
             }
         }
@@ -519,7 +519,7 @@ impl Machine {
 
     /// 29CF:04E1. The projectile at `si` hit something (`ax` as
     /// `projectile_hits` left it).
-    fn projectile_hit(&mut self, si: u16, ax: u16) -> Option<()> {
+    fn projectile_hit(&mut self, si: u16, ax: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         self.count_add(0xFFFF);
         self.mem.w8(DS, si + f::LIFE, 0);
         if self.mem.r16(DS, si + f::FLAGS) & 0x1000 == 0 {
@@ -529,7 +529,7 @@ impl Machine {
                 // 29CF:0568: the arrow strikes the actor found.
                 let a = ACTORS.wrapping_add((self.mem.r8(DS, OCCUPANT) as u16) * SIZE);
                 if a >= CREATURES {
-                    self.strike_actor(a)?;
+                    self.strike_actor(a, kill)?;
                 } else {
                     self.strike_person(a, 1)?;
                 }

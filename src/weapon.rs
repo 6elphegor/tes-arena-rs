@@ -76,6 +76,27 @@ pub trait WeaponHooks {
     fn fire_bow(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         m.fire_missile(0x1B, 0)
     }
+    /// 2AA1:0819..083B: a quest target giving up says so: its words made
+    /// (`Machine::surrender_text`), then shown (`surrender_box`).
+    fn surrender(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.surrender_text(files, &mut crate::text::NoTextHooks)?;
+        self.surrender_box(m, crate::strike::svar::SURRENDER_LINE);
+        Some(())
+    }
+    /// 1194:59C8: the words at DGROUP `text` in a message box.
+    fn surrender_box(&mut self, _m: &mut Machine, _text: u16) {}
+}
+
+/// The swing's `KillHooks`: a quest target's words through `WeaponHooks`.
+pub struct Kill<'a> {
+    pub files: &'a mut Files,
+    pub hooks: &'a mut dyn WeaponHooks,
+}
+
+impl crate::strike::KillHooks for Kill<'_> {
+    fn surrender(&mut self, m: &mut Machine) -> Option<()> {
+        self.hooks.surrender(m, self.files)
+    }
 }
 
 /// `WeaponHooks` that do nothing.
@@ -287,7 +308,7 @@ impl Machine {
                 self.mem.w16(DS, FRAME, frame);
                 match frame % 5 {
                     4 => {
-                        if !self.swing_hits()? {
+                        if !self.swing_hits(&mut Kill { files: &mut *files, hooks: &mut *hooks })? {
                             self.bash(files, hooks)?;
                         }
                     }

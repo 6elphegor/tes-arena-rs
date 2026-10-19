@@ -197,7 +197,7 @@ fn matches_original() {
                 m.launch(plan.cast, plan.actor, plan.dx)?;
             }
             for _ in 0..plan.frames {
-                m.projectiles_update()?;
+                m.projectiles_update(&mut arena::strike::NoKillHooks)?;
             }
             Some(())
         };
@@ -272,7 +272,7 @@ fn missiles_match_original() {
         let run = |m: &mut Machine| -> Option<()> {
             m.fire_missile(flat, src)?;
             for _ in 0..plan.frames {
-                m.projectiles_update()?;
+                m.projectiles_update(&mut arena::strike::NoKillHooks)?;
             }
             Some(())
         };
@@ -345,7 +345,7 @@ fn light_shots_match_original() {
         let run = |m: &mut Machine| -> Option<()> {
             m.light_missile(ax)?;
             for _ in 0..plan.frames {
-                m.projectiles_update()?;
+                m.projectiles_update(&mut arena::strike::NoKillHooks)?;
             }
             Some(())
         };
@@ -432,7 +432,7 @@ fn casts_match_original() {
                 m.resolve_cast(files, t)?;
             }
             for _ in 0..plan.frames {
-                m.projectiles_update()?;
+                m.projectiles_update(&mut arena::strike::NoKillHooks)?;
             }
             Some(())
         };

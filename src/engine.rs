@@ -224,7 +224,7 @@ fn world_hook(m: &mut Machine, files: &mut Files, hooks: &mut dyn EngineHooks, s
             // again: as the harness loads the image, 1000h.
             m.mem.w32(DS, 0x127A, 0x1000_A8F9);
             m.actors_update(files)?;
-            m.projectiles_update()
+            m.projectiles_update(&mut crate::weapon::Kill { files, hooks })
         }
         (0xC3A8, 0x481E) => m.frame_body(files, hooks),
         (0xCD1A, 0x2294_0A5D) => {

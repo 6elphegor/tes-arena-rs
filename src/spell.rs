@@ -688,7 +688,7 @@ impl Machine {
             }
             return Some(());
         }
-        self.kill_check(seg, off).map(drop)
+        self.kill_check(seg, off, &mut crate::strike::NoKillHooks).map(drop)
     }
 
     /// 2CDD:09E0 (`spell_flag_table`): the target's block in the
@@ -742,7 +742,7 @@ impl Machine {
             return Some(());
         }
         self.mem.w16(x.fs, x.dx.wrapping_add(field::HP), 0xFFFF);
-        self.kill_check(x.fs, x.dx)?;
+        self.kill_check(x.fs, x.dx, &mut crate::strike::NoKillHooks)?;
         if x.fs != DS {
             // DS is left at the target's segment: the message and every
             // table read after it go through the wrong segment.

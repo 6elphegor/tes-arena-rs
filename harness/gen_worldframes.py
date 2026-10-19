@@ -538,6 +538,23 @@ def corpse_items(a):
     gs.room(a)
 
 
+def surrendering(a):
+    """A person of class 0 (type 18h) brought as `brought` brings one, and
+    the first side quest (0E6E) made a kind-1 quest at stage 4 naming that
+    class (+2Fh 18h, 1194:A1D1), with 5CA bit 40h (a quest target being
+    fought, 25CA:0271): fought below half its HP it gives up (2AA1:07A4)
+    and says so (0819: [102C]'s font, 82E6 copied to 1044, its codes
+    made, 1194:59C8)."""
+    brought(0x18)(a)
+    seg, rec = a.r16(0x1042), a.r16(0x0C57 + 0x12)
+    a.w16(rec + 0x40D, a.r16(rec + 0x40D, seg=seg) & ~0x1000, seg=seg)
+    a.mu.mem_write(a.lin(seg, rec + 5), bytes([a.mu.mem_read(a.lin(seg, rec + 5), 1)[0] & 0xE0]))
+    q = 0x0E6E
+    a.w16(q + 4, (a.r16(q + 4) & ~0x0EC0) | 0x0840)
+    a.mu.mem_write(a.lin(a.ds, q + 0x2F), b'\x18')
+    a.w16(0x05CA, a.r16(0x05CA) | 0x40)
+
+
 def pile_ahead(a):
     """At row 0Bh, column 2Ah, facing the square beyond it (heading 0),
     whose floor byte is given flat 7 (the INF's third item flat, C934:
@@ -1137,7 +1154,14 @@ CASES = {
     # shown in a box, clicked away; five frames after. Then the same with
     # the corpse given two items and no gold (`corpse_items`): both
     # taken, the second with no room left.
-    'playloot': ('dungeon', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    # The surrender's box (1194:59C8): the swing's right button let go
+    # (its loop at 59E5 waits for that: an `rclick` with it held), then a
+    # click for its wait (1194:5536), at the mouse's place; the step's
+    # frames after go on with no button held.
+    'playsurrender': ('dungeon', surrendering, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
+                                                ((), (), 200, None, [], dict(SWINGING, script=[('rclick', 160, 100), ('click', 160, 100)])),
+                                                ((), (), 20, None, [], LET_GO)]),
+    'playloot': ('dungeon', brought(1), FIGHT +[((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playlootitems': ('dungeon', brought(1), FIGHT + [((), (), 1, None, [], {'do': corpse_items}),
                                                       ((), (), 10, None, [(160, 100)], {'script': LOOT_ITEMS_SCRIPT}), ((), (), 5, None)]),
     # A pile of treasure ahead (`pile_ahead`) clicked two frames on: the

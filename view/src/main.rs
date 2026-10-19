@@ -438,6 +438,10 @@ impl arena::weapon::WeaponHooks for Front<'_> {
     fn wall_trigger(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.wall_trigger(files, self)
     }
+    /// A quest target's words on giving up, the game's box (1194:59C8).
+    fn surrender_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        Front::message_box(self, m, text);
+    }
 }
 /// The triggers' messages are the game's boxes; entering an area isn't
 /// drawn yet (the frame ends: `Frame::Left`).
