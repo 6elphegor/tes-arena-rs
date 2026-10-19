@@ -812,8 +812,20 @@ INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 
 INFORMANT_PAID_SCRIPT = [MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
 TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 95), ('click', 100, 95), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+# As TALK_QUEST_SCRIPT, the list scrolled by its bar and its up arrow
+# first (3159:0D95, 09C2: the knob's middle at the click, the lines shown
+# from its share of the bar; the line above marked, the lines a line up
+# where it was the first shown), then a line clicked twice (marked,
+# taken), its box clicked away, Goodbye.
+TALK_BAR_SCRIPT = [('click', 0xA0, 0x65), ('click', 59, 80), ('click', 58, 10), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
+                ('click', 0xA0, 0xA3)]
+# As GUILD_SCRIPT, the potions' list scrolled by its bar first (3159:0D95:
+# the knob's middle at the click, the lines shown from its share of the
+# bar, the line marked kept among them), the top line then clicked twice
+# (marked, taken).
+GUILD_BAR_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 71, 80), ('click', 0x70, 0x26), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
 # The temple's menu (1194:C258: Bless, Cure, Heal, Exit, boxes 18h high
 # from 46h): Heal, its price accepted (Yes), "thou art healed" clicked
@@ -1252,6 +1264,7 @@ CASES = {
     # the quest's place (E015: A862's 9), its person's words (1194:D593:
     # one box, clicked away), back to the menu's Goodbye.
     'playtalkquestplace': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_QUEST_SCRIPT)})]),
+    'playtalkbar': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_BAR_SCRIPT)})]),
     'playstore': ('store', shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xF48E, STORE_SCRIPT)})]),
     # The dungeon, two frames, the player killed (`killed`) and the frame
     # that ends the world loop for it, the outer loop's death followed to
@@ -1291,6 +1304,7 @@ CASES = {
     'playinformant': ('tavern', informant, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_SCRIPT)})]),
     'playinformantpaid': ('tavern', informant_owed, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_PAID_SCRIPT)})]),
     'playguild': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_SCRIPT)})]),
+    'playguildbar': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_BAR_SCRIPT)})]),
     # In the town's first temple: two frames, a service (the keeper's
     # click, 1194:C258), thirty frames. Heal with the player hurt
     # (`temple_hurt`), Cure with a disease (`diseased`), Bless with a

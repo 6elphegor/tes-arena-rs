@@ -533,7 +533,7 @@ impl Machine {
 
     /// 0000:5458's state: A902 bit 0 on (the cursor drawn, the front
     /// end's).
-    fn cursor_drawn(&mut self) {
+    pub(crate) fn cursor_drawn(&mut self) {
         let f = self.mem.r16(DS, 0xA902) | 1;
         self.mem.w16(DS, 0xA902, f);
     }

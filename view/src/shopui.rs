@@ -363,9 +363,11 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     }
     fn list(&mut self, m: &mut Machine, si: u16, cx: u16, di: u16) -> u16 {
         let pick = self.list_pick(m, si, cx, di);
+        let reads = self.talk().and_then(|t| t.list_reads.take());
         if !self.paged {
             return pick;
         }
+        m.list_reads = reads;
         // The game's state round the pick (`Machine::list_window`: the
         // screen kept in the load bank, the panel, the window's record).
         let kind = m.list_kind;

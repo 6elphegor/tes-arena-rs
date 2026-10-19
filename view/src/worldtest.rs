@@ -975,6 +975,14 @@ fn informant_owed(a: &mut App) {
 /// paged, the tavern's menu's Exit.
 const INFORMANT_PAID_SCRIPT: [Act; 7] = [MORE, ACCEPT, MORE, MORE, MORE, MORE, Act::Click(0xA0, 0xA3)];
 
+/// gen_worldframes.py's GUILD_BAR_SCRIPT: as GUILD_SCRIPT, the potions'
+/// list scrolled by its bar (71, 80) first, its top line then clicked
+/// twice (marked, taken).
+const GUILD_BAR_SCRIPT: [Act; 10] = [
+    Act::Click(0xA0, 0x46), Act::Click(0xA0, 0x59), Act::Click(71, 80), Act::Click(0x70, 0x26), Act::Click(0x70, 0x26), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""), ACCEPT, ACCEPT,
+    Act::Click(0xA0, 0xA3),
+];
+
 /// gen_worldframes.py's GUILD_SCRIPT: a potion bought, the guild left.
 const GUILD_SCRIPT: [Act; 8] = [
     Act::Click(0xA0, 0x46), Act::Click(0xA0, 0x59), Act::Click(0x70, 0x26), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""), ACCEPT, ACCEPT,
@@ -1086,6 +1094,12 @@ const TALK_WHERE_SCRIPT: [Act; 5] = [Act::Click(0xA0, 0x65), Act::Click(100, 23)
 /// row, that row clicked twice (marked, taken: 1194:D593, the quest's
 /// person's one box clicked away), then the menu's Goodbye.
 const TALK_QUEST_SCRIPT: [Act; 6] = [Act::Click(0xA0, 0x65), Act::Click(58, 105), Act::Click(100, 95), Act::Click(100, 95), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's TALK_BAR_SCRIPT: "Where is" as TALK_QUEST_SCRIPT,
+/// its lines scrolled by the bar (59, 80) and then the up arrow (58, 10),
+/// a line clicked twice (marked, taken), its box clicked away, Goodbye:
+/// the list's loop (3159:06A0) run by the port over the view's reads.
+const TALK_BAR_SCRIPT: [Act; 7] = [Act::Click(0xA0, 0x65), Act::Click(59, 80), Act::Click(58, 10), Act::Click(100, 50), Act::Click(100, 50), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
 
 /// gen_worldframes.py's TALK_PALACE_SCRIPT ("Where is", the palace,
 /// the way's box, Goodbye), the list's fourth line taken by its number
@@ -1909,6 +1923,11 @@ fn case(name: &str) -> Option<Case> {
             talked(a, d, seen, &TALK_QUEST_SCRIPT);
             frames(a, d, seen, 1, |_| false);
         })),
+        "playtalkbar" => (Place::People, Box::new(dreaming), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_BAR_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
         "playtalkpalace" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             talked(a, d, seen, &TALK_PALACE_SCRIPT);
@@ -2022,6 +2041,14 @@ fn case(name: &str) -> Option<Case> {
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             serviced(a, d, seen, 7, &GUILD_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playguildbar" => (Place::Loaded, Box::new(|a: &mut App| {
+            room(a);
+            seeded(a);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 7, &GUILD_BAR_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
         "playlevelup" => (Place::Dungeon, Box::new(levelled), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2726,7 +2753,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 65] = ["playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 67] = ["playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2836,7 +2863,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 70] = ["playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 72] = ["playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's

@@ -15,17 +15,48 @@
 //! bar's background's buffer (+45) and the lines' (+49), the bar's knob
 //! (+4D: x, y, width, height).
 //!
-//! The library's loop (its mouse regions, keys and scrolling) is the front
-//! end's: it answers with the line picked (`pick`, FFFFh none), which the
-//! port takes as the original's loop leaves it for a pick made among the
-//! lines first shown (the line clicked made the record's pick, 3159:0A1D,
-//! 0BCA; the loop's last drawing, 0A58, then the window's end, 07D3). The
-//! lines' and the panel's pixels are the front end's too, but for the
-//! panel's picture, which the page keeps.
+//! The library's loop (3159:06A0..0717: its mouse regions, keys and
+//! scrolling, `Machine::list_loop`) is the port's, run over the mouse's
+//! reads the front end gives it (`ListRead`, `Machine::list_reads`): a
+//! click a read with the button down and one with it up, a key a read
+//! with it held and one with it let go. Without reads (or where they end
+//! before the loop does) the front end's pick (`pick`, FFFFh none) is
+//! taken as the loop leaves it for a pick made among the lines first
+//! shown, or scrolled to `top` (the line clicked made the record's pick,
+//! 3159:0A1D, 0BCA; the loop's last drawing, 0A58, then the window's
+//! end, 07D3). The lines' and the panel's pixels are the front end's, but
+//! for the panel's picture, which the page keeps; the cursor's drawing
+//! and the knob's and the arrows' too (their state: ADB6/ADB8, which the
+//! texts' drawing leaves, and 9288, which each pass's 0A58 sets again).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
+
+/// One read of the mouse by the list's loop (0000:8FC4): its buttons
+/// (AFF9: bit 0 left, 1 right), the cursor's place (8F92, 8F94), and the
+/// list's keys held then (`list_keys`), as the front end saw them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ListRead {
+    pub buttons: u8,
+    pub x: u16,
+    pub y: u16,
+    pub keys: u8,
+}
+
+/// The keys the list's loop looks at in the key table (ACB5 by scan
+/// code): `ListRead::keys`' bits and their scan codes.
+pub mod list_keys {
+    pub const UP: (u8, u8) = (1, 0x48);
+    pub const DOWN: (u8, u8) = (2, 0x50);
+    pub const PGUP: (u8, u8) = (4, 0x49);
+    pub const PGDN: (u8, u8) = (8, 0x51);
+    pub const HOME: (u8, u8) = (0x10, 0x47);
+    pub const END: (u8, u8) = (0x20, 0x4F);
+    pub const ENTER: (u8, u8) = (0x40, 0x1C);
+    pub const ESC: (u8, u8) = (0x80, 0x01);
+    pub const SCANS: [(u8, u8); 8] = [UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC];
+}
 
 /// The library's flags (B7C4): bit 0 the line under a click was the one
 /// picked already.
@@ -505,8 +536,12 @@ impl Machine {
         self.mem.w16(seg, rec + 0x3D, total);
         let (bx, bw, bh) = (r16(self, 0x1A), r16(self, 0x1C), r16(self, 0x1E));
         if bw == 0 {
-            // 07A9: no box: carry set, the loop never runs.
-            return crate::giveup::not_ported("3159:07D1: a list window with no box");
+            // 07A9: no box: 0718 leaves at 07D1 with carry set, which
+            // 06B7 doesn't look at: the loop runs with no buffers made and
+            // its end frees +47 and +4B as the record holds them. No
+            // record the game fills (5006, 505B, 50B0, 5105, 515A, 5AF4)
+            // has a box of no width.
+            return crate::giveup::not_ported("3159:07D1: a list window with no box (its loop over a record half made)");
         }
         // 07B4: what the lines' box covers kept on the heap (8F2A, DI
         // FFFEh).
@@ -536,6 +571,20 @@ impl Machine {
         }
         // 07C6: the first line picked (0BCA: no routine at +2F here).
         self.list_pick(seg, rec, 0)?;
+        // The loop itself, over the front end's reads where it gave them
+        // (run on a copy: reads that end before the loop does leave the
+        // pick as given, below).
+        if let Some(reads) = self.list_reads.take() {
+            let mut run = self.clone();
+            let ax = run.list_loop(seg, rec, &reads);
+            if std::env::var_os("ARENA_LIST_DEBUG").is_some() {
+                eprintln!("list loop over {} reads: {:?} (pick given {:04X}, top {})", reads.len(), ax, pick, top);
+            }
+            if let Some(ax) = ax {
+                *self = run;
+                return Some(ax);
+            }
+        }
         // The loop's scrolling (the arrows' 09C2 and 09E8, the keys' and
         // the bar's, each through 0E68) as it leaves the record: the first
         // line shown, the pick kept among the lines shown, the knob.
@@ -556,6 +605,254 @@ impl Machine {
         self.list_end(seg, rec);
         self.key_flush();
         Some(ax)
+    }
+
+    /// 3159:07CB..0717: the list's loop over the front end's `reads`, from
+    /// its first line picked: 0834 once as the start runs it (what it
+    /// comes to not taken), then each pass 0834 and, until it ends, the
+    /// pass's end (06EB: the mouse read, 8FC4; the cursor drawn and put
+    /// back, 5454 and 541E; the page shown, 9466, and two retraces waited,
+    /// 6BDE, the front end's). Its end (0709): the window's (07D3) and
+    /// the keys flushed (710E). AX: the record's pick (FFFFh left). None
+    /// where the reads end before the loop does, or the port gives up.
+    fn list_loop(&mut self, seg: u16, rec: u16, reads: &[ListRead]) -> Option<u16> {
+        let mut reads = reads.iter();
+        self.list_input(seg, rec, &mut reads)?;
+        let ax = loop {
+            if let Some(ax) = self.list_input(seg, rec, &mut reads)? {
+                break ax;
+            }
+            self.list_read(reads.next()?);
+            self.cursor_drawn();
+            self.cursor_hidden();
+        };
+        self.list_end(seg, rec);
+        self.key_flush();
+        Some(ax)
+    }
+
+    /// 0000:8FC4 as the list's loop reads the mouse: the buttons (AFF9) and
+    /// the cursor's place (8F92, 8F94, kept within its limits) as `r`
+    /// has them, and the list's keys held (the key table at ACB5 by scan
+    /// code, as the key interrupt has left it by then).
+    fn list_read(&mut self, r: &ListRead) {
+        self.mem.w8(DS, 0xAFF9, r.buttons);
+        self.mem.w16(DS, 0x8F92, r.x);
+        self.mem.w16(DS, 0x8F94, r.y);
+        self.mouse_clamp();
+        for (bit, scan) in list_keys::SCANS {
+            self.mem.w8(DS, 0xACB5 + scan as u16, (r.keys & bit != 0) as u8);
+        }
+    }
+
+    /// Whether the list's key `scan` is held (the key table at ACB5).
+    fn list_key_held(&self, scan: u8) -> bool {
+        self.mem.r8(DS, 0xACB5 + scan as u16) != 0
+    }
+
+    /// 3159:0834: one pass's input. With the left button down (AFF9 bit
+    /// 0), the first of the record's four boxes the cursor is in (their
+    /// right and bottom edges in: the arrows, the bar, the lines) has its
+    /// region's routine (B7F6: 09C2, 09E8, 0D95, 0A1D), and B7C4 bit 0
+    /// set by it the line picked. Otherwise B7F2 cleared and the keys:
+    /// Down and Up as the arrows; PgDn (08A3) and PgUp (08E7) a page less
+    /// one on (their ten retraces waited, the front end's); Home and End
+    /// the first and the last; Enter (its release waited) the line marked
+    /// picked; the right button or Esc (with the record's flag 4000h) the
+    /// list left, once they and the CyberMan's button are let go (8FC4
+    /// read meanwhile). Each pass ends in the lines' drawing (0A58).
+    /// Some(Some(AX)) the loop's end (its pick, FFFFh left), Some(None)
+    /// on; None where the reads end inside a wait, or the port gives up.
+    fn list_input(&mut self, seg: u16, rec: u16, reads: &mut std::slice::Iter<ListRead>) -> Option<Option<u16>> {
+        use list_keys::*;
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        if self.mem.r8(DS, 0xAFF9) & 1 != 0 {
+            let (mx, my) = (self.mem.r16(DS, 0x8F92) as i16, self.mem.r16(DS, 0x8F94) as i16);
+            for k in 0..4u16 {
+                let (x, y, w, h) = (r16(self, 8 * k) as i16, r16(self, 8 * k + 2) as i16, r16(self, 8 * k + 4) as i16, r16(self, 8 * k + 6) as i16);
+                if mx < x || mx > x.wrapping_add(w) || my < y || my > y.wrapping_add(h) {
+                    continue;
+                }
+                match k {
+                    0 => self.list_up(seg, rec)?,
+                    1 => self.list_down(seg, rec)?,
+                    2 => self.list_bar(seg, rec)?,
+                    _ => self.list_line_clicked(seg, rec, reads)?,
+                }
+                let f = self.mem.r8(DS, FLAGS);
+                if f & 1 != 0 {
+                    self.mem.w8(DS, FLAGS, f & 0xFE);
+                    return Some(Some(self.list_done(seg, rec)));
+                }
+                self.list_drawn(seg, rec);
+                return Some(None);
+            }
+        }
+        self.mem.w8(DS, SCROLLED, 0);
+        if self.list_key_held(DOWN.1) {
+            self.list_down(seg, rec)?;
+        } else if self.list_key_held(UP.1) {
+            self.list_up(seg, rec)?;
+        } else if self.list_key_held(PGDN.1) {
+            let ax = r16(self, 0x3B).wrapping_add(r16(self, 0x37)).wrapping_sub(1);
+            self.list_lowest(seg, rec, ax)?;
+        } else if self.list_key_held(PGUP.1) || self.list_key_held(HOME.1) {
+            let ax = if self.list_key_held(PGUP.1) { r16(self, 0x3B).wrapping_sub(r16(self, 0x37)).wrapping_add(1) } else { 0 };
+            let ax = if (ax as i16) < 0 { 0 } else { ax };
+            self.mem.w16(seg, rec + 0x39, ax);
+            self.list_scrolled(seg, rec, ax)?;
+        } else if self.list_key_held(END.1) {
+            let last = r16(self, 0x3D).wrapping_sub(1);
+            self.mem.w16(seg, rec + 0x39, last);
+            let ax = last.wrapping_add(1).wrapping_sub(r16(self, 0x37));
+            self.list_lowest(seg, rec, ax)?;
+        } else if self.list_key_held(ENTER.1) {
+            // 0932: its release waited for (the key interrupt's).
+            self.mem.w8(DS, 0xACB5 + ENTER.1 as u16, 0);
+            return Some(Some(self.list_done(seg, rec)));
+        } else if (self.mem.r8(DS, 0xAFF9) & 2 != 0 || self.list_key_held(ESC.1)) && r16(self, 0x20) & 0x4000 != 0 {
+            // 0975: the mouse read until Esc and the right button are let
+            // go (the CyberMan's button 20h none).
+            loop {
+                let r = reads.next()?;
+                self.list_read(r);
+                if !self.list_key_held(ESC.1) && self.mem.r8(DS, 0xAFF9) & 2 == 0 {
+                    break;
+                }
+            }
+            self.mem.w16(seg, rec + 0x39, 0xFFFF);
+            return Some(Some(self.list_done(seg, rec)));
+        }
+        self.list_drawn(seg, rec);
+        Some(None)
+    }
+
+    /// 3159:099C: the lines drawn (0A58), the loop's end with the record's
+    /// pick (+39).
+    fn list_done(&mut self, seg: u16, rec: u16) -> u16 {
+        self.list_drawn(seg, rec);
+        self.mem.r16(seg, rec + 0x39)
+    }
+
+    /// 3159:08BB: the first line shown made `ax`, but no lower than with
+    /// the last at the foot (the last then marked), or the top while the
+    /// lines all fit (the last marked); 0E68.
+    fn list_lowest(&mut self, seg: u16, rec: u16, ax: u16) -> Option<()> {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        let bx = r16(self, 0x3D).wrapping_sub(r16(self, 0x37));
+        let last = r16(self, 0x3D).wrapping_sub(1);
+        let ax = if (bx as i16) < 0 {
+            self.mem.w16(seg, rec + 0x39, last);
+            0
+        } else if ax > bx {
+            self.mem.w16(seg, rec + 0x39, last);
+            bx
+        } else {
+            ax
+        };
+        self.list_scrolled(seg, rec, ax)
+    }
+
+    /// 3159:09C2: the up arrow (B7F2 1): the line above marked, the lines
+    /// a line up where it was the first shown.
+    fn list_up(&mut self, seg: u16, rec: u16) -> Option<()> {
+        self.mem.w8(DS, SCROLLED, 1);
+        let ax = self.mem.r16(seg, rec + 0x39).wrapping_sub(1);
+        if ax == 0xFFFF {
+            return Some(());
+        }
+        let top = self.mem.r16(seg, rec + 0x3B);
+        self.list_pick(seg, rec, ax)?;
+        if ax < top {
+            self.list_scrolled(seg, rec, top.wrapping_sub(1))?;
+        }
+        Some(())
+    }
+
+    /// 3159:09E8: the down arrow (B7F2 2): the line below marked (not past
+    /// the last), the lines a line down where it would leave them, but
+    /// not once the last shows.
+    fn list_down(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        self.mem.w8(DS, SCROLLED, 2);
+        let mut ax = r16(self, 0x39).wrapping_add(1);
+        if ax >= r16(self, 0x3D) {
+            ax = ax.wrapping_sub(1);
+        }
+        let bx = r16(self, 0x3B).wrapping_add(r16(self, 0x37));
+        if ax < bx {
+            return self.list_pick(seg, rec, ax);
+        }
+        if bx.wrapping_add(1) > r16(self, 0x3D) {
+            return Some(());
+        }
+        self.list_pick(seg, rec, ax)?;
+        let top = r16(self, 0x3B).wrapping_add(1);
+        self.list_scrolled(seg, rec, top)
+    }
+
+    /// 3159:0D95: the bar clicked: the knob's middle put at the cursor's
+    /// y, kept to the bar (+4F; drawn, 0CFF), then the lines shown from
+    /// its share of the bar (0DCE: in 1/1024ths, times one more than the
+    /// lines, no lower than with the last at the foot; 0E68).
+    fn list_bar(&mut self, seg: u16, rec: u16) -> Option<()> {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        if r16(self, 0x14) == 0 {
+            return Some(());
+        }
+        let mut ax = self.mem.r16(DS, 0x8F94).wrapping_sub(r16(self, 0x53) >> 1);
+        let top = r16(self, 0x12);
+        if (ax as i16) <= (top as i16) {
+            ax = top;
+        }
+        let foot = top.wrapping_add(r16(self, 0x16)).wrapping_sub(r16(self, 0x53));
+        if ax > foot {
+            ax = foot;
+        }
+        self.mem.w16(seg, rec + 0x4F, ax);
+        let h = r16(self, 0x16) as u32;
+        if h == 0 {
+            return crate::giveup::original("3159:0DED: a bar of no height (a divide by 0)");
+        }
+        let share = ((ax.wrapping_sub(top) as u32) << 10) / h;
+        let t = (share.wrapping_mul(r16(self, 0x3D) as u32 + 1) >> 10) as u16;
+        let most = r16(self, 0x3D).wrapping_sub(r16(self, 0x37));
+        self.list_scrolled(seg, rec, if t > most { most } else { t })
+    }
+
+    /// 3159:0A1D: the lines clicked: the line under the cursor's y counted
+    /// from the first shown over the lines in all less one (its rows from
+    /// the box's top, +1A, each the font's height; with one line it is
+    /// taken as picked), B7C4 bit 0 set where it is the line marked
+    /// already; it marked (0BCA); the mouse read until the left button
+    /// is let go.
+    fn list_line_clicked(&mut self, seg: u16, rec: u16, reads: &mut std::slice::Iter<ListRead>) -> Option<()> {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        let y = self.mem.r16(DS, 0x8F94);
+        let cx = r16(self, 0x3D).wrapping_sub(1);
+        let mut row = r16(self, 0x1A);
+        let mut dx = r16(self, 0x3B);
+        let height = self.mem.r16(DS, ROW_HEIGHT);
+        if cx == 0 || {
+            for _ in 0..cx {
+                row = row.wrapping_add(height);
+                if y > row {
+                    dx = dx.wrapping_add(1);
+                }
+            }
+            dx == r16(self, 0x39)
+        } {
+            let f = self.mem.r8(DS, FLAGS) | 1;
+            self.mem.w8(DS, FLAGS, f);
+        }
+        self.list_pick(seg, rec, dx)?;
+        loop {
+            let r = reads.next()?;
+            self.list_read(r);
+            if self.mem.r8(DS, 0xAFF9) & 1 == 0 {
+                return Some(());
+            }
+        }
     }
 
     /// 3159:0E68: the record's first line shown (+3B) made `ax`, the pick
