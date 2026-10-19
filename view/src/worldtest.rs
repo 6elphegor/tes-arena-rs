@@ -682,6 +682,43 @@ fn ready(a: &mut App, seen: &mut Vec<[u16; 5]>) {
     a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
 }
 
+/// The sheet opened by F1 inside the next frame (its screen saved to
+/// SCREENSV.$$2), left by Esc, and the case ended there (`ENDS`), as
+/// gen_worldframes.py's sheet cases.
+fn sheet_ends(a: &mut App, d: &mut Driver) {
+    a.input(In::Key { code: KeyCode::F1, down: true, text: None });
+    d.key(a, KeyCode::Escape, None);
+    faded(a);
+    ENDS.with(|e| e.set(true));
+}
+
+/// gen_worldframes.py's `bowed`: the player's equipped weapon made a
+/// short bow (type 10h), the weapon class (0D49) 6.
+fn bowed(a: &mut App) {
+    let m = &mut a.engine.m;
+    let at = (0..40u16).map(|i| 0x0212 + 0x13 * i).find(|&at| {
+        let f = m.mem.r8(DS, at + 0x0E);
+        f & 0xC0 == 0xC0 && (f & 0x0C) >> 2 == 1
+    });
+    m.mem.w8(DS, at.expect("no weapon equipped"), 0x10);
+    m.mem.w8(DS, 0x0D49, 6);
+}
+
+/// gen_worldframes.py's `boated`: a boat's record at FFE0h at the
+/// player's place, boarded (2294:0DD0, `Machine::board_boat`).
+fn boated(a: &mut App) {
+    let m = &mut a.engine.m;
+    let (x, y) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+    m.mem.w16(DS, 0xFFE0, x);
+    m.mem.w16(DS, 0xFFE4, y);
+    a.engine.m.board_boat(&mut a.engine.files, 0xFFE0).expect("the boat boarded");
+}
+
+/// gen_worldframes.py's KEYS_HELD (0652): the first and the fifth key.
+const KEYS_HELD: [u8; 12] = [1, 5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5, 0xC5];
+/// gen_worldframes.py's EFFECT_WORDS (1405).
+const EFFECT_WORDS: &[u8] = b"You feel better.\0";
+
 /// gen_worldframes.py's `wild_edge`: the wilderness's window at the
 /// grid's top row, the player just inside its second quarter, facing
 /// north.
@@ -1484,6 +1521,57 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             ENDS.with(|e| e.set(true));
         })),
+        // gen_worldframes.py's sheet cases over what no other saves: the
+        // bow readied, the casting hands, the boat's prow, keys held, the
+        // crypt's text, an effect's words.
+        "playbowsheet" => (Place::Dungeon, Box::new(bowed), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            ready(a, seen);
+            frames(a, d, seen, 30, |_| false);
+            sheet_ends(a, d);
+        })),
+        "playcastsheet" => (Place::Dungeon, Box::new(|a: &mut App| {
+            brought(a, 1, 1, 0x200);
+            let e = &mut a.engine;
+            e.m.cast_spell(&mut e.files, &mut arena::cast::NoCastHooks, 6).expect("the spell cast");
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The harness's mouse at (160, 100), whose click (CB60) is 4
+            // past it; the view's click is that point (`take_click`). The
+            // aim reads the mouse (29CF:00D2), so it counts here.
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 2, |_| false);
+            sheet_ends(a, d);
+        })),
+        "playboatsheet" => (Place::Street, Box::new(boated), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            sheet_ends(a, d);
+        })),
+        "playkeyssheet" => (Place::Dungeon, Box::new(|a: &mut App| {
+            for (i, b) in KEYS_HELD.iter().enumerate() {
+                a.engine.m.mem.w8(DS, 0x0652 + i as u16, *b);
+            }
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            sheet_ends(a, d);
+        })),
+        "playtextsheet" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            sheet_ends(a, d);
+        })),
+        "playeffectsheet" => (Place::Dungeon, Box::new(|a: &mut App| {
+            for (i, b) in EFFECT_WORDS.iter().enumerate() {
+                a.engine.m.mem.w8(DS, arena::effects::var::MESSAGE_TEXT + i as u16, *b);
+            }
+            a.engine.m.mem.w8(DS, arena::effects::var::MESSAGE, 0x0F);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            sheet_ends(a, d);
+        })),
         "playlogend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
@@ -1555,6 +1643,40 @@ fn case(name: &str) -> Option<Case> {
             assert!(a.travel.is_some(), "Shift+M opens the travel map");
             // (The harness's mouse at the screen's centre, which the
             // map's passes find a region under.)
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            d.key(a, KeyCode::Escape, None);
+            for _ in 0..100 {
+                if a.travel.is_none() {
+                    break;
+                }
+                d.wait(a, 100);
+            }
+            faded(a);
+            assert!(a.travel.is_none(), "Esc leaves the world map");
+            ENDS.with(|e| e.set(true));
+        })),
+        // gen_worldframes.py's playsearchend: the search's list picked
+        // from (Daggerfall, twice), the journey's box read, the province
+        // left and the world map by Esc.
+        "playsearchend" => (Place::Street, Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            assert!(a.travel.is_some(), "Shift+M opens the travel map");
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: false, text: None });
+            for (x, y) in [(70, 45), (43, 175)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
+            for _ in 0..2 {
+                a.travel.as_mut().expect("the travel map").advance(0);
+            }
+            crate::inputtest::type_text(d, a, "z");
+            d.key(a, KeyCode::Enter, None);
+            for (x, y) in [(110, 46), (110, 46), (110, 46), (80, 180)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
             a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
             d.key(a, KeyCode::Escape, None);
             for _ in 0..100 {
@@ -2814,7 +2936,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 69] = ["playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 75] = ["playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2924,7 +3046,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 74] = ["playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 80] = ["playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
