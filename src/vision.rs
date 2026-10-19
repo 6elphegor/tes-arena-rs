@@ -225,9 +225,9 @@ impl Machine {
 
     /// 0000:6546 as the speech's movie runs it: looping (A902 bit 200h),
     /// the mouse read at each frame, the hook (2294:076C) after each, up to
-    /// the frame after which the hook ends it (A902 bit 100h). None where
-    /// the file is missing or not a movie, or where it would go round
-    /// (0000:64F0: not ported).
+    /// the frame after which the hook ends it (A902 bit 100h), going round
+    /// as often as it takes (64F0). None where the file is missing or not
+    /// a movie.
     fn vision_play(&mut self, files: &mut Files, hooks: &mut dyn VisionHooks, name: u16) -> Option<()> {
         let Some(handle) = self.file_open_handle(files, name) else {
             return crate::giveup::not_ported("0000:6143: a movie not found (its error drawn)");
@@ -255,7 +255,21 @@ impl Machine {
         let mut k = 0u16;
         loop {
             if k == frames {
-                return crate::giveup::not_ported("0000:6689: the speech's movie gone round (64F0)");
+                // 667F: the frames gone through; with A902 bit 200h round
+                // again (64F0 with CX 0): to the header's +50h, its first
+                // frame's place read to A836 (4 bytes), there, and the
+                // first frame read without its drawing (618F with AX 0;
+                // no mouse, no hook); then the frames after it, as many
+                // again. Else the movie over.
+                if self.mem.r16(DS, 0xA902) & 0x200 == 0 {
+                    break;
+                }
+                self.file_on(files, handle);
+                self.file_seek(files, 0, 0x50);
+                self.file_read(files, DS, 0xA836, 4);
+                self.file_seek(files, 0, self.mem.r32(DS, 0xA836));
+                self.movie_frame_read(files, buf, size);
+                k = 0;
             }
             // (On the movie's own handle: a page turned loads the speech's
             // parts, opening and closing their files.)

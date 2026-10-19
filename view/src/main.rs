@@ -1800,6 +1800,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         creation,
         creation_engine: None,
         title_engine: None,
+        creation_from_title: false,
         movie_at: Instant::now(),
         fade: Default::default(),
         fade_ms: 0,
@@ -3209,9 +3210,12 @@ struct App {
     /// The game's state as the program's main leaves it at its menu
     /// after a game's end or the options screen's New (`title_engine`:
     /// 0000:109B..1114, `Machine::title_menu`): the menu's Load goes on
-    /// from it (`open_saveui`). Creation's Start still begins on START.MIF
-    /// loaded afresh.
+    /// from it (`open_saveui`), and so does creation from the menu's Start
+    /// (`creation_from_title`).
     title_engine: Option<Engine>,
+    /// Creation going on from `title_engine` (the menu's Start took it):
+    /// the game then starts as the original's menu starts it.
+    creation_from_title: bool,
     /// When the screens' movie last advanced.
     movie_at: Instant,
     /// A screen opening as the original opens it (`fade_open`): the
@@ -3267,6 +3271,16 @@ impl App {
             Some(e) => c.input(e, inp),
             None => c.input(&mut self.engine, inp),
         }
+        // The menu's Start: creation goes on from the game as the program's
+        // start left it at the menu (0000:1130), where there is one, its
+        // 3D view drawn on as before.
+        if c.take_started() {
+            if let Some(mut t) = self.title_engine.take() {
+                t.keep_drawing(&mut self.engine);
+                self.engine = t;
+                self.creation_from_title = true;
+            }
+        }
         self.creation_outcome();
     }
 
@@ -3279,7 +3293,16 @@ impl App {
             create::Outcome::Play => {
                 self.creation = None;
                 self.title_engine = None;
-                newgame::play(&mut self.engine);
+                // From the menu's New on the program's own start: the
+                // rest of it as the original's (`areas::new_game_from_menu`);
+                // else (a start dungeon of the view's own) `newgame::play`.
+                if std::mem::take(&mut self.creation_from_title) {
+                    if areas::new_game_from_menu(&mut self.engine, &self.dir).is_none() {
+                        self.say("The new game could not be started.");
+                    }
+                } else {
+                    newgame::play(&mut self.engine);
+                }
                 self.run = arena::transit::Run::Start;
                 self.assets = Assets::new(&self.dir, &mut self.engine);
                 self.remake_renderer();

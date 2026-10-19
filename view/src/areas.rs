@@ -37,6 +37,13 @@ pub struct Areas<'a> {
 const RECORD: u16 = 0x0A22;
 
 impl AreaHooks for Areas<'_> {
+    /// 0000:8FC4 (the world's begin, 0AA9): the buttons waited up, so it
+    /// leaves AFF9 clear (a click whose release the game hadn't read yet,
+    /// as the vision's last after creation, read up here).
+    fn mouse_wait(&mut self, m: &mut Machine) {
+        m.mem.w8(DS, arena::controls::var::BUTTONS, 0);
+    }
+
     /// 1194:D459, the ending: the speech run as the game's state sees it
     /// (`Machine::vision`), its pages clicked through; what it shows is
     /// creation's ending's (`Creation::ending`), its text printed by
@@ -413,6 +420,43 @@ enum Tail {
 /// A new game's start dungeon is the run going (`newgame::play`).
 pub fn new_game_started() {
     NEW_GAME.with(|n| n.set(true));
+}
+
+/// A character made from the menu's New, on the game as the program's
+/// start left it at the menu: the rest of 0000:1139..117D
+/// (`Machine::new_game_begun`: creation's vision, its pages clicked
+/// through, the game set up, the working slot's files) and main on into
+/// the start dungeon (0C66: its run, 0997, and the world's begin and
+/// entry, 0AA9) up to its first frame. None where the port can't follow
+/// (reported).
+pub fn new_game_from_menu(engine: &mut Engine, dir: &Path) -> Option<Run> {
+    NEW_GAME.with(|n| n.set(true));
+    TAIL.with(|t| t.set(Tail::Current));
+    engine.area_watch();
+    let mut files = std::mem::take(&mut engine.files);
+    let ok = {
+        let m = &mut engine.m;
+        let begun = m.new_game_begun(&mut files, &mut arena::vision::ClickThrough::default()).is_some();
+        let h = &mut Areas { dir, files: Some(&mut files), failed: false, ending: None };
+        if begun {
+            m.start_run(h);
+            m.world_begin(0x0A36, h);
+        }
+        begun && !h.failed
+    };
+    let mut copy = files.clone();
+    engine.files = files;
+    engine.area_watched();
+    if !ok {
+        eprintln!("the new game's start gave up: {}", arena::giveup::describe());
+        return None;
+    }
+    let h = &mut Areas { dir, files: Some(&mut copy), failed: false, ending: None };
+    if engine.world_enter(h).is_none() || h.failed {
+        eprintln!("entering the start dungeon gave up: {}", arena::giveup::peek().map_or_else(|| "no reason noted".to_string(), |g| g.to_string()));
+        return None;
+    }
+    Some(Run::Start)
 }
 
 /// The area the view starts in, as the outer loop would have entered it:

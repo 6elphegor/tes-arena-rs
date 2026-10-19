@@ -2876,6 +2876,55 @@ fn the_menus_load_at_the_start_as_the_original() {
     titleplay_compared("startload", &a);
 }
 
+/// The program started, its main on to the menu (`world::title`), the
+/// menu's Start, the opening story run its course, and one character made
+/// (`creation`: gen_titleplay.py's CREATION, its inputs as the view's
+/// screens take them: the class from the list, Acrobat; "ria"; female;
+/// Morrowind; every bonus point on the first attribute; the second face),
+/// its vision clicked through: the game set up and the start dungeon
+/// entered, where its world loop is about to run its first frame, as the
+/// original's.
+#[test]
+fn a_new_game_from_the_menu_as_the_original() {
+    let Some((mut a, _d, _save)) = started_at_menu() else { return };
+    let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
+    let wait_until = |a: &mut App, done: &dyn Fn(&App) -> bool, what: &str| {
+        for _ in 0..20_000 {
+            if done(a) {
+                return;
+            }
+            a.creation_input(create::Input::Wait(50));
+        }
+        panic!("{what}: still {:?}", stage(a));
+    };
+    // The intro's movie skipped and the title left (the view's own
+    // screens: the game's state is the program's start's, `title_engine`).
+    for inp in create::parse_script("enter,esc") {
+        a.creation_input(inp);
+    }
+    wait_until(&mut a, &|a| stage(a).is_some_and(|p| p.2 == 5 && p.0 == 0), "the main menu");
+    a.creation_input(create::Input::Char(b'S'));
+    assert!(a.creation_from_title, "creation on the program's start's game");
+    // The opening story with no input: its movie and nine pictures.
+    wait_until(&mut a, &|a| stage(a).is_some_and(|p| p.2 == 0 && p.0 == 0), "the opening story");
+    let clicks = std::iter::repeat_n("click:41:50", 16).collect::<Vec<_>>().join(",");
+    let script = format!("S,click:94:51,click:94:51,type:ria,enter,F,enter,click:240:80,Y,enter,enter,enter,enter,enter,{clicks},click:10:175,S,enter,click:240:20,click:240:20,click:10:175");
+    for (i, inp) in create::parse_script(&script).into_iter().enumerate() {
+        assert!(a.creation.is_some(), "creation ended early at step {i} ({inp:?})");
+        a.creation_input(inp);
+    }
+    // The vision's pages clicked through, until the game starts.
+    for _ in 0..200 {
+        if a.creation.is_none() {
+            break;
+        }
+        a.creation_input(create::Input::Click(160, 100));
+        a.creation_input(create::Input::Wait(50));
+    }
+    assert!(a.creation.is_none(), "the game not started: {:?}", stage(&a));
+    titleplay_compared("creation", &a);
+}
+
 /// A case that ends where a game the title's Load loaded is about to run
 /// its first frame: its track, DGROUP from the case's start and from the
 /// load, the EMS banks, and the interface's rows of the page (see

@@ -284,11 +284,9 @@ impl Machine {
             hooks.message_box_number(self, files);
             self.mem.w16(DS, 0xCB5E, 0);
         }
-        // 292B:032A: a one-time note for classes without bit 20h.
-        if self.mem.r8(DS, 0x01A9) & 0x20 == 0 && self.mem.r16(DS, 0x05CA) & 8 == 0 {
-            let f = self.mem.r16(DS, 0x05CA) | 8;
-            self.mem.w16(DS, 0x05CA, f);
-        }
+        // 0000:492C: 292B:032A, the bar's spells barred for a class
+        // without bit 20h.
+        self.no_spells(files)?;
         self.weapon_change(files, hooks)?;
         self.weapon_frame(files, hooks)?;
         self.level_text_frame(hooks);
@@ -836,9 +834,7 @@ impl Machine {
         self.weather_drops()?;
         let f = self.mem.r16(DS, 0x05CA) & !8;
         self.mem.w16(DS, 0x05CA, f);
-        if self.mem.r8(DS, 0x01A9) & 0x20 == 0 {
-            self.mem.w16(DS, 0x05CA, f | 8);
-        }
+        self.no_spells(files)?;
         // 4E41..4E7B, the bar's texts and pictures (their pixels the front
         // end's): the font from 102E (9AEA: B036); the player's name
         // (1194:4BC8 with SI 1A4) copied to 1044, cut at its first space,
@@ -857,6 +853,24 @@ impl Machine {
         let v = self.mem.r16(DS, 0x102C);
         self.mem.w16(DS, 0xB036, v);
         self.bars_state();
+        Some(())
+    }
+
+    /// 292B:032A: for a class without 1A9 bit 20h (no spells), once (5CA
+    /// bit 8 set): NOSPELL.IMG (named at 7CFA) loaded whole to DS:1044
+    /// (7428) and its 19h by 13h bytes put into the page at (5Bh, B1h),
+    /// over the bar's spells button (599C; only where the page is the
+    /// game's own block). None where the file doesn't load.
+    pub(crate) fn no_spells(&mut self, files: &mut Files) -> Option<()> {
+        if self.mem.r8(DS, 0x01A9) & 0x20 != 0 || self.mem.r16(DS, 0x05CA) & 8 != 0 {
+            return Some(());
+        }
+        let f = self.mem.r16(DS, 0x05CA) | 8;
+        self.mem.w16(DS, 0x05CA, f);
+        self.file_load(files, 0x7CFA, DS, 0x1044)?;
+        if self.page_is_block() {
+            self.page_rect_put((DS, 0x1044), 0x5B, 0xB1, 0x19, 0x13);
+        }
         Some(())
     }
 
