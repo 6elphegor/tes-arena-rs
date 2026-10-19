@@ -18,7 +18,7 @@ use crate::machine::Machine;
 use crate::mem::{DATA, DS};
 use crate::travel::var::{DAYS, DISTANCE, MINUTES};
 use crate::travelmap::var::*;
-use crate::travelmap::TravelHooks;
+use crate::travelmap::{Marker, TravelHooks};
 
 /// What the screen's handlers leave to the front end beyond the journey's
 /// hooks.
@@ -524,7 +524,10 @@ impl Machine {
     /// markers' pictures are the front end's.
     pub fn travel_click(&mut self, files: &mut Files, hooks: &mut dyn TravelHooks) -> Option<()> {
         let (x, y) = (self.ms16(0x8F92), self.ms16(0x8F94));
-        self.travel_nearest(x, y);
+        // 0625..062D: the label's height over the place, by the nearest's
+        // kind (0B7A's BX) from the bytes at 6AA0.
+        let kind = self.travel_nearest(x, y);
+        let above = self.ms8(0x6AA0u16.wrapping_add(kind)) as u16;
         // 062E..0648: the screen kept in bank 4 copied back to the page
         // ([A8FE], all 64000 bytes; the bank stays mapped).
         hooks.bank(self, 4);
@@ -537,11 +540,13 @@ impl Machine {
             let pick = self.ms16(PICK);
             self.mem.w16(DS, PICK, self.ms8(HERE_ID) as u16);
             let kind = self.ms8(HERE_KIND) as u16;
-            self.travel_marker(kind);
+            let at = (self.ms16(0x0A48), self.ms16(0x0A4A), self.ms16(0x6AC9));
+            self.travel_marker(kind, at, hooks);
             self.mem.w16(DS, PICK, pick);
         }
-        // 0676..06CE: the nearest's name labelled (shadow CEh, text DFh),
-        // the colour EEh after.
+        // 0676..06CE: the nearest's name labelled (`travel_label`), the
+        // colour EEh after.
+        hooks.label(self, above);
         self.mem.w8(DS, 0x9288, 0xEE);
         if self.ms8(0xAFF9) != 0 {
             self.mem.w8(DS, CHOSEN, 1);
@@ -555,25 +560,58 @@ impl Machine {
         self.mem.w8(DS, BLINK, b);
         if self.ms8(CHOSEN) != 0 && b & 3 != 0 && self.ms8(SHOWN) == self.ms8(DEST_PROVINCE) {
             let kind = self.ms8(DEST_KIND) as u16;
-            self.travel_marker(kind);
+            let at = (self.ms16(0x193E), self.ms16(0x1940), self.ms16(0x6ACB));
+            self.travel_marker(kind, at, hooks);
         }
         Some(())
     }
 
-    /// 26F7:071F's state: a dungeon's marker (kind 3, the pick's low six
-    /// bits 20h) builds the identity remap at 929E (100h bytes) and its
-    /// colour at 937A, C2h for the dungeon the player is in, else DFh;
-    /// the marker itself (0000:9D84, or a frame of the marker's picture
-    /// placed over the location, 5828) is the front end's.
-    fn travel_marker(&mut self, kind: u16) {
-        if kind != 3 || self.ms16(PICK) % 0x40 != 0x20 {
+    /// 26F7:071F: the marker of kind `kind` (CX) at (x, y) (AX, BX), its
+    /// pictures in segment `seg` (DX). A dungeon's (kind 3, the pick's low
+    /// six bits 20h) builds the identity remap at 929E (100h bytes), its
+    /// colour at 937A C2h for the dungeon the player is in, else DFh, and
+    /// remaps the 16h by 11h box at (x - 8, y - 10) through it (9D84);
+    /// any other is the kind'th picture in `seg`, its header's place set
+    /// to (x, y) less half its size, drawn (5828). The drawings are
+    /// `TravelHooks::marker`'s.
+    fn travel_marker(&mut self, kind: u16, (x, y, seg): (u16, u16, u16), hooks: &mut dyn TravelHooks) {
+        if kind == 3 && self.ms16(PICK) % 0x40 == 0x20 {
+            for i in 0..0x100u16 {
+                self.mem.w8(DS, 0x929E + i, i as u8);
+            }
+            let here = self.ms16(PICK) == self.ms8(HERE_ID) as u16 && self.ms8(SHOWN) == self.ms8(HERE_PROVINCE);
+            self.mem.w8(DS, 0x937A, if here { 0xC2 } else { 0xDF });
+            hooks.marker(self, Marker::Remap(x.wrapping_sub(8), y.wrapping_sub(0xA)));
             return;
         }
-        for i in 0..0x100u16 {
-            self.mem.w8(DS, 0x929E + i, i as u8);
+        let mut si = 0u16;
+        for _ in 0..kind {
+            si = si.wrapping_add(self.mem.r16(seg, si.wrapping_add(0xA))).wrapping_add(0xC);
         }
-        let here = self.ms16(PICK) == self.ms8(HERE_ID) as u16 && self.ms8(SHOWN) == self.ms8(HERE_PROVINCE);
-        self.mem.w8(DS, 0x937A, if here { 0xC2 } else { 0xDF });
+        let w = self.mem.r16(seg, si.wrapping_add(4)) >> 1;
+        self.mem.w16(seg, si, x.wrapping_sub(w));
+        let h = self.mem.r16(seg, si.wrapping_add(6)) >> 1;
+        self.mem.w16(seg, si.wrapping_add(2), y.wrapping_sub(h));
+        hooks.marker(self, Marker::Picture(seg, si));
+    }
+
+    /// 0000:9D84 for a dungeon's marker: the 16h by 11h box at (`x`, `y`)
+    /// of the page remapped through the table at 929E, where the page is
+    /// the game's own block.
+    pub fn marker_remap(&mut self, x: u16, y: u16) {
+        if !self.page_is_block() {
+            return;
+        }
+        let page = self.ms16(0xA900);
+        let mut di = self.ms16(0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        for _ in 0..0x11 {
+            for k in 0..0x16u16 {
+                let b = self.mem.r8(page, di.wrapping_add(k));
+                let c = self.mem.r8(DS, 0x929Eu16.wrapping_add(b as u16));
+                self.mem.w8(page, di.wrapping_add(k), c);
+            }
+            di = di.wrapping_add(0x140);
+        }
     }
 
     /// 26F7:0483. The journey to the destination shown (not for the
@@ -626,6 +664,33 @@ impl Machine {
         let bank = self.ms16(0x1032);
         hooks.bank(self, bank);
         Some(())
+    }
+
+    /// 26F7:0676..06CE: the nearest's name (at [A8BA]) labelled centred
+    /// over its place (+14h, +16h less `above`; 2 where that goes under
+    /// 0), kept on the screen (x 2 where under 0, else no further right
+    /// than 13Eh less its width rounded down to even): a shadow in CEh one
+    /// right, then the text in DFh (9E06: into the page where it is the
+    /// game's own block, its state either way).
+    pub fn travel_label(&mut self, above: u16) {
+        let si = self.ms16(NEAREST_REC);
+        let dx = self.text_width_far((DS, si));
+        let mut ax = self.ms16(si.wrapping_add(0x14));
+        let mut bx = self.ms16(si.wrapping_add(0x16)).wrapping_sub(above);
+        if (bx as i16) < 0 {
+            bx = 2;
+        }
+        let half = dx >> 1;
+        ax = ax.wrapping_sub(half);
+        if (ax as i16) < 0 {
+            ax = 2;
+        } else if ax.wrapping_add(half << 1) >= 0x140 {
+            ax = 0x13Eu16.wrapping_sub(half << 1);
+        }
+        self.mem.w8(DS, 0x9288, 0xCE);
+        self.page_text_at(ax.wrapping_add(1), bx, (DS, si));
+        self.mem.w8(DS, 0x9288, 0xDF);
+        self.page_text_at(ax, bx, (DS, si));
     }
 
     /// 26F7:03A4 with 0ABC. The search: the names' scratch (1F4h bytes

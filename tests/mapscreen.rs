@@ -54,6 +54,10 @@ impl TravelHooks for Log {
     fn show_bank(&mut self, _m: &mut Machine, bx: u16) {
         self.log.extend([6, bx as u32]);
     }
+    // (The label's 66F2 and 9E06, the markers' 9D84 and 5828 are stubbed
+    // in gen_mapscreen.py.)
+    fn label(&mut self, _m: &mut Machine, _above: u16) {}
+    fn marker(&mut self, _m: &mut Machine, _marker: arena::travelmap::Marker) {}
     fn province(&mut self, _m: &mut Machine, _files: &mut Files, p: u8) -> Option<()> {
         self.log.extend([7, p as u32]);
         Some(())
