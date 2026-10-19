@@ -212,7 +212,7 @@ impl Machine {
     /// song stopped and the screen faded out (55B2: 929E black, the page
     /// cleared). None where a file doesn't load or a path isn't ported.
     pub fn story(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
-        self.music_song(EVLINTRO);
+        self.music_song(files, EVLINTRO);
         self.keys_up();
         self.map_bank(self.mem.r16(DS, 0x1030), 0);
         let frame = self.mem.r16(DS, 0x9030);
@@ -326,7 +326,7 @@ impl Machine {
 
     /// 0000:1246: the intro (see the module).
     fn title_intro(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
-        self.music_song(crate::music::var::PERCNTRO);
+        self.music_song(files, crate::music::var::PERCNTRO);
         self.keys_up();
         self.movie_play(files, hooks, INTRO_FLC)?;
         hooks.fade_out(self);

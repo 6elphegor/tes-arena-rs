@@ -203,7 +203,7 @@ impl Machine {
         // A failed load (no such file, 64 KiB or more, nothing read) is
         // ignored: the text left in the buffer is parsed, up to the last
         // size stored at OPEN_SIZE.
-        if self.hook_set(crate::bsa::var::OPEN_HOOK) {
+        if self.open_hook_unported() {
             return crate::giveup::not_ported("0000:EC03: the open hook set to a routine not ported");
         }
         if self.file_load(files, name, seg, off).is_none() && self.mem.r32(DS, crate::bsa::var::ERROR_HOOK) != 0 {

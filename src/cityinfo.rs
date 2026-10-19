@@ -420,7 +420,7 @@ impl Machine {
         hooks.city_info(self, files, self.ci8(PLACE) as u16)?;
         if self.ci16(0x05CA) & 0x4000 == 0 {
             self.quests_place(files, hooks)?;
-            hooks.music(self);
+            hooks.music(self, files);
         }
         for k in 0..4u16 {
             let si = crate::quest::var::QUESTS + k * 0x34;

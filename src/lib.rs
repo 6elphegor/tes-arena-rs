@@ -67,6 +67,7 @@ pub mod render;
 pub mod questitems;
 pub mod movement;
 pub mod music;
+pub mod musicdrv;
 pub mod names;
 pub mod piles;
 pub mod progression;

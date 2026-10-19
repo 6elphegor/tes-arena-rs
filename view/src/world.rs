@@ -103,7 +103,7 @@ fn heap(m: &mut Machine) {
 /// `game_setup`). A save loaded from here (`areas::load_game_title`) is
 /// the title's Load's.
 pub fn boot(dir: &Path) -> Engine {
-    boot_in(dir, None)
+    boot_in(dir, None, None)
 }
 
 /// `boot` with ARENA.BAT's sound driver (`arena_bat_sound`) loaded as
@@ -113,10 +113,20 @@ pub fn boot(dir: &Path) -> Engine {
 /// with sound on.
 #[cfg(test)]
 pub fn boot_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -> Engine {
-    boot_in(dir, Some(driver))
+    boot_in(dir, Some(driver), None)
 }
 
-fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -> Engine {
+/// `boot` with a music driver (`arena_bat_music`) loaded as main's
+/// command line loads it, after the working slot's files (1194:0783,
+/// `Machine::music_driver_main`), the original driver's answers
+/// `replay`'s (`Machine::music`): the songs are then started, stopped and
+/// asked after as the original's (src/musicdrv.rs).
+#[cfg(test)]
+pub fn boot_music(dir: &Path, replay: arena::musicdrv::Replay) -> Engine {
+    boot_in(dir, None, Some(replay))
+}
+
+fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>, music: Option<arena::musicdrv::Replay>) -> Engine {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
     let mut m = Machine::new(&image);
     let mut files = Files::new(dir).expect("game directory");
@@ -129,6 +139,11 @@ fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -
     if let Some(driver) = driver {
         arena_bat_sound(&mut m);
         m.sound_driver_main(&mut files, driver).expect("the sound driver's load");
+    }
+    if let Some(replay) = music {
+        m.music = Some(replay);
+        arena_bat_music(&mut m);
+        m.music_driver_main(&mut files);
     }
     m.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the game's set-up");
     m.store_rng();
@@ -162,6 +177,20 @@ fn title_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) 
     }
     m.program_main_driven(&mut files, &mut arena::title::NoTitleHooks, driver)?;
     Some(Engine::new(m, files))
+}
+
+/// A music driver as main's command line would leave it for a Sound
+/// Blaster Pro's FM chips (-Msbp1fm.adv -IOM220, 1194:066A: its name at
+/// 37EB, the I/O port at 3864; the IRQ and DMA channel the driver's own),
+/// and main's file-open hook (0000:1047: 0000:11DA at A904), which opens
+/// an FM driver's songs as their .xfm (harness/fmmus.py's).
+fn arena_bat_music(m: &mut Machine) {
+    for (i, &b) in b"SBP1FM.ADV\0".iter().enumerate() {
+        m.mem.w8(DS, arena::musicdrv::var::NAME + i as u16, b);
+    }
+    m.mem.w16(DS, arena::musicdrv::var::SETTINGS, 0x220);
+    m.mem.w16(DS, arena::bsa::var::OPEN_HOOK, 0x11DA);
+    m.mem.w16(DS, arena::bsa::var::OPEN_HOOK + 2, 0);
 }
 
 /// ARENA.BAT's sound driver as main's command line leaves it

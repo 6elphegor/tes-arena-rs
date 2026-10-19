@@ -920,14 +920,26 @@ impl Machine {
         files.dos.cur = h;
     }
 
+    /// Whether the file-open hook (A904) is set to a routine the port
+    /// doesn't run: anything but main's, 0000:11DA (`fm_song_name`; its
+    /// segment the image's, 0 here).
+    pub(crate) fn open_hook_unported(&self) -> bool {
+        self.hook_set(OPEN_HOOK) && (self.mem.r16(DS, OPEN_HOOK) != 0x11DA || self.mem.r16(DS, OPEN_HOOK + 2) != 0)
+    }
+
     /// The part of 67C4 and 6B26 they share: (handle, found).
     fn file_open_any(&mut self, files: &mut Files, name: u16) -> Option<(u16, bool)> {
         self.mem.w8(0, CS_IN_BSA, 0);
         self.mem.w16(DS, OPEN_NAME, name);
         self.mem.w16(DS, OPEN_NAME + 2, DS);
-        if self.hook_set(OPEN_HOOK) {
+        // The hook (A904) called with SI the name: main's, 0000:11DA (at
+        // 0000:1047; its segment the image's, 0 here), which hands an FM
+        // driver's songs over as their .xfm (`fm_song_name`); the name it
+        // returns opened.
+        if self.open_hook_unported() {
             return crate::giveup::not_ported("0000:67C4: the open hook set to a routine not ported");
         }
+        let name = if self.hook_set(OPEN_HOOK) { self.fm_song_name(name) } else { name };
         let raw = self.mem.cstr(DS, name).to_vec();
         let refused = Files::path_refused(0x3D, &raw);
         if let Some(bytes) = files.read_loose(&raw).filter(|_| refused.is_none()) {
@@ -1162,6 +1174,52 @@ impl Machine {
         } else {
             files.dos.close(files.dos.cur)
         }
+    }
+
+    /// DOS open (3Dh) of the file named `raw` (the music driver's timbre
+    /// file, 2F9F:0093, which calls DOS itself): AX, the handle (the
+    /// lowest free), or DOS's error code (2 not found, 3 a path it
+    /// refuses) as the original keeps it, carry or not. The handle the
+    /// port's file calls work on (CS:6837's) is left as it was: the
+    /// routine keeps its handle itself.
+    pub(crate) fn dos_open_raw(&mut self, files: &mut Files, raw: &[u8]) -> u16 {
+        let refused = Files::path_refused(0x3D, raw);
+        match files.read_loose(raw).filter(|_| refused.is_none()) {
+            Some(bytes) => {
+                let cur = files.dos.cur;
+                let h = files.dos.open(bytes, Files::base(raw).to_ascii_uppercase());
+                files.dos.cur = cur;
+                h
+            }
+            None => refused.unwrap_or(2),
+        }
+    }
+
+    /// DOS close (3Eh) of handle `h`, as a routine that keeps its handle
+    /// itself closes it (2F9F:00D6): false where nothing is open on it.
+    pub(crate) fn dos_close_on(&mut self, files: &mut Files, h: u16) -> bool {
+        files.dos.close(h)
+    }
+
+    /// 0000:6D56 on handle `h` (BX): a seek by `off` from the start (0),
+    /// the position (1) or the end, on DOS's handle; in a BSA entry
+    /// (CS:6839) the entry's own (`file_seek`). The new position, or as a
+    /// failed seek leaves DX:AX.
+    pub(crate) fn file_seek_on(&mut self, files: &mut Files, h: u16, whence: u8, off: u32) -> u32 {
+        if self.bsa_cs(CS_IN_BSA) != 0 {
+            return self.file_seek(files, whence, off);
+        }
+        files.dos.seek(h, whence, off).unwrap_or_else(|e| (off << 16) | e as u32)
+    }
+
+    /// 0000:6C10 on handle `h` (BX): up to `n` bytes read to `seg`:`off`
+    /// from DOS's handle; in a BSA entry (CS:6839) the entry's own
+    /// (`file_read`). AX.
+    pub(crate) fn file_read_on(&mut self, files: &mut Files, h: u16, seg: u16, off: u16, n: u16) -> u16 {
+        if self.bsa_cs(CS_IN_BSA) != 0 {
+            return self.file_read(files, seg, off, n);
+        }
+        self.dos_read(files, h, seg, off, n)
     }
 
     /// DOS read (3Fh) of up to `n` bytes on handle `h` to `seg`:`off`:

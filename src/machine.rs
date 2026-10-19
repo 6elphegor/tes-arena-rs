@@ -37,6 +37,11 @@ pub struct Machine {
     /// (AIL's sequence status: 0 stopped, 1 playing, 2 done).
     pub songs: Vec<crate::music::Song>,
     pub music_status: u8,
+    /// The music driver replayed (a test's, from the original's driver
+    /// loaded in the game's memory: its answers taken in turn, the calls
+    /// the music makes into it kept): None, the front end's (`songs`,
+    /// `music_status`).
+    pub music: Option<crate::musicdrv::Replay>,
     /// AX of the last list shown (1194:5734's kind: its panel, its record
     /// and the lines' colour), as the port's callers load it before their
     /// list hook, for the front end to draw the list as the original does.
@@ -86,7 +91,7 @@ pub struct Machine {
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured } = self;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -99,6 +104,7 @@ impl Clone for Machine {
             sound_names: sound_names.clone(),
             songs: songs.clone(),
             music_status: *music_status,
+            music: music.clone(),
             rows_made: *rows_made,
             rows_drawn: rows_drawn.clone(),
             page_di: *page_di,
@@ -116,7 +122,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured } = source;
+        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -128,6 +134,7 @@ impl Clone for Machine {
         self.sound_names.clone_from(sound_names);
         self.songs.clone_from(songs);
         self.music_status = *music_status;
+        self.music.clone_from(music);
         self.gave_up = *gave_up;
         self.list_kind = *list_kind;
         self.list_reads.clone_from(list_reads);
@@ -145,7 +152,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so

@@ -115,8 +115,11 @@ pub trait OptionsHooks {
     }
     /// 0FFD:0DE8: the music driver's volume set to `volume` (with the
     /// driver's words at DRIVER_A and DRIVER_B, and 0, the call's other
-    /// arguments).
-    fn music_volume(&mut self, _m: &mut Machine, _volume: u16) {}
+    /// arguments; by default kept with a music driver's replay,
+    /// `Machine::music_volume`).
+    fn music_volume(&mut self, m: &mut Machine, volume: u16) {
+        m.music_volume(volume);
+    }
 }
 
 /// `OptionsHooks` that leave the screen at once (Resume).

@@ -177,7 +177,7 @@ impl Machine {
         let own = self.mem.r8(DS, OWN_SONG) == 0;
         if own {
             self.music_stop();
-            self.music_start(self.mem.r16(DS, SONG));
+            self.music_start(files, self.mem.r16(DS, SONG));
         }
         hooks.fade_out(self);
         self.sheet_black();
@@ -193,9 +193,9 @@ impl Machine {
             self.view_clear();
             // 25FD:051F: in an interior (5E6 4) the building's song.
             if self.mem.r8(DS, 0x05E6) == 4 {
-                self.music_start(self.mem.r16(DS, crate::music::var::BUILDING_SONG));
+                self.music_start(files, self.mem.r16(DS, crate::music::var::BUILDING_SONG));
             } else if self.mem.r16(DS, 0x0D56) != 0 {
-                self.music_start(self.mem.r16(DS, 0x0D56));
+                self.music_start(files, self.mem.r16(DS, 0x0D56));
             }
         }
         Some(())

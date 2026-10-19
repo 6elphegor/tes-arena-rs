@@ -83,7 +83,7 @@ impl FrameHooks for Hooks {
     /// The generator's 0000:3491 is a RET.
     fn automap_mark(&mut self, _m: &mut Machine) {}
     /// The generator's 2294:04F5 is a RETF.
-    fn area_music(&mut self, _m: &mut Machine) {}
+    fn area_music(&mut self, _m: &mut Machine, _files: &mut Files) {}
     fn message_box(&mut self, m: &mut Machine, _text: u16) {
         count(m, 0xFFE8);
     }

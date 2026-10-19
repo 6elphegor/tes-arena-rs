@@ -42,11 +42,15 @@ struct Start<'a> {
     /// answered as SBPDIG.ADV answers its load: `Sbpdig`), the original's
     /// answers to the load's sounds this replay's.
     sound: Option<arena::digital::Replay>,
+    /// A music driver loaded at the program's start (`world::boot_music`),
+    /// the original's answers this replay's (the driver's load's, the
+    /// load's songs' and on).
+    music: Option<arena::musicdrv::Replay>,
 }
 
 impl Default for Start<'_> {
     fn default() -> Self {
-        Start { level: "CITY:8:0", hour: Some(12), at: None, picks: "", new_game: None, save_dir: None, load: None, sound: None }
+        Start { level: "CITY:8:0", hour: Some(12), at: None, picks: "", new_game: None, save_dir: None, load: None, sound: None, music: None }
     }
 }
 
@@ -54,8 +58,9 @@ fn app(dir: &Path, s: &Start) -> App {
     // A save loaded from the title: the game as the original reaches its
     // title (`world::boot`), no level of the view's own.
     let title = s.load.is_some() && s.new_game.is_none();
-    let mut engine = match &s.sound {
-        Some(replay) if title => {
+    let mut engine = match (&s.sound, &s.music) {
+        (_, Some(replay)) if title => world::boot_music(dir, replay.clone()),
+        (Some(replay), _) if title => {
             let mut e = world::boot_sound(dir, &mut Sbpdig::default());
             e.m.digital = Some(replay.clone());
             e

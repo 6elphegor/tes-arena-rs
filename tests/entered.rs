@@ -33,7 +33,7 @@ impl QuestHooks for Stubs {
         m.mem.w8(DS, 0xFFE6, b);
         Some(())
     }
-    fn music(&mut self, m: &mut Machine) {
+    fn music(&mut self, m: &mut Machine, _files: &mut Files) {
         let v = m.mem.r16(DS, 0xFFE2).wrapping_add(1);
         m.mem.w16(DS, 0xFFE2, v);
     }
