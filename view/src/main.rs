@@ -881,19 +881,29 @@ impl arena::rest::RestHooks for Front<'_> {
     fn message(&mut self, m: &mut arena::machine::Machine, si: u16) {
         Front::message_box(self, m, si);
     }
+    /// 1194:4659: drawn on the game's page (`Machine::rest_hours_draw`),
+    /// and kept for the status line.
     fn hours_text(&mut self, m: &mut arena::machine::Machine) {
+        m.rest_hours_draw();
         let s = String::from_utf8_lossy(m.mem.cstr(arena::mem::DS, arena::rest::var::TEXT)).into_owned();
         match self.talk.as_deref_mut() {
             Some(t) => t.status = Some(s),
             None => println!("{s}"),
         }
     }
+    /// The colours A611 and D45D read: the screen's.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.dac
+    }
     /// 1194:D3AF: the first level's dream (text 5DCh) on CHAOSVSN.FLC
     /// (DI 4E16h), the others (50Eh + F77) on VISION.FLC (DI 8085h), each
-    /// in the colour the port set at 9288 (33h, then 2Fh).
-    fn dream(&mut self, m: &mut arena::machine::Machine, text: u16) {
-        let flc = if text == 0x5DC { "CHAOSVSN.FLC" } else { "VISION.FLC" };
-        self.movie(flc, Some(text), m.mem.r8(arena::mem::DS, arena::rest::var::COLOUR));
+    /// in the colour the port set at 9288 (33h, then 2Fh), shown as the
+    /// window's movie; the game's D45D run on the game (`Machine::vision`,
+    /// its pages clicked through).
+    fn dream(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, di: u16) -> Option<()> {
+        let flc = if ax == 0x5DC { "CHAOSVSN.FLC" } else { "VISION.FLC" };
+        self.movie(flc, Some(ax), m.mem.r8(arena::mem::DS, arena::rest::var::COLOUR));
+        m.vision(files, &mut arena::vision::ClickThrough::default(), self.dac.as_ref(), ax, si, di)
     }
 }
 

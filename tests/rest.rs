@@ -188,10 +188,19 @@ impl RestHooks for Stubs {
     fn hours_text(&mut self, m: &mut Machine) {
         inc(m, 0xFFE4);
     }
-    fn dream(&mut self, m: &mut Machine, text: u16) {
+    fn dream(&mut self, m: &mut Machine, _files: &mut Files, text: u16, _si: u16, _di: u16) -> Option<()> {
         m.mem.w16(DS, 0xFFEE, text);
         inc(m, 0xFFEC);
+        Some(())
     }
+    // (gen_rest.py's stubs: A611, 55B2, A6B5, 2542:0446, 9A98 and 9AE6
+    // return.)
+    fn dream_keep(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    fn dream_black(&mut self, _m: &mut Machine) {}
+    fn dream_back(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn dream_screen(&mut self, _m: &mut Machine) {}
     fn sky(&mut self, m: &mut Machine) {
         inc(m, 0xFFEA);
     }

@@ -486,6 +486,72 @@ def wounded_with_potion(a):
     a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
 
 
+def resting_at(hour, heading):
+    """`resting` at `hour` (`at_hour`)."""
+    def put(a):
+        at_hour(hour, heading)(a)
+        a.w16(0x01A4 + 0x59, 1)
+        menu = a.lin(LOAD_SEG + 0x1194, 0x020E)
+        saved = bytes(a.mu.mem_read(menu, 4))
+        a.code_write(menu, b'\xb8\x01\x00\xcb')
+        try:
+            a.call_far(0x1194, 0x424E)
+        finally:
+            a.code_write(menu, saved)
+        assert a.mu.mem_read(a.lin(a.ds, 0x1013), 1)[0], 'not resting'
+    return put
+
+
+def dream_due(put):
+    """`put`, with the staff's line at its third stage and no dream pending
+    (F76 0, F77 3, F7A 0): the rest's end makes one pending and shows it
+    (1194:D340, D3AF: text 50Eh + 3 on VISION.FLC through D45D)."""
+    def both(a):
+        put(a)
+        a.mu.mem_write(a.lin(a.ds, 0x0F76), b'\x00\x03')
+        a.mu.mem_write(a.lin(a.ds, 0x0F7A), b'\x00')
+    return both
+
+
+def visioned(a, clicks):
+    """Hooks for a step whose frames show a vision (1194:D45D) outside a
+    death (`died`'s), or the Emperor's audience's movie (2294:0895 from
+    0000:41BE): inside them the timer (0151) ticks at each read of
+    it (the movie's frames wait on it), and as its movie begins (2294:0700)
+    `clicks` clicks are queued at the screen's centre, those not taken
+    dropped as they return (D45D to 1194:D41F, D459's D45C or D954; 0895
+    to 0000:41C3), but for the release of one
+    pressed. Returns the hooks
+    (for `hook_del`)."""
+    inside = [False]
+    t = a.lin(a.ds, 0x0151)
+
+    def enter(mu, addr, size, _):
+        inside[0] = True
+
+    def leave(mu, addr, size, _):
+        # (Its clicks not taken dropped, the window's click-through taking
+        # as many as its pages want; the one whose press ended it kept for
+        # its release.)
+        inside[0] = False
+        a.clicks = a.clicks[:1] if a.buttons else []
+
+    def tick(mu, access, addr, size, value, _):
+        if inside[0]:
+            a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+
+    def queue(mu, addr, size, _):
+        a.clicks = [(160, 100)] * clicks
+    ins = [a.lin(LOAD_SEG + 0x1194, 0xD45D), a.lin(LOAD_SEG + 0x2294, 0x0895)]
+    movie = a.lin(LOAD_SEG + 0x2294, 0x0700)
+    outs = [a.lin(LOAD_SEG + 0x1194, o) for o in (0xD41F, 0xD45C, 0xD954)] + [a.lin(LOAD_SEG, 0x41C3)]
+    hooks = [a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1),
+             a.mu.hook_add(UC_HOOK_CODE, queue, None, movie, movie)]
+    hooks += [a.mu.hook_add(UC_HOOK_CODE, enter, None, i, i) for i in ins]
+    hooks += [a.mu.hook_add(UC_HOOK_CODE, leave, None, o, o) for o in outs]
+    return hooks
+
+
 def dreaming(a):
     """The staff's line at stage 3 with its dream seen (F76 set, F77 3,
     F78 and F7D clear): "Where is" lists the stage's place tenth (1194:
@@ -669,6 +735,20 @@ def pile_ahead(a):
     gs.seeded(a)
 
 
+def piece_ahead(a):
+    """`pile_ahead`'s square and flat (7), with the level's staff flat
+    (C941, FFh here: the start dungeon holds no piece) made that flat, the
+    staff's line at its third piece (F77 3) and its text not yet told (F7D
+    0): clicked, the flat is the staff's piece (2433:0328's AH 0Fh with
+    AL [C941]): the keys go, the piece's sound plays, F77 moves on, its
+    text is shown (0BF4) and the flat taken from the map."""
+    at_square(0xB, 0x2A, 0)(a)
+    a.mu.mem_write(a.lin(a.r16(0xCCD0), 0x0C54), bytes([7]))
+    a.mu.mem_write(a.lin(a.ds, 0xC941), b'\x07')
+    a.mu.mem_write(a.lin(a.ds, 0x0F77), b'\x03')
+    a.mu.mem_write(a.lin(a.ds, 0x0F7D), b'\x00')
+
+
 def chest_ahead(a):
     """Row 0Bh, column 2Ah, facing north (heading 0), near the square's far
     edge (Y +70h), with the level's locked chest (its flat C93B on the
@@ -730,6 +810,19 @@ def palace_door_at_night(a):
     80h), at ten at night (`at_hour`)."""
     at_hour(22, 0)(a)
     at_square(9, 0x7C, 0x80)(a)
+
+
+def audience(stage):
+    """`palace_door_at_night` at noon, with the town taken for the Imperial
+    City (A46 8) and the staff's line at `stage` (F77): the palace's door
+    (0000:4192) runs the audience for it, 8 the Emperor's (41A4), 9 the
+    artifact's (425F: text 5DDh, 1194:A36C)."""
+    def put(a):
+        at_hour(12, 0)(a)
+        at_square(9, 0x7C, 0x80)(a)
+        a.mu.mem_write(a.lin(a.ds, 0x0A46), b'\x08')
+        a.mu.mem_write(a.lin(a.ds, 0x0F77), bytes([stage]))
+    return put
 
 
 def armed(put, seed=None):
@@ -1401,6 +1494,10 @@ CASES = {
     # 88D0) clicked away where the door was (the box's release left for
     # the next frame's controls, 2826:0A4C, which the window doesn't give:
     # at the same place, CB60 the same); three frames after.
+    # The palace's door by day in the Imperial City at the staff's ninth
+    # stage (`audience`): the artifact's audience, its text (5DDh) in its
+    # box clicked away.
+    'playaudience9': ('street', audience(9), [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)]}), ((), (), 3, None)]),
     'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)]}), ((), (), 3, None)]),
     # The house with picking armed (`armed`, the seed SEED): the lock
     # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area
@@ -1420,6 +1517,10 @@ CASES = {
     # encounters (1194:887A) until enemies come and end it ("Enemies are
     # nearby", the box read with Space), then what came comes on.
     'playrest': ('wild', resting(0x100), [((), (), 300, None, [], {'script': [('keys', [KEY_SPACE])]})]),
+    # `playcamp` with the staff's dream due (`dream_due`): the count's end
+    # shows it (1194:4606, D3AF through D45D, its pages clicked through).
+    'playdream': ('wild', dream_due(at_hour(12, 0x100)), [((), (), 2, None), ((KEY_R,), (), 1, None, [], {'script': [('keys', [KEY_C]), ('keys', [KEY_2]), ('keys', [KEY_ENTER])]}),
+                                                     ((), (KEY_R,), 30, None, [], {'script': [('keys', [KEY_SPACE])], 'dream': 8})]),
     # Camping (R, 2542:01E6) in the wilderness at noon: the camp's menu
     # (1194:020E) answered C (camp for a while), the hours typed (2,
     # Enter: 1194:46BF), then the rest's frames count them down (each 20
@@ -1490,6 +1591,9 @@ CASES = {
     # street (the corpse's record in the segment [1042] either way).
     'playlootwild': ('wild', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playlootstreet': ('street', open_ahead(brought(1)), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    # The staff's piece ahead (`piece_ahead`) clicked two frames on: its
+    # text in its box clicked away; five frames after.
+    'playpiece': ('dungeon', piece_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 5, None)]),
     'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
     'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
     # The crypt two squares north of its diagonal wall at row 8, column 3
@@ -2116,7 +2220,22 @@ def play(a, name, steps, tracks):
             a.keys_held(held)
         if let_go:
             a.keys_held(let_go, down=False)
-        why, _ = a.world_frames(n, until=until, each=each)
+        # (`dream`: a vision shown in the step's frames, `visioned`, with
+        # that many clicks; the install's speech served as `died` serves it.)
+        vhooks, names = [], None
+        if 'dream' in opts:
+            vhooks = visioned(a, opts['dream'])
+            names = dict(a.names)
+            speech = os.path.join(a.game_dir, 'SPEECH')
+            if os.path.isdir(speech):
+                a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
+        try:
+            why, _ = a.world_frames(n, until=until, each=each)
+        finally:
+            for h in vhooks:
+                a.mu.hook_del(h)
+            if names is not None:
+                a.names = names
         if opts.get('dies'):
             # (`dies`: the frames end the world loop, the player dead: the
             # outer loop's death followed, `died`; the case ends there.)

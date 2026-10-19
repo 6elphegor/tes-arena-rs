@@ -566,8 +566,9 @@ impl arena::rest::RestHooks for Rest {
     fn message(&mut self, m: &mut Machine, si: u16) {
         println!("    [box] {}", show(m, si));
     }
-    fn dream(&mut self, _m: &mut Machine, text: u16) {
+    fn dream(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, text: u16, _si: u16, _di: u16) -> Option<()> {
         println!("    [dream] text {text:#x}");
+        Some(())
     }
 }
 
