@@ -1135,9 +1135,14 @@ impl Creation {
         let mut s = Screen::new(self.pics.game);
         self.draw_back(&mut s, m, back);
         let under: Vec<u8> = s.indices().iter().map(|&i| i as u8).collect();
+        Self::game_box_over(m, text, &under);
+    }
+
+    /// `game_box` over the page `under` (a byte a pixel, 320 wide).
+    fn game_box_over(m: &mut Machine, text: (u16, u16), under: &[u8]) {
         let seed = m.mem.r16(DS, crate::film::DISSOLVE_SEED);
         m.key_flush();
-        if m.message_wait_box(text, Some(&under)).is_none() {
+        if m.message_wait_box(text, Some(under)).is_none() {
             eprintln!("a box gave up: {}", arena::giveup::describe());
         }
         m.message_box_closed();
@@ -2114,10 +2119,18 @@ impl Creation {
     /// (FACES1r.CIF, FACESF1r.CIF while creating), from the first.
     fn face_screen(&mut self, engine: &mut Engine) -> Stage {
         let m = &mut engine.m;
-        // 2BCB..2BE1 on the game: FONT_B ([102C]), colour FEh, the box.
+        // 2BCB..2BE1 on the game: FONT_B ([102C]), colour FEh, the box over
+        // the page the attributes left (`face_back`: their points, arrows
+        // and bonus panel still drawn).
         m.select_font(0x102C);
         m.mem.w8(DS, 0x9288, 0xFE);
-        self.game_box(m, (DATA, 0x3824), Back::Stats);
+        match &self.face_back {
+            Some((back, _)) => {
+                let under: Vec<u8> = back.iter().map(|&i| i as u8).collect();
+                Self::game_box_over(m, (DATA, 0x3824), &under);
+            }
+            None => self.game_box(m, (DATA, 0x3824), Back::Stats),
+        }
         let l = hud::lines(m.mem.cstr(DATA, 0x3824), COLOUR_B);
         self.push_box(l, FontId::Arena, Back::Stats);
         let name = format!("{}1{}.CIF", if m.mem.r8(DS, SEX) != 0 { "FACESF" } else { "FACES" }, m.mem.r8(DS, RACE));

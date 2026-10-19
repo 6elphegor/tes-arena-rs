@@ -2944,18 +2944,9 @@ fn the_menus_load_at_the_start_as_the_original() {
 /// Morrowind; every bonus point on the first attribute; the second face),
 /// its vision clicked through: the game set up and the start dungeon
 /// entered, where its world loop is about to run its first frame, as the
-/// original's.
-///
-/// Still differing (ARENA_STATE_DUMP and scratch diffs): the province's
-/// map (1194:27C2: its pictures into banks [1030] and [1032], the window
-/// library's run on TAMRIEL.MNU, 3159:000C: B7CE, B7D4, banks 12h and 18h),
-/// the class list run through the list window (1194:5734: 517F, 519E,
-/// B80D, A896), the keys creation's screens take into the game's buffer
-/// (AC4C, ACB4), the boxes' and texts' drawing state (A83D..A859), the
-/// dissolves' generator (4B8F), 8FBA, and from those the start dungeon's
-/// flats (D1E4.., CAE2) and bank 1Fh.
+/// original's: DGROUP (A83C left unshifted: no load writes a segment
+/// there in a new game), all 32 EMS banks and the interface.
 #[test]
-#[ignore = "the province map's window, the class list window, creation's keys and the boxes' drawing state aren't the original's yet (see the notes)"]
 fn a_new_game_from_the_menu_as_the_original() {
     let Some((mut a, _d, _save)) = started_at_menu() else { return };
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
