@@ -251,7 +251,7 @@ the original routine:
 | `OptionsHooks::hide` | src/options.rs:88 | 0000:541E | present | the mouse hidden | |
 | `OptionsHooks::load_menu` | src/options.rs:104 | 25FD:0242 and 0002 | elsewhere | the view runs its load menu itself (`SaveUi`) | |
 | `OptionsHooks::map_bank` | src/options.rs:74 | 0000:5C86 | port | the default runs the port | |
-| `OptionsHooks::music_volume` | src/options.rs:119 | 0FFD:0DE8 | elsewhere | the view sets its music's volume itself | |
+| `OptionsHooks::music_volume` | src/options.rs:120 | 0FFD:0DE8 | elsewhere | the view sets its music's volume itself | |
 | `OptionsHooks::picture` | src/options.rs:79 | 0000:7428 | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
 | `OptionsHooks::save_menu` | src/options.rs:105 |  | elsewhere | and its save menu | |
 | `OptionsHooks::show` | src/options.rs:90 |  | present | the screen shown | |
