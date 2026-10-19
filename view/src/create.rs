@@ -1795,11 +1795,12 @@ impl Creation {
         let seed = engine.m.mem.r16(DS, crate::film::DISSOLVE_SEED);
         let shown = engine.m.quiz_question(&mut engine.files);
         engine.m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
-        let Some((seg, di)) = shown else {
+        let Some((_, di)) = shown else {
             eprintln!("a question could not be found: {}", arena::giveup::describe());
             return self.list(engine);
         };
-        let text = engine.m.mem.cstr(seg, di).to_vec();
+        // The text in bank 4 (the window's routine leaves bank 3 mapped).
+        let text = with_bank(&mut engine.m, 4, |m, frame| m.mem.cstr(frame, di).to_vec());
         Stage::Quiz { asked, roll: self.roll_new(&text) }
     }
 
