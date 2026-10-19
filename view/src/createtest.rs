@@ -392,3 +392,44 @@ fn the_intro_plays_as_the_original() {
 
 const RETRACE: u32 = crate::film::RETRACE_MS;
 const TICK: u32 = crate::flc::TICK_MS;
+
+/// The main menu's Load and Exit (0000:1114's pick, then 111A's 55B2:
+/// the menu faded to black in 8) as the original shows them up to 117E
+/// and 11B1 (harness/gen_introframes.py's `menupick` runs): each state,
+/// and the waits for the retrace it shows at; the pick's outcome only
+/// once they've played.
+#[test]
+fn the_menus_load_and_exit_fade_as_the_original() {
+    let Some(dir) = game_dir() else { return };
+    let text = std::fs::read_to_string(INTRO).expect("tests/vectors/introframes.txt");
+    for (name, key) in [("menuload", b'L'), ("menuexit", b'E')] {
+        let want: Vec<(u64, u64, u32)> = text
+            .lines()
+            .map(|l| l.split(" | ").collect::<Vec<_>>())
+            .filter(|f| f.len() == 7 && f[0] == "menupick" && f[1] == name)
+            .map(|f| (u64::from_str_radix(f[3], 16).unwrap(), u64::from_str_radix(f[4], 16).unwrap(), f[5].parse().unwrap()))
+            .collect();
+        assert!(!want.is_empty(), "{name}: the original's run");
+        let mut engine = world::load(&dir, "START.MIF");
+        let archive = Rc::new(archive::Archive::open(&dir));
+        hud::init_style(&archive, &engine.m);
+        let mut c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
+        for inp in create::parse_script("enter,esc") {
+            c.input(&mut engine, inp);
+        }
+        c.settle(&mut engine.m);
+        c.input(&mut engine, create::Input::Char(key));
+        let mut seen: Vec<(u64, u64, u32)> = Vec::new();
+        for (px, dac) in c.film_frames() {
+            let st = (fnv(px.iter().copied()), fnv(dac.iter().copied()));
+            match seen.last_mut() {
+                Some(l) if (l.0, l.1) == st => l.2 += 1,
+                _ => seen.push((st.0, st.1, 1)),
+            }
+        }
+        assert_eq!(seen, want, "{name}: the fade differs from the original's");
+        assert!(c.outcome().is_none(), "{name}: the menu's pick waits for its fade");
+        c.advance(&mut engine.m, RETRACE * want.iter().map(|w| w.2).sum::<u32>());
+        assert!(c.outcome().is_some(), "{name}: the menu's pick once its fade has played");
+    }
+}

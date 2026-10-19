@@ -31,6 +31,9 @@ fn key(a: &mut App, code: KeyCode, down: bool) {
     a.input(In::Key { code, down, text: None });
 }
 
+/// Screens' pixels' and colours' digests, in turn.
+type Digests = Vec<(u64, u64)>;
+
 thread_local! {
     /// Each frame's 3D view (the engine's page, its first 92h rows) as
     /// the frame left it, for `boxview`.
@@ -45,6 +48,9 @@ thread_local! {
     /// Each day of the journey as the screen shows it (its pixels' and
     /// its colours' digests), for `journey`.
     static JOURNEY: std::cell::RefCell<Vec<(u64, u64)>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// The journey's fades before its days and after them, a retrace each
+    /// (their pixels' and colours' digests), for `journeyshow`.
+    static JOURNEY_FADES: std::cell::RefCell<(Digests, Digests)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
 }
 
 /// `n` frames as gen_areaplay.py's steps play them, a box read with Space
@@ -239,6 +245,9 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                     let mut m = a.engine.m.clone();
                     let seen = t.journey_seen(&a.font, &mut m).into_iter().map(|(px, dac)| (fnv(px), fnv(dac))).collect();
                     JOURNEY.set(seen);
+                    let (lead, tail) = t.journey_fades();
+                    let digests = |v: Vec<(Vec<u8>, Vec<u8>)>| v.into_iter().map(|(px, dac)| (fnv(px), fnv(dac))).collect::<Vec<_>>();
+                    JOURNEY_FADES.set((digests(lead), digests(tail)));
                 }
                 for _ in 0..100 {
                     if a.travel.is_none() {
@@ -327,6 +336,35 @@ fn transit(name: &str) {
         for (k, (s, o)) in seen.iter().zip(&days).enumerate() {
             assert_eq!(s.1, o.1, "{name}: day {k}'s colours differ from the original's");
             assert_eq!(s.0, o.0, "{name}: day {k}'s screen differs from the original's");
+        }
+    }
+    // The journey as the screen shows it: before the days, each wait for
+    // the retrace from Travel's first fade (55B2, then the world map's
+    // colours faded in); after them, the last day faded out (55B2).
+    let shows: Vec<(bool, u64, u64, usize)> = text
+        .lines()
+        .map(|l| l.split(" | ").collect::<Vec<_>>())
+        .filter(|f| f.len() == 3 && f[0] == "journeyshow" && f[1] == name)
+        .map(|f| {
+            let v: Vec<&str> = f[2].split(' ').collect();
+            (v[0] == "d", u64::from_str_radix(v[1], 16).unwrap(), u64::from_str_radix(v[2], 16).unwrap(), v[3].parse().unwrap())
+        })
+        .collect();
+    if !shows.is_empty() {
+        let expand = |runs: &[(bool, u64, u64, usize)]| runs.iter().flat_map(|&(_, s, c, n)| std::iter::repeat_n((s, c), n)).collect::<Vec<_>>();
+        let first = shows.iter().position(|s| s.0).unwrap_or(shows.len());
+        let last = shows.iter().rposition(|s| s.0).map_or(shows.len(), |i| i + 1);
+        let (want_lead, want_tail) = (expand(&shows[..first]), expand(&shows[last..]));
+        let (place, setup, play) = transit_case(name).unwrap();
+        JOURNEY_FADES.with(|j| *j.borrow_mut() = Default::default());
+        played(place, setup, play);
+        let (lead, tail) = JOURNEY_FADES.with(|j| std::mem::take(&mut *j.borrow_mut()));
+        for (what, seen, want) in [("before the days", lead, want_lead), ("after the days", tail, want_tail)] {
+            for (k, (s, o)) in seen.iter().zip(&want).enumerate() {
+                assert_eq!(s.1, o.1, "{name}: the journey's colours {what}, retrace {k}, differ from the original's");
+                assert_eq!(s.0, o.0, "{name}: the journey's screen {what}, retrace {k}, differs from the original's");
+            }
+            assert_eq!(seen.len(), want.len(), "{name}: the journey's retraces {what} differ from the original's");
         }
     }
     state_compared_in(AREAPLAY, name, false, transit_case(name).unwrap());

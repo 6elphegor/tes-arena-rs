@@ -850,6 +850,9 @@ impl Creation {
             return None;
         }
         match (&self.outcome, &self.stage) {
+            // The menu's Load and Exit once the fade to black after the
+            // pick (111A's 55B2) has played.
+            (Some(Outcome::Load | Outcome::Exit), _) if !self.film.is_empty() => None,
             (Some(o), _) => Some(o.clone()),
             (None, Stage::Done) => Some(Outcome::Play),
             _ => None,

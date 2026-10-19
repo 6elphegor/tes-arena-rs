@@ -48,6 +48,14 @@ days run as fast as the machine does.
 
   journey | NAME | <day> <screen digest> <colours digest> <retraces> <ticks>
 
+and the journey as shown, from Travel's first fade (26F7:081E, 1194:55B2)
+to its handler's end (08F6, after the last 55B2): each wait for the
+retrace (r: 0000:6BA8, and 9B74 in the colours' setting) and each day
+presented (d) with the screen and colours then,
+runs of the same counted:
+
+  journeyshow | NAME | <r|d> <screen digest> <colours digest> <count>
+
 With --dump DIR, each case's NAME.ds/.ems (as it ends) and NAME.ds0/
 .ems0 (as it starts) for worldtest's state reports (game data: never
 commit them).
@@ -255,6 +263,7 @@ def main():
 
         def retrace(*_):
             waited[0] += 1
+            show('r')
 
         def tick(*_):
             waited[1] += 1
@@ -262,13 +271,34 @@ def main():
         def days_start(*_):
             waited[0] = waited[1] = 0
 
+        shown = []
+        showing = [False]
+
+        def show(kind):
+            if showing[0]:
+                at = (kind, fnv(a.vga()), fnv(bytes(a.dac)))
+                if shown and shown[-1][0] == at:
+                    shown[-1][1] += 1
+                else:
+                    shown.append([at, 1])
+
+        def show_on(*_):
+            showing[0] = True
+
+        def show_off(*_):
+            showing[0] = False
+
         def day(*_):
+            show('d')
             days.append(f'journey | {name} | {len(days)} {fnv(a.vga()):x} {fnv(bytes(a.dac)):x} {waited[0]} {waited[1]}\n')
             waited[0] = waited[1] = 0
         hooks = [a.mu.hook_add(UC_HOOK_CODE, retrace, None, a.lin(LOAD_SEG, 0x6BA8), a.lin(LOAD_SEG, 0x6BA8)),
                  a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, a.lin(a.ds, 0x0151), a.lin(a.ds, 0x0152)),
                  a.mu.hook_add(UC_HOOK_CODE, days_start, None, a.lin(LOAD_SEG + 0x1194, 0x30F1), a.lin(LOAD_SEG + 0x1194, 0x30F1)),
-                 a.mu.hook_add(UC_HOOK_CODE, day, None, a.lin(LOAD_SEG + 0x1194, 0x312C), a.lin(LOAD_SEG + 0x1194, 0x312C))]
+                 a.mu.hook_add(UC_HOOK_CODE, day, None, a.lin(LOAD_SEG + 0x1194, 0x312C), a.lin(LOAD_SEG + 0x1194, 0x312C)),
+                 a.mu.hook_add(UC_HOOK_CODE, lambda *_: show('r'), None, a.lin(LOAD_SEG, 0x9B74), a.lin(LOAD_SEG, 0x9B74)),
+                 a.mu.hook_add(UC_HOOK_CODE, show_on, None, a.lin(LOAD_SEG + 0x26F7, 0x081E), a.lin(LOAD_SEG + 0x26F7, 0x081E)),
+                 a.mu.hook_add(UC_HOOK_CODE, show_off, None, a.lin(LOAD_SEG + 0x26F7, 0x08F6), a.lin(LOAD_SEG + 0x26F7, 0x08F6))]
         try:
             full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
         finally:
@@ -290,6 +320,8 @@ def main():
             out.write(f'provincepage | {name} | {digest:x}\n')
         for line in days:
             out.write(line)
+        for (kind, vga, dac), n in shown:
+            out.write(f'journeyshow | {name} | {kind} {vga:x} {dac:x} {n}\n')
         out.write(w.rows_line(a, name))
         if dump:
             os.makedirs(dump, exist_ok=True)

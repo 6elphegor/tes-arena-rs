@@ -1529,6 +1529,13 @@ fn each_bar_button_as_the_original_wires_it() {
     let got = a.boxes.front().map(|x| text(x)).unwrap_or_default();
     let first = want.split(['\r', '\n']).find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
     assert!(!first.is_empty() && got.contains(&first), "the status box: {got:?} / {want:?}");
+    // Its loop (2542:0530..0569) leaves only on a click or Esc held:
+    // Enter and Space leave it up.
+    d.key(&mut a, KeyCode::Enter, None);
+    d.key(&mut a, KeyCode::Space, Some(" "));
+    assert_eq!(a.boxes.len(), 1, "Enter and Space leave the status box up");
+    d.key(&mut a, KeyCode::Escape, None);
+    assert!(a.boxes.is_empty(), "Esc closes the status box");
     // 3 with a condition: poisoned (+40Dh bit 2) is listed after the
     // text (2686:005E), the same text status_box makes.
     let (mut a, mut d) = fresh();
@@ -1894,6 +1901,8 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     // title.)
     d.hold(&mut b, KeyCode::Escape);
     d.key(&mut b, KeyCode::KeyL, Some("L"));
+    // (The menu faded to black first, 111A's 55B2.)
+    d.wait(&mut b, 500);
     assert!(b.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
     let mut shot = hud::Screen::new(b.assets.palette);
     b.saveui.as_ref().unwrap().draw(&mut shot);
@@ -1936,6 +1945,8 @@ fn a_death_then_the_menus_load() {
     d.key(&mut a, KeyCode::Enter, None);
     d.hold(&mut a, KeyCode::Escape);
     d.key(&mut a, KeyCode::KeyL, Some("L"));
+    // (The menu faded to black first, 111A's 55B2.)
+    d.wait(&mut a, 500);
     assert!(a.saveui.as_ref().is_some_and(|u| u.kind == saveui::Kind::TitleLoad), "the title's load menu is up");
     d.click(&mut a, 160, 4 + 14 + 3, MouseButton::Left);
     assert!(a.saveui.is_none() && a.creation.is_none() && a.title_engine.is_none(), "loaded and playing");

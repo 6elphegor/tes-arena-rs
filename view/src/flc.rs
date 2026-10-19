@@ -9,6 +9,11 @@
 //! are read too. A .CEL (the quiz's figures) is the same with a smaller
 //! frame, placed by its CEL_DATA chunk.
 //!
+//! The palette chunk is only ever in a file's first frame: none of the
+//! game's 17 movies (in its folder; GLOBAL.BSA holds none) changes its
+//! colours later, so 6546's one retrace with a later frame's new colours
+//! over the old picture never shows, and isn't drawn.
+//!
 //! Where the original plays them:
 //! - INTRO.FLC at the main menu's start (0000:125C, through 2294:0895),
 //!   before TITLE.IMG and the menu (MENU.IMG, 0000:10FA);

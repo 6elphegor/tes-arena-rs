@@ -1778,6 +1778,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         log_run: None,
         ring_kept: false,
         ring_box_kept: false,
+        status_box: false,
+        journey_black: false,
         travel: None,
         saveui: None,
         saveui_under: None,
@@ -3166,6 +3168,12 @@ struct App {
     /// and Esc's key alone, forgetting no keys typed, so the ring isn't
     /// forgotten as it comes up (`ring_screen`).
     ring_box_kept: bool,
+    /// The status box is the box up: its loop (2542:0530..0569) leaves
+    /// only on a click or on Esc's key held, so Enter and Space don't read
+    /// it as they read the game's other boxes.
+    status_box: bool,
+    /// A journey just ended: the screen black (`fade_from`).
+    journey_black: bool,
     /// The travel map up (`travel`).
     travel: Option<travel::Travel>,
     /// The save or load menu up (`saveui`: the options screen's Save and
@@ -3986,6 +3994,11 @@ impl App {
         let pic = self.travel.as_ref().is_some_and(|t| t.picture_up());
         if let Some(t) = &mut self.travel {
             f(t, &mut self.engine, &self.assets.archive);
+            // A journey made: its fades from the screen as the click found
+            // it (26F7:081E's 55B2 on).
+            if t.journeying() {
+                t.journey_from(&was.2);
+            }
         }
         let pic_now = self.travel.as_ref().is_some_and(|t| t.picture_up());
         if pic != pic_now {
@@ -4030,8 +4043,12 @@ impl App {
         // Shown on the way out of a dungeon (a turn's question): its end
         // is the answer, the turn run again with the game as it ended.
         let forced = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_)));
+        let journeyed = self.travel.as_ref().is_some_and(|t| t.journeyed);
         let carry = travel::after(&mut self.travel, &mut self.engine, &mut boxes, !forced);
         self.boxes.extend(boxes);
+        // After a journey the screen is black (26F7:08F1's 55B2): the area's
+        // change starts from there.
+        self.journey_black |= journeyed && carry.is_some();
         // (Opened by the map button inside the frame: its end runs the
         // rest of that frame (`screen_ended`), which a journey's C398 bit
         // 80h (2542:0434) ends the world loop at, 0000:A453.)
@@ -4775,6 +4792,7 @@ impl App {
                 })
             }
             sheets::BarAction::Status(lines) => {
+                self.status_box = self.boxes.is_empty();
                 self.boxes.push_back(lines);
                 self.ring_box_kept = true;
             }
@@ -4847,6 +4865,10 @@ impl App {
     fn fade_from(&mut self) -> (std::collections::VecDeque<(film::Dac, bool)>, film::Dac, hud::Screen) {
         let queued = std::mem::take(&mut self.fade);
         self.compose();
+        if std::mem::take(&mut self.journey_black) {
+            let black = [[0, 0, 0, 0xFF]; 256];
+            return (queued, black, hud::Screen::new(black));
+        }
         let mut from = *self.screen.palette();
         // The world seen outdoors: its sky's colours in entries 1..8 and the
         // lamps' in 71h, as the game sets them in the DAC (`set_sky`).
@@ -5063,7 +5085,8 @@ impl App {
     fn dialog_key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) {
         use winit::keyboard::KeyCode;
         if !self.boxes.is_empty() {
-            if matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape) {
+            let keys = matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space) && !self.status_box;
+            if keys || code == KeyCode::Escape {
                 self.box_read();
             }
             return;
@@ -5184,6 +5207,7 @@ impl App {
 
     fn box_read(&mut self) {
         self.boxes.pop_front();
+        self.status_box = false;
         if self.boxes.is_empty() {
             self.box_backdrop = None;
         }

@@ -167,6 +167,9 @@ def run(a, start, keys):
         hooks.append(mu.hook_add(UC_HOOK_CODE, f, None, x, x))
 
     def menu(mu, addr, size, _):
+        # Its registers kept for `pick` (ES:SI the regions, main's stack).
+        a.menu_regs = {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()])
+                       for r in ('eax', 'ebx', 'ecx', 'edx', 'esi', 'edi', 'ebp', 'es', 'ss', 'sp')}
         a.waiting = ('menu',)
         mu.emu_stop()
     m = a.lin(LOAD_SEG, MENU_WAIT)
@@ -185,6 +188,43 @@ def run(a, start, keys):
     return r
 
 
+# The menu's picks (`pick`): Load (region 0, on to 0000:117E) and Exit
+# (2, on to 11B1), each after Esc held from the title's wait (`titleesc`'s
+# way to the menu).
+PICKS = [('menuload', 0, 0x117E), ('menuexit', 2, 0x11B1)]
+
+
+def pick(a, region, stop):
+    """From the menu's wait (`run`'s, its registers kept), the region
+    `region` picked as 1194:5CF4 returns it (B7C6 the region, B7C4 bit 1),
+    main on from 1119 (55B2) to `stop`, sampled as `run` samples."""
+    mu = a.mu
+    r = Run(a, [])
+    t = a.lin(a.ds, 0x0151)
+    hooks = [mu.hook_add(UC_HOOK_MEM_READ, r.tick, None, t, t + 1)]
+    for off, f in ((0x6BA8, r.retrace), (0x9B74, r.retrace)):
+        x = a.lin(LOAD_SEG, off)
+        hooks.append(mu.hook_add(UC_HOOK_CODE, f, None, x, x))
+
+    def stopped(mu, addr, size, _):
+        a.waiting = ('picked',)
+        mu.emu_stop()
+    x = a.lin(LOAD_SEG, stop)
+    hooks.append(mu.hook_add(UC_HOOK_CODE, stopped, None, x, x))
+    a.w16(0xB7C6, region)
+    a.w16(0xB7C4, a.r16(0xB7C4) | 2)
+    regs = dict(a.menu_regs)
+    stack = (regs.pop('ss'), regs.pop('sp'))
+    mu.ctl_flush_tb()
+    try:
+        res = a.run_screen(0, 0x1119, regs=regs, stack=stack, count=3_000_000_000)
+    finally:
+        for h in hooks:
+            mu.hook_del(h)
+    assert res == ('picked',), f'stopped by {res} (fault {a.fault})'
+    return r
+
+
 def main():
     exe, game, out = sys.argv[1:4]
     only = sys.argv[4:]
@@ -200,6 +240,15 @@ def main():
             for n, (s, c, rt, tk) in enumerate(r.states):
                 f.write(f'introframes | {name} | {n} | {s:x} | {c:x} | {rt} | {tk}\n')
             f.write('introframes | %s | end | %04x\n' % (name, a.r16(0x4B8E)))
+            print(name, len(r.states), 'states', file=sys.stderr)
+        for name, region, stop in PICKS:
+            if only and name not in only:
+                continue
+            a.restore(base)
+            run(a, 0x10C9, [(0x1B, 120, 2000)])
+            r = pick(a, region, stop)
+            for n, (s, c, rt, tk) in enumerate(r.states):
+                f.write(f'menupick | {name} | {n} | {s:x} | {c:x} | {rt} | {tk}\n')
             print(name, len(r.states), 'states', file=sys.stderr)
 
 
