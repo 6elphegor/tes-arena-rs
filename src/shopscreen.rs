@@ -71,6 +71,16 @@ impl Machine {
         let page_seg = self.mem.r16(DS, 0xA900);
         let mut page: Vec<u8> = (0..64000u32).map(|i| self.mem.r8(page_seg, i as u16)).collect();
         crate::render::image_page(self, &mut page, seg, off);
+        // A game the port starts without a page block has A000h there,
+        // over its heap's blocks (`page_is_block`): written back, the
+        // drawing would land on the images the screens load high as they
+        // are drawn (a playtest's shop from CITY:1:2, seed 77, broke the
+        // heap's chain and ran a picture's rows off the page). The drawing
+        // still runs, for what 5828 leaves (its unpacking's block, B53E);
+        // only the page keeps its bytes.
+        if !self.page_is_block() {
+            return;
+        }
         for (i, &b) in page.iter().enumerate() {
             self.mem.w8(page_seg, i as u16, b);
         }
@@ -115,8 +125,7 @@ impl Machine {
         let span = tiles.wrapping_mul(0x10);
         self.mem.w16(DS, 0xA876, span);
         let left = 0xA0u16.wrapping_sub(span >> 1);
-        self.mem.w16(DS, 0xA87C, left);
-        let img = self.load_alloc_high(files, MENU_CTR);
+        self.mem.w16(DS, 0xA87C, left);        let img = self.load_alloc_high(files, MENU_CTR);
         self.mem.w16(DS, 0xA872, img);
         let mut x = left;
         for _ in 0..tiles {

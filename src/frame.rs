@@ -823,8 +823,15 @@ impl Machine {
         }
         // 4E20..4E29: the bar's picture (P1.IMG, named at 12E4) read into
         // the draw page ([A900]) at B7C0h, row 147.
-        let page = self.mem.r16(DS, 0xA900);
-        self.file_load(files, 0x12E4, page, 0xB7C0)?;
+        // Not over a heap's blocks: a game the port starts without a page
+        // block has A000h there (`page_is_block`), where B7C0h on is its
+        // heap's high block (a playtest's area changes from CITY:1:2 broke
+        // the heap's chain). The file's open, read and close leave nothing
+        // else behind.
+        if self.page_is_block() {
+            let page = self.mem.r16(DS, 0xA900);
+            self.file_load(files, 0x12E4, page, 0xB7C0)?;
+        }
         self.view_record(0x883E);
         self.weather_drops()?;
         let f = self.mem.r16(DS, 0x05CA) & !8;

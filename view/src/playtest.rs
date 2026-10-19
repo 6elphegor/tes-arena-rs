@@ -995,6 +995,11 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                     if t.picture_up() {
                                         t.click(&mut engine, &archive, 0x120, 0xBD, false);
                                         *counts.entry("quest dungeon pictures").or_default() += 1;
+                                    } else if t.shown().is_some() {
+                                        // A province's map takes no keys
+                                        // (no keyed regions): its Exit
+                                        // button (x 72, row 167) clicked.
+                                        t.click(&mut engine, &archive, 81, 180, false);
                                     } else {
                                         t.key(&mut engine, KeyCode::Escape, None, (160, 100));
                                     }
@@ -1066,7 +1071,6 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                     }
                     let row = |s: u8| 4 + s as i32 * 14 + 3;
                     let archive = st.assets.archive.clone();
-                    let was = kept(&engine);
                     let (mut ui, mut e) = crate::saveui::SaveUi::open(crate::saveui::Kind::Save, &engine, sdir, &archive);
                     if let crate::saveui::Ended::Open = e {
                         e = ui.click(160, row(slot), false);
@@ -1090,6 +1094,14 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                         crate::saveui::Ended::Save(e2, s) => {
                             engine = e2;
                             let msg = crate::save_to(&mut engine, sdir, s, st.assets.dac(), None);
+                            // What the load must give back: the game as the
+                            // save left it, not as before the save (the save
+                            // moves the eye: a load makes the saved eye the
+                            // place, 0000:AA18..AA33, and the eye is set back
+                            // from it again; seed 41 from CITY:1:2, frame 903:
+                            // Y 2C2h before the save, 2D1h after it and the
+                            // load alike), as `Act::SaveLoad` compares.
+                            let was = kept(&engine);
                             if msg.contains("failed") {
                                 println!("ODD frame {n} (menus): {msg}; {}", place(&engine, run));
                                 issues.set(issues.get() + 1);
@@ -1107,7 +1119,8 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                         st.assets = Assets::new(dir, &mut engine);
                                         *counts.entry("menu loads").or_default() += 1;
                                         if was != kept(&engine) {
-                                            println!("SAVELOAD frame {n} (menus): slot {s3}; before {:?}; after {}", String::from_utf8_lossy(&was.0), place(&engine, run));
+                                            let now = kept(&engine);
+                                            println!("SAVELOAD frame {n} (menus): slot {s3}; before {:?} {:x?}; after {:?} {:x?}; {}", String::from_utf8_lossy(&was.0), (was.1, was.2, was.3, was.4), String::from_utf8_lossy(&now.0), (now.1, now.2, now.3, now.4), place(&engine, run));
                                             issues.set(issues.get() + 1);
                                         }
                                         citydata(&mut engine, n, run, &issues);
