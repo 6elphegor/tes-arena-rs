@@ -878,12 +878,10 @@ fn frames_answered(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usi
     }
 }
 
-/// gen_worldframes.py's PALACE_ACCEPT_SCRIPT: the ruler's question's Yes,
-/// the offer's Yes (136..157), its box after.
-const PALACE_ACCEPT_SCRIPT: [Act; 3] = [Act::Click(0xA0, 0x6E), Act::Click(0xA0, 0x90), Act::Click(0xA0, 0x60)];
-/// PALACE_ACCEPT_SCRIPT and the palace's words after the offer taken,
-/// which the harness's next frame shows (the step's `script`) and the
-/// view's turn shows before it ends.
+/// gen_worldframes.py's PALACE_ACCEPT_SCRIPT (the ruler's question's Yes,
+/// the offer's Yes, 136..157, its box after) and the palace's words after
+/// the offer taken, which the harness's next frame shows (the step's
+/// `script`) and the view's turn shows before it ends.
 const PALACE_ACCEPT_TURN: [Act; 4] = [Act::Click(0xA0, 0x6E), Act::Click(0xA0, 0x90), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x60)];
 /// gen_worldframes.py's QUEST_REACHED_SCRIPT: the quest's words, then the
 /// tavern's menu's Exit.
