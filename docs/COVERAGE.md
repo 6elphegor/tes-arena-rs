@@ -34,10 +34,10 @@ tables built in code, overlay-style dispatch) can be missing from
 "reachable"; routine sizes count decoded instruction bytes only (data
 inside code is not counted); a routine "ported" may be ported in part
 (its doc names what is left as hooks); addresses claimed in the port
-that fall in no routine the graph found: 1
-({'ported': 1}), a measure of what the graph misses; and routines the
+that fall in no routine the graph found: 8
+({'ported': 8}), a measure of what the graph misses; and routines the
 port names as entries that the graph alone did not reach, added as roots:
-143 routines came in with them.
+194 routines came in with them.
 
 "Likely ported inline" marks an uncovered routine whose distinctive
 constants (immediates and addresses of 100h and more) show as hex literals
@@ -53,52 +53,52 @@ drawing): the renderer's internals mostly land there.
 
 | | routines | bytes |
 |---|---:|---:|
-| reachable | 2458 | 198125 |
-| ported (in whole or part) | 1800 | 141037 |
-| hooks (front end's) | 72 | 5496 |
-| the view's own version | 75 | 8985 |
-| not covered: game state or undetermined | 0 | 0 |
-| &nbsp;&nbsp;of which likely ported inline in a caller | 0 | 0 |
-| &nbsp;&nbsp;of which open | 0 | 0 |
-| not covered: presentation / I/O / hardware | 511 | 42607 |
+| reachable | 2509 | 197875 |
+| ported (in whole or part) | 2110 | 171535 |
+| hooks (front end's) | 30 | 1206 |
+| the view's own version | 59 | 5228 |
+| not covered: game state or undetermined | 50 | 5771 |
+| &nbsp;&nbsp;of which likely ported inline in a caller | 23 | 2387 |
+| &nbsp;&nbsp;of which open | 27 | 3384 |
+| not covered: presentation / I/O / hardware | 260 | 14135 |
 
 By segment:
 
 | segment | routines | bytes | covered | covered bytes |
 |---|---:|---:|---:|---:|
-| 0000 | 768 | 66903 | 521 | 41858 |
-| 0FFD | 63 | 2085 | 1 | 6 |
-| 1194 | 863 | 63380 | 756 | 55816 |
-| 217B | 18 | 1834 | 15 | 1602 |
-| 21EE | 9 | 951 | 4 | 650 |
-| 222C | 24 | 1592 | 12 | 927 |
-| 2294 | 44 | 4661 | 43 | 4553 |
+| 0000 | 786 | 65955 | 639 | 54336 |
+| 0FFD | 63 | 2085 | 2 | 12 |
+| 1194 | 879 | 64068 | 828 | 61617 |
+| 217B | 18 | 1834 | 16 | 1697 |
+| 21EE | 9 | 951 | 5 | 714 |
+| 222C | 24 | 1592 | 17 | 1290 |
+| 2294 | 45 | 4661 | 45 | 4661 |
 | 23BA | 9 | 813 | 6 | 688 |
 | 23F1 | 11 | 901 | 11 | 901 |
 | 242A | 4 | 125 | 4 | 125 |
-| 2433 | 52 | 3317 | 49 | 3119 |
+| 2433 | 52 | 3317 | 51 | 3293 |
 | 24FA | 18 | 1246 | 18 | 1246 |
-| 2542 | 40 | 2296 | 37 | 2153 |
-| 25CA | 10 | 816 | 10 | 816 |
-| 25FD | 26 | 2191 | 25 | 2082 |
+| 2542 | 44 | 2297 | 42 | 2174 |
+| 25CA | 11 | 817 | 11 | 817 |
+| 25FD | 27 | 2191 | 26 | 2082 |
 | 2686 | 29 | 1805 | 29 | 1805 |
-| 26F7 | 28 | 3428 | 27 | 3301 |
+| 26F7 | 30 | 3428 | 30 | 3428 |
 | 27CE | 6 | 327 | 6 | 327 |
-| 27E3 | 12 | 1062 | 8 | 904 |
-| 2826 | 37 | 4037 | 36 | 4023 |
+| 27E3 | 17 | 1070 | 16 | 1028 |
+| 2826 | 38 | 4037 | 38 | 4037 |
 | 2901 | 6 | 672 | 6 | 672 |
-| 292B | 25 | 2394 | 19 | 1868 |
-| 29CF | 38 | 3487 | 36 | 3376 |
+| 292B | 25 | 2394 | 25 | 2394 |
+| 29CF | 38 | 3487 | 38 | 3487 |
 | 2AA1 | 33 | 2517 | 33 | 2517 |
 | 2B39 | 2 | 6721 | 1 | 6068 |
 | 2CDD | 85 | 3140 | 85 | 3140 |
 | 2DA2 | 93 | 4507 | 93 | 4507 |
 | 2EBD | 30 | 1678 | 30 | 1678 |
-| 2F26 | 17 | 1251 | 3 | 197 |
-| 2F75 | 5 | 663 | 1 | 210 |
+| 2F26 | 17 | 1251 | 4 | 221 |
+| 2F75 | 5 | 663 | 5 | 663 |
 | 2F9F | 6 | 1278 | 3 | 941 |
 | 3065 | 10 | 1759 | 10 | 1759 |
-| 3159 | 37 | 4288 | 9 | 1683 |
+| 3159 | 39 | 4288 | 26 | 3644 |
 
 ## The frontier: uncovered game-state routines the port reaches
 
@@ -108,6 +108,20 @@ the uncovered code reachable from them.
 
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | what it is | evidence |
 |---|---:|---:|---|---|---|
+| 2F26:03FD | 72 | 462 / 9 | 3159:06A0 (hud.rs, inputtest.rs, listwindow.rs) |  | vars 8F38 8BEC |
+| 1194:00A4 | 35 | 65 / 2 | 2F26:000E (start.rs) |  |  |
+| 1194:0051 | 22 | 63 / 2 | 1194:0067 (start.rs) |  |  |
+| 3159:0BA1 | 13 | 41 / 2 | 3159:0A58 (hud.rs, listwindow.rs) |  |  |
+| 3159:02B2 | 29 | 29 / 1 | 3159:033D, 3159:0494 (main.rs, mapscreen.rs, travel.rs) |  | vars BA0E |
+| 0000:5E0F | 29 | 29 / 1 | 0000:5DA0 (start.rs) |  |  |
+| 1194:51B8 | 25 | 25 / 1 | 1194:51D1 (main.rs, panels.rs, spellpage.rs) |  | files spelbook.$$$; vars A8FE |
+| 0000:B81E | 23 | 23 / 1 | 0000:B7DC (render.rs) |  | vars C3C6 A900 |
+| 1194:53E3 | 22 | 22 / 1 | 1194:51E6, 1194:5271, 1194:52DB (panels.rs, spellpage.rs) |  | files spelbook.$$$; vars A8FE |
+| 1194:2451 | 17 | 17 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  |  |
+| 0000:5E2C | 17 | 17 / 1 | 0000:5DA0 (start.rs) |  |  |
+| 3159:0483 | 16 | 16 / 1 | 3159:046E (window.rs) |  |  |
+| 0000:9D74 | 4 | 15 / 2 | 3159:0F2A (create.rs, dialog.rs, hud.rs) |  |  |
+| 1194:1687 | 14 | 14 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  | files saveface.$$$ |
 
 ## Game state still to port
 
@@ -125,11 +139,11 @@ docs:
 | 2AA1:0556 | 53 | 2AA1:04A5 (attack.rs, combat.rs, strike.rs) | a bare-handed hit's damage from the gauntlets (1194:7449) and the table at 8270h [game state; ported inline: combat.rs FIST_DAMAGE, 2AA1:04A5] |
 | 0000:E084 | 69 | 0000:E06A (actors.rs, travel.rs) | the heading's slope, the body of 0000:E06A [game math; ported inline: travel.rs travel_heading] |
 | 1194:8960 | 67 | 1194:887A (clock.rs, encounter.rs, main.rs) | the date from the clock 5CC (day of the year, 7E900h minutes a year) [game state; ported inline: text.rs, shops.rs, use_item.rs] |
-| 25CA:0233 | 62 | 25CA:006A (encounter.rs) | a fight's start: with 5C8 bit 1000h a free entry in the list at 622 [game state; ported inline: encounter.rs (25CA:006A)] |
+| 25CA:0233 | 62 | 25CA:006A (encounter.rs, render.rs) | a fight's start: with 5C8 bit 1000h a free entry in the list at 622 [game state; ported inline: encounter.rs (25CA:006A)] |
 | 2CDD:0658 | 57 | 2CDD:0604 (spell.rs) | a value at +66 changed and clamped to the maximum at +68, which the cap overwrites [game state; ported inline: spell.rs 2CDD:0604] |
 | 2CDD:0691 | 59 | 2CDD:0604 (spell.rs) | the same for another pair [game state; ported inline: spell.rs 2CDD:0604] |
 | 2CDD:06CC | 58 | 2CDD:0604 (spell.rs) | the same for another pair [game state; ported inline: spell.rs 2CDD:0604] |
-| 1194:E539 | 50 | 1194:E50D, 2826:0C15 (controls.rs, talk.rs) | a place's name: the name list 3276:3CB6 then a suffix [game text; ported inline: talk.rs names_a] |
+| 1194:E539 | 50 | 1194:E50D, 2826:0C15 (controls.rs, look.rs, main.rs) | a place's name: the name list 3276:3CB6 then a suffix [game text; ported inline: talk.rs names_a] |
 
 Not yet looked at: the open frontier past the hand-checked ones (no
 I/O or drawing signs, not marked inline, a ported caller), largest
@@ -137,6 +151,20 @@ first; candidates, not findings:
 
 | routine | bytes | uncovered below (bytes / routines) | callers (port files) | evidence |
 |---|---:|---:|---|---|
+| 2F26:03FD | 72 | 462 / 9 | 3159:06A0 (hud.rs, inputtest.rs, listwindow.rs) | vars 8F38 8BEC |
+| 1194:00A4 | 35 | 65 / 2 | 2F26:000E (start.rs) |  |
+| 1194:0051 | 22 | 63 / 2 | 1194:0067 (start.rs) |  |
+| 3159:0BA1 | 13 | 41 / 2 | 3159:0A58 (hud.rs, listwindow.rs) |  |
+| 3159:02B2 | 29 | 29 / 1 | 3159:033D, 3159:0494 (main.rs, mapscreen.rs, travel.rs) | vars BA0E |
+| 0000:5E0F | 29 | 29 / 1 | 0000:5DA0 (start.rs) |  |
+| 1194:51B8 | 25 | 25 / 1 | 1194:51D1 (main.rs, panels.rs, spellpage.rs) | files spelbook.$$$; vars A8FE |
+| 0000:B81E | 23 | 23 / 1 | 0000:B7DC (render.rs) | vars C3C6 A900 |
+| 1194:53E3 | 22 | 22 / 1 | 1194:51E6, 1194:5271, 1194:52DB (panels.rs, spellpage.rs) | files spelbook.$$$; vars A8FE |
+| 1194:2451 | 17 | 17 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) |  |
+| 0000:5E2C | 17 | 17 / 1 | 0000:5DA0 (start.rs) |  |
+| 3159:0483 | 16 | 16 / 1 | 3159:046E (window.rs) |  |
+| 0000:9D74 | 4 | 15 / 2 | 3159:0F2A (create.rs, dialog.rs, hud.rs) |  |
+| 1194:1687 | 14 | 14 / 1 | 1194:23E5 (charsheet.rs, create.rs, doll.rs) | files saveface.$$$ |
 
 ## Named in passing
 
@@ -144,59 +172,75 @@ Uncovered routines whose offset appears bare (no segment) in a comment
 of a port file that names their segment. Such a mention is as often a
 routine ported inline as one deliberately left out ("stubbed: ...") or a
 variable that happens to share the number, so they are not counted as
-ported; 105 to check, largest first:
+ported; 125 to check, largest first:
 
 | routine | bytes | files |
 |---|---:|---|
-| 0000:98A0 | 360 | hud.rs |
-| 0000:9798 | 264 | hud.rs |
-| 1194:0F08 | 208 | create.rs |
-| 1194:20BF | 200 | doll.rs |
-| 0000:1A5C | 157 | encounter.rs |
-| 0000:8F2A | 153 | frame.rs |
+| 0000:7A2B | 527 | render.rs |
+| 1194:066A | 326 | panels.rs |
+| 0000:9546 | 275 | render.rs |
+| 0000:DB78 | 209 | render.rs, worldtest.rs |
+| 1194:0F08 | 208 | charsheet.rs, create.rs |
 | 0000:8A60 | 146 | text.rs |
-| 1194:1C5E | 146 | text.rs |
-| 0000:91F2 | 129 | random.rs |
+| 0000:59D8 | 141 | listwindow.rs |
+| 1194:0E86 | 130 | charsheet.rs |
+| 0000:91F2 | 129 | random.rs, start.rs |
+| 3159:00F3 | 126 | window.rs |
 | 1194:124A | 116 | cityinfo.rs |
+| 25FD:05A5 | 109 | bsa.rs |
 | 2542:0205 | 104 | menukeys.rs |
-| 0000:4F1B | 87 | interface.rs |
-| 0000:5458 | 83 | spellmaker.rs |
-| 1194:2D60 | 79 | doll.rs |
-| 1194:5FC0 | 65 | store.rs |
-| 1194:545C | 58 | store.rs |
+| 222C:034C | 101 | create.rs |
+| 0000:9B04 | 73 | start.rs |
+| 0000:B2E5 | 66 | render.rs |
+| 222C:04E5 | 64 | create.rs |
+| 0000:2FFD | 63 | automapscreen.rs |
+| 0000:B2A7 | 62 | render.rs |
+| 0000:942A | 59 | title.rs |
+| 1194:5DE2 | 59 | charsheet.rs, main.rs |
 | 0000:9A34 | 57 | hud.rs |
+| 3159:09E8 | 53 | hud.rs, listwindow.rs |
 | 1194:2A69 | 52 | create.rs, newgame.rs |
-| 1194:5F8C | 52 | store.rs |
-| 1194:4F89 | 47 | savemenu.rs |
-| 0000:A0AE | 43 | automap.rs, hud.rs |
-| 0000:59A4 | 42 | mapnotes.rs |
-| 0000:9C62 | 41 | mapscreen.rs, travelmap.rs |
+| 1194:1A94 | 50 | charsheet.rs, panels.rs, worldtest.rs |
+| 1194:5D8D | 50 | charsheet.rs, panels.rs |
+| 0000:5B08 | 48 | listwindow.rs |
+| 0000:5422 | 46 | frame.rs, title.rs |
+| 0000:567A | 46 | render.rs |
+| 0000:59A4 | 42 | lineedit.rs, listwindow.rs, mapnotes.rs |
+| 1194:2A9D | 42 | create.rs |
+| 1194:2C96 | 42 | create.rs |
+| 27E3:03D6 | 42 | logbook.rs |
+| 0000:9C62 | 41 | lineedit.rs, mapscreen.rs, travel.rs, travelmap.rs |
 | 0000:A49C | 41 | load.rs |
+| 0000:1393 | 40 | create.rs |
 | 1194:12BE | 40 | guild.rs, tavern.rs |
-| 0000:9A72 | 37 | clock.rs, levelup.rs |
-| 1194:16BD | 35 | panels.rs, sheets.rs |
+| 1194:1F30 | 38 | charsheet.rs |
+| 0000:9A9C | 36 | frame.rs |
+| 0000:C0CE | 35 | render.rs |
+| 1194:16BD | 35 | charsheet.rs, panels.rs, screentest.rs, sheets.rs |
 | 23BA:01A4 | 35 | attack.rs, projectile.rs, strike.rs, talk.rs |
-| 1194:54B3 | 31 | store.rs |
+| 0000:56A8 | 31 | render.rs |
+| 0000:9B9B | 30 | create.rs |
 | 1194:000A | 30 | inputtest.rs, main.rs, menukeys.rs |
-| 1194:51B8 | 25 | transit.rs |
-| 0000:930E | 23 | automap.rs, inputtest.rs |
-| 0000:7706 | 18 | frame.rs |
-| 1194:5E21 | 18 | store.rs |
-| 1194:2451 | 17 | doll.rs |
+| 3159:0BAE | 28 | listwindow.rs |
+| 222C:04BC | 27 | create.rs |
+| 1194:51B8 | 25 | spellpage.rs, transit.rs |
+| 1194:55D9 | 25 | create.rs, dungeonpic.rs, travelmap.rs |
+| 1194:5D75 | 24 | charsheet.rs |
+| 1194:53E3 | 22 | spellpage.rs |
+| 1194:2451 | 17 | charsheet.rs, doll.rs |
 | 2F9F:000D | 17 | music.rs |
 | 0000:3815 | 16 | automap.rs |
-| 0000:9D64 | 16 | sidequest.rs |
-| 0000:AB2A | 13 | transit.rs |
-| 1194:0FFB | 12 | encounter.rs, frame.rs, levelup.rs, sidequest.rs, weapon.rs |
+| 3159:0483 | 16 | mapscreen.rs |
+| 1194:0FFB | 12 | encounter.rs, frame.rs, levelup.rs, screentest.rs, sidequest.rs, weapon.rs |
 | 0000:37F7 | 10 | automap.rs |
 | 0000:3801 | 10 | automap.rs |
 | 0000:380B | 10 | automap.rs |
-| 1194:0000 | 6 | hooks.rs, machine.rs, transit.rs |
-| 0000:9B56 | 5 | save.rs |
-| 0000:7138 | 4 | guild.rs |
-| 0000:77EC | 4 | controls.rs, guild.rs, store.rs |
-| 0000:9370 | 4 | hud.rs |
-| 0000:9B4E | 4 | mapscreen.rs, staffend.rs |
+| 0000:6BE2 | 9 | field.rs, lineedit.rs |
+| 1194:0000 | 6 | bsa.rs, hooks.rs, machine.rs, save.rs, transit.rs |
+| 0000:6028 | 4 | tavern.rs |
+| 0000:67A2 | 4 | bsa.rs |
+| 0000:77EC | 4 | controls.rs, guild.rs, logbook.rs, store.rs |
+| 0000:9370 | 4 | hud.rs, listwindow.rs |
 | 1194:55D5 | 4 | quest.rs |
 | 0000:C3AA | 3 | machine.rs |
 
@@ -213,68 +257,40 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:01BA | 67 | DOS I/O | 0000:0000 |  |  |
 | 0000:01FD | 30 | DOS I/O, BIOS | 0000:0000 |  | vars 9289 |
 | 0000:021B | 45 | DOS I/O | 0000:01FD |  |  |
-| 0000:0605 | 35 | under a hook | 0000:05B5 |  | vars 9288 |
 | 0000:0B89 | 19 | I/O (read) | 0000:0936, 0000:0997, 0000:09FA | the light table's file (NORMAL.LGT, si 1A6D) loaded to 3AAC:0240 (LightHooks::lgt) [I/O] |  |
 | 0000:1393 | 40 | presentation (read) | 0000:1246, 0000:1323 | an image loaded and drawn full screen, then shown [presentation] | vars 902E |
-| 0000:13ED | 14 | input (read) | 0000:1246, 0000:1323, 0000:13BF | the key buffer emptied, then a wait for the keys to be released [input] | vars AFF9 |
 | 0000:1849 | 11 | drawing? | 0000:17F9, 25CA:0000 |  |  |
-| 0000:1A5C | 157 | I/O (read) | 0000:17F9, 0000:1AF9, 25CA:0000 | a creature's or townsperson's five view files loaded into EMS (table 6270; the view's townsfolk graphics) [I/O] | vars A838 A83E A836 A83A |
-| 0000:1CB0 | 62 | drawing? | 0000:1B7F |  | vars 627A 651C |
-| 0000:2FFD | 63 | under a hook | 0000:2F10 |  | vars 9288 A868 05E6 A86E |
-| 0000:36B6 | 143 | UI (read) | 0000:2D1F | a text box drawn [UI] | vars A888 A88E A878 A87A |
-| 0000:37F7 | 10 | presentation (read) | 0000:2D1F | automap screen: the view moved down 80h (126E) [presentation] | vars 126E |
-| 0000:3801 | 10 | presentation (read) | 0000:2D1F | automap screen: the view moved left 80h (126C) [presentation] | vars 126C |
-| 0000:380B | 10 | presentation (read) | 0000:2D1F | automap screen: the view moved right 80h (126C) [presentation] | vars 126C |
-| 0000:3815 | 16 | presentation (read) | 0000:2D1F | automap screen: the view centred on the player [presentation] | vars C3D0 126C C3D4 126E |
+| 0000:2FFD | 63 | likely inline | 0000:2F10 |  | vars 9288 A868 05E6 A86E |
+| 0000:37F7 | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved down 80h (126E) [presentation] | vars 126E |
+| 0000:3801 | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved left 80h (126C) [presentation] | vars 126C |
+| 0000:380B | 10 | presentation (read) | 0000:2DB5 | automap screen: the view moved right 80h (126C) [presentation] | vars 126C |
+| 0000:3815 | 16 | presentation (read) | 0000:2DB5 | automap screen: the view centred on the player [presentation] | vars C3D0 126C C3D4 126E |
 | 0000:4D2F | 77 | presentation (read) | 0000:481E | the keys held (652, 12 of them) drawn as icons [drawing] | vars 43D4 |
-| 0000:4F1B | 87 | under a hook | 0000:4DD6 |  | vars C3D8 1B8C 1B8E 1B90 |
-| 0000:4F72 | 159 | presentation (read) | 0000:4ACD | the walls plane copied 80h x 80h into a buffer (A900) for a map image [presentation?] | vars C3D0 C3D4 A900 D806 |
-| 0000:5011 | 88 | presentation (read) | 0000:4BD6 | effect message 1405 drawn [presentation] | vars 9288 3C82 102C C3A2 |
+| 0000:4F72 | 159 | presentation (read) | 0000:4ACD, 0000:4B02 | the walls plane copied 80h x 80h into a buffer (A900) for a map image [presentation?] | vars C3D0 C3D4 A900 D806 |
 | 0000:5104 | 54 | drawing (read) | 0000:481E | rain/snow drops drawn over the view (F81 bit 2, not full daylight) [drawing] | vars A91A 0F81 C398 C3A2 |
 | 0000:51D3 | 11 | I/O (read) | 1194:4943, 2F9F:01BF, 3065:0D2D | a far C-style wrapper of the heap allocator 0000:51EC [I/O] |  |
-| 0000:5368 | 19 | presentation (read) | 0000:0511, 0000:0605, 0000:2FFD (+1) | a text centred (its width 66F6, drawn 9E0A) [presentation] |  |
-| 0000:5384 | 37 | DOS I/O, BIOS | 0000:9B04 |  |  |
-| 0000:53AA | 4 | thunk to front end | 1194:0282, 3159:0F2A |  |  |
-| 0000:53AE | 107 | BIOS | 0000:4F1B, 0000:53AA, 0000:A6B5 |  | vars 8F78 8F7A 8F74 8F76 |
 | 0000:5422 | 46 | presentation (read) | 0000:10C9, 0000:4DD6, 0000:541E (+1) | saved screen region restored (A902 bit 0) [presentation] | vars A902 8F8C 8F8E 8F90 |
-| 0000:5458 | 83 | under a hook | 0000:5454, 0000:77F0 |  | vars A902 8F7C 8F7E 8F8E |
 | 0000:54AB | 122 | drawing? | 0000:5458 |  | vars 8F8E 8F90 8F92 8F96 |
 | 0000:552E | 267 | under a hook | 0000:5526 |  | vars A918 A91A A916 A914 |
-| 0000:5656 | 36 | presentation (read) | 0000:552E, 0000:5652, 0000:C2CE (+4) | a frame of a DFA/CIF image found [presentation] |  |
 | 0000:567A | 46 | drawing? | 0000:5656 |  |  |
 | 0000:56A8 | 31 | drawing? | 0000:5656 |  |  |
-| 0000:56CC | 338 | drawing (read) | 0000:10C9, 0000:56C8 | an image drawn, clipped (A836..A83C) [drawing] | vars A83A A83C A836 A838 |
 | 0000:5998 | 4 | presentation (read) | 1194:149D, 1194:14C5, 1194:5B58 (+1) | a far entry of the window blit 0000:59A4 [presentation] |  |
-| 0000:599C | 4 | presentation (read) | 1194:21C2, 1194:223A, 1194:2C96 (+6) | a far entry of the window blit 0000:59A4 [presentation] |  |
-| 0000:59A4 | 42 | presentation (read) | 0000:3698, 0000:582C, 0000:5998 (+3) | a rectangle blitted to the screen buffer (A900) [presentation] |  |
+| 0000:59A4 | 42 | presentation (read) | 0000:3698, 0000:582C, 0000:5871 (+4) | a rectangle blitted to the screen buffer (A900) [presentation] |  |
 | 0000:59B5 | 31 | presentation (read) | 0000:5422 | a rectangle blitted to the screen buffer (A900) [presentation] |  |
-| 0000:59D8 | 141 | under a hook | 0000:582C, 0000:618F |  | vars A916 A91A A914 A918 |
-| 0000:5B04 | 4 | presentation (read) | 1194:1354, 1194:1647, 1194:20BF (+2) | a far entry of the transparent blit 0000:5B08 [presentation] |  |
-| 0000:5B08 | 48 | presentation (read) | 0000:4D2F, 0000:4D7C, 0000:5458 (+3) | an image blitted with colour 0 transparent (A900) [presentation] |  |
-| 0000:5B3C | 4 | presentation (read) | 29CF:0A28 | a far entry of the run-length blit 0000:5B65 [presentation] |  |
-| 0000:5B5C | 9 | under a hook | 0000:582C |  |  |
-| 0000:5B65 | 49 | presentation (read) | 0000:3B8E, 0000:5B3C, 0000:5B5C (+1) | a run-length coded image drawn [presentation] |  |
+| 0000:59D8 | 141 | likely inline | 0000:582C, 0000:5871, 0000:618F |  | vars A916 A91A A914 A918 |
+| 0000:5B08 | 48 | presentation (read) | 0000:4D2F, 0000:4D7C, 0000:5458 (+4) | an image blitted with colour 0 transparent (A900) [presentation] |  |
 | 0000:5CCE | 128 | DOS I/O | 0000:5CCA |  | vars 9032 8FA6 9030 |
 | 0000:5D4E | 4 | driver (read) | 21EE:01ED | EMS handle freed at the program's end (int 67h 45h), thunk of 5D52 [driver] |  |
 | 0000:5D52 | 30 | driver (read) | 0000:01FD, 0000:5D4E | EMS handle freed at the program's end (int 67h 45h) [driver] | vars 8FA6 9038 902A |
 | 0000:5D99 | 7 | under a hook | 0000:5CCE |  |  |
-| 0000:5DA0 | 111 | under a hook | 0000:5CCE |  | vars 9032 902C 902A 8FA8 |
-| 0000:5E0F | 29 | under a hook | 0000:5DA0 |  |  |
-| 0000:5E2C | 17 | under a hook | 0000:5DA0 |  |  |
-| 0000:5E50 | 276 | under a hook | 0000:56CC, 0000:5E3E |  |  |
-| 0000:5F64 | 54 | BIOS | 0000:9B04 |  | vars 9136 929A 929E |
+| 0000:5E0F | 29 | game | 0000:5DA0 |  |  |
+| 0000:5E2C | 17 | game | 0000:5DA0 |  |  |
 | 0000:5F9A | 73 | BIOS | 0000:8FC8 |  | vars 9144 9136 AFF9 9138 |
 | 0000:6010 | 19 | DOS I/O | 0000:600C |  |  |
 | 0000:6028 | 4 | thunk to front end | 1194:4F89, 1194:C0B1, 25FD:062D (+1) |  |  |
 | 0000:602C | 11 | DOS I/O | 0000:6028 |  |  |
-| 0000:603C | 276 | under a hook | 0000:654A |  | vars A69E |
-| 0000:6154 | 55 | under a hook | 0000:654A |  | vars A69E |
-| 0000:618F | 200 | under a hook | 0000:64F0, 0000:654A |  |  |
-| 0000:6257 | 608 | drawing? | 0000:618F |  | vars A8FE |
-| 0000:64F0 | 86 | under a hook | 0000:654A |  | vars A836 A838 |
-| 0000:654A | 383 | under a hook | 0000:6546 |  | vars A902 0151 9146 914A |
-| 0000:6746 | 27 | DOS I/O | 0000:31FE, 0000:32FE, 0000:33BF (+8) |  |  |
-| 0000:6762 | 4 | thunk to front end | 1194:080B, 25FD:056F, 3159:0494 |  |  |
+| 0000:6154 | 55 | likely inline | 0000:654A |  | vars A69E |
+| 0000:6746 | 27 | DOS I/O | 0000:31FE, 0000:3276, 0000:32FE (+9) |  |  |
 | 0000:6766 | 20 | DOS I/O | 0000:299F, 0000:603C, 0000:6154 (+6) |  |  |
 | 0000:67A2 | 4 | thunk to front end | 25FD:056F |  |  |
 | 0000:67A6 | 30 | DOS I/O | 0000:67A2 |  |  |
@@ -289,171 +305,99 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0000:6BF0 | 28 | DOS I/O | 0000:32FE, 0000:33BF, 0000:3546 (+5) |  |  |
 | 0000:6C0C | 4 | thunk to front end | 1194:08DE, 1194:0901, 1194:4943 (+2) |  |  |
 | 0000:6C10 | 21 | DOS I/O | 0000:2A73, 0000:603C, 0000:618F (+11) |  |  |
-| 0000:6D36 | 28 | DOS I/O | 0000:31FE, 0000:32FE, 0000:33BF (+4) |  |  |
+| 0000:6D36 | 28 | DOS I/O | 0000:31FE, 0000:3276, 0000:32FE (+5) |  |  |
 | 0000:6D56 | 23 | DOS I/O | 0000:2A54, 0000:2A73, 0000:603C (+10) |  |  |
-| 0000:6DE0 | 16 | DOS I/O | 0000:31FE, 0000:3546, 0000:6DDC (+2) |  |  |
+| 0000:6DE0 | 16 | DOS I/O | 0000:31FE, 0000:3276, 0000:3546 (+3) |  |  |
 | 0000:6DF0 | 4 | thunk to front end | 25FD:05A5 |  |  |
 | 0000:6DF4 | 9 | DOS I/O | 0000:6DF0 |  |  |
 | 0000:6E02 | 4 | thunk to front end | 21EE:0314 |  |  |
 | 0000:6E06 | 5 | DOS I/O | 0000:6E02 |  |  |
-| 0000:6F02 | 4 | thunk to front end | 21EE:0000 |  |  |
-| 0000:6F06 | 52 | BIOS | 0000:6F02 |  | vars A900 9289 A902 |
 | 0000:6F8C | 4 | thunk to front end | 1194:066A, 21EE:0000, 21EE:01ED |  |  |
 | 0000:6F90 | 41 | DOS I/O, BIOS | 0000:6F8C |  | vars 9289 A902 A920 |
-| 0000:6FBE | 4 | under a hook | 21EE:0000 |  |  |
-| 0000:6FC2 | 97 | under a hook | 0000:6FBE |  | vars 91F0 91EE 91F6 91F8 |
 | 0000:70D8 | 49 | hardware | 0000:9B04 |  |  |
-| 0000:7112 | 33 | input (read) | 0000:13ED, 0000:654A, 0000:710E (+1) | the keyboard buffer emptied [input] | vars AC46 ACB0 AC4A AC48 |
-| 0000:7138 | 4 | input (read) | 1194:5DE2, 3159:000C, 3159:0F2A | a far entry of the keyboard read 0000:713C [input] |  |
-| 0000:713C | 19 | input (read) | 0000:7138, 0000:A172 | a key read from the buffer if one is waiting [input] | vars ACB0 |
 | 0000:7158 | 45 | DOS I/O | 0000:6F06 |  |  |
 | 0000:72EE | 15 | DOS I/O | 0000:6F90 |  |  |
 | 0000:7306 | 46 | input (read) | 0000:713C | a key read from the keyboard buffer (AC4A..ACB0) [input] | vars ACB0 AC4A AC46 |
-| 0000:7334 | 4 | under a hook | 1194:22AF, 3159:0CFF |  |  |
-| 0000:7338 | 174 | under a hook | 0000:7334 |  | vars ADB6 ADB8 |
-| 0000:73E6 | 44 | under a hook | 0000:7338 |  | vars ADBA 9288 A900 |
+| 0000:7338 | 174 | likely inline | 0000:7334 |  | vars ADB6 ADB8 |
+| 0000:73E6 | 44 | game | 0000:7338 |  | vars ADBA 9288 A900 |
 | 0000:7412 | 22 | I/O (read) | 2F9F:001F, 2F9F:01BF, 2F9F:0364 | a far C-style wrapper of the file loader 0000:742C (the music driver's) [I/O] |  |
 | 0000:7570 | 64 | presentation (read) | 0000:756C | image resource table 91BE bookkeeping [presentation] | vars 91BC |
-| 0000:7706 | 18 | drawing? | 0000:59A4, 0000:59B5, 0000:59D8 (+5) |  |  |
-| 0000:77C4 | 4 | thunk to front end | 1194:AE68, 1194:FDDD |  |  |
-| 0000:77CC | 2 | presentation (read) | 0000:533C, 0000:5B65, 0000:6257 (+3) | a byte fill (the screen cleared, a colour run) [presentation] |  |
-| 0000:77CE | 30 | drawing? | 0000:6257, 0000:77C4, 0000:77CC |  |  |
-| 0000:77EC | 4 | input (read) | 1194:4D31, 1194:4E88, 1194:51D1 (+13) | waiting for input [input] |  |
+| 0000:77EC | 4 | input (read) | 1194:4D31, 1194:4E88, 1194:51E6 (+15) | waiting for input [input] |  |
 | 0000:77F0 | 45 | BIOS | 0000:77EC |  | vars 8F92 8F94 B03A |
-| 0000:78A0 | 8 | presentation (read) | 0000:C0F1 | the renderer's drawing routine patched (self-modifying jump at 789E) [presentation] |  |
-| 0000:7A2B | 527 | under a hook | 0000:78A8 |  |  |
-| 0000:7C51 | 2397 | under a hook | 0000:FF26 |  | vars AFB7 AFBB AFBF AFB9 |
+| 0000:7A2B | 527 | likely inline | 0000:78A8 |  |  |
+| 0000:7C51 | 2397 | game | 0000:FF26 |  | vars AFB7 AFBB AFBF AFB9 |
 | 0000:8755 | 125 | presentation (read) | 0000:85AE | a polygon clipped against one plane (Sutherland-Hodgman over AF74/AF78/AF7A, outcodes AF76/AF77) [renderer] | vars AF74 AF78 AF7A AF77 |
-| 0000:8839 | 138 | presentation (read) | 0000:8755 | the renderer's polygon clip: an edge's intersection [presentation] | vars AF76 AF77 |
 | 0000:8950 | 124 | presentation (read) | 0000:85AE, 0000:8839 | a point's outcode against the view's planes [renderer] |  |
 | 0000:89CE | 146 | presentation (read) | 0000:8AF2, 0000:8B80, 0000:8C52 | the renderer's polygon fill: the left edge walk [presentation] | vars AFD0 AFD4 AFD8 AFC2 |
 | 0000:8A60 | 146 | presentation (read) | 0000:8AF2, 0000:8B80, 0000:8C52 | the renderer's polygon fill: the right edge walk [presentation] | vars AFD2 AFD4 AFE0 AFC6 |
 | 0000:8AF2 | 143 | presentation (read) | 0000:85AE | the renderer's polygon fill [presentation] | vars AFD4 AFCC AFEE A900 |
 | 0000:8B80 | 268 | presentation (read) | 0000:8AF2, 0000:8B80, 0000:8C52 | polygon span filler (renderer, by cs:89CC) [presentation] | vars AFD4 AFC4 AFEA AFE8 |
 | 0000:8C52 | 282 | presentation (read) | 0000:8AF2, 0000:8B80, 0000:8C52 | polygon span filler, shaded (renderer, by cs:89CC) [presentation] | vars AFD4 AFC4 AFEA AFE8 |
-| 0000:8D2F | 63 | under a hook | 21EE:0000 |  | vars A902 ADB6 ADB8 |
+| 0000:8D2F | 63 | likely inline | 21EE:0000 |  | vars A902 ADB6 ADB8 |
 | 0000:8E70 | 72 | BIOS | 0000:8D2F |  |  |
 | 0000:8EB8 | 47 | BIOS | 0000:8E70 |  |  |
 | 0000:8EE7 | 55 | BIOS | 0000:8E70 |  |  |
 | 0000:8EF7 | 53 | BIOS | 0000:8E70 |  |  |
 | 0000:8F05 | 49 | BIOS | 0000:8E70 |  |  |
 | 0000:8F0F | 13 | BIOS | 0000:8E70 |  |  |
-| 0000:8F2A | 153 | presentation (read) | 0000:36B6, 0000:5458, 0000:56CC (+3) | image buffer allocated and blitted [presentation] | vars A8FC 8F9A 8F9C A900 |
-| 0000:9012 | 20 | BIOS | 0000:8FC8 |  | vars AFF9 8F92 8F94 |
 | 0000:9026 | 220 | input (read) | 0000:8FC8 | input device handler (B028): keyboard state into AFF1..AFF9 [input] | vars B000 B002 AFF3 AFF4 |
 | 0000:9102 | 240 | input (read) | 0000:8FC8, 0000:9026 | input device handler (B028): keys to movement AFF1/AFF2 [input] | vars AFF2 AFF1 AFF9 AFF0 |
 | 0000:91F2 | 129 | hardware | 0000:9026, 0000:9273 |  | vars AFFB AFFC AFFD AFFE |
-| 0000:9273 | 108 | under a hook | 0000:9B04 |  | vars B004 B006 B008 B00A |
+| 0000:9273 | 108 | game | 0000:9B04 |  | vars B004 B006 B008 B00A |
 | 0000:92DF | 42 | hardware | 0000:9273 |  | vars AFFA |
-| 0000:930A | 4 | I/O (read) | 1194:24A6, 1194:4BFF | a far entry of 0000:930E [I/O] |  |
-| 0000:930E | 23 | I/O (read) | 0000:2D1F, 0000:930A | a resource's handle slot (table 91AC) freed with its block [I/O] |  |
 | 0000:932A | 17 | I/O (read) | 0000:9326 | a resource slot freed (count 91BC) [I/O] | vars 91BC |
-| 0000:933C | 4 | presentation (read) | 1194:4800, 1194:59CC, 1194:5C34 (+1) | a far entry of 0000:9340 [presentation] |  |
 | 0000:9340 | 48 | presentation (read) | 0000:933C | a window's saved background put back [presentation] |  |
 | 0000:9370 | 4 | presentation (read) | 1194:6410, 3159:0AE2 | a far entry of 0000:9374 [presentation] |  |
 | 0000:9374 | 15 | presentation (read) | 0000:9370 | a text drawn right-aligned [presentation] |  |
 | 0000:942A | 59 | presentation (read) | 0000:10C9, 0000:618F, 0000:9426 | the screen buffer cleared [presentation] | vars A902 A8FE 928A 928E |
 | 0000:94B1 | 61 | drawing | 0000:946A, 0000:94F2 |  |  |
-| 0000:94EE | 4 | thunk to front end | 1194:5B58, 222C:0611, 222C:0640 |  |  |
 | 0000:94F2 | 76 | drawing | 0000:94EE |  | vars B032 A900 A902 |
-| 0000:953E | 8 | presentation (read) | 0000:C0F1 | the renderer's drawing routine patched (self-modifying jump at 789E) [presentation] |  |
-| 0000:9546 | 275 | under a hook | 0000:78A8 |  |  |
-| 0000:9798 | 264 | presentation (read) | 0000:965E | message box: the image placed and centred (under 0000:965E) [presentation] | vars A84C A83A A83C A848 |
-| 0000:98A0 | 360 | text drawing (read) | 0000:965E, 0000:9A0C | a text's lines laid out (colour codes 0Ch, tabs 09h) [text drawing] | vars A84C A858 A850 B036 |
-| 0000:9A08 | 4 | under a hook | 3159:0F2A |  |  |
-| 0000:9A0C | 40 | under a hook | 0000:9A08 |  | vars A83A A83C A846 A84C |
+| 0000:9546 | 275 | likely inline | 0000:78A8 |  |  |
+| 0000:9A0C | 40 | likely inline | 0000:9A08 |  | vars A83A A83C A846 A84C |
 | 0000:9A34 | 57 | under a hook | 0000:9727 |  | vars A854 A856 A900 B038 |
-| 0000:9A72 | 37 | presentation (read) | 0000:4EFD, 0000:9A6E, 0000:D4B4 (+2) | rectangle filled [presentation] | vars A900 9288 |
 | 0000:9A9C | 36 | presentation (read) | 0000:10C9, 0000:4DD6, 0000:9A98 | clip window A914..A91E set (the view's own clip) [presentation] | vars A91E A91C A914 A916 |
-| 0000:9AC0 | 4 | thunk to front end | 21EE:0000 |  |  |
 | 0000:9AC4 | 34 | drawing? | 0000:9AC0 |  | vars 8F96 8F98 |
-| 0000:9B00 | 4 | under a hook | 21EE:0000 |  |  |
-| 0000:9B04 | 73 | under a hook | 0000:9B00 |  | vars B03A B028 B030 |
-| 0000:9B4E | 4 | presentation (read) | 1194:1695, 1194:5E77, 1194:D986 (+2) | a far entry of the palette setter 0000:9B56 [presentation] |  |
-| 0000:9B56 | 5 | presentation (read) | 0000:0F05, 0000:10C9, 0000:464A (+5) | palette to the VGA DAC [presentation] |  |
+| 0000:9B04 | 73 | likely inline | 0000:9B00 |  | vars B03A B028 B030 |
 | 0000:9B9B | 30 | hardware | 0000:654A |  |  |
 | 0000:9BBA | 22 | driver (read) | 2F9F:001F | a far C-style wrapper of a string copy (the music driver's) [driver] |  |
 | 0000:9C5E | 4 | under a hook | 21EE:0314 |  |  |
 | 0000:9C62 | 41 | under a hook | 0000:9C5E |  |  |
 | 0000:9C8C | 20 | driver (read) | 2F9F:001F | a far C-style wrapper of a string routine (the music driver's) [driver] |  |
 | 0000:9CC6 | 11 | driver (read) |  | a far C-style wrapper (the music driver's) [driver] |  |
-| 0000:9D64 | 16 | hardware (read) | 0000:6FC2, 0000:9D60 | the BIOS timer read (0:046C), Machine::bios_ticks in the port [hardware] | vars 046C 046E |
-| 0000:9D74 | 4 | under a hook | 3159:0F2A |  |  |
-| 0000:9D78 | 11 | under a hook | 0000:9D74 |  |  |
+| 0000:9D74 | 4 | game | 3159:0F2A |  |  |
+| 0000:9D78 | 11 | game | 0000:9D74 |  |  |
 | 0000:9D88 | 58 | presentation (read) | 0000:9D84 | an image's colours remapped in a square of the screen buffer [presentation] | vars A900 |
-| 0000:A0AE | 43 | under a hook | 0000:9EE9 |  | vars A836 A838 A844 A846 |
-| 0000:A155 | 22 | under a hook | 0000:9EE9 |  | vars A83E A83A A840 |
-| 0000:A16B | 7 | under a hook | 0000:9EE9 |  |  |
-| 0000:A172 | 71 | under a hook | 0000:9EE9 |  | vars AFF9 AD02 AD00 |
-| 0000:A1B9 | 61 | under a hook | 0000:9EE9 |  | vars B034 |
-| 0000:A1F6 | 59 | under a hook | 0000:A0D9 |  |  |
+| 0000:A0AE | 43 | likely inline | 0000:9EE9, 0000:A096 |  | vars A836 A838 A844 A846 |
+| 0000:A155 | 22 | likely inline | 0000:9EE9 |  | vars A83E A83A A840 |
 | 0000:A49C | 41 | drawing? | 0000:A232, 0000:A240 |  | files waterani.rci; vars 9030 CCCE CB5B |
-| 0000:A561 | 63 | presentation (read) | 0000:A4C5, 0000:A4ED, 0000:A6B5 | the renderer's buffers allocated (CD86, CD82, CD7E, CD76/CD7A) and its set-up (AAA2) [renderer] | vars CD86 CD82 CD7E CB8C |
-| 0000:A7A0 | 20 | I/O (read) | 0000:2D1F, 0000:A6B5, 1194:54B3 (+1) | a screen image loaded into the screen buffer (A8FE) [I/O] | files screensv.$$2; vars A8FE |
-| 0000:A8FB | 30 | presentation (read) | 0000:A232, 0000:A240, 0000:A26F | rain or snow drops drawn per weather 82h/81h (0000:E26B, E1A2) [presentation] | vars BB09 C398 |
-| 0000:AB2A | 13 | presentation (read) | 0000:A5A0 | the renderer's light table (CCC2) freed [presentation] | vars CCC2 |
-| 0000:AB37 | 220 | drawing? | 0000:B210, 0000:B358 |  | vars 9030 BB04 BAF4 BA56 |
-| 0000:ADD4 | 57 | under a hook | 0000:AC13 |  | vars C3D6 C3D8 |
-| 0000:AE0D | 76 | under a hook | 0000:AC13 |  | vars CCF8 CB37 BAF6 C3D0 |
-| 0000:AE59 | 282 | under a hook | 0000:AB37 |  | vars BAEC A85E C398 A836 |
-| 0000:AFD6 | 115 | under a hook | 0000:AB37 |  | vars BAEE CD0A CD0E C398 |
-| 0000:B049 | 252 | under a hook | 0000:AC13 |  | vars BAFC BAFE |
-| 0000:B145 | 22 | under a hook | 0000:B049 |  |  |
+| 0000:A8FB | 30 | presentation (read) | 0000:A2A3 | rain or snow drops drawn per weather 82h/81h (0000:E26B, E1A2) [presentation] | vars BB09 C398 |
 | 0000:B15B | 25 | presentation (read) | 0000:F15C | a texture copied, turned, for the renderer [presentation] |  |
-| 0000:B1AD | 99 | under a hook | 0000:B210 |  | vars CCCA CB37 8F92 CCB2 |
-| 0000:B210 | 151 | drawing? | 0000:AC13 |  | vars A860 A914 A918 BA80 |
 | 0000:B2A7 | 62 | presentation (read) | 0000:C032, 0000:CFBA | the renderer's object list: an entry filed [presentation] | vars BA80 CD7A |
 | 0000:B2E5 | 66 | drawing? | 0000:CBFF |  | vars A91A BA80 C8F0 9030 |
 | 0000:B327 | 49 | presentation (read) | 0000:B210, 0000:B2A7, 0000:B2E5 | the renderer's object list's pool stepped [presentation] | vars CD7A BB06 BAC8 CB8C |
-| 0000:B358 | 400 | drawing? | 0000:A232, 0000:A240, 0000:A26F (+1) |  | vars BA4B BB06 C8F0 BAC8 |
 | 0000:B51B | 138 | presentation (read) | 0000:B4F5 | renderer's draw list (CD7A) clipped [presentation] | vars CD7A A914 A918 |
 | 0000:B5A5 | 164 | presentation (read) | 0000:B4F5 | a quad's corners flagged inside a rectangle (+12h bits F000h) [renderer] |  |
-| 0000:B649 | 98 | under a hook | 0000:AC13 |  | vars CB59 A85E CB5A CCF8 |
-| 0000:B7A9 | 51 | presentation (read) | 0000:B6AB | the renderer's lights behind the wall drawn (the view's shader does it) [presentation] | vars BA7E CCF8 CB37 BAF6 |
-| 0000:B7DC | 67 | under a hook | 0000:AE59 |  | vars A916 A91A CD90 |
-| 0000:B81E | 23 | under a hook | 0000:B7DC |  | vars C3C6 A900 |
-| 0000:B835 | 313 | under a hook | 0000:AB37, 0000:BBB6 |  | vars A916 A91A BA7F A900 |
+| 0000:B81E | 23 | game | 0000:B7DC |  | vars C3C6 A900 |
 | 0000:B8CB | 37 | decode artefact |  | the inside of a renderer's span loop, decoded from the middle [artefact] |  |
-| 0000:B96E | 389 | under a hook | 0000:AB37, 0000:BBB6 |  | vars 9030 A916 A91A BA7F |
-| 0000:BAF3 | 195 | drawing? | 0000:AB37 |  | vars CCC4 BA54 9030 CB38 |
-| 0000:BBB6 | 797 | drawing? | 0000:AB37 |  | vars BAA8 BAB0 A85E BA94 |
 | 0000:BFA9 | 23 | drawing? | 0000:BFA5 |  | vars D432 CCC0 |
-| 0000:C032 | 43 | presentation (read) | 0000:C9FF | the renderer's objects in a column filed [presentation] |  |
 | 0000:C0CE | 35 | presentation (read) | 0000:B2A7, 0000:B358 | the renderer's object list searched [presentation] |  |
-| 0000:C2CE | 933 | drawing? | 0000:C0F1 |  | vars A836 A838 CD97 A844 |
 | 0000:C3A6 | 277 | drawing? |  |  | vars A844 A84C CD97 A838 |
 | 0000:C3AA | 3 | decode artefact |  | data in the hooks' table decoded as code [artefact] |  |
 | 0000:C3AE | 269 | drawing? |  |  | vars A844 A84C CD97 A838 |
 | 0000:C3BA | 257 | drawing? |  |  | vars CD97 A84C A844 A838 |
-| 0000:C539 | 525 | drawing? | 0000:C0F1 |  | vars CD97 A836 A838 D438 |
-| 0000:CBFF | 100 | presentation (read) | 0000:CB20, 0000:D0A1 | an object's corners for the renderer's lists (A872..A888) [renderer] | vars A876 A87C A882 A888 |
 | 0000:CD2C | 8 | decode artefact |  | the renderer's code decoded from the middle of an instruction [artefact] |  |
 | 0000:CD30 | 4 | presentation (read) | 0000:CC63, 0000:CD6C | renderer |  |
-| 0000:CD34 | 212 | renderer (read) | 0000:CC63, 0000:CD6C | renderer (CCF8 wall sides, CB37) | vars CCF8 BA7F C398 CB37 |
+| 0000:CD34 | 95 | renderer (read) | 0000:CC63, 0000:CD6C | renderer (CCF8 wall sides, CB37) | vars CCF8 CB37 D742 C398 |
 | 0000:CD44 | 2 | decode artefact |  | the renderer's code decoded from the middle of an instruction [artefact] |  |
-| 0000:CD50 | 134 | decode artefact |  | the renderer's wall walk decoded from the middle of an instruction [artefact] | vars BA7F D7AC D7B2 D7B8 |
-| 0000:CD54 | 130 | decode artefact |  | the renderer's wall walk decoded from the middle of an instruction [artefact] | vars BA7F D7AC D7B2 D7B8 |
-| 0000:CD6C | 326 | presentation (read) |  | a door's wall drawn (C398 bit 1000h set for the hit test near the player) [renderer] | vars CCC4 C398 D7AC D7B2 |
-| 0000:CFBA | 231 | renderer (read) | 0000:C9FF, 0000:CF96 | map flats placed for the drawing (D806, C38E) [renderer] | vars D806 C38E A84A A84E |
-| 0000:D0A1 | 237 | renderer (read) | 0000:C9FF | the drawing's walk over floor squares (deep floors CCCE) [renderer] | vars CCCE 9031 C398 C39A |
-| 0000:D22B | 79 | presentation (read) | 0000:CC63, 0000:CD34, 0000:CD50 (+3) | renderer: a floor square's corners (D7AC..D7BE) for the drawing [presentation] | vars D7B8 BB04 D740 D73F |
-| 0000:D27A | 202 | presentation (read) | 0000:CC63, 0000:CD34, 0000:CD50 (+5) | the renderer: a wall's span set up [presentation] | vars CCF8 BA7F C398 D7D2 |
-| 0000:D344 | 56 | presentation (read) | 0000:D27A | the renderer: a door's opening turned (93BC) [presentation] | vars D7B0 D7B4 D7AA D7AE |
-| 0000:D78C | 766 | drawing? | 0000:D4B4 |  | vars C398 CCCE 9030 A918 |
+| 0000:CD50 | 16 | decode artefact |  | the renderer's wall walk decoded from the middle of an instruction [artefact] | vars CCF8 BA7F |
+| 0000:CD54 | 12 | decode artefact |  | the renderer's wall walk decoded from the middle of an instruction [artefact] | vars BA7F |
+| 0000:CD6C | 36 | presentation (read) |  | a door's wall drawn (C398 bit 1000h set for the hit test near the player) [renderer] | vars 058A CB38 CCC4 D742 |
+| 0000:CD70 | 25 | likely inline | 0000:CD66 |  | vars CB38 CCC4 |
 | 0000:DB78 | 209 | drawing? | 0000:DA8E |  | vars D80C C3D2 CD7E A836 |
-| 0000:DC67 | 286 | renderer (read) | 0000:D4B4 | renderer | vars CD86 D834 D838 A836 |
-| 0000:DD85 | 37 | presentation (read) | 0000:DC67 | the renderer: sprite light rows from the lights [presentation] | vars CCEC A836 C3DC BC8C |
-| 0000:DDAA | 117 | presentation (read) | 0000:DD85 | a sprite's shading row from the lights near it (A836) [renderer] | vars A836 C8E7 CCD2 |
-| 0000:DE1F | 124 | presentation (read) | 0000:A561 | the renderer's code tables generated [presentation] | vars CD8C CD8A CD90 CD8E |
-| 0000:DEA8 | 135 | drawing? | 0000:D4B4 |  | vars D813 C3D8 C8F2 A91A |
 | 0000:DF2F | 115 | presentation (read) | 0000:D4B4 | renderer's pattern fill [presentation] | vars A916 A914 CD8C C3D8 |
-| 0000:DFA2 | 57 | presentation (read) | 0000:D4B4 | sky colour rectangle filled [presentation] | vars C3D8 C398 A91A C3C6 |
-| 0000:E045 | 37 | under a hook | 0000:B049 |  |  |
-| 0000:E1A2 | 201 | presentation (read) | 0000:A8FB | the rain's drops drawn [presentation] | vars E05C A914 E05A A91A |
-| 0000:E37F | 155 | under a hook | 0000:C2CE, 0000:C3A6, 0000:C3AE (+2) |  | vars A914 A900 A918 A91A |
 | 0000:FEF8 | 46 | drawing? | 0000:ED0D, 0000:FEF4 |  |  |
-| 0000:FF26 | 78 | under a hook | 0000:B2E5, 0000:B358 |  | vars E8FE A918 A914 AF83 |
-| 0000:FF74 | 95 | under a hook | 0000:FF26 |  | vars A836 C3D0 C3D4 C3DA |
+| 0000:FF26 | 78 | likely inline | 0000:B2E5, 0000:B358 |  | vars E8FE A918 A914 AF83 |
+| 0000:FF74 | 95 | game | 0000:FF26 |  | vars A836 C3D0 C3D4 C3DA |
 | 0FFD:03C4 | 27 | hardware | 0FFD:03FD, 0FFD:0452, 0FFD:0480 (+1) |  |  |
 | 0FFD:03D7 | 1 | under a hook | 0FFD:03C4 |  |  |
 | 0FFD:03DF | 30 | hardware | 0FFD:03FD, 0FFD:0452, 0FFD:0480 |  |  |
@@ -500,7 +444,6 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 0FFD:0CF0 | 1 | driver (read) | 0FFD:0C49 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0CFB | 51 | driver (read) | 0FFD:0821 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0D46 | 6 | driver (read) | 23BA:002A, 23BA:012B, 23BA:014A (+1) | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
-| 0FFD:0D4C | 6 | driver (read) | 23BA:0183, 23BA:01C7, 23BA:0217 | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0D52 | 6 | driver (read) | 2294:076C, 23BA:000C, 23BA:002A (+3) | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0D58 | 6 | driver (read) | 23BA:002A, 23BA:012B, 23BA:014A (+1) | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
 | 0FFD:0D5E | 6 | driver (read) | 23BA:000C, 23BA:012B, 23BA:014A (+1) | the sound and music driver's interface (segment 0FFD: the card's registers and the driver's calls) [driver] |  |
@@ -519,9 +462,8 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:0000 | 6 | decode artefact | 1194:8020, 1194:9462, 1194:9D64 | the bytes before the segment's first routine, decoded from a near call to 0 [artefact] |  |
 | 1194:000A | 30 | DOS I/O | 1194:0067, 1194:00A4, 1194:0142 (+1) |  | vars 019A |
 | 1194:0028 | 41 | DOS I/O | 1194:0051 |  |  |
-| 1194:0051 | 22 | under a hook | 1194:0067 |  |  |
-| 1194:0067 | 61 | under a hook | 2F26:000E |  | vars 019A |
-| 1194:00A4 | 35 | under a hook | 2F26:000E |  |  |
+| 1194:0051 | 22 | game | 1194:0067 |  |  |
+| 1194:00A4 | 35 | game | 2F26:000E |  |  |
 | 1194:00EA | 88 | hardware (read) | 1194:0142, 1194:01E9 | the CyberMan's buttons read [hardware] | vars ACB7 ACB8 ACB9 ACBA |
 | 1194:0142 | 137 | hardware (read) | 2F26:00F2, 2F26:0214, 2F26:02A1 (+4) | the CyberMan's motion read [hardware] |  |
 | 1194:01CB | 30 | hardware (read) | 1194:0142 | the CyberMan's motion scaled [hardware] |  |
@@ -531,145 +473,65 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 1194:07B1 | 29 | under a hook | 1194:066A |  |  |
 | 1194:07CE | 17 | under a hook | 1194:066A |  |  |
 | 1194:07DF | 17 | under a hook | 1194:066A |  | vars 37EA |
-| 1194:0E19 | 58 | under a hook | 1194:0DE1, 1194:22F5 |  |  |
-| 1194:0E53 | 51 | under a hook | 1194:0DE1 |  | vars 05C8 |
-| 1194:0E86 | 130 | under a hook | 1194:0DE1 |  | vars 05C8 |
-| 1194:0F08 | 208 | under a hook | 1194:0DE1 |  |  |
-| 1194:0FD8 | 35 | under a hook | 1194:0E86 |  |  |
-| 1194:0FFB | 12 | under a hook | 1194:0F08 |  |  |
+| 1194:0E53 | 51 | likely inline | 1194:0DE1 |  | vars 05C8 |
+| 1194:0E86 | 130 | likely inline | 1194:0DE1 |  | vars 05C8 |
+| 1194:0F08 | 208 | likely inline | 1194:0DE1 |  |  |
+| 1194:0FFB | 12 | game | 1194:0F08 |  |  |
 | 1194:124A | 116 | under a hook | 1194:122C |  | files bonus.img, charstat.img; vars 9686 9288 B7C4 1299 |
 | 1194:12BE | 40 | presentation (read) | 1194:124A, 1194:2AFA | the character sheet's picture drawn [presentation] | vars 1032 9030 |
 | 1194:12E6 | 15 | presentation (read) | 1194:124A, 1194:138E, 1194:1528 (+1) | a value drawn at (5Ch, 71h) [UI] | vars 129C |
 | 1194:12F5 | 95 | presentation (read) | 1194:124A, 1194:157E | the character sheet's page drawn [presentation] | files updown.img; vars 9030 1032 1297 |
 | 1194:1354 | 58 | presentation (read) | 1194:12F5, 1194:138E, 1194:14C5 (+1) | character creation arrows drawn [presentation] | vars 1032 9030 |
 | 1194:149D | 40 | presentation (read) | 1194:138E, 1194:1528 | the character sheet's picture put back [presentation] | vars 1032 9030 |
-| 1194:1528 | 86 | presentation (read) |  | the character sheet's values redrawn [presentation] | vars 9288 |
 | 1194:157E | 13 | presentation (read) | 1194:2AFA | the character sheet's values shown (12E6/12F5 draw, DE1) [UI] |  |
-| 1194:1647 | 64 | under a hook | 1194:0DC7, 1194:1738 |  | files charshet.$$$; vars 9030 1030 |
-| 1194:1687 | 14 | under a hook | 1194:23E5 |  | files saveface.$$$ |
-| 1194:16BD | 35 | under a hook | 1194:0D67 |  | vars B7C4 |
-| 1194:16E0 | 88 | under a hook | 1194:16BD |  | vars 126C 1299 1270 1272 |
-| 1194:1738 | 160 | under a hook | 1194:16E0 |  | files backmsg.$$$, equip.img; vars 9030 A900 1032 |
-| 1194:1988 | 194 | presentation (read) | 1194:1C5E | the character sheet's status texts [UI] | vars 12B2 12B0 9288 102E |
-| 1194:1A4A | 74 | presentation (read) |  | the inventory list scrolled down [presentation] | vars 129A 1297 129D 126C |
+| 1194:1687 | 14 | game | 1194:23E5 |  | files saveface.$$$ |
+| 1194:16BD | 35 | likely inline | 1194:0D67 |  | vars B7C4 |
 | 1194:1A94 | 50 | presentation (read) |  | the inventory list scrolled up [presentation] | vars 1297 129A |
-| 1194:1AC6 | 109 | presentation (read) |  | the inventory screen's click on the list [presentation] | vars 1296 1299 129A AFF9 |
-| 1194:1C5E | 146 | presentation (read) | 1194:1AC6 | the inventory list's line under the cursor [presentation] | vars 1296 129A 129D 1270 |
-| 1194:1D5C | 108 | under a hook | 1194:1DC8 |  | vars 9288 1297 050A 1296 |
-| 1194:1F30 | 38 | under a hook | 1194:1DC8 |  |  |
-| 1194:1F56 | 55 | presentation (read) | 1194:1C5E | the inventory list's count with the quest items [presentation] | vars 126C 1272 0F77 129D |
-| 1194:20BF | 200 | under a hook | 1194:1F8D |  | vars 9030 12A6 12A4 8F9C |
-| 1194:21C2 | 47 | presentation (read) | 1194:1A4A, 1194:1A94, 1194:1AC6 (+2) | the inventory list's area put back [presentation] | vars 9030 |
-| 1194:223A | 117 | UI (read) | 1194:17D8, 1194:18CA, 1194:1988 (+2) | the inventory screen's list drawn [UI] | vars 102C 9288 1032 9030 |
-| 1194:22AF | 70 | under a hook | 1194:1D5C, 1194:1DC8 |  | vars ADB8 ADB6 |
-| 1194:22F5 | 32 | under a hook | 1194:23B1 |  | vars 9288 |
+| 1194:1F30 | 38 | likely inline | 1194:1DC8 |  |  |
 | 1194:2315 | 16 | presentation (read) | 1194:17D8, 1194:18F6, 1194:1988 | the selected inventory line's slot [presentation] | vars 1296 |
-| 1194:2365 | 39 | presentation (read) |  | the inventory and the other list toggled [presentation] | vars 01A9 129A 1296 1297 |
-| 1194:2451 | 17 | under a hook | 1194:23E5 |  |  |
-| 1194:2486 | 17 | under a hook | 1194:2BC5 |  | files msshirt.img |
+| 1194:2451 | 17 | game | 1194:23E5 |  |  |
 | 1194:28EC | 10 | presentation (read) |  | the window library's state for the creation screen [presentation] | files noexit.img |
-| 1194:2A69 | 52 | presentation (read) | 1194:24A6 | creation's attribute screen loop around the ported rolls/checks (2AC7, 2CD0, 2D28) [UI] | vars 0D49 |
+| 1194:2A69 | 52 | presentation (read) | 1194:2536 | creation's attribute screen loop around the ported rolls/checks (2AC7, 2CD0, 2D28) [UI] | vars 0D49 |
 | 1194:2A9D | 42 | presentation (read) | 1194:2A69 | the creation's attribute screen's picture [presentation] | vars 9030 |
 | 1194:2C96 | 42 | under a hook | 1194:2BC5 |  | vars 9030 |
 | 1194:2CC0 | 16 | presentation (read) |  | a window closed [presentation] | vars B7C4 1298 |
-| 1194:2D60 | 79 | under a hook | 1194:158F, 1194:2D5C |  | vars 9030 |
-| 1194:3A51 | 117 | I/O (read) | 0000:102E | startup: the environment scanned for the launch key at 472C, the slot read after it or @ by default, then 3AC5 (load.rs) [I/O] | files screensv.$$2, tempsave.$$$; vars 1A80 1A6C 7D0D |
-| 1194:4BCC | 51 | under a hook | 1194:4BC8 |  | vars 9288 |
-| 1194:4F89 | 47 | I/O (read) | 1194:4D91 | a file deleted if it exists [I/O] |  |
-| 1194:4FF7 | 110 | drawing | 0000:1393, 1194:020E, 1194:59CC (+2) |  | vars 05CA A900 |
-| 1194:5065 | 15 | under a hook | 1194:4FF7 |  | vars 4B8E |
-| 1194:5187 | 49 | DOS I/O | 27E3:01FC |  |  |
-| 1194:51B8 | 25 | under a hook | 1194:51D1 |  | files spelbook.$$$; vars A8FE |
-| 1194:51D1 | 530 | drawing? | 1194:1AC6 |  | files equip.img, spparts.rci; vars 1296 8F92 1280 12BC |
-| 1194:53E3 | 22 | under a hook | 1194:51D1 |  | files spelbook.$$$; vars A8FE |
-| 1194:545C | 58 | presentation (read) | 1194:AA8C, 1194:B1EA, 1194:BB83 (+5) | gold text drawn (0000:5364) [presentation] | vars 9288 1026 05C2 |
-| 1194:54B3 | 31 | presentation (read) | 1194:A7F1, 1194:B93C, 1194:C258 (+1) | shop screen cleared (with D39 bit 80h) [presentation] | vars 0D39 |
-| 1194:54D4 | 94 | DOS I/O | 0000:10C9 |  | vars 1AB9 1026 1034 9288 |
-| 1194:5536 | 33 | input (read) | 1194:223A, 1194:5532, 1194:59CC | waiting for a key or click (710E, 8FC4, 2F26:02A1) [input] | vars ACB0 AFF9 |
+| 1194:51B8 | 25 | game | 1194:51D1 |  | files spelbook.$$$; vars A8FE |
+| 1194:53E3 | 22 | game | 1194:51E6, 1194:5271, 1194:52DB |  | files spelbook.$$$; vars A8FE |
 | 1194:55D5 | 4 | thunk to front end | 0000:41A4 |  |  |
 | 1194:55D9 | 25 | drawing | 1194:55B6, 1194:55D5 |  |  |
 | 1194:5634 | 25 | presentation (read) | 1194:0E53, 1194:0E86, 1194:0F08 (+2) | a number drawn [presentation] |  |
-| 1194:5B58 | 216 | under a hook | 1194:27C2 |  | vars A896 9030 1030 A900 |
-| 1194:5C34 | 148 | UI (read) | 1194:2711, 1194:5C30 | a text window drawn (buffer 1044) [UI] | vars 1044 |
-| 1194:5CC8 | 4 | under a hook | 26F7:013E, 26F7:0268 |  |  |
-| 1194:5CCC | 13 | under a hook | 1194:1F8D, 1194:21A8, 1194:2D60 (+1) |  |  |
-| 1194:5CD9 | 27 | presentation (read) | 1194:0D8E, 1194:124A, 1194:1687 (+13) | EMS bank [1030] mapped (the port has ems_map) [infrastructure] | vars 1030 |
-| 1194:5CF4 | 91 | UI (read) | 0000:10C9, 1194:0CF8, 1194:122F (+2) | window library state (B7C4) [UI] | vars B7C4 B7C6 |
 | 1194:5D4F | 38 | presentation (read) | 1194:5CF4 | the window library's key dispatch [presentation] | vars B7C4 |
 | 1194:5D75 | 24 | presentation (read) | 1194:5CF4 | the window library's key case folding [presentation] |  |
 | 1194:5D8D | 50 | presentation (read) | 1194:5CF4 | the window library's click test [presentation] | vars 8F92 8F94 AFF9 |
 | 1194:5DE2 | 59 | input (read) | 1194:5CF4 | the window library's input loop [input] | vars B7C4 8F92 8F94 AFF9 |
-| 1194:5E21 | 18 | input (read) | 1194:122F, 1194:124A, 1194:16BD (+17) | waiting for input [input] | vars AFF9 |
-| 1194:5E63 | 20 | I/O (read) | 1194:B1EA | the screen saved to a file [I/O] | vars A8FE |
-| 1194:5E77 | 46 | I/O (read) | 1194:B1EA | the screen and its palette loaded from a file [I/O] | files pal.col; vars A8FE |
-| 1194:5F8C | 52 | presentation (read) | 1194:4D31, 1194:4E88, 1194:AA8C (+7) | a window's background saved [presentation] | vars 9030 |
-| 1194:5FC0 | 65 | presentation (read) | 1194:4D31, 1194:4E88, 1194:85DE (+14) | waiting for input [input] | vars 9030 |
-| 1194:6001 | 99 | input (read) | 1194:4E88 | waiting for a key or click (8F92/8F94 mouse, AFF9 key) [input] | vars 8F92 8F94 AFF9 |
+| 1194:5E63 | 20 | I/O (read) | 1194:B1EA, 1194:B242 | the screen saved to a file [I/O] | vars A8FE |
 | 1194:6513 | 63 | drawing? | 1194:636B, 1194:6410 |  | vars A880 A882 A900 A884 |
 | 1194:6552 | 27 | drawing? | 1194:6513, 1194:C258 |  |  |
 | 1194:68CB | 12 | decode artefact |  | data decoded as code (no callers) [artefact] | vars A890 |
-| 1194:76B4 | 101 | under a hook | 1194:23B1 |  | vars 9288 |
-| 1194:7CBA | 62 | presentation (read) | 1194:1988 | an item's description window [presentation] |  |
-| 1194:7CF8 | 129 | presentation (read) | 1194:7CBA | an item's description: its condition and value lines [presentation] | vars 91F6 12B2 12B0 137A |
-| 1194:7D79 | 104 | presentation (read) | 1194:7CBA | an item's description: a weapon's lines [presentation] | vars 12B2 12B0 |
-| 1194:7DE1 | 99 | presentation (read) | 1194:7CBA | an item's description: an armour's lines [presentation] |  |
-| 1194:7E44 | 107 | presentation (read) | 1194:7CBA | an item's description: its magic [presentation] | vars 12B4 137A 137E 103A |
-| 1194:7EAF | 127 | presentation (read) | 1194:7D79 | an item's description: weight and hands [presentation] | vars 12B2 |
-| 1194:7F2E | 165 | presentation (read) | 1194:7D79, 1194:7DE1 | an item's description: its ratings [presentation] |  |
-| 1194:A206 | 265 | presentation (read) | 1194:16E0, 1194:1DC8, 1194:1F56 | the logbook's quest lines listed (records at 0DCA, 0E6E) [UI] | vars 126C |
-| 1194:A30F | 72 | presentation (read) | 1194:A206 | a quest item's name for the inventory list [presentation] |  |
-| 1194:A357 | 21 | presentation (read) | 1194:A206 | a quest item's name capitalised for the list [presentation] |  |
-| 1194:BA44 | 77 | I/O (read) | 1194:BA91, 1194:C04C | the rented room's file name (.inn) built and the file opened (rest.rs RestHooks room_load, room_file) [I/O] | vars 05C8 1387 1AB5 |
-| 1194:D540 | 31 | under a hook | 1194:D45D |  |  |
 | 1194:EB71 | 36 | under a hook | 1194:F204 |  | vars 13F8 A874 |
 | 1194:F27D | 81 | under a hook | 1194:F204 |  | vars 12CD 9030 13C9 A874 |
-| 217B:05C2 | 95 | under a hook | 217B:0682 |  | vars C91A C91B C943 A840 |
-| 217B:0621 | 97 | under a hook | 217B:05C2 |  | vars C3D0 0608 A838 C3D4 |
+| 217B:0621 | 97 | likely inline | 217B:05C2 |  | vars C3D0 0608 A838 C3D4 |
 | 217B:0708 | 40 | drawing | 217B:0189 |  | vars A900 9288 |
-| 21EE:028A | 64 | presentation (read) | 0000:51F2, 0000:5C26 | fatal out-of-memory message and exit [presentation] | vars 41C6 9288 |
 | 21EE:02CA | 40 | drawing | 21EE:028A |  | vars 1036 102C 9288 A900 |
 | 21EE:0314 | 143 | DOS I/O | 0000:102E |  | vars A836 |
 | 21EE:03A3 | 39 | DOS I/O | 0000:102E |  |  |
-| 21EE:03CA | 15 | DOS I/O | 0000:102E, 21EE:01ED |  |  |
-| 222C:0149 | 37 | presentation (read) | 222C:00EA | the class quiz's palette set [presentation] | vars 929E 92A0 |
+| 21EE:03CA | 15 | DOS I/O | 0000:102E, 0000:109B, 21EE:01ED |  |  |
 | 222C:016E | 23 | presentation (read) | 222C:0000 | the class quiz's screen set up (font, sound) [presentation] | vars 102C 1030 |
-| 222C:025A | 102 | presentation (read) |  | the class quiz's scroll screen [presentation] | vars 40F2 9030 1298 129A |
 | 222C:02C0 | 20 | presentation (read) |  | the class quiz's screen freed [presentation] | vars 40F0 |
 | 222C:034C | 101 | presentation (read) | 222C:025A | the class quiz's question drawn [presentation] | vars 1296 1294 A900 40F2 |
-| 222C:040B | 82 | presentation (read) | 222C:0611 | the class quiz's scroll moved down [presentation] | vars 129C 129A 1298 40F0 |
-| 222C:045D | 95 | presentation (read) | 222C:0640 | the class quiz's scroll moved up [presentation] | vars 1298 129C 129A 1296 |
 | 222C:04BC | 27 | presentation (read) | 222C:040B, 222C:045D | the class quiz's scroll redrawn [presentation] | vars 40F2 |
 | 222C:04E5 | 64 | presentation (read) | 222C:040B, 222C:045D | the class quiz's answers drawn [presentation] | vars A900 9288 40F2 40F0 |
 | 222C:0611 | 47 | presentation (read) |  | the class quiz's scroll button (down) [presentation] | vars AFF9 |
-| 222C:0640 | 47 | presentation (read) |  | the class quiz's scroll button (up) [presentation] | vars AFF9 |
 | 222C:066F | 20 | presentation (read) |  | a window closed [presentation] | vars B7C6 129E |
-| 2294:0700 | 108 | under a hook | 1194:D45D |  | vars A91A 43CE 43D0 43D2 |
 | 23BA:014A | 57 | driver (read) | 222C:00EA | the sound driver's voices set up [driver] | vars 46F0 8F64 EB91 |
 | 23BA:0183 | 33 | driver (read) | 222C:0185 | a sound file loaded for the driver [driver] | vars 46F0 EB91 |
 | 23BA:01A4 | 35 | driver (read) | 222C:016E | the sound driver's voices freed [driver] | vars EB91 46F2 |
 | 2433:013A | 24 | drawing | 2433:0000 |  | vars 0FF2 9030 |
-| 2433:083D | 70 | presentation (read) | 1194:16E0, 1194:1DC8, 1194:1F56 | the inventory list's quest items counted and named [presentation] | vars 12CE 0F77 0F7F |
-| 2433:0A39 | 104 | drawing | 2542:00BE |  | vars C39A 0FF2 9030 |
 | 2542:01F2 | 19 | under a hook | 2542:0205 |  | vars 9288 1036 |
 | 2542:0205 | 104 | under a hook | 2542:01E6 |  | vars 0D48 C39A 1026 0FFB |
-| 2542:066A | 20 | presentation (read) | 2542:034D | character sheet: the names of the items with an effect listed (the view's sheets.rs) [presentation] | vars 127C |
 | 25FD:05A5 | 109 | file I/O (read) | 25FD:056F | a save slot's four files checked (list at 5F5A) [file I/O] | vars A836 A838 902E |
-| 26F7:0325 | 127 | under a hook | 26F7:0268 |  | vars 9030 A8BE A8C0 1030 |
-| 27E3:000E | 12 | I/O (read) | 27E3:000A | file open wrapper around 27E3:01AB [I/O] |  |
-| 27E3:01AB | 56 | I/O (read) | 27E3:000E | file at 78D6 opened (600C) and its size checked against 2000, closed otherwise [I/O] |  |
-| 27E3:03D6 | 42 | under a hook | 27E3:02DA |  | files log.$$$; vars A900 |
-| 27E3:0400 | 48 | under a hook | 27E3:01FC, 27E3:02DA |  | files log.$$$; vars A900 |
-| 2826:0D12 | 14 | under a hook | 2826:0C15 |  |  |
-| 292B:000E | 26 | drawing? | 0000:4BD6 |  | vars 7DB8 BC8C |
-| 292B:0028 | 54 | presentation (read) | 0000:A8EF | the hook CD5A: a person's colour remap (4A30) before drawing [presentation] | vars CD9C |
-| 292B:0074 | 145 | drawing? | 292B:0028 |  | vars 0A46 |
-| 292B:0189 | 61 | under a hook | 292B:0074 |  |  |
-| 292B:048F | 161 | drawing? | 0000:4DD6 |  | files faces00.cif, facesf00.cif; vars 05CA BA54 9030 |
-| 292B:0530 | 79 | presentation (read) | 0000:4BD6 | eight images of the list at 7BAA drawn (FD5 flags) [drawing] | vars 9030 |
-| 29CF:060B | 69 | under a hook | 2542:056A |  | vars 8036 |
-| 29CF:06F5 | 42 | under a hook | 1194:51D1 |  | vars 1A6C 7F14 |
+| 27E3:03D6 | 42 | likely inline | 27E3:02F3 |  | files log.$$$; vars A900 |
 | 2B39:17B8 | 653 | presentation (read) | 0000:5104 | a 3D object's file loaded and its points projected [renderer] | files fog.txt; vars 83AC 837A 833E 8358 |
-| 2F26:000E | 24 | under a hook | 21EE:0000 |  | vars 8BEC |
 | 2F26:0026 | 24 | hardware (read) | 2F26:00F2 | the CyberMan's turn (C3DA) [input hardware] | vars C3DA 127C |
 | 2F26:003E | 49 | hardware (read) | 2F26:00F2 | the CyberMan's move (CCBA, 5DE) [input hardware] | vars AFF9 C3DA CCBA 05DE |
 | 2F26:006F | 30 | hardware (read) | 2F26:00F2 | the Logitech CyberMan 3D controller's driver (segment 2F26) [hardware] | vars C3DA |
@@ -680,41 +542,22 @@ signs found. Evidence: files named, DGROUP variables most touched.
 | 2F26:01C9 | 75 | hardware (read) | 2F26:0214 | the Logitech CyberMan 3D controller's driver (segment 2F26) [hardware] | vars 8F30 8F31 8F32 8F33 |
 | 2F26:0214 | 141 | input (read) | 0000:38CE | key state [input] | vars 05E0 1012 8BEC 8F36 |
 | 2F26:0347 | 166 | BIOS | 2F26:00F2 |  | vars 8F92 8F94 8F74 8F76 |
-| 2F26:03FD | 72 | under a hook | 3159:06A0 |  | vars 8F38 8BEC |
-| 2F26:0445 | 107 | input (read) | 0000:2D1F | key handling [input] | vars 8F37 8F36 8BEC 126C |
+| 2F26:03FD | 72 | game | 3159:06A0 |  | vars 8F38 8BEC |
+| 2F26:0445 | 107 | input (read) | 0000:2DB5 | key handling [input] | vars 8F37 8F36 8BEC 126C |
 | 2F26:04B0 | 50 | input (read) | 2826:0002, 2826:0042 | key handling [input] | vars 8BEC CCBA 7A46 |
-| 2F75:00DC | 114 | under a hook | 2294:0700, 2294:076C |  | vars 8F5A 9030 EB8B EB89 |
-| 2F75:014E | 203 | under a hook | 2294:0700 |  | files vision.ems; vars 9030 8F4E 8F41 EB8B |
-| 2F75:0219 | 38 | under a hook | 1194:D45D |  |  |
-| 2F75:023F | 98 | under a hook | 2F75:000A, 2F75:00DC |  | vars 8F5C 8F48 9030 |
 | 2F9F:000D | 17 | driver (read) | 2294:04F5 | the music driver's call [driver] | vars EB00 EB93 |
 | 2F9F:0364 | 212 | under a hook | 1194:066A |  | vars EB95 EB91 8F64 8F62 |
-| 2F9F:04A0 | 108 | driver (read) | 0000:102E, 21EE:01ED | music shutdown: its buffers freed (6C26) and the driver stopped (0FFD:0821) [driver] | vars 8F5E 8F60 8F62 8F64 |
-| 3159:000C | 231 | drawing? | 1194:27C2, 222C:020A, 26F7:0000 (+1) |  | vars B7C4 |
-| 3159:00F3 | 126 | under a hook | 3159:000C |  | vars AFF9 B7C6 B7C4 B7D4 |
-| 3159:0171 | 41 | under a hook | 3159:000C, 3159:00F3 |  | vars B7CE B7D4 B7C6 |
-| 3159:019A | 214 | under a hook | 3159:000C, 3159:0432 |  | vars 8F92 8F94 B7C8 B7C6 |
-| 3159:02B2 | 29 | under a hook | 3159:033D, 3159:0494 |  | vars BA0E |
-| 3159:02CF | 29 | under a hook | 3159:033D, 3159:0403 |  | vars BA12 |
-| 3159:02EC | 53 | under a hook | 3159:000C, 3159:00F3 |  | vars B7C8 B7CC B7D0 |
-| 3159:0321 | 28 | under a hook | 3159:00F3, 3159:0171 |  |  |
-| 3159:033D | 198 | under a hook | 3159:00F3, 3159:02EC |  | vars B7C4 AFF9 B7D0 B7C8 |
-| 3159:0403 | 47 | under a hook | 3159:033D |  | vars B7CC B7D0 |
-| 3159:0432 | 50 | under a hook | 3159:00F3 |  | vars AFF9 8F92 8F94 |
-| 3159:046E | 21 | under a hook | 3159:000C, 3159:0E8A |  | vars B7C4 B7EA |
-| 3159:0483 | 16 | under a hook | 3159:046E |  |  |
-| 3159:0494 | 524 | drawing? | 26F7:0176, 3159:000C |  | vars A842 B7EA B7E8 9207 |
-| 3159:07D3 | 97 | under a hook | 3159:06A0 |  |  |
-| 3159:0834 | 374 | under a hook | 3159:06A0, 3159:0718 |  | vars AFF9 B7C4 ACD1 ACB6 |
-| 3159:09AA | 12 | under a hook | 2F26:03FD |  | vars B80A |
-| 3159:09B6 | 12 | under a hook | 2F26:03FD |  | vars B80A |
-| 3159:09C2 | 38 | under a hook | 3159:0834, 3159:09AA |  | vars B7F2 |
-| 3159:09E8 | 53 | under a hook | 3159:0834, 3159:09B6 |  | vars B7F2 |
-| 3159:0BA1 | 13 | under a hook | 3159:0A58 |  |  |
-| 3159:0BAE | 28 | under a hook | 3159:0A58, 3159:0BA1 |  | vars B80A 9288 |
-| 3159:0BCA | 26 | under a hook | 3159:0718, 3159:09C2, 3159:09E8 (+1) |  |  |
-| 3159:0C75 | 138 | under a hook | 3159:0718 |  |  |
-| 3159:0E11 | 87 | under a hook | 3159:0E68 |  |  |
-| 3159:0E68 | 33 | under a hook | 3159:0834, 3159:09C2, 3159:09E8 |  |  |
-| 3159:0E8A | 44 | drawing? | 26F7:0176 |  | vars B7C4 B7C5 |
-| 3159:0EB6 | 43 | drawing? | 26F7:0176 |  | vars B7C5 B7C4 |
+| 2F9F:04A0 | 108 | driver (read) | 0000:102E, 0000:109B, 21EE:01ED | music shutdown: its buffers freed (6C26) and the driver stopped (0FFD:0821) [driver] | vars 8F5E 8F60 8F62 8F64 |
+| 3159:00F3 | 126 | likely inline | 3159:000C |  | vars AFF9 B7C6 B7C4 B7D4 |
+| 3159:02B2 | 29 | game | 3159:033D, 3159:0494 |  | vars BA0E |
+| 3159:02CF | 29 | game | 3159:033D, 3159:0403 |  | vars BA12 |
+| 3159:02EC | 53 | likely inline | 3159:000C, 3159:00F3 |  | vars B7C8 B7CC B7D0 |
+| 3159:0321 | 28 | game | 3159:00F3, 3159:0171 |  |  |
+| 3159:033D | 198 | game | 3159:00F3, 3159:02EC |  | vars B7C4 AFF9 B7D0 B7C8 |
+| 3159:0403 | 47 | game | 3159:033D |  | vars B7CC B7D0 |
+| 3159:0483 | 16 | game | 3159:046E |  |  |
+| 3159:09AA | 12 | game | 2F26:03FD |  | vars B80A |
+| 3159:09B6 | 12 | game | 2F26:03FD |  | vars B80A |
+| 3159:09E8 | 53 | game | 3159:0834, 3159:09B6 |  | vars B7F2 |
+| 3159:0BA1 | 13 | game | 3159:0A58 |  |  |
+| 3159:0BAE | 28 | likely inline | 3159:0A58, 3159:0BA1 |  | vars B80A 9288 |
