@@ -515,10 +515,12 @@ def dream_due(put):
 
 def visioned(a, clicks):
     """Hooks for a step whose frames show a vision (1194:D45D) outside a
-    death (`died`'s): inside D45D the timer (0151) ticks at each read of
+    death (`died`'s), or the Emperor's audience's movie (2294:0895 from
+    0000:41BE): inside them the timer (0151) ticks at each read of
     it (the movie's frames wait on it), and as its movie begins (2294:0700)
     `clicks` clicks are queued at the screen's centre, those not taken
-    dropped as D45D returns (to 1194:D41F, D459's D45C or D954), but for the release of one
+    dropped as they return (D45D to 1194:D41F, D459's D45C or D954; 0895
+    to 0000:41C3), but for the release of one
     pressed. Returns the hooks
     (for `hook_del`)."""
     inside = [False]
@@ -540,12 +542,12 @@ def visioned(a, clicks):
 
     def queue(mu, addr, size, _):
         a.clicks = [(160, 100)] * clicks
-    d45d = a.lin(LOAD_SEG + 0x1194, 0xD45D)
+    ins = [a.lin(LOAD_SEG + 0x1194, 0xD45D), a.lin(LOAD_SEG + 0x2294, 0x0895)]
     movie = a.lin(LOAD_SEG + 0x2294, 0x0700)
-    outs = [a.lin(LOAD_SEG + 0x1194, o) for o in (0xD41F, 0xD45C, 0xD954)]
-    hooks = [a.mu.hook_add(UC_HOOK_CODE, enter, None, d45d, d45d),
-             a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1),
+    outs = [a.lin(LOAD_SEG + 0x1194, o) for o in (0xD41F, 0xD45C, 0xD954)] + [a.lin(LOAD_SEG, 0x41C3)]
+    hooks = [a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, t, t + 1),
              a.mu.hook_add(UC_HOOK_CODE, queue, None, movie, movie)]
+    hooks += [a.mu.hook_add(UC_HOOK_CODE, enter, None, i, i) for i in ins]
     hooks += [a.mu.hook_add(UC_HOOK_CODE, leave, None, o, o) for o in outs]
     return hooks
 

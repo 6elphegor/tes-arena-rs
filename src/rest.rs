@@ -130,10 +130,12 @@ pub trait RestHooks: ClockHooks {
     fn dream_black(&mut self, m: &mut Machine) {
         m.sheet_black();
     }
-    /// 0000:A6B5 (`Machine::world_back`) and 2542:0446 (the palette, the
-    /// front end's): the world given back after the dream.
+    /// 0000:A6B5 (`Machine::world_back`) and 2542:0446 (the colours of
+    /// the file named at DS:1304 read to 929E, 0000:7530; their setting
+    /// the front end's): the world given back after the dream.
     fn dream_back(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.world_back(files)
+        m.world_back(files)?;
+        m.colours_read(files, 0x1304)
     }
     /// 0000:9A98 (the clip the whole screen) and 9AE6 ([1026]'s font) as
     /// the dream ends.

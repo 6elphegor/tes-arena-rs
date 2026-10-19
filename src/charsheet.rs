@@ -1441,7 +1441,14 @@ impl Machine {
     /// of other than 300h bytes its colours past an 8-byte header, made
     /// 6-bit); their setting (9B4E) the front end's.
     pub(crate) fn sheet_colours(&mut self, files: &mut Files) -> Option<()> {
-        let n = self.file_load(files, COLOURS, DS, SCRATCH).map(|_| self.mem.r16(DS, crate::bsa::var::OPEN_SIZE))?;
+        self.colours_read(files, COLOURS)
+    }
+
+    /// 0000:7530: the colours of the file named at DS:`name` read to 929E
+    /// (a file of other than 300h bytes its colours past an 8-byte header,
+    /// made 6-bit); their setting (9B4E) the front end's.
+    pub(crate) fn colours_read(&mut self, files: &mut Files, name: u16) -> Option<()> {
+        let n = self.file_load(files, name, DS, SCRATCH).map(|_| self.mem.r16(DS, crate::bsa::var::OPEN_SIZE))?;
         if n != 0x300 {
             for i in 0..0x300u16 {
                 let b = self.mem.r8(DS, SCRATCH + 8 + i) >> 2;

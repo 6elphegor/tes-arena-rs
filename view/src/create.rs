@@ -2653,18 +2653,21 @@ pub(crate) fn image_with_palette(m: &Machine, archive: &Archive, name: &str) -> 
 /// Text number `n` made (1194:A374 into a buffer, as 1194:D459 makes the
 /// vision's) as lines in colour `colour`.
 pub(crate) fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
-    let m = &mut engine.m;
+    // (Made on a copy of the game: the window's showing of a movie is no
+    // game's doing, and the text's reading maps and fills bank 1Fh, which
+    // the game's own vision has left as it left it.)
+    let mut m = engine.m.clone();
+    let mut files = engine.files.clone();
     let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
         return Vec::new();
     };
     m.mem.w16(DS, 0x137A, n);
     m.mem.w8(DS, 0x137E, 0);
     m.mem.w8(DS, 0x101C, 0);
-    let text = match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, seg, off) {
-        Some(_) => engine.m.mem.cstr(seg, off).to_vec(),
+    let text = match m.text(&mut files, &mut arena::text::NoTextHooks, 2, seg, off) {
+        Some(_) => m.mem.cstr(seg, off).to_vec(),
         None => Vec::new(),
     };
-    engine.m.heap_free(seg);
     hud::lines(&text, colour)
 }
 
