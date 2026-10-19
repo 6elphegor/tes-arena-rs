@@ -397,12 +397,15 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:55B6's state: the palette buffer (300h bytes at 929E) cleared;
-    /// the fade itself is the front end's.
+    /// 1194:55B6's state: the palette buffer (300h bytes at 929E) cleared
+    /// and the page (55D9's 9426, `page_clear`); the fade itself and the
+    /// screen's clearing are the front end's.
     pub(crate) fn travel_screen_clear(&mut self, hooks: &mut dyn TravelHooks) {
         for i in 0..0x300u16 {
             self.mem.w8(DS, 0x929E + i, 0);
         }
+        // 55D9: the page cleared (9426).
+        self.page_clear();
         hooks.screen(self);
     }
 

@@ -39,6 +39,15 @@ the first such:
 
   provincepage | NAME | <digest>
 
+and, for a journey's days (1194:30F1), what each day shows once its
+frame of the travel animation is presented (312C, after 0000:9466): the
+screen (the VGA's memory) and the colours (the DAC, 6-bit), with how
+many waits for the retrace (0000:6BA8) and reads of the game's timer
+(0151) came since the day before (or the days' start, 30F1): none, the
+days run as fast as the machine does.
+
+  journey | NAME | <day> <screen digest> <colours digest> <retraces> <ticks>
+
 With --dump DIR, each case's NAME.ds/.ems (as it ends) and NAME.ds0/
 .ems0 (as it starts) for worldtest's state reports (game data: never
 commit them).
@@ -49,7 +58,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from emu import LOAD_SEG, fnv
-from unicorn import UC_HOOK_CODE
+from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ
 from screens import ScreenArena, PAGE_SEG_FIELD
 import gen_dungeonscreens as gd
 import gen_worldframes as w
@@ -241,11 +250,32 @@ def main():
                 seg = a.r16(PAGE_SEG_FIELD)
                 province.append(fnv(bytes(a.mu.mem_read(a.lin(seg, 0), 64000))))
         hook2 = a.mu.hook_add(UC_HOOK_CODE, drawn, None, a.lin(LOAD_SEG + 0x26F7, 0x01CD), a.lin(LOAD_SEG + 0x26F7, 0x01CD))
+        days = []
+        waited = [0, 0]
+
+        def retrace(*_):
+            waited[0] += 1
+
+        def tick(*_):
+            waited[1] += 1
+
+        def days_start(*_):
+            waited[0] = waited[1] = 0
+
+        def day(*_):
+            days.append(f'journey | {name} | {len(days)} {fnv(a.vga()):x} {fnv(bytes(a.dac)):x} {waited[0]} {waited[1]}\n')
+            waited[0] = waited[1] = 0
+        hooks = [a.mu.hook_add(UC_HOOK_CODE, retrace, None, a.lin(LOAD_SEG, 0x6BA8), a.lin(LOAD_SEG, 0x6BA8)),
+                 a.mu.hook_add(UC_HOOK_MEM_READ, tick, None, a.lin(a.ds, 0x0151), a.lin(a.ds, 0x0152)),
+                 a.mu.hook_add(UC_HOOK_CODE, days_start, None, a.lin(LOAD_SEG + 0x1194, 0x30F1), a.lin(LOAD_SEG + 0x1194, 0x30F1)),
+                 a.mu.hook_add(UC_HOOK_CODE, day, None, a.lin(LOAD_SEG + 0x1194, 0x312C), a.lin(LOAD_SEG + 0x1194, 0x312C))]
         try:
             full, page, mask, dac = w.run_case(a, places[where], name, setup, steps, tracks)
         finally:
             a.mu.hook_del(hook)
             a.mu.hook_del(hook2)
+            for h in hooks:
+                a.mu.hook_del(h)
         for t in tracks:
             out.write(t)
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
@@ -258,6 +288,8 @@ def main():
             out.write(f'boxview | {name} | {frame} {digest:x}\n')
         for digest in province:
             out.write(f'provincepage | {name} | {digest:x}\n')
+        for line in days:
+            out.write(line)
         out.write(w.rows_line(a, name))
         if dump:
             os.makedirs(dump, exist_ok=True)

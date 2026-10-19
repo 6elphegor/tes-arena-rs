@@ -32,7 +32,9 @@
 //!   and B7C4, B7C5 in a record and put them back: a window run from a
 //!   handler of another's.
 //!
-//! The drawing, the fades and the cursor are the front end's.
+//! The window's picture is drawn into the page where the page is the
+//! heap's block (`page_is_block`); the fades and the cursor are the front
+//! end's.
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -127,6 +129,11 @@ impl Machine {
         self.file_seek(files, 0, 0);
         let n = self.mem.r16(bseg, boff.wrapping_add(0xA)).wrapping_add(0xC);
         self.file_read(files, bseg, boff, n);
+        // 057E: the picture drawn into the page (5828), where the page is
+        // the heap's block.
+        if self.page_is_block() {
+            self.page_image(bseg, boff);
+        }
         if self.mem.r16(bseg, boff.wrapping_add(8)) & 0x100 != 0 {
             self.file_read(files, colours, 0, 0x300);
         }

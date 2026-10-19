@@ -159,6 +159,10 @@ pub struct Travel {
     /// they began (ms).
     journey: Vec<u8>,
     journey_ms: u32,
+    /// The game's page as the journey left it (the world map's picture,
+    /// 26F7:07CD's 56C8), under its frames; where the page is the
+    /// heap's block.
+    journey_page: Option<Vec<u8>>,
     /// The time the screen has been up (ms): its passes (A8C4's blink).
     up_ms: u32,
     /// The boxes' tiles while it is up: PARCH.CIF's 20 x 20, which 26F7:
@@ -183,7 +187,10 @@ pub struct Travel {
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
-/// frame of the journey.
+/// frame of the journey. The view's own pace: the original's window loop
+/// (3159:000C) and its days (1194:30F1) neither wait for the retrace nor
+/// read the timer, so they run as fast as the machine does (areaplay's
+/// `journey` lines).
 const TICK_MS: u32 = 55;
 
 /// A .CIF's frames, each by its coding (type 8 through the port's
@@ -230,6 +237,10 @@ struct Hooks<'a> {
     /// The page as the screen's pass left it (`Travel::page`), which a
     /// box keeps what it covers of (1194:59C8).
     screen: Option<Vec<u8>>,
+    /// The game's page as the journey's first day found it (the world
+    /// map's picture, 26F7:07CD's 56C8 with BX 24h), where the page is
+    /// the heap's block.
+    journey_page: Option<Vec<u8>>,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
@@ -260,7 +271,10 @@ impl TravelHooks for Hooks<'_> {
             self.failed = true;
         }
     }
-    fn animation_frame(&mut self, _m: &mut Machine, frame: u8) {
+    fn animation_frame(&mut self, m: &mut Machine, frame: u8) {
+        if self.frames.is_empty() && m.page_is_block() {
+            self.journey_page = Some(m.mem.segment(m.mem.r16(DS, 0xA900))[..64000].to_vec());
+        }
         self.frames.push(frame);
     }
     fn dungeon_location(&mut self, m: &mut Machine, id: u16, _bx: u16) {
@@ -316,14 +330,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
+            let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -342,7 +356,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None };
+        let mut h = Hooks { boxes: &mut boxes, files: engine.files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
         // The window's colours read from black (1194:55B2's fade before).
         let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
             eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
@@ -379,6 +393,7 @@ impl Travel {
             horse: dfa(archive, "HORSE.DFA"),
             journey: Vec::new(),
             journey_ms: 0,
+            journey_page: None,
             up_ms: 0,
             boxed_over: None,
             province_page: None,
@@ -391,7 +406,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>, files: &Files) -> Hooks<'a> {
-        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None }
+        Hooks { boxes, files: files.clone(), typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded and its window
@@ -643,6 +658,7 @@ impl Travel {
         let failed = h.failed;
         self.journey = std::mem::take(&mut h.frames);
         self.journey_ms = 0;
+        self.journey_page = h.journey_page.take();
         if ok.is_none() || failed {
             eprintln!("the journey gave up: {}", arena::giveup::describe());
         }
@@ -681,6 +697,29 @@ impl Travel {
     /// The journey's frames playing.
     pub fn journeying(&self) -> bool {
         !self.journey.is_empty()
+    }
+
+    /// Each day of the journey as the screen shows it (its pixels and its
+    /// 6-bit colours), the frames played or not.
+    #[cfg(test)]
+    pub fn journey_seen(&mut self, font: &Font, m: &mut Machine) -> Vec<(Vec<u8>, Vec<u8>)> {
+        let ms = self.journey_ms;
+        let mut seen = Vec::new();
+        for day in 0..self.journey.len() as u32 {
+            self.journey_ms = day * TICK_MS;
+            let mut screen = Screen::new([[0, 0, 0, 0xFF]; 256]);
+            self.draw(&mut screen, font, m, 0, 0);
+            let px = screen.indices().iter().map(|&c| c as u8).collect();
+            let dac = screen.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
+            seen.push((px, dac));
+        }
+        self.journey_ms = ms;
+        seen
+    }
+
+    /// The journey's frame for the time played (HORSE.DFA's).
+    fn journey_frame(&self) -> Option<&Image> {
+        self.journey.get((self.journey_ms / TICK_MS) as usize).and_then(|&f| self.horse.get(f as usize))
     }
 
     /// 26F7:071F: the marker of kind `kind` (frame `kind` of `pics`) centred
@@ -834,35 +873,10 @@ impl Travel {
     /// A message box over the map (1194:59C8: 965A with margin 5, centred
     /// on the screen) in its tiles (`parch`) and its text in EEh, the
     /// colour 26F7:0091 sets ([9288]).
-    pub fn draw_box(&self, screen: &mut Screen, font: &Font, lines: &[Vec<hud::Span>]) {
-        if let Some(t) = &self.parch {
-            hud::custom::draw_box(screen, t, font, lines, 5, 0xEE);
-        }
-    }
-
-    /// The screen, the cursor at (x, y): its palette set.
-    pub fn draw(&self, screen: &mut Screen, font: &Font, m: &mut Machine, x: i32, y: i32) {
+    /// Where the game's page isn't the heap's block: the buttons, and the
+    /// icons centred on their places (26F7:0268) as the view draws them.
+    fn icons_drawn(&self, screen: &mut Screen, m: &Machine, p: u8) {
         let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
-        if let Some(p) = &self.picture {
-            p.draw(screen, &self.fonts);
-            return;
-        }
-        let Some(p) = self.shown else {
-            if let Some((img, pal)) = &self.world {
-                screen.set_palette(*pal);
-                screen.fill(0, 0, 320, 200, 0, 0xFF);
-                blit(screen, img, img.x, img.y);
-            }
-            if let Some(f) = self.outprov.get(m.mem.r8(DS, 0x0A46) as usize) {
-                blit(screen, f, f.x, f.y);
-            }
-            return;
-        };
-        if let Some((img, pal)) = &self.province {
-            screen.set_palette(*pal);
-            screen.fill(0, 0, 320, 200, 0, 0xFF);
-            blit(screen, img, img.x, img.y);
-        }
         if let Some(b) = &self.buttons {
             blit(screen, b, b.x, b.y);
         }
@@ -895,6 +909,66 @@ impl Travel {
             for i in 0..16 {
                 icon(screen, 2, VILLAGES + i * RECORD);
             }
+        }
+    }
+
+    pub fn draw_box(&self, screen: &mut Screen, font: &Font, lines: &[Vec<hud::Span>]) {
+        if let Some(t) = &self.parch {
+            hud::custom::draw_box(screen, t, font, lines, 5, 0xEE);
+        }
+    }
+
+    /// The screen, the cursor at (x, y): its palette set.
+    pub fn draw(&self, screen: &mut Screen, font: &Font, m: &mut Machine, x: i32, y: i32) {
+        let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
+        if let Some(p) = &self.picture {
+            p.draw(screen, &self.fonts);
+            return;
+        }
+        // 1194:30F1: the day's frame of the journey over the world map's
+        // picture (26F7:07CD's 56C8 with BX 24h: its colours), as the
+        // game's page held it after the journey (`journey_page`).
+        if let (Some(f), Some(page)) = (self.journey_frame(), &self.journey_page) {
+            if let Some((_, pal)) = &self.world {
+                screen.set_palette(*pal);
+            }
+            screen.underlay(page);
+            screen.blit(f.x, f.y, f.w, f.h, &f.px, 199);
+            return;
+        }
+        // The game's page where it is the heap's block: the window's
+        // picture (3159:057E), the current province outlined (26F7:013E),
+        // or the province's picture and its places' icons as each pass
+        // copies them back from bank 4 (26F7:062E).
+        let page = m.page_is_block().then(|| m.mem.segment(m.mem.r16(DS, 0xA900))[..64000].to_vec());
+        let Some(p) = self.shown else {
+            if let Some((img, pal)) = &self.world {
+                screen.set_palette(*pal);
+                if let Some(page) = &page {
+                    screen.underlay(page);
+                } else {
+                    screen.fill(0, 0, 320, 200, 0, 0xFF);
+                    blit(screen, img, img.x, img.y);
+                }
+            }
+            if page.is_none() {
+                if let Some(f) = self.outprov.get(m.mem.r8(DS, 0x0A46) as usize) {
+                    blit(screen, f, f.x, f.y);
+                }
+            }
+            return;
+        };
+        if let Some((img, pal)) = &self.province {
+            screen.set_palette(*pal);
+            if let Some(page) = &page {
+                screen.underlay(page);
+            } else {
+                screen.fill(0, 0, 320, 200, 0, 0xFF);
+                blit(screen, img, img.x, img.y);
+            }
+        }
+        if page.is_none() {
+            self.icons_drawn(screen, m, p);
         }
         // 26F7:064A: the current place's marker.
         let r8 = |a: u16| m.mem.r8(DS, a);
@@ -971,8 +1045,9 @@ impl Travel {
             }
             None => {}
         }
-        // 1194:30F1: the day's frame of the journey.
-        if let Some(f) = self.journey.get((self.journey_ms / TICK_MS) as usize).and_then(|&f| self.horse.get(f as usize)) {
+        // 1194:30F1: the day's frame of the journey (over the province's
+        // map where the game's page isn't there to show).
+        if let Some(f) = self.journey_frame() {
             screen.blit(f.x, f.y, f.w, f.h, &f.px, 199);
         }
     }

@@ -42,6 +42,9 @@ thread_local! {
     /// The game's page as the first province's map opened left it
     /// (`Travel::province_page`), for `provincepage`.
     static PROVINCE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// Each day of the journey as the screen shows it (its pixels' and
+    /// its colours' digests), for `journey`.
+    static JOURNEY: std::cell::RefCell<Vec<(u64, u64)>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// `n` frames as gen_areaplay.py's steps play them, a box read with Space
@@ -231,6 +234,12 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                         PROVINCE.set(Some(fnv(p.iter().copied())));
                     }
                 }
+                // The journey's days, each as the screen shows it.
+                if let Some(t) = a.travel.as_mut() {
+                    let mut m = a.engine.m.clone();
+                    let seen = t.journey_seen(&a.font, &mut m).into_iter().map(|(px, dac)| (fnv(px), fnv(dac))).collect();
+                    JOURNEY.set(seen);
+                }
                 for _ in 0..100 {
                     if a.travel.is_none() {
                         break;
@@ -295,6 +304,30 @@ fn transit(name: &str) {
         PROVINCE.set(None);
         played(place, setup, play);
         assert_eq!(PROVINCE.take(), Some(digest), "{name}: the province's map's page differs from the original's");
+    }
+    // A journey's days as the screen shows them (1194:30F1), each with no
+    // wait for the retrace nor read of the timer since the last: the view's
+    // pace (a tick a day) is its own.
+    let days: Vec<(u64, u64)> = text
+        .lines()
+        .map(|l| l.split(" | ").collect::<Vec<_>>())
+        .filter(|f| f.len() == 3 && f[0] == "journey" && f[1] == name)
+        .map(|f| {
+            let v: Vec<&str> = f[2].split(' ').collect();
+            assert_eq!((v[3], v[4]), ("0", "0"), "{name}: a day of the journey waits in the original");
+            (u64::from_str_radix(v[1], 16).unwrap(), u64::from_str_radix(v[2], 16).unwrap())
+        })
+        .collect();
+    if !days.is_empty() {
+        let (place, setup, play) = transit_case(name).unwrap();
+        JOURNEY.with(|j| j.borrow_mut().clear());
+        played(place, setup, play);
+        let seen = JOURNEY.with(|j| std::mem::take(&mut *j.borrow_mut()));
+        assert_eq!(seen.len(), days.len(), "{name}: the journey's days differ from the original's");
+        for (k, (s, o)) in seen.iter().zip(&days).enumerate() {
+            assert_eq!(s.1, o.1, "{name}: day {k}'s colours differ from the original's");
+            assert_eq!(s.0, o.0, "{name}: day {k}'s screen differs from the original's");
+        }
     }
     state_compared_in(AREAPLAY, name, false, transit_case(name).unwrap());
     state_compared_in(AREAPLAY, name, true, transit_case(name).unwrap());
