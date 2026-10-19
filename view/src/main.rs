@@ -409,10 +409,10 @@ impl ControlHooks for Front<'_> {
         self.taken(m, files, taken);
         Some(true)
     }
-    /// 2826:0008: the stat bars' state (`bars_state`; the window draws
-    /// them itself).
+    /// 2826:0008: the stat bars drawn into the game's page (`bars_draw`;
+    /// the window draws its own).
     fn bars(&mut self, m: &mut arena::machine::Machine) {
-        m.bars_state();
+        m.bars_draw();
     }
     /// A click on a building's door, a city's gate or an interior's way
     /// out (0000:43B1).
@@ -655,18 +655,18 @@ impl arena::frame::FrameHooks for Front<'_> {
         if let (Some(i), Some(page)) = (self.interface.as_deref_mut(), self.drawn.as_mut()) {
             i.message_on(page, m);
         }
+        m.message_line_draw();
     }
     /// 1194:4635: a frame of rest, while resting.
     fn rest(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.rest_frame(files, self)
     }
-    /// 0000:05B5: the lines are drawn as the layer's (`hud::level_text`);
-    /// what the drawing leaves is the row of the last (9E0A's [ADB8]),
-    /// which the riddle's field is put under.
+    /// 0000:05B5: the lines drawn on the game's page
+    /// (`Machine::level_text_lines`; the window's are the layer's,
+    /// `hud::level_text`); what the drawing leaves is the row of the last
+    /// (9E0A's [ADB8]), which the riddle's field is put under.
     fn level_text_draw(&mut self, m: &mut arena::machine::Machine) {
-        if let Some(&(y, _)) = hud::level_text(m).last() {
-            m.mem.w16(arena::mem::DS, arena::riddle::var::TEXT_Y, y as u16);
-        }
+        m.level_text_lines();
     }
     /// 292B:05A2: the answer typed under the riddle's text (1044 cleared,
     /// 0000:9EE5 at 32h, [ADB8] + 0Ah, in the frame's font [102C] and
@@ -771,8 +771,10 @@ impl arena::talk::TalkHooks for Front<'_> {
     fn shop(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, kind: u8) -> Option<()> {
         shopui::shop(self, m, files, kind)
     }
-    /// A dungeon's keeper in the wilderness: in (0000:08EC).
+    /// A dungeon's keeper in the wilderness: the view cleared (0000:4EFD),
+    /// then in (08EC).
     fn dungeon_entrance(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) -> Option<()> {
+        m.view_clear();
         m.wild_dungeon_entry();
         Some(())
     }

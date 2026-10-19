@@ -1466,6 +1466,16 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             ENDS.with(|e| e.set(true));
         })),
+        // playsheetend with the weapon readied first (as playfight's): the
+        // hands drawn into the page that the sheet saves (SCREENSV.$$2).
+        "playsheetready" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            ready(a, seen);
+            frames(a, d, seen, 30, |_| false);
+            a.input(In::Key { code: KeyCode::F1, down: true, text: None });
+            d.key(a, KeyCode::Escape, None);
+            faded(a);
+            ENDS.with(|e| e.set(true));
+        })),
         "playlogend" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
@@ -2611,10 +2621,10 @@ fn files_written(f: &arena::bsa::Files) -> std::collections::BTreeMap<String, Ve
 
 /// gen_worldframes.py's `written` line from the files before and after:
 /// those created or changed, each its size and digest, deleted ones `-`;
-/// SCREENSV.$$2 left out and TEMPSAVE.$$$'s third plane counted as zeros
-/// where the floor plane's segment `floor` (D748) is 0, as there.
+/// TEMPSAVE.$$$'s third plane counted as zeros where the floor plane's
+/// segment `floor` (D748) is 0, as there.
 fn written_line(pre: &std::collections::BTreeMap<String, Vec<u8>>, now: &std::collections::BTreeMap<String, Vec<u8>>, floor: u16) -> String {
-    let names: std::collections::BTreeSet<&String> = pre.keys().chain(now.keys()).filter(|k| *k != "SCREENSV.$$2").collect();
+    let names: std::collections::BTreeSet<&String> = pre.keys().chain(now.keys()).collect();
     names.into_iter().filter_map(|k| match (now.get(k), pre.get(k)) {
         (None, _) => Some(format!("{k}:-")),
         (Some(n), was) if was != Some(n) => {
@@ -2796,7 +2806,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 68] = ["playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 69] = ["playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2906,7 +2916,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 73] = ["playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 74] = ["playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's

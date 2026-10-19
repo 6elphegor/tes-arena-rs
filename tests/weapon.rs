@@ -38,6 +38,16 @@ impl WeaponHooks for Count {
         m.mem.w16(DS, 0xFFF6, v);
         Some(())
     }
+    /// The generator's 0000:3B8E is a RET.
+    fn hands(&mut self, _m: &mut Machine) -> Option<()> {
+        Some(())
+    }
+    /// The generator's 0000:5C8A is a RET: the prow drawn (582C) with the
+    /// bank as it was.
+    fn prow(&mut self, m: &mut Machine) {
+        let (off, seg) = (m.mem.r16(DS, 0x902E), m.mem.r16(DS, 0x9030));
+        m.page_image(seg, off);
+    }
 }
 
 /// Mirrors harness/gen_weapon.py `setup`; returns each frame's motion.

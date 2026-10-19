@@ -46,8 +46,8 @@ whose words are the original's heap's segments, which no other layout has:
   view3d1 | NAME | <digest>
 
 and, where the case wrote files, each it created or changed (FILE:-
-deleted), by name (`written_line`: SCREENSV.$$2 left out, TEMPSAVE.$$$'s
-third plane zeros where D748 is 0):
+deleted), by name (`written_line`: TEMPSAVE.$$$'s third plane zeros
+where D748 is 0):
 
   written | NAME | FILE:<size>:<digest> ...
 
@@ -1115,6 +1115,10 @@ CASES = {
     # counters) run after it. As playsheet, playlog, playautomap and
     # playbook, without the frames after.
     'playsheetend': ('dungeon', None, [((), (), 2, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # playsheetend with the weapon readied first (A, its 30 frames of
+    # drawing it as playfight's): the hands drawn into the page (0000:38CE's
+    # 3B8E) which the sheet saves to SCREENSV.$$2 (A611).
+    'playsheetready': ('dungeon', None, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None), ((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
     'playlogend': ('dungeon', None, [((), (), 2, None), ((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)], 'ends': True})]),
     'playautomapend': ('dungeon', None, [((), (), 2, None), ((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}, 'ends': True})]),
     'playbookend': ('dungeon', None, [((), (), 2, None), ((KEY_C,), (), 1, None, [], {'script': [('rclick', 0xF0, 0xA0)], 'ends': True})]),
@@ -1515,17 +1519,12 @@ def rows_line(a, name):
 def written_line(a, name):
     """The files the case wrote (created, or changed from what they held
     as its frames began), by name, each its size and digest; deleted
-    ones `-`. Empty when it wrote none. Two left as the port can't have
-    them: SCREENSV.$$2, the page as the world was left (0000:A611), whose
-    3D view and HUD the port's front end draws, not the page in memory;
-    and TEMPSAVE.$$$'s third plane where the floor plane's segment (D748)
-    is 0, which A665 then writes from 0000:0000, DOS's interrupt table
-    (zeros here, the program's image in the port's memory): counted as
-    zeros."""
+    ones `-`. Empty when it wrote none. TEMPSAVE.$$$'s third plane where
+    the floor plane's segment (D748) is 0, which A665 then writes from
+    0000:0000, DOS's interrupt table (zeros here, the program's image in
+    the port's memory), counted as zeros."""
     got = []
     for k in sorted(set(a.written) | set(a.pre_written)):
-        if k == 'SCREENSV.$$2':
-            continue
         now, was = a.written.get(k), a.pre_written.get(k)
         if now is None:
             got.append(f'{k}:-')

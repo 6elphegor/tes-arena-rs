@@ -62,6 +62,15 @@ pub trait WeaponHooks {
     fn building_closed(&mut self, m: &mut Machine, kind: u8) -> Option<bool> {
         Some(m.building_closed(kind))
     }
+    /// 0000:3B8E: the hands drawn on the page (`Machine::hands_draw`).
+    fn hands(&mut self, m: &mut Machine) -> Option<()> {
+        m.hands_draw()
+    }
+    /// 0000:395E..397C: the boat's prow drawn on the page
+    /// (`Machine::prow_draw`).
+    fn prow(&mut self, m: &mut Machine) {
+        m.prow_draw();
+    }
     /// 29CF:037F: the bow fires an arrow (flat 1Bh) from the player,
     /// aimed by the cursor (`projectile::fire_missile`).
     fn fire_bow(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
@@ -130,10 +139,85 @@ impl Machine {
             // the drawing's, divide by it.
             return crate::giveup::original("0000:78CB: the casting hands' frame of no size: the scaler divides by 0");
         }
-        crate::render::scaler_rows(self, x, y, w, h, 0, w, h, 1, bpp, bseg);
-        crate::render::scaler_rows(self, 0x9F, y, w, h, 0, w, h, 3, bpp, bseg);
+        let src = (dseg, doff);
+        let map = (bseg, boff.wrapping_add(0x4C));
+        self.scaler_on_page(x, y, w, h, 1, src, bpp, map)?;
+        self.scaler_on_page(0x9F, y, w, h, 3, src, bpp, map)?;
         self.mem.w8(DS, CAST_FRAME, f + 1);
         Some(())
+    }
+
+    /// 0000:78A8 unscaled, unshaded (`w` by `h` at (`x`, `y`), flags
+    /// `flags`, the source `src`, its bits a pixel and colours): its row
+    /// compiled on the machine, its pixels drawn into the draw page where
+    /// it is the game's own block (`render::scaler_page`). None where 9546
+    /// would read the code segment's colours (not ported).
+    #[allow(clippy::too_many_arguments)]
+    fn scaler_on_page(&mut self, x: u16, y: u16, w: u16, h: u16, flags: u16, src: (u16, u16), bpp: u8, map: (u16, u16)) -> Option<()> {
+        if !self.page_is_block() {
+            crate::render::scaler_rows(self, x, y, w, h, 0, w, h, flags, bpp, map.0);
+            return Some(());
+        }
+        let p = self.mem.r16(DS, 0xA900);
+        let mut page = self.mem.segment(p).to_vec();
+        if !crate::render::scaler_page(self, &mut page, x, y, w, h, (0, 0), w, h, flags, src, bpp, map) {
+            return crate::giveup::not_ported("0000:9546: the hands through 781E's colours");
+        }
+        self.mem.segment_mut(p).copy_from_slice(&page);
+        Some(())
+    }
+
+    /// 0000:3B8E. The hands drawn into the page, the hands' graphic's bank
+    /// ([C8F4]) mapped (and left so). The bow (1012 6), unless reloading
+    /// (680E): its graphic's frame (at the far pointer 902E; its size +2,
+    /// +4, its runs from +0Ch's offset) unpacked by runs into the frames'
+    /// buffer [BA54] (5B65), then drawn from there by 78A8 at its place
+    /// (+6, +8), unscaled, flags 1, its colours at +4Ch. Otherwise the
+    /// weapon's picture [1947] of the graphic in the frame ([9030]:0; the
+    /// bare hands', classes 7..9, from 1Eh on 14h less) drawn (582C) with
+    /// the view's bottom (A91A) 93h meanwhile. None where the runs never
+    /// end.
+    pub fn hands_draw(&mut self) -> Option<()> {
+        self.ems_map(self.mem.r8(DS, crate::info::var::OTHER_BANKS) as u16);
+        let shown = self.mem.r8(DS, SHOWN);
+        if shown == 6 {
+            if self.mem.r8(DS, RELOAD) != 0 {
+                return Some(());
+            }
+            let (bx, fs) = (self.mem.r16(DS, HANDS), self.mem.r16(DS, HANDS + 2));
+            let hd = |m: &Machine, o: u16| m.mem.r16(fs, bx.wrapping_add(o));
+            let (cx, dx) = (hd(self, 4), hd(self, 2));
+            let si = bx.wrapping_add(hd(self, 0xC));
+            let (doff, dseg) = (self.mem.r16(DS, crate::info::var::BUFFER), self.mem.r16(DS, crate::info::var::BUFFER + 2));
+            let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+            self.rle_runs(frame, si, cx, dx, dseg, doff)?;
+            let (w, h, x, y) = (hd(self, 0), hd(self, 2), hd(self, 6), hd(self, 8));
+            let bpp = self.mem.r8(fs, bx.wrapping_add(0xA));
+            return self.scaler_on_page(x, y, w, h, 1, (dseg, doff), bpp, (fs, bx.wrapping_add(0x4C)));
+        }
+        let bottom = self.mem.r16(DS, 0xA91A);
+        self.mem.w16(DS, 0xA91A, 0x93);
+        let mut cx = self.mem.r16(DS, FRAME);
+        if (7..=9).contains(&shown) && cx >= 0x1E {
+            cx -= 0x14;
+        }
+        let frame = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+        let mut si = 0u16;
+        for _ in 0..cx {
+            si = si.wrapping_add(self.mem.r16(frame, si.wrapping_add(0xA))).wrapping_add(0xC);
+        }
+        self.page_image(frame, si);
+        self.mem.w16(DS, 0xA91A, bottom);
+        Some(())
+    }
+
+    /// 0000:395E..397C: in the boat, its prow (the picture at the far
+    /// pointer 902E, BOATPROL.IMG as boarding loaded it) drawn (582C) with
+    /// the hands' bank ([C8F4]) mapped.
+    pub fn prow_draw(&mut self) {
+        self.ems_map(self.mem.r8(DS, crate::info::var::OTHER_BANKS) as u16);
+        let (off, seg) = (self.mem.r16(DS, HANDS), self.mem.r16(DS, HANDS + 2));
+        self.page_image(seg, off);
     }
 
     /// 0000:38CE. The player's weapon this frame. None where a strike
@@ -149,43 +233,56 @@ impl Machine {
         }
         let level = self.mem.r16(DS, LEVEL_FLAGS);
         if level & 0x10 != 0 {
-            // In water: the hands stay down unless levitating.
+            // In water: the hands stay down unless levitating (38F9, drawn
+            // as they are).
+            if level & 0x4000 != 0 {
+                hooks.hands(self)?;
+            }
             return Some(());
         }
         let flags = self.mem.r16(DS, 0x05E0);
         let buttons = self.mem.r8(DS, crate::controls::var::BUTTONS);
         if self.mem.r8(DS, SHOWN) == 6 {
-            // 0000:390D: the bow.
-            if flags & 0x10 == 0
-                || buttons & 2 == 0
-                || self.mem.r16(DS, 0x05B1) & 0x40 != 0
-                || flags & 0x40 == 0
-                || self.mem.r8(DS, RELOAD) != 0
-            {
+            // 0000:390D: the bow: put away, not drawn; without the right
+            // button, or held back (5B1 bit 40h), drawn as it is.
+            if flags & 0x10 == 0 {
+                return Some(());
+            }
+            if buttons & 2 == 0 || self.mem.r16(DS, 0x05B1) & 0x40 != 0 {
+                return hooks.hands(self);
+            }
+            if flags & 0x40 == 0 || self.mem.r8(DS, RELOAD) != 0 {
                 return Some(());
             }
             let agility = self.mem.r8(DS, 0x01D1) as u16;
             self.mem.w8(DS, RELOAD, ((0x100 - agility) >> 4) as u8 + 4);
             return hooks.fire_bow(self, files);
         }
-        if self.mem.r16(DS, 0x05CA) & 0x10 != 0 || (self.mem.r8(DS, CLASS) as i8) < 0 {
+        if self.mem.r16(DS, 0x05CA) & 0x10 != 0 {
+            hooks.prow(self);
             return Some(());
+        }
+        if (self.mem.r8(DS, CLASS) as i8) < 0 {
+            return hooks.hands(self);
         }
         let frame = self.mem.r16(DS, FRAME);
         if flags & 0x10 == 0 {
-            // 0000:3AD9: sheathing.
+            // 0000:3AD9: sheathing, drawn as the frame was.
             if frame >= 0x1E {
+                hooks.hands(self)?;
                 self.mem.w16(DS, FRAME, frame - 1);
             }
             return Some(());
         }
         if frame >= 0x1E && frame != 0x20 {
-            // Drawing.
+            // Drawing, drawn as the frame was.
+            hooks.hands(self)?;
             self.mem.w16(DS, FRAME, frame + 1);
             return Some(());
         }
         if flags & 4 != 0 {
             if frame < 0x1E {
+                hooks.hands(self)?;
                 let frame = frame + 1;
                 self.mem.w16(DS, FRAME, frame);
                 match frame % 5 {
@@ -208,11 +305,11 @@ impl Machine {
         }
         if self.swing_start() {
             self.read_motion();
-            return Some(());
+            return hooks.hands(self);
         }
         self.read_motion();
         self.mem.w16(DS, FRAME, 0x20);
-        Some(())
+        hooks.hands(self)
     }
 
     /// 0000:3C9F. A drag of at least 40h with the right button down

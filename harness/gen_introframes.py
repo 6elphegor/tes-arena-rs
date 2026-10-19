@@ -9,8 +9,10 @@ INTRO.FLC, TITLE.IMG faded in and held, QUOTE.IMG faded in and held,
 SCROLL.FLC, SCROLL01..03.IMG dissolved in and held, each change through
 1194:55B2's fade to black and the screen cleared), then MENU.IMG shown
 and its colours set (10FA), up to the menu's wait for its regions
-(1114); and the opening story the menu's Start plays (0000:1323:
-SCROLL.FLC, INTRO01..09.IMG dissolved in and held, 55B2) to its return.
+(1114); the opening story the menu's Start plays (0000:1323:
+SCROLL.FLC, INTRO01..09.IMG dissolved in and held, 55B2) to its return;
+and the Start on (1130) through the story into creation's first screen
+(1194:2498, 25B9) up to its first menu's loop (020E).
 The game is as gen_createshot.py starts it (21EE:0000), the
 songs, the mouse's cursor and the CyberMan's poll left out.
 
@@ -84,7 +86,15 @@ CASES = [
     ('quotefadetap', 0x10C9, [(0x1B, 's170', 1)]),
     # A key in the second picture's wait, Esc held in the fourth's.
     ('storykeys', 0x1323, [(0x0D, 500, 1), (0x1B, 1300, 2000)]),
+    # The menu's Start on into creation (0000:1130 near: the story, then
+    # 1194:2498): its first screen (25B9: 55B6's fade, the page cleared
+    # and shown, the parchment faded in) up to its first menu's loop
+    # (020E).
+    ('storycreate', 0x1130, []),
 ]
+
+# Where the runs from 1130 stop: creation's first menu (1194:2603's call).
+CREATE_MENU = (0x1194, 0x020E)
 
 
 class Run:
@@ -174,16 +184,22 @@ def run(a, start, keys):
         mu.emu_stop()
     m = a.lin(LOAD_SEG, MENU_WAIT)
     hooks.append(mu.hook_add(UC_HOOK_CODE, menu, None, m, m))
+
+    def created(mu, addr, size, _):
+        a.waiting = ('create',)
+        mu.emu_stop()
+    c = a.lin(LOAD_SEG + CREATE_MENU[0], CREATE_MENU[1])
+    hooks.append(mu.hook_add(UC_HOOK_CODE, created, None, c, c))
     mu.ctl_flush_tb()
     try:
-        if start == 0x10C9:
+        if start in (0x10C9, 0x1130):
             res = a.run_screen(0, start, near=True, count=3_000_000_000)
         else:
             res = a.run_screen(0, start, count=3_000_000_000)
     finally:
         for h in hooks:
             mu.hook_del(h)
-    want = ('menu',) if start == 0x10C9 else None
+    want = {0x10C9: ('menu',), 0x1130: ('create',)}.get(start)
     assert res == want, f'stopped by {res} (fault {a.fault})'
     return r
 

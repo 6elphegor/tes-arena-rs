@@ -295,16 +295,11 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
     fn screen_saved(&mut self, m: &mut Machine, files: &mut Files) {
         // Only for a page that is the game's own block (`paged`): a game
         // started without one has heap blocks where [A900] points.
+        // The page is the game's as the frame left it (its 3D view and
+        // interface drawn there), which the shop's screen is drawn over
+        // and its lists keep.
         if !self.paged {
             return;
-        }
-        // The page as the last frame left it (the screen last shown), which
-        // the shop's screen is drawn over and its lists keep.
-        if let Some(shown) = self.front.shown {
-            let seg = m.mem.r16(DS, 0xA900);
-            for (i, &b) in shown.iter().take(0xFA00).enumerate() {
-                m.mem.w8(seg, i as u16, b);
-            }
         }
         m.shop_screen_saved(files, self.front.dac.as_ref());
     }

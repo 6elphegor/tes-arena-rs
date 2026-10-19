@@ -955,7 +955,7 @@ impl Creation {
             Stage::Title(_) => self.change(m, |c, f, _| c.after_title(f)),
             Stage::Quote(_) if esc => self.change(m, |c, f, _| c.intro_end(f)),
             Stage::Quote(_) => self.change(m, |c, f, _| c.scroll_story(f)),
-            Stage::Story { .. } if esc => self.change(m, |c, f, _| c.story_end(f)),
+            Stage::Story { .. } if esc => self.change(m, |c, f, m| c.story_end(f, m)),
             Stage::Story { .. } => self.story_next(m),
             _ => {}
         }
@@ -1028,7 +1028,7 @@ impl Creation {
         let Stage::Story { pic, scrolls, .. } = self.stage else { return };
         let n = pic + 1;
         if n > if scrolls { 3 } else { 9 } {
-            return self.change(m, |c, f, _| c.story_end(f));
+            return self.change(m, |c, f, m| c.story_end(f, m));
         }
         self.change(m, |c, f, m| {
             let mut page = f.vga.clone();
@@ -1043,8 +1043,11 @@ impl Creation {
     }
 
     /// The story's end: to black (55B2: 131D, 138D); the intro's then the
-    /// menu (`intro_end`), the opening story's its `next`.
-    fn story_end(&mut self, film: &mut Film) -> Stage {
+    /// menu (`intro_end`), the opening story's creation's first screen
+    /// (1194:2498, 25B9): to black again (55B6, from black), the page
+    /// cleared and shown, then its `next`'s picture (3ED9) drawn and
+    /// shown, its colours set (5CD9 with BX 40h: 946A, 9B56).
+    fn story_end(&mut self, film: &mut Film, m: &mut Machine) -> Stage {
         let Stage::Story { next, scrolls, .. } = std::mem::replace(&mut self.stage, Stage::Done) else { return Stage::Done };
         if scrolls {
             return self.intro_end(film);
@@ -1053,7 +1056,12 @@ impl Creation {
             r.done = true;
         }
         fade_black(film);
-        *next
+        fade_black(film);
+        self.stage = *next;
+        let (page, dac) = self.shot(m, false);
+        film.whole(&page);
+        film.colours(&dac);
+        std::mem::replace(&mut self.stage, Stage::Done)
     }
 
     /// The next screen when the movie is over (from the frame it shows).

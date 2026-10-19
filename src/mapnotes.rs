@@ -96,11 +96,16 @@ impl Machine {
     /// (FONT): each character's width byte (signed) at +(c - 20h), a
     /// space its +1 byte plus 1; characters below 20h or from 80h count 0.
     pub fn text_width(&self, si: u16) -> u16 {
+        self.text_width_far((DS, si))
+    }
+
+    /// `text_width` of the text at `tseg`:`si`.
+    pub fn text_width_far(&self, (tseg, si): (u16, u16)) -> u16 {
         let (off, seg) = (self.mem.r16(DS, FONT), self.mem.r16(DS, FONT + 2));
         let mut dx = 0u16;
         let mut si = si;
         loop {
-            let c = self.mem.r8(DS, si);
+            let c = self.mem.r8(tseg, si);
             if c == 0 {
                 return dx;
             }

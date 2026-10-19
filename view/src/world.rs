@@ -203,6 +203,11 @@ pub fn load(dir: &Path, level: &str) -> Engine {
     if m.mem.r16(sseg, 0x18) == 0 {
         eprintln!("the spells did not load (SPELLSG.64)");
     }
+    // No keys held, as a new game begins (1194:2508..2510: the 0Ch bytes
+    // at 652 C5h), which each frame draws (0000:4D2F).
+    for i in 0..0x0Cu16 {
+        m.mem.w8(DS, 0x0652 + i, 0xC5);
+    }
     // The light table's source as the game starts with it.
     lgt(&mut m, dir, arena::weather::NORMAL_LGT);
     m.mem.w8(DS, 0xC3C6, 0x70);
