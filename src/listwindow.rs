@@ -15,13 +15,19 @@
 //! bar's background's buffer (+45) and the lines' (+49), the bar's knob
 //! (+4D: x, y, width, height).
 //!
-//! The library's loop (its mouse regions, keys and scrolling) is the front
-//! end's: it answers with the line picked (`pick`, FFFFh none), which the
-//! port takes as the original's loop leaves it for a pick made among the
-//! lines first shown (the line clicked made the record's pick, 3159:0A1D,
-//! 0BCA; the loop's last drawing, 0A58, then the window's end, 07D3). The
-//! lines' and the panel's pixels are the front end's too, but for the
-//! panel's picture, which the page keeps.
+//! The library's loop (3159:06A0..0717: its mouse regions, keys and
+//! scrolling, `Machine::list_loop`) is the port's, run over the mouse's
+//! reads the front end gives it (`ListRead`, `Machine::list_reads`): a
+//! click a read with the button down and one with it up, a key a read
+//! with it held and one with it let go. Without reads (or where they end
+//! before the loop does) the front end's pick (`pick`, FFFFh none) is
+//! taken as the loop leaves it for a pick made among the lines first
+//! shown, or scrolled to `top` (the line clicked made the record's pick,
+//! 3159:0A1D, 0BCA; the loop's last drawing, 0A58, then the window's
+//! end, 07D3). The lines' and the panel's pixels are the front end's, but
+//! for the panel's picture, which the page keeps; the cursor's drawing
+//! and the knob's and the arrows' too (their state: ADB6/ADB8, which the
+//! texts' drawing leaves, and 9288, which each pass's 0A58 sets again).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -530,8 +536,12 @@ impl Machine {
         self.mem.w16(seg, rec + 0x3D, total);
         let (bx, bw, bh) = (r16(self, 0x1A), r16(self, 0x1C), r16(self, 0x1E));
         if bw == 0 {
-            // 07A9: no box: carry set, the loop never runs.
-            return crate::giveup::not_ported("3159:07D1: a list window with no box");
+            // 07A9: no box: 0718 leaves at 07D1 with carry set, which
+            // 06B7 doesn't look at: the loop runs with no buffers made and
+            // its end frees +47 and +4B as the record holds them. No
+            // record the game fills (5006, 505B, 50B0, 5105, 515A, 5AF4)
+            // has a box of no width.
+            return crate::giveup::not_ported("3159:07D1: a list window with no box (its loop over a record half made)");
         }
         // 07B4: what the lines' box covers kept on the heap (8F2A, DI
         // FFFEh).

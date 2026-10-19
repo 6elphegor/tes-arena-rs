@@ -4152,6 +4152,18 @@ impl App {
         let mut said = panels::Said::default();
         if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
             said.screen = Some(self.list_page());
+            // The key as the list's loop reads it, held and let go.
+            use arena::listwindow::list_keys::{ENTER, ESC};
+            match code {
+                KeyCode::Enter | KeyCode::NumpadEnter => self.list_tap(ENTER.0),
+                KeyCode::Escape => self.list_tap(ESC.0),
+                _ => {
+                    if let Some(k) = list_key_of(code) {
+                        self.list_key_read(k);
+                    }
+                }
+            }
+            self.engine.m.list_reads = Some(self.list_reads.clone());
         }
         let m = &mut self.engine.m;
         let mut cast = None;
@@ -4340,6 +4352,7 @@ impl App {
             self.panel = None;
             panels::book_cast(&mut self.engine, line, &mut said);
         }
+        self.engine.m.list_reads = None;
         self.boxes.extend(said.boxes);
     }
 
@@ -4585,6 +4598,11 @@ impl App {
         let mut said = panels::Said::default();
         if matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_))) {
             said.screen = Some(self.list_page());
+            // The click as the list's loop reads it, down and up (the
+            // reads kept while it is up: its loop takes them when it ends).
+            self.list_read(if right { 2 } else { 1 }, 0);
+            self.list_read(0, 0);
+            self.engine.m.list_reads = Some(self.list_reads.clone());
         }
         let mut cast = None;
         let mut back = false;
@@ -4769,6 +4787,7 @@ impl App {
             self.panel = None;
             panels::book_cast(&mut self.engine, line, &mut said);
         }
+        self.engine.m.list_reads = None;
         self.boxes.extend(said.boxes);
     }
 
@@ -4852,6 +4871,7 @@ impl App {
                 let mut said = panels::Said::default();
                 if !panels::book_cast_last(&mut self.engine, right, &mut said) {
                     self.panel = Some(panels::Panel::Spellbook(Default::default()));
+                    self.list_reads.clear();
                 }
                 self.boxes.extend(said.boxes);
             }
@@ -4865,6 +4885,7 @@ impl App {
                 let names = panels::usable_names(&self.engine.m);
                 if !names.is_empty() {
                     self.panel = Some(panels::Panel::Use(names, 0, 0));
+                    self.list_reads.clear();
                 }
             }
             sheets::BarAction::Camp => self.camp = true,
