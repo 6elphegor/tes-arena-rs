@@ -68,6 +68,78 @@ fn night(a: &mut App, heading: u16) {
     at_hour(a, 22, heading);
 }
 
+/// gen_worldframes.py's DISEASE_ID.
+const DISEASE_ID: u16 = 10;
+
+/// gen_worldframes.py's `midnight`: 23:59 facing north, seeded, the
+/// player given disease DISEASE_ID (2EBD:0573) and its slot's count put at
+/// 1, so the next minute tick passes midnight and pulses it.
+fn midnight(a: &mut App) {
+    use arena::effects::{slot, NSLOTS, SLOTS, SLOT_SIZE};
+    at_time(a, 23, 59, 0);
+    seeded(a);
+    let m = &mut a.engine.m;
+    m.apply_disease(DS, arena::character::PLAYER, DISEASE_ID).expect("the disease given");
+    let s = (0..NSLOTS)
+        .map(|i| SLOTS + i * SLOT_SIZE)
+        .find(|&s| m.mem.r8(DS, s + slot::KIND) as u16 == DISEASE_ID && m.mem.r16(DS, s + slot::TARGET_OFF) == arena::character::PLAYER)
+        .expect("the disease took no slot");
+    m.mem.w16(DS, s, 1);
+}
+
+/// gen_worldframes.py's `dawning`: 5:59 facing north.
+fn dawning(a: &mut App) {
+    at_time(a, 5, 59, 0);
+}
+
+/// gen_worldframes.py's HOLIDAY_DAY (gen_screens.py's).
+const HOLIDAY_DAY: u32 = 14;
+
+/// gen_worldframes.py's `on_holiday`: noon on HOLIDAY_DAY of the save's
+/// year, the frame counter (CCBC) past 3, seeded, facing north.
+fn on_holiday(a: &mut App) {
+    let m = &mut a.engine.m;
+    let now = m.mem.r32(DS, arena::clock::var::MINUTES);
+    m.mem.w32(DS, arena::clock::var::MINUTES, now / 518_400 * 518_400 + HOLIDAY_DAY * 1440 + 12 * 60);
+    m.mem.w16(DS, 0xCCBC, 4);
+    seeded(a);
+    at_hour(a, 12, 0);
+}
+
+/// gen_worldframes.py's `store_closed`: ten at night beside the town's
+/// first store's door (its entry list at 1008, the count at 138B), in the
+/// first neighbouring square with no wall (empty, or only a flat), at its
+/// edge toward the door and facing it; seeded.
+fn store_closed(a: &mut App) {
+    let m = &a.engine.m;
+    assert_ne!(m.mem.r16(DS, 0x138B), 0, "no store in the town");
+    let sq = m.mem.r16(m.mem.r16(DS, 0x100A), m.mem.r16(DS, 0x1008));
+    let (row, col) = (sq >> 8, sq & 0xFF);
+    let walls = m.mem.r16(DS, 0xD806);
+    let (heading, r, c, dx, dz) = [
+        (0u16, row - 1, col, 0u16, 0x30u16),
+        (0x200, row + 1, col, 0, 0x30u16.wrapping_neg()),
+        (0x100, row, col - 1, 0x30, 0),
+        (0x300, row, col + 1, 0x30u16.wrapping_neg(), 0),
+    ]
+    .into_iter()
+    .find(|&(_, r, c, _, _)| {
+        let v = m.mem.r16(walls, (r << 8) + (c << 1));
+        v == 0 || v & 0x8000 != 0
+    })
+    .expect("the store's door has no open square beside it");
+    at_square(a, r, c, heading);
+    let m = &mut a.engine.m;
+    for base in [0xC3D0, 0xBA62] {
+        let v = m.mem.r16(DS, base).wrapping_add(dx);
+        m.mem.w16(DS, base, v);
+        let v = m.mem.r16(DS, base + 4).wrapping_add(dz);
+        m.mem.w16(DS, base + 4, v);
+    }
+    night(a, heading);
+    seeded(a);
+}
+
 /// `night(heading)` in a thunderstorm with a bolt forced at the circle's
 /// `angle`, as gen_worldframes.py's `storm` sets it: the weather rain
 /// (BB09 1), 5C8 bit 1, the first bolt's image (D8AE) at its frame 0
@@ -1491,6 +1563,38 @@ fn case(name: &str) -> Option<Case> {
         "playdown" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 10, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != 0, 2)),
         "playsky" => (Place::Street, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playnight" => (Place::Street, Box::new(|a: &mut App| night(a, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        "playmidnight" => (Place::Street, Box::new(midnight), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            minute_due(a);
+            frames(a, d, seen, 6, |_| false);
+        })),
+        "playdawn" => (Place::Street, Box::new(dawning), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            for _ in 0..3 {
+                minute_due(a);
+                frames(a, d, seen, 2, |_| false);
+            }
+        })),
+        "playholiday" => (Place::Street, Box::new(on_holiday), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            // The first frame's holiday message (0000:49D9), clicked away
+            // inside it; the turn's frame counted as the case's first.
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the holiday's message");
+            d.click(a, 0xA0, 0x60, MouseButton::Left);
+            assert!(a.boxes.is_empty() && a.pending.is_none(), "the holiday's message still up");
+            seen.push(state(a));
+            frames(a, d, seen, 2, |_| false);
+        })),
+        "playstoreclosed" => (Place::Street, Box::new(store_closed), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The door clicked at the view's middle, 4 on as the harness's
+            // click lands (CB60).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 5, |_| false);
+        })),
         "playbolt" => (Place::Street, Box::new(|a: &mut App| storm(a, 0, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playfog" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playfogfirst" => (Place::Fogged, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 0, |_| false))),
@@ -3298,7 +3402,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 95] = ["playchestpick", "playlootwild", "playlootstreet", "playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
+const BUSY: [&str; 99] = ["playmidnight", "playdawn", "playholiday", "playstoreclosed", "playchestpick", "playlootwild", "playlootstreet", "playspellmaker", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3409,7 +3513,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
 /// (playspellmaker's EMS banks are left out: `EMS_LEFT_OUT`.)
-const BUSY_STATE: [&str; 100] = ["playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
+const BUSY_STATE: [&str; 104] = ["playmidnight", "playdawn", "playholiday", "playstoreclosed", "playspellmaker", "playchestpick", "playlootwild", "playlootstreet", "playheal", "playlight", "playopen", "playsilence", "playlightout", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet", "playpalaceaccept", "playquestreached", "playquestreward", "playsurrender"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
