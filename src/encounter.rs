@@ -364,8 +364,8 @@ impl Machine {
     /// building's square; the area's chance (`encounter_odds`, 25% on the
     /// nights of days F3h and 11Bh) against d100 picks a row of the
     /// encounter table (7 more at night), and `encounter` brings it.
-    /// None where unported code is met (a quest's encounter, 5C8 bit
-    /// 8000h) or a roll faults.
+    /// None where a roll faults (a quest's encounter, 5C8 bit 8000h, is
+    /// `quest_encounter`).
     pub fn random_encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks) -> Option<()> {
         if self.mem.r16(DS, 0x05CA) & 0x200 != 0 || self.mem.r16(DS, 0x0FF7) != 0 || self.mem.r16(DS, 0x0FFB) != 0 {
             return Some(());

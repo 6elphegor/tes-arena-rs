@@ -20,10 +20,10 @@
 //!   talk (`talk`): a menu of greeting, "Where is...", rumours and
 //!   goodbye, or, with picking armed (5CA bit 0), a pickpocketing try.
 //!
-//! The text windows, menus and lists are the front end's (`TalkHooks`),
-//! as are the parts not ported: the quests, the shops, the loot window
-//! (1194:7B16), the wild's way-finding and entrances, and the text
-//! substitutions (2DA2:000A).
+//! The text windows, menus and lists are the front end's (`TalkHooks`).
+//! The quests, the shops, the loot window (1194:7B16) and the text
+//! substitutions (2DA2:000A) run the port's routines by default; the
+//! wild's way-finding and dungeon entrances are left to the front end.
 
 use crate::bsa::Files;
 use crate::cast::Touch;

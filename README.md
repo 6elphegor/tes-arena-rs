@@ -288,14 +288,16 @@ original's screens and questions.
 
 `docs/COVERAGE.md` (made by `tools/coverage.py`) counts the original's
 reachable routines against the addresses the port names. At the time of
-writing: 2458 reachable routines (198,125 bytes); 1800 ported in whole or
-part (141,037 bytes), counting far thunks to ported code, the handlers
+writing: 2509 reachable routines (197,875 bytes); 2110 ported in whole or
+part (171,535 bytes), counting far thunks to ported code, the handlers
 the port dispatches on by their offsets, and the routines read by hand as
-trivial or inlined (`tools/triage.tsv`); 72 left to the front end as hooks
-and 75 that the view re-implements; 511 presentation, I/O, driver or
-hardware routines not ported (the renderer's internals, the menu library,
-input waits, the sound and CyberMan drivers, decode artefacts); no
-game-state routine left open. Every indirect call site is followed or
+trivial or inlined (`tools/triage.tsv`); 30 left to the front end as hooks
+and 59 that the view re-implements; 260 presentation, I/O, driver or
+hardware routines not ported (the renderer's deferred lists, the menu
+library's remains, input waits, the sound and CyberMan drivers, decode
+artefacts); 50 game-state or undetermined routines not covered by an
+address (3.4 KB of them open, the rest likely ported inside their
+callers). Every indirect call site is followed or
 explained: the ones no table or pointer heuristic resolves were traced by
 hand (`INDIRECT` in the tool), 15 with no target in the image (window
 callbacks, code generated at run time, a chained interrupt, a return).
@@ -315,9 +317,6 @@ At the time of writing:
     it in the street). Two of the text vectors' cases survive that return
     by reading on from FFFD:0001, the BIOS ROM's last bytes; they are
     counted, not compared.
-  - The save menu and typing a save's name (25FD:004F..00D0), the CITYDATA
-    check (242A:000E) and loading from the title screen (5C8 bit 4) are not
-    ported; the view saves to and loads from a fixed slot.
   - The staff walkthrough (`mainquest GAME_DIR STAFF:CITY:3:3 9`) runs
     from a new game through the eight pieces, the Emperor's audience, the
     palace's piece and the staff made whole (1194:D986), and is back in
@@ -327,17 +326,19 @@ At the time of writing:
   gives up after 65536 tries; collapsing from exhaustion inside the hour it
   costs gives up after 200 nested collapses.
 - **View:**
-  - The squares the drawing reaches, for a monster's flat to come alive
-    (0000:CF96, `world::creature_flats_seen`), are those in the view's
-    columns with no wall on the line to them, not the ray caster's own.
+  - The view's own guess at the squares the drawing reaches
+    (`world::creature_flats_seen`) is kept only for when the engine has no
+    page; in play the ported renderer always draws (render-gaps' sweep: no
+    fallback in 112,955 frames), so the ray caster's own squares are used.
   - Lights behind a wall follow the original's rule but are unconfirmed on
     screen, and its two exceptions (CB37 = 0Dh, CCF8 = FFFFh) aren't
     modelled; a spell's burst is nudged in front of the wall it hits.
   - The sun and the helmet's head recolour are ported but not yet seen on
     screen.
-  - The travel map's texts take the province picture's palette; its
-    passes and the journey's days go a game tick each, not as fast as the
-    original's loop.
+  - The travel map's texts take the province picture's palette. Its
+    passes and the journey's days go a game tick each: the original's loop
+    never waits (no retrace or timer read), so they run as fast as the
+    machine, and the view's tick is its own pace.
   - Fonts are each screen's own as its routine selects them (B036 set
     through 0000:9AE6); no text in the game's files switches font inline
     (0Ch), so that path isn't drawn.

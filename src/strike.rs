@@ -6,9 +6,10 @@
 //! reach in front of the player (`swing_hits`): people die at once
 //! (`strike_person`), others take a blow (`strike_actor`). A swing that
 //! reaches no actor hits the wall ahead (0000:3D43: doors, locks and
-//! crime, `Machine::bash` in weapon.rs). Not ported: the sound (23BA:002A) and the text a
-//! quest target says when giving up (0000:9AE6, 9CA0, 2DA2:000A,
-//! 1194:59C8), which only shows a message.
+//! crime, `Machine::bash` in weapon.rs). The sounds (23BA:002A) are
+//! played as the original plays them. Not ported: the text a quest target
+//! says when giving up (0000:9AE6, 9CA0, 2DA2:000A, 1194:59C8), which only
+//! shows a message.
 
 use crate::character::{field, PLAYER};
 use crate::combat::{var, Gear, Ptr};
