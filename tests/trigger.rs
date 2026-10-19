@@ -48,9 +48,8 @@ impl TriggerHooks for Hooks {
     fn blackout(&mut self, m: &mut Machine) {
         count(m, 0xFFEC);
     }
-    fn music(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
+    fn automap_write(&mut self, m: &mut Machine, _files: &mut Files) {
         count(m, 0xFFEE);
-        Some(())
     }
     fn enter_dungeon(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         count(m, 0xFFF0);

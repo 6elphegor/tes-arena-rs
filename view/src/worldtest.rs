@@ -132,6 +132,8 @@ enum Place {
     Store,
     /// The town's first tavern, in as the store.
     Tavern,
+    /// The town's first temple, in as the store.
+    Temple,
     /// The street with the guild left from the seed SEED
     /// (gen_worldframes.py's `people`): its townspeople placed the same
     /// on both sides.
@@ -250,6 +252,7 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
         // gen_worldframes.py's `building` takes them.)
         Place::Store => into(&mut a, 0x1008),
         Place::Tavern => into(&mut a, 0x1AB5),
+        Place::Temple => into(&mut a, 0x1004),
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -807,6 +810,47 @@ const GUILD_SCRIPT: [Act; 8] = [
     Act::Click(0xA0, 0x46), Act::Click(0xA0, 0x59), Act::Click(0x70, 0x26), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""), ACCEPT, ACCEPT,
     Act::Click(0xA0, 0xA3),
 ];
+
+/// gen_worldframes.py's TEMPLE_HEAL_SCRIPT: Heal, its price accepted,
+/// "thou art healed" clicked away, Exit.
+const TEMPLE_HEAL_SCRIPT: [Act; 4] = [Act::Click(0xA0, 0x7F), ACCEPT, Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x97)];
+
+/// gen_worldframes.py's TEMPLE_CURE_SCRIPT: Cure, the list's one line
+/// (taken: paid and cured), Exit.
+const TEMPLE_CURE_SCRIPT: [Act; 3] = [Act::Click(0xA0, 0x67), Act::Click(0x60, 0x32), Act::Click(0xA0, 0x97)];
+
+/// gen_worldframes.py's TEMPLE_BLESS_SCRIPT: Bless, 100 typed, the
+/// blessing clicked away, Exit.
+const TEMPLE_BLESS_SCRIPT: [Act; 7] = [
+    Act::Click(0xA0, 0x4F), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Digit0, "0"), Act::Key(KeyCode::Digit0, "0"), Act::Key(KeyCode::Enter, ""),
+    Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x97),
+];
+
+/// gen_worldframes.py's TAVERN_DRINK_SCRIPT: Drinks, the first line, its
+/// words clicked away, Exit.
+const TAVERN_DRINK_SCRIPT: [Act; 4] = [Act::Click(0xA0, 0x43), Act::Click(0x70, 0x26), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0xA3)];
+
+/// gen_worldframes.py's TAVERN_ROOM_SCRIPT: Get a Room, the Single, a day
+/// typed, the price accepted and the deal confirmed, then Exit.
+const TAVERN_ROOM_SCRIPT: [Act; 7] = [
+    Act::Click(0xA0, 0x5B), Act::Click(0x80, 0x31), Act::Key(KeyCode::Digit1, "1"), Act::Key(KeyCode::Enter, ""),
+    Act::Click(0x70, 0x85), Act::Click(0x70, 0x85), Act::Click(0xA0, 0x87),
+];
+
+/// gen_worldframes.py's `temple_hurt`: the player at half health, seeded.
+fn temple_hurt(a: &mut App) {
+    let m = &mut a.engine.m;
+    let max = m.mem.r16(DS, 0x01FF);
+    m.mem.w16(DS, 0x01FD, max / 2);
+    seeded(a);
+}
+
+/// gen_worldframes.py's `diseased`: the player's afflictions (05B1) a
+/// disease only, seeded.
+fn diseased(a: &mut App) {
+    a.engine.m.mem.w8(DS, 0x05B1, 1);
+    seeded(a);
+}
 
 /// gen_worldframes.py's `serviced`: the building's services (869F's
 /// `kind`) run as its keeper's click runs them, between frames, `script`
@@ -1692,6 +1736,31 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 7, &GUILD_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playtempleheal" => (Place::Temple, Box::new(temple_hurt), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 5, &TEMPLE_HEAL_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playtemplecure" => (Place::Temple, Box::new(diseased), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 5, &TEMPLE_CURE_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playtemplebless" => (Place::Temple, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 5, &TEMPLE_BLESS_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playtaverndrink" => (Place::Tavern, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &TAVERN_DRINK_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playtavernroom" => (Place::Tavern, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &TAVERN_ROOM_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
         _ => return None,
     })
 }
@@ -2231,14 +2300,16 @@ fn state_ems_in(path: &str, name: &str, c: Case) {
     let Some((a, _)) = played(place, |a| {
         a.engine.page = Some(vec![0; 64000]);
         setup(a);
-        *pre.borrow_mut() = Some(grab(a).1);
+        *pre.borrow_mut() = Some(grab(a));
     }, play) else { return };
-    let before = pre.into_inner().unwrap();
+    let (ds0, before) = pre.into_inner().unwrap();
     let after = grab(&a).1;
     // (With ARENA_STATE_DUMP naming a directory: the banks here before and
-    // after, and DGROUP after, to compare with gen_worldframes.py's dumps.)
+    // after, and DGROUP before and after, to compare with
+    // gen_worldframes.py's dumps.)
     if let Ok(d) = std::env::var("ARENA_STATE_DUMP") {
         let d = PathBuf::from(d);
+        let _ = std::fs::write(d.join(format!("{name}.port.ds0")), &ds0);
         let _ = std::fs::write(d.join(format!("{name}.port.ems0")), &before);
         let _ = std::fs::write(d.join(format!("{name}.port.ems")), &after);
         let _ = std::fs::write(d.join(format!("{name}.port.ds")), grab(&a).0);
@@ -2308,7 +2379,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 50] = ["playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 55] = ["playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2416,7 +2487,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 55] = ["playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 60] = ["playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).
@@ -2424,13 +2495,7 @@ const BUSY_STATE: [&str; 55] = ["playoptionsend", "playoptionsload", "playmapend
 fn busy_play_leaves_the_state_as_the_original() {
     for name in BUSY_STATE {
         state_case(name);
-        // (Not the store's from the load: the test's way in, `into`'s door
-        // trigger with no hooks, keeps no automap (0000:368E), so the path
-        // buffers' last (1AEB) is CITYDATA.64's where the original's is
-        // AUTOMAP.64's; the shop's own frames are compared above.)
-        if name != "playstore" {
-            state_load_case(name);
-        }
+        state_load_case(name);
     }
 }
 

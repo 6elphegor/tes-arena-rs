@@ -4,9 +4,9 @@
 //!
 //! The pieces are in `combat`, `inventory` and `effects`; this ties
 //! them together in the original's order and fills in what `combat`
-//! takes as `Gear` with the inventory routines the original calls. The
-//! sound (23BA:002A) and the message box of a broken special item
-//! (1194:A36C) are not ported.
+//! takes as `Gear` with the inventory routines the original calls: the
+//! blow's sound (23BA:002A, `sound_here`) and, for a broken special item,
+//! the message box's text and item (1194:A36C's, at 137A and 1AA4).
 
 use crate::character::{field, PLAYER};
 use crate::combat::{var, Gear, Ptr};

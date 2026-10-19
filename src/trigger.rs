@@ -104,9 +104,11 @@ pub trait TriggerHooks {
     fn sounds_off(&mut self, _m: &mut Machine) {}
     /// 1194:55B2: the palette (929E) black and set, the screen cleared.
     fn blackout(&mut self, _m: &mut Machine) {}
-    /// 23F1:0178: the music for where the player now is (MUSIC).
-    fn music(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
-        Some(())
+    /// 23F1:0145 and 013C (their 0178): the area's automap written back
+    /// (`Machine::automap_write`) as the building is entered, before and
+    /// after AREA is set; 013C's clearing of 6636 follows in `go_in`.
+    fn automap_write(&mut self, m: &mut Machine, files: &mut Files) {
+        m.automap_write(files);
     }
     /// 1194:D55F and 2433:0199: an interior is left for the outside
     /// (`Machine::staff_leave`, then `Machine::piles_forget` with AX as
@@ -402,21 +404,23 @@ impl Machine {
         self.go_in(files, hooks)
     }
 
-    /// 0000:4118. In: the break-in's mark cleared, the area left (C398
-    /// bit 80h) for the interior (AREA 4, its file at D58) with the
-    /// player's place kept.
+    /// 0000:4118. In: the break-in's mark cleared, the street's automap
+    /// written back (23F1:0145), the area left (C398 bit 80h) for the
+    /// interior (AREA 4, its file at D58) with the player's place kept, and
+    /// the automap written again and let go (23F1:013C: C398 bit 4 still
+    /// the street's, so it writes).
     fn go_in(&mut self, files: &mut Files, hooks: &mut dyn TriggerHooks) -> Option<()> {
         self.set_flag(0x05CA, 0, 0x800);
         hooks.sounds_off(self);
         hooks.blackout(self);
-        hooks.music(self, files)?;
+        hooks.automap_write(self, files);
         self.mem.w8(DS, AREA, 4);
         let (x, y) = (self.mem.r16(DS, X), self.mem.r16(DS, Y));
         self.mem.w16(DS, OUTSIDE_X, x);
         self.mem.w16(DS, OUTSIDE_Y, y);
         self.set_flag(0xC398, 0x80, 0);
         self.mem.w16(DS, 0x0D58, INTERIOR);
-        hooks.music(self, files)?;
+        hooks.automap_write(self, files);
         self.mem.w8(DS, 0x6636, 0);
         Some(())
     }

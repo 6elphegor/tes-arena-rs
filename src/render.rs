@@ -7,7 +7,7 @@
 //! - 0000:D4B4 (`draw_half`), twice: the floor's half (140h), then the
 //!   ceiling's (FEC0h) unless outdoors or C398 bit 40h.
 //!   - DEA8, DFA2: the half filled with its colour (9A72, a rectangle of
-//!     [9288]); water or lava (CB5B) animate instead (not ported).
+//!     [9288]); water or lava (CB5B) animate instead (DEAF, `water`).
 //!   - the floor's half only: the walk (C923, below) with C398 bit 20h
 //!     clear, which draws the chasms' sides (D0A1) and the flats lying
 //!     above the floor (CFBA), then B358 (the deferred list) and B4E8.
@@ -520,7 +520,7 @@ impl Soft {
     }
 
     /// 0000:DEA8: the lower half in [C3C6] (CB5B 0), or the water's or
-    /// lava's frames (not ported).
+    /// lava's frames (`water`).
     fn half_fill(&mut self) {
         if self.g8(0xCB5B) != 0 {
             return self.water();

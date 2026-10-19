@@ -565,6 +565,20 @@ def guild_shopping(a):
     gs.seeded(a)
 
 
+def temple_hurt(a):
+    """The player at half health (gen_screens.py's `hurt`), seeded: what
+    the temple's Heal needs."""
+    gs.hurt(a)
+    gs.seeded(a)
+
+
+def diseased(a):
+    """The player's afflictions (+40Dh, 05B1) a disease (bit 1) and only
+    that, seeded: the temple's Cure lists one line."""
+    a.mu.mem_write(a.lin(a.ds, 0x05B1), bytes([1]))
+    gs.seeded(a)
+
+
 def newgame(a):
     """The options screen's New (its handler, 2542:0627, as a click on it
     runs it): FCE 0, the area left (C398 bit 80h) with 5CA bit 8000h for
@@ -637,6 +651,24 @@ TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 9
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
+# The temple's menu (1194:C258: Bless, Cure, Heal, Exit, boxes 18h high
+# from 46h): Heal, its price accepted (Yes), "thou art healed" clicked
+# away; Exit.
+TEMPLE_HEAL_SCRIPT = [('click', 0xA0, 0x7F), ACCEPT, ('click', 0xA0, 0x60), ('click', 0xA0, 0x97)]
+# Cure: the afflictions' list (1194:C36E), its one line clicked (marked
+# as the list comes up, so taken: paid and cured with no question); Exit.
+TEMPLE_CURE_SCRIPT = [('click', 0xA0, 0x67), ('click', 0x60, 0x32), ('click', 0xA0, 0x97)]
+# Bless: the donation typed (1, 0, 0, Enter, a key a wait), "Receive our
+# blessings" clicked away; Exit.
+TEMPLE_BLESS_SCRIPT = [('click', 0xA0, 0x4F)] + [('keys', [k]) for k in (0x02, 0x0B, 0x0B, 0x1C)] + [('click', 0xA0, 0x60), ('click', 0xA0, 0x97)]
+# The tavern's menu (1194:B93C): Drinks, the first line (bought and drunk:
+# "You finish the ..." clicked away); Exit.
+TAVERN_DRINK_SCRIPT = [('click', 0xA0, 0x43), ('click', 0x70, 0x26), ('click', 0xA0, 0x60), ('click', 0xA0, 0xA3)]
+# Get a Room as gen_screens.py's `tavernroomtaken` takes it (the Single,
+# a day typed, the price accepted, the deal confirmed), then the menu
+# without its rooms left by its Exit (the third box).
+TAVERN_ROOM_SCRIPT = [('click', 0xA0, 0x5B), ('click', 0x80, 0x31), ('keys', [0x02, 0x1C]), ('click', 0x70, 0x85),
+                      ('click', 0x70, 0x85), ('click', 0xA0, 0x87)]
 
 
 # The main quest's Crypt of Hearts: its .MIF (whose INFO names
@@ -1021,6 +1053,17 @@ CASES = {
     # thirty frames.
     'playinformant': ('tavern', informant, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, INFORMANT_SCRIPT)})]),
     'playguild': ('guild', guild_shopping, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xA73E, GUILD_SCRIPT)})]),
+    # In the town's first temple: two frames, a service (the keeper's
+    # click, 1194:C258), thirty frames. Heal with the player hurt
+    # (`temple_hurt`), Cure with a disease (`diseased`), Bless with a
+    # donation of 100.
+    'playtempleheal': ('temple', temple_hurt, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xC258, TEMPLE_HEAL_SCRIPT)})]),
+    'playtemplecure': ('temple', diseased, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xC258, TEMPLE_CURE_SCRIPT)})]),
+    'playtemplebless': ('temple', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xC258, TEMPLE_BLESS_SCRIPT)})]),
+    # In the town's first tavern, seeded: two frames, a drink or a room
+    # (1194:B93C), thirty frames.
+    'playtaverndrink': ('tavern', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, TAVERN_DRINK_SCRIPT)})]),
+    'playtavernroom': ('tavern', gs.seeded, [((), (), 2, None), ((), (), 30, None, [], {'do': serviced(0x1194, 0xB93C, TAVERN_ROOM_SCRIPT)})]),
 }
 
 
@@ -1383,7 +1426,7 @@ def main():
             continue
         if where not in places:
             places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
-                             'people': people, 'store': building('store'), 'tavern': building('tavern'), 'guild': guild}[where](a, base)
+                             'people': people, 'store': building('store'), 'tavern': building('tavern'), 'temple': building('temple'), 'guild': guild}[where](a, base)
         at = places[where]
         print(name, file=sys.stderr)
         seen = []

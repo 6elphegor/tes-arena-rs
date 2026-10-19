@@ -35,7 +35,7 @@ const NEW_OLD: u16 = 0x1346;
 /// (`TalkHooks::shop`).
 pub fn shop(front: &mut Front, m: &mut Machine, files: &mut Files, kind: u8) -> Option<()> {
     let paged = m.page_is_block();
-    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new(), paged };
+    let mut ui = ShopFront { front, files: files.clone(), lines: None, picture: 0, written: Vec::new(), paged, screen: false };
     let r = match kind {
         5 => m.temple(files, &mut ui),
         4 => m.tavern_shop(files, &mut ui),
@@ -121,6 +121,8 @@ struct ShopFront<'a, 'b> {
     /// The draw page is the game's own block (`Machine::page_is_block`):
     /// the screens' state that writes into it is kept as the original's.
     paged: bool,
+    /// The temple's screen (4B60) loaded, for its banner after (4BFF).
+    screen: bool,
 }
 
 /// The LINES (0FF5) lines 1194:4E54 left at DS:`si`, each ending at a
@@ -281,8 +283,11 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
             m.shop_message(si);
         }
     }
+    fn shop_screen(&mut self, m: &mut Machine) {
+        self.screen = m.shop_screen(&mut self.files, 0x12EB).is_some();
+    }
     fn banner(&mut self, m: &mut Machine, si: u16) {
-        self.show_banner(m, si);
+        self.show_name(m, si, self.screen);
     }
     fn picture(&mut self, m: &mut Machine, si: u16) {
         self.show_picture(m, si);
