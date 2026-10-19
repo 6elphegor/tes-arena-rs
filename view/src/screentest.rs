@@ -1886,7 +1886,7 @@ fn the_dreams_as_the_original_shows_them() {
             a.engine.m.mem.w8(DS, at, v);
         }
         let mut talk = dialog::Talk::default();
-        a.engine.m.dream_show(&mut Front { talk: Some(&mut talk), ..Default::default() });
+        let _ = a.engine.m.dream_show(&mut a.engine.files, &mut Front { talk: Some(&mut talk), ..Default::default() });
         let archive = a.assets.archive.clone();
         let cleared = vec![0u8; 64000];
         let mut mv = crate::movies_of(&mut a.engine, &archive, std::mem::take(&mut talk.movies), Some((&cleared, a.assets.palette))).into_iter().next().expect("a dream");
@@ -1955,7 +1955,7 @@ fn the_dreams_two_movies_as_the_original_shows_them() {
             a.engine.m.mem.w8(DS, at, v);
         }
         let mut talk = dialog::Talk::default();
-        a.engine.m.dream_show(&mut Front { talk: Some(&mut talk), ..Default::default() });
+        let _ = a.engine.m.dream_show(&mut a.engine.files, &mut Front { talk: Some(&mut talk), ..Default::default() });
         let archive = a.assets.archive.clone();
         let cleared = vec![0u8; 64000];
         let mut movies: std::collections::VecDeque<_> = crate::movies_of(&mut a.engine, &archive, std::mem::take(&mut talk.movies), Some((&cleared, a.assets.palette))).into();

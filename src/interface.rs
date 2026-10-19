@@ -262,7 +262,7 @@ impl Machine {
     /// 0000:5368: the text at `seg`:`si` drawn centred on x `x` at row `y`
     /// (its width, 66F6, halved off: 9E0A), into the page where it is the
     /// game's own block; its state either way (`text_state_far`).
-    fn text_centred(&mut self, text: (u16, u16), x: u16, y: u16) {
+    pub(crate) fn text_centred(&mut self, text: (u16, u16), x: u16, y: u16) {
         let w = self.text_width_far(text);
         let x = x.wrapping_sub(w >> 1);
         if self.page_is_block() {

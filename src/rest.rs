@@ -103,10 +103,44 @@ pub trait RestHooks: ClockHooks {
     fn type_hours(&mut self, _m: &mut Machine) {}
     /// 1194:59C8 (59CC): a message box with the text at DS:`si`.
     fn message(&mut self, _m: &mut Machine, _si: u16) {}
-    /// 1194:4659 / 452F (0000:5364): the hours (TEXT, formatted) drawn.
-    fn hours_text(&mut self, _m: &mut Machine) {}
-    /// 1194:D45D: the dream's picture and its text number `text` shown.
-    fn dream(&mut self, _m: &mut Machine, _text: u16) {}
+    /// 1194:4659 / 452F: the hours (TEXT, formatted) drawn
+    /// (`Machine::rest_hours_draw`).
+    fn hours_text(&mut self, m: &mut Machine) {
+        m.rest_hours_draw();
+    }
+    /// The colours shown (6-bit), which A611 reads to A39E and D45D to
+    /// 9A6E; None leaves them as they are.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
+    }
+    /// 0000:A611: the world kept before the dream (`Machine::world_keep`,
+    /// the colours `dac`).
+    fn dream_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        let dac = self.dac();
+        m.world_keep(files, dac.as_ref());
+    }
+    /// 1194:D45D: the dream's movie (DS:`di`, its song `si`) with its text
+    /// number `ax` (`Machine::vision`, its pages clicked through).
+    fn dream(&mut self, m: &mut Machine, files: &mut Files, ax: u16, si: u16, di: u16) -> Option<()> {
+        let dac = self.dac();
+        m.vision(files, &mut crate::vision::ClickThrough::default(), dac.as_ref(), ax, si, di)
+    }
+    /// 1194:55B2 between the first level's two dreams: the colours at 929E
+    /// black and the page cleared (the fade the front end's).
+    fn dream_black(&mut self, m: &mut Machine) {
+        m.sheet_black();
+    }
+    /// 0000:A6B5 (`Machine::world_back`) and 2542:0446 (the palette, the
+    /// front end's): the world given back after the dream.
+    fn dream_back(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.world_back(files)
+    }
+    /// 0000:9A98 (the clip the whole screen) and 9AE6 ([1026]'s font) as
+    /// the dream ends.
+    fn dream_screen(&mut self, m: &mut Machine) {
+        m.clip_whole();
+        m.select_font(0x1026);
+    }
     /// 2294:0341 (after its window is reset): the sky for the new hour.
     fn sky(&mut self, m: &mut Machine) {
         m.sky_step();
@@ -334,6 +368,14 @@ impl Machine {
         self.sprintf((DS, TEXT), (DS, si), &[Arg::Int(n)]);
         self.mem.w8(DS, COLOUR, 0x3E);
         hooks.hours_text(self);
+    }
+
+    /// 1194:466B..4681: [1026]'s font selected (9AE6) and the hours at
+    /// TEXT drawn centred on x A0h at row 14h (0000:5364) in COLOUR, into
+    /// the page where it is the game's own block.
+    pub fn rest_hours_draw(&mut self) {
+        self.select_font(0x1026);
+        self.text_centred((DS, TEXT), 0xA0, 0x14);
     }
 
     fn rest_passed_text(&self) -> u16 {
@@ -576,7 +618,7 @@ impl Machine {
         }
         self.rest_end();
         if !self.dream_check() {
-            self.dream_show(hooks);
+            self.dream_show(files, hooks)?;
             self.mem.w16(DS, crate::sky::var::WINDOW, 0xFFFF);
             hooks.sky(self);
         }
@@ -628,7 +670,7 @@ impl Machine {
         }
         hooks.screen(self);
         if !self.dream_check() {
-            self.dream_show(hooks);
+            self.dream_show(files, hooks)?;
             self.mem.w16(DS, crate::sky::var::WINDOW, 0xFFFF);
             hooks.sky(self);
         }
@@ -670,7 +712,7 @@ impl Machine {
         if self.r_g16(ENEMIES) == 0 && !self.dream_check() {
             hooks.screen(self);
             self.mem.w8(DS, 0xC994, 1);
-            self.dream_show(hooks);
+            self.dream_show(files, hooks)?;
         } else {
             hooks.screen(self);
         }
@@ -713,7 +755,7 @@ impl Machine {
             if self.r_g16(ENEMIES) == 0 && !self.dream_check() {
                 hooks.screen(self);
                 self.mem.w8(DS, 0xC994, 1);
-                self.dream_show(hooks);
+                self.dream_show(files, hooks)?;
             } else {
                 hooks.screen(self);
             }
@@ -813,13 +855,18 @@ impl Machine {
         self.r_g8(DREAM_COUNT) >= 8
     }
 
-    /// 1194:D3AF. A pending dream not yet shown: at level 1 the first
-    /// (text 5DCh), then the one for DREAM_COUNT (50Eh + it, a byte
-    /// add); the screen to be redrawn, the dream shown.
-    pub fn dream_show(&mut self, hooks: &mut dyn RestHooks) {
+    /// 1194:D3AF. A pending dream not yet shown: the world kept (A611);
+    /// at level 1 the first (text 5DCh on CHAOSVSN.FLC, DI 4E16h) and the
+    /// colours black (55B2), then the one for DREAM_COUNT (50Eh + it, a
+    /// byte add, on VISION.FLC, DI 8085h); the world given back (A6B5,
+    /// 2542:0446), A91A as it was, the clip and [1026]'s font (9A98, 9AE6).
+    /// None where the vision or the world's return gives up.
+    pub fn dream_show(&mut self, files: &mut Files, hooks: &mut dyn RestHooks) -> Option<()> {
         if self.r_g8(DREAM) == 0 || self.r_g8(DREAM_SHOWN) != 0 {
-            return;
+            return Some(());
         }
+        let a91a = self.r_g16(0xA91A);
+        hooks.dream_keep(self, files);
         let a902 = 0xA902;
         let flags = |m: &mut Machine| {
             let f = (m.r_g16(a902) | 0x200) & 0xFEFF;
@@ -829,18 +876,21 @@ impl Machine {
             self.mem.w8(DS, 0x803C, 0);
             flags(self);
             self.mem.w8(DS, COLOUR, 0x33);
-            hooks.dream(self, 0x5DC);
-            hooks.screen(self);
+            hooks.dream(self, files, 0x5DC, 0x809A, 0x4E16)?;
+            hooks.dream_black(self);
         }
         self.mem.w8(DS, 0x803C, 0);
         let text = 0x0500 | 0x0Eu8.wrapping_add(self.r_g8(DREAM_COUNT)) as u16;
         flags(self);
         self.mem.w8(DS, COLOUR, 0x2F);
-        hooks.dream(self, text);
+        hooks.dream(self, files, text, 0x809A, 0x8085)?;
         self.mem.w8(DS, 0xC994, 1);
-        hooks.screen(self);
+        hooks.dream_back(self, files)?;
+        self.mem.w16(DS, 0xA91A, a91a);
+        hooks.dream_screen(self);
         self.r_or8(0x0D39, 0x80);
         self.mem.w8(DS, DREAM_SHOWN, 1);
         self.mem.w8(DS, DREAM, 1);
+        Some(())
     }
 }
