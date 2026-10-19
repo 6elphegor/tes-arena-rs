@@ -919,10 +919,26 @@ impl Machine {
         self.mem.w16(DS, FIELDS, n);
     }
 
-    /// 1194:65FD: the name typed (its background put back first).
+    /// 1194:65FD: the name typed, its background (kept by 68D7 at
+    /// [A890]:0, 83h by 9) put back at (45h, 30h) first (599C). With the
+    /// hooks' `texts`, on the page where it is the game's own block, so is
+    /// what the field (0000:9EE5) leaves there as it closes: the strip it
+    /// kept put back and the name drawn at (45h, 30h) (A0AE: 59A4, 9E0A),
+    /// which a later keep of the page (6B6A) holds. The typing itself is
+    /// the hooks' (`type_name`).
     fn sm_name(&mut self, hooks: &mut dyn SpellmakerHooks) {
         self.mem.w8(DS, COLOUR, 0xA0);
+        let drawn = hooks.texts() && self.page_is_block();
+        if drawn {
+            let back = self.sg16(NAME_BACK);
+            self.page_rect_put((back, 0), 0x45, 0x30, 0x83, 9);
+        }
         hooks.type_name(self, NAME);
+        if drawn {
+            let back = self.sg16(NAME_BACK);
+            self.page_rect_put((back, 0), 0x45, 0x30, 0x83, 9);
+            self.page_text_at(0x45, 0x30, (DS, NAME));
+        }
         // DI past the field's background (83h by 9 bytes) the editor puts
         // back from DI 0.
         self.spellmaker_di = Some(0x83 * 9);
