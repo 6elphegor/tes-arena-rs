@@ -86,7 +86,7 @@ impl MapHooks for Log {
             m.mem.w8(DS, 0x9C62 + i as u16, c);
         }
     }
-    fn list(&mut self, _m: &mut Machine, si: u16, cx: u16) -> u16 {
+    fn list(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files, si: u16, cx: u16, _di: u16) -> u16 {
         self.log.extend([12, si as u32, cx as u32]);
         self.a.list
     }

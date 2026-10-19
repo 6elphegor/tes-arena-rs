@@ -355,6 +355,14 @@ pub struct Creation {
     /// The map's window is up on the game (1194:286B..288E,
     /// `creation_map_window`), for the clicks on it.
     map_window: bool,
+    /// The class list's loop (3159:06A0) as it starts, on a copy of the
+    /// game (`arena::listwindow::ListCapture`), the mouse's reads and the
+    /// keys held given it so far, and the cursor's last place (a key's
+    /// read is there): what the loop makes of them is what the list
+    /// shows, and its end the class picked.
+    class_live: Option<Box<arena::listwindow::ListCapture>>,
+    class_reads: Vec<arena::listwindow::ListRead>,
+    cursor: (u16, u16),
     /// The text colour now (9288).
     colour: u8,
     /// The movie playing (Intro, Vision, Ending).
@@ -655,7 +663,7 @@ impl Creation {
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let quote = image_with_palette(m, &archive, "QUOTE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, class_live: None, class_reads: Vec::new(), cursor: (0, 0), colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -738,7 +746,7 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, map_window: false, class_live: None, class_reads: Vec::new(), cursor: (0, 0), colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false }
     }
 
     /// Whether the menu's Start was picked since last asked: the window
@@ -1553,6 +1561,29 @@ impl Creation {
                 Some(0) => self.class_chosen(engine, class),
                 Some(_) => self.list(engine),
             },
+            Stage::List(mut ask) if self.class_live.is_some() => {
+                // The input as the loop reads it (`class_read`), the loop
+                // run over all so far: its mark and first line shown the
+                // list's; its end the class (the game's list run over the
+                // same reads, `Machine::list_reads`).
+                self.class_read(inp);
+                let (mark, top, end) = self.class_live.as_ref().map(|l| l.live(&self.class_reads)).unwrap_or((0, 0, None));
+                ask.sel = if mark == 0xFFFF { 0 } else { mark as usize };
+                ask.top = top as usize;
+                match end {
+                    Some(i) if i < 18 => {
+                        self.class_live = None;
+                        engine.m.list_reads = Some(std::mem::take(&mut self.class_reads));
+                        let class = engine.m.class_list(&mut engine.files, i, ask.top as u16).unwrap_or_else(|| {
+                            eprintln!("the class list gave up: {}", arena::giveup::describe());
+                            engine.m.mem.r8(DS, LIST_ORDER + i)
+                        });
+                        engine.m.list_reads = None;
+                        self.class_chosen(engine, class)
+                    }
+                    _ => Stage::List(ask),
+                }
+            }
             Stage::List(mut ask) => match self.ask_input(&mut ask, inp) {
                 Some(i) if (i as usize) < 18 => {
                     // 1194:2678 as the game's state has it (`class_list`:
@@ -1709,7 +1740,36 @@ impl Creation {
             })
             .collect();
         let title = hud::lines(m.mem.cstr(DS, 0x3F56), 0x0F);
+        // The list run on a copy of the game, nothing picked, to its
+        // loop's start (`class_live`).
+        let (mut copy, mut files) = (engine.m.clone(), engine.files.clone());
+        copy.list_reads = None;
+        copy.list_capture = true;
+        let _ = copy.class_list(&mut files, 0xFFFF, 0);
+        self.class_live = copy.list_captured.take();
+        self.class_reads.clear();
         Stage::List(Ask { title, entries, keys: Vec::new(), sel: 0, top: 0, rows: 6, font: FontId::C, moved: false })
+    }
+
+    /// `inp` as the class list's loop reads it (0000:8FC4): a click a read
+    /// with the button down and one with it up, a key one with it held
+    /// and one with it let go (the cursor where it last was); the right
+    /// button too. Characters it doesn't read.
+    fn class_read(&mut self, inp: Input) {
+        use arena::listwindow::{list_keys::*, ListRead};
+        let (x, y) = self.cursor;
+        let (buttons, keys, at) = match inp {
+            Input::Click(cx, cy) => (1, 0, (cx.clamp(0, 319) as u16, cy.clamp(0, 199) as u16)),
+            Input::Right => (2, 0, (x, y)),
+            Input::Up => (0, UP.0, (x, y)),
+            Input::Down => (0, DOWN.0, (x, y)),
+            Input::Enter => (0, ENTER.0, (x, y)),
+            Input::Esc => (0, ESC.0, (x, y)),
+            _ => return,
+        };
+        self.cursor = at;
+        self.class_reads.push(ListRead { buttons, x: at.0, y: at.1, keys });
+        self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0 });
     }
 
     /// The next question (number `asked` from 0), its text's lines.

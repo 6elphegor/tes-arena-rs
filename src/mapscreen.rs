@@ -30,8 +30,9 @@ pub trait MapHooks: TravelHooks {
     /// (at most 14h characters, its NUL after).
     fn type_name(&mut self, _m: &mut Machine) {}
     /// 1194:5730 with AX 8: a pick from the `cx` names at DS:`si` (NUL
-    /// after each); its index, or FFFFh (negative) for none.
-    fn list(&mut self, _m: &mut Machine, _si: u16, _cx: u16) -> u16 {
+    /// after each; DI past the last's, 5730 keeping it at A872); its
+    /// index, or FFFFh (negative) for none.
+    fn list(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16, _cx: u16, _di: u16) -> u16 {
         0xFFFF
     }
 }
@@ -678,7 +679,7 @@ impl Machine {
                 }
                 // AX 8h (26F7:0AFB): the list's kind (1194:5734).
                 self.list_kind = 0x8;
-                let ax = hooks.list(self, NAMES, 0x20);
+                let ax = hooks.list(self, files, NAMES, 0x20, di);
                 if (ax as i16) < 0 {
                     return Some(());
                 }

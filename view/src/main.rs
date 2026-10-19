@@ -292,7 +292,11 @@ impl Front<'_> {
         let drawn = m.mem.r8(DS, 0x9288);
         m.mem.w8(DS, 0x9288, colour);
         let pick = match (&boxes, self.talk.as_deref_mut()) {
-            (Some(_), Some(t)) => t.menu(m, si, bx, di),
+            (Some(b), Some(t)) => {
+                let pick = t.menu(m, si, bx, di);
+                m.menu_reads = t.menu_reads.take();
+                m.menu_answered(b, bx, pick)
+            }
             _ => 0xFFFF,
         };
         m.mem.w8(DS, 0x9288, drawn);
@@ -704,6 +708,9 @@ impl arena::talk::TalkHooks for Front<'_> {
             return pick;
         }
         m.list_reads = reads;
+        // A list asked: the copy of the game as its loop starts, for the
+        // window to follow the loop (`list_followed`).
+        m.list_capture = self.talk.as_deref().is_some_and(|t| t.need.is_some());
         // The page as it stands (the screen a box covers: `box_screen`) is
         // the game's page block, which the list keeps in the load bank.
         let page = m.mem.r16(arena::mem::DS, 0xA900);
@@ -1780,6 +1787,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         selected: 0,
         list_top: 0,
         list_reads: Vec::new(),
+        menu_reads: Vec::new(),
+        list_live: None,
         arrowed: false,
         live: None,
         status: None,
@@ -3156,6 +3165,15 @@ struct App {
     /// loop (3159:06A0) would read them (`list_read`); given the game's
     /// list with its answer (`dialog::Answer::List`).
     list_reads: Vec<arena::listwindow::ListRead>,
+    /// The mouse's reads and the keys typed before each since the menu was
+    /// asked, the menu's loop's (3159:0F2A), given the game's menu with
+    /// its answer (`dialog::Answer::Menu`).
+    menu_reads: Vec<arena::menubox::MenuRead>,
+    /// A copy of the game as the list asked (or the spellbook's or the
+    /// use list in the bar) started its loop (`arena::listwindow::
+    /// ListCapture`): what the loop makes of the reads so far is what the
+    /// window shows, and its end the list's answer (`list_followed`).
+    list_live: Option<Box<arena::listwindow::ListCapture>>,
     /// The arrows or the wheel moved `selected` since the menu came up:
     /// only then is its entry marked (the original marks none).
     arrowed: bool,
@@ -3549,10 +3567,13 @@ impl App {
             return;
         }
         if let Some(need) = talk.need {
+            self.list_live = self.engine.m.list_captured.take();
+            self.engine.m.list_capture = false;
             copy_into(&mut self.engine, &before);
             self.selected = 0;
             self.list_top = 0;
             self.list_reads.clear();
+            self.menu_reads.clear();
             self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
@@ -4134,6 +4155,7 @@ impl App {
             self.engine.m.drop_place();
         }
         self.panel = Some(if inventory { panels::open_inventory(&mut self.engine.m) } else { panels::Panel::Spellbook(Default::default()) });
+        self.bar_list_capture();
         if self.captured {
             self.release();
         }
@@ -4164,6 +4186,9 @@ impl App {
                 }
             }
             self.engine.m.list_reads = Some(self.list_reads.clone());
+            if self.bar_list_followed(&mut said) {
+                return;
+            }
         }
         let m = &mut self.engine.m;
         let mut cast = None;
@@ -4590,6 +4615,61 @@ impl App {
         s
     }
 
+    /// The spellbook's or the use list's loop as it starts, on a copy of
+    /// the game (the list run there with nothing picked): `list_live`.
+    fn bar_list_capture(&mut self) {
+        let mut m = self.engine.m.clone();
+        let mut files = self.engine.files.clone();
+        let screen = self.list_page();
+        m.list_reads = None;
+        m.list_capture = true;
+        match &self.panel {
+            Some(panels::Panel::Spellbook(_)) => {
+                let _ = m.spellbook_list(&mut files, Some(&screen), 0xFFFF);
+            }
+            Some(panels::Panel::Use(..)) => {
+                let mut said = panels::Said { screen: Some(screen), ..Default::default() };
+                panels::use_pick(&mut m, &mut files, 0xFFFF, &mut said);
+            }
+            _ => {}
+        }
+        self.list_live = m.list_captured.take();
+    }
+
+    /// The spellbook or the use list up, with its copy (`list_live`): the
+    /// line marked and the first shown as its loop has them over the
+    /// reads so far, and where they end it, its answer taken (the spell
+    /// cast, the item used; FFFFh nothing); the panel's own model
+    /// otherwise (false).
+    fn bar_list_followed(&mut self, said: &mut panels::Said) -> bool {
+        let Some(live) = self.list_live.as_ref() else { return false };
+        let (mark, top, end) = live.live(&self.list_reads);
+        let mark = if mark == 0xFFFF { usize::MAX } else { mark as usize };
+        let spellbook = match self.panel.as_mut() {
+            Some(panels::Panel::Spellbook(book)) => {
+                (book.selected, book.top) = (mark, top as usize);
+                true
+            }
+            Some(panels::Panel::Use(_, sel, t)) => {
+                (*sel, *t) = (mark, top as usize);
+                false
+            }
+            _ => return false,
+        };
+        if let Some(ax) = end {
+            self.panel = None;
+            self.list_live = None;
+            if spellbook {
+                panels::book_cast(&mut self.engine, if ax == 0xFFFF { usize::MAX } else { ax as usize }, said);
+            } else {
+                panels::use_pick(&mut self.engine.m, &mut self.engine.files, ax, said);
+            }
+        }
+        self.engine.m.list_reads = None;
+        self.boxes.extend(std::mem::take(&mut said.boxes));
+        true
+    }
+
     /// A click with a panel up (`right`: the right button): an inventory
     /// line's item put on or off, or selected; the use list's entry used;
     /// the spellbook's entry cast.
@@ -4603,6 +4683,9 @@ impl App {
             self.list_read(if right { 2 } else { 1 }, 0);
             self.list_read(0, 0);
             self.engine.m.list_reads = Some(self.list_reads.clone());
+            if self.bar_list_followed(&mut said) {
+                return;
+            }
         }
         let mut cast = None;
         let mut back = false;
@@ -4872,6 +4955,7 @@ impl App {
                 if !panels::book_cast_last(&mut self.engine, right, &mut said) {
                     self.panel = Some(panels::Panel::Spellbook(Default::default()));
                     self.list_reads.clear();
+                    self.bar_list_capture();
                 }
                 self.boxes.extend(said.boxes);
             }
@@ -4886,6 +4970,7 @@ impl App {
                 if !names.is_empty() {
                     self.panel = Some(panels::Panel::Use(names, 0, 0));
                     self.list_reads.clear();
+                    self.bar_list_capture();
                 }
             }
             sheets::BarAction::Camp => self.camp = true,
@@ -5163,6 +5248,14 @@ impl App {
             return;
         }
         let Some(p) = &self.pending else { return };
+        // A menu's loop takes the keys typed through the key interrupt
+        // (3159:10DD, 7138): pressed and let go before its next read.
+        if matches!(&p.need, dialog::Need::Menu(m) if !m.list && m.kind != hud::DIALOG_BUTTONS) {
+            if let Some(scan) = interface::scan_code(code) {
+                self.menu_read(0, &[scan, scan | 0x80]);
+            }
+        }
+        let Some(p) = &self.pending else { return };
         match &p.need {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
@@ -5174,7 +5267,9 @@ impl App {
                     _ if menu.list && list_key.is_some() => {
                         if let Some(k) = list_key {
                             self.list_key_read(k);
-                            self.list_moved(|m| hud::list_key(m, k));
+                            if self.list_followed().is_none() {
+                                self.list_moved(|m| hud::list_key(m, k));
+                            }
                         }
                     }
                     KeyCode::ArrowUp => {
@@ -5188,19 +5283,22 @@ impl App {
                     KeyCode::Enter | KeyCode::NumpadEnter if menu.list => {
                         let s = self.selected.min(n - 1) as u16;
                         self.list_tap(arena::listwindow::list_keys::ENTER.0);
-                        self.list_answer(s);
+                        self.list_ended(s);
                     }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
                         let s = self.selected.min(n - 1) as u16;
-                        self.answer(dialog::Answer::Pick(s));
+                        self.menu_answer(s);
                     }
                     // Esc leaves a list as the right button does, where it
                     // does (`hud::leaves`).
                     KeyCode::Escape if menu.list && hud::leaves(menu) => {
                         self.list_tap(arena::listwindow::list_keys::ESC.0);
-                        self.list_answer(0xFFFF);
+                        self.list_ended(0xFFFF);
                     }
-                    KeyCode::Escape if !menu.list => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    KeyCode::Escape if !menu.list => {
+                        self.menu_read(0, &[]);
+                        self.menu_answer(0xFFFF);
+                    }
                     KeyCode::Escape => {}
                     _ => {
                         let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
@@ -5208,7 +5306,8 @@ impl App {
                         let by_key = menu.keys.iter().position(|&k| k.to_ascii_uppercase() == up);
                         let by_number = (c as char).to_digit(10).filter(|&d| d >= 1).map(|d| d as usize - 1).filter(|&i| i < menu.entries.len());
                         if let Some(i) = by_key.or(by_number) {
-                            self.answer(dialog::Answer::Pick(i as u16));
+                            self.menu_read(0, &[]);
+                            self.menu_answer(i as u16);
                         }
                     }
                 }
@@ -5327,6 +5426,12 @@ impl App {
             let mut picked = None;
             self.list_read(1, 0);
             self.list_read(0, 0);
+            if let Some(end) = self.list_followed() {
+                if let Some(ax) = end {
+                    self.list_answer(ax);
+                }
+                return;
+            }
             self.list_moved(|m| picked = hud::list_click(m, x, y));
             if let Some(i) = picked {
                 self.list_answer(i.min(n.saturating_sub(1)) as u16);
@@ -5335,8 +5440,30 @@ impl App {
         }
         let hud = self.hud();
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
-            self.answer(dialog::Answer::Pick(i as u16));
+            self.menu_read(1, &[]);
+            self.menu_read(0, &[]);
+            self.menu_answer(i as u16);
         }
+    }
+
+    /// A read of the mouse as the menu's loop makes it (0000:8FC4): its
+    /// `buttons`, the cursor's place on the 320 x 200 screen, the bytes the
+    /// keyboard gave since (`codes`); the loop's first read, as it starts
+    /// with nothing held, before the first.
+    fn menu_read(&mut self, buttons: u8, codes: &[u8]) {
+        let (x, y) = self.screen_point();
+        let (x, y) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        if self.menu_reads.is_empty() {
+            self.menu_reads.push(arena::menubox::MenuRead { buttons: 0, x, y, codes: Vec::new() });
+        }
+        self.menu_reads.push(arena::menubox::MenuRead { buttons, x, y, codes: codes.to_vec() });
+    }
+
+    /// The menu's entry `pick` answered (FFFFh: left), with the reads that
+    /// came to it.
+    fn menu_answer(&mut self, pick: u16) {
+        let reads = std::mem::take(&mut self.menu_reads);
+        self.answer(dialog::Answer::Menu(pick, reads));
     }
 
     /// A read of the mouse as the list's loop makes it (0000:8FC4): its
@@ -5366,6 +5493,30 @@ impl App {
             hud::ListKey::End => END.0,
         };
         self.list_tap(bit);
+    }
+
+    /// The list's loop as the game runs it over the reads so far
+    /// (`ListCapture::live`, from the copy taken as the list came up): its
+    /// line marked and first line shown made the window's; Some(its
+    /// answer) where the reads reach its end. None without the copy (the
+    /// window's own model then: `hud::list_click`, `list_key`).
+    fn list_followed(&mut self) -> Option<Option<u16>> {
+        let live = self.list_live.as_ref()?;
+        let (mark, top, end) = live.live(&self.list_reads);
+        self.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
+        self.list_top = top as usize;
+        Some(end)
+    }
+
+    /// A key or click that ends the list where the window's own model
+    /// has it end (`pick`): with the game's copy, its loop's answer
+    /// instead, if the reads end it.
+    fn list_ended(&mut self, pick: u16) {
+        match self.list_followed() {
+            Some(Some(ax)) => self.list_answer(ax),
+            Some(None) => {}
+            None => self.list_answer(pick),
+        }
     }
 
     /// The list's line `pick` answered (FFFFh: left), with the reads that
@@ -5459,7 +5610,9 @@ impl App {
                             let k = if dy > 0.0 { hud::ListKey::Up } else { hud::ListKey::Down };
                             if dy != 0.0 {
                                 self.list_key_read(k);
-                                self.list_moved(|m| hud::list_key(m, k));
+                                if self.list_followed().is_none() {
+                                    self.list_moved(|m| hud::list_key(m, k));
+                                }
                             }
                             return;
                         }
@@ -5607,9 +5760,11 @@ impl App {
                 } else if self.menu_asked().is_some_and(|m| m.list && hud::leaves(m)) {
                     self.list_read(2, 0);
                     self.list_read(0, 0);
-                    self.list_answer(0xFFFF);
+                    self.list_ended(0xFFFF);
                 } else if self.menu_asked().is_some_and(hud::leaves) {
-                    self.answer(dialog::Answer::Pick(0xFFFF));
+                    self.menu_read(2, &[]);
+                    self.menu_read(0, &[]);
+                    self.menu_answer(0xFFFF);
                 }
             }
             In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),

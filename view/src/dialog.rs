@@ -40,6 +40,10 @@ pub enum Answer {
     /// held that came to it (`arena::listwindow::ListRead`), which the
     /// list's loop (3159:06A0) is run over.
     List(u16, Vec<arena::listwindow::ListRead>),
+    /// A menu's entry picked (FFFFh: left), and the mouse's reads and the
+    /// keys typed before each that came to it (`arena::menubox::MenuRead`),
+    /// which the menu's loop (3159:0F2A) is run over.
+    Menu(u16, Vec<arena::menubox::MenuRead>),
     /// Text typed (a script's): Esc where the field doesn't end on it
     /// (it empties the field), its characters, Enter.
     Text(String),
@@ -168,6 +172,9 @@ pub struct Talk {
     /// The reads the last list answered came with (`Answer::List`), for
     /// its asker to give the game's list (`Machine::list_reads`).
     pub list_reads: Option<Vec<arena::listwindow::ListRead>>,
+    /// The reads the last menu answered came with (`Answer::Menu`), for
+    /// its asker to give the game's menu (`Machine::menu_reads`).
+    pub menu_reads: Option<Vec<arena::menubox::MenuRead>>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -321,12 +328,16 @@ impl Talk {
     /// `menu` asked: the next answer, or the question left (FFFFh).
     fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {
-            Some(Answer::Pick(p) | Answer::List(p, _)) => {
+            Some(Answer::Pick(p) | Answer::List(p, _) | Answer::Menu(p, _)) => {
                 // Only an entry shown can be picked (1194:020E, 5734 give
                 // an entry or Esc): an answer past them is Esc.
                 let p = if (*p as usize) < menu.entries.len() { *p } else { 0xFFFF };
                 self.list_reads = match self.answers.front() {
                     Some(Answer::List(_, r)) => Some(r.clone()),
+                    _ => None,
+                };
+                self.menu_reads = match self.answers.front() {
+                    Some(Answer::Menu(_, r)) => Some(r.clone()),
                     _ => None,
                 };
                 self.answers.pop_front();

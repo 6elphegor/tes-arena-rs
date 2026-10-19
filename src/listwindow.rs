@@ -44,6 +44,29 @@ pub struct ListRead {
     pub keys: u8,
 }
 
+/// A list's loop as it starts (`Machine::list_capture`): a copy of the
+/// game there and its record, for a front end to show what the loop makes
+/// of the reads so far (`live`).
+#[derive(Clone)]
+pub struct ListCapture {
+    pub m: Machine,
+    pub seg: u16,
+    pub rec: u16,
+}
+
+impl ListCapture {
+    /// The record's line marked (+39, FFFFh none) and first line shown
+    /// (+3B) after the loop's passes over `reads` (to its end, or as far
+    /// as they go; as it starts where it gives up), on a copy; and the
+    /// loop's answer where they reach its end (its pick, FFFFh left).
+    pub fn live(&self, reads: &[ListRead]) -> (u16, u16, Option<u16>) {
+        let mut m = self.m.clone();
+        let (seg, rec) = (self.seg, self.rec);
+        let end = m.list_passes(seg, rec, reads);
+        (m.mem.r16(seg, rec + 0x39), m.mem.r16(seg, rec + 0x3B), end)
+    }
+}
+
 /// The keys the list's loop looks at in the key table (ACB5 by scan
 /// code): `ListRead::keys`' bits and their scan codes.
 pub mod list_keys {
@@ -571,6 +594,10 @@ impl Machine {
         }
         // 07C6: the first line picked (0BCA: no routine at +2F here).
         self.list_pick(seg, rec, 0)?;
+        if self.list_capture {
+            self.list_capture = false;
+            self.list_captured = Some(Box::new(ListCapture { m: self.clone(), seg, rec }));
+        }
         // The loop itself, over the front end's reads where it gave them
         // (run on a copy: reads that end before the loop does leave the
         // pick as given, below).
@@ -615,17 +642,23 @@ impl Machine {
     /// 6BDE, the front end's). Its end (0709): the window's (07D3) and
     /// the keys flushed (710E). AX: the record's pick (FFFFh left). None
     /// where the reads end before the loop does, or the port gives up.
-    fn list_loop(&mut self, seg: u16, rec: u16, reads: &[ListRead]) -> Option<u16> {
+    /// The loop's passes over `reads` up to its end or theirs, without its
+    /// end (`ListCapture::live`).
+    fn list_passes(&mut self, seg: u16, rec: u16, reads: &[ListRead]) -> Option<u16> {
         let mut reads = reads.iter();
         self.list_input(seg, rec, &mut reads)?;
-        let ax = loop {
+        loop {
             if let Some(ax) = self.list_input(seg, rec, &mut reads)? {
-                break ax;
+                return Some(ax);
             }
             self.list_read(reads.next()?);
             self.cursor_drawn();
             self.cursor_hidden();
-        };
+        }
+    }
+
+    fn list_loop(&mut self, seg: u16, rec: u16, reads: &[ListRead]) -> Option<u16> {
+        let ax = self.list_passes(seg, rec, reads)?;
         self.list_end(seg, rec);
         self.key_flush();
         Some(ax)

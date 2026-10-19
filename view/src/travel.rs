@@ -147,6 +147,12 @@ pub struct Travel {
     outprov: Vec<Image>,
     stafdung: Vec<Image>,
     asking: Option<Asking>,
+    /// The search's list's loop as it starts, on a copy of the game
+    /// (`arena::listwindow::ListCapture`), and the reads given it so far:
+    /// what the loop makes of them is what the list shows, its end the
+    /// pick.
+    list_live: Option<Box<arena::listwindow::ListCapture>>,
+    list_reads: Vec<arena::listwindow::ListRead>,
     /// Boxes shown since asked for (`take_boxes`).
     boxes: Vec<Lines>,
     /// Ended: the carry (the area left).
@@ -253,6 +259,11 @@ struct Hooks<'a> {
     /// map's picture, 26F7:07CD's 56C8 with BX 24h), where the page is
     /// the heap's block.
     journey_page: Option<Vec<u8>>,
+    /// The search's list: whether its loop's start is to be kept
+    /// (`Machine::list_capture`), and the reads its loop runs over
+    /// (`Machine::list_reads`).
+    capture: bool,
+    reads: Option<Vec<arena::listwindow::ListRead>>,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
@@ -321,7 +332,11 @@ impl MapHooks for Hooks<'_> {
         }
         m.named_closed();
     }
-    fn list(&mut self, m: &mut Machine, si: u16, cx: u16) -> u16 {
+    /// The names listed for the window, and the game's state round the
+    /// pick (`Machine::list_window`, kind 8: the screen kept in the load
+    /// bank, the panel, the window's record; its loop over `reads`) where
+    /// the page is the game's own block.
+    fn list(&mut self, m: &mut Machine, files: &mut arena::bsa::Files, si: u16, cx: u16, di: u16) -> u16 {
         let mut at = si;
         let mut names = Vec::new();
         for _ in 0..cx {
@@ -330,7 +345,15 @@ impl MapHooks for Hooks<'_> {
             names.push(String::from_utf8_lossy(s).into_owned());
         }
         self.listed = Some(names);
-        self.pick
+        if !m.page_is_block() {
+            return self.pick;
+        }
+        m.list_capture = self.capture;
+        m.list_reads = self.reads.take();
+        m.list_window(files, 8, (DS, si), cx, di, self.pick).unwrap_or_else(|| {
+            eprintln!("the search's list gave up: {}", arena::giveup::describe());
+            self.pick
+        })
     }
 }
 
@@ -342,14 +365,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -368,7 +391,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None };
+        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
         // The window's colours read from black (1194:55B2's fade before).
         let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
             eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
@@ -394,6 +417,8 @@ impl Travel {
             outprov: archive.read("OUTPROV.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             stafdung: archive.read("STAFDUNG.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
             asking: None,
+            list_live: None,
+            list_reads: Vec::new(),
             boxes,
             done: None,
             mapout: archive.read("MAPOUT.CIF").map(|d| cif(m, &d)).unwrap_or_default(),
@@ -421,7 +446,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>) -> Hooks<'a> {
-        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None }
+        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded and its window
@@ -569,7 +594,22 @@ impl Travel {
             // The arrows, the track and the lines as 3159:0834 takes them
             // (`hud::list_click`): a line clicked is marked, the marked
             // line clicked picked (5734).
-            let pick = if right { Some(0xFFFF) } else { hud::list_click(menu, x, y).map(|i| i.min(menu.entries.len().saturating_sub(1)) as u16) };
+            let pick = match self.list_live.as_ref() {
+                // The click as the loop reads it, down and up: the loop's
+                // mark and first line shown, and its end the pick.
+                Some(live) => {
+                    let (cx, cy) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+                    let b = if right { 2 } else { 1 };
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: b, x: cx, y: cy, keys: 0 });
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0 });
+                    let (mark, top, end) = live.live(&self.list_reads);
+                    menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
+                    menu.top = Some(top as usize);
+                    end
+                }
+                None if right => Some(0xFFFF),
+                None => hud::list_click(menu, x, y).map(|i| i.min(menu.entries.len().saturating_sub(1)) as u16),
+            };
             if let Some(pick) = pick {
                 let typed = typed.clone();
                 self.asking = None;
@@ -824,7 +864,12 @@ impl Travel {
         let mut h = Self::hooks(&mut scratch);
         h.typed = typed.clone();
         h.pick = 0xFFFF;
+        h.capture = pick.is_none();
         let _ = copy.travel_search(&mut engine.files.clone(), &mut h);
+        if pick.is_none() {
+            self.list_live = copy.list_captured.take();
+            self.list_reads.clear();
+        }
         if let (Some(names), None) = (h.listed.take(), pick) {
             let entries = names.iter().map(|n| hud::lines(n.as_bytes(), 0x0F).into_iter().flatten().collect()).collect();
             self.asking = Some(Asking::List(hud::list_menu(&copy, Vec::new(), entries), typed));
@@ -835,6 +880,7 @@ impl Travel {
         h.typed = typed;
         h.pick = pick.unwrap_or(0xFFFF);
         h.screen = screen;
+        h.reads = self.list_live.take().map(|_| std::mem::take(&mut self.list_reads));
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
             eprintln!("the search gave up: {}", arena::giveup::describe());
         }
@@ -900,6 +946,35 @@ impl Travel {
         }
         match &mut self.asking {
             Some(Asking::Name(_)) => {}
+            Some(Asking::List(menu, typed)) if self.list_live.is_some() => {
+                // The key as the loop reads it, held and let go (the cursor
+                // where it is): the loop's mark and first line shown, and
+                // its end the pick.
+                use arena::listwindow::list_keys::*;
+                let bit = match code {
+                    KeyCode::ArrowUp => UP.0,
+                    KeyCode::ArrowDown => DOWN.0,
+                    KeyCode::PageUp => PGUP.0,
+                    KeyCode::PageDown => PGDN.0,
+                    KeyCode::Home => HOME.0,
+                    KeyCode::End => END.0,
+                    KeyCode::Enter | KeyCode::NumpadEnter => ENTER.0,
+                    KeyCode::Escape => ESC.0,
+                    _ => return,
+                };
+                let (cx, cy) = (at.0.clamp(0, 319) as u16, at.1.clamp(0, 199) as u16);
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: bit });
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0 });
+                let Some(live) = self.list_live.as_ref() else { return };
+                let (mark, top, end) = live.live(&self.list_reads);
+                menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
+                menu.top = Some(top as usize);
+                if let Some(pick) = end {
+                    let typed = typed.clone();
+                    self.asking = None;
+                    self.search(engine, typed, Some(pick));
+                }
+            }
             Some(Asking::List(menu, typed)) => {
                 let key = match code {
                     KeyCode::ArrowUp => hud::ListKey::Up,
