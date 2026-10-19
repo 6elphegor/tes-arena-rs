@@ -159,6 +159,15 @@ pub struct Travel {
     /// they began (ms).
     journey: Vec<u8>,
     journey_ms: u32,
+    /// What the screen shows before the days and after them, a retrace
+    /// each (`journey_from`): 26F7:081E's 55B2 (the screen as the click
+    /// left it to black in 8, cleared), 56C8 with BX 24h (the cleared
+    /// screen to the world map's colours in 12, 5E50), and 08F1's 55B2 (the
+    /// last day to black in 8).
+    journey_lead: Vec<(Vec<u8>, crate::film::Dac)>,
+    journey_tail: Vec<(Vec<u8>, crate::film::Dac)>,
+    /// A journey was made (its days played): the screen ends black.
+    pub journeyed: bool,
     /// The game's page as the journey left it (the world map's picture,
     /// 26F7:07CD's 56C8), under its frames; where the page is the
     /// heap's block.
@@ -393,6 +402,9 @@ impl Travel {
             horse: dfa(archive, "HORSE.DFA"),
             journey: Vec::new(),
             journey_ms: 0,
+            journey_lead: Vec::new(),
+            journey_tail: Vec::new(),
+            journeyed: false,
             journey_page: None,
             up_ms: 0,
             boxed_over: None,
@@ -658,6 +670,9 @@ impl Travel {
         let failed = h.failed;
         self.journey = std::mem::take(&mut h.frames);
         self.journey_ms = 0;
+        self.journey_lead.clear();
+        self.journey_tail.clear();
+        self.journeyed |= !self.journey.is_empty();
         self.journey_page = h.journey_page.take();
         if ok.is_none() || failed {
             eprintln!("the journey gave up: {}", arena::giveup::describe());
@@ -683,8 +698,10 @@ impl Travel {
         }
         if !self.journey.is_empty() {
             self.journey_ms += ms;
-            if (self.journey_ms / TICK_MS) as usize >= self.journey.len() {
+            if self.journey_ms >= self.journey_lead_ms() + self.journey.len() as u32 * TICK_MS + self.journey_tail.len() as u32 * crate::film::RETRACE_MS {
                 self.journey.clear();
+                self.journey_lead.clear();
+                self.journey_tail.clear();
             }
         }
     }
@@ -692,6 +709,61 @@ impl Travel {
     /// The journey's frames left unplayed (the scripted shots).
     pub fn skip_journey(&mut self) {
         self.journey.clear();
+        self.journey_lead.clear();
+        self.journey_tail.clear();
+    }
+
+    /// The fades about a journey just made (`journey_lead`, `journey_tail`),
+    /// from `before`, the screen as the Travel click found it: none where
+    /// there is no journey, or the world map's picture or the page isn't
+    /// the view's.
+    pub fn journey_from(&mut self, before: &Screen) {
+        use crate::film::Film;
+        let (Some(page), Some((_, world)), Some(&last)) = (&self.journey_page, &self.world, self.journey.last()) else { return };
+        if !self.journey_lead.is_empty() {
+            return;
+        }
+        let black = [[0, 0, 0, 0xFF]; 256];
+        let mut film = Film::new(before.indices().iter().map(|&c| c as u8).collect(), *before.palette());
+        film.fade(&black, 8);
+        film.vga.fill(0);
+        film.fade(world, 12);
+        self.journey_lead = film.frames;
+        let mut screen = Screen::new(*world);
+        screen.underlay(page);
+        if let Some(f) = self.horse.get(last as usize) {
+            screen.blit(f.x, f.y, f.w, f.h, &f.px, 199);
+        }
+        let mut film = Film::new(screen.indices().iter().map(|&c| c as u8).collect(), *world);
+        film.fade(&black, 8);
+        self.journey_tail = film.frames;
+    }
+
+    /// The lead's time (ms).
+    fn journey_lead_ms(&self) -> u32 {
+        self.journey_lead.len() as u32 * crate::film::RETRACE_MS
+    }
+
+    /// The lead's or the tail's frame for the time played, if in either.
+    fn journey_fade(&self) -> Option<&(Vec<u8>, crate::film::Dac)> {
+        let lead = self.journey_lead_ms();
+        if self.journey_ms < lead {
+            return self.journey_lead.get((self.journey_ms / crate::film::RETRACE_MS) as usize);
+        }
+        let days = lead + self.journey.len() as u32 * TICK_MS;
+        if self.journey_ms >= days {
+            return self.journey_tail.get(((self.journey_ms - days) / crate::film::RETRACE_MS) as usize);
+        }
+        None
+    }
+
+    /// The journey as the screen shows it, a retrace each before the days
+    /// and after them, the days between (`Travel::journey_seen`): its
+    /// pixels and 6-bit colours.
+    #[cfg(test)]
+    pub fn journey_fades(&self) -> (Vec<(Vec<u8>, Vec<u8>)>, Vec<(Vec<u8>, Vec<u8>)>) {
+        let six = |f: &(Vec<u8>, crate::film::Dac)| (f.0.clone(), f.1.iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect());
+        (self.journey_lead.iter().map(six).collect(), self.journey_tail.iter().map(six).collect())
     }
 
     /// The journey's frames playing.
@@ -706,7 +778,7 @@ impl Travel {
         let ms = self.journey_ms;
         let mut seen = Vec::new();
         for day in 0..self.journey.len() as u32 {
-            self.journey_ms = day * TICK_MS;
+            self.journey_ms = self.journey_lead_ms() + day * TICK_MS;
             let mut screen = Screen::new([[0, 0, 0, 0xFF]; 256]);
             self.draw(&mut screen, font, m, 0, 0);
             let px = screen.indices().iter().map(|&c| c as u8).collect();
@@ -719,7 +791,8 @@ impl Travel {
 
     /// The journey's frame for the time played (HORSE.DFA's).
     fn journey_frame(&self) -> Option<&Image> {
-        self.journey.get((self.journey_ms / TICK_MS) as usize).and_then(|&f| self.horse.get(f as usize))
+        let day = self.journey_ms.checked_sub(self.journey_lead_ms())? / TICK_MS;
+        self.journey.get(day as usize).and_then(|&f| self.horse.get(f as usize))
     }
 
     /// 26F7:071F: the marker of kind `kind` (frame `kind` of `pics`) centred
@@ -923,6 +996,12 @@ impl Travel {
         let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
         if let Some(p) = &self.picture {
             p.draw(screen, &self.fonts);
+            return;
+        }
+        // The fades before the days and after them (`journey_from`).
+        if let Some((vga, dac)) = self.journey_fade().filter(|_| !self.journey.is_empty()) {
+            screen.set_palette(*dac);
+            screen.underlay(vga);
             return;
         }
         // 1194:30F1: the day's frame of the journey over the world map's
