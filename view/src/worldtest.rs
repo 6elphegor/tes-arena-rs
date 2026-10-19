@@ -134,6 +134,9 @@ enum Place {
     Tavern,
     /// The town's first temple, in as the store.
     Temple,
+    /// The town's palace, in at its first door (gen_worldframes.py's
+    /// `palace`).
+    Palace,
     /// The street with the guild left from the seed SEED
     /// (gen_worldframes.py's `people`): its townspeople placed the same
     /// on both sides.
@@ -261,6 +264,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
         Place::Store => into(&mut a, 0x1008),
         Place::Tavern => into(&mut a, 0x1AB5),
         Place::Temple => into(&mut a, 0x1004),
+        Place::Palace => {
+            into_palace(&mut a);
+            a.engine.m.mem.w8(DS, 0x191F, 0);
+        }
         Place::Dungeon => into_dungeon(&mut a),
         Place::Crypt => into_named(&mut a, b"41649375.MIF"),
         Place::Capped => into_named(&mut a, b"39699021.MIF"),
@@ -827,6 +834,82 @@ fn surrendering(a: &mut App) {
     m.mem.w8(DS, q + 0x2F, 0x18);
     let v = m.mem.r16(DS, 0x05CA) | 0x40;
     m.mem.w16(DS, 0x05CA, v);
+}
+
+/// gen_worldframes.py's `ruled`: the palace's ruler clicked (a map flat of
+/// the palace's first kind copied to the clicked record, out of a
+/// thing's reach, the seed SEED) and the click's turn run (1194:DB6C:
+/// the palace's quests, 8F1E from DCE1), `script` answering it.
+fn ruled(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act]) {
+    let m = &mut a.engine.m;
+    for at in [0x191F, 0x101C, 0x137E] {
+        m.mem.w8(DS, at, 0);
+    }
+    let (x, y) = (m.mem.r16(DS, arena::movement::var::X), m.mem.r16(DS, arena::movement::var::Y));
+    let rec = arena::talk::var::RECORD;
+    m.mem.w16(DS, rec, x.wrapping_add(0x200));
+    m.mem.w16(DS, rec + 4, y);
+    let base = m.mem.r16(DS, 0xC38E) as u8;
+    m.mem.w8(DS, rec + 0xC, base);
+    m.mem.w16(DS, arena::talk::var::CLICKED, rec);
+    seeded(a);
+    a.compose();
+    super::super::super::talk_turn(a);
+    for step in script {
+        assert!(a.pending.is_some() || !a.boxes.is_empty(), "the ruler's words ended early");
+        act(a, d, step);
+    }
+    assert!(a.pending.is_none() && a.boxes.is_empty(), "the ruler still asking");
+    seen.push(state(a));
+}
+
+/// `n` frames, a box one of them shows (a quest's words, 0000:4903)
+/// answered by `script`'s next clicks, as the harness's step `script`
+/// answers the box's wait inside that frame.
+fn frames_answered(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, script: &[Act]) {
+    let mut left = script.iter();
+    for _ in 0..n {
+        a.compose();
+        d.frame(a);
+        while a.pending.is_some() || !a.boxes.is_empty() {
+            act(a, d, left.next().expect("a box the script doesn't answer"));
+        }
+        seen.push(state(a));
+    }
+}
+
+/// gen_worldframes.py's PALACE_ACCEPT_SCRIPT: the ruler's question's Yes,
+/// the offer's Yes (136..157), its box after.
+const PALACE_ACCEPT_SCRIPT: [Act; 3] = [Act::Click(0xA0, 0x6E), Act::Click(0xA0, 0x90), Act::Click(0xA0, 0x60)];
+/// PALACE_ACCEPT_SCRIPT and the palace's words after the offer taken,
+/// which the harness's next frame shows (the step's `script`) and the
+/// view's turn shows before it ends.
+const PALACE_ACCEPT_TURN: [Act; 4] = [Act::Click(0xA0, 0x6E), Act::Click(0xA0, 0x90), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x60)];
+/// gen_worldframes.py's QUEST_REACHED_SCRIPT: the quest's words, then the
+/// tavern's menu's Exit.
+const QUEST_REACHED_SCRIPT: [Act; 2] = [Act::Click(0xA0, 0x60), Act::Click(0xA0, 0xA3)];
+/// gen_worldframes.py's QUEST_REWARD_SCRIPT: the reward's boxes.
+const QUEST_REWARD_SCRIPT: [Act; 2] = [Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x60)];
+/// The step's own clicks for a box the next frames show.
+const FRAME_BOXES: [Act; 3] = [Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x60)];
+
+/// gen_worldframes.py's `quest_under_way`: the save's palace quest (0E6E's
+/// first) taken on and leading here (+24h the location, 0A4C): `reached`
+/// false, its goal the town's first tavern's keeper (+14h's low word its
+/// door square, 0FD2, its column halved); true, the goal reached and
+/// back at its giver (+4 bit 20h); the seed SEED.
+fn quest_under_way(a: &mut App, reached: bool) {
+    let m = &mut a.engine.m;
+    let q = 0x0E6E;
+    let w = (m.mem.r16(DS, q + 4) & !0x00E0) | 0x0040 | if reached { 0x20 } else { 0 };
+    m.mem.w16(DS, q + 4, w);
+    let here = m.mem.r8(DS, 0x0A4C);
+    m.mem.w8(DS, q + 0x24, here);
+    if !reached {
+        let t = m.mem.r16(DS, 0x0FD2);
+        m.mem.w16(DS, q + 0x14, t & 0xFF00 | (t & 0xFF) >> 1);
+    }
+    seeded(a);
 }
 
 /// gen_worldframes.py's `pile_ahead`: at row 0Bh, column 2Ah facing the
@@ -2392,6 +2475,21 @@ fn case(name: &str) -> Option<Case> {
             serviced(a, d, seen, 4, &TAVERN_DRINK_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
+        "playpalaceaccept" => (Place::Palace, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            ruled(a, d, seen, &PALACE_ACCEPT_TURN);
+            frames_answered(a, d, seen, 29, &FRAME_BOXES);
+        })),
+        "playquestreached" => (Place::Tavern, Box::new(|a: &mut App| quest_under_way(a, false)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &QUEST_REACHED_SCRIPT);
+            frames_answered(a, d, seen, 29, &FRAME_BOXES);
+        })),
+        "playquestreward" => (Place::Palace, Box::new(|a: &mut App| quest_under_way(a, true)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            ruled(a, d, seen, &QUEST_REWARD_SCRIPT);
+            frames_answered(a, d, seen, 29, &FRAME_BOXES);
+        })),
         "playtavernroom" => (Place::Tavern, Box::new(seeded), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             serviced(a, d, seen, 4, &TAVERN_ROOM_SCRIPT);
@@ -3065,7 +3163,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 83] = ["playsurrender", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY: [&str; 86] = ["playpalaceaccept", "playquestreached", "playquestreward", "playsurrender", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -3175,7 +3273,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 88] = ["playsurrender", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
+const BUSY_STATE: [&str; 91] = ["playpalaceaccept", "playquestreached", "playquestreward", "playsurrender", "playstorehaggle", "playstoresellhaggle", "playstorestolen", "playstorefailed", "playstorecaught", "playguards", "playsheetready", "playtalkkey", "playguildbar", "playtalkbar", "playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin", "playsearchend", "playbowsheet", "playcastsheet", "playboatsheet", "playkeyssheet", "playtextsheet", "playeffectsheet"];
 
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
