@@ -8,6 +8,7 @@ screen | equipmentquestinfo | d1ab9b97293aaa5b ef6ad023fa2b8c2b
 screen | equipmentspecial | 36dd796a0fe9e144 ef6ad023fa2b8c2b
 screen | equipmentpotion | 707d1563e7ab7aaf ef6ad023fa2b8c2b
 screen | equipmentquestequip | cdcecf4fdac6fbf ef6ad023fa2b8c2b
+screen | equipmentdropask | 3b326872ce25c2f6 ef6ad023fa2b8c2b
 screen | equipmentinfo | a7cf26d6550a0eb5 ef6ad023fa2b8c2b
 screen | equipmentoff | 8e8691788f7b16b3 ef6ad023fa2b8c2b
 screen | equipmentspellpage | e8d24b276c1fdb48 7b9dbd5285f32ad5
@@ -126,4 +127,3 @@ screen | palacedecline | c53dd1e740f17cf4 a97a4bafd992e4ed 84778cba60dcaa0e
 screen | palacenone | b0ce105eb5a635e3 a97a4bafd992e4ed e5cc6fd39d770635
 screen | looktavern | 52c93d16d44c869 2376632b30141d5 613b4b1f89b7ed89
 screen | boatprow | 295d1adbc8a1eaa1 a97a4bafd992e4ed ed9ea17870e2cccd
-screen | equipmentdropask | 3b326872ce25c2f6 ef6ad023fa2b8c2b

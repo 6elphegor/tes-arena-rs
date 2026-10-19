@@ -8,6 +8,7 @@ screenfade | equipmentquestinfo | 28 | c63880118b2d904d
 screenfade | equipmentspecial | 28 | c63880118b2d904d
 screenfade | equipmentpotion | 28 | c63880118b2d904d
 screenfade | equipmentquestequip | 28 | c63880118b2d904d
+screenfade | equipmentdropask | 28 | c63880118b2d904d
 screenfade | equipmentinfo | 28 | c63880118b2d904d
 screenfade | equipmentoff | 28 | c63880118b2d904d
 screenfade | equipmentspellpage | 30 | 60223a0222993c8b
@@ -34,4 +35,3 @@ screenfade | guildspellpick | 3 | e5b889bfc934ea49
 screenfade | automap | 72 | 2c86ca8f17bddf19
 screenfade | levelupstats | 27 | 67fd4d5ec45a4717
 screenfade | spellmaker | 3 | 3fba6b030819c2f6
-screenfade | equipmentdropask | 28 | c63880118b2d904d

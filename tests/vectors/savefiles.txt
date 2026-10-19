@@ -153,6 +153,12 @@ screen | equipmentquestequip | SAVEFACE.$$$ 21c 167cdb245601327a
 screen | equipmentquestequip | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | equipmentquestequip | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
 screendel | equipmentquestequip | 
+screen | equipmentdropask | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
+screen | equipmentdropask | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | equipmentdropask | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | equipmentdropask | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | equipmentdropask | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | equipmentdropask | 
 screen | equipmentinfo | BACKMSG.$$$ 1d64 d3ea2437aa09e2d4
 screen | equipmentinfo | CHARSHET.$$$ fa00 18f6da19f846c98d
 screen | equipmentinfo | SAVEFACE.$$$ 21c 167cdb245601327a
