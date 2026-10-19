@@ -1218,8 +1218,11 @@ impl Machine {
         s.wrapping_add(s).wrapping_add(self.f16(si.wrapping_add(0xC))).wrapping_add(self.sg16(FIELDS))
     }
 
-    /// 1194:6B6A: the screen (A8FE) kept in the frame (9030).
+    /// 1194:6B6A: the load bank [1030] mapped (5C86, left mapped) and the
+    /// screen (A8FE) kept in the frame (9030).
     fn sm_keep_screen(&mut self) {
+        let bank = self.sg16(0x1030);
+        self.map_bank(bank, 0);
         let (off, seg) = (self.sg16(0xA8FE), self.sg16(0xA900));
         let frame = self.sg16(0x9030);
         for i in 0..64000u16 {
