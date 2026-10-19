@@ -79,6 +79,11 @@ pub trait FrameHooks: WeaponHooks + ClockHooks {
     /// (x A0h) from the view's bottom (C3A2) less its height (3D40), 0Ah
     /// apart, in the font at 102C and colour F0h.
     fn level_text_draw(&mut self, _m: &mut Machine) {}
+    /// 0000:0511: the message line (the text at [061A], while 061E
+    /// counts down) drawn on the page, before the click (1194:DB6C) and
+    /// the compass (4D7C): centred on x A0h at row 14h in the font at
+    /// 102C, in colour 70h, then one pixel right in 9Fh.
+    fn message_draw(&mut self, _m: &mut Machine) {}
     /// 292B:05A2: the riddle's answer asked (typed under the text: 1044
     /// cleared, `lineedit::fields::riddle`) and looked for
     /// (`Machine::riddle_answered`); by default not asked.
@@ -302,6 +307,7 @@ impl Machine {
             self.mem.w16(DS, 0x061E, t - 1);
             let v = self.mem.r16(DS, 0x102C);
             self.mem.w16(DS, 0xB036, v);
+            hooks.message_draw(self);
             self.mem.w8(DS, 0x9288, 0x9F);
         }
         self.speeds();

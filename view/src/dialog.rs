@@ -311,18 +311,6 @@ impl Talk {
         self.ask(menu)
     }
 
-    /// Lines shown in a box, as a message box's.
-    pub fn lines_box(&mut self, lines: Vec<Vec<Span>>) {
-        if self.need.is_some() {
-            return;
-        }
-        for l in &lines {
-            println!("{}", hud::plain(l));
-        }
-        self.boxes.push(lines.clone());
-        self.since_answer.push(lines);
-    }
-
     /// `menu` asked: the next answer, or the question left (FFFFh).
     fn ask(&mut self, menu: Menu) -> u16 {
         match self.answers.front() {

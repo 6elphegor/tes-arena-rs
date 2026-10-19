@@ -754,6 +754,24 @@ fn pile_ahead(a: &mut App) {
     seeded(a);
 }
 
+/// gen_worldframes.py's `chest_ahead`: facing north at row 0Bh, column 2Ah,
+/// near the square's far edge, the level's locked chest (C93B) on the
+/// walls plane two squares on, an Open spell waiting at its surest (0DC4
+/// 7D0h), a slot free, seeded.
+fn chest_ahead(a: &mut App) {
+    at_square(a, 0xB, 0x2A, 0);
+    let m = &mut a.engine.m;
+    for base in [arena::movement::var::X, 0xBA62] {
+        m.mem.w16(DS, base + 4, (0xB << 7) + 0x70);
+    }
+    let chest = m.mem.r8(DS, 0xC93B) as u16;
+    let walls = m.mem.r16(DS, 0xD806);
+    m.mem.w16(walls, 0x0D54, 0x8000 | chest);
+    m.mem.w16(DS, 0x0DC4, 0x7D0);
+    room(a);
+    seeded(a);
+}
+
 /// A step of gen_worldframes.py's with a click at the view's centre and
 /// `script` for its waits, `n` frames in all: the button down for the
 /// first frame, let go for the next; the frame that takes the click (the
@@ -944,6 +962,18 @@ fn informant(a: &mut App) {
 /// gen_worldframes.py's INFORMANT_SCRIPT: the informant's words paged, his
 /// price accepted, the rest paged to the tavern's menu, its Exit.
 const INFORMANT_SCRIPT: [Act; 8] = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, Act::Click(0xA0, 0xA3)];
+
+/// gen_worldframes.py's `informant_owed`: `informant`, his price agreed
+/// before (0FE6 bit 0): paid for (1194:D019) rather than haggled with.
+fn informant_owed(a: &mut App) {
+    informant(a);
+    a.engine.m.mem.w8(DS, 0x0FE6, 3);
+}
+
+/// gen_worldframes.py's INFORMANT_PAID_SCRIPT: his offer paged once, Yes
+/// on YESNO.IMG's first button (1194:4E88 kind 1, 6001), his words after
+/// paged, the tavern's menu's Exit.
+const INFORMANT_PAID_SCRIPT: [Act; 7] = [MORE, ACCEPT, MORE, MORE, MORE, MORE, Act::Click(0xA0, 0xA3)];
 
 /// gen_worldframes.py's GUILD_SCRIPT: a potion bought, the guild left.
 const GUILD_SCRIPT: [Act; 8] = [
@@ -1233,6 +1263,18 @@ fn case(name: &str) -> Option<Case> {
         })),
         "playloot" => (Place::Dungeon, Box::new(fought), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, false))),
         "playlootitems" => (Place::Dungeon, Box::new(fought), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| looted(a, d, seen, true))),
+        "playchest" => (Place::Dungeon, Box::new(chest_ahead), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            // The click that opens it (292B:0743), then the one that lists
+            // its piles (292B:07FB).
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 3, |_| false);
+            clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::RClick(0x60, 0x25)]);
+            frames(a, d, seen, 5, |_| false);
+        })),
         "playpile" => (Place::Dungeon, Box::new(pile_ahead), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             clicked_with(a, d, seen, 10, &[LOOT_LINE, LOOT_LINE, Act::RClick(0x60, 0x25)]);
@@ -1880,6 +1922,11 @@ fn case(name: &str) -> Option<Case> {
         "playinformant" => (Place::Tavern, Box::new(informant), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             serviced(a, d, seen, 4, &INFORMANT_SCRIPT);
+            frames(a, d, seen, 29, |_| false);
+        })),
+        "playinformantpaid" => (Place::Tavern, Box::new(informant_owed), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            serviced(a, d, seen, 4, &INFORMANT_PAID_SCRIPT);
             frames(a, d, seen, 29, |_| false);
         })),
         "playdeath" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2679,7 +2726,7 @@ fn the_state_as_the_original_leaves_it() {
 /// equipment page, a store's buying,
 /// selling and repairing, a potion bought in the mages' guild, the main
 /// quest's informant paid in a tavern, a townsperson asked the way).
-const BUSY: [&str; 63] = ["playloot", "playlootitems", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY: [&str; 65] = ["playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playlog", "playuselist", "playbook", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playscreens", "playstore", "playguild", "playinformant", "playinformantpaid", "playautomap", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
 /// does: each of the log's lines with an LF CR, then the form feed
@@ -2789,7 +2836,30 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-const BUSY_STATE: [&str; 68] = ["playloot", "playlootitems", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+const BUSY_STATE: [&str; 70] = ["playloot", "playlootitems", "playchest", "playpile", "playriddleright", "playriddlewrong", "playexitmapend", "playstatusend", "playlevelup", "playtempleheal", "playtemplecure", "playtemplebless", "playtaverndrink", "playtavernroom", "playoptionsend", "playoptionsload", "playmapend", "playjourneyend", "playbarjump", "playsheetend", "playlogend", "playautomapend", "playbookend", "playlogprint", "playtalkquest", "playtalkquestplace", "playtalkwhere", "playtalkpalace", "playlogbar", "playquickcast", "playcamp", "playuselist", "playbook", "playlog", "playvolcano", "playvolcanofar", "playbolt", "playfogfirst", "playghost", "playlock", "playcrowd", "playfight", "playcast", "playcreaturecast", "playwildnight", "playstairsfight", "playrest", "playpick", "playswim", "playlevitate", "playuse", "playstore", "playguild", "playinformant", "playinformantpaid", "playscreens", "playsheet", "playequip", "playequipscroll", "playequipwear", "playequipdrop", "playequipspells", "playequipdescribe", "playequipnoroom", "playequipstaff", "playequipclash", "playequipcantuse", "playequipspellpage", "playequipdropwhat", "playequipdropin"];
+
+/// The cases whose doors, locks or chests change the walls plane, which
+/// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
+/// WALLS_CASES).
+const WALLS_CASES: [&str; 6] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest"];
+
+/// Those cases leave the walls plane ([D806], the level's width by its
+/// depth in words, C357, C359) as the original's do: the riddle's door
+/// opened or not, the lock picked, the chest opened.
+#[test]
+fn the_walls_left_as_the_original() {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    for name in WALLS_CASES {
+        let Some((place, setup, play)) = case(name) else { return };
+        let Some((a, _)) = played(place, setup, play) else { return };
+        let m = &a.engine.m;
+        let (seg, w, d) = (m.mem.r16(DS, 0xD806), m.mem.r16(DS, 0xC357), m.mem.r16(DS, 0xC359));
+        let n = w as usize * d as usize * 2;
+        let got = format!("{:x} {:x}", n, fnv((0..n).map(|i| m.mem.r8(seg, i as u16))));
+        let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "walls" && f[1] == name).unwrap_or_else(|| panic!("{name}: no walls line"))[2].to_string();
+        assert_eq!(got, want, "{name}: the walls plane differs from the original's");
+    }
+}
 
 /// Each busy case's frames leave DGROUP as the original's do, from the
 /// case's start and from the load (`state_case`, `state_load_case`).

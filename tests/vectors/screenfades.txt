@@ -8,6 +8,7 @@ screenfade | equipmentquestinfo | 28 | c63880118b2d904d
 screenfade | equipmentspecial | 28 | c63880118b2d904d
 screenfade | equipmentpotion | 28 | c63880118b2d904d
 screenfade | equipmentquestequip | 28 | c63880118b2d904d
+screenfade | equipmentdropask | 28 | c63880118b2d904d
 screenfade | equipmentinfo | 28 | c63880118b2d904d
 screenfade | equipmentoff | 28 | c63880118b2d904d
 screenfade | equipmentspellpage | 30 | 60223a0222993c8b

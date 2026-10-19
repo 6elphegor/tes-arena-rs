@@ -118,28 +118,29 @@ the original routine:
 | `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
 | `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
 | `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
-| `FrameHooks::actor_click` | src/frame.rs:90 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
-| `FrameHooks::area_music` | src/frame.rs:100 | 2294:04F5 | port | the default runs the port | |
-| `FrameHooks::automap_mark` | src/frame.rs:95 | 0000:3491 | port | the default runs the port | |
-| `FrameHooks::effect_words` | src/frame.rs:62 | 0000:5011 | overridden | the view: main.rs Front<'_> | faithful: `effect_words`, drawn as 5011 draws them (hooktest) |
-| `FrameHooks::faces` | src/frame.rs:64 | 0000:4C86, 292B:0530 | overridden | the view: main.rs Front<'_> | faithful: `faces_draw` (faces vectors) |
-| `FrameHooks::guards_arrive` | src/frame.rs:84 |  | port | the default runs the port | |
+| `FrameHooks::actor_click` | src/frame.rs:100 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
+| `FrameHooks::area_music` | src/frame.rs:110 | 2294:04F5 | port | the default runs the port | |
+| `FrameHooks::automap_mark` | src/frame.rs:105 | 0000:3491 | port | the default runs the port | |
+| `FrameHooks::effect_words` | src/frame.rs:67 | 0000:5011 | overridden | the view: main.rs Front<'_> | faithful: `effect_words`, drawn as 5011 draws them (hooktest) |
+| `FrameHooks::faces` | src/frame.rs:69 | 0000:4C86, 292B:0530 | overridden | the view: main.rs Front<'_> | faithful: `faces_draw` (faces vectors) |
+| `FrameHooks::guards_arrive` | src/frame.rs:94 |  | port | the default runs the port | |
 | `FrameHooks::interface` | src/frame.rs:55 | 0000:4C83, 4DD6 | overridden | the view: main.rs Front<'_> | faithful: `interface_setup` (state tests) |
 | `FrameHooks::no_spells_picture` | src/frame.rs:60 | 292B:0341..0358 | port | the default runs the port (`no_spells_picture`); the frame vectors stub 7428 and 599C | fixed: NOSPELL.IMG was neither loaded to 1044 nor drawn (titleplay creation) |
-| `FrameHooks::key_d327` | src/frame.rs:126 | 1194:D327 | port | the default runs the port | |
-| `FrameHooks::level_text_draw` | src/frame.rs:76 | 0000:05B5 | overridden | the view: main.rs Front<'_> | present: the level's text drawn by the window, ADB8 left as 9E0A leaves it (riddle screens) |
-| `FrameHooks::menu_keys` | src/frame.rs:112 | 2542:0100 | overridden | the view: main.rs Front<'_> | faithful: `Machine::menu_keys` in the frame's body (0000:4952), its switches and camping (2542:01E6) done there; the screen a key asks for run inside the body (`Talk::screen`), the rest of the frame after it, but the travel map and the options screen after the frame (busy worldframes cases, the `...end` cases ending with that frame) |
-| `FrameHooks::message_box` | src/frame.rs:68 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
-| `FrameHooks::message_box_number` | src/frame.rs:70 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port then its box (entry boxes in screens.txt) |
-| `FrameHooks::outdoor_light` | src/frame.rs:141 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | faithful: `outdoor_light` with its loads made inside it (`LightNow`), in the frame body where the original runs it; was the view's after the frame, so a title load's first frame lost its relight (savefiles.txt `loadframe` lines) |
-| `FrameHooks::projectile_lights_end` | src/frame.rs:66 | 292B:000E | overridden | the view: main.rs Front<'_> | faithful: `projectile_lights_end` |
-| `FrameHooks::quest_carry` | src/frame.rs:117 | 0000:4D00 | port | the default runs the port | |
-| `FrameHooks::rest` | src/frame.rs:133 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
-| `FrameHooks::riddle` | src/frame.rs:80 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
-| `FrameHooks::sky_colours` | src/frame.rs:145 | 0000:4C7E, 2294:0428 | overridden | the view: main.rs Front<'_> | faithful: `sky_colours`, `sky_colours_load` in the frame body (was after the frame) |
-| `FrameHooks::town_welcome` | src/frame.rs:124 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
-| `FrameHooks::townsfolk_graphics` | src/frame.rs:108 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
-| `FrameHooks::weapon_graphics` | src/frame.rs:104 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
+| `FrameHooks::key_d327` | src/frame.rs:136 | 1194:D327 | port | the default runs the port | |
+| `FrameHooks::level_text_draw` | src/frame.rs:81 | 0000:05B5 | overridden | the view: main.rs Front<'_> | present: the level's text drawn by the window, ADB8 left as 9E0A leaves it (riddle screens) |
+| `FrameHooks::message_draw` | src/frame.rs:86 | 0000:0511 | overridden | the view: main.rs Front<'_> | present: the message line drawn on the frame's page before the click, which the boxes and lists a click opens keep (worldframes `playchest`: bank 1Fh) |
+| `FrameHooks::menu_keys` | src/frame.rs:122 | 2542:0100 | overridden | the view: main.rs Front<'_> | faithful: `Machine::menu_keys` in the frame's body (0000:4952), its switches and camping (2542:01E6) done there; the screen a key asks for run inside the body (`Talk::screen`), the rest of the frame after it, but the travel map and the options screen after the frame (busy worldframes cases, the `...end` cases ending with that frame) |
+| `FrameHooks::message_box` | src/frame.rs:73 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
+| `FrameHooks::message_box_number` | src/frame.rs:75 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port then its box (entry boxes in screens.txt) |
+| `FrameHooks::outdoor_light` | src/frame.rs:151 | 0000:4B84, 0390 | overridden | the view: main.rs Front<'_> | faithful: `outdoor_light` with its loads made inside it (`LightNow`), in the frame body where the original runs it; was the view's after the frame, so a title load's first frame lost its relight (savefiles.txt `loadframe` lines) |
+| `FrameHooks::projectile_lights_end` | src/frame.rs:71 | 292B:000E | overridden | the view: main.rs Front<'_> | faithful: `projectile_lights_end` |
+| `FrameHooks::quest_carry` | src/frame.rs:127 | 0000:4D00 | port | the default runs the port | |
+| `FrameHooks::rest` | src/frame.rs:143 | 1194:4635 | overridden | the view: main.rs Front<'_> | faithful: `rest_frame` (rest vectors, screens.txt) |
+| `FrameHooks::riddle` | src/frame.rs:90 | 292B:05A2 | overridden | the view: main.rs Front<'_> | faithful: the game's editor, `riddle_answered` (riddle vectors, screens.txt) |
+| `FrameHooks::sky_colours` | src/frame.rs:155 | 0000:4C7E, 2294:0428 | overridden | the view: main.rs Front<'_> | faithful: `sky_colours`, `sky_colours_load` in the frame body (was after the frame) |
+| `FrameHooks::town_welcome` | src/frame.rs:134 | 0000:4B02 | overridden | the view: main.rs Front<'_> | faithful: `Machine::town_welcome_box` (the load by its save path, 965E's state with the original's AX and BX); what it covers kept from the screen last shown (`Assets::shown`), as the page at the frame's start (tests/vectors/welcome.txt, worldtest's `the_welcome_keeps_the_screen_as_the_original`, the box's working words included) |
+| `FrameHooks::townsfolk_graphics` | src/frame.rs:118 | 0000:17F9 | overridden | the view: main.rs Front<'_> | faithful: `townsfolk_load` |
+| `FrameHooks::weapon_graphics` | src/frame.rs:114 | 0000:3C4C | overridden | the view: main.rs Front<'_> | faithful: `weapon_graphics_load` (state tests) |
 | `FxHooks::spell_reflected` | src/effects.rs:172 | 0000:27E5 | overridden | the engine: GameHooks | faithful: the engine's |
 | `GuildHooks::click` | src/guild.rs:108 |  | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::haggle` | src/guild.rs:100 | 1194:8020 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |

@@ -13,7 +13,7 @@
 //!   audience as `Audience` plays it.
 
 use crate::dialog::Talk;
-use crate::hud::{self, Menu, Span};
+use crate::hud::{self, Span};
 use crate::{Audience, Front};
 use arena::bsa::Files;
 use arena::haggle::{Haggle, HaggleIo};
@@ -238,23 +238,40 @@ impl QuestHooks for QuestFront<'_, '_> {
         self.0.menu(m, si, bx, di)
     }
     /// 1194:4E88: the text's window, its lines at 929E (LINES of them,
-    /// each ending at a NUL); kind 1 a yes or no (AX 0 yes).
+    /// each ending at a NUL) in the strip, three to a page with
+    /// "...More" between; kind 0 then waits for a click (4F3F), kind 1
+    /// takes the picture's buttons the caller showed (6001: YESNO.IMG's,
+    /// AX 0 yes, 1 no, 2 the third), as the shops' dialogs do.
     fn dialog(&mut self, m: &mut Machine, kind: u8) -> u16 {
         let n = m.mem.r16(DS, 0x0FF5).clamp(1, 32);
         let mut at = 0x929Eu16;
-        let mut lines = Vec::new();
+        let mut raw = Vec::new();
         for _ in 0..n {
-            let s = m.mem.cstr(DS, at);
+            let s = m.mem.cstr(DS, at).to_vec();
             at = at.wrapping_add(s.len() as u16 + 1);
-            lines.extend(hud::lines(s, 0x0F));
+            raw.push(s);
         }
         let Some(t) = self.0.talk.as_deref_mut() else { return 1 };
-        if kind != 1 {
-            t.lines_box(lines);
-            return 0;
+        let ax = if kind != 1 {
+            t.dialog_lines(&raw);
+            0
+        } else {
+            let last: Vec<&[u8]> = t.dialog_pages(&raw).iter().map(|l| l.as_slice()).collect();
+            match t.ask_menu(hud::dialog_buttons(&last, &["Yes", "No"])) {
+                0 => 0,
+                1 => 1,
+                _ => 2,
+            }
+        };
+        // The game's state round the answer, as the shops' (each page's
+        // strip kept in bank 18h, `Machine::shop_dialog`), the strip put
+        // back after it (4F34, 4F55: 5FC0); only where the page is the
+        // game's own block.
+        if m.page_is_block() {
+            m.shop_dialog(0x929E);
+            m.shop_strip_back();
         }
-        let menu = Menu { title: lines, entries: vec![line("Yes"), line("No")], keys: b"YN".to_vec(), selected: 0, list: false, kind: hud::WINDOW_YES_NO, font: None, top: None };
-        if t.ask_menu(menu) == 0 { 0 } else { 1 }
+        ax
     }
     fn informant_haggle(&mut self, m: &mut Machine, files: &mut Files, price: u32, per: u16, mode: u8, di: u16) -> Option<bool> {
         let mut io = HaggleTalk::new(self.0.talk.as_deref_mut()).with_files(self.1.clone(), m.page_is_block());

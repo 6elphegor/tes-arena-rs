@@ -155,7 +155,7 @@ impl Machine {
     }
 
     /// 0000:6EEA with DS = `seg`: [lo, hi), None on a zero span.
-    fn cr_range_in(&mut self, seg: u16, lo: u16, hi: u16) -> Option<u16> {
+    pub(crate) fn cr_range_in(&mut self, seg: u16, lo: u16, hi: u16) -> Option<u16> {
         let r = self.cr_next_in(seg);
         let span = hi.wrapping_sub(lo);
         if span == 0 {
