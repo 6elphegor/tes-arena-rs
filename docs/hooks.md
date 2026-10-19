@@ -102,22 +102,22 @@ the original routine:
 | `EndHooks::shown` | src/staffend.rs:49 | 1194:DAC4 | present | the screen shown and a key waited for | |
 | `EndHooks::speech` | src/staffend.rs:31 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies with their texts, brought in as D459 brings them (`Movie::lead_in`, checked on the dreams) |
 | `EndHooks::text` | src/staffend.rs:41 | 1194:A36C | port | the default runs the port | |
-| `EngineHooks::creature_flats` | src/engine.rs:70 | 0000:CF96, 25CA:0271 | overridden | the view: main.rs Front<'_> | fixed: the view ran the hook for every flat the walk reached after the frame, so a square brought to life earlier in the walk brought its creature again, and the controls' bars (2826:0008) came before it; now at the drawing, a square whose word is gone skipped (playswim) |
-| `EngineHooks::draw` | src/engine.rs:49 | 0000:C980 | overridden | the view: main.rs Front<'_> | fixed: was the view's stand-in (every projectile and changed square in reach stepped, the click hit-tested on the GPU, a door's span the whole width): with the page the engine now takes the drawing's own walk (`render::Walked`: C23A's steps, D3F9's, the square and door under the cursor, the hit test 0000:C4BB with the hook CD3A); the stand-in is left for --gpu-world. playghostclick's state matches |
-| `EngineHooks::draw_setup` | src/engine.rs:65 | 0000:D4B4 | elsewhere | the drawing's set-up is the renderer's (`render::draw`); fog's step runs on the machine (`fog_step`) | |
+| `EngineHooks::creature_flats` | src/engine.rs:72 | 0000:CF96, 25CA:0271 | overridden | the view: main.rs Front<'_> | fixed: the view ran the hook for every flat the walk reached after the frame, so a square brought to life earlier in the walk brought its creature again, and the controls' bars (2826:0008) came before it; now at the drawing, a square whose word is gone skipped (playswim) |
+| `EngineHooks::draw` | src/engine.rs:50 | 0000:C980 | overridden | the view: main.rs Front<'_> | fixed: was the view's stand-in (every projectile and changed square in reach stepped, the click hit-tested on the GPU, a door's span the whole width): with the page the engine now takes the drawing's own walk (`render::Walked`: C23A's steps, D3F9's, the square and door under the cursor, the hit test 0000:C4BB with the hook CD3A); the stand-in is left for --gpu-world. playghostclick's state matches |
+| `EngineHooks::draw_setup` | src/engine.rs:66 | 0000:D4B4 | elsewhere | the drawing's set-up is the renderer's (`render::draw`); fog's step runs on the machine (`fog_step`) | |
 | `EngineHooks::drawn` | src/engine.rs:88 |  | overridden | the view: main.rs Front<'_> | fixed: a box opened after the frame's drawing (a click's, from the physics) saved what it covers (0000:8F2A) from the screen at the frame's start; now from the page as this frame drew it, the 3D rows over the interface (transitpalace's bank 11h) |
-| `EngineHooks::present` | src/engine.rs:74 | 0000:A7B4 | present | the frame put on the screen | |
-| `EngineHooks::rain` | src/engine.rs:72 |  | elsewhere | as snow (`rain_drops`) | |
-| `EngineHooks::sky` | src/engine.rs:68 |  | overridden | the view: main.rs Front<'_> | faithful: `fog_step` on the game's memory (playfog, playfogfirst exact; state tests) |
-| `EngineHooks::snow` | src/engine.rs:71 | 0000:E26B, E1A2 | elsewhere | the drops move in the engine before the hook (`snow_drops`); the hook only tells the front end | |
-| `EngineHooks::sound` | src/engine.rs:54 |  | port | the default runs the port | |
-| `EngineHooks::step` | src/engine.rs:59 |  | stub | a test's stand-in; false lets the engine run the step | |
+| `EngineHooks::present` | src/engine.rs:83 | 0000:A7B4 | present | the frame put on the screen | |
+| `EngineHooks::rain` | src/engine.rs:81 |  | elsewhere | as snow (`rain_drops`) | |
+| `EngineHooks::sky` | src/engine.rs:77 |  | overridden | the view: main.rs Front<'_> | faithful: `fog_step` on the game's memory (playfog, playfogfirst exact; state tests) |
+| `EngineHooks::snow` | src/engine.rs:80 | 0000:E26B, E1A2 | elsewhere | the drops move in the engine before the hook (`snow_drops`); the hook only tells the front end | |
+| `EngineHooks::sound` | src/engine.rs:55 |  | port | the default runs the port | |
+| `EngineHooks::step` | src/engine.rs:60 |  | stub | a test's stand-in; false lets the engine run the step | |
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |
 | `FightHooks::fight_graphics` | src/encounter.rs:48 | 0000:1AF9 | port | the default runs the port | |
 | `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's (kept with a replay: soundplay vectors) | |
-| `FightHooks::jagar` | src/encounter.rs:55 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
-| `FightHooks::view_restored` | src/encounter.rs:58 |  | present | and put back | |
-| `FightHooks::view_saved` | src/encounter.rs:57 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
+| `FightHooks::jagar` | src/encounter.rs:58 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
+| `FightHooks::view_restored` | src/encounter.rs:61 |  | present | and put back | |
+| `FightHooks::view_saved` | src/encounter.rs:60 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
 | `FrameHooks::actor_click` | src/frame.rs:109 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
 | `FrameHooks::area_music` | src/frame.rs:119 | 2294:04F5 | port | the default runs the port | |
 | `FrameHooks::automap_mark` | src/frame.rs:114 | 0000:3491 | port | the default runs the port | |
@@ -178,141 +178,141 @@ the original routine:
 | `LightHooks::sky` | src/light.rs:53 | 2294:0341 | overridden | the view: main.rs LightState | faithful: the dither loaded after the frame (playnight, state tests) |
 | `LightHooks::sky_objects` | src/light.rs:48 | 2294:08B9 | overridden | the view: main.rs LightState | faithful: `sky_objects` (playsky exact) |
 | `LightHooks::weather_palette` | src/light.rs:66 | 0000:7534 and 9B56 | elsewhere | PAL.COL's palette: the view sets its palette from its assets | |
-| `LoadHooks::automap_area` | src/load.rs:123 | 0000:3503 | port | the default runs the port | |
+| `LoadHooks::automap_area` | src/load.rs:133 | 0000:3503 | port | the default runs the port | |
 | `LoadHooks::automap_keep` | src/load.rs:83 | 23F1:0178 | port | the default runs the port | |
-| `LoadHooks::citydata` | src/load.rs:95 | 242A:000E | port | the default runs the port | |
-| `LoadHooks::copy_file` | src/load.rs:113 | 25FD:056F | port | the default runs the port | |
+| `LoadHooks::citydata` | src/load.rs:99 | 242A:000E | port | the default runs the port | |
+| `LoadHooks::copy_file` | src/load.rs:123 | 25FD:056F | port | the default runs the port | |
 | `LoadHooks::exists` | src/load.rs:75 | 0000:600C | port | the default runs the port | |
-| `LoadHooks::interior_song` | src/load.rs:128 | 25FD:051F | port | the default runs the port | |
-| `LoadHooks::level_automap` | src/load.rs:118 | 292B:09AC | port | the default runs the port | |
-| `LoadHooks::loading` | src/load.rs:87 | 25FD:0803 | present | "Loading..." shown | |
+| `LoadHooks::interior_song` | src/load.rs:138 | 25FD:051F | port | the default runs the port | |
+| `LoadHooks::level_automap` | src/load.rs:128 | 292B:09AC | port | the default runs the port | |
+| `LoadHooks::loading` | src/load.rs:88 | 25FD:0803 | present | "Loading..." shown | |
 | `LoadHooks::message` | src/load.rs:80 | 1194:59C8 | elsewhere | the view's save menu shows the empty slot's words (`SaveUi::empty_slot`) | |
-| `LoadHooks::mode_3d` | src/load.rs:134 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
-| `LoadHooks::renderer` | src/load.rs:110 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
-| `LoadHooks::screen` | src/load.rs:103 | 0000:A5D1 | present | the view's screen set up | |
-| `LoadHooks::sky_graphics` | src/load.rs:108 | 0000:E5C9 | overridden | the view: areas.rs Areas<'_> | faithful: `sky_images` where the load runs it (25FD:0417, AA5C); was the assets' own after the load (savefiles.txt `loadplace`) |
-| `LoadHooks::slot_files` | src/load.rs:90 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
+| `LoadHooks::mode_3d` | src/load.rs:146 | 2294:0006 | stub | false: the port's `mode_3d` runs (the vectors stub it) | |
+| `LoadHooks::renderer` | src/load.rs:118 | 0000:AAA2 | overridden | the view: areas.rs Areas<'_>; the default runs `light_table_make` | faithful: the light table made (titleload vectors) |
+| `LoadHooks::screen` | src/load.rs:107 | 0000:A5D1 | present | the view's screen set up | |
+| `LoadHooks::sky_graphics` | src/load.rs:115 | 0000:E5C9 | overridden | the view: areas.rs Areas<'_> | faithful: `sky_images` where the load runs it (25FD:0417, AA5C); was the assets' own after the load (savefiles.txt `loadplace`) |
+| `LoadHooks::slot_files` | src/load.rs:94 | 25FD:06A1 | overridden | the view: areas.rs Areas<'_> | faithful: `slot_files_in` (titleload vectors) |
 | `LoadHooks::sound_off` | src/load.rs:70 | 23BA:000C | port | the default runs the port (`sound_stop`: the driver asked, 7Ch, and stopped while it plays, 7Eh; no game state, its calls kept with a replay: soundplay vectors' `driver | load`) | |
-| `LoadHooks::view_update` | src/load.rs:105 | 0000:DA8E | present | the view updated | |
-| `LootHooks::last_piece` | src/loot_window.rs:75 | 1194:D986 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
-| `LootHooks::list` | src/loot_window.rs:58 | 1194:5734 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
+| `LoadHooks::view_update` | src/load.rs:110 | 0000:DA8E | present | the view updated | |
+| `LootHooks::last_piece` | src/loot_window.rs:76 | 1194:D986 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
+| `LootHooks::list` | src/loot_window.rs:59 | 1194:5734 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
 | `LootHooks::message_box` | src/loot_window.rs:55 | 1194:59CC | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
-| `LootHooks::piece_told` | src/loot_window.rs:70 | 1194:D363 | port | the default runs the port | |
-| `LootHooks::piles` | src/loot_window.rs:79 | 2433:0000 | port | the default runs the port | |
-| `LootHooks::sound` | src/loot_window.rs:65 | 23BA:012B | port | the default runs the port | |
-| `LootHooks::text` | src/loot_window.rs:63 | 1194:A374 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
-| `MapHooks::list` | src/mapscreen.rs:34 | 1194:5730 | overridden | the view: travel.rs Hooks<'_> | present: the game's list (screens.txt) |
+| `LootHooks::piece_told` | src/loot_window.rs:71 | 1194:D363 | port | the default runs the port | |
+| `LootHooks::piles` | src/loot_window.rs:80 | 2433:0000 | port | the default runs the port | |
+| `LootHooks::sound` | src/loot_window.rs:66 | 23BA:012B | port | the default runs the port | |
+| `LootHooks::text` | src/loot_window.rs:64 | 1194:A374 | overridden | the view: main.rs LootFront<'_, '_> | present: the loot window's boxes and lists (screens.txt) |
+| `MapHooks::list` | src/mapscreen.rs:35 | 1194:5730 | overridden | the view: travel.rs Hooks<'_> | present: the game's list (screens.txt) |
 | `MapHooks::quest_dungeon` | src/mapscreen.rs:28 | 292B:0362 | overridden | the view: travel.rs Hooks<'_> | faithful: the picture shown after the screen (dungeonpic vectors, screens) |
 | `MapHooks::type_name` | src/mapscreen.rs:31 | 1194:5C30 | overridden | the view: travel.rs Hooks<'_> | present: the game's editor (screens.txt); the prompt's box state round it (`named_shown`, `named_closed`; msgbox vectors) |
-| `MenuHooks::automap_keep` | src/savemenu.rs:111 | 23F1:0145 | port | the default runs the port | |
-| `MenuHooks::centred` | src/savemenu.rs:88 |  | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::click` | src/savemenu.rs:92 | 1194:564D | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::delete_matching` | src/savemenu.rs:102 | 1194:4D91 | port | the default runs the port | |
-| `MenuHooks::fill` | src/savemenu.rs:87 | 0000:9A6E | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::font` | src/savemenu.rs:71 | 0000:9AE6 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::load_screen` | src/savemenu.rs:115 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `MenuHooks::map_bank` | src/savemenu.rs:73 | 0000:5C86 | port | the default runs the port | |
-| `MenuHooks::message` | src/savemenu.rs:99 | 1194:59C8 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::automap_keep` | src/savemenu.rs:114 | 23F1:0145 | port | the default runs the port | |
+| `MenuHooks::centred` | src/savemenu.rs:91 |  | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::click` | src/savemenu.rs:95 | 1194:564D | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::delete_matching` | src/savemenu.rs:105 | 1194:4D91 | port | the default runs the port | |
+| `MenuHooks::fill` | src/savemenu.rs:90 | 0000:9A6E | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::font` | src/savemenu.rs:72 | 0000:9AE6 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::load_screen` | src/savemenu.rs:118 | 2294:11F2 | present | 2294:11F2, the heap check | |
+| `MenuHooks::map_bank` | src/savemenu.rs:76 | 0000:5C86 | port | the default runs the port | |
+| `MenuHooks::message` | src/savemenu.rs:102 | 1194:59C8 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
 | `MenuHooks::mouse_wait` | src/savemenu.rs:66 | 0000:8FC4 | original | AFF9 cleared, as the wait leaves it | |
-| `MenuHooks::names` | src/savemenu.rs:82 | 0000:7428 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::picture` | src/savemenu.rs:78 | 0000:7428 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `MenuHooks::show` | src/savemenu.rs:90 | 0000:9466 and 541E | present | the screen shown | |
-| `MenuHooks::states_keep` | src/savemenu.rs:107 | 292B:095E | port | the default runs the port | |
-| `MenuHooks::type_name` | src/savemenu.rs:97 | 0000:9EE5 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::names` | src/savemenu.rs:85 | 0000:7428 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::picture` | src/savemenu.rs:81 | 0000:7428 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `MenuHooks::show` | src/savemenu.rs:93 | 0000:9466 and 541E | present | the screen shown | |
+| `MenuHooks::states_keep` | src/savemenu.rs:110 | 292B:095E | port | the default runs the port | |
+| `MenuHooks::type_name` | src/savemenu.rs:100 | 0000:9EE5 | overridden | the view: saveui.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
 | `MenuKeyHooks::cyber_button` | src/menukeys.rs:96 | 2F26:04E2 | original | no CyberMan: never down | |
 | `MenuKeyHooks::cyber_buttons` | src/menukeys.rs:100 | 2F26:03ED | original | no CyberMan: none | |
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
-| `NewGameHooks::creation_done` | src/newgame.rs:107 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
-| `NewGameHooks::faded` | src/newgame.rs:129 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
-| `NewGameHooks::game_screen` | src/newgame.rs:111 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `NewGameHooks::hands` | src/newgame.rs:116 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
-| `NewGameHooks::level_flats` | src/newgame.rs:121 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
+| `NewGameHooks::creation_done` | src/newgame.rs:150 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
+| `NewGameHooks::faded` | src/newgame.rs:139 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
+| `NewGameHooks::game_screen` | src/newgame.rs:154 | 2294:11F2 | present | 2294:11F2, the heap check | |
+| `NewGameHooks::hands` | src/newgame.rs:159 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
+| `NewGameHooks::level_flats` | src/newgame.rs:164 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
 | `NewGameHooks::message_box` | src/newgame.rs:99 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
-| `NewGameHooks::palette` | src/newgame.rs:104 | 1194:1695 | present | the attribute screen's palette | |
-| `NewGameHooks::parchment_drop` | src/newgame.rs:123 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
-| `NewGameHooks::resources` | src/newgame.rs:114 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::palette` | src/newgame.rs:129 | 1194:1695 | present | the attribute screen's palette | |
+| `NewGameHooks::parchment_drop` | src/newgame.rs:133 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
+| `NewGameHooks::resources` | src/newgame.rs:157 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
 | `NewGameHooks::roll_picture` | src/newgame.rs:113 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
 | `NewGameHooks::roll_screen` | src/newgame.rs:122 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
-| `NewGameHooks::sheet_keep` | src/newgame.rs:134 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
-| `NewGameHooks::spells` | src/newgame.rs:118 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
+| `NewGameHooks::sheet_keep` | src/newgame.rs:144 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
+| `NewGameHooks::spells` | src/newgame.rs:161 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
 | `NewGameHooks::stats_screen` | src/newgame.rs:107 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
 | `NoteHooks::restore` | src/mapnotes.rs:60 | 0000:3698 | present | the screen region put back | |
 | `NoteHooks::type_text` | src/mapnotes.rs:66 | 0000:9EE9 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors) |
-| `OptionsHooks::automap_write` | src/options.rs:67 | 23F1:0145 | port | the default runs the port | |
-| `OptionsHooks::centred` | src/options.rs:81 |  | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::click` | src/options.rs:89 | 1194:564D | overridden | the view: inputtest.rs Clicks, options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::confirm` | src/options.rs:103 | 1194:48DF | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::cyber` | src/options.rs:93 | 2F26:04E2 | original | no CyberMan | |
-| `OptionsHooks::delete_matching` | src/options.rs:108 | 1194:4D91 | port | the default runs the port | |
-| `OptionsHooks::fill` | src/options.rs:80 | 0000:9A6E | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::font` | src/options.rs:65 | 0000:9AE6 | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::hide` | src/options.rs:83 | 0000:541E | present | the mouse hidden | |
-| `OptionsHooks::load_menu` | src/options.rs:99 | 25FD:0242 and 0002 | elsewhere | the view runs its load menu itself (`SaveUi`) | |
-| `OptionsHooks::map_bank` | src/options.rs:71 | 0000:5C86 | port | the default runs the port | |
-| `OptionsHooks::music_volume` | src/options.rs:114 | 0FFD:0DE8 | elsewhere | the view sets its music's volume itself | |
-| `OptionsHooks::picture` | src/options.rs:76 | 0000:7428 | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
-| `OptionsHooks::save_menu` | src/options.rs:100 |  | elsewhere | and its save menu | |
-| `OptionsHooks::show` | src/options.rs:85 |  | present | the screen shown | |
-| `OptionsHooks::unhide` | src/options.rs:84 |  | present | and shown | |
-| `PhysicsHooks::input` | src/movement.rs:799 |  | overridden | the engine: Classic<'_>, Physics<'_, '_> | faithful: the engine's controls |
-| `PhysicsHooks::transition` | src/movement.rs:804 |  | overridden | the engine: Physics<'_, '_> | faithful: the engine's |
-| `QuestHooks::audience` | src/quest.rs:175 |  | overridden | the view: main.rs Audience<'_, '_>, questui.rs QuestFront<'_, '_> | present: the audience's movies (not screen-checked) |
-| `QuestHooks::bios_ticks` | src/quest.rs:126 | 0000:9D60 | original | the machine's BIOS ticks | |
-| `QuestHooks::city_info` | src/quest.rs:111 | 1194:3EC3 | port | the default runs the port | |
-| `QuestHooks::dialog` | src/quest.rs:166 | 1194:4E88 | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
-| `QuestHooks::entry_save` | src/quest.rs:89 | 26F7:0C0A | port | the default runs the port | |
-| `QuestHooks::expand` | src/quest.rs:84 | 2DA2:000A | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
-| `QuestHooks::finale` | src/quest.rs:100 | 1194:1034 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: `level_up_screen` with the cursor's column (by reading the code) |
-| `QuestHooks::font` | src/quest.rs:67 | 0000:9AE6 | present | fonts selected | |
-| `QuestHooks::frame_load` | src/quest.rs:158 | 0000:7428 | port | the default runs the port | |
-| `QuestHooks::informant_haggle` | src/quest.rs:152 | 1194:8020 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: `haggle` with the player's answers (haggle vectors) |
-| `QuestHooks::inventory_full` | src/quest.rs:104 | 1194:42EA | original | 1194:42EA: fonts selected and 9288 60h; the text is 19DE's own | |
-| `QuestHooks::log_entry` | src/quest.rs:94 | 27E3:000A | port | the default runs the port | |
-| `QuestHooks::menu` | src/quest.rs:142 | 1194:020E | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
-| `QuestHooks::message_box` | src/quest.rs:69 | 1194:59CC | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
-| `QuestHooks::music` | src/quest.rs:121 | 2294:04C0 | port | the default runs the port | |
-| `QuestHooks::notice` | src/quest.rs:170 | 1194:4D31 | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
-| `QuestHooks::npc_name` | src/quest.rs:180 | 1194:080B | port | the default runs the port | |
-| `QuestHooks::picture` | src/quest.rs:163 | 1194:4B8E | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
-| `QuestHooks::province_load` | src/quest.rs:72 | 1194:2E18 | port | the default runs the port | |
-| `QuestHooks::province_save` | src/quest.rs:77 | 26F7:0CF1 | port | the default runs the port | |
-| `QuestHooks::substitute` | src/quest.rs:137 | 2DA2:000A | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
+| `OptionsHooks::automap_write` | src/options.rs:70 | 23F1:0145 | port | the default runs the port | |
+| `OptionsHooks::centred` | src/options.rs:86 |  | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::click` | src/options.rs:94 | 1194:564D | overridden | the view: inputtest.rs Clicks, options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::confirm` | src/options.rs:108 | 1194:48DF | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::cyber` | src/options.rs:98 | 2F26:04E2 | original | no CyberMan | |
+| `OptionsHooks::delete_matching` | src/options.rs:113 | 1194:4D91 | port | the default runs the port | |
+| `OptionsHooks::fill` | src/options.rs:85 | 0000:9A6E | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::font` | src/options.rs:66 | 0000:9AE6 | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::hide` | src/options.rs:88 | 0000:541E | present | the mouse hidden | |
+| `OptionsHooks::load_menu` | src/options.rs:104 | 25FD:0242 and 0002 | elsewhere | the view runs its load menu itself (`SaveUi`) | |
+| `OptionsHooks::map_bank` | src/options.rs:74 | 0000:5C86 | port | the default runs the port | |
+| `OptionsHooks::music_volume` | src/options.rs:119 | 0FFD:0DE8 | elsewhere | the view sets its music's volume itself | |
+| `OptionsHooks::picture` | src/options.rs:79 | 0000:7428 | overridden | the view: options.rs Script<'_> | present: the options and save screens answered by the player (screens.txt) |
+| `OptionsHooks::save_menu` | src/options.rs:105 |  | elsewhere | and its save menu | |
+| `OptionsHooks::show` | src/options.rs:90 |  | present | the screen shown | |
+| `OptionsHooks::unhide` | src/options.rs:89 |  | present | and shown | |
+| `PhysicsHooks::input` | src/movement.rs:816 |  | overridden | the engine: Classic<'_>, Physics<'_, '_> | faithful: the engine's controls |
+| `PhysicsHooks::transition` | src/movement.rs:821 |  | overridden | the engine: Physics<'_, '_> | faithful: the engine's |
+| `QuestHooks::audience` | src/quest.rs:180 |  | overridden | the view: main.rs Audience<'_, '_>, questui.rs QuestFront<'_, '_> | present: the audience's movies (not screen-checked) |
+| `QuestHooks::bios_ticks` | src/quest.rs:130 | 0000:9D60 | original | the machine's BIOS ticks | |
+| `QuestHooks::city_info` | src/quest.rs:115 | 1194:3EC3 | port | the default runs the port | |
+| `QuestHooks::dialog` | src/quest.rs:171 | 1194:4E88 | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
+| `QuestHooks::entry_save` | src/quest.rs:93 | 26F7:0C0A | port | the default runs the port | |
+| `QuestHooks::expand` | src/quest.rs:88 | 2DA2:000A | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
+| `QuestHooks::finale` | src/quest.rs:104 | 1194:1034 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: `level_up_screen` with the cursor's column (by reading the code) |
+| `QuestHooks::font` | src/quest.rs:69 | 0000:9AE6 | present | fonts selected | |
+| `QuestHooks::frame_load` | src/quest.rs:163 | 0000:7428 | port | the default runs the port | |
+| `QuestHooks::informant_haggle` | src/quest.rs:157 | 1194:8020 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: `haggle` with the player's answers (haggle vectors) |
+| `QuestHooks::inventory_full` | src/quest.rs:108 | 1194:42EA | original | 1194:42EA: fonts selected and 9288 60h; the text is 19DE's own | |
+| `QuestHooks::log_entry` | src/quest.rs:98 | 27E3:000A | port | the default runs the port | |
+| `QuestHooks::menu` | src/quest.rs:146 | 1194:020E | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
+| `QuestHooks::message_box` | src/quest.rs:73 | 1194:59CC | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
+| `QuestHooks::music` | src/quest.rs:125 | 2294:04C0 | port | the default runs the port | |
+| `QuestHooks::notice` | src/quest.rs:175 | 1194:4D31 | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
+| `QuestHooks::npc_name` | src/quest.rs:185 | 1194:080B | port | the default runs the port | |
+| `QuestHooks::picture` | src/quest.rs:168 | 1194:4B8E | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |
+| `QuestHooks::province_load` | src/quest.rs:76 | 1194:2E18 | port | the default runs the port | |
+| `QuestHooks::province_save` | src/quest.rs:81 | 26F7:0CF1 | port | the default runs the port | |
+| `QuestHooks::substitute` | src/quest.rs:141 | 2DA2:000A | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
 | `QuestHooks::text` | src/quest.rs:65 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
-| `QuestHooks::text_at` | src/quest.rs:132 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
-| `QuestHooks::text_shown` | src/quest.rs:81 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port and its box |
-| `QuestHooks::travel` | src/quest.rs:116 | 1194:2E69 | port | the default runs the port | |
-| `RestHooks::advance` | src/rest.rs:129 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `RestHooks::dream` | src/rest.rs:108 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
-| `RestHooks::hours_text` | src/rest.rs:106 | 1194:4659 / 452F | overridden | the view: main.rs Front<'_> | present: drawn as 1194:4659 draws it (screens.txt) |
+| `QuestHooks::text_at` | src/quest.rs:136 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port |
+| `QuestHooks::text_shown` | src/quest.rs:85 | 1194:A374 | overridden | the view: questui.rs QuestFront<'_, '_> | faithful: the text port and its box |
+| `QuestHooks::travel` | src/quest.rs:120 | 1194:2E69 | port | the default runs the port | |
+| `RestHooks::advance` | src/rest.rs:130 | 0000:142D | stub | false: the game's clock runs the minutes | |
+| `RestHooks::dream` | src/rest.rs:109 | 1194:D45D | overridden | the view: main.rs Front<'_> | fixed: was CHAOSVSN.FLC in 33h for every dream; 1194:D3AF shows only the first (5DCh) so, the others on VISION.FLC in 2Fh, as the view now does, each brought in as D459 brings it (`Movie::lead_in`: faded to black in 8, cleared); tests/vectors/dream.txt (gen_dream.py) state by state, screentest's `the_dreams_as_the_original_shows_them` |
+| `RestHooks::hours_text` | src/rest.rs:107 | 1194:4659 / 452F | overridden | the view: main.rs Front<'_> | present: drawn as 1194:4659 draws it (screens.txt) |
 | `RestHooks::menu` | src/rest.rs:97 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
-| `RestHooks::message` | src/rest.rs:104 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
-| `RestHooks::room_file` | src/rest.rs:120 | 1194:BA91 | port | the default runs the port | |
-| `RestHooks::room_load` | src/rest.rs:115 | 1194:C04C | port | the default runs the port | |
-| `RestHooks::screen` | src/rest.rs:125 |  | present | the screen redrawn after the rest | |
-| `RestHooks::sky` | src/rest.rs:110 | 2294:0341 | port | the default runs the port | |
-| `RestHooks::type_hours` | src/rest.rs:102 | 1194:4800 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors); the prompt's box state round it (`prompt_shown`, `prompt_closed`; msgbox vectors) |
+| `RestHooks::message` | src/rest.rs:105 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box (screens.txt) |
+| `RestHooks::room_file` | src/rest.rs:121 | 1194:BA91 | port | the default runs the port | |
+| `RestHooks::room_load` | src/rest.rs:116 | 1194:C04C | port | the default runs the port | |
+| `RestHooks::screen` | src/rest.rs:126 |  | present | the screen redrawn after the rest | |
+| `RestHooks::sky` | src/rest.rs:111 | 2294:0341 | port | the default runs the port | |
+| `RestHooks::type_hours` | src/rest.rs:103 | 1194:4800 | overridden | the view: main.rs Front<'_> | present: the game's editor (lineedit vectors); the prompt's box state round it (`prompt_shown`, `prompt_closed`; msgbox vectors) |
 | `SaveHooks::delete` | src/save_write.rs:53 | 0000:9DC6 | overridden | the view: main.rs SaveDir<'_> | faithful: the file deleted |
 | `SaveHooks::palette` | src/save_write.rs:59 | 0000:6E3C | overridden | the view: main.rs SaveDir<'_> | present: the window's palette for the save's |
 | `SaveHooks::write` | src/save_write.rs:56 |  | overridden | the view: main.rs SaveDir<'_> | faithful: the save's files written (save vectors); SAVEGAME's screen bytes black, the window's picture not being the game's |
 | `ShopHooks::banner` | src/shops.rs:46 | 1194:4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::buffer_freed` | src/shops.rs:105 | 1194:5E49 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
-| `ShopHooks::buffer_made` | src/shops.rs:107 | 1194:5E54 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
-| `ShopHooks::dialog` | src/shops.rs:64 | 1194:4E88 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::dialog_at` | src/shops.rs:69 |  | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::expand` | src/shops.rs:79 | 2DA2:000A | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::gold_left` | src/shops.rs:52 | 1194:545C | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::list` | src/shops.rs:74 | 1194:5734 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::menu` | src/shops.rs:59 | 1194:020E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::buffer_freed` | src/shops.rs:109 | 1194:5E49 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::buffer_made` | src/shops.rs:111 | 1194:5E54 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::dialog` | src/shops.rs:68 | 1194:4E88 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::dialog_at` | src/shops.rs:73 |  | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::expand` | src/shops.rs:83 | 2DA2:000A | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::gold_left` | src/shops.rs:56 | 1194:545C | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::list` | src/shops.rs:78 | 1194:5734 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::menu` | src/shops.rs:63 | 1194:020E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `ShopHooks::message` | src/shops.rs:38 | 1194:4D31 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::picture` | src/shops.rs:47 | 1194:4B8E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::quest_check` | src/shops.rs:88 | 1194:D961 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::quests` | src/shops.rs:93 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `ShopHooks::screen_back` | src/shops.rs:102 | 1194:54B3 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
-| `ShopHooks::screen_saved` | src/shops.rs:98 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | fixed: it wrote the window's own screen into the page first, its condition picture drawn from the afflictions as they are; the page is now the game's as the frame left it (worldframes playtemplecure's SCREENSV.$$2), for a game whose page is its own block |
+| `ShopHooks::picture` | src/shops.rs:51 | 1194:4B8E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::quest_check` | src/shops.rs:92 | 1194:D961 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::quests` | src/shops.rs:97 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::screen_back` | src/shops.rs:106 | 1194:54B3 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' screens' state as the original's (worldframes.txt's playstore and playguild state lines), for a game whose page is its own block |
+| `ShopHooks::screen_saved` | src/shops.rs:102 | 1194:5496 | overridden | the view: shopui.rs ShopFront<'_, '_> | fixed: it wrote the window's own screen into the page first, its condition picture drawn from the afflictions as they are; the page is now the game's as the frame left it (worldframes playtemplecure's SCREENSV.$$2), for a game whose page is its own block |
 | `ShopHooks::shop_screen` | src/shops.rs:42 | 1194:4B60 | overridden | the view: shopui.rs ShopFront<'_, '_> | faithful: `shop_screen`, before the temple's name is made (playtempleheal's EMS) |
-| `ShopHooks::strip_back` | src/shops.rs:56 | 1194:5FC0 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `ShopHooks::strip_back` | src/shops.rs:60 | 1194:5FC0 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `SkyHooks::bolt` | src/skyobj.rs:52 | 0000:78A8 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `SkyHooks::draw_dfa` | src/skyobj.rs:46 | 0000:5652 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `SkyHooks::draw_image` | src/skyobj.rs:42 | 0000:5828 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -320,12 +320,12 @@ the original routine:
 | `SkyHooks::fog` | src/skyobj.rs:37 | 2294:0B01 | overridden | the view: main.rs SkyDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself (playsky, playbolt, playvolcano exact) |
 | `SkyHooks::load` | src/skyobj.rs:31 | 0000:7428 | overridden | the view: main.rs SkyLoad | faithful: the sky's images into EMS as 0000:7428 loads them |
 | `SkyHooks::sound` | src/skyobj.rs:54 | 23BA:002A | port | the default runs the port | |
-| `SpellPageHooks::click` | src/spellpage.rs:69 | 0000:8FC4 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
-| `SpellPageHooks::confirm` | src/spellpage.rs:76 | 1194:48E9 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
-| `SpellPageHooks::leave` | src/spellpage.rs:80 | 1194:55B2 and 53E3 | present | faded out, the equipment screen back | |
-| `SpellPageHooks::page` | src/spellpage.rs:66 | 1194:68D7 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
-| `SpellPageHooks::type_name` | src/spellpage.rs:74 | 1194:65FD | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
-| `SpellPageHooks::write` | src/spellpage.rs:83 | 25FD:0844, 0000:9DD2 | port | the default runs the port | |
+| `SpellPageHooks::click` | src/spellpage.rs:75 | 0000:8FC4 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
+| `SpellPageHooks::confirm` | src/spellpage.rs:82 | 1194:48E9 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
+| `SpellPageHooks::leave` | src/spellpage.rs:87 | 1194:55B2 and 53E3 | present | faded out, the equipment screen back | |
+| `SpellPageHooks::page` | src/spellpage.rs:72 | 1194:68D7 | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
+| `SpellPageHooks::type_name` | src/spellpage.rs:80 | 1194:65FD | overridden | the view: panels.rs Replay | present: the spell page answered by the player (screens.txt) |
+| `SpellPageHooks::write` | src/spellpage.rs:90 | 25FD:0844, 0000:9DD2 | port | the default runs the port | |
 | `SpellmakerHooks::click` | src/spellmaker.rs:64 | 1194:5651 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
 | `SpellmakerHooks::form` | src/spellmaker.rs:94 |  | present | an effect's form shown | |
 | `SpellmakerHooks::list` | src/spellmaker.rs:77 | 1194:5734 | overridden | the view: shopui.rs LiveMaker<'_, '_>, spellmaker.rs Maker | present: the spellmaker's screen answered by the player (screens.txt) |
@@ -342,72 +342,72 @@ the original routine:
 | `StairsHooks::light_table` | src/hooks.rs:40 | 2294:0B8A | overridden | the view: main.rs Front<'_> | faithful: NORMAL.LGT's table (playdown exact) |
 | `StairsHooks::map_keep` | src/hooks.rs:70 | 0000:4564..4568 | overridden | the view: main.rs Front<'_> | faithful: `map_keep` with the screen's colours (A39E) |
 | `StairsHooks::quest_level` | src/hooks.rs:50 | 1194:9FAC | port | the default runs the port | |
-| `StoreHooks::armor_lines` | src/store.rs:123 | 1194:F204 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `StoreHooks::greeting` | src/store.rs:106 | 1194:4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `StoreHooks::haggle` | src/store.rs:114 | 1194:8020 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `StoreHooks::message_box` | src/store.rs:108 | 1194:59CC | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `StoreHooks::repair_instead` | src/store.rs:128 | 1194:C6AC | stub | None: the repairs run | |
-| `StoreHooks::text` | src/store.rs:133 | 1194:A374 | port | the default runs the port | |
-| `StoreHooks::weapon_lines` | src/store.rs:119 | 1194:F142 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TalkHooks::dungeon_entrance` | src/talk.rs:195 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `view_clear`, then `wild_dungeon_entry` |
-| `TalkHooks::expand` | src/talk.rs:135 | 2DA2:000A | stub | None: the port's `expand` runs | |
-| `TalkHooks::list` | src/talk.rs:115 | 1194:5734 | overridden | the view: main.rs Front<'_> | present: the game's list (screens.txt) |
-| `TalkHooks::loot` | src/talk.rs:125 | 1194:7B16 | overridden | the view: main.rs Front<'_> | faithful: `loot_window` (lootwin vectors, screens.txt) |
-| `TalkHooks::palace` | src/talk.rs:155 | 1194:8F1E | overridden | the view: main.rs Front<'_> | faithful: `quests_talk` (sidequest vectors, palace screens) |
-| `TalkHooks::quest_chest` | src/talk.rs:165 | 2294:0F33 | overridden | the view: main.rs Front<'_> | faithful: `quest_chest` (mainquest vectors, hooktest) |
-| `TalkHooks::quest_item` | src/talk.rs:146 | 1194:9F04 | overridden | the view: main.rs Front<'_> | faithful: `quest_item_taken` (hooktest) |
-| `TalkHooks::quest_offer` | src/talk.rs:160 | 1194:CD9A | port | the default runs the port | |
-| `TalkHooks::quest_person` | src/talk.rs:150 | 1194:D593 | overridden | the view: main.rs Front<'_> | faithful: `quest_person_talk` |
-| `TalkHooks::shop` | src/talk.rs:174 |  | overridden | the view: main.rs Front<'_> | faithful: the shops' ports with the player's answers (shops vectors, screens.txt) |
-| `TalkHooks::sound` | src/talk.rs:129 | 23BA:002A | port | the default runs the port | |
-| `TalkHooks::square_text` | src/talk.rs:208 | 0000:06BE | port | the default runs the port | |
+| `StoreHooks::armor_lines` | src/store.rs:124 | 1194:F204 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `StoreHooks::greeting` | src/store.rs:107 | 1194:4BFF | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `StoreHooks::haggle` | src/store.rs:115 | 1194:8020 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `StoreHooks::message_box` | src/store.rs:109 | 1194:59CC | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `StoreHooks::repair_instead` | src/store.rs:129 | 1194:C6AC | stub | None: the repairs run | |
+| `StoreHooks::text` | src/store.rs:134 | 1194:A374 | port | the default runs the port | |
+| `StoreHooks::weapon_lines` | src/store.rs:120 | 1194:F142 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TalkHooks::dungeon_entrance` | src/talk.rs:197 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `view_clear`, then `wild_dungeon_entry` |
+| `TalkHooks::expand` | src/talk.rs:137 | 2DA2:000A | stub | None: the port's `expand` runs | |
+| `TalkHooks::list` | src/talk.rs:117 | 1194:5734 | overridden | the view: main.rs Front<'_> | present: the game's list (screens.txt) |
+| `TalkHooks::loot` | src/talk.rs:127 | 1194:7B16 | overridden | the view: main.rs Front<'_> | faithful: `loot_window` (lootwin vectors, screens.txt) |
+| `TalkHooks::palace` | src/talk.rs:157 | 1194:8F1E | overridden | the view: main.rs Front<'_> | faithful: `quests_talk` (sidequest vectors, palace screens) |
+| `TalkHooks::quest_chest` | src/talk.rs:167 | 2294:0F33 | overridden | the view: main.rs Front<'_> | faithful: `quest_chest` (mainquest vectors, hooktest) |
+| `TalkHooks::quest_item` | src/talk.rs:148 | 1194:9F04 | overridden | the view: main.rs Front<'_> | faithful: `quest_item_taken` (hooktest) |
+| `TalkHooks::quest_offer` | src/talk.rs:162 | 1194:CD9A | port | the default runs the port | |
+| `TalkHooks::quest_person` | src/talk.rs:152 | 1194:D593 | overridden | the view: main.rs Front<'_> | faithful: `quest_person_talk` |
+| `TalkHooks::shop` | src/talk.rs:176 |  | overridden | the view: main.rs Front<'_> | faithful: the shops' ports with the player's answers (shops vectors, screens.txt) |
+| `TalkHooks::sound` | src/talk.rs:131 | 23BA:002A | port | the default runs the port | |
+| `TalkHooks::square_text` | src/talk.rs:210 | 0000:06BE | port | the default runs the port | |
 | `TalkHooks::text` | src/talk.rs:111 | 1194:A374 | stub | false: the text port runs | |
-| `TalkHooks::touch_cast` | src/talk.rs:140 | 29CF:0000 | port | the default runs the port | |
-| `TalkHooks::way` | src/talk.rs:120 | 23F1:00A3 | overridden | the view: main.rs Front<'_> | faithful: `note_add` (look vectors) |
-| `TalkHooks::wild_flat` | src/talk.rs:191 | 2294:0DD0 | port | the default runs the port | |
-| `TalkHooks::wild_way` | src/talk.rs:201 | 217B:0682 | overridden | the view: main.rs Front<'_> | faithful: `wild_way` (wildtalk vectors) |
+| `TalkHooks::touch_cast` | src/talk.rs:142 | 29CF:0000 | port | the default runs the port | |
+| `TalkHooks::way` | src/talk.rs:122 | 23F1:00A3 | overridden | the view: main.rs Front<'_> | faithful: `note_add` (look vectors) |
+| `TalkHooks::wild_flat` | src/talk.rs:193 | 2294:0DD0 | port | the default runs the port | |
+| `TalkHooks::wild_way` | src/talk.rs:203 | 217B:0682 | overridden | the view: main.rs Front<'_> | faithful: `wild_way` (wildtalk vectors) |
 | `TavernHooks::files` | src/tavern.rs:61 | 1194:C0B1 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `TavernHooks::greeting` | src/tavern.rs:63 | 1194:C12A | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::haggle` | src/tavern.rs:94 | 1194:C14E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::message_box` | src/tavern.rs:88 | 1194:59CC | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::quest` | src/tavern.rs:65 | 1194:CED7 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::quests_talk` | src/tavern.rs:69 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::room_file` | src/tavern.rs:84 | 1194:BA91 | port | the default runs the port | |
-| `TavernHooks::room_load` | src/tavern.rs:79 | 1194:C04C | port | the default runs the port | |
-| `TavernHooks::rumours` | src/tavern.rs:100 | 1194:E3F7 | stub | false: the port's rumours run | |
-| `TavernHooks::tavern_quest` | src/tavern.rs:73 | 1194:90B9 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TavernHooks::text` | src/tavern.rs:105 | 1194:A374 | stub | false: the text port runs | |
+| `TavernHooks::haggle` | src/tavern.rs:96 | 1194:C14E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TavernHooks::message_box` | src/tavern.rs:90 | 1194:59CC | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TavernHooks::quest` | src/tavern.rs:67 | 1194:CED7 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TavernHooks::quests_talk` | src/tavern.rs:71 | 1194:8F1E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TavernHooks::room_file` | src/tavern.rs:86 | 1194:BA91 | port | the default runs the port | |
+| `TavernHooks::room_load` | src/tavern.rs:81 | 1194:C04C | port | the default runs the port | |
+| `TavernHooks::rumours` | src/tavern.rs:102 | 1194:E3F7 | stub | false: the port's rumours run | |
+| `TavernHooks::tavern_quest` | src/tavern.rs:75 | 1194:90B9 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
+| `TavernHooks::text` | src/tavern.rs:107 | 1194:A374 | stub | false: the text port runs | |
 | `TextHooks::menu` | src/text.rs:54 | 1194:020E | overridden | the view: main.rs Front<'_> | present: the game's menu (screens.txt); its boxes' state (`menu_boxes`, `menu_closed`; msgbox vectors) |
 | `TextHooks::message_box` | src/text.rs:43 | 1194:59CC | overridden | the view: main.rs Front<'_>, panels.rs Said | present: the game's box (screens.txt) |
 | `TextHooks::message_box_far` | src/text.rs:47 | 1194:59CC | overridden | the view: panels.rs Said | present: the special item's box (screens.txt) |
-| `TravelHooks::advance` | src/travelmap.rs:105 | 0000:142D | stub | false: the game's clock runs the minutes | |
-| `TravelHooks::animation` | src/travelmap.rs:100 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
-| `TravelHooks::animation_frame` | src/travelmap.rs:102 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
-| `TravelHooks::arrival_delete` | src/travelmap.rs:128 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::arrival_log` | src/travelmap.rs:119 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
-| `TravelHooks::arrival_text` | src/travelmap.rs:124 | 1194:A36C | port | the default runs the port | |
-| `TravelHooks::arrival_write` | src/travelmap.rs:133 | 25FD:0844 | port | the default runs the port | |
-| `TravelHooks::bank` | src/travelmap.rs:89 | 0000:5C86 | port | the default runs the port | |
-| `TravelHooks::close` | src/travelmap.rs:147 | 3159:0006 | present | the map's window closed | |
-| `TravelHooks::days` | src/travelmap.rs:96 | 1194:2E69 | port | the default runs the port | |
+| `TravelHooks::advance` | src/travelmap.rs:116 | 0000:142D | stub | false: the game's clock runs the minutes | |
+| `TravelHooks::animation` | src/travelmap.rs:108 | 1194:2F69 | present | the travel animation loaded; the view plays its own | |
+| `TravelHooks::animation_frame` | src/travelmap.rs:113 | 0000:5526 | overridden | the view: travel.rs Hooks<'_> | present: the journey's frames, one a game tick (the original's as fast as its loop) |
+| `TravelHooks::arrival_delete` | src/travelmap.rs:141 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::arrival_log` | src/travelmap.rs:132 | 26F7:08F7 | stub | false: `travel_arrival` runs | |
+| `TravelHooks::arrival_text` | src/travelmap.rs:137 | 1194:A36C | port | the default runs the port | |
+| `TravelHooks::arrival_write` | src/travelmap.rs:146 | 25FD:0844 | port | the default runs the port | |
+| `TravelHooks::bank` | src/travelmap.rs:93 | 0000:5C86 | port | the default runs the port | |
+| `TravelHooks::close` | src/travelmap.rs:160 | 3159:0006 | present | the map's window closed | |
+| `TravelHooks::days` | src/travelmap.rs:102 | 1194:2E69 | port | the default runs the port | |
 | `TravelHooks::dungeon_location` | src/travelmap.rs:129 | 1194:3B0C | overridden | the view: travel.rs Hooks<'_> | faithful: `city_climate`, `dungeon_build_location`, on the journey's files |
-| `TravelHooks::journey_stub` | src/travelmap.rs:143 |  | stub | a test's stand-in | |
+| `TravelHooks::journey_stub` | src/travelmap.rs:156 |  | stub | a test's stand-in | |
 | `TravelHooks::location` | src/travelmap.rs:127 | 1194:3AE8 | overridden | the view: travel.rs Hooks<'_> | faithful: `city_location`, on the journey's files (a shore's TMP2.$$$ kept) |
 | `TravelHooks::message_box` | src/travelmap.rs:78 | 1194:5E1D | overridden | the view: travel.rs Hooks<'_> | present: the map's box (screens.txt) |
-| `TravelHooks::pick_stub` | src/travelmap.rs:138 |  | stub | a test's stand-in | |
-| `TravelHooks::province` | src/travelmap.rs:110 | 1194:2E14 / 2E18 | port | the default runs the port | |
+| `TravelHooks::pick_stub` | src/travelmap.rs:151 |  | stub | a test's stand-in | |
+| `TravelHooks::province` | src/travelmap.rs:121 | 1194:2E14 / 2E18 | port | the default runs the port | |
 | `TravelHooks::question` | src/travelmap.rs:80 | 1194:48DB | overridden | the view: travel.rs Hooks<'_> | fixed: was answered Yes without asking: 1194:48DB asks it (020E: "Yes", "No", keys YN), as the view now does (`Asking::Question`); screen-checked (worldunwell) |
-| `TravelHooks::resource` | src/travelmap.rs:87 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
+| `TravelHooks::resource` | src/travelmap.rs:89 | 0000:56C8 | present | the map's pictures loaded for drawing; the view loads its own | |
 | `TravelHooks::screen` | src/travelmap.rs:85 |  | present | a fade | |
-| `TravelHooks::show_bank` | src/travelmap.rs:93 | 1194:4D74 | present | a screen bank shown | |
-| `TitleHooks::fade_out` | src/title.rs:72 | 1194:55B2 | present | the screen faded out; the view's creation screens draw the intro | |
-| `TitleHooks::movie_frame` | src/title.rs:68 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
-| `TitleHooks::picture` | src/title.rs:77 | 0000:5828 | present | a picture shown, faded or dissolved in | |
-| `TitleHooks::wait` | src/title.rs:80 | 0000:13BF | present | the intro's waits; none ended by a key | |
-| `VisionHooks::fade_out` | src/vision.rs:107 | 1194:55B2 | present | the screen faded out; the view's ending shows the vision | |
-| `VisionHooks::frame` | src/vision.rs:102 | 0000:618F | present | the speech's movie's frame drawn and shown | |
-| `VisionHooks::line` | src/vision.rs:105 | 0000:5364 | present | a line of the speech's page drawn | |
-| `VisionHooks::mouse` | src/vision.rs:97 | 0000:9012 | overridden | the view: vision.rs ClickThrough | elsewhere: a click at each page, as the vectors' run clicks; by default no button, the place kept |
+| `TravelHooks::show_bank` | src/travelmap.rs:97 | 1194:4D74 | present | a screen bank shown | |
+| `TitleHooks::fade_out` | src/title.rs:79 | 1194:55B2 | present | the screen faded out; the view's creation screens draw the intro | |
+| `TitleHooks::movie_frame` | src/title.rs:75 | 0000:6546 | present | a movie's frame drawn and shown; no key or click ends it (the view's intro plays the movies itself) | |
+| `TitleHooks::picture` | src/title.rs:84 | 0000:5828 | present | a picture shown, faded or dissolved in | |
+| `TitleHooks::wait` | src/title.rs:87 | 0000:13BF | present | the intro's waits; none ended by a key | |
+| `VisionHooks::fade_out` | src/vision.rs:116 | 1194:55B2 | present | the screen faded out; the view's ending shows the vision | |
+| `VisionHooks::frame` | src/vision.rs:111 | 0000:618F | present | the speech's movie's frame drawn and shown | |
+| `VisionHooks::line` | src/vision.rs:114 | 0000:5364 | present | a line of the speech's page drawn | |
+| `VisionHooks::mouse` | src/vision.rs:106 | 0000:9012 | overridden | the view: vision.rs ClickThrough | elsewhere: a click at each page, as the vectors' run clicks; by default no button, the place kept |
 | `TriggerHooks::artifact_audience` | src/trigger.rs:100 | 1194:A36C | overridden | the view: main.rs Front<'_> | faithful: the text port and its box |
 | `TriggerHooks::automap_write` | src/trigger.rs:110 | 23F1:0145 and 013C | port | the default runs the port | |
 | `TriggerHooks::blackout` | src/trigger.rs:106 | 1194:55B2 | overridden | the view: main.rs Front<'_>, screentest.rs DoorHooks | present: the fade the window plays (areafade.txt) |
@@ -435,13 +435,13 @@ the original routine:
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |
 | `WildHooks::write` | src/wild.rs:74 | 0000:9DD2 | port | the default runs the port | |
-| `StartHooks::video_mode` | src/start.rs:22 | 0000:6F21 | original | INT 10h AH=0Fh's mode before the start's 13h: 3, the text mode DOS leaves (the harness's too) | |
-| `StartHooks::mouse` | src/start.rs:27 | 0000:5384 | original | a mouse driver present (the harness's has one): the pointer's drawing [B02C] chosen (9B04) | |
+| `StartHooks::video_mode` | src/start.rs:27 | 0000:6F21 | original | INT 10h AH=0Fh's mode before the start's 13h: 3, the text mode DOS leaves (the harness's too) | |
+| `StartHooks::mouse` | src/start.rs:32 | 0000:5384 | original | a mouse driver present (the harness's has one): the pointer's drawing [B02C] chosen (9B04) | |
 | `CommandHooks::ail_startup` | src/cmdline.rs:58 | 0FFD:07D6 | unreached | the AIL started before a driver named on the command line loads; no port path runs the command line in play (the view picks its drivers itself) | |
 | `CommandHooks::sound_driver` | src/cmdline.rs:60 | 2F9F:0364 | unreached | the -S driver loaded and set to the -IOS/-IRQS/-DMAS settings; not run in play (the view's sound is its own) | |
 | `CommandHooks::music_driver` | src/cmdline.rs:62 | 2F9F:01BF | unreached | the -M driver loaded (the FM driver, view/src/fmdrv.rs, is the view's choice); not run in play | |
 | `CommandHooks::video_restore` | src/cmdline.rs:64 | 0000:6F8C | present | the screen given back to DOS before "Bad command line arguments" | |
 | `CommandHooks::print` | src/cmdline.rs:66 | int 21h AH 9 | present | the message printed (DOS's console) | |
 | `CdHooks::print` | src/cmdline.rs:80 | int 21h AH 9 | present | MSCDEX's or the CD-ROM's message printed (DOS's console) | |
-| `CStartHooks::midnight_seen` | src/start.rs:230 | 0000:007D | original | the BIOS's midnight flag 0040:0070 set again after the ticks' read cleared it: the BIOS's data, not the game's | |
-| `CStartHooks::vectors_taken` | src/start.rs:235 | 0000:016B | original | interrupts 0, 8 and 24h taken and the DTA set: DOS's state and the original's own code segment, not DGROUP | |
+| `CStartHooks::midnight_seen` | src/start.rs:235 | 0000:007D | original | the BIOS's midnight flag 0040:0070 set again after the ticks' read cleared it: the BIOS's data, not the game's | |
+| `CStartHooks::vectors_taken` | src/start.rs:240 | 0000:016B | original | interrupts 0, 8 and 24h taken and the DTA set: DOS's state and the original's own code segment, not DGROUP | |
