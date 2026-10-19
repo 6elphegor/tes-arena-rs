@@ -68,6 +68,8 @@ impl ClockHooks for Hooks {
 }
 
 impl FrameHooks for Hooks {
+    /// The generator's 0000:7428 and 599C are RETFs.
+    fn no_spells_picture(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {}
     /// The generator's 0000:3491 is a RET.
     fn automap_mark(&mut self, _m: &mut Machine) {}
     /// The generator's 2294:04F5 is a RETF.

@@ -382,6 +382,47 @@ pub struct Creation {
     /// Esc held (the held keys' table, ACB6): the intro tests it as it
     /// takes a key (13E2, 12CD), so an Esc let go before then is a key.
     esc_held: bool,
+    /// The menu's Start picked, the opening story shown as the player
+    /// took it: run on the engine once it's over (`story_ran`), with the
+    /// pick and creation's start, at the next input that has the engine.
+    story_run: Option<StoryRun>,
+    /// The menu's Start picked, for the window (`take_started`).
+    started: bool,
+}
+
+/// How the opening story (0000:1323) went in the view: its movie cut by a
+/// key, each picture's wait cut by one, Esc held at the cut, and whether
+/// it's over.
+#[derive(Clone, Default)]
+struct StoryRun {
+    movie_cut: bool,
+    cut: Vec<bool>,
+    esc: bool,
+    done: bool,
+}
+
+/// `TitleHooks` playing the story back as the view showed it
+/// (`StoryRun`): the movie cut at its first frame where a key cut it, each
+/// picture's wait cut where one cut it; Esc held there (ACB6) where Esc
+/// ended it, put back after by the caller.
+struct StoryReplay<'a> {
+    run: &'a StoryRun,
+    waits: usize,
+}
+
+impl arena::title::TitleHooks for StoryReplay<'_> {
+    fn movie_frame(&mut self, _m: &mut Machine, _name: u16, first: bool) -> bool {
+        first && self.run.movie_cut
+    }
+    fn wait(&mut self, m: &mut Machine, _retraces: u16) -> bool {
+        let k = self.waits;
+        self.waits += 1;
+        let cut = self.run.cut.get(k).copied().unwrap_or(false);
+        if cut && self.run.esc && k + 1 == self.run.cut.len() {
+            m.mem.w8(DS, arena::title::var::ESC_HELD, 1);
+        }
+        cut
+    }
 }
 
 /// The creation's `NewGameHooks`: its boxes kept (the attributes' note).
@@ -612,7 +653,7 @@ impl Creation {
         let title = image_with_palette(m, &archive, "TITLE.IMG");
         let quote = image_with_palette(m, &archive, "QUOTE.IMG");
         let menu_pic = image_with_palette(m, &archive, "MENU.IMG");
-        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false };
+        let mut c = Creation { stage: Stage::Done, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_A, movie: None, title, quote, menu_pic, level_up: None, face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false };
         // The program's start (0000:10C9): the intro (0000:125C), the
         // title, the menu.
         c.movie = Movie::new(&c.archive, "INTRO.FLC", Vec::new());
@@ -695,7 +736,62 @@ impl Creation {
             shirt_file: Vec::new(),
             cel: None,
         };
-        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false }
+        Creation { stage: Stage::Stats, boxes: VecDeque::new(), archive, pics, fonts, name: String::new(), asked_again: false, colour: COLOUR_B, movie: None, title: None, quote: None, menu_pic: None, level_up: Some(Vec::new()), face_back: None, quiz_shown: None, outcome: None, film: VecDeque::new(), film_ms: 0, pending: None, esc_held: false, story_run: None, started: false }
+    }
+
+    /// Whether the menu's Start was picked since last asked: the window
+    /// then puts the game as the program's start left it at the menu under
+    /// creation (its `title_engine`), before the story's state is run.
+    pub fn take_started(&mut self) -> bool {
+        std::mem::take(&mut self.started)
+    }
+
+    /// The menu's Start as the game's state takes it, once the opening
+    /// story is over (`story_run`): the pick (1194:5CF4: B7C6 1), the fade
+    /// after it (0000:111A, 55B2), the story as the player took it
+    /// (0000:1323, `StoryReplay`), then creation's start (1194:24A6: the
+    /// state cleared, its font) and its first menu made again on the game.
+    fn story_ran(&mut self, engine: &mut Engine) {
+        if !self.story_run.as_ref().is_some_and(|r| r.done) {
+            return;
+        }
+        let run = self.story_run.take().unwrap();
+        let m = &mut engine.m;
+        m.main_menu_pick(1);
+        m.screen_faded();
+        let esc = m.mem.r8(DS, arena::title::var::ESC_HELD);
+        // The dissolves' generator (4B8E) was stepped by the screen's own
+        // dissolves as the pictures came (`Film::dissolve`): kept so.
+        let generator = m.mem.r16(DS, 0x4B8E);
+        if m.story(&mut engine.files, &mut StoryReplay { run: &run, waits: 0 }).is_none() {
+            eprintln!("the opening story gave up: {}", arena::giveup::describe());
+        }
+        engine.m.mem.w8(DS, arena::title::var::ESC_HELD, esc);
+        engine.m.mem.w16(DS, 0x4B8E, generator);
+        engine.m.newgame_reset();
+        engine.m.creation_font(&mut engine.files);
+        if let Stage::Method(_) = self.stage {
+            self.stage = Stage::Method(self.method(&mut engine.m));
+        }
+    }
+
+    /// Creation begun on the game as it is, from 1194:24A6, as
+    /// harness/gen_createshot.py runs the original's (the program's start,
+    /// then 24A6 straight): the menu's pick and the opening story the
+    /// screens showed leave nothing in the game's state (the story's
+    /// would: its movie's buffer at A69E, which the parchment's unrolling
+    /// reads before its row table), only creation's start (`story_ran`'s
+    /// last part).
+    #[cfg(test)]
+    pub fn begin_at_creation(&mut self, engine: &mut Engine) {
+        if self.story_run.take().is_none() {
+            return;
+        }
+        engine.m.newgame_reset();
+        engine.m.creation_font(&mut engine.files);
+        if let Stage::Method(_) = self.stage {
+            self.stage = Stage::Method(self.method(&mut engine.m));
+        }
     }
 
     /// Back on the main menu (a load that failed).
@@ -821,6 +917,18 @@ impl Creation {
     /// An Esc no longer held as it's taken (`esc_held`) is a key.
     fn take_key(&mut self, m: &mut Machine, inp: Input) {
         let esc = inp == Input::Esc && self.esc_held;
+        if let (Stage::Story { scrolls: false, .. }, Some(r)) = (&self.stage, &mut self.story_run) {
+            // The opening story's course for the game's state (`story_ran`):
+            // the movie or the picture's wait cut, Esc ending it.
+            // (Esc cutting the movie is a key: 6697 waits the keys up.)
+            match self.stage {
+                Stage::Story { pic: 0, .. } => r.movie_cut = true,
+                _ => {
+                    r.cut.push(true);
+                    r.esc |= esc;
+                }
+            }
+        }
         match self.stage {
             Stage::Intro | Stage::Story { pic: 0, .. } => {
                 if let Some(mv) = &mut self.movie {
@@ -895,6 +1003,9 @@ impl Creation {
         *shown += ms;
         let wait = if *scrolls { SCROLL_MS[*pic as usize - 1] } else { STORY_MS };
         if *shown >= wait {
+            if let (false, Some(r)) = (*scrolls, &mut self.story_run) {
+                r.cut.push(false);
+            }
             self.story_next(m);
         }
     }
@@ -927,6 +1038,9 @@ impl Creation {
         let Stage::Story { next, scrolls, .. } = std::mem::replace(&mut self.stage, Stage::Done) else { return Stage::Done };
         if scrolls {
             return self.intro_end(film);
+        }
+        if let Some(r) = &mut self.story_run {
+            r.done = true;
         }
         fade_black(film);
         *next
@@ -1024,6 +1138,7 @@ impl Creation {
     ///   out (1194:55B6), the screen cleared (55D9), the picture's colours
     ///   set (0000:57DD).
     pub fn input(&mut self, engine: &mut Engine, inp: Input) {
+        self.story_ran(engine);
         if let Input::Wait(ms) = inp {
             return self.advance(&mut engine.m, ms);
         }
@@ -1287,11 +1402,15 @@ impl Creation {
                     Some(1) => {
                         // 0000:1131: the opening story (0000:1323), then
                         // creation (1194:2498), which starts from a cleared
-                        // state (1194:24A6).
-                        engine.m.newgame_reset();
-                        engine.m.creation_font(&mut engine.files);
+                        // state (1194:24A6). The game's state takes them
+                        // as the story ends (`story_ran`), as the player
+                        // took it; its first menu made here on a copy for
+                        // the screen meanwhile.
+                        self.started = true;
+                        self.story_run = Some(StoryRun::default());
                         self.colour = COLOUR_A;
-                        let next = Box::new(Stage::Method(self.method(&mut engine.m)));
+                        let mut copy = engine.m.clone();
+                        let next = Box::new(Stage::Method(self.method(&mut copy)));
                         self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
                         Stage::Story { pic: 0, ms: 0, img: None, next, scrolls: false }
                     }
@@ -1787,7 +1906,7 @@ impl Creation {
     /// The attributes rolled (1194:2AC7; the first time its note).
     fn roll(&mut self, engine: &mut Engine) -> Stage {
         self.colour = COLOUR_B;
-        if engine.m.creation_roll(&mut Hooks { boxes: &mut self.boxes }).is_none() {
+        if engine.m.creation_roll(&mut engine.files, &mut Hooks { boxes: &mut self.boxes }).is_none() {
             eprintln!("the attributes could not be rolled");
         }
         Stage::Stats
@@ -1819,8 +1938,20 @@ impl Creation {
                 }
                 return Stage::Stats;
             }
-            // 1194:2CD0: "Which dost thou choose?", in FONT_A.
+            // The points' loop left (122F's 1241..1249), then 1194:2CD0:
+            // "Which dost thou choose?", in FONT_A.
+            m.points_screen_end();
             Stage::Choose(c.menu(m, (DATA, 0x3A43), &[], 0x3F9C, 0x3F9F, FontId::A))
+        };
+        // The arrows' handler as the points' loop runs it (1194:138E whole,
+        // the stats' texts made again where a click took); a level's are
+        // replayed on the game that way after (`attribute_arrow`).
+        let arrow = |c: &Self, m: &mut Machine, y: u16| {
+            if c.level_up.is_some() {
+                m.creation_arrow(y);
+            } else {
+                m.attribute_arrow(y);
+            }
         };
         let record = |c: &mut Self, k: Click| {
             if let Some(v) = &mut c.level_up {
@@ -1841,7 +1972,7 @@ impl Creation {
             Input::Up | Input::Down => {
                 let mid = m.mem.r8(DS, arena::newgame::var::ARROWS) as u16;
                 let y = if inp == Input::Up { mid } else { mid + 1 };
-                m.creation_arrow(y);
+                arrow(self, m, y);
                 record(self, Click::Arrow(y));
                 Stage::Stats
             }
@@ -1853,7 +1984,7 @@ impl Creation {
                     Stage::Stats
                 }
                 Some(9) => {
-                    m.creation_arrow(y as u16);
+                    arrow(self, m, y as u16);
                     record(self, Click::Arrow(y as u16));
                     Stage::Stats
                 }
@@ -1939,7 +2070,10 @@ impl Creation {
                 self.show_face(m);
                 Stage::Face
             }
-            Some(1) => self.finish(engine),
+            Some(1) => {
+                m.face_done();
+                self.finish(engine)
+            }
             _ => Stage::Face,
         }
     }
@@ -1947,24 +2081,28 @@ impl Creation {
     /// The face kept (2C72), creation's end (257B..25B7), then the vision
     /// (0000:113E..115D: text 578h through 1194:D459).
     fn finish(&mut self, engine: &mut Engine) -> Stage {
-        let m = &mut engine.m;
-        m.face_chosen();
-        m.creation_end(&mut arena::newgame::NoNewGameHooks);
+        engine.m.face_chosen();
+        engine.m.creation_end(&mut engine.files, &mut arena::newgame::NoNewGameHooks);
         self.colour = 0x2F;
-        let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
+        // The vision's text for the screen, made on a copy of the game as
+        // 1194:D45D makes it (its block, A374 mode 2): the game's own run
+        // of the speech is the window's as the game starts
+        // (`Machine::new_game_begun`).
+        let mut c = engine.m.clone();
+        let mut files = engine.files.clone();
+        let Some((seg, off)) = c.heap_alloc_bytes(0xBB8) else {
             return Stage::Done;
         };
-        m.mem.w16(DS, 0x137A, 0x578);
-        m.mem.w8(DS, 0x137E, 0);
-        m.mem.w8(DS, 0x101C, 0);
-        let text = match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, seg, off) {
-            Some(_) => engine.m.mem.cstr(seg, off).to_vec(),
+        c.mem.w16(DS, 0x137A, 0x578);
+        c.mem.w8(DS, 0x137E, 0);
+        c.mem.w8(DS, 0x101C, 0);
+        let text = match c.text(&mut files, &mut arena::text::NoTextHooks, 2, seg, off) {
+            Some(_) => c.mem.cstr(seg, off).to_vec(),
             None => {
                 eprintln!("the vision's text could not be made");
                 Vec::new()
             }
         };
-        engine.m.heap_free(seg);
         let lines = hud::lines(&text, 0x2F);
         if lines.iter().all(|l| l.is_empty()) {
             return Stage::Done;

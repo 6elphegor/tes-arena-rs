@@ -98,10 +98,43 @@ pub trait NewGameHooks {
     /// 1194:59CC: a message box with the text at `seg`:`si`.
     fn message_box(&mut self, _m: &mut Machine, _seg: u16, _si: u16) {}
     /// 1194:0DC7: the stats screen drawn (also counting the items, 129D,
-    /// and naming the clothes' images by sex and class: 1194:16AA).
-    fn stats_screen(&mut self, _m: &mut Machine) {}
+    /// and naming the clothes' images by sex and class: 1194:16AA). By
+    /// default the clothes' names (1D22, `sheet_clothes`); the drawing is
+    /// the front end's.
+    fn stats_screen(&mut self, m: &mut Machine) {
+        m.sheet_clothes();
+    }
+    /// 1194:2B42..2B52, in the roll before the stats screen: the page's
+    /// corner kept in bank [1032] (12BE, `corner_kept`; 1299 cleared
+    /// round it), then 157E: the points' number (12E6, its drawing the
+    /// front end's), the arrows (12F5, `arrows_made`: 1297 38h) and the
+    /// stats' texts (0DE1, `sheet_texts`).
+    fn roll_screen(&mut self, m: &mut Machine, files: &mut Files) {
+        m.corner_kept();
+        // (Where it gives up the reason is noted, `giveup`.)
+        let _ = m.arrows_made(files);
+        m.sheet_texts();
+    }
     /// 1194:1695: the attribute screen's palette.
     fn palette(&mut self, _m: &mut Machine) {}
+    /// 0000:9326 with AX [1038], at the end of creation: the parchment's
+    /// resource dropped (`Machine::resource_drop`: its slot's first word
+    /// cleared, its block freed, 91BC counted down).
+    fn parchment_drop(&mut self, m: &mut Machine) {
+        let slot = m.mem.r16(DS, 0x1038);
+        m.resource_drop(slot);
+    }
+    /// 1194:55B6, at the end of creation: the colours at 929E black and
+    /// the page cleared (the fade the front end's).
+    fn faded(&mut self, m: &mut Machine) {
+        m.sheet_black();
+    }
+    /// 1194:158F, at the end of creation: the sheet's screen and the face
+    /// kept (CHARSHET.$$$, SAVEFACE.$$$; 5E0 bit 200h: `sheet_keep`).
+    fn sheet_keep(&mut self, m: &mut Machine, files: &mut Files) {
+        // (Where it gives up the reason is noted, `giveup`.)
+        let _ = m.sheet_keep(files);
+    }
     /// 0000:5D70, at the end of creation: EMS banks freed but the
     /// level's (`Machine::ems_reset`).
     fn creation_done(&mut self, m: &mut Machine) {
@@ -201,12 +234,17 @@ impl Machine {
         self.ng_fill(0x0652, 0xC, 0xC5);
     }
 
-    /// 1194:2512..251C, after `newgame_reset`: FONT_C.DAT (its name at
+    /// 1194:2512..2530, after `newgame_reset`: FONT_C.DAT (its name at
     /// 3EF2) loaded whole (0000:7504) to [102A], the class list's title's
-    /// font.
+    /// font; PARCH.CIF (3AE0) added to the resources as 20 by 20 tiles
+    /// (0000:756C), its slot at 1038 and selected as the boxes' tiles
+    /// (9AF8: B038).
     pub fn creation_font(&mut self, files: &mut Files) {
         let seg = self.font_load(files, 0x3EF2);
         self.mem.w16(DS, 0x102A, seg);
+        let slot = self.resource_add(files, 0x3AE0, 0x14, 0x14).unwrap_or(0);
+        self.mem.w16(DS, 0x1038, slot);
+        self.select_tiles(0x1038);
     }
 
     /// 1194:2536..2542, the class chosen (1194:25B9, by the questions or
@@ -528,7 +566,7 @@ impl Machine {
     /// the stats screen; the first time (1299 clear) its palette and the
     /// note on spending the points (3276:37C5), 1299 set. The screen
     /// flag B7C4 bit 4 is set and the text colour FEh.
-    pub fn creation_roll(&mut self, hooks: &mut dyn NewGameHooks) -> Option<()> {
+    pub fn creation_roll(&mut self, files: &mut Files, hooks: &mut dyn NewGameHooks) -> Option<()> {
         self.mem.w16(DS, POINTS_ROLLED, 0x19);
         self.roll_starting_gold()?;
         self.mem.w8(DS, COLOUR, 0xFE);
@@ -539,6 +577,7 @@ impl Machine {
         self.create_player_stats()?;
         let p = crate::dice::dice(&mut self.rng, 0x19)?;
         self.mem.w8(DS, POINTS, p as u8);
+        hooks.roll_screen(self, files);
         hooks.stats_screen(self);
         if self.ng8(NOTED) == 0 {
             hooks.palette(self);
@@ -633,6 +672,17 @@ impl Machine {
             self.mem.w8(DS, 0x050C, 0x3E);
             self.mem.w8(DS, 0x050A, 2);
         }
+    }
+
+    /// 1194:2CC0..2CCF, the faces' screen's Done (its region's handler,
+    /// from 5CF4: B7C6 its index, 1, and B7C4 cleared as the loop
+    /// begins): B7C4 bit 4 cleared, bit 1 set (3159:0006), 1298 1 (the
+    /// loop over the faces left).
+    pub fn face_done(&mut self) {
+        self.mem.w16(DS, 0xB7C6, 1);
+        let v = self.ng8(0xB7C4) & 0xFB | 1;
+        self.mem.w8(DS, 0xB7C4, v);
+        self.mem.w8(DS, 0x1298, 1);
     }
 
     /// 1194:2C72..2C95. The face picked (129A, 0..9) is the player's
@@ -743,7 +793,7 @@ impl Machine {
         self.name_and_sex(&ch.name, ch.sex);
         self.province_chosen(files, ch.province)?;
         for _ in 0..=ch.rerolls {
-            self.creation_roll(hooks)?;
+            self.creation_roll(files, hooks)?;
         }
         if ch.clicks.is_empty() {
             while self.ng8(POINTS) != 0 {
@@ -768,7 +818,7 @@ impl Machine {
         self.creation_finish();
         self.mem.w8(DS, FACE_PICKED, ch.face);
         self.face_chosen();
-        self.creation_end(hooks);
+        self.creation_end(files, hooks);
         Some(class)
     }
 
@@ -853,18 +903,25 @@ impl Machine {
         self.mem.w8(DS, 0x05E4, v);
     }
 
-    /// 1194:257B..25B7. Creation's end: 5C8 bit 10h clear, A902 bit 0
-    /// clear, 12BA cleared, 5B1 bit 4000h set, the time 2BCh (5AD); then
-    /// 0000:5D70 and 2294:11F2 (hooks).
-    pub fn creation_end(&mut self, hooks: &mut dyn NewGameHooks) {
+    /// 1194:257B..25B7. Creation's end: 5C8 bit 10h clear; the parchment's
+    /// resource dropped (0000:9326 with [1038]); A902 bit 0 clear; the
+    /// screen faded out (55B6); the song stopped; 12BA cleared, 5B1 bit
+    /// 4000h set, the time 2BCh (5AD); the sheet's screens kept (158F);
+    /// then 0000:5D70 and 2294:11F2. (The drop, the fade and the keeping
+    /// are hooks, by default the game's own.)
+    pub fn creation_end(&mut self, files: &mut Files, hooks: &mut dyn NewGameHooks) {
         let v = self.ng16(0x05C8) & 0xFFEF;
         self.mem.w16(DS, 0x05C8, v);
+        hooks.parchment_drop(self);
         let v = self.ng16(0xA902) & 0xFFFE;
         self.mem.w16(DS, 0xA902, v);
+        hooks.faded(self);
+        self.music_stop();
         self.mem.w16(DS, 0x12BA, 0);
         let v = self.ng16(0x05B1) | 0x4000;
         self.mem.w16(DS, 0x05B1, v);
         self.mem.w32(DS, 0x05AD, 0x2BC);
+        hooks.sheet_keep(self, files);
         hooks.creation_done(self);
         hooks.game_screen(self);
     }

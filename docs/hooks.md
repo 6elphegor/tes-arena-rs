@@ -125,6 +125,7 @@ the original routine:
 | `FrameHooks::faces` | src/frame.rs:64 | 0000:4C86, 292B:0530 | overridden | the view: main.rs Front<'_> | faithful: `faces_draw` (faces vectors) |
 | `FrameHooks::guards_arrive` | src/frame.rs:84 |  | port | the default runs the port | |
 | `FrameHooks::interface` | src/frame.rs:55 | 0000:4C83, 4DD6 | overridden | the view: main.rs Front<'_> | faithful: `interface_setup` (state tests) |
+| `FrameHooks::no_spells_picture` | src/frame.rs:60 | 292B:0341..0358 | port | the default runs the port (`no_spells_picture`); the frame vectors stub 7428 and 599C | fixed: NOSPELL.IMG was neither loaded to 1044 nor drawn (titleplay creation) |
 | `FrameHooks::key_d327` | src/frame.rs:126 | 1194:D327 | port | the default runs the port | |
 | `FrameHooks::level_text_draw` | src/frame.rs:76 | 0000:05B5 | overridden | the view: main.rs Front<'_> | present: the level's text drawn by the window, ADB8 left as 9E0A leaves it (riddle screens) |
 | `FrameHooks::menu_keys` | src/frame.rs:112 | 2542:0100 | overridden | the view: main.rs Front<'_> | faithful: `Machine::menu_keys` in the frame's body (0000:4952), its switches and camping (2542:01E6) done there; the screen a key asks for run inside the body (`Talk::screen`), the rest of the frame after it, but the travel map and the options screen after the frame (busy worldframes cases, the `...end` cases ending with that frame) |
@@ -220,14 +221,18 @@ the original routine:
 | `MenuKeyHooks::cyber_buttons` | src/menukeys.rs:100 | 2F26:03ED | original | no CyberMan: none | |
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
 | `NewGameHooks::creation_done` | src/newgame.rs:107 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
+| `NewGameHooks::faded` | src/newgame.rs:129 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
 | `NewGameHooks::game_screen` | src/newgame.rs:111 | 2294:11F2 | present | 2294:11F2, the heap check | |
 | `NewGameHooks::hands` | src/newgame.rs:116 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
 | `NewGameHooks::level_flats` | src/newgame.rs:121 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
 | `NewGameHooks::message_box` | src/newgame.rs:99 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
 | `NewGameHooks::palette` | src/newgame.rs:104 | 1194:1695 | present | the attribute screen's palette | |
+| `NewGameHooks::parchment_drop` | src/newgame.rs:123 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
 | `NewGameHooks::resources` | src/newgame.rs:114 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::roll_screen` | src/newgame.rs:112 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
+| `NewGameHooks::sheet_keep` | src/newgame.rs:134 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
 | `NewGameHooks::spells` | src/newgame.rs:118 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
-| `NewGameHooks::stats_screen` | src/newgame.rs:102 | 1194:0DC7 | present | creation's screens are the view's (`create.rs`) | |
+| `NewGameHooks::stats_screen` | src/newgame.rs:102 | 1194:0DC7 | port | the default names the clothes (16AA's 1D22, `sheet_clothes`); the drawing is the view's (`create.rs`) | fixed: the clothes' names stayed a man's (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
 | `NoteHooks::restore` | src/mapnotes.rs:60 | 0000:3698 | present | the screen region put back | |

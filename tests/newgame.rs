@@ -40,6 +40,12 @@ impl NewGameHooks for Log {
     fn creation_done(&mut self, _m: &mut Machine) {
         self.0.push(4);
     }
+    // The resource's drop, the fade and the sheet's keeping return at once
+    // in the vectors (0000:9326, 1194:55B6, 158F stubbed).
+    fn roll_screen(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {}
+    fn parchment_drop(&mut self, _m: &mut Machine) {}
+    fn faded(&mut self, _m: &mut Machine) {}
+    fn sheet_keep(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) {}
     fn game_screen(&mut self, _m: &mut Machine) {
         self.0.push(5);
     }
@@ -299,7 +305,7 @@ fn matches_original() {
             }),
             4 => m.quiz_class(&mut fs).map(|class| ret = format!(" {class:x}")),
             5 => m.class_weapon(c.ax as u8),
-            6 => m.creation_roll(&mut log),
+            6 => m.creation_roll(&mut fs, &mut log),
             7 => {
                 for &k in &c.clicks {
                     m.creation_click(k);
@@ -315,7 +321,7 @@ fn matches_original() {
                 Some(())
             }
             10 => {
-                m.creation_end(&mut log);
+                m.creation_end(&mut fs, &mut log);
                 Some(())
             }
             11 => m.game_setup(&mut log),

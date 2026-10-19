@@ -321,15 +321,37 @@ impl Machine {
         self.mem.w8(DS, 0x1296, 0);
         self.sheet_image(files, CHARSTAT)?;
         self.sheet_image(files, BONUS)?;
+        self.corner_kept();
+        self.page_clear();
+        self.sheet_image(files, CHARSTAT)?;
+        self.sheet_texts();
+        self.sheet_image(files, BONUS)?;
+        self.arrows_made(files)?;
+        let rolled = self.l16(POINTS_ROLLED);
+        self.cursor_hidden();
+        self.sheet_back(files)?;
+        self.sheet_doll(files)?;
+        self.mem.w16(DS, POINTS_ROLLED, rolled);
+        self.sheet_colours(files)
+    }
+
+    /// 1194:12BE: the page's top left, A7h by 9Fh, kept in bank [1032]
+    /// at the frame's start (8F26), the bank mapped before put back.
+    pub(crate) fn corner_kept(&mut self) {
         let bank = self.l16(0x1032);
         let frame = self.l16(FRAME);
         let old = self.map_bank(bank, 0);
         self.page_rect_save((frame, 0), 0, 0, 0xA7, 0x9F);
         self.map_bank(old, 0);
-        self.page_clear();
-        self.sheet_image(files, CHARSTAT)?;
-        self.sheet_texts();
-        self.sheet_image(files, BONUS)?;
+    }
+
+    /// 1194:12F5: the arrows: UPDOWN.IMG into bank [1032] at 67B9, the
+    /// page under them (8 by 48h at 26h, 30h) kept in bank 5, the bank
+    /// mapped before put back; 1297 38h, their region at y 30h (1354
+    /// draws them). None where the file is missing.
+    pub(crate) fn arrows_made(&mut self, files: &mut Files) -> Option<()> {
+        let bank = self.l16(0x1032);
+        let frame = self.l16(FRAME);
         let old = self.map_bank(bank, 0);
         self.file_load(files, UPDOWN, frame, ARROWS_PIC)?;
         self.map_bank(5, 0);
@@ -337,12 +359,7 @@ impl Machine {
         self.map_bank(old, 0);
         self.mem.w8(DS, 0x1297, 0x38);
         self.mem.w16(crate::mem::DATA, ARROWS_Y, 0x30);
-        let rolled = self.l16(POINTS_ROLLED);
-        self.cursor_hidden();
-        self.sheet_back(files)?;
-        self.sheet_doll(files)?;
-        self.mem.w16(DS, POINTS_ROLLED, rolled);
-        self.sheet_colours(files)
+        Some(())
     }
 
     /// 1194:1241..1249: the loop (5CF4) left by its first region, the

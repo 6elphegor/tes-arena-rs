@@ -50,6 +50,12 @@ pub mod var {
     pub const SCROLL_IMG: u16 = 0x4DC4;
     pub const SCROLL_DIGIT: u16 = 0x4DCB;
     pub const MENU_IMG: u16 = 0x4E0D;
+    /// The opening story's song ("EVLINTRO.XMI"), its pictures (nine of
+    /// a name's offset and a wait: "intro01.img" and on) and their names'
+    /// digit.
+    pub const EVLINTRO: u16 = 0x4D87;
+    pub const STORY_PICTURES: u16 = 0x4DA0;
+    pub const STORY_DIGIT: u16 = 0x4DD7;
     /// The movies' buffer's segment (0 for one of the heap's).
     pub const MOVIE_BUFFER: u16 = 0xA69E;
     /// The game's timer count.
@@ -174,6 +180,97 @@ impl Machine {
         self.title_image(seg, 0)?;
         hooks.picture(self, seg, 0, 3);
         self.heap_free(seg);
+        Some(())
+    }
+
+    /// 1194:55B2 as the game's state sees it (from 0000:111A, the menu's
+    /// pick): the colours at 929E black and the page cleared; the fade to
+    /// them is the front end's.
+    pub fn screen_faded(&mut self) {
+        self.sheet_black();
+    }
+
+    /// 0000:1323, the opening story before creation (from the menu's New,
+    /// 1130): the song stopped and EVLINTRO.XMI (4D87) started, the keys
+    /// flushed and the buttons waited up (13ED); bank [1030] mapped, the
+    /// frame the movie's buffer (A69E), A902 bits 100h..200h cleared,
+    /// SCROLL.FLC (6546 straight); the digit at 4DD7 '1'; unless Esc is
+    /// held, the nine pictures of the table at 4DA0 (each its name and its
+    /// wait) each to the far pointer at 902E, drawn and dissolved in (1393)
+    /// and waited for (13BF), the digit counted on, Esc ending them; the
+    /// song stopped and the screen faded out (55B2: 929E black, the page
+    /// cleared). None where a file doesn't load or a path isn't ported.
+    pub fn story(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks) -> Option<()> {
+        self.music_song(EVLINTRO);
+        self.keys_up();
+        self.map_bank(self.mem.r16(DS, 0x1030), 0);
+        let frame = self.mem.r16(DS, 0x9030);
+        self.mem.w16(DS, MOVIE_BUFFER, frame);
+        let v = self.mem.r16(DS, 0xA902) & 0xFCFF;
+        self.mem.w16(DS, 0xA902, v);
+        self.movie(files, hooks, SCROLL_FLC)?;
+        self.mem.w8(DS, STORY_DIGIT, b'1');
+        if self.mem.r8(DS, ESC_HELD) == 0 {
+            for k in 0..9u16 {
+                let name = self.mem.r16(DS, STORY_PICTURES + 4 * k);
+                let wait = self.mem.r16(DS, STORY_PICTURES + 4 * k + 2);
+                self.picture_dissolved(files, hooks, name)?;
+                self.title_wait(hooks, wait);
+                let d = self.mem.r8(DS, STORY_DIGIT).wrapping_add(1);
+                self.mem.w8(DS, STORY_DIGIT, d);
+                if self.mem.r8(DS, ESC_HELD) != 0 {
+                    break;
+                }
+            }
+        }
+        self.music_stop();
+        self.sheet_black();
+        hooks.fade_out(self);
+        Some(())
+    }
+
+    /// 0000:1393: the picture named at DS:`name` to the far pointer at
+    /// 902E (742C), drawn (582C), dissolved in (1194:4FF7, its generator
+    /// 4B8E stepped: the hook sees it as the dissolve starts) and shown
+    /// (946A).
+    fn picture_dissolved(&mut self, files: &mut Files, hooks: &mut dyn TitleHooks, name: u16) -> Option<()> {
+        let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+        self.file_load(files, name, seg, off)?;
+        self.title_image(seg, off)?;
+        hooks.picture(self, seg, off, 2);
+        self.dissolve();
+        Some(())
+    }
+
+    /// 0000:1139..117D, the menu's New after creation (1194:2498): the
+    /// screen faded out (55B2); creation's vision (1194:D459 with text
+    /// 578h, the song at 809A, the movie at 8085; 803C 0, A902 bit 200h
+    /// set and 100h cleared, 9288 2Fh; `vision` with `hooks` and the
+    /// colours as the fade left them, 929E's); faded out again; 5C8 bit 4
+    /// cleared; the game set up (21EE:016C, `game_setup`); the game's own
+    /// files copied to the working slot (25FD:0219); 5CA bit 8000h
+    /// cleared. Then main (0000:1096..10AB): the song stopped, on to the
+    /// start dungeon (0C66, `game_start`). None where a file doesn't load
+    /// or a path isn't ported.
+    pub fn new_game_begun(&mut self, files: &mut Files, hooks: &mut dyn crate::vision::VisionHooks) -> Option<()> {
+        self.sheet_black();
+        hooks.fade_out(self);
+        self.mem.w8(DS, 0x803C, 0);
+        let v = (self.mem.r16(DS, 0xA902) | 0x200) & 0xFEFF;
+        self.mem.w16(DS, 0xA902, v);
+        self.mem.w8(DS, 0x9288, 0x2F);
+        let dac: [[u8; 3]; 256] = std::array::from_fn(|i| std::array::from_fn(|k| self.mem.r8(DS, 0x929E + (i * 3 + k) as u16)));
+        self.vision(files, hooks, Some(&dac), 0x578, 0x809A, 0x8085)?;
+        self.sheet_black();
+        hooks.fade_out(self);
+        let v = self.mem.r16(DS, 0x05C8) & 0xFFFB;
+        self.mem.w16(DS, 0x05C8, v);
+        self.game_setup(&mut crate::start::SetupPort(files))?;
+        self.working_files_fresh(files);
+        let v = self.mem.r16(DS, 0x05CA) & 0x7FFF;
+        self.mem.w16(DS, 0x05CA, v);
+        self.music_stop();
+        self.game_start();
         Some(())
     }
 
