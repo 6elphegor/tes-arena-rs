@@ -292,7 +292,11 @@ impl Front<'_> {
         let drawn = m.mem.r8(DS, 0x9288);
         m.mem.w8(DS, 0x9288, colour);
         let pick = match (&boxes, self.talk.as_deref_mut()) {
-            (Some(_), Some(t)) => t.menu(m, si, bx, di),
+            (Some(b), Some(t)) => {
+                let pick = t.menu(m, si, bx, di);
+                m.menu_reads = t.menu_reads.take();
+                m.menu_answered(b, bx, pick)
+            }
             _ => 0xFFFF,
         };
         m.mem.w8(DS, 0x9288, drawn);
@@ -1780,6 +1784,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         selected: 0,
         list_top: 0,
         list_reads: Vec::new(),
+        menu_reads: Vec::new(),
         arrowed: false,
         live: None,
         status: None,
@@ -3156,6 +3161,10 @@ struct App {
     /// loop (3159:06A0) would read them (`list_read`); given the game's
     /// list with its answer (`dialog::Answer::List`).
     list_reads: Vec<arena::listwindow::ListRead>,
+    /// The mouse's reads and the keys typed before each since the menu was
+    /// asked, the menu's loop's (3159:0F2A), given the game's menu with
+    /// its answer (`dialog::Answer::Menu`).
+    menu_reads: Vec<arena::menubox::MenuRead>,
     /// The arrows or the wheel moved `selected` since the menu came up:
     /// only then is its entry marked (the original marks none).
     arrowed: bool,
@@ -3553,6 +3562,7 @@ impl App {
             self.selected = 0;
             self.list_top = 0;
             self.list_reads.clear();
+            self.menu_reads.clear();
             self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
@@ -5163,6 +5173,14 @@ impl App {
             return;
         }
         let Some(p) = &self.pending else { return };
+        // A menu's loop takes the keys typed through the key interrupt
+        // (3159:10DD, 7138): pressed and let go before its next read.
+        if matches!(&p.need, dialog::Need::Menu(m) if !m.list && m.kind != hud::DIALOG_BUTTONS) {
+            if let Some(scan) = interface::scan_code(code) {
+                self.menu_read(0, &[scan, scan | 0x80]);
+            }
+        }
+        let Some(p) = &self.pending else { return };
         match &p.need {
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
@@ -5192,7 +5210,7 @@ impl App {
                     }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
                         let s = self.selected.min(n - 1) as u16;
-                        self.answer(dialog::Answer::Pick(s));
+                        self.menu_answer(s);
                     }
                     // Esc leaves a list as the right button does, where it
                     // does (`hud::leaves`).
@@ -5200,7 +5218,10 @@ impl App {
                         self.list_tap(arena::listwindow::list_keys::ESC.0);
                         self.list_answer(0xFFFF);
                     }
-                    KeyCode::Escape if !menu.list => self.answer(dialog::Answer::Pick(0xFFFF)),
+                    KeyCode::Escape if !menu.list => {
+                        self.menu_read(0, &[]);
+                        self.menu_answer(0xFFFF);
+                    }
                     KeyCode::Escape => {}
                     _ => {
                         let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
@@ -5208,7 +5229,8 @@ impl App {
                         let by_key = menu.keys.iter().position(|&k| k.to_ascii_uppercase() == up);
                         let by_number = (c as char).to_digit(10).filter(|&d| d >= 1).map(|d| d as usize - 1).filter(|&i| i < menu.entries.len());
                         if let Some(i) = by_key.or(by_number) {
-                            self.answer(dialog::Answer::Pick(i as u16));
+                            self.menu_read(0, &[]);
+                            self.menu_answer(i as u16);
                         }
                     }
                 }
@@ -5335,8 +5357,30 @@ impl App {
         }
         let hud = self.hud();
         if let Some(i) = hud::menu_pick(&self.font, &hud, x, y) {
-            self.answer(dialog::Answer::Pick(i as u16));
+            self.menu_read(1, &[]);
+            self.menu_read(0, &[]);
+            self.menu_answer(i as u16);
         }
+    }
+
+    /// A read of the mouse as the menu's loop makes it (0000:8FC4): its
+    /// `buttons`, the cursor's place on the 320 x 200 screen, the bytes the
+    /// keyboard gave since (`codes`); the loop's first read, as it starts
+    /// with nothing held, before the first.
+    fn menu_read(&mut self, buttons: u8, codes: &[u8]) {
+        let (x, y) = self.screen_point();
+        let (x, y) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        if self.menu_reads.is_empty() {
+            self.menu_reads.push(arena::menubox::MenuRead { buttons: 0, x, y, codes: Vec::new() });
+        }
+        self.menu_reads.push(arena::menubox::MenuRead { buttons, x, y, codes: codes.to_vec() });
+    }
+
+    /// The menu's entry `pick` answered (FFFFh: left), with the reads that
+    /// came to it.
+    fn menu_answer(&mut self, pick: u16) {
+        let reads = std::mem::take(&mut self.menu_reads);
+        self.answer(dialog::Answer::Menu(pick, reads));
     }
 
     /// A read of the mouse as the list's loop makes it (0000:8FC4): its
@@ -5609,7 +5653,9 @@ impl App {
                     self.list_read(0, 0);
                     self.list_answer(0xFFFF);
                 } else if self.menu_asked().is_some_and(hud::leaves) {
-                    self.answer(dialog::Answer::Pick(0xFFFF));
+                    self.menu_read(2, &[]);
+                    self.menu_read(0, &[]);
+                    self.menu_answer(0xFFFF);
                 }
             }
             In::Button { down: true, button } if self.panel.is_some() => self.panel_click(button == MouseButton::Right),

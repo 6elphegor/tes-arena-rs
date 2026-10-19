@@ -150,9 +150,14 @@ fn differs(a: &Engine, b: &Engine) -> Vec<u16> {
 /// alone and not compared.
 const KEY_RING: std::ops::Range<u16> = 0xAC46..0xACB5;
 
+/// The cursor's place (8F92, 8F94): a menu's loop (3159:0F2A) reads it
+/// from the window's mouse (kept within the entries' column), which the
+/// scripted path, given its picks, doesn't run; the input's alone too.
+const CURSOR: std::ops::Range<u16> = 0x8F92..0x8F96;
+
 fn same(a: &App, b: &App, what: &str) {
     let mut b_engine = Engine::new(b.engine.m.clone(), b.engine.files.clone());
-    for o in KEY_RING {
+    for o in KEY_RING.chain(CURSOR) {
         let v = a.engine.m.mem.r8(arena::mem::DS, o);
         b_engine.m.mem.w8(arena::mem::DS, o, v);
     }
@@ -307,7 +312,7 @@ fn talk_menu_by_letter_as_by_script() {
     let m = menu(&a).expect("a menu").clone();
     // Entry 1's key ("Where is..."), typed.
     let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
-    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    d.key(&mut a, KeyCode::KeyH, Some(&letter));
     let (mut b, _) = talk_start(&dir, "1");
     as_far_as(&mut b, &a);
     same(&a, &b, "entry 1 by its letter and by --picks 1");
@@ -321,7 +326,7 @@ fn where_is_shows_its_list_and_tells_the_way_as_by_script() {
     assert!(until_asked(&mut d, &mut a, 3));
     let m = menu(&a).expect("a menu").clone();
     let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
-    d.key(&mut a, KeyCode::KeyW, Some(&letter));
+    d.key(&mut a, KeyCode::KeyH, Some(&letter));
     // "Where is": 1194:5734 with AX 9 (POPUP11.IMG, the record at 5105).
     let l = menu(&a).expect("the places' list").clone();
     assert!(l.list && l.kind == 9, "a list of kind 9: {} {}", l.list, l.kind);
@@ -391,7 +396,7 @@ fn a_list_takes_two_clicks_and_leaves_by_the_right_button() {
         assert!(until_asked(&mut d, &mut a, 3));
         let m = menu(&a).expect("a menu").clone();
         let letter = (m.keys[1] as char).to_ascii_lowercase().to_string();
-        d.key(&mut a, KeyCode::KeyW, Some(&letter));
+        d.key(&mut a, KeyCode::KeyH, Some(&letter));
         assert!(menu(&a).is_some_and(|l| l.list), "the places' list");
         (a, d)
     };

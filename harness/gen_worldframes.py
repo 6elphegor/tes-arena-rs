@@ -811,6 +811,11 @@ INFORMANT_SCRIPT = [MORE, MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 
 # the tavern's menu; its Exit.
 INFORMANT_PAID_SCRIPT = [MORE, ACCEPT, MORE, MORE, MORE, MORE, ('click', 0xA0, 0xA3)]
 TALK_WHERE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+# TALK_WHERE_SCRIPT with the talk's menu answered by its key, H (3159:
+# 10DD: the key interrupt's character, 7138, made a capital by 9D74 and
+# found among the keys at 8532), and left by the right button (10D6)
+# instead of Goodbye.
+TALK_KEY_SCRIPT = [('keys', [0x23]), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('rclick', 0xA0, 0x95)]
 TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 95), ('click', 100, 95), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 # As TALK_QUEST_SCRIPT, the list scrolled by its bar and its up arrow
 # first (3159:0D95, 09C2: the knob's middle at the click, the lines shown
@@ -1251,6 +1256,9 @@ CASES = {
     # 13h, 9 rows high), 1194:E087's sorted list's first line (the way
     # told, its box clicked away), then the menu's Goodbye.
     'playtalkwhere': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_WHERE_SCRIPT)})]),
+    # As playtalkwhere, the menu answered by its key and left by the right
+    # button (TALK_KEY_SCRIPT).
+    'playtalkkey': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_KEY_SCRIPT)})]),
     # "Where is" and its fourth line, the palace (marked by the first
     # click, taken by the second: 3159:0A1D; the way told at once,
     # 1194:E0DE): the list's DI, A872, as the talk's menu left it.

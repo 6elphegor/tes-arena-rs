@@ -1,7 +1,9 @@
 //! A menu's boxes (1194:020E and its 3159:0F2A): what showing a menu and
-//! putting it away leaves in the game's state around the pick, which is
-//! the front end's (the keys, the clicks by row, Esc and the right
-//! button: 3159:10BE..1134).
+//! putting it away leaves in the game's state, and its loop (3159:10BE..
+//! 1199: the keys, the clicks by row, Esc and the right button), run over
+//! the mouse's reads the front end gives it (`MenuRead`,
+//! `Machine::menu_reads`, `Machine::menu_answered`). Without reads (or
+//! where they end before the loop does) the front end's pick is taken.
 //!
 //! 020E waits for the buttons to be let go (8FC4), flushes the keys
 //! (710E) and calls 0F2A with its title (DS:SI), its keys (DS:BX) and its
@@ -38,6 +40,19 @@
 
 use crate::machine::Machine;
 use crate::mem::DS;
+
+/// One read of the mouse by the menu's loop (0000:8FC4): its buttons
+/// (AFF9: bit 0 left, 1 right) and the cursor's place (8F92, 8F94), and
+/// the bytes the keyboard gave the key interrupt (0000:718A) since the
+/// read before (a key's make code pressed, its break code let go), as the
+/// front end saw them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MenuRead {
+    pub buttons: u8,
+    pub x: u16,
+    pub y: u16,
+    pub codes: Vec<u8>,
+}
 
 /// The boxes a menu showed: where their backgrounds' records are (965A's
 /// DX:AX, a heap block's segment and 0, or DGROUP:FFFEh with none kept),
@@ -140,5 +155,108 @@ impl Machine {
         self.dissolve();
         self.key_flush();
         self.mouse_limits(0, 0, 0x135, 0xC8);
+    }
+
+    /// The menu's loop over the front end's `reads` (`menu_reads`, taken)
+    /// run on a copy between `menu_boxes` and `menu_closed`, its keys at
+    /// DS:`bx` (FFFFh none): where they reach its end the copy is kept and
+    /// its pick returned; otherwise the front end's `pick` as it is.
+    pub fn menu_answered(&mut self, boxes: &MenuBoxes, bx: u16, pick: u16) -> u16 {
+        if let Some(reads) = self.menu_reads.take() {
+            let mut run = self.clone();
+            let ax = run.menu_loop(boxes, bx, &reads);
+            if std::env::var_os("ARENA_LIST_DEBUG").is_some() {
+                eprintln!("menu loop over {} reads: {:?} (pick given {:04X})", reads.len(), ax, pick);
+            }
+            if let Some(ax) = ax {
+                *self = run;
+                return ax;
+            }
+        }
+        pick
+    }
+
+    /// 3159:10BE..1199: the menu's loop. The mouse read (8FC4; the
+    /// CyberMan's poll, 2F26:02A1, nothing without one), then each pass:
+    /// the left button down ends it; the right button (020E's flags always
+    /// have 4000h) leaves it; a key typed (7138), Esc leaving, others
+    /// made capitals (9D74) and looked for among the entries' keys (one
+    /// byte each at DS:`bx`, as many as the entries, whatever they hold),
+    /// picking that entry; otherwise the mouse read again, the cursor
+    /// drawn and put back (5454, 541E; the page shown, 9466, the front
+    /// end's). Ended, the cursor's place is kept while the buttons are
+    /// read until all are let go, then put back (1134..1151); left, the
+    /// pick is FFFFh; otherwise a key's entry, or the count less one of
+    /// the entries whose boxes start at or above the cursor (1164..1199,
+    /// FFFFh above them all). None where the reads end first.
+    pub fn menu_loop(&mut self, boxes: &MenuBoxes, bx: u16, reads: &[MenuRead]) -> Option<u16> {
+        let mut reads = reads.iter();
+        let n = boxes.entries.len() as u16;
+        self.menu_read(reads.next()?)?;
+        let mut keyed = 0xFFFFu16;
+        let left = 'pass: loop {
+            let b = self.mem.r8(DS, 0xAFF9);
+            if b & 1 != 0 {
+                break false;
+            }
+            if b & 2 != 0 {
+                break true;
+            }
+            let al = self.key_read();
+            if al != 0 {
+                if al == 0x1B {
+                    break true;
+                }
+                let up = if al.is_ascii_lowercase() { al - 0x20 } else { al };
+                if bx != 0xFFFF {
+                    for i in 0..n {
+                        if self.mem.r8(DS, bx.wrapping_add(i)) == up {
+                            keyed = i;
+                            break 'pass false;
+                        }
+                    }
+                }
+            }
+            self.menu_read(reads.next()?)?;
+            self.cursor_drawn();
+            self.cursor_hidden();
+        };
+        let (x, y) = (self.mem.r16(DS, 0x8F92), self.mem.r16(DS, 0x8F94));
+        loop {
+            self.menu_read(reads.next()?)?;
+            if self.mem.r8(DS, 0xAFF9) == 0 {
+                break;
+            }
+        }
+        self.mem.w16(DS, 0x8F94, y);
+        self.mem.w16(DS, 0x8F92, x);
+        if left {
+            return Some(0xFFFF);
+        }
+        if keyed != 0xFFFF {
+            return Some(keyed);
+        }
+        let cy = self.mem.r16(DS, 0x8F94);
+        let mut dx = 0xFFFFu16;
+        for &(seg, off) in &boxes.entries {
+            if cy >= self.mem.r16(seg, off.wrapping_add(2)) {
+                dx = dx.wrapping_add(1);
+            }
+        }
+        Some(dx)
+    }
+
+    /// 0000:8FC4 as the menu's loop reads the mouse: the bytes the key
+    /// interrupt took since (`key_event`), the buttons (AFF9) and the
+    /// cursor's place (8F92, 8F94, kept within its limits) as `r` has them.
+    fn menu_read(&mut self, r: &MenuRead) -> Option<()> {
+        for &c in &r.codes {
+            self.key_event(c)?;
+        }
+        self.mem.w8(DS, 0xAFF9, r.buttons);
+        self.mem.w16(DS, 0x8F92, r.x);
+        self.mem.w16(DS, 0x8F94, r.y);
+        self.mouse_clamp();
+        Some(())
     }
 }

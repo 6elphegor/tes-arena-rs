@@ -703,7 +703,15 @@ impl Machine {
                         failed = true;
                         return false;
                     };
-                    let answer = if boxes.is_some() { pick(m) } else { 0xFFFF };
+                    // The loop over the front end's reads where it gave
+                    // them (`menu_reads`), its keys at 4B60 (Y, N).
+                    let answer = match &boxes {
+                        Some(b) => {
+                            let p = pick(m);
+                            m.menu_answered(b, 0x4B60, p)
+                        }
+                        None => 0xFFFF,
+                    };
                     m.menu_closed(boxes.as_ref());
                     answer == 0
                 },
