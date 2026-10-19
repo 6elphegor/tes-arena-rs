@@ -229,10 +229,11 @@ the original routine:
 | `NewGameHooks::palette` | src/newgame.rs:104 | 1194:1695 | present | the attribute screen's palette | |
 | `NewGameHooks::parchment_drop` | src/newgame.rs:123 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
 | `NewGameHooks::resources` | src/newgame.rs:114 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
-| `NewGameHooks::roll_screen` | src/newgame.rs:112 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
+| `NewGameHooks::roll_picture` | src/newgame.rs:113 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
+| `NewGameHooks::roll_screen` | src/newgame.rs:122 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
 | `NewGameHooks::sheet_keep` | src/newgame.rs:134 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
 | `NewGameHooks::spells` | src/newgame.rs:118 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
-| `NewGameHooks::stats_screen` | src/newgame.rs:102 | 1194:0DC7 | port | the default names the clothes (16AA's 1D22, `sheet_clothes`); the drawing is the view's (`create.rs`) | fixed: the clothes' names stayed a man's (titleplay creation) |
+| `NewGameHooks::stats_screen` | src/newgame.rs:107 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
 | `NoteHooks::restore` | src/mapnotes.rs:60 | 0000:3698 | present | the screen region put back | |

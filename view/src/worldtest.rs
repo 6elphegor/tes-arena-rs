@@ -2275,6 +2275,13 @@ fn the_state_measured_against_the_originals() {
 /// too, or a word marked `alone` is 0, another writer's); the offsets
 /// tests/vectors/loadexclude.txt names zeroed (on both sides).
 fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
+    load_canonical_kept(dir, d, &[])
+}
+
+/// `load_canonical` with the loadsegs.txt words at `kept` left as they
+/// are: where the path compared never ran the writer the file names (a
+/// new game's A83C is 56C8's last picture's height, no load's segment).
+fn load_canonical_kept(dir: &std::path::Path, d: &[u8], kept: &[usize]) -> Vec<u8> {
     let image = arena::exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
     let mut d = d.to_vec();
     let base = DS as usize * 16;
@@ -2285,7 +2292,7 @@ fn load_canonical(dir: &std::path::Path, d: &[u8]) -> Vec<u8> {
         if let Some(w) = f.next() {
             let at = usize::from_str_radix(w, 16).unwrap();
             let held = if f.next() == Some("alone") { &d[at..at + 2] } else { &d[at - 2..at + 2] };
-            if held.iter().any(|&b| b != 0) {
+            if held.iter().any(|&b| b != 0) && !kept.contains(&at) {
                 slots.push(at);
             }
         }
@@ -2895,8 +2902,9 @@ fn started_at_menu() -> Option<(App, Driver, Scratch)> {
 /// `name`'s line of TITLEPLAY against the app's game: DGROUP whole (the
 /// harness's form, loadexclude.txt's offsets left out: `load_canonical`),
 /// the EMS banks whole, and the interface's rows of the page (as
-/// `title_load_case`'s).
-fn titleplay_compared(name: &str, a: &App) {
+/// `title_load_case`'s). `kept`: loadsegs.txt's words the path never
+/// gives a segment (`load_canonical_kept`).
+fn titleplay_compared(name: &str, a: &App, kept: &[usize]) {
     let text = std::fs::read_to_string(TITLEPLAY).expect(TITLEPLAY);
     let want: Vec<&str> = text.lines().find_map(|l| l.strip_prefix(&format!("titleplay | {name} | "))).expect("a titleplay line").split(' ').collect();
     let (ds, ems) = grab(a);
@@ -2904,12 +2912,13 @@ fn titleplay_compared(name: &str, a: &App) {
     let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
     let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
     let rows: Vec<u8> = (146 * 320..64000).map(|i| if (14..=80).contains(&(i % 320)) { 0 } else { page[i] }).collect();
+    let canon = load_canonical_kept(&a.dir, &ds, kept);
     if let Ok(d) = std::env::var("ARENA_STATE_DUMP") {
         let d = PathBuf::from(d);
-        let _ = std::fs::write(d.join(format!("{name}.port.ds")), load_canonical(&a.dir, &ds));
+        let _ = std::fs::write(d.join(format!("{name}.port.ds")), &canon);
         let _ = std::fs::write(d.join(format!("{name}.port.ems")), &ems);
     }
-    assert_eq!(format!("{:x}", fnv(load_canonical(&a.dir, &ds))), want[0], "{name}: DGROUP differs from the original's");
+    assert_eq!(format!("{:x}", fnv(canon)), want[0], "{name}: DGROUP differs from the original's");
     assert_eq!(format!("{:x}", fnv(ems)), want[1], "{name}: the EMS banks differ from the original's");
     assert_eq!(format!("{:x}", fnv(rows)), want[2], "{name}: the interface differs from the original's");
 }
@@ -2925,7 +2934,7 @@ fn the_menus_load_at_the_start_as_the_original() {
     assert!(a.saveui.is_some(), "the title's load menu");
     d.click(&mut a, 160, 21, MouseButton::Left);
     assert!(a.saveui.is_none() && a.title_engine.is_none() && a.creation.is_none(), "loaded");
-    titleplay_compared("startload", &a);
+    titleplay_compared("startload", &a, &[]);
 }
 
 /// The program started, its main on to the menu (`world::title`), the
@@ -2935,18 +2944,9 @@ fn the_menus_load_at_the_start_as_the_original() {
 /// Morrowind; every bonus point on the first attribute; the second face),
 /// its vision clicked through: the game set up and the start dungeon
 /// entered, where its world loop is about to run its first frame, as the
-/// original's.
-///
-/// Still differing (ARENA_STATE_DUMP and scratch diffs): the province's
-/// map (1194:27C2: its pictures into banks [1030] and [1032], the window
-/// library's run on TAMRIEL.MNU, 3159:000C: B7CE, B7D4, banks 12h and 18h),
-/// the class list run through the list window (1194:5734: 517F, 519E,
-/// B80D, A896), the keys creation's screens take into the game's buffer
-/// (AC4C, ACB4), the boxes' and texts' drawing state (A83D..A859), the
-/// dissolves' generator (4B8F), 8FBA, and from those the start dungeon's
-/// flats (D1E4.., CAE2) and bank 1Fh.
+/// original's: DGROUP (A83C left unshifted: no load writes a segment
+/// there in a new game), all 32 EMS banks and the interface.
 #[test]
-#[ignore = "the province map's window, the class list window, creation's keys and the boxes' drawing state aren't the original's yet (see the notes)"]
 fn a_new_game_from_the_menu_as_the_original() {
     let Some((mut a, _d, _save)) = started_at_menu() else { return };
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
@@ -2984,7 +2984,7 @@ fn a_new_game_from_the_menu_as_the_original() {
         a.creation_input(create::Input::Wait(50));
     }
     assert!(a.creation.is_none(), "the game not started: {:?}", stage(&a));
-    titleplay_compared("creation", &a);
+    titleplay_compared("creation", &a, &[0xA83C]);
 }
 
 /// A case that ends where a game the title's Load loaded is about to run

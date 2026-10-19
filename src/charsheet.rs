@@ -1283,12 +1283,7 @@ impl Machine {
         let old = self.map_bank(bank, 0);
         let page = self.mem.r16(DS, 0xA900);
         self.page_clear();
-        // 161A.
-        let si = if self.mem.r8(DS, PLAYER + 7) != 0 { BODY_F } else { BODY };
-        let race = self.mem.r8(DS, PLAYER + 4) as u16;
-        let di = self.name_dot(si, 0x0B).wrapping_sub(2);
-        self.store_utoa(race, di);
-        self.sheet_image_here(files, si)?;
+        self.body_drawn(files)?;
         self.map_bank(5, 0);
         let path = self.save_path(CHARSHET);
         self.file_write(files, path, page, 0, 0xFA00);
@@ -1309,6 +1304,26 @@ impl Machine {
 
     /// `repne scasb` for '.' over `n` bytes from DS:`si`: DI after it (or
     /// after the `n` bytes).
+    /// 1194:161A for the player with BX 14h (from 158F: a picture to the
+    /// frame drawn, its colours the front end's): the body's picture
+    /// (`body_name`) loaded into the frame of the bank mapped and drawn
+    /// (56C8, `sheet_image_here`).
+    pub(crate) fn body_drawn(&mut self, files: &mut Files) -> Option<()> {
+        let si = self.body_name();
+        self.sheet_image_here(files, si)
+    }
+
+    /// 1194:161A..163A: the body's picture named by the sex (4B90, the
+    /// woman's 3DEF) with the race's number written before its dot
+    /// (7024); its name's offset.
+    pub(crate) fn body_name(&mut self) -> u16 {
+        let si = if self.mem.r8(DS, PLAYER + 7) != 0 { BODY_F } else { BODY };
+        let race = self.mem.r8(DS, PLAYER + 4) as u16;
+        let di = self.name_dot(si, 0x0B).wrapping_sub(2);
+        self.store_utoa(race, di);
+        si
+    }
+
     fn name_dot(&self, si: u16, n: u16) -> u16 {
         for i in 0..n {
             if self.mem.r8(DS, si.wrapping_add(i)) == b'.' {
