@@ -28,7 +28,10 @@
 //! The driver is the front end's: the songs asked for are recorded on the
 //! machine (`Machine::songs`), and the front end says how the playing one
 //! is doing (`Machine::music_status`: AIL's 0 stopped, 1 playing, 2 done).
+//! With a music driver loaded in the game's memory and replayed, 2F9F's
+//! wrappers run as the original's (src/musicdrv.rs).
 
+use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
@@ -88,40 +91,28 @@ pub enum Song {
 }
 
 impl Machine {
-    /// 2F9F:0438.
-    pub fn music_stop(&mut self) {
-        self.songs.push(Song::Stop);
-    }
-
-    /// 2F9F:001F with the name at DS:`si` (the driver's own checks, a
-    /// driver loaded and a name, are the front end's).
-    pub fn music_start(&mut self, si: u16) {
-        let file = self.fm_song_file(si);
-        self.songs.push(Song::Play { at: si, file });
-    }
-
     /// The song named at DS:`si` stopped and started again, as the
     /// opening, the sheet, the vision and the ending play theirs (2F9F:0438
     /// then 001F; 0D56 isn't set).
-    pub fn music_song(&mut self, si: u16) {
+    pub fn music_song(&mut self, files: &mut Files, si: u16) {
         self.music_stop();
-        self.music_start(si);
+        self.music_start(files, si);
     }
 
     /// 1194:DB26's song: after a scene that played its own song, the song
     /// stopped and, in a building (area 4), the building's song started
     /// (25FD:051F), else the song playing before (CURRENT) when there is
     /// one. Memory is left as it is.
-    pub fn music_resume(&mut self) {
+    pub fn music_resume(&mut self, files: &mut Files) {
         self.music_stop();
         if self.mem.r8(DS, crate::trigger::var::AREA) == 4 {
             let si = self.mem.r16(DS, BUILDING_SONG);
-            self.music_start(si);
+            self.music_start(files, si);
             return;
         }
         let si = self.mem.r16(DS, CURRENT);
         if si != 0 && si != 0xFFFF {
-            self.music_start(si);
+            self.music_start(files, si);
         }
     }
 
@@ -179,7 +170,7 @@ impl Machine {
     /// town's song marked playing (TOWN_SONG), and the town's song by its
     /// size (0A47: city, town, village; three on in the desert, climate 4)
     /// started.
-    pub fn town_music(&mut self) {
+    pub fn town_music(&mut self, files: &mut Files) {
         if self.mem.r8(DS, crate::trigger::var::AREA) != 0 {
             return;
         }
@@ -190,7 +181,7 @@ impl Machine {
             cx = cx.wrapping_add(3);
         }
         let si = self.skip_strings(DS, TOWN_SONGS, cx);
-        self.music_start(si);
+        self.music_start(files, si);
     }
 
     /// 2294:04F5. Each frame's song: outdoors (C398 bit 4) NEAR cleared;
@@ -198,11 +189,11 @@ impl Machine {
     /// nothing, once over the weather's song; indoors a building's song
     /// (area 4: BUILDING_SONG), else (a dungeon) NEAR cleared and, when the
     /// dungeon changed (BB0A against DUNGEON_PICKED), its song.
-    pub fn area_music(&mut self) {
+    pub fn area_music(&mut self, files: &mut Files) {
         if self.mem.r16(DS, crate::movement::var::MAP_FLAGS) & 4 != 0 {
             self.mem.w8(DS, NEAR, 0);
             if self.mem.r8(DS, TOWN_SONG) != 0 {
-                if self.music_status == 1 {
+                if self.music_state() == 1 {
                     return;
                 }
                 self.mem.w8(DS, TOWN_SONG, 0);
@@ -222,12 +213,12 @@ impl Machine {
                     _ => SNOWING,
                 }
             };
-            self.music_play(si);
+            self.music_play(files, si);
             return;
         }
         if self.mem.r8(DS, crate::trigger::var::AREA) == 4 {
             let si = self.mem.r16(DS, BUILDING_SONG);
-            self.music_play(si);
+            self.music_play(files, si);
             return;
         }
         self.mem.w8(DS, NEAR, 0);
@@ -240,7 +231,7 @@ impl Machine {
             let r = self.rng.next() as u8;
             self.mem.w8(DS, DUNGEON_DIGIT, r % 5 + 0x31);
         }
-        self.music_play(DUNGEON);
+        self.music_play(files, DUNGEON);
     }
 
     /// 2294:10B6. The song at DS:`si` played: not without a music driver
@@ -248,7 +239,7 @@ impl Machine {
     /// or while the combat song holds (COMBAT_HOLD); the combat song starts
     /// a hold of 1Eh. It becomes CURRENT, the one playing is stopped and
     /// it is started.
-    pub fn music_play(&mut self, si: u16) {
+    pub fn music_play(&mut self, files: &mut Files, si: u16) {
         if self.mem.r16(DS, DRIVER + 2) == 0 || self.mem.r16(DS, CURRENT) == si || self.mem.r8(DS, COMBAT_HOLD) != 0 {
             return;
         }
@@ -257,6 +248,6 @@ impl Machine {
         }
         self.mem.w16(DS, CURRENT, si);
         self.music_stop();
-        self.music_start(si);
+        self.music_start(files, si);
     }
 }

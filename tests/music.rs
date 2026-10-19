@@ -102,9 +102,11 @@ fn matches_original() {
         m.music_status = m.mem.r8(DS, 0xFFBC);
         let before = m.clone();
         let mut si = 0;
+        // (No music driver in this memory: the files are never opened.)
+        let files = &mut arena::bsa::Files::default();
         match op {
-            0 => m.town_music(),
-            1 => m.area_music(),
+            0 => m.town_music(files),
+            1 => m.area_music(files),
             _ => si = m.fm_song_name(0xF000),
         }
         m.store_rng();

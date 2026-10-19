@@ -135,9 +135,9 @@ pub trait LoadHooks: AreaHooks + FightHooks + LightHooks {
     }
     /// 25FD:051F: in an interior, 2F9F:001F with the building's song at
     /// DS:[FF0] (by default `Machine::music_start`).
-    fn interior_song(&mut self, m: &mut Machine) {
+    fn interior_song(&mut self, m: &mut Machine, files: &mut Files) {
         let si = m.mem.r16(DS, crate::music::var::BUILDING_SONG);
-        m.music_start(si);
+        m.music_start(files, si);
     }
     /// 2294:0006, the 3D mode in play: true where the hook did it (the
     /// vectors stub it); by default not, and `Machine::mode_3d_level`
@@ -668,7 +668,7 @@ impl Machine {
         let w = self.mem.r8(DS, WORKING_SLOT);
         self.mem.w8(DS, SLOT, w);
         if self.mem.r8(DS, AREA) == 4 {
-            hooks.interior_song(self);
+            hooks.interior_song(self, files);
         }
         self.mem.w8(DS, 0x6636, 0);
         hooks.automap_area(self, files);

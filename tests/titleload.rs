@@ -90,7 +90,7 @@ impl LoadHooks for Count {
     fn level_automap(&mut self, m: &mut Machine, _files: &mut Files) {
         count(m, 0xFFF0);
     }
-    fn interior_song(&mut self, m: &mut Machine) {
+    fn interior_song(&mut self, m: &mut Machine, _files: &mut Files) {
         count(m, 0xFFF2);
     }
     fn automap_area(&mut self, m: &mut Machine, _files: &mut Files) {

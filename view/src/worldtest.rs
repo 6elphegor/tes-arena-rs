@@ -242,7 +242,11 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     // loaded at the program's start, its answers the original's, the
     // load's (`driver | load`) then the case's from its place's way in.
     let sound = SOUND_CASE.with(|c| c.borrow().clone());
-    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), sound: sound.as_ref().map(|_| sound_replay("load")), ..Default::default() });
+    // With music on (`MUSIC_CASE`, gen_musicplay.py's cases): a music
+    // driver loaded at the program's start, its answers the original's,
+    // the driver's load's and the load's (`music | load`) then the case's.
+    let music = MUSIC_CASE.with(|c| c.borrow().clone());
+    let mut a = app(&dir, &Start { hour: None, load: Some((save.to_path_buf(), 1)), save_dir: Some(save.to_path_buf()), sound: sound.as_ref().map(|_| sound_replay("load")), music: music.as_ref().map(|_| music_replay("load")), ..Default::default() });
     // The random seed as the harness's game has it after its load: the
     // original seeds it from the BIOS ticks (21EE:0059 -> 0000:6FC2), so
     // a game run in the harness has the seed its clock gives.
@@ -253,6 +257,10 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     BASE.with(|b| *b.borrow_mut() = Some(grab(&a)));
     if let Some(name) = &sound {
         let load = a.engine.m.digital.replace(sound_replay(name)).map(|r| r.calls).unwrap_or_default();
+        LOAD_CALLS.with(|c| *c.borrow_mut() = load);
+    }
+    if let Some(name) = &music {
+        let load = a.engine.m.music.replace(music_replay(name)).map(|r| r.calls).unwrap_or_default();
         LOAD_CALLS.with(|c| *c.borrow_mut() = load);
     }
     BASE_HEAP.with(|h| *h.borrow_mut() = heap_blocks(&a.engine.m));
@@ -1993,6 +2001,29 @@ fn case(name: &str) -> Option<Case> {
             faded(a);
             assert!(a.travel.is_none(), "the journey ends the travel map");
             ENDS.with(|e| e.set(true));
+        })),
+        // gen_musicplay.py's own: `playjourneyend` on into three of the
+        // town's frames (each asking after the town's song, 2294:0509).
+        "playjourneyon" => (Place::Street, Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            for (x, y) in [(70, 45), (200, 100), (200, 100), (62, 180)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
+            for _ in 0..100 {
+                if a.travel.is_none() {
+                    break;
+                }
+                d.wait(a, 100);
+            }
+            faded(a);
+            assert!(a.travel.is_none(), "the journey ends the travel map");
+            // (Shift and M still held, as the harness's step leaves them.)
+            // The town's first frame's top, then its three frames.
+            seen.push(state(a));
+            frames(a, d, seen, 3, |_| false);
         })),
         // The first level's up stairs walked into: the way out's travel
         // map (0000:4537, 26F7:0000) inside the frame, Esc on it stays,
@@ -3994,7 +4025,104 @@ fn the_sounds_play_as_the_original() {
     }
 }
 
+/// gen_musicplay.py's vectors: worldframes cases with a music driver
+/// loaded at the program's start.
+const MUSIC_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/musicplay.txt");
+
+/// The cases gen_musicplay.py runs with music on: a town's street by day
+/// and at night, the wilderness, a dungeon, a tavern (each starting its
+/// song, 2294:04F5's), and a journey to another town (the street's song
+/// faded and stopped, the town's started and asked after each frame).
+const MUSIC_CASES: [&str; 6] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon"];
+
+/// A `music` line of MUSIC_VECTORS, its runs (`DD6:0=1*4`) spelt out.
+fn music_calls(name: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(MUSIC_VECTORS).expect(MUSIC_VECTORS);
+    let line = text.lines().find_map(|l| l.strip_prefix(&format!("music | {name} | "))).unwrap_or_else(|| panic!("{name}: a music line"));
+    let mut out = Vec::new();
+    for w in line.split(' ').filter(|w| !w.is_empty()) {
+        let (c, n) = w.rsplit_once('*').map_or((w, 1), |(c, n)| (c, n.parse().unwrap()));
+        out.extend(std::iter::repeat_n(c.to_string(), n));
+    }
+    out
+}
+
+/// The original driver's answers in `name`'s line, in turn, for the
+/// engine's replay (`Machine::music`).
+fn music_replay(name: &str) -> arena::musicdrv::Replay {
+    arena::musicdrv::Replay::of(&music_calls(name).join(" "))
+}
+
+/// The calls the engine made into the music driver (`got`) against the
+/// original's (`name`'s line): the first that differs, and around it.
+fn music_calls_check(name: &str, got: &[String]) {
+    let want = music_calls(name);
+    if let Some(i) = (0..want.len().max(got.len())).find(|&i| want.get(i) != got.get(i)) {
+        let around = |v: &[String]| v[i.saturating_sub(3)..(i + 3).min(v.len())].join(" ");
+        panic!("{name}: the calls into the music driver differ from the original's at {i} of {}: {} against the original's {}", want.len(), around(got), around(&want));
+    }
+}
+
+/// With a music driver loaded at the program's start (gen_musicplay.py:
+/// `world::boot_music`), the driver's load and the title's Load make the
+/// original's calls into it (`music | load`: the image registered,
+/// described, its device found and set going, the state table's and the
+/// timbre cache's sizes asked and the cache given; the load's interior's
+/// song, its name stale in this save, not read) and leave the game's
+/// state as the original's (`loadstate`, `loadems`; the file-open hook's
+/// segment word, A906, the harness's 1000h higher, left out).
+#[test]
+fn the_load_with_music_on_as_the_original_leaves_it() {
+    MUSIC_CASE.with(|c| *c.borrow_mut() = Some(MUSIC_CASES[0].into()));
+    let r = played(Place::Guild, |_| {}, |_, _, _| {});
+    MUSIC_CASE.with(|c| c.borrow_mut().take());
+    let Some(_) = r else { return };
+    let (mine, banks) = BASE.with(|b| b.borrow_mut().take()).unwrap();
+    music_calls_check("load", &LOAD_CALLS.with(|c| c.take()));
+    let text = std::fs::read_to_string(MUSIC_VECTORS).expect(MUSIC_VECTORS);
+    let want = text.lines().find_map(|l| l.strip_prefix("loadstate | ")).expect("a loadstate line");
+    let mut d = load_canonical(&game_dir().unwrap(), &mine);
+    d[0xA906..0xA908].fill(0);
+    assert_eq!(format!("{:x}", fnv(d)), want, "the state after the load with music on differs from the original's");
+    let want = text.lines().find_map(|l| l.strip_prefix("loadems | ")).expect("a loadems line");
+    assert_eq!(format!("{:x}", fnv(banks)), want, "the EMS banks after the load with music on differ from the original's");
+}
+
+/// gen_musicplay.py's cases, with music on: the player's frames, the
+/// calls into the music driver (a song started, 2F9F:001F: its file read
+/// to the heap, its sequence registered, each timbre it asks for read
+/// from SAMPLE.AD, 1194:4943, and installed, its channels' volume set, it
+/// started at the music's volume; faded and stopped, 0438; asked after,
+/// 000D), DGROUP from the case's start and from the load, and the EMS
+/// banks, as the original's. (ARENA_CASE: that case alone.)
+#[test]
+fn the_music_plays_as_the_original() {
+    let only = std::env::var("ARENA_CASE").ok();
+    for name in MUSIC_CASES {
+        if only.as_deref().is_some_and(|o| o != name) {
+            continue;
+        }
+        MUSIC_CASE.with(|c| *c.borrow_mut() = Some(name.into()));
+        let (place, setup, play) = case(name).unwrap();
+        let Some((a, seen)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a);
+        }, play) else {
+            MUSIC_CASE.with(|c| c.borrow_mut().take());
+            return;
+        };
+        assert_eq!(seen, track_in(MUSIC_VECTORS, name), "{name}: the player's frames differ from the original's");
+        music_calls_check(name, &a.engine.m.music.as_ref().expect("the replay").calls);
+        state_compared_in(MUSIC_VECTORS, name, false, case(name).unwrap());
+        state_compared_in(MUSIC_VECTORS, name, true, case(name).unwrap());
+        state_ems_in(MUSIC_VECTORS, name, case(name).unwrap());
+        MUSIC_CASE.with(|c| c.borrow_mut().take());
+    }
+}
+
 thread_local! {
+    /// The case `played` runs with music on (gen_musicplay.py's).
+    static MUSIC_CASE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
     /// The case `played` runs with sound on (gen_soundplay.py's).
     static SOUND_CASE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
     /// The calls the load made into the driver, with sound on.

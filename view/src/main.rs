@@ -2068,7 +2068,7 @@ fn movies_of(engine: &mut Engine, archive: &archive::Archive, played: Vec<(&'sta
         .filter_map(|(name, text, colour)| {
             // Its song (the routines that show them take one).
             if let Some(song) = music::movie_song(name) {
-                engine.m.music_song(song);
+                engine.m.music_song(&mut engine.files, song);
             }
             if name.ends_with(".IMG") {
                 // A still with its text all at once (the ending's house).
@@ -3299,7 +3299,7 @@ impl App {
             mv.lead_from(&self.assets.shown, *self.screen.palette());
         }
         if self.movies.is_empty() {
-            self.engine.m.music_resume();
+            self.engine.m.music_resume(&mut self.engine.files);
             self.music.after(&mut self.engine.m, 0);
         }
     }
@@ -3316,7 +3316,7 @@ impl App {
             self.creation_song = song;
             if let Some(s) = song {
                 self.music.before(&mut self.engine.m);
-                self.engine.m.music_song(s);
+                self.engine.m.music_song(&mut self.engine.files, s);
                 self.music.after(&mut self.engine.m, 0);
             }
         }
