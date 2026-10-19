@@ -239,9 +239,13 @@ pub enum Panel {
 #[derive(Clone, Debug, Default)]
 pub struct Inventory {
     pub using: Option<(Vec<String>, usize)>,
-    /// The drop button's question up (its text, the answer highlighted:
-    /// 0 yes).
+    /// The drop button's question up (its text, the answer the arrows
+    /// marked: 0 yes, none until they move).
     pub asking: Option<(Vec<u8>, usize)>,
+    /// That question as 1194:48E9's 020E shows it (`dialog::menu_at` on
+    /// the game as it asked: the text at DROP_TEXT, the keys at 4B60, the
+    /// entries at 4B63, its colour and font).
+    pub asked_menu: Option<crate::hud::Menu>,
     /// On the sheet's own page, the key interrupt's ring (AC46..ACB4) as
     /// the drop's key left it: the answer's key, which the window's key
     /// interrupt puts after it, goes in after the menu's flush instead
@@ -836,11 +840,14 @@ pub fn drop_press(m: &mut Machine, inv: &mut Inventory, said: &mut Said) {
     let mut probe = m.clone();
     let mut asked = None;
     let r = probe.drop_button(&mut |p| {
-        asked = Some(p.mem.cstr(DS, DROP_TEXT).to_vec());
+        asked = Some((p.mem.cstr(DS, DROP_TEXT).to_vec(), crate::dialog::menu_at(p, DROP_TEXT, 0x4B60, 0x4B63)));
         false
     });
     match asked {
-        Some(text) => inv.asking = Some((text, 0)),
+        Some((text, menu)) => {
+            inv.asking = Some((text, usize::MAX));
+            inv.asked_menu = Some(menu);
+        }
         None => {
             *m = probe;
             drop_said(m, r, said);
@@ -865,6 +872,40 @@ fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
 
 /// The drop's question as the original's yes-or-no menu (1194:48E9 ->
 /// 020E), entry `sel` highlighted.
+/// The drop's question as it is up (`Inventory::asked_menu`, else
+/// `drop_menu`), the entry the arrows marked.
+pub fn drop_question(inv: &Inventory) -> Option<crate::hud::Menu> {
+    let (text, sel) = inv.asking.as_ref()?;
+    let mut menu = inv.asked_menu.clone().unwrap_or_else(|| drop_menu(text, 0));
+    menu.selected = *sel;
+    Some(menu)
+}
+
+/// The drop question's boxes' tiles: the sheet's, MARBLE2.CIF's 3 x 3
+/// ([103A], made B038's as the sheet opens, 1194:0CF8).
+pub fn drop_tiles(archive: &crate::archive::Archive) -> Option<crate::hud::Tiles> {
+    crate::hud::Tiles::load(archive, "MARBLE2.CIF", 3, 3)
+}
+
+/// The font the drop question is drawn in: the one selected as it was
+/// asked (B036, `Menu::font`).
+fn drop_font(menu: &crate::hud::Menu) -> Option<&'static crate::hud::Font> {
+    crate::hud::game_font(menu.font?)
+}
+
+/// The drop question's boxes as 3159:0F2A lays them out in those tiles
+/// and that font: its title's and its entries'.
+#[allow(clippy::type_complexity)]
+pub fn drop_rects(archive: &crate::archive::Archive, menu: &crate::hud::Menu) -> Option<(Option<(i32, i32, i32, i32)>, Vec<(i32, i32, i32, i32)>)> {
+    let tiles = drop_tiles(archive)?;
+    Some(crate::hud::custom::menu_rects(&tiles, drop_font(menu)?, &menu.title, &menu.entries))
+}
+
+/// The drop question's entry a click at y picks (`menu_entry`).
+pub fn drop_pick(archive: &crate::archive::Archive, menu: &crate::hud::Menu, y: i32) -> Option<usize> {
+    crate::hud::custom::menu_entry(&drop_rects(archive, menu)?.1, y)
+}
+
 pub fn drop_menu(text: &[u8], sel: usize) -> crate::hud::Menu {
     let line = |s: &str| vec![Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }];
     crate::hud::Menu {
@@ -1144,9 +1185,24 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                 let hud = crate::hud::Hud { menu: Some(use_menu(names, *sel)), ..Default::default() };
                 crate::hud::compose_over(screen, font, &hud);
             }
-            if let Some((text, sel)) = &inv.asking {
-                let hud = crate::hud::Hud { menu: Some(drop_menu(text, *sel)), ..Default::default() };
-                crate::hud::compose_over(screen, font, &hud);
+            if let Some(menu) = drop_question(inv) {
+                // 3159:0F2A's boxes in the sheet's tiles and font; the
+                // view marks the entry the arrows are on.
+                let drawn = archive.and_then(|(a, _)| Some((drop_tiles(a)?, drop_rects(a, &menu)?)));
+                match (drawn, drop_font(&menu)) {
+                    (Some((tiles, (_, rects))), Some(f)) => {
+                        crate::hud::custom::draw_menu(screen, &tiles, f, &menu.title, &menu.entries, 0x60);
+                        if let Some(&(x, y, w, h)) = rects.get(menu.selected) {
+                            for (fx, fy, fw, fh) in [(x + 2, y + 2, w - 4, 1), (x + 2, y + h - 3, w - 4, 1), (x + 2, y + 2, 1, h - 4), (x + w - 3, y + 2, 1, h - 4)] {
+                                screen.fill(fx, fy, fw, fh, 0x60, 0xFF);
+                            }
+                        }
+                    }
+                    _ => {
+                        let hud = crate::hud::Hud { menu: Some(menu), ..Default::default() };
+                        crate::hud::compose_over(screen, font, &hud);
+                    }
+                }
             }
             if let Some(p) = &inv.page {
                 if let Some(archive) = archive {

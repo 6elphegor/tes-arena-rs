@@ -361,7 +361,7 @@ impl arena::hooks::StairsHooks for Front<'_> {
 /// (its text), "Drop what?" waiting in its loop (its lines and their first
 /// row), or done.
 enum SheetDrop {
-    Asked(Vec<u8>),
+    Asked(Vec<u8>, hud::Menu),
     /// "Drop what?" waiting: its lines and their row, and the list's first
     /// line shown (1297) as its loop's arrows left it.
     Waiting((Vec<(String, u8)>, u16), u8),
@@ -4176,17 +4176,19 @@ impl App {
                 } else if let Some((_, sel)) = inv.asking.as_mut() {
                     // The drop's yes or no (020E: its keys Y and N, Esc no).
                     let answer = match code {
+                        // (No entry marked till the arrows move one.)
                         KeyCode::ArrowUp | KeyCode::ArrowDown => {
-                            *sel ^= 1;
+                            *sel = if *sel == 0 { 1 } else { 0 };
                             None
                         }
-                        KeyCode::Enter | KeyCode::NumpadEnter => Some(*sel == 0),
+                        KeyCode::Enter | KeyCode::NumpadEnter if *sel < 2 => Some(*sel == 0),
                         KeyCode::KeyY => Some(true),
                         KeyCode::KeyN | KeyCode::Escape => Some(false),
                         _ => None,
                     };
                     if let Some(yes) = answer {
                         inv.asking = None;
+                        inv.asked_menu = None;
                         if inv.from_sheet && self.sheet_run.is_some() {
                             let typed = match code {
                                 KeyCode::KeyY => Some(b'y'),
@@ -4331,7 +4333,7 @@ impl App {
     fn sheet_drop(&mut self, key: Option<u8>, steps: &[DropStep]) -> SheetDrop {
         use arena::charsheet::PageInput;
         enum Stop {
-            Asked(Vec<u8>),
+            Asked(Vec<u8>, hud::Menu),
             Waiting,
         }
         let screen = self.assets.shown.clone();
@@ -4353,7 +4355,8 @@ impl App {
                     }
                     _ => {
                         if stop.borrow().is_none() {
-                            **stop.borrow_mut() = Some(Stop::Asked(p.mem.cstr(arena::mem::DS, arena::use_item::var::DROP_TEXT).to_vec()));
+                            let text = arena::use_item::var::DROP_TEXT;
+                            **stop.borrow_mut() = Some(Stop::Asked(p.mem.cstr(arena::mem::DS, text).to_vec(), dialog::menu_at(p, text, 0x4B60, 0x4B63)));
                         }
                         1
                     }
@@ -4370,7 +4373,7 @@ impl App {
             });
         }
         match stop {
-            Some(Stop::Asked(text)) => return SheetDrop::Asked(text),
+            Some(Stop::Asked(text, menu)) => return SheetDrop::Asked(text, menu),
             Some(Stop::Waiting) => return SheetDrop::Waiting(shown.unwrap_or_default(), m.mem.r8(arena::mem::DS, arena::use_item::var::FIRST_LINE)),
             None => {}
         }
@@ -4451,8 +4454,9 @@ impl App {
         let ring: Vec<u8> = RING.map(|at| self.engine.m.mem.r8(arena::mem::DS, at)).collect();
         if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
             match run {
-                SheetDrop::Asked(text) => {
-                    inv.asking = Some((text, 0));
+                SheetDrop::Asked(text, menu) => {
+                    inv.asking = Some((text, usize::MAX));
+                    inv.asked_menu = Some(menu);
                     inv.drop_ring = Some(Box::new((ring, key)));
                     inv.drop_what = Some(steps);
                     inv.drop_first = None;
@@ -4588,15 +4592,14 @@ impl App {
                         inv.using = None;
                         panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
                     }
-                } else if let Some((text, _)) = &inv.asking {
+                } else if let Some(menu) = panels::drop_question(inv) {
                     // The drop's yes or no (020E): the entry by the click's
-                    // y (`menu_entry`); the right button leaves it, as Esc.
-                    let menu = panels::drop_menu(text, 0);
-                    let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
-                    let rects: Vec<_> = (0..2).map(|i| (ex - 3, ey + i * lh, ew + 6, lh)).collect();
-                    let pick = if right { Some((1, Some(0x1B))) } else { hud::custom::menu_entry(&rects, y).map(|i| (i, None)) };
+                    // y as its boxes are laid out (`menu_pick`); the right
+                    // button leaves it, as Esc.
+                    let pick = if right { Some((1, Some(0x1B))) } else { panels::drop_pick(&self.assets.archive, &menu, y).map(|i| (i, None)) };
                     if let Some((i, typed)) = pick {
                         inv.asking = None;
+                        inv.asked_menu = None;
                         if inv.from_sheet && self.sheet_run.is_some() {
                             sheet_drop = Some((None, Some((i == 0, typed))));
                         } else {

@@ -284,6 +284,22 @@ fn an_items_description_as_the_original_draws_it() {
     );
 }
 
+/// The list's third line marked and D: the drop's question, the yes-or-no
+/// menu (1194:48E9's 020E) over the page.
+#[test]
+fn the_drops_question_as_the_original_draws_it() {
+    screen(
+        "equipmentdropask",
+        |a, d| {
+            d.key(a, KeyCode::F1, None);
+            d.click(a, 0x80, 0xB8, MouseButton::Left);
+            d.click(a, 0x40, 0x4D, MouseButton::Left);
+            d.key(a, KeyCode::KeyD, Some("d"));
+        },
+        layer,
+    );
+}
+
 /// The marked line clicked again: the boots taken off.
 #[test]
 fn an_item_taken_off_as_the_original_draws_it() {

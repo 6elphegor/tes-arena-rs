@@ -73,6 +73,10 @@ SCREENS = {
     'equipmentspecial': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
     'equipmentpotion': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('rclick', 60, 111)]),
     'equipmentquestequip': (0x00BE, [('click', 0x80, 0xB8)] + [('click', 16, 131)] * 40 + [('click', 60, 111), ('click', 60, 111)]),
+    # The list's third line marked and D typed (1194:17D8): the drop's
+    # question, the yes-or-no menu (48E9: 020E, the text at 1044, the
+    # entries at 4B63) over the page.
+    'equipmentdropask': (0x00BE, [('click', 0x80, 0xB8), ('click', 0x40, 0x4D), ('keys', [0x20])]),
     # A line right-clicked: marked, its item described (1194:1988).
     'equipmentinfo': (0x00BE, [('click', 0x80, 0xB8), ('rclick', 60, 62)]),
     # The marked line clicked again: its item (worn) taken off (1194:1AFB).
