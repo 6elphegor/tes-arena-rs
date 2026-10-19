@@ -269,7 +269,8 @@ fn intro_runs() -> Vec<IntroRun> {
 /// The intro (0000:10C9 on to the main menu: the movies, the pictures
 /// faded in and held, the scrolls dissolved in, each change through the
 /// fade to black; MENU.IMG's colours set), and the opening story after
-/// the menu's Start (1323), frame by frame against the original's
+/// the menu's Start (1323, and on into creation's first screen: 1194:25B9),
+/// frame by frame against the original's
 /// (harness/gen_introframes.py): each state in turn, and how long it
 /// shows (a wait for the retrace `RETRACE_MS`, a timer tick
 /// `flc::TICK_MS`; the view's time passing a millisecond at a time).
