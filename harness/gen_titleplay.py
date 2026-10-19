@@ -40,6 +40,7 @@ import gen_worldframes as gw
 
 KEY_L = 0x26
 R, I, A, ENTER, F, Y, S = 0x13, 0x17, 0x1E, 0x1C, 0x21, 0x15, 0x1F
+G, B, C = 0x22, 0x30, 0x2E
 
 # A new game made through the original's screens, each step the answer to
 # one of its waits for input: New (the menu's region at 160,120); the
@@ -59,6 +60,16 @@ CREATION = ([('click', 160, 120), ('keys', [S]), ('click', 94, 51), ('click', 94
             + [('click', 10, 175), ('keys', [S]), ('keys', [ENTER]),
                ('click', 240, 20), ('click', 240, 20), ('click', 10, 175)])
 
+# A new game whose class the questions give (222C:0000): as CREATION, but
+# G, generate, then the instructions' box taken with Enter (1194:260A),
+# the ten questions answered by key (A, B, C in turn from A), and the
+# class offered (1194:261F) taken with Y; then the name on as CREATION.
+QUIZ_ANSWERS = [A, B, C, A, B, C, A, B, C, A]
+CREATION_QUIZ = ([('click', 160, 120), ('keys', [G]), ('keys', [ENTER])]
+                 + [('keys', [k]) for k in QUIZ_ANSWERS]
+                 + [('keys', [Y])]
+                 + CREATION[4:])
+
 # The clicks the vision after creation takes (1194:D459, text 578h): a
 # page turned for each of the first ten, the eleventh's press ending the
 # movie (its release read after it, on the way into the game).
@@ -73,8 +84,8 @@ CASES = {
     'creationsound': CREATION,
 }
 
-# Run only when named (none now).
-NAMED_ONLY = {}
+# Run only when named.
+NAMED_ONLY = {'creationquiz': CREATION_QUIZ, 'creationquizsound': CREATION_QUIZ}
 
 # Where main's frame is made (its far call's return, its BP, argc 1).
 FRAME = (0x9000, 0xFF00)
