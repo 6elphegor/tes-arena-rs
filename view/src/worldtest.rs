@@ -1275,6 +1275,21 @@ fn levitating(a: &mut App) {
     m.mem.w16(seg, off + 4 * 7, 30);
 }
 
+/// gen_worldframes.py's `unshielded`: `playdiseasebite`'s creature, the
+/// player's magic shield (+41Ch) taken away, and with `damage` the
+/// creature's range (the creature segment's first record, +9 and +0Ah).
+fn unshielded(a: &mut App, damage: Option<(u8, u8)>) {
+    use arena::character::{field, PLAYER};
+    brought(a, 1, 1, 0x180);
+    let m = &mut a.engine.m;
+    m.mem.w16(DS, PLAYER + field::MAGIC_SHIELD, 0);
+    if let Some((lo, hi)) = damage {
+        let seg = m.mem.r16(DS, arena::combat::var::CREATURE_SEG);
+        m.mem.w8(seg, field::CREATURE_MIN_DAMAGE, lo);
+        m.mem.w8(seg, field::CREATURE_MAX_DAMAGE, hi);
+    }
+}
+
 /// gen_worldframes.py's POTION: a potion of healing (spell FFh) in a
 /// stack of one.
 const POTION: [u8; 19] = [0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0, 0, 0, 0x4C, 0xFF, 0xFF, 0xFF, 0];
@@ -3286,6 +3301,22 @@ fn case(name: &str) -> Option<Case> {
             wielding(a, &ARTIFACT_85, None, None);
             captured(a);
         }), Box::new(fight_steps)),
+        "playtakehits" => (Place::Dungeon, Box::new(|a: &mut App| unshielded(a, None)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        "playblowdeath" => (Place::Dungeon, Box::new(|a: &mut App| unshielded(a, Some((0x1E, 0x28)))), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            // Till a blow kills (2AA1:0161 -> 2686:02B4): the frame that
+            // ends the world loop for it and the view's way on
+            // (`App::area_next`), as `playdeath`; the original's frames end
+            // there, before another top.
+            use arena::character::{field, PLAYER};
+            for _ in 0..400 {
+                d.frame(a);
+                if a.engine.m.mem.r16(DS, PLAYER + field::HP) as i16 <= 0 {
+                    return;
+                }
+                pushed(a, seen);
+            }
+            panic!("playblowdeath: no blow killed");
+        })),
         "playweaponbreak" => (Place::Dungeon, Box::new(|a: &mut App| {
             brought(a, 1, 1, 0x180);
             a.engine.m.mem.w16(DS, WEAPON_SLOT + 6, 2);
@@ -4390,6 +4421,7 @@ const BUSY: &[&str] = &[
     "playsurrender",
     "playsurrenderspell",
     "playswim",
+    "playtakehits",
     "playtalkbar",
     "playtalkenter",
     "playtalkheld",
@@ -4647,6 +4679,7 @@ const BUSY_STATE: &[&str] = &[
     "playsurrender",
     "playsurrenderspell",
     "playswim",
+    "playtakehits",
     "playtalkbar",
     "playtalkenter",
     "playtalkheld",
@@ -4703,8 +4736,8 @@ fn the_walls_left_as_the_original() {
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 22] = [
-    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak",
+const SPELL_CASES: [&str; 24] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak", "playtakehits", "playblowdeath",
 ];
 
 /// The cases whose projectiles and actors are compared frame by frame
@@ -4713,6 +4746,7 @@ const OBJECT_CASES: &[&str] = &[
     "playartifactheal",
     "playartifactparalyse",
     "playartifacttriple",
+    "playblowdeath",
     "playcast",
     "playcreaturecast",
     "playcreaturehex",
@@ -4723,6 +4757,7 @@ const OBJECT_CASES: &[&str] = &[
     "playparalyse",
     "playquickcast",
     "playsurrenderspell",
+    "playtakehits",
     "playweaponbreak",
 ];
 
@@ -4924,6 +4959,22 @@ fn a_drowning_leaves_the_state_as_the_original() {
     state_case("playdrown");
     state_load_case("playdrown");
     state_ems_case("playdrown");
+}
+
+/// The player killed by a creature's blows (`playblowdeath`: unshielded,
+/// the creature hitting for 30..40 from full health, the armour struck
+/// wearing, 2AA1:0161 -> 2686:02B4), the frame that ends the world loop
+/// and the outer loop's death as `playdeath`'s: the player's frames, DGROUP
+/// from the case's start and from the load, and the EMS banks, as the
+/// original leaves them.
+#[test]
+fn a_blow_kills_as_the_original() {
+    let (place, setup, play) = case("playblowdeath").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playblowdeath"), "playblowdeath: the player's frames differ from the original's");
+    state_case("playblowdeath");
+    state_load_case("playblowdeath");
+    state_ems_case("playblowdeath");
 }
 
 /// The player killed (`playdeath`), then the program's main back to its

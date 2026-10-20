@@ -570,6 +570,22 @@ def wielding(item, condition=None, hp=None):
     return put
 
 
+def unshielded(damage=None):
+    """`playdiseasebite`'s creature (type 1, `brought`), the player's magic
+    shield (+41Ch) taken away: the save's 2268 points take every blow whole
+    (29CF:0C4F, after the armour's wear), so its health never drops. With
+    `damage` (low, high) the creature's range (its record, the creature
+    segment's first, +9 and +0Ah) instead of type 1's 1..4: a blow of 1..4
+    wears no armour (2AA1:017C rounds damage times the material's rate over
+    100 to 0)."""
+    def put(a):
+        brought(1)(a)
+        a.w16(0x01A4 + 0x41C, 0)
+        if damage is not None:
+            a.mu.mem_write(a.lin(a.r16(0x1042), 9), bytes(damage))
+    return put
+
+
 def worn_weapon(condition):
     """`playfight`'s creature, the save's weapon (the ninth slot) at
     `condition`: its wear from the blows (2AA1:017C) breaks it."""
@@ -1679,6 +1695,7 @@ LEVEL_XP = 9_750_000
 # arrows' upper half clicked six times (a level's 3..6 points; once none
 # are left a click does nothing, 1194:138E), then the button (region 0).
 LEVEL_SCRIPT = [('click', 0xA0, 0x60)] + [act for r in range(8) for act in [('click', 10, 54 + 8 * r)] + [('click', 40, 0x32 + 8 * r)] * 6] + [('click', 10, 175)]
+
 CASES = {
     'playlevelup': ('dungeon', levelled, [((), (), 2, None), ((), (), 10, None, [], {'do': minute_due, 'script': LEVEL_SCRIPT})]),
     # The dungeon's first frames, nothing held: the interface and the
@@ -1856,6 +1873,16 @@ CASES = {
     # spells' heals (2CDD) and the timed effects (2EBD).)
     'playdiseasebite': ('dungeon', brought(1), [((), (), 400, None)]),
     'playcreaturehex': ('dungeon', brought(0x15), [((), (), 400, None)]),
+    # `playdiseasebite` unshielded (`unshielded`): the creature's blows
+    # land on the player's health (2AA1:00D8): to-hit, damage (205 to 161
+    # here), the armour struck taking its wear of 0 (2AA1:046E), the hurt
+    # palette (0000:07F7), the bar.
+    'playtakehits': ('dungeon', unshielded(), [((), (), 400, None)]),
+    # The same creature hitting for 30..40 from the player's full health:
+    # the armour struck wears, and the ninth blow or so kills (2AA1:0161 ->
+    # 2686:02B4), the frame ends the world loop and the outer loop's death
+    # follows (`died`).
+    'playblowdeath': ('dungeon', unshielded((0x1E, 0x28)), [((), (), 400, None, [], {'dies': True})]),
     'playcreaturemissile': ('dungeon', brought(0xC), [((), (), 160, None)]),
     # The guards called on the street (`guards_called`) come to the player
     # and fight him: two people's approach, their blows' to-hit rolls.
@@ -2587,14 +2614,15 @@ def walls_line(a, name):
 SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout', 'playresist', 'playfortify', 'playinvisible',
                'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick', 'playdiseasebite', 'playcreaturehex',
                'playcreaturemissile', 'playguardsfight', 'playpotionresist', 'playusebreak', 'playartifactheal',
-               'playartifactparalyse', 'playartifacttriple', 'playweaponbreak')
+               'playartifactparalyse', 'playartifacttriple', 'playweaponbreak', 'playtakehits', 'playblowdeath')
 
 
 # The cases whose projectiles and actors are compared frame by frame
 # (`objects_line`), not only as their last frame leaves them: a fireball
 # a frame late can still end where the original's ends.
 OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell', 'playdiseasebite',
-                'playcreaturehex', 'playcreaturemissile', 'playguardsfight', 'playartifactheal', 'playartifactparalyse', 'playartifacttriple', 'playweaponbreak')
+                'playcreaturehex', 'playcreaturemissile', 'playguardsfight', 'playartifactheal', 'playartifactparalyse', 'playartifacttriple', 'playweaponbreak',
+                'playtakehits', 'playblowdeath')
 
 
 def objects_digest(a):
