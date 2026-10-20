@@ -2326,6 +2326,25 @@ SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout
                'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick')
 
 
+# The cases whose projectiles and actors are compared frame by frame
+# (`objects_line`), not only as their last frame leaves them: a fireball
+# a frame late can still end where the original's ends.
+OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell')
+
+
+def objects_digest(a):
+    """The projectiles' slots (7DB8's count, 7DBC's twelve 1Ch-byte slots;
+    7DBA, a segment the harness has 1000h higher, left out) and the eight
+    active actors' entries (0C57, 1Ch bytes each) as the top of the frame
+    finds them."""
+    return fnv(bytes(a.mu.mem_read(a.lin(a.ds, 0x7DB8), 2)) + bytes(a.mu.mem_read(a.lin(a.ds, 0x7DBC), 12 * 0x1C))
+               + bytes(a.mu.mem_read(a.lin(a.ds, 0x0C57), 8 * 0x1C)))
+
+
+def objects_line(a, name):
+    return f'objects | {name} | {" ".join(f"{d:x}" for d in a.objects)}\n'
+
+
 def creatures_line(a, name):
     """What the spells write outside DGROUP and the EMS banks: the eight
     active creatures' records (0C57's entries, 1Ch bytes each: +12h the
@@ -2364,10 +2383,14 @@ def run_case(a, at, name, setup, steps, tracks):
 
 
 def play(a, name, steps, tracks):
+    # (Beside each track line, the frame's projectiles and actors: popped
+    # with it, `objects_line`.)
+    a.objects = []
     frame = [0]
     drag = [None]
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
+        a.objects.append(objects_digest(a))
         frame[0] += 1
         # The step's drag: the mouse moved by it before each frame.
         if drag[0] is not None:
@@ -2463,6 +2486,7 @@ def play(a, name, steps, tracks):
             # closed and the rest of that frame's body run after it: the
             # state as that frame leaves it, no frame after.)
             tracks.pop()
+            a.objects.pop()
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         if clicked:
@@ -2475,6 +2499,7 @@ def play(a, name, steps, tracks):
             a.buttons = 0
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
+        a.objects.pop()
         frame[0] -= 1
     drag[0] = None
     a.motion = (0, 0)
@@ -2494,6 +2519,7 @@ def play(a, name, steps, tracks):
         a.mu.hook_del(h)
     assert why == ('frames',), f'{name}: the last frame stopped by {why}'
     tracks.pop()
+    a.objects.pop()
     full = a.page()
     mask = bytes(int(k != 1) for k in last)
     page = bytes(x if k else 0 for x, k in zip(full, mask))
@@ -2616,6 +2642,8 @@ def main():
             out.write(walls_line(a, name))
         if name in SPELL_CASES:
             out.write(creatures_line(a, name))
+        if name in OBJECT_CASES:
+            out.write(objects_line(a, name))
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
