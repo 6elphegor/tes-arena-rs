@@ -15,6 +15,11 @@ pub struct Machine {
     /// The mouse driver's motion counters (mickeys, x and y) since they
     /// were last read (INT 33h function 0Bh; see `weapon`).
     pub mouse_motion: (u16, u16),
+    /// The mouse driver's report waiting for the controls' read of it
+    /// (2826:0D85, in the frame's physics): the cursor and the buttons a
+    /// front end gives with `report_mouse`, which the frame's steps
+    /// before that read (the actors') don't yet see.
+    pub mouse_report: Option<(u16, u16, u8)>,
     /// The PC's timer: the BIOS's tick count at 0:046C (18.2 a second
     /// since midnight), which 0000:9D60 reads. The port keeps the image at
     /// segment 0, so it lives here: `Engine::tick` advances it with the
@@ -96,12 +101,13 @@ pub struct Machine {
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = self;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
             ems: ems.clone(),
             mouse_motion: *mouse_motion,
+            mouse_report: *mouse_report,
             bios_ticks: *bios_ticks,
             sound_busy: *sound_busy,
             sounds: sounds.clone(),
@@ -128,11 +134,12 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = source;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
         self.mouse_motion = *mouse_motion;
+        self.mouse_report = *mouse_report;
         self.bios_ticks = *bios_ticks;
         self.sound_busy = *sound_busy;
         self.sounds.clone_from(sounds);
@@ -159,7 +166,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), mouse_report: None, bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so

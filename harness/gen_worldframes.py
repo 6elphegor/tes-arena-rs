@@ -1668,6 +1668,41 @@ LONG_RUN = ([((), (), 2, None), ((), (), 10, None, [(160, 100)], {'leaves': True
             + [((), (), 600, None),
                ((KEY_RIGHT,), (), 10, None), ((), (KEY_RIGHT,), 2, None), ((UP,), (), 400, None), ((), (UP,), 20, None)])
 
+
+def mouse_at(x, y):
+    """The mouse put at (x, y) before a step's frames (its read, 0000:8FC4,
+    gives it the driver's way, x doubled)."""
+    return lambda a: setattr(a, 'mouse', (x, y))
+
+
+def mouse_steps(steps):
+    """The mouse put at (x, y) with the buttons `b` for `n` frames, for
+    each (x, y, b, n) of `steps`: moved with the left button held (the
+    region under it its handler from the next frame, 2826:02E2), or let go
+    in the centre (its click, 2826:011F)."""
+    return [((), (), n, None, [], {'buttons': b, 'do': mouse_at(x, y)}) for x, y, b, n in steps]
+
+
+def mouse_walk(points, held=6, coast=5):
+    """The left button held `held` frames with the mouse at each of
+    `points` in turn, then let go `coast` frames: the view's regions
+    (79D8: the top row forward and forward while turning, the middle row
+    turning, the bottom row strafing and back) and their handlers' speeds
+    by the cursor's place (2826:055A..0768), the acceleration (7A46)
+    building while the button is down and running out after (2826:0D20)."""
+    steps = []
+    for x, y in points:
+        steps += [((), (), held, None, [], {'buttons': 1, 'do': mouse_at(x, y)}),
+                  ((), (), coast, None, [], {'buttons': 0})]
+    return steps
+
+
+# Each region at its far edge (full speed) and near its inner edge (slow):
+# forward, forward-left, forward-right, turning left and right, strafing
+# left and right, back.
+MOUSE_POINTS = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (0, 80), (80, 80),
+                (319, 80), (240, 80), (0, 130), (130, 130), (319, 130), (190, 130), (160, 146), (160, 118)]
+
 # Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
 # way (`checkpoint` lines), as at their end.
 CHECKPOINT_CASES = ('playlongrun',)
@@ -1775,6 +1810,15 @@ CASES = {
     # out, the street walked with turns, Light cast, minute ticks, a long
     # stand), DGROUP and EMS measured every 250 frames (`checkpoint`).
     'playlongrun': ('street', long_run_start, LONG_RUN),
+    # The left button held over each of the view's regions in turn
+    # (`mouse_walk`, MOUSE_POINTS) in the street, then in the dungeon.
+    'mousestreet': ('street', None, mouse_walk(MOUSE_POINTS)),
+    'mousedungeon': ('dungeon', None, mouse_walk(MOUSE_POINTS)),
+    # Held at the top, dragged to the right edge and on to the bottom
+    # right while held, let go there; then pressed and let go in the
+    # middle of the view, the original's controls' click.
+    'mousedrag': ('dungeon', None, mouse_steps([(160, 10, 1, 4), (300, 80, 1, 6), (200, 140, 1, 4), (200, 140, 0, 3),
+                                                (160, 100, 1, 1), (160, 100, 0, 3)])),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on

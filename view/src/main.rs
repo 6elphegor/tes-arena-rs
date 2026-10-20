@@ -1898,6 +1898,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         clicked: false,
         click_point: None,
         queued_click: None,
+        walk_mouse: None,
         queued_bar: None,
         released: Vec::new(),
         menu_held: Vec::new(),
@@ -2078,6 +2079,11 @@ struct TurnIn {
     /// A click on the bar's button at this point (and whether the right
     /// button's), taken in the frame's input step (`Front::bar_click`).
     bar: Option<(i32, i32, bool)>,
+    /// The original's own controls for the frame (`Input::Classic`): the
+    /// cursor at this point of the 320 x 200 screen and whether the left
+    /// button is down, the view's regions (79D8) walking and turning by
+    /// the cursor's place (2826:02E2) as holding the button there does.
+    walk: Option<(u16, u16, bool)>,
 }
 
 /// What a turn did besides the engine's state: how its frame ended, and
@@ -2088,6 +2094,13 @@ struct TurnOut {
     level_changed: bool,
     /// The effect's words the frame drew (`Front::effect`).
     effect: Option<(Vec<u8>, i32)>,
+}
+
+/// Whether a point of the view is in its centre region (79D8's fifth,
+/// 2826:077E's: x 57h..EAh, y 29h..73h), where the left button clicks
+/// rather than walks.
+fn in_centre((x, y): (i32, i32)) -> bool {
+    (0x57..=0xEA).contains(&x) && (0x29..=0x73).contains(&y)
 }
 
 /// One turn (`dialog`): camping if asked, then a frame, with `talk`
@@ -2135,7 +2148,13 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     engine.m.mem.w8(DS, arena::controls::var::BUTTONS, buttons);
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
-    let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
+    let frame = match input.walk {
+        Some((x, y, left)) => {
+            engine.m.report_mouse(x, y, buttons & !1 | left as u8);
+            prof::time("engine.frame", || engine.frame(Input::Classic, &mut hooks))
+        }
+        None => prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks)),
+    };
     // A428..A444: the frame's waits for the timer after its body (the
     // ticks a level's flags ask, C39A as the body left it), so what the
     // body did to 0151 (a movie's resets) is under them.
@@ -2379,6 +2398,7 @@ fn shot_frame(dir: &std::path::Path, engine: &mut Engine, run: &mut arena::trans
         aspect: 1.6,
         note: st.note.take(),
         bar: None,
+        walk: None,
     };
     let mut talk = dialog::Talk { answers: std::mem::take(&mut st.answers), ..Default::default() };
     st.audio.before(&mut engine.m);
@@ -3270,6 +3290,13 @@ struct App {
     click_point: Option<(i32, i32)>,
     /// The click taken: the next frame's input step takes it (`TurnIn::click`).
     queued_click: Option<(i32, i32)>,
+    /// Uncaptured, the left button held in the view outside its centre:
+    /// the original's controls walk by the cursor's place (`TurnIn::walk`).
+    /// Let go, they stay the controls, the cursor's region still theirs
+    /// (the acceleration running out, 2826:0D20; in the centre, 5E0 bit
+    /// 40h and clicks, 2826:00F6), until a key is pressed or the mouse
+    /// captured.
+    walk_mouse: Option<(i32, i32, bool)>,
     /// A click on the bar's button: the frame it runs takes it in its
     /// input step (`TurnIn::bar`).
     queued_bar: Option<(i32, i32, bool)>,
@@ -3665,6 +3692,7 @@ impl App {
             note: None,
             click: self.queued_click.take(),
             bar: self.queued_bar.take(),
+            walk: self.walk_mouse.map(|(x, y, left)| (x as u16, y as u16, left)),
         };
         // The engine before the turn, for a question to run it again: into
         // the last standing turn's copy, its allocations reused.
@@ -5141,6 +5169,7 @@ impl App {
             aspect: (self.size.0 / self.size.1.max(1.0)) as f32,
             note: Some((x as u16, y as u16)),
             bar: None,
+            walk: None,
         };
         self.turn(before, input, Vec::new(), true);
     }
@@ -5834,6 +5863,10 @@ impl App {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
         self.ring_screen();
+        // A key pressed with the button let go: the view's own controls again.
+        if matches!(ev, In::Key { down: true, .. }) && matches!(self.walk_mouse, Some((_, _, false))) {
+            self.walk_mouse = None;
+        }
         // A key goes through the key interrupt (0000:718A, `key_event`)
         // whatever is up, as the original's every key does: its state
         // where the game keeps it (DS:ACB5 + its scan code, FFh down), for
@@ -5864,6 +5897,10 @@ impl App {
             In::Resized(w, h) => self.size = (w, h),
             In::Cursor(x, y) => {
                 self.cursor = (x, y);
+                if let Some((_, _, left)) = self.walk_mouse {
+                    let (x, y) = self.screen_point();
+                    self.walk_mouse = Some((x, y.min(146), left));
+                }
                 // The travel map's next pass reads the cursor where it is.
                 if self.boxes.is_empty() {
                     let (x, y) = self.screen_point();
@@ -6090,8 +6127,21 @@ impl App {
                 }
                 self.keys.swing = down;
             }
-            // Uncaptured, a left click in the view clicks where it is (a
-            // corpse on the floor); another button captures the mouse.
+            // Uncaptured, the left button held in the view outside its
+            // centre walks as the original's controls do (`walk_mouse`; with
+            // those the controls, in the centre too: its click is theirs,
+            // on the release, 2826:011F); in the centre a click clicks where
+            // it is (a corpse on the floor); another button captures the
+            // mouse.
+            In::Button { down: true, button: MouseButton::Left } if !self.captured && self.screen_point().1 < 147 && !self.waiting() && (!in_centre(self.screen_point()) || self.walk_mouse.is_some()) => {
+                let (x, y) = self.screen_point();
+                self.walk_mouse = Some((x, y, true));
+            }
+            In::Button { down: false, button: MouseButton::Left } if !self.captured && self.walk_mouse.is_some() => {
+                if let Some((x, y, _)) = self.walk_mouse {
+                    self.walk_mouse = Some((x, y, false));
+                }
+            }
             In::Button { down: true, button: MouseButton::Left } if !self.captured && self.screen_point().1 < 147 => {
                 self.click_point = Some(self.screen_point());
                 self.click = true;
@@ -6187,6 +6237,7 @@ impl App {
     /// The mouse captured: locked (or confined) and hidden in the window;
     /// with no window (a test), taken as captured.
     fn capture(&mut self) {
+        self.walk_mouse = None;
         match &self.gpu {
             Some(g) => {
                 let ok = g
