@@ -1205,7 +1205,18 @@ fn sprites_tagged(m: &Machine, sheet: &SpriteSheet, heading: f32, tick: usize) -
     let mut out = Vec::new();
     let frame_of = |f: Frames, k: usize| sheet.rects[f.first + k % f.count];
     let flat = |n: usize| sheet.flats.get(n).copied().flatten();
-    let lift = |n: usize| m.mem.r8(DS, arena::info::var::FLATS + n as u16 * 5) as i8 as f32;
+    // How far up a flat stands: the original's z negated (up is negative
+    // there, as an actor's +2), z being its record's +0 less the level's
+    // ceiling D80C where its +3 has bit 20h (0000:D18E: a flat hung from
+    // the ceiling, Crypt of Hearts' staff piece), as `flat_drawn` fills it.
+    let lift = |n: usize| {
+        let rec = arena::info::var::FLATS + n as u16 * 5;
+        let mut z = m.mem.r8(DS, rec) as i8 as f32;
+        if m.mem.r8(DS, rec + 3) & 0x20 != 0 {
+            z -= m.mem.r16(DS, 0xD80C) as f32;
+        }
+        -z
+    };
     // The units a pixel the original draws a flat at (0000:C0F1): it
     // projects the image's size at a depth of its own, a quarter of the
     // true one for a flat whose record (F:, +3) has bit 4 (C140, C347:
