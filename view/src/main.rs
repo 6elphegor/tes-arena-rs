@@ -1888,6 +1888,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         list_reads: Vec::new(),
         menu_reads: Vec::new(),
         list_live: None,
+        list_page: None,
         arrowed: false,
         live: None,
         status: None,
@@ -3277,6 +3278,9 @@ struct App {
     /// ListCapture`): what the loop makes of the reads so far is what the
     /// window shows, and its end the list's answer (`list_followed`).
     list_live: Option<Box<arena::listwindow::ListCapture>>,
+    /// The game's page as the list's loop has drawn it over the reads so
+    /// far (`ListCapture::page`): what the window shows of the list.
+    list_page: Option<std::sync::Arc<Vec<u8>>>,
     /// The arrows or the wheel moved `selected` since the menu came up:
     /// only then is its entry marked (the original marks none).
     arrowed: bool,
@@ -3685,6 +3689,7 @@ impl App {
         }
         if let Some(need) = talk.need {
             self.list_live = self.engine.m.list_captured.take();
+            self.list_page = self.list_live.as_ref().and_then(|l| l.page(&[])).map(std::sync::Arc::new);
             self.engine.m.list_capture = false;
             copy_into(&mut self.engine, &before);
             self.selected = 0;
@@ -5467,6 +5472,8 @@ impl App {
         let page = match self.boxes.front() {
             Some(b) => b.page.as_ref()?,
             None => match self.pending.as_ref()? {
+                // A list: as its loop has drawn it over the reads so far.
+                Pending { need: dialog::Need::Menu(m), .. } if m.list => self.list_page.as_ref()?,
                 Pending { need: dialog::Need::Menu(_), page: Some(p), .. } if !self.arrowed => p,
                 _ => return None,
             },
@@ -5625,6 +5632,9 @@ impl App {
     fn list_followed(&mut self) -> Option<Option<u16>> {
         let live = self.list_live.as_ref()?;
         let (mark, top, end) = live.live(&self.list_reads);
+        if end.is_none() {
+            self.list_page = live.page(&self.list_reads).map(std::sync::Arc::new);
+        }
         self.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
         self.list_top = top as usize;
         Some(end)

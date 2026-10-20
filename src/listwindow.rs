@@ -65,6 +65,17 @@ impl ListCapture {
         let end = m.list_passes(seg, rec, reads);
         (m.mem.r16(seg, rec + 0x39), m.mem.r16(seg, rec + 0x3B), end)
     }
+
+    /// The game's page after the loop's passes over `reads`, on a copy:
+    /// the window and its lines as the last pass drew them (0A58, the
+    /// knob), what the original shows while it waits for the next read.
+    /// None where the page isn't the game's own block.
+    pub fn page(&self, reads: &[ListRead]) -> Option<Vec<u8>> {
+        let mut m = self.m.clone();
+        m.list_passes(self.seg, self.rec, reads);
+        let seg = m.mem.r16(crate::mem::DS, 0xA900);
+        m.page_is_block().then(|| m.mem.segment(seg)[..0xFA00].to_vec())
+    }
 }
 
 /// The keys the list's loop looks at in the key table (ACB5 by scan
