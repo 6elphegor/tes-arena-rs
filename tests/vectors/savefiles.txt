@@ -568,6 +568,6 @@ screen | palacedecline | TMP2.$$$ fa00 98e7d995733ab27
 screendel | palacedecline | 
 screen | palacenone | TMP2.$$$ fa00 98e7d995733ab27
 screendel | palacenone | 
-screen | looktavern | AUTOMAP.64 20040 e432850c6dfcf92
+screen | looktavern | AUTOMAP.64 20040 562f49a027f4b2c0
 screen | looktavern | TMP2.$$$ fa00 98e7d995733ab27
 screendel | looktavern | 
