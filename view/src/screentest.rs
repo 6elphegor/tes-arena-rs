@@ -157,6 +157,22 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
     check_fade(name, &mut a);
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
+    // A box over play the window shows as the game's page (the engine's
+    // drawing of it, `hud::Said`): what the window composes then (the
+    // page, a field's cursor over it), where the layer just checked drew
+    // (whose mask is the original's), the original's too.
+    if a.box_page_shown().is_some() {
+        a.compose();
+        // A field's cursor as the original's first wait has it (the
+        // window's blinks, off as the field opens): as the layer's.
+        if let Some(l) = &a.live {
+            l.draw(&mut a.screen, true);
+        }
+        let shown = a.screen.indices().to_vec();
+        let idx: Vec<u16> = idx.iter().zip(&shown).map(|(&o, &c)| if o < 0x100 { c } else { 0x100 }).collect();
+        assert!(check(name, &idx, &dac), "{name}: the game's page under its box differs from the original's");
+        eprintln!("{name}: the box shown as the game's page");
+    }
     // The files written from the load, against the original's
     // (tests/vectors/savefiles.txt's `screen` lines). A menu the view
     // runs over a copy of the game till it ends (the spell's page, the

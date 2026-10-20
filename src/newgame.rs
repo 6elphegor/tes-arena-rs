@@ -139,11 +139,12 @@ pub trait NewGameHooks {
     }
     /// 1194:2B42..2B52, in the roll before the stats screen: the page's
     /// corner kept in bank [1032] (12BE, `corner_kept`; 1299 cleared
-    /// round it), then 157E: the points' number (12E6, its drawing the
-    /// front end's), the arrows (12F5, `arrows_made`: 1297 38h) and the
+    /// round it), then 157E: the points' number (12E6, `points_drawn`),
+    /// the arrows (12F5, `arrows_made`: 1297 38h, drawn) and the
     /// stats' texts (0DE1, `sheet_texts`).
     fn roll_screen(&mut self, m: &mut Machine, files: &mut Files) {
         m.corner_kept();
+        m.points_drawn();
         // (Where it gives up the reason is noted, `giveup`.)
         let _ = m.arrows_made(files);
         m.sheet_texts();
@@ -278,6 +279,18 @@ impl Machine {
         let slot = self.resource_add(files, 0x3AE0, 0x14, 0x14).unwrap_or(0);
         self.mem.w16(DS, 0x1038, slot);
         self.select_tiles(0x1038);
+    }
+
+    /// 1194:25B9..25D1, how the class is chosen, its screen: to black
+    /// (55B6: 929E black, the page cleared), the page cleared again
+    /// (9426), and STARTGAM's picture at 3ED9 drawn (5CD9 with BX 40h:
+    /// loaded into bank [1030], onto the page). Showing the page (9466),
+    /// the cursor (541E) and setting its colours are the front end's; the
+    /// menu after is `creation`'s.
+    pub fn creation_method_screen(&mut self, files: &mut Files) -> Option<()> {
+        self.sheet_black();
+        self.page_clear();
+        self.sheet_image(files, 0x3ED9)
     }
 
     /// 1194:2536..2542, the class chosen (1194:25B9, by the questions or

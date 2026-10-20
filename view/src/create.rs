@@ -154,11 +154,18 @@ enum FontId {
 
 /// What the screen behind shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Back {
+pub enum Back {
     Start,
     Map,
     Stats,
     Black,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Each creation box that read the game's page: its screen and the
+    /// pixels where the page differs from the window's drawing of it.
+    pub static BOX_PAGES: std::cell::RefCell<Vec<(Back, usize)>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// What is up on the screen (`Creation::up`).
@@ -781,6 +788,9 @@ impl Creation {
         engine.m.newgame_reset();
         engine.m.creation_font(&mut engine.files);
         if let Stage::Method(_) = self.stage {
+            if engine.m.creation_method_screen(&mut engine.files).is_none() {
+                eprintln!("STARTGAM's picture could not be loaded");
+            }
             self.stage = Stage::Method(self.method(&mut engine.m));
         }
     }
@@ -800,6 +810,9 @@ impl Creation {
         engine.m.newgame_reset();
         engine.m.creation_font(&mut engine.files);
         if let Stage::Method(_) = self.stage {
+            if engine.m.creation_method_screen(&mut engine.files).is_none() {
+                eprintln!("STARTGAM's picture could not be loaded");
+            }
             self.stage = Stage::Method(self.method(&mut engine.m));
         }
     }
@@ -1155,10 +1168,47 @@ impl Creation {
     /// and once taken the background put back (933C). The dissolves'
     /// generator is the film's (it steps it as it plays them).
     fn game_box(&self, m: &mut Machine, text: (u16, u16), back: Back) {
+        // Where the screen is on the game's page (its own block: the map's
+        // pictures, the attributes' page with its texts), the box reads
+        // the page as the original's does.
+        if m.page_is_block() && matches!(back, Back::Start | Back::Map | Back::Stats) {
+            #[cfg(test)]
+            self.page_against_drawing(m, back);
+            let seed = m.mem.r16(DS, crate::film::DISSOLVE_SEED);
+            m.key_flush();
+            if m.message_wait_box(text, None).is_none() {
+                eprintln!("a box gave up: {}", arena::giveup::describe());
+            }
+            m.message_box_closed();
+            m.mem.w16(DS, crate::film::DISSOLVE_SEED, seed);
+            return;
+        }
         let mut s = Screen::new(self.pics.game);
         self.draw_back(&mut s, m, back);
         let under: Vec<u8> = s.indices().iter().map(|&i| i as u8).collect();
         Self::game_box_over(m, text, &under);
+    }
+
+    /// For the tests: the game's page a box reads (`game_box`) against the
+    /// window's drawing of the screen behind it (as the createframes
+    /// vectors check it against the original's), the attribute screen with
+    /// its points' panel (the roll draws BONUS.IMG before its note: the
+    /// stage only becomes `Stats` after), the pixels that differ kept by
+    /// screen (`BOX_PAGES`).
+    #[cfg(test)]
+    fn page_against_drawing(&self, m: &Machine, back: Back) {
+        let mut s = Screen::new(self.pics.game);
+        if back == Back::Stats && !matches!(self.stage, Stage::Face) {
+            s.set_palette(self.pics.charsheet);
+            s.fill(0, 0, W as i32, H as i32, 0, 0xFF);
+            self.stats_page(&mut s, m, true, true);
+        } else {
+            self.draw_back(&mut s, m, back);
+        }
+        let seg = m.mem.r16(DS, 0xA900);
+        let page = &m.mem.segment(seg)[..0xFA00];
+        let differ = s.indices().iter().zip(page).filter(|(v, p)| **v as u8 != **p).count();
+        BOX_PAGES.with(|b| b.borrow_mut().push((back, differ)));
     }
 
     /// `game_box` over the page `under` (a byte a pixel, 320 wide).

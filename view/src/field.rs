@@ -278,6 +278,15 @@ impl Live {
         }
     }
 
+    /// The game's page on the editor's copy (its own block): the prompt's
+    /// box and the text as the last pass's redraw (A0AE) left them, what
+    /// the original shows while it waits for a key. None where the page
+    /// isn't the game's.
+    pub fn page(&self) -> Option<Vec<u8>> {
+        let seg = self.m.mem.r16(DS, 0xA900);
+        self.m.page_is_block().then(|| self.m.mem.segment(seg)[..0xFA00].to_vec())
+    }
+
     /// The text alone at the field's place in its font and colour.
     pub fn draw_text(&self, screen: &mut Screen) {
         let Some(font) = draw_font(self.look.font) else { return };

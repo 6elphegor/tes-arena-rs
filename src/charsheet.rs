@@ -1814,41 +1814,65 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:0DE1: the stats' texts, their state: the numbers made (0000:
-    /// 7028's digits at A931.., the formatted at 1044: hit points,
-    /// fatigue, experience and the bonuses), and the player's derived
-    /// numbers (+39h, 16 words) scaled and divided in place for their
-    /// texts and put back from their copy at 10A8 (0F08). Their drawing
-    /// is the front end's.
+    /// 1194:0DE1: the stats' texts: the numbers made (0000:7028's digits
+    /// at A931.., the formatted at 1044 and 929E: gold, the attributes,
+    /// hit points, fatigue, experience and the bonuses), each drawn at its
+    /// place with 9E06 in the font and colour selected (on the page where
+    /// it is the game's own block, else their state alone,
+    /// `page_text_at`), and the player's derived numbers (+39h, 16 words)
+    /// scaled and divided in place for their texts and put back from their
+    /// copy at 10A8 (0F08).
     pub(crate) fn sheet_texts(&mut self) {
         let gold = self.mem.r32(DS, 0x05C2);
         self.dun_ultoa(gold, SCRATCH);
+        self.sheet_text(0x2D, 0x90, SCRATCH);
+        // 0E19: the name, the race (5585: the race byte's string of 2B94's)
+        // and the class (2686:0645).
+        let p = PLAYER;
+        self.sheet_text(0x0B, 0x07, p + 9);
+        let race = self.mem.r8(DS, p + 4) as u16;
+        let at = if race == 0 { 0x2B94 } else { self.skip_strings(DS, 0x2B94, race) };
+        self.sheet_text(0x0B, 0x10, at);
+        let class = if self.mem.r16(DS, p + 0x40D) & 0x1000 == 0 {
+            (DS, self.skip_strings(DS, 0x2A62, (self.mem.r8(DS, p + 5) & 0x1F) as u16))
+        } else {
+            // A creature's record (bit 1000h): 2686:0645 returns with DS
+            // DATA, which the texts after would then read from. The
+            // player's record (1A4h) is never one, so that isn't followed.
+            (DATA, self.skip_strings(DATA, 0x465D, race))
+        };
+        self.page_text_at(0x0B, 0x19, class);
         let raw = self.mem.r16(DS, 0x05C8) & 0x10 != 0;
-        // 0E53: the attributes.
+        // 0E53: the attributes, 8 apart down from 34h at x 1Ah (5634).
         for i in 0..8u16 {
-            let mut cx = self.mem.r8(DS, PLAYER + 0x29 + i) as u16;
+            let mut cx = self.mem.r8(DS, p + 0x29 + i) as u16;
             if !raw {
                 cx = crate::scale::to100(cx as i16) as u16;
             }
             self.utoa_nul(cx, SCRATCH);
+            self.sheet_text(0x1A, 0x34 + 8 * i, SCRATCH);
         }
         // 0E86.
-        let p = PLAYER;
         let cx = self.mem.r16(DS, p + 0x5B);
         let dx = if raw { cx } else { self.mem.r16(DS, p + 0x59) };
         self.sheet_ratio(dx, cx);
+        self.sheet_text(0x2D, 0x7F, NUMBER);
         let mut ax = (self.mem.r8(DS, p + 0x29) as u16).wrapping_add(self.mem.r8(DS, p + 0x2E) as u16);
         if !raw {
             ax = crate::scale::to100_u(ax);
         }
         let dx = crate::scale::to100_u(self.mem.r16(DS, p + 0x5D) >> 6);
         self.sheet_ratio(dx, ax);
+        self.sheet_text(0x2D, 0x87, NUMBER);
         let (cx, dx) = (self.mem.r16(DS, p + 0x68), self.mem.r16(DS, p + 0x66));
         self.sheet_ratio(dx, cx);
+        self.sheet_text(0x56, 0x3C, NUMBER);
         let level = self.mem.r8(DS, p + 6) as u16 + 1;
         self.utoa_nul(level, SCRATCH);
+        self.sheet_text(0x2D, 0xA7, SCRATCH);
         let exp = self.mem.r32(DS, p + 0x409);
         self.dun_ultoa(exp, SCRATCH);
+        self.sheet_text(0x2D, 0x9E, SCRATCH);
         // 0F08.
         for i in 0..0x20u16 {
             let b = self.mem.r8(DS, p + 0x39 + i);
@@ -1857,9 +1881,11 @@ impl Machine {
         // (The cap at 1FEh is overwritten: the number shown as it is.)
         let v = crate::scale::to100_u(self.mem.r16(DS, p + 0x3B));
         self.utoa_nul(v, SCRATCH);
-        for off in [0x39u16, 0x4F, 0x53] {
+        self.sheet_text(0x91, 0x34, SCRATCH);
+        for (off, x, y) in [(0x39u16, 0x56, 0x34), (0x4F, 0x56, 0x5C), (0x53, 0x91, 0x5C)] {
             let v = self.mem.r16(DS, p + off);
             self.sheet_signed(v, 0);
+            self.sheet_text(x, y, NUMBER);
         }
         for i in 0..16u16 {
             let at = p + 0x39 + 2 * i;
@@ -1873,14 +1899,29 @@ impl Machine {
         }
         let v = self.mem.r16(DS, p + 0x43).wrapping_neg();
         self.sheet_signed(v, 0);
-        for off in [0x47u16, 0x49, 0x55] {
+        self.sheet_text(0x56, 0x44, NUMBER);
+        for (off, x, y) in [(0x47u16, 0x91, 0x4C), (0x49, 0x56, 0x4C), (0x55, 0x56, 0x64)] {
             let v = self.mem.r16(DS, p + off);
             self.sheet_signed(v, 0);
+            self.sheet_text(x, y, NUMBER);
         }
         for i in 0..0x20u16 {
             let b = self.mem.r8(DS, 0x10A8 + i);
             self.mem.w8(DS, p + 0x39 + i, b);
         }
+    }
+
+    /// 1194:5634: `v`'s digits at 929E (7052), drawn at (`x`, `y`)
+    /// (9E06).
+    pub(crate) fn number_at(&mut self, x: u16, y: u16, v: u16) {
+        self.utoa_nul(v, SCRATCH);
+        self.sheet_text(x, y, SCRATCH);
+    }
+
+    /// 0000:9E06 for the stats' texts: DGROUP's text at `at` drawn at
+    /// (`x`, `y`).
+    fn sheet_text(&mut self, x: u16, y: u16, at: u16) {
+        self.page_text_at(x, y, (DS, at));
     }
 
     /// 0000:7052: `v` in decimal at DS:`di` (7028), NUL-terminated.
