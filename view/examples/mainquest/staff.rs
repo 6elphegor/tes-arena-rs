@@ -145,11 +145,13 @@ impl arena::loot_window::LootHooks for Loot {
 struct End;
 
 impl arena::staffend::EndHooks for End {
-    fn movie(&mut self, m: &mut Machine, _files: &mut Files, si: u16) {
+    fn movie(&mut self, m: &mut Machine, _files: &mut Files, si: u16) -> Option<()> {
         println!("    [movie] {}", show(m, si));
+        Some(())
     }
-    fn speech(&mut self, m: &mut Machine, _files: &mut Files, ax: u16, _si: u16, di: u16) {
+    fn speech(&mut self, m: &mut Machine, _files: &mut Files, ax: u16, _si: u16, di: u16) -> Option<()> {
         println!("    [speech] text {ax:#x} over {} in {:#x}", show(m, di), m.mem.r8(DS, 0x9288));
+        Some(())
     }
     fn line(&mut self, m: &mut Machine, si: u16, y: u16) {
         println!("    [house, row {y:#x}] {}", show(m, si));

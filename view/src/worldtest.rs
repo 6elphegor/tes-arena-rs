@@ -1815,6 +1815,20 @@ fn case(name: &str) -> Option<Case> {
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         // gen_worldframes.py's wild-life cases: the noon encounter fought;
         // doors clicked (`before_door`).
+        // gen_worldframes.py's `jagar_encounter`: the first frame's hour
+        // brings the main quest's encounter, Jagar's words first (1194:
+        // D91C), clicked through; twenty frames after.
+        "playjagar" => (Place::Wild, Box::new(|a: &mut App| {
+            day_encounter(a, 0x100);
+            let m = &mut a.engine.m;
+            let f = m.mem.r16(DS, 0x05C8);
+            m.mem.w16(DS, 0x05C8, f | 0x8000);
+            m.mem.w8(DS, 0x0F77, 3);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 1, |_| false);
+            movies_through(a, d);
+            frames(a, d, seen, 20, |_| false);
+        })),
         "playwildambush" => (Place::Wild, Box::new(|a: &mut App| {
             day_encounter(a, 0x100);
             captured(a);
@@ -1940,6 +1954,33 @@ fn case(name: &str) -> Option<Case> {
         // level's staff flat (C941 7), the staff's line at its third piece
         // and its text not told: clicked, the piece taken (2433:0328's AH
         // 0Fh), its text's box clicked away; five frames after.
+        // `playpiece`'s pile as the staff's last piece (F77 8): the staff
+        // made whole (1194:D986), its scenes clicked through, the area
+        // left; the case ends before the next area's first frame.
+        "playlastpiece" => (Place::Dungeon, Box::new(|a: &mut App| {
+            at_square(a, 0xB, 0x2A, 0);
+            let m = &mut a.engine.m;
+            let floor = m.mem.r16(DS, 0xCCD0);
+            m.mem.w8(floor, 0x0C54, 7);
+            m.mem.w8(DS, 0xC941, 7);
+            m.mem.w8(DS, 0x0F77, 8);
+            m.mem.w8(DS, 0x0F7D, 0);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            let at = a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+            a.release();
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            movies_through(a, d);
+            frames(a, d, seen, 3, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
+            assert_ne!(a.engine.m.mem.r8(DS, arena::trigger::var::AREA), at, "the area isn't left");
+            // (The harness ends before the next area's first frame: the
+            // frame that left has its top, not what it led into.)
+            seen.pop();
+            ENDS.with(|e| e.set(true));
+        })),
         "playpiece" => (Place::Dungeon, Box::new(|a: &mut App| {
             at_square(a, 0xB, 0x2A, 0);
             let m = &mut a.engine.m;
@@ -3467,7 +3508,13 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     if path == VECTORS && !from_load {
         let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "written" && f[1] == name).map_or(String::new(), |f| f[2].to_string());
         let now = files_written(&a.engine.files);
-        let got = written_line(&pre_files.into_inner(), &now, a.engine.m.mem.r16(DS, 0xD748));
+        // (The floor plane's segment where TEMPSAVE.$$$ was written: 0
+        // when it is 0 as the case begins or as it ends, as the generator
+        // counts it; a case leaving the area ends with the next area's,
+        // e.g. playlastpiece's scenes keeping the dungeon's world.)
+        let start_floor = pre.borrow().as_ref().map_or(1, |d: &Vec<u8>| u16::from_le_bytes([d[0xD748], d[0xD749]]));
+        let floor = if start_floor == 0 { 0 } else { a.engine.m.mem.r16(DS, 0xD748) };
+        let got = written_line(&pre_files.into_inner(), &now, floor);
         // (With ARENA_SCREENS holding gen_worldframes.py's dumps, NAME.file.F
         // the original's: the engine's beside them as NAME.port.F.)
         if got != want {
@@ -3652,8 +3699,10 @@ const BUSY: &[&str] = &[
     "playhousepick",
     "playinformant",
     "playinformantpaid",
+    "playjagar",
     "playjourneyend",
     "playkeyssheet",
+    "playlastpiece",
     "playlevelup",
     "playlevitate",
     "playlight",
@@ -3827,6 +3876,13 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
+/// (playjagar's state is left out too: its track, EMS banks and files
+/// match; DGROUP differs in the screen's colours that Jagar's words read
+/// before any frame of the case is drawn (A611's to A39E, D45D's to 9A6E):
+/// entries 1..8, which the original's DAC holds from the sky's window as
+/// it was last set, before the case's clock moved it, and 71h, the lamps'
+/// (set black by day), both of which the view's colours have only from a
+/// drawn frame; and by a tick in the timer (0151).)
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
@@ -3877,6 +3933,7 @@ const BUSY_STATE: &[&str] = &[
     "playinformantpaid",
     "playjourneyend",
     "playkeyssheet",
+    "playlastpiece",
     "playlevelup",
     "playlevitate",
     "playlight",

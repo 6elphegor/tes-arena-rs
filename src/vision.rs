@@ -288,13 +288,15 @@ impl Machine {
                 self.file_seek(files, 0, 0x50);
                 self.file_read(files, DS, 0xA836, 4);
                 self.file_seek(files, 0, self.mem.r32(DS, 0xA836));
-                self.movie_frame_read(files, buf, size);
+                self.movie_frame_decode(files, buf, (block, off), w, h, false)?;
                 k = 0;
             }
             // (On the movie's own handle: a page turned loads the speech's
-            // parts, opening and closing their files.)
+            // parts, opening and closing their files.) Each frame decoded
+            // (its colours to 929E, its pixels to the block) and drawn
+            // (618F with AX 2: with A902 bit 400h, 5A6A).
             self.file_on(files, handle);
-            self.movie_frame_read(files, buf, size);
+            self.movie_frame_decode(files, buf, (block, off), w, h, true)?;
             hooks.frame(self, k == 0);
             // 8FC8: the mouse read (9012), its place kept within its limits.
             let (buttons, x, y) = hooks.mouse(self);

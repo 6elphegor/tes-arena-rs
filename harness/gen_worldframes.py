@@ -752,6 +752,17 @@ def piece_ahead(a):
     a.mu.mem_write(a.lin(a.ds, 0x0F7D), b'\x00')
 
 
+def last_piece_ahead(a):
+    """`piece_ahead` with the staff's line at its eighth piece (F77 8):
+    clicked, the piece is the last (2433:0328 with F77 8): F77 made 9 and
+    the staff made whole (1194:D986: WALK.FLC, AFLC2.FLC, NUJAGDTH.FLC's
+    speech, STAFF.FLC, KING.FLC, NUKING.FLC's two speeches, the house
+    with text 579h and its key's wait), then the area left (C398 bit 80h;
+    0F76, 5E6 and FCE cleared)."""
+    piece_ahead(a)
+    a.mu.mem_write(a.lin(a.ds, 0x0F77), b'\x08')
+
+
 def chest_ahead(a):
     """Row 0Bh, column 2Ah, facing north (heading 0), near the square's far
     edge (Y +70h), with the level's locked chest (its flat C93B on the
@@ -845,6 +856,20 @@ def day_encounter(heading):
         at_hour(11, heading, minute=59)(a)
         a.w16(0x884A, (a.r16(0x0151) - 0x5B) & 0xFFFF)
         a.mu.mem_write(a.lin(a.ds, 0x91F6), struct.pack('<I', ENCOUNTER_SEED))
+    return put
+
+
+def jagar_encounter(heading):
+    """`day_encounter` with a staff piece's quest just done (5C8 bit 8000h,
+    as 1194:D363 leaves it) and the staff's line at its third piece (F77
+    3): the hour's encounter is the main quest's (89D4..8A0A): Jagar's
+    words first (1194:D91C: the world kept, JAGAR.FLC's speech, text
+    572h, the world given back), then the creatures at the player's
+    level plus F77."""
+    def put(a):
+        day_encounter(heading)(a)
+        a.w16(0x05C8, a.r16(0x05C8) | 0x8000)
+        a.mu.mem_write(a.lin(a.ds, 0x0F77), b'\x03')
     return put
 
 
@@ -1482,6 +1507,10 @@ CASES = {
     # The same by day (`day_encounter`): the noon hour's encounter roll,
     # then what came fought: the weapon readied, waited for, swung at
     # frame on frame (`SWINGING`), let go.
+    # The main quest's encounter (`jagar_encounter`): the first frame's
+    # hour brings Jagar's words, clicked through (`dream`), then the
+    # creatures; twenty frames after.
+    'playjagar': ('wild', jagar_encounter(0x100), [((), (), 1, None, [], {'dream': 8}), ((), (), 20, None)]),
     'playwildambush': ('wild', day_encounter(0x100), [((KEY_A,), (), 1, None), ((), (KEY_A,), 120, None),
                                                       ((), (), 150, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]),
     # A house's door (`before_door`; the town's trigger 6, a plain wall:
@@ -1598,6 +1627,11 @@ CASES = {
     # street (the corpse's record in the segment [1042] either way).
     'playlootwild': ('wild', brought(1), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playlootstreet': ('street', open_ahead(brought(1)), FIGHT + [((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
+    # The staff's last piece ahead (`last_piece_ahead`) clicked two frames
+    # on: the staff made whole, its scenes' movies, speeches and house
+    # (`dream`'s clicks), then the area left; the case ends before the
+    # next area's first frame.
+    'playlastpiece': ('dungeon', last_piece_ahead, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)], 'dream': 12, 'leaves': True, 'ends': True})]),
     # The staff's piece ahead (`piece_ahead`) clicked two frames on: its
     # text in its box clicked away; five frames after.
     'playpiece': ('dungeon', piece_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 5, None)]),
@@ -2125,16 +2159,19 @@ def written_line(a, name):
     as its frames began), by name, each its size and digest; deleted
     ones `-`. Empty when it wrote none. TEMPSAVE.$$$'s third plane where
     the floor plane's segment (D748) is 0, which A665 then writes from
-    0000:0000, DOS's interrupt table (zeros here, the program's image in
-    the port's memory), counted as zeros."""
+    0000:0000, DOS's interrupt table (the BIOS's data and zeros here, the
+    program's image in the port's memory), counted as zeros: 0 as the
+    case begins or as it ends (one leaving the area ends with the next
+    area's, `playlastpiece`)."""
     got = []
+    floor0 = int.from_bytes(a.pre_state[0][0xD748:0xD74A], 'little')
     for k in sorted(set(a.written) | set(a.pre_written)):
         now, was = a.written.get(k), a.pre_written.get(k)
         if now is None:
             got.append(f'{k}:-')
         elif was is None or bytes(now) != was:
             data = bytes(now)
-            if k == 'TEMPSAVE.$$$' and a.r16(0xD748) == 0:
+            if k == 'TEMPSAVE.$$$' and (a.r16(0xD748) == 0 or floor0 == 0):
                 data = data[:0x10000] + bytes(len(data[0x10000:]))
             got.append(f'{k}:{len(data):x}:{fnv(data):x}')
     return f'written | {name} | {" ".join(got)}\n' if got else ''

@@ -23,26 +23,30 @@ struct Screens {
 }
 
 impl EndHooks for Screens {
-    fn begin(&mut self, m: &mut Machine, _files: &mut Files) {
+    fn begin(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.n[0] += 1;
         // As the generator's stub of DAF0.
         m.mem.w16(DS, 0xA91A, 0x1234);
         m.mem.w16(DS, 0x0D56, 0x5678);
+        Some(())
     }
-    fn movie(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16) {
+    fn movie(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16) -> Option<()> {
         self.n[1] += 1;
+        Some(())
     }
-    fn speech(&mut self, _m: &mut Machine, _files: &mut Files, _ax: u16, _si: u16, _di: u16) {
+    fn speech(&mut self, _m: &mut Machine, _files: &mut Files, _ax: u16, _si: u16, _di: u16) -> Option<()> {
         self.n[2] += 1;
+        Some(())
     }
     fn fade(&mut self, _m: &mut Machine) {
         self.n[3] += 1;
     }
-    fn house(&mut self, _m: &mut Machine, _files: &mut Files) {
+    fn house(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         // 9426, 9466, 5C86, 7428 (5828 and 9B4E aren't counted).
         for i in 4..8 {
             self.n[i] += 1;
         }
+        Some(())
     }
     fn text(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.n[8] += 1;
@@ -57,8 +61,9 @@ impl EndHooks for Screens {
         self.n[5] += 1;
         self.n[10] += 1;
     }
-    fn end(&mut self, _m: &mut Machine, _files: &mut Files) {
+    fn end(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         self.n[11] += 1;
+        Some(())
     }
     fn clear(&mut self, _m: &mut Machine) {
         self.n[12] += 1;
