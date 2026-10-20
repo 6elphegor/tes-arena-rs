@@ -64,6 +64,35 @@ fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
     m.mem.w16(DS, arena::movement::var::HEADING, heading);
 }
 
+/// gen_worldframes.py's `pit_ahead`: at the start's square (row 0Bh,
+/// column 2Ah) facing heading 0, the floor ahead (row 0Ch) made a dry
+/// chasm: its high byte that of the floor's solid limit (CCCE).
+fn pit_ahead(a: &mut App) {
+    at_square(a, 0xB, 0x2A, 0);
+    let m = &mut a.engine.m;
+    let seg = m.mem.r16(DS, arena::movement::var::FLOOR_SEG);
+    let at = (0xC << 8) + (0x2A << 1);
+    let v = (m.mem.r16(DS, arena::movement::var::FLOOR_SOLID) & 0xFF00) | (m.mem.r16(seg, at) & 0xFF);
+    m.mem.w16(seg, at, v);
+}
+
+/// gen_worldframes.py's `fatigued`: the player's fatigue `fatigue`.
+fn fatigued(a: &mut App, fatigue: u16) {
+    a.engine.m.mem.w16(DS, arena::character::PLAYER + arena::character::field::FATIGUE, fatigue);
+}
+
+/// gen_worldframes.py's `false_wall`: at `row`, `col` facing `heading`,
+/// the wall at `wall_row`, `wall_col` made a kind-9 wall with bit 100h
+/// (drawn, but walked through).
+fn false_wall(a: &mut App, (row, col, heading): (u16, u16, u16), (wall_row, wall_col): (u16, u16)) {
+    at_square(a, row, col, heading);
+    let m = &mut a.engine.m;
+    let seg = m.mem.r16(DS, 0xD806);
+    let at = (wall_row << 8) + (wall_col << 1);
+    let v = 0x9100 | (m.mem.r16(seg, at) & 0x3F);
+    m.mem.w16(seg, at, v);
+}
+
 /// Facing `heading` at `hour` o'clock of the save's day, as
 /// gen_worldframes.py's `at_hour` sets it.
 fn at_hour(a: &mut App, hour: u16, heading: u16) {
@@ -2299,6 +2328,45 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 3, |_| false);
         })),
         "playswim" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 21, 7, 0)), held(30, |_| false, 60)),
+        // gen_worldframes.py's dungeon features: a pit fallen into and
+        // climbed out of, the water's minute drain, drowning, a wall walked
+        // through.
+        "playpit" => (Place::Dungeon, Box::new(pit_ahead), held(46, |_| false, 6)),
+        "playwater" => (Place::Dungeon, Box::new(|a: &mut App| {
+            at_square(a, 3, 3, 0x100);
+            fatigued(a, 0x400);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 16, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 4, |_| false);
+            minute_due(a);
+            frames(a, d, seen, 6, |_| false);
+        })),
+        "playdrown" => (Place::Dungeon, Box::new(|a: &mut App| {
+            at_square(a, 3, 3, 0x100);
+            fatigued(a, 0x100);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 16, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 4, |_| false);
+            // The minute tick's drain below 0 in the water: the drowning's
+            // box (7B2F) inside the frame, clicked away; the frame then ends
+            // the world loop (2686:02B4) and the view takes the death on
+            // (`App::area_next`), as `playdeath`.
+            minute_due(a);
+            d.frame(a);
+            assert!(!a.boxes.is_empty() || a.pending.is_some(), "the drowning's box");
+            d.click(a, 0xA0, 0x60, MouseButton::Left);
+        })),
+        "playfalsewall" => (Place::Dungeon, Box::new(|a: &mut App| false_wall(a, (6, 52, 0x100), (5, 52))), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+            frames(a, d, seen, 24, |_| false);
+            a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+            frames(a, d, seen, 4, |_| false);
+        })),
         "playlevitate" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 21, 7, 0);
             levitating(a);
@@ -4027,6 +4095,7 @@ const BUSY: &[&str] = &[
     "playequipstaff",
     "playequipwear",
     "playexitmapend",
+    "playfalsewall",
     "playfight",
     "playfortify",
     "playguards",
@@ -4068,6 +4137,7 @@ const BUSY: &[&str] = &[
     "playpick",
     "playpiece",
     "playpile",
+    "playpit",
     "playpoisontick",
     "playpotionresist",
     "playquestreached",
@@ -4112,6 +4182,7 @@ const BUSY: &[&str] = &[
     "playuse",
     "playusebreak",
     "playuselist",
+    "playwater",
     "playweaponbreak",
     "playwildambush",
     "playwildhouse",
@@ -4269,6 +4340,7 @@ const BUSY_STATE: &[&str] = &[
     "playequipstaff",
     "playequipwear",
     "playexitmapend",
+    "playfalsewall",
     "playfight",
     "playfogfirst",
     "playfortify",
@@ -4313,6 +4385,7 @@ const BUSY_STATE: &[&str] = &[
     "playpick",
     "playpiece",
     "playpile",
+    "playpit",
     "playpoisontick",
     "playpotionresist",
     "playquestreached",
@@ -4359,6 +4432,7 @@ const BUSY_STATE: &[&str] = &[
     "playuselist",
     "playvolcano",
     "playvolcanofar",
+    "playwater",
     "playweaponbreak",
     "playwildambush",
     "playwildhouse",
@@ -4368,7 +4442,7 @@ const BUSY_STATE: &[&str] = &[
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
 /// WALLS_CASES).
-const WALLS_CASES: [&str; 8] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playchestpick", "playopen"];
+const WALLS_CASES: [&str; 9] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playchestpick", "playopen", "playfalsewall"];
 
 /// Those cases leave the walls plane ([D806], the level's width by its
 /// depth in words, C357, C359) as the original's do: the riddle's door
@@ -4533,6 +4607,21 @@ fn a_death_leaves_the_state_as_the_original() {
     state_case("playdeath");
     state_load_case("playdeath");
     state_ems_case("playdeath");
+}
+
+/// The player drowned (`playdrown`): the water's minute drain taking the
+/// fatigue below 0, the exhaustion's box clicked away, the frame that ends
+/// the world loop and the outer loop's death as `playdeath`'s: the
+/// player's frames, DGROUP from the case's start and from the load, and
+/// the EMS banks, as the original leaves them.
+#[test]
+fn a_drowning_leaves_the_state_as_the_original() {
+    let (place, setup, play) = case("playdrown").unwrap();
+    let Some((_, seen)) = played(place, setup, play) else { return };
+    assert_eq!(seen, track("playdrown"), "playdrown: the player's frames differ from the original's");
+    state_case("playdrown");
+    state_load_case("playdrown");
+    state_ems_case("playdrown");
 }
 
 /// The player killed (`playdeath`), then the program's main back to its

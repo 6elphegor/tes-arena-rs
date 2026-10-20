@@ -1539,6 +1539,40 @@ PILE_SCRIPT = [LOOT_LINE, LOOT_LINE, ('rclick', 0x60, 0x25)]
 # crypt1.inf).
 CRYPT = b'41649375.MIF'
 
+
+def fatigued(put, fatigue):
+    """`put`, then the player's fatigue (01A4 + 5Dh) `fatigue`: what the
+    minute tick (0000:1644) takes down: 2901:0002's Bh, and in water (C39A
+    bit 10h, no boat) 1Eh more of it; below 0, in water, the player
+    drowns (the exhaustion's 7B2F box, then 2686:02B4)."""
+    def both(a):
+        put(a)
+        a.w16(0x01A4 + 0x5D, fatigue)
+    return both
+
+
+def pit_ahead(a):
+    """At the start's square (row 0Bh, column 2Ah) facing heading 0, the
+    floor of the square ahead (row 0Ch) made a dry chasm: its high byte
+    FCh (frame + C00h, the floor's solid limit CCCE: chasm 0, the INF's
+    DRYCHASM), as the dungeon's own at row 7."""
+    at_square(0xB, 0x2A, 0)(a)
+    at, seg = (0xC << 8) + (0x2A << 1), a.r16(0xCCD0)
+    a.w16(at, (a.r16(0xCCCE) & 0xFF00) | (a.r16(at, seg=seg) & 0xFF), seg=seg)
+
+
+def false_wall(row, col, heading, wall_row, wall_col):
+    """The player at `row`, `col` facing `heading`, the wall at `wall_row`,
+    `wall_col` made a kind-9 wall with bit 100h (9100h and its texture,
+    the old word's low six bits): drawn as a wall (0000:CC63's kind 9),
+    but no obstacle (0000:FB81: kind 9 blocks only without 100h)."""
+    def put(a):
+        at_square(row, col, heading)(a)
+        at, seg = (wall_row << 8) + (wall_col << 1), a.r16(0xD806)
+        a.w16(at, 0x9100 | (a.r16(at, seg=seg) & 0x3F), seg=seg)
+    return put
+
+
 # name: (where, set-up, [(keys held, keys let go, frames, until[, clicks])...]):
 # the clicks (x, y) are queued for the mouse's reads before the frames.
 LEVEL_XP = 9_750_000
@@ -1836,14 +1870,39 @@ CASES = {
     # frame the first face drawn after the walk steps it (C398 bit 1000h,
     # 0000:CD89) is drawn with CCF8 FFFFh, which hides no light (B7A9).
     'playdoormoving': ('crypt', picking(1), [((), (), 2, None), ((), (), 4, None, [(160, 100)])]),
-    # The crypt's water (row 22, columns 6..10) walked into from the
-    # square north of it (row 21, column 7), facing it (heading 0): the
-    # player sinks (0000:F9C4's water), swims and bobs (C39A bit 10h,
-    # CB68), the footsteps the swimming sound.
+    # The crypt's lava (row 22, columns 6..10: floor FE00h, its INF's
+    # LAVACHASM, chasm 2) walked into from the square north of it (row 21,
+    # column 7), facing it (heading 0): the player sinks (0000:F9C4: lava
+    # is a chasm deep as water), swims and bobs (C39A bit 10h, CB68), the
+    # footsteps the swimming sound. (Lava burns nothing in this version:
+    # only the renderer tells the chasms' kinds apart, 0000:D0D4.)
     'playswim': ('crypt', at_square(21, 7, 0), [((UP,), (), 30, None), ((), (UP,), 60, None)]),
     # The same levitating (`levitating`): kept up over the water, bobbing
     # (2826:0042).
     'playlevitate': ('crypt', levitating(at_square(21, 7, 0)), [((UP,), (), 30, None), ((), (UP,), 30, None)]),
+    # A dry chasm (floor FC00h, chasm 0, as the dungeon's own at row 7)
+    # made of the square ahead of the start (`pit_ahead`), walked into and
+    # on (heading 0): the player falls (0000:F9C4: E8BE doubling every
+    # other frame) to its floor, 50h down, and against the next square's
+    # floor, low, climbs 6 a frame (0000:F955: moving within 10h of
+    # heading 0 only) up onto it.
+    'playpit': ('dungeon', pit_ahead, [((UP,), (), 46, None), ((), (UP,), 6, None)]),
+    # The dungeon's water (row 2, columns 1..8: floor FD00h, chasm 1)
+    # walked into from row 3, column 3 (heading 100h), the player's
+    # fatigue 400h (`fatigued`); then the minute tick (`minute_due`): the
+    # water's drain of 1Fh fatigue ticks (0000:1644).
+    'playwater': ('dungeon', fatigued(at_square(3, 3, 0x100), 0x400), [((UP,), (), 16, None), ((), (UP,), 4, None),
+                                                                        ((), (), 6, None, [], {'do': minute_due})]),
+    # The same with fatigue 100h: the drain takes it below 0 in the water
+    # and the player drowns (the exhaustion, 7B2F's box clicked away, then
+    # 2686:02B4); the frame that ends the world loop for it, the outer
+    # loop's death followed (`died`).
+    'playdrown': ('dungeon', fatigued(at_square(3, 3, 0x100), 0x100), [((UP,), (), 16, None), ((), (UP,), 4, None),
+                                                                        ((), (), 1, None, [], {'do': minute_due, 'script': [('click', 0xA0, 0x60)], 'dies': True})]),
+    # North (heading 100h) from row 6, column 52 into the wall at row 5
+    # made a kind-9 wall with bit 100h (`false_wall`): drawn, but walked
+    # through to row 4.
+    'playfalsewall': ('dungeon', false_wall(6, 52, 0x100, 5, 52), [((), (), 2, None), ((UP,), (), 24, None), ((), (UP,), 4, None)]),
     # Wounded with a potion (`wounded_with_potion`): two frames, the
     # A creature brought (`brought`) and fought off by standing: twenty
     # frames, then M held a frame (the automap, 2542:045A, left by a click
@@ -2393,7 +2452,8 @@ def written_line(a, name):
 # The cases whose doors, locks or chests change the walls plane, which
 # neither DGROUP nor the EMS banks hold: its words (the level's width by
 # its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
-WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen')
+WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen',
+               'playfalsewall')
 
 
 def walls_line(a, name):
