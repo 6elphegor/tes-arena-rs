@@ -417,9 +417,12 @@ impl Engine {
             });
             self.page_ems_prior = self.page_ems_wrote.clone();
             let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote, &self.page_ems_prior);
-            for (o, before, after) in ems {
-                self.page_ems_wrote.insert(o, (before, after));
-            }
+            // The copy started from the earlier drawings' changes (those
+            // still standing), so what it holds otherwise than the machine
+            // now is all the drawings' changes: one this drawing wrote back
+            // to the machine's byte (a cloud's image in bank 0Eh put back
+            // to 0) is gone, as in the original, drawing on the machine.
+            self.page_ems_wrote = ems.into_iter().map(|(o, before, after)| (o, (before, after))).collect();
             *page = p;
             self.walked = Some(walked);
             self.page_gaps = gaps;

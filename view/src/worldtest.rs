@@ -52,7 +52,22 @@ fn objects(a: &App) -> u64 {
 fn pushed(a: &App, seen: &mut Vec<[u16; 5]>) {
     seen.push(state(a));
     OBJECTS.with(|o| o.borrow_mut().push(objects(a)));
+    // (Every CHECKPOINT frames, when measuring: the state then, and the
+    // offsets the drawing's copy wrote, as `state_compared` takes them.)
+    let k = seen.len() - 1;
+    if k > 0 && k % CHECKPOINT == 0 {
+        CHECKPOINTS.with(|c| {
+            if let Some(v) = c.borrow_mut().as_mut() {
+                let (ds, ems) = grab(a);
+                v.push((k, ds, ems, a.engine.page_wrote.iter().map(|w| w.is_some()).collect()));
+            }
+        });
+    }
 }
+
+/// gen_worldframes.py's CHECKPOINT: how many frames apart a long case is
+/// measured on the way.
+const CHECKPOINT: usize = 250;
 
 /// The player at the middle of a square, facing `heading`.
 fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
@@ -313,6 +328,11 @@ thread_local! {
     /// The level a stairs walk started on (gen_worldframes.py's
     /// `stairs_from`, for `level_moved`).
     static LEVEL_AT: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+    /// While a long case is measured on the way: at every CHECKPOINT-th
+    /// frame `pushed` keeps, the frame, DGROUP and the EMS banks (`grab`),
+    /// and which offsets the drawing's copy wrote.
+    #[allow(clippy::type_complexity)]
+    static CHECKPOINTS: std::cell::RefCell<Option<Vec<(usize, Vec<u8>, Vec<u8>, Vec<bool>)>>> = const { std::cell::RefCell::new(None) };
 }
 
 #[path = "savetest.rs"]
@@ -1602,6 +1622,55 @@ fn known(a: &mut App, spell: u8) {
     m.mem.w8(DS, 0x5CAE, n);
 }
 
+/// gen_worldframes.py's LONG_RUN (`playlongrun`): the house before the
+/// player picked and in, its door ahead walked to and clicked, back out;
+/// turned about (Left until the heading is F0h..110h) and the street
+/// walked with three turns; Light cast by Shift+C as `quick_cast` casts
+/// it; eight minute ticks 30 frames apart; 600 frames stood; a turn and
+/// 400 frames walked.
+fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    let key = |a: &mut App, code: KeyCode, down: bool| a.input(In::Key { code, down, text: None });
+    let area = |a: &App| a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+    let walk = |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, code: KeyCode, n: usize, after: usize| {
+        key(a, code, true);
+        frames(a, d, seen, n, |_| false);
+        key(a, code, false);
+        frames(a, d, seen, after, |_| false);
+    };
+    frames(a, d, seen, 2, |_| false);
+    let at = area(a);
+    door_clicked(a, d, seen, 160.0, 100.0);
+    frames(a, d, seen, 10, |a| area(a) != at);
+    frames(a, d, seen, 3, |_| false);
+    walk(a, d, seen, KeyCode::ArrowUp, 12, 2);
+    let at = area(a);
+    door_clicked(a, d, seen, 160.0, 100.0);
+    frames(a, d, seen, 10, |a| area(a) != at);
+    frames(a, d, seen, 4, |_| false);
+    key(a, KeyCode::ArrowLeft, true);
+    frames(a, d, seen, 30, |a| (0xF0..=0x110).contains(&a.engine.m.mem.r16(DS, arena::movement::var::HEADING)));
+    key(a, KeyCode::ArrowLeft, false);
+    frames(a, d, seen, 2, |_| false);
+    walk(a, d, seen, KeyCode::ArrowUp, 150, 2);
+    walk(a, d, seen, KeyCode::ArrowRight, 6, 2);
+    walk(a, d, seen, KeyCode::ArrowUp, 150, 2);
+    walk(a, d, seen, KeyCode::ArrowLeft, 3, 2);
+    walk(a, d, seen, KeyCode::ArrowUp, 200, 4);
+    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+    a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+    pushed(a, seen);
+    key(a, KeyCode::KeyC, false);
+    key(a, KeyCode::ShiftLeft, false);
+    frames(a, d, seen, 100, |_| false);
+    for _ in 0..8 {
+        minute_due(a);
+        frames(a, d, seen, 30, |_| false);
+    }
+    frames(a, d, seen, 600, |_| false);
+    walk(a, d, seen, KeyCode::ArrowRight, 10, 2);
+    walk(a, d, seen, KeyCode::ArrowUp, 400, 20);
+}
+
 /// gen_worldframes.py's spell numbers (3276:0000's records).
 const LIGHT: u8 = 2;
 const OPEN: u8 = 9;
@@ -2296,6 +2365,17 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 3, |_| false);
         })),
         "playcrowd" => (Place::Street, Box::new(|a: &mut App| at_hour(a, 12, 0)), held(60, |_| false, 240)),
+        // gen_worldframes.py's LONG_RUN: the house picked, in and out,
+        // the street walked with turns, Light cast, eight minute ticks, a
+        // long stand, a last walk; 1937 frames, measured on the way too
+        // (`a_long_session_as_the_original`).
+        "playlongrun" => (Place::Street, Box::new(|a: &mut App| {
+            before_door(a, 95, 47, None);
+            let f = a.engine.m.mem.r16(DS, 0x05CA);
+            a.engine.m.mem.w16(DS, 0x05CA, f | 1);
+            seeded(a);
+            known(a, LIGHT);
+        }), Box::new(long_run)),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         "playpick" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -4264,6 +4344,7 @@ const BUSY: &[&str] = &[
     "playlogbar",
     "playlogend",
     "playlogprint",
+    "playlongrun",
     "playloot",
     "playlootitems",
     "playlootstreet",
@@ -4761,6 +4842,73 @@ fn a_death_leaves_the_state_as_the_original() {
     state_case("playdeath");
     state_load_case("playdeath");
     state_ems_case("playdeath");
+}
+
+/// A long session (`playlongrun`, 1937 frames) as the original plays it:
+/// the player's frames, and every 250 frames what the frames so far
+/// changed in DGROUP and the EMS banks (gen_worldframes.py's `checkpoint`
+/// and `checkpointems` lines, measured as `state_compared` and
+/// `state_ems_in` measure the end): drift shows at the first checkpoint
+/// it reaches, not only at the end.
+#[test]
+fn a_long_session_as_the_original() {
+    let name = "playlongrun";
+    if !only_case(name) {
+        return;
+    }
+    let (place, setup, play) = case(name).unwrap();
+    let pre = std::cell::RefCell::new(None);
+    CHECKPOINTS.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    let r = played(place, |a| {
+        a.engine.page = Some(vec![0; 64000]);
+        setup(a);
+        *pre.borrow_mut() = Some(grab(a));
+    }, play);
+    let got = CHECKPOINTS.with(|c| c.borrow_mut().take()).unwrap();
+    let Some((_, seen)) = r else { return };
+    let want = track(name);
+    let first = (0..seen.len().max(want.len())).find(|&i| seen.get(i) != want.get(i));
+    assert!(first.is_none(), "{name}: the player's frames differ from the original's from frame {first:?} ({} here, {} there): here {:x?}, there {:x?}",
+        seen.len(), want.len(), first.map(|i| &seen[i.saturating_sub(2)..(i + 3).min(seen.len())]), first.map(|i| &want[i.saturating_sub(2)..(i + 3).min(want.len())]));
+    let (ds0, ems0) = pre.into_inner().unwrap();
+    let skip = state_excluded();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let lines = |kind: &str| -> Vec<Vec<String>> {
+        text.lines().map(|l| l.split(" | ").map(str::to_string).collect::<Vec<_>>()).filter(|f| f.len() == 5 && f[0] == kind && f[1] == name).collect()
+    };
+    let (want, want_ems) = (lines("checkpoint"), lines("checkpointems"));
+    assert_eq!(got.iter().map(|c| c.0).collect::<Vec<_>>(), want.iter().map(|f| usize::from_str_radix(&f[2], 16).unwrap()).collect::<Vec<_>>(), "{name}: the checkpoints' frames");
+    let hx = |v: &[usize]| v.iter().take(24).map(|i| format!("{i:04x}")).collect::<Vec<_>>().join(" ");
+    // (With ARENA_STATE_DUMP naming a directory: the state here at each
+    // checkpoint, NAME.port.FRAME.ds and .ems, beside gen_worldframes.py's
+    // dumps' NAME.FRAME.ds and .ems.)
+    if let Ok(dir) = std::env::var("ARENA_STATE_DUMP") {
+        for (k, ds, ems, _) in &got {
+            let _ = std::fs::write(PathBuf::from(&dir).join(format!("{name}.port.{k:x}.ds")), ds);
+            let _ = std::fs::write(PathBuf::from(&dir).join(format!("{name}.port.{k:x}.ems")), ems);
+        }
+        let _ = std::fs::write(PathBuf::from(&dir).join(format!("{name}.port.ems0")), &ems0);
+        let _ = std::fs::write(PathBuf::from(&dir).join(format!("{name}.port.ds0")), &ds0);
+    }
+    for ((k, ds, ems, drawn), (f, fe)) in got.iter().zip(want.iter().zip(&want_ems)) {
+        let mut changed = vec![false; 0x10000];
+        for run in f[3].split_whitespace() {
+            let (s, n) = run.split_once('+').unwrap();
+            let (s, n) = (usize::from_str_radix(s, 16).unwrap(), usize::from_str_radix(n, 16).unwrap());
+            changed[s..s + n].iter_mut().for_each(|x| *x = true);
+        }
+        let extra: Vec<usize> = (0..0x10000).filter(|&i| ds0[i] != ds[i] && !skip[i] && !changed[i] && !drawn[i]).collect();
+        assert!(extra.is_empty(), "{name}: by frame {k} the frames changed what the original's don't: {}", hx(&extra));
+        let unchanged: Vec<usize> = (0..0x10000).filter(|&i| changed[i] && ds0[i] == ds[i]).collect();
+        let digest = fnv((0..0x10000).filter(|&i| changed[i]).map(|i| ds[i]));
+        assert_eq!(format!("{digest:x}"), f[4], "{name}: the state at frame {k} differs from the original's (of its changes, unchanged here: {})", hx(&unchanged));
+        let moved: Vec<usize> = (0..ems.len()).filter(|&i| ems0[i] != ems[i]).collect();
+        let got_ems = format!("{:x} {:x}", moved.len(), fnv(moved.iter().flat_map(|&i| (i as u32).to_le_bytes())));
+        assert_eq!((got_ems, format!("{:x}", fnv(moved.iter().map(|&i| ems[i])))), (fe[3].clone(), fe[4].clone()), "{name}: the EMS banks at frame {k} differ from the original's");
+    }
+    state_case(name);
+    state_load_case(name);
+    state_ems_case(name);
 }
 
 /// The player drowned (`playdrown`): the water's minute drain taking the

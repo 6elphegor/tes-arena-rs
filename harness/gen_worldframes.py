@@ -97,6 +97,13 @@ flags only the bits DA8E reads), their digest:
 
   rows | NAME | <drawings> <digest>
 
+For the cases of CHECKPOINT_CASES, every CHECKPOINT frames (at the
+frame's top), what the frames so far changed in DGROUP and in the EMS
+banks, as the `state` and `stateems` lines measure them:
+
+  checkpoint | NAME | <frame> | <start+length ...> | <digest>
+  checkpointems | NAME | <frame> | <count> <offsets' digest> | <digest>
+
 A case that printed (the logbook's Print), what PRN took, its length
 and digest:
 
@@ -1627,6 +1634,45 @@ def false_wall(row, col, heading, wall_row, wall_col):
 
 # name: (where, set-up, [(keys held, keys let go, frames, until[, clicks])...]):
 # the clicks (x, y) are queued for the mouse's reads before the frames.
+KEY_LEFT = 0x4B
+KEY_RIGHT = 0x4D
+
+
+def heading_between(lo, hi):
+    """Until the player's heading (C3DA) is within lo..hi: a turn's key
+    let go there (the arrows turn 13h a frame, the circle 200h)."""
+    return lambda a: lo <= a.r16(0xC3DA) <= hi
+
+
+def long_run_start(a):
+    """`playhousepick`'s start (before the house at row 95, column 47,
+    picking armed, the seed SEED), Light added to the book (`known`)."""
+    armed(before_door(95, 47), gs.SEED)(a)
+    known(LIGHT)(a)
+
+
+# playlongrun's frames: the house picked and in, its door ahead walked to
+# and clicked: back out in the street; turned about and walked down the
+# street with three turns (walls met and slid along); Light cast by
+# Shift+C; eight minute ticks 30 frames apart; 600 frames stood; a turn
+# and 400 frames walked. 1937 frames.
+LONG_RUN = ([((), (), 2, None), ((), (), 10, None, [(160, 100)], {'leaves': True}), ((), (), 3, None),
+             ((UP,), (), 12, None), ((), (UP,), 2, None),
+             ((), (), 10, None, [(160, 100)], {'leaves': True}), ((), (), 4, None),
+             ((KEY_LEFT,), (), 30, heading_between(0xF0, 0x110)), ((), (KEY_LEFT,), 2, None),
+             ((UP,), (), 150, None), ((), (UP,), 2, None),
+             ((KEY_RIGHT,), (), 6, None), ((), (KEY_RIGHT,), 2, None), ((UP,), (), 150, None), ((), (UP,), 2, None),
+             ((KEY_LEFT,), (), 3, None), ((), (KEY_LEFT,), 2, None), ((UP,), (), 200, None), ((), (UP,), 4, None),
+             ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 100, None)]
+            + [((), (), 30, None, [], {'do': minute_due})] * 8
+            + [((), (), 600, None),
+               ((KEY_RIGHT,), (), 10, None), ((), (KEY_RIGHT,), 2, None), ((UP,), (), 400, None), ((), (UP,), 20, None)])
+
+# Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
+# way (`checkpoint` lines), as at their end.
+CHECKPOINT_CASES = ('playlongrun',)
+CHECKPOINT = 250
+
 LEVEL_XP = 9_750_000
 # The level's notice clicked away (1194:5E33), then on the attribute
 # screen (1194:122C, the regions at 3276:5312) each line picked and its
@@ -1725,6 +1771,10 @@ CASES = {
     # arrow for 60 frames and then stood in for 240: the townspeople
     # made on the way in walking about the player.
     'playcrowd': ('street', at_hour(12, 0), [((UP,), (), 60, None), ((), (UP,), 240, None)]),
+    # A long session for drift (`LONG_RUN`, 1937 frames: a house in and
+    # out, the street walked with turns, Light cast, minute ticks, a long
+    # stand), DGROUP and EMS measured every 250 frames (`checkpoint`).
+    'playlongrun': ('street', long_run_start, LONG_RUN),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -2581,6 +2631,7 @@ def run_case(a, at, name, setup, steps, tracks):
     a.mouse = (160, 100)
     a.buttons = 0
     a.menu_loaded = False
+    a.checkpoints = {}
     if setup:
         setup(a)
     # The state the frames start from (for the state comparison's
@@ -2606,6 +2657,10 @@ def play(a, name, steps, tracks):
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
         a.objects.append(objects_digest(a))
+        # (A CHECKPOINT_CASES case's state every CHECKPOINT frames, as the
+        # top of the frame first finds it: before a step's `do` there.)
+        if name in CHECKPOINT_CASES and frame[0] and frame[0] % CHECKPOINT == 0 and frame[0] not in a.checkpoints:
+            a.checkpoints[frame[0]] = (bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)), b''.join(a.ems_bank(b) for b in range(0x20)))
         frame[0] += 1
         # The step's drag: the mouse moved by it before each frame.
         if drag[0] is not None:
@@ -2862,6 +2917,9 @@ def main():
         out.write(state_line(name, loaded, after, skip_load, 'stateload'))
         ems = b''.join(a.ems_bank(b) for b in range(0x20))
         out.write(state_runs('stateems', name, a.pre_state[1], ems))
+        for k, (ds, banks) in sorted(a.checkpoints.items()):
+            out.write(state_line(f'{name} | {k:x}', a.pre_state[0], ds, skip, 'checkpoint'))
+            out.write(state_runs('checkpointems', f'{name} | {k:x}', a.pre_state[1], banks))
         out.write(f'screen | {name} | {fnv(page):x} {fnv(dac):x} {fnv(mask):x}\n')
         out.write(written_line(a, name))
         if name in WALLS_CASES:
@@ -2892,6 +2950,10 @@ def main():
             open(os.path.join(dump, f'{name}.ems'), 'wb').write(b''.join(a.ems_bank(b) for b in range(0x20)))
             open(os.path.join(dump, f'{name}.ds0'), 'wb').write(a.pre_state[0])
             open(os.path.join(dump, f'{name}.ems0'), 'wb').write(a.pre_state[1])
+            # (And at each checkpoint, as NAME.FRAME.ds and NAME.FRAME.ems.)
+            for k, (ds, banks) in a.checkpoints.items():
+                open(os.path.join(dump, f'{name}.{k:x}.ds'), 'wb').write(ds)
+                open(os.path.join(dump, f'{name}.{k:x}.ems'), 'wb').write(banks)
     out.close()
 
 

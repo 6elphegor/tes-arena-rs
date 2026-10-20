@@ -379,11 +379,24 @@ impl Machine {
             self.turn(it.look as u16);
         }
         if it.turn != 0 {
-            let d = self.turn_speed(it.turn.unsigned_abs().min(0x100));
+            let fraction = match it.turn {
+                // (2826:06A0 and 06FA's regions, REGIONS + 28h and 40h.)
+                -0x100 => self.arrow_fraction(3, 4, None)?,
+                0x100 => self.arrow_fraction(5, 4, Some(0x13C))?,
+                t => t.unsigned_abs().min(0x100),
+            };
+            let d = self.turn_speed(fraction);
             self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
         }
         if it.forward != 0 || it.strafe != 0 {
-            let fraction = it.forward.unsigned_abs().max(it.strafe.unsigned_abs()).min(0x100);
+            let fraction = match (it.forward, it.strafe) {
+                // (`forward`, `back`, `strafe_right`, `strafe_left`'s.)
+                (0x100, 0) => self.arrow_fraction(1, 6, None)?,
+                (-0x100, 0) => self.arrow_fraction(7, 6, Some(0x90))?,
+                (0, 0x100) => self.arrow_fraction(8, 4, Some(0x13C))?,
+                (0, -0x100) => self.arrow_fraction(6, 4, None)?,
+                _ => it.forward.unsigned_abs().max(it.strafe.unsigned_abs()).min(0x100),
+            };
             let speed = self.walk_speed(fraction, it.forward < 0);
             // The direction in heading units (512 a turn, + to the right).
             let a = (it.strafe as f64).atan2(it.forward as f64);
@@ -621,6 +634,18 @@ impl Machine {
         }
         self.mem.w8(DS, BUTTONS, buttons);
         Some(())
+    }
+
+    /// The fraction an arrow key held alone gives region `i`'s handler,
+    /// its range at `field` and `field` + 4: 2826:0473 puts the cursor at
+    /// the screen's edge on the arrow's side, `at` (13Ch across, 90h down;
+    /// None for 0, where the handler counts from the range's far end), as
+    /// `intent_step` takes a key's full intent. Left and Up reach the far
+    /// end (100h); Right and Down fall a little short, so the original
+    /// turns right more slowly than left.
+    fn arrow_fraction(&self, i: u16, field: u16, at: Option<u16>) -> Option<u16> {
+        let (lo, hi) = (self.region(i, field), self.region(i, field + 4));
+        Self::fraction(at.map_or(hi, |at| at.wrapping_sub(lo)), hi.wrapping_sub(lo))
     }
 
     fn with_cursor<T>(&mut self, at: u16, v: u16, f: impl FnOnce(&mut Machine) -> Option<T>) -> Option<T> {
