@@ -158,12 +158,18 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
     // A box over play the window shows as the game's page (the engine's
-    // drawing of it, `hud::Said`): the page's pixels where the box is (the
-    // view's own layer of it, whose mask the check above found the
-    // original's) the original's too.
-    if let Some(page) = a.box_page_shown().cloned() {
-        let (over_idx, dac) = over(&mut a);
-        let idx: Vec<u16> = over_idx.iter().zip(page.iter()).map(|(&o, &c)| if o < 0x100 { c as u16 } else { 0x100 }).collect();
+    // drawing of it, `hud::Said`): what the window composes then (the
+    // page, a field's cursor over it), where the layer just checked drew
+    // (whose mask is the original's), the original's too.
+    if a.box_page_shown().is_some() {
+        a.compose();
+        // A field's cursor as the original's first wait has it (the
+        // window's blinks, off as the field opens): as the layer's.
+        if let Some(l) = &a.live {
+            l.draw(&mut a.screen, true);
+        }
+        let shown = a.screen.indices().to_vec();
+        let idx: Vec<u16> = idx.iter().zip(&shown).map(|(&o, &c)| if o < 0x100 { c } else { 0x100 }).collect();
         assert!(check(name, &idx, &dac), "{name}: the game's page under its box differs from the original's");
         eprintln!("{name}: the box shown as the game's page");
     }

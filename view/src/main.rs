@@ -3842,7 +3842,7 @@ impl App {
             if let Some(lines) = boxed {
                 t.draw_box(&mut self.screen, &self.font, &lines);
             }
-        } else if let Some(page) = self.box_page_shown().cloned() {
+        } else if let Some(page) = self.box_page_shown() {
             // A box over play the engine drew on the game's page (which
             // holds the 3D view and the interface as the original's does):
             // the page as the box's wait found it, all the original shows.
@@ -5466,15 +5466,17 @@ impl App {
     /// does. None where another screen is up (a movie, the save menu, the
     /// options screen, creation, the spellmaker, a shop's, the travel
     /// map, a sheet, the automap: their pictures are the window's own).
-    fn box_page_shown(&self) -> Option<&std::sync::Arc<Vec<u8>>> {
+    fn box_page_shown(&self) -> Option<std::sync::Arc<Vec<u8>>> {
         // A box to read first; else the menu asked, unmarked (the arrows
-        // mark an entry, the window's own: the original marks none).
+        // mark an entry, the window's own: the original marks none); a
+        // list as its loop has drawn it; a field in its prompt's box as
+        // the game's editor has it.
         let page = match self.boxes.front() {
-            Some(b) => b.page.as_ref()?,
+            Some(b) => b.page.clone()?,
             None => match self.pending.as_ref()? {
-                // A list: as its loop has drawn it over the reads so far.
-                Pending { need: dialog::Need::Menu(m), .. } if m.list => self.list_page.as_ref()?,
-                Pending { need: dialog::Need::Menu(_), page: Some(p), .. } if !self.arrowed => p,
+                Pending { need: dialog::Need::Menu(m), .. } if m.list => self.list_page.clone()?,
+                Pending { need: dialog::Need::Menu(_), page: Some(p), .. } if !self.arrowed => p.clone(),
+                Pending { need: dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(..), .. }), .. } => std::sync::Arc::new(self.live.as_ref()?.page()?),
                 _ => return None,
             },
         };
