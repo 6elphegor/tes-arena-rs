@@ -3781,8 +3781,10 @@ impl App {
             // faded out in 8 steps, its colours in in 6 (as `open_travel`).
             // (A level's attribute screen fades in after its notice,
             // `box_read`.)
+            // (Only as it opens: a turn given a click on it already has it
+            // up, the box a click brought up shown in its colours.)
             let fade = match &need {
-                dialog::Need::Spellmaker => Some((0, 0)),
+                dialog::Need::Spellmaker if !given.iter().any(|g| matches!(g, dialog::Answer::Click(..))) => Some((0, 0)),
                 dialog::Need::Travel(_) => Some((8, 6)),
                 _ => None,
             };
@@ -5342,6 +5344,8 @@ impl App {
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
         let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().map(|b| b.lines.clone()), counters: hud::spell_counters(&self.engine.m), level: hud::level_text(&self.engine.m), effect: effect_of(&self.effect), clip: game_clip(&self.engine.m), ..Default::default() };
+        // Asked over the spellmaker (its screen drawn behind): its tiles.
+        h.spparts = self.pending.as_ref().is_some_and(|p| p.maker.is_some());
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 || (self.status_held && !self.boxes.is_empty()) {
             h.status = self.status.clone();
         }
@@ -5548,7 +5552,10 @@ impl App {
             || self.saveui.is_some()
             || self.options.is_some()
             || (self.creation.is_some() && !self.level_notice())
-            || self.map;
+            || self.map
+            // The spellmaker's screen, in its own colours (its boxes in
+            // its tiles: `Hud::spparts`).
+            || self.pending.as_ref().is_some_and(|p| p.maker.is_some());
         (!other).then_some(page)
     }
 

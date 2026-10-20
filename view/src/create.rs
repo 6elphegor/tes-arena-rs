@@ -744,7 +744,9 @@ impl Creation {
             updown: archive.read("UPDOWN.IMG").unwrap_or_default(),
             parch: hud::Tiles::load(&archive, "PARCH.CIF", 20, 20),
             shirt: None,
-            marble2: hud::Tiles::load(&archive, "MARBLE2.CIF", 3, 3),
+            // In play the boxes' tiles (B038) are still MARBLE.CIF's
+            // ([1036]): the refusal's box (3E17) is drawn in them.
+            marble2: hud::Tiles::load(&archive, "MARBLE.CIF", 3, 3),
             charsheet: crate::world::palette_file(dir, "CHARSHT.COL"),
             game,
             faces: Vec::new(),
@@ -2208,6 +2210,9 @@ impl Creation {
             if let Some(clicks) = &c.level_up {
                 // 1194:122C's end: refused (3E17) while points are left.
                 if m.mem.r8(DS, arena::newgame::var::POINTS) != 0 {
+                    // 59CC on the game, as the original's box draws it
+                    // over the attribute screen.
+                    c.game_box(m, (DS, 0x3E17), Back::Stats);
                     let l = hud::lines(m.mem.cstr(DS, 0x3E17), COLOUR_B);
                     c.push_box(l, FontId::Arena, Back::Stats);
                 } else {

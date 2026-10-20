@@ -723,6 +723,7 @@ impl Travel {
             return;
         }
         self.label_held = false;
+        let before = self.at;
         self.at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
         // 3159:019A: the region under the cursor (its mask's pixel), and
         // 00F3: the right button as Esc (the world map's Exit's key, 1Bh;
@@ -743,7 +744,7 @@ impl Travel {
         }
         match engine.m.travel_province_region(self.at.0, self.at.1) {
             MapRegion::Exit => self.exit(engine),
-            MapRegion::Travel => self.travel(engine),
+            MapRegion::Travel => self.travel(engine, before),
             MapRegion::Search => self.ask_name(engine),
             // 26F7:0625 with the button down (AFF9).
             MapRegion::Map => self.pass(engine, true),
@@ -782,7 +783,10 @@ impl Travel {
     /// Unwell, it asks first (1194:48DB, run on a copy to see): the
     /// question's menu is shown, and its answer travels or stays
     /// (`travel_answered`).
-    fn travel(&mut self, engine: &mut Engine) {
+    /// Travel clicked, the loop's last pass having found the cursor at
+    /// `before`: the button's handler runs before the pass that read finds
+    /// (007F), so a box it shows covers the page as that pass left it.
+    fn travel(&mut self, engine: &mut Engine, before: (u16, u16)) {
         let mut copy = engine.m.clone();
         let mut scratch = Vec::new();
         let mut h = Self::hooks(&mut scratch);
@@ -798,7 +802,14 @@ impl Travel {
             self.asking = Some(Asking::Question(title, entries));
             return;
         }
+        let screen = self.page(engine, before);
+        let shown = self.boxes.len();
         self.travel_answered(engine, None);
+        // "Select a destination" (DATA:5024): over the page the box
+        // opened on till it is clicked away (the handler's pass after).
+        if self.boxes.len() > shown && self.journey.is_empty() && self.done.is_none() {
+            self.box_page = screen;
+        }
     }
 
     /// The journey made, the question's answer `answer` (0 Yes, 1 No,

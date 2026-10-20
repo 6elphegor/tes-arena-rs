@@ -478,6 +478,10 @@ screen | worldsearch | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | worldsearch | TEMPSAVE.$$$ 18000 10fa631d87b677c
 screen | worldsearch | TMP2.$$$ fa00 98e7d995733ab27
 screendel | worldsearch | 
+screen | worldnodest | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldnodest | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldnodest | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldnodest | 
 screen | worldhover | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | worldhover | TEMPSAVE.$$$ 18000 10fa631d87b677c
 screen | worldhover | TMP2.$$$ fa00 98e7d995733ab27
@@ -542,6 +546,11 @@ screen | levelupstats | SAVEFACE.$$$ 21c 167cdb245601327a
 screen | levelupstats | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | levelupstats | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
 screendel | levelupstats | 
+screen | levelupleft | CHARSHET.$$$ fa00 18f6da19f846c98d
+screen | levelupleft | SAVEFACE.$$$ 21c 167cdb245601327a
+screen | levelupleft | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | levelupleft | TEMPSAVE.$$$ 18000 7e091cf2f9fb11b3
+screendel | levelupleft | 
 screen | palacewelcome | TMP2.$$$ fa00 98e7d995733ab27
 screendel | palacewelcome | 
 screen | tavernwelcome | TMP2.$$$ fa00 98e7d995733ab27
