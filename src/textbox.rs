@@ -130,8 +130,11 @@ impl Machine {
         let w = |m: &mut Machine, o: u16, v: u16| m.mem.w16(DS, o, v);
         let r = |m: &Machine, o: u16| m.mem.r16(DS, o);
         let (tw, th) = (r(self, 0xA856), r(self, 0xA854));
+        let mut across = r(self, 0xA83A) / tw;
+        let mut down = r(self, 0xA83C) / th;
         let rem = r(self, 0xA83A) % tw;
         if rem != 0 {
+            across = across.wrapping_add(1);
             let d = tw - rem;
             let v = r(self, 0xA83A).wrapping_add(d);
             w(self, 0xA83A, v);
@@ -140,6 +143,7 @@ impl Machine {
         }
         let rem = r(self, 0xA83C) % th;
         if rem != 0 {
+            down = down.wrapping_add(1);
             let d = th - rem;
             let v = r(self, 0xA83C).wrapping_add(d);
             w(self, 0xA83C, v);
@@ -160,6 +164,7 @@ impl Machine {
             w(self, 0xA850, v);
         }
         if flags & 1 == 0 {
+            self.box_tiles(x, y, across, down);
             return Some(());
         }
         w(self, 0xA84C, flags | 0x20);
@@ -190,7 +195,68 @@ impl Machine {
             self.mem.w16(seg, off, x);
         }
         self.mem.w16(DS, 0xA8FC, 0);
+        self.box_tiles(x, y, across, down);
         Some(())
+    }
+
+    /// 0000:9727 with 9A34 (989C: DI the row table's offset for `y`, plus
+    /// `x`): the box's tiles drawn into the page ([A900]) where it is the
+    /// game's own block, `across` by `down` of them: the corners, edges
+    /// and middle from the tile set's pixels ([[B038] + 4]:0, A83E bytes
+    /// a tile, nine in order: the top's left, middle and right, the
+    /// middle row's, the bottom's), each A856 by A854, its 0 bytes not
+    /// drawn. The top and bottom rows are always drawn; the middle rows
+    /// with more than two down. Each row's middle tiles are drawn by a
+    /// `loop`, so with fewer than two across it runs 10000h times, as the
+    /// original's does.
+    fn box_tiles(&mut self, x: u16, y: u16, across: u16, down: u16) {
+        if !self.page_is_block() {
+            return;
+        }
+        let r = |m: &Machine, o: u16| m.mem.r16(DS, o);
+        let page = r(self, 0xA900);
+        let (tw, th, size, step) = (r(self, 0xA856), r(self, 0xA854), r(self, 0xA83E), r(self, 0xA840));
+        let tiles = r(self, 0xB038);
+        let pix = r(self, tiles.wrapping_add(4));
+        let tile = |m: &mut Machine, si: u16, di: u16| {
+            let (mut si, mut di) = (si, di);
+            for _ in 0..th {
+                for k in 0..tw {
+                    let b = m.mem.r8(pix, si);
+                    si = si.wrapping_add(1);
+                    if b != 0 {
+                        m.mem.w8(page, di.wrapping_add(k), b);
+                    }
+                }
+                di = di.wrapping_add(0x140);
+            }
+        };
+        let mids = across.wrapping_sub(2);
+        let count = |c: u16| if c == 0 { 0x10000u32 } else { c as u32 };
+        // One row of tiles from `first` (its left; the middle one after,
+        // the right one after that) at `di`.
+        let row = |m: &mut Machine, first: u16, di: u16| {
+            let mut di = di;
+            tile(m, first, di);
+            let mid = first.wrapping_add(size);
+            di = di.wrapping_add(tw);
+            for _ in 0..count(mids) {
+                tile(m, mid, di);
+                di = di.wrapping_add(tw);
+            }
+            tile(m, mid.wrapping_add(size), di);
+        };
+        let mut di = r(self, ROWS.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        row(self, 0, di);
+        di = di.wrapping_add(step);
+        let middle = down.wrapping_sub(2);
+        if (middle as i16) > 0 {
+            for _ in 0..middle {
+                row(self, size.wrapping_mul(3), di);
+                di = di.wrapping_add(step);
+            }
+        }
+        row(self, size.wrapping_mul(6), di);
     }
 
     /// 0000:98A0: the box's text laid out line by line (to a NUL, CR or
@@ -287,7 +353,11 @@ impl Machine {
             } else {
                 (r(m, 0xA84E), r(m, 0xA850))
             };
-            m.text_state(x, y, di);
+            if m.page_is_block() {
+                m.page_text((DS, di), x, y);
+            } else {
+                m.text_state(x, y, di);
+            }
         };
         let mut si = LINE;
         let mut di = si;
@@ -418,6 +488,9 @@ impl Machine {
     pub fn box_restore(&mut self, seg: u16) -> (u16, u16, u16, u16) {
         let x = self.mem.r16(seg, 0);
         let rect = (x & 0x7FFF, self.mem.r16(seg, 2), self.mem.r16(seg, 4), self.mem.r16(seg, 6));
+        if self.page_is_block() {
+            self.page_rect_put((seg, 8), rect.0, rect.1, rect.2, rect.3);
+        }
         if x & 0x8000 == 0 {
             self.heap_free(seg);
         }

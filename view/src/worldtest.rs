@@ -4093,7 +4093,8 @@ fn one_case_leaves_the_state_as_the_original() {
 /// (`state_ems_case`).
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
-    for name in BUSY_STATE.iter().copied() {
+    let only = std::env::var("ARENA_CASE").ok();
+    for name in BUSY_STATE.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n)) {
         state_ems_case(name);
     }
 }

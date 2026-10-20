@@ -345,13 +345,16 @@ impl arena::shops::ShopHooks for ShopFront<'_, '_> {
         self.dialog_at(m, kind, 0, di)
     }
     fn dialog_at(&mut self, m: &mut Machine, kind: u8, si: u16, di: u16) -> u16 {
+        // The game's state round the answer, in 4E88's order: the lines
+        // drawn, each page's strip kept first (`Machine::shop_dialog`),
+        // then the answer (a typed number drawn over them, 9EE5, in the
+        // font and colour they leave), then the strip put back (4F34,
+        // 4F55, 4F84: 5FC0).
+        if self.paged && si != 0 {
+            m.shop_dialog(si);
+        }
         let ax = self.dialog_answer(m, kind, si, di);
-        // The game's state round the answer (`Machine::shop_dialog`), the
-        // strip put back after it (4F34, 4F55, 4F84: 5FC0).
         if self.paged {
-            if si != 0 {
-                m.shop_dialog(si);
-            }
             m.shop_strip_back();
         }
         ax

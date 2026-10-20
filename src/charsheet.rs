@@ -1244,7 +1244,7 @@ impl Machine {
     /// error passes 0; then ADB6 and ADB8 at (`ax`, `bx`). A line of no
     /// length draws nothing and leaves them. (Drawn where the page is the
     /// game's own block.)
-    fn line_to(&mut self, ax: u16, bx: u16) {
+    pub(crate) fn line_to(&mut self, ax: u16, bx: u16) {
         let (mut cx, mut dx) = (self.mem.r16(DS, 0xADB6), self.mem.r16(DS, 0xADB8));
         let (mut x, mut y) = (ax, bx);
         if y >= dx {

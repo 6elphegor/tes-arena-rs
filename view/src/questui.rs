@@ -66,11 +66,14 @@ pub(crate) struct HaggleTalk<'a> {
     prompt: String,
     /// The game's files, for the pictures put on the page (1194:4B8E).
     files: Option<Files>,
+    /// The offer's prompt already drawn before its field (`type_offer`),
+    /// so the `shown` after it only puts the strip back.
+    prompted: bool,
 }
 
 impl<'a> HaggleTalk<'a> {
     pub(crate) fn new(talk: Option<&'a mut Talk>) -> Self {
-        HaggleTalk { talk, said: Vec::new(), kind: 0, prompt: "Your offer?".into(), files: None }
+        HaggleTalk { talk, said: Vec::new(), kind: 0, prompt: "Your offer?".into(), files: None, prompted: false }
     }
 
     /// With the game's files and its page its own (`paged`): the pictures
@@ -116,9 +119,19 @@ impl HaggleIo for HaggleTalk<'_> {
     /// TEENYFNT.DAT and colour C0h.
     fn type_offer(&mut self, m: &mut Machine) -> Option<()> {
         let Some(t) = self.talk.as_deref_mut() else { return Some(()) };
+        // With the page the game's own, 4E88's order: the prompt's lines
+        // drawn, the strip kept first (`Machine::shop_dialog`), then the
+        // field over them; the strip is put back after it (`shown`).
+        if self.files.is_some() {
+            m.split_lines(OFFER_PROMPT);
+            m.shop_dialog(OFFER_PROMPT);
+            self.prompted = true;
+        }
         let mut split = m.clone();
-        split.mem.w8(DS, 0x137E, 3);
-        split.split_lines(OFFER_PROMPT);
+        if !self.prompted {
+            split.mem.w8(DS, 0x137E, 3);
+            split.split_lines(OFFER_PROMPT);
+        }
         let lines = split.mem.r16(DS, arena::shops::var::LINES);
         let field = arena::lineedit::fields::dialog_at(lines, 6, arena::haggle::var::TYPED);
         let look = crate::field::Look { font: "TEENYFNT.DAT", colour: 0xC0, put_font: true };
@@ -154,6 +167,10 @@ impl HaggleIo for HaggleTalk<'_> {
         }
     }
     fn shown(&mut self, m: &mut Machine, si: u16) {
+        if std::mem::take(&mut self.prompted) {
+            m.shop_strip_back();
+            return;
+        }
         m.split_lines(si);
         if self.files.is_some() {
             m.shop_dialog(si);

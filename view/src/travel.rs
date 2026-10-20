@@ -259,6 +259,9 @@ struct Hooks<'a> {
     /// 1 No, FFFFh none), once asked; `asked` whether it was.
     answer: Option<u16>,
     asked: bool,
+    /// The game's page as the question's menu left it (1194:020E's end:
+    /// its boxes put back, 933C), where it is the heap's block.
+    menu_page: Option<Vec<u8>>,
     /// The province whose main quest's dungeon was reached (292B:0362's
     /// AX, `MapHooks::quest_dungeon`): its picture to show.
     quest: Option<u16>,
@@ -304,9 +307,21 @@ impl TravelHooks for Hooks<'_> {
     }
     /// 1194:48DB: the question (unwell: "Considering your condition...")
     /// asked as a menu (`Asking::Question`); not yet answered, staying.
-    fn question(&mut self, _m: &mut Machine, _si: u16) -> u16 {
+    /// Answered, its menu (48E9: 020E with the keys at 4B60, the entries
+    /// at 4B63) is the game's round the answer (`Machine::menu_boxes`,
+    /// `menu_closed`: its boxes drawn on the page and put back), and the
+    /// page it leaves kept for the journey's first fade.
+    fn question(&mut self, m: &mut Machine, si: u16) -> u16 {
         self.asked = true;
-        self.answer.unwrap_or(0xFFFF)
+        let Some(answer) = self.answer else { return 0xFFFF };
+        match m.menu_boxes(si, QUESTION_ENTRIES, None) {
+            Some(boxes) => m.menu_closed(boxes.as_ref()),
+            None => eprintln!("the question's menu gave up: {}", arena::giveup::describe()),
+        }
+        if m.page_is_block() {
+            self.menu_page = Some(m.mem.segment(m.mem.r16(DS, 0xA900))[..64000].to_vec());
+        }
+        answer
     }
     fn location(&mut self, m: &mut Machine, files: &mut Files, id: u16) {
         let ax = if m.mem.r8(DS, 0x0A46) == 8 { 0x100 } else { id };
@@ -385,14 +400,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -411,7 +426,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
+        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
         // The window's colours read from black (1194:55B2's fade before).
         let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
             eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
@@ -469,7 +484,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>) -> Hooks<'a> {
-        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false }
+        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded and its window
@@ -661,10 +676,9 @@ impl Travel {
                 self.at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
                 // 1194:020E's end: its boxes' backgrounds put back and the
                 // page dissolved onto the screen (4FF7), where the journey's
-                // first fade then starts: the map as the menu found it. (The
-                // original's page there keeps parchment over the No box's
-                // rows, which the view's menu doesn't model: areaplaytest's
-                // LEAD_SCREEN_LEFT_OUT.)
+                // first fade then starts: the game's page as the menu left
+                // it where it is the heap's block (`Hooks::question`), else
+                // the map as the menu found it.
                 self.answered_over = self.page(engine, self.at);
                 self.travel_answered(engine, Some(i as u16));
             }
@@ -793,6 +807,9 @@ impl Travel {
         h.answer = answer;
         let ok = engine.m.travel_go(&mut engine.files, &mut h);
         let failed = h.failed;
+        if let Some(page) = h.menu_page.take() {
+            self.answered_over = Some(page);
+        }
         self.journey = std::mem::take(&mut h.frames);
         self.journey_ms = 0;
         self.journey_lead.clear();
