@@ -103,14 +103,14 @@ the original routine:
 | `EndHooks::shown` | src/staffend.rs:67 | 1194:DAC4 | present | the screen shown and a key waited for | |
 | `EndHooks::speech` | src/staffend.rs:43 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | faithful: runs `end_speech_play` (the default), then shows the movie with its text (`Movie::lead_in`) |
 | `EndHooks::text` | src/staffend.rs:57 | 1194:A36C | port | the default runs the port | |
-| `EngineHooks::creature_flats` | src/engine.rs:72 | 0000:CF96, 25CA:0271 | overridden | the view: main.rs Front<'_> | fixed: the view ran the hook for every flat the walk reached after the frame, so a square brought to life earlier in the walk brought its creature again, and the controls' bars (2826:0008) came before it; now at the drawing, a square whose word is gone skipped (playswim) |
+| `EngineHooks::creature_flats` | src/engine.rs:73 | 0000:CF96, 25CA:0271 | overridden | the view: main.rs Front<'_> | fixed: the view ran the hook for every flat the walk reached after the frame, so a square brought to life earlier in the walk brought its creature again, and the controls' bars (2826:0008) came before it; now at the drawing, a square whose word is gone skipped (playswim); after the view's set-up (C923), so a creature placed then finds this frame's CB90 (playimppal) |
 | `EngineHooks::draw` | src/engine.rs:50 | 0000:C980 | overridden | the view: main.rs Front<'_> | fixed: was the view's stand-in (every projectile and changed square in reach stepped, the click hit-tested on the GPU, a door's span the whole width): with the page the engine now takes the drawing's own walk (`render::Walked`: C23A's steps, D3F9's, the square and door under the cursor, the hit test 0000:C4BB with the hook CD3A); the stand-in is left for --gpu-world. playghostclick's state matches |
 | `EngineHooks::draw_setup` | src/engine.rs:66 | 0000:D4B4 | elsewhere | the drawing's set-up is the renderer's (`render::draw`); fog's step runs on the machine (`fog_step`) | |
-| `EngineHooks::drawn` | src/engine.rs:88 |  | overridden | the view: main.rs Front<'_> | fixed: a box opened after the frame's drawing (a click's, from the physics) saved what it covers (0000:8F2A) from the screen at the frame's start; now from the page as this frame drew it, the 3D rows over the interface (transitpalace's bank 11h) |
-| `EngineHooks::present` | src/engine.rs:83 | 0000:A7B4 | present | the frame put on the screen | |
-| `EngineHooks::rain` | src/engine.rs:81 |  | elsewhere | as snow (`rain_drops`) | |
-| `EngineHooks::sky` | src/engine.rs:77 |  | overridden | the view: main.rs Front<'_> | faithful: `fog_step` on the game's memory (playfog, playfogfirst exact; state tests) |
-| `EngineHooks::snow` | src/engine.rs:80 | 0000:E26B, E1A2 | elsewhere | the drops move in the engine before the hook (`snow_drops`); the hook only tells the front end | |
+| `EngineHooks::drawn` | src/engine.rs:89 |  | overridden | the view: main.rs Front<'_> | fixed: a box opened after the frame's drawing (a click's, from the physics) saved what it covers (0000:8F2A) from the screen at the frame's start; now from the page as this frame drew it, the 3D rows over the interface (transitpalace's bank 11h) |
+| `EngineHooks::present` | src/engine.rs:84 | 0000:A7B4 | present | the frame put on the screen | |
+| `EngineHooks::rain` | src/engine.rs:82 |  | elsewhere | as snow (`rain_drops`) | |
+| `EngineHooks::sky` | src/engine.rs:78 |  | overridden | the view: main.rs Front<'_> | faithful: `fog_step` on the game's memory (playfog, playfogfirst exact; state tests) |
+| `EngineHooks::snow` | src/engine.rs:81 | 0000:E26B, E1A2 | elsewhere | the drops move in the engine before the hook (`snow_drops`); the hook only tells the front end | |
 | `EngineHooks::sound` | src/engine.rs:55 |  | port | the default runs the port | |
 | `EngineHooks::step` | src/engine.rs:60 |  | stub | a test's stand-in; false lets the engine run the step | |
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |

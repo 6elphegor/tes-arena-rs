@@ -873,6 +873,41 @@ def jagar_encounter(heading):
     return put
 
 
+def stairs_from(row, col, heading):
+    """`at_square` before a level's down stairs, the level (BB0A) kept for
+    `level_moved`."""
+    def put(a):
+        at_square(row, col, heading)(a)
+        a.level_at = a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0]
+    return put
+
+
+def level_moved(a):
+    """The level (BB0A) another than `stairs_from` kept: the stairs taken
+    (0000:F76F)."""
+    return a.mu.mem_read(a.lin(a.ds, 0xBB0A), 1)[0] != a.level_at
+
+
+# IMPPAL.MIF (the palace the Emperor's audience leaves for, 0000:4232):
+# each of its first three levels' down stairs walked into from the square
+# beside them (level 0's at row 2, column 3; 1's at 20, 30; 2's at 18, 48),
+# the up arrow held until the level changes, then let go for two frames.
+# The fourth's INF (IMPPAL4.INF's *ITEM 13) makes its staff flat (C941
+# 2Fh), on its walls plane at row 24, column 20.
+IMPPAL_DOWN = [step for at in ((3, 3, 0x100), (20, 29, 0x80), (18, 47, 0x80))
+               for step in (((), (), 1, None, [], {'do': stairs_from(*at)}), ((UP,), (), 40, level_moved), ((), (UP,), 2, None))]
+
+
+def imppal_piece(a):
+    """South of IMPPAL's fourth level's staff piece (row 23, column 20),
+    facing it (heading 0), near the square's far edge (Y +70h): within the
+    click's reach (E6h, 292B:06DC) and drawn high enough for the view's
+    middle (`chest_ahead`)."""
+    at_square(23, 20, 0)(a)
+    for base in (0xC3D0, 0xBA62):
+        a.w16(base + 4, (23 << 7) + 0x70)
+
+
 def message_up(a):
     """The message line's time set (061E)."""
     return a.r16(0x061E) != 0
@@ -1534,6 +1569,13 @@ CASES = {
     # D459, text 5A7h) clicked through (`dream`), then the palace entered
     # (the area left, `leaves`); three frames inside.
     'playaudience8': ('street', audience(8), [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)], 'dream': 8, 'leaves': True}), ((), (), 3, None)]),
+    # The main quest's end in its own place: `playaudience8` into IMPPAL,
+    # its stairs down to the fourth level (`IMPPAL_DOWN`), then its staff
+    # piece clicked (`imppal_piece`): the last (F77 8), so the staff made
+    # whole (1194:D986's scenes clicked through) and the area left; the
+    # case ends before the next area's first frame (`playlastpiece`).
+    'playimppal': ('street', audience(8), [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)], 'dream': 8, 'leaves': True}), ((), (), 3, None)]
+                   + IMPPAL_DOWN + [((), (), 2, None, [], {'do': imppal_piece}), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)], 'dream': 12, 'leaves': True, 'ends': True})]),
     'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 3, None)]),
     # The house with picking armed (`armed`, the seed SEED): the lock
     # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area
@@ -2162,7 +2204,13 @@ def written_line(a, name):
     0000:0000, DOS's interrupt table (the BIOS's data and zeros here, the
     program's image in the port's memory), counted as zeros: 0 as the
     case begins or as it ends (one leaving the area ends with the next
-    area's, `playlastpiece`)."""
+    area's, `playlastpiece`), or the plane 0000:0000's bytes as they stand
+    (written where D748 was 0 between the two, `playimppal`'s palace),
+    what changes there after the write aside: the BIOS's tick count
+    (0040:006C) here, the movie player's chunk header (0000:64B7..64BC) in
+    the port's image."""
+    def low_masked(b):
+        return b[:0x46C] + bytes(4) + b[0x470:0x64B7] + bytes(6) + b[0x64BD:]
     got = []
     floor0 = int.from_bytes(a.pre_state[0][0xD748:0xD74A], 'little')
     for k in sorted(set(a.written) | set(a.pre_written)):
@@ -2171,7 +2219,8 @@ def written_line(a, name):
             got.append(f'{k}:-')
         elif was is None or bytes(now) != was:
             data = bytes(now)
-            if k == 'TEMPSAVE.$$$' and (a.r16(0xD748) == 0 or floor0 == 0):
+            third = data[0x10000:]
+            if k == 'TEMPSAVE.$$$' and (a.r16(0xD748) == 0 or floor0 == 0 or (len(third) > 0x64BD and low_masked(third) == low_masked(bytes(a.mu.mem_read(0, len(third)))))):
                 data = data[:0x10000] + bytes(len(data[0x10000:]))
             got.append(f'{k}:{len(data):x}:{fnv(data):x}')
     return f'written | {name} | {" ".join(got)}\n' if got else ''
