@@ -83,7 +83,6 @@ const TOWNS: u16 = 0x150D;
 const VILLAGES: u16 = 0x15D5;
 const DUNGEONS: u16 = 0x1765;
 const RECORD: u16 = 0x19;
-const SHOWN: u16 = 0x47E1;
 const NEAREST_REC: u16 = 0xA8BA;
 /// What `travel_nearest` writes: the nearest's index, record, distance,
 /// and the known-only switch.
