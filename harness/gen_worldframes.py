@@ -983,10 +983,12 @@ def hearts_stage(a):
 
 def hearts_piece(a):
     """North of Crypt of Hearts' staff piece (row 31, column 30), facing it
-    (heading 0), near the square's far edge (Y +70h), as `imppal_piece`."""
+    (heading 0), near the square's near edge (Y +10h): within the click's
+    reach (E6h, 292B:06DC), the piece (hung from the ceiling) drawn about
+    the view's middle."""
     at_square(31, 30, 0)(a)
     for base in (0xC3D0, 0xBA62):
-        a.w16(base + 4, (31 << 7) + 0x70)
+        a.w16(base + 4, (31 << 7) + 0x10)
 
 
 def imppal_piece(a):
@@ -1669,11 +1671,12 @@ CASES = {
                    + IMPPAL_DOWN + [((), (), 2, None, [], {'do': imppal_piece}), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)], 'dream': 12, 'leaves': True, 'ends': True})]),
     # A staff piece in its own dungeon: Crypt of Hearts travelled to on
     # the sixth stage (`hearts_stage`, `HEARTS`), down to its last level
-    # (`HEARTS_DOWN`), the piece clicked from beside it (`hearts_piece`):
+    # (`HEARTS_DOWN`), the piece clicked from beside it (`hearts_piece`;
+    # it hangs high in the view: the mouse at (156, 56), the click 4 on):
     # the loot window's piece (2433:0328, AH 0Fh with C941), F77 moved on
     # and its text clicked away; five frames after.
     'playheartspiece': ('street', hearts_stage, [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': HEARTS, 'leaves': True}), ((), (KEY_LSHIFT, KEY_M), 3, None)]
-                        + HEARTS_DOWN + [((), (), 2, None, [], {'do': hearts_piece}), ((), (), 10, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 5, None)]),
+                        + HEARTS_DOWN + [((), (), 2, None, [], {'do': hearts_piece}), ((), (), 10, None, [(156, 56)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 5, None)]),
     'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 3, None)]),
     # The house with picking armed (`armed`, the seed SEED): the lock
     # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area
