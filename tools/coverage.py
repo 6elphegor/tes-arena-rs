@@ -624,7 +624,10 @@ def claims(repo):
     named_entries = set()
     for sub, kind_default in (('src', 'ported'), ('view/src', 'view')):
         d = os.path.join(repo, sub)
-        for name in sorted(os.listdir(d)):
+        # Modules in subdirectories (src/render/poly.rs) too, by their
+        # path under `sub`.
+        names = sorted(os.path.relpath(os.path.join(top, f), d) for top, _, fs in os.walk(d) for f in fs)
+        for name in names:
             if not name.endswith('.rs'):
                 continue
             in_hooks = False
@@ -914,7 +917,7 @@ def main():
     for a, files in where.items():
         r = routine_of(a)
         if r is not None:
-            claims_in[r] |= {f.split('/')[-1] for f in files}
+            claims_in[r] |= {f.removeprefix('view/').removeprefix('src/') for f in files}
 
     def context(e):
         files = set()
