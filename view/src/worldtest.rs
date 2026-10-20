@@ -3884,8 +3884,9 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// match; DGROUP differs in the screen's colours that Jagar's words read
 /// before any frame of the case is drawn (A611's to A39E, D45D's to 9A6E):
 /// entries 1..8, which the original's DAC holds from the sky's window as
-/// it was last set, before the case's clock moved it, and which the view
-/// has only from a drawn frame; and by a tick in the timer (0151).)
+/// it was last set, before the case's clock moved it, and 71h, the lamps'
+/// (set black by day), both of which the view's colours have only from a
+/// drawn frame; and by a tick in the timer (0151).)
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[

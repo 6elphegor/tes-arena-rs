@@ -92,16 +92,17 @@ the original routine:
 | `DungeonPicHooks::line` | src/dungeonpic.rs:39 | 0000:5364 | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |
 | `DungeonPicHooks::picture` | src/dungeonpic.rs:37 | 0000:5828 | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |
 | `DungeonPicHooks::shown` | src/dungeonpic.rs:42 | 0000:9466 | overridden | the view: travel.rs PictureHooks | present: the quest dungeon's picture (dungeonscreens) |
-| `EndHooks::begin` | src/staffend.rs:26 | 1194:DAF0 | present | the scenes' screen and song | |
-| `EndHooks::clear` | src/staffend.rs:55 | 0000:9A98 | present | the view cleared | |
-| `EndHooks::end` | src/staffend.rs:53 | 1194:DB26 | present | the game's screen and the area's song back | |
-| `EndHooks::fade` | src/staffend.rs:33 | 1194:55B2 | present | a fade | |
-| `EndHooks::house` | src/staffend.rs:38 | 1194:DA25 | overridden | the view: main.rs EndFront<'_, '_> | present: HOUSE.IMG as a still with its text (now screen-checked: house.txt) |
-| `EndHooks::line` | src/staffend.rs:46 | 0000:5364 | elsewhere | the view's still of HOUSE.IMG draws the lines as 0000:5364 does (`Movie::draw`: centred on A0h from row 32h, 0Ah apart), screen-checked against the original (gen_house.py, house.txt) | |
-| `EndHooks::movie` | src/staffend.rs:28 | 2294:0895 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies (not screen-checked) |
-| `EndHooks::shown` | src/staffend.rs:49 | 1194:DAC4 | present | the screen shown and a key waited for | |
-| `EndHooks::speech` | src/staffend.rs:31 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | present: the movies with their texts, brought in as D459 brings them (`Movie::lead_in`, checked on the dreams) |
-| `EndHooks::text` | src/staffend.rs:41 | 1194:A36C | port | the default runs the port | |
+| `EndHooks::begin` | src/staffend.rs:30 | 1194:DAF0 | port | the default runs the port (`scenes_begin`) | fixed: was empty; playlastpiece's state now matches |
+| `EndHooks::clear` | src/staffend.rs:73 | 0000:9A98 | port | the default runs the port (`clip_whole`) | fixed: was empty |
+| `EndHooks::dac` | src/staffend.rs:25 | 0000:6E38 | overridden | the view: main.rs EndFront<'_, '_> | faithful: the screen's colours for DAF0's read |
+| `EndHooks::end` | src/staffend.rs:69 | 1194:DB26 | port | the default runs the port (`scenes_end`) | fixed: was empty |
+| `EndHooks::fade` | src/staffend.rs:48 | 1194:55B2 | port | the default runs the port (`sheet_black`); the fading is the front end's | fixed: was empty |
+| `EndHooks::house` | src/staffend.rs:52 | 1194:DA25 | overridden | the view: main.rs EndFront<'_, '_> | faithful: runs `end_house` (the default), then HOUSE.IMG as a still with its text (screen-checked: house.txt) |
+| `EndHooks::line` | src/staffend.rs:62 | 0000:5364 | port | the default runs the port (`text_centred` on the page); | the view's still of HOUSE.IMG draws the lines as 0000:5364 does (`Movie::draw`: centred on A0h from row 32h, 0Ah apart), screen-checked against the original (gen_house.py, house.txt) | |
+| `EndHooks::movie` | src/staffend.rs:37 | 2294:0895 | overridden | the view: main.rs EndFront<'_, '_> | faithful: runs `movie_play` (the default), then shows the movie |
+| `EndHooks::shown` | src/staffend.rs:67 | 1194:DAC4 | present | the screen shown and a key waited for | |
+| `EndHooks::speech` | src/staffend.rs:43 | 1194:D459 | overridden | the view: main.rs EndFront<'_, '_> | faithful: runs `end_speech_play` (the default), then shows the movie with its text (`Movie::lead_in`) |
+| `EndHooks::text` | src/staffend.rs:57 | 1194:A36C | port | the default runs the port | |
 | `EngineHooks::creature_flats` | src/engine.rs:72 | 0000:CF96, 25CA:0271 | overridden | the view: main.rs Front<'_> | fixed: the view ran the hook for every flat the walk reached after the frame, so a square brought to life earlier in the walk brought its creature again, and the controls' bars (2826:0008) came before it; now at the drawing, a square whose word is gone skipped (playswim) |
 | `EngineHooks::draw` | src/engine.rs:50 | 0000:C980 | overridden | the view: main.rs Front<'_> | fixed: was the view's stand-in (every projectile and changed square in reach stepped, the click hit-tested on the GPU, a door's span the whole width): with the page the engine now takes the drawing's own walk (`render::Walked`: C23A's steps, D3F9's, the square and door under the cursor, the hit test 0000:C4BB with the hook CD3A); the stand-in is left for --gpu-world. playghostclick's state matches |
 | `EngineHooks::draw_setup` | src/engine.rs:66 | 0000:D4B4 | elsewhere | the drawing's set-up is the renderer's (`render::draw`); fog's step runs on the machine (`fog_step`) | |
@@ -113,11 +114,12 @@ the original routine:
 | `EngineHooks::sound` | src/engine.rs:55 |  | port | the default runs the port | |
 | `EngineHooks::step` | src/engine.rs:60 |  | stub | a test's stand-in; false lets the engine run the step | |
 | `EngineHooks::transition` | src/engine.rs:42 |  | original | C3AC is 0000:4470, a RETF in the 3D mode | |
+| `FightHooks::dac` | src/encounter.rs:58 | 0000:6E3C | overridden | the view: main.rs FightFront<'_, '_> | faithful: the screen's colours for A611's and D45D's reads |
 | `FightHooks::fight_graphics` | src/encounter.rs:48 | 0000:1AF9 | port | the default runs the port | |
 | `FightHooks::fight_music` | src/encounter.rs:53 | 23BA:01C7 | port | fixed by the overrides audit: was empty, so a monster fight's sound (the creature's .VOC, 43D7's list by 100D) never reached bank 15h at AFC8 nor the file slot 45F0 that 23BA:0217 keeps and 012B plays (`fight_sound`, soundload vectors); the driver's call 85h stays the front end's (kept with a replay: soundplay vectors) | |
-| `FightHooks::jagar` | src/encounter.rs:58 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | present: JAGAR.FLC with the text, as a movie brought in as D459 brings it (`Movie::lead_in`, checked on the dreams) |
-| `FightHooks::view_restored` | src/encounter.rs:61 |  | present | and put back | |
-| `FightHooks::view_saved` | src/encounter.rs:60 | 0000:A611 and A6B5 | present | the view saved around a fight's start | |
+| `FightHooks::jagar` | src/encounter.rs:64 | 1194:D45D | overridden | the view: main.rs FightFront<'_, '_> | faithful: runs the speech (`vision`, the default), then shows JAGAR.FLC with the text (`Movie::lead_in`); playjagar's track and banks match |
+| `FightHooks::view_restored` | src/encounter.rs:74 | 0000:A6B5 | port | the default runs the port (`world_back`) | fixed: was empty |
+| `FightHooks::view_saved` | src/encounter.rs:69 | 0000:A611 | port | the default runs the port (`world_keep`) | fixed: was empty |
 | `FrameHooks::actor_click` | src/frame.rs:109 | 1194:DB6C | overridden | the view: main.rs Front<'_> | faithful: `actor_click` (talk vectors; playghostclick) |
 | `FrameHooks::area_music` | src/frame.rs:119 | 2294:04F5 | port | the default runs the port | |
 | `FrameHooks::automap_mark` | src/frame.rs:114 | 0000:3491 | port | the default runs the port | |

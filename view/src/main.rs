@@ -1219,12 +1219,9 @@ impl Assets {
                     p[1 + i] = [c[0], c[1], c[2], 255];
                 }
             }
-        }
-        // (71h is the game's once it set it, whether or not a frame has
-        // been drawn yet: the light's own record of it, e.g. a frame's
-        // hour bringing Jagar's words before any frame was shown.)
-        if let Some(l) = self.light.lamp {
-            p[0x71] = [l[0], l[1], l[2], 255];
+            if let Some(l) = sky.lamp {
+                p[0x71] = [l[0], l[1], l[2], 255];
+            }
         }
         p
     }
