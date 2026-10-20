@@ -1504,8 +1504,8 @@ fn poisoned(a: &mut App) {
     m.spell_effects(gs, spell, DS, arena::character::PLAYER, 10, &mut arena::strike::NoKillHooks).expect("the poison given");
     let s = (0..NSLOTS)
         .map(|i| SLOTS + i * SLOT_SIZE)
-        .filter(|&s| m.mem.r8(DS, s + slot::STATE) != 0xFF && m.mem.r16(DS, s + slot::TARGET_OFF) == arena::character::PLAYER)
-        .last()
+        .rev()
+        .find(|&s| m.mem.r8(DS, s + slot::STATE) != 0xFF && m.mem.r16(DS, s + slot::TARGET_OFF) == arena::character::PLAYER)
         .expect("the poison took no slot");
     m.mem.w16(DS, s, 1);
 }
