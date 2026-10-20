@@ -531,6 +531,10 @@ class ScreenArena(DosArena):
                         self.clicks.append(act[1:])
                     elif act[0] == 'rclick':
                         self.clicks.append((*act[1:], 2))
+                    elif act[0] == 'move':
+                        # The mouse moved to (x, y), no button: the reads
+                        # from here on find it there.
+                        self.mouse = tuple(act[1:3])
                     elif act[0] == 'keys':
                         # Keys pressed and let go: the key interrupt run for
                         # each (`press`) from the wait, then on.

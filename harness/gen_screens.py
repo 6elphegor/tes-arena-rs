@@ -264,6 +264,13 @@ SCREENS = {
     # 1194:48DB asks "Considering your condition..." (6B1D) as a menu.
     'worldunwell': (0x03BF, [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]),
     'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
+    # The province's map with the mouse moved (no button) across it: each
+    # pass of its loop (3159:0078..0097) runs 26F7:0625 wherever the
+    # mouse is, the place nearest it (0B7A) labelled. Moved to (120, 60),
+    # then on to (230, 130) by (180, 90); then over the buttons (100, 185).
+    'worldhover': (0x03BF, [('click', 70, 45), ('move', 120, 60)]),
+    'worldhovermoves': (0x03BF, [('click', 70, 45), ('move', 120, 60), ('move', 180, 90), ('move', 230, 130)]),
+    'worldhoverbuttons': (0x03BF, [('click', 70, 45), ('move', 100, 185)]),
     # The province's Exit (the button at 72, 167): the world map again.
     'worldback': (0x03BF, [('click', 70, 45), ('click', 80, 180)]),
     # The search's name typed (d, a, g: a key a wait); a name none starts
@@ -389,7 +396,7 @@ WAIT = (0, 0x8FC4)
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
           'people': None, 'palace': 'triggers', 'guild': 'guild'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
-         'worldprovince': 'street', 'worldtrip': 'street', 'worldunwell': 'street', 'worldsearch': 'street', 'worldback': 'street',
+         'worldprovince': 'street', 'worldhover': 'street', 'worldhovermoves': 'street', 'worldhoverbuttons': 'street', 'worldtrip': 'street', 'worldunwell': 'street', 'worldsearch': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
          'tavernwelcome': 'tavern', 'templewelcome': 'temple', 'storewelcome': 'store', 'guildwelcome': 'guild',

@@ -478,6 +478,18 @@ screen | worldsearch | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | worldsearch | TEMPSAVE.$$$ 18000 10fa631d87b677c
 screen | worldsearch | TMP2.$$$ fa00 98e7d995733ab27
 screendel | worldsearch | 
+screen | worldhover | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldhover | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldhover | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldhover | 
+screen | worldhovermoves | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldhovermoves | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldhovermoves | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldhovermoves | 
+screen | worldhoverbuttons | SCREENSV.$$2 fa00 dd14fcc6528cab25
+screen | worldhoverbuttons | TEMPSAVE.$$$ 18000 10fa631d87b677c
+screen | worldhoverbuttons | TMP2.$$$ fa00 98e7d995733ab27
+screendel | worldhoverbuttons | 
 screen | worldback | SCREENSV.$$2 fa00 dd14fcc6528cab25
 screen | worldback | TEMPSAVE.$$$ 18000 10fa631d87b677c
 screen | worldback | TMP2.$$$ fa00 98e7d995733ab27

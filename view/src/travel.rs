@@ -199,10 +199,16 @@ pub struct Travel {
     /// picture and its places' icons, 26F7:01CD), where the page is the
     /// heap's block.
     pub province_page: Option<Vec<u8>>,
-    /// The page as the province shown opened (what 26F7:01CD keeps in
-    /// bank 4 and each pass copies back, 062E): what the window draws
-    /// over, not the page as the last pass's label left it.
-    kept: Option<Vec<u8>>,
+    /// The map's ticks the loop's idle passes have run to (`idle`).
+    idle_ticks: u32,
+    /// The page a box shown from the map opened over (what 1194:59C8
+    /// keeps of it), the screen while it waits: the rest of its pass (or
+    /// the pass after its handler) comes once it is clicked away, the
+    /// loop's next pass putting this by.
+    box_page: Option<Vec<u8>>,
+    /// The screen once the unwell traveller's question was answered (its
+    /// menu gone, `click`): where the journey's fades start.
+    answered_over: Option<Vec<u8>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -268,6 +274,8 @@ struct Hooks<'a> {
     /// (`Machine::list_reads`).
     capture: bool,
     reads: Option<Vec<arena::listwindow::ListRead>>,
+    /// Run from the window's loop's pass (`Travel::pass`).
+    in_pass: bool,
 }
 
 impl arena::clock::ClockHooks for Hooks<'_> {}
@@ -282,6 +290,14 @@ impl TravelHooks for Hooks<'_> {
             println!("{}", hud::plain(l));
         }
         self.boxes.push(lines);
+        // From the loop's pass (26F7:0625): over the page as the pass has
+        // it so far (its label drawn, 0676, before the pick that shows the
+        // box), where it is the game's own block. (The search's, from its
+        // button's handler, opens over the screen its list's put-back
+        // left, 1194:5E1D: the front end's.)
+        if self.in_pass && m.page_is_block() {
+            self.screen = Some(m.mem.segment(m.mem.r16(DS, 0xA900))[..64000].to_vec());
+        }
         if m.message_shown((seg, si), self.screen.as_deref()).is_none() {
             eprintln!("the message box gave up: {}", arena::giveup::describe());
         }
@@ -369,14 +385,14 @@ impl Travel {
         let mut boxes = Vec::new();
         let m = &mut engine.m;
         {
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
             // then the button's own refusals (03DC).
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
             m.mem.w8(DS, 0x9288, 0x60);
-            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
+            let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             if !m.map_button(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -395,7 +411,7 @@ impl Travel {
     /// 26F7:0000's start, on the world map.
     fn begin(engine: &mut Engine, archive: &crate::archive::Archive, mut boxes: Vec<Lines>) -> Travel {
         let m = &mut engine.m;
-        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None };
+        let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
         // The window's colours read from black (1194:55B2's fade before).
         let start = m.travel_map_open(&mut engine.files, &mut h, Some(&[[0; 3]; 256])).unwrap_or_else(|| {
             eprintln!("the travel map's start gave up: {}", arena::giveup::describe());
@@ -441,7 +457,9 @@ impl Travel {
             up_ms: 0,
             boxed_over: None,
             province_page: None,
-            kept: None,
+            idle_ticks: 0,
+            box_page: None,
+            answered_over: None,
         }
     }
 
@@ -451,7 +469,7 @@ impl Travel {
     }
 
     fn hooks<'a>(boxes: &'a mut Vec<Lines>) -> Hooks<'a> {
-        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None }
+        Hooks { boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, screen: None, journey_page: None, capture: false, reads: None, in_pass: false }
     }
 
     /// 26F7:0176: province `p`'s map (its data loaded and its window
@@ -461,9 +479,8 @@ impl Travel {
         if engine.m.travel_province_open(&mut engine.files, &mut h, p, None).is_none() {
             eprintln!("the province's map gave up: {}", arena::giveup::describe());
         }
-        self.kept = engine.m.page_is_block().then(|| engine.m.mem.segment(engine.m.mem.r16(DS, 0xA900))[..64000].to_vec());
         if self.province_page.is_none() {
-            self.province_page = self.kept.clone();
+            self.province_page = engine.m.page_is_block().then(|| engine.m.mem.segment(engine.m.mem.r16(DS, 0xA900))[..64000].to_vec());
         }
         self.province = PICTURES.get(p as usize).and_then(|n| crate::create::image_with_palette(&engine.m, archive, n));
         self.shown = Some(p);
@@ -523,14 +540,61 @@ impl Travel {
         let shown = self.boxes.len();
         let mut h = Self::hooks(&mut self.boxes);
         h.screen = screen;
+        h.in_pass = true;
         if m.travel_click(&mut engine.files, &mut h).is_none() {
             eprintln!("the map's pass gave up: {}", arena::giveup::describe());
         }
         let screen = h.screen.take();
-        if self.boxes.len() > shown && self.boxed_over.is_none() {
-            self.boxed_over = screen;
+        if self.boxes.len() > shown {
+            if self.boxed_over.is_none() {
+                self.boxed_over = screen.clone();
+            }
+            self.box_page = screen;
+        } else {
+            self.box_page = None;
         }
         m.mem.w8(DS, BUTTONS, b);
+    }
+
+    /// Whether the province's window's loop is running its passes: its
+    /// map up, nothing asked over it, no journey or picture, not ended.
+    fn looping(&self) -> bool {
+        self.shown.is_some() && self.asking.is_none() && self.journey.is_empty() && self.picture.is_none() && self.done.is_none()
+    }
+
+    /// The cursor moved to (x, y) over the screen, no button: the loop's
+    /// next pass reads it there (3159:00B4's 8FC4) and 26F7:0625 runs on
+    /// it wherever it is, over the buttons too (`idle`): the place
+    /// nearest it, its label on the page. A click before that pass is
+    /// taken first, as the original's read finds the button down with
+    /// the mouse (its handler before that read's pass, 007F).
+    pub fn moved(&mut self, x: i32, y: i32) {
+        let at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        if self.looping() {
+            self.at = at;
+        }
+    }
+
+    /// Its box clicked away: the page the box opened over put by (the
+    /// screen the page again, as the rest of its pass left it).
+    pub fn box_read(&mut self) {
+        self.box_page = None;
+    }
+
+    /// The loop's passes go on between inputs (the label redrawn where
+    /// the cursor moved, the destination's marker three passes in four):
+    /// a pass for each of the map's ticks since the last (`advance`'s
+    /// pace).
+    pub fn idle(&mut self, engine: &mut Engine) {
+        let ticks = self.up_ms / TICK_MS;
+        if !self.looping() {
+            self.idle_ticks = ticks;
+            return;
+        }
+        if ticks != self.idle_ticks {
+            self.idle_ticks = ticks;
+            self.pass(engine, false);
+        }
     }
 
     /// The screen's end: the province's window ended first where it is
@@ -592,6 +656,16 @@ impl Travel {
             };
             if let Some(i) = pick {
                 self.asking = None;
+                // The menu's reads left the mouse at its click (3159:0F2A),
+                // where the loop's passes after find it.
+                self.at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+                // 1194:020E's end: its boxes' backgrounds put back and the
+                // page dissolved onto the screen (4FF7), where the journey's
+                // first fade then starts: the map as the menu found it. (The
+                // original's page there keeps parchment over the No box's
+                // rows, which the view's menu doesn't model: areaplaytest's
+                // LEAD_SCREEN_LEFT_OUT.)
+                self.answered_over = self.page(engine, self.at);
                 self.travel_answered(engine, Some(i as u16));
             }
             return;
@@ -775,7 +849,8 @@ impl Travel {
             return;
         }
         let black = [[0, 0, 0, 0xFF]; 256];
-        let mut film = Film::new(before.indices().iter().map(|&c| c as u8).collect(), *before.palette());
+        let from = self.answered_over.take().unwrap_or_else(|| before.indices().iter().map(|&c| c as u8).collect());
+        let mut film = Film::new(from, *before.palette());
         film.fade(&black, 8);
         film.vga.fill(0);
         film.fade(world, 12);
@@ -884,6 +959,7 @@ impl Travel {
             return;
         }
         let screen = self.page(engine, self.at);
+        let shown = self.boxes.len();
         let mut h = Self::hooks(&mut self.boxes);
         h.typed = typed;
         h.pick = pick.unwrap_or(0xFFFF);
@@ -892,8 +968,14 @@ impl Travel {
         if engine.m.travel_search(&mut engine.files, &mut h).is_none() {
             eprintln!("the search gave up: {}", arena::giveup::describe());
         }
-        // The handler's pass after it.
+        let boxed = h.screen.take();
+        let boxed = boxed.filter(|_| self.boxes.len() > shown);
+        // The handler's pass after it (once its box, if any, is clicked
+        // away: the screen till then the page the box opened over).
         self.pass(engine, false);
+        if boxed.is_some() {
+            self.box_page = boxed;
+        }
     }
 
     /// The search's name asked: the game's editor opened on a copy of the
@@ -1123,19 +1205,24 @@ impl Travel {
             }
             return;
         };
-        let page = page.and(self.kept.clone());
+        // Each pass of the province's loop (3159:0078..0097, `pass`) puts
+        // bank 4's copy back on the page and draws on it the current
+        // place's marker, the label and the destination's (26F7:0625):
+        // the page as the last pass left it is the screen.
+        if let Some(page) = &page {
+            if let Some((_, pal)) = &self.province {
+                screen.set_palette(*pal);
+            }
+            screen.underlay(self.box_page.as_ref().unwrap_or(page));
+            self.asked_drawn(screen, font, m);
+            return;
+        }
         if let Some((img, pal)) = &self.province {
             screen.set_palette(*pal);
-            if let Some(page) = &page {
-                screen.underlay(page);
-            } else {
-                screen.fill(0, 0, 320, 200, 0, 0xFF);
-                blit(screen, img, img.x, img.y);
-            }
+            screen.fill(0, 0, 320, 200, 0, 0xFF);
+            blit(screen, img, img.x, img.y);
         }
-        if page.is_none() {
-            self.icons_drawn(screen, m, p);
-        }
+        self.icons_drawn(screen, m, p);
         // 26F7:064A: the current place's marker.
         let r8 = |a: u16| m.mem.r8(DS, a);
         let r16 = |a: u16| m.mem.r16(DS, a) as i32;
@@ -1156,11 +1243,10 @@ impl Travel {
         // moved in from the right (13Eh less the width, its lowest bit
         // dropped) where it would reach 140h; drawn one pixel right in CEh,
         // then in DFh (9E06).
-        // The search's state is put back after: the label is the window's,
-        // drawn whenever, and the game's state follows the clicks only.
-        // Over the buttons the pass isn't run (their regions' handlers
-        // are): the label stays where the cursor last was over the map.
-        if y < 165 && !self.label_held && self.asking.is_none() {
+        // The search's state is put back after (where the page isn't the
+        // game's, the label the view's own): the pass runs wherever the
+        // cursor is, over the buttons too.
+        if !self.label_held && self.asking.is_none() {
             self.label_at.set(Some((x, y)));
         }
         if let Some((x, y)) = self.label_at.get() {
@@ -1190,7 +1276,12 @@ impl Travel {
         if let Some((kind, pick, here, x, y)) = dest {
             self.marker(screen, &self.mapblink, kind, pick, here, x, y);
         }
-        // What the screen asks, over the map as its last pass left it.
+        self.asked_drawn(screen, font, m);
+    }
+
+    /// What the screen asks, over the map as its last pass left it; and
+    /// the journey's day where the game's page isn't there to show.
+    fn asked_drawn(&self, screen: &mut Screen, font: &Font, m: &mut Machine) {
         match &self.asking {
             Some(Asking::Name(live)) => {
                 // 26F7:0ABC: 1194:5C30 with the prompt at 6AD1, its box
