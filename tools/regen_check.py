@@ -77,6 +77,10 @@ OLD_CACHE = os.path.join(ROOT, '.regen_cache.json')
 # Generators cached case by case (tools/casecache.py): only the cases whose
 # key changed run, the rest come from the block cache.
 PER_CASE = {'worldframes'}
+# Sharded generators whose cases are dealt out in turn (par.py -i): one
+# line per case, and slow cases bunched together (level's levels past the
+# last one take a minute each, the rest a fifth of a second).
+INTERLEAVED = {'level'}
 
 
 def block_cache_dir(name):
@@ -242,8 +246,8 @@ def run(name, env, opts):
     out = os.path.join(opts.out, os.path.basename(vec))
     log = open(out + '.log', 'w')
     gen = os.path.join(HARNESS, f'gen_{name}.py')
-    cmd = [sys.executable, os.path.join(HARNESS, 'par.py'), str(opts.shards), gen] if sharded \
-        else [sys.executable, gen]
+    cmd = [sys.executable, os.path.join(HARNESS, 'par.py')] + (['-i'] if name in INTERLEAVED else []) \
+        + [str(opts.shards), gen] if sharded else [sys.executable, gen]
     t0 = time.time()
     try:
         rc = subprocess.run(cmd + args + [out], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,

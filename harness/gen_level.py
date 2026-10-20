@@ -48,10 +48,17 @@ done = 0
 
 def skip():
     """True for cases an interrupted run already wrote, or another shard's
-    (every case's settings are drawn either way, so the cases don't change)."""
+    (every case's settings are drawn either way, so the cases don't change).
+    With SHARD=k/K/i (par.py -i) the cases are dealt out in turn, every K-th
+    from the k-th: the levels past the last one, which take a minute each
+    against a fifth of a second, come in a run that contiguous shards would
+    hand to one process."""
     global done
     done += 1
     n, total = done - 1, TOTAL
+    shard = os.environ.get('SHARD', '').split('/')
+    if len(shard) == 3 and shard[2] == 'i':
+        return done <= SKIP or n % int(shard[1]) != int(shard[0])
     return done <= SKIP or not mine(n, total)
 
 BUFFER_SEG, MAP2_PRESET = 0x8800, 0x8000
