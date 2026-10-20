@@ -27,6 +27,13 @@ banks 0..1Fh (64K each, end to end) and the interface's rows of the page
 and for those with the driver their calls into it (sbdig.py's
 `calls_line`): driver | NAME | ...
 
+The PLAYS cases (`created...`) make a character of a class of their own
+the same way, then play on in the start dungeon from its first frame
+(`played_on`): the class's own ways in play (a caster's spell, a
+Sorcerer's lack of spell points, an Acrobat's jump and lockpicking).
+Beside their titleplay line: the track, the projectiles and actors, what
+the frames changed in DGROUP and the EMS banks, and the last page.
+
 With --dump DIR, NAME.ds, NAME.ems and NAME.page (the page whole).
 """
 import os
@@ -43,6 +50,7 @@ import gen_worldframes as gw
 KEY_L = 0x26
 R, I, A, ENTER, F, Y, S = 0x13, 0x17, 0x1E, 0x1C, 0x21, 0x15, 0x1F
 G, B, C = 0x22, 0x30, 0x2E
+KEY_P = 0x19
 
 # A new game made through the original's screens, each step the answer to
 # one of its waits for input: New (the menu's region at 160,120); the
@@ -86,6 +94,44 @@ CASES = {
     'creationsound': CREATION,
     'creationquiz': CREATION_QUIZ,
     'creationquizsound': CREATION_QUIZ,
+}
+
+# A new game whose questions are all answered A: the class offered a
+# Sorcerer (1A9 23h), whose spell points start at none (020A 0, of 174:
+# 1194:2D28 gives the class none to begin with).
+CREATION_SORCERER = ([('click', 160, 120), ('keys', [G]), ('keys', [ENTER])]
+                     + [('keys', [A])] * 10
+                     + [('keys', [Y])]
+                     + CREATION[4:])
+
+# Characters made through the original's screens, then played on in the
+# start dungeon from its first frame, as gen_worldframes.py's cases play
+# (its `play`: the steps, a track line at the top of each frame): the
+# class's own ways in play. NAME: (creation's script, setup between
+# creation and the first frame, steps).
+PLAYS = {
+    # `creationquiz`'s caster (1A9 E5h, 87 spell points, the book its
+    # class gives: Fire Dart and Light Heal, spells 61 and 62) opening its
+    # book (C, 2542:056A: a new game has no spell picked last, 5CAE FFh),
+    # its first line, Fire Dart (marked already), clicked: cast
+    # (29CF:071F), its target clicked at the view's centre a frame on, the
+    # dart followed through its flight; its spell points spent.
+    'createdcast': (CREATION_QUIZ, None, [((), (), 2, None), ((gw.KEY_C,), (), 1, None, [], {'script': [('click', 0xF0, 0x9A)]}),
+                                          ((), (gw.KEY_C,), 10, None, [(160, 100)]), ((), (), 30, None)]),
+    # The Sorcerer (CREATION_SORCERER) the same, with no spell points: "Not
+    # enough spell points..." in a box, which a click takes.
+    'createdsorcerer': (CREATION_SORCERER, None, [((), (), 2, None), ((gw.KEY_C,), (), 1, None, [], {'script': [('click', 0xF0, 0x9A), ('click', 160, 100)]}),
+                                                  ((), (gw.KEY_C,), 20, None)]),
+    # `creation`'s Acrobat (1A9 C9h) jumping (J): its jump's own rise
+    # (2826:0279: C9h, every other frame by CCBC).
+    'createdjump': (CREATION, None, [((), (), 2, None), ((gw.KEY_J,), (), 1, None), ((), (gw.KEY_J,), 30, None)]),
+    # The Acrobat put west of the start dungeon's door at row 23, column 4
+    # (its own lock, LOCKS' 1704h, level 10), facing it (heading 80h):
+    # picking armed with P (2542:0279), the door clicked (2826:0AAB: the
+    # roll, 1194:53F9, by the class's factor, 2A3E), then the up arrow held
+    # into it and let go.
+    'createdpick': (CREATION, gw.at_square(23, 3, 0x80), [((), (), 2, None), ((KEY_P,), (), 1, None), ((), (KEY_P,), 20, None, [(160, 100)]),
+                                                          ((gw.UP,), (), 40, None), ((), (gw.UP,), 10, None)]),
 }
 
 # Run only when named.
@@ -167,20 +213,64 @@ def created(a, script, clicks=VISION_CLICKS):
     assert not a.clicks and not a.buttons, f'clicks left over: {a.clicks}'
 
 
+def played_on(a, name, setup, steps, out, skip):
+    """From the first frame a new game reaches (`created`) on, `setup`
+    then `steps` played as gen_worldframes.py's `run_case` plays a case
+    (its `play`; the mouse's cursor kept from drawing, CURSOR_DRAW):
+    the track, the projectiles and actors beside it, then what the frames
+    changed in DGROUP (`state_line`, loadexclude.txt's and
+    stateexclude.txt's offsets aside) and in the EMS banks
+    (`state_runs`), and the page and colours the last frame left:
+
+      track | NAME | ...
+      objects | NAME | ...
+      titlestate | NAME | <runs> | <digest>
+      titleems | NAME | <count> <offsets digest> | <digest>
+      titlescreen | NAME | <page digest> <colours digest>"""
+    a.rows_drawn = []
+    a.waits = set()
+    a.script = []
+    a.clicks = []
+    a.mouse = (160, 100)
+    a.buttons = 0
+    a.menu_loaded = False
+    if setup:
+        setup(a)
+    pre = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+    pre_ems = b''.join(a.ems_bank(b) for b in range(0x20))
+
+    def no_cursor(*_):
+        a.w16(0x7A48, 0xFFFF)
+    at = a.lin(LOAD_SEG, gw.CURSOR_DRAW)
+    cursor = a.mu.hook_add(UC_HOOK_CODE, no_cursor, None, at, at)
+    tracks = []
+    try:
+        full, _, _, dac = gw.play(a, name, steps, tracks)
+    finally:
+        a.mu.hook_del(cursor)
+    out.writelines(tracks)
+    out.write(gw.objects_line(a, name))
+    after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
+    out.write(gw.state_line(name, pre, after, skip | gw.excluded(), kind='titlestate'))
+    out.write(gw.state_runs('titleems', name, pre_ems, b''.join(a.ems_bank(b) for b in range(0x20))))
+    out.write(f'titlescreen | {name} | {fnv(full):x} {fnv(bytes(dac)):x}\n')
+
+
 def main():
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     skip = gw.excluded('loadexclude.txt')
     out = open(OUT, 'w', buffering=1)
-    for name, script in (CASES | {n: c for n, c in NAMED_ONLY.items() if n in only}).items():
+    plays = {n: p[0] for n, p in PLAYS.items()}
+    for name, script in (CASES | plays | {n: c for n, c in NAMED_ONLY.items() if n in only}).items():
         if only and name not in only:
             continue
         print(name, file=sys.stderr)
         sound = name.endswith('sound')
         a = SoundArena(EXE, GAME, SAVE) if sound else ScreenArena(EXE, GAME, SAVE)
         program_start(a, sound)
-        if name.startswith('creation'):
+        if name.startswith('creat'):
             created(a, script, 0 if sound else VISION_CLICKS)
         else:
             gw.menu_picked(a, script)
@@ -200,6 +290,10 @@ def main():
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('ds', ds), ('ems', ems), ('page', page)):
                 open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
+        if name in PLAYS:
+            played_on(a, name, PLAYS[name][1], PLAYS[name][2], out, skip)
+            if dump:
+                open(os.path.join(dump, f'{name}.end.ds'), 'wb').write(bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)))
 
 
 if __name__ == '__main__':

@@ -4879,8 +4879,16 @@ fn titleplay_replay(name: &str) -> arena::digital::Replay {
 /// vision run, against TITLEPLAY's `name` (and with `sound` its calls into
 /// the driver).
 fn new_game_from_the_menu(name: &str, class: &str, sound: Option<arena::digital::Replay>) {
+    let Some((a, _save)) = made_from_the_menu(name, class, sound) else { return };
+    titleplay_compared(name, &a, &[0xA83C]);
+}
+
+/// `new_game_from_the_menu`'s way to the start dungeon's first frame:
+/// the app there (the boxes' pages and the driver's calls checked on the
+/// way), and the save folder's copy.
+fn made_from_the_menu(name: &str, class: &str, sound: Option<arena::digital::Replay>) -> Option<(App, Scratch)> {
     let with_sound = sound.is_some();
-    let Some((mut a, _d, _save)) = started_at_menu_with(sound) else { return };
+    let (mut a, _d, save) = started_at_menu_with(sound)?;
     let stage = |a: &App| a.creation.as_ref().map(|c| c.phase());
     let wait_until = |a: &mut App, done: &dyn Fn(&App) -> bool, what: &str| {
         for _ in 0..20_000 {
@@ -4932,7 +4940,154 @@ fn new_game_from_the_menu(name: &str, class: &str, sound: Option<arena::digital:
             panic!("{name}: the calls into the sound driver differ from the original's at {i} of {}: {} against the original's {}", want.len(), around(&got), around(&want));
         }
     }
+    Some((a, save))
+}
+
+/// A character made through the original's screens (`made_from_the_menu`,
+/// its class by `class`), then, `setup` run, played on in the start
+/// dungeon by `play` (gen_titleplay.py's PLAYS): at the first frame
+/// DGROUP, the EMS banks and the interface as the original's
+/// (`titleplay_compared`), then the track, the projectiles and actors
+/// frame by frame, what the frames
+/// changed in DGROUP (loadexclude.txt's and stateexclude.txt's offsets
+/// aside) and in the EMS banks, and the page and colours the last frame
+/// left.
+fn made_and_played(name: &str, class: &str, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut App, &mut Driver, &mut Vec<[u16; 5]>)) {
+    let Some((mut a, _save)) = made_from_the_menu(name, class, None) else { return };
     titleplay_compared(name, &a, &[0xA83C]);
+    let mut d = Driver::new(&mut a);
+    a.fade.clear();
+    a.fade_old = None;
+    // The engine drawing the frames on a page of its own, as the original
+    // draws them (its drawing's state in DGROUP), as `state_compared_in`.
+    a.engine.page = Some(vec![0; 64000]);
+    let canonical = |a: &App| {
+        let (ds, ems) = grab(a);
+        let mut ds = load_canonical_kept(&a.dir, &ds, &[0xA83C]);
+        let mut skip = vec![false; 0x10000];
+        excluded_in(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/stateexclude.txt"), &mut skip);
+        for (b, &x) in ds.iter_mut().zip(&skip) {
+            if x {
+                *b = 0;
+            }
+        }
+        (ds, ems)
+    };
+    setup(&mut a);
+    let (pre, pre_ems) = canonical(&a);
+    OBJECTS.with(|o| o.borrow_mut().clear());
+    let mut seen = vec![];
+    pushed(&a, &mut seen);
+    play(&mut a, &mut d, &mut seen);
+    // The harness's last frame, run again with the page's writes watched.
+    d.frame(&mut a);
+    let text = std::fs::read_to_string(TITLEPLAY).expect(TITLEPLAY);
+    let field = |kind: &str| text.lines().find_map(|l| l.strip_prefix(&format!("{kind} | {name} | "))).unwrap_or_else(|| panic!("{name}: a {kind} line")).to_string();
+    assert_eq!(seen, track_in(TITLEPLAY, name), "{name}: the player's frames differ from the original's");
+    let objects: Vec<String> = OBJECTS.with(|o| o.borrow().iter().map(|d| format!("{d:x}")).collect());
+    assert_eq!(objects.join(" "), field("objects"), "{name}: the projectiles or actors differ from the original's");
+    let (after, ems) = canonical(&a);
+    let changed: Vec<usize> = (0..0x10000).filter(|&i| pre[i] != after[i]).collect();
+    let mut runs: Vec<(usize, usize)> = vec![];
+    for &i in &changed {
+        match runs.last_mut() {
+            Some((s, n)) if *s + *n == i => *n += 1,
+            _ => runs.push((i, 1)),
+        }
+    }
+    let offs = runs.iter().map(|(s, n)| format!("{s:x}+{n:x}")).collect::<Vec<_>>().join(" ");
+    let got = format!("{offs} | {:x}", fnv(changed.iter().map(|&i| after[i])));
+    assert_eq!(got, field("titlestate"), "{name}: what the frames changed in DGROUP differs from the original's");
+    let ems_changed: Vec<usize> = (0..ems.len()).filter(|&i| pre_ems[i] != ems[i]).collect();
+    let ems_got = format!("{:x} {:x} | {:x}", ems_changed.len(), fnv(ems_changed.iter().flat_map(|&i| (i as u32).to_le_bytes())), fnv(ems_changed.iter().map(|&i| ems[i])));
+    assert_eq!(ems_got, field("titleems"), "{name}: what the frames changed in the EMS banks differs from the original's");
+    let m = &a.engine.m;
+    let (off, seg) = (m.mem.r16(DS, 0xA8FE), m.mem.r16(DS, 0xA900));
+    let page: Vec<u8> = (0..64000u16).map(|i| m.mem.r8(seg, off.wrapping_add(i))).collect();
+    let want = field("titlescreen");
+    assert_eq!(format!("{:x}", fnv(page)), want.split(' ').next().unwrap(), "{name}: the page the last frame left differs from the original's");
+}
+
+/// The book opened (C, 2542:056A) and its first line, Fire Dart, clicked
+/// (marked already): cast, as gen_titleplay.py's PLAYS cast it; with
+/// `target` its target clicked at the view's centre a frame on, then
+/// `n` frames.
+fn book_cast(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, target: bool, n: usize) {
+    frames(a, d, seen, 2, |_| false);
+    a.compose();
+    d.key(a, KeyCode::KeyC, Some("c"));
+    assert!(matches!(a.panel, Some(crate::panels::Panel::Spellbook(_))), "C opens the spellbook");
+    d.click(a, 0xF0, 0x9A, MouseButton::Left);
+    assert!(a.panel.is_none(), "the spell picked");
+    // A refusal's box ("Not enough spell points...", 29CF:07A8) taken by
+    // a click, as the original's (1194:59C8).
+    if !a.boxes.is_empty() {
+        d.click(a, 160, 100, MouseButton::Left);
+        assert!(a.boxes.is_empty(), "the box taken");
+    }
+    // The frame that took the key (or the button) ends with its screen.
+    pushed(a, seen);
+    if target {
+        a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+        a.input(In::Button { button: MouseButton::Left, down: true });
+        frames(a, d, seen, 1, |_| false);
+        a.input(In::Button { button: MouseButton::Left, down: false });
+        frames(a, d, seen, 9, |_| false);
+    }
+    frames(a, d, seen, n, |_| false);
+}
+
+/// gen_titleplay.py's `createdcast`: the questions' caster (`creationquiz`,
+/// 87 spell points) casting its book's Fire Dart at the view's centre,
+/// then the dart's flight: its spell points spent.
+#[test]
+fn a_new_caster_casts_as_the_original() {
+    made_and_played("createdcast", QUIZ, |_| {}, |a, d, seen| book_cast(a, d, seen, true, 30));
+}
+
+/// gen_titleplay.py's `createdsorcerer`: the questions all answered A, a
+/// Sorcerer, whose spell points start at none, trying the same.
+#[test]
+fn a_new_sorcerer_casts_as_the_original() {
+    made_and_played("createdsorcerer", "G,enter,A,A,A,A,A,A,A,A,A,A,Y", |_| {}, |a, d, seen| book_cast(a, d, seen, false, 20));
+}
+
+/// gen_titleplay.py's `createdpick`: `creation`'s Acrobat west of the
+/// start dungeon's locked door (row 23, column 4: its own lock, level 10)
+/// facing it, picking armed with P, the door clicked (the lockpicking
+/// roll by the class's factor, 1194:53F9), then the up arrow held into
+/// it and let go.
+#[test]
+fn a_new_acrobat_picks_a_lock_as_the_original() {
+    made_and_played("createdpick", LISTED, |a| at_square(a, 23, 3, 0x80), |a, d, seen| {
+        frames(a, d, seen, 2, |_| false);
+        // P, a menu key: its press runs the frame that takes it.
+        a.input(In::Key { code: KeyCode::KeyP, down: true, text: None });
+        pushed(a, seen);
+        a.input(In::Key { code: KeyCode::KeyP, down: false, text: None });
+        a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+        a.input(In::Button { button: MouseButton::Left, down: true });
+        frames(a, d, seen, 1, |_| false);
+        a.input(In::Button { button: MouseButton::Left, down: false });
+        frames(a, d, seen, 19, |_| false);
+        a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+        frames(a, d, seen, 40, |_| false);
+        a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+        frames(a, d, seen, 10, |_| false);
+    });
+}
+
+/// gen_titleplay.py's `createdjump`: `creation`'s Acrobat jumping (J held
+/// a frame, then let go): the class's own rise (2826:0279, 1A9 C9h).
+#[test]
+fn a_new_acrobat_jumps_as_the_original() {
+    made_and_played("createdjump", LISTED, |_| {}, |a, d, seen| {
+        frames(a, d, seen, 2, |_| false);
+        a.input(In::Key { code: KeyCode::KeyJ, down: true, text: None });
+        frames(a, d, seen, 1, |_| false);
+        a.input(In::Key { code: KeyCode::KeyJ, down: false, text: None });
+        frames(a, d, seen, 30, |_| false);
+    });
 }
 
 /// A case that ends where a game the title's Load loaded is about to run
