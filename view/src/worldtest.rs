@@ -4344,14 +4344,6 @@ fn the_state_as_the_original_leaves_it() {
 /// quest's informant paid in a tavern, a townsperson asked the way).
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
-// (gen_worldframes.py's `playheartspiece`, Crypt of Hearts' own staff
-// piece taken after the journey and three stairs, is left out of both
-// lists for now: the piece is taken and F77 and the staff's flags end as
-// the original's, but DGROUP still differs in the last door face drawn
-// (0000:B1AD's CCB6, CCB8, CCC8: another door last on the two sides), and
-// without the engine's page (the track test) the view's own pick misses
-// the piece hung from the ceiling. Its case is kept: ARENA_STATE_CASE
-// runs it.)
 const BUSY: &[&str] = &[
     "mousedrag",
     "mousedungeon",
@@ -4404,6 +4396,7 @@ const BUSY: &[&str] = &[
     "playguild",
     "playguildbar",
     "playheal",
+    "playheartspiece",
     "playholiday",
     "playhouselocked",
     "playhousepick",
@@ -4538,11 +4531,6 @@ fn the_row_tables_made_as_the_original_makes_them() {
             if only.as_deref().is_some_and(|o| o != name) {
                 continue;
             }
-            // (`playheartspiece` left out, as from the busy lists: without
-            // the engine's page the view's own pick misses its piece.)
-            if name == "playheartspiece" && only.is_none() {
-                continue;
-            }
             let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };
             let Some((mut a, _)) = played(place, |a| {
                 setup(a);
@@ -4665,6 +4653,7 @@ const BUSY_STATE: &[&str] = &[
     "playguild",
     "playguildbar",
     "playheal",
+    "playheartspiece",
     "playholiday",
     "playhouselocked",
     "playhousepick",

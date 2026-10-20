@@ -291,9 +291,15 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
     // face's first shades (0000:BE02..BE2D) come of the last lit frame's
     // A85E, and a frame that draws no lit face keeps its BAE6/BAE8. And
     // A840, the last packed flat's buffer (0000:C3DB), which a list the
-    // frame's click opens takes for its DL: 1194:5734's record +2Bh.)
+    // frame's click opens takes for its DL: 1194:5734's record +2Bh. And
+    // the kind drawn last and what goes with it, CB37, CB38, BA7F and
+    // CCC4: the door hook (0000:CD66, `Machine::door_drawn`) sets them on
+    // the machine for each door the walk meets, but in the original the
+    // walk's later squares set them again (a nearer flat's CB37 8), and
+    // the next frame's first face reads CB37 as the walk left it: a door
+    // span kept, 0000:B1AD, only after a door.)
     let mut left = Vec::new();
-    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D), (0xA85E, 0xA862), (0xBAE6, 0xBAEA), (0xA840, 0xA842)] {
+    for (from, to) in [(0xCB92, 0xCB94), (0xCCB2, 0xCCBA), (0xCCC8, 0xCCCC), (0xCD14, 0xCD16), (0xCB5E, 0xCB60), (crate::talk::var::RECORD, crate::talk::var::RECORD + 0x1C), (FLAT, FLAT + 0x1C), (0xC302, 0xC322), (0xCB59, 0xCB5B), (0xD73C, 0xD73D), (0xA85E, 0xA862), (0xBAE6, 0xBAEA), (0xA840, 0xA842), (0xCB37, 0xCB39), (0xBA7F, 0xBA80), (0xCCC4, 0xCCC6)] {
         for o in from..to {
             left.push((o, r.m.mem.r8(DS, o)));
         }
