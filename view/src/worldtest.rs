@@ -9,6 +9,12 @@ use super::*;
 
 const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/worldframes.txt");
 
+/// Whether a test that walks several cases should run `name`: every case,
+/// or with ARENA_CASE set, that case alone.
+fn only_case(name: &str) -> bool {
+    std::env::var("ARENA_CASE").ok().is_none_or(|o| o == name)
+}
+
 /// The case's track: per frame, level, x, height, y, heading.
 fn track(name: &str) -> Vec<[u16; 5]> {
     track_in(VECTORS, name)
@@ -602,6 +608,9 @@ fn the_3d_view_measured_against_the_originals() {
         ),
     ];
     for (name, place, setup, play) in cases {
+        if !only_case(name) {
+            continue;
+        }
         let (Ok(full), Ok(mask), Ok(odac)) = (std::fs::read(dump.join(format!("{name}.full"))), std::fs::read(dump.join(format!("{name}.mask"))), std::fs::read(dump.join(format!("{name}.dac")))) else {
             eprintln!("{name}: no dump");
             continue;
@@ -1231,6 +1240,57 @@ fn wounded_with_potion(a: &mut App) {
 fn used(a: &mut App, index: u16) {
     let e = &mut a.engine;
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said { listless: true, ..Default::default() });
+}
+
+/// gen_worldframes.py's ARTIFACT_84, _85 and _88: the main quest's three
+/// weapon artifacts as the original's 1194:D1F4 makes them from this save.
+const ARTIFACT_84: [u8; 19] = [0x84, 0x00, 0x06, 0x01, 0x03, 0x10, 0xA8, 0x61, 0xA8, 0x61, 0xA0, 0x86, 0x01, 0x00, 0x45, 0x00, 0x07, 0x2F, 0xFF];
+const ARTIFACT_85: [u8; 19] = [0x85, 0x00, 0x01, 0x02, 0x02, 0x0C, 0xA8, 0x61, 0xA8, 0x61, 0xA0, 0x86, 0x01, 0x00, 0x45, 0x00, 0x03, 0x39, 0xFF];
+const ARTIFACT_88: [u8; 19] = [0x88, 0x00, 0x10, 0x02, 0x03, 0x12, 0xA8, 0x61, 0xA8, 0x61, 0xA0, 0x86, 0x01, 0x00, 0x45, 0x00, 0x04, 0x35, 0xFF];
+/// The save's equipped weapon: the inventory's ninth slot.
+const WEAPON_SLOT: u16 = arena::character::PLAYER + 0x6E + 0x13 * 8;
+
+/// gen_worldframes.py's `wielding`: `playfight`'s creature, the ninth slot
+/// made `item` and equipped, its condition and the player's health set
+/// when given.
+fn wielding(a: &mut App, item: &[u8; 19], condition: Option<u16>, hp: Option<u16>) {
+    use arena::character::{field, PLAYER};
+    brought(a, 1, 1, 0x180);
+    let m = &mut a.engine.m;
+    for (i, &b) in item.iter().enumerate() {
+        m.mem.w8(DS, WEAPON_SLOT + i as u16, if i == 0x0E { b | 0x80 } else { b });
+    }
+    if let Some(c) = condition {
+        m.mem.w16(DS, WEAPON_SLOT + 6, c);
+    }
+    if let Some(h) = hp {
+        m.mem.w16(DS, PLAYER + field::HP, h);
+    }
+}
+
+/// gen_worldframes.py's `spell_potion`: `wounded_with_potion`, the potion
+/// one of `spell` at level `level`.
+fn spell_potion(a: &mut App, spell: u8, level: u8) {
+    use arena::character::PLAYER;
+    wounded_with_potion(a);
+    let slot = PLAYER + 0x6E + 0x13 * 38;
+    a.engine.m.mem.w8(DS, slot + 0x0F, level);
+    a.engine.m.mem.w8(DS, slot + 0x11, spell);
+}
+
+/// gen_worldframes.py's `last_charge`: the Ring of Shielding (the sixteenth
+/// slot) at its last charge.
+fn last_charge(a: &mut App) {
+    a.engine.m.mem.w8(DS, arena::character::PLAYER + 0x6E + 0x13 * 15 + 3, 1);
+}
+
+/// `playfight`'s steps: ready, thirty frames, the swing held two hundred,
+/// let go, twenty.
+fn fight_steps(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    ready(a, seen);
+    frames(a, d, seen, 30, |_| false);
+    swinging(a, d, seen, 200);
+    frames(a, d, seen, 20, |_| false);
 }
 
 /// gen_worldframes.py's `audience(8)`: west of the palace's door at noon,
@@ -2938,6 +2998,33 @@ fn case(name: &str) -> Option<Case> {
             used(a, 3);
             frames(a, d, seen, 60, |_| false);
         })),
+        "playpotionresist" => (Place::Dungeon, Box::new(|a: &mut App| spell_potion(a, RESIST_FIRE, 3)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            used(a, 4);
+            frames(a, d, seen, 20, |_| false);
+        })),
+        "playusebreak" => (Place::Dungeon, Box::new(last_charge), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            used(a, 3);
+            frames(a, d, seen, 20, |_| false);
+        })),
+        "playartifactheal" => (Place::Dungeon, Box::new(|a: &mut App| {
+            wielding(a, &ARTIFACT_84, None, Some(0x40));
+            captured(a);
+        }), Box::new(fight_steps)),
+        "playartifactparalyse" => (Place::Dungeon, Box::new(|a: &mut App| {
+            wielding(a, &ARTIFACT_88, None, None);
+            captured(a);
+        }), Box::new(fight_steps)),
+        "playartifacttriple" => (Place::Dungeon, Box::new(|a: &mut App| {
+            wielding(a, &ARTIFACT_85, None, None);
+            captured(a);
+        }), Box::new(fight_steps)),
+        "playweaponbreak" => (Place::Dungeon, Box::new(|a: &mut App| {
+            brought(a, 1, 1, 0x180);
+            a.engine.m.mem.w16(DS, WEAPON_SLOT + 6, 2);
+            captured(a);
+        }), Box::new(fight_steps)),
         "playtalkwhere" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             talked(a, d, seen, &TALK_WHERE_SCRIPT);
@@ -3309,6 +3396,9 @@ fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
 #[test]
 fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
     for name in ["playdungeon", "playdown", "playcap", "playfog", "playfogfirst", "playghost"] {
+        if !only_case(name) {
+            continue;
+        }
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -3323,6 +3413,9 @@ fn the_dungeons_3d_view_drawn_as_the_original_draws_it() {
 #[test]
 fn the_streets_3d_view_drawn_as_the_original_draws_it() {
     for name in ["playstreet", "playsky", "playnight", "playbolt", "playrain", "playsnow"] {
+        if !only_case(name) {
+            continue;
+        }
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -3333,6 +3426,9 @@ fn the_streets_3d_view_drawn_as_the_original_draws_it() {
 #[test]
 fn the_wildernesss_3d_view_drawn_as_the_original_draws_it() {
     for name in ["playwild", "playvolcano", "playvolcanofar"] {
+        if !only_case(name) {
+            continue;
+        }
         let Some((ok, same)) = soft_view(name) else { return };
         assert!(ok, "{name}: the 3D view differs from the original's ({same:?}% alike)");
     }
@@ -3596,6 +3692,9 @@ fn the_play_loads_as_the_original_leaves_them() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/playload.txt");
     let text = std::fs::read_to_string(path).expect(path);
     for (name, street) in PLAY_LOADS {
+        if !only_case(name) {
+            continue;
+        }
         let Some((mine, banks)) = play_loaded(street) else { return };
         let want = text.lines().find_map(|l| l.strip_prefix(&format!("playload | {name} | "))).expect("a playload line");
         let got = format!("{:x} {:x}", fnv(load_canonical(&game_dir().unwrap(), &mine)), fnv(banks));
@@ -3610,6 +3709,9 @@ fn the_play_loads_as_the_original_leaves_them() {
 fn the_play_loads_measured() {
     let Some(dump) = std::env::var("ARENA_SCREENS").ok().map(PathBuf::from) else { return };
     for (name, street) in PLAY_LOADS {
+        if !only_case(name) {
+            continue;
+        }
         let (Ok(ds), Ok(ems)) = (std::fs::read(dump.join(format!("{name}.ds"))), std::fs::read(dump.join(format!("{name}.ems")))) else {
             eprintln!("no {name} dump");
             continue;
@@ -3841,6 +3943,9 @@ fn state_ems_in(path: &str, name: &str, c: Case) {
 #[test]
 fn the_ems_banks_as_the_original_leaves_them() {
     for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playcrypt", "playfog", "playcap", "playsky"] {
+        if !only_case(name) {
+            continue;
+        }
         state_ems_case(name);
     }
 }
@@ -3850,6 +3955,9 @@ fn the_ems_banks_as_the_original_leaves_them() {
 #[test]
 fn the_state_from_the_load_as_the_original_leaves_it() {
     for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky"] {
+        if !only_case(name) {
+            continue;
+        }
         state_load_case(name);
     }
 }
@@ -3860,6 +3968,9 @@ fn the_state_from_the_load_as_the_original_leaves_it() {
 #[test]
 fn the_state_as_the_original_leaves_it() {
     for name in ["playstreet", "playnight", "playrain", "playsnow", "playwild", "playdungeon", "playdown", "playcrypt", "playfog", "playcap", "playsky", "playghostclick", "playwildedge"] {
+        if !only_case(name) {
+            continue;
+        }
         state_case(name);
     }
 }
@@ -3876,6 +3987,9 @@ fn the_state_as_the_original_leaves_it() {
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY: &[&str] = &[
+    "playartifactheal",
+    "playartifactparalyse",
+    "playartifacttriple",
     "playaudience8",
     "playaudience9",
     "playautomap",
@@ -3955,6 +4069,7 @@ const BUSY: &[&str] = &[
     "playpiece",
     "playpile",
     "playpoisontick",
+    "playpotionresist",
     "playquestreached",
     "playquestreward",
     "playquickcast",
@@ -3995,7 +4110,9 @@ const BUSY: &[&str] = &[
     "playtempleheal",
     "playtextsheet",
     "playuse",
+    "playusebreak",
     "playuselist",
+    "playweaponbreak",
     "playwildambush",
     "playwildhouse",
     "playwildnight",
@@ -4112,6 +4229,9 @@ fn the_row_tables_made_as_the_original_makes_them() {
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
+    "playartifactheal",
+    "playartifactparalyse",
+    "playartifacttriple",
     "playaudience8",
     "playaudience9",
     "playautomapend",
@@ -4194,6 +4314,7 @@ const BUSY_STATE: &[&str] = &[
     "playpiece",
     "playpile",
     "playpoisontick",
+    "playpotionresist",
     "playquestreached",
     "playquestreward",
     "playquickcast",
@@ -4234,9 +4355,11 @@ const BUSY_STATE: &[&str] = &[
     "playtempleheal",
     "playtextsheet",
     "playuse",
+    "playusebreak",
     "playuselist",
     "playvolcano",
     "playvolcanofar",
+    "playweaponbreak",
     "playwildambush",
     "playwildhouse",
     "playwildnight",
@@ -4254,6 +4377,9 @@ const WALLS_CASES: [&str; 8] = ["playriddleright", "playriddlewrong", "playpick"
 fn the_walls_left_as_the_original() {
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
     for name in WALLS_CASES {
+        if !only_case(name) {
+            continue;
+        }
         let Some((place, setup, play)) = case(name) else { return };
         let Some((a, _)) = played(place, setup, play) else { return };
         let m = &a.engine.m;
@@ -4268,13 +4394,16 @@ fn the_walls_left_as_the_original() {
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 16] = [
-    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight",
+const SPELL_CASES: [&str; 22] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak",
 ];
 
 /// The cases whose projectiles and actors are compared frame by frame
 /// (gen_worldframes.py's OBJECT_CASES).
 const OBJECT_CASES: &[&str] = &[
+    "playartifactheal",
+    "playartifactparalyse",
+    "playartifacttriple",
     "playcast",
     "playcreaturecast",
     "playcreaturehex",
@@ -4285,6 +4414,7 @@ const OBJECT_CASES: &[&str] = &[
     "playparalyse",
     "playquickcast",
     "playsurrenderspell",
+    "playweaponbreak",
 ];
 
 /// The missile and fight cases' projectiles and actors, frame by frame,
@@ -4325,6 +4455,9 @@ fn the_spells_leave_creatures_and_timers_as_the_original() {
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
     let mut bad = vec![];
     for name in SPELL_CASES {
+        if !only_case(name) {
+            continue;
+        }
         let Some((place, setup, play)) = case(name) else { return };
         // With the engine's page, as the state comparison runs (the
         // touch's target is what the ported renderer's hit test finds).
@@ -4354,6 +4487,9 @@ fn the_spells_leave_creatures_and_timers_as_the_original() {
 #[test]
 fn busy_play_leaves_the_state_as_the_original() {
     for name in BUSY_STATE.iter().copied() {
+        if !only_case(name) {
+            continue;
+        }
         state_case(name);
         state_load_case(name);
     }
@@ -4737,6 +4873,9 @@ fn a_death_plays_the_farewell_as_the_original() {
 #[test]
 fn a_death_plays_the_farewell_through_the_sound_driver_as_the_original() {
     for name in ["playfarewellsound", "playfarewellsoundclick"] {
+        if !only_case(name) {
+            continue;
+        }
         let (place, setup, play) = case(name).unwrap();
         let Some((_, seen)) = played(place, setup, play) else { return };
         let replay = SPEECH_REPLAY.with(|r| r.borrow_mut().take()).expect("the speech replayed");
@@ -5091,6 +5230,9 @@ const SCREENS_STATE: [&str; 1] = ["playautomap"];
 #[test]
 fn the_screens_leave_the_state_as_the_original() {
     for name in SCREENS_STATE {
+        if !only_case(name) {
+            continue;
+        }
         let (place, setup, play) = case(name).unwrap();
         let Some((_, seen)) = played(place, setup, play) else { return };
         assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
@@ -5154,6 +5296,9 @@ fn the_welcome_keeps_the_screen_as_the_original() {
 #[test]
 fn faces_that_hide_no_lights_as_the_original() {
     for name in ["playdiagonal", "playdoormoving"] {
+        if !only_case(name) {
+            continue;
+        }
         let Some((place, setup, play)) = case(name) else { return };
         let Some((_, seen)) = played(place, setup, play) else { return };
         assert_eq!(seen, track(name), "{name}: the player's frames differ from the original's");
