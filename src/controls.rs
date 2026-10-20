@@ -455,7 +455,7 @@ impl Machine {
     }
 
     /// 0000:8FC8 after the driver: the cursor kept within its limits.
-    pub(crate) fn mouse_clamp(&mut self) {
+    pub fn mouse_clamp(&mut self) {
         let lim = |i: u16| self.mem.r16(DS, MOUSE_LIMITS + 2 * i);
         let (x0, x1, y0, y1) = (lim(0), lim(1), lim(2), lim(3));
         let clamp = |v: u16, lo: u16, hi: u16| {

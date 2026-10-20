@@ -1183,9 +1183,9 @@ const RUMOURS: [(u32, u16); 2] = [(0x0001_2345, 0x0456), (0x0001_2385, 0x043F)];
 fn rumour(a: &mut App, d: &mut Driver, at: (u32, u16)) {
     into(a, 0x1AB5);
     a.engine.m.mem.w32(DS, 0x05CC, at.0);
-    // The turn's ticks (`Engine::tick`) come before the shop.
-    let t = a.engine.frame_ticks();
-    a.engine.m.mem.w16(DS, arena::frame::var::TICKS, at.1.wrapping_sub(t));
+    // (The turn's ticks, `Engine::tick`, come after the shop, as the
+    // frame's waits do.)
+    a.engine.m.mem.w16(DS, arena::frame::var::TICKS, at.1);
     super::shop_turn(a, 4);
     assert!(a.pending.is_some(), "the shop's menu");
     d.click(a, 0xA0, 0x8B, MouseButton::Left);
@@ -1675,16 +1675,16 @@ fn who_are_you_at_a_timer_of_456h_gives_up_as_the_original() {
     a.engine.m.mem.w32(DS, arena::random::SEED, SEED);
     a.engine.m.rng.seed = SEED;
     area_left(&mut a);
-    let ft = a.engine.frame_ticks();
     let m = &mut a.engine.m;
     let (x, y) = (m.mem.r16(DS, 0x0AB3), m.mem.r16(DS, 0x0AB7));
     for (at, v) in [(arena::movement::var::X, x), (arena::movement::var::Y, y), (0xBA62, x), (0xBA66, y)] {
         m.mem.w16(DS, at, v);
     }
     m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
-    // The turn's tick comes before the talk: the timer 456h as it runs
-    // (and again as the answer's turn runs again from before it).
-    m.mem.w16(DS, arena::frame::var::TICKS, 0x456u16.wrapping_sub(ft));
+    // The timer 456h as the talk runs (the turn's tick after it, as the
+    // frame's waits; and again as the answer's turn runs again from
+    // before it).
+    m.mem.w16(DS, arena::frame::var::TICKS, 0x456);
     d.frame(&mut a);
     assert!(a.pending.is_some(), "the townsperson's menu");
     d.click(&mut a, 0xA0, 0x4D, MouseButton::Left);
