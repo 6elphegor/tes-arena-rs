@@ -368,9 +368,9 @@ impl Machine {
         Some(())
     }
 
-    /// The modern counterpart of `classic_step`: turning, then one walk
-    /// along the combined direction of `forward` and `strafe` at the
-    /// larger of their speeds (the original walks one region's direction
+    /// The modern counterpart of `classic_step`: one walk along the
+    /// combined direction of `forward` and `strafe` at the larger of their
+    /// speeds, then turning (the original walks one region's direction
     /// a frame) as if the left button were down, so the acceleration
     /// builds; going back is at half speed. The speed is 0 after, moving
     /// or not, as the keys with the cursor in the centre leave it.
@@ -385,16 +385,6 @@ impl Machine {
         self.mem.w16(DS, 0x05E0, f | 0x40);
         if it.look != 0 {
             self.turn(it.look as u16);
-        }
-        if it.turn != 0 {
-            let fraction = match it.turn {
-                // (2826:06A0 and 06FA's regions, REGIONS + 28h and 40h.)
-                -0x100 => self.arrow_fraction(3, 4, None)?,
-                0x100 => self.arrow_fraction(5, 4, Some(0x13C))?,
-                t => t.unsigned_abs().min(0x100),
-            };
-            let d = self.turn_speed(fraction);
-            self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
         }
         if it.forward != 0 || it.strafe != 0 {
             let fraction = match (it.forward, it.strafe) {
@@ -426,6 +416,19 @@ impl Machine {
             self.mem.w16(DS, SPEED, 0);
         } else {
             self.mem.w16(DS, SPEED, 0);
+        }
+        // The turn after the walk, as 2826:0473 runs Up or Down's handler
+        // before Left or Right's: held together, the step is along the
+        // heading the frame began with.
+        if it.turn != 0 {
+            let fraction = match it.turn {
+                // (2826:06A0 and 06FA's regions, REGIONS + 28h and 40h.)
+                -0x100 => self.arrow_fraction(3, 4, None)?,
+                0x100 => self.arrow_fraction(5, 4, Some(0x13C))?,
+                t => t.unsigned_abs().min(0x100),
+            };
+            let d = self.turn_speed(fraction);
+            self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
         }
         // Where the classic controls take a click on the interface bar
         // (2826:02E2, `pick_region`, after the moves): the front end's, if

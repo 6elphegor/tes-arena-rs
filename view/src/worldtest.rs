@@ -1722,6 +1722,93 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
     walk(a, d, seen, KeyCode::ArrowUp, 400, 20);
 }
 
+/// gen_worldframes.py's FUZZ: seeded random sessions, each played from
+/// the script its `fuzz` line holds and measured every CHECKPOINT frames
+/// as `playlongrun` (`fuzz_sessions_as_the_original`).
+const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2"];
+
+/// A FUZZ case's script, its `fuzz` line's tokens.
+fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    text.lines()
+        .map(|l| l.split(" | ").collect::<Vec<_>>())
+        .find(|f| f.len() == 3 && f[0] == "fuzz" && f[1] == name)
+        .map(|f| f[2].split(' ').map(str::to_string).collect())
+}
+
+/// gen_worldframes.py's `fuzz_steps`: `hK[+K..],N,M` the keys held N
+/// frames, let go, M frames; `wN` N frames; `tN` a minute tick due, N
+/// frames; `qN` Shift+C (`quick_cast`), let go, N frames; `aN` A
+/// (`ready`), N frames; `sN,M` `swinging` N frames, M frames; `cN` the
+/// view clicked with the mouse captured (its click at 164, 74, where the
+/// harness's at 160, 70 lands), N frames in all.
+fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    let key = |a: &mut App, code: KeyCode, down: bool| a.input(In::Key { code, down, text: None });
+    for t in tokens {
+        let (kind, args) = t.split_at(1);
+        let n: Vec<&str> = args.split(',').collect();
+        let num = |i: usize| n[i].parse::<usize>().unwrap();
+        match kind {
+            "h" => {
+                let codes: Vec<KeyCode> = n[0].split('+').map(|c| match c {
+                    "48" => KeyCode::ArrowUp,
+                    "50" => KeyCode::ArrowDown,
+                    "4b" => KeyCode::ArrowLeft,
+                    "4d" => KeyCode::ArrowRight,
+                    _ => panic!("fuzz key {c}"),
+                }).collect();
+                for &c in &codes {
+                    key(a, c, true);
+                }
+                frames(a, d, seen, num(1), |_| false);
+                for &c in &codes {
+                    key(a, c, false);
+                }
+                frames(a, d, seen, num(2), |_| false);
+            }
+            "w" => frames(a, d, seen, num(0), |_| false),
+            "t" => {
+                minute_due(a);
+                frames(a, d, seen, num(0), |_| false);
+            }
+            "q" => {
+                a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+                a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+                pushed(a, seen);
+                key(a, KeyCode::KeyC, false);
+                key(a, KeyCode::ShiftLeft, false);
+                frames(a, d, seen, num(0), |_| false);
+            }
+            "a" => {
+                ready(a, seen);
+                frames(a, d, seen, num(0), |_| false);
+            }
+            "s" => {
+                recaptured(a);
+                swinging(a, d, seen, num(0));
+                frames(a, d, seen, num(1), |_| false);
+            }
+            "c" => {
+                recaptured(a);
+                a.input(In::Button { button: MouseButton::Left, down: true });
+                frames(a, d, seen, 1, |_| false);
+                a.input(In::Button { button: MouseButton::Left, down: false });
+                frames(a, d, seen, num(0) - 1, |_| false);
+            }
+            _ => panic!("fuzz token {t}"),
+        }
+    }
+}
+
+/// The mouse captured again if a screen the session's frames opened let
+/// it go (`open_taken`), as a player clicks the window again; the harness's
+/// mouse is always the game's.
+fn recaptured(a: &mut App) {
+    if !a.captured {
+        captured(a);
+    }
+}
+
 /// gen_worldframes.py's spell numbers (3276:0000's records).
 const LIGHT: u8 = 2;
 const OPEN: u8 = 9;
@@ -1973,6 +2060,20 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, after, |_| false);
         })
     };
+    if let Some(tokens) = FUZZ.contains(&name).then(|| fuzz_tokens(name)).flatten() {
+        let place = match name {
+            n if n.starts_with("fuzztown") => Place::Street,
+            n if n.starts_with("fuzzdungeon") => Place::Dungeon,
+            _ => Place::Wild,
+        };
+        // (The mouse captured, as `fought`: the window's first right press
+        // would otherwise take it, and the swings' drags wouldn't reach
+        // the game.)
+        return Some((place, Box::new(|a: &mut App| {
+            known(a, LIGHT);
+            captured(a);
+        }), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| fuzz_play(&tokens, a, d, seen))));
+    }
     Some(match name {
         "playdungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playghost" => (Place::Dungeon, Box::new(ghost), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
@@ -5008,7 +5109,21 @@ fn a_death_leaves_the_state_as_the_original() {
 /// it reaches, not only at the end.
 #[test]
 fn a_long_session_as_the_original() {
-    let name = "playlongrun";
+    checkpointed("playlongrun");
+}
+
+/// The seeded random sessions (FUZZ) as the original plays them, measured
+/// as `a_long_session_as_the_original` measures playlongrun.
+#[test]
+fn fuzz_sessions_as_the_original() {
+    for name in FUZZ {
+        checkpointed(name);
+    }
+}
+
+/// A CHECKPOINT_CASES case (gen_worldframes.py's) as the original plays
+/// it: the player's frames, each checkpoint's DGROUP and EMS, the end's.
+fn checkpointed(name: &str) {
     if !only_case(name) {
         return;
     }
