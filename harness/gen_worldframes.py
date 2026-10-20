@@ -3,7 +3,10 @@ view/src/worldtest.rs: what its 2D drawing leaves on the page in play
 (the interface, the compass, the bars over the 3D view) and where the
 player goes, frame by frame, under keys held.
 
-Usage: gen_worldframes.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [NAME...]
+Usage: gen_worldframes.py ACD_unpacked.EXE GAME_DIR SAVE_DIR OUT [--dump DIR] [NAME...] (SHARD=k/K: par.py)
+
+The cases run are the NAMEs given, or those ARENA_CASES lists (comma-separated),
+or every case.
 
 The game is loaded from the title and taken into the dungeon made from
 gen_dungeonscreens.py's seed as that does (`dungeon`), or into the main
@@ -104,7 +107,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from emu import LOAD_SEG, STUB_SEG, fnv
+from emu import LOAD_SEG, STUB_SEG, fnv, mine
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
 import unicorn.x86_const as x86
@@ -2377,20 +2380,29 @@ def main():
         open(os.path.join(dump, 'base.ds'), 'wb').write(bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000)))
         open(os.path.join(dump, 'base.ems'), 'wb').write(b''.join(a.ems_bank(b) for b in range(0x20)))
     places = {}
+    # The cases to run: NAMEs after OUT, or ARENA_CASES (comma-separated:
+    # tools/regen_check.py's per-case cache runs only the cases it lacks,
+    # through par.py, which takes the last argument for OUT).
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
+    only += [n for n in os.environ.get('ARENA_CASES', '').split(',') if n]
+    names = [n for n in CASES if not only or n in only]
+    total = len(names)
+    first_shard = os.environ.get('SHARD', '0/1').split('/')[0] == '0'
     out = open(OUT, 'w', buffering=1)
     # The state as the title's Load leaves it: DGROUP, the offsets
     # tests/vectors/loadexclude.txt names zeroed (the port's in this form:
     # worldtest's `load_canonical`).
     skip_base = excluded('loadexclude.txt')
-    if not only:
+    if not only and first_shard:
         out.write(f'loadstate | {fnv(bytes(0 if i in skip_base else b for i, b in enumerate(loaded))):x}\n')
         out.write(f'loadems | {fnv(loaded_ems):x}\n')
     skip = excluded()
     skip_load = skip | excluded('stateloadexclude.txt') | excluded('loadexclude.txt')
-    for name, (where, setup, steps) in CASES.items():
-        if only and name not in only:
+    for n, name in enumerate(names):
+        # SHARD=k/K: the k-th contiguous block of the cases (par.py).
+        if not mine(n, total):
             continue
+        where, setup, steps = CASES[name]
         if where not in places:
             places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
                              'people': people, 'store': building('store'), 'tavern': building('tavern'), 'temple': building('temple'), 'guild': guild,

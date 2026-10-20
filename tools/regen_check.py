@@ -16,8 +16,8 @@ re/ACD_unpacked.EXE (ARENA_UNPACKED to override), the game folder
 game (ARENA_SAVE, slot ARENA_SLOT, default 1); the save folder is copied
 to the scratch directory first, and only read from there.
 
-Generators whose cases are sharded (`mine(n, total)`) run through
-harness/par.py on K processes; the others run their cases in order on
+Generators whose cases are sharded (`mine(n, total)`, worldframes among
+them) run through harness/par.py on K processes; the others run their cases in order on
 one, as they must (gen_cast.py and gen_missile.py carry each case's
 state into the next). Up to J generators run at once; each gets a hard
 timeout. Identical outputs are deleted as they finish, so the scratch
@@ -30,6 +30,17 @@ unpacked EXE, the game folder's file list (names, sizes, times) and the
 save folder's bytes, plus its committed vector file(s). When none of
 those changed it isn't run again (`cached` in the listing); --no-cache
 runs everything.
+
+The PER_CASE generators (worldframes) are cached case by case instead
+(tools/casecache.py): each case's block of lines is kept under a key over
+its own entry in CASES and the helpers only it reaches, the code every
+case runs, and everything outside the generator as above. Only the cases
+whose key changed run (through ARENA_CASES, sharded like the others when
+there are several), and the output is put together from the blocks in
+CASES order and compared with the committed vector; a change to the
+common code runs every case. The blocks live in git's common directory
+(regen-cache/), shared by every worktree. The listing then has a line
+`NAME  N of M cases run` above the result.
 
 A long run belongs in the background, e.g.
 
@@ -48,6 +59,9 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from casecache import Cases, split_blocks  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HARNESS = os.path.join(ROOT, 'harness')
 VECTORS = os.path.join(ROOT, 'tests', 'vectors')
@@ -58,6 +72,31 @@ VECTOR = {'move': 'movement', 'savew': 'save_write'}
 BESIDE = {'screens': ['screenfades.txt'], 'createshot': ['createframes.txt'], 'dungeonscreens': ['dungeonfades.txt']}
 CACHE = os.path.join(ROOT, '.regen_cache.json')
 CACHE_LOCK = threading.Lock()
+# Generators cached case by case (tools/casecache.py): only the cases whose
+# key changed run, the rest come from the block cache.
+PER_CASE = {'worldframes'}
+
+
+def block_cache_dir(name):
+    """Where a PER_CASE generator's blocks are kept: in git's common
+    directory, so every worktree of the repository shares them (the blocks
+    are named by their keys, so sharing is safe)."""
+    try:
+        common = subprocess.run(['git', 'rev-parse', '--git-common-dir'], cwd=ROOT, capture_output=True,
+                                text=True, check=True).stdout.strip()
+        top = os.path.join(ROOT, common, 'regen-cache')
+    except (OSError, subprocess.CalledProcessError):
+        top = os.path.join(ROOT, '.regen_cache')
+    path = os.path.join(top, name)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def write_atomic(path, text):
+    tmp = f'{path}.{os.getpid()}.{threading.get_ident()}.tmp'
+    with open(tmp, 'w') as f:
+        f.write(text)
+    os.replace(tmp, path)
 
 
 def harness_deps(name):
@@ -97,21 +136,28 @@ def tree_bytes(h, top):
             h.update(open(path, 'rb').read())
 
 
-def cache_key(name, env, vecs):
-    """The key over everything gen_NAME.py's output can depend on."""
+def cache_key(name, env, vecs, own=True):
+    """The key over everything gen_NAME.py's output can depend on (with
+    OWN false, all but gen_NAME.py's own source and its committed vectors:
+    a PER_CASE generator's, which casecache keys case by case)."""
     h = hashlib.sha256()
     srcs = harness_deps(name)
     text = ''
+    gen = os.path.join(HARNESS, f'gen_{name}.py')
     for path in srcs:
         data = open(path, 'rb').read()
         text += data.decode('latin-1')
-        h.update(os.path.basename(path).encode() + b'\0' + data)
-    # Vector files the harness reads (exclusion lists, segment maps, ...).
+        if own or path != gen:
+            h.update(os.path.basename(path).encode() + b'\0' + data)
+    # Vector files the harness reads (exclusion lists, segment maps, ...),
+    # not those it writes.
+    mine = {os.path.basename(v) for v in vecs}
     for f in sorted(os.listdir(VECTORS)):
-        if f in text:
+        if f in text and f not in mine:
             h.update(b'read ' + f.encode() + b'\0' + open(os.path.join(VECTORS, f), 'rb').read())
-    for path in vecs:
-        h.update(b'vec ' + os.path.basename(path).encode() + b'\0' + open(path, 'rb').read())
+    if own:
+        for path in vecs:
+            h.update(b'vec ' + os.path.basename(path).encode() + b'\0' + open(path, 'rb').read())
     h.update(open(env['exe'], 'rb').read())
     h.update(env['game_listing'])
     h.update(env['save_digest'].encode())
@@ -180,6 +226,8 @@ def run(name, env, opts):
         return name, 0.0, f'skipped: {p}'
     args, sharded = p
     vecs = [vec] + [os.path.join(VECTORS, f) for f in BESIDE.get(name, [])]
+    if name in PER_CASE:
+        return run_per_case(name, env, opts, vec, vecs, args, sharded)
     key = cache_key(name, env, [v for v in vecs if os.path.exists(v)])
     if not opts.no_cache and env['cache'].get(name) == key:
         return name, 0.0, 'cached'
@@ -217,6 +265,70 @@ def run(name, env, opts):
     return name, dt, 'identical'
 
 
+def run_per_case(name, env, opts, vec, vecs, args, sharded):
+    """A PER_CASE generator: the cases whose blocks aren't cached run (all
+    of them, the header too, when the code every case runs changed, or with
+    --no-cache), and the output put together from the blocks in CASES order
+    is compared with the committed vector."""
+    gen = os.path.join(HARNESS, f'gen_{name}.py')
+    cases = Cases(open(gen).read())
+    base = cache_key(name, env, vecs, own=False)
+    hkey = hashlib.sha256((base + cases.common_digest()).encode()).hexdigest()
+    keys = {n: hashlib.sha256((hkey + cases.case_digest(n)).encode()).hexdigest() for n in cases.order}
+    store = block_cache_dir(name)
+    header_path = os.path.join(store, hkey + '.header')
+    block_path = {n: os.path.join(store, k + '.lines') for n, k in keys.items()}
+    if opts.no_cache or not os.path.exists(header_path):
+        todo = list(cases.order)
+    else:
+        todo = [n for n in cases.order if not os.path.exists(block_path[n])]
+    out = os.path.join(opts.out, os.path.basename(vec))
+    dt = 0.0
+    if todo:
+        full = todo == cases.order
+        run_env = dict(os.environ)
+        run_env.pop('ARENA_CASES', None)
+        if not full:
+            run_env['ARENA_CASES'] = ','.join(todo)
+        k = min(opts.shards, len(todo)) if sharded else 1
+        cmd = [sys.executable, os.path.join(HARNESS, 'par.py'), str(k), gen] if k > 1 else [sys.executable, gen]
+        log = open(out + '.log', 'w')
+        print(f'{name}: running {len(todo)} of {len(cases.order)} cases on {k}', file=log, flush=True)
+        t0 = time.time()
+        try:
+            rc = subprocess.run(cmd + args + [out], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                timeout=opts.timeout, start_new_session=True, env=run_env).returncode
+        except subprocess.TimeoutExpired:
+            rc = 'timeout'
+        dt = time.time() - t0
+        log.close()
+        if rc != 0:
+            return name, dt, 'timeout' if rc == 'timeout' else f'rc={rc} (see {out}.log)'
+        header, blocks = split_blocks(open(out).read(), cases.order)
+        missing = [n for n in todo if n not in blocks]
+        if missing:
+            return name, dt, f'DIFFERENT (no lines for {", ".join(missing[:5])}; see {out}.log)'
+        if full:
+            write_atomic(header_path, ''.join(header))
+        for n in todo:
+            write_atomic(block_path[n], ''.join(blocks[n]))
+    text = open(header_path).read() + ''.join(open(block_path[n]).read() for n in cases.order)
+    note = f'{len(todo)} of {len(cases.order)} cases run'
+    with open(out, 'w') as f:
+        f.write(text)
+    a, b = text.encode(), open(vec, 'rb').read()
+    if a != b:
+        a, b = a.split(b'\n'), b.split(b'\n')
+        first = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+        return name, dt, (f'DIFFERENT ({os.path.basename(vec)} first line {first + 1}; '
+                          f'{len(a) - 1} lines vs {len(b) - 1}; {note})')
+    if not opts.keep:
+        os.remove(out)
+        if os.path.exists(out + '.log'):
+            os.remove(out + '.log')
+    return name, dt, ('identical' if todo else 'cached'), note
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('names', nargs='*')
@@ -252,7 +364,9 @@ def main():
     bad = 0
     with ThreadPoolExecutor(opts.jobs) as pool:
         for f in as_completed([pool.submit(run, n, env, opts) for n in names]):
-            name, dt, res = f.result()
+            name, dt, res, *note = f.result()
+            if note:
+                print(f'{name:14} {note[0]}', flush=True)
             print(f'{name:14} {dt:7.1f} s  {res}', flush=True)
             bad += not (res in ('identical', 'cached') or res.startswith('skipped'))
     if save:

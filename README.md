@@ -167,7 +167,11 @@ from a copy of a save.
 - `tools/regen_check.py` regenerates every vector file into a scratch
   directory (sharding where it can) and says, per generator, whether it
   reproduces the committed file byte for byte. Generators without a
-  `Usage:` line take `ACD_unpacked.EXE OUT`.
+  `Usage:` line take `ACD_unpacked.EXE OUT`. What it found identical is
+  cached; gen_worldframes.py's output is cached case by case
+  (`tools/casecache.py`), so adding or changing a case reruns only that
+  case (the blocks are shared by every worktree, under git's common
+  directory).
 
 Running them:
 
