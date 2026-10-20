@@ -299,6 +299,30 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
         ),
         "wildtavern" => wild_building(0x0B0B),
         "wildtemple" => wild_building(0x0C0C),
+        // Two crossings east (WILD057 in the window), its crypt's 0909h
+        // wall (trigger 1).
+        "wildcrypt" => (
+            Place::Wild,
+            Box::new(|a: &mut App| wild_at(a, Some(0x2FF8), None, 0x80)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                wild_south(a, d, seen, |a| wild_at(a, Some(0x2FF8), None, 0x80));
+                wild_south(a, d, seen, |a| before_wall(a, 0x0909));
+                frames_until(a, d, seen, 2, |_| false);
+                click_leaving(a, d, seen, 10);
+                frames_until(a, d, seen, 3, |_| false);
+            }),
+        ),
+        // A flat (800Eh, its low bits trigger 5's) clicked where the
+        // player starts: no area left.
+        "wildflat" => (
+            Place::Wild,
+            Box::new(|a: &mut App| before_wall(a, 0x800E)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                frames_until(a, d, seen, 2, |_| false);
+                click_leaving(a, d, seen, 10);
+                frames_until(a, d, seen, 3, |_| false);
+            }),
+        ),
         _ => return None,
     })
 }
@@ -581,6 +605,20 @@ fn into_a_wilderness_tavern_as_the_original() {
 #[test]
 fn into_a_wilderness_temple_as_the_original() {
     transit("wildtemple");
+}
+
+/// A crypt in the wilderness (WILD057's 0909h wall, trigger 1) clicked
+/// after two crossings east: its interior entered.
+#[test]
+fn into_a_wilderness_crypt_as_the_original() {
+    transit("wildcrypt");
+}
+
+/// A flat whose low bits are a trigger's (800Eh: 0000:43B1 takes any word
+/// with bit 8000h) clicked: the original's frames, no area left.
+#[test]
+fn a_wilderness_flat_clicked_as_the_original() {
+    transit("wildflat");
 }
 
 /// Crypt of Hearts, High Rock's staff dungeon, travelled to: the journey,
