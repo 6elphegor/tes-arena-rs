@@ -535,6 +535,61 @@ def wounded_with_potion(a):
     a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
 
 
+# Three main-quest artifacts as the original makes them (1194:D1F4 with AL
+# the kind: E8B2's weapon of item level k | 80h, its type from 36DD), kinds
+# 4, 5 and 8, made once from this save and kept so both sides write the
+# same bytes: type 84h heals the player half each blow's damage (2AA1:
+# 0956); 85h and 88h triple it (2AA1:0911), 88h with a chance to paralyse
+# the creature at 800 of its condition each time (breaking at none left).
+ARTIFACT_84 = bytes.fromhex('84 00 06 01 03 10 a8 61 a8 61 a0 86 01 00 45 00 07 2f ff')
+ARTIFACT_85 = bytes.fromhex('85 00 01 02 02 0c a8 61 a8 61 a0 86 01 00 45 00 03 39 ff')
+ARTIFACT_88 = bytes.fromhex('88 00 10 02 03 12 a8 61 a8 61 a0 86 01 00 45 00 04 35 ff')
+# The save's equipped weapon is the inventory's ninth slot (flags C5).
+WEAPON_SLOT = 0x01A4 + 0x6E + 0x13 * 8
+
+
+def wielding(item, condition=None, hp=None):
+    """A creature (type 1) brought as `playfight`'s, the inventory's ninth
+    slot (the save's equipped weapon) made `item`, equipped (flags +0Eh bit
+    80h), its condition (+6) `condition` when given, the player's health
+    `hp` when given."""
+    def put(a):
+        brought(1)(a)
+        a.mu.mem_write(a.lin(a.ds, WEAPON_SLOT), item[:0x0E] + bytes([item[0x0E] | 0x80]) + item[0x0F:])
+        if condition is not None:
+            a.w16(WEAPON_SLOT + 6, condition)
+        if hp is not None:
+            a.w16(0x01A4 + 0x59, hp)
+    return put
+
+
+def worn_weapon(condition):
+    """`playfight`'s creature, the save's weapon (the ninth slot) at
+    `condition`: its wear from the blows (2AA1:017C) breaks it."""
+    def put(a):
+        brought(1)(a)
+        a.w16(WEAPON_SLOT + 6, condition)
+    return put
+
+
+def spell_potion(spell, level):
+    """`wounded_with_potion`, the potion one of spell `spell` (+11h) cast at
+    level `level` (+0Fh: 29CF:07C3 casts a stack's spell but FFh at it)."""
+    def put(a):
+        wounded_with_potion(a)
+        slot = 0x01A4 + 0x6E + 0x13 * 38
+        a.mu.mem_write(a.lin(a.ds, slot + 0x0F), bytes([level]))
+        a.mu.mem_write(a.lin(a.ds, slot + 0x11), bytes([spell]))
+    return put
+
+
+def last_charge(a):
+    """The Ring of Shielding (the inventory's sixteenth slot, the use list's
+    fourth: an accessory of armour kind 0) at its last charge (+3 1): its
+    use spends it and breaks the ring (29CF:07C3 by 7F81's table)."""
+    a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 15 + 3), bytes([1]))
+
+
 def resting_at(hour, heading):
     """`resting` at `hour` (`at_hour`)."""
     def put(a):
@@ -2017,6 +2072,21 @@ CASES = {
     # cast on the player, its charge spent), sixty frames on.
     'playuse': ('dungeon', wounded_with_potion, [((), (), 2, None), ((), (), 5, None, [], {'do': used(4)}),
                                                  ((), (), 60, None, [], {'do': used(3)})]),
+    # The potion one of Resist Fire (`spell_potion`) drunk as `playuse`'s
+    # (29CF:07C3 casts it on the player at its level byte), twenty frames.
+    'playpotionresist': ('dungeon', spell_potion(RESIST_FIRE, 3), [((), (), 2, None), ((), (), 20, None, [], {'do': used(4)})]),
+    # The Ring of Shielding at its last charge (`last_charge`) used: its
+    # spell cast, the charge spent and the ring broken; twenty frames.
+    'playusebreak': ('dungeon', last_charge, [((), (), 2, None), ((), (), 20, None, [], {'do': used(3)})]),
+    # `playfight` with an artifact wielded (`wielding`): 84h's blows heal
+    # the wounded player (2AA1:0956); 88h's triple and may paralyse the
+    # creature, at 800 of the artifact's condition a time.
+    'playartifactheal': ('dungeon', wielding(ARTIFACT_84, hp=0x40), FIGHT),
+    'playartifactparalyse': ('dungeon', wielding(ARTIFACT_88), FIGHT),
+    'playartifacttriple': ('dungeon', wielding(ARTIFACT_85), FIGHT),
+    # `playfight` with the save's weapon nearly worn through (`worn_weapon`):
+    # a blow's wear breaks it (2AA1:017C, the broken item's box).
+    'playweaponbreak': ('dungeon', worn_weapon(2), FIGHT),
     # In the town's first equipment store (`building`), set up to shop
     # (`shopping`): two frames, the store's services (`serviced`): a
     # weapon bought, an item sold, one repaired (STORE_SCRIPT), thirty
@@ -2337,14 +2407,15 @@ def walls_line(a, name):
 # (`creatures_line`).
 SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout', 'playresist', 'playfortify', 'playinvisible',
                'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick', 'playdiseasebite', 'playcreaturehex',
-               'playcreaturemissile', 'playguardsfight')
+               'playcreaturemissile', 'playguardsfight', 'playpotionresist', 'playusebreak', 'playartifactheal',
+               'playartifactparalyse', 'playartifacttriple', 'playweaponbreak')
 
 
 # The cases whose projectiles and actors are compared frame by frame
 # (`objects_line`), not only as their last frame leaves them: a fireball
 # a frame late can still end where the original's ends.
 OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell', 'playdiseasebite',
-                'playcreaturehex', 'playcreaturemissile', 'playguardsfight')
+                'playcreaturehex', 'playcreaturemissile', 'playguardsfight', 'playartifactheal', 'playartifactparalyse', 'playartifacttriple', 'playweaponbreak')
 
 
 def objects_digest(a):
