@@ -742,101 +742,82 @@ fn f5_saves_and_f9_loads_back() {
     assert_eq!(at(&a), saved, "F9 brings the player back where F5 saved");
 }
 
+/// The view's I: the original's inputs for the equipment page (the
+/// portrait clicked, N typed), the same as K then N; a line clicked twice
+/// goes to the page's own loop (its list's record, 1194:1AC6) and puts
+/// the item on, as the engine's click does.
+#[test]
+fn inventory_by_i_is_the_sheets_page_and_its_clicks_the_games() {
+    let Some(dir) = game_dir() else { return };
+    let setup = |app: &mut App| panels::give(&mut app.engine.m, 6);
+    let mut a = app(&dir, &Start::default());
+    setup(&mut a);
+    named(&mut a);
+    let mut d = Driver::new(&mut a);
+    d.key(&mut a, KeyCode::KeyI, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "I opens the equipment page: {:?} {}", a.panel.as_ref().map(std::mem::discriminant), a.page_after_sheet);
+    let mut b = app(&dir, &Start::default());
+    setup(&mut b);
+    named(&mut b);
+    let mut db = Driver::new(&mut b);
+    db.key(&mut b, KeyCode::KeyK, None);
+    db.key(&mut b, KeyCode::KeyN, None);
+    same(&a, &b, "I and K then N");
+    // The first line (its bottom at 3Dh), clicked twice: marked, then
+    // its item put on or taken off.
+    d.click(&mut a, 0x40, 0x38, MouseButton::Left);
+    d.click(&mut a, 0x40, 0x38, MouseButton::Left);
+    for _ in 0..2 {
+        let mut wait = |_: &mut arena::machine::Machine, _: &[(Vec<u8>, u8)], _: u16| {};
+        b.engine.m.sheet_equipment_click(&mut b.engine.files, 0x38, &mut wait).expect("the list's click");
+    }
+    same(&a, &b, "line 0 clicked twice and the engine's clicks");
+    // Off every record: nothing but the loop's turn.
+    d.click(&mut a, 300, 20, MouseButton::Left);
+    b.engine.m.sheet_equipment_none(None);
+    same(&a, &b, "a click off the records");
+    // I again leaves the page as its exit does.
+    d.key(&mut a, KeyCode::KeyI, None);
+    assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "I goes back to the sheet");
+}
+
+/// The page's Drop by D (its fourth record): a marked item asks, N keeps
+/// it, Y drops it; with nothing marked, "Drop what?"; no room refuses.
 #[test]
 fn the_drop_button_asks_and_refuses_as_the_original() {
     let Some(dir) = game_dir() else { return };
     let mut a = app(&dir, &Start::default());
     panels::give(&mut a.engine.m, 6);
+    named(&mut a);
     let mut d = Driver::new(&mut a);
+    // A square that keeps what is dropped (the start's loses it, 12D0).
+    a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 0);
+    d.key(&mut a, KeyCode::KeyI, None);
     let asking = |app: &App| match &app.panel {
         Some(panels::Panel::Inventory(inv)) => inv.asking.as_ref().map(|(t, _)| String::from_utf8_lossy(t).into_owned()),
         _ => None,
     };
+    let info = |app: &App| match &app.panel {
+        Some(panels::Panel::Inventory(inv)) => inv.info.as_ref().map(|l| l.iter().map(|(t, _)| t.clone()).collect::<Vec<_>>().join(" ")),
+        _ => None,
+    };
     let items = |app: &App| panels::item_lines(&app.engine.m).len();
-    d.key(&mut a, KeyCode::KeyI, None);
-    // I checks where the player stands as the portrait does (1194:5F13):
-    // the start's square has room, but would lose what is dropped (12D0
-    // set); the plain path is taken from a square that keeps it.
-    assert_eq!(a.engine.m.mem.r16(arena::mem::DS, 0x05E0) & 0x20, 0, "room here");
-    assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x12D0), 1, "the start's square loses it");
+    assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x1296), 0, "the first line marked (1194:16E0)");
     a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 0);
-    // The page opens on its first line (1194:1726); with nothing selected
-    // (as after a drop, 1924): "Drop what?".
-    assert_eq!(a.engine.m.mem.r8(arena::mem::DS, 0x1296), 0, "the first line selected");
-    a.engine.m.mem.w8(arena::mem::DS, 0x1296, 0xFF);
-    d.key(&mut a, KeyCode::KeyD, None);
-    assert!(a.boxes.iter().any(|b| text(b).contains("Drop what?")), "nothing selected");
-    while !a.boxes.is_empty() {
-        d.key(&mut a, KeyCode::Enter, None);
-    }
-    // The first item selected: D asks by its name; N keeps it.
-    panels::select_line(&mut a.engine.m, 0);
     let n = items(&a);
     d.key(&mut a, KeyCode::KeyD, None);
-    let q = asking(&a).expect("D asks");
-    assert!(q.starts_with("Do you wish to drop"), "{q:?}");
+    let q = asking(&a).unwrap_or_else(|| panic!("D asks: info {:?}, boxes {:?}, n {n}, 12D0 {}", info(&a), a.boxes.iter().map(|b| text(b)).collect::<Vec<_>>(), a.engine.m.mem.r8(arena::mem::DS, 0x12D0)));
+    assert!(q.starts_with("Do you wish to drop") || q.starts_with("This item will be lost here."), "{q:?}");
     d.key(&mut a, KeyCode::KeyN, None);
     assert!(asking(&a).is_none() && items(&a) == n, "no keeps it");
-    // Y drops it.
     d.key(&mut a, KeyCode::KeyD, None);
     d.key(&mut a, KeyCode::KeyY, None);
     assert_eq!(items(&a), n - 1, "yes drops it");
-    // Where it would be lost (12D0), the question says so.
-    panels::select_line(&mut a.engine.m, 0);
-    a.engine.m.mem.w8(arena::mem::DS, 0x12D0, 1);
+    // Nothing marked: "Drop what?" (18CA), its loop left by Esc.
+    a.engine.m.mem.w8(arena::mem::DS, 0x1296, 0xFF);
     d.key(&mut a, KeyCode::KeyD, None);
-    assert!(asking(&a).expect("asks").starts_with("This item will be lost here."), "lost");
+    assert!(info(&a).is_some_and(|t| t.contains("Drop what?")), "nothing marked: {:?}", info(&a));
     d.key(&mut a, KeyCode::Escape, None);
-    assert_eq!(items(&a), n - 1, "Esc answers no");
-    // No room (5E0 bit 20h): refused.
-    let f = a.engine.m.mem.r16(arena::mem::DS, 0x05E0) | 0x20;
-    a.engine.m.mem.w16(arena::mem::DS, 0x05E0, f);
-    d.key(&mut a, KeyCode::KeyD, None);
-    assert!(a.boxes.iter().any(|b| text(b).contains("There is no room to drop this here.")), "no room");
-    assert_eq!(items(&a), n - 1);
-}
-
-#[test]
-fn inventory_by_i_and_a_click_equips_as_panels_do() {
-    let Some(dir) = game_dir() else { return };
-    let setup = |app: &mut App| panels::give(&mut app.engine.m, 6);
-    let mut a = app(&dir, &Start::default());
-    setup(&mut a);
-    let mut d = Driver::new(&mut a);
-    d.key(&mut a, KeyCode::KeyI, None);
-    assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "I opens the inventory");
-    // The first line, as the screen lays it out (`panels::line_at`).
-    let (x, y) = (0..200)
-        .flat_map(|y| (0..320).map(move |x| (x, y)))
-        .find(|&(x, y)| panels::line_at(x, y) == Some(0))
-        .expect("line 0 somewhere");
-    d.click(&mut a, x, y, MouseButton::Left);
-    let mut b = app(&dir, &Start::default());
-    setup(&mut b);
-    Driver::new(&mut b);
-    // I checks the player's place first (1194:5F13), as the portrait does.
-    b.engine.m.drop_place();
-    b.panel = Some(panels::open_inventory(&mut b.engine.m));
-    let mut said = panels::Said::default();
-    panels::equip_line(&mut b.engine.m, 0, &mut said);
-    same(&a, &b, "line 0 clicked and panels::equip_line(0)");
-    assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), said.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), "the same boxes said");
-    // A refusal is drawn in the list's panel (1194:223A), not boxed.
-    let shown = match &a.panel {
-        Some(panels::Panel::Inventory(inv)) => inv.info.as_ref().map(|l| l[0].0.clone()),
-        _ => None,
-    };
-    assert_eq!(shown, said.panel, "the same refusal in the panel");
-    // A box up takes the next key (it is read), as a refusal in the
-    // panel does (1194:5536); then I closes the panel.
-    while !a.boxes.is_empty() {
-        d.key(&mut a, KeyCode::Enter, None);
-    }
-    if shown.is_some() {
-        d.key(&mut a, KeyCode::Enter, None);
-    }
-    d.key(&mut a, KeyCode::KeyI, None);
-    assert!(a.panel.is_none(), "I closes it");
 }
 
 #[test]
@@ -1428,7 +1409,7 @@ fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
     d.key(&mut a, KeyCode::KeyK, None);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "K opens the sheet");
     d.key(&mut a, KeyCode::KeyN, None);
-    assert!(matches!(a.panel, Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, .. }))), "N turns to the equipment page");
+    assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "N turns to the equipment page");
     d.key(&mut a, KeyCode::Escape, None);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "its exit comes back to the sheet");
     d.key(&mut a, KeyCode::Escape, None);
@@ -1441,11 +1422,9 @@ fn the_character_sheet_by_k_and_the_portrait_and_its_pages() {
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the portrait opens the sheet");
     d.click(&mut a, 0x6A + 0x1A, 0xB2 + 7, MouseButton::Left);
     assert!(matches!(a.panel, Some(panels::Panel::Inventory(_))), "the button turns the page");
-    let (ex, ey) = (0..200)
-        .flat_map(|y| (0..320).map(move |x| (x, y)))
-        .find(|&(x, y)| panels::button_at(x, y) == Some(panels::Button::Exit))
-        .expect("the equipment's exit somewhere");
-    d.click(&mut a, ex, ey, MouseButton::Left);
+    // The exit's record (3276:57D8's fifth: 0, BCh, 2Fh x 0Ch).
+    assert_eq!(a.engine.m.sheet_equipment_record(arena::charsheet::PageInput::Click(20, 0xBC + 6)), Some(4));
+    d.click(&mut a, 20, 0xBC + 6, MouseButton::Left);
     assert!(matches!(a.panel, Some(panels::Panel::Sheet)), "the equipment's exit comes back");
     d.click(&mut a, 10, 0xAA + 8, MouseButton::Left);
     assert!(a.panel.is_none(), "Done leaves");

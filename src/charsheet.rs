@@ -430,6 +430,30 @@ impl Machine {
         Some(true)
     }
 
+    /// The list's record (1AC6) taking its key, Space (`key`): no button
+    /// down (AFF9 0), so its left click's path at the cursor's row (8F94),
+    /// as `sheet_equipment_click`.
+    pub fn sheet_equipment_list_typed(&mut self, files: &mut Files, key: u8, wait: &mut PanelWait<'_>) -> Option<bool> {
+        self.equipment_turn(Some(key), 0);
+        if self.mem.r8(DS, 0x1299) != 0 {
+            return crate::giveup::not_ported("1194:1ACD: the list's click with another list up (the page's loop left)");
+        }
+        let y = self.mem.r16(DS, 0x8F94);
+        if !self.equipment_list_click(files, y, wait)? {
+            return Some(false);
+        }
+        self.equipment_turn_end();
+        Some(true)
+    }
+
+    /// A turn of the equipment page's loop whose input (`key` typed, or
+    /// None a click) no record takes (5D3B..5D3D): B7C6 counts all six and
+    /// the loop reads again, the keys flushed.
+    pub fn sheet_equipment_none(&mut self, key: Option<u8>) {
+        self.equipment_turn(key, 6);
+        self.equipment_turn_end();
+    }
+
     /// 1194:1AD6..1BCD, the list's left click with no other list up: the
     /// line marked, and the line marked already clicked again (its item
     /// put on or taken off, a refusal or a quest's line said in the
@@ -770,19 +794,7 @@ impl Machine {
             if let PageInput::Key(k) = input {
                 self.ring_typed(k);
             }
-            // 5D24..5D39: each record in turn, its key (a letter made a
-            // capital, 5D75) or its rectangle (5D8D, edges included); B7C6
-            // counts the records passed over.
-            let hit = (0..5u16).find(|&i| {
-                let r = PAGE_BUTTONS.wrapping_add(0x62 * i);
-                match input {
-                    PageInput::Key(k) => k != 0 && k.to_ascii_uppercase() == self.mem.r8(DATA, r.wrapping_add(0x59)),
-                    PageInput::Click(x, y) => {
-                        let w = |o: u16| self.mem.r16(DATA, r.wrapping_add(o));
-                        x >= w(0) && y >= w(2) && x <= w(0).wrapping_add(w(4)) && y <= w(2).wrapping_add(w(6))
-                    }
-                }
-            });
+            let hit = self.page_record(input, 5);
             let Some(rec) = hit else {
                 self.mem.w16(DS, LOOP_MATCH, 5);
                 continue;
@@ -823,6 +835,34 @@ impl Machine {
         let f = self.mem.r8(DS, LOOP_FLAGS) & !1;
         self.mem.w8(DS, LOOP_FLAGS, f);
         Some(())
+    }
+
+    /// 1194:5D24..5D39 over the first `count` of the equipment page's
+    /// records (3276:57D8): each in turn, its key (a letter made a capital,
+    /// 5D75) or its rectangle (5D8D, edges included); the first that takes
+    /// `input`, or None when none does (B7C6 then counts them all and the
+    /// loop reads again: no state of its own).
+    fn page_record(&self, input: PageInput, count: u16) -> Option<u16> {
+        (0..count).find(|&i| {
+            let r = PAGE_BUTTONS.wrapping_add(0x62 * i);
+            match input {
+                PageInput::Key(k) => k != 0 && k.to_ascii_uppercase() == self.mem.r8(DATA, r.wrapping_add(0x59)),
+                PageInput::Click(x, y) => {
+                    let w = |o: u16| self.mem.r16(DATA, r.wrapping_add(o));
+                    x >= w(0) && y >= w(2) && x <= w(0).wrapping_add(w(4)) && y <= w(2).wrapping_add(w(6))
+                }
+            }
+        })
+    }
+
+    /// The record of the equipment page's own loop (5CF4 over 3276:57D8's
+    /// six) that takes `input`, a key typed or a click: 0 the list (1AC6),
+    /// 1 and 2 the arrows ('+', '-'), 3 Drop (D), 4 the exit (Esc), 5 the
+    /// Spells button (S); None for none. The front end then runs that
+    /// record's handler (`sheet_equipment_click` or `_describe`,
+    /// `_scroll`, `_drop`, `_close`, `_spells`).
+    pub fn sheet_equipment_record(&self, input: PageInput) -> Option<u16> {
+        self.page_record(input, 6)
     }
 
     /// S or the Spells button (3276:57D8's sixth record, 1194:2365), `key`

@@ -27,8 +27,7 @@ use crate::hud::{Font, Screen, Span};
 use crate::interface::Image;
 use arena::machine::Machine;
 use arena::mem::{DATA, DS};
-use arena::use_item::var::{DROP_TEXT, FIRST_LINE, LINES, NOT_OWN, OTHER_LIST, OWN_ITEMS, SELECTED, USABLE_NAMES};
-use arena::use_item::DropButton;
+use arena::use_item::var::{FIRST_LINE, NOT_OWN, OWN_ITEMS, SELECTED, USABLE_NAMES};
 
 /// The list's place and lines (1194:1DE9..1EA6).
 pub const LIST_X: i32 = 0x0E;
@@ -234,11 +233,9 @@ pub enum Panel {
     Use(Vec<String>, usize, usize),
 }
 
-/// The inventory: the use list when it is up (the names, the line
-/// highlighted).
+/// The sheet's equipment page as the window shows it.
 #[derive(Clone, Debug, Default)]
 pub struct Inventory {
-    pub using: Option<(Vec<String>, usize)>,
     /// The drop button's question up (its text, the answer the arrows
     /// marked: 0 yes, none until they move).
     pub asking: Option<(Vec<u8>, usize)>,
@@ -261,9 +258,6 @@ pub struct Inventory {
     /// loop's arrows left it on the drop's copy, the game's untouched
     /// until the drop is done.
     pub drop_first: Option<u8>,
-    /// Opened from the character sheet (1194:0D67 -> 16BD): its exit goes
-    /// back to the sheet.
-    pub from_sheet: bool,
     /// An item's description up over the list's foot (1194:1988): its
     /// lines and their colours, until a click.
     pub info: Option<Vec<(String, u8)>>,
@@ -435,12 +429,6 @@ impl SpellPage {
         crate::hud::custom::menu_entry(&es, y)
     }
 
-    /// 1194:1B3C: the marked spell's page opened.
-    pub fn open(m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
-        let start = m.clone();
-        SpellPage::run(&start, false, files, &[], m)
-    }
-
     /// 1194:1B3C from the sheet's equipment page's list
     /// (`Machine::sheet_spell_page`).
     pub fn open_sheet(m: &mut Machine, files: &mut arena::bsa::Files) -> Option<SpellPage> {
@@ -512,27 +500,61 @@ impl Panel {
     }
 }
 
-/// The equipment screen opened on the player's own items (1194:23C7's
-/// list; from the sheet 16F4 and 171F): the first line selected (1296
-/// 0, 1726) and shown first, no other list.
-pub fn open_inventory(m: &mut Machine) -> Panel {
-    m.mem.w8(DS, OWN_ITEMS, 1);
-    m.mem.w8(DS, OTHER_LIST, 0);
-    m.mem.w16(DS, NOT_OWN, 0);
-    m.mem.w8(DS, SELECTED, 0);
-    m.mem.w8(DS, FIRST_LINE, 0);
-    m.mem.w16(DS, LINES, 0);
+/// The sheet's equipment page ('N') as the window shows it, its exit
+/// back to the sheet; its state the game's (`Machine::sheet_equipment`,
+/// 1194:16E0).
+pub fn equipment_page() -> Panel {
     Panel::Inventory(Inventory::default())
 }
 
-/// The sheet's equipment page ('N'): the equipment screen, its exit
-/// back to the sheet.
-pub fn equipment_page(m: &mut Machine) -> Panel {
-    let mut p = open_inventory(m);
-    if let Panel::Inventory(inv) = &mut p {
-        inv.from_sheet = true;
+/// For scripts: the sheet opened (the portrait: where the player stands
+/// checked, 1194:5F13; `Machine::sheet_open`, `dac` the colours shown,
+/// 6-bit) and turned to its equipment page (N), all in the game's state.
+pub fn script_page(engine: &mut arena::engine::Engine, dac: &[[u8; 3]; 256]) -> Panel {
+    engine.m.drop_place();
+    if engine.m.sheet_open(&mut engine.files, Some(dac)).is_none() || engine.m.sheet_equipment(&mut engine.files, Some(b'n')).is_none() {
+        eprintln!("the equipment page gave up: {}", arena::giveup::describe());
     }
-    p
+    equipment_page()
+}
+
+/// For scripts: the page's list line `row` (on screen) clicked as its
+/// record takes a click (`Machine::sheet_equipment_click`): marked, and
+/// with `again` clicked once more, its item put on or taken off (1AFB).
+/// A line marked already is clicked only the once `again` asks for.
+pub fn script_line(engine: &mut arena::engine::Engine, row: usize, again: bool, said: &mut Said) {
+    // A row within the line: its bottom 3Dh, each next 0Bh lower (1C5E).
+    let y = 0x3D + 0x0B * row as u16 - 4;
+    let slot = engine.m.mem.r8(DS, FIRST_LINE).wrapping_add(row as u8);
+    let clicks = match (engine.m.mem.r8(DS, SELECTED) == slot, again) {
+        (true, true) | (false, false) => 1,
+        (false, true) => 2,
+        (true, false) => 0,
+    };
+    for _ in 0..clicks {
+        let mut wait = |_: &mut Machine, lines: &[(Vec<u8>, u8)], _: u16| {
+            if let Some((t, _)) = lines.first() {
+                said.panel = Some(String::from_utf8_lossy(t).into_owned());
+            }
+        };
+        if engine.m.sheet_equipment_click(&mut engine.files, y, &mut wait).is_none() {
+            eprintln!("the list's click gave up: {}", arena::giveup::describe());
+            return;
+        }
+    }
+}
+
+/// For scripts: the page's Drop button clicked (`Machine::sheet_equipment_drop`),
+/// its question (if it asks) answered `yes` or no, and "Drop what?" left
+/// by its exit's key (Esc).
+pub fn script_drop(engine: &mut arena::engine::Engine, yes: bool, said: &mut Said) {
+    let mut wait = |_: &mut Machine, lines: &[(Vec<u8>, u8)], _: u16| {
+        said.boxes.push(lines.iter().flat_map(|(t, _)| crate::hud::lines(t, 0x0F)).collect());
+    };
+    let r = engine.m.sheet_equipment_drop(&mut engine.files, None, None, &mut |_| if yes { 0 } else { 1 }, &mut wait, &mut |_| arena::charsheet::PageInput::Key(0x1B));
+    if r.is_none() {
+        eprintln!("the drop gave up: {}", arena::giveup::describe());
+    }
 }
 
 /// What the engine says while the inventory or the spellbook acts: the
@@ -668,208 +690,6 @@ fn printf_s(fmt: &[u8], s: &[u8]) -> Vec<u8> {
     out
 }
 
-/// 1194:2365: the Spellbook button (the Equipment button on the spells'
-/// page): for a class with spells (bit 20h) the page turns (OWN_ITEMS
-/// toggled), its first line marked and shown first; for another, its
-/// text (3276:5AD7) said.
-pub fn spells_button(m: &mut Machine, said: &mut Said) {
-    if m.mem.r8(DS, 0x01A9) & 0x20 == 0 {
-        let t = m.mem.cstr(DATA, 0x5AD7).to_vec();
-        said.text(&t);
-        return;
-    }
-    let own = m.mem.r8(DS, OWN_ITEMS) ^ 1;
-    m.mem.w8(DS, OWN_ITEMS, own);
-    m.mem.w8(DS, SELECTED, 0);
-    m.mem.w8(DS, FIRST_LINE, 0);
-}
-
-/// 1194:1C5E: the line a click at row `y` marks (1296), by the row
-/// alone: the first line's ends at 3Dh, each next 0Bh lower, over the
-/// lines shown (the items or the book's spells, at most seven); below
-/// them none (FFh).
-fn mark_at(m: &mut Machine, y: i32, quests: usize) -> u8 {
-    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as usize } else { item_lines(m).len() + quests };
-    let shown = n.min(LIST_LINES);
-    let mark = (0..shown).find(|&i| y <= 0x3D + 0x0B * i as i32).map_or(0xFF, |i| m.mem.r8(DS, FIRST_LINE).wrapping_add(i as u8));
-    m.mem.w8(DS, SELECTED, mark);
-    mark
-}
-
-/// 1194:1988 for a quest's line (1270): "This item is needed to complete
-/// your quest..." (DATA:5AF3), or for the last of `lines` with staff
-/// pieces held (1F56: 1272) "You currently have %d piece(s) of the Staff
-/// of Chaos." (5B36 with F77); three lines, all in FEh (12B2 1).
-fn quest_info(m: &mut Machine, lines: usize) -> Vec<(String, u8)> {
-    let pieces = m.mem.r8(DS, arena::questitems::var::PIECES);
-    let staff = pieces != 0 && m.mem.r8(DS, SELECTED) as usize + 1 == lines;
-    let text = if staff {
-        m.sprintf((DS, 0x1044), (DATA, 0x5B36), &[arena::format::Arg::Int(pieces as u16)]);
-        m.mem.cstr(DS, 0x1044).to_vec()
-    } else {
-        m.mem.cstr(DATA, 0x5AF3).to_vec()
-    };
-    text.split(|&c| c == b'\r').take(3).map(|l| (String::from_utf8_lossy(l).into_owned(), 0xFE)).collect()
-}
-
-/// Whether a click at row `y` (`right`: the right button) opens the
-/// marked spell's page: a left click on the spells' page's line already
-/// marked (1194:1AD6 -> 1B3C).
-pub fn opens_page(m: &Machine, y: i32, right: bool) -> bool {
-    let old = m.mem.r8(DS, SELECTED);
-    let mark = mark_at(&mut m.clone(), y, 0);
-    !right && m.mem.r8(DS, OWN_ITEMS) == 0 && mark != 0xFF && mark == old
-}
-
-/// Inventory line `row` (on screen) put on or taken off, as a left click
-/// on it marked does (for scripts).
-pub fn equip_line(m: &mut Machine, row: usize, said: &mut Said) {
-    let slot = m.mem.r8(DS, FIRST_LINE) as u16 + row as u16;
-    if let Some(l) = item_lines(m).into_iter().find(|l| l.slot == slot) {
-        m.mem.w8(DS, SELECTED, l.slot as u8);
-        if m.equip_click(said, l.slot).is_none() {
-            eprintln!("equipping gave up: {}", arena::giveup::describe());
-        }
-    }
-}
-
-/// Line `row` marked (1296), or none (for scripts).
-pub fn select_line(m: &mut Machine, row: usize) {
-    let slot = m.mem.r8(DS, FIRST_LINE) as u16 + row as u16;
-    let occupied = item_lines(m).iter().any(|l| l.slot == slot);
-    m.mem.w8(DS, SELECTED, if occupied { slot as u8 } else { 0xFF });
-}
-
-/// 1194:1988: the marked item described (`Machine::item_info`, with
-/// 12B0 3 and 12B2 0 first, 9288 FEh), its first [12B0] lines (the CRs
-/// made NULs, 1194:223A): the first in 55h when 12B2 is left 0, else FEh
-/// as the rest. None with no item there, where the description gives
-/// up, or for a special item, whose description is a message box of its
-/// own (7E44, in `said`) and the carry skips the drawing.
-fn item_info(m: &mut Machine, files: &mut arena::bsa::Files, said: &mut Said) -> Option<Vec<(String, u8)>> {
-    use arena::use_item::info;
-    m.mem.w16(DS, info::ARGS, 0);
-    m.mem.w16(DS, info::LINES, 3);
-    m.mem.w8(DS, 0x9288, 0xFE);
-    // The font the list's drawing (1194:1EB8, its lines through 0000:9AE6)
-    // leaves selected: [102E], TEENYFNT, which a special item's box is
-    // drawn in.
-    let teeny = m.mem.r16(DS, 0x102E);
-    m.mem.w16(DS, 0xB036, teeny);
-    let it = arena::inventory::PLAYER_SLOTS + m.mem.r8(DS, SELECTED) as u16 * arena::inventory::SLOT_SIZE;
-    match m.item_info(files, said, it) {
-        None => {
-            eprintln!("the description gave up: {}", arena::giveup::describe());
-            return None;
-        }
-        Some(true) => return None,
-        Some(false) => {}
-    }
-    let first = if m.mem.r16(DS, info::ARGS) == 0 { 0x55 } else { 0xFE };
-    let mut si = info::TEXT;
-    let mut out = Vec::new();
-    for i in 0..m.mem.r16(DS, info::LINES) {
-        let start = si;
-        for _ in 0..500 {
-            let c = m.mem.r8(DS, si);
-            si = si.wrapping_add(1);
-            if c == 0x0D {
-                m.mem.w8(DS, si.wrapping_sub(1), 0);
-                break;
-            }
-        }
-        let text = String::from_utf8_lossy(m.mem.cstr(DS, start)).into_owned();
-        out.push((text, if i == 0 { first } else { 0xFE }));
-    }
-    Some(out)
-}
-
-/// 1194:1AD6: a click on the list (`right`: the right button). The line
-/// under it is marked (`mark_at`); a left click on the line already
-/// marked puts its item on or takes it off (1AFB).
-pub fn line_click(m: &mut Machine, files: &mut arena::bsa::Files, inv: &mut Inventory, y: i32, right: bool, said: &mut Said) {
-    let old = m.mem.r8(DS, SELECTED);
-    // 1C5E: the items (129D) and the quests' lines (126C, as the list
-    // last drew them).
-    let quests = if m.mem.r8(DS, OWN_ITEMS) != 0 { quest_lines(m, files) } else { Vec::new() };
-    let items = item_lines(m).len();
-    let mark = mark_at(m, y, quests.len());
-    // A quest's line (1CBF: the mark past the items, 1270): a right click
-    // describes it (1988), a left click on it marked again can't equip it
-    // (1AFB -> 1BE0).
-    if mark != 0xFF && mark as usize >= items && m.mem.r8(DS, OWN_ITEMS) != 0 {
-        if right {
-            inv.info = Some(quest_info(m, items + quests.len()));
-        } else if mark == old {
-            let t = String::from_utf8_lossy(m.mem.cstr(DATA, CANT_EQUIP)).trim_end_matches('\r').to_string();
-            inv.info = Some(vec![(t, 0xA0)]);
-            inv.info_y = Some(0xA0);
-        }
-        return;
-    }
-    // 1194:1CE5: a right click on the player's own items describes the
-    // line marked.
-    if right && mark != 0xFF && m.mem.r8(DS, OWN_ITEMS) != 0 {
-        inv.info = item_info(m, files, said);
-        inv.info_y = None;
-    }
-    if mark == 0xFF || mark != old || right {
-        return;
-    }
-    // On the spells' page the line marked again shows its spell's page
-    // (1194:1B3C).
-    if m.mem.r8(DS, OWN_ITEMS) == 0 {
-        inv.page = SpellPage::open(m, files);
-        return;
-    }
-    if m.equip_click(said, mark as u16).is_none() {
-        eprintln!("equipping gave up: {}", arena::giveup::describe());
-    }
-    if let Some(t) = said.panel.take() {
-        inv.info = Some(vec![(t, 0xA0)]);
-        inv.info_y = Some(0xA0);
-    }
-}
-
-/// D and the drop button (1194:17D8, `drop_button`): run on a copy
-/// first, so a question it asks ("Do you wish to drop the ...?", or the
-/// item lost where the player stands) is put up and the game left as it
-/// was until it is answered (`drop_answer`); without one it is the
-/// game's. Its refusals are said.
-pub fn drop_press(m: &mut Machine, inv: &mut Inventory, said: &mut Said) {
-    let mut probe = m.clone();
-    let mut asked = None;
-    let r = probe.drop_button(&mut |p| {
-        asked = Some((p.mem.cstr(DS, DROP_TEXT).to_vec(), crate::dialog::menu_at(p, DROP_TEXT, 0x4B60, 0x4B63)));
-        false
-    });
-    match asked {
-        Some((text, menu)) => {
-            inv.asking = Some((text, usize::MAX));
-            inv.asked_menu = Some(Box::new(menu));
-        }
-        None => {
-            *m = probe;
-            drop_said(m, r, said);
-        }
-    }
-}
-
-/// The drop's question answered (`yes`): the button again with that
-/// answer.
-pub fn drop_answer(m: &mut Machine, yes: bool, said: &mut Said) {
-    let r = m.drop_button(&mut |_| yes);
-    drop_said(m, r, said);
-}
-
-fn drop_said(m: &Machine, r: Option<DropButton>, said: &mut Said) {
-    match r {
-        Some(DropButton::NoRoom | DropButton::CantDrop | DropButton::DropWhat) => said.text(m.mem.cstr(DS, DROP_TEXT)),
-        Some(DropButton::Nothing | DropButton::Dropped) => {}
-        None => eprintln!("the drop button gave up: {}", arena::giveup::describe()),
-    }
-}
-
 /// The drop's question as the original's yes-or-no menu (1194:48E9 ->
 /// 020E), entry `sel` highlighted.
 /// The drop's question as it is up (`Inventory::asked_menu`, else
@@ -942,20 +762,6 @@ pub fn use_pick(m: &mut Machine, files: &mut arena::bsa::Files, pick: u16, said:
     }
 }
 
-/// The use list as a menu, entry `sel` highlighted.
-pub fn use_menu(names: &[String], sel: usize) -> crate::hud::Menu {
-    crate::hud::Menu {
-        title: crate::hud::lines(b"Use which item?", 0x0F),
-        entries: names.iter().map(|n| vec![Span { colour: 0x0F, text: n.clone(), font: Default::default(), code: None }]).collect(),
-        keys: Vec::new(),
-        selected: sel,
-        list: false,
-        kind: 0,
-        font: None,
-        top: None,
-    }
-}
-
 /// The spellbook's entry `sel` cast (29CF:071F); a spell with a target
 /// then waits for a click in the view, which aims it.
 pub fn cast(engine: &mut arena::engine::Engine, sel: usize, said: &mut Said) {
@@ -993,81 +799,6 @@ pub fn book_cast_last(engine: &mut arena::engine::Engine, right: bool, said: &mu
         eprintln!("the cast gave up: {}", arena::giveup::describe());
     }
     true
-}
-
-/// The scroll of the list (FIRST_LINE) moved by `d` lines, kept in range.
-pub fn scroll(m: &mut Machine, d: i32) {
-    let n = item_lines(m).last().map_or(0, |l| l.slot as i32 + 1);
-    let first = (m.mem.r8(DS, FIRST_LINE) as i32 + d).clamp(0, (n - LIST_LINES as i32).max(0));
-    m.mem.w8(DS, FIRST_LINE, first as u8);
-}
-
-/// The inventory line under (x, y) on the 320 x 200 screen, within the
-/// list's click record (the first of 1194:2325's five at 3276:57D8: 0Eh,
-/// 32h, 8Eh x 4Dh, to 1194:1AC6),
-/// as the lines are drawn (the click marks by 1C5E's rows, `mark_at`).
-pub fn line_at(x: i32, y: i32) -> Option<usize> {
-    if !(0x0E..0x0E + 0x8E).contains(&x) || !(0x32..0x32 + 0x4D).contains(&y) {
-        return None;
-    }
-    let row = ((y - LIST_Y + 2) / LINE_H) as usize;
-    Some(row.min(LIST_LINES - 1))
-}
-
-/// The list's arrows (their click records after the list's: 8 x 8 at
-/// 0Ch, 80h, key '+', 1194:1A4A; at 95h, 80h, key '-', 1A94): the
-/// lines moved on (+1) or back (-1).
-pub fn arrow_at(x: i32, y: i32) -> Option<i32> {
-    if !(0x80..0x88).contains(&y) {
-        return None;
-    }
-    match x {
-        0x0C..0x14 => Some(1),
-        0x95..0x9D => Some(-1),
-        _ => None,
-    }
-}
-
-/// 1194:1A4A / 1A94: the first line shown one on, while seven or more
-/// lines (the items, or the book's spells) leave lines below; or one
-/// back, unless at the first.
-pub fn arrow(m: &mut Machine, files: &arena::bsa::Files, d: i32) {
-    let first = m.mem.r8(DS, FIRST_LINE);
-    if d < 0 {
-        if first != 0 {
-            m.mem.w8(DS, FIRST_LINE, first - 1);
-        }
-        return;
-    }
-    // 1A4A: the items (129D) and the quests' lines (126C), or the book's.
-    let n = if m.mem.r8(DS, OWN_ITEMS) == 0 { m.mem.r8(DS, BOOK_COUNT) as u16 } else { (item_lines(m).len() + quest_lines(m, files).len()) as u16 };
-    if n >= 7 && first as u16 != n - 7 {
-        m.mem.w8(DS, FIRST_LINE, first.wrapping_add(1));
-    }
-}
-
-/// The equipment screen's buttons along its bottom.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Button {
-    Exit,
-    Spellbook,
-    Drop,
-}
-
-/// The button under (x, y): as EQUIP.IMG shows them along rows 189..199
-/// (the spellbook's where EQUIPB.IMG, 41 x 9 at 64, 190, covers it while
-/// another list is up); their exact spans in the original's click table
-/// weren't traced.
-pub fn button_at(x: i32, y: i32) -> Option<Button> {
-    if !(188..200).contains(&y) {
-        return None;
-    }
-    match x {
-        0..=45 => Some(Button::Exit),
-        60..=110 => Some(Button::Spellbook),
-        120..=170 => Some(Button::Drop),
-        _ => None,
-    }
 }
 
 /// The panel drawn over the layer (`pics`: EQUIP.IMG).
@@ -1180,10 +911,6 @@ pub fn draw(screen: &mut Screen, font: &Font, equip: Option<&Image>, doll: &[Ima
                 for (i, (t, c)) in lines.iter().enumerate() {
                     screen.text_plain(f, 0x55 - (f.width(t) as i32 >> 1), y0 + 0x0B * i as i32, t, *c);
                 }
-            }
-            if let Some((names, sel)) = &inv.using {
-                let hud = crate::hud::Hud { menu: Some(use_menu(names, *sel)), ..Default::default() };
-                crate::hud::compose_over(screen, font, &hud);
             }
             if let Some(menu) = drop_question(inv) {
                 // 3159:0F2A's boxes in the sheet's tiles and font; the

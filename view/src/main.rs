@@ -1848,6 +1848,7 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         slot,
         panel: None,
         sheet_run: None,
+        page_after_sheet: false,
         log_run: None,
         ring_kept: false,
         ring_box_kept: false,
@@ -2506,8 +2507,9 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             // The inventory (I) and the spellbook (C), up until `close`;
             // their actions as the window's keys and clicks make them.
             "inv" => {
-                engine.m.drop_place();
-                st.panel = Some(panels::open_inventory(&mut engine.m));
+                sheets::pics(&st.assets.archive, &engine.m);
+                let dac = st.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+                st.panel = Some(panels::script_page(&mut engine, &dac));
             }
             "spells" => st.panel = Some(panels::Panel::Spellbook(Default::default())),
             "close" => st.panel = None,
@@ -2575,17 +2577,11 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "equip" | "select" | "drop" | "use" | "spell" => {
                 let mut said = panels::Said::default();
                 match what {
-                    "equip" => panels::equip_line(&mut engine.m, n as usize, &mut said),
-                    "select" => panels::select_line(&mut engine.m, n as usize),
+                    "equip" => panels::script_line(&mut engine, n as usize, true, &mut said),
+                    "select" => panels::script_line(&mut engine, n as usize, false, &mut said),
                     // The drop button, its question (if it asks) answered
                     // yes, or no with drop:1.
-                    "drop" => {
-                        let mut inv = panels::Inventory::default();
-                        panels::drop_press(&mut engine.m, &mut inv, &mut said);
-                        if inv.asking.is_some() {
-                            panels::drop_answer(&mut engine.m, n == 0, &mut said);
-                        }
-                    }
+                    "drop" => panels::script_drop(&mut engine, n == 0, &mut said),
                     "use" => panels::use_pick(&mut engine.m, &mut engine.files, n as u16, &mut said),
                     _ => {
                         st.panel = None;
@@ -2596,13 +2592,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     st.boxes = said.boxes;
                 }
             }
-            "usable" => {
-                if let Some(panels::Panel::Inventory(inv)) = st.panel.as_mut() {
-                    let names = panels::usable_names(&engine.m);
-                    println!("usable: {names:?}");
-                    inv.using = (!names.is_empty()).then_some((names, 0));
-                }
-            }
+            "usable" => println!("usable: {:?}", panels::usable_names(&engine.m)),
             "book" => {
                 for (i, sp) in panels::spells(&engine.m).iter().enumerate() {
                     println!("spell {i}: {} ({}), cost {}", sp.name, sp.index, sp.cost);
@@ -2628,9 +2618,18 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             "sheet" => {
                 sheets::pics(&st.assets.archive, &engine.m);
                 engine.m.drop_place();
+                let dac = st.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+                if engine.m.sheet_open(&mut engine.files, Some(&dac)).is_none() {
+                    eprintln!("the character sheet gave up: {}", arena::giveup::describe());
+                }
                 st.panel = Some(panels::Panel::Sheet);
             }
-            "page" => st.panel = Some(panels::equipment_page(&mut engine.m)),
+            "page" => {
+                if engine.m.sheet_equipment(&mut engine.files, Some(b'n')).is_none() {
+                    eprintln!("the equipment page gave up: {}", arena::giveup::describe());
+                }
+                st.panel = Some(panels::equipment_page());
+            }
             "log" => {
                 sheets::pics(&st.assets.archive, &engine.m);
                 st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files)));
@@ -3247,6 +3246,9 @@ struct App {
     /// The character sheet's run up (`Machine::sheet_open`): B7C4 as it
     /// found it, for `sheet_close`.
     sheet_run: Option<u8>,
+    /// The view's I pressed: the sheet's equipment page wanted once the
+    /// sheet its portrait click opens is up (`inventory_key`).
+    page_after_sheet: bool,
     /// The logbook's run up (`Machine::log_open`), for its loop's turns
     /// and `log_close`.
     log_run: Option<arena::logbook::LogRun>,
@@ -4190,26 +4192,14 @@ impl App {
         }
     }
 
-    /// I and C: the inventory or the spellbook up, or down.
-    fn toggle_panel(&mut self, inventory: bool) {
-        let open = match &self.panel {
-            Some(panels::Panel::Inventory(_)) => inventory,
-            Some(panels::Panel::Spellbook(_)) => !inventory,
-            Some(_) | None => false,
-        };
-        if open {
-            self.panel = None;
-            return;
-        }
-        // The inventory as the sheet's page would show it: where the
-        // player stands checked first, as the portrait does (1194:5F13).
-        if inventory {
-            self.engine.m.drop_place();
-        }
-        self.panel = Some(if inventory { panels::open_inventory(&mut self.engine.m) } else { panels::Panel::Spellbook(Default::default()) });
-        self.bar_list_capture();
-        if self.captured {
-            self.release();
+    /// The view's I: the original's own inputs for the equipment page, the
+    /// bar's portrait clicked (as K) and N typed once the sheet is up.
+    fn inventory_key(&mut self) {
+        let (x, y) = sheets::bar_centre(8);
+        // (Set first: the frame the click runs may open the sheet at once.)
+        self.page_after_sheet = true;
+        if !self.bar(x, y, false) || !matches!(self.panel, None | Some(panels::Panel::Sheet)) {
+            self.page_after_sheet = false;
         }
     }
 
@@ -4247,8 +4237,8 @@ impl App {
         let mut page = false;
         let mut back: Option<Option<u8>> = None;
         let mut sheet_drop = None;
-        let mut sheet_spells = false;
         let mut log_poll = false;
+        let mut page_key = None;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page waits for clicks (51D1's 8FC4 loop); its
@@ -4286,20 +4276,7 @@ impl App {
                     inv.info_y = None;
                     return;
                 }
-                if let Some((names, sel)) = inv.using.as_mut() {
-                    let n = names.len().max(1);
-                    match code {
-                        KeyCode::ArrowUp => *sel = (*sel + n - 1) % n,
-                        KeyCode::ArrowDown => *sel = (*sel + 1) % n,
-                        KeyCode::Enter | KeyCode::NumpadEnter => {
-                            let pick = *sel as u16;
-                            inv.using = None;
-                            panels::use_pick(m, &mut self.engine.files, pick, &mut said);
-                        }
-                        KeyCode::Escape => inv.using = None,
-                        _ => {}
-                    }
-                } else if let Some((_, sel)) = inv.asking.as_mut() {
+                if let Some((_, sel)) = inv.asking.as_mut() {
                     // The drop's yes or no (020E: its keys Y and N, Esc no).
                     let answer = match code {
                         // (No entry marked till the arrows move one.)
@@ -4315,48 +4292,30 @@ impl App {
                     if let Some(yes) = answer {
                         inv.asking = None;
                         inv.asked_menu = None;
-                        if inv.from_sheet && self.sheet_run.is_some() {
-                            let typed = match code {
-                                KeyCode::KeyY => Some(b'y'),
-                                KeyCode::KeyN => Some(b'n'),
-                                KeyCode::Escape => Some(0x1B),
-                                KeyCode::Enter | KeyCode::NumpadEnter => Some(0x0D),
-                                _ => None,
-                            };
-                            sheet_drop = Some((Some(b'd'), Some((yes, typed))));
-                        } else {
-                            panels::drop_answer(m, yes, &mut said);
-                        }
+                        let typed = match code {
+                            KeyCode::KeyY => Some(b'y'),
+                            KeyCode::KeyN => Some(b'n'),
+                            KeyCode::Escape => Some(0x1B),
+                            KeyCode::Enter | KeyCode::NumpadEnter => Some(0x0D),
+                            _ => None,
+                        };
+                        sheet_drop = Some((Some(b'd'), Some((yes, typed))));
                     }
-                } else if inv.from_sheet && self.sheet_run.is_some() && code == KeyCode::KeyD {
-                    // The drop button's key (3276:57D8's fourth record).
-                    sheet_drop = Some((Some(b'd'), None));
-                } else if inv.from_sheet && self.sheet_run.is_some() && code == KeyCode::KeyS {
-                    // The Spells button's key (3276:57D8's sixth record).
-                    sheet_spells = true;
-                } else if inv.from_sheet && self.sheet_run.is_some() && matches!(code, KeyCode::NumpadAdd | KeyCode::Equal | KeyCode::Minus | KeyCode::NumpadSubtract) {
-                    // The arrows' keys, '+' and '-' (3276:57D8's second and
-                    // third records): the game's state's own handlers.
-                    let on = matches!(code, KeyCode::NumpadAdd | KeyCode::Equal);
-                    let e = &mut self.engine;
-                    if e.m.sheet_equipment_scroll(&mut e.files, Some(if on { b'+' } else { b'-' }), on).is_none() {
-                        eprintln!("the list's arrow gave up: {}", arena::giveup::describe());
-                    }
+                } else if code == KeyCode::KeyI {
+                    // The view's I: the page left as its Exit clicked.
+                    back = Some(None);
                 } else {
-                    match code {
-                        KeyCode::Escape | KeyCode::KeyI if inv.from_sheet => back = Some((code == KeyCode::Escape).then_some(0x1B)),
-                        KeyCode::Escape | KeyCode::KeyI => self.panel = None,
-                        KeyCode::ArrowUp => panels::scroll(m, -1),
-                        KeyCode::ArrowDown => panels::scroll(m, 1),
-                        KeyCode::KeyD => panels::drop_press(m, inv, &mut said),
-                        KeyCode::KeyU => {
-                            let names = panels::usable_names(m);
-                            if !names.is_empty() {
-                                inv.using = Some((names, 0));
-                            }
-                        }
-                        _ => {}
-                    }
+                    // The page's own loop (5CF4 over 3276:57D8): the key
+                    // typed goes to the record that takes it.
+                    page_key = match code {
+                        KeyCode::NumpadAdd | KeyCode::Equal => Some(b'+'),
+                        KeyCode::Minus | KeyCode::NumpadSubtract => Some(b'-'),
+                        KeyCode::Escape => Some(0x1B),
+                        KeyCode::Space => Some(b' '),
+                        KeyCode::KeyD => Some(b'd'),
+                        KeyCode::KeyS => Some(b's'),
+                        _ => text.and_then(|t| t.bytes().next()).filter(u8::is_ascii),
+                    };
                 }
             }
             Some(p @ panels::Panel::Spellbook(_)) => {
@@ -4416,14 +4375,14 @@ impl App {
         if page {
             self.equipment_page(Some(b'n'));
         }
-        if sheet_spells {
-            self.sheet_spells(Some(b's'));
-        }
         if let Some((key, answer)) = sheet_drop {
             self.sheet_drop_asked(key, answer);
         }
         if let Some(key) = back {
             self.equipment_back(key);
+        }
+        if let Some(c) = page_key {
+            self.page_input(arena::charsheet::PageInput::Key(c), false, &mut said);
         }
         if let Some(line) = cast {
             self.panel = None;
@@ -4438,15 +4397,11 @@ impl App {
     /// to it (`Machine::sheet_equipment`); its colours set again (9B56).
     fn equipment_page(&mut self, key: Option<u8>) {
         self.fade_open(0, 0, |a| {
-            if a.sheet_run.is_none() {
-                a.panel = Some(panels::equipment_page(&mut a.engine.m));
-                return;
-            }
             let e = &mut a.engine;
             if e.m.sheet_equipment(&mut e.files, key).is_none() {
                 eprintln!("the equipment page gave up: {}", arena::giveup::describe());
             }
-            a.panel = Some(panels::Panel::Inventory(panels::Inventory { from_sheet: true, ..Default::default() }));
+            a.panel = Some(panels::equipment_page());
         });
     }
 
@@ -4740,10 +4695,9 @@ impl App {
             }
         }
         let mut cast = None;
-        let mut back = false;
         let mut sheet_drop = None;
-        let mut sheet_spells = false;
         let mut log_poll = false;
+        let mut page_click = false;
         match self.panel.as_mut() {
             Some(panels::Panel::Inventory(inv)) => {
                 // A spell's page up (1194:51D1): the click its question
@@ -4774,15 +4728,7 @@ impl App {
                     inv.info_y = None;
                     return;
                 }
-                if let Some((names, _)) = &inv.using {
-                    let menu = panels::use_menu(names, 0);
-                    let (ex, ey, lh, ew) = hud::menu_layout(&self.font, &menu);
-                    let i = ((y - ey) / lh.max(1)) as usize;
-                    if x >= ex - 3 && x < ex + ew + 3 && y >= ey && i < names.len() {
-                        inv.using = None;
-                        panels::use_pick(&mut self.engine.m, &mut self.engine.files, i as u16, &mut said);
-                    }
-                } else if let Some(menu) = panels::drop_question(inv) {
+                if let Some(menu) = panels::drop_question(inv) {
                     // The drop's yes or no (020E): the entry by the click's
                     // y as its boxes are laid out (`menu_pick`); the right
                     // button leaves it, as Esc.
@@ -4790,82 +4736,12 @@ impl App {
                     if let Some((i, typed)) = pick {
                         inv.asking = None;
                         inv.asked_menu = None;
-                        if inv.from_sheet && self.sheet_run.is_some() {
-                            sheet_drop = Some((None, Some((i == 0, typed))));
-                        } else {
-                            panels::drop_answer(&mut self.engine.m, i == 0, &mut said);
-                        }
+                        sheet_drop = Some((None, Some((i == 0, typed))));
                     }
-                } else if let Some(b) = panels::button_at(x, y) {
-                    match b {
-                        panels::Button::Exit if inv.from_sheet => back = true,
-                        panels::Button::Exit => self.panel = None,
-                        panels::Button::Spellbook if inv.from_sheet && self.sheet_run.is_some() => sheet_spells = true,
-                        panels::Button::Spellbook => {
-                            inv.bare = false;
-                            panels::spells_button(&mut self.engine.m, &mut said)
-                        }
-                        panels::Button::Drop if inv.from_sheet && self.sheet_run.is_some() => sheet_drop = Some((None, None)),
-                        panels::Button::Drop => panels::drop_press(&mut self.engine.m, inv, &mut said),
-                    }
-                } else if let Some(d) = panels::arrow_at(x, y).filter(|_| inv.from_sheet && self.sheet_run.is_some()) {
-                    // The sheet's own page: its arrows' records' handlers.
-                    let e = &mut self.engine;
-                    if e.m.sheet_equipment_scroll(&mut e.files, None, d > 0).is_none() {
-                        eprintln!("the list's arrow gave up: {}", arena::giveup::describe());
-                    }
-                } else if let Some(d) = panels::arrow_at(x, y) {
-                    panels::arrow(&mut self.engine.m, &self.engine.files, d);
-                } else if panels::line_at(x, y).is_some() && inv.from_sheet && self.sheet_run.is_some() {
-                    // The sheet's own page: the list's record's handler
-                    // (1194:1AC6); a right click describes the line it
-                    // marks (1988). What the list's panel shows (223A)
-                    // waits there for a click or a key (5536). A spell's
-                    // line marked already opens its page (1B3C), which
-                    // waits for clicks of its own (51D1).
-                    let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
-                    let mut wait = |_: &mut arena::machine::Machine, lines: &[(Vec<u8>, u8)], top: u16| {
-                        shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
-                    };
-                    let e = &mut self.engine;
-                    let done = if right {
-                        e.m.sheet_equipment_describe(&mut e.files, &mut said, y as u16, &mut wait)
-                    } else {
-                        e.m.sheet_equipment_click(&mut e.files, y as u16, &mut wait)
-                    };
-                    match done {
-                        None => eprintln!("the list's click gave up: {}", arena::giveup::describe()),
-                        Some(false) => {
-                            // The spell's page sets its colours (68D7).
-                            self.fade_open(0, 1, move |s| {
-                                if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
-                                    inv.page = panels::SpellPage::open_sheet(&mut s.engine.m, &mut s.engine.files);
-                                }
-                            });
-                            return;
-                        }
-                        Some(true) => {}
-                    }
-                    if let Some((lines, top)) = shown {
-                        inv.info = Some(lines);
-                        inv.info_y = Some(top as i32);
-                    } else if let Some(t) = said.panel.take() {
-                        // A refusal's text (1BE0, 1B78) in the list's panel.
-                        inv.info = Some(vec![(t, 0xA0)]);
-                        inv.info_y = Some(0xA0);
-                    }
-                } else if panels::line_at(x, y).is_some() {
-                    if panels::opens_page(&self.engine.m, y, right) {
-                        // The spell's page sets its colours (68D7).
-                        self.fade_open(0, 1, move |s| {
-                            let mut said = panels::Said::default();
-                            if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
-                                panels::line_click(&mut s.engine.m, &mut s.engine.files, inv, y, right, &mut said);
-                            }
-                        });
-                        return;
-                    }
-                    panels::line_click(&mut self.engine.m, &mut self.engine.files, inv, y, right, &mut said);
+                } else {
+                    // The page's own loop (5CF4 over 3276:57D8): the click
+                    // goes to the record whose rectangle takes it.
+                    page_click = true;
                 }
             }
             // A line of the list in the bar's corner clicked (2542:06F8):
@@ -4909,14 +4785,11 @@ impl App {
         if log_poll {
             self.log_turn(if right { 2 } else { 1 });
         }
-        if sheet_spells {
-            self.sheet_spells(None);
-        }
         if let Some((key, answer)) = sheet_drop {
             self.sheet_drop_asked(key, answer);
         }
-        if back {
-            self.equipment_back(None);
+        if page_click {
+            self.page_input(arena::charsheet::PageInput::Click(x as u16, y as u16), right, &mut said);
         }
         if let Some(line) = cast {
             self.panel = None;
@@ -4924,6 +4797,73 @@ impl App {
         }
         self.engine.m.list_reads = None;
         self.boxes.extend(said.boxes);
+    }
+
+    /// The equipment page's own loop (5CF4 over 3276:57D8) given a key
+    /// typed or a click (`right`: the right button, AFF9 2): the record
+    /// that takes it (`Machine::sheet_equipment_record`) runs its handler.
+    /// The list's (1AC6: a line marked, put on or taken off; a right
+    /// click's description, 1988) shows what it says in the list's panel
+    /// (223A), which waits for a click or a key (5536); a spell's line
+    /// marked already opens its page (1B3C), which waits for clicks of
+    /// its own (51D1). No record: the turn reads again.
+    fn page_input(&mut self, input: arena::charsheet::PageInput, right: bool, said: &mut panels::Said) {
+        use arena::charsheet::PageInput;
+        if self.sheet_run.is_none() {
+            return;
+        }
+        let key = match input {
+            PageInput::Key(k) => Some(k),
+            PageInput::Click(..) => None,
+        };
+        match self.engine.m.sheet_equipment_record(input) {
+            Some(0) => {
+                let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
+                let mut wait = |_: &mut arena::machine::Machine, lines: &[(Vec<u8>, u8)], top: u16| {
+                    shown = Some((lines.iter().map(|(t, c)| (String::from_utf8_lossy(t).into_owned(), *c)).collect(), top));
+                };
+                let e = &mut self.engine;
+                let done = match input {
+                    PageInput::Key(k) => e.m.sheet_equipment_list_typed(&mut e.files, k, &mut wait),
+                    PageInput::Click(_, y) if right => e.m.sheet_equipment_describe(&mut e.files, said, y, &mut wait),
+                    PageInput::Click(_, y) => e.m.sheet_equipment_click(&mut e.files, y, &mut wait),
+                };
+                match done {
+                    None => eprintln!("the list's click gave up: {}", arena::giveup::describe()),
+                    Some(false) => {
+                        // The spell's page sets its colours (68D7).
+                        self.fade_open(0, 1, move |s| {
+                            if let Some(panels::Panel::Inventory(inv)) = s.panel.as_mut() {
+                                inv.page = panels::SpellPage::open_sheet(&mut s.engine.m, &mut s.engine.files);
+                            }
+                        });
+                        return;
+                    }
+                    Some(true) => {}
+                }
+                let panel = said.panel.take();
+                if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
+                    if let Some((lines, top)) = shown {
+                        inv.info = Some(lines);
+                        inv.info_y = Some(top as i32);
+                    } else if let Some(t) = panel {
+                        // A refusal's text (1BE0, 1B78) in the list's panel.
+                        inv.info = Some(vec![(t, 0xA0)]);
+                        inv.info_y = Some(0xA0);
+                    }
+                }
+            }
+            Some(r @ (1 | 2)) => {
+                let e = &mut self.engine;
+                if e.m.sheet_equipment_scroll(&mut e.files, key, r == 1).is_none() {
+                    eprintln!("the list's arrow gave up: {}", arena::giveup::describe());
+                }
+            }
+            Some(3) => self.sheet_drop_asked(key, None),
+            Some(4) => self.equipment_back(key),
+            Some(5) => self.sheet_spells(key),
+            _ => self.engine.m.sheet_equipment_none(key),
+        }
     }
 
     /// A click on the interface bar: on a button (2542:06CE's table), the
@@ -5029,7 +4969,11 @@ impl App {
             // 1194:0CF8: the screen faded out in 8 steps first.
             sheets::BarAction::Sheet => self.fade_open(8, 0, |a| {
                 a.sheet_begin();
-                a.panel = Some(panels::Panel::Sheet)
+                a.panel = Some(panels::Panel::Sheet);
+                // The view's I: N typed on the sheet.
+                if std::mem::take(&mut a.page_after_sheet) {
+                    a.equipment_page(Some(b'n'));
+                }
             }),
         }
     }
@@ -5970,7 +5914,7 @@ impl App {
                     KeyCode::KeyF if down && k.run => world::summon_people(&mut self.engine),
                     KeyCode::KeyF if down => world::summon(&mut self.engine),
                     KeyCode::KeyE if down => self.click = true,
-                    KeyCode::KeyI if down => self.toggle_panel(true),
+                    KeyCode::KeyI if down => self.inventory_key(),
                     // The view's quick save and load of slot --slot (the
                     // game's menus are the options screen's Save and
                     // Load); Alt+F5 is the game's debug key.
