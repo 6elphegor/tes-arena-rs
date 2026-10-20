@@ -81,14 +81,14 @@ fn at_first_question(dir: &Path) -> (Engine, create::Creation) {
     // The intro's movie skipped and the rest of it left (Esc at the
     // title): the main menu.
     for inp in create::parse_script("enter,esc") {
-        c.input(&mut engine, inp);
+        c.script_input(&mut engine, inp);
     }
     engine.m.mem.w32(arena::mem::DS, arena::random::SEED, SEED);
     engine.m.load_rng();
     // Start, the opening story passed (Esc ends its movie, then the
     // story at its first picture).
     for inp in create::parse_script("S,esc,esc") {
-        c.input(&mut engine, inp);
+        c.script_input(&mut engine, inp);
     }
     c.settle(&mut engine.m);
     // Creation from 1194:24A6 on the game as it is, as the generator runs
@@ -140,7 +140,7 @@ fn creation_draws_as_the_original() {
                 wrong.push(format!("{name}{}{}", if page_ok { "" } else { " pixels" }, if pal_ok { "" } else { " colours" }));
             }
             if let Some(&inp) = inputs.get(at) {
-                c.input(&mut engine, inp);
+                c.script_input(&mut engine, inp);
                 c.settle(&mut engine.m);
             }
         }
@@ -212,7 +212,7 @@ fn creation_animates_as_the_original() {
             }
             before = Some(now.clone());
             if let Some(&inp) = inputs.get(at) {
-                c.input(&mut engine, inp);
+                c.script_input(&mut engine, inp);
                 states = c.film_frames().into_iter().map(|(f, dac)| (f.into_iter().map(u16::from).collect(), dac)).collect();
                 c.settle(&mut engine.m);
             }
@@ -312,7 +312,7 @@ fn the_intro_plays_as_the_original() {
         if story {
             // The menu (the intro passed), then Start.
             for inp in create::parse_script("enter,esc") {
-                c.input(&mut engine, inp);
+                c.script_input(&mut engine, inp);
             }
             c.settle(&mut engine.m);
             c.input(&mut engine, create::Input::Char(b'S'));
@@ -420,7 +420,7 @@ fn the_menus_load_and_exit_fade_as_the_original() {
         hud::init_style(&archive, &engine.m);
         let mut c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
         for inp in create::parse_script("enter,esc") {
-            c.input(&mut engine, inp);
+            c.script_input(&mut engine, inp);
         }
         c.settle(&mut engine.m);
         c.input(&mut engine, create::Input::Char(key));

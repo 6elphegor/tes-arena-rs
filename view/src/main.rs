@@ -1670,7 +1670,7 @@ fn main() {
             let archive = Rc::new(archive::Archive::open(&dir));
             let mut c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
             for inp in create::parse_script(script) {
-                c.input(&mut engine, inp);
+                c.script_input(&mut engine, inp);
             }
             if c.done() {
                 newgame::play(&mut engine);
@@ -2424,7 +2424,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     Some(ms) => c.advance(&mut e.m, ms.parse().expect("--do ui:ms:N")),
                     None => {
                         for inp in create::parse_script(t) {
-                            c.input(e, inp);
+                            c.script_input(e, inp);
                         }
                     }
                 }
@@ -3346,6 +3346,17 @@ impl App {
 
     /// A key or click for creation; at its end the game started, in the
     /// start dungeon, its assets made again.
+    /// For tests: creation's change passed and a key left in the buffer
+    /// taken (`Creation::settle`), as a script's keys come one a screen.
+    #[cfg(test)]
+    fn creation_settle(&mut self) {
+        let Some(c) = &mut self.creation else { return };
+        match &mut self.creation_engine {
+            Some(e) => c.settle(&mut e.m),
+            None => c.settle(&mut self.engine.m),
+        }
+    }
+
     fn creation_input(&mut self, inp: create::Input) {
         let Some(c) = &mut self.creation else { return };
         match &mut self.creation_engine {

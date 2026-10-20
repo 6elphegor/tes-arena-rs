@@ -84,6 +84,11 @@ CASES = [
     ('titlefade', 0x10C9, [(0x0D, 's110', 1)]),
     ('quotefadeesc', 0x10C9, [(0x1B, 's170', 2000)]),
     ('quotefadetap', 0x10C9, [(0x1B, 's170', 1)]),
+    # Two keys in one fade, both in the buffer till the wait after it ends
+    # at once and its flush takes them: two Enters in TITLE.IMG's; Enter,
+    # then Esc held, in QUOTE.IMG's.
+    ('titlefadetwo', 0x10C9, [(0x0D, 's110', 1), (0x0D, 's116', 1)]),
+    ('quotefadekeyesc', 0x10C9, [(0x0D, 's164', 1), (0x1B, 's172', 2000)]),
     # A key in the second picture's wait, Esc held in the fourth's.
     ('storykeys', 0x1323, [(0x0D, 500, 1), (0x1B, 1300, 2000)]),
     # The menu's Start on into creation (0000:1130 near: the story, then

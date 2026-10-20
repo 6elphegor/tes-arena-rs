@@ -930,6 +930,12 @@ fn creation_by_keys_and_clicks_as_by_script() {
     let script = "enter,esc,S,esc,esc,S,right,esc,click:94:62,click:94:62,type:Ria,enter,F";
     let typing = |app: &App| app.creation.as_ref().is_some_and(|c| c.typing());
     for (i, inp) in create::parse_script(script).into_iter().enumerate() {
+        // (Each key once the change before it has played, as a player's:
+        // a key within the same change joins the one in the buffer.)
+        while a.creation.as_ref().is_some_and(|c| c.busy()) {
+            d.wait(&mut a, 5);
+        }
+        b.creation_settle();
         match inp {
             create::Input::Enter => d.key(&mut a, KeyCode::Enter, None),
             // (Held, as the twin's: `Creation` takes an Esc never let go.)
@@ -1963,10 +1969,24 @@ fn saved_by_the_menu_then_loaded_from_the_title() {
     let c = create::Creation::new(&mut engine, archive, &dir, world::palette(&dir));
     let mut b = make_app(dir.clone(), engine, arena::transit::Run::Start, Some(c), Default::default(), Some(scratch.to_path_buf()), 0, false);
     let mut d = Driver::new(&mut b);
+    // (Each key once the change before it has played: keys within one
+    // change are one in the buffer.)
+    while b.creation.as_ref().is_some_and(|c| c.busy()) {
+        d.wait(&mut b, 5);
+    }
     d.key(&mut b, KeyCode::Enter, None);
     // (The intro's movie skipped, the rest of it left: Esc held at the
-    // title.)
+    // title; L once the menu is up.)
+    while b.creation.as_ref().is_some_and(|c| c.busy()) {
+        d.wait(&mut b, 5);
+    }
     d.hold(&mut b, KeyCode::Escape);
+    for _ in 0..4000 {
+        if b.creation.as_ref().is_some_and(|c| !c.busy() && c.phase().0 == 5) {
+            break;
+        }
+        d.wait(&mut b, 5);
+    }
     d.key(&mut b, KeyCode::KeyL, Some("L"));
     // (The menu faded to black first, 111A's 55B2.)
     d.wait(&mut b, 500);
@@ -2011,6 +2031,9 @@ fn a_death_then_the_menus_load() {
     assert_eq!(a.title_engine.as_ref().unwrap().m.mem.r8(DS, arena::title::var::SCROLL_DIGIT), b'4', "the intro's scrolls counted (4DCB)");
     d.key(&mut a, KeyCode::Enter, None);
     d.hold(&mut a, KeyCode::Escape);
+    while a.creation.as_ref().is_some_and(|c| c.busy()) {
+        d.wait(&mut a, 5);
+    }
     d.key(&mut a, KeyCode::KeyL, Some("L"));
     // (The menu faded to black first, 111A's 55B2.)
     d.wait(&mut a, 500);
