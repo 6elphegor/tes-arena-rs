@@ -907,7 +907,14 @@ impl Creation {
             self.esc_held = true;
         }
         if !self.film.is_empty() {
-            self.pending = Some(inp);
+            // The keys typed while a change plays wait in the keyboard's
+            // buffer together (ACB0 counts them): the poll after it is
+            // ended by them at once and its flush (7112) takes them all,
+            // so a second is no key of its own. Esc among them is what is
+            // tested after, as held (12CD's ACB6), so it is the one kept.
+            if self.pending.is_none() || inp == Input::Esc {
+                self.pending = Some(inp);
+            }
             return;
         }
         self.take_key(m, inp);
@@ -1239,12 +1246,14 @@ impl Creation {
                 return;
             }
         }
-        // (A key on one already left: that one taken first, its change
-        // passed, as scripts give their keys one a screen.)
-        if self.pending.is_some() {
+        let intro = matches!(self.stage, Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::Story { .. });
+        // (A key on one already left, past the intro's changes: that one
+        // taken first, its change passed. In the intro a key typed within
+        // the same change joins the one in the buffer, `intro_key`.)
+        if self.pending.is_some() && !(intro && self.boxes.is_empty()) {
             self.settle(&mut engine.m);
         }
-        if self.boxes.is_empty() && matches!(self.stage, Stage::Intro | Stage::Title(_) | Stage::Quote(_) | Stage::Story { .. }) {
+        if self.boxes.is_empty() && intro {
             return self.intro_key(&mut engine.m, inp);
         }
         if self.boxes.is_empty() && matches!(self.stage, Stage::MainMenu) {
@@ -1420,6 +1429,23 @@ impl Creation {
         let mut s = Screen::new(self.pics.game);
         self.draw_page_with(&mut s, m, ui);
         (s.indices().iter().map(|&i| i as u8).collect(), *s.palette())
+    }
+
+    /// A change playing, or a key waiting in the buffer for the poll after
+    /// it: a key typed now joins that one (`intro_key`).
+    #[cfg(test)]
+    pub fn busy(&self) -> bool {
+        !self.film.is_empty() || self.pending.is_some()
+    }
+
+    /// A script's input (`--create`, `--do ui:`, the tests'), its keys
+    /// one a screen: a key left in the buffer taken first and its change
+    /// passed (`settle`), so the next isn't typed within the same change.
+    pub fn script_input(&mut self, engine: &mut Engine, inp: Input) {
+        if self.pending.is_some() {
+            self.settle(&mut engine.m);
+        }
+        self.input(engine, inp);
     }
 
     /// The change playing passed: the screen as it settles, a key left
