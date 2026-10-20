@@ -1069,7 +1069,7 @@ def killed(a):
     a.call_far(0x2686, 0x02B4)
 
 
-def died(a, vision=None, driver=False):
+def died(a, vision=None, driver=False, waited=False):
     """From the world loop's end (0000:A45D, on the world's stack as
     `area_ended` goes on from it) through the outer loop (0CAD) to its
     death's way out (0CE1..0D43: the clip the screen, the ending's text
@@ -1082,13 +1082,17 @@ def died(a, vision=None, driver=False):
     reads of the mouse before it, the world's way out's, take none). With
     `driver` the sound driver is loaded as the vision begins (1194:D459:
     sbdig.py's `driver_loaded`, the case's Blaster attached), so the
-    speech plays through it."""
+    speech plays through it. `waited`: the dying frame reached its wait
+    for the timer (0000:A428), as one whose body ends the world loop after
+    it checks the area (a drowning in the minute tick) does."""
     # The dying frame's tick: the harness ticks the timer (0151) at the
     # frame's waits for it (0000:A428, A43D), which a frame that ends the
-    # world loop leaves before; the timer ticks all the same, before the
-    # outer loop goes on (the view's frames tick before the frame; the
-    # vision's movie makes it 0 again).
-    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+    # world loop early leaves before; the timer ticks all the same, before
+    # the outer loop goes on (the view's frames tick after their body; the
+    # vision's movie makes it 0 again). A frame that reached its wait has
+    # had its tick there.
+    if not waited:
+        a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
     ss, sp, words = a.world_stack
     a.mu.mem_write(a.lin(ss, sp), words)
     saved = a.stub(location=False)
@@ -1570,6 +1574,40 @@ PILE_SCRIPT = [LOOT_LINE, LOOT_LINE, ('rclick', 0x60, 0x25)]
 # crypt1.inf).
 CRYPT = b'41649375.MIF'
 
+
+def fatigued(put, fatigue):
+    """`put`, then the player's fatigue (01A4 + 5Dh) `fatigue`: what the
+    minute tick (0000:1644) takes down: 2901:0002's Bh, and in water (C39A
+    bit 10h, no boat) 1Eh more of it; below 0, in water, the player
+    drowns (the exhaustion's 7B2F box, then 2686:02B4)."""
+    def both(a):
+        put(a)
+        a.w16(0x01A4 + 0x5D, fatigue)
+    return both
+
+
+def pit_ahead(a):
+    """At the start's square (row 0Bh, column 2Ah) facing heading 0, the
+    floor of the square ahead (row 0Ch) made a dry chasm: its high byte
+    FCh (frame + C00h, the floor's solid limit CCCE: chasm 0, the INF's
+    DRYCHASM), as the dungeon's own at row 7."""
+    at_square(0xB, 0x2A, 0)(a)
+    at, seg = (0xC << 8) + (0x2A << 1), a.r16(0xCCD0)
+    a.w16(at, (a.r16(0xCCCE) & 0xFF00) | (a.r16(at, seg=seg) & 0xFF), seg=seg)
+
+
+def false_wall(row, col, heading, wall_row, wall_col):
+    """The player at `row`, `col` facing `heading`, the wall at `wall_row`,
+    `wall_col` made a kind-9 wall with bit 100h (9100h and its texture,
+    the old word's low six bits): drawn as a wall (0000:CC63's kind 9),
+    but no obstacle (0000:FB81: kind 9 blocks only without 100h)."""
+    def put(a):
+        at_square(row, col, heading)(a)
+        at, seg = (wall_row << 8) + (wall_col << 1), a.r16(0xD806)
+        a.w16(at, 0x9100 | (a.r16(at, seg=seg) & 0x3F), seg=seg)
+    return put
+
+
 # name: (where, set-up, [(keys held, keys let go, frames, until[, clicks])...]):
 # the clicks (x, y) are queued for the mouse's reads before the frames.
 LEVEL_XP = 9_750_000
@@ -1875,14 +1913,39 @@ CASES = {
     # frame the first face drawn after the walk steps it (C398 bit 1000h,
     # 0000:CD89) is drawn with CCF8 FFFFh, which hides no light (B7A9).
     'playdoormoving': ('crypt', picking(1), [((), (), 2, None), ((), (), 4, None, [(160, 100)])]),
-    # The crypt's water (row 22, columns 6..10) walked into from the
-    # square north of it (row 21, column 7), facing it (heading 0): the
-    # player sinks (0000:F9C4's water), swims and bobs (C39A bit 10h,
-    # CB68), the footsteps the swimming sound.
+    # The crypt's lava (row 22, columns 6..10: floor FE00h, its INF's
+    # LAVACHASM, chasm 2) walked into from the square north of it (row 21,
+    # column 7), facing it (heading 0): the player sinks (0000:F9C4: lava
+    # is a chasm deep as water), swims and bobs (C39A bit 10h, CB68), the
+    # footsteps the swimming sound. (Lava burns nothing in this version:
+    # only the renderer tells the chasms' kinds apart, 0000:D0D4.)
     'playswim': ('crypt', at_square(21, 7, 0), [((UP,), (), 30, None), ((), (UP,), 60, None)]),
     # The same levitating (`levitating`): kept up over the water, bobbing
     # (2826:0042).
     'playlevitate': ('crypt', levitating(at_square(21, 7, 0)), [((UP,), (), 30, None), ((), (UP,), 30, None)]),
+    # A dry chasm (floor FC00h, chasm 0, as the dungeon's own at row 7)
+    # made of the square ahead of the start (`pit_ahead`), walked into and
+    # on (heading 0): the player falls (0000:F9C4: E8BE doubling every
+    # other frame) to its floor, 50h down, and against the next square's
+    # floor, low, climbs 6 a frame (0000:F955: moving within 10h of
+    # heading 0 only) up onto it.
+    'playpit': ('dungeon', pit_ahead, [((UP,), (), 46, None), ((), (UP,), 6, None)]),
+    # The dungeon's water (row 2, columns 1..8: floor FD00h, chasm 1)
+    # walked into from row 3, column 3 (heading 100h), the player's
+    # fatigue 400h (`fatigued`); then the minute tick (`minute_due`): the
+    # water's drain of 1Fh fatigue ticks (0000:1644).
+    'playwater': ('dungeon', fatigued(at_square(3, 3, 0x100), 0x400), [((UP,), (), 16, None), ((), (UP,), 4, None),
+                                                                        ((), (), 6, None, [], {'do': minute_due})]),
+    # The same with fatigue 100h: the drain takes it below 0 in the water
+    # and the player drowns (the exhaustion, 7B2F's box clicked away, then
+    # 2686:02B4); the frame that ends the world loop for it, the outer
+    # loop's death followed (`died`).
+    'playdrown': ('dungeon', fatigued(at_square(3, 3, 0x100), 0x100), [((UP,), (), 16, None), ((), (UP,), 4, None),
+                                                                        ((), (), 1, None, [], {'do': minute_due, 'script': [('click', 0xA0, 0x60)], 'dies': True})]),
+    # North (heading 100h) from row 6, column 52 into the wall at row 5
+    # made a kind-9 wall with bit 100h (`false_wall`): drawn, but walked
+    # through to row 4.
+    'playfalsewall': ('dungeon', false_wall(6, 52, 0x100, 5, 52), [((), (), 2, None), ((UP,), (), 24, None), ((), (UP,), 4, None)]),
     # Wounded with a potion (`wounded_with_potion`): two frames, the
     # A creature brought (`brought`) and fought off by standing: twenty
     # frames, then M held a frame (the automap, 2542:045A, left by a click
@@ -2432,7 +2495,8 @@ def written_line(a, name):
 # The cases whose doors, locks or chests change the walls plane, which
 # neither DGROUP nor the EMS banks hold: its words (the level's width by
 # its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
-WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen')
+WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen',
+               'playfalsewall')
 
 
 def walls_line(a, name):
@@ -2552,10 +2616,21 @@ def play(a, name, steps, tracks):
             speech = os.path.join(a.game_dir, 'SPEECH')
             if os.path.isdir(speech):
                 a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
+        # (Whether the step's last frame reached its wait for the timer,
+        # 0000:A428: `died`'s `waited`.)
+        waited = [False]
+
+        def frame_top(*_):
+            waited[0] = False
+
+        def frame_wait(*_):
+            waited[0] = True
+        whooks = [a.mu.hook_add(UC_HOOK_CODE, f, None, a.lin(LOAD_SEG, o), a.lin(LOAD_SEG, o))
+                  for f, o in ((frame_top, 0xA2AC), (frame_wait, 0xA428))]
         try:
             why, _ = a.world_frames(n, until=until, each=each)
         finally:
-            for h in vhooks:
+            for h in vhooks + whooks:
                 a.mu.hook_del(h)
             if names is not None:
                 a.names = names
@@ -2573,7 +2648,7 @@ def play(a, name, steps, tracks):
             if 'vision' in opts and os.path.isdir(speech):
                 a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
             try:
-                died(a, opts.get('vision'), opts.get('driver', False))
+                died(a, opts.get('vision'), opts.get('driver', False), waited[0])
             finally:
                 a.names = names
             if opts.get('title'):
