@@ -319,8 +319,12 @@ impl Front<'_> {
         let page = game_page(m);
         let pick = match (&boxes, self.talk.as_deref_mut()) {
             (Some(b), Some(t)) => {
+                // The page only for the question this menu asks: a turn
+                // runs on past one left unanswered (a shop's buttons,
+                // 1194:6001), and may reach a menu after it.
+                let asking = t.need.is_none();
                 let pick = t.menu(m, si, bx, di);
-                if t.need.is_some() && t.need_page.is_none() {
+                if asking && t.need.is_some() && t.need_page.is_none() {
                     t.need_page = page.map(std::sync::Arc::new);
                 }
                 m.menu_reads = t.menu_reads.take();
@@ -1889,7 +1893,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         menu_reads: Vec::new(),
         list_live: None,
         list_page: None,
-        arrowed: false,
+        #[cfg(test)]
+        own_drawing: false,
         live: None,
         status: None,
         status_held: false,
@@ -3281,9 +3286,10 @@ struct App {
     /// The game's page as the list's loop has drawn it over the reads so
     /// far (`ListCapture::page`): what the window shows of the list.
     list_page: Option<std::sync::Arc<Vec<u8>>>,
-    /// The arrows or the wheel moved `selected` since the menu came up:
-    /// only then is its entry marked (the original marks none).
-    arrowed: bool,
+    /// The window's own drawing composed even where a box shows the
+    /// game's page (the screen tests' layer, whose mask is the original's).
+    #[cfg(test)]
+    own_drawing: bool,
     live: Option<field::Live>,
     status: Option<String>,
     /// `status` kept under the boxes of the turn that drew it last.
@@ -3696,7 +3702,6 @@ impl App {
             self.list_top = 0;
             self.list_reads.clear();
             self.menu_reads.clear();
-            self.arrowed = false;
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
             self.live = match &need {
@@ -3822,6 +3827,12 @@ impl App {
             ui.draw(&mut self.screen, &self.font);
         } else if let Some(c) = self.creation.as_ref().filter(|_| !self.level_notice()) {
             c.draw(&mut self.screen, &self.creation_engine.as_ref().unwrap_or(&self.engine).m);
+        } else if let Some(page) = self.box_page_shown() {
+            // A box over play the engine drew on the game's page (which
+            // holds the 3D view and the interface as the original's does):
+            // the page as the box's wait found it, all the original shows.
+            self.screen.set_palette(self.assets.dac());
+            self.screen.underlay(&page);
         } else if let Some((snap, form)) = self.pending.as_ref().and_then(|p| p.maker.as_ref()) {
             // Inside the guild's spellmaker: its screen, the question asked
             // (a list, the name) over it.
@@ -3842,12 +3853,6 @@ impl App {
             if let Some(lines) = boxed {
                 t.draw_box(&mut self.screen, &self.font, &lines);
             }
-        } else if let Some(page) = self.box_page_shown() {
-            // A box over play the engine drew on the game's page (which
-            // holds the 3D view and the interface as the original's does):
-            // the page as the box's wait found it, all the original shows.
-            self.screen.set_palette(self.assets.dac());
-            self.screen.underlay(&page);
         } else {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
             self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
@@ -5295,8 +5300,9 @@ impl App {
                         m.selected = self.selected;
                         m.top = Some(self.list_top);
                     }
-                    // A menu's boxes mark no entry until the arrows move.
-                    if !m.list && !self.arrowed {
+                    // A menu's boxes mark no entry (3159:0F2A's loop has
+                    // no arrows).
+                    if !m.list {
                         m.selected = usize::MAX;
                     }
                     h.menu = Some(m);
@@ -5337,8 +5343,8 @@ impl App {
                 let list_key = list_key_of(code);
                 match code {
                     // A list's keys move its mark and its lines as
-                    // 3159:06A0 does (`hud::list_key`); a menu's arrows
-                    // (the view's own) go round.
+                    // 3159:06A0 does (`hud::list_key`); a menu's loop
+                    // (0F2A) has no arrows.
                     _ if menu.list && list_key.is_some() => {
                         if let Some(k) = list_key {
                             self.list_key_read(k);
@@ -5346,14 +5352,6 @@ impl App {
                                 self.list_moved(|m| hud::list_key(m, k));
                             }
                         }
-                    }
-                    KeyCode::ArrowUp => {
-                        self.selected = (self.selected + n - 1) % n;
-                        self.arrowed = true;
-                    }
-                    KeyCode::ArrowDown => {
-                        self.selected = (self.selected + 1) % n;
-                        self.arrowed = true;
                     }
                     KeyCode::Enter | KeyCode::NumpadEnter if menu.list => {
                         let s = self.selected.min(n - 1) as u16;
@@ -5467,15 +5465,18 @@ impl App {
     /// options screen, creation, the spellmaker, a shop's, the travel
     /// map, a sheet, the automap: their pictures are the window's own).
     fn box_page_shown(&self) -> Option<std::sync::Arc<Vec<u8>>> {
-        // A box to read first; else the menu asked, unmarked (the arrows
-        // mark an entry, the window's own: the original marks none); a
-        // list as its loop has drawn it; a field in its prompt's box as
-        // the game's editor has it.
+        #[cfg(test)]
+        if self.own_drawing {
+            return None;
+        }
+        // A box to read first; else the menu asked; a list as its loop
+        // has drawn it; a field in its prompt's box as the game's editor
+        // has it.
         let page = match self.boxes.front() {
             Some(b) => b.page.clone()?,
             None => match self.pending.as_ref()? {
                 Pending { need: dialog::Need::Menu(m), .. } if m.list => self.list_page.clone()?,
-                Pending { need: dialog::Need::Menu(_), page: Some(p), .. } if !self.arrowed => p.clone(),
+                Pending { need: dialog::Need::Menu(_), page: Some(p), .. } => p.clone(),
                 Pending { need: dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(..), .. }), .. } => std::sync::Arc::new(self.live.as_ref()?.page()?),
                 _ => return None,
             },
@@ -5484,10 +5485,6 @@ impl App {
             || self.saveui.is_some()
             || self.options.is_some()
             || (self.creation.is_some() && !self.level_notice())
-            || self.pending.as_ref().is_some_and(|p| p.maker.is_some() || p.backdrop.is_some())
-            || self.box_backdrop.is_some()
-            || self.travel.is_some()
-            || self.panel.is_some()
             || self.map;
         (!other).then_some(page)
     }
@@ -5741,25 +5738,18 @@ impl App {
                     self.log_turn(0);
                 }
             }
-            // The wheel moves a menu's or a list's entry, as Up and Down do
-            // (a list scrolls to keep it shown).
+            // The wheel moves a list's line, as Up and Down do (a list
+            // scrolls to keep it shown); a menu's loop has no arrows.
             In::Wheel(dy) => {
-                if self.boxes.is_empty() {
+                if self.boxes.is_empty() && dy != 0.0 {
                     if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
                         if m.list {
-                            // A list's line moved as by its arrows.
                             let k = if dy > 0.0 { hud::ListKey::Up } else { hud::ListKey::Down };
-                            if dy != 0.0 {
-                                self.list_key_read(k);
-                                if self.list_followed().is_none() {
-                                    self.list_moved(|m| hud::list_key(m, k));
-                                }
+                            self.list_key_read(k);
+                            if self.list_followed().is_none() {
+                                self.list_moved(|m| hud::list_key(m, k));
                             }
-                            return;
                         }
-                        let n = m.entries.len().max(1);
-                        self.selected = if dy > 0.0 { (self.selected + n - 1) % n } else if dy < 0.0 { (self.selected + 1) % n } else { self.selected };
-                        self.arrowed = true;
                     }
                 }
             }

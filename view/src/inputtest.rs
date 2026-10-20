@@ -332,16 +332,17 @@ fn talk_start(dir: &Path, picks: &str) -> (App, Driver) {
 }
 
 #[test]
-fn talk_menu_by_arrows_and_enter_as_by_script() {
+fn talk_menu_by_enter_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
     assert!(until_asked(&mut d, &mut a, 3), "clicking the townsperson asks");
     let m = menu(&a).expect("a menu");
     assert!(text(&m.title).contains("ASK ABOUT"), "the talk's menu: {:?}", text(&m.title));
-    // Down to "Where is...", up again, Enter: the greeting (entry 0).
+    // The arrows mark nothing (3159:0F2A's loop has none); Enter: the
+    // greeting (entry 0).
     d.key(&mut a, KeyCode::ArrowDown, None);
-    assert_eq!(a.selected, 1);
-    d.key(&mut a, KeyCode::ArrowUp, None);
+    assert_eq!(a.selected, 0, "the arrows move no mark");
+    assert_eq!(a.hud().menu.map(|m| m.selected), Some(usize::MAX), "the menu shows no entry marked");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(!a.boxes.is_empty(), "the townsperson answers in a box");
     let (mut b, _) = talk_start(&dir, "0");
@@ -1390,17 +1391,17 @@ fn a_store_list_line_clicked_as_by_script() {
     assert_eq!(menu(&a).map(|m| text(&m.title)), menu(&b).map(|m| text(&m.title)));
 }
 
+/// The wheel moves no menu's mark: 3159:0F2A's loop has none (a list's
+/// wheel is its arrows, 06A0).
 #[test]
-fn the_wheel_moves_a_menus_entry() {
+fn the_wheel_marks_no_menus_entry() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
     assert!(until_asked(&mut d, &mut a, 3));
     a.input(In::Wheel(-1.0));
-    assert_eq!(a.selected, 1, "down a line");
     a.input(In::Wheel(1.0));
-    a.input(In::Wheel(1.0));
-    let n = menu(&a).unwrap().entries.len();
-    assert_eq!(a.selected, n - 1, "up past the first wraps to the last");
+    assert_eq!(a.selected, 0, "the wheel moves no mark");
+    assert_eq!(a.hud().menu.map(|m| m.selected), Some(usize::MAX), "the menu shows no entry marked");
 }
 
 /// The character sheet by K and by the portrait; its page turned to the
