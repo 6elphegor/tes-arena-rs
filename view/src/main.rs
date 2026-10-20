@@ -5397,6 +5397,11 @@ impl App {
         self.status_box = false;
         if self.boxes.is_empty() {
             self.box_backdrop = None;
+            // The travel map's box clicked away: its page put back (933C)
+            // and the rest of its pass's drawing the screen.
+            if let Some(t) = &mut self.travel {
+                t.box_read();
+            }
         }
         if self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_))) {
             let c = self.creation.take();
@@ -5620,6 +5625,13 @@ impl App {
             In::Resized(w, h) => self.size = (w, h),
             In::Cursor(x, y) => {
                 self.cursor = (x, y);
+                // The travel map's next pass reads the cursor where it is.
+                if self.boxes.is_empty() {
+                    let (x, y) = self.screen_point();
+                    if let Some(t) = &mut self.travel {
+                        t.moved(x, y);
+                    }
+                }
                 // A button the logbook's loop has seen stays seen (AFF9 or'd
                 // in, 27E3:0216): the cursor moved is read as a click there.
                 if matches!(self.panel, Some(panels::Panel::Log(_))) && self.engine.m.log_buttons_held() {
@@ -5989,6 +6001,10 @@ impl App {
         let travelling = self.travel.is_some();
         if let Some(t) = &mut self.travel {
             t.advance(now.duration_since(self.movie_at).as_millis() as u32);
+            // The province's loop's passes go on while no box waits.
+            if self.boxes.is_empty() {
+                t.idle(&mut self.engine);
+            }
             self.travel_after();
         }
         self.movie_at = now;

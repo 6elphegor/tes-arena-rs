@@ -26,6 +26,9 @@ screenfade | worldprovince | 70 | 40f6a41e18287ddc
 screenfade | worldtrip | 70 | 40f6a41e18287ddc
 screenfade | worldunwell | 70 | 40f6a41e18287ddc
 screenfade | worldsearch | 70 | 40f6a41e18287ddc
+screenfade | worldhover | 70 | 40f6a41e18287ddc
+screenfade | worldhovermoves | 70 | 40f6a41e18287ddc
+screenfade | worldhoverbuttons | 70 | 40f6a41e18287ddc
 screenfade | worldback | 105 | ad34c8f6e802007
 screenfade | worldsearchtyped | 70 | 40f6a41e18287ddc
 screenfade | worldsearchlist | 70 | 40f6a41e18287ddc

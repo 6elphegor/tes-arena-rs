@@ -82,6 +82,9 @@ screen | worldprovince | f3f78560a3108ebb db15945b94271757
 screen | worldtrip | 258358a48621ee11 db15945b94271757
 screen | worldunwell | 30401c250c4ebfff db15945b94271757
 screen | worldsearch | 933f15b614404805 db15945b94271757
+screen | worldhover | d61d837ce9ee3def db15945b94271757
+screen | worldhovermoves | d76c508cca357aa0 db15945b94271757
+screen | worldhoverbuttons | 942f3c8517a43d5d db15945b94271757
 screen | worldback | 4c16ae6cc47301f 6c1d8428b606b30f
 screen | worldsearchtyped | 1cab8472a7d03360 db15945b94271757
 screen | worldsearchlist | ac50fdeceb5ce67d db15945b94271757

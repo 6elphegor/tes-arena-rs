@@ -2111,6 +2111,39 @@ fn a_provinces_map_as_the_original_draws_it() {
     screen("worldprovince", |a, d| world_clicks(a, d, &[(70, 45)]), layer);
 }
 
+/// High Rock's map, then the mouse moved (no button) to each (x, y) in
+/// turn, as gen_screens.py's `move`s, a tick of the map's loop after
+/// each: its passes (26F7:0625) run wherever the mouse is.
+fn world_hovered(a: &mut App, d: &mut Driver, at: &[(i32, i32)]) {
+    world_clicks(a, d, &[(70, 45)]);
+    let _ = d;
+    for &(x, y) in at {
+        a.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
+        let t = a.travel.as_mut().expect("the travel map");
+        t.advance(60);
+        t.idle(&mut a.engine);
+    }
+}
+
+/// The mouse moved over the province's map: the place nearest it named.
+#[test]
+fn the_maps_label_follows_the_mouse_as_the_original_draws_it() {
+    screen("worldhover", |a, d| world_hovered(a, d, &[(120, 60)]), layer);
+}
+
+/// Moved on through two more points: the last's nearest named.
+#[test]
+fn the_maps_label_after_moves_as_the_original_draws_it() {
+    screen("worldhovermoves", |a, d| world_hovered(a, d, &[(120, 60), (180, 90), (230, 130)]), layer);
+}
+
+/// Moved over the buttons: the pass runs there too, the place nearest
+/// that point named.
+#[test]
+fn the_maps_label_over_its_buttons_as_the_original_draws_it() {
+    screen("worldhoverbuttons", |a, d| world_hovered(a, d, &[(100, 185)]), layer);
+}
+
 /// A place on it clicked: the journey's length asked.
 #[test]
 fn a_journeys_length_as_the_original_draws_it() {
