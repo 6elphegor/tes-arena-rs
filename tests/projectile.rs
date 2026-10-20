@@ -429,7 +429,7 @@ fn casts_match_original() {
             m.cast_spell(files, &mut NoCastHooks, 0x80 | idx)?;
             if m.mem.r16(DS, 0x0620) != 0 {
                 let t = if touch == 0 { Touch::Actor(slot) } else { Touch::Record(DS, 0x1A4) };
-                m.resolve_cast(files, t)?;
+                m.resolve_cast(files, t, &mut |_, _| {})?;
             }
             for _ in 0..plan.frames {
                 m.projectiles_update(&mut arena::strike::NoKillHooks)?;

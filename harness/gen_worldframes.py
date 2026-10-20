@@ -694,6 +694,22 @@ def surrendering(a):
     a.w16(0x05CA, a.r16(0x05CA) | 0x40)
 
 
+def surrender_spell(a):
+    """`surrendering`'s quest target given 400 HP with 201 left (+5Bh,
+    +59h) and Wizard's Fire (the book's seventh) cast as `casting` casts
+    it, waiting for its target: one fire takes it below half without
+    killing it, and it gives up to the spell (the projectile's 29CF:09B8
+    -> 2CDD:029B -> 2AA1:06A0, its words through 0819 as the swing's)."""
+    surrendering(a)
+    seg, rec = a.r16(0x1042), a.r16(0x0C57 + 0x12)
+    a.w16(rec + 0x5B, 400, seg=seg)
+    a.w16(rec + 0x59, 201, seg=seg)
+    a._setup([0, STUB_SEG], {'eax': WIZARDS_FIRE, 'esi': 0x1A4})
+    a.mu.reg_write(UC_X86_REG_FS, a.ds)
+    a._run(0x29CF, 0x071F, STUB_SEG, 0, count=10_000_000)
+    assert a.r16(0x0620), 'the spell not waiting for its target'
+
+
 def ruled(script):
     """The palace's ruler clicked (gen_screens.py's `ruler`: a map flat of
     the palace's first kind, the seed SEED) and the click run as the
@@ -1649,6 +1665,11 @@ CASES = {
     'playsurrender': ('dungeon', surrendering, [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
                                                 ((), (), 200, None, [], dict(SWINGING, script=[('rclick', 160, 100), ('click', 160, 100)])),
                                                 ((), (), 20, None, [], LET_GO)]),
+    # `surrender_spell`: Wizard's Fire's target clicked at the view's
+    # centre as playcast clicks it; the quest target gives up to the
+    # spell, its box clicked away (59E5 with no button held, then 5536).
+    'playsurrenderspell': ('dungeon', surrender_spell, [((), (), 2, None), ((), (), 10, None, [(160, 100)]),
+                                                        ((), (), 120, None, [], {'script': [('click', 160, 100)]})]),
     'playloot': ('dungeon', brought(1), FIGHT +[((), (), 10, None, [(160, 100)], {'script': LOOT_GOLD_SCRIPT}), ((), (), 5, None)]),
     'playlootitems': ('dungeon', brought(1), FIGHT + [((), (), 1, None, [], {'do': corpse_items}),
                                                       ((), (), 10, None, [(160, 100)], {'script': LOOT_ITEMS_SCRIPT}), ((), (), 5, None)]),

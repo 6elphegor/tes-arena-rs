@@ -69,14 +69,15 @@ the original routine:
 | `CelestialHooks::moon_phase` | src/celestial.rs:31 | 0000:E6CB | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `CelestialHooks::star_image` | src/celestial.rs:41 |  | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
 | `CelestialHooks::star_pixel` | src/celestial.rs:38 |  | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
-| `ClockHooks::encounter` | src/clock.rs:67 | 1194:887A | overridden | the view: main.rs Front<'_> | faithful: `random_encounter` (encounter vectors) |
-| `ClockHooks::encounter_minute` | src/clock.rs:73 | 1194:86F2 | overridden | the view: main.rs Front<'_> | faithful: `quest_ambush` (ambush vectors); its fight's music is `FightHooks::fight_music`'s |
-| `ClockHooks::exhausted` | src/clock.rs:80 | 2901:0014 | original | Some(true): the port's `exhaustion` runs | |
-| `ClockHooks::exhaustion_box` | src/clock.rs:85 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
-| `ClockHooks::level_up_screen` | src/clock.rs:96 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt, worldframes playlevelup) |
-| `ClockHooks::quests_daily` | src/clock.rs:54 | 1194:99F8 | overridden | the view: main.rs Front<'_> | faithful: `quests_daily` with its texts (hooktest) |
-| `ClockHooks::quests_hourly` | src/clock.rs:60 | 1194:98E8 | overridden | the view: main.rs Front<'_> | faithful: `quests_hourly` with its texts (hooktest) |
-| `ClockHooks::view_cleared` | src/clock.rs:88 | 0000:4EFD | port | the view filled with 9288's colour, which the port sets, in the page (`view_clear`) | |
+| `ClockHooks::encounter` | src/clock.rs:71 | 1194:887A | overridden | the view: main.rs Front<'_> | faithful: `random_encounter` (encounter vectors) |
+| `ClockHooks::encounter_minute` | src/clock.rs:77 | 1194:86F2 | overridden | the view: main.rs Front<'_> | faithful: `quest_ambush` (ambush vectors); its fight's music is `FightHooks::fight_music`'s |
+| `ClockHooks::exhausted` | src/clock.rs:84 | 2901:0014 | original | Some(true): the port's `exhaustion` runs | |
+| `ClockHooks::exhaustion_box` | src/clock.rs:89 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
+| `ClockHooks::surrender_box` | src/clock.rs:54 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
+| `ClockHooks::level_up_screen` | src/clock.rs:100 | 2686:0319 | overridden | the view: main.rs Front<'_> | faithful: `level_up_around`, the points spent on the attribute screen (levelup vectors, screens.txt, worldframes playlevelup) |
+| `ClockHooks::quests_daily` | src/clock.rs:58 | 1194:99F8 | overridden | the view: main.rs Front<'_> | faithful: `quests_daily` with its texts (hooktest) |
+| `ClockHooks::quests_hourly` | src/clock.rs:64 | 1194:98E8 | overridden | the view: main.rs Front<'_> | faithful: `quests_hourly` with its texts (hooktest) |
+| `ClockHooks::view_cleared` | src/clock.rs:92 | 0000:4EFD | port | the view filled with 9288's colour, which the port sets, in the page (`view_clear`) | |
 | `ControlHooks::bars` | src/controls.rs:139 | 2826:0008, 2901:00A8 | overridden | the view: main.rs Front<'_> | fixed: the controls skipped the bars as drawing, but they leave 126C (their last x, which a flat brought to life writes over at 25CA:02F3) and 9288; now `bars_draw` at 2826:0008, the bars drawn into the page too (playswim; the pages the screens save, SCREENSV.$$2) |
 | `ControlHooks::bar_click` | src/controls.rs:175 | 2542:00BA | overridden | the view: main.rs Front<'_> | faithful: the window's click on a bar button taken in the frame's input step (`player_steer`, where the classic controls' 2826:02E2 takes it), its handler run there (camping's too); the screen it asks for run inside the frame (`Talk::screen`: the turn stops there, the screen opens on the game as it asked, and the turn runs again as it ends with the game it left, the rest of the frame after it), but the travel map and the options screen after the frame; whether a click was taken (a click on the bar ends the controls there, 2826:00CB: no jump) (busy worldframes cases, playbarjump) |
 | `ControlHooks::cast_at_target` | src/controls.rs:163 | 29CF:0000 | port | the default runs the port | |
@@ -224,19 +225,19 @@ the original routine:
 | `MenuKeyHooks::cyber_button` | src/menukeys.rs:96 | 2F26:04E2 | original | no CyberMan: never down | |
 | `MenuKeyHooks::cyber_buttons` | src/menukeys.rs:100 | 2F26:03ED | original | no CyberMan: none | |
 | `MenuKeyHooks::touch_cast` | src/menukeys.rs:105 | 29CF:0000 | port | the default runs the port | |
-| `NewGameHooks::creation_done` | src/newgame.rs:173 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
-| `NewGameHooks::faded` | src/newgame.rs:162 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
-| `NewGameHooks::game_screen` | src/newgame.rs:177 | 2294:11F2 | present | 2294:11F2, the heap check | |
-| `NewGameHooks::hands` | src/newgame.rs:182 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
-| `NewGameHooks::level_flats` | src/newgame.rs:187 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
+| `NewGameHooks::creation_done` | src/newgame.rs:174 | 0000:5D70 | port | fixed by this audit: `ems_reset` | |
+| `NewGameHooks::faded` | src/newgame.rs:163 | 1194:55B6 | port | the default runs the port (`sheet_black`); the newgame vectors stub it | fixed: creation's end didn't fade (titleplay creation) |
+| `NewGameHooks::game_screen` | src/newgame.rs:178 | 2294:11F2 | present | 2294:11F2, the heap check | |
+| `NewGameHooks::hands` | src/newgame.rs:183 | 0000:3C4C | overridden | the title's set-up: start.rs SetupPort (`weapon_graphics_load`); a new game's, the view loads the hands | faithful: programstart vectors (setup) |
+| `NewGameHooks::level_flats` | src/newgame.rs:188 | 21EE:0134 | overridden | the title's set-up: start.rs SetupPort (`effect_flats`, C38E); a new game's, the view's world load | faithful: programstart vectors (setup) |
 | `NewGameHooks::message_box` | src/newgame.rs:122 | 1194:59CC | overridden | the view: create.rs Hooks<'_> | present: creation's boxes (createshot.txt) |
-| `NewGameHooks::palette` | src/newgame.rs:152 | 1194:1695 | present | the attribute screen's palette | |
-| `NewGameHooks::parchment_drop` | src/newgame.rs:156 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
-| `NewGameHooks::resources` | src/newgame.rs:180 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
+| `NewGameHooks::palette` | src/newgame.rs:153 | 1194:1695 | present | the attribute screen's palette | |
+| `NewGameHooks::parchment_drop` | src/newgame.rs:157 | 0000:9326 | port | the default runs the port (`resource_drop` of [1038]); the newgame vectors stub it | fixed: the parchment's tiles weren't added or dropped (titleplay creation) |
+| `NewGameHooks::resources` | src/newgame.rs:181 | 2294:01F1 | overridden | the title's set-up: start.rs SetupPort (`game_resources`); a new game's, the view's assets | faithful: programstart vectors (setup) |
 | `NewGameHooks::roll_picture` | src/newgame.rs:136 | 1194:5CD9 (2ADD, 2B9B) | port | the default runs the port (`sheet_image`: CHARSTAT.IMG, BONUS.IMG into bank [1030], drawn); the newgame vectors stub it | fixed: bank 1Fh and the corner kept in bank 12h lacked them (titleplay creation) |
 | `NewGameHooks::roll_screen` | src/newgame.rs:145 | 1194:12BE, 157E | port | the default runs the port (`corner_kept`, `arrows_made`, `sheet_texts`); the newgame vectors stub them | fixed: 1297 left 34h, bank [1032] and bank 5 not written (titleplay creation) |
-| `NewGameHooks::sheet_keep` | src/newgame.rs:167 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
-| `NewGameHooks::spells` | src/newgame.rs:184 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
+| `NewGameHooks::sheet_keep` | src/newgame.rs:168 | 1194:158F | port | the default runs the port (`sheet_keep`); the newgame vectors stub it | fixed: creation's end kept no sheet (5E0 bit 200h, the race's digit; titleplay creation) |
+| `NewGameHooks::spells` | src/newgame.rs:185 | 29CF:0691 | overridden | the title's set-up: start.rs SetupPort (`spells_load`); a new game's, world.rs | faithful: programstart vectors (setup) |
 | `NewGameHooks::stats_screen` | src/newgame.rs:130 | 1194:0DC7 | port | the default runs the port (1647 `sheet_back`, 16AA `sheet_doll`: CHARSHET.$$$ and the doll into bank [1030], drawn); the newgame vectors stub it | fixed: the clothes' names stayed a man's, bank 1Fh lacked CHARSHET.$$$ (titleplay creation) |
 | `NoteHooks::draw_text` | src/mapnotes.rs:68 | 0000:9E0A | overridden | the view: automap.rs Collect, inputtest.rs Collect | present: the automap's notes drawn (screens.txt) |
 | `NoteHooks::redraw` | src/mapnotes.rs:62 | 0000:2F10 | present | the map redrawn | |
@@ -360,23 +361,24 @@ the original routine:
 | `StoreHooks::repair_instead` | src/store.rs:129 | 1194:C6AC | stub | None: the repairs run | |
 | `StoreHooks::text` | src/store.rs:134 | 1194:A374 | port | the default runs the port | |
 | `StoreHooks::weapon_lines` | src/store.rs:120 | 1194:F142 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `TalkHooks::dungeon_entrance` | src/talk.rs:197 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `view_clear`, then `wild_dungeon_entry` |
-| `TalkHooks::expand` | src/talk.rs:137 | 2DA2:000A | stub | None: the port's `expand` runs | |
-| `TalkHooks::list` | src/talk.rs:117 | 1194:5734 | overridden | the view: main.rs Front<'_> | present: the game's list (screens.txt) |
-| `TalkHooks::loot` | src/talk.rs:127 | 1194:7B16 | overridden | the view: main.rs Front<'_> | faithful: `loot_window` (lootwin vectors, screens.txt) |
-| `TalkHooks::palace` | src/talk.rs:157 | 1194:8F1E | overridden | the view: main.rs Front<'_> | faithful: `quests_talk` (sidequest vectors, palace screens) |
-| `TalkHooks::quest_chest` | src/talk.rs:167 | 2294:0F33 | overridden | the view: main.rs Front<'_> | faithful: `quest_chest` (mainquest vectors, hooktest) |
-| `TalkHooks::quest_item` | src/talk.rs:148 | 1194:9F04 | overridden | the view: main.rs Front<'_> | faithful: `quest_item_taken` (hooktest) |
-| `TalkHooks::quest_offer` | src/talk.rs:162 | 1194:CD9A | port | the default runs the port | |
-| `TalkHooks::quest_person` | src/talk.rs:152 | 1194:D593 | overridden | the view: main.rs Front<'_> | faithful: `quest_person_talk` |
-| `TalkHooks::shop` | src/talk.rs:176 |  | overridden | the view: main.rs Front<'_> | faithful: the shops' ports with the player's answers (shops vectors, screens.txt) |
-| `TalkHooks::sound` | src/talk.rs:131 | 23BA:002A | port | the default runs the port | |
-| `TalkHooks::square_text` | src/talk.rs:210 | 0000:06BE | port | the default runs the port | |
-| `TalkHooks::text` | src/talk.rs:111 | 1194:A374 | stub | false: the text port runs | |
-| `TalkHooks::touch_cast` | src/talk.rs:142 | 29CF:0000 | port | the default runs the port | |
-| `TalkHooks::way` | src/talk.rs:122 | 23F1:00A3 | overridden | the view: main.rs Front<'_> | faithful: `note_add` (look vectors) |
-| `TalkHooks::wild_flat` | src/talk.rs:193 | 2294:0DD0 | port | the default runs the port | |
-| `TalkHooks::wild_way` | src/talk.rs:203 | 217B:0682 | overridden | the view: main.rs Front<'_> | faithful: `wild_way` (wildtalk vectors) |
+| `TalkHooks::dungeon_entrance` | src/talk.rs:200 | 0000:4EFD | overridden | the view: main.rs Front<'_> | faithful: `view_clear`, then `wild_dungeon_entry` |
+| `TalkHooks::expand` | src/talk.rs:140 | 2DA2:000A | stub | None: the port's `expand` runs | |
+| `TalkHooks::list` | src/talk.rs:120 | 1194:5734 | overridden | the view: main.rs Front<'_> | present: the game's list (screens.txt) |
+| `TalkHooks::loot` | src/talk.rs:130 | 1194:7B16 | overridden | the view: main.rs Front<'_> | faithful: `loot_window` (lootwin vectors, screens.txt) |
+| `TalkHooks::palace` | src/talk.rs:160 | 1194:8F1E | overridden | the view: main.rs Front<'_> | faithful: `quests_talk` (sidequest vectors, palace screens) |
+| `TalkHooks::quest_chest` | src/talk.rs:170 | 2294:0F33 | overridden | the view: main.rs Front<'_> | faithful: `quest_chest` (mainquest vectors, hooktest) |
+| `TalkHooks::quest_item` | src/talk.rs:151 | 1194:9F04 | overridden | the view: main.rs Front<'_> | faithful: `quest_item_taken` (hooktest) |
+| `TalkHooks::quest_offer` | src/talk.rs:165 | 1194:CD9A | port | the default runs the port | |
+| `TalkHooks::quest_person` | src/talk.rs:155 | 1194:D593 | overridden | the view: main.rs Front<'_> | faithful: `quest_person_talk` |
+| `TalkHooks::shop` | src/talk.rs:179 |  | overridden | the view: main.rs Front<'_> | faithful: the shops' ports with the player's answers (shops vectors, screens.txt) |
+| `TalkHooks::sound` | src/talk.rs:134 | 23BA:002A | port | the default runs the port | |
+| `TalkHooks::square_text` | src/talk.rs:213 | 0000:06BE | port | the default runs the port | |
+| `TalkHooks::text` | src/talk.rs:114 | 1194:A374 | stub | false: the text port runs | |
+| `TalkHooks::surrender_box` | src/talk.rs:109 | 1194:59C8 | overridden | the view: main.rs Front<'_> | present: the game's box |
+| `TalkHooks::touch_cast` | src/talk.rs:145 | 29CF:0000 | port | the default runs the port | |
+| `TalkHooks::way` | src/talk.rs:125 | 23F1:00A3 | overridden | the view: main.rs Front<'_> | faithful: `note_add` (look vectors) |
+| `TalkHooks::wild_flat` | src/talk.rs:196 | 2294:0DD0 | port | the default runs the port | |
+| `TalkHooks::wild_way` | src/talk.rs:206 | 217B:0682 | overridden | the view: main.rs Front<'_> | faithful: `wild_way` (wildtalk vectors) |
 | `TavernHooks::files` | src/tavern.rs:61 | 1194:C0B1 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `TavernHooks::greeting` | src/tavern.rs:63 | 1194:C12A | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `TavernHooks::haggle` | src/tavern.rs:96 | 1194:C14E | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
@@ -434,19 +436,19 @@ the original routine:
 | `TriggerHooks::sound` | src/trigger.rs:79 | 23BA:002A | port | the default runs the port | |
 | `TriggerHooks::sounds_off` | src/trigger.rs:104 | 2F9F:0438 | present | the sounds stopped | |
 | `TriggerHooks::tavern_room` | src/trigger.rs:88 | 1194:C048 | port | the default runs the port | |
-| `UseHooks::broken` | src/use_item.rs:134 | 2AA1:021B | port | the default runs the port | |
-| `UseHooks::cant_use` | src/use_item.rs:146 | 1194:1BE0 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
+| `UseHooks::broken` | src/use_item.rs:135 | 2AA1:021B | port | the default runs the port | |
+| `UseHooks::cant_use` | src/use_item.rs:147 | 1194:1BE0 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
 | `UseHooks::cast` | src/use_item.rs:130 | 29CF:00FA | port | the default runs the port | |
-| `UseHooks::clash` | src/use_item.rs:149 | 1194:1B78 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
-| `UseHooks::message_box` | src/use_item.rs:143 | 1194:59C8 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
-| `UseHooks::pick` | src/use_item.rs:139 | 24FA:0B78 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
+| `UseHooks::clash` | src/use_item.rs:150 | 1194:1B78 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
+| `UseHooks::message_box` | src/use_item.rs:144 | 1194:59C8 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
+| `UseHooks::pick` | src/use_item.rs:140 | 24FA:0B78 | overridden | the view: panels.rs Said | present: the equipment page's boxes and panel lines (screens.txt) |
 | `WeaponHooks::building_closed` | src/weapon.rs:62 | 1194:4FB8 | port | the default runs the port | |
 | `WeaponHooks::hands` | src/weapon.rs:66 | 0000:3B8E | port | the default runs the port (`hands_draw`: the bow's frame or the weapon's picture drawn on the page, the hands' bank mapped; worldframes `playsheetready`'s SCREENSV.$$2) | |
 | `WeaponHooks::prow` | src/weapon.rs:71 | 0000:395E..397C | port | the default runs the port (`prow_draw`: the boat's prow drawn on the page) | |
 | `WeaponHooks::fire_bow` | src/weapon.rs:76 | 29CF:037F | port | the default runs the port | |
 | `WeaponHooks::surrender` | src/weapon.rs:81 | 2AA1:0819..083B | port | the default runs the port (`surrender_text`), then `surrender_box` | |
 | `WeaponHooks::surrender_box` | src/weapon.rs:87 | 1194:59C8 | overridden | the view's `Front` shows the box (`message_shown`) | faithful: playsurrender's DGROUP and EMS |
-| `KillHooks::surrender` | src/strike.rs:498 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; a kill by a spell's effect or the clock's (`NoKillHooks`) leaves the words unsaid | faithful for swings (playsurrender); left for spell and effect kills |
+| `KillHooks::surrender` | src/strike.rs:498 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; `strike::Words` makes the words and hands the box to `ClockHooks::surrender_box` (a spell's lingering effect), `TalkHooks::surrender_box` (a touch spell) or the cast's message box (an area spell); a creature's spell on itself passes `NoKillHooks` | faithful (playsurrender, playsurrenderspell) |
 | `WeaponHooks::wall_trigger` | src/weapon.rs:57 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |

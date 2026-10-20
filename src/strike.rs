@@ -505,6 +505,23 @@ pub struct NoKillHooks;
 
 impl KillHooks for NoKillHooks {}
 
+/// `KillHooks` that make a quest target's words (`Machine::surrender_text`)
+/// and hand their box (1194:59C8, the text at DGROUP SURRENDER_LINE) to
+/// `shown`: the kill paths that aren't the swing's (a spell's effect, the
+/// clock's).
+pub struct Words<'a> {
+    pub files: &'a mut crate::bsa::Files,
+    pub shown: &'a mut dyn FnMut(&mut Machine, u16),
+}
+
+impl KillHooks for Words<'_> {
+    fn surrender(&mut self, m: &mut Machine) -> Option<()> {
+        m.surrender_text(self.files, &mut crate::text::NoTextHooks)?;
+        (self.shown)(m, svar::SURRENDER_LINE);
+        Some(())
+    }
+}
+
 impl Machine {
     /// 2AA1:0819..0833: a quest target's words on giving up: [102C]'s font
     /// selected (0000:9AE6), "%nc gives up his fight, ..." (82E6) copied
@@ -526,15 +543,16 @@ impl Machine {
     }
 }
 
-/// The game's handlers for the effects engine: the kill handler, player
-/// death and the blood flash of a reflected spell.
-pub struct GameHooks;
+/// The game's handlers for the effects engine: the kill handler (with
+/// its quest target's words through the `KillHooks`), player death and
+/// the blood flash of a reflected spell.
+pub struct GameHooks<'a>(pub &'a mut dyn KillHooks);
 
-impl FxHooks for GameHooks {
+impl FxHooks for GameHooks<'_> {
     /// 2AA1:06A0. Where the original would hang (no actor slot for a
     /// dying creature, see `kill_check`) this reports no kill.
     fn vitals_changed(&mut self, m: &mut Machine, seg: u16, rec: u16) -> bool {
-        m.kill_check(seg, rec, &mut NoKillHooks).unwrap_or(false)
+        m.kill_check(seg, rec, &mut *self.0).unwrap_or(false)
     }
 
     fn player_died(&mut self, m: &mut Machine) {

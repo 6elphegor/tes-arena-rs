@@ -180,7 +180,7 @@ fn matches_original() {
         let cast = setup(&mut m, seed);
         m.load_rng();
         let before = m.clone();
-        let got = m.cast_apply(cast).map(|()| {
+        let got = m.cast_apply(cast, &mut arena::strike::NoKillHooks).map(|()| {
             m.store_rng();
             let changed = (0..=0xFFFFu16)
                 .filter(|&o| m.mem.r8(DS, o) != before.mem.r8(DS, o))

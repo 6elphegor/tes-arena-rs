@@ -99,7 +99,7 @@ impl Machine {
     /// (type 0 or "negative") without its defences; anyone else may stop
     /// it (`spell_stopped`). A reflection adds the caster to the list.
     /// None where the original faults.
-    pub fn cast_apply(&mut self, cast: u16) -> Option<()> {
+    pub fn cast_apply(&mut self, cast: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         let flags = self.mem.r16(DS, cast + 0xA) & !1;
         self.mem.w16(DS, cast + 0xA, flags);
         let mut n = self.mem.r16(DS, svar::TARGET_COUNT);
@@ -128,11 +128,11 @@ impl Machine {
             };
             match direct {
                 None => {}
-                Some(true) => self.spell_effects(gs, spell, tseg, toff, level)?,
+                Some(true) => self.spell_effects(gs, spell, tseg, toff, level, &mut *kill)?,
                 Some(false) => {
                     let cost = self.mem.r16(gs, spell.wrapping_add(0x32));
-                    if !self.spell_stopped(tseg, toff, cost, &mut crate::strike::GameHooks)? {
-                        self.spell_effects(gs, spell, tseg, toff, level)?;
+                    if !self.spell_stopped(tseg, toff, cost, &mut crate::strike::GameHooks(&mut *kill))? {
+                        self.spell_effects(gs, spell, tseg, toff, level, &mut *kill)?;
                     }
                 }
             }
@@ -192,7 +192,9 @@ impl Machine {
         self.mem.w16(DS, svar::TARGETS, rec);
         self.mem.w16(DS, svar::TARGETS + 2, seg);
         self.mem.w16(DS, svar::TARGET_COUNT, 1);
-        self.cast_apply(cast)?;
+        // The target is the caster itself: no quest target's words (any
+        // giving up came with the blow that took it below half).
+        self.cast_apply(cast, &mut crate::strike::NoKillHooks)?;
         self.blood(slot, 0x19);
         Some(())
     }
@@ -200,7 +202,7 @@ impl Machine {
     /// 2CDD:000C. The spell's three effects on the target at tseg:toff,
     /// with the caster's level + 1 in DGROUP 1292. Kinds of 19h and up
     /// (FFh included) do nothing.
-    pub fn spell_effects(&mut self, gs: u16, spell: u16, tseg: u16, toff: u16, level: u16) -> Option<()> {
+    pub fn spell_effects(&mut self, gs: u16, spell: u16, tseg: u16, toff: u16, level: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         self.mem.w16(DS, svar::CASTER_LEVEL, level);
         for k in 0..3u16 {
             let at = spell.wrapping_add(k);
@@ -217,7 +219,7 @@ impl Machine {
                 continue;
             }
             let h = self.mem.r16(DS, svar::KINDS + 2 * kind);
-            self.sp_kind(h, fx)?;
+            self.sp_kind(h, fx, &mut *kill)?;
         }
         Some(())
     }
@@ -233,32 +235,32 @@ impl Machine {
     }
 
     /// The handler of a kind (83E2).
-    fn sp_kind(&mut self, h: u16, x: Fx) -> Option<()> {
+    fn sp_kind(&mut self, h: u16, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         match h {
-            0x004F => self.sp_sub(self.sub_handler(0x8414, &x), x).map(drop),
-            0x0142 => self.sp_sub(self.sub_handler(0x841E, &x), x).map(drop),
-            0x01B3 => self.sp_sub_leaky(self.sub_handler(0x8424, &x), x),
-            0x020C => self.sp_sub(self.sub_handler(0x842A, &x), x).map(drop),
-            0x0278 => self.sp_sub(self.sub_handler(0x8432, &x), x).map(drop),
+            0x004F => self.sp_sub(self.sub_handler(0x8414, &x), x, kill).map(drop),
+            0x0142 => self.sp_sub(self.sub_handler(0x841E, &x), x, kill).map(drop),
+            0x01B3 => self.sp_sub_leaky(self.sub_handler(0x8424, &x), x, kill),
+            0x020C => self.sp_sub(self.sub_handler(0x842A, &x), x, kill).map(drop),
+            0x0278 => self.sp_sub(self.sub_handler(0x8432, &x), x, kill).map(drop),
             0x030F => self.sp_timed_flag1(x),
-            0x037D => self.sp_sub_leaky(self.sub_handler(0x8438, &x), x),
-            0x03C1 => self.sp_instant_death(x),
+            0x037D => self.sp_sub_leaky(self.sub_handler(0x8438, &x), x, kill),
+            0x03C1 => self.sp_instant_death(x, kill),
             0x03F1 | 0x0712 => Some(()),
             // 03F2 zeroes DI before its call: always the first entry.
-            0x03F2 => self.sp_sub(self.mem.r16(DS, 0x843E), x).map(drop),
+            0x03F2 => self.sp_sub(self.mem.r16(DS, 0x843E), x, kill).map(drop),
             0x0447 => self.sp_timed_flag_by_sub(x),
-            0x0497 => self.sp_sub(0x04A6, x).map(drop),
+            0x0497 => self.sp_sub(0x04A6, x, kill).map(drop),
             0x04FA => {
                 // The flag is set before DS is restored: in the target's
                 // segment when the handler left DS there.
-                let (_, at_target) = self.sp_sub(self.sub_handler(0x8442, &x), x)?;
+                let (_, at_target) = self.sp_sub(self.sub_handler(0x8442, &x), x, kill)?;
                 let seg = if at_target { x.fs } else { DS };
                 let c = self.mem.r8(seg, svar::CHANGED) | 0x80;
                 self.mem.w8(seg, svar::CHANGED, c);
                 Some(())
             }
             0x05CE => {
-                let (cf, _) = self.sp_sub(self.sub_handler(0x844A, &x), x)?;
+                let (cf, _) = self.sp_sub(self.sub_handler(0x844A, &x), x, kill)?;
                 if cf {
                     self.msg(FAILED);
                 } else {
@@ -301,8 +303,8 @@ impl Machine {
     /// segment; for a target outside DGROUP the original then reads the
     /// next handler and 29CF:0941's variables through it and runs into
     /// data: None.
-    fn sp_sub_leaky(&mut self, h: u16, x: Fx) -> Option<()> {
-        let (_, at_target) = self.sp_sub(h, x)?;
+    fn sp_sub_leaky(&mut self, h: u16, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
+        let (_, at_target) = self.sp_sub(h, x, kill)?;
         if at_target && x.fs != DS {
             return crate::giveup::not_ported("29CF:0941: DS left at the target's segment: not followed");
         }
@@ -313,7 +315,7 @@ impl Machine {
     /// whether it left DS at the target's segment: handlers pop the
     /// target's far pointer into DS:SI, and DS is DGROUP again only after
     /// a successful 2EBD:0102 or a 2EBD:0004.
-    fn sp_sub(&mut self, h: u16, x: Fx) -> Option<(bool, bool)> {
+    fn sp_sub(&mut self, h: u16, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<(bool, bool)> {
         let ds = |t: bool| Some((false, t));
         match h {
             0x00CB | 0x03C0 => ds(false),
@@ -365,7 +367,7 @@ impl Machine {
             0x0288 => {
                 let element = self.sw(&x, 0x26) & 0xFF;
                 let (ax, _) = self.val_0bca(&x)?;
-                self.hp_change(x.fs, x.dx, ax, element)?;
+                self.hp_change(x.fs, x.dx, ax, element, kill)?;
                 ds(true)
             }
             0x02F0 => {
@@ -406,9 +408,9 @@ impl Machine {
             0x058F => self.sp_restore_attr(x).and(ds(true)),
             0x05F7 => {
                 let bp = x.bp.wrapping_mul(2).wrapping_add(8);
-                Some((self.sp_transfer(Fx { bp, ..x })?, true))
+                Some((self.sp_transfer(Fx { bp, ..x }, kill)?, true))
             }
-            0x0604 => Some((self.sp_transfer(x)?, true)),
+            0x0604 => Some((self.sp_transfer(x, kill)?, true)),
             _ => crate::giveup::not_ported("2EBD:0102: a spell routine not in the table"),
         }
     }
@@ -666,7 +668,7 @@ impl Machine {
     /// 0x80 (but not 0x4000) change their maximum too; HP is capped at
     /// the maximum. A player-like record (0x4000) at 0 HP or less dies
     /// (2686:02B4); any other goes through the kill handler.
-    fn hp_change(&mut self, seg: u16, off: u16, ax: u16, element: u16) -> Option<()> {
+    fn hp_change(&mut self, seg: u16, off: u16, ax: u16, element: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         let ax = self.absorb_damage(seg, off, ax);
         let ax = self.resist(seg, off, ax, element);
         let flags = self.mem.r16(seg, off.wrapping_add(field::FLAGS));
@@ -688,7 +690,7 @@ impl Machine {
             }
             return Some(());
         }
-        self.kill_check(seg, off, &mut crate::strike::NoKillHooks).map(drop)
+        self.kill_check(seg, off, kill).map(drop)
     }
 
     /// 2CDD:09E0 (`spell_flag_table`): the target's block in the
@@ -735,14 +737,14 @@ impl Machine {
     /// the kill handler runs. It leaves DS at the target's segment; for
     /// a target outside DGROUP the original then reads its message and
     /// handler tables through that segment and runs into data: None.
-    fn sp_instant_death(&mut self, x: Fx) -> Option<()> {
+    fn sp_instant_death(&mut self, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         let chance = self.h08b7(&x)?.wrapping_add(self.sw(&x, 0));
         if chance > self.percent() {
             self.msg(FAILED);
             return Some(());
         }
         self.mem.w16(x.fs, x.dx.wrapping_add(field::HP), 0xFFFF);
-        self.kill_check(x.fs, x.dx, &mut crate::strike::NoKillHooks)?;
+        self.kill_check(x.fs, x.dx, kill)?;
         if x.fs != DS {
             // DS is left at the target's segment: the message and every
             // table read after it go through the wrong segment.
@@ -868,7 +870,7 @@ impl Machine {
     /// capped at (STR + END) × 64, at least 0 when draining). The player
     /// gets the opposite of what the target gets. Returns CF (only SP can
     /// fail).
-    fn sp_transfer(&mut self, x: Fx) -> Option<bool> {
+    fn sp_transfer(&mut self, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<bool> {
         let a = self.val_0c23(&x, true);
         let b = x.bp & 0xF;
         let passes = [(x.fs, x.dx, a.ax), (DS, PLAYER, a.ax.wrapping_neg())];
@@ -885,7 +887,7 @@ impl Machine {
                 Some(false)
             }
             8 => {
-                self.hp_change(x.fs, x.dx, a.ax, 4)?;
+                self.hp_change(x.fs, x.dx, a.ax, 4, kill)?;
                 let hp = PLAYER + field::HP;
                 let v = self.mem.r16(DS, hp).wrapping_add(a.ax.wrapping_neg());
                 self.mem.w16(DS, hp, v);

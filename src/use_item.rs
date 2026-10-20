@@ -128,7 +128,8 @@ pub trait UseHooks {
     /// 29CF:00FA with SI the player and FS DGROUP: the player casts spell
     /// `spell` (the level byte at 1AA as the caller set it).
     fn cast(&mut self, m: &mut Machine, files: &mut Files, spell: u8) -> Option<()> {
-        m.player_cast(files, spell)
+        // On the player (no target is asked): no quest target to give up.
+        m.player_cast(files, spell, &mut |_, _| {})
     }
     /// 2AA1:021B: the player's item at DGROUP `si` broke.
     fn broken(&mut self, m: &mut Machine, si: u16) -> Option<()> {
