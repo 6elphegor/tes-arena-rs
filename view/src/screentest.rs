@@ -803,7 +803,8 @@ fn the_spellmaker_as_the_original_draws_it() {
             d.click(a, 164, 74, MouseButton::Left);
             d.frame(a);
             assert!(until_asked(d, a, 3), "the guild master asks");
-            d.key(a, KeyCode::Digit3, Some("3"));
+            // Its third entry, the spellmaker (the boxes 18h high from 3Ah).
+            d.click(a, 0xA0, 0x76, MouseButton::Left);
             assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker is up");
         },
         layer,
@@ -825,12 +826,13 @@ fn the_guilds_menu_as_the_original_draws_it() {
     );
 }
 
-/// The guild's menu up, its entry `key` picked: the screen it asks next.
-fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
+/// The guild's menu up, its entry at `y` clicked (gen_screens.py's): the
+/// screen it asks next.
+fn guild_pick(a: &mut App, d: &mut Driver, y: i32) {
     d.click(a, 164, 74, MouseButton::Left);
     d.frame(a);
     assert!(until_asked(d, a, 3), "the guild master asks");
-    d.key(a, key, Some(text));
+    d.click(a, 0xA0, y, MouseButton::Left);
     assert!(a.pending.is_some(), "the guild asks again");
 }
 
@@ -838,13 +840,13 @@ fn guild_pick(a: &mut App, d: &mut Driver, key: KeyCode, text: &str) {
 /// gold left.
 #[test]
 fn the_guilds_buy_as_the_original_draws_it() {
-    screen("guildbuy", |a, d| guild_pick(a, d, KeyCode::Digit1, "1"), layer);
+    screen("guildbuy", |a, d| guild_pick(a, d, 0x46), layer);
 }
 
 /// The guild's Detect Magic: the items to look at, a list.
 #[test]
 fn the_guilds_detect_magic_as_the_original_draws_it() {
-    screen("guilddetect", |a, d| guild_pick(a, d, KeyCode::Digit2, "2"), layer);
+    screen("guilddetect", |a, d| guild_pick(a, d, 0x5E), layer);
 }
 
 /// R: camping (2542:01E6, 1194:424E), refused in the guild: its box.
@@ -2271,7 +2273,7 @@ fn the_world_map_again_as_the_original_draws_it() {
 /// The guild's Buy, then its kind clicked at row `y` (as gen_screens.py's
 /// script clicks it, x A0h): the potions, the magic items, the spells.
 fn guild_buy(a: &mut App, d: &mut Driver, y: i32) {
-    guild_pick(a, d, KeyCode::Digit1, "1");
+    guild_pick(a, d, 0x46);
     d.click(a, 0xA0, y, MouseButton::Left);
 }
 

@@ -697,8 +697,8 @@ impl Travel {
                 Some(live) => {
                     let (cx, cy) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
                     let b = if right { 2 } else { 1 };
-                    self.list_reads.push(arena::listwindow::ListRead { buttons: b, x: cx, y: cy, keys: 0 });
-                    self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0 });
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: b, x: cx, y: cy, keys: 0, codes: [0; 2] });
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; 2] });
                     let (mark, top, end) = live.live(&self.list_reads);
                     menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
                     menu.top = Some(top as usize);
@@ -1071,8 +1071,8 @@ impl Travel {
                     _ => return,
                 };
                 let (cx, cy) = (at.0.clamp(0, 319) as u16, at.1.clamp(0, 199) as u16);
-                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: bit });
-                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0 });
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: bit, codes: [0; 2] });
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; 2] });
                 let Some(live) = self.list_live.as_ref() else { return };
                 let (mark, top, end) = live.live(&self.list_reads);
                 menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };

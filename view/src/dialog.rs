@@ -203,7 +203,9 @@ pub fn menu_at(m: &Machine, si: u16, bx: u16, di: u16) -> Menu {
         let mut l = text_at(m, p, colour);
         entries.push(l.swap_remove(0));
     }
-    let keys = m.mem.cstr(DS, bx).to_vec();
+    // (A byte an entry, whatever they hold, 0F2A's loop compares; none
+    // with BX FFFFh.)
+    let keys = if bx == 0xFFFF { Vec::new() } else { (0..entries.len() as u16).map(|i| m.mem.r8(DS, bx.wrapping_add(i))).collect() };
     // 3159:0F2A draws it in the font selected as it is asked (B036).
     Menu { title, entries, keys, selected: 0, list: false, kind: 0, font: Some(hud::GameFont::selected(m)), top: None }
 }

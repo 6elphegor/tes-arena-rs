@@ -1860,8 +1860,8 @@ impl Creation {
             _ => return,
         };
         self.cursor = at;
-        self.class_reads.push(ListRead { buttons, x: at.0, y: at.1, keys });
-        self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0 });
+        self.class_reads.push(ListRead { buttons, x: at.0, y: at.1, keys, codes: [0; 2] });
+        self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0, codes: [0; 2] });
     }
 
     /// The next question (number `asked` from 0): its window on the game
@@ -2406,6 +2406,9 @@ impl Creation {
         let n = ask.entries.len();
         let rows = if ask.rows == 0 { n } else { ask.rows.min(n) };
         match inp {
+            // A menu's loop (0F2A) has no arrows and no Enter: its keys
+            // and a click pick, Esc and the right button leave.
+            Input::Up | Input::Down | Input::Enter if ask.rows == 0 => {}
             Input::Up => {
                 ask.sel = ask.sel.saturating_sub(1);
                 ask.moved = true;
@@ -2420,9 +2423,11 @@ impl Creation {
             // waits on.
             Input::Esc | Input::Right if ask.rows == 0 => return Some(0xFFFF),
             Input::Esc | Input::Right => {}
+            // The character typed made a capital (0000:9D74), found among
+            // the entries' keys as they are.
             Input::Char(c) => {
                 let c = c.to_ascii_uppercase();
-                if let Some(i) = ask.keys.iter().position(|&k| k.to_ascii_uppercase() == c) {
+                if let Some(i) = ask.keys.iter().take(n).position(|&k| k == c) {
                     return Some(i as u16);
                 }
             }
