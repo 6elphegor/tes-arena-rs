@@ -1539,9 +1539,10 @@ fn talked_to(a: &mut App, d: &mut Driver) {
         m.mem.w16(DS, at, v);
     }
     m.mem.w16(DS, arena::talk::var::CLICKED, 0x0AB3);
-    // The turn's tick (`Engine::tick`) moves the timer to gen_screens.py's
-    // TALK_TICKS as the talk starts (what is said of oneself is rolled from
-    // it, 1194:E273).
+    // The timer at gen_screens.py's TALK_TICKS as the talk starts (what is
+    // said of oneself is rolled from it, 1194:E273); the turn's tick
+    // (`Engine::tick`) comes after it, as the frame's waits do.
+    m.mem.w16(DS, arena::frame::var::TICKS, 1);
     d.frame(a);
     assert!(a.pending.is_some(), "the townsperson's menu");
 }
