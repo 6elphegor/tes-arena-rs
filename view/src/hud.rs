@@ -1012,15 +1012,10 @@ fn box_size_in(tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32) -> 
     (w, h, tx, margin + (rh + 1) / 2)
 }
 
-/// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them:
-/// a line ended by a CR (`lines` leaves an empty span at its end) centred
-/// on the box, a last one without from the text's x.
-#[allow(clippy::too_many_arguments)]
-fn draw_box(screen: &mut Screen, st: &Style, font: &Font, rect: (i32, i32, i32, i32), lines: &[Vec<Span>], colour: u8) {
-    draw_box_in(screen, &st.tiles, font, rect, lines, MARGIN, colour);
-}
-
-/// `draw_box` with the tiles `tiles` and 965A's margin `margin`.
+/// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them
+/// with the tiles `tiles` and margin `margin`: a line ended by a CR
+/// (`lines` leaves an empty span at its end) centred on the box, a last
+/// one without from the text's x.
 fn draw_box_in(screen: &mut Screen, tiles: &Tiles, font: &Font, (x, y, w, h): (i32, i32, i32, i32), lines: &[Vec<Span>], margin: i32, colour: u8) {
     screen.tiles(tiles, x, y, w / tiles.w as i32, h / tiles.h as i32);
     let (_, _, tx, ty) = box_size_in(tiles, font, lines, margin);
