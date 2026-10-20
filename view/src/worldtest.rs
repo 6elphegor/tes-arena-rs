@@ -787,6 +787,12 @@ fn frames_reading(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usiz
     for _ in 0..n {
         a.compose();
         frames(a, d, seen, 1, |_| false);
+        // A movie up (a dream's vision): its pages clicked through, as
+        // gen_worldframes.py's `visioned` clicks them (no keys typed, so
+        // none in the ring); then the box read with the one Space.
+        while !a.movies.is_empty() {
+            d.click(a, 160, 100, MouseButton::Left);
+        }
         if a.waiting() {
             d.key(a, KeyCode::Space, Some(" "));
         }
@@ -1827,19 +1833,24 @@ fn case(name: &str) -> Option<Case> {
                 frames(a, d, seen, 1, |_| false);
             }))
         }
-        // The palace closed at night: its box clicked away.
+        // The palace closed at night: its box clicked away at its middle,
+        // the harness's mouse at (A0h, 60h) (the window's click 4 on): the
+        // box's reads (1194:59C8's 5536 and 5E21) leave the mouse there,
+        // where the next frame's controls take the door's click's release
+        // (2826:0A4C: CB60).
         "playpalacenight" => (Place::Street, Box::new(|a: &mut App| {
             at_hour(a, 22, 0);
             at_square(a, 9, 0x7C, 0x80);
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            clicked_with(a, d, seen, 3, &[Act::Click(160, 100)]);
+            clicked_with(a, d, seen, 3, &[Act::Click(0xA4, 0x64)]);
             frames(a, d, seen, 3, |_| false);
         })),
         // gen_worldframes.py's `audience`: the palace's door by day with the
         // town taken for the Imperial City (A46 8) at the staff's ninth
         // stage: the artifact's audience (0000:425F, text 5DDh), its box
-        // clicked away.
+        // clicked away with the harness's mouse at (160, 100) (the window's
+        // click 4 on: the click left for the actors goes on from there).
         "playaudience9" => (Place::Street, Box::new(|a: &mut App| {
             at_hour(a, 12, 0);
             at_square(a, 9, 0x7C, 0x80);
@@ -1847,7 +1858,7 @@ fn case(name: &str) -> Option<Case> {
             a.engine.m.mem.w8(DS, 0x0F77, 9);
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            clicked_with(a, d, seen, 3, &[Act::Click(160, 100)]);
+            clicked_with(a, d, seen, 3, &[Act::Click(164, 104)]);
             frames(a, d, seen, 3, |_| false);
         })),
         // The Emperor's audience (F77 8): the palace's door clicked, the
@@ -3750,14 +3761,6 @@ fn the_row_tables_made_as_the_original_makes_them() {
             if only.as_deref().is_some_and(|o| o != name) {
                 continue;
             }
-            // (playdream left out: the original's rest and dream make five
-            // drawings more than the view's (34 against 29, CCBC's count
-            // as much ahead), likely the screen's redraws round the dream
-            // (1194:43F5's 4EFD, 2294:10EC) that `RestHooks::screen` leaves
-            // to the front end.)
-            if only.is_none() && name == "playdream" {
-                continue;
-            }
             let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };
             let Some((mut a, _)) = played(place, |a| {
                 setup(a);
@@ -3824,13 +3827,6 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-/// (playdream's state is left out: its track matches, and its EMS banks
-/// and files (the world kept, the dream's D45D, the world back, 2542:0446's
-/// colours, the hours drawn on the page) are the original's; DGROUP still
-/// differs where the window's input meets the boxes: the timer (0151) and
-/// CCBC, the key ring (AC4D: the view's Space at each wait, the harness's
-/// one key at the box) and the buttons (AFF9, 7926: the dream's last click's
-/// release, which the original's box reads at 1194:59E5, the window's own).)
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
@@ -3851,6 +3847,7 @@ const BUSY_STATE: &[&str] = &[
     "playcreaturecast",
     "playcrowd",
     "playdawn",
+    "playdream",
     "playeffectsheet",
     "playequip",
     "playequipcantuse",

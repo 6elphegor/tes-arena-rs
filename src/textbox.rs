@@ -358,12 +358,16 @@ impl Machine {
 
     /// 1194:59C8 whole: the box shown (`message_wait_box`) and, unless 5E0
     /// bit 800h, once the front end's wait for a click or a key (1194:5536)
-    /// is over, put away (`message_box_closed`). The mouse's reads on the
-    /// way (8FC4: 8F92, 8F94, 8FA8, AFF9) are the front end's.
+    /// is over, put away (`message_box_closed`) and the buttons let go: its
+    /// last loop (5E21) reads the mouse until AFF9 is 0, so a click's
+    /// release (or a press left from before, which 59E5 waits out) is the
+    /// box's, not the next frame's. The mouse's other reads on the way
+    /// (8FC4: 8F92, 8F94) are the front end's.
     pub fn message_shown(&mut self, text: (u16, u16), screen: Option<&[u8]>) -> Option<()> {
         self.message_wait_box(text, screen)?;
         if self.mem.r16(DS, 0x05E0) & 0x800 == 0 {
             self.message_box_closed();
+            self.mem.w8(DS, 0xAFF9, 0);
         }
         Some(())
     }

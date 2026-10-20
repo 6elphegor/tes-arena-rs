@@ -1991,8 +1991,6 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
         }
         return TurnOut { frame: Some(arena::engine::Frame::Running), level_changed: false, effect: None };
     }
-    let t = engine.frame_ticks();
-    engine.tick(t);
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
     let dac = assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
@@ -2025,6 +2023,11 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     let (mx, my) = engine.m.mouse_motion;
     engine.m.mouse_motion = (mx.wrapping_add(input.drag.0 as u16), my.wrapping_add(input.drag.1 as u16));
     let frame = prof::time("engine.frame", || engine.frame(Input::Steer(&input.intent), &mut hooks));
+    // A428..A444: the frame's waits for the timer after its body (the
+    // ticks a level's flags ask, C39A as the body left it), so what the
+    // body did to 0151 (a movie's resets) is under them.
+    let t = engine.frame_ticks();
+    engine.tick(t);
     if frame == Some(arena::engine::Frame::Running) && !(engine.page.is_some() && engine.page_gaps.is_empty()) {
         creature_flats(engine, &mut hooks);
     }
@@ -5456,11 +5459,30 @@ impl App {
 
     /// A click while the game waits: a box read, or a menu's entry picked.
     fn dialog_click(&mut self) {
+        let (x, y) = self.screen_point();
         if !self.boxes.is_empty() {
+            // The box's reads of the mouse (1194:5536's that takes the
+            // press, 5E21's that takes the release) leave the cursor where
+            // the click was, 4 up and left of the window's. A click on the
+            // world whose handling showed the box (a door's trigger in
+            // 2826:09AC) goes on after it to leave the click for the actors
+            // (0A4C: C39A bit 80h, CB60 the cursor + 4) from there; the
+            // port's box doesn't wait, so that was left at the click's
+            // place before: moved to where the box's reads left the cursor.
+            use arena::mem::DS;
+            let m = &mut self.engine.m;
+            m.mem.w16(DS, arena::controls::var::MOUSE_X, (x - 4).max(0) as u16);
+            m.mem.w16(DS, arena::controls::var::MOUSE_Y, (y - 4).max(0) as u16);
+            m.mouse_clamp();
+            if m.mem.r16(DS, arena::movement::var::LEVEL_FLAGS) & 0x80 != 0 {
+                let cx = m.mem.r16(DS, arena::controls::var::MOUSE_X).wrapping_add(4);
+                let cy = m.mem.r16(DS, arena::controls::var::MOUSE_Y).wrapping_add(4);
+                m.mem.w16(DS, arena::click::var::ACTOR_CLICK, cx);
+                m.mem.w16(DS, arena::click::var::ACTOR_CLICK + 2, cy);
+            }
             self.box_read();
             return;
         }
-        let (x, y) = self.screen_point();
         // The spellmaker waits for a click on its screen or form.
         if matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)) {
             self.answer(dialog::Answer::Click(x.clamp(0, 319) as u16, y.clamp(0, 199) as u16));
