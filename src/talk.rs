@@ -1334,11 +1334,13 @@ impl Machine {
         let (x, y) = (self.g16(si), self.g16(si.wrapping_add(4)));
         let sq = square_at(x, y);
         if al != self.g8(ITEM_FLATS + 1) {
-            // 292B:086C: FS isn't set on this way: it is the walls'
-            // segment ([D806]) as the frame leaves it before 1194:DB6C,
-            // which the loot window keeps as the record's (12C2).
+            // 292B:086C: FS isn't set on this way: it is as the frame
+            // left it before 1194:DB6C (`Machine::fs_creatures`): the
+            // walls' segment ([D806]) from the drawing's set-up, or the
+            // creatures' ([1042]) once the frame's speeds ran with a fight
+            // on; the loot window keeps it as the record's (12C2).
             let ax = 0x0F00 | (self.flat_of(si) & 0xFF);
-            let fs = self.g16(MAP);
+            let fs = if self.fs_creatures { self.g16(0x1042) } else { self.g16(MAP) };
             hooks.loot(self, files, ax, si, fs, sq)?;
             return Some(true);
         }

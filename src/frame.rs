@@ -527,6 +527,10 @@ impl Machine {
         self.mem.w16(DS, crate::controls::var::TURN, (bx >> 1) + 0xD);
         let n = self.mem.r16(DS, 0x0FFB);
         let seg = self.mem.r16(DS, 0x1042);
+        // (2294:115F loads FS with it unless no creature fights, `jcxz`.)
+        if n != 0 {
+            self.fs_creatures = true;
+        }
         let corpse = (self.mem.r8(DS, 0xC936) as u16).wrapping_add(self.mem.r16(DS, 0xC38E)) as u8;
         let mut si = 0x0C57u16;
         for _ in 0..n {

@@ -66,9 +66,10 @@ pub trait EngineHooks: ControlHooks + FrameHooks {
     fn draw_setup(&mut self, _m: &mut Machine, _half: u16) {}
     /// 0000:CF96, the hook CD56 (25CA:0271, `Machine::flat_creature`) for
     /// each creature's flat the page's drawing reached, in its walk's
-    /// order, called on the machine as the drawing ends (the drawing ran
-    /// on a copy). Nothing by default: the flats stay in
-    /// `Engine::page_creatures`.
+    /// order, called on the machine where C923's walk calls it: after the
+    /// view's set-up (`Machine::view_begin`: the player's square, CB90),
+    /// the drawing itself having run on a copy. Nothing by default: the
+    /// flats stay in `Engine::page_creatures`.
     fn creature_flats(&mut self, _m: &mut Machine, _files: &mut Files, _reached: &[crate::render::Creature]) -> Option<()> {
         Some(())
     }
@@ -422,9 +423,6 @@ impl Engine {
             *page = p;
             self.walked = Some(walked);
             self.page_gaps = gaps;
-            if self.page_gaps.is_empty() {
-                hooks.creature_flats(m, files, &creatures)?;
-            }
             self.page_creatures = creatures;
             for (o, before, after) in wrote {
                 // Written back to the machine's own byte: the original's
@@ -457,7 +455,9 @@ impl Engine {
                 self.page_wrote[mapped as usize + 1] = None;
             }
         }
-        // A322: the drawing's set-up (0000:D4B4, the floor's half).
+        // A322: the drawing's set-up (0000:D4B4, the floor's half), which
+        // leaves FS the walls' (0000:D476).
+        m.fs_creatures = false;
         if !hooks.step(m, Step::DrawSetup(0x140)) {
             hooks.draw_setup(m, 0x140);
         }
@@ -498,6 +498,13 @@ impl Engine {
         m.mem.w8(DS, STAGE, 7);
         if !hooks.step(m, Step::View) {
             m.view_begin();
+            // The creature flats the drawing reached (its hook CD56,
+            // 25CA:0271): in the original they come in C923's walk, after
+            // its set-up above, so a creature placed then finds the
+            // player's square (CB90) and the view's as this frame's.
+            if self.page.is_some() && self.page_gaps.is_empty() {
+                hooks.creature_flats(m, files, &self.page_creatures)?;
+            }
             for (s, at) in m.view_walk_doors() {
                 hooks.sound(m, s, at);
             }
