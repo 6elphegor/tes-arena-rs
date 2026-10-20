@@ -257,6 +257,9 @@ thread_local! {
     /// The case ends with its play's last frame (gen_worldframes.py's
     /// `ends`): no last frame run again after it.
     static ENDS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The level a stairs walk started on (gen_worldframes.py's
+    /// `stairs_from`, for `level_moved`).
+    static LEVEL_AT: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }
 
 #[path = "savetest.rs"]
@@ -1210,6 +1213,50 @@ fn used(a: &mut App, index: u16) {
     crate::panels::use_pick(&mut e.m, &mut e.files, index, &mut crate::panels::Said { listless: true, ..Default::default() });
 }
 
+/// gen_worldframes.py's `audience(8)`: west of the palace's door at noon,
+/// the town taken for the Imperial City (A46 8), the staff's line at the
+/// Emperor's audience (F77 8).
+fn audience8(a: &mut App) {
+    at_hour(a, 12, 0);
+    at_square(a, 9, 0x7C, 0x80);
+    a.engine.m.mem.w8(DS, 0x0A46, 8);
+    a.engine.m.mem.w8(DS, 0x0F77, 8);
+}
+
+/// A step's `do` between frames, as gen_worldframes.py's steps take it:
+/// the harness reads the track at the top of each frame, and the next
+/// step's first top comes after its `do`, so the last frame's line holds
+/// what the `do` left.
+fn done_between(a: &mut App, seen: &mut [[u16; 5]], put: impl FnOnce(&mut App)) {
+    put(a);
+    if let Some(l) = seen.last_mut() {
+        *l = state(a);
+    }
+}
+
+/// `playaudience8`'s door and audience into IMPPAL, then `stairs` of its
+/// levels' down stairs walked into (gen_worldframes.py's `IMPPAL_DOWN`:
+/// the square beside them, a frame, the up arrow held until the level
+/// changes, two frames after).
+fn imppal_down(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, stairs: usize) {
+    frames(a, d, seen, 2, |_| false);
+    let at = a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+    door_clicked(a, d, seen, 160.0, 100.0);
+    frames(a, d, seen, 3, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
+    movies_through(a, d);
+    frames(a, d, seen, 3, |_| false);
+    for &(row, col, heading) in [(3, 3, 0x100), (20, 29, 0x80), (18, 47, 0x80)].iter().take(stairs) {
+        done_between(a, seen, |a| at_square(a, row, col, heading));
+        frames(a, d, seen, 1, |_| false);
+        let level = a.engine.m.mem.r8(DS, arena::movement::var::LEVEL);
+        LEVEL_AT.with(|l| l.set(level));
+        a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+        frames(a, d, seen, 40, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != LEVEL_AT.with(|l| l.get()));
+        a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+        frames(a, d, seen, 2, |_| false);
+    }
+}
+
 /// A left click at (x, y) of the 320 x 200 screen whose release isn't
 /// read: the button held as the case ends, as the harness's last click's
 /// is (the screen it ends taken it at its press).
@@ -1890,6 +1937,31 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 3, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
             movies_through(a, d);
             frames(a, d, seen, 3, |_| false);
+        })),
+        // gen_worldframes.py's `playimppal`: `playaudience8` into IMPPAL,
+        // its stairs down to the fourth level (`IMPPAL_DOWN`), its staff
+        // piece clicked (`imppal_piece`): the staff made whole, its scenes
+        // clicked through, the area left (as `playlastpiece` ends).
+        "playimppal" => (Place::Street, Box::new(audience8), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            imppal_down(a, d, seen, 3);
+            done_between(a, seen, |a| {
+                at_square(a, 23, 20, 0);
+                for base in [0xC3D0u16, 0xBA62] {
+                    a.engine.m.mem.w16(DS, base + 4, (23 << 7) + 0x70);
+                }
+            });
+            frames(a, d, seen, 2, |_| false);
+            let at = a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+            a.release();
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            movies_through(a, d);
+            frames(a, d, seen, 3, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
+            assert_ne!(a.engine.m.mem.r8(DS, arena::trigger::var::AREA), at, "the area isn't left");
+            seen.pop();
+            ENDS.with(|e| e.set(true));
         })),
         // The house picked (picking armed, the seed SEED) and in (the area
         // left, `leaves`); three frames in the house.
@@ -3463,14 +3535,21 @@ fn files_written(f: &arena::bsa::Files) -> std::collections::BTreeMap<String, Ve
 /// gen_worldframes.py's `written` line from the files before and after:
 /// those created or changed, each its size and digest, deleted ones `-`;
 /// TEMPSAVE.$$$'s third plane counted as zeros where the floor plane's
-/// segment `floor` (D748) is 0, as there.
-fn written_line(pre: &std::collections::BTreeMap<String, Vec<u8>>, now: &std::collections::BTreeMap<String, Vec<u8>>, floor: u16) -> String {
+/// segment `floor` (D748) is 0, or where the plane is 0000:0000's bytes
+/// (`low`, written where D748 was 0 between the case's start and end), as
+/// there.
+fn written_line(pre: &std::collections::BTreeMap<String, Vec<u8>>, now: &std::collections::BTreeMap<String, Vec<u8>>, floor: u16, low: &[u8]) -> String {
     let names: std::collections::BTreeSet<&String> = pre.keys().chain(now.keys()).collect();
     names.into_iter().filter_map(|k| match (now.get(k), pre.get(k)) {
         (None, _) => Some(format!("{k}:-")),
         (Some(n), was) if was != Some(n) => {
             let mut d = n.clone();
-            if k == "TEMPSAVE.$$$" && floor == 0 && d.len() > 0x10000 {
+            // (What changes there after the write aside: the BIOS's tick
+            // count, 0040:006C, in the harness's; the movie player's chunk
+            // header, 0000:64B7..64BC, in the port's image.)
+            let masked = |b: &[u8]| -> Vec<u8> { b.iter().enumerate().map(|(i, &x)| if (0x46C..0x470).contains(&i) || (0x64B7..0x64BD).contains(&i) { 0 } else { x }).collect() };
+            let from_low = d.len() > 0x164BD && low.get(..d.len() - 0x10000).is_some_and(|l| masked(l) == masked(&d[0x10000..]));
+            if k == "TEMPSAVE.$$$" && (floor == 0 || from_low) && d.len() > 0x10000 {
                 d[0x10000..].fill(0);
             }
             Some(format!("{k}:{:x}:{:x}", d.len(), fnv(d.iter().copied())))
@@ -3514,7 +3593,7 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
         // e.g. playlastpiece's scenes keeping the dungeon's world.)
         let start_floor = pre.borrow().as_ref().map_or(1, |d: &Vec<u8>| u16::from_le_bytes([d[0xD748], d[0xD749]]));
         let floor = if start_floor == 0 { 0 } else { a.engine.m.mem.r16(DS, 0xD748) };
-        let got = written_line(&pre_files.into_inner(), &now, floor);
+        let got = written_line(&pre_files.into_inner(), &now, floor, a.engine.m.mem.segment(0));
         // (With ARENA_SCREENS holding gen_worldframes.py's dumps, NAME.file.F
         // the original's: the engine's beside them as NAME.port.F.)
         if got != want {
@@ -3697,6 +3776,7 @@ const BUSY: &[&str] = &[
     "playholiday",
     "playhouselocked",
     "playhousepick",
+    "playimppal",
     "playinformant",
     "playinformantpaid",
     "playjagar",
@@ -3876,13 +3956,6 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// `list_window`, A872 the DI each caller leaves: E037's two short of
 /// the talk menu's table, E0A7's the sorted names'; the page the list
 /// keeps the screen shown, its picture left on it).
-/// (playjagar's state is left out too: its track, EMS banks and files
-/// match; DGROUP differs in the screen's colours that Jagar's words read
-/// before any frame of the case is drawn (A611's to A39E, D45D's to 9A6E):
-/// entries 1..8, which the original's DAC holds from the sky's window as
-/// it was last set, before the case's clock moved it, and 71h, the lamps'
-/// (set black by day), both of which the view's colours have only from a
-/// drawn frame; and by a tick in the timer (0151).)
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
@@ -3929,8 +4002,10 @@ const BUSY_STATE: &[&str] = &[
     "playholiday",
     "playhouselocked",
     "playhousepick",
+    "playimppal",
     "playinformant",
     "playinformantpaid",
+    "playjagar",
     "playjourneyend",
     "playkeyssheet",
     "playlastpiece",
