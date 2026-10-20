@@ -1141,11 +1141,17 @@ fn chest_picking(a: &mut App) {
 /// `script` answers, and goes on.
 fn clicked_with(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, script: &[Act]) {
     // The harness's mouse at (160, 100): the click 4 on (CB60), as
-    // playghostclick's; the mouse let go first (after a fight's swings the
-    // captured mouse clicks where they left it, not where the harness's
-    // click puts it).
+    // playghostclick's.
+    clicked_at(a, d, seen, n, (164, 104), script);
+}
+
+/// `clicked_with` clicking at (x, y) of the screen (the harness's mouse
+/// 4 before it). The mouse let go first (after a fight's swings the
+/// captured mouse clicks where they left it, not where the harness's
+/// click puts it).
+fn clicked_at(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, (x, y): (i32, i32), script: &[Act]) {
     a.release();
-    a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
+    a.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
     a.input(In::Button { button: MouseButton::Left, down: true });
     frames(a, d, seen, 1, |_| false);
     a.input(In::Button { button: MouseButton::Left, down: false });
@@ -2143,6 +2149,63 @@ fn case(name: &str) -> Option<Case> {
         // its stairs down to the fourth level (`IMPPAL_DOWN`), its staff
         // piece clicked (`imppal_piece`): the staff made whole, its scenes
         // clicked through, the area left (as `playlastpiece` ends).
+        // gen_worldframes.py's `playheartspiece`: Crypt of Hearts travelled
+        // to on the staff's sixth stage, its picture left, down its three
+        // stairs, its staff piece clicked (high in the view: (160, 60)),
+        // its text clicked away; five frames after.
+        "playheartspiece" => (Place::Street, Box::new(|a: &mut App| {
+            at_square(a, 95, 52, 0x100);
+            for (i, v) in [1u8, 5, 1, 1, 1, 1, 1, 1, 1].into_iter().enumerate() {
+                a.engine.m.mem.w8(DS, 0x0F76 + i as u16, v);
+            }
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            for (x, y) in [(70, 45), (198, 62), (198, 62), (62, 180)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
+            for _ in 0..200 {
+                if a.travel.is_none() {
+                    break;
+                }
+                if a.travel.as_ref().is_some_and(|t| t.picture_up()) {
+                    d.click(a, 295, 189, MouseButton::Left);
+                }
+                d.wait(a, 100);
+            }
+            assert!(a.travel.is_none(), "the journey ends the travel map");
+            for _ in 0..100 {
+                if a.fade.is_empty() && a.inside.is_none() {
+                    break;
+                }
+                d.wait(a, 20);
+            }
+            seen.push(state(a));
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: false, text: None });
+            frames(a, d, seen, 3, |_| false);
+            for &(row, col, heading) in &[(4, 52, 0x80), (53, 56, 0), (59, 56, 0x100)] {
+                done_between(a, seen, |a| at_square(a, row, col, heading));
+                frames(a, d, seen, 1, |_| false);
+                let level = a.engine.m.mem.r8(DS, arena::movement::var::LEVEL);
+                LEVEL_AT.with(|l| l.set(level));
+                a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+                frames(a, d, seen, 40, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != LEVEL_AT.with(|l| l.get()));
+                a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+                frames(a, d, seen, 2, |_| false);
+            }
+            done_between(a, seen, |a| {
+                at_square(a, 31, 30, 0);
+                for base in [0xC3D0u16, 0xBA62] {
+                    a.engine.m.mem.w16(DS, base + 4, (31 << 7) + 0x10);
+                }
+            });
+            frames(a, d, seen, 2, |_| false);
+            clicked_at(a, d, seen, 10, (160, 60), &[Act::Click(0xA0, 0x60)]);
+            frames(a, d, seen, 5, |_| false);
+        })),
         "playimppal" => (Place::Street, Box::new(audience8), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             imppal_down(a, d, seen, 3);
             done_between(a, seen, |a| {
@@ -3986,6 +4049,14 @@ fn the_state_as_the_original_leaves_it() {
 /// quest's informant paid in a tavern, a townsperson asked the way).
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
+// (gen_worldframes.py's `playheartspiece`, Crypt of Hearts' own staff
+// piece taken after the journey and three stairs, is left out of both
+// lists for now: the piece is taken and F77 and the staff's flags end as
+// the original's, but DGROUP still differs in the last door face drawn
+// (0000:B1AD's CCB6, CCB8, CCC8: another door last on the two sides), and
+// without the engine's page (the track test) the view's own pick misses
+// the piece hung from the ceiling. Its case is kept: ARENA_STATE_CASE
+// runs it.)
 const BUSY: &[&str] = &[
     "playartifactheal",
     "playartifactparalyse",
@@ -4158,6 +4229,11 @@ fn the_row_tables_made_as_the_original_makes_them() {
         for f in text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).filter(|f| f.len() == 3 && f[0] == "rows") {
             let name = f[1];
             if only.as_deref().is_some_and(|o| o != name) {
+                continue;
+            }
+            // (`playheartspiece` left out, as from the busy lists: without
+            // the engine's page the view's own pick misses its piece.)
+            if name == "playheartspiece" && only.is_none() {
                 continue;
             }
             let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };

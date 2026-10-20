@@ -101,6 +101,13 @@ LEAVES = dict(BOXES, leaves=True)
 TRAVEL = [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]
 
 
+def quest_dungeon(x, y, picture):
+    """The travel map's clicks to High Rock's place at (x, y), Travel, then
+    with `picture` (the staff's dungeon: 26F7:00CE's 292B:0362) its
+    button (295, 189)."""
+    return [('click', 70, 45), ('click', x, y), ('click', x, y), ('click', 62, 180)] + [('click', 295, 189)] * picture
+
+
 def poisoned(put):
     """`put`, then the player poisoned (05B1 bit 0): unwell for the
     journey's question (26F7:07CD's 5B1 & 7), the poison's damage on
@@ -223,6 +230,22 @@ CASES = {
                      [((), (), 2, None),
                       ((SHIFT, M), (), 1, None, [], dict(script=TRAVEL + [('click', 160, 118)] + BOXES['script'], leaves=True)),
                       ((), (SHIFT, M), 3, None)]),
+    # A main quest's dungeon travelled to (the save's are all known,
+    # CITYDATA's +18h bit 2): High Rock, the dungeon's place clicked
+    # (Crypt of Hearts, the staff's, at (198, 62); Mines of Khuras, the
+    # map's, at (71, 132)), its journey's box read, Travel; the journey's
+    # days, then for the staff's the dungeon's picture (26F7:00CE's
+    # 292B:0362: its words over it) left by its button (295, 189:
+    # 292B:042B), the area left; the outer loop on into the dungeon's
+    # first level; three frames.
+    'travelhearts': ('street', w.at_square(95, 52, 0x100),
+                     [((), (), 2, None),
+                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(198, 62, True), leaves=True)),
+                      ((), (SHIFT, M), 3, None)]),
+    'travelkhuras': ('street', w.at_square(95, 52, 0x100),
+                     [((), (), 2, None),
+                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(71, 132, False), leaves=True)),
+                      ((), (SHIFT, M), 3, None)]),
     # A dungeon in the wilderness: the window crossed south three times
     # (`wild_south`), which brings the grid's block (1Fh, 23h), WILD065
     # (its entrance, a 3333h wall: trigger 8), to the window's first
@@ -344,7 +367,9 @@ def main():
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('ds', after), ('ems', ems), ('ds0', a.pre_state[0]), ('ems0', a.pre_state[1]),
                               ('page', page), ('mask', mask), ('dac', dac), ('full', full)):
-                open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
+                # (`full` is the whole screen's digest, not its bytes.)
+                if isinstance(data, (bytes, bytearray)):
+                    open(os.path.join(dump, f'{name}.{ext}'), 'wb').write(data)
     out.close()
 
 

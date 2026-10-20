@@ -506,9 +506,7 @@ impl arena::travelmap::TravelHooks for Trip {
         }
     }
     fn dungeon_location(&mut self, m: &mut Machine, files: &mut Files, id: u16, _bx: u16) {
-        let (x, y) = (m.mem.r16(DS, 0x193E), m.mem.r16(DS, 0x1940));
-        let p = m.mem.r8(DS, arena::travelmap::var::SHOWN);
-        if m.city_climate(files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c)).is_none() {
+        if m.dungeon_location_built(files, id as u8).is_none() {
             println!("    the dungeon's record could not be built");
         }
     }

@@ -236,6 +236,11 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
             }),
             Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| fast_travel(a, d, seen, &[(70, 45), (200, 100), (200, 100), (62, 180), (160, 118)])),
         ),
+        // A main quest's dungeon of High Rock travelled to (Crypt of
+        // Hearts, the staff's; Mines of Khuras, the map's), its picture
+        // (292B:0362) left by its button, the dungeon entered.
+        "travelhearts" => quest_dungeon_case(198, 62),
+        "travelkhuras" => quest_dungeon_case(71, 132),
         "wilddungeon" => (
             Place::Wild,
             Box::new(|a: &mut App| wild_at(a, None, Some(0x2FF8), 0)),
@@ -250,6 +255,16 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
         ),
         _ => return None,
     })
+}
+
+/// gen_areaplay.py's `quest_dungeon`: from the street, High Rock's place
+/// at (x, y) travelled to and its picture left by its button.
+fn quest_dungeon_case(x: i32, y: i32) -> Case {
+    (
+        Place::Street,
+        Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)),
+        Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| fast_travel(a, d, seen, &[(70, 45), (x, y), (x, y), (62, 180)])),
+    )
 }
 
 /// The case's track, its state from its start and from the load, and its
@@ -287,9 +302,22 @@ fn fast_travel(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, clicks: &[
         if a.travel.is_none() {
             break;
         }
+        // A main quest's dungeon's picture, left by its button (the
+        // harness's click at (295, 189), 292B:042B).
+        if a.travel.as_ref().is_some_and(|t| t.picture_up()) {
+            d.click(a, 295, 189, MouseButton::Left);
+        }
         d.wait(a, 100);
     }
     assert!(a.travel.is_none(), "the journey ends the travel map");
+    // The picture's button's fade out (292B:0362's 55B2) played, the frame
+    // the screen was opened in run on to its end (`screen_ended`).
+    for _ in 0..100 {
+        if a.fade.is_empty() && a.inside.is_none() {
+            break;
+        }
+        d.wait(a, 20);
+    }
     // The area left at that frame's end: the next place entered.
     seen.push(state(a));
     frames_until(a, d, seen, 3, |_| false);
@@ -493,4 +521,19 @@ fn fast_travel_unwell_as_the_original() {
 #[test]
 fn into_a_wilderness_dungeon_as_the_original() {
     transit("wilddungeon");
+}
+
+/// Crypt of Hearts, High Rock's staff dungeon, travelled to: the journey,
+/// the dungeon's picture (292B:0362: its words, the button), the
+/// dungeon's first level entered (its MIF and INF), its first frames.
+#[test]
+fn into_the_crypt_of_hearts_as_the_original() {
+    transit("travelhearts");
+}
+
+/// Mines of Khuras, High Rock's map dungeon, travelled to as
+/// `travelhearts`.
+#[test]
+fn into_the_mines_of_khuras_as_the_original() {
+    transit("travelkhuras");
 }

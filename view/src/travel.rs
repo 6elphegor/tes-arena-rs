@@ -83,7 +83,6 @@ const TOWNS: u16 = 0x150D;
 const VILLAGES: u16 = 0x15D5;
 const DUNGEONS: u16 = 0x1765;
 const RECORD: u16 = 0x19;
-const SHOWN: u16 = 0x47E1;
 const NEAREST_REC: u16 = 0xA8BA;
 /// What `travel_nearest` writes: the nearest's index, record, distance,
 /// and the known-only switch.
@@ -336,10 +335,7 @@ impl TravelHooks for Hooks<'_> {
         self.frames.push(frame);
     }
     fn dungeon_location(&mut self, m: &mut Machine, files: &mut Files, id: u16, _bx: u16) {
-        let (x, y) = (m.mem.r16(DS, 0x193E), m.mem.r16(DS, 0x1940));
-        let p = m.mem.r8(DS, SHOWN);
-        let ok = m.city_climate(files, x, y, p).and_then(|c| m.dungeon_build_location(id as u8, c));
-        if ok.is_none() {
+        if m.dungeon_location_built(files, id as u8).is_none() {
             self.failed = true;
         }
     }
@@ -633,9 +629,12 @@ impl Travel {
         self.picture = Some(Picture::drawn(engine, ax));
     }
 
-    /// Whether a main quest's dungeon's picture is up.
+    /// Whether a main quest's dungeon's picture is up: kept from the
+    /// screen's end (26F7:00CE's 292B:0362), shown once the journey before
+    /// it has played (1194:30F1's days and their fades come first, inside
+    /// Travel).
     pub fn picture_up(&self) -> bool {
-        self.picture.is_some()
+        self.picture.is_some() && !self.journeying()
     }
 
     /// A click on the picture: in its button (110h..13Ah, B7h..C3h, as
@@ -656,7 +655,9 @@ impl Travel {
     /// A click at (x, y) of the screen (a button down: `right` the right).
     pub fn click(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, x: i32, y: i32, right: bool) {
         if self.picture.is_some() {
-            self.picture_click(engine, x, y);
+            if self.picture_up() {
+                self.picture_click(engine, x, y);
+            }
             return;
         }
         if self.done.is_some() {
@@ -1179,7 +1180,7 @@ impl Travel {
     /// The screen, the cursor at (x, y): its palette set.
     pub fn draw(&self, screen: &mut Screen, font: &Font, m: &mut Machine, x: i32, y: i32) {
         let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
-        if let Some(p) = &self.picture {
+        if let Some(p) = self.picture.as_ref().filter(|_| self.picture_up()) {
             p.draw(screen, &self.fonts);
             return;
         }

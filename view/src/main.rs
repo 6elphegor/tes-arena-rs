@@ -6121,6 +6121,7 @@ impl App {
         // The travel map's passes and journey (the game's turns from the
         // next tick after it ends).
         let travelling = self.travel.is_some();
+        let pic = self.travel.as_ref().is_some_and(|t| t.picture_up());
         if let Some(t) = &mut self.travel {
             t.advance(now.duration_since(self.movie_at).as_millis() as u32);
             // The province's loop's passes go on while no box waits.
@@ -6128,6 +6129,14 @@ impl App {
                 t.idle(&mut self.engine);
             }
             self.travel_after();
+        }
+        // A main quest's dungeon's picture once the journey to it has
+        // played (its tail faded to black): 26F7:00CE's 1194:55B2, black
+        // to black in 8 steps, then the picture in in 12 (5E3E).
+        if !pic && self.travel.as_ref().is_some_and(|t| t.picture_up()) {
+            let black = [[0, 0, 0, 0xFF]; 256];
+            let was = (std::mem::take(&mut self.fade), black, hud::Screen::new(black));
+            self.fade_to(was, 8, 12);
         }
         self.movie_at = now;
         self.screen_ended();

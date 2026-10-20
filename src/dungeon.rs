@@ -179,6 +179,21 @@ impl Machine {
         }
     }
 
+    /// 1194:3B0C with its I/O: the map row's conversion (3B3A, 1194:3E9E)
+    /// starts with 3183's province load (2E18, the destination's province
+    /// at 47E1), then the climate (3B49, 1194:3D91: its own 3183 load
+    /// and TERRAIN.IMG's byte, `city_climate`), the record filled
+    /// (`dungeon_build_location`). Two loads of the province, each a
+    /// CITYDATA path built (25FD:0844, its buffers taken in turn). None
+    /// where a load, the climate or the record can't be made.
+    pub fn dungeon_location_built(&mut self, files: &mut crate::bsa::Files, id: u8) -> Option<()> {
+        let province = self.mem.r8(DS, var::DEST_PROVINCE);
+        self.city_load_province(files, province)?;
+        let (x, y) = (self.mem.r16(DS, var::DEST_X), self.mem.r16(DS, var::DEST_Y));
+        let climate = self.city_climate(files, x, y, province)?;
+        self.dungeon_build_location(id, climate)
+    }
+
     /// 1194:3B0C. Fills the current location record (0A22) for a dungeon
     /// with local id `id`, from the travel destination at 1929 (name),
     /// 193E/1940 (x, y) and 47E1 (province). The climate byte that
