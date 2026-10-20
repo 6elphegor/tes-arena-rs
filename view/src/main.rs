@@ -5738,21 +5738,17 @@ impl App {
                     self.log_turn(0);
                 }
             }
-            // The wheel moves a menu's or a list's entry, as Up and Down do
-            // (a list scrolls to keep it shown).
+            // The wheel moves a list's line, as Up and Down do (a list
+            // scrolls to keep it shown); a menu's loop has no arrows.
             In::Wheel(dy) => {
-                if self.boxes.is_empty() {
+                if self.boxes.is_empty() && dy != 0.0 {
                     if let Some(Pending { need: dialog::Need::Menu(m), .. }) = &self.pending {
                         if m.list {
-                            // A list's line moved as by its arrows.
                             let k = if dy > 0.0 { hud::ListKey::Up } else { hud::ListKey::Down };
-                            if dy != 0.0 {
-                                self.list_key_read(k);
-                                if self.list_followed().is_none() {
-                                    self.list_moved(|m| hud::list_key(m, k));
-                                }
+                            self.list_key_read(k);
+                            if self.list_followed().is_none() {
+                                self.list_moved(|m| hud::list_key(m, k));
                             }
-                            return;
                         }
                     }
                 }
