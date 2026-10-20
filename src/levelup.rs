@@ -326,6 +326,7 @@ impl Machine {
         self.sheet_image(files, CHARSTAT)?;
         self.sheet_texts();
         self.sheet_image(files, BONUS)?;
+        self.points_drawn();
         self.arrows_made(files)?;
         let rolled = self.l16(POINTS_ROLLED);
         self.cursor_hidden();
@@ -347,8 +348,9 @@ impl Machine {
 
     /// 1194:12F5: the arrows: UPDOWN.IMG into bank [1032] at 67B9, the
     /// page under them (8 by 48h at 26h, 30h) kept in bank 5, the bank
-    /// mapped before put back; 1297 38h, their region at y 30h (1354
-    /// draws them). None where the file is missing.
+    /// mapped before put back; 1297 38h, their region at y 30h, and the
+    /// arrows drawn there (1354, `arrows_drawn`). None where the file is
+    /// missing.
     pub(crate) fn arrows_made(&mut self, files: &mut Files) -> Option<()> {
         let bank = self.l16(0x1032);
         let frame = self.l16(FRAME);
@@ -359,7 +361,41 @@ impl Machine {
         self.map_bank(old, 0);
         self.mem.w8(DS, 0x1297, 0x38);
         self.mem.w16(crate::mem::DATA, ARROWS_Y, 0x30);
+        self.arrows_drawn();
         Some(())
+    }
+
+    /// 1194:1354: UPDOWN.IMG's 8 x 10h at 67B9 in bank [1032] drawn at x
+    /// 26h, their region's y (5312's +372h +2), its 0s left out (5B04,
+    /// into the page where it is the game's own block), the bank before
+    /// mapped again.
+    pub(crate) fn arrows_drawn(&mut self) {
+        let bank = self.l16(0x1032);
+        let old = self.map_bank(bank, 0);
+        if self.page_is_block() {
+            let (frame, page) = (self.l16(FRAME), self.l16(0xA900));
+            let y = self.mem.r16(crate::mem::DATA, ARROWS_Y);
+            let mut di = self.l16(0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(0x26);
+            let mut si = ARROWS_PIC;
+            for _ in 0..0x10 {
+                for k in 0..8u16 {
+                    let b = self.mem.r8(frame, si);
+                    si = si.wrapping_add(1);
+                    if b != 0 {
+                        self.mem.w8(page, di.wrapping_add(k), b);
+                    }
+                }
+                di = di.wrapping_add(0x140);
+            }
+        }
+        self.map_bank(old, 0);
+    }
+
+    /// 1194:12E6: the points left (129C) drawn at (5Ch, 71h) (5634: their
+    /// digits at 929E, 9E06).
+    pub(crate) fn points_drawn(&mut self) {
+        let points = self.l8(crate::newgame::var::POINTS) as u16;
+        self.number_at(0x5C, 0x71, points);
     }
 
     /// 1194:1241..1249: the loop (5CF4) left by its first region, the

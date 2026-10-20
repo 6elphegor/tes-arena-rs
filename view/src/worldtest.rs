@@ -4330,6 +4330,14 @@ fn new_game_from_the_menu(name: &str, class: &str, sound: Option<arena::digital:
         a.creation_input(create::Input::Wait(50));
     }
     assert!(a.creation.is_none(), "the game not started: {:?}", stage(&a));
+    // Each box creation showed read the game's page (`Creation::game_box`):
+    // the page then the screen the window drew behind it (the frames the
+    // createframes vectors check against the original's), pixel for pixel.
+    let pages = create::BOX_PAGES.with(|b| std::mem::take(&mut *b.borrow_mut()));
+    assert!(!pages.is_empty(), "{name}: no box read the game's page");
+    for (back, differ) in &pages {
+        assert_eq!(*differ, 0, "{name}: the page under a box on the {back:?} screen differs from the screen in {differ} pixels");
+    }
     if with_sound {
         let got = a.engine.m.digital.as_ref().expect("the replay").calls.clone();
         let want = titleplay_calls(name);
