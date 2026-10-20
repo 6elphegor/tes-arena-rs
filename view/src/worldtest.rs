@@ -33,6 +33,21 @@ fn state(a: &App) -> [u16; 5] {
     [m.mem.r8(DS, arena::movement::var::LEVEL) as u16, m.mem.r16(DS, 0xBA62), m.mem.r16(DS, 0xBA64), m.mem.r16(DS, 0xBA66), m.mem.r16(DS, arena::movement::var::HEADING)]
 }
 
+/// The projectiles' slots (7DB8's count, 7DBC's twelve 1Ch-byte slots;
+/// 7DBA, a segment, left out) and the eight active actors' entries
+/// (0C57, 1Ch bytes each), as gen_worldframes.py's `objects_digest`.
+fn objects(a: &App) -> u64 {
+    let m = &a.engine.m;
+    fnv((0x7DB8..0x7DBA).chain(0x7DBC..0x7DBC + 12 * 0x1C).chain(0x0C57..0x0C57 + 8 * 0x1C).map(|o| m.mem.r8(DS, o)))
+}
+
+/// A track entry for the frame just run, and its projectiles and actors
+/// beside it (`OBJECTS`).
+fn pushed(a: &App, seen: &mut Vec<[u16; 5]>) {
+    seen.push(state(a));
+    OBJECTS.with(|o| o.borrow_mut().push(objects(a)));
+}
+
 /// The player at the middle of a square, facing `heading`.
 fn at_square(a: &mut App, row: u16, col: u16, heading: u16) {
     let m = &mut a.engine.m;
@@ -246,6 +261,9 @@ fn into_wild(a: &mut App) {
 const HARNESS_SEED: u32 = 0x19B7_6141;
 
 thread_local! {
+    /// Beside each track entry `pushed` keeps, the frame's projectiles and
+    /// actors (`objects`: gen_worldframes.py's `objects_digest`).
+    static OBJECTS: std::cell::RefCell<Vec<u64>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The state as `played`'s load left it, before the place's entry
     /// (for `the_state_measured_against_the_originals`).
     static BASE: std::cell::RefCell<Option<(Vec<u8>, Vec<u8>)>> = const { std::cell::RefCell::new(None) };
@@ -373,7 +391,9 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     a.fade.clear();
     a.fade_old = None;
     setup(&mut a);
-    let mut seen = vec![state(&a)];
+    OBJECTS.with(|o| o.borrow_mut().clear());
+    let mut seen = vec![];
+    pushed(&a, &mut seen);
     ENDS.with(|e| e.set(false));
     play(&mut a, &mut d, &mut seen);
     // The harness's last frame, run again with the page's writes watched
@@ -399,7 +419,7 @@ fn world_case(name: &str, place: Place, setup: impl FnOnce(&mut App), play: impl
 fn frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, until: impl Fn(&App) -> bool) {
     for _ in 0..n {
         d.frame(a);
-        seen.push(state(a));
+        pushed(a, seen);
         if until(a) {
             break;
         }
@@ -846,7 +866,7 @@ fn swinging_to_surrender(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, 
 /// runs the frame that takes it.
 fn ready(a: &mut App, seen: &mut Vec<[u16; 5]>) {
     a.input(In::Key { code: KeyCode::KeyA, down: true, text: Some("a".into()) });
-    seen.push(state(a));
+    pushed(a, seen);
     a.input(In::Key { code: KeyCode::KeyA, down: false, text: None });
 }
 
@@ -1000,7 +1020,7 @@ fn ruled(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act]) 
         act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the ruler still asking");
-    seen.push(state(a));
+    pushed(a, seen);
 }
 
 /// `n` frames, a box one of them shows (a quest's words, 0000:4903)
@@ -1014,7 +1034,7 @@ fn frames_answered(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usi
         while a.pending.is_some() || !a.boxes.is_empty() {
             act(a, d, left.next().expect("a box the script doesn't answer"));
         }
-        seen.push(state(a));
+        pushed(a, seen);
     }
 }
 
@@ -1131,14 +1151,14 @@ fn clicked_with(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize,
         if a.pending.is_some() || !a.boxes.is_empty() {
             break;
         }
-        seen.push(state(a));
+        pushed(a, seen);
     }
     for step in script {
         assert!(a.pending.is_some() || !a.boxes.is_empty(), "the window ended early");
         act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the window still asking");
-    seen.push(state(a));
+    pushed(a, seen);
     frames(a, d, seen, n - used, |_| false);
 }
 
@@ -1177,7 +1197,7 @@ fn riddle_played(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, answer: 
     super::super::super::type_text(d, a, answer);
     d.key(a, KeyCode::Enter, None);
     assert!(a.pending.is_none(), "the riddle answered");
-    seen.push(state(a));
+    pushed(a, seen);
     frames(a, d, seen, 10, |_| false);
 }
 
@@ -1521,7 +1541,7 @@ fn quick_cast(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, click: bool
     a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
     a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
     assert!(a.panel.is_none(), "no list with a Shift");
-    seen.push(state(a));
+    pushed(a, seen);
     a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
     a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
     if click {
@@ -1576,7 +1596,7 @@ fn levelled_frame(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
     }
     d.click(a, 10, 175, MouseButton::Left);
     assert!(a.creation.is_none() && a.pending.is_none() && a.boxes.is_empty(), "the level-up still asking");
-    seen.push(state(a));
+    pushed(a, seen);
 }
 
 /// gen_worldframes.py's `temple_hurt`: the player at half health, seeded.
@@ -1607,7 +1627,7 @@ fn serviced(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, kind: u8, scr
         act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the services still asking");
-    seen.push(state(a));
+    pushed(a, seen);
 }
 
 /// gen_worldframes.py's TALK_WHERE_SCRIPT: "Where is", its first line,
@@ -1666,7 +1686,7 @@ fn talked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act])
         act(a, d, step);
     }
     assert!(a.pending.is_none() && a.boxes.is_empty(), "the talk still asking");
-    seen.push(state(a));
+    pushed(a, seen);
 }
 
 /// The cases' set-ups and plays, by name (as the tests above play them).
@@ -1718,7 +1738,7 @@ fn case(name: &str) -> Option<Case> {
             assert!(!a.boxes.is_empty(), "the holiday's message");
             d.click(a, 0xA0, 0x60, MouseButton::Left);
             assert!(a.boxes.is_empty() && a.pending.is_none(), "the holiday's message still up");
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 2, |_| false);
         })),
         "playstoreclosed" => (Place::Street, Box::new(store_closed), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -1804,7 +1824,10 @@ fn case(name: &str) -> Option<Case> {
             assert_ne!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "the spell not waiting for its target");
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            // The harness's mouse at (160, 100), its click 4 past it
+            // (CB60): the window's click there, the mouse 4 up and left of
+            // it, which the aim reads (29CF:00D2).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
             frames(a, d, seen, 1, |_| false);
             a.input(In::Button { button: MouseButton::Left, down: false });
@@ -1836,7 +1859,9 @@ fn case(name: &str) -> Option<Case> {
             assert_ne!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "the spell not waiting for its target");
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            // (The aim reads the mouse, 4 up and left of the window's
+            // click: there at the harness's (160, 100).)
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
             frames(a, d, seen, 1, |_| false);
             a.input(In::Button { button: MouseButton::Left, down: false });
@@ -1871,7 +1896,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Digit2, Some("2"));
             d.key(a, KeyCode::Enter, None);
             assert!(a.pending.is_none(), "the hours answered");
-            seen.push(state(a));
+            pushed(a, seen);
             frames_reading(a, d, seen, 12);
         })),
         // `playcamp` with the staff's dream due (F76 0, F77 3, F7A 0): the
@@ -1892,7 +1917,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Digit2, Some("2"));
             d.key(a, KeyCode::Enter, None);
             assert!(a.pending.is_none(), "the hours answered");
-            seen.push(state(a));
+            pushed(a, seen);
             frames_reading(a, d, seen, 30);
         })),
         "playquickcast" => (Place::Dungeon, Box::new(|a: &mut App| {
@@ -1906,7 +1931,7 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
             a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
             assert!(a.panel.is_none(), "no list with a Shift");
-            seen.push(state(a));
+            pushed(a, seen);
             a.input(In::Key { code: KeyCode::KeyC, down: false, text: None });
             a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
             // (The harness's click puts the mouse at 160, 100; the window's
@@ -2219,12 +2244,12 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::KeyM, Some("m"));
             d.click(a, 0x100, 0xB0, MouseButton::Left);
             faded(a);
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
             d.key(a, KeyCode::F1, None);
             d.key(a, KeyCode::Escape, None);
             faded(a);
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 30, |_| false);
         })),
         "playautomap" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2236,7 +2261,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x100, 0xB0, MouseButton::Left);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playlog" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2254,7 +2279,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playlogprint" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2269,7 +2294,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playbarjump" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2280,7 +2305,7 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::KeyJ, down: true, text: None });
             let (x, y) = crate::sheets::bar_centre(0);
             d.click(a, x, y, MouseButton::Left);
-            seen.push(state(a));
+            pushed(a, seen);
             a.input(In::Key { code: KeyCode::KeyJ, down: false, text: None });
             frames(a, d, seen, 5, |_| false);
         })),
@@ -2298,7 +2323,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0x110, 0xBC, MouseButton::Left);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 9, |_| false);
         })),
         "playuselist" => (Place::Dungeon, Box::new(wounded_with_potion), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2313,7 +2338,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0xF0, 0xBD, MouseButton::Left);
             assert!(a.panel.is_none(), "the potion picked");
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 60, |_| false);
         })),
         "playbook" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2327,7 +2352,7 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0xF0, 0xA0, MouseButton::Right);
             assert!(a.panel.is_none(), "a right click leaves the list");
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         // The screens a menu key opens inside the frame, each case ending
@@ -2555,7 +2580,7 @@ fn case(name: &str) -> Option<Case> {
             assert!(a.travel.is_none(), "the journey ends the travel map");
             // (Shift and M still held, as the harness's step leaves them.)
             // The town's first frame's top, then its three frames.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 3, |_| false);
         })),
         // The first level's up stairs walked into: the way out's travel
@@ -2604,7 +2629,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequip" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2620,7 +2645,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipscroll" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2639,7 +2664,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipwear" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2657,7 +2682,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipdrop" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2676,7 +2701,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipspells" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2695,7 +2720,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipdescribe" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2714,7 +2739,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipstaff" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2741,7 +2766,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipclash" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2765,7 +2790,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipcantuse" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2789,7 +2814,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipspellpage" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2812,7 +2837,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipdropwhat" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2836,7 +2861,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipdropin" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -2865,7 +2890,7 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::Escape, None);
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 10, |_| false);
         })),
         "playequipnoroom" => (
@@ -2892,7 +2917,7 @@ fn case(name: &str) -> Option<Case> {
                 d.key(a, KeyCode::Escape, None);
                 faded(a);
                 // The frame that took the key (or the button) ends with its screen.
-                seen.push(state(a));
+                pushed(a, seen);
                 frames(a, d, seen, 10, |_| false);
             }),
         ),
@@ -3000,7 +3025,7 @@ fn case(name: &str) -> Option<Case> {
             let mut e = arena::engine::Engine::new(a.engine.m.clone(), a.engine.files.clone());
             let run = a.load_slot(&mut e, &dir, 1, false).expect("slot 1 loads in play");
             a.game_loaded(e, run, 1);
-            seen.push(state(a));
+            pushed(a, seen);
             frames(a, d, seen, 4, |_| false);
         })),
         "playfarewell" => (Place::Dungeon, Box::new(|a: &mut App| {
@@ -4222,16 +4247,6 @@ fn the_walls_left_as_the_original() {
     }
 }
 
-/// Busy cases whose EMS banks aren't compared (their track, row tables,
-/// files and DGROUP are). playsurrenderspell: its quest target gives up
-/// in the original's 16th frame and the port's 17th; the box keeps (bank
-/// 18h) the page as that frame finds it. The port's 3D view already
-/// differs at the 15th frame, its fireball 6 pixels and the person a few
-/// off the original's, while the final state matches: the fireball and
-/// the approaching person meet a frame later in the port (a projectile or
-/// actor step to find, not the kill path's).
-const EMS_LEFT_OUT: &[&str] = &["playsurrenderspell"];
-
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
@@ -4239,6 +4254,45 @@ const SPELL_CASES: [&str; 12] = [
     "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse",
     "playcurepoison", "playpoisontick",
 ];
+
+/// The cases whose projectiles and actors are compared frame by frame
+/// (gen_worldframes.py's OBJECT_CASES).
+const OBJECT_CASES: &[&str] = &[
+    "playcast",
+    "playcreaturecast",
+    "playfight",
+    "playparalyse",
+    "playquickcast",
+    "playsurrenderspell",
+];
+
+/// The missile and fight cases' projectiles and actors, frame by frame,
+/// as the original's (the `objects` lines: each track entry's
+/// `objects_digest`), not only as the last frame leaves them: a fireball
+/// a frame late can end where the original's ends. With the engine's
+/// page, as the state comparison runs. (ARENA_CASE: that case alone.)
+#[test]
+fn missiles_and_actors_go_as_the_originals_frame_by_frame() {
+    let only = std::env::var("ARENA_CASE").ok();
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut bad = vec![];
+    for name in OBJECT_CASES.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n)) {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a)
+        }, play) else { return };
+        let got = OBJECTS.with(|o| o.borrow().clone());
+        let want: Vec<u64> = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "objects" && f[1] == name)
+            .unwrap_or_else(|| panic!("{name}: no objects line"))[2].split(' ').map(|x| u64::from_str_radix(x, 16).unwrap()).collect();
+        assert_eq!(got.len(), seen.len(), "{name}: an objects entry per track entry");
+        let differ: Vec<usize> = (0..got.len().max(want.len())).filter(|&k| got.get(k) != want.get(k)).collect();
+        if !differ.is_empty() {
+            bad.push(format!("{name}: frames {differ:?} of {} (the original's {})", got.len(), want.len()));
+        }
+    }
+    assert!(bad.is_empty(), "the projectiles or actors differ from the original's: {bad:#?}");
+}
 
 /// The spell cases leave the eight active creatures' records (0C57's
 /// entries: +12h the record in the segment at [1042], 41Eh bytes) and
@@ -4304,7 +4358,7 @@ fn one_case_leaves_the_state_as_the_original() {
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
     let only = std::env::var("ARENA_CASE").ok();
-    for name in BUSY_STATE.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n) && !EMS_LEFT_OUT.contains(n)) {
+    for name in BUSY_STATE.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n)) {
         state_ems_case(name);
     }
 }
