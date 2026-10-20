@@ -206,6 +206,9 @@ pub struct Travel {
     /// the pass after its handler) comes once it is clicked away, the
     /// loop's next pass putting this by.
     box_page: Option<Vec<u8>>,
+    /// The screen once the unwell traveller's question was answered (its
+    /// menu gone, `click`): where the journey's fades start.
+    answered_over: Option<Vec<u8>>,
 }
 
 /// A game tick (1/18.2 s) in ms: a pass of the screen's loop, a day's
@@ -456,6 +459,7 @@ impl Travel {
             province_page: None,
             idle_ticks: 0,
             box_page: None,
+            answered_over: None,
         }
     }
 
@@ -652,6 +656,16 @@ impl Travel {
             };
             if let Some(i) = pick {
                 self.asking = None;
+                // The menu's reads left the mouse at its click (3159:0F2A),
+                // where the loop's passes after find it.
+                self.at = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+                // 1194:020E's end: its boxes' backgrounds put back and the
+                // page dissolved onto the screen (4FF7), where the journey's
+                // first fade then starts: the map as the menu found it. (The
+                // original's page there keeps parchment over the No box's
+                // rows, which the view's menu doesn't model: areaplaytest's
+                // LEAD_SCREEN_LEFT_OUT.)
+                self.answered_over = self.page(engine, self.at);
                 self.travel_answered(engine, Some(i as u16));
             }
             return;
@@ -835,7 +849,8 @@ impl Travel {
             return;
         }
         let black = [[0, 0, 0, 0xFF]; 256];
-        let mut film = Film::new(before.indices().iter().map(|&c| c as u8).collect(), *before.palette());
+        let from = self.answered_over.take().unwrap_or_else(|| before.indices().iter().map(|&c| c as u8).collect());
+        let mut film = Film::new(from, *before.palette());
         film.fade(&black, 8);
         film.vga.fill(0);
         film.fade(world, 12);

@@ -101,6 +101,16 @@ LEAVES = dict(BOXES, leaves=True)
 TRAVEL = [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]
 
 
+def poisoned(put):
+    """`put`, then the player poisoned (05B1 bit 0): unwell for the
+    journey's question (26F7:07CD's 5B1 & 7), the poison's damage on
+    each of its days (0000:142D)."""
+    def setup(a):
+        put(a)
+        a.mu.mem_write(a.lin(a.ds, 0x05B1), bytes([a.mu.mem_read(a.lin(a.ds, 0x05B1), 1)[0] | 1]))
+    return setup
+
+
 def wild_at(x=None, y=None, heading=0):
     """The wilderness's player put at `x` and/or `y` (the place the
     physics moves, BA62/BA66, and the eye's, C3D0/C3D4) with the last
@@ -206,6 +216,13 @@ CASES = {
                    [((), (), 2, None),
                     ((SHIFT, M), (), 1, None, [], dict(script=TRAVEL + BOXES['script'], leaves=True)),
                     ((), (SHIFT, M), 3, None)]),
+    # `travelfast` poisoned: Travel asks "Considering your condition..."
+    # (1194:48DB's menu, 6B1D) and its Yes (the first entry, (160, 118))
+    # travels anyway, the poison working through the journey's days.
+    'travelunwell': ('street', poisoned(w.at_square(95, 52, 0x100)),
+                     [((), (), 2, None),
+                      ((SHIFT, M), (), 1, None, [], dict(script=TRAVEL + [('click', 160, 118)] + BOXES['script'], leaves=True)),
+                      ((), (SHIFT, M), 3, None)]),
     # A dungeon in the wilderness: the window crossed south three times
     # (`wild_south`), which brings the grid's block (1Fh, 23h), WILD065
     # (its entrance, a 3333h wall: trigger 8), to the window's first
