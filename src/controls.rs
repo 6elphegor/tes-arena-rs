@@ -161,7 +161,7 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
     /// resolve_cast`; only aimed and area spells come this way, so the
     /// touch is never used).
     fn cast_at_target(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
-        m.resolve_cast(files, crate::cast::Touch::Record(crate::mem::DS, crate::character::PLAYER)).map(|_| ())
+        m.resolve_cast(files, crate::cast::Touch::Record(crate::mem::DS, crate::character::PLAYER), &mut |m, t| self.message_box(m, t)).map(|_| ())
     }
     /// 1194:42EA, 59C8: the text at DGROUP `text` in a message box.
     fn message_box(&mut self, _m: &mut Machine, _text: u16) {}

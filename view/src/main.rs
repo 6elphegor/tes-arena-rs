@@ -545,6 +545,11 @@ impl arena::encounter::FightHooks for FightFront<'_, '_> {
 /// on the attribute screen, `LevelUpHooks`), the quests' deadlines and
 /// ambushes with their texts.
 impl arena::clock::ClockHooks for Front<'_> {
+    /// A quest target's words on giving up to a spell's lingering effect,
+    /// the game's box (1194:59C8).
+    fn surrender_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        Front::message_box(self, m, text);
+    }
     /// 1194:887A with the fight's hooks the front end's (`FightFront`).
     fn encounter(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
         m.random_encounter(files, &mut FightFront(self))
@@ -768,6 +773,11 @@ impl arena::text::TextHooks for Front<'_> {
 /// Clicking on people and things: the way told is a note; the lists
 /// ("Where is", kind 9) asked through `dialog`.
 impl arena::talk::TalkHooks for Front<'_> {
+    /// A quest target's words on giving up to a touch spell, the game's
+    /// box (1194:59C8).
+    fn surrender_box(&mut self, m: &mut arena::machine::Machine, text: u16) {
+        Front::message_box(self, m, text);
+    }
     /// The pick asked through `dialog`; the game's state round it
     /// (`Machine::list_window`: the screen kept in the load bank, the
     /// picture, the window's record) where the page is the game's own

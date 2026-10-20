@@ -553,7 +553,7 @@ impl Machine {
         self.mem.w8(DS, si + f::FRAME, 0);
         self.mem.w8(DS, si + f::FLAT_FLAGS, life);
         self.mem.w16(DS, si + f::HEADING, 0xFFFF);
-        self.impact(self.mem.r16(DS, si + f::CAST), x, y)
+        self.impact(self.mem.r16(DS, si + f::CAST), x, y, kill)
     }
 
     /// 29CF:0589. Whether the projectile at `si` hit something, and AX
@@ -628,7 +628,7 @@ impl Machine {
     /// (2CDD:08D9), another on OCCUPANT: the player (01A4) or a creature
     /// slot's record, while nobody (FFFF) or a person (slots below 0Fh)
     /// takes nothing and the cast is never applied (nor freed).
-    pub fn impact(&mut self, cast: u16, x: u16, y: u16) -> Option<()> {
+    pub fn impact(&mut self, cast: u16, x: u16, y: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         let (spell, seg) = (self.mem.r16(DS, cast), self.mem.r16(DS, cast.wrapping_add(2)));
         let ty = self.mem.r8(seg, spell.wrapping_add(0x24));
         if ty == 3 || ty == 4 {
@@ -652,7 +652,7 @@ impl Machine {
             }
             self.mem.w16(DS, TARGETS, 1);
         }
-        self.cast_apply(cast)
+        self.cast_apply(cast, kill)
     }
 
     /// 2CDD:08D9. The targets of an area spell centred on (x, y): the

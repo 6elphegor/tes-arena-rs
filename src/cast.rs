@@ -87,7 +87,7 @@ impl Machine {
         let sp = self.mem.r16(DS, 0x020A) - cost;
         self.mem.w16(DS, 0x020A, sp);
         self.mem.w16(DS, COST, cost);
-        self.player_cast(files, index)?;
+        self.player_cast(files, index, &mut |m, t| hooks.message_box(m, t))?;
         if self.mem.r8(DS, 0x05E6) == 0 && (target as i8) > 0 && self.crime_seen() && self.mem.r16(DS, 0x0FF9) == 0 {
             // 0000:3F21
             self.mem.w8(DS, 0x680F, 0x0F);
@@ -101,8 +101,7 @@ impl Machine {
     /// free one, 29CF:01C4) waits at PENDING if it needs a target
     /// (`target_prompt`): the weapon is put away (5E0 bit 10h saved and
     /// cleared, D49 FFh). Otherwise it takes effect on the player now.
-    pub(crate) fn player_cast(&mut self, files: &mut Files, index: u8) -> Option<()> {
-        let _ = files;
+    pub(crate) fn player_cast(&mut self, files: &mut Files, index: u8, shown: &mut dyn FnMut(&mut Machine, u16)) -> Option<()> {
         let cast = self.free_cast()?;
         self.mem.w16(DS, cast.wrapping_add(0xA), 1);
         let level = self.mem.r8(DS, PLAYER + 6) as u16 + 1;
@@ -130,7 +129,7 @@ impl Machine {
         self.mem.w16(DS, crate::spell::svar::TARGETS, PLAYER);
         self.mem.w16(DS, crate::spell::svar::TARGETS + 2, DS);
         self.mem.w16(DS, crate::spell::svar::TARGET_COUNT, 1);
-        self.cast_apply(cast)
+        self.cast_apply(cast, &mut crate::strike::Words { files, shown })
     }
 
     /// 29CF:01C4. The first cast record not in use (searching on past
@@ -180,7 +179,7 @@ impl Machine {
     /// player's state comes back (29CF:00AC). Returns whether a cast was
     /// waiting (the original's carry). None where a launch or the
     /// effects fail.
-    pub fn resolve_cast(&mut self, files: &mut Files, touch: Touch) -> Option<bool> {
+    pub fn resolve_cast(&mut self, files: &mut Files, touch: Touch, shown: &mut dyn FnMut(&mut Machine, u16)) -> Option<bool> {
         let cast = self.mem.r16(DS, PENDING);
         if cast == 0 {
             return Some(false);
@@ -202,22 +201,22 @@ impl Machine {
                 }
                 Touch::Record(seg, rec) => target(self, seg, rec),
             }
-            self.cast_apply(cast)?;
+            self.cast_apply(cast, &mut crate::strike::Words { files: &mut *files, shown: &mut *shown })?;
         } else if ty == 3 {
             let at = self.mem.r16(DS, cast.wrapping_add(0x14));
             if (at as i16) >= 0 {
                 let (x, y) = (self.mem.r16(DS, at), self.mem.r16(DS, at.wrapping_add(4)));
-                self.impact(cast, x, y)?;
+                self.impact(cast, x, y, &mut crate::strike::Words { files: &mut *files, shown: &mut *shown })?;
             } else {
                 self.load_cast_hands(files, gs, spell)?;
                 // 29CF:0040: the spell's sound (8) at the player's square.
                 self.sound_here(8)?;
                 let (x, y) = (self.mem.r16(DS, 0xC3D0), self.mem.r16(DS, 0xC3D4));
-                self.impact(cast, x, y)?;
+                self.impact(cast, x, y, &mut crate::strike::Words { files: &mut *files, shown: &mut *shown })?;
             }
         } else if self.mem.r16(gs, spell.wrapping_add(0x27)) & 0x80 != 0 {
             target(self, DS, PLAYER);
-            self.cast_apply(cast)?;
+            self.cast_apply(cast, &mut crate::strike::Words { files: &mut *files, shown: &mut *shown })?;
         } else {
             // 29CF:00D2: the fake actor at the player, facing the cursor.
             let r = |m: &Machine, a: u16| m.mem.r16(DS, a);

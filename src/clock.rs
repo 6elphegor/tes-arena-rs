@@ -48,6 +48,10 @@ pub mod var {
 
 /// The handlers the clock calls that are not ported here.
 pub trait ClockHooks {
+    /// 1194:59C8 after 2AA1:0819: a quest target giving up to a spell's
+    /// lingering effect says so; its words are at DGROUP `text`. By
+    /// default no box.
+    fn surrender_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:99F8, daily: the deadlines of the records at 0DCA
     /// (`quest::quests_daily`, its texts and files left out; override to
     /// show them).
@@ -234,8 +238,12 @@ impl Machine {
     fn minute_tick(&mut self, files: &mut Files, hooks: &mut dyn ClockHooks) -> Option<()> {
         self.auras();
         self.tick_spell_flags();
-        self.tick_effects(&mut GameHooks);
-        self.drain_death_check(&mut GameHooks);
+        {
+            let mut shown = |m: &mut Machine, t: u16| hooks.surrender_box(m, t);
+            let mut words = crate::strike::Words { files: &mut *files, shown: &mut shown };
+            self.tick_effects(&mut GameHooks(&mut words));
+            self.drain_death_check(&mut GameHooks(&mut words));
+        }
         self.countdowns();
         let busy = self.mem.r8(DS, 0x05E6) == 4 && self.mem.r8(DS, 0x137F) != 0xFF;
         if !busy && self.mem.r16(DS, 0x0FFB) == 0 && self.mem.r8(DS, 0x1013) == 0 && self.mem.r16(DS, 0x05CA) & 0x100 != 0 {

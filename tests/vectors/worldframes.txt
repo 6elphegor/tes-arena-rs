@@ -2992,6 +2992,271 @@ screen | playlightout | c3a3edd22d2d6dd7 a97a4bafd992e4ed df87cca47c2f5ed6
 creatures | playlightout | b4043daa78e1f54a 4a6a3b1b4e085651
 view3d | playlightout | cd1e679c1c79e96c
 view3d1 | playlightout | f9e0f64ef279e5fe
+track | playresist | 0 0 1540 3c 5c0 71
+track | playresist | 1 0 1540 3c 5c0 71
+track | playresist | 2 0 1540 3c 5c0 71
+track | playresist | 3 0 1540 3c 5c0 71
+track | playresist | 4 0 1540 3c 5c0 71
+track | playresist | 5 0 1540 3c 5c0 71
+track | playresist | 6 0 1540 3c 5c0 71
+track | playresist | 7 0 1540 3c 5c0 71
+track | playresist | 8 0 1540 3c 5c0 71
+track | playresist | 9 0 1540 3c 5c0 71
+track | playresist | a 0 1540 3c 5c0 71
+track | playresist | b 0 1540 3c 5c0 71
+track | playresist | c 0 1540 3c 5c0 71
+track | playresist | d 0 1540 3c 5c0 71
+track | playresist | e 0 1540 3c 5c0 71
+track | playresist | f 0 1540 3c 5c0 71
+track | playresist | 10 0 1540 3c 5c0 71
+track | playresist | 11 0 1540 3c 5c0 71
+track | playresist | 12 0 1540 3c 5c0 71
+track | playresist | 13 0 1540 3c 5c0 71
+track | playresist | 14 0 1540 3c 5c0 71
+track | playresist | 15 0 1540 3c 5c0 71
+track | playresist | 16 0 1540 3c 5c0 71
+track | playresist | 17 0 1540 3c 5c0 71
+rows | playresist | 24 844c61bc313fcfc5
+state | playresist | 151+1 20a+1 5be+1 5cb+1 d5c+1 f84+1 100e+1 1012+1 1292+1 129d+1 1951+1e 427d+1 4285+1 627a+2 651c+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 9176+b 9184+2 9194+2 9198+3 919c+2 91f6+4 a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 | 913419e14757f48d
+stateload | playresist | 151+1 20a+1 50a+1 52a+1 5be+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c67+1 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+1 f84+1 fce+2 100e+1 1012+1 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 129d+1 1367+2 1387+1 1389+1 138b+1 138d+4 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 5cae+1 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 8702+1 8b98+1 8b9a+1 8fba+2 9176+b 9184+2 9194+2 9198+3 919c+2 91f6+1 91f8+2 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e7a2+4 e8bc+1 eee7+1 | 846b04a6a6a98fde
+stateems | playresist | 2a8d2 b26e0d0698b455fb | 2d4774c4e0903689
+screen | playresist | d34614ab85ad23ef a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playresist | b4043daa78e1f54a 152238d13f6d47bb
+view3d | playresist | cd1e679c1c79e96c
+view3d1 | playresist | f9e0f64ef279e5fe
+track | playfortify | 0 0 1540 3c 5c0 71
+track | playfortify | 1 0 1540 3c 5c0 71
+track | playfortify | 2 0 1540 3c 5c0 71
+track | playfortify | 3 0 1540 3c 5c0 71
+track | playfortify | 4 0 1540 3c 5c0 71
+track | playfortify | 5 0 1540 3c 5c0 71
+track | playfortify | 6 0 1540 3c 5c0 71
+track | playfortify | 7 0 1540 3c 5c0 71
+track | playfortify | 8 0 1540 3c 5c0 71
+track | playfortify | 9 0 1540 3c 5c0 71
+track | playfortify | a 0 1540 3c 5c0 71
+track | playfortify | b 0 1540 3c 5c0 71
+track | playfortify | c 0 1540 3c 5c0 71
+track | playfortify | d 0 1540 3c 5c0 71
+track | playfortify | e 0 1540 3c 5c0 71
+track | playfortify | f 0 1540 3c 5c0 71
+track | playfortify | 10 0 1540 3c 5c0 71
+track | playfortify | 11 0 1540 3c 5c0 71
+track | playfortify | 12 0 1540 3c 5c0 71
+track | playfortify | 13 0 1540 3c 5c0 71
+track | playfortify | 14 0 1540 3c 5c0 71
+track | playfortify | 15 0 1540 3c 5c0 71
+track | playfortify | 16 0 1540 3c 5c0 71
+track | playfortify | 17 0 1540 3c 5c0 71
+rows | playfortify | 24 844c61bc313fcfc5
+state | playfortify | 151+1 20a+1 5b1+1 5b7+1 5cb+1 660+1 662+1 664+1 666+1 674+1 676+3 67a+1 688+2 68c+9 696+1 698+4 d5c+1 f84+1 100e+1 1012+1 1292+1 129d+1 1951+1e 427d+1 4285+1 627a+2 651c+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 91f6+4 a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 | 7f21da6140ebb65
+stateload | playfortify | 151+1 20a+1 50a+1 52a+1 5b1+1 5b7+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 660+1 662+1 664+1 666+1 674+1 676+3 67a+1 688+2 68c+9 696+1 698+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c67+1 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+1 f84+1 fce+2 100e+1 1012+1 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 129d+1 1367+2 1387+1 1389+1 138b+1 138d+4 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 5cae+1 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 8702+1 8b98+1 8b9a+1 8fba+2 91f6+1 91f8+2 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e7a2+4 e8bc+1 eee7+1 | b6102c664c6da9cb
+stateems | playfortify | 2a8d2 b26e0d0698b455fb | 2d4774c4e0903689
+screen | playfortify | c3a3edd22d2d6dd7 a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playfortify | b4043daa78e1f54a 8424a87b7918a7a5
+view3d | playfortify | cd1e679c1c79e96c
+view3d1 | playfortify | f9e0f64ef279e5fe
+track | playinvisible | 0 0 1540 3c 5c0 71
+track | playinvisible | 1 0 1540 3c 5c0 71
+track | playinvisible | 2 0 1540 3c 5c0 71
+track | playinvisible | 3 0 1540 3c 5c0 71
+track | playinvisible | 4 0 1540 3c 5c0 71
+track | playinvisible | 5 0 1540 3c 5c0 71
+track | playinvisible | 6 0 1540 3c 5c0 71
+track | playinvisible | 7 0 1540 3c 5c0 71
+track | playinvisible | 8 0 1540 3c 5c0 71
+track | playinvisible | 9 0 1540 3c 5c0 71
+track | playinvisible | a 0 1540 3c 5c0 71
+track | playinvisible | b 0 1540 3c 5c0 71
+track | playinvisible | c 0 1540 3c 5c0 71
+track | playinvisible | d 0 1540 3c 5c0 71
+track | playinvisible | e 0 1540 3c 5c0 71
+track | playinvisible | f 0 1540 3c 5c0 71
+track | playinvisible | 10 0 1540 3c 5c0 71
+track | playinvisible | 11 0 1540 3c 5c0 71
+track | playinvisible | 12 0 1540 3c 5c0 71
+track | playinvisible | 13 0 1540 3c 5c0 71
+track | playinvisible | 14 0 1540 3c 5c0 71
+track | playinvisible | 15 0 1540 3c 5c0 71
+track | playinvisible | 16 0 1540 3c 5c0 71
+track | playinvisible | 17 0 1540 3c 5c0 71
+track | playinvisible | 18 0 1540 3c 5c0 71
+track | playinvisible | 19 0 1540 3c 5c0 71
+track | playinvisible | 1a 0 1540 3c 5c0 71
+track | playinvisible | 1b 0 1540 3c 5c0 71
+track | playinvisible | 1c 0 1540 3c 5c0 71
+track | playinvisible | 1d 0 1540 3c 5c0 71
+track | playinvisible | 1e 0 1540 3c 5c0 71
+track | playinvisible | 1f 0 1540 3c 5c0 71
+track | playinvisible | 20 0 1540 3c 5c0 71
+track | playinvisible | 21 0 1540 3c 5c0 71
+track | playinvisible | 22 0 1540 3c 5c0 71
+track | playinvisible | 23 0 1540 3c 5c0 71
+track | playinvisible | 24 0 1540 3c 5c0 71
+track | playinvisible | 25 0 1540 3c 5c0 71
+track | playinvisible | 26 0 1540 3c 5c0 71
+track | playinvisible | 27 0 1540 3c 5c0 71
+track | playinvisible | 28 0 1540 3c 5c0 71
+track | playinvisible | 29 0 1540 3c 5c0 71
+track | playinvisible | 2a 0 1540 3c 5c0 71
+track | playinvisible | 2b 0 1540 3c 5c0 71
+rows | playinvisible | 44 b4d1acc6c2518e15
+state | playinvisible | 151+1 20a+1 5be+1 5cb+1 d5c+1 f84+1 100e+1 1012+1 1292+1 129d+1 1951+1e 427d+1 4285+1 627a+2 651c+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 91f6+4 a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 | 7eb27a7844e6bcf0
+stateload | playinvisible | 151+1 20a+1 50a+1 52a+1 5be+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c67+1 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+1 f84+1 fce+2 100e+1 1012+1 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 129d+1 1367+2 1387+1 1389+1 138b+1 138d+4 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 5cae+1 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 8702+1 8b98+1 8b9a+1 8fba+2 91f6+1 91f8+2 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e7a2+4 e8bc+1 eee7+1 | dc7b3cd8663759a7
+stateems | playinvisible | 2a8d2 b26e0d0698b455fb | 2d4774c4e0903689
+screen | playinvisible | cb87c591e093dfef a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playinvisible | b4043daa78e1f54a d23e1f6c2ba423de
+view3d | playinvisible | cd1e679c1c79e96c
+view3d1 | playinvisible | f9e0f64ef279e5fe
+track | playreflect | 0 0 1540 3c 5c0 71
+track | playreflect | 1 0 1540 3c 5c0 71
+track | playreflect | 2 0 1540 3c 5c0 71
+track | playreflect | 3 0 1540 3c 5c0 71
+track | playreflect | 4 0 1540 3c 5c0 71
+track | playreflect | 5 0 1540 3c 5c0 71
+track | playreflect | 6 0 1540 3c 5c0 71
+track | playreflect | 7 0 1540 3c 5c0 71
+track | playreflect | 8 0 1540 3c 5c0 71
+track | playreflect | 9 0 1540 3c 5c0 71
+track | playreflect | a 0 1540 3c 5c0 71
+track | playreflect | b 0 1540 3c 5c0 71
+track | playreflect | c 0 1540 3c 5c0 71
+track | playreflect | d 0 1540 3c 5c0 71
+track | playreflect | e 0 1540 3c 5c0 71
+track | playreflect | f 0 1540 3c 5c0 71
+track | playreflect | 10 0 1540 3c 5c0 71
+track | playreflect | 11 0 1540 3c 5c0 71
+track | playreflect | 12 0 1540 3c 5c0 71
+track | playreflect | 13 0 1540 3c 5c0 71
+track | playreflect | 14 0 1540 3c 5c0 71
+track | playreflect | 15 0 1540 3c 5c0 71
+track | playreflect | 16 0 1540 3c 5c0 71
+track | playreflect | 17 0 1540 3c 5c0 71
+rows | playreflect | 24 844c61bc313fcfc5
+state | playreflect | 151+1 20a+1 5bf+1 5cb+1 d5c+1 f84+1 100e+1 1012+1 1292+1 129d+1 1951+1e 427d+1 4285+1 627a+2 651c+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 91f6+4 a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 | 91106260afc6bc88
+stateload | playreflect | 151+1 20a+1 50a+1 52a+1 5bf+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c67+1 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+1 f84+1 fce+2 100e+1 1012+1 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 129d+1 1367+2 1387+1 1389+1 138b+1 138d+4 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 5cae+1 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 8702+1 8b98+1 8b9a+1 8fba+2 91f6+1 91f8+2 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e7a2+4 e8bc+1 eee7+1 | 4483bb5122987053
+stateems | playreflect | 2a8d2 b26e0d0698b455fb | 2d4774c4e0903689
+screen | playreflect | c540048323ddf667 a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playreflect | b4043daa78e1f54a aa83df30a69f2849
+view3d | playreflect | cd1e679c1c79e96c
+view3d1 | playreflect | f9e0f64ef279e5fe
+track | playparalyse | 0 0 1540 3c 5c0 0
+track | playparalyse | 1 0 1540 3c 5c0 0
+track | playparalyse | 2 0 1540 3c 5c0 0
+track | playparalyse | 3 0 1540 3c 5c0 0
+track | playparalyse | 4 0 1540 3c 5c0 0
+track | playparalyse | 5 0 1540 3c 5c0 0
+track | playparalyse | 6 0 1540 3c 5c0 0
+track | playparalyse | 7 0 1540 3c 5c0 0
+track | playparalyse | 8 0 1540 3c 5c0 0
+track | playparalyse | 9 0 1540 3c 5c0 0
+track | playparalyse | a 0 1540 3c 5c0 0
+track | playparalyse | b 0 1540 3c 5c0 0
+track | playparalyse | c 0 1540 3c 5c0 0
+track | playparalyse | d 0 1540 3c 5c0 0
+track | playparalyse | e 0 1540 3c 5c0 0
+track | playparalyse | f 0 1540 3c 5c0 0
+track | playparalyse | 10 0 1540 3c 5c0 0
+track | playparalyse | 11 0 1540 3c 5c0 0
+track | playparalyse | 12 0 1540 3c 5c0 0
+track | playparalyse | 13 0 1540 3c 5c0 0
+track | playparalyse | 14 0 1540 3c 5c0 0
+track | playparalyse | 15 0 1540 3c 5c0 0
+track | playparalyse | 16 0 1540 3c 5c0 0
+track | playparalyse | 17 0 1540 3c 5c0 0
+track | playparalyse | 18 0 1540 3c 5c0 0
+track | playparalyse | 19 0 1540 3c 5c0 0
+track | playparalyse | 1a 0 1540 3c 5c0 0
+track | playparalyse | 1b 0 1540 3c 5c0 0
+track | playparalyse | 1c 0 1540 3c 5c0 0
+track | playparalyse | 1d 0 1540 3c 5c0 0
+track | playparalyse | 1e 0 1540 3c 5c0 0
+track | playparalyse | 1f 0 1540 3c 5c0 0
+track | playparalyse | 20 0 1540 3c 5c0 0
+track | playparalyse | 21 0 1540 3c 5c0 0
+track | playparalyse | 22 0 1540 3c 5c0 0
+track | playparalyse | 23 0 1540 3c 5c0 0
+track | playparalyse | 24 0 1540 3c 5c0 0
+track | playparalyse | 25 0 1540 3c 5c0 0
+track | playparalyse | 26 0 1540 3c 5c0 0
+track | playparalyse | 27 0 1540 3c 5c0 0
+track | playparalyse | 28 0 1540 3c 5c0 0
+track | playparalyse | 29 0 1540 3c 5c0 0
+track | playparalyse | 2a 0 1540 3c 5c0 0
+track | playparalyse | 2b 0 1540 3c 5c0 0
+track | playparalyse | 2c 0 1540 3c 5c0 0
+track | playparalyse | 2d 0 1540 3c 5c0 0
+track | playparalyse | 2e 0 1540 3c 5c0 0
+track | playparalyse | 2f 0 1540 3c 5c0 0
+track | playparalyse | 30 0 1540 3c 5c0 0
+track | playparalyse | 31 0 1540 3c 5c0 0
+track | playparalyse | 32 0 1540 3c 5c0 0
+track | playparalyse | 33 0 1540 3c 5c0 0
+track | playparalyse | 34 0 1540 3c 5c0 0
+track | playparalyse | 35 0 1540 3c 5c0 0
+rows | playparalyse | 54 7f2923d48e52288c
+state | playparalyse | 151+1 20a+1 5cb+1 61a+2 a21+1 c5b+2 c5f+1 c61+1 c63+2 c66+1 d5c+2 f84+1 ffb+1 100e+1 1012+1 1292+1 1298+1 129a+1 129c+2 1402+2 1951+1e 1970+1 427d+1 4285+1 6206+2 627a+2 651c+2 7a44+2 7dba+1 7dbc+8 7dc6+5 7dcc+1 7dce+2 7f86+2 7f8a+2 7f8e+1 7f90+1 7f9a+2 8038+2 8fa8+1 9176+9 9184+2 9194+2 9198+3 919c+2 91f6+4 9800+12 9813+10 9824+d 9832+12 9845+10 9856+12 9869+12 987c+10 988d+12 98a0+10 98b1+d 98bf+12 98d2+10 98e3+12 98f6+12 9909+10 991a+12 992d+10 993e+d 994c+12 995f+10 9970+12 9983+12 9996+10 99a7+12 99ba+10 99cb+d 99d9+12 99ec+10 99fd+12 9a10+12 9a23+10 9a34+12 9a47+10 9a58+d 9a66+12 9a79+10 9a8a+12 9a9d+12 9ab0+10 9ac1+12 9ad4+10 9ae5+d 9af3+12 9b06+10 9b17+12 9b2a+12 9b3d+10 9b4e+12 9b61+10 9b72+d 9b80+12 9b93+10 9ba4+12 9bb7+12 9bca+10 9bdb+12 9bee+10 9bff+d 9c0d+12 9c20+10 9c31+12 9c44+12 9c57+10 9c68+12 9c7b+10 9c8c+d 9c9a+12 9cad+10 9cbe+12 9cd1+12 9ce4+10 9cf5+12 9d08+10 9d19+d 9d27+12 9d3a+10 9d4b+12 9d5e+12 9d71+f 9d82+11 9d95+d a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba8d+3 ba91+2 ba95+2 ba9b+4 baa0+3 baa5+6 baae+1 bab0+1 baba+2 bac4+1 bac6+1 bae7+1 bae9+1 baee+1 baf0+1 baf2+1 baf6+4 bafc+2 bb00+3 bbcd+3 c399+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c887+1 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+3 cd0c+5 cd12+1 cd14+1 cd96+3 cd9a+1 cd9c+2 d0b6+1 d438+4 d43e+1 d444+1 d744+1 d746+1 d7aa+2 d7ae+3 d7b4+3 d7ba+4 d7c0+11 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 | bac2a872f7862968
+stateload | playparalyse | 151+1 20a+1 50a+1 52a+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 61a+2 a21+1 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c57+2 c5b+2 c5f+1 c61+2 c64+1 c66+2 c6d+2 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+2 dbe+2 f84+1 fce+2 ff9+1 ffb+1 fff+2 100d+2 1012+1 1044+a 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 1296+2 129a+1 129c+2 12ad+1 1367+2 1387+1 1389+1 138b+1 138d+4 13cc+1 1402+2 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 45f0+1 45f2+2 45f5+3 47dd+1 47df+1 486b+24 4bd0+1 4efe+2 5cae+1 6206+2 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7a44+1 7dba+1 7dbc+8 7dc6+5 7dcc+1 7dce+2 7f86+2 7f8a+2 7f8e+1 7f90+1 7f9a+2 8038+2 8702+1 8b98+1 8b9a+1 8fba+2 9176+b 9184+2 9194+2 9198+3 919c+2 91f6+4 9800+12 9813+10 9824+d 9832+12 9845+10 9856+12 9869+12 987c+10 988d+12 98a0+10 98b1+d 98bf+12 98d2+10 98e3+12 98f6+12 9909+10 991a+12 992d+10 993e+d 994c+12 995f+10 9970+12 9983+12 9996+10 99a7+12 99ba+10 99cb+d 99d9+12 99ec+10 99fd+12 9a10+12 9a23+10 9a34+12 9a47+10 9a58+d 9a66+12 9a79+10 9a8a+12 9a9d+12 9ab0+10 9ac1+12 9ad4+10 9ae5+d 9af3+12 9b06+10 9b17+12 9b2a+12 9b3d+10 9b4e+12 9b61+10 9b72+d 9b80+12 9b93+10 9ba4+12 9bb7+12 9bca+10 9bdb+12 9bee+10 9bff+d 9c0d+12 9c20+10 9c31+12 9c44+12 9c57+10 9c68+12 9c7b+10 9c8c+d 9c9a+12 9cad+10 9cbe+12 9cd1+12 9ce4+10 9cf5+12 9d08+10 9d19+d 9d27+12 9d3a+10 9d4b+12 9d5e+12 9d71+f 9d82+11 9d95+d a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba8d+3 ba91+2 ba95+2 ba9b+4 baa0+3 baa5+6 baae+1 bab0+1 baba+2 bac4+1 bac6+1 bae7+1 bae9+1 baee+1 baf0+1 baf2+1 baf6+4 bafc+2 bb00+3 bbcd+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3da+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+5 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+3 cd0c+5 cd12+1 cd14+1 cd32+2 cd93+1 cd95+4 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d0b6+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d438+4 d43e+1 d444+1 d744+1 d746+1 d7aa+2 d7ae+3 d7b4+3 d7ba+4 d7c0+11 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 eee7+1 | c952ee3fb324a7be
+stateems | playparalyse | 2e093 3715f2ae530a32f6 | d4f7eda59799ebbd
+screen | playparalyse | 9f8e7fbd7114e19b a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playparalyse | e398d48af88cdd22 8424a87b7918a7a5
+view3d | playparalyse | a8c229a667223e62
+view3d1 | playparalyse | b5a8d40081853bd6
+track | playcurepoison | 0 0 1540 3c 5c0 71
+track | playcurepoison | 1 0 1540 3c 5c0 71
+track | playcurepoison | 2 0 1540 3c 5c0 71
+track | playcurepoison | 3 0 1540 3c 5c0 71
+track | playcurepoison | 4 0 1540 3c 5c0 71
+track | playcurepoison | 5 0 1540 3c 5c0 71
+track | playcurepoison | 6 0 1540 3c 5c0 71
+track | playcurepoison | 7 0 1540 3c 5c0 71
+track | playcurepoison | 8 0 1540 3c 5c0 71
+track | playcurepoison | 9 0 1540 3c 5c0 71
+track | playcurepoison | a 0 1540 3c 5c0 71
+track | playcurepoison | b 0 1540 3c 5c0 71
+track | playcurepoison | c 0 1540 3c 5c0 71
+track | playcurepoison | d 0 1540 3c 5c0 71
+track | playcurepoison | e 0 1540 3c 5c0 71
+track | playcurepoison | f 0 1540 3c 5c0 71
+track | playcurepoison | 10 0 1540 3c 5c0 71
+track | playcurepoison | 11 0 1540 3c 5c0 71
+track | playcurepoison | 12 0 1540 3c 5c0 71
+track | playcurepoison | 13 0 1540 3c 5c0 71
+track | playcurepoison | 14 0 1540 3c 5c0 71
+track | playcurepoison | 15 0 1540 3c 5c0 71
+track | playcurepoison | 16 0 1540 3c 5c0 71
+track | playcurepoison | 17 0 1540 3c 5c0 71
+rows | playcurepoison | 24 844c61bc313fcfc5
+state | playcurepoison | 151+1 20a+1 5b1+1 5b4+1 5b9+1 5cb+1 660+1 662+1 664+1 674+1 676+2 688+2 68c+9 696+1 698+4 d39+1 d5c+1 f84+1 100e+1 1012+1 1292+1 129d+1 1405+11 1428+1 1951+1e 427d+1 4285+1 627a+2 651c+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 91f6+4 a886+2 ac48+1 ac4c+1 acb0+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e7a2+4 e8bc+1 | 61b209134169abea
+stateload | playcurepoison | 151+1 20a+1 50a+1 52a+1 5b9+1 5c9+1 5cb+1 5da+1 5e6+1 5fc+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c67+1 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 d5c+1 f84+1 fce+2 100e+1 1012+1 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 129d+1 1367+2 1387+1 1389+1 138b+1 138d+4 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 5cae+1 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7f86+2 7f8a+2 7f8e+1 7f9a+2 8702+1 8b98+1 8b9a+1 8fba+2 91f6+4 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 ac48+1 ac4c+1 acb0+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+4 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e7a2+4 e8bc+1 eee7+1 | ac8f0283ad78f7b9
+stateems | playcurepoison | 2a8d2 b26e0d0698b455fb | 2d4774c4e0903689
+screen | playcurepoison | d34614ab85ad23ef a97a4bafd992e4ed df87cca47c2f5ed6
+creatures | playcurepoison | b4043daa78e1f54a 8424a87b7918a7a5
+view3d | playcurepoison | cd1e679c1c79e96c
+view3d1 | playcurepoison | f9e0f64ef279e5fe
+track | playpoisontick | 0 0 1540 3c 5c0 71
+track | playpoisontick | 1 0 1540 3c 5c0 71
+track | playpoisontick | 2 0 1540 3c 5c0 71
+track | playpoisontick | 3 0 1540 3c 5c0 71
+track | playpoisontick | 4 0 1540 3c 5c0 71
+track | playpoisontick | 5 0 1540 3c 5c0 71
+track | playpoisontick | 6 0 1540 3c 5c0 71
+track | playpoisontick | 7 0 1540 3c 5c0 71
+track | playpoisontick | 8 0 1540 3c 5c0 71
+track | playpoisontick | 9 0 1540 3c 5c0 71
+track | playpoisontick | a 0 1540 3c 5c0 71
+track | playpoisontick | b 0 1540 3c 5c0 71
+track | playpoisontick | c 0 1540 3c 5c0 71
+track | playpoisontick | d 0 1540 3c 5c0 71
+track | playpoisontick | e 0 1540 3c 5c0 71
+rows | playpoisontick | 15 df6deb6986a747c0
+state | playpoisontick | 151+1 201+1 204+5 5cb+2 5d8+1 660+1 662+1 69b+1 c57+2 c5b+2 c5f+1 c61+2 c64+1 c66+2 c6d+2 d39+1 dbe+2 ff9+1 ffb+1 fff+2 100d+1 1012+1 101e+1 1044+c 1294+1 12ad+1 1391+1 13cc+1 13da+1 13dc+1 13de+1 13e0+5 13e8+1 13f8+1 13fa+1 1405+11 1428+1 1951+20 427d+1 4285+1 45f0+1 45f2+2 45f5+3 4efe+2 4f02+1 4f04+1 6206+2 6270+c 651c+2 7a44+2 86b0+1 9176+4 917b+6 9184+2 9194+2 9198+3 919c+2 91f6+4 a886+1 ba4b+1 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 c399+1 c3d0+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 ccfe+1 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd96+3 cd9a+1 cd9c+2 d0b6+1 d438+4 d43e+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 | dbc53e07a5b5a485
+stateload | playpoisontick | 151+1 201+1 204+5 5b1+1 5b4+1 5c9+1 5cb+2 5d8+1 5da+1 5e6+1 5fc+4 660+1 662+1 664+1 674+1 676+2 688+2 68c+9 696+1 698+4 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c57+2 c5b+2 c5f+1 c61+2 c64+1 c66+2 c6d+2 c83+1 c9f+1 cbb+1 cd7+1 cf3+1 d0f+1 d2b+1 dbe+2 fce+2 ff9+1 ffb+1 fff+2 100d+1 1012+1 101e+1 1044+c 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 1292+1 1294+1 12ad+1 1367+2 1387+1 1389+1 138b+1 138d+5 13cc+1 13da+1 13dc+1 13de+1 13e0+5 13e8+1 13f8+1 13fa+1 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 45f0+1 45f2+2 45f5+3 47dd+1 47df+1 486b+24 4bd0+1 4efe+2 4f02+1 4f04+1 6206+2 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7a44+2 86b0+1 8702+1 8b98+1 8b9a+1 8fba+2 9176+4 917b+6 9184+2 9194+2 9198+3 919c+2 91f6+4 a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a888+2 a88c+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba88+2 ba8d+6 ba95+2 ba9b+4 baa0+3 baa4+5 baaa+1 baae+1 bab0+1 bab8+1 baba+2 bac4+3 bae7+1 bae9+1 baee+5 baf6+4 bafd+1 bb00+3 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+5 cd00+1 cd02+2 cd08+1 cd0a+3 cd0e+3 cd12+1 cd14+1 cd32+2 cd93+1 cd95+4 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d0b6+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d438+4 d43e+1 d744+1 d746+1 d7aa+1 d7ae+3 d7b4+3 d7ba+3 d7c0+3 d7c4+1 d7c6+7 d7ce+1 d7d0+1 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 eee7+1 | fd89b6ca2aa5a031
+stateems | playpoisontick | 411ac e31dd168d4cb7bc5 | cacedc310f8f8438
+screen | playpoisontick | 898bad5847ae490b a97a4bafd992e4ed 92d32dfaaa38d68a
+creatures | playpoisontick | f74d7ae701b6f714 8424a87b7918a7a5
+view3d | playpoisontick | acdeb0c4b5b36eb7
+view3d1 | playpoisontick | 29ee49d6801ef4a9
 track | playghostclick | 0 0 1540 3c 5c0 0
 track | playghostclick | 1 0 1540 3c 5c0 0
 track | playghostclick | 2 0 1540 3c 5c0 0
@@ -3345,6 +3610,146 @@ stateems | playsurrender | 2cd06 436f4b13a4c54343 | c0f6a4a2f589adcb
 screen | playsurrender | 8eea8f8fb98228cd a97a4bafd992e4ed 2bab1ba07e7f9b08
 view3d | playsurrender | 654e0ed32202a66
 view3d1 | playsurrender | 8785abe931a77192
+track | playsurrenderspell | 0 0 1540 3c 5c0 0
+track | playsurrenderspell | 1 0 1540 3c 5c0 0
+track | playsurrenderspell | 2 0 1540 3c 5c0 0
+track | playsurrenderspell | 3 0 1540 3c 5c0 0
+track | playsurrenderspell | 4 0 1540 3c 5c0 0
+track | playsurrenderspell | 5 0 1540 3c 5c0 0
+track | playsurrenderspell | 6 0 1540 3c 5c0 0
+track | playsurrenderspell | 7 0 1540 3c 5c0 0
+track | playsurrenderspell | 8 0 1540 3c 5c0 0
+track | playsurrenderspell | 9 0 1540 3c 5c0 0
+track | playsurrenderspell | a 0 1540 3c 5c0 0
+track | playsurrenderspell | b 0 1540 3c 5c0 0
+track | playsurrenderspell | c 0 1540 3c 5c0 0
+track | playsurrenderspell | d 0 1540 3c 5c0 0
+track | playsurrenderspell | e 0 1540 3c 5c0 0
+track | playsurrenderspell | f 0 1540 3c 5c0 0
+track | playsurrenderspell | 10 0 1540 3c 5c0 0
+track | playsurrenderspell | 11 0 1540 3c 5c0 0
+track | playsurrenderspell | 12 0 1540 3c 5c0 0
+track | playsurrenderspell | 13 0 1540 3c 5c0 0
+track | playsurrenderspell | 14 0 1540 3c 5c0 0
+track | playsurrenderspell | 15 0 1540 3c 5c0 0
+track | playsurrenderspell | 16 0 1540 3c 5c0 0
+track | playsurrenderspell | 17 0 1540 3c 5c0 0
+track | playsurrenderspell | 18 0 1540 3c 5c0 0
+track | playsurrenderspell | 19 0 1540 3c 5c0 0
+track | playsurrenderspell | 1a 0 1540 3c 5c0 0
+track | playsurrenderspell | 1b 0 1540 3c 5c0 0
+track | playsurrenderspell | 1c 0 1540 3c 5c0 0
+track | playsurrenderspell | 1d 0 1540 3c 5c0 0
+track | playsurrenderspell | 1e 0 1540 3c 5c0 0
+track | playsurrenderspell | 1f 0 1540 3c 5c0 0
+track | playsurrenderspell | 20 0 1540 3c 5c0 0
+track | playsurrenderspell | 21 0 1540 3c 5c0 0
+track | playsurrenderspell | 22 0 1540 3c 5c0 0
+track | playsurrenderspell | 23 0 1540 3c 5c0 0
+track | playsurrenderspell | 24 0 1540 3c 5c0 0
+track | playsurrenderspell | 25 0 1540 3c 5c0 0
+track | playsurrenderspell | 26 0 1540 3c 5c0 0
+track | playsurrenderspell | 27 0 1540 3c 5c0 0
+track | playsurrenderspell | 28 0 1540 3c 5c0 0
+track | playsurrenderspell | 29 0 1540 3c 5c0 0
+track | playsurrenderspell | 2a 0 1540 3c 5c0 0
+track | playsurrenderspell | 2b 0 1540 3c 5c0 0
+track | playsurrenderspell | 2c 0 1540 3c 5c0 0
+track | playsurrenderspell | 2d 0 1540 3c 5c0 0
+track | playsurrenderspell | 2e 0 1540 3c 5c0 0
+track | playsurrenderspell | 2f 0 1540 3c 5c0 0
+track | playsurrenderspell | 30 0 1540 3c 5c0 0
+track | playsurrenderspell | 31 0 1540 3c 5c0 0
+track | playsurrenderspell | 32 0 1540 3c 5c0 0
+track | playsurrenderspell | 33 0 1540 3c 5c0 0
+track | playsurrenderspell | 34 0 1540 3c 5c0 0
+track | playsurrenderspell | 35 0 1540 3c 5c0 0
+track | playsurrenderspell | 36 0 1540 3c 5c0 0
+track | playsurrenderspell | 37 0 1540 3c 5c0 0
+track | playsurrenderspell | 38 0 1540 3c 5c0 0
+track | playsurrenderspell | 39 0 1540 3c 5c0 0
+track | playsurrenderspell | 3a 0 1540 3c 5c0 0
+track | playsurrenderspell | 3b 0 1540 3c 5c0 0
+track | playsurrenderspell | 3c 0 1540 3c 5c0 0
+track | playsurrenderspell | 3d 0 1540 3c 5c0 0
+track | playsurrenderspell | 3e 0 1540 3c 5c0 0
+track | playsurrenderspell | 3f 0 1540 3c 5c0 0
+track | playsurrenderspell | 40 0 1540 3c 5c0 0
+track | playsurrenderspell | 41 0 1540 3c 5c0 0
+track | playsurrenderspell | 42 0 1540 3c 5c0 0
+track | playsurrenderspell | 43 0 1540 3c 5c0 0
+track | playsurrenderspell | 44 0 1540 3c 5c0 0
+track | playsurrenderspell | 45 0 1540 3c 5c0 0
+track | playsurrenderspell | 46 0 1540 3c 5c0 0
+track | playsurrenderspell | 47 0 1540 3c 5c0 0
+track | playsurrenderspell | 48 0 1540 3c 5c0 0
+track | playsurrenderspell | 49 0 1540 3c 5c0 0
+track | playsurrenderspell | 4a 0 1540 3c 5c0 0
+track | playsurrenderspell | 4b 0 1540 3c 5c0 0
+track | playsurrenderspell | 4c 0 1540 3c 5c0 0
+track | playsurrenderspell | 4d 0 1540 3c 5c0 0
+track | playsurrenderspell | 4e 0 1540 3c 5c0 0
+track | playsurrenderspell | 4f 0 1540 3c 5c0 0
+track | playsurrenderspell | 50 0 1540 3c 5c0 0
+track | playsurrenderspell | 51 0 1540 3c 5c0 0
+track | playsurrenderspell | 52 0 1540 3c 5c0 0
+track | playsurrenderspell | 53 0 1540 3c 5c0 0
+track | playsurrenderspell | 54 0 1540 3c 5c0 0
+track | playsurrenderspell | 55 0 1540 3c 5c0 0
+track | playsurrenderspell | 56 0 1540 3c 5c0 0
+track | playsurrenderspell | 57 0 1540 3c 5c0 0
+track | playsurrenderspell | 58 0 1540 3c 5c0 0
+track | playsurrenderspell | 59 0 1540 3c 5c0 0
+track | playsurrenderspell | 5a 0 1540 3c 5c0 0
+track | playsurrenderspell | 5b 0 1540 3c 5c0 0
+track | playsurrenderspell | 5c 0 1540 3c 5c0 0
+track | playsurrenderspell | 5d 0 1540 3c 5c0 0
+track | playsurrenderspell | 5e 0 1540 3c 5c0 0
+track | playsurrenderspell | 5f 0 1540 3c 5c0 0
+track | playsurrenderspell | 60 0 1540 3c 5c0 0
+track | playsurrenderspell | 61 0 1540 3c 5c0 0
+track | playsurrenderspell | 62 0 1540 3c 5c0 0
+track | playsurrenderspell | 63 0 1540 3c 5c0 0
+track | playsurrenderspell | 64 0 1540 3c 5c0 0
+track | playsurrenderspell | 65 0 1540 3c 5c0 0
+track | playsurrenderspell | 66 0 1540 3c 5c0 0
+track | playsurrenderspell | 67 0 1540 3c 5c0 0
+track | playsurrenderspell | 68 0 1540 3c 5c0 0
+track | playsurrenderspell | 69 0 1540 3c 5c0 0
+track | playsurrenderspell | 6a 0 1540 3c 5c0 0
+track | playsurrenderspell | 6b 0 1540 3c 5c0 0
+track | playsurrenderspell | 6c 0 1540 3c 5c0 0
+track | playsurrenderspell | 6d 0 1540 3c 5c0 0
+track | playsurrenderspell | 6e 0 1540 3c 5c0 0
+track | playsurrenderspell | 6f 0 1540 3c 5c0 0
+track | playsurrenderspell | 70 0 1540 3c 5c0 0
+track | playsurrenderspell | 71 0 1540 3c 5c0 0
+track | playsurrenderspell | 72 0 1540 3c 5c0 0
+track | playsurrenderspell | 73 0 1540 3c 5c0 0
+track | playsurrenderspell | 74 0 1540 3c 5c0 0
+track | playsurrenderspell | 75 0 1540 3c 5c0 0
+track | playsurrenderspell | 76 0 1540 3c 5c0 0
+track | playsurrenderspell | 77 0 1540 3c 5c0 0
+track | playsurrenderspell | 78 0 1540 3c 5c0 0
+track | playsurrenderspell | 79 0 1540 3c 5c0 0
+track | playsurrenderspell | 7a 0 1540 3c 5c0 0
+track | playsurrenderspell | 7b 0 1540 3c 5c0 0
+track | playsurrenderspell | 7c 0 1540 3c 5c0 0
+track | playsurrenderspell | 7d 0 1540 3c 5c0 0
+track | playsurrenderspell | 7e 0 1540 3c 5c0 0
+track | playsurrenderspell | 7f 0 1540 3c 5c0 0
+track | playsurrenderspell | 80 0 1540 3c 5c0 0
+track | playsurrenderspell | 81 0 1540 3c 5c0 0
+track | playsurrenderspell | 82 0 1540 3c 5c0 0
+track | playsurrenderspell | 83 0 1540 3c 5c0 0
+track | playsurrenderspell | 84 0 1540 3c 5c0 0
+rows | playsurrenderspell | 133 a4416e91d9e3e1d8
+state | playsurrenderspell | 151+1 201+1 5c0+1 5cb+2 5d8+1 61e+4 c5b+2 c5f+1 c61+1 c63+2 c67+1 d49+1 d5c+1 e72+1 e8a+1 fd5+1 ff9+1 1012+1 1044+6b 128a+1 128c+1 1292+1 1404+1 1951+20 427d+1 4285+1 6206+2 627a+2 651c+2 7a44+2 7dbc+8 7dc6+5 7dcc+1 7dce+2 7dd8+8 7de2+5 7de8+1 7dea+2 7f90+1 7f9c+2 7fa4+1 7fa6+1 7fb0+2 8038+2 8a0c+1 8fa8+1 9176+7 917f+2 9184+2 9194+2 9198+3 919c+2 91f6+4 9800+10 9811+12 9824+10 9835+12 9848+10 9859+d 9867+12 987a+10 988b+12 989e+12 98b1+10 98c2+12 98d5+b 98e3+b 98ef+1d 990d+1f 992d+10 993e+10 994f+12 9962+10 9973+d 9981+12 9994+10 99a5+12 99b8+12 99cb+10 99dc+12 99ef+10 9a00+d 9a0e+12 9a21+10 9a32+12 9a45+12 9a58+10 9a69+12 9a7c+10 9a8d+d 9a9b+12 9aae+10 9abf+12 9ad2+12 9ae5+10 9af6+12 9b09+10 9b1a+d 9b28+12 9b3b+10 9b4c+12 9b5f+12 9b72+10 9b83+12 9b96+10 9ba7+d 9bb5+12 9bc8+10 9bd9+12 9bec+12 9bff+10 9c10+12 9c23+10 9c34+d 9c42+12 9c55+10 9c66+12 9c79+12 9c8c+10 9c9d+12 9cb0+10 9cc1+d 9ccf+12 9ce2+10 9cf3+12 9d06+12 9d19+f 9d2a+11 9d3d+d a886+2 ba4b+1 ba7e+1 ba8d+3 ba91+2 ba95+2 ba9b+4 baa0+3 baa5+6 baae+1 bab0+1 baba+2 bac4+1 bac6+1 bae7+1 bae9+1 baee+1 baf0+1 baf2+1 baf6+4 bafc+2 bb00+3 bbcd+1 bbcf+1 bbd2+4 c399+1 c3d4+1 c3d8+1 c3dc+1 c3de+4 c8ed+2 cb38+1 cb5b+1 cb90+2 cca4+1 cca6+1 ccbc+1 ccca+2 ccf8+1 ccfe+1 cd00+1 cd02+2 cd08+3 cd0c+5 cd12+1 cd14+1 cd98+1 cd9a+1 cd9c+2 d0b6+1 d43e+1 d444+1 d44a+1 d450+1 d744+1 d746+1 d7aa+2 d7ae+3 d7b4+3 d7ba+4 d7c0+11 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d810+2 d813+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 | bc5110be46464a4b
+stateload | playsurrenderspell | 151+1 201+1 20a+1 5c0+1 5c9+4 5d8+1 5da+1 5e6+1 5fc+4 61a+2 a21+1 a56+4 ab3+2 ab8+1 abd+2 ac5+2 ad3+2 ae1+1 aeb+2 af0+1 af6+1 afc+3 b08+1 b0b+2 b19+2 b24+1 b27+2 b2d+1 b35+2 b3f+2 b44+1 b49+2 b50+3 b5b+2 b60+1 b66+1 b6d+2 b78+1 b7b+2 b88+3 b94+1 b97+2 ba5+2 baf+2 bb4+1 bc0+3 bcc+1 bcf+2 bd6+1 bdc+3 be7+2 bf1+1 bf8+3 c03+2 c07+2 c0d+2 c14+3 c20+1 c23+2 c29+2 c31+2 c3b+2 c3f+2 c46+1 c4d+2 c57+2 c5b+2 c61+2 c64+1 c66+2 d5c+1 e72+2 e8a+1 e9d+1 f84+1 fce+2 fd5+1 1012+1 104c+63 113b+1 1141+1 124a+1 124c+1 124e+1 1250+2 128c+1 1292+1 1294+1 1296+3 129d+1 12aa+1 12ad+1 1367+2 1387+1 1389+1 138b+1 138d+5 13cc+1 13da+1 13dc+1 13de+1 13e0+1 13e2+1 13e4+1 13e8+1 13f8+1 13fa+1 1404+1 1951+2e 1af7+2 1afa+2 1afd+5 1b47+b 370c+2 3710+3 3718+2 371c+2 3c85+2 3c89+6 3ffc+1 3ffe+1 4198+2 427d+1 4285+1 42be+4 42c4+2 42fb+1 4308+1 438c+1 4396+2a 47dd+1 47df+1 486b+24 4bd0+1 6206+2 6270+c 651c+2 6596+1 6636+1 6639+2 66c6+2 7a44+2 7dba+1 7dbc+8 7dc6+5 7dcc+1 7dce+2 7dd8+8 7de2+5 7de8+1 7dea+2 7f86+2 7f8a+2 7f8e+1 7f90+1 7f9a+4 7fa4+1 7fa6+1 7fb0+2 8038+2 86b0+1 8702+1 8a0c+1 8b98+1 8b9a+1 8fba+2 91f7+3 9800+10 9811+12 9824+10 9835+12 9848+10 9859+d 9867+12 987a+10 988b+12 989e+12 98b1+10 98c2+12 98d5+9 98df+2 98e2+5 98e8+5 98ee+3 98f2+5 98f8+4 98fd+4 9902+5 9908+4 990d+3 9911+5 9917+3 991b+3 991f+4 9924+3 9928+4 992d+10 993e+10 994f+12 9962+10 9973+d 9981+12 9994+10 99a5+12 99b8+12 99cb+10 99dc+12 99ef+10 9a00+d 9a0e+12 9a21+10 9a32+12 9a45+12 9a58+10 9a69+12 9a7c+10 9a8d+d 9a9b+12 9aae+10 9abf+12 9ad2+12 9ae5+10 9af6+12 9b09+10 9b1a+d 9b28+12 9b3b+10 9b4c+12 9b5f+12 9b72+10 9b83+12 9b96+10 9ba7+d 9bb5+12 9bc8+10 9bd9+12 9bec+12 9bff+10 9c10+12 9c23+10 9c34+d 9c42+12 9c55+10 9c66+12 9c79+12 9c8c+10 9c9d+12 9cb0+10 9cc1+d 9ccf+12 9ce2+10 9cf3+12 9d06+12 9d19+f 9d2a+11 9d3d+d a2a4+4 a2a9+3 a2af+1 a2b1+1 a2b4+3 a2b8+1 a2bb+1 a2bd+1 a2c1+2 a2c5+1 a2c8+3 a2ce+2 a2d1+1 a2d4+1 a2d6+3 a2e0+3 a2e4+2 a2e9+1 a2eb+2 a2ee+2 a2f3+2 a2f8+1 a2fa+2 a2fe+9 a30a+1 a30d+2 a323+1 a864+1 a86c+1 a886+4 a88c+1 b53e+1 ba4b+1 ba62+2 ba66+2 ba7e+1 ba8d+3 ba91+2 ba95+2 ba9b+4 baa0+3 baa5+6 baae+1 bab0+1 baba+2 bac4+1 bac6+1 bae7+1 bae9+1 baee+1 baf0+1 baf2+1 baf6+4 bafc+2 bb00+3 bbcd+1 bbcf+1 bbd2+4 bc8e+1 bc90+4 bc95+5 bc9b+5 bca1+5 bca7+5 bcad+5 bcb3+5 bcb9+5 bcbf+5 bcc5+5 bccb+1 c2b5+8 c342+2 c345+3 c34d+3 c357+1 c359+1 c35b+1 c36b+1 c36d+1 c371+1 c37f+2 c399+1 c39b+1 c3d0+2 c3d4+2 c3d8+1 c3da+1 c3dc+1 c3de+4 c6e5+c c765+f c775+3 c779+3 c77d+3 c781+1 c866+3 c86d+6 c875+6 c87c+3 c883+4 c8ed+2 c8fd+1 c917+7 c92f+5 c935+8 c93f+2 c943+1 c949+1 c94c+5 c954+2a cab4+1 cab7+2 cacb+2 cad0+4 cad5+7 cadd+5 cae9+1 cb36+1 cb38+1 cb3a+3 cb49+f cb5b+1 cb66+1 cb90+2 cb96+1 cb98+1 cb9a+1 cb9c+1 cb9e+1 cba0+1 cba2+1 cba6+1 cba8+1 cbaa+1 cbac+1 cbae+1 cbb0+1 cbb2+1 cbb6+1 cbb8+1 cbba+1 cbbc+1 cbbe+1 cbc0+1 cbc2+1 cbc6+1 cbc8+1 cbca+1 cbcc+1 cbce+1 cbd0+1 cbd2+1 cbd4+1 cbd6+1 cbd8+1 cbda+1 cbdc+1 cbde+1 cbe0+1 cbe2+1 cbe8+1 cbea+1 cbec+1 cbee+1 cbf0+1 cbf2+1 cbf4+1 cbf6+1 cbf8+1 cbfa+1 cbfc+1 cbfe+1 cc00+1 cc02+1 cca4+1 cca6+1 ccaa+2 ccad+3 ccb1+1 ccbc+1 ccbe+1 ccc0+1 ccca+2 ccf8+1 ccfa+5 cd00+1 cd02+2 cd08+3 cd0c+5 cd12+1 cd14+1 cd32+2 cd93+1 cd95+1 cd98+1 cd9a+1 cd9c+2 ce2d+1 ce33+1 ce38+1 ce42+1 ce47+1 ce4b+1 ce69+1 ce6e+1 ce73+1 ce78+3 ce7f+1 ce84+1 ce89+1 ce8e+1 ce9c+1 ceb9+1 cebf+1 cec3+1 cec8+1 cecd+1 ced2+1 ced7+1 cedc+1 cee1+1 cee6+1 ceeb+1 cef0+1 cef5+1 cefa+1 ceff+1 cf04+1 cf09+1 cf0e+1 cf18+1 cf1d+1 cf86+1 cf8b+1 cf90+1 cf95+1 cf9a+1 d0b6+1 d12c+2 d130+2 d134+2 d138+2 d13c+2 d140+3 d144+3 d148+2 d14c+2 d150+2 d154+3 d15c+2 d160+2 d164+3 d168+3 d16c+3 d170+3 d174+3 d178+3 d17c+3 d180+3 d184+2 d188+2 d18c+2 d190+3 d194+2 d198+3 d19c+3 d1a0+2 d1a4+2 d1a8+3 d1ac+3 d1b0+3 d1b4+3 d1b8+3 d1bc+3 d1c0+3 d1c4+3 d1c8+3 d1cc+3 d1d0+3 d1d4+2 d1d8+2 d1dc+2 d1e0+3 d1e4+3 d1e8+3 d1ec+3 d1f0+3 d1f4+3 d1f8+3 d1fc+3 d200+3 d204+3 d208+3 d20c+3 d210+3 d214+3 d218+3 d21c+3 d220+3 d224+3 d228+3 d22c+3 d230+3 d234+3 d238+3 d23c+3 d432+1 d43e+1 d444+1 d44a+1 d450+1 d744+1 d746+1 d7aa+2 d7ae+3 d7b4+3 d7ba+4 d7c0+11 d7d3+1 d7d7+d d7ea+3 d7ee+1 d802+1 d804+1 d80a+1 d80c+1 d810+2 d813+1 d894+1 d89f+3 d8a8+1 d8ae+1e d8ce+1 d8d0+7 d8d8+9 d8e2+9 d8ec+9 d8f6+9 d900+9 d90a+9 d914+9 d91e+9 d928+9 d932+9 d93c+8 d946+1 d948+6 d950+1 d952+7 d95a+9 d964+9 d96e+9 d978+9 d982+9 d98c+8 d996+1 d998+6 d9a0+1 d9a2+7 d9aa+8 d9b4+1 d9b6+7 d9be+9 d9c8+9 d9d2+9 d9dc+8 d9e6+1 d9e8+7 d9f0+9 d9fa+8 da04+1 da06+7 da0e+9 da18+9 da22+9 da2c+8 da36+1 da38+7 da40+9 da4a+9 da54+3 da58+3 da5c+1 da5e+1 da60+1 da62+1 da64+1 da66+1 da68+1 da6a+1 da6c+1 da6e+1 da70+3 da74+1 da76+1 da78+1 da7a+1 da7c+3 da80+1 da82+1 da84+1 da86+1 da88+1 da8a+1 da8c+1 da8e+1 da90+1 da92+1 da94+3 da98+5 da9e+5 daa4+1 daa6+1 daa8+1 daaa+1 daac+3 dab0+1 dab2+3 dab6+1 dab8+1 daba+1 dabc+5 dac2+5 dac8+3 dacc+1 dace+1 dad0+1 dad2+1 dad4+1 dad6+1 dad8+1 dada+5 dae0+1 dae2+3 dae6+3 daea+1 daec+3 daf0+1 daf2+5 daf8+1 dafa+1 dafc+1 dafe+3 db02+1 db04+5 db0a+3 db0e+1 db10+5 db16+5 db1c+5 db22+3 db26+1 db28+1 db2a+3 db2e+3 db32+1 db34+1 db36+1 db38+1 db3a+1 db3c+1 db3e+1 db40+5 db46+3 db4a+1 db4c+1 db4e+1 db50+1 db52+5 db58+1 db5a+3 db5e+5 db64+1 db66+1 db68+1 db6a+1 db6c+1 db6e+1 db70+3 db74+1 db76+5 db7c+1 db7e+3 db82+3 db86+1 db88+5 db8e+5 db94+3 db98+1 db9a+5 dba0+3 dba4+1 dba6+1 dba8+1 dbaa+1 dbac+3 dbb0+1 dbb2+1 dbb4+3 dbb8+1 dbba+1 dbbc+1 dbbe+3 dbc2+1 dbc4+3 dbc8+1 dbca+1 dbcc+3 dbd0+3 dbd4+1 dbd6+1 dbd8+3 dbdc+1 dbde+1 dbe0+1 dbe2+1 dbe4+1 dbe6+1 dbe8+3 dbec+1 dbee+1 dbf0+3 dbf4+5 dbfa+3 dbfe+1 dc00+1 dc02+1 dc04+1 dc06+3 dc0a+1 dc0c+1 dc0e+3 dc12+1 dc14+1 dc16+1 dc18+1 dc1a+1 dc1c+1 dc1e+1 dc20+1 dc22+1 dc24+5 dc2a+1 dc2c+1 dc2e+1 dc30+1 dc32+1 dc34+1 dc36+3 dc3a+1 dc3c+1 dc3e+3 dc42+1 dc44+3 dc48+1 dc4a+1 dc4c+1 dc4e+5 dc54+3 dc58+1 dc5a+3 dc5e+1 dc60+5 dc66+1 dc68+3 dc6c+1 dc6e+3 dc72+1 dc74+1 dc76+1 dc78+1 dc7a+1 dc7c+1 dc7e+5 dc84+1 dc86+1 dc88+1 dc8a+3 dc8e+1 dc90+1 dc92+3 dc96+1 dc98+1 dc9a+1 dc9c+1 dc9e+3 dca2+3 dca6+1 dca8+3 dcac+1 dcae+1 dcb0+3 dcb4+1 dcb6+1 dcb8+1 dcba+3 dcbe+1 dcc0+1 dcc2+1 dcc4+1 dcc6+5 dccc+1 dcce+3 dcd2+1 dcd4+1 dcd6+1 dcd8+3 dcdc+1 dcde+1 dce0+3 dce4+1 dce6+3 dcea+3 dcee+1 dcf0+1 dcf2+1 dcf4+1 e032+10 e04a+1 e04c+1 e04e+1 e050+1 e39d+1 e3a0+1 e7a2+4 e8a6+10 e8bc+1 eee7+1 | e28a63e813f191a7
+stateems | playsurrenderspell | 2f76e 4a75f653ab3f76be | a20dbc4995bd0fdd
+screen | playsurrenderspell | 9b8b4175609a03c4 a97a4bafd992e4ed 844f00df3107e9be
+view3d | playsurrenderspell | 9c0b862198b63325
+view3d1 | playsurrenderspell | d91b05fcb26382f9
 track | playloot | 0 0 1540 3c 5c0 0
 track | playloot | 1 0 1540 3c 5c0 0
 track | playloot | 2 0 1540 3c 5c0 0

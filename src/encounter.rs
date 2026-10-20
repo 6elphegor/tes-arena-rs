@@ -277,7 +277,11 @@ impl Machine {
     }
 
     /// 0000:3F0C / 3F3B, the guards' hook: their call (a sound), everyone
-    /// calms down, and the guards arrive. None for another hook.
+    /// calms down, and the guards arrive. None for another hook, which
+    /// the original never sets: the EXE's only stores to the hook word
+    /// 67EA are those two immediates (0000:3EED's 3F0C, 3F2E's 3F3B, each
+    /// with the countdown at 680F), and its one other reference is the
+    /// far call through it (3F09).
     pub fn guards_hook(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, hook: u32) -> Option<()> {
         if hook != 0x3F0C && hook != 0x3F3B {
             return crate::giveup::not_ported("0000:3F0C: a guards hook not ported");

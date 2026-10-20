@@ -103,7 +103,8 @@ pub trait MenuKeyHooks {
     /// 29CF:0000 with AX 1 and FS:SI the player: the spell waiting cast
     /// on the player (`resolve_cast`); whether one was waiting.
     fn touch_cast(&mut self, m: &mut Machine, files: &mut Files) -> Option<bool> {
-        m.resolve_cast(files, crate::cast::Touch::Record(DS, crate::character::PLAYER))
+        // On the player: no quest target to give up.
+        m.resolve_cast(files, crate::cast::Touch::Record(DS, crate::character::PLAYER), &mut |_, _| {})
     }
 }
 

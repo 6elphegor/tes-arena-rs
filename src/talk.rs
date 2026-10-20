@@ -104,6 +104,9 @@ const MARKS: u16 = 0x0622;
 /// message boxes (1194:59C8/59CC) and menus (1194:020E) are the
 /// `TextHooks`' (the texts shown through them too).
 pub trait TalkHooks: TextHooks {
+    /// 1194:59C8 after 2AA1:0819: a quest target giving up to a touch
+    /// spell says so; its words are at DGROUP `text`. By default no box.
+    fn surrender_box(&mut self, _m: &mut Machine, _text: u16) {}
     /// 1194:A374 (A36C): text number TEXT, written to BUFFER (`mode` 2)
     /// or shown (0), when the front end does it itself (Some(true));
     /// by default (Some(false)) the port's `Machine::text` runs. None
@@ -140,7 +143,7 @@ pub trait TalkHooks: TextHooks {
     /// 29CF:0000 with AL 0: a waiting touch spell lands on the actor at
     /// `si`. Whether one was waiting (the carry).
     fn touch_cast(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<bool> {
-        m.resolve_cast(files, Touch::Actor(si))
+        m.resolve_cast(files, Touch::Actor(si), &mut |m, t| self.surrender_box(m, t))
     }
     /// 1194:9F04: the level's quest item at `si` is taken. The carry: it
     /// stays (`quest::quest_item_taken`; it stays too where the original
