@@ -129,7 +129,7 @@ impl Machine {
     /// 1194:51D1 with AL `mark`.
     fn spell_page_run(&mut self, files: &mut Files, hooks: &mut dyn SpellPageHooks, mark: u8) -> Option<()> {
         self.mem.w16(DS, var::BLOCK, 0);
-        // 51B8: the screen as it stands kept in SPELBOOK.$$$ (the page at
+        // 1194:51B8: the screen as it stands kept in SPELBOOK.$$$ (the page at
         // [A8FE], FA00h bytes).
         let path = self.save_path(SPELBOOK);
         let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
@@ -190,7 +190,7 @@ impl Machine {
             hooks.leave(self);
             let block = self.mem.r16(DS, var::BLOCK);
             self.heap_free(block);
-            // 53E3: the screen read back from SPELBOOK.$$$ into the page.
+            // 1194:53E3: the screen read back from SPELBOOK.$$$ into the page.
             let path = self.save_path(SPELBOOK);
             let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
             self.file_load(files, path, seg, off)?;

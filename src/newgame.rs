@@ -1017,7 +1017,7 @@ impl Machine {
         Some(())
     }
 
-    /// `class_quiz`'s next question (222C:00EA..00F6, 020A..0231): picked
+    /// `class_quiz`'s next question (222C:00EA..00F6, 222C:020A..0231): picked
     /// (`quiz_pick`), found in bank 4 (`quiz_find`), its position kept at
     /// SHOWN; then its window: the cursor put back (541E), B7C4 bits 1-2
     /// and B7E4 set (no fades: no colours read), bank 6's frame the

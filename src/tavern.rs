@@ -540,7 +540,8 @@ impl Machine {
 
     /// 1194:C0B1. The slot's rented rooms' files ("in*.%d", 754C, by the
     /// slot 1A6C, made at ROOM_NAME and its path, 25FD:0844) found one by
-    /// one (DOS find first and next, 0000:600C, 6028): each loaded whole
+    /// one (DOS find first and next, 0000:600C, 0000:6028
+    /// and its body 0000:602C): each loaded whole
     /// to 929E (0000:7428, its size at A90C), and deleted (0000:9DC2)
     /// unless the end it holds (the dword at +2, 92A0) is past the time
     /// (5CC, signed). Here the files are found through `Files` in name

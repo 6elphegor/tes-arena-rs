@@ -717,8 +717,8 @@ impl Machine {
     /// 25FD:056F: the file named at DS:`from` copied to DS:`to` (kept in
     /// `Files` as a written file, as `file_write` does), through the EMS
     /// banks: `from` opened (0000:6B22, its handle at 126C and A836), `to`
-    /// deleted (9DC2) and made (67A2, its handle at 126E and A838; both
-    /// DOS's lowest free handles), then (05A5) up to FFFFh bytes read
+    /// deleted (9DC2) and made (0000:67A2, its body 0000:67A6; its handle at 126E and A838; both
+    /// DOS's lowest free handles), then (25FD:05A5) up to FFFFh bytes read
     /// into the frame ([902E]) with each of the four banks of the table
     /// at 5F5A mapped in turn (1Fh, 17h, 18h, 12h; AX, the count read, at
     /// the entry's +2), until a read comes short, and written out again

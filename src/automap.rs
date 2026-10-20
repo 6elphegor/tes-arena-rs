@@ -458,9 +458,9 @@ impl Machine {
     }
 
     /// The automap screen's buttons (the table at 66CA, handlers at 66F2):
-    /// 0 up (0000:37ED, y less 80h), 1 down (37F7), 2 the right arrow
-    /// (3801, x less 80h: the map is drawn with x falling to the right),
-    /// 3 the left arrow (380B), 4 the centre (3815, back on the player);
+    /// 0 up (0000:37ED, y less 80h), 1 down (0000:37F7), 2 the right arrow
+    /// (0000:3801, x less 80h: the map is drawn with x falling to the right),
+    /// 3 the left arrow (0000:380B), 4 the centre (0000:3815, back on the player);
     /// each then kept inside the level (3796). The screen's loop makes the
     /// top left square again after (377D, `automap_origin`, 0000:2E75).
     pub fn automap_view_button(&mut self, b: u16) {

@@ -299,7 +299,7 @@ impl Machine {
 
     /// The sheet's loop on N (5CF4's first record, 3276:52B0), `key` its
     /// key typed (`n`; None, a click on it): 1194:0D67's turn to the
-    /// equipment page, 129B 1, and 16BD up to its own buttons' loop
+    /// equipment page, 129B 1, and 1194:16BD up to its own buttons' loop
     /// (`equipment_setup`, then B7C4 bit 4: no waits for the buttons'
     /// release).
     pub fn sheet_equipment(&mut self, files: &mut Files, key: Option<u8>) -> Option<()> {
@@ -383,7 +383,7 @@ impl Machine {
         Some(())
     }
 
-    /// 1194:1A4A (`on`) or 1A94: the arrows' handlers.
+    /// 1194:1A4A (`on`) or 1194:1A94: the arrows' handlers.
     fn equipment_scrolled(&mut self, files: &mut Files, on: bool) -> Option<()> {
         let first = self.mem.r8(DS, 0x1297);
         let moved = if on {
@@ -839,7 +839,7 @@ impl Machine {
 
     /// 1194:5D24..5D39 over the first `count` of the equipment page's
     /// records (3276:57D8): each in turn, its key (a letter made a capital,
-    /// 5D75) or its rectangle (5D8D, edges included); the first that takes
+    /// 1194:5D75) or its rectangle (1194:5D8D, edges included); the first that takes
     /// `input`, or None when none does (B7C6 then counts them all and the
     /// loop reads again: no state of its own).
     fn page_record(&self, input: PageInput, count: u16) -> Option<u16> {
@@ -1178,7 +1178,7 @@ impl Machine {
                     self.mem.w8(DS, 0x9288, if flags & 0x80 != 0 { 0x65 } else { 0x68 });
                 }
                 let name = if self.item_category(DS, si) == 3 && flags & 2 == 0 {
-                    // 1F30: "%s (%d)" (3276:5B6D), the name and +1 plus one.
+                    // 1194:1F30: "%s (%d)" (3276:5B6D), the name and +1 plus one.
                     let count = self.mem.r16(DS, si.wrapping_add(1)).wrapping_add(1);
                     let name = self.display_name(si)?;
                     self.sprintf((DS, NUMBER), (DATA, 0x5B6D), &[crate::format::Arg::Str(DS, name), crate::format::Arg::Int(count)]);
@@ -1235,7 +1235,7 @@ impl Machine {
         self.line_to(0x0C, y);
     }
 
-    /// 0000:7334 (its body 7338, the steps 0000:73E6): a line from
+    /// 0000:7334 (its body 0000:7338, the steps 0000:73E6): a line from
     /// (ADB6, ADB8) to (`ax`, `bx`) in [9288],
     /// drawn from whichever end is higher on the page (the lower y, the
     /// other where they're level) one pixel a step of the longer axis,
@@ -1852,7 +1852,7 @@ impl Machine {
             self.utoa_nul(cx, SCRATCH);
             self.sheet_text(0x1A, 0x34 + 8 * i, SCRATCH);
         }
-        // 0E86.
+        // 1194:0E86.
         let cx = self.mem.r16(DS, p + 0x5B);
         let dx = if raw { cx } else { self.mem.r16(DS, p + 0x59) };
         self.sheet_ratio(dx, cx);
@@ -1873,7 +1873,7 @@ impl Machine {
         let exp = self.mem.r32(DS, p + 0x409);
         self.dun_ultoa(exp, SCRATCH);
         self.sheet_text(0x2D, 0x9E, SCRATCH);
-        // 0F08.
+        // 1194:0F08.
         for i in 0..0x20u16 {
             let b = self.mem.r8(DS, p + 0x39 + i);
             self.mem.w8(DS, 0x10A8 + i, b);
@@ -1887,6 +1887,7 @@ impl Machine {
             self.sheet_signed(v, 0);
             self.sheet_text(x, y, NUMBER);
         }
+        // 1194:0FFB: each word scaled (5B07) and stored back.
         for i in 0..16u16 {
             let at = p + 0x39 + 2 * i;
             let v = crate::scale::to100(self.mem.r16(DS, at) as i16) as u16;

@@ -290,7 +290,7 @@ impl Machine {
     }
 
     /// 27E3:02F3..03C7 from the top of a page: the page written to
-    /// LOG.$$$ (03D6), the release wait (AFF9 0), the page's lines drawn;
+    /// LOG.$$$ (27E3:03D6), the release wait (AFF9 0), the page's lines drawn;
     /// where the loop goes next.
     fn log_pages(&mut self, files: &mut Files, mut si: u16, mut lines: u16, pages: u16) -> At {
         let path = self.save_path(var::PAGE_FILE);

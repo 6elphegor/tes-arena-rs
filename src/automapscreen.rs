@@ -97,7 +97,7 @@ impl Machine {
         Some(())
     }
 
-    /// 0000:2F10: the map drawn: AUTOMAP.IMG into the page (2FFD, 582C)
+    /// 0000:2F10: the map drawn: AUTOMAP.IMG into the page (0000:2FFD, 582C)
     /// with the place's name over it in [A86E]'s font (not in a dungeon,
     /// 5E6 3), [A86C]'s selected again; the squares (2F20..2F47, bank 11h
     /// mapped); the notes (32FE), not where 5E6 is 4 nor in the

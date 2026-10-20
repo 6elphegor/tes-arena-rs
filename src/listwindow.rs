@@ -974,7 +974,7 @@ impl Machine {
     /// plus one on by the font's height (B7F4), then the marked line and
     /// the arrows remapped (0BE4). After each line passed or drawn, BP
     /// (the texts' count, +26) is counted down, and where it reaches 0
-    /// the colour after them (+2B) taken (0BAE). The pixels go into the
+    /// the colour after them (+2B) taken (3159:0BAE). The pixels go into the
     /// page where it is the game's own block; the texts' state (ADB6,
     /// ADB8) either way.
     fn list_drawn(&mut self, seg: u16, rec: u16) {

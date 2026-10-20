@@ -388,7 +388,8 @@ impl Machine {
         if self.r_g16(HOURS) == 1 { text::HOURS_LEFT } else { text::HOURS_LEFT_N }
     }
 
-    /// 2433:12F5. Whether camping is refused here (the carry), with its
+    /// 2433:12F5 (the same bytes as 2542:0205, the camping key's
+    /// checks). Whether camping is refused here (the carry), with its
     /// message: enemies near; in the wild's dungeons (C39A bit 10h) or a
     /// city's streets (C398 bit 4) "You can't camp here."; in the wild
     /// (C39A bit 200h) it is allowed, and inside (5E6 4) in buildings of

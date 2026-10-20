@@ -199,7 +199,7 @@ impl Machine {
         Some(())
     }
 
-    /// 0000:9727 with 9A34 (989C: DI the row table's offset for `y`, plus
+    /// 0000:9727 with 0000:9A34 (989C: DI the row table's offset for `y`, plus
     /// `x`): the box's tiles drawn into the page ([A900]) where it is the
     /// game's own block, `across` by `down` of them: the corners, edges
     /// and middle from the tile set's pixels ([[B038] + 4]:0, A83E bytes
