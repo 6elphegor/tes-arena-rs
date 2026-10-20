@@ -1809,6 +1809,20 @@ fn case(name: &str) -> Option<Case> {
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
         // gen_worldframes.py's wild-life cases: the noon encounter fought;
         // doors clicked (`before_door`).
+        // gen_worldframes.py's `jagar_encounter`: the first frame's hour
+        // brings the main quest's encounter, Jagar's words first (1194:
+        // D91C), clicked through; twenty frames after.
+        "playjagar" => (Place::Wild, Box::new(|a: &mut App| {
+            day_encounter(a, 0x100);
+            let m = &mut a.engine.m;
+            let f = m.mem.r16(DS, 0x05C8);
+            m.mem.w16(DS, 0x05C8, f | 0x8000);
+            m.mem.w8(DS, 0x0F77, 3);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 1, |_| false);
+            movies_through(a, d);
+            frames(a, d, seen, 20, |_| false);
+        })),
         "playwildambush" => (Place::Wild, Box::new(|a: &mut App| {
             day_encounter(a, 0x100);
             captured(a);
@@ -3674,6 +3688,7 @@ const BUSY: &[&str] = &[
     "playhousepick",
     "playinformant",
     "playinformantpaid",
+    "playjagar",
     "playjourneyend",
     "playkeyssheet",
     "playlastpiece",
@@ -3865,6 +3880,12 @@ fn the_row_tables_made_as_the_original_makes_them() {
 /// CCBC, the key ring (AC4D: the view's Space at each wait, the harness's
 /// one key at the box) and the buttons (AFF9, 7926: the dream's last click's
 /// release, which the original's box reads at 1194:59E5, the window's own).)
+/// (playjagar's state is left out too: its track, EMS banks and files
+/// match; DGROUP differs in the screen's colours that Jagar's words read
+/// before any frame of the case is drawn (A611's to A39E, D45D's to 9A6E):
+/// entries 1..8, which the original's DAC holds from the sky's window as
+/// it was last set, before the case's clock moved it, and which the view
+/// has only from a drawn frame; and by a tick in the timer (0151).)
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[

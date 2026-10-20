@@ -498,6 +498,11 @@ impl arena::encounter::FightHooks for FightFront<'_, '_> {
     fn jagar(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, text: u16) -> Option<()> {
         let dac = self.0.dac;
         m.vision(files, &mut arena::vision::ClickThrough::default(), dac.as_ref(), text, 0x80A5, 0x8090)?;
+        // The click that ended the pages let go, as the mouse driver
+        // reports it at the frame's next read (the window clicks them
+        // through whole).
+        let (x, y) = (m.mem.r16(arena::mem::DS, arena::controls::var::MOUSE_X), m.mem.r16(arena::mem::DS, arena::controls::var::MOUSE_Y));
+        m.set_mouse(x, y, 0);
         self.0.movie("JAGAR.FLC", Some(text), 0xF5);
         Some(())
     }
@@ -1214,9 +1219,12 @@ impl Assets {
                     p[1 + i] = [c[0], c[1], c[2], 255];
                 }
             }
-            if let Some(l) = sky.lamp {
-                p[0x71] = [l[0], l[1], l[2], 255];
-            }
+        }
+        // (71h is the game's once it set it, whether or not a frame has
+        // been drawn yet: the light's own record of it, e.g. a frame's
+        // hour bringing Jagar's words before any frame was shown.)
+        if let Some(l) = self.light.lamp {
+            p[0x71] = [l[0], l[1], l[2], 255];
         }
         p
     }
