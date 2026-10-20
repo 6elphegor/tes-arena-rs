@@ -350,9 +350,12 @@ class ScreenArena(DosArena):
         # the entered hook makes (1194:3EBF) are built from it.
         saved = self.stub(location=False)
         # The working slot as the start leaves it with no ARENA variable in
-        # the environment (1194:3A72: 40h).
+        # the environment (1194:3A72..3A7C: 40h, and STATES.nn's digits at
+        # 7D0D "64", so a main quest dungeon's locks and triggers are
+        # read from and kept in the working slot's STATES.64, 292B:09AC).
         self.mu.mem_write(self.lin(self.ds, 0x1A80), b'\x40')
         self.mu.mem_write(self.lin(self.ds, 0x1A6C), b'\x40')
+        self.mu.mem_write(self.lin(self.ds, 0x7D0D), b'64')
         # The title's Load (0000:116F): the working slot's files fresh
         # (25FD:0219: "*.64" deleted, the game's "*.65" copied to them).
         assert self.run_screen(0x25FD, 0x0219) is None, 'the fresh files waited'
