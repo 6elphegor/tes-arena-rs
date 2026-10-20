@@ -110,6 +110,7 @@ and digest:
   printed | NAME | <length> <digest>
 """
 import os
+import random
 import struct
 import sys
 
@@ -1684,9 +1685,93 @@ LONG_RUN = ([((), (), 2, None), ((), (), 10, None, [(160, 100)], {'leaves': True
             + [((), (), 600, None),
                ((KEY_RIGHT,), (), 10, None), ((), (KEY_RIGHT,), 2, None), ((UP,), (), 400, None), ((), (UP,), 20, None)])
 
+# Seeded random sessions (`fuzz_script`): name: (where, seed). Each
+# writes its script (`fuzz` line) for worldtest to play the same.
+FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1)}
+KEY_DOWN = 0x50
+
+
+def fuzz_script(where, seed, total=1500):
+    """A random session of about `total` frames from `seed`, as tokens:
+    `hK[+K..],N,M` keys K (scan codes, hex) held N frames, let go, M
+    frames; `wN` N frames; `tN` a minute tick due (`minute_due`), N
+    frames; `qN` Shift+C (the book's Light, `known`) a frame, let go, N
+    frames; `aN` A (the weapon readied or put away) a frame, let go, N
+    frames; `sN,M` the right button held and dragged down (`SWINGING`) N
+    frames, let go, M frames; `cN` (the dungeon only: no doors out) the
+    view's middle clicked, N frames. No screens or boxes are opened."""
+    rng = random.Random(f'{where}:{seed}')
+    out, n, ready = [], 0, False
+    moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
+             ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60)]
+    while n < total:
+        r = rng.random()
+        if r < 0.55:
+            keys, lo, hi = rng.choice(moves)
+            k, m = rng.randint(lo, hi), rng.randint(1, 10)
+            out.append('h' + '+'.join(f'{c:x}' for c in keys) + f',{k},{m}')
+            n += k + m
+        elif r < 0.70:
+            k = rng.randint(1, 60)
+            out.append(f'w{k}')
+            n += k
+        elif r < 0.76:
+            k = rng.randint(5, 30)
+            out.append(f't{k}')
+            n += k
+        elif r < 0.80:
+            k = rng.randint(20, 60)
+            out.append(f'q{k}')
+            n += 1 + k
+        elif r < 0.86:
+            k = rng.randint(10, 30)
+            out.append(f'a{k}')
+            ready = not ready
+            n += 1 + k
+        elif r < 0.94 and ready:
+            k, m = rng.randint(5, 40), rng.randint(2, 10)
+            out.append(f's{k},{m}')
+            n += k + m
+        elif where == 'dungeon':
+            k = rng.randint(5, 20)
+            out.append(f'c{k}')
+            n += k
+    return out
+
+
+def fuzz_steps(tokens):
+    """`fuzz_script`'s tokens as a case's steps."""
+    steps = []
+    for t in tokens:
+        kind, args = t[0], t[1:].split(',')
+        if kind == 'h':
+            keys = tuple(int(c, 16) for c in args[0].split('+'))
+            steps += [(keys, (), int(args[1]), None), ((), keys, int(args[2]), None)]
+        elif kind == 'w':
+            steps.append(((), (), int(args[0]), None))
+        elif kind == 't':
+            steps.append(((), (), int(args[0]), None, [], {'do': minute_due}))
+        elif kind == 'q':
+            steps += [((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), int(args[0]), None)]
+        elif kind == 'a':
+            steps += [((KEY_A,), (), 1, None), ((), (KEY_A,), int(args[0]), None)]
+        elif kind == 's':
+            steps += [((), (), int(args[0]), None, [], SWINGING), ((), (), int(args[1]), None, [], LET_GO)]
+        elif kind == 'c':
+            steps.append(((), (), int(args[0]), None, [(160, 100)]))
+    return steps
+
+
+def fuzz_case(name):
+    """A FUZZ case's CASES entry: its place, the book's Light (`known`),
+    its script's steps."""
+    where, seed = FUZZ[name]
+    return where, known(LIGHT), fuzz_steps(fuzz_script(where, seed))
+
+
 # Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
 # way (`checkpoint` lines), as at their end.
-CHECKPOINT_CASES = ('playlongrun',)
+CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -1792,6 +1877,11 @@ CASES = {
     # out, the street walked with turns, Light cast, minute ticks, a long
     # stand), DGROUP and EMS measured every 250 frames (`checkpoint`).
     'playlongrun': ('street', long_run_start, LONG_RUN),
+    # Seeded random sessions (FUZZ, `fuzz_script`), measured every 250
+    # frames as playlongrun.
+    'fuzztown1': fuzz_case('fuzztown1'),
+    'fuzzdungeon1': fuzz_case('fuzzdungeon1'),
+    'fuzzwild1': fuzz_case('fuzzwild1'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -2928,6 +3018,8 @@ def main():
         finally:
             for h in hooks:
                 a.mu.hook_del(h)
+        if name in FUZZ:
+            out.write(f'fuzz | {name} | {" ".join(fuzz_script(*FUZZ[name]))}\n')
         for t in tracks:
             out.write(t)
         if len(seen) > 1:
