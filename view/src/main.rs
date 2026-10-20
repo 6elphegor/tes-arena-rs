@@ -1212,8 +1212,12 @@ impl Assets {
     /// time of day (2294:0341) and, once the game has set it, 71h the
     /// lamps' (0000:9B5B): anything drawn in those colours shows them.
     fn dac(&self) -> [[u8; 4]; 256] {
-        let mut p = self.palette;
-        if let Some((sky, _, _)) = &self.frame_view {
+        Self::dac_with(self.palette, self.frame_view.as_ref().map(|v| &v.0))
+    }
+
+    fn dac_with(palette: [[u8; 4]; 256], sky: Option<&render::Sky>) -> [[u8; 4]; 256] {
+        let mut p = palette;
+        if let Some(sky) = sky {
             if sky.outdoors {
                 for (i, c) in sky.colours.iter().enumerate() {
                     p[1 + i] = [c[0], c[1], c[2], 255];
@@ -1224,6 +1228,21 @@ impl Assets {
             }
         }
         p
+    }
+
+    /// The colours a game turn finds: `dac`, but before the area's first
+    /// frame has drawn, those the original's DAC holds in that frame: the
+    /// sky's colours from the window the frame's 2294:0341 sets (from the
+    /// sky's time, CCFE; it runs before the minute's tick, whose encounter
+    /// may read them, 1194:D91C) and 71h as the light state last set it.
+    fn dac_turn(&mut self, m: &mut arena::machine::Machine) -> [[u8; 4]; 256] {
+        if self.frame_view.is_some() {
+            return self.dac();
+        }
+        let mut c = m.clone();
+        c.sky_step();
+        let sky = self.sky(&mut c);
+        Self::dac_with(self.palette, Some(&sky))
     }
 
     /// Also enters the area's sky (0000:464A: its objects made).
@@ -2019,7 +2038,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     }
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
-    let dac = assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+    let dac = assets.dac_turn(&mut engine.m).map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac), interface: Some(&mut assets.interface) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
         eprintln!("camping gave up: {}", arena::giveup::describe());
