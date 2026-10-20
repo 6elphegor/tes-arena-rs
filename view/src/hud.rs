@@ -67,6 +67,35 @@ impl Font {
     }
 }
 
+/// A box to read: its lines, and the game's page as the box's wait found
+/// it (the game's own block, which the engine drew the box on: what the
+/// original shows while it waits), which the window shows instead of its
+/// own drawing of the lines; None where the page isn't the game's.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Said {
+    pub lines: Vec<Vec<Span>>,
+    pub page: Option<std::sync::Arc<Vec<u8>>>,
+}
+
+impl std::ops::Deref for Said {
+    type Target = Vec<Vec<Span>>;
+    fn deref(&self) -> &Vec<Vec<Span>> {
+        &self.lines
+    }
+}
+
+impl std::ops::DerefMut for Said {
+    fn deref_mut(&mut self) -> &mut Vec<Vec<Span>> {
+        &mut self.lines
+    }
+}
+
+impl From<Vec<Vec<Span>>> for Said {
+    fn from(lines: Vec<Vec<Span>>) -> Said {
+        Said { lines, page: None }
+    }
+}
+
 /// A run of text in one colour.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {

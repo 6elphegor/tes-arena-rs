@@ -147,8 +147,8 @@ pub struct Talk {
     /// The question the turn stopped at.
     pub need: Option<Need>,
     /// The message boxes shown, and those since the last answer given.
-    pub boxes: Vec<Vec<Vec<Span>>>,
-    pub since_answer: Vec<Vec<Vec<Span>>>,
+    pub boxes: Vec<crate::hud::Said>,
+    pub since_answer: Vec<crate::hud::Said>,
     /// The rest's hours, last shown.
     pub status: Option<String>,
     /// The animations the turn played (1194:D45D, 2294:0895): the file,
@@ -175,6 +175,10 @@ pub struct Talk {
     /// The reads the last menu answered came with (`Answer::Menu`), for
     /// its asker to give the game's menu (`Machine::menu_reads`).
     pub menu_reads: Option<Vec<arena::menubox::MenuRead>>,
+    /// The game's page as the question the turn stopped at was drawn on
+    /// it (a menu's boxes, `Machine::menu_boxes`): what the original shows
+    /// while it waits for the pick.
+    pub need_page: Option<std::sync::Arc<Vec<u8>>>,
 }
 
 /// The game's text at DS:`at`, as lines.
@@ -219,8 +223,21 @@ impl Talk {
         // Centred in the clip as it is asked (A914..A91A).
         let r = |at| m.mem.r16(DS, at) as i16 as i32;
         let lines = hud::clipped(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
-        self.boxes.push(lines.clone());
-        self.since_answer.push(lines);
+        self.boxes.push(lines.clone().into());
+        self.since_answer.push(lines.into());
+    }
+
+    /// The game's page as the last box kept's wait found it (`hud::Said`):
+    /// given that box, here and in `since_answer`, where it has none yet.
+    pub fn paged(&mut self, page: std::sync::Arc<Vec<u8>>) {
+        if self.need.is_some() {
+            return;
+        }
+        for b in [self.boxes.last_mut(), self.since_answer.last_mut()].into_iter().flatten() {
+            if b.page.is_none() {
+                b.page = Some(page.clone());
+            }
+        }
     }
 
     /// 1194:4D31's message: the strip under the shop's menu saved (5F8C),
@@ -234,8 +251,8 @@ impl Talk {
         let text = m.mem.cstr(DS, si).to_vec();
         println!("{}", String::from_utf8_lossy(&text));
         let lines = hud::placed(0x23, 0x91, &text, 0xC0, hud::GameFont::Teeny);
-        self.boxes.push(lines.clone());
-        self.since_answer.push(lines);
+        self.boxes.push(lines.clone().into());
+        self.since_answer.push(lines.into());
     }
 
     /// 1194:4E88 with 13D3 0: the dialog's lines in the strip under the
@@ -273,8 +290,8 @@ impl Talk {
         if more {
             b.push(hud::more_line());
         }
-        self.boxes.push(b.clone());
-        self.since_answer.push(b);
+        self.boxes.push(b.clone().into());
+        self.since_answer.push(b.into());
     }
 
 

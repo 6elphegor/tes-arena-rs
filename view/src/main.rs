@@ -274,8 +274,21 @@ impl Front<'_> {
     /// after the player's click unless 5E0 bit 800h).
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         self.show(m, si);
-        if m.message_shown((arena::mem::DS, si), self.box_under(m)).is_none() {
+        if m.message_wait_box((arena::mem::DS, si), self.box_under(m)).is_none() {
             eprintln!("the message box gave up: {}", arena::giveup::describe());
+            return;
+        }
+        // The page as the box's wait (1194:5536) finds it: what the window
+        // shows of the box.
+        self.box_page(m);
+        m.message_waited();
+    }
+
+    /// The game's page as it stands (the game's own block: the box the
+    /// engine just drew on it) given the box last kept (`Talk::paged`).
+    fn box_page(&mut self, m: &arena::machine::Machine) {
+        if let (Some(t), Some(p)) = (self.talk.as_deref_mut(), game_page(m)) {
+            t.paged(std::sync::Arc::new(p));
         }
     }
 
@@ -303,9 +316,13 @@ impl Front<'_> {
         // colour codes change 9288 as they are drawn).
         let drawn = m.mem.r8(DS, 0x9288);
         m.mem.w8(DS, 0x9288, colour);
+        let page = game_page(m);
         let pick = match (&boxes, self.talk.as_deref_mut()) {
             (Some(b), Some(t)) => {
                 let pick = t.menu(m, si, bx, di);
+                if t.need.is_some() && t.need_page.is_none() {
+                    t.need_page = page.map(std::sync::Arc::new);
+                }
                 m.menu_reads = t.menu_reads.take();
                 m.menu_answered(b, bx, pick)
             }
@@ -2253,7 +2270,7 @@ struct Shot {
     answers: std::collections::VecDeque<dialog::Answer>,
     message: Option<(u16, u16)>,
     frames: usize,
-    boxes: Vec<Vec<Vec<hud::Span>>>,
+    boxes: Vec<hud::Said>,
     need: Option<dialog::Need>,
     /// The spellmaker's screen when the turn stopped inside it.
     maker_screen: Option<(dialog::Snapshot, Option<u16>)>,
@@ -2412,7 +2429,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             if step == "travel" {
                 match travel::Travel::open(&mut engine, &archive, Some(&st.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]))) {
                     Ok(t) => st.travel = Some(t),
-                    Err(b) => st.boxes = vec![b],
+                    Err(b) => st.boxes = vec![b.into()],
                 }
             } else if let Some(at) = step.strip_prefix("tclick:") {
                 let (x, y) = at.split_once(':').expect("--do tclick:X:Y");
@@ -2440,7 +2457,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
             let mut boxes = Vec::new();
             travel::after(&mut st.travel, &mut engine, &mut boxes, true);
             if !boxes.is_empty() {
-                st.boxes = boxes;
+                st.boxes = boxes.into_iter().map(Into::into).collect();
             }
             continue;
         }
@@ -2687,7 +2704,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                         automap::open(&mut engine, st.assets.dac(), (x, y));
                         st.map = true;
                     }
-                    Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines],
+                    Some(sheets::BarAction::Status(lines)) => st.boxes = vec![lines.into()],
                     Some(sheets::BarAction::Spells(_)) => st.panel = Some(panels::Panel::Spellbook(Default::default())),
                     Some(sheets::BarAction::Log(_)) => st.panel = Some(panels::Panel::Log(sheets::open_log(&engine.m, &engine.files))),
                     Some(sheets::BarAction::Sheet) => st.panel = Some(panels::Panel::Sheet),
@@ -2747,7 +2764,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
                     }
                 };
                 println!("{msg}");
-                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]]];
+                st.boxes = vec![vec![vec![hud::Span { colour: 0x0F, text: msg, font: Default::default(), code: None }]].into()];
             }
             "key" => {
                 // A key (its scan code) down for a frame, through the key
@@ -2772,7 +2789,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
         if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
             hud::init_style(&st.assets.archive, &engine.m);
             t.draw(&mut screen, &font, &mut engine.m, st.cursor.0, st.cursor.1);
-            let hud = hud::Hud { boxed: st.boxes.last().cloned(), ..Default::default() };
+            let hud = hud::Hud { boxed: st.boxes.last().map(|b| b.lines.clone()), ..Default::default() };
             hud::compose_over(&mut screen, &font, &hud);
         }
         create::Creation::save_png(&screen, out);
@@ -2813,7 +2830,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
     r.draw(&device, &queue, &view, w, h, cam, &sprites);
     if let Some(font) = hud::Font::load(&st.assets.archive, FONT) {
         hud::init_style(&st.assets.archive, &engine.m);
-        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().cloned(), status: None, counters: hud::spell_counters(&engine.m), level: hud::level_text(&engine.m), effect: effect_of(&st.effect), clip: game_clip(&engine.m), ..Default::default() };
+        let mut hud = hud::Hud { message: message_line(&engine), boxed: st.boxes.last().map(|b| b.lines.clone()), status: None, counters: hud::spell_counters(&engine.m), level: hud::level_text(&engine.m), effect: effect_of(&st.effect), clip: game_clip(&engine.m), ..Default::default() };
         if engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 {
             hud.status = st.status.clone();
         }
@@ -2921,7 +2938,7 @@ fn shot(dir: &std::path::Path, mut engine: Engine, mut run: arena::transit::Run,
 /// a shop closed) added to `boxes`. Whether it is left for the actors
 /// (C39A bit 80h), for the next frame's drawing to find. (A question it
 /// asks is left, as Esc leaves it.)
-fn centre_click(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>) -> bool {
+fn centre_click(engine: &mut Engine, boxes: &mut Vec<hud::Said>) -> bool {
     click_at(engine, boxes, (164, 74))
 }
 
@@ -2951,7 +2968,7 @@ fn look_at(engine: &mut Engine, ax: u16) {
 /// A left click at (x, y) of the 320 x 200 screen in the view: the mouse
 /// put 4 up and left of it, as the click (CB60, 2826:0A52) is the cursor
 /// + 4; else as `centre_click`.
-fn click_at(engine: &mut Engine, boxes: &mut Vec<Vec<Vec<hud::Span>>>, (x, y): (i32, i32)) -> bool {
+fn click_at(engine: &mut Engine, boxes: &mut Vec<hud::Said>, (x, y): (i32, i32)) -> bool {
     engine.m.set_mouse((x - 4).max(0) as u16, (y - 4).max(0) as u16, 0);
     let mut talk = dialog::Talk::default();
     let mut hooks = Front { talk: Some(&mut talk), ..Default::default() };
@@ -3148,6 +3165,8 @@ struct Pending {
     maker: Option<(dialog::Snapshot, Option<u16>)>,
     /// The shop's screen behind the question (`Talk::backdrop`).
     backdrop: Option<shopui::Backdrop>,
+    /// The game's page with the question drawn on it (`Talk::need_page`).
+    page: Option<std::sync::Arc<Vec<u8>>>,
 }
 
 /// A turn stopped inside its frame at a screen a menu key or the bar's
@@ -3240,7 +3259,7 @@ struct App {
     /// (`Talk::backdrop`): the original's box (42EE) waits over the screen
     /// before the shop's way out (stealing, the guards called).
     box_backdrop: Option<shopui::Backdrop>,
-    boxes: std::collections::VecDeque<Vec<Vec<hud::Span>>>,
+    boxes: std::collections::VecDeque<hud::Said>,
     selected: usize,
     /// A list's first line shown (3159:06A0's +3Bh, 0 as it comes up,
     /// 0718), moved with `selected` by `hud::list_key`, `list_click`.
@@ -3698,6 +3717,7 @@ impl App {
             };
             let maker = talk.maker.take();
             let backdrop = talk.backdrop.take();
+            let page = talk.need_page.take();
             let take = move |a: &mut App| {
                 if forced.is_some() {
                     a.travel = forced;
@@ -3708,7 +3728,7 @@ impl App {
                     a.creation = Some(c);
                     a.creation_engine = Some(e);
                 }
-                a.pending = Some(Pending { before, input, given, need, maker, backdrop });
+                a.pending = Some(Pending { before, input, given, need, maker, backdrop, page });
             };
             match fade {
                 Some((steps, fade_in)) => self.fade_open(steps, fade_in, take),
@@ -3817,6 +3837,12 @@ impl App {
             if let Some(lines) = boxed {
                 t.draw_box(&mut self.screen, &self.font, &lines);
             }
+        } else if let Some(page) = self.box_page_shown().cloned() {
+            // A box over play the engine drew on the game's page (which
+            // holds the 3D view and the interface as the original's does):
+            // the page as the box's wait found it, all the original shows.
+            self.screen.set_palette(self.assets.dac());
+            self.screen.underlay(&page);
         } else {
             let sheet = self.panel.as_ref().is_some_and(|p| !p.over_play());
             self.screen.set_palette(if sheet { self.assets.charsheet } else { self.assets.dac() });
@@ -4151,7 +4177,7 @@ impl App {
                     self.release();
                 }
             }
-            Err(b) => self.boxes.push_back(b),
+            Err(b) => self.boxes.push_back(b.into()),
         }
         self.travel_after();
     }
@@ -4215,7 +4241,7 @@ impl App {
         let forced = matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Travel(_)));
         let journeyed = self.travel.as_ref().is_some_and(|t| t.journeyed);
         let carry = travel::after(&mut self.travel, &mut self.engine, &mut boxes, !forced);
-        self.boxes.extend(boxes);
+        self.boxes.extend(boxes.into_iter().map(hud::Said::from));
         // After a journey the screen is black (26F7:08F1's 55B2): the area's
         // change starts from there.
         self.journey_black |= journeyed && carry.is_some();
@@ -4548,7 +4574,7 @@ impl App {
         }
         if !caster {
             let t = self.engine.m.mem.cstr(arena::mem::DATA, 0x5AD7).to_vec();
-            self.boxes.push_back(hud::lines(&t, 0x0F));
+            self.boxes.push_back(hud::lines(&t, 0x0F).into());
         }
         if let Some(panels::Panel::Inventory(inv)) = self.panel.as_mut() {
             inv.bare = false;
@@ -4985,7 +5011,7 @@ impl App {
             }
             sheets::BarAction::Status(lines) => {
                 self.status_box = self.boxes.is_empty();
-                self.boxes.push_back(lines);
+                self.boxes.push_back(lines.into());
                 self.ring_box_kept = true;
             }
             // 056A: the last spell again (C with a Shift, or the right
@@ -5243,12 +5269,12 @@ impl App {
     /// A box of the view's own.
     fn say(&mut self, s: &str) {
         println!("{s}");
-        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]]);
+        self.boxes.push_back(vec![vec![hud::Span { colour: 0x0F, text: s.to_string(), font: Default::default(), code: None }]].into());
     }
 
     /// What the HUD shows now.
     fn hud(&self) -> hud::Hud {
-        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().cloned(), counters: hud::spell_counters(&self.engine.m), level: hud::level_text(&self.engine.m), effect: effect_of(&self.effect), clip: game_clip(&self.engine.m), ..Default::default() };
+        let mut h = hud::Hud { message: message_line(&self.engine), boxed: self.boxes.front().map(|b| b.lines.clone()), counters: hud::spell_counters(&self.engine.m), level: hud::level_text(&self.engine.m), effect: effect_of(&self.effect), clip: game_clip(&self.engine.m), ..Default::default() };
         if self.engine.m.mem.r8(arena::mem::DS, arena::rest::var::RESTING) != 0 || (self.status_held && !self.boxes.is_empty()) {
             h.status = self.status.clone();
         }
@@ -5427,6 +5453,34 @@ impl App {
     /// screen only after it's read (`box_read`).
     fn level_notice(&self) -> bool {
         !self.boxes.is_empty() && self.creation.is_some() && matches!(self.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spend(_)))
+    }
+
+    /// The game's page the window shows for the box up (`hud::Said`): a
+    /// box over play, the engine's drawing of it on the game's own block,
+    /// which holds the 3D view and the interface as the original's page
+    /// does. None where another screen is up (a movie, the save menu, the
+    /// options screen, creation, the spellmaker, a shop's, the travel
+    /// map, a sheet, the automap: their pictures are the window's own).
+    fn box_page_shown(&self) -> Option<&std::sync::Arc<Vec<u8>>> {
+        // A box to read first; else the menu asked, unmarked (the arrows
+        // mark an entry, the window's own: the original marks none).
+        let page = match self.boxes.front() {
+            Some(b) => b.page.as_ref()?,
+            None => match self.pending.as_ref()? {
+                Pending { need: dialog::Need::Menu(_), page: Some(p), .. } if !self.arrowed => p,
+                _ => return None,
+            },
+        };
+        let other = !self.movies.is_empty()
+            || self.saveui.is_some()
+            || self.options.is_some()
+            || (self.creation.is_some() && !self.level_notice())
+            || self.pending.as_ref().is_some_and(|p| p.maker.is_some() || p.backdrop.is_some())
+            || self.box_backdrop.is_some()
+            || self.travel.is_some()
+            || self.panel.is_some()
+            || self.map;
+        (!other).then_some(page)
     }
 
     fn box_read(&mut self) {

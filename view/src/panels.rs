@@ -549,7 +549,7 @@ pub fn script_line(engine: &mut arena::engine::Engine, row: usize, again: bool, 
 /// by its exit's key (Esc).
 pub fn script_drop(engine: &mut arena::engine::Engine, yes: bool, said: &mut Said) {
     let mut wait = |_: &mut Machine, lines: &[(Vec<u8>, u8)], _: u16| {
-        said.boxes.push(lines.iter().flat_map(|(t, _)| crate::hud::lines(t, 0x0F)).collect());
+        said.boxes.push(lines.iter().flat_map(|(t, _)| crate::hud::lines(t, 0x0F)).collect::<Vec<_>>().into());
     };
     let r = engine.m.sheet_equipment_drop(&mut engine.files, None, None, &mut |_| if yes { 0 } else { 1 }, &mut wait, &mut |_| arena::charsheet::PageInput::Key(0x1B));
     if r.is_none() {
@@ -561,7 +561,7 @@ pub fn script_drop(engine: &mut arena::engine::Engine, yes: bool, said: &mut Sai
 /// texts of its message boxes, and the use list's pick.
 #[derive(Default)]
 pub struct Said {
-    pub boxes: Vec<Vec<Vec<Span>>>,
+    pub boxes: Vec<crate::hud::Said>,
     pub pick: Option<u16>,
     /// A refusal the equipment screen draws in its list's panel (1194:
     /// 223A: one line centred at 55h, y A0h, colour A0h, until a click),
@@ -578,7 +578,7 @@ pub struct Said {
 
 impl Said {
     fn text(&mut self, bytes: &[u8]) {
-        self.boxes.push(crate::hud::lines(bytes, 0x0F));
+        self.boxes.push(crate::hud::lines(bytes, 0x0F).into());
     }
     /// What 59C8 (59CC) leaves in the game's state for its box
     /// (`Machine::message_shown`); the screen it covers isn't kept here.
@@ -611,7 +611,7 @@ impl arena::text::TextHooks for Said {
         // tiles (the view keeps no tile records to compare B038 with).
         let r = |at| m.mem.r16(DS, at) as i32;
         lines = crate::hud::in_marble2(lines, (r(0xA914), r(0xA916), r(0xA918), r(0xA91A)));
-        self.boxes.push(lines);
+        self.boxes.push(lines.into());
         Said::shown(m, (seg, si));
     }
 }

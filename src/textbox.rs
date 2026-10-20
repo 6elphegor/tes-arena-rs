@@ -435,11 +435,19 @@ impl Machine {
     /// (8FC4: 8F92, 8F94) are the front end's.
     pub fn message_shown(&mut self, text: (u16, u16), screen: Option<&[u8]>) -> Option<()> {
         self.message_wait_box(text, screen)?;
+        self.message_waited();
+        Some(())
+    }
+
+    /// 1194:59C8 after its wait (5A23 on): unless 5E0 bit 800h, the box put
+    /// away (`message_box_closed`) and the buttons let go (5E21's loop
+    /// until AFF9 is 0). The page between `message_wait_box` and this is
+    /// what the original shows while it waits.
+    pub fn message_waited(&mut self) {
         if self.mem.r16(DS, 0x05E0) & 0x800 == 0 {
             self.message_box_closed();
             self.mem.w8(DS, 0xAFF9, 0);
         }
-        Some(())
     }
 
     /// 1194:59C8 up to 5A23 (all of it with 5E0 bit 800h set): bank 18h

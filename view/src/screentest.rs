@@ -157,6 +157,16 @@ fn screen(name: &str, open: impl FnOnce(&mut App, &mut Driver), take: impl FnOnc
     check_fade(name, &mut a);
     let (idx, dac) = take(&mut a);
     assert!(check(name, &idx, &dac), "{name}: differs from the original's");
+    // A box over play the window shows as the game's page (the engine's
+    // drawing of it, `hud::Said`): the page's pixels where the box is (the
+    // view's own layer of it, whose mask the check above found the
+    // original's) the original's too.
+    if let Some(page) = a.box_page_shown().cloned() {
+        let (over_idx, dac) = over(&mut a);
+        let idx: Vec<u16> = over_idx.iter().zip(page.iter()).map(|(&o, &c)| if o < 0x100 { c as u16 } else { 0x100 }).collect();
+        assert!(check(name, &idx, &dac), "{name}: the game's page under its box differs from the original's");
+        eprintln!("{name}: the box shown as the game's page");
+    }
     // The files written from the load, against the original's
     // (tests/vectors/savefiles.txt's `screen` lines). A menu the view
     // runs over a copy of the game till it ends (the spell's page, the

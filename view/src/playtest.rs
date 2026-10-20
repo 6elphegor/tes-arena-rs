@@ -1012,7 +1012,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                                 issues.set(issues.get() + 1);
                             }
                             if !boxes.is_empty() {
-                                st.boxes = boxes;
+                                st.boxes = boxes.into_iter().map(Into::into).collect();
                             }
                             if engine.m.mem.cstr(DS, 0x0A22) != here {
                                 *counts.entry("journeys").or_default() += 1;
@@ -1039,7 +1039,7 @@ pub fn run(dir: &Path, mut engine: Engine, mut run: arena::transit::Run, seed: u
                             *counts.entry("automap").or_default() += 1;
                         }
                         Some(crate::sheets::BarAction::Status(lines)) => {
-                            st.boxes = vec![lines];
+                            st.boxes = vec![lines.into()];
                             *counts.entry("status").or_default() += 1;
                         }
                         Some(crate::sheets::BarAction::Log(_)) => {

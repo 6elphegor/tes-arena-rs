@@ -25,7 +25,7 @@ fn engine() -> Option<Engine> {
 fn said(talk: &dialog::Talk) -> String {
     let mut s = String::new();
     for b in &talk.boxes {
-        for line in b {
+        for line in b.iter() {
             for span in line {
                 s.push_str(&span.text);
             }
