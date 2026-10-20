@@ -310,6 +310,14 @@ fn fast_travel(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, clicks: &[
         d.wait(a, 100);
     }
     assert!(a.travel.is_none(), "the journey ends the travel map");
+    // The picture's button's fade out (292B:0362's 55B2) played, the frame
+    // the screen was opened in run on to its end (`screen_ended`).
+    for _ in 0..100 {
+        if a.fade.is_empty() && a.inside.is_none() {
+            break;
+        }
+        d.wait(a, 20);
+    }
     // The area left at that frame's end: the next place entered.
     seen.push(state(a));
     frames_until(a, d, seen, 3, |_| false);

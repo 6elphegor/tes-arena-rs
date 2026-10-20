@@ -101,10 +101,11 @@ LEAVES = dict(BOXES, leaves=True)
 TRAVEL = [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]
 
 
-def quest_dungeon(x, y):
+def quest_dungeon(x, y, picture):
     """The travel map's clicks to High Rock's place at (x, y), Travel, then
-    the main quest dungeon's picture's button (295, 189)."""
-    return [('click', 70, 45), ('click', x, y), ('click', x, y), ('click', 62, 180), ('click', 295, 189)]
+    with `picture` (the staff's dungeon: 26F7:00CE's 292B:0362) its
+    button (295, 189)."""
+    return [('click', 70, 45), ('click', x, y), ('click', x, y), ('click', 62, 180)] + [('click', 295, 189)] * picture
 
 
 def poisoned(put):
@@ -233,16 +234,17 @@ CASES = {
     # CITYDATA's +18h bit 2): High Rock, the dungeon's place clicked
     # (Crypt of Hearts, the staff's, at (198, 62); Mines of Khuras, the
     # map's, at (71, 132)), its journey's box read, Travel; the journey's
-    # days, then the dungeon's picture (26F7:00CE's 292B:0362: its words
-    # over it) left by its button (295, 189: 292B:042B), the area left;
-    # the outer loop on into the dungeon's first level; three frames.
+    # days, then for the staff's the dungeon's picture (26F7:00CE's
+    # 292B:0362: its words over it) left by its button (295, 189:
+    # 292B:042B), the area left; the outer loop on into the dungeon's
+    # first level; three frames.
     'travelhearts': ('street', w.at_square(95, 52, 0x100),
                      [((), (), 2, None),
-                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(198, 62), leaves=True)),
+                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(198, 62, True), leaves=True)),
                       ((), (SHIFT, M), 3, None)]),
     'travelkhuras': ('street', w.at_square(95, 52, 0x100),
                      [((), (), 2, None),
-                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(71, 132), leaves=True)),
+                      ((SHIFT, M), (), 1, None, [], dict(script=quest_dungeon(71, 132, False), leaves=True)),
                       ((), (SHIFT, M), 3, None)]),
     # A dungeon in the wilderness: the window crossed south three times
     # (`wild_south`), which brings the grid's block (1Fh, 23h), WILD065

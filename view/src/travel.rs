@@ -630,9 +630,12 @@ impl Travel {
         self.picture = Some(Picture::drawn(engine, ax));
     }
 
-    /// Whether a main quest's dungeon's picture is up.
+    /// Whether a main quest's dungeon's picture is up: kept from the
+    /// screen's end (26F7:00CE's 292B:0362), shown once the journey before
+    /// it has played (1194:30F1's days and their fades come first, inside
+    /// Travel).
     pub fn picture_up(&self) -> bool {
-        self.picture.is_some()
+        self.picture.is_some() && !self.journeying()
     }
 
     /// A click on the picture: in its button (110h..13Ah, B7h..C3h, as
@@ -653,7 +656,9 @@ impl Travel {
     /// A click at (x, y) of the screen (a button down: `right` the right).
     pub fn click(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, x: i32, y: i32, right: bool) {
         if self.picture.is_some() {
-            self.picture_click(engine, x, y);
+            if self.picture_up() {
+                self.picture_click(engine, x, y);
+            }
             return;
         }
         if self.done.is_some() {
@@ -1176,7 +1181,7 @@ impl Travel {
     /// The screen, the cursor at (x, y): its palette set.
     pub fn draw(&self, screen: &mut Screen, font: &Font, m: &mut Machine, x: i32, y: i32) {
         let blit = |screen: &mut Screen, i: &Image, x: i32, y: i32| screen.blit(x, y, i.w, i.h, &i.px, 199);
-        if let Some(p) = &self.picture {
+        if let Some(p) = self.picture.as_ref().filter(|_| self.picture_up()) {
             p.draw(screen, &self.fonts);
             return;
         }
