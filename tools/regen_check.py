@@ -23,8 +23,9 @@ state into the next). Up to J generators run at once; each gets a hard
 timeout. Identical outputs are deleted as they finish, so the scratch
 directory only keeps what differs (--keep keeps everything).
 
-A generator found identical is remembered in .regen_cache.json under a
-key over everything its output can depend on: its own source and every
+A generator found identical is remembered in git's common directory
+(regen-cache/whole/NAME.KEY, shared by every worktree, so a fresh
+worktree starts with master's results) under a key over everything its output can depend on: its own source and every
 harness module it imports (transitively), the vector files it names, the
 unpacked EXE, the game folder's file list (names, sizes, times) and the
 save folder's bytes, plus its committed vector file(s). When none of
@@ -70,8 +71,9 @@ VECTORS = os.path.join(ROOT, 'tests', 'vectors')
 VECTOR = {'move': 'movement', 'savew': 'save_write'}
 # Vector files a generator writes beside its OUT, checked with it.
 BESIDE = {'screens': ['screenfades.txt'], 'createshot': ['createframes.txt'], 'dungeonscreens': ['dungeonfades.txt']}
-CACHE = os.path.join(ROOT, '.regen_cache.json')
-CACHE_LOCK = threading.Lock()
+# The whole-generator cache was once this per-worktree file; its entries
+# are carried into the shared store (`cache_hit`).
+OLD_CACHE = os.path.join(ROOT, '.regen_cache.json')
 # Generators cached case by case (tools/casecache.py): only the cases whose
 # key changed run, the rest come from the block cache.
 PER_CASE = {'worldframes'}
@@ -165,20 +167,26 @@ def cache_key(name, env, vecs, own=True):
     return h.hexdigest()
 
 
-def cache_load():
-    try:
-        return json.load(open(CACHE))
-    except (OSError, ValueError):
-        return {}
+def cache_hit(name, key):
+    """Whether generator NAME was found identical under KEY, in this
+    worktree or any other (a key names everything the output depends on,
+    so another worktree's result is as good as this one's)."""
+    return os.path.exists(os.path.join(block_cache_dir('whole'), f'{name}.{key}'))
 
 
 def cache_store(name, key):
-    with CACHE_LOCK:
-        c = cache_load()
-        c[name] = key
-        tmp = CACHE + '.tmp'
-        json.dump(c, open(tmp, 'w'), indent=0, sort_keys=True)
-        os.replace(tmp, CACHE)
+    write_atomic(os.path.join(block_cache_dir('whole'), f'{name}.{key}'), '')
+
+
+def cache_migrate():
+    """Carry the old per-worktree .regen_cache.json into the shared store."""
+    try:
+        old = json.load(open(OLD_CACHE))
+    except (OSError, ValueError):
+        return
+    for name, key in old.items():
+        cache_store(name, key)
+    os.remove(OLD_CACHE)
 
 
 def usage(src):
@@ -229,7 +237,7 @@ def run(name, env, opts):
     if name in PER_CASE:
         return run_per_case(name, env, opts, vec, vecs, args, sharded)
     key = cache_key(name, env, [v for v in vecs if os.path.exists(v)])
-    if not opts.no_cache and env['cache'].get(name) == key:
+    if not opts.no_cache and cache_hit(name, key):
         return name, 0.0, 'cached'
     out = os.path.join(opts.out, os.path.basename(vec))
     log = open(out + '.log', 'w')
@@ -357,9 +365,9 @@ def main():
         'save': save,
         'slot': os.environ.get('ARENA_SLOT', '1'),
         'save_digest': digest.hexdigest() if save else '',
-        'cache': cache_load(),
     }
     env['game_listing'] = tree_listing(env['game'])
+    cache_migrate()
     print(f'output in {opts.out}', flush=True)
     bad = 0
     with ThreadPoolExecutor(opts.jobs) as pool:
