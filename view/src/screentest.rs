@@ -59,7 +59,12 @@ fn loaded(dir: &Path, save: &Path) -> (App, Driver) {
 /// The composed layer's colours (100h: nothing drawn) and palette as 6-bit
 /// DAC values.
 fn layer(a: &mut App) -> (Vec<u16>, Vec<u8>) {
+    // The window's own drawing (where it marks what it drew); a box shown
+    // as the game's page is checked after (`screen`), in the original's
+    // mask.
+    a.own_drawing = true;
     a.compose();
+    a.own_drawing = false;
     let idx = a.screen.indices().to_vec();
     let dac = a.screen.palette().iter().flat_map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]).collect();
     (idx, dac)

@@ -332,16 +332,17 @@ fn talk_start(dir: &Path, picks: &str) -> (App, Driver) {
 }
 
 #[test]
-fn talk_menu_by_arrows_and_enter_as_by_script() {
+fn talk_menu_by_enter_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
     assert!(until_asked(&mut d, &mut a, 3), "clicking the townsperson asks");
     let m = menu(&a).expect("a menu");
     assert!(text(&m.title).contains("ASK ABOUT"), "the talk's menu: {:?}", text(&m.title));
-    // Down to "Where is...", up again, Enter: the greeting (entry 0).
+    // The arrows mark nothing (3159:0F2A's loop has none); Enter: the
+    // greeting (entry 0).
     d.key(&mut a, KeyCode::ArrowDown, None);
-    assert_eq!(a.selected, 1);
-    d.key(&mut a, KeyCode::ArrowUp, None);
+    assert_eq!(a.selected, 0, "the arrows move no mark");
+    assert_eq!(a.hud().menu.map(|m| m.selected), Some(usize::MAX), "the menu shows no entry marked");
     d.key(&mut a, KeyCode::Enter, None);
     assert!(!a.boxes.is_empty(), "the townsperson answers in a box");
     let (mut b, _) = talk_start(&dir, "0");
