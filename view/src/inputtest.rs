@@ -332,22 +332,26 @@ fn talk_start(dir: &Path, picks: &str) -> (App, Driver) {
 }
 
 #[test]
-fn talk_menu_by_enter_as_by_script() {
+fn talk_menu_takes_no_enter_as_by_script() {
     let Some(dir) = game_dir() else { return };
     let (mut a, mut d) = talk_start(&dir, "");
     assert!(until_asked(&mut d, &mut a, 3), "clicking the townsperson asks");
-    let m = menu(&a).expect("a menu");
+    let m = menu(&a).expect("a menu").clone();
     assert!(text(&m.title).contains("ASK ABOUT"), "the talk's menu: {:?}", text(&m.title));
-    // The arrows mark nothing (3159:0F2A's loop has none); Enter: the
-    // greeting (entry 0).
+    // The arrows mark nothing and Enter picks nothing (3159:0F2A's loop
+    // has neither: Enter's character is among none of the keys); the
+    // greeting (entry 0) by its key.
     d.key(&mut a, KeyCode::ArrowDown, None);
     assert_eq!(a.selected, 0, "the arrows move no mark");
     assert_eq!(a.hud().menu.map(|m| m.selected), Some(usize::MAX), "the menu shows no entry marked");
     d.key(&mut a, KeyCode::Enter, None);
+    assert!(a.boxes.is_empty() && menu(&a).is_some(), "Enter leaves the menu asked");
+    let letter = m.keys[0].to_ascii_lowercase();
+    d.key(&mut a, key_for(letter).0, Some(&(letter as char).to_string()));
     assert!(!a.boxes.is_empty(), "the townsperson answers in a box");
     let (mut b, _) = talk_start(&dir, "0");
     as_far_as(&mut b, &a);
-    same(&a, &b, "the greeting answered by Enter and by --picks 0");
+    same(&a, &b, "the greeting answered by its key after Enter and by --picks 0");
     assert_eq!(a.boxes.iter().map(|x| text(x)).collect::<Vec<_>>(), b.boxes.iter().map(|x| text(x)).collect::<Vec<_>>());
 }
 
@@ -688,8 +692,9 @@ fn camping_with_typed_hours_as_by_script() {
     assert!(until_asked(&mut d, &mut a, 3), "R asks how to rest");
     let m = menu(&a).expect("the camp's menu").clone();
     eprintln!("camp menu: {:?}", text(&m.title));
-    // "For a while" (entry 0), then the hours typed.
-    d.key(&mut a, KeyCode::Enter, None);
+    // "For a while" (entry 0) by its key, then the hours typed.
+    let letter = m.keys[0].to_ascii_lowercase();
+    d.key(&mut a, key_for(letter).0, Some(&(letter as char).to_string()));
     match a.pending.as_ref().map(|p| &p.need) {
         // The prompt's trailing spaces kept: the field's room in its box.
         Some(dialog::Need::Text(dialog::Ask { prompt: dialog::Prompt::Boxed(prompt, _, _), field, .. })) => {
@@ -710,7 +715,13 @@ fn camping_with_typed_hours_as_by_script() {
     // (R's frame takes it, the camp asked and answered from the picks.)
     db.key(&mut b, KeyCode::KeyR, None);
     same(&a, &b, "camping for 2 hours by keys and by --picks 0,t2");
-    // The rest runs on in the frames that follow, alike.
+    // The rest runs on in the frames that follow, alike (from the cursor
+    // the menu's loop left, which lays out the rest's boxes: the
+    // scripted path runs no loop).
+    for o in CURSOR {
+        let v = a.engine.m.mem.r8(arena::mem::DS, o);
+        b.engine.m.mem.w8(arena::mem::DS, o, v);
+    }
     d.frames(&mut a, 30);
     db.frames(&mut b, 30);
     same(&a, &b, "the rest's frames");
@@ -1330,7 +1341,8 @@ fn the_spellmaker_clicked_live_as_by_script() {
     d.click(&mut a, 164, 74, MouseButton::Left);
     d.frame(&mut a);
     assert!(until_asked(&mut d, &mut a, 3), "the guild master asks");
-    d.key(&mut a, KeyCode::Digit3, Some("3"));
+    // Its third entry, the spellmaker (the boxes 18h high from 3Ah).
+    d.click(&mut a, 0xA0, 0x76, MouseButton::Left);
     assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker waits for a click");
     d.click(&mut a, 35, 75, MouseButton::Left);
     d.key(&mut a, KeyCode::Enter, None);

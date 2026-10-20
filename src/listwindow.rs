@@ -34,14 +34,18 @@ use crate::machine::Machine;
 use crate::mem::DS;
 
 /// One read of the mouse by the list's loop (0000:8FC4): its buttons
-/// (AFF9: bit 0 left, 1 right), the cursor's place (8F92, 8F94), and the
-/// list's keys held then (`list_keys`), as the front end saw them.
+/// (AFF9: bit 0 left, 1 right), the cursor's place (8F92, 8F94), the
+/// list's keys held then (`list_keys`), and the bytes the keyboard gave
+/// the key interrupt (0000:718A) since the read before (a make code, a
+/// break code; 0 none), as the front end saw them: the loop reads none
+/// of their characters, which stay in the ring.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ListRead {
     pub buttons: u8,
     pub x: u16,
     pub y: u16,
     pub keys: u8,
+    pub codes: [u8; 2],
 }
 
 /// A list's loop as it starts (`Machine::list_capture`): a copy of the
@@ -680,8 +684,14 @@ impl Machine {
     /// 0000:8FC4 as the list's loop reads the mouse: the buttons (AFF9) and
     /// the cursor's place (8F92, 8F94, kept within its limits) as `r`
     /// has them, and the list's keys held (the key table at ACB5 by scan
-    /// code, as the key interrupt has left it by then).
+    /// code, as the key interrupt has left it by then, its bytes given
+    /// first: `key_event`).
     fn list_read(&mut self, r: &ListRead) {
+        for &c in r.codes.iter().filter(|&&c| c != 0) {
+            // (Ctrl, Alt and Del together: the original reboots; the
+            // front end's to stop.)
+            let _ = self.key_event(c);
+        }
         self.mem.w8(DS, 0xAFF9, r.buttons);
         self.mem.w16(DS, 0x8F92, r.x);
         self.mem.w16(DS, 0x8F94, r.y);

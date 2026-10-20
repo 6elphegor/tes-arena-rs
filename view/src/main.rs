@@ -53,8 +53,9 @@
 //!
 //! In the window the game's texts are drawn in its own font (ARENAFNT.DAT):
 //! the message line at the top, message boxes (Enter, Space or a click
-//! reads them), menus (arrows and Enter, an entry's letter or number, a
-//! click; Esc leaves them), the hours typed (digits, Enter). R camps; F5
+//! reads them), menus (an entry's letter or a click, as the original's;
+//! Esc leaves them), lists (the arrows, PgUp, PgDn, Home, End held, Enter,
+//! a click), the hours typed (digits, Enter). R camps; F5
 //! saves to slot --slot N (default 0) in --save-dir DIR; F9 loads it back
 //! as the game loads in play (src/load.rs), into whatever area it was
 //! saved in; --load loads it at the start. Esc opens the game's options
@@ -1919,6 +1920,8 @@ fn make_app(dir: PathBuf, mut engine: Engine, run: arena::transit::Run, creation
         selected: 0,
         list_top: 0,
         list_reads: Vec::new(),
+        list_held: None,
+        list_codes: Vec::new(),
         menu_reads: Vec::new(),
         list_live: None,
         list_page: None,
@@ -2008,6 +2011,26 @@ fn list_key_of(code: winit::keyboard::KeyCode) -> Option<hud::ListKey> {
         KeyCode::End => Some(hud::ListKey::End),
         _ => None,
     }
+}
+
+/// A list's key's bit in its loop's reads (`arena::listwindow::list_keys`).
+fn list_key_bit(k: hud::ListKey) -> u8 {
+    use arena::listwindow::list_keys::*;
+    match k {
+        hud::ListKey::Up => UP.0,
+        hud::ListKey::Down => DOWN.0,
+        hud::ListKey::PageUp => PGUP.0,
+        hud::ListKey::PageDown => PGDN.0,
+        hud::ListKey::Home => HOME.0,
+        hud::ListKey::End => END.0,
+    }
+}
+
+/// Of the list's keys `held`, the one its loop's pass acts on (3159:0834
+/// asks Down, Up, PgDn, PgUp, Home, End in turn).
+fn list_key_first(held: u8) -> Option<hud::ListKey> {
+    use hud::ListKey::*;
+    [Down, Up, PageDown, PageUp, Home, End].into_iter().find(|&k| held & list_key_bit(k) != 0)
 }
 
 /// The game's font for its texts (`hud`).
@@ -3303,6 +3326,14 @@ struct App {
     /// loop (3159:06A0) would read them (`list_read`); given the game's
     /// list with its answer (`dialog::Answer::List`).
     list_reads: Vec<arena::listwindow::ListRead>,
+    /// A list's keys held (its loop's passes each find them down,
+    /// `list_held_passes`): their `list_keys` bits, and the time since the
+    /// last pass's read (ms).
+    list_held: Option<(u8, u32)>,
+    /// The bytes the keyboard gave the key interrupt while a list is up,
+    /// for its loop's next read (`ListRead::codes`): their characters
+    /// stay in the ring as the list leaves it.
+    list_codes: Vec<u8>,
     /// The mouse's reads and the keys typed before each since the menu was
     /// asked, the menu's loop's (3159:0F2A), given the game's menu with
     /// its answer (`dialog::Answer::Menu`).
@@ -3730,6 +3761,7 @@ impl App {
             self.selected = 0;
             self.list_top = 0;
             self.list_reads.clear();
+            self.list_codes.clear();
             self.menu_reads.clear();
             // A typed field: the game's editor opened on a copy of the
             // game as it asked.
@@ -4389,15 +4421,10 @@ impl App {
                     inv.info_y = None;
                     return;
                 }
-                if let Some((_, sel)) = inv.asking.as_mut() {
-                    // The drop's yes or no (020E: its keys Y and N, Esc no).
+                if inv.asking.is_some() {
+                    // The drop's yes or no (020E: its keys Y and N, Esc no;
+                    // its loop, 0F2A, has no arrows and no Enter).
                     let answer = match code {
-                        // (No entry marked till the arrows move one.)
-                        KeyCode::ArrowUp | KeyCode::ArrowDown => {
-                            *sel = if *sel == 0 { 1 } else { 0 };
-                            None
-                        }
-                        KeyCode::Enter | KeyCode::NumpadEnter if *sel < 2 => Some(*sel == 0),
                         KeyCode::KeyY => Some(true),
                         KeyCode::KeyN | KeyCode::Escape => Some(false),
                         _ => None,
@@ -4409,7 +4436,6 @@ impl App {
                             KeyCode::KeyY => Some(b'y'),
                             KeyCode::KeyN => Some(b'n'),
                             KeyCode::Escape => Some(0x1B),
-                            KeyCode::Enter | KeyCode::NumpadEnter => Some(0x0D),
                             _ => None,
                         };
                         sheet_drop = Some((Some(b'd'), Some((yes, typed))));
@@ -5060,6 +5086,7 @@ impl App {
                 if !panels::book_cast_last(&mut self.engine, right, &mut said) {
                     self.panel = Some(panels::Panel::Spellbook(Default::default()));
                     self.list_reads.clear();
+                    self.list_codes.clear();
                     self.bar_list_capture();
                 }
                 self.boxes.extend(said.boxes);
@@ -5075,6 +5102,7 @@ impl App {
                 if !names.is_empty() {
                     self.panel = Some(panels::Panel::Use(names, 0, 0));
                     self.list_reads.clear();
+                    self.list_codes.clear();
                     self.bar_list_capture();
                 }
             }
@@ -5345,10 +5373,10 @@ impl App {
         h
     }
 
-    /// A key while the game waits: a box read; a menu's entry moved to,
-    /// picked (Enter, its key letter, its number) or none (Esc); hours
-    /// typed.
-    fn dialog_key(&mut self, code: winit::keyboard::KeyCode, text: Option<&str>) {
+    /// A key while the game waits: a box read; a menu's entry picked by
+    /// its key or none (Esc), as 3159:0F2A's loop takes them; a list's
+    /// keys (3159:06A0); hours typed.
+    fn dialog_key(&mut self, code: winit::keyboard::KeyCode) {
         use winit::keyboard::KeyCode;
         if !self.boxes.is_empty() {
             let keys = matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space) && !self.status_box;
@@ -5360,25 +5388,32 @@ impl App {
         let Some(p) = &self.pending else { return };
         // A menu's loop takes the keys typed through the key interrupt
         // (3159:10DD, 7138): pressed and let go before its next read.
+        let mut typed = 0;
         if matches!(&p.need, dialog::Need::Menu(m) if !m.list && m.kind != hud::DIALOG_BUTTONS) {
             if let Some(scan) = interface::scan_code(code) {
+                typed = menu_typed(&p.before.m, scan);
                 self.menu_read(0, &[scan, scan | 0x80]);
             }
         }
         let Some(p) = &self.pending else { return };
         match &p.need {
+            // The shop's buttons (1194:6001) take clicks alone.
+            dialog::Need::Menu(menu) if menu.kind == hud::DIALOG_BUTTONS => {}
             dialog::Need::Menu(menu) => {
                 let n = menu.entries.len().max(1);
                 let list_key = list_key_of(code);
                 match code {
                     // A list's keys move its mark and its lines as
-                    // 3159:06A0 does (`hud::list_key`); a menu's loop
-                    // (0F2A) has no arrows.
+                    // 3159:06A0 does (`hud::list_key`): held, each of its
+                    // loop's passes finds the key down (its read with it
+                    // held now, then one a pass, `list_held_passes`, till
+                    // it is let go); the keyboard's own repeats aside.
                     _ if menu.list && list_key.is_some() => {
                         if let Some(k) = list_key {
-                            self.list_key_read(k);
-                            if self.list_followed().is_none() {
-                                self.list_moved(|m| hud::list_key(m, k));
+                            let (held, _) = self.list_held.unwrap_or((0, 0));
+                            if held & list_key_bit(k) == 0 {
+                                self.list_held = Some((held | list_key_bit(k), 0));
+                                self.list_held_read(held | list_key_bit(k));
                             }
                         }
                     }
@@ -5387,27 +5422,26 @@ impl App {
                         self.list_tap(arena::listwindow::list_keys::ENTER.0);
                         self.list_ended(s);
                     }
-                    KeyCode::Enter | KeyCode::NumpadEnter => {
-                        let s = self.selected.min(n - 1) as u16;
-                        self.menu_answer(s);
-                    }
                     // Esc leaves a list as the right button does, where it
                     // does (`hud::leaves`).
                     KeyCode::Escape if menu.list && hud::leaves(menu) => {
                         self.list_tap(arena::listwindow::list_keys::ESC.0);
                         self.list_ended(0xFFFF);
                     }
-                    KeyCode::Escape if !menu.list => {
+                    _ if menu.list => {}
+                    // A menu's loop leaves on Esc's character and picks the
+                    // entry whose key (a byte each at DS:BX) is the
+                    // character typed made a capital (0000:9D74); nothing
+                    // else ends it (no Enter, no arrows). Ended, it reads
+                    // the mouse until the buttons are let go.
+                    _ if typed == 0x1B => {
                         self.menu_read(0, &[]);
                         self.menu_answer(0xFFFF);
                     }
-                    KeyCode::Escape => {}
                     _ => {
-                        let Some(c) = text.and_then(|t| t.bytes().next()) else { return };
-                        let up = c.to_ascii_uppercase();
-                        let by_key = menu.keys.iter().position(|&k| k.to_ascii_uppercase() == up);
-                        let by_number = (c as char).to_digit(10).filter(|&d| d >= 1).map(|d| d as usize - 1).filter(|&i| i < menu.entries.len());
-                        if let Some(i) = by_key.or(by_number) {
+                        let up = if typed.is_ascii_lowercase() { typed - 0x20 } else { typed };
+                        let keyed = menu.keys.iter().take(menu.entries.len()).position(|&k| k == up);
+                        if let Some(i) = keyed.filter(|_| typed != 0) {
                             self.menu_read(0, &[]);
                             self.menu_answer(i as u16);
                         }
@@ -5628,7 +5662,15 @@ impl App {
     /// `keys` held (`arena::listwindow::list_keys`).
     fn list_read(&mut self, buttons: u8, keys: u8) {
         let (x, y) = self.screen_point();
-        self.list_reads.push(arena::listwindow::ListRead { buttons, x: x.clamp(0, 319) as u16, y: y.clamp(0, 199) as u16, keys });
+        // The keyboard's bytes since the read before (`list_codes`), two
+        // a read.
+        let mut codes = [0; 2];
+        for c in codes.iter_mut() {
+            if !self.list_codes.is_empty() {
+                *c = self.list_codes.remove(0);
+            }
+        }
+        self.list_reads.push(arena::listwindow::ListRead { buttons, x: x.clamp(0, 319) as u16, y: y.clamp(0, 199) as u16, keys, codes });
     }
 
     /// The list's key `bit` pressed and let go: a read with it held, one
@@ -5638,18 +5680,60 @@ impl App {
         self.list_read(0, 0);
     }
 
+    /// A read of the list's loop with the keys `held` down: its mark and
+    /// lines as its pass leaves them (the window's own model without the
+    /// game's copy: the first of them the pass looks at, `hud::list_key`).
+    fn list_held_read(&mut self, held: u8) {
+        self.list_read(0, held);
+        if self.list_followed().is_none() {
+            if let Some(k) = list_key_first(held) {
+                self.list_moved(|m| hud::list_key(m, k));
+            }
+        }
+    }
+
+    /// A list's key let go: a read without it.
+    fn list_key_up(&mut self, k: hud::ListKey) {
+        let Some((held, _)) = self.list_held.filter(|h| h.0 & list_key_bit(k) != 0) else { return };
+        let rest = held & !list_key_bit(k);
+        self.list_held = (rest != 0).then_some((rest, 0));
+        if matches!(self.menu_asked(), Some(m) if m.list) && self.boxes.is_empty() {
+            self.list_held_read(rest);
+        }
+    }
+
+    /// `ms` of time on with a list's keys held: a read for each of its
+    /// loop's passes in it, each finding them down (a pass: the read, the
+    /// page shown and two retraces waited, 3159:06EB; PgDn's and PgUp's
+    /// ten more, 08AA, 08EE).
+    fn list_held_passes(&mut self, ms: u32) {
+        let Some((held, mut t)) = self.list_held else { return };
+        if !matches!(self.menu_asked(), Some(m) if m.list) || !self.boxes.is_empty() {
+            self.list_held = None;
+            return;
+        }
+        t += ms;
+        loop {
+            let pass = match list_key_first(held) {
+                Some(hud::ListKey::PageDown | hud::ListKey::PageUp) => 12,
+                _ => 2,
+            } * film::RETRACE_MS;
+            if t < pass {
+                break;
+            }
+            t -= pass;
+            self.list_held_read(held);
+            if !matches!(self.menu_asked(), Some(m) if m.list) {
+                self.list_held = None;
+                return;
+            }
+        }
+        self.list_held = Some((held, t));
+    }
+
     /// `list_tap` of a list's key (the wheel's are Up and Down).
     fn list_key_read(&mut self, k: hud::ListKey) {
-        use arena::listwindow::list_keys::*;
-        let bit = match k {
-            hud::ListKey::Up => UP.0,
-            hud::ListKey::Down => DOWN.0,
-            hud::ListKey::PageUp => PGUP.0,
-            hud::ListKey::PageDown => PGDN.0,
-            hud::ListKey::Home => HOME.0,
-            hud::ListKey::End => END.0,
-        };
-        self.list_tap(bit);
+        self.list_tap(list_key_bit(k));
     }
 
     /// The list's loop as the game runs it over the reads so far
@@ -5682,6 +5766,8 @@ impl App {
     /// The list's line `pick` answered (FFFFh: left), with the reads that
     /// came to it.
     fn list_answer(&mut self, pick: u16) {
+        self.list_held = None;
+        self.list_codes.clear();
         let reads = std::mem::take(&mut self.list_reads);
         self.answer(dialog::Answer::List(pick, reads));
     }
@@ -5694,6 +5780,18 @@ impl App {
         self.selected = m.selected;
         self.list_top = hud::list_first(&m);
     }
+}
+
+/// The character the key interrupt (0000:718A) puts in the ring for the
+/// key `scan` pressed and let go in the game `m` (its tables, its Shifts
+/// held), as a menu's loop reads it (7138): 0 none.
+fn menu_typed(m: &arena::machine::Machine, scan: u8) -> u8 {
+    let mut m = m.clone();
+    m.key_flush();
+    if m.key_event(scan).and_then(|_| m.key_event(scan | 0x80)).is_none() {
+        return 0;
+    }
+    m.key_read()
 }
 
 /// An input the window gives, apart from winit's event loop and the GPU,
@@ -5739,6 +5837,11 @@ impl App {
         // it, so its next press is taken.
         if let In::Key { code, down, .. } = ev {
             if let Some(scan) = interface::scan_code(code) {
+                // A list up: the byte for its loop's next read too.
+                let list = matches!(self.menu_asked(), Some(m) if m.list) || matches!(self.panel, Some(panels::Panel::Use(..) | panels::Panel::Spellbook(_)));
+                if list && self.boxes.is_empty() {
+                    self.list_codes.push(if down { scan } else { scan | 0x80 });
+                }
                 if down {
                     if self.engine.m.key_event(scan).is_none() {
                         eprintln!("the key interrupt met a fault of the original's: {}", arena::giveup::describe());
@@ -5990,8 +6093,11 @@ impl App {
             In::Button { down: true, button: MouseButton::Left } => self.click = true,
             In::Button { .. } => {}
             In::Key { code, down, text } => {
+                if let Some(k) = list_key_of(code).filter(|_| !down) {
+                    self.list_key_up(k);
+                }
                 if down && self.waiting() {
-                    self.dialog_key(code, text.as_deref());
+                    self.dialog_key(code);
                     return;
                 }
                 if down && self.panel.is_some() {
@@ -6118,6 +6224,8 @@ impl App {
             self.creation_outcome();
         }
         self.creation_music();
+        // A list's keys held: its loop's passes in the time.
+        self.list_held_passes(now.duration_since(self.movie_at).as_millis() as u32);
         // The travel map's passes and journey (the game's turns from the
         // next tick after it ends).
         let travelling = self.travel.is_some();

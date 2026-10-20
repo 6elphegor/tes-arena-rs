@@ -547,13 +547,31 @@ class ScreenArena(DosArena):
                         # Keys held let go (their break codes alone), as
                         # `keys` runs them, then on.
                         self.pressed = act[1]
-                        self.let_go = True
+                        self.let_go = 'up'
+                        mu.emu_stop()
+                    elif act[0] == 'hold':
+                        # Keys pressed and held (their make codes alone),
+                        # as `keys` runs them, then on: the reads from here
+                        # find them down (a list's loop, 3159:0834), till
+                        # an `up`.
+                        self.pressed = act[1]
+                        self.let_go = 'down'
                         mu.emu_stop()
                     return
                 self.waiting = ('call', w)
                 mu.emu_stop()
             lin = self.lin(LOAD_SEG + wseg, woff)
             hooks.append(mu.hook_add(UC_HOOK_CODE, stop, (wseg, woff), lin, lin))
+        # A list's Enter held (3159:0932) waits for its release in a loop
+        # on the key table alone: the key let go there (its break code), as
+        # a player's finger does.
+        def enter_up(mu, addr, size, _):
+            if self.mu.mem_read(self.lin(self.ds, 0xACB5 + 0x1C), 1)[0]:
+                self.pressed = [0x1C]
+                self.let_go = 'up'
+                mu.emu_stop()
+        lin = self.lin(LOAD_SEG + 0x3159, 0x0932)
+        hooks.append(mu.hook_add(UC_HOOK_CODE, enter_up, None, lin, lin))
         # Code translated before the hooks were added doesn't see them.
         mu.ctl_flush_tb()
         start = self.lin(LOAD_SEG + seg, off)
@@ -663,12 +681,12 @@ class ScreenArena(DosArena):
         """Each scan code given to the key interrupt (0000:718A from its
         port's read, 71BB, to 72B2: the PIC's end left out, as
         gen_lineedit.py runs it) pressed and then let go (with `up` only
-        let go), on the stack under the game's, the game's registers kept
-        round it."""
+        let go, 'down' only pressed), on the stack under the game's, the
+        game's registers kept round it."""
         mu = self.mu
         kept = {r: mu.reg_read(globals()['UC_X86_REG_' + r.upper()]) for r in self.KEPT}
         for scan in scans:
-            for code in ((scan | 0x80,) if up else (scan, scan | 0x80)):
+            for code in ((scan,) if up == 'down' else (scan | 0x80,) if up else (scan, scan | 0x80)):
                 sp = (kept['sp'] - 0x200) & 0xFFFF
                 mu.mem_write(self.lin(kept['ss'], sp), struct.pack('<H', code | code << 8))
                 for r, v in dict(ss=kept['ss'], sp=sp, ds=self.ds, es=self.ds).items():

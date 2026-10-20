@@ -1512,6 +1512,23 @@ TALK_QUEST_SCRIPT = [('click', 0xA0, 0x65), ('click', 58, 105), ('click', 100, 9
 # taken), its box clicked away, Goodbye.
 TALK_BAR_SCRIPT = [('click', 0xA0, 0x65), ('click', 59, 80), ('click', 58, 10), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 TALK_PALACE_SCRIPT = [('click', 0xA0, 0x65), ('click', 100, 50), ('click', 100, 50), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+# "Where is" as TALK_WHERE_SCRIPT, its list answered by keys held (the
+# list's loop, 3159:0834, asks the key table at each pass, ACB5 by scan
+# code): Down held over two passes (its make at one read, its break at
+# the next the script answers: a line down at each), then Enter held
+# (0932 waits for its release, which comes there), the line marked
+# taken: its kind's places listed, the first taken by Enter again; its
+# box, Goodbye.
+TALK_HELD_SCRIPT = [('click', 0xA0, 0x65), ('hold', [0x50]), ('up', [0x50]), ('hold', [KEY_ENTER]), ('hold', [KEY_ENTER]), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+# The same with End held over two passes (the last line marked, the
+# lines shown down to it), then PgUp over two (a page less one up at
+# each, 08EE, after its ten retraces), then Enter.
+TALK_PAGES_SCRIPT = [('click', 0xA0, 0x65), ('hold', [0x4F]), ('up', [0x4F]), ('hold', [0x49]), ('up', [0x49]), ('hold', [KEY_ENTER]), ('hold', [KEY_ENTER]), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
+# TALK_WHERE_SCRIPT with Enter typed at the talk's menu (3159:0F2A's
+# loop: its character found among none of the keys, the loop on) and 4
+# typed in its list (the list's loop asks the key table for its own keys
+# alone): neither picks anything.
+TALK_ENTER_SCRIPT = [('keys', [KEY_ENTER]), ('click', 0xA0, 0x65), ('keys', [0x05]), ('click', 100, 23), ('click', 100, 23), ('click', 0xA0, 0x60), ('click', 0xA0, 0x95)]
 GUILD_SCRIPT = [('click', 0xA0, 0x46), ('click', 0xA0, 0x59), ('click', 0x70, 0x26), ('keys', [0x02]), ('keys', [0x1C]), ACCEPT, ACCEPT,
                 ('click', 0xA0, 0xA3)]
 # The guild's Spellmaker (its menu's third, 1194:A80D: 6064 with SI the
@@ -2204,6 +2221,9 @@ CASES = {
     # 13h, 9 rows high), 1194:E087's sorted list's first line (the way
     # told, its box clicked away), then the menu's Goodbye.
     'playtalkwhere': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_WHERE_SCRIPT)})]),
+    'playtalkenter': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_ENTER_SCRIPT)})]),
+    'playtalkheld': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_HELD_SCRIPT)})]),
+    'playtalkpages': ('people', dreaming, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_PAGES_SCRIPT)})]),
     # As playtalkwhere, the menu answered by its key and left by the right
     # button (TALK_KEY_SCRIPT).
     'playtalkkey': ('people', None, [((), (), 2, None), ((), (), 2, None, [], {'do': talked(TALK_KEY_SCRIPT)})]),

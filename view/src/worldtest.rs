@@ -1428,6 +1428,8 @@ enum Act {
     Click(i32, i32),
     RClick(i32, i32),
     Key(KeyCode, &'static str),
+    /// A key held for that many milliseconds, then let go.
+    Held(KeyCode, u64),
 }
 
 /// `act` done as the window does it.
@@ -1436,6 +1438,11 @@ fn act(a: &mut App, d: &mut Driver, act: &Act) {
         Act::Click(x, y) => d.click(a, x, y, MouseButton::Left),
         Act::RClick(x, y) => d.click(a, x, y, MouseButton::Right),
         Act::Key(k, t) => d.key(a, k, (!t.is_empty()).then_some(t)),
+        Act::Held(k, ms) => {
+            a.input(In::Key { code: k, down: true, text: None });
+            d.wait(a, ms);
+            a.input(In::Key { code: k, down: false, text: None });
+        }
     }
 }
 
@@ -1746,10 +1753,28 @@ const TALK_QUEST_SCRIPT: [Act; 6] = [Act::Click(0xA0, 0x65), Act::Click(58, 105)
 /// the list's loop (3159:06A0) run by the port over the view's reads.
 const TALK_BAR_SCRIPT: [Act; 7] = [Act::Click(0xA0, 0x65), Act::Click(59, 80), Act::Click(58, 10), Act::Click(100, 50), Act::Click(100, 50), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
 
+/// gen_worldframes.py's TALK_ENTER_SCRIPT: TALK_WHERE_SCRIPT with Enter
+/// typed at the talk's menu and 4 in its list, which pick nothing (the
+/// menu's loop, 3159:0F2A, finds Enter's character among none of its
+/// keys; the list's, 06A0, asks its own keys alone).
+const TALK_ENTER_SCRIPT: [Act; 7] = [Act::Key(KeyCode::Enter, ""), Act::Click(0xA0, 0x65), Act::Key(KeyCode::Digit4, "4"), Act::Click(100, 23), Act::Click(100, 23), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's TALK_HELD_SCRIPT: "Where is" answered by keys
+/// held, as the list's loop (3159:0834) finds them at its passes: Down
+/// held over two (its read as it goes down, then a pass's 28 ms: two
+/// retraces), Enter on the line marked and again on the first of its
+/// kind's places, the box, Goodbye.
+const TALK_HELD_SCRIPT: [Act; 6] = [Act::Click(0xA0, 0x65), Act::Held(KeyCode::ArrowDown, 30), Act::Key(KeyCode::Enter, ""), Act::Key(KeyCode::Enter, ""), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
+/// gen_worldframes.py's TALK_PAGES_SCRIPT: End held over two passes,
+/// PgUp over two (its pass twelve retraces, its ten waited, 08EE), then
+/// Enter twice, the box, Goodbye.
+const TALK_PAGES_SCRIPT: [Act; 7] = [Act::Click(0xA0, 0x65), Act::Held(KeyCode::End, 30), Act::Held(KeyCode::PageUp, 170), Act::Key(KeyCode::Enter, ""), Act::Key(KeyCode::Enter, ""), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+
 /// gen_worldframes.py's TALK_PALACE_SCRIPT ("Where is", the palace,
-/// the way's box, Goodbye), the list's fourth line taken by its number
-/// (the original's two clicks on it: the first marks it).
-const TALK_PALACE_SCRIPT: [Act; 4] = [Act::Click(0xA0, 0x65), Act::Key(KeyCode::Digit4, "4"), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
+/// the way's box, Goodbye), the list's fourth line clicked twice (the
+/// first marks it).
+const TALK_PALACE_SCRIPT: [Act; 5] = [Act::Click(0xA0, 0x65), Act::Click(100, 50), Act::Click(100, 50), Act::Click(0xA0, 0x60), Act::Click(0xA0, 0x95)];
 
 /// gen_worldframes.py's `dreaming`: the staff's line at stage 3 with its
 /// dream seen (F76 set, F77 3, F78 and F7D clear), so "Where is" lists
@@ -3191,6 +3216,21 @@ fn case(name: &str) -> Option<Case> {
             talked(a, d, seen, &TALK_WHERE_SCRIPT);
             frames(a, d, seen, 1, |_| false);
         })),
+        "playtalkenter" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_ENTER_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
+        "playtalkheld" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_HELD_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
+        "playtalkpages" => (Place::People, Box::new(dreaming), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            talked(a, d, seen, &TALK_PAGES_SCRIPT);
+            frames(a, d, seen, 1, |_| false);
+        })),
         "playtalkkey" => (Place::People, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             talked(a, d, seen, &TALK_KEY_SCRIPT);
@@ -4270,7 +4310,10 @@ const BUSY: &[&str] = &[
     "playsurrenderspell",
     "playswim",
     "playtalkbar",
+    "playtalkenter",
+    "playtalkheld",
     "playtalkkey",
+    "playtalkpages",
     "playtalkpalace",
     "playtalkquest",
     "playtalkquestplace",
@@ -4524,7 +4567,10 @@ const BUSY_STATE: &[&str] = &[
     "playsurrenderspell",
     "playswim",
     "playtalkbar",
+    "playtalkenter",
+    "playtalkheld",
     "playtalkkey",
+    "playtalkpages",
     "playtalkpalace",
     "playtalkquest",
     "playtalkquestplace",
