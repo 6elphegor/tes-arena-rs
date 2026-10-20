@@ -176,6 +176,50 @@ fn before_entrance(a: &mut App) {
     m.mem.w16(DS, arena::movement::var::HEADING, 0x100);
 }
 
+/// gen_areaplay.py's `before_wall`: beside the window's first wall
+/// `word` (in row order) with a square beside it open or a flat (bit
+/// 8000h, a building's sign), south, north, west or east tried in that
+/// order: on that square 20h from the wall, centred across, facing it,
+/// the last place the same.
+fn before_wall(a: &mut App, word: u16) {
+    let m = &mut a.engine.m;
+    let walls = m.mem.r16(DS, arena::mif::var::MAP1_SEG);
+    let sq = |m: &arena::machine::Machine, r: i32, c: i32| m.mem.r16(walls, ((r as u16 & 0x7F) << 8) | ((c as u16 & 0x7F) << 1));
+    let walkable = |v: u16| v == 0 || v & 0x8000 != 0;
+    // (row step, column step, x within the square, y within it, heading)
+    let sides = [(1, 0, 0x40, 0x20, 0x100), (-1, 0, 0x40, 0x60, 0), (0, -1, 0x60, 0x40, 0x80), (0, 1, 0x20, 0x40, 0x180)];
+    let (row, col, (dr, dc, fx, fy, heading)) = (0..128)
+        .flat_map(|r| (0..128).map(move |c| (r, c)))
+        .filter(|&(r, c)| sq(m, r, c) == word)
+        .find_map(|(r, c)| sides.iter().find(|s| walkable(sq(m, r + s.0, c + s.1))).map(|&s| (r, c, s)))
+        .expect("no such wall in the window");
+    let (x, y) = ((((col + dc) as u16) << 7) + fx, (((row + dr) as u16) << 7) + fy);
+    for o in [0xC3D0, 0xBA62, 0x0600] {
+        m.mem.w16(DS, o, x);
+    }
+    for o in [0xC3D4, 0xBA66, 0x0602] {
+        m.mem.w16(DS, o, y);
+    }
+    m.mem.w16(DS, arena::movement::var::HEADING, heading);
+}
+
+/// gen_areaplay.py's `wildtavern`, `wildtemple`: the window crossed north
+/// twice (WILD063 in its first row), the player put before the wall
+/// `word`, two frames, the door clicked, three frames inside.
+fn wild_building(word: u16) -> Case {
+    (
+        Place::Wild,
+        Box::new(|a: &mut App| wild_at(a, None, Some(0x1008), 0x100)),
+        Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            wild_south(a, d, seen, |a| wild_at(a, None, Some(0x1008), 0x100));
+            wild_south(a, d, seen, |a| before_wall(a, word));
+            frames_until(a, d, seen, 2, |_| false);
+            click_leaving(a, d, seen, 10);
+            frames_until(a, d, seen, 3, |_| false);
+        }),
+    )
+}
+
 pub(super) fn transit_case(name: &str) -> Option<Case> {
     Some(match name {
         "transitstairs" => (
@@ -248,6 +292,32 @@ pub(super) fn transit_case(name: &str) -> Option<Case> {
                 wild_south(a, d, seen, |a| wild_at(a, None, Some(0x2FF8), 0));
                 wild_south(a, d, seen, |a| wild_at(a, None, Some(0x2FF8), 0));
                 wild_south(a, d, seen, before_entrance);
+                frames_until(a, d, seen, 2, |_| false);
+                click_leaving(a, d, seen, 10);
+                frames_until(a, d, seen, 3, |_| false);
+            }),
+        ),
+        "wildtavern" => wild_building(0x0B0B),
+        "wildtemple" => wild_building(0x0C0C),
+        // Two crossings east (WILD057 in the window), its crypt's 0909h
+        // wall (trigger 1).
+        "wildcrypt" => (
+            Place::Wild,
+            Box::new(|a: &mut App| wild_at(a, Some(0x2FF8), None, 0x80)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                wild_south(a, d, seen, |a| wild_at(a, Some(0x2FF8), None, 0x80));
+                wild_south(a, d, seen, |a| before_wall(a, 0x0909));
+                frames_until(a, d, seen, 2, |_| false);
+                click_leaving(a, d, seen, 10);
+                frames_until(a, d, seen, 3, |_| false);
+            }),
+        ),
+        // A flat (800Eh, its low bits trigger 5's) clicked where the
+        // player starts: no area left.
+        "wildflat" => (
+            Place::Wild,
+            Box::new(|a: &mut App| before_wall(a, 0x800E)),
+            Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
                 frames_until(a, d, seen, 2, |_| false);
                 click_leaving(a, d, seen, 10);
                 frames_until(a, d, seen, 3, |_| false);
@@ -521,6 +591,34 @@ fn fast_travel_unwell_as_the_original() {
 #[test]
 fn into_a_wilderness_dungeon_as_the_original() {
     transit("wilddungeon");
+}
+
+/// A tavern in the wilderness (WILD063's 0B0Bh wall, the wilderness's
+/// trigger 3) clicked after two crossings north: its interior entered,
+/// its welcome read.
+#[test]
+fn into_a_wilderness_tavern_as_the_original() {
+    transit("wildtavern");
+}
+
+/// A temple in the wilderness (WILD063's 0C0Ch wall, trigger 4), the same.
+#[test]
+fn into_a_wilderness_temple_as_the_original() {
+    transit("wildtemple");
+}
+
+/// A crypt in the wilderness (WILD057's 0909h wall, trigger 1) clicked
+/// after two crossings east: its interior entered.
+#[test]
+fn into_a_wilderness_crypt_as_the_original() {
+    transit("wildcrypt");
+}
+
+/// A flat whose low bits are a trigger's (800Eh: 0000:43B1 takes any word
+/// with bit 8000h) clicked: the original's frames, no area left.
+#[test]
+fn a_wilderness_flat_clicked_as_the_original() {
+    transit("wildflat");
 }
 
 /// Crypt of Hearts, High Rock's staff dungeon, travelled to: the journey,

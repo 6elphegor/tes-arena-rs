@@ -340,9 +340,11 @@ def main():
     # building), and what the run wrote, where it wrote anything. The
     # tavern looked at is noted on the automap at the square under the
     # cursor (CB92, 2826:0D0x), which gen_screens.py's call (AX the
-    # square only) leaves 0: here the one screentest's right click in
-    # the view's centre picks (row 7, column 0Eh).
-    gs.BEFORE['looktavern'] = lambda a: a.w16(0xCB92, 0x071C)
+    # square only) leaves 0: here the one the guild's first frame leaves
+    # (row 7, column 10h, a 1E1Eh wall; the flat before it at column 0Eh
+    # keeps no CB92, 0000:B1AD), which screentest's view keeps on into
+    # the street.
+    gs.BEFORE['looktavern'] = lambda a: a.w16(0xCB92, 0x0720)
     for name, (handler, script, *waits) in gs.SCREENS.items():
         if only and name not in only:
             continue

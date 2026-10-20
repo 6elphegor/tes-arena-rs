@@ -830,14 +830,17 @@ pub fn door_layers(m: &Machine, textures: &[[u8; 4096]]) -> Vec<[u8; 4096]> {
 /// The map square under the centre of the view, as the original's
 /// renderer leaves the square under the cursor (CB92) for a click: the
 /// first square that isn't empty along the player's heading, within
-/// `reach` squares; None past it or the map's edge.
+/// `reach` squares; None past it or the map's edge. A flat (kind 8) is
+/// passed over: CB92 is kept only by a wall's face drawn across the
+/// cursor's column (0000:B1AD), so a click on a tree whose low bits are
+/// a trigger's runs the wall's behind it, not the flat's.
 pub fn pick(m: &Machine, reach: u16) -> Option<u16> {
     pick_at(m, reach).map(|(sq, _)| sq)
 }
 
 /// `pick`, with how far along the line the square was met.
 pub fn pick_at(m: &Machine, reach: u16) -> Option<(u16, f32)> {
-    pick_where(m, reach, |_, _| true)
+    pick_where(m, reach, |_, v| v >> 12 != 8)
 }
 
 /// `pick_at`, meeting only the squares `meets` takes.
