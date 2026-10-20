@@ -3403,7 +3403,7 @@ fn compile_rows(m: &mut Machine, light: bool, x: u16, dw: u16, fx: u16, xs: u16,
     o.di
 }
 
-/// CS:789E, the routine 78A8 has compile each row: 7A2B (`blit`) or,
+/// CS:789E, the routine 78A8 has compile each row: 0000:7A2B (`blit`) or,
 /// after 953E, 9546 (`blit_light`).
 const GENERATOR: u16 = 0x789E;
 const PLAIN_ROWS: u16 = 0x7A2B;
@@ -3914,7 +3914,7 @@ impl Machine {
         self.mem.w16(DS, 0xA836, num as u16);
         self.mem.w16(DS, 0xA838, (num >> 16) as u16);
         self.row_table(g(self, 0xCD82), g(self, 0xCD84), num, bp);
-        // DB78.
+        // 0000:DB78.
         if g(self, 0xC39A) & 8 != 0 {
             return;
         }
@@ -3969,7 +3969,7 @@ impl Machine {
         let mut p = si.wrapping_add(0xA);
         let r8 = |m: &Machine, p: u16| m.mem.r8(seg, p);
         let r16 = |m: &Machine, p: u16| m.mem.r16(seg, p);
-        // 567A.
+        // 0000:567A.
         {
             let mut dx = r16(self, p);
             let mut q = p.wrapping_add(2);
@@ -4007,7 +4007,7 @@ impl Machine {
         for _ in 0..frame {
             p = p.wrapping_add(r16(self, p)).wrapping_add(2);
         }
-        // 56A8.
+        // 0000:56A8.
         let mut q = p.wrapping_add(2);
         let n = r16(self, q);
         q = q.wrapping_add(2);

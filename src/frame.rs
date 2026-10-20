@@ -831,7 +831,7 @@ impl Machine {
     /// 292B:048F (`faces_load`: the faces' pictures into bank 19h); the cursor's
     /// background flag (A902 bit 1, 5422) cleared; with the bow's hands
     /// up (1012 6) the hands made again (1012 FFh, 3C4C: `weapon_change`);
-    /// the clip the whole screen (9A9C with 0, 0, 140h, C8h: A914..A91E);
+    /// the clip the whole screen (0000:9A9C with 0, 0, 140h, C8h: A914..A91E);
     /// the view's window from the interface's record (4F1B with SI 883E:
     /// C39C..C3A3 its first eight bytes, C3D8 its next word; the view's
     /// click box 1B8C..1B92, its corner two in, 10h less each way; the

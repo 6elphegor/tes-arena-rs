@@ -436,7 +436,7 @@
 0FFD:0817	driver	the AIL's IRET handler, reached from its start-up (0FFD:07D6, which clears the AIL's own state in its code segment and installs it): the driver interface's own
 0000:7C51	presentation	the renderer's deferred lists drawn (from 0000:FF26): the 3D mode never fills them (render.rs: B4F5, B358, B23F unreached; page_gaps no hits in play)
 0000:B81E	presentation	the column's stores through the hook at CD8E: the tail of 0000:B7DC, which render.rs ports whole
-1194:0FFB	game	the loop closing 1194:0F08 (each word through 4B0C, stored back), called only from there: charsheet.rs `sheet_texts` ports 0F08 with 0DE1
+1194:0FFB	inline	the loop closing 1194:0F08 (each word through 5B07, stored back), called only from there: charsheet.rs `sheet_texts`
 2F26:03FD	hardware	the CyberMan's motion in the list loop (3159:06A0), only with one found (8BEC): controls.rs leaves the CyberMan out
 3159:09AA	hardware	a list scrolled a line up for the CyberMan's motion (2F26:03FD only)
 3159:09B6	hardware	a list scrolled a line down for the CyberMan's motion (2F26:03FD only)
@@ -446,3 +446,7 @@
 3159:033D	input	a window's button (B7D0's list) pressed: drawn pressed (02B2), held until the mouse lets go (0000:8FC4), drawn back, its routine run: the travel map's buttons, the view's (travel.rs)
 3159:0403	input	a group of toggle buttons (kind 5) given up but the one pressed (02CF): part of 033D's press
 3159:0BA1	presentation	a list's line skipped past its NUL for the next (3159:0A58's lines drawn: the front end's)
+3159:00F3	input	the window loop's click: the right button as Esc (0171, 02EC), else the region under the cursor (B7C6) drawn pressed and its handler run, the window library's input (window.rs: the front end's)
+0000:9B04	input	the pointing device chosen (AL 1 the mouse: 5F64, 5384; 2 the joystick: 70D8) and B03A, B028 set (start.rs: StartHooks::mouse, the front end's)
+1194:55D9	inline	the page cleared (0000:9426, `page_clear`) and the screen (A000h, the front end's): travelmap.rs, dungeonpic.rs, quest.rs
+1194:55D5	inline	a far entry of 1194:55D9 (the page cleared): quest.rs

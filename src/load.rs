@@ -249,7 +249,7 @@ impl Machine {
     /// entered afresh (0000:A232..A269): its way back (BA7A) the menu's
     /// 25FD:032D until the rebuild sets the outer loop's (`load_return`),
     /// the ceiling 64h, the walking speed, standing (3Ch), the view's
-    /// window (A5D1), the world's entry without an INF (A49C, as A4ED in
+    /// window (A5D1), the world's entry without an INF (0000:A49C, as A4ED in
     /// `Engine::world_enter`: the banks, the deep floors, no changing
     /// squares, the rain's drops, no moving lights, dry ground and the
     /// water's frames (`water_frames`), the

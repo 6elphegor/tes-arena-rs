@@ -94,7 +94,6 @@ NOTES = {
     '0000:CD34': 'renderer (CCF8 wall sides, CB37)',
     '0000:CFBA': 'map flats placed for the drawing (D806, C38E) [renderer]',
     '1194:4943': "a file's 6-byte records searched for a two-byte key [file I/O]",
-    '25FD:05A5': "a save slot's four files checked (list at 5F5A) [file I/O]",
     '222C:0185': "the class quiz's scroll screen (question.txt, scroll01.dfa) [UI]",
     '25FD:0718': 'the load/save screen (loadsave.img, names.dat) [UI]',
     '1194:157E': "the character sheet's values shown (12E6/12F5 draw, DE1) [UI]",
@@ -624,7 +623,10 @@ def claims(repo):
     named_entries = set()
     for sub, kind_default in (('src', 'ported'), ('view/src', 'view')):
         d = os.path.join(repo, sub)
-        for name in sorted(os.listdir(d)):
+        # Modules in subdirectories (src/render/poly.rs) too, by their
+        # path under `sub`.
+        names = sorted(os.path.relpath(os.path.join(top, f), d) for top, _, fs in os.walk(d) for f in fs)
+        for name in names:
             if not name.endswith('.rs'):
                 continue
             in_hooks = False
@@ -677,6 +679,15 @@ def claims(repo):
                         bare.append((int(m.group(1), 16), kind))
             out.bare.extend((segs, off, kind, f'{sub}/{name}') for off, kind in bare)
     return out, where, named_entries
+
+
+# Bare offsets in comments that are not the routine of that offset (a
+# variable, another segment's routine): the routine is left to the other
+# lists, not to "Named in passing".
+PASSING = {
+    '0000:91F2': "random.rs's and start.rs's 91F2 is the DGROUP word (words left before the table is regenerated); the routine is the joystick's read (port 201h)",
+    '1194:000A': "menukeys.rs's 000A is 2542:000A, the Esc key's handler; 1194:000A calls the interrupt vector at [19A]",
+}
 
 
 def resolve_bare(cl, g):
@@ -914,7 +925,7 @@ def main():
     for a, files in where.items():
         r = routine_of(a)
         if r is not None:
-            claims_in[r] |= {f.split('/')[-1] for f in files}
+            claims_in[r] |= {f.removeprefix('view/').removeprefix('src/') for f in files}
 
     def context(e):
         files = set()
@@ -1111,13 +1122,17 @@ def main():
     w('of a port file that names their segment. Such a mention is as often a')
     w('routine ported inline as one deliberately left out ("stubbed: ...") or a')
     w('variable that happens to share the number, so they are not counted as')
-    w(f'ported; {len(bare)} to check, largest first:')
+    unread = [e for e in bare if e in rest_set]
+    read = [e for e in unread if fmt(e) in NOTES or e in TRIAGE or fmt(e) in PASSING]
+    todo = [e for e in unread if e not in read]
+    w(f'ported. Of the {len(unread)} uncovered ones, {len(read)} are read already')
+    w('(a verdict in NOTES or tools/triage.tsv, or PASSING: the mention is')
+    w(f'not the routine); {len(todo)} to check, largest first:')
     w('')
     w('| routine | bytes | files |')
     w('|---|---:|---|')
-    for e in sorted(bare, key=lambda e: (-size[e], e)):
-        if e in rest_set:
-            w(f'| {fmt(e)} | {size[e]} | {", ".join(sorted(os.path.basename(f) for f in bare[e]))} |')
+    for e in sorted(todo, key=lambda e: (-size[e], e)):
+        w(f'| {fmt(e)} | {size[e]} | {", ".join(sorted(os.path.basename(f) for f in bare[e]))} |')
     w('')
     w('## All uncovered routines')
     w('')

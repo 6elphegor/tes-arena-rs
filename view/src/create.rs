@@ -383,7 +383,7 @@ pub struct Creation {
     /// The attribute page as last drawn (palette indices), which the
     /// faces are drawn over.
     /// The faces' page (the attributes' last) and the head's corner
-    /// 2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
+    /// 1194:2C96 puts back under each face (0DAh, 0, 4Ah x 37h).
     face_back: Option<(Vec<u16>, Vec<u16>)>,
     /// The last question's lines and its roll, under the class offered.
     quiz_shown: Option<Roll>,
@@ -866,7 +866,7 @@ impl Creation {
     }
 
     /// After the quote (0000:12D4): SCROLL.FLC, its first frame after a
-    /// wait for the retrace (9B9B), and the scrolls; else the intro's end.
+    /// wait for the retrace (0000:9B9B), and the scrolls; else the intro's end.
     fn scroll_story(&mut self, film: &mut Film) -> Stage {
         self.movie = crate::flc::Movie::new(&self.archive, "SCROLL.FLC", Vec::new());
         if self.movie.is_none() {
@@ -2108,7 +2108,7 @@ impl Creation {
         Stage::ProvinceYes(ask, p)
     }
 
-    /// The province accepted (28E1), what the player is told (2902), then
+    /// The province accepted (28E1), what the player is told (1194:2902), then
     /// the attributes (2A69).
     fn province_accepted(&mut self, engine: &mut Engine, p: u8) -> Stage {
         if engine.m.province_accepted(&mut engine.files).is_none() {
