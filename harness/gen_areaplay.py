@@ -163,6 +163,40 @@ def before_entrance(a):
     a.w16(0xC3DA, 0x100)
 
 
+# The player just inside the window's first quarter, facing north (y
+# shrinks): walking on crosses into the window's first block row and the
+# origin moves a block north.
+wild_north = wild_at(y=0x1008, heading=0x100)
+WILD_NORTH = [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=wild_north))]
+# The same east (x grows).
+wild_east = wild_at(x=0x2FF8, heading=0x80)
+WILD_EAST = [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=wild_east))]
+
+
+def before_wall(word):
+    """The player beside the window's first wall `word` (in row order,
+    MAP1 at D806) with a square beside it that is open or a flat (bit
+    8000h: a building's sign stands before its door), south, north, west
+    or east tried in that order: on that square 20h from the wall, centred
+    across, facing it, the last place the same (`before_entrance`'s way);
+    the wall's corner within the trigger's reach (DCh)."""
+    def put(a):
+        m1 = a.r16(0xD806)
+        sq = lambda r, c: struct.unpack('<H', a.mu.mem_read(a.lin(m1, ((r & 0x7F) << 8) | ((c & 0x7F) << 1)), 2))[0]
+        walkable = lambda v: v == 0 or v & 0x8000
+        # (row step, column step, x within the square, y within it, heading)
+        sides = [(1, 0, 0x40, 0x20, 0x100), (-1, 0, 0x40, 0x60, 0), (0, -1, 0x60, 0x40, 0x80), (0, 1, 0x20, 0x40, 0x180)]
+        row, col, (dr, dc, fx, fy, heading) = next((r, c, side) for r in range(128) for c in range(128) if sq(r, c) == word
+                                                   for side in sides if walkable(sq(r + side[0], c + side[1])))
+        x, y = ((col + dc) << 7) + fx, ((row + dr) << 7) + fy
+        for o in (0xC3D0, 0xBA62, 0x0600):
+            a.w16(o, x)
+        for o in (0xC3D4, 0xBA66, 0x0602):
+            a.w16(o, y)
+        a.w16(0xC3DA, heading)
+    return put
+
+
 def building(row, col, heading, back=None):
     """Before a building's door in the street (`at_square`), two frames,
     the door clicked (the area left for its interior), three frames
@@ -255,6 +289,31 @@ CASES = {
     'wilddungeon': ('wild', wild_south,
                     WILD_SOUTH * 2 + [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=before_entrance)),
                                       ((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
+    # A tavern and a temple in the wilderness: the window crossed north
+    # twice (`wild_north`), which brings the grid's block (1Fh, 1Eh),
+    # WILD063, to the window's first row; the player put before its
+    # tavern (a 0B0Bh wall: the wilderness's trigger 3, 0000:43B1's
+    # table at 894B) or its temple (0C0Ch: trigger 4), two frames, the
+    # door clicked (the area left for the interior, its welcome read),
+    # three frames inside.
+    'wildtavern': ('wild', wild_north,
+                   WILD_NORTH + [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=before_wall(0x0B0B))),
+                                 ((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
+    # A crypt in the wilderness: the window crossed east twice (the
+    # player just inside its third quarter facing east), which brings
+    # the grid's block (22h, 21h), WILD057, into it; the player put
+    # before its crypt (a 0909h wall: the wilderness's trigger 1), the
+    # same.
+    'wildcrypt': ('wild', wild_east,
+                  WILD_EAST + [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=before_wall(0x0909))),
+                               ((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
+    # A flat whose low bits are the wilderness's trigger 5 (800Eh, a
+    # tree: 0000:43B1 takes any word with bit 8000h) clicked where the
+    # player starts.
+    'wildflat': ('wild', before_wall(0x800E), [((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
+    'wildtemple': ('wild', wild_north,
+                   WILD_NORTH + [((UP,), (), 12, origin_moved), ((), (UP,), 1, None, [], dict(do=before_wall(0x0C0C))),
+                                 ((), (), 2, None), ((), (), 10, None, CLICK, LEAVES), ((), (), 3, None)]),
 }
 
 
