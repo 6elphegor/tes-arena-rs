@@ -353,6 +353,19 @@ LIGHT = 2
 OPEN = 9
 HEAL = 13
 SILENCE = 31
+# And (spells-2) kinds the first cases didn't reach: an attribute up
+# (5: kind 0Bh), a resistance (Resist Fire, 14: kind 0Ah), poison given
+# (Wyvern's Sting, 20: kind 0 sub-kind 1), poison cured (Cure Poison, 21:
+# kind 3 sub-kind 1), invisibility (24: kind 0Fh), paralysis (Medusa's
+# Gaze, 42: kind 0 sub-kind 2, a missile) and reflection (Shalidor's
+# Mirror, 44: kind 17h).
+FORTIFY = 5
+RESIST_FIRE = 14
+WYVERNS_STING = 20
+CURE_POISON = 21
+INVISIBLE = 24
+MEDUSAS_GAZE = 42
+MIRROR = 44
 
 
 def known(spell):
@@ -387,6 +400,39 @@ def silencing(a):
     the spell picked last."""
     brought(1, ahead=0x100)(a)
     known(SILENCE)(a)
+
+
+# A seed Wyvern's Sting's roll poisons the player from (found by a scan;
+# the gen_screens.py SEED's roll resists).
+POISON_SEED = 0xF2A74DE4
+
+
+def poisoned(a):
+    """The player poisoned as Wyvern's Sting poisons its target: the
+    spell's three effects (2CDD:000C: BX the caster's level, 10; GS:SI the
+    spell's record; FS:DX the player's, 01A4) from POISON_SEED, whose roll
+    poisons (05B1 bit 2, a slot); the slot it took (the last one aimed at
+    the player) counted to its pulse (phase A's count at +0 put at 1), so
+    the next minute tick takes its toll."""
+    gs.seeded(a, POISON_SEED)
+    a.call_far(0x2CDD, 0x000C, ebx=10, gs=LOAD_SEG + 0x3276, esi=WYVERNS_STING * 0x55, edx=0x01A4)
+    slots = [0x0660 + 0x3C * i for i in range(16)]
+    mine = [s for s in slots if a.mu.mem_read(a.lin(a.ds, s + 0x3B), 1)[0] != 0xFF and a.r16(s + 0x28) == 0x01A4]
+    assert mine, 'the poison took no slot'
+    a.w16(mine[-1], 1)
+
+
+def cure_poisoning(a):
+    """`poisoned`, Cure Poison the spell picked last."""
+    poisoned(a)
+    known(CURE_POISON)(a)
+
+
+def paralysing(a):
+    """A creature (type 1) brought two squares north, Medusa's Gaze the
+    spell picked last."""
+    brought(1, ahead=0x200)(a)
+    known(MEDUSAS_GAZE)(a)
 
 
 def cast_now(spell):
@@ -1643,6 +1689,20 @@ CASES = {
     # Light cast with a minute left (`light_ending`): two frames, then the
     # minute tick (`minute_due`) ends it; ten frames.
     'playlightout': ('dungeon', light_ending, [((), (), 2, None), ((), (), 10, None, [], {'do': minute_due})]),
+    # spells-2: Resist Fire, an attribute up, invisibility and Shalidor's
+    # Mirror cast on the caster as playheal casts them; Medusa's Gaze at a
+    # creature two squares off as playsilence aims (its flight forty frames);
+    # Cure Poison with the player poisoned (`poisoned`); and the poison's
+    # toll over three minute ticks.
+    'playresist': ('dungeon', known(RESIST_FIRE), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 20, None)]),
+    'playfortify': ('dungeon', known(FORTIFY), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 20, None)]),
+    'playinvisible': ('dungeon', known(INVISIBLE), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 40, None)]),
+    'playreflect': ('dungeon', known(MIRROR), [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 20, None)]),
+    'playparalyse': ('dungeon', paralysing, [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None),
+                                             ((), (KEY_C, KEY_LSHIFT), 10, None, [(160, 100)]), ((), (), 40, None)]),
+    'playcurepoison': ('dungeon', cure_poisoning, [((), (), 2, None), ((KEY_LSHIFT, KEY_C), (), 1, None), ((), (KEY_C, KEY_LSHIFT), 20, None)]),
+    'playpoisontick': ('dungeon', poisoned, [((), (), 2, None), ((), (), 4, None, [], {'do': minute_due}),
+                                             ((), (), 4, None, [], {'do': minute_due}), ((), (), 4, None, [], {'do': minute_due})]),
     'playghostclick': ('dungeon', ghost, [((), (), 1, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # `locked_door`'s door with a lock of level 1, picking armed
     # (`picking`), clicked: the roll picks it (2826:0AAB, 1194:53F9), the
@@ -2262,7 +2322,8 @@ def walls_line(a, name):
 
 # The spell cases, whose effects land outside DGROUP and the EMS banks
 # (`creatures_line`).
-SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout')
+SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout', 'playresist', 'playfortify', 'playinvisible',
+               'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick')
 
 
 def creatures_line(a, name):

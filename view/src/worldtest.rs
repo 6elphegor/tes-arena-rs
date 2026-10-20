@@ -1485,6 +1485,30 @@ const LIGHT: u8 = 2;
 const OPEN: u8 = 9;
 const HEAL: u8 = 13;
 const SILENCE: u8 = 31;
+const FORTIFY: u8 = 5;
+const RESIST_FIRE: u8 = 14;
+const WYVERNS_STING: u8 = 20;
+const CURE_POISON: u8 = 21;
+const INVISIBLE: u8 = 24;
+const MEDUSAS_GAZE: u8 = 42;
+const MIRROR: u8 = 44;
+
+/// gen_worldframes.py's `poisoned`: Wyvern's Sting's effects on the
+/// player (2CDD:000C, the caster's level 10) from POISON_SEED, its slot
+/// counted to its pulse.
+fn poisoned(a: &mut App) {
+    use arena::effects::{slot, NSLOTS, SLOTS, SLOT_SIZE};
+    seeded_with(a, 0xF2A7_4DE4);
+    let m = &mut a.engine.m;
+    let (gs, spell) = m.spell_record(WYVERNS_STING);
+    m.spell_effects(gs, spell, DS, arena::character::PLAYER, 10, &mut arena::strike::NoKillHooks).expect("the poison given");
+    let s = (0..NSLOTS)
+        .map(|i| SLOTS + i * SLOT_SIZE)
+        .filter(|&s| m.mem.r8(DS, s + slot::STATE) != 0xFF && m.mem.r16(DS, s + slot::TARGET_OFF) == arena::character::PLAYER)
+        .last()
+        .expect("the poison took no slot");
+    m.mem.w16(DS, s, 1);
+}
 
 /// gen_worldframes.py's spell cases: two frames, Shift+C (2542:056A: the
 /// spell picked last cast without the list, the frame that took the key
@@ -1886,6 +1910,26 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 2, |_| false);
             minute_due(a);
             frames(a, d, seen, 10, |_| false);
+        })),
+        // gen_worldframes.py's spells-2 cases.
+        "playresist" => (Place::Dungeon, Box::new(|a: &mut App| known(a, RESIST_FIRE)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 20, 0))),
+        "playfortify" => (Place::Dungeon, Box::new(|a: &mut App| known(a, FORTIFY)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 20, 0))),
+        "playinvisible" => (Place::Dungeon, Box::new(|a: &mut App| known(a, INVISIBLE)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 40, 0))),
+        "playreflect" => (Place::Dungeon, Box::new(|a: &mut App| known(a, MIRROR)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 20, 0))),
+        "playparalyse" => (Place::Dungeon, Box::new(|a: &mut App| {
+            brought(a, 1, 1, 0x200);
+            known(a, MEDUSAS_GAZE);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, true, 10, 40))),
+        "playcurepoison" => (Place::Dungeon, Box::new(|a: &mut App| {
+            poisoned(a);
+            known(a, CURE_POISON);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| quick_cast(a, d, seen, false, 20, 0))),
+        "playpoisontick" => (Place::Dungeon, Box::new(poisoned), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            for _ in 0..3 {
+                minute_due(a);
+                frames(a, d, seen, 4, |_| false);
+            }
         })),
         "playrest" => (Place::Wild, Box::new(|a: &mut App| resting(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames_reading(a, d, seen, 300))),
         "playwildnight" => (Place::Wild, Box::new(|a: &mut App| night_encounter(a, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
@@ -3780,6 +3824,7 @@ const BUSY: &[&str] = &[
     "playchestpick",
     "playcreaturecast",
     "playcrowd",
+    "playcurepoison",
     "playdawn",
     "playdream",
     "playeffectsheet",
@@ -3798,6 +3843,7 @@ const BUSY: &[&str] = &[
     "playequipwear",
     "playexitmapend",
     "playfight",
+    "playfortify",
     "playguards",
     "playguild",
     "playguildbar",
@@ -3808,6 +3854,7 @@ const BUSY: &[&str] = &[
     "playimppal",
     "playinformant",
     "playinformantpaid",
+    "playinvisible",
     "playjagar",
     "playjourneyend",
     "playkeyssheet",
@@ -3831,12 +3878,16 @@ const BUSY: &[&str] = &[
     "playoptionsload",
     "playpalaceaccept",
     "playpalacenight",
+    "playparalyse",
     "playpick",
     "playpiece",
     "playpile",
+    "playpoisontick",
     "playquestreached",
     "playquestreward",
     "playquickcast",
+    "playreflect",
+    "playresist",
     "playrest",
     "playriddleright",
     "playriddlewrong",
@@ -4005,6 +4056,7 @@ const BUSY_STATE: &[&str] = &[
     "playchestpick",
     "playcreaturecast",
     "playcrowd",
+    "playcurepoison",
     "playdawn",
     "playdream",
     "playeffectsheet",
@@ -4024,6 +4076,7 @@ const BUSY_STATE: &[&str] = &[
     "playexitmapend",
     "playfight",
     "playfogfirst",
+    "playfortify",
     "playghost",
     "playguards",
     "playguild",
@@ -4035,6 +4088,7 @@ const BUSY_STATE: &[&str] = &[
     "playimppal",
     "playinformant",
     "playinformantpaid",
+    "playinvisible",
     "playjagar",
     "playjourneyend",
     "playkeyssheet",
@@ -4059,12 +4113,16 @@ const BUSY_STATE: &[&str] = &[
     "playoptionsload",
     "playpalaceaccept",
     "playpalacenight",
+    "playparalyse",
     "playpick",
     "playpiece",
     "playpile",
+    "playpoisontick",
     "playquestreached",
     "playquestreward",
     "playquickcast",
+    "playreflect",
+    "playresist",
     "playrest",
     "playriddleright",
     "playriddlewrong",
@@ -4144,7 +4202,10 @@ const EMS_LEFT_OUT: &[&str] = &["playsurrenderspell"];
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 5] = ["playheal", "playlight", "playopen", "playsilence", "playlightout"];
+const SPELL_CASES: [&str; 12] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse",
+    "playcurepoison", "playpoisontick",
+];
 
 /// The spell cases leave the eight active creatures' records (0C57's
 /// entries: +12h the record in the segment at [1042], 41Eh bytes) and
