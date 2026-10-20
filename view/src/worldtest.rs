@@ -1893,6 +1893,40 @@ fn talked(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, script: &[Act])
     pushed(a, seen);
 }
 
+/// gen_worldframes.py's MOUSE_POINTS: each of the view's regions at its
+/// far edge and near its inner edge.
+const MOUSE_POINTS: [(i32, i32); 16] = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (0, 80), (80, 80),
+    (319, 80), (240, 80), (0, 130), (130, 130), (319, 130), (190, 130), (160, 146), (160, 118)];
+
+/// gen_worldframes.py's `mouse_walk`: the window's left button held six
+/// frames with the cursor (uncaptured) at each point in turn, the
+/// original's controls walking by its place (`App::walk_mouse`), then
+/// let go five frames, the acceleration running out.
+fn mouse_walk(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, points: &[(i32, i32)]) {
+    for &(x, y) in points {
+        a.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
+        a.input(In::Button { button: MouseButton::Left, down: true });
+        frames(a, d, seen, 6, |_| false);
+        a.input(In::Button { button: MouseButton::Left, down: false });
+        frames(a, d, seen, 5, |_| false);
+    }
+}
+
+/// gen_worldframes.py's `mouse_steps`: for each (x, y, down, n) the
+/// window's cursor moved there (uncaptured), the left button pressed or
+/// let go as `down` says, `n` frames.
+fn mouse_steps(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, steps: &[(i32, i32, bool, usize)]) {
+    let mut held = false;
+    for &(x, y, down, n) in steps {
+        a.input(In::Cursor(x as f64 * 3.0 + 1.0, y as f64 * 3.0 + 1.0));
+        if down != held {
+            a.input(In::Button { button: MouseButton::Left, down });
+            held = down;
+        }
+        frames(a, d, seen, n, |_| false);
+    }
+}
+
 /// The cases' set-ups and plays, by name (as the tests above play them).
 fn case(name: &str) -> Option<Case> {
     let held = |n: usize, until: fn(&App) -> bool, after: usize| -> Play {
@@ -2391,6 +2425,11 @@ fn case(name: &str) -> Option<Case> {
             seeded(a);
             known(a, LIGHT);
         }), Box::new(long_run)),
+        "mousestreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| mouse_walk(a, d, seen, &MOUSE_POINTS))),
+        "mousedrag" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            mouse_steps(a, d, seen, &[(160, 10, true, 4), (300, 80, true, 6), (200, 140, true, 4), (200, 140, false, 3), (160, 100, true, 1), (160, 100, false, 3)])
+        })),
+        "mousedungeon" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| mouse_walk(a, d, seen, &MOUSE_POINTS))),
         "playcrypt" => (Place::Crypt, Box::new(|a: &mut App| a.engine.m.mem.w16(DS, arena::movement::var::HEADING, 0x100)), held(20, |a| a.engine.m.mem.r8(DS, 0x3C82) != 0, 1)),
         "playpick" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
@@ -4176,6 +4215,13 @@ fn state_compared_in(path: &str, name: &str, from_load: bool, c: Case) {
     } else {
         extra
     };
+    // (With ARENA_SCREENS holding the original's dumps: each such byte
+    // before, here and there.)
+    if !extra.is_empty() {
+        if let Some(orig) = std::env::var("ARENA_SCREENS").ok().and_then(|d| std::fs::read(PathBuf::from(d).join(format!("{name}.ds"))).ok()) {
+            eprintln!("{name}: {kind}: changed here only: {}", extra.iter().take(48).map(|&i| format!("{i:04x} {:02x}>{:02x}/{:02x}", before[i], after[i], orig[i])).collect::<Vec<_>>().join(", "));
+        }
+    }
     assert!(extra.is_empty(), "{name}: the frames changed what the original's don't: {}", hx(&extra));
     let unchanged: Vec<usize> = (0..0x10000).filter(|&i| want[i] && before[i] == after[i]).collect();
     // (With ARENA_SCREENS holding gen_worldframes.py's or gen_areaplay.py's
@@ -4307,6 +4353,9 @@ fn the_state_as_the_original_leaves_it() {
 // the piece hung from the ceiling. Its case is kept: ARENA_STATE_CASE
 // runs it.)
 const BUSY: &[&str] = &[
+    "mousedrag",
+    "mousedungeon",
+    "mousestreet",
     "playartifactheal",
     "playartifactparalyse",
     "playartifacttriple",
@@ -4563,6 +4612,9 @@ fn the_row_tables_made_as_the_original_makes_them() {
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
+    "mousedrag",
+    "mousedungeon",
+    "mousestreet",
     "playartifactheal",
     "playartifactparalyse",
     "playartifacttriple",

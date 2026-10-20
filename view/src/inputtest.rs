@@ -620,6 +620,7 @@ fn talk_turn(app: &mut App) {
         aspect: 1.6,
         note: None,
         bar: None,
+        walk: None,
     };
     app.turn(before, input, Vec::new(), true);
 }
@@ -643,6 +644,7 @@ fn shop_turn(app: &mut App, kind: u8) {
         aspect: 1.6,
         note: None,
         bar: None,
+        walk: None,
     };
     app.turn(before, input, Vec::new(), true);
 }

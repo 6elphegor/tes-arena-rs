@@ -1681,6 +1681,7 @@ fn looted(a: &mut App, _d: &mut Driver) {
         aspect: 1.6,
         note: None,
         bar: None,
+        walk: None,
     };
     a.turn(before, input, Vec::new(), true);
     assert!(a.pending.is_some(), "the piles listed");

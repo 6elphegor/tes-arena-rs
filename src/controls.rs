@@ -234,6 +234,14 @@ impl Machine {
         self.mem.w8(DS, BUTTONS, buttons);
     }
 
+    /// The mouse driver's report (cursor, buttons) as the controls' read
+    /// takes it, in the frame's physics (`mouse_poll`): the frame's
+    /// actors, before it, still see the last (0000:1854's test of the
+    /// button, `actor_idle`).
+    pub fn report_mouse(&mut self, x: u16, y: u16, buttons: u8) {
+        self.mouse_report = Some((x, y, buttons));
+    }
+
     /// A key (scan code) pressed or released.
     pub fn set_key(&mut self, scan: u8, down: bool) {
         self.mem.w8(DS, KEYS.wrapping_add(scan as u16), down as u8);
@@ -457,6 +465,9 @@ impl Machine {
     /// 2826:0D85. Reads the mouse; a button's release this frame (it was
     /// down last frame) sets RELEASED_LEFT / RIGHT.
     fn mouse_poll(&mut self) {
+        if let Some((x, y, buttons)) = self.mouse_report.take() {
+            self.set_mouse(x, y, buttons);
+        }
         self.mouse_clamp();
         let now = self.mem.r8(DS, BUTTONS);
         let last = self.mem.r8(DS, BUTTONS_LAST);
