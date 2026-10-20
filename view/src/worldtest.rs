@@ -1771,7 +1771,10 @@ fn case(name: &str) -> Option<Case> {
             assert_ne!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "the spell not waiting for its target");
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            // The harness's mouse at (160, 100), its click 4 past it
+            // (CB60): the window's click there, the mouse 4 up and left of
+            // it, which the aim reads (29CF:00D2).
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
             frames(a, d, seen, 1, |_| false);
             a.input(In::Button { button: MouseButton::Left, down: false });
@@ -1803,7 +1806,9 @@ fn case(name: &str) -> Option<Case> {
             assert_ne!(e.m.mem.r16(DS, arena::cast::var::PENDING), 0, "the spell not waiting for its target");
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
-            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            // (The aim reads the mouse, 4 up and left of the window's
+            // click: there at the harness's (160, 100).)
+            a.input(In::Cursor(164.0 * 3.0 + 1.0, 104.0 * 3.0 + 1.0));
             a.input(In::Button { button: MouseButton::Left, down: true });
             frames(a, d, seen, 1, |_| false);
             a.input(In::Button { button: MouseButton::Left, down: false });
@@ -4189,16 +4194,6 @@ fn the_walls_left_as_the_original() {
     }
 }
 
-/// Busy cases whose EMS banks aren't compared (their track, row tables,
-/// files and DGROUP are). playsurrenderspell: its quest target gives up
-/// in the original's 16th frame and the port's 17th; the box keeps (bank
-/// 18h) the page as that frame finds it. The port's 3D view already
-/// differs at the 15th frame, its fireball 6 pixels and the person a few
-/// off the original's, while the final state matches: the fireball and
-/// the approaching person meet a frame later in the port (a projectile or
-/// actor step to find, not the kill path's).
-const EMS_LEFT_OUT: &[&str] = &["playsurrenderspell"];
-
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
@@ -4271,7 +4266,7 @@ fn one_case_leaves_the_state_as_the_original() {
 #[test]
 fn busy_play_leaves_the_ems_banks_as_the_original() {
     let only = std::env::var("ARENA_CASE").ok();
-    for name in BUSY_STATE.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n) && !EMS_LEFT_OUT.contains(n)) {
+    for name in BUSY_STATE.iter().copied().filter(|n| only.as_deref().is_none_or(|o| o == *n)) {
         state_ems_case(name);
     }
 }
