@@ -1038,7 +1038,7 @@ def killed(a):
     a.call_far(0x2686, 0x02B4)
 
 
-def died(a, vision=None, driver=False):
+def died(a, vision=None, driver=False, waited=False):
     """From the world loop's end (0000:A45D, on the world's stack as
     `area_ended` goes on from it) through the outer loop (0CAD) to its
     death's way out (0CE1..0D43: the clip the screen, the ending's text
@@ -1051,13 +1051,17 @@ def died(a, vision=None, driver=False):
     reads of the mouse before it, the world's way out's, take none). With
     `driver` the sound driver is loaded as the vision begins (1194:D459:
     sbdig.py's `driver_loaded`, the case's Blaster attached), so the
-    speech plays through it."""
+    speech plays through it. `waited`: the dying frame reached its wait
+    for the timer (0000:A428), as one whose body ends the world loop after
+    it checks the area (a drowning in the minute tick) does."""
     # The dying frame's tick: the harness ticks the timer (0151) at the
     # frame's waits for it (0000:A428, A43D), which a frame that ends the
-    # world loop leaves before; the timer ticks all the same, before the
-    # outer loop goes on (the view's frames tick before the frame; the
-    # vision's movie makes it 0 again).
-    a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
+    # world loop early leaves before; the timer ticks all the same, before
+    # the outer loop goes on (the view's frames tick after their body; the
+    # vision's movie makes it 0 again). A frame that reached its wait has
+    # had its tick there.
+    if not waited:
+        a.w16(0x0151, (a.r16(0x0151) + 1) & 0xFFFF)
     ss, sp, words = a.world_stack
     a.mu.mem_write(a.lin(ss, sp), words)
     saved = a.stub(location=False)
@@ -2573,10 +2577,21 @@ def play(a, name, steps, tracks):
             speech = os.path.join(a.game_dir, 'SPEECH')
             if os.path.isdir(speech):
                 a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
+        # (Whether the step's last frame reached its wait for the timer,
+        # 0000:A428: `died`'s `waited`.)
+        waited = [False]
+
+        def frame_top(*_):
+            waited[0] = False
+
+        def frame_wait(*_):
+            waited[0] = True
+        whooks = [a.mu.hook_add(UC_HOOK_CODE, f, None, a.lin(LOAD_SEG, o), a.lin(LOAD_SEG, o))
+                  for f, o in ((frame_top, 0xA2AC), (frame_wait, 0xA428))]
         try:
             why, _ = a.world_frames(n, until=until, each=each)
         finally:
-            for h in vhooks:
+            for h in vhooks + whooks:
                 a.mu.hook_del(h)
             if names is not None:
                 a.names = names
@@ -2594,7 +2609,7 @@ def play(a, name, steps, tracks):
             if 'vision' in opts and os.path.isdir(speech):
                 a.names.update({n.upper(): os.path.join(speech, n) for n in os.listdir(speech)})
             try:
-                died(a, opts.get('vision'), opts.get('driver', False))
+                died(a, opts.get('vision'), opts.get('driver', False), waited[0])
             finally:
                 a.names = names
             if opts.get('title'):
