@@ -746,6 +746,13 @@ def keyed(a):
     a.mu.mem_write(a.lin(a.ds, 0x0652), KEYS_HELD)
 
 
+def key_door(a):
+    """`locked_door` with KEYS_HELD, whose second key is the lock's level
+    (5): 2826:0AAB opens it with that key, used up (C5h)."""
+    locked_door(a)
+    keyed(a)
+
+
 # An effect's words (1405, up to 23h bytes) and their count (1428).
 EFFECT_WORDS = b'You feel better.\0'
 
@@ -1596,6 +1603,10 @@ TAVERN_ROOM_SCRIPT = [('click', 0xA0, 0x5B), ('click', 0x80, 0x31), ('keys', [0x
 # and Enter: "fire" (its first answer: right) and "water" (wrong).
 RIDDLE_RIGHT_SCRIPT = [('keys', [k]) for k in (0x21, 0x17, 0x13, 0x12, KEY_ENTER)]
 RIDDLE_WRONG_SCRIPT = [('keys', [k]) for k in (0x11, 0x1E, 0x14, 0x12, 0x13, KEY_ENTER)]
+# The Crypt of Hearts' own riddle (CRYPT4.INF's first text, `^255 0`):
+# "shadow" (its first answer: right) and "dog" (wrong).
+HEARTS_RIGHT_SCRIPT = [('keys', [k]) for k in (0x1F, 0x23, 0x1E, 0x20, 0x18, 0x11, KEY_ENTER)]
+HEARTS_WRONG_SCRIPT = [('keys', [k]) for k in (0x20, 0x18, 0x22, KEY_ENTER)]
 # The loot window's list (1194:5734 with kind Bh: record 5006, its lines
 # from 54h, 21h), its first line clicked: marked as the list comes up, a
 # click takes it.
@@ -1811,6 +1822,10 @@ CASES = {
     # frame: its flat drawn through the light table (0000:953E).
     'playghost': ('dungeon', ghost, [((), (), 1, None)]),
     'playlock': ('crypt', locked_door, [((), (), 2, None), ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
+    # The same door with its key held (`key_door`), clicked: opened with
+    # the key (used up, its record put out), the door sliding open over
+    # the next frames.
+    'playkeydoor': ('crypt', key_door, [((), (), 2, None), ((), (), 10, None, [(160, 100)])]),
     # The ghost (`ghost`) clicked in the middle of the view a frame on:
     # the drawing's hit test (0000:C4BB, before 78A8 scales it) finds it
     # under the click (CB5E, the hook CD3A), the frame's actor click
@@ -2043,6 +2058,18 @@ CASES = {
     'playpiece': ('dungeon', piece_ahead, [((), (), 2, None), ((), (), 10, None, [(160, 100)], {'script': [('click', 0xA0, 0x60)]}), ((), (), 5, None)]),
     'playriddleright': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_RIGHT_SCRIPT}), ((), (), 10, None)]),
     'playriddlewrong': ('dungeon', riddle_door, [((), (), 1, None, [], {'script': RIDDLE_WRONG_SCRIPT}), ((), (), 10, None)]),
+    # The Crypt of Hearts' own riddle: the crypt's stairs down to its last
+    # level (`HEARTS_DOWN`), the player put on its riddle's trigger square
+    # (TRIG's row 32, column 34: CRYPT4.INF's first text, `^255 0`, the
+    # riddle 0000:06BE finds), facing the door beside it (row 32, column
+    # 33, whose lock is level FFh); the trigger shows the riddle and its
+    # frame asks for its answer (292B:05A2), typed: right, the locks
+    # of level FFh opened (the door's wall bit 200h, its sound) and the
+    # riddle's CORRECT text shown; wrong, its WRONG text, the door left
+    # locked, then clicked: the lock's words (a magic lock, 2294:0E35).
+    'playheartsriddle': ('crypt', None, HEARTS_DOWN + [((), (), 3, None, [], {'do': at_square(32, 34, 0x180), 'script': HEARTS_RIGHT_SCRIPT}), ((), (), 10, None)]),
+    'playheartswrong': ('crypt', None, HEARTS_DOWN + [((), (), 3, None, [], {'do': at_square(32, 34, 0x180), 'script': HEARTS_WRONG_SCRIPT}), ((), (), 4, None),
+                                                      ((), (), 10, message_up, [(160, 100)]), ((), (), 1, None)]),
     # The crypt two squares north of its diagonal wall at row 8, column 3
     # (kind 0Dh), facing it (heading 0): its faces never hide a light
     # behind them (0000:B7A9 returns at once for CB37 0Dh).
@@ -2643,7 +2670,7 @@ def written_line(a, name):
 # neither DGROUP nor the EMS banks hold: its words (the level's width by
 # its depth, C357, C359, from [D806]) compared as they end (`walls_line`).
 WALLS_CASES = ('playriddleright', 'playriddlewrong', 'playpick', 'playdoormoving', 'playlock', 'playchest', 'playchestpick', 'playopen',
-               'playfalsewall')
+               'playfalsewall', 'playheartsriddle', 'playheartswrong', 'playkeydoor')
 
 
 def walls_line(a, name):
@@ -2658,7 +2685,8 @@ def walls_line(a, name):
 SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout', 'playresist', 'playfortify', 'playinvisible',
                'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick', 'playdiseasebite', 'playcreaturehex',
                'playcreaturemissile', 'playguardsfight', 'playpotionresist', 'playusebreak', 'playartifactheal',
-               'playartifactparalyse', 'playartifacttriple', 'playweaponbreak', 'playtakehits', 'playblowdeath')
+               'playartifactparalyse', 'playartifacttriple', 'playweaponbreak', 'playtakehits', 'playblowdeath',
+               'playheartsriddle', 'playheartswrong')
 
 
 # The cases whose projectiles and actors are compared frame by frame
@@ -2666,7 +2694,7 @@ SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout
 # a frame late can still end where the original's ends.
 OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell', 'playdiseasebite',
                 'playcreaturehex', 'playcreaturemissile', 'playguardsfight', 'playartifactheal', 'playartifactparalyse', 'playartifacttriple', 'playweaponbreak',
-                'playtakehits', 'playblowdeath')
+                'playtakehits', 'playblowdeath', 'playheartsriddle', 'playheartswrong')
 
 
 def objects_digest(a):

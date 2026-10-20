@@ -1255,6 +1255,27 @@ const LOOT_LINE: Act = Act::Click(0x60, 0x25);
 
 /// The riddle's frame: shown and its answer asked (0000:0550, 292B:05A2),
 /// `answer` typed and Enter, the frame going on; ten frames after.
+/// gen_worldframes.py's `playheartsriddle` and `playheartswrong`: the
+/// Crypt of Hearts' stairs down to its last level, the player put on its
+/// riddle's trigger square facing the door beside it; three frames, the
+/// trigger's asking for the riddle's answer, typed.
+fn hearts_riddle(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, answer: &str) {
+    hearts_down(a, d, seen);
+    done_between(a, seen, |a| at_square(a, 32, 34, 0x180));
+    let mut asked = false;
+    for _ in 0..3 {
+        d.frame(a);
+        if matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))) {
+            super::super::super::type_text(d, a, answer);
+            d.key(a, KeyCode::Enter, None);
+            assert!(a.pending.is_none(), "the riddle answered");
+            asked = true;
+        }
+        pushed(a, seen);
+    }
+    assert!(asked, "the riddle's answer asked");
+}
+
 fn riddle_played(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, answer: &str) {
     d.frame(a);
     assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))), "the riddle's answer asked");
@@ -1396,6 +1417,21 @@ fn imppal_down(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, stairs: us
     movies_through(a, d);
     frames(a, d, seen, 3, |_| false);
     for &(row, col, heading) in [(3, 3, 0x100), (20, 29, 0x80), (18, 47, 0x80)].iter().take(stairs) {
+        done_between(a, seen, |a| at_square(a, row, col, heading));
+        frames(a, d, seen, 1, |_| false);
+        let level = a.engine.m.mem.r8(DS, arena::movement::var::LEVEL);
+        LEVEL_AT.with(|l| l.set(level));
+        a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
+        frames(a, d, seen, 40, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != LEVEL_AT.with(|l| l.get()));
+        a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
+        frames(a, d, seen, 2, |_| false);
+    }
+}
+
+/// The Crypt of Hearts' three down stairs walked into (gen_worldframes.py's
+/// `HEARTS_DOWN`, as `imppal_down` walks IMPPAL's).
+fn hearts_down(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
+    for &(row, col, heading) in &[(4, 52, 0x80), (53, 56, 0), (59, 56, 0x100)] {
         done_between(a, seen, |a| at_square(a, row, col, heading));
         frames(a, d, seen, 1, |_| false);
         let level = a.engine.m.mem.r8(DS, arena::movement::var::LEVEL);
@@ -2358,16 +2394,7 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Key { code: KeyCode::ShiftLeft, down: false, text: None });
             a.input(In::Key { code: KeyCode::KeyM, down: false, text: None });
             frames(a, d, seen, 3, |_| false);
-            for &(row, col, heading) in &[(4, 52, 0x80), (53, 56, 0), (59, 56, 0x100)] {
-                done_between(a, seen, |a| at_square(a, row, col, heading));
-                frames(a, d, seen, 1, |_| false);
-                let level = a.engine.m.mem.r8(DS, arena::movement::var::LEVEL);
-                LEVEL_AT.with(|l| l.set(level));
-                a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
-                frames(a, d, seen, 40, |a| a.engine.m.mem.r8(DS, arena::movement::var::LEVEL) != LEVEL_AT.with(|l| l.get()));
-                a.input(In::Key { code: KeyCode::ArrowUp, down: false, text: None });
-                frames(a, d, seen, 2, |_| false);
-            }
+            hearts_down(a, d, seen);
             done_between(a, seen, |a| {
                 at_square(a, 31, 30, 0);
                 for base in [0xC3D0u16, 0xBA62] {
@@ -2520,6 +2547,23 @@ fn case(name: &str) -> Option<Case> {
         })),
         "playriddleright" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "fire"))),
         "playriddlewrong" => (Place::Dungeon, Box::new(riddle_door), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| riddle_played(a, d, seen, "water"))),
+        // The Crypt of Hearts' own riddle answered (`hearts_riddle`): right,
+        // its door opened over ten frames; wrong, four frames, then the
+        // door clicked (its magic lock's words).
+        "playheartsriddle" => (Place::Crypt, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            hearts_riddle(a, d, seen, "shadow");
+            frames(a, d, seen, 10, |_| false);
+        })),
+        "playheartswrong" => (Place::Crypt, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            hearts_riddle(a, d, seen, "dog");
+            frames(a, d, seen, 4, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
+            frames(a, d, seen, 1, |_| false);
+        })),
         "playlock" => (Place::Crypt, Box::new(|a: &mut App| {
             at_square(a, 13, 4, 0);
             let m = &mut a.engine.m;
@@ -2539,6 +2583,27 @@ fn case(name: &str) -> Option<Case> {
             a.input(In::Button { button: MouseButton::Left, down: false });
             frames(a, d, seen, 10, |a| a.engine.m.mem.r16(DS, 0x061E) != 0);
             frames(a, d, seen, 1, |_| false);
+        })),
+        // `playlock`'s door with its key held (KEYS_HELD's second, level
+        // 5), clicked: opened with the key, used up.
+        "playkeydoor" => (Place::Crypt, Box::new(|a: &mut App| {
+            at_square(a, 13, 4, 0);
+            let m = &mut a.engine.m;
+            let n = m.mem.r8(DS, arena::movement::var::LOCK_COUNT);
+            let rec = arena::movement::var::LOCKS + 3 * n as u16;
+            m.mem.w16(DS, rec, 0x0E04);
+            m.mem.w8(DS, rec + 2, 5);
+            m.mem.w8(DS, arena::movement::var::LOCK_COUNT, n + 1);
+            for (i, b) in KEYS_HELD.iter().enumerate() {
+                m.mem.w8(DS, 0x0652 + i as u16, *b);
+            }
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            frames(a, d, seen, 1, |_| false);
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            frames(a, d, seen, 9, |_| false);
         })),
         "playdiagonal" => (Place::Crypt, Box::new(|a: &mut App| at_square(a, 6, 3, 0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
         "playdoormoving" => (Place::Crypt, Box::new(|a: &mut App| picking(a, 1)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -4397,6 +4462,8 @@ const BUSY: &[&str] = &[
     "playguildbar",
     "playheal",
     "playheartspiece",
+    "playheartsriddle",
+    "playheartswrong",
     "playholiday",
     "playhouselocked",
     "playhousepick",
@@ -4407,6 +4474,7 @@ const BUSY: &[&str] = &[
     "playjagar",
     "playjourneyend",
     "playjourneytown",
+    "playkeydoor",
     "playkeyssheet",
     "playlastpiece",
     "playlevelup",
@@ -4654,6 +4722,8 @@ const BUSY_STATE: &[&str] = &[
     "playguildbar",
     "playheal",
     "playheartspiece",
+    "playheartsriddle",
+    "playheartswrong",
     "playholiday",
     "playhouselocked",
     "playhousepick",
@@ -4664,6 +4734,7 @@ const BUSY_STATE: &[&str] = &[
     "playjagar",
     "playjourneyend",
     "playjourneytown",
+    "playkeydoor",
     "playkeyssheet",
     "playlastpiece",
     "playlevelup",
@@ -4751,7 +4822,7 @@ const BUSY_STATE: &[&str] = &[
 /// The cases whose doors, locks or chests change the walls plane, which
 /// neither DGROUP nor the EMS banks hold (gen_worldframes.py's
 /// WALLS_CASES).
-const WALLS_CASES: [&str; 9] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playchestpick", "playopen", "playfalsewall"];
+const WALLS_CASES: [&str; 12] = ["playriddleright", "playriddlewrong", "playpick", "playdoormoving", "playlock", "playchest", "playchestpick", "playopen", "playfalsewall", "playheartsriddle", "playheartswrong", "playkeydoor"];
 
 /// Those cases leave the walls plane ([D806], the level's width by its
 /// depth in words, C357, C359) as the original's do: the riddle's door
@@ -4764,7 +4835,14 @@ fn the_walls_left_as_the_original() {
             continue;
         }
         let Some((place, setup, play)) = case(name) else { return };
-        let Some((a, _)) = played(place, setup, play) else { return };
+        // Drawn by the original's renderer, as the window draws it: its
+        // walk brings the creatures' flats it reaches to life, clearing
+        // their squares (the view's own guess, `creature_flats_seen`,
+        // misses some the original's rays reach).
+        let Some((a, _)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a);
+        }, play) else { return };
         let m = &a.engine.m;
         let (seg, w, d) = (m.mem.r16(DS, 0xD806), m.mem.r16(DS, 0xC357), m.mem.r16(DS, 0xC359));
         let n = w as usize * d as usize * 2;
@@ -4777,8 +4855,8 @@ fn the_walls_left_as_the_original() {
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 24] = [
-    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak", "playtakehits", "playblowdeath",
+const SPELL_CASES: [&str; 26] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak", "playtakehits", "playblowdeath", "playheartsriddle", "playheartswrong",
 ];
 
 /// The cases whose projectiles and actors are compared frame by frame
@@ -4795,6 +4873,8 @@ const OBJECT_CASES: &[&str] = &[
     "playdiseasebite",
     "playfight",
     "playguardsfight",
+    "playheartsriddle",
+    "playheartswrong",
     "playparalyse",
     "playquickcast",
     "playsurrenderspell",
