@@ -2037,6 +2037,12 @@ CASES = {
     # province left (Exit, 80, 180) and the world map by Esc.
     'playsearchend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': [('click', 70, 45), ('click', 43, 175), ('keys', [0x2C]), ('keys', [KEY_ENTER]), ('click', 110, 46), ('click', 110, 46), ('click', 110, 46), ('click', 80, 180), ('keys', [KEY_ESC])], 'ends': True})]),
     'playjourneyend': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL + [('keys', [KEY_SPACE])] * 4, 'leaves': True, 'ends': True})]),
+    # playjourneyend on into the town's frames, Shift and M still held as
+    # the step left them: its fifth (the last, run again) shows the
+    # arrival's words (1194:5536), read by Space, whose character the box
+    # leaves in the ring (it only asks ACB0).
+    'playjourneytown': ('street', at_square(95, 52, 0x100), [((), (), 2, None), ((KEY_LSHIFT, KEY_M), (), 1, None, [], {'script': TRAVEL, 'leaves': True}),
+                                                             ((), (), 4, None, [], {'script': [('keys', [KEY_SPACE])]})]),
     'playnewend': ('dungeon', None, [((), (), 2, None), ((KEY_ESC,), (), 1, None, [], {'script': [('click', 32, 132)], 'dies': True, 'title': True})]),
     # The first level's up stairs (row 10, column 42: byte 1Dh) walked
     # into from the start's square south of them, facing north: the way

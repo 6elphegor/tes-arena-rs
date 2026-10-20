@@ -2784,6 +2784,36 @@ fn case(name: &str) -> Option<Case> {
             pushed(a, seen);
             frames(a, d, seen, 3, |_| false);
         })),
+        // playjourneyend on into the town's frames: the fifth (the
+        // harness's last, run again) shows the arrival's words (1194:5536),
+        // read by Space, which the box leaves in the ring.
+        "playjourneytown" => (Place::Street, Box::new(|a: &mut App| at_square(a, 95, 52, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+            a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+            faded(a);
+            for (x, y) in [(70, 45), (200, 100), (200, 100), (62, 180)] {
+                d.click(a, x, y, MouseButton::Left);
+            }
+            for _ in 0..100 {
+                if a.travel.is_none() {
+                    break;
+                }
+                d.wait(a, 100);
+            }
+            faded(a);
+            assert!(a.travel.is_none(), "the journey ends the travel map");
+            // (Shift and M still held, as the harness's step leaves them.)
+            pushed(a, seen);
+            frames(a, d, seen, 4, |_| false);
+            // (The welcome keeps what its box covers from the screen as
+            // the last frame left it, `Assets::shown`: shown first.)
+            a.compose();
+            d.frame(a);
+            assert!(!a.boxes.is_empty(), "the arrival's words are up");
+            d.key(a, KeyCode::Space, Some(" "));
+            ENDS.with(|e| e.set(true));
+        })),
         // The first level's up stairs walked into: the way out's travel
         // map (0000:4537, 26F7:0000) inside the frame, Esc on it stays,
         // the world given back and the frame run on to its end.
@@ -4183,6 +4213,7 @@ const BUSY: &[&str] = &[
     "playinvisible",
     "playjagar",
     "playjourneyend",
+    "playjourneytown",
     "playkeyssheet",
     "playlastpiece",
     "playlevelup",
@@ -4435,6 +4466,7 @@ const BUSY_STATE: &[&str] = &[
     "playinvisible",
     "playjagar",
     "playjourneyend",
+    "playjourneytown",
     "playkeyssheet",
     "playlastpiece",
     "playlevelup",
