@@ -1643,31 +1643,33 @@ impl Machine {
 
     /// 0000:41A4..4247. The audience with the Emperor (the Imperial
     /// palace at the main quest's stage 8): the keys all used (652, 12
-    /// bytes C5h; ES taken to be DS), the speech shown (803C 1, A902 bit
-    /// 200h set and 100h cleared, colour 39h; `QuestHooks::audience` 0),
-    /// D56 put back, its end (5E0 bit 1000h meanwhile; part 1), A91A put
-    /// back, the view cleared (part 2); then the palace is entered: 5C8
-    /// bit 80h cleared, the area left (C398 bit 80h), C39A bit 200h
-    /// cleared, area kind 2, the palace's file (88C5h) to A36, the way
-    /// back the player's square (FCE, FD0).
+    /// bytes C5h; ES taken to be DS), the scenes begun and MORPH.FLC
+    /// (`QuestHooks::audience` 0), the speech (803C 1, A902 bit 200h set
+    /// and 100h cleared, colour 39h; part 1), D56 put back, the scenes'
+    /// end (5E0 bit 1000h meanwhile; part 2), A91A put back, the view
+    /// cleared (part 3); then the palace is entered: 5C8 bit 80h cleared,
+    /// the area left (C398 bit 80h), C39A bit 200h cleared, area kind 2,
+    /// the palace's file (88C5h) to A36, the way back the player's square
+    /// (FCE, FD0).
     pub fn emperor_audience(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<()> {
         for i in 0..12 {
             self.mem.w8(DS, 0x0652 + i, 0xC5);
         }
         let (a91a, d56) = (self.sq16(0xA91A), self.sq16(0x0D56));
+        hooks.audience(self, files, 0)?;
         self.mem.w8(DS, 0x803C, 1);
         let f = self.sq16(0xA902) | 0x200;
         self.mem.w16(DS, 0xA902, f & !0x100);
         self.mem.w8(DS, crate::quest::var::TEXT_COLOUR, 0x39);
-        hooks.audience(self, files, 0)?;
+        hooks.audience(self, files, 1)?;
         self.mem.w16(DS, 0x0D56, d56);
         let f = self.sq16(0x05E0) | 0x1000;
         self.mem.w16(DS, 0x05E0, f);
-        hooks.audience(self, files, 1)?;
+        hooks.audience(self, files, 2)?;
         let f = self.sq16(0x05E0) & !0x1000;
         self.mem.w16(DS, 0x05E0, f);
         self.mem.w16(DS, 0xA91A, a91a);
-        hooks.audience(self, files, 2)?;
+        hooks.audience(self, files, 3)?;
         let f = self.sq16(0x05C8) & !0x80;
         self.mem.w16(DS, 0x05C8, f);
         let f = self.sq16(0xC398) | 0x80;

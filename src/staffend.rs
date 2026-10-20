@@ -66,6 +66,43 @@ const TEXT: u16 = 0x929E;
 const LINE: u16 = 0x0A;
 
 impl Machine {
+    /// 1194:DAF0: the scenes begun: the colours `dac` read to 9A6E
+    /// (0000:6E38; None leaves them), the page written to SCREENSV.$$2
+    /// (A69E), the song stopped (2F9F:0438), the colours at 929E black and
+    /// the page cleared (55B2), WINGAME.XMI (80B0h) started (2F9F:001F)
+    /// and the world kept (0000:A611) with the screen's colours as the
+    /// fade left them, black.
+    pub fn scenes_begin(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>) {
+        for (i, c) in dac.iter().flat_map(|d| d.iter()).enumerate() {
+            for (k, &v) in c.iter().enumerate() {
+                self.mem.w8(DS, 0x9A6E_u16.wrapping_add((i * 3 + k) as u16), v);
+            }
+        }
+        self.screen_save(files);
+        self.music_stop();
+        self.sheet_black();
+        self.music_start(files, 0x80B0);
+        self.world_keep(files, Some(&[[0; 3]; 256]));
+    }
+
+    /// 1194:DB26: the scenes' end: the song stopped (2F9F:0438), the view
+    /// filled with colour 0 (0000:4EFD); with 5E0 bit 1000h the page
+    /// cleared (9426; its showing, 9466, the front end's), else the
+    /// area's song again (25FD:051F: in an interior the building's, else
+    /// D56's when there is one); then the world given back (0000:A6B5).
+    pub fn scenes_end(&mut self, files: &mut Files) -> Option<()> {
+        self.music_stop();
+        self.view_clear();
+        if self.mem.r16(DS, 0x05E0) & 0x1000 != 0 {
+            self.page_clear();
+        } else if self.mem.r8(DS, 0x05E6) == 4 {
+            self.music_start(files, self.mem.r16(DS, crate::music::var::BUILDING_SONG));
+        } else if self.mem.r16(DS, 0x0D56) != 0 {
+            self.music_start(files, self.mem.r16(DS, 0x0D56));
+        }
+        self.world_back(files)
+    }
+
     fn end_speech(&mut self, files: &mut Files, hooks: &mut dyn EndHooks, ax: u16, di: u16, colour: u8, set: bool) {
         self.mem.w8(DS, 0x803C, 1);
         let mut f = self.mem.r16(DS, 0xA902);

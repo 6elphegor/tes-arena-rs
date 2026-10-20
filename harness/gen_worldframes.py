@@ -1501,6 +1501,11 @@ CASES = {
     # stage (`audience`): the artifact's audience, its text (5DDh) in its
     # box clicked away.
     'playaudience9': ('street', audience(9), [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)]}), ((), (), 3, None)]),
+    # The Emperor's audience (`audience` 8, 0000:41A4): the palace's door
+    # clicked by day; MORPH.FLC (2294:0895) and JAGAR.FLC's speech (1194:
+    # D459, text 5A7h) clicked through (`dream`), then the palace entered
+    # (the area left, `leaves`); three frames inside.
+    'playaudience8': ('street', audience(8), [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)], 'dream': 8, 'leaves': True}), ((), (), 3, None)]),
     'playpalacenight': ('street', palace_door_at_night, [((), (), 2, None), ((), (), 3, None, [(160, 100)], {'script': [('click', 160, 100)]}), ((), (), 3, None)]),
     # The house with picking armed (`armed`, the seed SEED): the lock
     # tried (2542:028F, 1194:53F9) and picked, "Success...", in (the area

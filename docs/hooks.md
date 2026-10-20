@@ -258,7 +258,8 @@ the original routine:
 | `OptionsHooks::unhide` | src/options.rs:89 |  | present | and shown | |
 | `PhysicsHooks::input` | src/movement.rs:816 |  | overridden | the engine: Classic<'_>, Physics<'_, '_> | faithful: the engine's controls |
 | `PhysicsHooks::transition` | src/movement.rs:821 |  | overridden | the engine: Physics<'_, '_> | faithful: the engine's |
-| `QuestHooks::audience` | src/quest.rs:180 |  | overridden | the view: main.rs Audience<'_, '_>, questui.rs QuestFront<'_, '_> | present: the audience's movies (not screen-checked) |
+| `QuestHooks::audience` | src/quest.rs:189 | 0000:41B6..4216 | overridden | the view: main.rs Audience<'_, '_>, questui.rs QuestFront<'_, '_> | fixed: the parts did nothing; now each runs `Machine::audience_part` (1194:DAF0, 2294:0895 with the movie's frames and colours, D459, 55B2, 55D5, DB26, 9A98) before the view shows its movies; worldframes playaudience8 |
+| `QuestHooks::dac` | src/quest.rs:178 | 0000:6E38 | overridden | the view: main.rs Audience<'_, '_> | faithful: the screen's colours (`Front::dac`); worldframes playaudience8 |
 | `QuestHooks::bios_ticks` | src/quest.rs:130 | 0000:9D60 | original | the machine's BIOS ticks | |
 | `QuestHooks::city_info` | src/quest.rs:115 | 1194:3EC3 | port | the default runs the port | |
 | `QuestHooks::dialog` | src/quest.rs:171 | 1194:4E88 | overridden | the view: questui.rs QuestFront<'_, '_> | present: the game's boxes, menus and windows (palace screens) |

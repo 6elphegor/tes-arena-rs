@@ -314,15 +314,22 @@ impl Front<'_> {
 }
 
 /// The Emperor's audience's screens (`QuestHooks::audience`, 0000:41B6):
-/// MORPH.FLC (2294:0895), then JAGAR.FLC with text 5A7h in 39h
-/// (1194:D459).
+/// each part run on the game (`Machine::audience_part`, the colours the
+/// screen's), and shown as MORPH.FLC (2294:0895), then JAGAR.FLC with
+/// text 5A7h in 39h (1194:D459).
 struct Audience<'a, 'b>(&'a mut Front<'b>);
 
 impl arena::quest::QuestHooks for Audience<'_, '_> {
-    fn audience(&mut self, _m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, part: u8) -> Option<()> {
-        if part == 0 {
-            self.0.movie("MORPH.FLC", None, 0);
-            self.0.movie("JAGAR.FLC", Some(0x5A7), 0x39);
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.0.dac
+    }
+    fn audience(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, part: u8) -> Option<()> {
+        let dac = self.0.dac;
+        m.audience_part(files, dac.as_ref(), part)?;
+        match part {
+            0 => self.0.movie("MORPH.FLC", None, 0),
+            1 => self.0.movie("JAGAR.FLC", Some(0x5A7), 0x39),
+            _ => {}
         }
         Some(())
     }

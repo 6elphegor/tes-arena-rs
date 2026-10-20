@@ -173,12 +173,22 @@ pub trait QuestHooks {
     }
     /// 1194:4D31: a message with the text at DS:`si`.
     fn notice(&mut self, _m: &mut Machine, _si: u16) {}
-    /// The Emperor's audience's screens (0000:41B6..4216): `part` 0 the
-    /// speech (1194:DAF0, 2294:0895, 1194:D459 with text 5A7h and the
-    /// picture at 884Ch, 55B2, 55D5), 1 its end (1194:DB26), 2 the view
-    /// cleared (0000:9A98 over 140h x C8h, 55D5).
-    fn audience(&mut self, _m: &mut Machine, _files: &mut Files, _part: u8) -> Option<()> {
-        Some(())
+    /// The colours the audience's scenes read (0000:6E38 to 9A6E, A611):
+    /// the screen's, None leaving them.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
+    }
+    /// The Emperor's audience's screens (0000:41B6..4216), the port's by
+    /// default: `part` 0 the scenes begun (1194:DAF0, `scenes_begin`) and
+    /// MORPH.FLC at 884Ch played (2294:0895, to its end), 1 the speech
+    /// (1194:D459: text 5A7h over JAGAR.FLC at 8090h, SI 0 as 6546 leaves
+    /// it; its pages clicked through), the colours at 929E black and the
+    /// page cleared (55B2) and the page cleared again (55D5's 9426), 2 the
+    /// scenes' end (1194:DB26, `scenes_end`), 3 the clip the whole screen
+    /// (0000:9A98 over 140h x C8h) and the page cleared (55D5).
+    fn audience(&mut self, m: &mut Machine, files: &mut Files, part: u8) -> Option<()> {
+        let dac = self.dac();
+        m.audience_part(files, dac.as_ref(), part)
     }
     /// 1194:080B (0807): a name of set AL and sex AH from the RNG seed
     /// `seed`, written at DS:`di` (`Machine::npc_name`).
@@ -194,6 +204,36 @@ pub struct NoQuestHooks;
 impl QuestHooks for NoQuestHooks {}
 
 impl Machine {
+    /// The Emperor's audience's screens as the original runs them
+    /// (`QuestHooks::audience`'s parts), the colours read `dac`.
+    pub fn audience_part(&mut self, files: &mut Files, dac: Option<&[[u8; 3]; 256]>, part: u8) -> Option<()> {
+        match part {
+            0 => {
+                self.scenes_begin(files, dac);
+                self.movie_play(files, &mut crate::title::NoTitleHooks, 0x884C)?;
+            }
+            1 => {
+                // The screen's colours as the movie left them: its own,
+                // which its palette chunks wrote at 929E (6546 shows them).
+                let mut shown = [[0u8; 3]; 256];
+                for (i, c) in shown.iter_mut().enumerate() {
+                    for (k, v) in c.iter_mut().enumerate() {
+                        *v = self.mem.r8(DS, 0x929E + (i * 3 + k) as u16);
+                    }
+                }
+                self.vision(files, &mut crate::vision::ClickThrough::default(), Some(&shown), 0x5A7, 0, 0x8090)?;
+                self.sheet_black();
+                self.page_clear();
+            }
+            2 => self.scenes_end(files)?,
+            _ => {
+                self.clip_whole();
+                self.page_clear();
+            }
+        }
+        Some(())
+    }
+
     /// 1194:9B52. The record's kind (+4 bits 6-7).
     pub fn quest_kind(&self, si: u16) -> u16 {
         (self.mem.r16(DS, si.wrapping_add(4)) & 0xC0) >> 6
