@@ -3892,10 +3892,22 @@ pub fn rows_read(m: &Machine) -> [u16; 11] {
 
 impl Machine {
     /// A call of 0000:DA8E: the inputs it makes the row tables from noted
-    /// (`rows_made`), which the drawings after it build theirs from (the
-    /// tables are in the drawing's buffers, which only its copy has).
+    /// (`rows_made`), which the drawings after it build theirs from, and
+    /// the tables made in the machine's own buffers (CD82, CD7E, once
+    /// A561 has them): the drawing reads its copy's, but the original's
+    /// are on the heap, past the creatures' records, where 2686:03C9 reads
+    /// its tier tables through a creature's segment (47D2.. of [1042]).
+    /// The products DA8E keeps in DGROUP (A836, A838) are left the
+    /// machine's: the drawing's copy writes them each frame.
     pub fn rows_note(&mut self) {
         self.rows_made = Some(ROW_INPUTS.map(|o| self.mem.r16(DS, o)));
+        if self.mem.r16(DS, 0xCD84) == 0 || self.mem.r16(DS, 0xCD80) == 0 {
+            return;
+        }
+        let kept = (self.mem.r16(DS, 0xA836), self.mem.r16(DS, 0xA838));
+        self.rows_write();
+        self.mem.w16(DS, 0xA836, kept.0);
+        self.mem.w16(DS, 0xA838, kept.1);
     }
 
     /// 0000:DA8E: the floor's row table at CD82 (each row below the
@@ -3903,7 +3915,12 @@ impl Machine {
     /// then DB78 the ceiling's at CD7E. Each keeps its distance's
     /// product at A836, A838 (DAC3, DBCA).
     pub fn row_tables(&mut self) {
-        self.rows_note();
+        self.rows_made = Some(ROW_INPUTS.map(|o| self.mem.r16(DS, o)));
+        self.rows_write();
+    }
+
+    /// DA8E's tables and products from the inputs now (`row_tables`).
+    fn rows_write(&mut self) {
         let g = |m: &Machine, o: u16| m.mem.r16(DS, o);
         if g(self, 0xC398) & 0x4000 != 0 {
             return;
