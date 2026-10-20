@@ -46,13 +46,13 @@ OWN = {'playjourneyon': (JOURNEY[0], JOURNEY[1], [JOURNEY[2][0],
 HOOK_SEGMENT = {0xA906, 0xA907}
 
 
-def main():
+def main(kind='fm'):
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
     only = [n for n in sys.argv[5:] if not n.startswith('--') and n != dump]
     a = MusicArena(EXE, GAME, SAVE)
     gw.rows_watch(a)
-    a.start(music=True)
+    a.start(music=True, kind=kind)
     out = open(OUT, 'w', buffering=1)
     loaded = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
     loaded_ems = b''.join(a.ems_bank(b) for b in range(0x20))
@@ -65,7 +65,11 @@ def main():
         out.write(f'loadstate | {fnv(bytes(0 if i in skip_base else b for i, b in enumerate(loaded))):x}\n')
         out.write(f'loadems | {fnv(loaded_ems):x}\n')
         out.write(a.music.calls_line('load'))
+        if kind == 'mt32':
+            out.write(a.music.midi_line('load'))
     a.music.calls = []
+    if kind == 'mt32':
+        a.music.midi = bytearray()
     base = a.snapshot()
     skip = gw.excluded() | HOOK_SEGMENT
     skip_load = skip | gw.excluded('stateloadexclude.txt') | gw.excluded('loadexclude.txt')
@@ -83,6 +87,8 @@ def main():
         for t in tracks:
             out.write(t)
         out.write(a.music.calls_line(name))
+        if kind == 'mt32':
+            out.write(a.music.midi_line(name))
         print(f'  {a.music.ticks} ticks, {a.music.taken} clock interrupts, {a.music.writes} chip writes', file=sys.stderr)
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(gw.state_line(name, a.pre_state[0], after, skip))

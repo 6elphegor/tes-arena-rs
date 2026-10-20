@@ -179,16 +179,31 @@ fn title_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) 
     Some(Engine::new(m, files))
 }
 
-/// A music driver as main's command line would leave it for a Sound
-/// Blaster Pro's FM chips (-Msbp1fm.adv -IOM220, 1194:066A: its name at
-/// 37EB, the I/O port at 3864; the IRQ and DMA channel the driver's own),
-/// and main's file-open hook (0000:1047: 0000:11DA at A904), which opens
-/// an FM driver's songs as their .xfm (harness/fmmus.py's).
+thread_local! {
+    /// The music driver `boot_music` loads: ARENA.BAT's own MT32MPU.ADV
+    /// (set) or a Sound Blaster Pro's SBP1FM.ADV (the default).
+    pub static MUSIC_MT32: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A music driver as main's command line would leave it (1194:066A: its
+/// name at 37EB, the I/O port, IRQ and DMA channel at 3864, 3866, 3868,
+/// FFFFh the driver's own): ARENA.BAT's -Mmt32mpu.adv -IOM330 -IRQM2
+/// -DMAM1 with `MUSIC_MT32`, else a Sound Blaster Pro's FM chips'
+/// -Msbp1fm.adv -IOM220; and main's file-open hook (0000:1047: 0000:11DA
+/// at A904), which opens an FM driver's songs as their .xfm
+/// (harness/fmmus.py's).
 fn arena_bat_music(m: &mut Machine) {
-    for (i, &b) in b"SBP1FM.ADV\0".iter().enumerate() {
+    let (name, settings): (&[u8], &[u16]) = if MUSIC_MT32.with(|c| c.get()) {
+        (b"MT32MPU.ADV\0", &[0x330, 2, 1])
+    } else {
+        (b"SBP1FM.ADV\0", &[0x220])
+    };
+    for (i, &b) in name.iter().enumerate() {
         m.mem.w8(DS, arena::musicdrv::var::NAME + i as u16, b);
     }
-    m.mem.w16(DS, arena::musicdrv::var::SETTINGS, 0x220);
+    for (k, &v) in settings.iter().enumerate() {
+        m.mem.w16(DS, arena::musicdrv::var::SETTINGS + 2 * k as u16, v);
+    }
     m.mem.w16(DS, arena::bsa::var::OPEN_HOOK, 0x11DA);
     m.mem.w16(DS, arena::bsa::var::OPEN_HOOK + 2, 0);
 }

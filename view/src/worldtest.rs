@@ -4638,9 +4638,15 @@ const MUSIC_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vecto
 /// faded and stopped, the town's started and asked after each frame).
 const MUSIC_CASES: [&str; 6] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon"];
 
-/// A `music` line of MUSIC_VECTORS, its runs (`DD6:0=1*4`) spelt out.
+/// gen_mt32play.py's vectors: the same cases with ARENA.BAT's own music
+/// driver, MT32MPU.ADV, on an MPU-401.
+const MT32_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vectors/mt32play.txt");
+
+/// A `music` line of the music vectors in use (`MUSIC_FILE`), its runs
+/// (`DD6:0=1*4`) spelt out.
 fn music_calls(name: &str) -> Vec<String> {
-    let text = std::fs::read_to_string(MUSIC_VECTORS).expect(MUSIC_VECTORS);
+    let file = MUSIC_FILE.with(|f| f.get());
+    let text = std::fs::read_to_string(file).expect(file);
     let line = text.lines().find_map(|l| l.strip_prefix(&format!("music | {name} | "))).unwrap_or_else(|| panic!("{name}: a music line"));
     let mut out = Vec::new();
     for w in line.split(' ').filter(|w| !w.is_empty()) {
@@ -4676,13 +4682,36 @@ fn music_calls_check(name: &str, got: &[String]) {
 /// segment word, A906, the harness's 1000h higher, left out).
 #[test]
 fn the_load_with_music_on_as_the_original_leaves_it() {
+    music_load_check(MUSIC_VECTORS, false);
+}
+
+/// The same with ARENA.BAT's MT32MPU.ADV (gen_mt32play.py): its load's
+/// calls (an XMIDI driver at 330h, IRQ 2, DMA 1; no timbre cache) and the
+/// state the load leaves.
+#[test]
+fn the_load_with_the_mt32_driver_as_the_original_leaves_it() {
+    music_load_check(MT32_VECTORS, true);
+}
+
+/// The music vectors in use (`MUSIC_FILE`) and the driver the boot loads
+/// (`world::MUSIC_MT32`), for `f`.
+fn with_music_file<T>(file: &'static str, mt32: bool, f: impl FnOnce() -> T) -> T {
+    MUSIC_FILE.with(|c| c.set(file));
+    crate::world::MUSIC_MT32.with(|c| c.set(mt32));
+    let r = f();
+    MUSIC_FILE.with(|c| c.set(MUSIC_VECTORS));
+    crate::world::MUSIC_MT32.with(|c| c.set(false));
+    r
+}
+
+fn music_load_check(file: &'static str, mt32: bool) {
     MUSIC_CASE.with(|c| *c.borrow_mut() = Some(MUSIC_CASES[0].into()));
-    let r = played(Place::Guild, |_| {}, |_, _, _| {});
+    let r = with_music_file(file, mt32, || played(Place::Guild, |_| {}, |_, _, _| {}));
     MUSIC_CASE.with(|c| c.borrow_mut().take());
     let Some(_) = r else { return };
     let (mine, banks) = BASE.with(|b| b.borrow_mut().take()).unwrap();
-    music_calls_check("load", &LOAD_CALLS.with(|c| c.take()));
-    let text = std::fs::read_to_string(MUSIC_VECTORS).expect(MUSIC_VECTORS);
+    with_music_file(file, mt32, || music_calls_check("load", &LOAD_CALLS.with(|c| c.take())));
+    let text = std::fs::read_to_string(file).expect(file);
     let want = text.lines().find_map(|l| l.strip_prefix("loadstate | ")).expect("a loadstate line");
     let mut d = load_canonical(&game_dir().unwrap(), &mine);
     d[0xA906..0xA908].fill(0);
@@ -4700,6 +4729,20 @@ fn the_load_with_music_on_as_the_original_leaves_it() {
 /// banks, as the original's. (ARENA_CASE: that case alone.)
 #[test]
 fn the_music_plays_as_the_original() {
+    music_cases_check(MUSIC_VECTORS, false);
+}
+
+/// The same cases with ARENA.BAT's MT32MPU.ADV (gen_mt32play.py): no
+/// timbres asked for (the MT-32 has its own), the songs opened as their
+/// .xmi (1010 clear, so 0000:11DA leaves the name), and everything else
+/// as with the FM driver. (The MIDI the driver sends, the `mpu` lines,
+/// is the driver's own and the port doesn't run drivers: not compared.)
+#[test]
+fn the_mt32_music_plays_as_the_original() {
+    music_cases_check(MT32_VECTORS, true);
+}
+
+fn music_cases_check(file: &'static str, mt32: bool) {
     let only = std::env::var("ARENA_CASE").ok();
     for name in MUSIC_CASES {
         if only.as_deref().is_some_and(|o| o != name) {
@@ -4707,18 +4750,21 @@ fn the_music_plays_as_the_original() {
         }
         MUSIC_CASE.with(|c| *c.borrow_mut() = Some(name.into()));
         let (place, setup, play) = case(name).unwrap();
-        let Some((a, seen)) = played(place, |a| {
+        let Some((a, seen)) = with_music_file(file, mt32, || played(place, |a| {
             a.engine.page = Some(vec![0; 64000]);
             setup(a);
-        }, play) else {
+        }, play)) else {
             MUSIC_CASE.with(|c| c.borrow_mut().take());
             return;
         };
-        assert_eq!(seen, track_in(MUSIC_VECTORS, name), "{name}: the player's frames differ from the original's");
-        music_calls_check(name, &a.engine.m.music.as_ref().expect("the replay").calls);
-        state_compared_in(MUSIC_VECTORS, name, false, case(name).unwrap());
-        state_compared_in(MUSIC_VECTORS, name, true, case(name).unwrap());
-        state_ems_in(MUSIC_VECTORS, name, case(name).unwrap());
+        assert_eq!(seen, track_in(file, name), "{name}: the player's frames differ from the original's");
+        with_music_file(file, mt32, || {
+            // (Each of these plays the case again, with the same driver.)
+            music_calls_check(name, &a.engine.m.music.as_ref().expect("the replay").calls);
+            state_compared_in(file, name, false, case(name).unwrap());
+            state_compared_in(file, name, true, case(name).unwrap());
+            state_ems_in(file, name, case(name).unwrap());
+        });
         MUSIC_CASE.with(|c| c.borrow_mut().take());
     }
 }
@@ -4726,6 +4772,9 @@ fn the_music_plays_as_the_original() {
 thread_local! {
     /// The case `played` runs with music on (gen_musicplay.py's).
     static MUSIC_CASE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// The music vectors the replays and checks read (MUSIC_VECTORS, or
+    /// MT32_VECTORS for ARENA.BAT's own driver).
+    static MUSIC_FILE: std::cell::Cell<&'static str> = const { std::cell::Cell::new(MUSIC_VECTORS) };
     /// The case `played` runs with sound on (gen_soundplay.py's).
     static SOUND_CASE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
     /// The calls the load made into the driver, with sound on.
