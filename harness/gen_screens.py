@@ -264,6 +264,9 @@ SCREENS = {
     # 1194:48DB asks "Considering your condition..." (6B1D) as a menu.
     'worldunwell': (0x03BF, [('click', 70, 45), ('click', 200, 100), ('click', 200, 100), ('click', 62, 180)]),
     'worldsearch': (0x03BF, [('click', 70, 45), ('click', 43, 175)]),
+    # Travel with no place chosen: "select a destination" (26F7:07CD,
+    # DATA:5024) in a box over the province's map.
+    'worldnodest': (0x03BF, [('click', 70, 45), ('click', 62, 180)]),
     # The province's map with the mouse moved (no button) across it: each
     # pass of its loop (3159:0078..0097) runs 26F7:0625 wherever the
     # mouse is, the place nearest it (0B7A) labelled. Moved to (120, 60),
@@ -329,9 +332,18 @@ SCREENS = {
     # points to spend (1194:14C5).
     'levelup': ((0x2686, 0x02D8, {}), []),
     'levelupstats': ((0x2686, 0x02D8, {}), [('click', 0xA0, 0x64)]),
+    # Its button (region 0 of 3276:5312, at the bottom left) clicked with
+    # the points unspent: refused, "You must distribute..." (3E17) in its
+    # box over the screen (1194:122C's end, 59CC).
+    'levelupleft': ((0x2686, 0x02D8, {}), [('click', 0xA0, 0x64), ('click', 10, 175)]),
     # The mages' guild's spellmaker (1194:6064, SI the player, as the
     # guild's menu calls it: the save is in Daggerfall's guild).
     'spellmaker': ((0x1194, 0x6064, {'esi': 0x01A4}), []),
+    # Its Buy (the region at CAh..F3h, BCh..C5h) with no name yet: the
+    # message box (1194:6BD7 -> 59CC, colour D6h) over the screen; its
+    # New (0Ah..35h): "Are you sure ?" (6A6C: 48E6, its menu 4B50).
+    'spellmakerbuy': ((0x1194, 0x6064, {'esi': 0x01A4}), [('click', 0xDE, 0xC0)]),
+    'spellmakernew': ((0x1194, 0x6064, {'esi': 0x01A4}), [('click', 0x1F, 0xC0)]),
     # A riddle (`riddled`: the save has none within reach) as the frame
     # shows the level's text (0000:0550): the text drawn, then its answer
     # asked under it (292B:05A2's typed field); then an answer typed in it
@@ -396,7 +408,7 @@ WAIT = (0, 0x8FC4)
 PLACES = {'tavern': (0x1AB5, 0x1387), 'temple': (0x1004, 0x1389), 'store': (0x1008, 0x138B), 'street': None,
           'people': None, 'palace': 'triggers', 'guild': 'guild'}
 WHERE = {'tavern': 'tavern', 'temple': 'temple', 'store': 'store', 'streetcamp': 'street', 'worldmap': 'street',
-         'worldprovince': 'street', 'worldhover': 'street', 'worldhovermoves': 'street', 'worldhoverbuttons': 'street', 'worldtrip': 'street', 'worldunwell': 'street', 'worldsearch': 'street', 'worldback': 'street',
+         'worldprovince': 'street', 'worldhover': 'street', 'worldhovermoves': 'street', 'worldhoverbuttons': 'street', 'worldtrip': 'street', 'worldunwell': 'street', 'worldsearch': 'street', 'worldnodest': 'street', 'worldback': 'street',
          'worldsearchtyped': 'street', 'worldsearchpick': 'street', 'worldsearchgo': 'street', 'worldsearchlist': 'street',
          'talk': 'people', 'talkwho': 'people', 'talkwhere': 'people', 'talkrumor': 'people',
          'tavernwelcome': 'tavern', 'templewelcome': 'temple', 'storewelcome': 'store', 'guildwelcome': 'guild',
@@ -730,7 +742,7 @@ BEFORE = {'automap': square, 'storesellhaggle': seeded, 'tavernrumorgeneral': cl
           'tavernroomtaken': seeded, 'tavernrest': rented, 'tavernresthours': rented,
           'tavernrestneed': lambda a: (rented(a), healed(a)),
           'talk': beside, 'talkwho': beside, 'talkwhere': beside, 'talkrumor': beside,
-          'levelup': leveled, 'levelupstats': leveled,
+          'levelup': leveled, 'levelupstats': leveled, 'levelupleft': leveled,
           'campenemies': hunted,
           'restleft': resting(1, 5), 'restpassed': lambda a: (resting(0, 2)(a), hurt(a)),
           'restrested': lambda a: (resting(0, 1, 2)(a), healed(a)),

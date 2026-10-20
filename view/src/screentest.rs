@@ -811,6 +811,30 @@ fn the_spellmaker_as_the_original_draws_it() {
     );
 }
 
+/// The spellmaker up (`the_spellmaker_as_the_original_draws_it`), then
+/// its region at (`x`, `y`) clicked.
+fn spellmaker_clicked(a: &mut App, d: &mut Driver, x: i32, y: i32) {
+    d.click(a, 164, 74, MouseButton::Left);
+    d.frame(a);
+    assert!(until_asked(d, a, 3), "the guild master asks");
+    d.click(a, 0xA0, 0x76, MouseButton::Left);
+    assert!(matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker)), "the spellmaker is up");
+    d.click(a, x, y, MouseButton::Left);
+}
+
+/// Its Buy with no name yet: "You must name this spell!" (1194:6BD7's
+/// message box, colour D6h) over the screen.
+#[test]
+fn the_spellmakers_unnamed_buy_as_the_original_draws_it() {
+    screen("spellmakerbuy", |a, d| spellmaker_clicked(a, d, 0xDE, 0xC0), layer);
+}
+
+/// Its New: "Are you sure ?" (1194:6A6C, the menu 4B50) over the screen.
+#[test]
+fn the_spellmakers_new_question_as_the_original_draws_it() {
+    screen("spellmakernew", |a, d| spellmaker_clicked(a, d, 0x1F, 0xC0), layer);
+}
+
 /// The mages' guild's menu (1194:A73E): its screen, banner and menu over
 /// the view, Drakain before Daggerfall's guild master.
 #[test]
@@ -1829,6 +1853,23 @@ fn the_level_ups_attributes_as_the_original_draws_them() {
     );
 }
 
+/// Its button (region 0, at the bottom left) clicked with the points
+/// unspent: "You must distribute all your bonus points." (3E17) in its
+/// box over the screen.
+#[test]
+fn the_level_ups_refusal_as_the_original_draws_it() {
+    screen(
+        "levelupleft",
+        |a, d| {
+            leveled(a, d);
+            d.click(a, 0xA0, 0x64, MouseButton::Left);
+            assert!(a.creation.is_some(), "the attribute screen");
+            d.click(a, 10, 175, MouseButton::Left);
+        },
+        layer,
+    );
+}
+
 /// The game over (5B1 bit 100h) from the loaded save: the farewell's
 /// vision (`Creation::ending`) frame by frame against the original's
 /// (harness/gen_vision.py, tests/vectors/vision.txt: from a cleared
@@ -2187,6 +2228,14 @@ fn the_unwell_travellers_question_as_the_original_draws_it() {
         },
         layer,
     );
+}
+
+/// Travel with no place chosen: "You can not travel until you have
+/// chosen a destination..." (26F7:07CD, DATA:5024) over the province's
+/// map.
+#[test]
+fn travel_with_no_destination_as_the_original_draws_it() {
+    screen("worldnodest", |a, d| world_clicks(a, d, &[(70, 45), (62, 180)]), layer);
 }
 
 /// Its Search: a name asked, after the editor's two passes before its

@@ -26,6 +26,7 @@ screenfade | worldprovince | 70 | 40f6a41e18287ddc
 screenfade | worldtrip | 70 | 40f6a41e18287ddc
 screenfade | worldunwell | 70 | 40f6a41e18287ddc
 screenfade | worldsearch | 70 | 40f6a41e18287ddc
+screenfade | worldnodest | 70 | 40f6a41e18287ddc
 screenfade | worldhover | 70 | 40f6a41e18287ddc
 screenfade | worldhovermoves | 70 | 40f6a41e18287ddc
 screenfade | worldhoverbuttons | 70 | 40f6a41e18287ddc
@@ -37,4 +38,7 @@ screenfade | worldsearchgo | 70 | 40f6a41e18287ddc
 screenfade | guildspellpick | 3 | e5b889bfc934ea49
 screenfade | automap | 72 | 2c86ca8f17bddf19
 screenfade | levelupstats | 27 | 67fd4d5ec45a4717
+screenfade | levelupleft | 27 | 67fd4d5ec45a4717
 screenfade | spellmaker | 3 | 3fba6b030819c2f6
+screenfade | spellmakerbuy | 3 | 3fba6b030819c2f6
+screenfade | spellmakernew | 3 | 3fba6b030819c2f6

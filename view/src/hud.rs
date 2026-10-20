@@ -668,6 +668,9 @@ pub struct Hud {
     /// The window the game centres its boxes in (A914, A916, A918, A91A:
     /// left, top, right, bottom); all zero: the whole screen.
     pub clip: (i32, i32, i32, i32),
+    /// The boxes and menus asked over the spellmaker: in its tiles
+    /// (SPPARTS.RCI, B038's while it is up).
+    pub spparts: bool,
 }
 
 /// 2826:0BB2, each frame of the controls: the counter of a wall spell
@@ -832,6 +835,9 @@ pub struct Style {
     tiles: Tiles,
     /// MARBLE2.CIF, 3 x 3 tiles ([103A]), for the boxes made B038's.
     tiles2: Option<Tiles>,
+    /// SPPARTS.RCI, 3 x 3 tiles: the spellmaker's (1194:6064 loads them
+    /// as a resource, 756C, and makes them B038's, 0000:9AF8).
+    tiles_sp: Option<Tiles>,
     /// The lists' kinds 0..11 as 1194:5734 sets them up (any other kind
     /// is kind 1's).
     kinds: Vec<ListKind>,
@@ -958,7 +964,8 @@ pub fn init_style(archive: &crate::archive::Archive, m: &arena::machine::Machine
     let bar = kind("", RECORD_5AF4, 0xFD, None);
     let font_b = Font::load(archive, "FONT_B.DAT");
     let tiles2 = Tiles::load(archive, "MARBLE2.CIF", 3, 3);
-    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, tiles2, kinds, bar, font_b });
+    let tiles_sp = Tiles::load(archive, "SPPARTS.RCI", 3, 3);
+    let _ = STYLE.set(Style { menu_font, box_font, list_font, tiles, tiles2, tiles_sp, kinds, bar, font_b });
 }
 
 /// The kind a list is shown as: 1194:5734's AX (`Menu::kind`, from the
@@ -1005,15 +1012,10 @@ fn box_size_in(tiles: &Tiles, font: &Font, lines: &[Vec<Span>], margin: i32) -> 
     (w, h, tx, margin + (rh + 1) / 2)
 }
 
-/// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them:
-/// a line ended by a CR (`lines` leaves an empty span at its end) centred
-/// on the box, a last one without from the text's x.
-#[allow(clippy::too_many_arguments)]
-fn draw_box(screen: &mut Screen, st: &Style, font: &Font, rect: (i32, i32, i32, i32), lines: &[Vec<Span>], colour: u8) {
-    draw_box_in(screen, &st.tiles, font, rect, lines, MARGIN, colour);
-}
-
-/// `draw_box` with the tiles `tiles` and 965A's margin `margin`.
+/// A box of `w` x `h` at (x, y) with `lines` in it, as 965A draws them
+/// with the tiles `tiles` and margin `margin`: a line ended by a CR
+/// (`lines` leaves an empty span at its end) centred on the box, a last
+/// one without from the text's x.
 fn draw_box_in(screen: &mut Screen, tiles: &Tiles, font: &Font, (x, y, w, h): (i32, i32, i32, i32), lines: &[Vec<Span>], margin: i32, colour: u8) {
     screen.tiles(tiles, x, y, w / tiles.w as i32, h / tiles.h as i32);
     let (_, _, tx, ty) = box_size_in(tiles, font, lines, margin);
@@ -1113,6 +1115,12 @@ fn box_tiles<'a>(st: &'a Style, lines: &[Vec<Span>]) -> &'a Tiles {
         (Some(t), true) => t,
         _ => &st.tiles,
     }
+}
+
+/// The tiles the boxes and menus asked over `hud` are drawn in where
+/// they aren't play's: the spellmaker's.
+fn asked_tiles<'a>(st: &'a Style, hud: &Hud) -> Option<&'a Tiles> {
+    st.tiles_sp.as_ref().filter(|_| hud.spparts)
 }
 
 fn boxed_rect(st: &Style, hud: &Hud) -> Option<(i32, i32, i32, i32)> {
@@ -1502,7 +1510,7 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
         draw_placed(screen, st, p);
     }
     if let (Some(lines), Some(r)) = (&hud.boxed, boxed_rect(st, hud)) {
-        let tiles = box_tiles(st, lines);
+        let tiles = asked_tiles(st, hud).unwrap_or_else(|| box_tiles(st, lines));
         let lines = clip_of(lines).1;
         draw_box_in(screen, tiles, st.box_font_of(lines), r, lines, MARGIN, 0x60);
     }
@@ -1515,11 +1523,12 @@ fn compose_game(screen: &mut Screen, _font: &Font, st: &Style, hud: &Hud) {
             draw_list(screen, st, menu);
         } else {
             let (title, entries) = menu_boxes(st, menu, hud);
+            let tiles = asked_tiles(st, hud).unwrap_or(&st.tiles);
             if let Some(t) = title {
-                draw_box(screen, st, menu_font(st, menu), t, &menu_title(st, menu), 0x60);
+                draw_box_in(screen, tiles, menu_font(st, menu), t, &menu_title(st, menu), MARGIN, 0x60);
             }
             for (i, (r, e)) in entries.iter().zip(&menu.entries).enumerate() {
-                draw_box(screen, st, menu_font(st, menu), *r, std::slice::from_ref(e), 0x60);
+                draw_box_in(screen, tiles, menu_font(st, menu), *r, std::slice::from_ref(e), MARGIN, 0x60);
                 // The original has no highlight (picks are clicks or the
                 // keys' letters); the view marks the entry the arrows are on.
                 if i == menu.selected {
