@@ -1648,6 +1648,19 @@ CASES = {
     # player it casts (29CF:0145: its spell launched at the player) and
     # comes.
     'playcreaturecast': ('dungeon', brought(0xB, ahead=0x300), [((), (), 400, None)]),
+    # Creatures of other kinds coming down the corridor and fighting the
+    # player stood still. Type 1 is one of the four disease carriers
+    # (82BB): its blow's special attack (2AA1:03FC through 2EBD:0573)
+    # gives the player a disease. Type 15h leaves its own effect on him.
+    # Type Ch has its missile in flight by its 150th frame. (No creature
+    # regenerates: the only adds to a record's health at +59h are the
+    # spells' heals (2CDD) and the timed effects (2EBD).)
+    'playdiseasebite': ('dungeon', brought(1), [((), (), 400, None)]),
+    'playcreaturehex': ('dungeon', brought(0x15), [((), (), 400, None)]),
+    'playcreaturemissile': ('dungeon', brought(0xC), [((), (), 160, None)]),
+    # The guards called on the street (`guards_called`) come to the player
+    # and fight him: two people's approach, their blows' to-hit rolls.
+    'playguardsfight': ('street', None, [((), (), 2, None), ((), (), 1, None, [], {'do': guards_called}), ((), (), 300, None)]),
     # `stairs_fight`: stood in while the creature comes and strikes, then
     # the up arrow held into the stairs mid-fight (0000:F76F), and two
     # dozen frames on the level below.
@@ -2323,13 +2336,15 @@ def walls_line(a, name):
 # The spell cases, whose effects land outside DGROUP and the EMS banks
 # (`creatures_line`).
 SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout', 'playresist', 'playfortify', 'playinvisible',
-               'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick')
+               'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick', 'playdiseasebite', 'playcreaturehex',
+               'playcreaturemissile', 'playguardsfight')
 
 
 # The cases whose projectiles and actors are compared frame by frame
 # (`objects_line`), not only as their last frame leaves them: a fireball
 # a frame late can still end where the original's ends.
-OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell')
+OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell', 'playdiseasebite',
+                'playcreaturehex', 'playcreaturemissile', 'playguardsfight')
 
 
 def objects_digest(a):

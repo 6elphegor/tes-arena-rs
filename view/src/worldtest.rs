@@ -1869,6 +1869,16 @@ fn case(name: &str) -> Option<Case> {
             frames(a, d, seen, 120, |_| false);
         })),
         "playcreaturecast" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 0xB, 1, 0x300)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        // Other creatures fighting the player stood still: a disease
+        // carrier's bite, type 15h's effect, type Ch's missile.
+        "playdiseasebite" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 1, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        "playcreaturehex" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 0x15, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 400, |_| false))),
+        "playcreaturemissile" => (Place::Dungeon, Box::new(|a: &mut App| brought(a, 0xC, 1, 0x180)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 160, |_| false))),
+        "playguardsfight" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            guards_called(a);
+            frames(a, d, seen, 301, |_| false);
+        })),
         "playstairsfight" => (Place::Dungeon, Box::new(|a: &mut App| {
             // gen_worldframes.py's `stairs_fight`: south of the down
             // stairs facing them, a creature two squares behind.
@@ -3881,9 +3891,12 @@ const BUSY: &[&str] = &[
     "playchest",
     "playchestpick",
     "playcreaturecast",
+    "playcreaturehex",
+    "playcreaturemissile",
     "playcrowd",
     "playcurepoison",
     "playdawn",
+    "playdiseasebite",
     "playdream",
     "playeffectsheet",
     "playequip",
@@ -3903,6 +3916,7 @@ const BUSY: &[&str] = &[
     "playfight",
     "playfortify",
     "playguards",
+    "playguardsfight",
     "playguild",
     "playguildbar",
     "playheal",
@@ -4113,9 +4127,12 @@ const BUSY_STATE: &[&str] = &[
     "playchest",
     "playchestpick",
     "playcreaturecast",
+    "playcreaturehex",
+    "playcreaturemissile",
     "playcrowd",
     "playcurepoison",
     "playdawn",
+    "playdiseasebite",
     "playdream",
     "playeffectsheet",
     "playequip",
@@ -4137,6 +4154,7 @@ const BUSY_STATE: &[&str] = &[
     "playfortify",
     "playghost",
     "playguards",
+    "playguardsfight",
     "playguild",
     "playguildbar",
     "playheal",
@@ -4250,9 +4268,8 @@ fn the_walls_left_as_the_original() {
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 12] = [
-    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse",
-    "playcurepoison", "playpoisontick",
+const SPELL_CASES: [&str; 16] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight",
 ];
 
 /// The cases whose projectiles and actors are compared frame by frame
@@ -4260,7 +4277,11 @@ const SPELL_CASES: [&str; 12] = [
 const OBJECT_CASES: &[&str] = &[
     "playcast",
     "playcreaturecast",
+    "playcreaturehex",
+    "playcreaturemissile",
+    "playdiseasebite",
     "playfight",
+    "playguardsfight",
     "playparalyse",
     "playquickcast",
     "playsurrenderspell",
