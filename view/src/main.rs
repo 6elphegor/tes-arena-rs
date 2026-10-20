@@ -256,13 +256,25 @@ impl Front<'_> {
         self.drawn.as_deref().or(self.shown)
     }
 
+    /// The screen a message box or a menu keeps what it covers of: none
+    /// where the page is the game's own block (the box reads the page, on
+    /// which it then draws and puts back: `Machine::box_background`),
+    /// else `box_screen`.
+    fn box_under(&self, m: &arena::machine::Machine) -> Option<&[u8]> {
+        if m.page_is_block() {
+            None
+        } else {
+            self.box_screen()
+        }
+    }
+
     /// 1194:59C8: a message box with the text at DS:`si`, shown (`show`)
     /// and what it leaves in the game's state (`Machine::message_shown`:
     /// the box laid out, its background kept, the dissolve, put away
     /// after the player's click unless 5E0 bit 800h).
     fn message_box(&mut self, m: &mut arena::machine::Machine, si: u16) {
         self.show(m, si);
-        if m.message_shown((arena::mem::DS, si), self.box_screen()).is_none() {
+        if m.message_shown((arena::mem::DS, si), self.box_under(m)).is_none() {
             eprintln!("the message box gave up: {}", arena::giveup::describe());
         }
     }
@@ -283,7 +295,7 @@ impl Front<'_> {
     fn menu(&mut self, m: &mut arena::machine::Machine, si: u16, bx: u16, di: u16) -> u16 {
         use arena::mem::DS;
         let colour = m.mem.r8(DS, 0x9288);
-        let Some(boxes) = m.menu_boxes(si, di, self.box_screen()) else {
+        let Some(boxes) = m.menu_boxes(si, di, self.box_under(m)) else {
             eprintln!("the menu gave up: {}", arena::giveup::describe());
             return 0xFFFF;
         };

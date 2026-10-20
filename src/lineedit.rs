@@ -226,8 +226,11 @@ impl Machine {
         let seg = self.heap_alloc_high(f.w.wrapping_mul(f.h))?;
         self.mem.w16(DS, var::KEPT, 0);
         self.mem.w16(DS, var::KEPT + 2, seg);
-        // 9F45: the screen under the field kept (8F2A), then drawn (A0AE).
-        self.page_rect_save((seg, 0), f.x, f.y, f.w, f.h);
+        // 9F45: the screen under the field kept (8F2A), where the page is
+        // the game's own block, then drawn (A0AE).
+        if self.page_is_block() {
+            self.page_rect_save((seg, 0), f.x, f.y, f.w, f.h);
+        }
         self.edit_redraw();
         Some(())
     }
