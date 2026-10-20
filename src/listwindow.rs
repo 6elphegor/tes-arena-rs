@@ -592,6 +592,8 @@ impl Machine {
                 self.mem.w16(seg, rec + 0x53, v);
             }
         }
+        // 07C3: the knob drawn (0CFF).
+        self.list_knob(seg, rec);
         // 07C6: the first line picked (0BCA: no routine at +2F here).
         self.list_pick(seg, rec, 0)?;
         if self.list_capture {
@@ -843,6 +845,7 @@ impl Machine {
             ax = foot;
         }
         self.mem.w16(seg, rec + 0x4F, ax);
+        self.list_knob(seg, rec);
         let h = r16(self, 0x16) as u32;
         if h == 0 {
             return crate::giveup::original("3159:0DED: a bar of no height (a divide by 0)");
@@ -923,6 +926,7 @@ impl Machine {
                 y
             };
             self.mem.w16(seg, rec + 0x4F, y);
+            self.list_knob(seg, rec);
         }
         Some(())
     }
@@ -941,20 +945,32 @@ impl Machine {
         Some(())
     }
 
-    /// 3159:0A58, the state its drawing leaves: the lines' box put back
-    /// (599C, its pixels the front end's), and of the lines shown from the
-    /// first (+3B, at most the rows), each one's tab stops (9 and three
-    /// digits) written at A836 of the texts' segment (0B07: DS is theirs),
-    /// the last stop's left; the colour (9288) as the lines' colour codes
-    /// and their count leave it. The texts' drawing is the front end's.
+    /// 3159:0A58: the lines drawn. The lines' box put back (599C from
+    /// +49); the colour (9288) the lines' (+28), or the one after them
+    /// (+2B) with no texts (+26 0); the lines passed up to the first shown
+    /// (+3B), then those shown (at most the rows, +37; a `loop`, so none
+    /// runs it 10000h times), each by its segments (0AE2) from row +1A
+    /// plus one on by the font's height (B7F4), then the marked line and
+    /// the arrows remapped (0BE4). After each line passed or drawn, BP
+    /// (the texts' count, +26) is counted down, and where it reaches 0
+    /// the colour after them (+2B) taken (0BAE). The pixels go into the
+    /// page where it is the game's own block; the texts' state (ADB6,
+    /// ADB8) either way.
     fn list_drawn(&mut self, seg: u16, rec: u16) {
         let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
-        let (tseg, mut at) = (r16(self, 0x24), r16(self, 0x22));
+        if self.page_is_block() {
+            let (x, y, w, h) = (r16(self, 0x18), r16(self, 0x1A), r16(self, 0x1C), r16(self, 0x1E));
+            self.page_rect_put((r16(self, 0x4B), r16(self, 0x49)), x, y, w, h);
+        }
         let colour = if r16(self, 0x26) == 0 { self.mem.r8(seg, rec + 0x2B) } else { self.mem.r8(seg, rec + 0x28) };
         self.mem.w8(DS, 0x9288, colour);
-        // 0BAE after each line passed or drawn: BP, from the texts'
-        // count (+26), counted down, and where it reaches 0 the colour
-        // after them (+2B) taken.
+        let mut ax = r16(self, 0x3F);
+        if r16(self, 0x20) & 0x3000 == 0 {
+            ax = ax.wrapping_add(1);
+        }
+        let mut bx = r16(self, 0x1A).wrapping_add(1);
+        let dx = self.mem.r16(DS, ROW_HEIGHT);
+        let (tseg, mut at) = (r16(self, 0x24), r16(self, 0x22));
         let mut bp = r16(self, 0x26);
         let mut line_done = |m: &mut Machine| {
             bp = bp.wrapping_sub(1);
@@ -974,51 +990,188 @@ impl Machine {
         if r16(self, 0x37) < n {
             n = r16(self, 0x37);
         }
-        for _ in 0..n {
-            // 0AE2 by its segments from SI: a tab stop (9 and three digits)
-            // at a segment's start written at A836 of the texts' segment;
-            // the bytes after the segment's first (and after a stop's
-            // digits, its fourth) looked at: 1 a colour code (its colour
-            // taken, the segment after it next), Ah, Dh and 8 a segment
-            // drawn (Dh Ah the pair passed), 0 the line's end, drawn
-            // through +41 from the last segment's start, SI past its NUL.
-            let mut start = at;
-            loop {
-                let mut p = start;
-                if self.mem.r8(tseg, p) == 9 {
-                    for k in 0..3u16 {
-                        let d = self.mem.r8(tseg, p.wrapping_add(1 + k));
-                        self.mem.w8(tseg, 0xA836 + k, d);
-                    }
-                    self.mem.w8(tseg, 0xA839, 0);
-                    p = p.wrapping_add(4);
+        let lines = if n == 0 { 0x10000u32 } else { n as u32 };
+        for _ in 0..lines {
+            let last = self.list_line_segments(seg, rec, (tseg, at), bx);
+            // The line's last segment through +41 (9E06, 5364 or 9370) at
+            // the line's x and row.
+            at = match r16(self, 0x41) {
+                0x5364 => {
+                    let w = self.text_width_far((tseg, last));
+                    self.page_text_at(ax.wrapping_sub(w >> 1), bx, (tseg, last))
                 }
-                let next = loop {
-                    p = p.wrapping_add(1);
-                    match self.mem.r8(tseg, p) {
-                        0 => break None,
-                        1 => {
-                            let colour = self.mem.r8(tseg, p.wrapping_add(1));
-                            self.mem.w8(DS, 0x9288, colour);
-                            break Some(p.wrapping_add(2));
-                        }
-                        0x0A | 8 => break Some(p.wrapping_add(1)),
-                        0x0D if self.mem.r8(tseg, p.wrapping_add(1)) == 0x0A => break Some(p.wrapping_add(2)),
-                        0x0D => break Some(p.wrapping_add(1)),
-                        _ => {}
-                    }
-                };
-                match next {
-                    Some(s) => start = s,
-                    None => break,
+                0x9370 => {
+                    let w = self.text_width_far((tseg, last));
+                    self.page_text_at(ax.wrapping_sub(w), bx, (tseg, last))
                 }
-            }
-            while self.mem.r8(tseg, start) != 0 {
-                start = start.wrapping_add(1);
-            }
-            at = start.wrapping_add(1);
+                _ => self.page_text_at(ax, bx, (tseg, last)),
+            };
             line_done(self);
+            bx = bx.wrapping_add(dx);
         }
+        self.list_marked_drawn(seg, rec);
+    }
+
+    /// 3159:0AE2: one line's segments up to its last, each drawn where it
+    /// ends (DS the texts' segment, `text`): a segment starting with a tab
+    /// stop (9 and three digits) has them written at A836 of the texts'
+    /// segment, its x their decimal (0000:52B6) and CX its first two
+    /// digits (CH, CL: what the box's width was); otherwise its x is the
+    /// box's (+18), CX its width (+1C). The bytes after the segment's
+    /// first (after a stop's digits, its fourth) are looked at: 1 a colour
+    /// code (into 9288 of the texts' segment, the segment after it next);
+    /// Ah, Dh Ah a segment drawn at its x plus one (9E06); Dh alone drawn
+    /// centred on its x plus half of CX (5364); 8 drawn ending at its x
+    /// plus CX less one (9370); each with its end made a NUL while drawn;
+    /// 0 the line's end. Returns where the last segment starts.
+    fn list_line_segments(&mut self, seg: u16, rec: u16, (tseg, mut start): (u16, u16), bx: u16) -> u16 {
+        loop {
+            let mut x = self.mem.r16(seg, rec + 0x18);
+            let mut cx = self.mem.r16(seg, rec + 0x1C);
+            let mut p = start;
+            if self.mem.r8(tseg, p) == 9 {
+                let (ch, cl, al) = (self.mem.r8(tseg, p.wrapping_add(1)), self.mem.r8(tseg, p.wrapping_add(2)), self.mem.r8(tseg, p.wrapping_add(3)));
+                cx = (ch as u16) << 8 | cl as u16;
+                for (k, v) in [ch, cl, al, 0].into_iter().enumerate() {
+                    self.mem.w8(tseg, 0xA836 + k as u16, v);
+                }
+                x = self.decimal(tseg, 0xA836);
+                p = p.wrapping_add(4);
+                start = p;
+            }
+            loop {
+                p = p.wrapping_add(1);
+                let c = self.mem.r8(tseg, p);
+                match c {
+                    0 => return start,
+                    1 => {
+                        let colour = self.mem.r8(tseg, p.wrapping_add(1));
+                        self.mem.w8(tseg, 0x9288, colour);
+                        start = p.wrapping_add(2);
+                        break;
+                    }
+                    0x0A | 0x0D | 8 => {
+                        let crlf = c == 0x0D && self.mem.r8(tseg, p.wrapping_add(1)) == 0x0A;
+                        self.mem.w8(tseg, p, 0);
+                        let si = if c == 0x0A || crlf {
+                            self.page_text_at(x.wrapping_add(1), bx, (tseg, start))
+                        } else if c == 0x0D {
+                            let at = x.wrapping_add(cx >> 1);
+                            let w = self.text_width_far((tseg, start));
+                            self.page_text_at(at.wrapping_sub(w >> 1), bx, (tseg, start))
+                        } else {
+                            let at = x.wrapping_add(cx).wrapping_sub(1);
+                            let w = self.text_width_far((tseg, start));
+                            self.page_text_at(at.wrapping_sub(w), bx, (tseg, start))
+                        };
+                        self.mem.w8(tseg, si.wrapping_sub(1), c);
+                        start = if crlf { si.wrapping_add(1) } else { si };
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// 3159:0BE4: the marked line (+39, its row from the first shown, +3B,
+    /// on from +1A plus one) across the box (+18, +1C), the font's height
+    /// (B7F4) high, remapped through [BA0E] (9D84); then the up and down
+    /// arrows' boxes (+0, +8; none where 0 wide) through [BA0E] where the
+    /// arrow is the one being pressed (B7F2 bit 0, 1), else [BA12].
+    fn list_marked_drawn(&mut self, seg: u16, rec: u16) {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        let height = self.mem.r16(DS, ROW_HEIGHT);
+        let rows = r16(self, 0x39).wrapping_sub(r16(self, 0x3B)).wrapping_mul(height);
+        let y = r16(self, 0x1A).wrapping_add(1).wrapping_add(rows);
+        let lit = (self.mem.r16(DS, 0xBA10), self.mem.r16(DS, 0xBA0E));
+        let plain = (self.mem.r16(DS, 0xBA14), self.mem.r16(DS, 0xBA12));
+        self.page_remap(lit, r16(self, 0x18), y, r16(self, 0x1C), height);
+        for (k, bit) in [(0u16, 1u8), (8, 2)] {
+            let w = r16(self, k + 4);
+            if w == 0 {
+                continue;
+            }
+            let table = if self.mem.r8(DS, SCROLLED) & bit != 0 { lit } else { plain };
+            self.page_remap(table, r16(self, k), r16(self, k + 2), w, r16(self, k + 6));
+        }
+    }
+
+    /// 0000:9D84: the page's `w` by `h` box at (`x`, `y`) remapped through
+    /// the table at `table`, where the page is the game's own block (rows
+    /// and columns each a `loop`: 0 runs 10000h times).
+    pub(crate) fn page_remap(&mut self, (tseg, toff): (u16, u16), x: u16, y: u16, w: u16, h: u16) {
+        if !self.page_is_block() {
+            return;
+        }
+        let page = self.mem.r16(DS, 0xA900);
+        let count = |c: u16| if c == 0 { 0x10000u32 } else { c as u32 };
+        let mut di = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        for _ in 0..count(h) {
+            let mut at = di;
+            for _ in 0..count(w) {
+                let b = self.mem.r8(page, at);
+                let c = self.mem.r8(tseg, toff.wrapping_add(b as u16));
+                self.mem.w8(page, at, c);
+                at = at.wrapping_add(1);
+            }
+            di = di.wrapping_add(0x140);
+        }
+    }
+
+    /// 0000:9A6E: the page's `w` by `h` box at (`x`, `y`) filled with
+    /// [9288] (77CC a row: none for 0 wide; the rows a `loop`), where the
+    /// page is the game's own block.
+    pub(crate) fn page_fill(&mut self, x: u16, y: u16, w: u16, h: u16) {
+        if !self.page_is_block() {
+            return;
+        }
+        let page = self.mem.r16(DS, 0xA900);
+        let colour = self.mem.r8(DS, 0x9288);
+        let mut di = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
+        for _ in 0..if h == 0 { 0x10000u32 } else { h as u32 } {
+            for k in 0..w {
+                self.mem.w8(page, di.wrapping_add(k), colour);
+            }
+            di = di.wrapping_add(0x140);
+        }
+    }
+
+    /// 3159:0CFF: with a bar (+14), the knob drawn: the bar's background
+    /// put back (599C from +45), the knob (+4D..+53) filled in +2E (9A6E),
+    /// then its edges (7334 from its corner, ADB6 and ADB8): the left and
+    /// the bottom in +2C, the right and the top in +2D. 9288 and the
+    /// texts' place are left either way; the pixels go into the page
+    /// where it is the game's own block.
+    fn list_knob(&mut self, seg: u16, rec: u16) {
+        let r16 = |m: &Machine, o: u16| m.mem.r16(seg, rec.wrapping_add(o));
+        if r16(self, 0x14) == 0 {
+            return;
+        }
+        let c = self.mem.r8(seg, rec + 0x2E);
+        self.mem.w8(DS, 0x9288, c);
+        if self.page_is_block() {
+            let (x, y, w, h) = (r16(self, 0x10), r16(self, 0x12), r16(self, 0x14), r16(self, 0x16));
+            self.page_rect_put((r16(self, 0x47), r16(self, 0x45)), x, y, w, h);
+        }
+        let (ax, bx, cx, dx) = (r16(self, 0x4D), r16(self, 0x4F), r16(self, 0x51), r16(self, 0x53));
+        self.page_fill(ax, bx, cx, dx);
+        let c = self.mem.r8(seg, rec + 0x2C);
+        self.mem.w8(DS, 0x9288, c);
+        self.mem.w16(DS, 0xADB6, ax);
+        self.mem.w16(DS, 0xADB8, bx);
+        let foot = bx.wrapping_add(dx).wrapping_sub(1);
+        self.line_to(ax, foot);
+        let right = ax.wrapping_add(cx);
+        self.line_to(right, foot);
+        let c = self.mem.r8(seg, rec + 0x2D);
+        self.mem.w8(DS, 0x9288, c);
+        let top = foot.wrapping_sub(dx).wrapping_add(1);
+        let v = self.mem.r16(DS, 0xADB6).wrapping_sub(1);
+        self.mem.w16(DS, 0xADB6, v);
+        let r = right.wrapping_sub(1);
+        self.line_to(r, top);
+        self.line_to(r.wrapping_sub(cx), top);
     }
 
     /// 3159:07D3: the window's end: with flag 1 what the lines' box and

@@ -226,7 +226,25 @@ impl Machine {
         let seg = self.heap_alloc_high(f.w.wrapping_mul(f.h))?;
         self.mem.w16(DS, var::KEPT, 0);
         self.mem.w16(DS, var::KEPT + 2, seg);
+        // 9F45: the screen under the field kept (8F2A), then drawn (A0AE).
+        self.page_rect_save((seg, 0), f.x, f.y, f.w, f.h);
+        self.edit_redraw();
         Some(())
+    }
+
+    /// 0000:A0AE: the field drawn: the screen it covers put back from its
+    /// kept block (59A4) and its text drawn at X, Y (9E0A), into the page
+    /// where it is the game's own block; the text's state (ADB6, ADB8)
+    /// either way.
+    fn edit_redraw(&mut self) {
+        let (x, y) = (self.mem.r16(DS, var::X), self.mem.r16(DS, var::Y));
+        if self.page_is_block() {
+            let (w, h) = (self.mem.r16(DS, var::W), self.mem.r16(DS, var::H));
+            let kept = (self.mem.r16(DS, var::KEPT + 2), self.mem.r16(DS, var::KEPT));
+            self.page_rect_put(kept, x, y, w, h);
+        }
+        let text = (self.mem.r16(DS, var::TEXT_SEG), self.mem.r16(DS, var::TEXT));
+        self.page_text_at(x, y, text);
     }
 
     /// 0000:A16B: DS:`si` copied down to DS:`di` through its NUL. None
@@ -247,6 +265,17 @@ impl Machine {
     /// One pass of 0000:9EE9's loop with A172's input: whether the field
     /// ended (Enter, the right button, Esc in the save menu).
     pub fn edit_key(&mut self, k: EditKey) -> Option<bool> {
+        let ended = self.edit_key_taken(k)?;
+        // Each pass that doesn't end goes back to 9F49: the field drawn.
+        if !ended {
+            self.edit_redraw();
+        }
+        Some(ended)
+    }
+
+    /// 9EE9's handling of one pass's input up to its jump back to 9F49
+    /// (on) or A096 (ended).
+    fn edit_key_taken(&mut self, k: EditKey) -> Option<bool> {
         let al = match k {
             EditKey::Button => return Some(true),
             EditKey::Key(al) => al,
@@ -327,15 +356,11 @@ impl Machine {
     }
 
     /// 0000:A096 on: the keys flushed (7112), the field drawn once more
-    /// (A0AE: the screen put back, 59A4, and the text drawn at X, Y, 9E0A;
-    /// the pixels the front end's, the text's state, `text_state_far`,
-    /// the game's) and the screen's block freed (6C36). The text is
+    /// (A0AE, `edit_redraw`) and the screen's block freed (6C36). The text is
     /// DS:`TEXT` as the field left it.
     pub fn edit_close(&mut self) {
         self.key_flush();
-        let (x, y) = (self.mem.r16(DS, var::X), self.mem.r16(DS, var::Y));
-        let text = (self.mem.r16(DS, var::TEXT_SEG), self.mem.r16(DS, var::TEXT));
-        self.text_state_far(x, y, text);
+        self.edit_redraw();
         let seg = self.mem.r16(DS, var::KEPT + 2);
         self.heap_free(seg);
     }

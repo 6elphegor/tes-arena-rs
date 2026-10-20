@@ -665,6 +665,10 @@ impl Machine {
         // is the memory after it, as is any other segment's.
         let page = self.mem.r16(DS, 0xA900);
         let from = if self.mem.r32(DS, 0x8F9A) != 0 { self.mem.r16(DS, 0x8F9C) } else { page };
+        // With no screen from the front end, the page itself where it is
+        // the game's own block. (Where a front end gives one it is taken:
+        // its screen still holds pictures the page doesn't, as creation's.)
+        let in_memory = screen.is_none() && self.page_is_block();
         let mut row = self.mem.r16(DS, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);
         let mut at = off.wrapping_add(8);
         for _ in 0..h {
@@ -672,7 +676,7 @@ impl Machine {
                 let o = row.wrapping_add(c);
                 let v = match screen {
                     Some(s) if from == page && (o as usize) < s.len() => s[o as usize],
-                    None if from == page && o < 0xFA00 => 0,
+                    None if from == page && o < 0xFA00 && !in_memory => 0,
                     _ => self.mem.r8(from, o),
                 };
                 self.mem.w8(seg, at, v);

@@ -295,15 +295,6 @@ fn fast_travel(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, clicks: &[
     frames_until(a, d, seen, 3, |_| false);
 }
 
-/// The cases whose journey's first fades (26F7:081E's 55B2) are compared
-/// in their colours and count but not their screens: travelunwell's
-/// starts from the page the unwell traveller's question (1194:020E's
-/// 3159:0F2A) leaves, where the original keeps parchment over the No
-/// box's rows (125..164: two bare boxes, tiled out of step with the menu's)
-/// while its title and Yes are put back. The menu's boxes and their
-/// backgrounds are the front end's here (the view draws the question;
-/// its fade starts from the map as the menu found it).
-const LEAD_SCREEN_LEFT_OUT: [&str; 1] = ["travelunwell"];
 
 fn transit(name: &str) {
     let (place, setup, play) = transit_case(name).unwrap();
@@ -388,9 +379,6 @@ fn transit(name: &str) {
         for (what, seen, want) in [("before the days", lead, want_lead), ("after the days", tail, want_tail)] {
             for (k, (s, o)) in seen.iter().zip(&want).enumerate() {
                 assert_eq!(s.1, o.1, "{name}: the journey's colours {what}, retrace {k}, differ from the original's");
-                if what == "before the days" && LEAD_SCREEN_LEFT_OUT.contains(&name) {
-                    continue;
-                }
                 assert_eq!(s.0, o.0, "{name}: the journey's screen {what}, retrace {k}, differs from the original's");
             }
             assert_eq!(seen.len(), want.len(), "{name}: the journey's retraces {what} differ from the original's");
