@@ -38,6 +38,8 @@
 //!   and EB8D cleared.
 //! - 2F9F:000D (`music_state`): the sequence's status (0DD6: 0 stopped,
 //!   1 playing, 2 done).
+//! - 2F9F:04A0 (`music_shutdown`): the song stopped, the driver's blocks
+//!   given back, the AIL shut down.
 //!
 //! The driver is a replay's (`Replay`, on `Machine::music`): the original
 //! driver's answers (harness/gen_musicplay.py's `music` lines) taken in
@@ -324,6 +326,33 @@ impl Machine {
         self.heap_free(seg);
         self.mem.w16(DS, SONG, 0);
         self.mem.w16(DS, SONG + 2, 0);
+    }
+
+    /// 2F9F:04A0, the music shut down (main's end, 0000:10B8; the options
+    /// screen's Quit, 21EE:020D): the song stopped (0438, `music_stop`),
+    /// the timbre cache given back when there is one (EB9F), then the
+    /// state table, the driver's image and the sound driver's (8F62, when
+    /// loaded), each through 0000:6C26 (`heap_free`, which does nothing
+    /// for 0), and the AIL shut down (0FFD:0821). The far pointers are
+    /// left as they were.
+    pub fn music_shutdown(&mut self) {
+        self.music_stop();
+        if self.mem.r16(DS, CACHE_SIZE) != 0 {
+            let seg = self.mem.r16(DS, CACHE + 2);
+            self.heap_free(seg);
+        }
+        let seg = self.mem.r16(DS, STATE + 2);
+        self.heap_free(seg);
+        if self.mem.r16(DS, IMAGE) | self.mem.r16(DS, IMAGE + 2) != 0 {
+            let seg = self.mem.r16(DS, IMAGE + 2);
+            self.heap_free(seg);
+        }
+        let sound = crate::digital::var::IMAGE;
+        if self.mem.r16(DS, sound) | self.mem.r16(DS, sound + 2) != 0 {
+            let seg = self.mem.r16(DS, sound + 2);
+            self.heap_free(seg);
+        }
+        self.music_call("821".into());
     }
 
     /// 2542:07BD/07FF, the options screen's music volume: the sequence's

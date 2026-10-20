@@ -14,7 +14,9 @@ as the game asks: the load's interior's song, a town's on its streets
 each frame until it ends, a dungeon's, a building's).
 
 Each case's lines are gen_worldframes.py's (`track`, `state`,
-`stateload`, `stateems`), its `music` line the calls into the AIL from
+`stateload`, `stateems`), its `heap` line (the heap's blocks' sizes and
+flags, `heap_line`: what the songs and the shut down take and give back,
+which DGROUP and the banks don't hold), its `music` line the calls into the AIL from
 the load on, its place's way in and its frames, answers and all
 (fmmus.py's `calls_line`), and the load's own: `loadstate` and `loadems`
 (the state the load with music on leaves, as gen_worldframes.py's),
@@ -30,8 +32,10 @@ from fmmus import MusicArena
 import gen_worldframes as gw
 
 # The cases run with music on (gen_worldframes.py's): a town's street, at
-# night too, the wilderness, a dungeon, a tavern.
-CASES = ['playstreet', 'playnight', 'playwild', 'playdungeon', 'playtaverndrink', 'playjourneyon']
+# night too, the wilderness, a dungeon, a tavern; and this generator's own
+# (OWN, SHUTDOWN).
+CASES = ['playstreet', 'playnight', 'playwild', 'playdungeon', 'playtaverndrink', 'playjourneyon', 'playoptionsmusic',
+         'playshutdown']
 # This generator's own: `playjourneyend` (gen_worldframes.py's: the
 # street's song started, then a journey to another town, whose arrival
 # fades the song out and stops it, 2F9F:0438, and starts the town's,
@@ -40,10 +44,39 @@ CASES = ['playstreet', 'playnight', 'playwild', 'playdungeon', 'playtaverndrink'
 JOURNEY = gw.CASES['playjourneyend']
 OWN = {'playjourneyon': (JOURNEY[0], JOURNEY[1], [JOURNEY[2][0],
                                                   JOURNEY[2][1][:5] + ({**JOURNEY[2][1][5], 'ends': False},),
-                                                  ((), (), 3, None)])}
+                                                  ((), (), 3, None)]),
+       # The dungeon's song started, then the options screen (Esc) and its
+       # music volume clicked up twice (2542:079C: D3A raised, its box
+       # drawn, the sequence's volume set at once, 0FFD:0DE8 from 07BD)
+       # and down once (07DE, 07FF), then Resume (playoptionsend's).
+       'playoptionsmusic': ('dungeon', None, [((), (), 2, None),
+                                              ((gw.KEY_ESC,), (), 1, None, [], {'script': [
+                                                  ('click', 127, 83), ('click', 127, 83), ('click', 127, 107),
+                                                  ('click', 288, 132)], 'ends': True})])}
+# Cases followed by the music's shut down (2F9F:04A0, as main's end,
+# 0000:10B8, and the options screen's Quit, 21EE:020D, run it): the song
+# faded and stopped (0438), the timbre cache (when there is one), the
+# state table, the driver's image and the sound driver's (8F62, when
+# loaded) given back (0000:6C26), the AIL shut down (0821). Run alone
+# after `playstreet`'s frames, its calls on the case's line.
+SHUTDOWN = {'playshutdown': 'playstreet'}
 # The file-open hook's segment word (A906: 0000:11DA's code segment, the
 # harness's 1000h higher than the port's): left out of the comparisons.
 HOOK_SEGMENT = {0xA906, 0xA907}
+
+
+def heap_line(a, name):
+    """The heap's blocks from the first header (DGROUP 0157: a far
+    pointer; each header's next at +0 and +2, its size at +8, its flags at
+    +0Ah), as `heap | NAME | COUNT DIGEST` over their sizes and flags (the
+    segments, the harness's 1000h higher, left out)."""
+    off, seg = a.r16(0x157), a.r16(0x159)
+    out = []
+    while (seg | off) and len(out) < 500:
+        hdr = bytes(a.mu.mem_read(seg * 16 + off, 0xB))
+        out.append(f'{hdr[8] | hdr[9] << 8:x}:{hdr[10]:x}')
+        off, seg = hdr[0] | hdr[1] << 8, hdr[2] | hdr[3] << 8
+    return f'heap | {name} | {len(out)} {fnv(",".join(out).encode()):x}\n'
 
 
 def main(kind='fm'):
@@ -77,18 +110,21 @@ def main(kind='fm'):
     for name in CASES:
         if only and name not in only:
             continue
-        where, setup, steps = OWN[name] if name in OWN else gw.CASES[name]
+        where, setup, steps = OWN[name] if name in OWN else gw.CASES[SHUTDOWN.get(name, name)]
         if where not in places:
             places[where] = {'dungeon': gw.gd.dungeon, 'crypt': gw.crypt, 'street': gw.street, 'wild': gw.wild,
                              'tavern': gw.building('tavern')}[where](a, base)
         print(name, file=sys.stderr)
         tracks = []
         gw.run_case(a, places[where], name, setup, steps, tracks)
+        if name in SHUTDOWN:
+            assert a.run_screen(0x2F9F, 0x04A0) is None, 'the shut down waited'
         for t in tracks:
             out.write(t)
         out.write(a.music.calls_line(name))
         if kind == 'mt32':
             out.write(a.music.midi_line(name))
+        out.write(heap_line(a, name))
         print(f'  {a.music.ticks} ticks, {a.music.taken} clock interrupts, {a.music.writes} chip writes', file=sys.stderr)
         after = bytes(a.mu.mem_read(a.lin(a.ds, 0), 0x10000))
         out.write(gw.state_line(name, a.pre_state[0], after, skip))

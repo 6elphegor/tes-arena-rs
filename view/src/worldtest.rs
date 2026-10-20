@@ -1671,6 +1671,28 @@ fn case(name: &str) -> Option<Case> {
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        // gen_musicplay.py's own: `playstreet`, then the music shut down
+        // (2F9F:04A0, `Machine::music_shutdown`).
+        "playshutdown" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 3, |_| false);
+            a.engine.m.music_shutdown();
+        })),
+        // gen_musicplay.py's own: the dungeon's song, then the options
+        // screen's music volume up twice and down once (2542:079C, 07DE,
+        // each setting the sequence's volume, 0FFD:0DE8), then Resume.
+        "playoptionsmusic" => (Place::Dungeon, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.input(In::Key { code: KeyCode::Escape, down: true, text: None });
+            faded(a);
+            assert!(a.options.is_some(), "Esc opens the options screen");
+            for (x, y) in [(127, 83), (127, 83), (127, 107)] {
+                held_click(a, x, y);
+            }
+            held_click(a, 288, 132);
+            faded(a);
+            assert!(a.options.is_none(), "Resume leaves it");
+            ENDS.with(|e| e.set(true));
+        })),
         "playguards" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             guards_called(a);
@@ -4635,8 +4657,9 @@ const MUSIC_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vecto
 /// The cases gen_musicplay.py runs with music on: a town's street by day
 /// and at night, the wilderness, a dungeon, a tavern (each starting its
 /// song, 2294:04F5's), and a journey to another town (the street's song
-/// faded and stopped, the town's started and asked after each frame).
-const MUSIC_CASES: [&str; 6] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon"];
+/// faded and stopped, the town's started and asked after each frame), the
+/// options screen's music volume moved, and the music shut down.
+const MUSIC_CASES: [&str; 8] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon", "playoptionsmusic", "playshutdown"];
 
 /// gen_mt32play.py's vectors: the same cases with ARENA.BAT's own music
 /// driver, MT32MPU.ADV, on an MPU-401.
@@ -4742,6 +4765,16 @@ fn the_mt32_music_plays_as_the_original() {
     music_cases_check(MT32_VECTORS, true);
 }
 
+/// The heap's blocks as `name`'s `heap` line has them (gen_musicplay.py's
+/// `heap_line`: their sizes and flags in order, the segments left out).
+fn heap_check(file: &str, name: &str, m: &arena::machine::Machine) {
+    let text = std::fs::read_to_string(file).expect(file);
+    let want = text.lines().find_map(|l| l.strip_prefix(&format!("heap | {name} | "))).unwrap_or_else(|| panic!("{name}: a heap line"));
+    let blocks = heap_blocks(m);
+    let list = blocks.iter().map(|(_, size, flags)| format!("{size:x}:{flags:x}")).collect::<Vec<_>>().join(",");
+    assert_eq!(format!("{} {:x}", blocks.len(), fnv(list.bytes())), want, "{name}: the heap's blocks differ from the original's");
+}
+
 fn music_cases_check(file: &'static str, mt32: bool) {
     let only = std::env::var("ARENA_CASE").ok();
     for name in MUSIC_CASES {
@@ -4764,6 +4797,7 @@ fn music_cases_check(file: &'static str, mt32: bool) {
             state_compared_in(file, name, false, case(name).unwrap());
             state_compared_in(file, name, true, case(name).unwrap());
             state_ems_in(file, name, case(name).unwrap());
+            heap_check(file, name, &a.engine.m);
         });
         MUSIC_CASE.with(|c| c.borrow_mut().take());
     }
