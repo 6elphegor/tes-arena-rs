@@ -303,6 +303,67 @@ class Music:
         return f'music | {name} | ' + ' '.join(c if n == 1 else f'{c}*{n}' for c, n in out) + '\n'
 
 
+class Mpu(Music):
+    """A Roland MPU-401 at 330h (data) and 331h (status and command), for
+    MT32MPU.ADV, with the clock and PICs as `Music`'s. As the interface
+    reports it: the status's bit 7 (DSR) clear while a byte waits to be
+    read at 330h, bit 6 (DRR) clear as it is always ready to take one
+    (the low six bits read 1s, as an unconnected bus does); command FFh
+    resets it (an acknowledgement, FEh, to read; in UART mode only back
+    out of it, with none), 3Fh puts it in UART mode (acknowledged), any
+    other command acknowledged in its intelligent mode and ignored in
+    UART mode; in UART mode each byte written to 330h goes to the MIDI
+    out, kept (`midi`) for the comparison as the FM chips' writes are
+    counted. A byte waiting raises the interface's interrupt (IRQ 2) on
+    the real card; MT32MPU.ADV polls the status instead and hooks no
+    vector for it (0Ah and 71h stay 0:0 after its load; only the AIL's
+    clock, 70h, is set), so the interrupt isn't modelled."""
+
+    def __init__(self):
+        super().__init__()
+        self.uart = False
+        self.queue = []
+        self.midi = bytearray()
+
+    KEPT = Music.KEPT + ('uart', 'queue', 'midi')
+
+    def ports(self, port):
+        return port in (0x330, 0x331, 0x70, 0x71, 0xA0, 0xA1)
+
+    def port_in(self, port):
+        if port == 0x331:
+            return 0x3F | (0 if self.queue else 0x80)
+        if port == 0x330:
+            return self.queue.pop(0) if self.queue else 0xFE
+        return super().port_in(port)
+
+    def port_out(self, port, value):
+        value &= 0xFF
+        if port == 0x331:
+            if value == 0xFF:
+                if self.uart:
+                    self.uart = False
+                    return
+                self.queue = [0xFE]
+            elif not self.uart:
+                if value == 0x3F:
+                    self.uart = True
+                self.queue.append(0xFE)
+            return
+        if port == 0x330:
+            if self.uart:
+                self.midi.append(value)
+                self.writes += 1
+            return
+        super().port_out(port, value)
+
+    def midi_line(self, name):
+        """The MIDI out since the last line: its length and digest."""
+        line = f'mpu | {name} | {len(self.midi)} {fnv(bytes(self.midi)):x}\n'
+        self.midi = bytearray()
+        return line
+
+
 class MusicArena(SoundArena):
     """A SoundArena with, at `start(music=True)`, the music driver loaded
     as the program's main loads it (`music_loaded`) on the card (`Music`),
@@ -310,9 +371,13 @@ class MusicArena(SoundArena):
 
     music = None
     music_at_start = False
+    # The driver loaded: 'fm' (SBP1FM.ADV on the FM chips, `Music`) or
+    # 'mt32' (MT32MPU.ADV on an MPU-401, `Mpu`).
+    music_kind = 'fm'
 
-    def start(self, slot=1, sound=False, music=False):
+    def start(self, slot=1, sound=False, music=False, kind='fm'):
         self.music_at_start = music
+        self.music_kind = kind
         super().start(slot, sound)
 
     def stub(self, location=True):
@@ -346,8 +411,8 @@ class MusicArena(SoundArena):
             # driver a song's ".xmi" opened as its ".xfm".
             self.w16(0xA904, 0x11DA)
             self.w16(0xA906, LOAD_SEG)
-            music_named(self)
-            Music().attach(self)
+            music_named(self, self.music_kind)
+            (Mpu() if self.music_kind == 'mt32' else Music()).attach(self)
             music_loaded(self)
         return r
 
@@ -366,10 +431,52 @@ class MusicArena(SoundArena):
         return super()._out(mu, port, size, value, ud)
 
 
-def music_named(a):
-    """A music driver as the command line leaves it (-Msbp1fm.adv -IOM220:
-    37EB, 3864; its IRQ and DMA channel, 3866 and 3868, the driver's own,
-    FFFFh)."""
+IDLE = 0x0500  # a free paragraph (DOS's communication area): `jmp $` for `music_time`
+
+
+def music_time(a, ticks):
+    """`ticks` of the music's time passed between two frames, the game's
+    own timer (0151, the BIOS count) left as it is: the CPU idles at a
+    `jmp $` outside the game while the AIL's clock interrupts owed for
+    that time run (each calling the driver's serve, which reads the
+    sequence on, so a song that reaches its end is done, status 2, as it
+    would be after that long of play). A harness shortcut for a song's
+    end, which takes minutes of frames to reach; nothing the game keeps
+    is touched, only the AIL's, the driver's and the card's."""
+    mu, m = a.mu, a.music
+    kept = {r: mu.reg_read(getattr(x86, 'UC_X86_REG_' + r.upper())) for r in a.KEPT}
+    mu.mem_write(IDLE, b'\xEB\xFE')
+    assert not m.in_service, 'music_time: an interrupt already in service'
+    assert m.vector() != (0, 0) and m.period(), 'the AIL clock not going'
+    mu.reg_write(UC_X86_REG_CS, IDLE >> 4)
+    mu.reg_write(UC_X86_REG_IP, 0)
+    pc = lambda: mu.reg_read(UC_X86_REG_CS) * 16 + mu.reg_read(UC_X86_REG_IP)
+    for _ in range(ticks):
+        m.tick()
+        spins = 0
+        # On from wherever the last slice stopped (in a handler, its
+        # end and IRET still to come), until nothing is owed or in
+        # service and the CPU is back at the idle loop.
+        while m.owed or m.in_service or pc() != IDLE:
+            spins += 1
+            assert spins < 10_000, f'music_time: the clock interrupt not taken (owed {m.owed}, in service {m.in_service}, masks {m.mask})'
+            mu.emu_start(pc(), IDLE if not (m.owed or m.in_service) else 0xFFFFF, count=20_000)
+    for r, v in kept.items():
+        mu.reg_write(getattr(x86, 'UC_X86_REG_' + r.upper()), v)
+
+
+def music_named(a, kind='fm'):
+    """A music driver as the command line leaves it (37EB, 3864; its IRQ
+    and DMA channel, 3866 and 3868, the driver's own, FFFFh, unless given):
+    -Msbp1fm.adv -IOM220, or ARENA.BAT's -Mmt32mpu.adv -IOM330 -IRQM2
+    -DMAM1 (cmdline.rs's parser leaves the uppercased name and the
+    numbers)."""
+    if kind == 'mt32':
+        a.mu.mem_write(a.lin(a.ds, 0x37EB), b'MT32MPU.ADV\0')
+        a.w16(0x3864, 0x330)
+        a.w16(0x3866, 2)
+        a.w16(0x3868, 1)
+        return
     a.mu.mem_write(a.lin(a.ds, 0x37EB), b'SBP1FM.ADV\0')
     a.w16(0x3864, 0x220)
 
