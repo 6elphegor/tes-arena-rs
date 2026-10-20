@@ -1433,6 +1433,7 @@ impl Creation {
 
     /// A change playing, or a key waiting in the buffer for the poll after
     /// it: a key typed now joins that one (`intro_key`).
+    #[cfg(test)]
     pub fn busy(&self) -> bool {
         !self.film.is_empty() || self.pending.is_some()
     }
