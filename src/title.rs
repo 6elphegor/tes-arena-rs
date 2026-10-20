@@ -440,7 +440,7 @@ impl Machine {
         self.mem.w16(DS, TIMER, 0);
         let mut ax = 1;
         for k in 0..frames {
-            self.movie_frame_read(files, buf, size);
+            self.movie_frame_decode(files, buf, (seg, off), w, h)?;
             if hooks.movie_frame(self, name, k == 0) {
                 // 6697: the keys waited up (the held keys' table all 0)
                 // and flushed.
@@ -457,6 +457,277 @@ impl Machine {
         self.file_close(files);
         self.heap_free(seg);
         Some(ax)
+    }
+
+    /// 0000:618F with AX 2, as 6546 calls it: a frame read and drawn. Its
+    /// 10h-byte head into the buffer (`buf`:0), then each chunk's head
+    /// into the code segment (64B7) and its bytes into the buffer (its
+    /// length less 6; a copy chunk's, 10h, the frame's `w` x `h`; one of 6
+    /// bytes or less reads none and is taken on the buffer as it was),
+    /// each decoded into the frame's block (`block`, `w` x `h`; 6257) as
+    /// it is read; a thumbnail (12h) is skipped (seeked past). Then the
+    /// block is drawn at (0, 0) on the page (where it is the game's
+    /// block): with A902 bit 400h its 0s left out (5A6A), else the page
+    /// cleared first (942A) and all of it drawn (59D8). None where a
+    /// chunk's kind is none of the player's (64AC: the original draws its
+    /// error).
+    fn movie_frame_decode(&mut self, files: &mut Files, buf: u16, block: (u16, u16), w: u16, h: u16) -> Option<()> {
+        self.file_read(files, buf, 0, 0x10);
+        let chunks = self.mem.r16(buf, 6);
+        for _ in 0..chunks {
+            self.file_read(files, 0, 0x64B7, 6);
+            let len = self.mem.r32(0, 0x64B7);
+            let kind = self.mem.r16(0, 0x64BB);
+            if (len as i32) > 6 {
+                if kind == 0x12 {
+                    self.file_seek(files, 1, len.wrapping_sub(6));
+                    continue;
+                }
+                let n = if kind == 0x10 { w.wrapping_mul(h) } else { len.wrapping_sub(6) as u16 };
+                self.file_read(files, buf, 0, n);
+            }
+            match kind {
+                4 | 0x0B => self.flc_palette(buf, kind == 4),
+                0x0C => self.flc_lc(buf, block, w),
+                7 => self.flc_ss2(buf, block, w),
+                0x0D => {
+                    // 6430: the page (not the block) cleared.
+                    if self.page_is_block() {
+                        let (off, seg) = (self.mem.r16(DS, 0xA8FE), self.mem.r16(DS, 0xA900));
+                        for i in 0..0xFA00u16 {
+                            self.mem.w8(seg, off.wrapping_add(i), 0);
+                        }
+                    }
+                }
+                0x0F => self.flc_brun(buf, block, w, h),
+                0x10 => self.flc_copy(buf, 0, block.0, block.1, w.wrapping_mul(h)),
+                _ => return crate::giveup::not_ported("0000:64AC: a movie's chunk of no kind the player has (its error drawn)"),
+            }
+        }
+        if !self.page_is_block() {
+            return Some(());
+        }
+        let page_seg = self.mem.r16(DS, 0xA900);
+        if self.mem.r16(DS, 0xA902) & 0x400 == 0 {
+            self.page_clear();
+        }
+        let mut page: Vec<u8> = (0..64000u32).map(|i| self.mem.r8(page_seg, i as u16)).collect();
+        if self.mem.r16(DS, 0xA902) & 0x400 != 0 {
+            crate::render::clipped_page(self, &mut page, 0, 0, w, h, block.0, block.1);
+        } else {
+            crate::render::clipped_page_opaque(self, &mut page, 0, 0, w, h, block.0, block.1);
+        }
+        for (i, &b) in page.iter().enumerate() {
+            self.mem.w8(page_seg, i as u16, b);
+        }
+        Some(())
+    }
+
+    /// 0000:7706: `cx` bytes copied from `buf`:`si` to seg:`di`.
+    fn flc_copy(&mut self, buf: u16, si: u16, seg: u16, di: u16, cx: u16) {
+        for i in 0..cx {
+            let b = self.mem.r8(buf, si.wrapping_add(i));
+            self.mem.w8(seg, di.wrapping_add(i), b);
+        }
+    }
+
+    /// 0000:77CE: `cx` bytes at seg:`di` filled with the word `ax`: on an
+    /// odd offset its low byte first, then the word over and over a
+    /// dword at a time, the last odd bytes its low byte.
+    fn flc_fill(&mut self, seg: u16, mut di: u16, mut cx: u16, ax: u16) {
+        if cx == 0 {
+            return;
+        }
+        let (lo, hi) = (ax as u8, (ax >> 8) as u8);
+        if di & 1 != 0 {
+            self.mem.w8(seg, di, lo);
+            di = di.wrapping_add(1);
+            cx = cx.wrapping_sub(1);
+        }
+        for _ in 0..cx >> 2 {
+            for b in [lo, hi, lo, hi] {
+                self.mem.w8(seg, di, b);
+                di = di.wrapping_add(1);
+            }
+        }
+        for _ in 0..cx & 3 {
+            self.mem.w8(seg, di, lo);
+            di = di.wrapping_add(1);
+        }
+    }
+
+    /// A `loop` count: 0 is 10000h times.
+    fn flc_count(cx: u16) -> u32 {
+        if cx == 0 { 0x10000 } else { cx as u32 }
+    }
+
+    /// 0000:62F0, chunks 4 and 0Bh: the colours at DS:929E (6546's) set
+    /// from the packets (a skip of colours, then a count, 0 for 100h, its
+    /// high byte the packets' counter's left over; three bytes each,
+    /// `six` (chunk 4) shifted down to 6 bits).
+    fn flc_palette(&mut self, buf: u16, six: bool) {
+        let mut si = 0u16;
+        let mut di = 0x929Eu16;
+        let mut packets = self.mem.r16(buf, si);
+        si = si.wrapping_add(2);
+        for _ in 0..Self::flc_count(packets) {
+            let skip = self.mem.r8(buf, si) as u16;
+            di = di.wrapping_add(skip.wrapping_mul(3));
+            let cl = self.mem.r8(buf, si.wrapping_add(1));
+            si = si.wrapping_add(2);
+            let n = if cl == 0 { 0x100 } else { (packets & 0xFF00) | cl as u16 };
+            for _ in 0..Self::flc_count(n) {
+                for _ in 0..3 {
+                    let mut b = self.mem.r8(buf, si);
+                    si = si.wrapping_add(1);
+                    if six {
+                        b >>= 2;
+                    }
+                    self.mem.w8(DS, di, b);
+                    di = di.wrapping_add(1);
+                }
+            }
+            packets = packets.wrapping_sub(1);
+        }
+    }
+
+    /// 0000:6354, chunk 0Ch: the lines skipped, then each line's packets
+    /// (its first skip read before them, each later one after the packet
+    /// before), a negative count a run of one byte, a positive one bytes
+    /// copied.
+    fn flc_lc(&mut self, buf: u16, (seg, base): (u16, u16), w: u16) {
+        let mut di = base.wrapping_add(self.mem.r16(buf, 0).wrapping_mul(w));
+        let lines = self.mem.r16(buf, 2);
+        let mut si = 4u16;
+        for _ in 0..Self::flc_count(lines) {
+            let packets = self.mem.r8(buf, si) as u16;
+            si = si.wrapping_add(1);
+            if packets != 0 {
+                let mut bx = self.mem.r8(buf, si) as u16;
+                si = si.wrapping_add(1);
+                let mut cx = packets;
+                loop {
+                    let cl = self.mem.r8(buf, si);
+                    si = si.wrapping_add(1);
+                    if cl & 0x80 != 0 {
+                        let n = cl.wrapping_neg() as u16;
+                        let at = di.wrapping_add(bx);
+                        bx = bx.wrapping_add(n);
+                        let al = self.mem.r8(buf, si);
+                        si = si.wrapping_add(1);
+                        self.flc_fill(seg, at, n, al as u16 * 0x101);
+                    } else {
+                        let n = cl as u16;
+                        let at = di.wrapping_add(bx);
+                        bx = bx.wrapping_add(n);
+                        self.flc_copy(buf, si, seg, at, n);
+                        si = si.wrapping_add(n);
+                    }
+                    if cx != 1 {
+                        bx = bx.wrapping_add(self.mem.r8(buf, si) as u16);
+                        si = si.wrapping_add(1);
+                    }
+                    cx = cx.wrapping_sub(1);
+                    if cx == 0 {
+                        break;
+                    }
+                }
+            }
+            di = di.wrapping_add(w);
+        }
+    }
+
+    /// 0000:63B4, chunk 7 (word deltas), with its quirks: a line whose
+    /// word is negative (bit 4000h: lines skipped; else its low byte put
+    /// at the offset before) or 0 isn't counted as one of the chunk's
+    /// lines; a run of words on an odd offset is 77CE's.
+    fn flc_ss2(&mut self, buf: u16, (seg, base): (u16, u16), w: u16) {
+        let mut di = base;
+        let mut lines = self.mem.r16(buf, 0);
+        let mut si = 2u16;
+        loop {
+            let ax = self.mem.r16(buf, si);
+            si = si.wrapping_add(2);
+            if ax & 0x8000 != 0 {
+                if ax & 0x4000 != 0 {
+                    di = di.wrapping_add(ax.wrapping_neg().wrapping_mul(w));
+                } else {
+                    self.mem.w8(seg, di.wrapping_sub(1), ax as u8);
+                }
+                continue;
+            }
+            if ax == 0 {
+                continue;
+            }
+            let mut bx = self.mem.r8(buf, si) as u16;
+            si = si.wrapping_add(1);
+            let mut cx = ax;
+            loop {
+                let cl = self.mem.r8(buf, si);
+                si = si.wrapping_add(1);
+                if cl & 0x80 != 0 {
+                    let n = (cl.wrapping_neg() as u16).wrapping_mul(2);
+                    let at = di.wrapping_add(bx);
+                    bx = bx.wrapping_add(n);
+                    let word = self.mem.r16(buf, si);
+                    si = si.wrapping_add(2);
+                    self.flc_fill(seg, at, n, word);
+                } else {
+                    let n = (cl as u16).wrapping_mul(2);
+                    let at = di.wrapping_add(bx);
+                    bx = bx.wrapping_add(n);
+                    self.flc_copy(buf, si, seg, at, n);
+                    si = si.wrapping_add(n);
+                }
+                if cx != 1 {
+                    bx = bx.wrapping_add(self.mem.r8(buf, si) as u16);
+                    si = si.wrapping_add(1);
+                }
+                cx = cx.wrapping_sub(1);
+                if cx == 0 {
+                    break;
+                }
+            }
+            di = di.wrapping_add(w);
+            lines = lines.wrapping_sub(1);
+            if lines == 0 {
+                break;
+            }
+        }
+    }
+
+    /// 0000:644A, chunk 0Fh: each of the `h` lines' runs (its count byte
+    /// skipped) until `w` are made: a positive count a run of one byte, a
+    /// negative one bytes copied.
+    fn flc_brun(&mut self, buf: u16, (seg, base): (u16, u16), w: u16, h: u16) {
+        let mut di = base;
+        let mut si = 0u16;
+        for _ in 0..Self::flc_count(h) {
+            si = si.wrapping_add(1);
+            let mut bx = 0u16;
+            loop {
+                let cl = self.mem.r8(buf, si);
+                si = si.wrapping_add(1);
+                if cl & 0x80 == 0 {
+                    let n = cl as u16;
+                    let at = di.wrapping_add(bx);
+                    bx = bx.wrapping_add(n);
+                    let al = self.mem.r8(buf, si);
+                    si = si.wrapping_add(1);
+                    self.flc_fill(seg, at, n, al as u16 * 0x101);
+                } else {
+                    let n = cl.wrapping_neg() as u16;
+                    let at = di.wrapping_add(bx);
+                    bx = bx.wrapping_add(n);
+                    self.flc_copy(buf, si, seg, at, n);
+                    si = si.wrapping_add(n);
+                }
+                if (bx as i16) >= (w as i16) {
+                    break;
+                }
+            }
+            di = di.wrapping_add(w);
+        }
     }
 
     /// 0000:618F's reads: the frame's 10h-byte head into the buffer, and

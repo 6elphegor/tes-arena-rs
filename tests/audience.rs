@@ -61,7 +61,7 @@ fn matches_original() {
         let before = m.clone();
         let mut screens = Screens(Vec::new());
         m.emperor_audience(&mut files, &mut screens).expect("audience");
-        assert_eq!(screens.0, [0, 1, 2]);
+        assert_eq!(screens.0, [0, 1, 2, 3]);
         let ds = DS as usize * 16;
         let changed = m.mem.diff(&before.mem, ds..ds + 0x10000).into_iter().flat_map(|(i, v)| {
             let o = (i - ds) as u16;

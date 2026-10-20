@@ -767,6 +767,22 @@ fn resting(a: &mut App, heading: u16) {
 /// gen_worldframes.py's script reads a box's wait (0000:8FC4); the
 /// screen shown before each (`compose`, as the window shows it), for what
 /// a box keeps of it.
+/// The movies the frame played (the window shows them in place of its
+/// frames) clicked through, a click and a few milliseconds each, no
+/// game frame due meanwhile: the original plays them inside the frame
+/// that started them.
+fn movies_through(a: &mut App, d: &mut Driver) {
+    for _ in 0..200 {
+        if a.movies.is_empty() {
+            return;
+        }
+        a.input(In::Button { button: MouseButton::Left, down: true });
+        a.input(In::Button { button: MouseButton::Left, down: false });
+        d.wait(a, 10);
+    }
+    panic!("the movies didn't end");
+}
+
 fn frames_reading(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
     for _ in 0..n {
         a.compose();
@@ -1832,6 +1848,22 @@ fn case(name: &str) -> Option<Case> {
         }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             frames(a, d, seen, 2, |_| false);
             clicked_with(a, d, seen, 3, &[Act::Click(160, 100)]);
+            frames(a, d, seen, 3, |_| false);
+        })),
+        // The Emperor's audience (F77 8): the palace's door clicked, the
+        // audience's movies (0000:41A4) and the palace entered (the area
+        // left); three frames in the palace.
+        "playaudience8" => (Place::Street, Box::new(|a: &mut App| {
+            at_hour(a, 12, 0);
+            at_square(a, 9, 0x7C, 0x80);
+            a.engine.m.mem.w8(DS, 0x0A46, 8);
+            a.engine.m.mem.w8(DS, 0x0F77, 8);
+        }), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            let at = a.engine.m.mem.r8(DS, arena::trigger::var::AREA);
+            door_clicked(a, d, seen, 160.0, 100.0);
+            frames(a, d, seen, 3, |a| a.engine.m.mem.r8(DS, arena::trigger::var::AREA) != at);
+            movies_through(a, d);
             frames(a, d, seen, 3, |_| false);
         })),
         // The house picked (picking armed, the seed SEED) and in (the area
@@ -3566,6 +3598,7 @@ fn the_state_as_the_original_leaves_it() {
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY: &[&str] = &[
+    "playaudience8",
     "playaudience9",
     "playautomap",
     "playautomapend",
@@ -3801,6 +3834,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
 // (One name a line, in order, so that cases added on different branches
 // merge on their own.)
 const BUSY_STATE: &[&str] = &[
+    "playaudience8",
     "playaudience9",
     "playautomapend",
     "playbarjump",
