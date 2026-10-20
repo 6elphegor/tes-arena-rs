@@ -431,6 +431,40 @@ class MusicArena(SoundArena):
         return super()._out(mu, port, size, value, ud)
 
 
+IDLE = 0x0500  # a free paragraph (DOS's communication area): `jmp $` for `music_time`
+
+
+def music_time(a, ticks):
+    """`ticks` of the music's time passed between two frames, the game's
+    own timer (0151, the BIOS count) left as it is: the CPU idles at a
+    `jmp $` outside the game while the AIL's clock interrupts owed for
+    that time run (each calling the driver's serve, which reads the
+    sequence on, so a song that reaches its end is done, status 2, as it
+    would be after that long of play). A harness shortcut for a song's
+    end, which takes minutes of frames to reach; nothing the game keeps
+    is touched, only the AIL's, the driver's and the card's."""
+    mu, m = a.mu, a.music
+    kept = {r: mu.reg_read(getattr(x86, 'UC_X86_REG_' + r.upper())) for r in a.KEPT}
+    mu.mem_write(IDLE, b'\xEB\xFE')
+    assert not m.in_service, 'music_time: an interrupt already in service'
+    assert m.vector() != (0, 0) and m.period(), 'the AIL clock not going'
+    mu.reg_write(UC_X86_REG_CS, IDLE >> 4)
+    mu.reg_write(UC_X86_REG_IP, 0)
+    pc = lambda: mu.reg_read(UC_X86_REG_CS) * 16 + mu.reg_read(UC_X86_REG_IP)
+    for _ in range(ticks):
+        m.tick()
+        spins = 0
+        # On from wherever the last slice stopped (in a handler, its
+        # end and IRET still to come), until nothing is owed or in
+        # service and the CPU is back at the idle loop.
+        while m.owed or m.in_service or pc() != IDLE:
+            spins += 1
+            assert spins < 10_000, f'music_time: the clock interrupt not taken (owed {m.owed}, in service {m.in_service}, masks {m.mask})'
+            mu.emu_start(pc(), IDLE if not (m.owed or m.in_service) else 0xFFFFF, count=20_000)
+    for r, v in kept.items():
+        mu.reg_write(getattr(x86, 'UC_X86_REG_' + r.upper()), v)
+
+
 def music_named(a, kind='fm'):
     """A music driver as the command line leaves it (37EB, 3864; its IRQ
     and DMA channel, 3866 and 3868, the driver's own, FFFFh, unless given):

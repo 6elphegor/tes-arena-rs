@@ -28,14 +28,14 @@ import os
 import sys
 
 from emu import fnv
-from fmmus import MusicArena
+from fmmus import MusicArena, music_time
 import gen_worldframes as gw
 
 # The cases run with music on (gen_worldframes.py's): a town's street, at
 # night too, the wilderness, a dungeon, a tavern; and this generator's own
 # (OWN, SHUTDOWN).
 CASES = ['playstreet', 'playnight', 'playwild', 'playdungeon', 'playtaverndrink', 'playjourneyon', 'playoptionsmusic',
-         'playshutdown']
+         'playshutdown', 'playsongdone']
 # This generator's own: `playjourneyend` (gen_worldframes.py's: the
 # street's song started, then a journey to another town, whose arrival
 # fades the song out and stops it, 2F9F:0438, and starts the town's,
@@ -52,7 +52,31 @@ OWN = {'playjourneyon': (JOURNEY[0], JOURNEY[1], [JOURNEY[2][0],
        'playoptionsmusic': ('dungeon', None, [((), (), 2, None),
                                               ((gw.KEY_ESC,), (), 1, None, [], {'script': [
                                                   ('click', 127, 83), ('click', 127, 83), ('click', 127, 107),
-                                                  ('click', 288, 132)], 'ends': True})])}
+                                                  ('click', 288, 132)], 'ends': True})]),
+       # The street's two frames, then the town's arrival song started as
+       # arriving starts it (2294:04C0, `town_song`: the song stopped,
+       # 430F set, the town's by its size started) and a frame, whose poll
+       # (2294:0509) finds it playing; then the song played to its end
+       # (2000 ticks of music time, about 110 s, `songs_done`) and a frame,
+       # whose poll is answered 2, done: the town's song let go (430F
+       # cleared) and the weather's asked for (2294:051B, 10B6).
+       'playsongdone': ('street', None, [((), (), 2, None),
+                                         ((), (), 1, None, [], {'do': lambda a: town_song(a)}),
+                                         ((), (), 1, None, [], {'do': lambda a: songs_done(a)})])}
+
+
+def town_song(a):
+    """2294:04C0, the town's arrival song started, run alone between two
+    frames."""
+    assert a.run_screen(0x2294, 0x04C0) is None, 'the town song waited'
+
+
+def songs_done(a):
+    """The song playing taken to its end: 2000 ticks of the music's time
+    passed between two frames (fmmus.py's `music_time`: the AIL's clock
+    interrupts run with the CPU idle, the game's own timer left; a
+    shortcut for the minutes of frames the song would take)."""
+    music_time(a, 2000)
 # Cases followed by the music's shut down (2F9F:04A0, as main's end,
 # 0000:10B8, and the options screen's Quit, 21EE:020D, run it): the song
 # faded and stopped (0438), the timbre cache (when there is one), the

@@ -1671,6 +1671,17 @@ fn case(name: &str) -> Option<Case> {
         "playvolcano" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0x20)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playvolcanofar" => (Place::Wild, Box::new(|a: &mut App| volcanic(a, 0x100, 0, 0xA0)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 1, |_| false))),
         "playstreet" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| frames(a, d, seen, 3, |_| false))),
+        // gen_musicplay.py's own: the street's two frames, the town's
+        // arrival song started (2294:04C0, `town_music`) and a frame (its
+        // poll answered 1, playing), then a frame after the song has played
+        // to its end (the harness passes its music's time; the replay
+        // answers the poll, 2294:0509, with the original's 2): the town's
+        // song let go and the weather's asked for.
+        "playsongdone" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            frames(a, d, seen, 2, |_| false);
+            a.engine.m.town_music(&mut a.engine.files);
+            frames(a, d, seen, 2, |_| false);
+        })),
         // gen_musicplay.py's own: `playstreet`, then the music shut down
         // (2F9F:04A0, `Machine::music_shutdown`).
         "playshutdown" => (Place::Street, Box::new(|_: &mut App| {}), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
@@ -4658,8 +4669,9 @@ const MUSIC_VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/vecto
 /// and at night, the wilderness, a dungeon, a tavern (each starting its
 /// song, 2294:04F5's), and a journey to another town (the street's song
 /// faded and stopped, the town's started and asked after each frame), the
-/// options screen's music volume moved, and the music shut down.
-const MUSIC_CASES: [&str; 8] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon", "playoptionsmusic", "playshutdown"];
+/// options screen's music volume moved, the music shut down, and the
+/// town's song played to its end.
+const MUSIC_CASES: [&str; 9] = ["playstreet", "playnight", "playwild", "playdungeon", "playtaverndrink", "playjourneyon", "playoptionsmusic", "playshutdown", "playsongdone"];
 
 /// gen_mt32play.py's vectors: the same cases with ARENA.BAT's own music
 /// driver, MT32MPU.ADV, on an MPU-401.
