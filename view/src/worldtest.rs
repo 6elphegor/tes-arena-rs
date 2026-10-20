@@ -1689,7 +1689,7 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 /// gen_worldframes.py's FUZZ: seeded random sessions, each played from
 /// the script its `fuzz` line holds and measured every CHECKPOINT frames
 /// as `playlongrun` (`fuzz_sessions_as_the_original`).
-const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1"];
+const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2"];
 
 /// A FUZZ case's script, its `fuzz` line's tokens.
 fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
@@ -1704,7 +1704,8 @@ fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
 /// frames, let go, M frames; `wN` N frames; `tN` a minute tick due, N
 /// frames; `qN` Shift+C (`quick_cast`), let go, N frames; `aN` A
 /// (`ready`), N frames; `sN,M` `swinging` N frames, M frames; `cN` the
-/// view's middle clicked (`door_clicked`), N frames in all.
+/// view clicked with the mouse captured (its click at 164, 74, where the
+/// harness's at 160, 70 lands), N frames in all.
 fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
     let key = |a: &mut App, code: KeyCode, down: bool| a.input(In::Key { code, down, text: None });
     for t in tokens {
@@ -1747,15 +1748,28 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 frames(a, d, seen, num(0), |_| false);
             }
             "s" => {
+                recaptured(a);
                 swinging(a, d, seen, num(0));
                 frames(a, d, seen, num(1), |_| false);
             }
             "c" => {
-                door_clicked(a, d, seen, 160.0, 100.0);
+                recaptured(a);
+                a.input(In::Button { button: MouseButton::Left, down: true });
+                frames(a, d, seen, 1, |_| false);
+                a.input(In::Button { button: MouseButton::Left, down: false });
                 frames(a, d, seen, num(0) - 1, |_| false);
             }
             _ => panic!("fuzz token {t}"),
         }
+    }
+}
+
+/// The mouse captured again if a screen the session's frames opened let
+/// it go (`open_taken`), as a player clicks the window again; the harness's
+/// mouse is always the game's.
+fn recaptured(a: &mut App) {
+    if !a.captured {
+        captured(a);
     }
 }
 

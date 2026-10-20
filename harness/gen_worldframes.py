@@ -1687,7 +1687,8 @@ LONG_RUN = ([((), (), 2, None), ((), (), 10, None, [(160, 100)], {'leaves': True
 
 # Seeded random sessions (`fuzz_script`): name: (where, seed). Each
 # writes its script (`fuzz` line) for worldtest to play the same.
-FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1)}
+FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1),
+        'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2)}
 KEY_DOWN = 0x50
 
 
@@ -1699,7 +1700,9 @@ def fuzz_script(where, seed, total=1500):
     frames; `aN` A (the weapon readied or put away) a frame, let go, N
     frames; `sN,M` the right button held and dragged down (`SWINGING`) N
     frames, let go, M frames; `cN` (the dungeon only: no doors out) the
-    view's middle clicked, N frames. No screens or boxes are opened."""
+    view's middle clicked, N frames: at (160, 70), landing (4 on) where
+    the view's click with the mouse captured lands, 164, 74 (the swings
+    need it captured). No screens or boxes are opened."""
     rng = random.Random(f'{where}:{seed}')
     out, n, ready = [], 0, False
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
@@ -1758,7 +1761,7 @@ def fuzz_steps(tokens):
         elif kind == 's':
             steps += [((), (), int(args[0]), None, [], SWINGING), ((), (), int(args[1]), None, [], LET_GO)]
         elif kind == 'c':
-            steps.append(((), (), int(args[0]), None, [(160, 100)]))
+            steps.append(((), (), int(args[0]), None, [(160, 70)]))
     return steps
 
 
@@ -1771,7 +1774,7 @@ def fuzz_case(name):
 
 # Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
 # way (`checkpoint` lines), as at their end.
-CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1')
+CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -1882,6 +1885,9 @@ CASES = {
     'fuzztown1': fuzz_case('fuzztown1'),
     'fuzzdungeon1': fuzz_case('fuzzdungeon1'),
     'fuzzwild1': fuzz_case('fuzzwild1'),
+    'fuzztown2': fuzz_case('fuzztown2'),
+    'fuzzdungeon2': fuzz_case('fuzzdungeon2'),
+    'fuzzwild2': fuzz_case('fuzzwild2'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
