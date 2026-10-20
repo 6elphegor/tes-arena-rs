@@ -490,8 +490,16 @@ impl arena::trigger::TriggerHooks for Front<'_> {
 struct FightFront<'a, 'b>(&'a mut Front<'b>);
 
 impl arena::encounter::FightHooks for FightFront<'_, '_> {
-    fn jagar(&mut self, _m: &mut arena::machine::Machine, text: u16) {
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.0.dac
+    }
+    /// The words as the game runs them (`FightHooks::jagar`'s default),
+    /// then shown.
+    fn jagar(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, text: u16) -> Option<()> {
+        let dac = self.0.dac;
+        m.vision(files, &mut arena::vision::ClickThrough::default(), dac.as_ref(), text, 0x80A5, 0x8090)?;
         self.0.movie("JAGAR.FLC", Some(text), 0xF5);
+        Some(())
     }
 }
 
@@ -847,18 +855,30 @@ impl EndFront<'_, '_> {
 }
 
 impl arena::staffend::EndHooks for EndFront<'_, '_> {
-    fn movie(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, si: u16) {
-        if let Some(name) = Self::named(m, si) {
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        self.0.dac
+    }
+    /// Each scene as the game runs it (`EndHooks`' defaults), then shown.
+    fn movie(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, si: u16) -> Option<()> {
+        let name = Self::named(m, si);
+        m.movie_play(files, &mut arena::title::NoTitleHooks, si)?;
+        if let Some(name) = name {
             self.0.movie(name, None, 0);
         }
+        Some(())
     }
-    fn speech(&mut self, m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files, ax: u16, _si: u16, di: u16) {
-        if let Some(name) = Self::named(m, di) {
-            self.0.movie(name, Some(ax), m.mem.r8(arena::mem::DS, 0x9288));
+    fn speech(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files, ax: u16, si: u16, di: u16) -> Option<()> {
+        let (name, colour) = (Self::named(m, di), m.mem.r8(arena::mem::DS, 0x9288));
+        m.end_speech_play(files, ax, si, di)?;
+        if let Some(name) = name {
+            self.0.movie(name, Some(ax), colour);
         }
+        Some(())
     }
-    fn house(&mut self, _m: &mut arena::machine::Machine, _files: &mut arena::bsa::Files) {
+    fn house(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) -> Option<()> {
+        m.end_house(files)?;
         self.0.movie("HOUSE.IMG", Some(0x579), 0x5C);
+        Some(())
     }
 }
 /// Resting (src/rest.rs): its menu and the hours typed through `dialog`,

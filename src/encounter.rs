@@ -53,12 +53,27 @@ pub trait FightHooks {
     fn fight_music(&mut self, m: &mut Machine, files: &mut Files, music: u8) -> Option<()> {
         m.fight_sound(files, music as u16)
     }
-    /// 1194:D45D: JAGAR.FLC with text `text` (colour 9288 F5h), Jagar's
-    /// words before a main quest's encounter.
-    fn jagar(&mut self, _m: &mut Machine, _text: u16) {}
-    /// 0000:A611 and A6B5: the view saved and put back around it.
-    fn view_saved(&mut self, _m: &mut Machine) {}
-    fn view_restored(&mut self, _m: &mut Machine) {}
+    /// The screen's colours (6-bit) the words read (0000:6E3C to A39E at
+    /// A611, 6E38 to 9A6E at D45D), None leaving them.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
+    }
+    /// 1194:D45D: the speech, text `text` over JAGAR.FLC (8090h), the song
+    /// at 80A5h, colour 9288 F5h: Jagar's words before a main quest's
+    /// encounter (`Machine::vision`, its pages clicked through).
+    fn jagar(&mut self, m: &mut Machine, files: &mut Files, text: u16) -> Option<()> {
+        let dac = self.dac();
+        m.vision(files, &mut crate::vision::ClickThrough::default(), dac.as_ref(), text, 0x80A5, 0x8090)
+    }
+    /// 0000:A611: the world kept around the words (`Machine::world_keep`).
+    fn view_saved(&mut self, m: &mut Machine, files: &mut Files) {
+        let dac = self.dac();
+        m.world_keep(files, dac.as_ref());
+    }
+    /// 0000:A6B5: the world given back (`Machine::world_back`).
+    fn view_restored(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.world_back(files)
+    }
 }
 
 /// `FightHooks` that do nothing.
@@ -481,7 +496,7 @@ impl Machine {
     pub fn encounter(&mut self, files: &mut Files, hooks: &mut dyn FightHooks, row: u16) -> Option<()> {
         self.mem.w16(DS, 0x12AC, 0);
         let mut level = self.mem.r8(DS, 0x01AA) as u16;
-        if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 && self.jagar_words(hooks) {
+        if self.mem.r16(DS, 0x05C8) & 0x8000 != 0 && self.jagar_words(files, hooks)? {
             // 89F9..8A0A: the main quest's encounter: 12AC set, 5C8 bit
             // 8000h used up, its level the player's plus F77 (8 bits).
             self.mem.w16(DS, 0x12AC, 1);
@@ -500,25 +515,26 @@ impl Machine {
 
     /// 1194:D91C. Jagar's words before a main quest's encounter: none
     /// without F77 (the carry clear); otherwise, with the view's clip
-    /// (A91A) at C7h meanwhile and the view saved and put back around it,
-    /// JAGAR.FLC with text 570h + F77 - 1 (its low byte added in 8 bits),
-    /// A902 bit 200h set and 100h cleared, colour 9288 F5h.
-    fn jagar_words(&mut self, hooks: &mut dyn FightHooks) -> bool {
+    /// (A91A) at C7h meanwhile and the world kept and given back around
+    /// it (0000:A611, A6B5), JAGAR.FLC with text 570h + F77 - 1 (its low
+    /// byte added in 8 bits), A902 bit 200h set and 100h cleared, colour
+    /// 9288 F5h (1194:D45D). None where a step gives up.
+    fn jagar_words(&mut self, files: &mut Files, hooks: &mut dyn FightHooks) -> Option<bool> {
         let f77 = self.mem.r8(DS, 0x0F77);
         if f77 == 0 {
-            return false;
+            return Some(false);
         }
         let clip = self.mem.r16(DS, 0xA91A);
         self.mem.w16(DS, 0xA91A, 0xC7);
-        hooks.view_saved(self);
+        hooks.view_saved(self, files);
         let text = (0x0500 | 0x70u8.wrapping_add(f77) as u16).wrapping_sub(1);
         let f = self.mem.r16(DS, 0xA902) & !0x100 | 0x200;
         self.mem.w16(DS, 0xA902, f);
         self.mem.w8(DS, 0x9288, 0xF5);
-        hooks.jagar(self, text);
-        hooks.view_restored(self);
+        hooks.jagar(self, files, text)?;
+        hooks.view_restored(self, files)?;
         self.mem.w16(DS, 0xA91A, clip);
-        true
+        Some(true)
     }
 
     /// 1194:8AF0. The first creature's type: a monster's (+4), a person's

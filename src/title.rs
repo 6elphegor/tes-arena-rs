@@ -440,7 +440,7 @@ impl Machine {
         self.mem.w16(DS, TIMER, 0);
         let mut ax = 1;
         for k in 0..frames {
-            self.movie_frame_decode(files, buf, (seg, off), w, h)?;
+            self.movie_frame_decode(files, buf, (seg, off), w, h, true)?;
             if hooks.movie_frame(self, name, k == 0) {
                 // 6697: the keys waited up (the held keys' table all 0)
                 // and flushed.
@@ -459,8 +459,10 @@ impl Machine {
         Some(ax)
     }
 
-    /// 0000:618F with AX 2, as 6546 calls it: a frame read and drawn. Its
-    /// 10h-byte head into the buffer (`buf`:0), then each chunk's head
+    /// 0000:618F with AX 2, as 6546 calls it (`draw`; AX 0, `draw` false,
+    /// decodes and draws nothing, as 64F0's first frame of a loop): a
+    /// frame read and drawn. Its 10h-byte head into the buffer (`buf`:0),
+    /// then each chunk's head
     /// into the code segment (64B7) and its bytes into the buffer (its
     /// length less 6; a copy chunk's, 10h, the frame's `w` x `h`; one of 6
     /// bytes or less reads none and is taken on the buffer as it was),
@@ -471,7 +473,7 @@ impl Machine {
     /// cleared first (942A) and all of it drawn (59D8). None where a
     /// chunk's kind is none of the player's (64AC: the original draws its
     /// error).
-    fn movie_frame_decode(&mut self, files: &mut Files, buf: u16, block: (u16, u16), w: u16, h: u16) -> Option<()> {
+    pub(crate) fn movie_frame_decode(&mut self, files: &mut Files, buf: u16, block: (u16, u16), w: u16, h: u16, draw: bool) -> Option<()> {
         self.file_read(files, buf, 0, 0x10);
         let chunks = self.mem.r16(buf, 6);
         for _ in 0..chunks {
@@ -504,7 +506,7 @@ impl Machine {
                 _ => return crate::giveup::not_ported("0000:64AC: a movie's chunk of no kind the player has (its error drawn)"),
             }
         }
-        if !self.page_is_block() {
+        if !draw || !self.page_is_block() {
             return Some(());
         }
         let page_seg = self.mem.r16(DS, 0xA900);
@@ -727,28 +729,6 @@ impl Machine {
                 }
             }
             di = di.wrapping_add(w);
-        }
-    }
-
-    /// 0000:618F's reads: the frame's 10h-byte head into the buffer, and
-    /// each chunk's head and bytes (`size` for a copy chunk, 10h).
-    pub(crate) fn movie_frame_read(&mut self, files: &mut Files, buf: u16, size: u16) {
-        self.file_read(files, buf, 0, 0x10);
-        let chunks = self.mem.r16(buf, 6);
-        for _ in 0..chunks {
-            // 6257: the head into the code segment (64B7).
-            self.file_read(files, 0, 0x64B7, 6);
-            let len = self.mem.r32(0, 0x64B7);
-            let kind = self.mem.r16(0, 0x64BB);
-            if (len as i32) <= 6 {
-                continue;
-            }
-            if kind == 0x12 {
-                self.file_seek(files, 1, len.wrapping_sub(6));
-            } else {
-                let n = if kind == 0x10 { size } else { len.wrapping_sub(6) as u16 };
-                self.file_read(files, buf, 0, n);
-            }
         }
     }
 }

@@ -2675,18 +2675,20 @@ pub(crate) fn vision_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Sp
 /// made with 101C FFh into 929E), its lines split at the line feeds as
 /// DA9E does, in colour `colour` (5Ch).
 pub(crate) fn house_text(engine: &mut Engine, n: u16, colour: u8) -> Vec<Vec<Span>> {
-    let m = &mut engine.m;
+    // (Made on a copy of the game, as `vision_text`: the game made its
+    // own (`Machine::staff_end`), and a second making would step its
+    // random numbers, which the text's variants draw from.)
+    let mut m = engine.m.clone();
+    let mut files = engine.files.clone();
     let Some((seg, off)) = m.heap_alloc_bytes(0xBB8) else {
         return Vec::new();
     };
     m.mem.w16(DS, 0x137A, n);
     m.mem.w8(DS, 0x137E, 0);
     m.mem.w8(DS, 0x101C, 0xFF);
-    let text = match m.text(&mut engine.files, &mut arena::text::NoTextHooks, 2, seg, off) {
-        Some(_) => engine.m.mem.cstr(seg, off).to_vec(),
+    let text = match m.text(&mut files, &mut arena::text::NoTextHooks, 2, seg, off) {
+        Some(_) => m.mem.cstr(seg, off).to_vec(),
         None => Vec::new(),
     };
-    engine.m.mem.w8(DS, 0x101C, 0);
-    engine.m.heap_free(seg);
     text.split(|&b| b == 0x0A).flat_map(|l| hud::lines(l, colour)).collect()
 }

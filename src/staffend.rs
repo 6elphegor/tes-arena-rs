@@ -18,47 +18,91 @@ use crate::bsa::Files;
 use crate::machine::Machine;
 use crate::mem::DS;
 
-/// The scenes, the front end's.
+/// The scenes, the port's by default; the showing of them the front end's.
 pub trait EndHooks {
-    /// 1194:DAF0: the scenes begun (the screen kept, 0000:6E38 to 9A6E,
-    /// A69E; the song stopped and WINGAME.XMI, named at 80B0h, played;
-    /// 0000:A611).
-    fn begin(&mut self, _m: &mut Machine, _files: &mut Files) {}
-    /// 2294:0895: the FLC named at DS:`si` played.
-    fn movie(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16) {}
+    /// The colours the scenes read (0000:6E38 to 9A6E at DAF0): the
+    /// screen's, None leaving them.
+    fn dac(&mut self) -> Option<[[u8; 3]; 256]> {
+        None
+    }
+    /// 1194:DAF0: the scenes begun (`Machine::scenes_begin`: the screen
+    /// kept, the song stopped and WINGAME.XMI played, 0000:A611).
+    fn begin(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        let dac = self.dac();
+        m.scenes_begin(files, dac.as_ref());
+        Some(())
+    }
+    /// 2294:0895: the FLC named at DS:`si` played to its end
+    /// (`Machine::movie_play`).
+    fn movie(&mut self, m: &mut Machine, files: &mut Files, si: u16) -> Option<()> {
+        m.movie_play(files, &mut crate::title::NoTitleHooks, si).map(|_| ())
+    }
     /// 1194:D459: a speech, text `ax` over the FLC named at DS:`di`
-    /// (SI the song's name at 80BDh), in the colour at 9288.
-    fn speech(&mut self, _m: &mut Machine, _files: &mut Files, _ax: u16, _si: u16, _di: u16) {}
-    /// 1194:55B2: the screen faded out.
-    fn fade(&mut self, _m: &mut Machine) {}
-    /// 1194:DA25..DA63: the house: the screen cleared (0000:9426, 9466),
-    /// the bank at 1030 mapped (0000:5C86), HOUSE.IMG (807Bh) loaded into
-    /// the EMS frame (0000:7428), its colours set (5828) and it drawn
-    /// (9B4E).
-    fn house(&mut self, _m: &mut Machine, _files: &mut Files) {}
+    /// (SI the song's name at 80BDh), in the colour at 9288
+    /// (`Machine::end_speech_play`, its pages clicked through).
+    fn speech(&mut self, m: &mut Machine, files: &mut Files, ax: u16, si: u16, di: u16) -> Option<()> {
+        m.end_speech_play(files, ax, si, di)
+    }
+    /// 1194:55B2: the colours at 929E black and the page cleared
+    /// (their fading the front end's).
+    fn fade(&mut self, m: &mut Machine) {
+        m.sheet_black();
+    }
+    /// 1194:DA25..DA63: the house (`Machine::end_house`).
+    fn house(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.end_house(files)
+    }
     /// 1194:A36C mode 2: text number 137A written to DS:929E
     /// (`Machine::text`).
     fn text(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
         m.text(files, &mut crate::text::NoTextHooks, 2, DS, 0x929E).map(|_| ())
     }
     /// 0000:5364: the line at DS:`si` drawn centred on column A0h at row
-    /// `y`.
-    fn line(&mut self, _m: &mut Machine, _si: u16, _y: u16) {}
+    /// `y` (`Machine::text_centred`, on the page where it is the game's).
+    fn line(&mut self, m: &mut Machine, si: u16, y: u16) {
+        m.text_centred((DS, si), 0xA0, y);
+    }
     /// 1194:DAC4..DACE: the screen shown (0000:9466) and 1194:5532 (the
-    /// screen faded in, a key waited for).
+    /// screen faded in, a key waited for): the front end's.
     fn shown(&mut self, _m: &mut Machine) {}
-    /// 1194:DB26: the scenes' end: the song stopped, the game's screen
-    /// back (0000:4EFD), the area's song (D56) played again (25FD:051F),
-    /// 0000:A6B5.
-    fn end(&mut self, _m: &mut Machine, _files: &mut Files) {}
-    /// 0000:9A98: the view (0, 0, 140h x C8h) cleared.
+    /// 1194:DB26: the scenes' end (`Machine::scenes_end`).
+    fn end(&mut self, m: &mut Machine, files: &mut Files) -> Option<()> {
+        m.scenes_end(files)
+    }
+    /// 0000:9A98 with (0, 0, 140h x C8h): the clip the whole screen.
+    fn clear(&mut self, m: &mut Machine) {
+        m.clip_whole();
+    }
+}
+
+/// `EndHooks` that only write the house's text: the screens none.
+pub struct NoEndHooks;
+
+impl EndHooks for NoEndHooks {
+    fn begin(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn movie(&mut self, _m: &mut Machine, _files: &mut Files, _si: u16) -> Option<()> {
+        Some(())
+    }
+    fn speech(&mut self, _m: &mut Machine, _files: &mut Files, _ax: u16, _si: u16, _di: u16) -> Option<()> {
+        Some(())
+    }
+    fn fade(&mut self, _m: &mut Machine) {}
+    fn house(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
+    fn line(&mut self, _m: &mut Machine, _si: u16, _y: u16) {}
+    fn end(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
+        Some(())
+    }
     fn clear(&mut self, _m: &mut Machine) {}
 }
 
-/// `EndHooks` that only write the house's text.
-pub struct NoEndHooks;
+/// `EndHooks` running the game's own scenes (every default).
+pub struct GameEndHooks;
 
-impl EndHooks for NoEndHooks {}
+impl EndHooks for GameEndHooks {}
 
 /// The house's text, where it is written and how far apart its lines
 /// are drawn.
@@ -103,7 +147,37 @@ impl Machine {
         self.world_back(files)
     }
 
-    fn end_speech(&mut self, files: &mut Files, hooks: &mut dyn EndHooks, ax: u16, di: u16, colour: u8, set: bool) {
+    /// 1194:D459 for the scenes: the speech (`vision`) with its pages
+    /// clicked through, over the colours the movie before it left at 929E
+    /// (its palette chunks', which 6546 showed).
+    pub fn end_speech_play(&mut self, files: &mut Files, ax: u16, si: u16, di: u16) -> Option<()> {
+        let mut shown = [[0u8; 3]; 256];
+        for (i, c) in shown.iter_mut().enumerate() {
+            for (k, v) in c.iter_mut().enumerate() {
+                *v = self.mem.r8(DS, 0x929E + (i * 3 + k) as u16);
+            }
+        }
+        self.vision(files, &mut crate::vision::ClickThrough::default(), Some(&shown), ax, si, di)
+    }
+
+    /// 1194:DA25..DA63: the house: the page cleared (0000:9426; its
+    /// showing, 9466, the front end's), the bank at 1030 mapped (5C86),
+    /// HOUSE.IMG (807Bh) read to [902E] (7428) and drawn on the page
+    /// where it is the game's own block (5828); its colours set (9B4E)
+    /// the front end's.
+    pub fn end_house(&mut self, files: &mut Files) -> Option<()> {
+        self.page_clear();
+        let bank = self.mem.r16(DS, 0x1030);
+        self.ems_map(bank);
+        let (off, seg) = (self.mem.r16(DS, 0x902E), self.mem.r16(DS, 0x9030));
+        self.file_load(files, 0x807B, seg, off)?;
+        if self.page_is_block() {
+            self.page_image(seg, off);
+        }
+        Some(())
+    }
+
+    fn end_speech(&mut self, files: &mut Files, hooks: &mut dyn EndHooks, ax: u16, di: u16, colour: u8, set: bool) -> Option<()> {
         self.mem.w8(DS, 0x803C, 1);
         let mut f = self.mem.r16(DS, 0xA902);
         if set {
@@ -114,7 +188,7 @@ impl Machine {
         }
         self.mem.w16(DS, 0xA902, f);
         self.mem.w8(DS, 0x9288, colour);
-        hooks.speech(self, files, ax, 0x80BD, di);
+        hooks.speech(self, files, ax, 0x80BD, di)
     }
 
     /// 1194:D986. The scenes of the staff made whole (see the module):
@@ -125,19 +199,19 @@ impl Machine {
     /// reads on for ever).
     pub fn staff_end(&mut self, files: &mut Files, hooks: &mut dyn EndHooks) -> Option<()> {
         let (a91a, d56) = (self.mem.r16(DS, 0xA91A), self.mem.r16(DS, 0x0D56));
-        hooks.begin(self, files);
+        hooks.begin(self, files)?;
         let f = self.mem.r16(DS, 0xA902) & 0xFBFF;
         self.mem.w16(DS, 0xA902, f);
-        hooks.movie(self, files, 0x803D);
-        hooks.movie(self, files, 0x8046);
-        self.end_speech(files, hooks, 0x57C, 0x8050, 0x64, false);
+        hooks.movie(self, files, 0x803D)?;
+        hooks.movie(self, files, 0x8046)?;
+        self.end_speech(files, hooks, 0x57C, 0x8050, 0x64, false)?;
         hooks.fade(self);
-        hooks.movie(self, files, 0x805D);
-        hooks.movie(self, files, 0x8067);
-        self.end_speech(files, hooks, 0x57D, 0x8070, 0x99, true);
-        self.end_speech(files, hooks, 0x57F, 0x8070, 0x99, true);
+        hooks.movie(self, files, 0x805D)?;
+        hooks.movie(self, files, 0x8067)?;
+        self.end_speech(files, hooks, 0x57D, 0x8070, 0x99, true)?;
+        self.end_speech(files, hooks, 0x57F, 0x8070, 0x99, true)?;
         hooks.fade(self);
-        hooks.house(self, files);
+        hooks.house(self, files)?;
         self.mem.w8(DS, 0x101C, 0xFF);
         self.mem.w16(DS, 0x137A, 0x579);
         self.mem.w8(DS, 0x137E, 0);
@@ -173,7 +247,7 @@ impl Machine {
         }
         hooks.shown(self);
         self.mem.w16(DS, 0x0D56, d56);
-        hooks.end(self, files);
+        hooks.end(self, files)?;
         self.mem.w16(DS, 0xA91A, a91a);
         hooks.clear(self);
         let f = self.mem.r16(DS, 0xA902) & 0xFBFF;

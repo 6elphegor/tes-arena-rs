@@ -31,15 +31,17 @@ impl FightHooks for Hooks {
         count(m, if people { 0xFFE0 } else { 0xFFE2 });
         Some(())
     }
-    fn jagar(&mut self, m: &mut Machine, text: u16) {
+    fn jagar(&mut self, m: &mut Machine, _files: &mut Files, text: u16) -> Option<()> {
         m.mem.w16(DS, 0xFFEC, text);
         count(m, 0xFFE6);
+        Some(())
     }
-    fn view_saved(&mut self, m: &mut Machine) {
+    fn view_saved(&mut self, m: &mut Machine, _files: &mut Files) {
         count(m, 0xFFE8);
     }
-    fn view_restored(&mut self, m: &mut Machine) {
+    fn view_restored(&mut self, m: &mut Machine, _files: &mut Files) -> Option<()> {
         count(m, 0xFFEA);
+        Some(())
     }
     fn fight_music(&mut self, m: &mut Machine, _files: &mut Files, _music: u8) -> Option<()> {
         count(m, 0xFFE4);
