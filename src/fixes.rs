@@ -59,3 +59,15 @@ pub const SELLING_ROLL: u8 = 10;
 pub const UNEQUIP_WRAP: u8 = 13;
 /// #15: a room sneaked into rests for the end time's low word in hours.
 pub const SNEAK_HOURS: u8 = 15;
+/// #18: instant death kills on a roll at or above its chance (2CDD:03C1).
+pub const INSTANT_DEATH: u8 = 18;
+/// #21: "Spell succeeded/failed" tested on the wrong register (2CDD:0B77, 0404).
+pub const SPELL_MESSAGE: u8 = 21;
+/// #22: 2CDD:030F's timed flag set on the player, not the target.
+pub const TIMED_FLAG_PLAYER: u8 = 22;
+/// #28: the fatigue drain tests the wrong carry (2CDD:0180).
+pub const FATIGUE_DRAIN_CARRY: u8 = 28;
+/// #67: ending an effect decrements DGROUP's counter, not the record's (2EBD:0004).
+pub const END_EFFECT_COUNTER: u8 = 67;
+/// #69: spell kinds 2 and 6 leave DS at the target's segment (29CF:0941).
+pub const SUB_KIND_DS: u8 = 69;

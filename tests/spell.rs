@@ -220,3 +220,159 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 2000);
 }
+
+/// A machine for one spell effect: the spell at SSEG:0 with effect 0 of
+/// `kind`, `sub` and `param` and amounts `amounts` (+0, +6, +C, +12, +18,
+/// +1E), the others none; creatures in CSEG, timers in TSEG, every effect
+/// slot free.
+fn one_effect(img: &arena::exe::Image, fixes: arena::fixes::Fixes, kind: u8, sub: u8, param: u8, amounts: [u16; 6]) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w16(DS, 0x1042, CSEG);
+    m.mem.w16(DS, 0xD806, WSEG);
+    m.mem.w16(DS, 0x1020, 0);
+    m.mem.w16(DS, 0x1022, TSEG);
+    for (i, v) in amounts.into_iter().enumerate() {
+        m.mem.w16(SSEG, 6 * i as u16, v);
+    }
+    put(&mut m, SSEG, 0x24, &[0, 0, 5, 0, 0]);
+    put(&mut m, SSEG, 0x29, &[kind, 0xFF, 0xFF, sub, 0, 0, param, 0, 0]);
+    for i in 0..16 {
+        m.mem.w8(DS, SLOTS + i * 0x3C + 0x3B, 0xFF);
+    }
+    // A creature at CSEG:0 with some HP.
+    m.mem.w16(CSEG, 0x40D, 0x1000);
+    m.mem.w16(CSEG, 0x1A, 50);
+    m
+}
+
+/// The message over the view after a cast (0 for none).
+fn message(m: &Machine) -> u16 {
+    m.mem.r16(DS, 0x061A)
+}
+
+const FAILED: u16 = 0x7BFA;
+const SUCCEEDED: u16 = 0x7C05;
+
+/// Fixed (kept bug #18): an instant-death spell with a 10% chance kills
+/// about one time in ten, where the original's reversed comparison kills
+/// nine times in ten; and a kill outside DGROUP goes on (DS restored)
+/// where the original runs into data.
+#[test]
+fn fixed_instant_death_kills_on_a_roll_under_the_chance() {
+    use arena::fixes::{Fixes, INSTANT_DEATH};
+    let Some(img) = common::image() else { return };
+    let kills = |fixes: Fixes| {
+        (0..400u32)
+            .filter(|&seed| {
+                let mut m = one_effect(&img, fixes, 7, 0, 0, [10, 0, 1, 0, 1, 0]);
+                m.rng.seed = seed.wrapping_mul(2_654_435_761);
+                let got = m.spell_effects(SSEG, 0, CSEG, 0, 1, &mut arena::strike::NoKillHooks);
+                if fixes.has(INSTANT_DEATH) {
+                    assert!(got.is_some(), "seed {seed}");
+                }
+                got.is_none() || message(&m) != FAILED
+            })
+            .count()
+    };
+    let n = kills(Fixes::NONE);
+    assert!((320..400).contains(&n), "the original: {n} of 400 killed");
+    let n = kills(Fixes::only(INSTANT_DEATH));
+    assert!((15..70).contains(&n), "fixed: {n} of 400 killed");
+}
+
+/// Fixed (kept bug #21): the success roll's message shows when the
+/// player is the target (the original's check reads the multiply's high
+/// word, so it doesn't), and 2CDD:0404's success message only then (the
+/// original's looks at the slot pointer and always shows).
+#[test]
+fn fixed_spell_messages_show_for_the_player() {
+    use arena::fixes::{Fixes, SPELL_MESSAGE};
+    let Some(img) = common::image() else { return };
+    let fixed = Fixes::only(SPELL_MESSAGE);
+    // Kind 0 sub 4 (2CDD:012F): a roll that always succeeds, on the player.
+    for (fixes, want) in [(Fixes::NONE, 0), (fixed, SUCCEEDED)] {
+        let mut m = one_effect(&img, fixes, 0, 4, 0, [100, 0, 1, 0, 1, 0]);
+        m.mem.w16(DS, 0x061A, 0);
+        m.spell_effects(SSEG, 0, DS, PLAYER, 1, &mut arena::strike::NoKillHooks).unwrap();
+        assert_eq!(message(&m), want, "{fixes:?}");
+    }
+    // Kind 9 (2CDD:0404) on a creature.
+    for (fixes, want) in [(Fixes::NONE, SUCCEEDED), (fixed, 0)] {
+        let mut m = one_effect(&img, fixes, 9, 0, 0, [1, 1, 1, 1, 1, 1]);
+        m.mem.w16(DS, 0x061A, 0);
+        m.spell_effects(SSEG, 0, CSEG, 0, 1, &mut arena::strike::NoKillHooks).unwrap();
+        assert_eq!(message(&m), want, "{fixes:?}");
+    }
+}
+
+/// Fixed (kept bug #22): 2CDD:030F's timed flag 2 goes on the target,
+/// beside its timer; the original sets it on the player.
+#[test]
+fn fixed_timed_flag_goes_on_the_target() {
+    use arena::fixes::{Fixes, TIMED_FLAG_PLAYER};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(TIMED_FLAG_PLAYER)] {
+        let mut m = one_effect(&img, fixes, 5, 0, 0, [100, 0, 1, 0, 1, 3]);
+        m.mem.w16(DS, PLAYER + 0x41A, 0);
+        m.spell_effects(SSEG, 0, CSEG, 0, 1, &mut arena::strike::NoKillHooks).unwrap();
+        let (player, target) = (m.mem.r16(DS, PLAYER + 0x41A), m.mem.r16(CSEG, 0x41A));
+        if fixes == Fixes::NONE {
+            assert_eq!((player, target), (2, 0));
+        } else {
+            assert_eq!((player, target), (0, 2));
+        }
+    }
+}
+
+/// Fixed (kept bug #28): the fatigue drain (2CDD:0180) writes nothing
+/// into a target that already has the effect; the original tests the
+/// wrong carry and stores the delta into the target's record.
+#[test]
+fn fixed_fatigue_drain_stores_nothing_when_refused() {
+    use arena::fixes::{FATIGUE_DRAIN_CARRY, Fixes};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(FATIGUE_DRAIN_CARRY)] {
+        let mut m = one_effect(&img, fixes, 1, 1, 0, [0xFFFB, 0xFFFB, 0, 0, 1, 1]);
+        m.mem.w16(CSEG, 0x40D, 0x1200);
+        m.mem.w16(CSEG, 0x12, 0xBEEF);
+        m.spell_effects(SSEG, 0, CSEG, 0, 1, &mut arena::strike::NoKillHooks).unwrap();
+        let want = if fixes == Fixes::NONE { 5 << 6 } else { 0xBEEF };
+        assert_eq!(m.mem.r16(CSEG, 0x12), want, "{fixes:?}");
+    }
+}
+
+/// Fixed (kept bug #67): ending an effect decrements the record's own
+/// counter, not DGROUP's at the record's offset.
+#[test]
+fn fixed_end_effect_counts_down_the_record() {
+    use arena::fixes::{END_EFFECT_COUNTER, Fixes};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(END_EFFECT_COUNTER)] {
+        let mut m = one_effect(&img, fixes, 0xFF, 0, 0, [0; 6]);
+        let kind = m.effect_kind(1);
+        assert!(kind < 9);
+        let rec = 2 * CSIZE;
+        let at = rec + kind + 0x40F;
+        m.mem.w8(CSEG, at, 3);
+        m.mem.w8(DS, at, 7);
+        m.end_effect_flag(CSEG, rec, 1);
+        let got = (m.mem.r8(CSEG, at), m.mem.r8(DS, at));
+        assert_eq!(got, if fixes == Fixes::NONE { (3, 6) } else { (2, 7) }, "{fixes:?}");
+    }
+}
+
+/// Fixed (kept bug #69): kinds 2 and 6 on a creature outside DGROUP go
+/// on after their sub-kind handler; the original reads on through the
+/// creature's segment (the port gives up: None).
+#[test]
+fn fixed_sub_kind_handlers_restore_ds() {
+    use arena::fixes::{Fixes, SUB_KIND_DS};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(SUB_KIND_DS)] {
+        // Kind 2 sub 3 (2CDD:021C) with a roll that always fails.
+        let mut m = one_effect(&img, fixes, 2, 3, 0, [0, 0, 1, 0, 1, 0]);
+        let got = m.spell_effects(SSEG, 0, CSEG, 0, 1, &mut arena::strike::NoKillHooks);
+        assert_eq!(got.is_some(), fixes != Fixes::NONE, "{fixes:?}");
+    }
+}
