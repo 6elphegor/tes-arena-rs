@@ -61,6 +61,9 @@ pub const WILD_PILES: u8 = 5;
 pub const GUILD_PICK_PAST: u8 = 6;
 /// #7: a chest's failed lockpicking looked up under the player's square.
 pub const CHEST_RETRIED: u8 = 7;
+/// #8: a stolen store record stays for sale, an unenchanted one's resale
+/// price is its type byte (1194:FCC6, FC78).
+pub const STORE_STOLEN: u8 = 8;
 /// #9: from level 11 on every crime is seen (0000:3F50).
 pub const CRIME_SEEN: u8 = 9;
 /// #10: selling never reaches the merchant's acceptance roll (1194:81F0).
@@ -71,6 +74,8 @@ pub const GUILD_HAGGLE: u8 = 11;
 pub const SECOND_DONATION: u8 = 12;
 /// #13: taking off an item wraps a drained attribute to its maximum.
 pub const UNEQUIP_WRAP: u8 = 13;
+/// #14: the first price accepted returns an earlier haggle's (1194:8349).
+pub const FIRST_PRICE: u8 = 14;
 /// #15: a room sneaked into rests for the end time's low word in hours.
 pub const SNEAK_HOURS: u8 = 15;
 /// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).

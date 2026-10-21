@@ -41,8 +41,10 @@
 //! DGROUP 65B8 as left by an earlier haggle; the informant is paid before
 //! the player confirms, and a refusal then keeps the gold. (An asking
 //! price equal to the limit would divide by zero, but the offer's tests
-//! before each divide leave nothing to divide with it.) Fixed mode
-//! (`crate::fixes`) makes the sale's roll (#10).
+//! before each divide leave nothing to divide with it. Nor can a refusal
+//! follow the informant's payment: his confirmation always agrees.)
+//! Fixed mode (`crate::fixes`) makes the sale's roll (#10), and the first
+//! price accepted the deal's price (#14).
 
 use crate::bsa::Files;
 use crate::dice::roll;
@@ -440,6 +442,14 @@ impl Machine {
             self.mem.w32(DS, AGREED, price as u32);
         }
         if self.haggle_confirm(files, io)? {
+            if self.fixed(crate::fixes::FIRST_PRICE) {
+                // Fixed (#14): the deal is the price accepted (doubled
+                // back if halved), what a line's %mm puts in RESULT; the
+                // opening line may have none, and RESULT is then an
+                // earlier haggle's.
+                let price = price as u32;
+                return Some(Haggle::Deal(if self.mem.r8(DS, HALVED) == 1 { price.wrapping_add(price) } else { price }));
+            }
             Some(Haggle::Deal(self.mem.r32(DS, RESULT)))
         } else {
             Some(Haggle::NoDeal)

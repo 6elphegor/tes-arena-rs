@@ -1253,7 +1253,9 @@ impl Machine {
     /// back. Bug kept: with no days left the informant is forgotten
     /// (0FE6 bits 1, 2) and the return address (CF92h) popped as the bank
     /// to map, none being that high; it returns past CF58 as its RET
-    /// would. The carry.
+    /// would. (Not reached: its only caller, CED7, has already let the
+    /// informant go when no days are left, #14 in docs/kept-bugs.md.)
+    /// The carry.
     fn informant_paid(&mut self, files: &mut Files, hooks: &mut dyn QuestHooks) -> Option<bool> {
         let left = self.informant_days();
         if (left as i16) <= 0 {

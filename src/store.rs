@@ -91,6 +91,9 @@
 //! Bugs kept: a record's price for selling back (1194:FC78) with no
 //! enchantment (+0Fh FFh) is the type byte, or the material's scaled
 //! price, not the table's price plus it; a stolen record stays for sale.
+//! Fixed mode (`crate::fixes`) prices such a record at the table's price
+//! (with its material) and takes a stolen magic record out of the list,
+//! as a purchase does (#8).
 
 use crate::bsa::Files;
 use crate::format::Arg;
@@ -749,7 +752,9 @@ impl Machine {
     /// (+10h not FFh) times its word at 2882 over four (16 bits); with an
     /// enchantment (+0Fh not FFh) its word at `enchant` plus that. With
     /// none, AX as it was left: the type, or the material's product.
-    fn store_price_from(&self, si: u16, prices: u16, enchant: u16) -> u32 {
+    /// Fixed (#8), with none the price is the one the enchantment's is
+    /// added to (CX: the table's, times the material's when it has one).
+    pub fn store_price_from(&self, si: u16, prices: u16, enchant: u16) -> u32 {
         let ty = self.mem.r8(DS, si) as u16;
         let mut ax = ty;
         let mut cx = self.mem.r8(DS, prices.wrapping_add(ty)) as u16;
@@ -763,6 +768,9 @@ impl Machine {
         if e != 0xFF {
             let w = self.mem.r16(DS, enchant.wrapping_add((e as u16).wrapping_mul(2)));
             return w as u32 + cx as u32;
+        }
+        if self.fixed(crate::fixes::STORE_STOLEN) {
+            return cx as u32;
         }
         ax as u32
     }
@@ -843,6 +851,17 @@ impl Machine {
         let frame = self.mem.r16(DS, FRAME);
         let si = list.wrapping_add(pick.wrapping_mul(13));
         self.memmove(frame, si, DS, TEMPLATE, 13);
+        if self.fixed(crate::fixes::STORE_STOLEN) && self.mem.r8(frame, si.wrapping_add(t::MAGIC)) == 1 {
+            // Fixed (#8): a magic record stolen leaves its list, as one
+            // bought does (1194:F9A2: 5ED1 on the list, 0Dh bytes an
+            // entry), so it can't be stolen or bought again; a plain
+            // record stays, as one bought does (the plain stock is
+            // endless).
+            self.mem.w8(DS, ENTRY, 13);
+            self.mem.w8(DS, PICK, pick as u8);
+            self.table_remove(si, n);
+            self.mem.w8(DS, count, (n as u8).wrapping_sub(1));
+        }
         self.mem.w8(DS, 0x13EF, 1);
         if weapons {
             self.finish_weapon_at(ITEM);
