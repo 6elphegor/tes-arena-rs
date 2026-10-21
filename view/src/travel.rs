@@ -130,6 +130,10 @@ const SEARCH_PROMPT: u16 = 0x6AD1;
 
 pub struct Travel {
     start: MapStart,
+    /// The left button down as the screen began (26F7:0011's read: a
+    /// walk by the mouse held into the way out), not yet let go (`hold`,
+    /// `let_go`).
+    held: bool,
     /// A main quest's dungeon reached: its picture up until its button is
     /// clicked (292B:0362).
     picture: Option<Picture>,
@@ -438,6 +442,7 @@ impl Travel {
             .collect();
         Travel {
             start,
+            held: false,
             picture: None,
             fonts,
             shown: None,
@@ -471,6 +476,39 @@ impl Travel {
             idle_ticks: 0,
             box_page: None,
             answered_over: None,
+        }
+    }
+
+    /// The left button down as the screen begins: the map's read
+    /// (26F7:0011) finds it, and the world map's pass (3159:00F3, AFF9 as
+    /// it is, not a press) takes it as a click begun.
+    pub fn hold(&mut self) {
+        self.held = true;
+    }
+
+    /// Whether the button the screen began with is still down.
+    pub fn held(&self) -> bool {
+        self.held
+    }
+
+    /// The button the screen began with forgotten: let go before the
+    /// map's read.
+    pub fn forget_held(&mut self) {
+        self.held = false;
+    }
+
+    /// The button the screen began with let go at (x, y): on the world
+    /// map, a pass with it down over a region waits for its release
+    /// (3159:0432, the region found again at each read, 019A) and then
+    /// runs the region's handler, as a click there (a province's map
+    /// opened, or the Exit); over none, nothing.
+    pub fn let_go(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, x: i32, y: i32) {
+        if !std::mem::take(&mut self.held) || self.shown.is_some() || self.asking.is_some() || self.done.is_some() {
+            return;
+        }
+        let (cx, cy) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        if engine.m.clone().travel_world_region(cx, cy).is_some() {
+            self.click(engine, archive, x, y, false);
         }
     }
 

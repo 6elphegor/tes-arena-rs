@@ -2171,12 +2171,12 @@ def let_go_at_map(a):
 def let_go_in_map(a):
     """`fuzz_script4`'s seeds' release: a walk by the mouse held into the
     way out comes to its travel map (26F7:0000) with the left button
-    down, which the map's passes take as pressed (3159:00F3 asks the
-    buttons as they are): a province's region opens its map, whose pass
-    (0625) picks the place nearest the cursor and shows the journey's box
-    (1194:59C8), which first waits for the buttons' release (59E5); a
-    province's button waits for it too (3159:035A). There the player lets
-    go (`letting_go`), the map's own waits only."""
+    down, as its first read (0011) finds it, which the world map's pass
+    takes as pressed (3159:00F3 asks AFF9 as it is): over a region (a
+    province, the Exit) it waits for the release (0432, the region found
+    again at each read) before the region's handler. There the player
+    lets go (`letting_go4`; the view's `Travel::let_go`). Over none the
+    button stays down, and the map's Esc ends it."""
     a.in_map = False
     if not hasattr(a, 'in_map_hooks'):
         def begun(*_):
@@ -2190,7 +2190,7 @@ def let_go_in_map(a):
                 a.buttons = 0
         a.in_map_hooks = [a.mu.hook_add(UC_HOOK_CODE, f, None, at, at) for f, at in
                           ((begun, a.lin(LOAD_SEG + 0x26F7, 0x0000)), (ended, a.lin(LOAD_SEG + 0x26F7, 0x00AE)),
-                           (let_go, a.lin(LOAD_SEG + 0x1194, 0x59EF)), (let_go, a.lin(LOAD_SEG + 0x3159, 0x0364)))]
+                           (let_go, a.lin(LOAD_SEG + 0x3159, 0x0432)))]
     a.letting_go4 = True
 
 
@@ -2815,6 +2815,15 @@ CASES = {
     # (26F7:0000, 1A81 set), Esc on it stays, the world given back (A5D1,
     # A6B5) and the frame runs on to its end (`exit_asked`).
     'playexitmapend': ('dungeon', exit_stairs, [((UP,), (), 30, exit_asked, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # The same stairs walked into by the mouse, the left button held with
+    # the cursor at (150, 35) (the view's top region: forward), so the way
+    # out's travel map begins with it down: the world map's pass takes it
+    # as pressed over Skyrim, waits for its release (3159:0432), where the
+    # player lets go (`let_go_in_map`), and opens Skyrim's map; its Exit
+    # clicked, the world map left by Esc; six frames after.
+    'playmapheld': ('dungeon', lambda a: (exit_stairs(a), let_go_in_map(a)),
+                    [((), (), 30, exit_asked, [], {'buttons': 1, 'do': mouse_at(150, 35), 'script': [('click', 80, 180), ('keys', [KEY_ESC])]}),
+                     ((), (), 6, None, [], {'buttons': 0})]),
     # The status box (S, 2542:037C -> 04B1) inside its frame, a click
     # closing it (0530..0569: the buttons let go, then a click or Esc
     # held), the rest of the frame after it.

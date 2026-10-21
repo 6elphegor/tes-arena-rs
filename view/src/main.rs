@@ -3817,7 +3817,13 @@ impl App {
                 // The travel map from the game as the way out showed it.
                 self.engine.m.clone_from(&w.0 .0);
                 self.engine.files.clone_from(&w.0 .1);
-                forced = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
+                let mut t = travel::Travel::forced(&mut self.engine, &self.assets.archive);
+                // (A walk by the mouse held into it: the button down as
+                // the map reads it, `Travel::hold`.)
+                if self.walk_mouse.is_some_and(|w| w.2) {
+                    t.hold();
+                }
+                forced = Some(t);
             }
             // The spellmaker's screen with its colours set (1194:6064,
             // 0000:57DD); the travel map as 26F7:0000 opens it, the screen
@@ -6100,6 +6106,15 @@ impl App {
             In::Button { down: true, button } if self.travel.is_some() && self.boxes.is_empty() => {
                 let (x, y) = self.screen_point();
                 self.travel_input(|t, e, a| t.click(e, a, x, y, button == MouseButton::Right));
+            }
+            // The left button the map began with let go: a click begun
+            // there (`Travel::let_go`); the walk's button let go too.
+            In::Button { down: false, button: MouseButton::Left } if self.travel.as_ref().is_some_and(|t| t.held()) && self.boxes.is_empty() => {
+                if let Some((x, y, _)) = self.walk_mouse {
+                    self.walk_mouse = Some((x, y, false));
+                }
+                let (x, y) = self.screen_point();
+                self.travel_input(|t, e, a| t.let_go(e, a, x, y));
             }
             In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
             // The right button on a menu leaves it (3159:10D6), and on a

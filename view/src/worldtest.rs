@@ -2103,6 +2103,17 @@ fn fuzz_frames_acts(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse
             // the button let go as the map began, gen_worldframes.py's
             // `let_go_at_map`; the map takes presses alone.)
             if LET_GO_AT_MAP.with(|l| l.get()) && a.walk_mouse.is_some_and(|w| w.2) {
+                // (Before the map's read: not a click begun.)
+                if let Some(t) = a.travel.as_mut() {
+                    t.forget_held();
+                }
+                a.input(In::Button { button: MouseButton::Left, down: false });
+            }
+            // (`fuzz_script4`'s: the button held over a region of the world
+            // map let go at its wait for the release, 3159:0432, as
+            // gen_worldframes.py's `let_go_in_map`; over none it stays
+            // down.)
+            if a.travel.as_ref().is_some_and(|t| t.held()) && a.engine.m.clone().travel_world_region(mouse.0.clamp(0, 319) as u16, mouse.1.clamp(0, 199) as u16).is_some() {
                 a.input(In::Button { button: MouseButton::Left, down: false });
             }
             fuzz_travel(a, d, acts);
@@ -3620,6 +3631,25 @@ fn case(name: &str) -> Option<Case> {
         // The first level's up stairs walked into: the way out's travel
         // map (0000:4537, 26F7:0000) inside the frame, Esc on it stays,
         // the world given back and the frame run on to its end.
+        // The way out's travel map begun with the left button held: let
+        // go over Skyrim (`fuzz_frames`, as fuzz_script4's), its map
+        // opened, its Exit clicked, the world map's Esc.
+        "playmapheld" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 42, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+            let mut mouse = (150, 35);
+            a.input(In::Cursor(150.0 * 3.0 + 1.0, 35.0 * 3.0 + 1.0));
+            a.input(In::Button { button: MouseButton::Left, down: true });
+            let mut acts = std::collections::VecDeque::from([FuzzAct::Click(80, 180)]);
+            for _ in 0..30 {
+                fuzz_frames_acts(a, d, seen, &mut mouse, 1, &mut acts);
+                if acts.is_empty() {
+                    break;
+                }
+            }
+            assert!(acts.is_empty(), "the way out's travel map never came");
+            a.input(In::Button { button: MouseButton::Left, down: false });
+            a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+            frames(a, d, seen, 6, |_| false);
+        })),
         "playexitmapend" => (Place::Dungeon, Box::new(|a: &mut App| at_square(a, 11, 42, 0x100)), Box::new(|a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
             a.input(In::Key { code: KeyCode::ArrowUp, down: true, text: None });
             frames(a, d, seen, 30, |a| a.travel.is_some());
@@ -5061,6 +5091,7 @@ const BUSY: &[&str] = &[
     "playlootstreet",
     "playlootwild",
     "playmapend",
+    "playmapheld",
     "playmidnight",
     "playopen",
     "playoptionsend",
@@ -5333,6 +5364,7 @@ const BUSY_STATE: &[&str] = &[
     "playlootstreet",
     "playlootwild",
     "playmapend",
+    "playmapheld",
     "playmidnight",
     "playopen",
     "playoptionsend",
