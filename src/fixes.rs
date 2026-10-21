@@ -85,6 +85,8 @@ pub const LOOT_PICK: u8 = 16;
 pub const TRAVEL_HEADER: u8 = 17;
 /// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).
 pub const GUILD_SPELLS_PICK: u8 = 20;
+/// #25: Knights' kind-2 check never applies to shields (1194:7772).
+pub const KNIGHT_SHIELD: u8 = 25;
 /// #32: the automap's groups of four squares read back reversed (23F1:037A).
 pub const AUTOMAP_ORDER: u8 = 32;
 /// #33: the logbook is never trimmed, its new path built twice (27E3:0169).

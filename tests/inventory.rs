@@ -192,6 +192,40 @@ fn matches_original() {
     assert_eq!(count.len(), 24);
 }
 
+/// Fixed (kept bug #25): a Knight (class 11h) can't use a kind-2 shield,
+/// as he can't use kind-2 armour; the original's check after a shield's
+/// match compares the doubled class and the shield's base type, so it
+/// never applies. A shield of another kind, and other classes, as before.
+#[test]
+fn fixed_a_knight_can_t_use_a_kind_2_shield() {
+    use arena::fixes::{Fixes, KNIGHT_SHIELD};
+    use arena::mem::DS;
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    let it = 0x0212u16;
+    let mut tried = 0;
+    for ty in 7..=10u8 {
+        m.mem.w8(DS, it, ty);
+        m.mem.w16(DS, it + 6, 10);
+        let can = |m: &mut Machine, fixes: Fixes, kind: u8, class: u16| {
+            m.fixes = fixes;
+            m.mem.w8(DS, it + 0x0E, 0x40 | kind << 4);
+            m.class_can_use(DS, it, class).unwrap()
+        };
+        if !can(&mut m, Fixes::NONE, 2, 0x11) {
+            continue; // not on the Knight's list of shields
+        }
+        let fixed = Fixes::only(KNIGHT_SHIELD);
+        assert!(!can(&mut m, fixed, 2, 0x11), "type {ty}");
+        assert!(can(&mut m, fixed, 0, 0x11) == can(&mut m, Fixes::NONE, 0, 0x11), "type {ty}");
+        for class in [0u16, 5, 0x10] {
+            assert_eq!(can(&mut m, fixed, 2, class), can(&mut m, Fixes::NONE, 2, class), "type {ty} class {class}");
+        }
+        tried += 1;
+    }
+    assert!(tried > 0, "no shield a Knight may carry");
+}
+
 /// The scan in `class_can_use` stops at an FFh or a match; with neither
 /// anywhere in segment 3276 the original never returns.
 #[test]
