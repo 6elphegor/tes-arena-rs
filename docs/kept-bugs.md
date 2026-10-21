@@ -21,6 +21,20 @@ The port stays faithful by default; each bug below can also be corrected behind 
   4. Mark the entry's Fix cell here **Fixed** with the constant's name.
   Don't regenerate vectors for a fix: faithful runs don't change.
 - `Fixes::ALL` sets every bit, so a new fix is on in the view as soon as it is added.
+- **The fixes together, in play** (view/src/fixedtest.rs, opt-in): `ARENA_FIXED=1 ARENA_EXE=...
+  ARENA_SAVE=... cargo test --release -p arena-view fixed_mode_plays -- --nocapture` plays every
+  case of worldframes.txt and areaplay.txt (the BUSY cases and the 40 FUZZ sessions among them,
+  243 in all, about 3 minutes) faithful and then with `Fixes::ALL`, and fails on what the fixed
+  run does that the faithful one doesn't: a panic, a hang (`ARENA_FIXED_SECS`, 900 by default), a
+  give-up (`arena::giveup::noted`), an insane state after a frame (HP over its maximum, spell
+  points, gold, level out of range, an attribute wrapping, the heap's list broken, an EMS bank
+  mapped that isn't there) or a blank 3D view. ARENA_CASE runs one case. Its frames differ from
+  the vectors; that isn't checked. `ARENA_FIXED=all` makes every machine of the whole view suite
+  fixed instead: a sweep of the other flows (screens, inputs, creation, saves), where every
+  comparison with the original fails as it should and any other failure is fixed mode's.
+  `ARENA_FIXED_FRAMES=DIR cargo test --release -p arena-view fixed_mode_drawing_frames` writes the
+  drawing fixes' frames (#31, #44-#47), faithful | fixed | the pixels that differ, as PNGs (game
+  frames: keep them out of the repository).
 
 Read-only survey of `arena-port/src`, `arena-port/view/src` and `arena-port/docs` (2026-10-21).
 Search terms: bug / bugs kept / the original's bug / (kept) / meant / wrong / never / always /

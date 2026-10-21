@@ -359,6 +359,9 @@ mod savetest;
 #[path = "areaplaytest.rs"]
 mod areaplaytest;
 
+#[path = "fixedtest.rs"]
+mod fixedtest;
+
 /// The heap's blocks from the first header (DGROUP 0157): segment, size,
 /// flags.
 fn heap_blocks(m: &arena::machine::Machine) -> Vec<(u16, u16, u8)> {
@@ -3429,8 +3432,12 @@ fn case(name: &str) -> Option<Case> {
             d.click(a, 0xA0, 0x60, MouseButton::Left);
             d.click(a, 0xA0, 0x60, MouseButton::Left);
             d.click(a, 0x110, 0xBC, MouseButton::Left);
-            assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "the first Exit ends only the pages' loop");
-            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            // (Fixed, #34, the first Exit leaves: no second click.)
+            let open = matches!(a.panel, Some(crate::panels::Panel::Log(_)));
+            assert!(open || a.engine.m.fixed(arena::fixes::LOGBOOK_CLICKS), "the first Exit ends only the pages' loop");
+            if open {
+                d.click(a, 0x110, 0xBC, MouseButton::Left);
+            }
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
             pushed(a, seen);
@@ -3444,8 +3451,12 @@ fn case(name: &str) -> Option<Case> {
             d.key(a, KeyCode::KeyL, Some("l"));
             faded(a);
             d.click(a, 0x30, 0xBC, MouseButton::Left);
-            assert!(matches!(a.panel, Some(crate::panels::Panel::Log(_))), "Print ends only the pages' loop");
-            d.click(a, 0x110, 0xBC, MouseButton::Left);
+            // (Fixed, #34, Print leaves the screen: no Exit to click.)
+            let open = matches!(a.panel, Some(crate::panels::Panel::Log(_)));
+            assert!(open || a.engine.m.fixed(arena::fixes::LOGBOOK_CLICKS), "Print ends only the pages' loop");
+            if open {
+                d.click(a, 0x110, 0xBC, MouseButton::Left);
+            }
             faded(a);
             // The frame that took the key (or the button) ends with its screen.
             pushed(a, seen);

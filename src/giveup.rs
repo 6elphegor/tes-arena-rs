@@ -54,11 +54,27 @@ impl fmt::Display for GaveUp {
 
 thread_local! {
     static LAST: Cell<Option<GaveUp>> = const { Cell::new(None) };
+    /// Every give-up noted on this thread since `noted` last took them
+    /// (the first 64): for a test that plays on through the front end's
+    /// `take`s and asks afterwards what gave up on the way.
+    static ALL: std::cell::RefCell<Vec<GaveUp>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 fn note<T>(kind: Kind, why: &'static str) -> Option<T> {
     LAST.with(|last| last.set(Some(GaveUp { kind, why })));
+    ALL.with(|all| {
+        let mut all = all.borrow_mut();
+        if all.len() < 64 {
+            all.push(GaveUp { kind, why });
+        }
+    });
     None
+}
+
+/// Every give-up noted on this thread since the last call (up to 64),
+/// cleared; `take` and `describe` leave them.
+pub fn noted() -> Vec<GaveUp> {
+    ALL.with(|all| std::mem::take(&mut *all.borrow_mut()))
 }
 
 /// None, noting the original faults or hangs here.

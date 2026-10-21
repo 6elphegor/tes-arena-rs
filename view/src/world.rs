@@ -49,10 +49,27 @@ pub fn set_fixed(on: bool) {
     FIXED.store(on, std::sync::atomic::Ordering::Relaxed);
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The fixes the machines made on this thread have, where set: the
+    /// fixed-mode play check's (view/src/fixedtest.rs), each case on a
+    /// thread of its own, beside the faithful tests running on theirs.
+    pub static FIXED_HERE: std::cell::Cell<Option<arena::fixes::Fixes>> = const { std::cell::Cell::new(None) };
+}
+
 /// A machine for the game in `image`, its fixes as `FIXED` says.
 fn machine(image: &exe::Image) -> Machine {
     let mut m = Machine::new(image);
     if FIXED.load(std::sync::atomic::Ordering::Relaxed) {
+        m.fixes = arena::fixes::Fixes::ALL;
+    }
+    #[cfg(test)]
+    if let Some(f) = FIXED_HERE.with(|f| f.get()) {
+        m.fixes = f;
+    } else if std::env::var("ARENA_FIXED").is_ok_and(|v| v == "all") {
+        // (The whole suite with every fix, for a sweep of its flows:
+        // their comparisons with the original fail as they should, and
+        // any other failure is fixed mode's. view/src/fixedtest.rs.)
         m.fixes = arena::fixes::Fixes::ALL;
     }
     m
