@@ -1773,7 +1773,7 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 /// crypt's lava (a death), a main quest dungeon; fought, the guards on
 /// the street, a fight with a bow and with bare hands),
 /// each played from the script its `fuzz` line holds and measured every
-/// CHECKPOINT frames as `playlongrun` (`fuzz_sessions_as_the_original`).
+/// CHECKPOINT frames as `playlongrun` (`fuzz_sessions`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
     "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2",
@@ -5331,7 +5331,7 @@ fn busy_play_goes_as_the_originals() {
 /// (ARENA_CASE runs one): fuzzcrypt2, played there without the engine's
 /// page, walks onto the crypt's stairs by its 586th drawing where the
 /// original turns on (its heading 100h round, the stairs' turn); with the
-/// page (`fuzz_sessions_as_the_original`) every frame matches. fuzzlava1
+/// page (`fuzz_sessions`) every frame matches. fuzzlava1
 /// likewise: without the page no creature flats are taken from the
 /// drawing (`Engine::frame`'s CD56 hook, 25CA:0271), so the crypt's
 /// creature the original's drawing wakes never comes, its blows never
@@ -5811,12 +5811,55 @@ fn a_long_session_as_the_original() {
 }
 
 /// The seeded random sessions (FUZZ) as the original plays them, measured
-/// as `a_long_session_as_the_original` measures playlongrun.
-#[test]
-fn fuzz_sessions_as_the_original() {
-    for name in FUZZ {
+/// as `a_long_session_as_the_original` measures playlongrun: every
+/// FUZZ_PARTS-th from the `part`-th, so the parts run side by side (one
+/// test for all 40 took ten minutes on a thread of its own).
+fn fuzz_sessions(part: usize) {
+    for name in FUZZ.iter().skip(part).step_by(FUZZ_PARTS) {
         checkpointed(name);
     }
+}
+
+const FUZZ_PARTS: usize = 8;
+
+#[test]
+fn fuzz_sessions_as_the_original_0() {
+    fuzz_sessions(0);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_1() {
+    fuzz_sessions(1);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_2() {
+    fuzz_sessions(2);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_3() {
+    fuzz_sessions(3);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_4() {
+    fuzz_sessions(4);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_5() {
+    fuzz_sessions(5);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_6() {
+    fuzz_sessions(6);
+}
+
+#[test]
+fn fuzz_sessions_as_the_original_7() {
+    fuzz_sessions(7);
 }
 
 /// A CHECKPOINT_CASES case (gen_worldframes.py's) as the original plays
