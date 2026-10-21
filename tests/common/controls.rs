@@ -208,4 +208,6 @@ impl arena::controls::ControlHooks for Pick {
     fn cast_at_target(&mut self, _m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         Some(())
     }
+    // And 2826:0BB2 (gen_input.py's RET).
+    fn spell_counters(&mut self, _m: &mut Machine) {}
 }

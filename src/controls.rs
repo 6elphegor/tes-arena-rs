@@ -180,6 +180,11 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
     fn wild_recentre(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
+    /// 2826:0BB2: the counters of a spell waiting for a target, printed
+    /// and drawn over the view (`Machine::spell_counters`).
+    fn spell_counters(&mut self, m: &mut Machine) {
+        m.spell_counters();
+    }
 }
 
 /// What a modern front end asks of the player in a frame, in place of
@@ -491,7 +496,7 @@ impl Machine {
         if self.mem.r16(DS, LEVEL_FLAGS) & 0x200 != 0 && self.mem.r16(DS, MAP_FLAGS) & 4 != 0 {
             hooks.wild_recentre(self, files)?;
         }
-        self.spell_counters();
+        hooks.spell_counters(self);
         let tx = self.mem.r16(DS, TELEPORT);
         if tx != 0 {
             self.mem.w16(DS, X, tx);

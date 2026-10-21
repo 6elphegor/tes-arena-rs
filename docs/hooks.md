@@ -85,6 +85,7 @@ the original routine:
 | `ControlHooks::floor_pick` | src/controls.rs:143 | 2826:0B52 | port | fixed by this audit: answered no floor, so wall and floor spells never took (`Machine::floor_pick`, 3000 vectors) | |
 | `ControlHooks::look` | src/controls.rs:170 | 2826:0C15 | elsewhere | the view looks from its own right click (`look_at`) | |
 | `ControlHooks::message_box` | src/controls.rs:167 | 1194:42EA, 59C8 | present | the box drawn; front ends with a screen override it | |
+| `ControlHooks::spell_counters` | src/controls.rs:185 | 2826:0BB2 | port | the default runs the port (`Machine::spell_counters`: the counter printed into 1044, drawn at (BEh, 2)); tests/input.rs's Pick stubs it as gen_input.py's RET | |
 | `ControlHooks::take_click` | src/controls.rs:153 | 2826:0128 | overridden | the view: main.rs Front<'_> | faithful: the window's click taken in the frame's input step, after the frame's actors, as the classic controls' centre handler takes it (`view_click`; areaplay vectors) |
 | `ControlHooks::wall_trigger` | src/controls.rs:157 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `ControlHooks::wild_recentre` | src/controls.rs:180 | 217B:0265 | overridden | the view: main.rs Front<'_> | faithful: `wild_shift` (wild vectors) |
