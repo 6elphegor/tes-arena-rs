@@ -1749,12 +1749,30 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 
 /// gen_worldframes.py's FUZZ: seeded random sessions (the street, the
 /// start dungeon, the wilderness; a fight taking blows, the Crypt of
-/// Hearts' stairs, the street's people), each played from
-/// the script its `fuzz` line holds and measured every CHECKPOINT frames
-/// as `playlongrun` (`fuzz_sessions_as_the_original`).
+/// Hearts' stairs, the street's people; with the bar's lists and the
+/// camp, a creature casting at the player, the wilderness by day and by
+/// night, a level gained in a fight, the fog of a main quest dungeon),
+/// each played from the script its `fuzz` line holds and measured every
+/// CHECKPOINT frames as `playlongrun` (`fuzz_sessions_as_the_original`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
-    "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2"];
+    "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2",
+    "fuzzspell1", "fuzzspell2", "fuzzcamp1", "fuzzcamp2", "fuzzlevel1", "fuzzfog1"];
+
+/// gen_worldframes.py's CASTER_BOOK: the spells `caster` and
+/// `level_fight` add to the book (`booked`).
+const CASTER_BOOK: [u8; 6] = [6, MEDUSAS_GAZE, SILENCE, HEAL, RESIST_FIRE, MIRROR];
+
+/// gen_worldframes.py's `booked`: `spells` added to the end of the book,
+/// the spell picked last (5CAE) left as it was.
+fn booked(a: &mut App, spells: &[u8]) {
+    let m = &mut a.engine.m;
+    for &spell in spells {
+        let n = m.mem.r8(DS, 0x01A4 + 0x366);
+        m.mem.w8(DS, 0x01A4 + 0x367 + n as u16, spell);
+        m.mem.w8(DS, 0x01A4 + 0x366, n + 1);
+    }
+}
 
 /// A FUZZ case's script, its `fuzz` line's tokens.
 fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
@@ -1808,6 +1826,9 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
             "q" => {
                 a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
                 a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
+                // (A box the cast puts up inside the frame, a refusal, read
+                // with Esc before the frame ends, as BOX_SPARE reads it.)
+                fuzz_screen(a, d, &mut Default::default());
                 pushed(a, seen);
                 key(a, KeyCode::KeyC, false);
                 key(a, KeyCode::ShiftLeft, false);
@@ -1880,6 +1901,47 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 pushed(a, seen);
                 fuzz_frames(a, d, seen, mouse, num(0));
             }
+            // `fuzz_script3`'s: the spellbook (C) or the use list (U) in
+            // the bar's corner, its down arrow clicked K times and a line
+            // clicked twice (`playbook`, `playuselist`); camping (R), its
+            // menu's C, the hours, Enter (`playcamp`). What a screen on
+            // the way leaves of these, then Esc (`fuzz_screen`); the
+            // frame that took the key ends with its screens.
+            "b" | "u" | "r" => {
+                if a.captured {
+                    a.release();
+                }
+                a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
+                a.compose();
+                let mut acts = std::collections::VecDeque::new();
+                match kind {
+                    "r" => {
+                        d.key(a, KeyCode::KeyR, Some("r"));
+                        let digit = [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3][num(0) - 1];
+                        acts.push_back(FuzzAct::Key(KeyCode::KeyC, Some("c")));
+                        acts.push_back(FuzzAct::Key(digit, Some(["1", "2", "3"][num(0) - 1])));
+                        acts.push_back(FuzzAct::Key(KeyCode::Enter, None));
+                    }
+                    _ => {
+                        if kind == "b" {
+                            d.key(a, KeyCode::KeyC, Some("c"));
+                        } else {
+                            d.key(a, KeyCode::KeyU, Some("u"));
+                        }
+                        acts.extend(std::iter::repeat_n(FuzzAct::Click(0xD4, 0xC1), num(0)));
+                        acts.extend(std::iter::repeat_n(FuzzAct::Click(0xF0, num(1) as i32), 2));
+                    }
+                }
+                fuzz_screen(a, d, &mut acts);
+                // (A screen's clicks done, the harness's mouse back at the
+                // centre; the camp's keys leave it.)
+                if kind != "r" {
+                    mouse = (160, 100);
+                    a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+                }
+                pushed(a, seen);
+                fuzz_frames(a, d, seen, mouse, num(if kind == "r" { 1 } else { 2 }));
+            }
             _ => panic!("fuzz token {t}"),
         }
     }
@@ -1911,10 +1973,57 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: (i3
             unpushed(seen);
             pushed(a, seen);
         }
-        while a.waiting() {
-            d.key(a, KeyCode::Escape, None);
+        loop {
+            if a.creation.is_some() {
+                level_points(a, d);
+            } else if a.waiting() {
+                d.key(a, KeyCode::Escape, None);
+            } else {
+                break;
+            }
         }
     }
+}
+
+/// An input `fuzz_screen` gives a screen: a click at (x, y), a key.
+#[derive(Clone, Copy)]
+enum FuzzAct {
+    Click(i32, i32),
+    Key(KeyCode, Option<&'static str>),
+}
+
+/// A screen a session's key opened (a list, the camp's menu) and what
+/// comes up from it given `acts` in turn while one is up, then Esc, as
+/// gen_worldframes.py's script and BOX_SPARE answer the original's waits;
+/// the level's attribute screen `level_points`' clicks first.
+fn fuzz_screen(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDeque<FuzzAct>) {
+    loop {
+        if a.creation.is_some() {
+            level_points(a, d);
+            continue;
+        }
+        if !a.waiting() && a.panel.is_none() {
+            break;
+        }
+        match acts.pop_front() {
+            Some(FuzzAct::Click(x, y)) => d.click(a, x, y, MouseButton::Left),
+            Some(FuzzAct::Key(code, text)) => d.key(a, code, text),
+            None => d.key(a, KeyCode::Escape, None),
+        }
+    }
+}
+
+/// The level's attribute screen (1194:122C) given LEVEL_SCRIPT's clicks
+/// after the notice's, as gen_worldframes.py's `level_fight` gives them.
+fn level_points(a: &mut App, d: &mut Driver) {
+    for r in 0..8 {
+        d.click(a, 10, 54 + 8 * r, MouseButton::Left);
+        for _ in 0..6 {
+            d.click(a, 40, 0x32 + 8 * r, MouseButton::Left);
+        }
+    }
+    d.click(a, 10, 175, MouseButton::Left);
+    assert!(a.creation.is_none(), "the level's attribute screen still up");
 }
 
 /// The mouse captured again if a screen the session's frames opened let
@@ -2183,14 +2292,27 @@ fn case(name: &str) -> Option<Case> {
             n if n.starts_with("fuzzdungeon") || n.starts_with("fuzzfight") => Place::Dungeon,
             n if n.starts_with("fuzzcrypt") => Place::Crypt,
             n if n.starts_with("fuzzpeople") => Place::People,
+            n if n.starts_with("fuzzspell") || n.starts_with("fuzzlevel") => Place::Dungeon,
+            n if n.starts_with("fuzzfog") => Place::Fogged,
             _ => Place::Wild,
         };
         let (fight, crypt) = (name.starts_with("fuzzfight"), name.starts_with("fuzzcrypt"));
+        let (caster, level) = (name.starts_with("fuzzspell"), name.starts_with("fuzzlevel"));
+        let hour = match name {
+            "fuzzcamp1" => Some(12),
+            "fuzzcamp2" => Some(22),
+            _ => None,
+        };
+        // (`fuzz_script3`'s seeds, with the lists and the camp.)
+        let third = caster || level || hour.is_some() || name.starts_with("fuzzfog");
         // (The mouse captured, as `fought`: the window's first right press
         // would otherwise take it, and the swings' drags wouldn't reach
         // the game.) gen_worldframes.py's FUZZ_AT: `fight` with
         // `playtakehits`' creature and no shield, `crypt` before the
-        // Crypt of Hearts' first down stairs, facing them.
+        // Crypt of Hearts' first down stairs, facing them; `caster`
+        // `playcreaturecast`'s creature (casting at the player) and CASTER_BOOK;
+        // `levelup` `fight`'s with a level's experience (`levelled`) and
+        // the book; `wildday` and `wildnight` at noon and at ten.
         return Some((place, Box::new(move |a: &mut App| {
             known(a, LIGHT);
             if fight {
@@ -2198,6 +2320,24 @@ fn case(name: &str) -> Option<Case> {
             }
             if crypt {
                 at_square(a, 4, 52, 0x80);
+            }
+            if caster {
+                brought(a, 0xB, 1, 0x300);
+                booked(a, &CASTER_BOOK);
+            }
+            if level {
+                unshielded(a, None);
+                levelled(a);
+                booked(a, &CASTER_BOOK);
+            }
+            if let Some(h) = hour {
+                at_hour(a, h, 0x100);
+            }
+            if third {
+                // (A potion of healing in the use list.)
+                for (i, &b) in POTION.iter().enumerate() {
+                    a.engine.m.mem.w8(DS, arena::character::PLAYER + 0x6E + 0x13 * 38 + i as u16, b);
+                }
             }
             captured(a);
         }), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| fuzz_play(&tokens, a, d, seen))));
@@ -4023,12 +4163,6 @@ fn the_3d_view_drawn_as_the_original_draws_it() {
 /// against the original's (`view3d`), and the share of them alike where
 /// ARENA_SCREENS has the original's page.
 fn soft_view(name: &str) -> Option<(bool, Option<f64>)> {
-    soft_view_from(name, 0)
-}
-
-/// `soft_view` from row `top` on (`view3d1`: from row 1, the rows above
-/// left 0).
-fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
     let (place, setup, play) = case(name)?;
     let (mut a, _) = played(
         place,
@@ -4040,10 +4174,9 @@ fn soft_view_from(name: &str, top: usize) -> Option<(bool, Option<f64>)> {
     )?;
     let page = a.engine.page.take().unwrap();
     let (idx, _) = layer(&mut a);
-    let three: Vec<u8> = page.iter().zip(&idx).enumerate().map(|(k, (&c, &i))| if i >= 0x100 && k >= top * 320 { c } else { 0 }).collect();
+    let three: Vec<u8> = page.iter().zip(&idx).map(|(&c, &i)| if i >= 0x100 { c } else { 0 }).collect();
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
-    let kind = if top == 0 { "view3d" } else { "view3d1" };
-    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == kind && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
+    let want = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "view3d" && f[1] == name).map(|f| u64::from_str_radix(f[2], 16).unwrap());
     let same = std::env::var("ARENA_SCREENS").ok().and_then(|d| {
         let full = std::fs::read(PathBuf::from(&d).join(format!("{name}.full"))).ok()?;
         let n = idx.iter().filter(|&&i| i >= 0x100).count();
@@ -4101,15 +4234,13 @@ fn the_wildernesss_3d_view_drawn_as_the_original_draws_it() {
 
 /// The crypt (the ceiling's dark runs stepped by the EMS frame's segment,
 /// CCCE: 0000:D865's EDX bug, the frame at F000h as the harness's), every
-/// pixel as the original's renderer draws them from row 1 on. Its topmost
-/// ceiling row reads one entry past the row table (DB78's), the next heap
-/// block's header in the original, whose words are its heap's segments
-/// (7A33h, 78FFh there): no other layout has them, so row 0 is left out
-/// (`view3d1`).
+/// pixel as the original's renderer draws them, row 0 too: its topmost
+/// ceiling row reads one entry past the row table (DB78's), which the
+/// drawing's tables, started from the machine's, hold as the original's.
 #[test]
 fn the_crypts_3d_view_drawn_as_the_original_draws_it() {
-    let Some((ok, same)) = soft_view_from("playcrypt", 1) else { return };
-    assert!(ok, "playcrypt: the 3D view from row 1 differs from the original's ({same:?}% alike)");
+    let Some((ok, same)) = soft_view("playcrypt") else { return };
+    assert!(ok, "playcrypt: the 3D view differs from the original's ({same:?}% alike)");
 }
 
 
