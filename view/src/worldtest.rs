@@ -1761,7 +1761,7 @@ const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
     "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2",
     "fuzzspell1", "fuzzspell2", "fuzzcamp1", "fuzzcamp2", "fuzzlevel1", "fuzzfog1",
-    "fuzzstore1", "fuzztavern1", "fuzztemple1", "fuzzguild1", "fuzznight1", "fuzzday1"];
+    "fuzzstore1", "fuzzstore2", "fuzztavern1", "fuzztemple1", "fuzzguild1", "fuzzguild2", "fuzznight1", "fuzzday1", "fuzzday2"];
 
 /// gen_worldframes.py's CASTER_BOOK: the spells `caster` and
 /// `level_fight` add to the book (`booked`).
@@ -2038,6 +2038,7 @@ fn fuzz_acts(fields: &[&str]) -> std::collections::VecDeque<FuzzAct> {
                     "2" => (KeyCode::Digit1, Some("1")),
                     "3" => (KeyCode::Digit2, Some("2")),
                     "4" => (KeyCode::Digit3, Some("3")),
+                    "b" => (KeyCode::Digit0, Some("0")),
                     "39" => (KeyCode::Space, Some(" ")),
                     "30" => (KeyCode::KeyB, Some("b")),
                     "1f" => (KeyCode::KeyS, Some("s")),
@@ -2132,7 +2133,7 @@ fn fuzz_frames_acts(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse
                 match acts.pop_front() {
                     Some(FuzzAct::Click(x, y)) => d.click(a, x, y, MouseButton::Left),
                     Some(FuzzAct::Key(code, text)) => d.key(a, code, text),
-                    None => d.key(a, KeyCode::Escape, None),
+                    None => fuzz_esc(a, d),
                 }
             } else {
                 break;
@@ -2169,8 +2170,52 @@ fn fuzz_screen(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDequ
         match acts.pop_front() {
             Some(FuzzAct::Click(x, y)) => d.click(a, x, y, MouseButton::Left),
             Some(FuzzAct::Key(code, text)) => d.key(a, code, text),
-            None => d.key(a, KeyCode::Escape, None),
+            None => fuzz_esc(a, d),
         }
+    }
+}
+
+/// gen_worldframes.py's SpareEsc for what a session's frames or a
+/// screen bring up: Esc, but Enter on a list whose record doesn't let Esc
+/// leave (+20h bit 4000h, 3159:0966): its line marked picked; a shop
+/// dialog's page with "...More" (1194:4EF7, the buttons alone) clicked
+/// there, its last page (4F3F) and the strip's message (4D51) at the
+/// centre; its picture's buttons (6001) the second clicked; a spell's
+/// page (5234) and the spellmaker (5651) their Exit; a field typed in
+/// (0000:A172) Enter.
+fn fuzz_esc(a: &mut App, d: &mut Driver) {
+    if a.boxes.is_empty() && matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Text(_))) {
+        // (A 1 typed first while the field is empty.)
+        if a.live.as_ref().is_some_and(|l| l.text().is_empty()) {
+            d.key(a, KeyCode::Digit1, Some("1"));
+        } else {
+            d.key(a, KeyCode::Enter, None);
+        }
+        return;
+    }
+    if a.boxes.front().is_some_and(|b| b.last() == Some(&hud::more_line())) {
+        d.click(a, 0x11D, 0xA9, MouseButton::Left);
+        return;
+    }
+    if a.boxes.front().is_some_and(|b| hud::clicks_only(b)) {
+        d.click(a, 160, 100, MouseButton::Left);
+        return;
+    }
+    if a.boxes.is_empty() && matches!(a.menu_asked(), Some(m) if m.kind == hud::DIALOG_BUTTONS) {
+        d.click(a, 0x9F, 0x85, MouseButton::Left);
+        return;
+    }
+    if a.boxes.is_empty() && (matches!(&a.panel, Some(panels::Panel::Inventory(inv)) if inv.page.is_some()) || matches!(a.pending.as_ref().map(|p| &p.need), Some(dialog::Need::Spellmaker))) {
+        d.click(a, 0x128, 0xC0, MouseButton::Left);
+        return;
+    }
+    let stuck = a.boxes.is_empty()
+        && matches!(a.menu_asked(), Some(m) if m.list)
+        && a.list_live.as_ref().is_some_and(|l| l.m.mem.r16(l.seg, l.rec.wrapping_add(0x20)) & 0x4000 == 0);
+    if stuck {
+        d.key(a, KeyCode::Enter, None);
+    } else {
+        d.key(a, KeyCode::Escape, None);
     }
 }
 
@@ -2475,13 +2520,15 @@ fn case(name: &str) -> Option<Case> {
         let (fight, crypt) = (name.starts_with("fuzzfight"), name.starts_with("fuzzcrypt"));
         let (caster, level) = (name.starts_with("fuzzspell"), name.starts_with("fuzzlevel"));
         let hour = match name {
-            "fuzzcamp1" | "fuzzday1" => Some(12),
-            "fuzzcamp2" | "fuzznight1" => Some(22),
+            "fuzzcamp1" => Some(12),
+            "fuzzcamp2" => Some(22),
+            n if n.starts_with("fuzzday") => Some(12),
+            n if n.starts_with("fuzznight") => Some(22),
             _ => None,
         };
         // (`fuzz_script3`'s seeds, with the lists and the camp.)
         let third = caster || level || name.starts_with("fuzzcamp") || name.starts_with("fuzzfog");
-        let who = name.to_string();
+        let who = name.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
         // (The mouse captured, as `fought`: the window's first right press
         // would otherwise take it, and the swings' drags wouldn't reach
         // the game.) gen_worldframes.py's FUZZ_AT: `fight` with
@@ -2514,19 +2561,19 @@ fn case(name: &str) -> Option<Case> {
             // facing him; the store's shopping, the temple's hurt, the
             // guild's room, the tavern's seed.)
             match who.as_str() {
-                "fuzzstore1" => {
+                "fuzzstore" => {
                     shopping(a);
                     at_square(a, 15, 11, 0x100);
                 }
-                "fuzztavern1" => {
+                "fuzztavern" => {
                     seeded(a);
                     at_square(a, 7, 12, 0x100);
                 }
-                "fuzztemple1" => {
+                "fuzztemple" => {
                     temple_hurt(a);
                     at_square(a, 10, 11, 0x100);
                 }
-                "fuzzguild1" => {
+                "fuzzguild" => {
                     room(a);
                     seeded(a);
                     at_square(a, 7, 12, 0x80);

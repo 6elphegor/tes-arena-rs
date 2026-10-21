@@ -1745,8 +1745,9 @@ FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1':
         'fuzzcrypt2': ('crypt', 2, 2), 'fuzzpeople1': ('people', 1, 2), 'fuzzpeople2': ('people', 2, 2),
         'fuzzspell1': ('caster', 1, 3), 'fuzzspell2': ('caster', 2, 3), 'fuzzcamp1': ('wildday', 1, 3),
         'fuzzcamp2': ('wildnight', 1, 3), 'fuzzlevel1': ('levelup', 1, 3), 'fuzzfog1': ('fogged', 1, 3),
-        'fuzzstore1': ('shop', 1, 4), 'fuzztavern1': ('inn', 1, 4), 'fuzztemple1': ('shrine', 1, 4),
-        'fuzzguild1': ('mages', 1, 4), 'fuzznight1': ('nighttown', 1, 4), 'fuzzday1': ('daytown', 1, 4)}
+        'fuzzstore1': ('shop', 7, 4), 'fuzzstore2': ('shop', 4, 4), 'fuzztavern1': ('inn', 3, 4),
+        'fuzztemple1': ('shrine', 4, 4), 'fuzzguild1': ('mages', 3, 4), 'fuzzguild2': ('mages', 5, 4),
+        'fuzznight1': ('nighttown', 2, 4), 'fuzzday1': ('daytown', 1, 4), 'fuzzday2': ('daytown', 2, 4)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
 
@@ -1946,20 +1947,46 @@ def fuzz_script3(where, seed, total):
 
 
 # The keys `fuzz_acts` presses on a screen: Enter, Y, N (the equipment
-# page from the sheet too), 1..3, Space, B, S, R.
-ACT_KEYS = (KEY_ENTER, KEY_Y, KEY_N, 0x02, 0x03, 0x04, KEY_SPACE, 0x30, KEY_S, KEY_R)
+# page from the sheet too), 1..3 and 0 (a price typed), Space, B, S, R.
+ACT_KEYS = (KEY_ENTER, KEY_Y, KEY_N, 0x02, 0x03, 0x04, 0x0B, KEY_SPACE, 0x30, KEY_S, KEY_R)
+# Where the game's screens have something to click (`fuzz_acts`): the
+# menus' entries (a box 18h high from 3Eh, 1194:F48E's and the others'),
+# the lists' lines (from 26h), a haggle's Accept and ...More, a box's
+# middle, the talk's "Where is" and its list's lines, the sheet's
+# equipment button, the equipment page's list, Drop and Spells.
+ACT_POINTS = ([(0xA0, y) for y in range(0x43, 0xA4, 0x0C)] + [(0x70, 0x26 + 8 * k) for k in range(7)]
+              + [ACCEPT[1:], MORE[1:], (0xA0, 0x60), (0xA0, 0x65), (100, 23), (100, 50), (100, 95),
+                 (0x80, 0xB8), (0x40, 0x36), (0x40, 0x46), (0x40, 0x56), (0x90, 0xC2), (0x4F, 0xC2)])
 # The places where `fuzz_script4`'s `gN` opens the travel map (outdoors).
 TRAVELLED4 = ('nighttown', 'daytown')
+# A point in each province's region of the world map (DATA:6D90).
+PROVINCE_POINTS = [(70, 45), (80, 90), (150, 50), (240, 70), (60, 155), (130, 140), (165, 145), (235, 150), (165, 110)]
+# The province map's Travel button (26F7:07CD, MAPBTNS' second).
+TRAVEL_BUTTON = (62, 180)
+# `fuzz_script4`'s places indoors: shorter walks, more clicks, so the
+# player stays near the keeper.
+INDOORS4 = ('shop', 'inn', 'shrine', 'mages')
 
 
-def fuzz_acts(rng):
-    """What a screen a `fuzz_script4` token opens is given, 1..8 of them:
-    a click anywhere on the page (`X.Y`) three times in four, else a key
-    of ACT_KEYS (`kHH`, its scan code); then Esc for whatever is left up
-    (`fuzz_steps`)."""
+def fuzz_acts(rng, travel=False):
+    """What a screen a `fuzz_script4` token opens is given, 2..12 of
+    them: a click (`X.Y`) at one of ACT_POINTS or anywhere on the page,
+    or a key of ACT_KEYS (`kHH`, its scan code); then Esc for whatever is
+    left up (`fuzz_steps`). For the travel map (`travel`): a province's
+    region, places on its map, and Travel one time in two."""
     acts = []
-    for _ in range(rng.randint(1, 8)):
-        if rng.random() < 0.75:
+    if travel:
+        acts.append('%d.%d' % rng.choice(PROVINCE_POINTS))
+        for _ in range(rng.randint(1, 3)):
+            acts.append(f'{rng.randint(20, 300)}.{rng.randint(20, 160)}')
+        if rng.random() < 0.5:
+            acts.append('%d.%d' % TRAVEL_BUTTON)
+        return acts
+    for _ in range(rng.randint(2, 12)):
+        r = rng.random()
+        if r < 0.45:
+            acts.append('%d.%d' % rng.choice(ACT_POINTS))
+        elif r < 0.7:
             acts.append(f'{rng.randint(0, 319)}.{rng.randint(0, 199)}')
         else:
             acts.append(f'k{rng.choice(ACT_KEYS):x}')
@@ -1982,6 +2009,8 @@ def fuzz_script4(where, seed, total):
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
              ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60),
              ((KEY_LCTRL, KEY_LEFT), 2, 40), ((KEY_LCTRL, KEY_RIGHT), 2, 40)]
+    if where in INDOORS4:
+        moves = [(keys, lo, min(hi, 12)) for keys, lo, hi in moves]
     while n < total:
         r = rng.random()
         if r < 0.30:
@@ -2032,7 +2061,7 @@ def fuzz_script4(where, seed, total):
             n += 1 + k
         elif r < 0.92 and where in TRAVELLED4:
             k = rng.randint(5, 30)
-            out.append(f'g{k},' + ','.join(fuzz_acts(rng)))
+            out.append(f'g{k},' + ','.join(fuzz_acts(rng, travel=True)))
             n += 1 + k
     return out
 
@@ -2194,13 +2223,24 @@ def let_go_in_map(a):
     a.letting_go4 = True
 
 
-class ProvinceExit(list):
-    """`fuzz_script4`'s steps' script: an Esc taken by the travel map's
-    loop (its mouse read, 3159:00B4) while a province's map is up (B7E4
-    1, 26F7:01FF) is a click on its Exit (80, 180) instead: Esc is none
-    of that window's keys (3159:0171 finds no region by it), so a map
-    left a province up would wait for ever; the world map's own Esc ends
-    the screen."""
+class SpareEsc(list):
+    """`fuzz_script4`'s steps' script: Esc (BOX_SPARE's, an act's left)
+    as the screen asking takes a way out. The travel map's loop (its
+    mouse read, 3159:00B4) with a province's map up (B7E4 1, 26F7:01FF):
+    its Exit clicked (80, 180), Esc being none of that window's keys
+    (3159:0171 finds no region by it). A list's loop (06EB) asks the keys
+    held, not typed (0834): Esc held where its record lets Esc leave
+    (+20h bit 4000h, 0966), and let go at the wait for its release that
+    follows (0975); else Enter held, the line marked picked (its release
+    the list's own wait, 0932: `run_screen`'s). A shop dialog's page
+    waiting on the buttons alone (1194:4EF7): its "...More" clicked, its
+    last (4F3F) at the centre; its
+    picture's buttons (6001, clicks alone): the second, No; a spell's
+    page from the equipment page (5234, clicks alone) and the guild's
+    spellmaker (5651): their Exit; a field
+    typed in (0000:A172, Esc only with A902 bit 1000h): Enter, a 1 first
+    while it is empty; the strip's message (4D51, clicks alone): a click.
+    Otherwise Esc typed."""
     def __init__(self, a, acts):
         super().__init__(acts)
         self.a = a
@@ -2208,11 +2248,29 @@ class ProvinceExit(list):
     def pop(self, i=-1):
         a = self.a
         act = super().pop(i)
-        if i == 0 and act == ('keys', [KEY_ESC]) and getattr(a, 'in_map', False):
-            ss, sp = a.mu.reg_read(x86.UC_X86_REG_SS), a.mu.reg_read(x86.UC_X86_REG_SP)
-            caller = (a.r16(sp + 2, seg=ss) - LOAD_SEG, a.r16(sp, seg=ss))
-            if caller == (0x3159, 0x00B9) and a.mu.mem_read(a.lin(a.ds, 0xB7E4), 1)[0] == 1:
-                return ('click', 80, 180)
+        if i != 0 or act != ('keys', [KEY_ESC]):
+            return act
+        ss, sp = a.mu.reg_read(x86.UC_X86_REG_SS), a.mu.reg_read(x86.UC_X86_REG_SP)
+        caller = (a.r16(sp + 2, seg=ss) - LOAD_SEG, a.r16(sp, seg=ss))
+        if caller == (0x3159, 0x00B9) and getattr(a, 'in_map', False) and a.mu.mem_read(a.lin(a.ds, 0xB7E4), 1)[0] == 1:
+            return ('click', 80, 180)
+        if caller == (0x3159, 0x06F0):
+            rec, seg = a.r16(0xB80A), a.r16(0xB80C)
+            return ('hold', [KEY_ESC]) if a.r16(rec + 0x20, seg=seg) & 0x4000 else ('hold', [KEY_ENTER])
+        if caller == (0x3159, 0x097A) and a.mu.mem_read(a.lin(a.ds, 0xACB5 + KEY_ESC), 1)[0]:
+            return ('up', [KEY_ESC])
+        if caller == (0x1194, 0x4EFC):
+            return ('click', 0x11D, 0xA9)
+        if caller == (0x1194, 0x6016):
+            return ('click', 0x9F, 0x85)
+        if caller in ((0x1194, 0x523E), (0x1194, 0x5656)):
+            return ('click', 0x128, 0xC0)
+        if caller == (0, 0xA177):
+            # (A field that takes no Enter while empty, a number's: a
+            # digit typed first.)
+            return ('keys', [KEY_ENTER] if a.r16(0xA840) else [0x02])
+        if caller in ((0x1194, 0x4D56), (0x1194, 0x4F44)):
+            return ('click', 160, 100)
         return act
 
 
@@ -2290,7 +2348,8 @@ CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fu
                     'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4',
                     'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2',
                     'fuzzspell1', 'fuzzspell2', 'fuzzcamp1', 'fuzzcamp2', 'fuzzlevel1', 'fuzzfog1',
-                    'fuzzstore1', 'fuzztavern1', 'fuzztemple1', 'fuzzguild1', 'fuzznight1', 'fuzzday1')
+                    'fuzzstore1', 'fuzzstore2', 'fuzztavern1', 'fuzztemple1', 'fuzzguild1', 'fuzzguild2',
+                    'fuzznight1', 'fuzzday1', 'fuzzday2')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -2436,11 +2495,14 @@ CASES = {
     'fuzzlevel1': fuzz_case('fuzzlevel1'),
     'fuzzfog1': fuzz_case('fuzzfog1'),
     'fuzzstore1': fuzz_case('fuzzstore1'),
+    'fuzzstore2': fuzz_case('fuzzstore2'),
     'fuzztavern1': fuzz_case('fuzztavern1'),
     'fuzztemple1': fuzz_case('fuzztemple1'),
     'fuzzguild1': fuzz_case('fuzzguild1'),
+    'fuzzguild2': fuzz_case('fuzzguild2'),
     'fuzznight1': fuzz_case('fuzznight1'),
     'fuzzday1': fuzz_case('fuzzday1'),
+    'fuzzday2': fuzz_case('fuzzday2'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -3406,7 +3468,7 @@ def play(a, name, steps, tracks):
             a.waits = {MOUSE_READ}
             a.script = list(opts['spare'])
         if opts.get('goes_on'):
-            a.script = ProvinceExit(a, a.script)
+            a.script = SpareEsc(a, a.script)
         drag[0] = opts.get('drag')
         a.motion = (0, 0)
         # (`do`: something the player does between frames, before the

@@ -5467,6 +5467,12 @@ impl App {
             // gave the key a character, any but the arrows, the Shifts
             // and their like); the status box's loop (2542:0530..0569)
             // only on Esc.
+            // A shop dialog's pages and the strip's message wait on the
+            // mouse's buttons alone (1194:4EF7..4F0B, 4F3F..4F53,
+            // 4D51..4D6A): no key reads them.
+            if self.boxes.front().is_some_and(|b| hud::clicks_only(b)) {
+                return;
+            }
             let typed = self.engine.m.mem.r16(arena::mem::DS, arena::lineedit::var::COUNT) != 0;
             if (typed && !self.status_box) || code == KeyCode::Escape {
                 self.box_read();

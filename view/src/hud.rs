@@ -248,6 +248,16 @@ pub fn more_line() -> Vec<Span> {
     ]
 }
 
+/// Whether a box waits on the mouse's buttons alone, no key reading it:
+/// a shop dialog's page (1194:4E88's, placed at 20h, 91h, 9 apart), with
+/// "...More" under it (4EF7..4F0B) or its last with nothing asked after
+/// (13D3 0: 4F3F..4F53), or the strip's message (4D31's wait, 4D51..4D6A:
+/// placed at 23h, 91h).
+pub fn clicks_only(b: &[Vec<Span>]) -> bool {
+    let marker = |t: String| b.first().and_then(|l| l.first()).is_some_and(|s| s.code == Some(0) && s.text == t);
+    marker(format!("{},{},9", 0x20, 0x91)) || marker(format!("{},{},0", 0x23, 0x91))
+}
+
 /// Draws a box made by `placed`: each line's text with no shadow (a line
 /// with a place of its own, `more_line`, there).
 fn draw_placed(screen: &mut Screen, st: &Style, (x, y, step, lines): (i32, i32, i32, &[Vec<Span>])) {
