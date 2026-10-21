@@ -193,3 +193,13 @@ pub const EFFECT_DELTAS: u8 = 70;
 pub const LAUNCH_DX: u8 = 71;
 /// #77: GetByte lets the end of the input in as FFFFh; a size of 0 leaks the tables (3065:0D2D).
 pub const MIF_EOF: u8 = 77;
+/// #84: the spellmaker's cost and price wrap at 16 bits (1194:6AA9, 6AD8).
+pub const SPELL_COST: u8 = 84;
+/// #85: Spell Absorption's chance leaves out its base percent (2CDD:0822).
+pub const ABSORB_BASE: u8 = 85;
+/// #86: a second reflection in one cast overwrites the first; a stale
+/// target is struck (2CDD:0A38, 29CF:0941).
+pub const REFLECT_LIST: u8 = 86;
+/// #87: a level gained sets the attributes to their new bases, active
+/// effects then restore them to before the level (1194:1012).
+pub const LEVEL_GAIN: u8 = 87;

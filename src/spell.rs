@@ -294,7 +294,16 @@ impl Machine {
             }
             0x07A3 => self.sp_kind20(x),
             0x07DB => self.sp_kind21(x),
-            0x0822 => self.sp_timed_pair(x, 0x400, 0x28, false),
+            // Spell Absorption: its strength without the spell's +0, the
+            // base percent its description (SPELLMKR.TXT #40, as #41's and
+            // #42's) gives first, so an absorb spell's chance is only its
+            // per-level part, 0 for most (the original's, #85). Fixed
+            // (`ABSORB_BASE`), +0 added as Reflection's and Resistance's
+            // beside it.
+            0x0822 => {
+                let plus = self.fixed(crate::fixes::ABSORB_BASE);
+                self.sp_timed_pair(x, 0x400, 0x28, plus)
+            }
             0x0841 => self.sp_timed_pair(x, 0x800, 0x2C, true),
             0x0863 => self.sp_timed_pair(x, 0x1000, 0x30, true),
             _ => crate::giveup::not_ported("the table at 83E2: a spell kind not in the table"),

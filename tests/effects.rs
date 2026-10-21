@@ -238,3 +238,46 @@ fn fixed_new_effects_start_with_no_deltas() {
         assert!(deltas.iter().all(|&d| d == want), "{fixes:?}: {deltas:x?}");
     }
 }
+
+/// #86 fixed (`REFLECT_LIST`): two targets of one cast that both reflect
+/// it each queue the caster in an entry of their own, after the list's
+/// targets, the count raised; the original's writes the same entry twice
+/// (the count never raised), so the caster is struck once and 29CF:0941
+/// goes on into the entry after it, left from an earlier list.
+#[test]
+fn fixed_two_reflections_queue_the_caster_twice() {
+    use arena::effects::spell_flag::{ACTIVE, ACTIVE_COUNT, ACTIVE_SIZE, REFLECT};
+    use arena::fixes::{Fixes, REFLECT_LIST};
+    const TSEG: u16 = 0x6000;
+    const STALE: u32 = 0x1234_5678;
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(REFLECT_LIST)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        // Two targets in a segment of no creature's (their spell flags'
+        // entries at the record's segment, ACTIVE's end: 2CDD:09E0), each
+        // reflecting (flag 800h, its strength 100); the caster 1 level up.
+        let table = ACTIVE + ACTIVE_COUNT * ACTIVE_SIZE;
+        m.mem.w16(TSEG, table + 0x2C + 2, 100);
+        for off in [0u16, 0x41E] {
+            m.mem.w16(TSEG, off + 0x41A, REFLECT);
+        }
+        m.mem.w16(DS, 0x1292, 1);
+        // The cast's projectile (A886) from the player; the list of two,
+        // the entry after its third left from before.
+        m.mem.w16(DS, 0xA886, 0xFF00);
+        m.mem.w32(DS, 0xFF04, (DS as u32) << 16 | arena::character::PLAYER as u32);
+        m.mem.w16(DS, 0x0D5A, 2);
+        m.mem.w32(DS, 0x0D5C + 3 * 4, STALE);
+        for off in [0u16, 0x41E] {
+            assert_eq!(m.spell_stopped(TSEG, off, 0, &mut Hooks::default()), Some(true), "{fixes:?}: reflected");
+        }
+        let caster = (DS as u32) << 16 | arena::character::PLAYER as u32;
+        let list = (m.mem.r16(DS, 0x0D5A), m.mem.r32(DS, 0x0D5C + 2 * 4), m.mem.r32(DS, 0x0D5C + 3 * 4), m.mem.r16(DS, 0x1276));
+        if fixes == Fixes::NONE {
+            assert_eq!(list, (2, caster, STALE, 2), "the original's: one entry for two, the stale one next");
+        } else {
+            assert_eq!(list, (4, caster, caster, 2), "fixed: an entry each");
+        }
+    }
+}

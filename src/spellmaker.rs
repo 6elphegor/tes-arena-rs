@@ -537,12 +537,20 @@ impl Machine {
     }
 
     /// 1194:6AD8: the effects' costs, each by the class's factor (halved
-    /// through 32 bits, 16 kept).
+    /// through 32 bits, 16 kept). The sum is kept in 16 bits, so costs
+    /// adding up past FFFFh wrap to a cheap spell (the original's, #84).
+    /// Fixed (`SPELL_COST`), the sum stops at FFFFh: the most a cost word
+    /// holds, as the costs it adds are each a word.
     fn sm_total(&self) -> u16 {
+        let fixed = self.fixed(crate::fixes::SPELL_COST);
         let Some(si) = self.sm_class_factors() else {
+            if fixed {
+                return (self.sg16(COSTS) as u32 + self.sg16(COSTS + 2) as u32 + self.sg16(COSTS + 4) as u32).min(0xFFFF) as u16;
+            }
             return self.sg16(COSTS).wrapping_add(self.sg16(COSTS + 2)).wrapping_add(self.sg16(COSTS + 4));
         };
         let mut bp = 0u16;
+        let mut sum = 0u32;
         for i in 0..3 {
             let e = self.sg8(EFFECTS + i);
             if e == 0xFF {
@@ -551,6 +559,10 @@ impl Machine {
             let f = self.sg8(si.wrapping_add(e as u16)) as u16;
             let (dx, ax) = mul(self.sg16(COSTS + 2 * i), f);
             bp = bp.wrapping_add((((dx as u32) << 16 | ax as u32) >> 1) as u16);
+            sum += ((dx as u32) << 16 | ax as u32) >> 1;
+        }
+        if fixed {
+            return sum.min(0xFFFF) as u16;
         }
         bp
     }
@@ -566,8 +578,12 @@ impl Machine {
         let dx = self.sg8(TARGET) as u16;
         let bx = self.sm_steps(dx).wrapping_add(2);
         let total = self.sm_total();
-        let (_, ax) = mul(total, bx);
-        let ax = ax >> 1;
+        // The product's low word only (MUL BX, DX dropped): a spell whose
+        // cost times its targets' steps passes 16 bits costs what wraps
+        // (the original's, #84). Fixed (`SPELL_COST`), the whole product
+        // halved, at most FFFFh, the cost word's most.
+        let (dx, ax) = mul(total, bx);
+        let ax = if self.fixed(crate::fixes::SPELL_COST) { ((((dx as u32) << 16 | ax as u32) >> 1).min(0xFFFF)) as u16 } else { ax >> 1 };
         // AX / the level + 1 (at least 1): never past 16 bits.
         let per = ax / self.sg16(LEVEL).max(1);
         (ax, per)
@@ -652,7 +668,13 @@ impl Machine {
         } else {
             self.sm_cost()
         };
-        self.sm_itoa(ax.wrapping_add(ax), BUF);
+        // The price, twice the cost, in 16 bits (#84). Fixed
+        // (`SPELL_COST`), in 32, as the gold beside it is written.
+        if self.fixed(crate::fixes::SPELL_COST) {
+            self.dun_ultoa(ax as u32 * 2, BUF);
+        } else {
+            self.sm_itoa(ax.wrapping_add(ax), BUF);
+        }
         text(self, 0xFA, 0x21, BUF);
         self.sm_itoa(bx, BUF);
         text(self, 0x104, 0x3B, BUF);
@@ -1566,7 +1588,9 @@ impl Machine {
         let (cost, _) = self.sm_cost();
         self.mem.w16(DS, COST, cost);
         let (cost, _) = self.sm_cost();
-        let price = cost.wrapping_add(cost) as u32;
+        // Twice the cost in 16 bits (#84). Fixed (`SPELL_COST`), in 32,
+        // as the gold it is taken from.
+        let price = if self.fixed(crate::fixes::SPELL_COST) { cost as u32 * 2 } else { cost.wrapping_add(cost) as u32 };
         if self.mem.r32(DS, GOLD) < price {
             say(self, hooks, NO_GOLD);
             return Some(());

@@ -1003,8 +1003,25 @@ impl Machine {
         }
         let projectile = self.mem.r16(DS, 0xA886);
         let source = self.mem.r32(DS, projectile.wrapping_add(4));
-        let at = (self.mem.r16(DS, 0x0D5A) << 2).wrapping_add(0x0D5C);
+        // The caster goes after the list's targets, at its count, which
+        // nothing raises: a second reflection in the same cast writes the
+        // same entry, and 29CF:0941, counting two more, strikes the entry
+        // after it, left from an earlier list (the original's, #86).
+        // Fixed (`REFLECT_LIST`), the count is raised with each, so each
+        // reflection's caster has an entry of its own (0941 read the count
+        // as it began); up to ten entries, as far as the original's list
+        // ever reaches (nine targets and one reflection), past which a
+        // reflection still stops the spell but sends nothing back.
+        let fixed = self.fixed(crate::fixes::REFLECT_LIST);
+        let count = self.mem.r16(DS, 0x0D5A);
+        if fixed && count >= 10 {
+            return Some(true);
+        }
+        let at = (count << 2).wrapping_add(0x0D5C);
         self.mem.w32(DS, at, source);
+        if fixed {
+            self.mem.w16(DS, 0x0D5A, count + 1);
+        }
         self.fx_add16(DS, 0x1276, 1);
         let caster = source as u16;
         if caster != crate::character::PLAYER {

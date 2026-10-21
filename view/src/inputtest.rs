@@ -134,6 +134,12 @@ struct Driver {
     now: Instant,
 }
 
+thread_local! {
+    /// Run after each frame `Driver` gives, where set (the fixed-mode
+    /// play check's sanity checks, view/src/fixedtest.rs).
+    static FRAME_CHECK: std::cell::Cell<Option<fn(&App)>> = const { std::cell::Cell::new(None) };
+}
+
 impl Driver {
     fn new(app: &mut App) -> Driver {
         let now = Instant::now();
@@ -147,6 +153,11 @@ impl Driver {
     fn frame(&mut self, app: &mut App) {
         self.now += Duration::from_secs(1);
         app.tick(self.now);
+        // (The fixed-mode play check's look at the state after each
+        // frame, where it runs: view/src/fixedtest.rs.)
+        if let Some(check) = FRAME_CHECK.with(|c| c.get()) {
+            check(app);
+        }
     }
 
     fn frames(&mut self, app: &mut App, n: usize) {
