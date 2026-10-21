@@ -1756,19 +1756,6 @@ const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
     "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2"];
 
-/// FUZZ sessions `fuzz_sessions_as_the_original` leaves out (ARENA_CASE
-/// runs one). fuzzcrypt1: every frame and checkpoint matches, but the
-/// page its automap saves (SCREENSV.$$2) differs, with row 146 cleared as
-/// the original does; which rows differ isn't looked at. fuzzpeople2 parts at frame 187 (its first checkpoint, frame
-/// 250: the 8th actor's record, 0B9D..0BA2): the logbook opened by L
-/// (27E3:0088, from the menu keys) before the frame's townspeople, the
-/// original's person step (0000:26F5) finds AFF9 1 (the logbook's last
-/// read, the click that left it), 7A54 06A0h and CCBA 0Eh, the player
-/// busy, and turns the person a quarter at a blocked square (+0Ah 0180h
-/// to 0); the port's doesn't. What the rest of the frame the view runs
-/// after the logbook (`Talk::screen`) leaves those three isn't found yet.
-const FUZZ_LEFT_OUT: &[&str] = &["fuzzcrypt1", "fuzzpeople2"];
-
 /// A FUZZ case's script, its `fuzz` line's tokens.
 fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
@@ -5330,12 +5317,8 @@ fn a_long_session_as_the_original() {
 /// as `a_long_session_as_the_original` measures playlongrun.
 #[test]
 fn fuzz_sessions_as_the_original() {
-    // (ARENA_CASE runs that one only, left out or not.)
-    let only = std::env::var("ARENA_CASE").ok();
     for name in FUZZ {
-        if only.as_deref().map_or(!FUZZ_LEFT_OUT.contains(name), |c| c == *name) {
-            checkpointed(name);
-        }
+        checkpointed(name);
     }
 }
 
