@@ -85,6 +85,10 @@ pub const LOOT_PICK: u8 = 16;
 pub const TRAVEL_HEADER: u8 = 17;
 /// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).
 pub const GUILD_SPELLS_PICK: u8 = 20;
+/// #32: the automap's groups of four squares read back reversed (23F1:037A).
+pub const AUTOMAP_ORDER: u8 = 32;
+/// #33: the logbook is never trimmed, its new path built twice (27E3:0169).
+pub const LOG_TRIM: u8 = 33;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;

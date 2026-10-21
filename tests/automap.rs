@@ -225,3 +225,42 @@ fn matches_original() {
     }
     assert!(n > 2500, "{n} compared");
 }
+
+/// Fixed (kept bug #32): a dungeon level's map written out on leaving
+/// (23F1:013C) and read back on entering again (0000:3503) is the map
+/// seen; the original reads each group of four squares back reversed.
+#[test]
+fn fixed_the_automap_comes_back_as_seen() {
+    use arena::fixes::{AUTOMAP_ORDER, Fixes};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w8(DS, 0x8FA6, 1);
+    base.mem.w16(DS, 0x9032, 0x20);
+    base.mem.w16(DS, 0x8FA8, 0);
+    base.mem.w16(DS, 0xD806, WSEG);
+    // A dungeon's level (indoors, area 3), slot 1.
+    base.mem.w16(DS, 0xC398, 0);
+    base.mem.w8(DS, 0x05E6, 3);
+    base.mem.w8(DS, 0x1A6C, 1);
+    let seen: Vec<u8> = (0..0x4000u32).map(|i| [0u8, 7, 0x0E, 0x15][(i * 7 / 3 % 4) as usize]).collect();
+    let back = |fixes: Fixes| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        let mut fs = Files::default();
+        m.automap_load(&mut fs);
+        for (i, &v) in seen.iter().enumerate() {
+            m.mem.w8(FRAME, i as u16, v);
+        }
+        m.automap_keep(&mut fs);
+        for i in 0..0x4000u16 {
+            m.mem.w8(FRAME, i, 0);
+        }
+        m.automap_load(&mut fs);
+        (0..0x4000u16).map(|i| m.mem.r8(FRAME, i)).collect::<Vec<u8>>()
+    };
+    let faithful = back(Fixes::NONE);
+    let reversed: Vec<u8> = seen.chunks(4).flat_map(|g| g.iter().rev().copied()).collect();
+    assert_eq!(faithful, reversed, "the original's groups reversed");
+    assert_eq!(back(Fixes::only(AUTOMAP_ORDER)), seen);
+}

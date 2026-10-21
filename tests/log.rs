@@ -53,3 +53,37 @@ fn matches_original() {
     }
     eprintln!("{counts:?}");
 }
+
+/// Fixed (kept bug #33): a logbook of 2000 bytes or more has its oldest
+/// entry dropped before the new one is added; the original writes the
+/// trimmed log to "C:\ARENA_CD\C:\ARENA_CD\log.nn", which DOS refuses,
+/// so the log only grows.
+#[test]
+fn fixed_a_full_logbook_drops_its_oldest_entry() {
+    use arena::fixes::{Fixes, LOG_TRIM};
+    let Some(img) = common::image() else { return };
+    let mut old = Vec::new();
+    for i in 0..60 {
+        old.extend(format!("&Day {i}\r\nSomething happened today, number {i}. *").bytes());
+    }
+    assert!(old.len() >= 2000);
+    let after = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0x9030, 0x7000);
+        m.mem.w8(DS, 0x1A6C, 1);
+        for (i, &b) in b"A new entry\0".iter().enumerate() {
+            m.mem.w8(DS, 0xA800 + i as u16, b);
+        }
+        let mut files = arena::bsa::Files::default();
+        files.put(b"LOG.01", &old);
+        m.log_add(&mut files, 0xA800).expect("added");
+        files.written(b"LOG.01").expect("the log").to_vec()
+    };
+    let grown = after(Fixes::NONE);
+    assert_eq!(grown[..old.len()], old[..], "the original's log kept whole");
+    let trimmed = after(Fixes::only(LOG_TRIM));
+    let first = old.iter().position(|&c| c == b'*').unwrap() + 1;
+    assert_eq!(trimmed[..old.len() - first], old[first..], "the oldest entry dropped");
+    assert_eq!(trimmed[old.len() - first..], grown[old.len()..], "the new entry after");
+}
