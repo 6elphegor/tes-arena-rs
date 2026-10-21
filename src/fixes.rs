@@ -104,8 +104,16 @@ pub const KEY_RING: u8 = 37;
 pub const SPELL_DELETED: u8 = 38;
 /// #39: the status lists only the first fortifying effect (2686:01C3).
 pub const STATUS_FORTIFIED: u8 = 39;
+/// #40: a find-a-person quest's deadline reads the stage from the name
+/// (1194:9162).
+pub const OFFER_STAGE: u8 = 40;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
+/// #49: a failed quest's search compares with a stage left over (1194:9B26).
+pub const FAILED_STAGE: u8 = 49;
+/// #50: the informant's line rolled on a fake RNG in the EMS frame
+/// (1194:D105).
+pub const INFORMANT_RNG: u8 = 50;
 /// #61: the loot window puts back a bank it never saved (2433:0583).
 pub const LOOT_BANK: u8 = 61;

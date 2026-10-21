@@ -260,7 +260,8 @@ impl Machine {
     /// 1194:9B26. The failed quest (kind 3) given at `place` (+25h) of
     /// stage `stage` (FFFFh: any), the first of the four. Bug kept: a
     /// failed quest of the place with another stage leaves its stage in
-    /// AX, so the records after it are compared with that stage.
+    /// AX, so the records after it are compared with that stage. Fixed
+    /// (#49), each is compared with `stage`.
     pub fn quest_failed_at(&self, stage: u16, place: u8) -> Option<u16> {
         let mut ax = stage;
         for i in 0..4 {
@@ -268,7 +269,7 @@ impl Machine {
             if self.sq8(si + 0x25) != place || self.quest_kind(si) != 3 {
                 continue;
             }
-            let dx = ax;
+            let dx = if self.fixed(crate::fixes::FAILED_STAGE) { stage } else { ax };
             ax = self.quest_stage(si);
             if dx == 0xFFFF || ax == dx {
                 return Some(si);
@@ -1073,7 +1074,9 @@ impl Machine {
     /// mode 1), the journey there, and the deadline again: the days twice
     /// unless the stage is 6, plus the level + 1. Bug kept: that stage is
     /// read through SI as 26F7:0C0A leaves it, the name's buffer, so from
-    /// the name's fifth and sixth characters. The offer's text
+    /// the name's fifth and sixth characters (fixed, #40: the record's
+    /// own stage, CURRENT's, as the rest of the offer reads it). The
+    /// offer's text
     /// (OFFER_TEXT) is then asked (A374 mode 1, the player put at the
     /// place's square meanwhile, 9D51): no frees the record (text 5Bh, Fh
     /// in a palace); yes gives a stage 3 quest its item (1194:3829, bit
@@ -1111,7 +1114,8 @@ impl Machine {
             self.mem.w16(DS, TRAVEL_Y, cx);
             hooks.travel(self, files)?;
             let mut days = self.sq16(TRAVEL_DAYS);
-            if self.quest_stage(0x6D49) != 6 {
+            let staged = if self.fixed(crate::fixes::OFFER_STAGE) { self.sq16(CURRENT) } else { 0x6D49 };
+            if self.quest_stage(staged) != 6 {
                 days = days.wrapping_add(days);
             }
             let days = (self.sq8(LEVEL) as u16 + 1).wrapping_add(days);
@@ -1315,7 +1319,10 @@ impl Machine {
             // one at frame:91EE..91F9, made from the file's bytes, and
             // stepped there: its table (a far pointer at 91EE, on where
             // 91F0 isn't 0) read and refilled there too.
-            let r = self.cr_range_in(frame, 0, 3)?;
+            // Fixed (#50): the game's own RNG (DGROUP's), as every other
+            // roll; the line is then any of the three, not one fixed by
+            // the file's bytes.
+            let r = if self.fixed(crate::fixes::INFORMANT_RNG) { self.cr_range_in(DS, 0, 3)? } else { self.cr_range_in(frame, 0, 3)? };
             n = n.wrapping_add(r);
         }
         let si = self.skip_strings(frame, 0, n);
