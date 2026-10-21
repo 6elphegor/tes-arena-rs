@@ -1733,12 +1733,16 @@ MOUSE_POINTS = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (
 
 # Seeded random sessions (`fuzz_script`): name: (where, seed). Each
 # writes its script (`fuzz` line) for worldtest to play the same.
+# A third field 2 draws from the wider vocabulary (`fuzz_script2`).
 FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1),
-        'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2)}
+        'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2),
+        'fuzztown3': ('street', 3, 2), 'fuzzdungeon3': ('dungeon', 4, 2), 'fuzzwild3': ('wild', 3, 2),
+        'fuzztown4': ('street', 4, 2), 'fuzzdungeon4': ('dungeon', 5, 2), 'fuzzwild4': ('wild', 4, 2)}
 KEY_DOWN = 0x50
+KEY_LCTRL = 0x1D
 
 
-def fuzz_script(where, seed, total=1500):
+def fuzz_script(where, seed, vocab=1, total=1500):
     """A random session of about `total` frames from `seed`, as tokens:
     `hK[+K..],N,M` keys K (scan codes, hex) held N frames, let go, M
     frames; `wN` N frames; `tN` a minute tick due (`minute_due`), N
@@ -1748,7 +1752,10 @@ def fuzz_script(where, seed, total=1500):
     frames, let go, M frames; `cN` (the dungeon only: no doors out) the
     view's middle clicked, N frames: at (160, 70), landing (4 on) where
     the view's click with the mouse captured lands, 164, 74 (the swings
-    need it captured). No screens or boxes are opened."""
+    need it captured). No screens or boxes are opened. With `vocab` 2,
+    `fuzz_script2`'s."""
+    if vocab == 2:
+        return fuzz_script2(where, seed, total)
     rng = random.Random(f'{where}:{seed}')
     out, n, ready = [], 0, False
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
@@ -1788,9 +1795,75 @@ def fuzz_script(where, seed, total=1500):
     return out
 
 
-def fuzz_steps(tokens):
-    """`fuzz_script`'s tokens as a case's steps."""
+def fuzz_script2(where, seed, total):
+    """`fuzz_script`'s session with more to draw from: Ctrl held with a
+    turn (strafing, 2826:0473), `mX,Y,N,M` the left button held N frames
+    with the mouse at (X, Y), outside the view's centre (the original's
+    controls walking by its place, as `mouse_walk`), let go, M frames; and
+    screens left again: `oN` the automap (M) left by its exit, `fN` the
+    character sheet (F1) with Esc, `lN` the logbook (L) as playlog's, each
+    N frames after."""
+    rng = random.Random(f'v2:{where}:{seed}')
+    out, n, ready = [], 0, False
+    moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
+             ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60),
+             ((KEY_LCTRL, KEY_LEFT), 2, 40), ((KEY_LCTRL, KEY_RIGHT), 2, 40)]
+    while n < total:
+        r = rng.random()
+        if r < 0.38:
+            keys, lo, hi = rng.choice(moves)
+            k, m = rng.randint(lo, hi), rng.randint(1, 10)
+            out.append('h' + '+'.join(f'{c:x}' for c in keys) + f',{k},{m}')
+            n += k + m
+        elif r < 0.56:
+            while True:
+                x, y = rng.randint(0, 319), rng.randint(0, 146)
+                if not (0x57 <= x <= 0xEA and 0x29 <= y <= 0x73):
+                    break
+            k, m = rng.randint(3, 40), rng.randint(1, 15)
+            out.append(f'm{x},{y},{k},{m}')
+            n += k + m
+        elif r < 0.64:
+            k = rng.randint(1, 60)
+            out.append(f'w{k}')
+            n += k
+        elif r < 0.68:
+            k = rng.randint(5, 30)
+            out.append(f't{k}')
+            n += k
+        elif r < 0.71:
+            k = rng.randint(20, 60)
+            out.append(f'q{k}')
+            n += 1 + k
+        elif r < 0.76:
+            k = rng.randint(10, 30)
+            out.append(f'a{k}')
+            ready = not ready
+            n += 1 + k
+        elif r < 0.82 and ready:
+            k, m = rng.randint(5, 40), rng.randint(2, 10)
+            out.append(f's{k},{m}')
+            n += k + m
+        elif r < 0.86:
+            k = rng.randint(5, 20)
+            out.append(f'{rng.choice("ofl")}{k}')
+            n += 1 + k
+        elif where == 'dungeon':
+            k = rng.randint(5, 20)
+            out.append(f'c{k}')
+            n += k
+    return out
+
+
+def fuzz_steps(tokens, spare=False):
+    """`fuzz_script`'s tokens as a case's steps; with `spare`, each step
+    but a screen's key gives its frames BOX_SPARE: a box or question that
+    comes up on the way (the way out walked onto) left with Esc; and a
+    swing with the view's mouse let go (by a held button or a screen;
+    worldtest captures it again) has the mouse back at the view's centre
+    first, where the view's controls take a captured mouse to be."""
     steps = []
+    captured = True
     for t in tokens:
         kind, args = t[0], t[1:].split(',')
         if kind == 'h':
@@ -1805,22 +1878,51 @@ def fuzz_steps(tokens):
         elif kind == 'a':
             steps += [((KEY_A,), (), 1, None), ((), (KEY_A,), int(args[0]), None)]
         elif kind == 's':
-            steps += [((), (), int(args[0]), None, [], SWINGING), ((), (), int(args[1]), None, [], LET_GO)]
+            swing = SWINGING if captured or not spare else dict(SWINGING, do=mouse_at(160, 100))
+            steps += [((), (), int(args[0]), None, [], swing), ((), (), int(args[1]), None, [], LET_GO)]
+            captured = True
         elif kind == 'c':
             steps.append(((), (), int(args[0]), None, [(160, 70)]))
+            captured = True
+        elif kind == 'm':
+            x, y, k, m = (int(v) for v in args)
+            steps += [((), (), k, None, [], {'buttons': 1, 'do': mouse_at(x, y)}), ((), (), m, None, [], {'buttons': 0})]
+            captured = False
+        elif kind in 'ofl':
+            captured = False
+        if kind == 'o':
+            steps += [((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
+                      ((), (KEY_M,), int(args[0]), None)]
+        elif kind == 'f':
+            steps += [((KEY_F1,), (), 1, None, [], {'script': [('keys', [KEY_ESC])]}), ((), (KEY_F1,), int(args[0]), None)]
+        elif kind == 'l':
+            steps += [((KEY_L,), (), 1, None, [], {'script': [('click', 0xA0, 0x60), ('click', 0xA0, 0x60),
+                                                               ('click', 0x110, 0xBC), ('click', 0x110, 0xBC)]}),
+                      ((), (KEY_L,), int(args[0]), None)]
+    if spare:
+        steps = [s if len(s) > 5 and 'script' in s[5] else
+                 (*s[:4], s[4] if len(s) > 4 else [], dict(s[5] if len(s) > 5 else {}, spare=BOX_SPARE)) for s in steps]
     return steps
+
+
+# `fuzz_steps`'s `spare`: Esc for each box or question on the way (a box
+# takes any key, 1194:5536; the way out's travel map leaves with it), as
+# many as a step's frames may ask (the way out walked into with Up held
+# asks again every frame).
+BOX_SPARE = [('keys', [KEY_ESC])] * 128
 
 
 def fuzz_case(name):
     """A FUZZ case's CASES entry: its place, the book's Light (`known`),
     its script's steps."""
-    where, seed = FUZZ[name]
-    return where, known(LIGHT), fuzz_steps(fuzz_script(where, seed))
+    where = FUZZ[name][0]
+    return where, known(LIGHT), fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
 
 
 # Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
 # way (`checkpoint` lines), as at their end.
-CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2')
+CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2',
+                    'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -1947,6 +2049,12 @@ CASES = {
     'fuzztown2': fuzz_case('fuzztown2'),
     'fuzzdungeon2': fuzz_case('fuzzdungeon2'),
     'fuzzwild2': fuzz_case('fuzzwild2'),
+    'fuzztown3': fuzz_case('fuzztown3'),
+    'fuzzdungeon3': fuzz_case('fuzzdungeon3'),
+    'fuzzwild3': fuzz_case('fuzzwild3'),
+    'fuzztown4': fuzz_case('fuzztown4'),
+    'fuzzdungeon4': fuzz_case('fuzzdungeon4'),
+    'fuzzwild4': fuzz_case('fuzzwild4'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -2861,7 +2969,7 @@ def play(a, name, steps, tracks):
         # The step's drag: the mouse moved by it before each frame.
         if drag[0] is not None:
             a.motion = drag[0]
-    for held, let_go, n, until, *more in steps:
+    for step, (held, let_go, n, until, *more) in enumerate(steps):
         a.clicks.extend(more[0] if more else [])
         # A step's options: the buttons held through it (`buttons`, 2 the
         # right), the mouse's motion before each of its frames (`drag`).
@@ -2874,6 +2982,11 @@ def play(a, name, steps, tracks):
         if 'script' in opts:
             a.waits = {MOUSE_READ} | opts.get('waits', set())
             a.script = list(opts['script'])
+        # (`spare`: actions for a box or question that may come up in the
+        # step's frames; those left over dropped after the step.)
+        if 'spare' in opts:
+            a.waits = {MOUSE_READ}
+            a.script = list(opts['spare'])
         drag[0] = opts.get('drag')
         a.motion = (0, 0)
         # (`do`: something the player does between frames, before the
@@ -2937,6 +3050,8 @@ def play(a, name, steps, tracks):
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         clicked = any(act[0] in ('click', 'rclick') for act in opts.get('script', []))
+        if 'spare' in opts:
+            a.script = []
         if why == ('ended',) and opts.get('leaves'):
             # The area left in the step's frame (a door, a gate, a
             # journey): the outer loop on into the next (`area_next`, its
@@ -2956,7 +3071,7 @@ def play(a, name, steps, tracks):
                 a.clicks = []
                 a.buttons = 0
             continue
-        assert why == ('frames',), f'{name}: stopped by {why}'
+        assert why == ('frames',), f'{name}: stopped by {why} in step {step}, frame {frame[0]}'
         if opts.get('ends'):
             # (`ends`: the case ends with the step's last frame, a screen
             # its menu key opened inside it (2542:0100 from 0000:4952)

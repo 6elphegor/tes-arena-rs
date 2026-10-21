@@ -3294,8 +3294,10 @@ struct App {
     /// the original's controls walk by the cursor's place (`TurnIn::walk`).
     /// Let go, they stay the controls, the cursor's region still theirs
     /// (the acceleration running out, 2826:0D20; in the centre, 5E0 bit
-    /// 40h and clicks, 2826:00F6), until a key is pressed or the mouse
-    /// captured.
+    /// 40h and clicks, 2826:00F6), until the mouse is captured: the arrow
+    /// keys too are theirs then (2826:0473, from the key states the key
+    /// interrupt keeps), the cursor's region's handler walking on after
+    /// them while the acceleration lasts.
     walk_mouse: Option<(i32, i32, bool)>,
     /// A click on the bar's button: the frame it runs takes it in its
     /// input step (`TurnIn::bar`).
@@ -5863,10 +5865,6 @@ impl App {
         use winit::event::MouseButton;
         use winit::keyboard::KeyCode;
         self.ring_screen();
-        // A key pressed with the button let go: the view's own controls again.
-        if matches!(ev, In::Key { down: true, .. }) && matches!(self.walk_mouse, Some((_, _, false))) {
-            self.walk_mouse = None;
-        }
         // A key goes through the key interrupt (0000:718A, `key_event`)
         // whatever is up, as the original's every key does: its state
         // where the game keeps it (DS:ACB5 + its scan code, FFh down), for
@@ -6237,7 +6235,18 @@ impl App {
     /// The mouse captured: locked (or confined) and hidden in the window;
     /// with no window (a test), taken as captured.
     fn capture(&mut self) {
-        self.walk_mouse = None;
+        // From the original's controls back to the view's own: the cursor
+        // where those take a captured mouse to be, the view's centre (the
+        // classic controls' centre region, 2826:00F0), not left where the
+        // held button walked it (its region's handler would walk on while
+        // the acceleration lasts, 2826:0D20).
+        if self.walk_mouse.take().is_some() {
+            use arena::mem::DS;
+            let m = &mut self.engine.m;
+            m.mouse_report = None;
+            m.mem.w16(DS, arena::controls::var::MOUSE_X, 160);
+            m.mem.w16(DS, arena::controls::var::MOUSE_Y, 100);
+        }
         match &self.gpu {
             Some(g) => {
                 let ok = g
