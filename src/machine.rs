@@ -1,6 +1,7 @@
 //! Shared state of the original program that ported routines run against.
 
 use crate::exe::Image;
+use crate::fixes::Fixes;
 use crate::mem::Memory;
 use crate::random::ArenaRandom;
 
@@ -106,11 +107,14 @@ pub struct Machine {
     /// the drawing's set-up loaded the walls' ([D806], 0000:D476). Read
     /// where the original reads FS without setting it (292B:086C).
     pub fs_creatures: bool,
+    /// The kept bugs corrected (`fixes`): none, the original's behaviour,
+    /// unless a front end asks for them. Copies of the machine keep it.
+    pub fixes: Fixes,
 }
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, mouse_report, arrows_buttons, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = self;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, arrows_buttons, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures, fixes } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -138,6 +142,7 @@ impl Clone for Machine {
             list_capture: *list_capture,
             list_captured: list_captured.clone(),
             fs_creatures: *fs_creatures,
+            fixes: *fixes,
         }
     }
 
@@ -145,7 +150,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, mouse_report, arrows_buttons, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = source;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, arrows_buttons, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures, fixes } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -172,6 +177,7 @@ impl Clone for Machine {
         self.list_capture = *list_capture;
         self.list_captured.clone_from(list_captured);
         self.fs_creatures = *fs_creatures;
+        self.fixes = *fixes;
     }
 }
 
@@ -179,7 +185,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), mouse_report: None, arrows_buttons: None, bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, row_cleared: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), mouse_report: None, arrows_buttons: None, bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, row_cleared: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false, fixes: Fixes::NONE }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so
@@ -187,6 +193,12 @@ impl Machine {
     pub fn original_fault<T>(&mut self, why: &'static str) -> Option<T> {
         self.gave_up = Some(why);
         crate::giveup::original(why)
+    }
+
+    /// Whether kept bug `n` (docs/kept-bugs.md's number, `fixes`'s
+    /// constants) is corrected: the original's behaviour where not.
+    pub fn fixed(&self, n: u8) -> bool {
+        self.fixes.has(n)
     }
 
     /// Reload the RNG after its DGROUP variables were written directly.

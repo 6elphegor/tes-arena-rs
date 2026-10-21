@@ -215,3 +215,36 @@ fn class_list_without_terminator_is_none() {
     m.mem.w8(DATA, 0x1100, 1);
     assert_eq!(m.class_can_use(seg, it, 0), Some(true));
 }
+
+/// An equipped item raising strength by `bonus` percent taken off a
+/// player whose strength is `pct` percent (1194:511A), with `fixes`: the
+/// strength byte after (256 scale).
+fn strength_after_unequip(img: &arena::exe::Image, fixes: arena::fixes::Fixes, pct: i16, bonus: u8) -> u8 {
+    use arena::{item, mem::DS, scale::to256};
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    let (player, si) = (0x01A4u16, 0x01A4 + 0x6E);
+    m.mem.w8(DS, player + 0x29, to256(pct) as u8);
+    m.mem.w8(DS, si + item::FLAGS, item::EQUIPPED | item::OCCUPIED | item::ENCHANTED);
+    m.mem.w8(DS, si + item::ENCHANT, 0);
+    m.mem.w8(DS, si + item::ENCHANT_VALUE, bonus);
+    m.mem.w8(DS, si + item::ENCHANT_ATTR, 0);
+    m.unequip_enchantment(si);
+    m.mem.r8(DS, player + 0x29)
+}
+
+/// Fixed (kept bug #13): taking off an item whose bonus is more than the
+/// attribute has (a drain since it was put on) leaves the attribute at 0,
+/// not wrapped round and clamped to its maximum as the original does.
+/// Where the attribute covers the bonus, both are the same.
+#[test]
+fn fixed_unequipping_a_drained_attribute_stops_at_0() {
+    use arena::fixes::{Fixes, UNEQUIP_WRAP};
+    let Some(img) = common::image() else { return };
+    let fixed = Fixes::only(UNEQUIP_WRAP);
+    assert_eq!(strength_after_unequip(&img, Fixes::NONE, 10, 30), 0xFF, "the original's wrap");
+    assert_eq!(strength_after_unequip(&img, fixed, 10, 30), 0);
+    let plain = strength_after_unequip(&img, Fixes::NONE, 50, 20);
+    assert_eq!(plain, arena::scale::to256(30) as u8);
+    assert_eq!(strength_after_unequip(&img, fixed, 50, 20), plain);
+}

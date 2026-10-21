@@ -167,3 +167,54 @@ fn a_haggle_given_up_maps_the_bank_back() {
     assert_eq!(m.haggle(&mut files, &mut io, 100, 50, 0x80, 0x80, 0, 1, 0x1A4C), None);
     assert_eq!(m.mem.r16(DS, 0x8FA8), 3 * 4, "the bank mapped before back");
 }
+
+/// Of 200 sales (mode 4) of an item the merchant offers 1000 for (his
+/// limit 1222), each with its own seed, how many take the player's one
+/// counter-offer of `offer` at once, with `fixes`. The player says yes to
+/// whatever comes next: the deal's confirmation, or the merchant's counter
+/// (a deal at his new price, not the offer).
+fn sales_taken(fixes: arena::fixes::Fixes, offer: &[u8]) -> Option<usize> {
+    let img = common::image()?;
+    let mut files = Files::new(&game_dir()).ok()?;
+    let mut base = Machine::new(&img);
+    assert!(base.bsa_open(&mut files));
+    base.mem.w16(DS, 0x9030, 0x7000);
+    base.fixes = fixes;
+    let mut taken = 0;
+    for seed in 0..200u32 {
+        let mut m = base.clone();
+        m.rng.seed = seed.wrapping_mul(0x9E37_79B9);
+        // (A refused offer is followed by none: the player leaves.)
+        let mut io = Script { menus: vec![1, 0, 0], offers: vec![offer.to_vec(), Vec::new()], used: [0; 3] };
+        let asked: u32 = std::str::from_utf8(offer).unwrap().parse().unwrap();
+        if m.haggle(&mut files, &mut io, 1000, 50, 0x80, 0x80, 0, 4, 0x1A4C)? == Haggle::Deal(asked) {
+            taken += 1;
+        }
+    }
+    Some(taken)
+}
+
+/// Fixed (kept bug #10): selling reaches the merchant's acceptance roll,
+/// the purchase's mirrored: an offer between his price and his limit is
+/// taken on a roll out of 256 at or under the share of the way from the
+/// limit back to his price (x 256) plus the quality and personality
+/// terms; the closer to his price, the likelier. The original never rolls
+/// and always counters.
+#[test]
+fn fixed_selling_rolls_to_accept() {
+    use arena::fixes::{Fixes, SELLING_ROLL};
+    let fixed = Fixes::only(SELLING_ROLL);
+    let Some(never) = sales_taken(Fixes::NONE, b"1001") else {
+        eprintln!("skipping: no game");
+        return;
+    };
+    assert_eq!(never, 0, "the original always counters");
+    assert_eq!(sales_taken(Fixes::NONE, b"1100"), Some(0));
+    // Share (1222 - offer) x 256 / 222, personality 50 - 128: a = 177 for
+    // 1001 (about 69%), 62 for 1100 (24%); past 1222 refused.
+    let near = sales_taken(fixed, b"1001").unwrap();
+    let far = sales_taken(fixed, b"1100").unwrap();
+    assert!((110..170).contains(&near), "{near} of 200 at 1001");
+    assert!((25..75).contains(&far), "{far} of 200 at 1100");
+    assert_eq!(sales_taken(fixed, b"1300"), Some(0));
+}

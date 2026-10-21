@@ -31,6 +31,8 @@ struct Script {
     haggles: Vec<(bool, u32)>,
     n: [usize; 5],
     log: Vec<u32>,
+    /// The rooms' files written: their hours (1019) and end (12CA).
+    rooms: Vec<(u16, u32)>,
 }
 
 fn take<T: Copy>(q: &[T], n: &mut usize, default: T) -> T {
@@ -104,6 +106,7 @@ impl TavernHooks for Script {
     }
     fn room_file(&mut self, m: &mut Machine, _files: &mut Files) {
         self.log.extend([7, m.mem.r16(DS, 0x1019) as u32, m.mem.r16(DS, 0x12CA) as u32, m.mem.r16(DS, 0x12CC) as u32]);
+        self.rooms.push((m.mem.r16(DS, 0x1019), m.mem.r32(DS, 0x12CA)));
     }
     fn message_box(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([10, si as u32]);
@@ -343,4 +346,40 @@ fn rooms_whose_time_is_up_are_deleted() {
     assert!(files.exists(b"IN5678.3"), "still let");
     assert!(files.exists(b"IN9999.4"), "another slot's");
     assert_eq!(m.mem.cstr(DS, 0x733A), b"in*.3");
+}
+
+/// Fixed (kept bug #15): a room sneaked into (1194:BCEA) is the player's
+/// for 24 hours, as a day's room paid for is; the original gives it the
+/// end time's low word in hours. The vectors' cases are played both ways:
+/// the rooms that differ are the sneaked ones.
+#[test]
+fn fixed_a_sneaked_room_rests_a_day() {
+    use arena::fixes::{Fixes, SNEAK_HOURS};
+    let Some(img) = common::image() else { return };
+    let mut files = arena::bsa::Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).expect("files");
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0xD806, WSEG);
+    let mut sneaked = 0;
+    for line in include_str!("vectors/tavern.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let mut run = |fixes: Fixes| {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut sc = setup(&mut m, seed);
+            m.load_rng();
+            let _ = m.tavern_shop(&mut files, &mut sc);
+            sc.rooms
+        };
+        let (faithful, fixed) = (run(Fixes::NONE), run(Fixes::only(SNEAK_HOURS)));
+        assert_eq!(faithful.len(), fixed.len(), "{line}");
+        for (a, b) in faithful.iter().zip(&fixed).filter(|(a, b)| a != b) {
+            assert_eq!(a.0, a.1 as u16, "the original's hours, the end's low word\n{line}");
+            assert_eq!(*b, (24, a.1), "a day's hours, the same end\n{line}");
+            sneaked += 1;
+        }
+        if sneaked == 20 {
+            break;
+        }
+    }
+    assert!(sneaked > 0, "no case sneaked into a room");
 }

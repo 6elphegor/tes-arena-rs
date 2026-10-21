@@ -488,6 +488,9 @@ impl Machine {
     /// gives it back (8-bit: a value over the attribute wraps, then
     /// clamps at 255) and rebases drain snapshots; enchantment value C1h
     /// clears flag 5CA bit 0x1000. The modifiers are always recomputed.
+    /// Fixed (#13), the subtraction stops at 0: the bonus given back
+    /// takes what the attribute has, as the clamp at 255 was meant to keep
+    /// it in range, not to make a drained attribute its maximum.
     pub fn unequip_enchantment(&mut self, si: u16) {
         use crate::scale::{to100, to256};
         let p = crate::character::PLAYER;
@@ -497,7 +500,11 @@ impl Machine {
                 let attr = b(self, item::ENCHANT_ATTR) as u16;
                 let at = p + field::ATTRS + attr;
                 let r = to100(self.mem.r8(DS, at) as i16) as u16;
-                let ax = r & 0xFF00 | (r as u8).wrapping_sub(b(self, item::ENCHANT_VALUE)) as u16;
+                let ax = if self.fixed(crate::fixes::UNEQUIP_WRAP) {
+                    r & 0xFF00 | (r as u8).saturating_sub(b(self, item::ENCHANT_VALUE)) as u16
+                } else {
+                    r & 0xFF00 | (r as u8).wrapping_sub(b(self, item::ENCHANT_VALUE)) as u16
+                };
                 let ax = (to256(ax as i16) as u16).min(0xFF);
                 self.mem.w8(DS, at, ax as u8);
                 let v = (to256(b(self, item::ENCHANT_VALUE) as i16) as u16).min(0xFF);

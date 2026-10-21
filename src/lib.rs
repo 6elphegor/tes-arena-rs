@@ -27,6 +27,7 @@ pub mod effects;
 pub mod encounter;
 pub mod engine;
 pub mod exe;
+pub mod fixes;
 pub mod format;
 pub mod frame;
 pub mod giveup;

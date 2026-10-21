@@ -520,3 +520,48 @@ fn a_talk_given_up_puts_the_seed_back() {
     }
     assert!(tried > 0, "no case reached the talk's menu");
 }
+
+/// A locked chest (RECORD, its flat C93Bh's) by the player, with picking
+/// armed and a sure pick, whose square is among the failed picks
+/// (0F88): whether a click opens it, with `fixes`. None without the game.
+fn failed_chest_opens(fixes: arena::fixes::Fixes) -> Option<bool> {
+    let img = common::image()?;
+    let mut files = Files::new(&common::game_dir()).ok()?;
+    let mut m = Machine::new(&img);
+    m.fixes = fixes;
+    let (rec, x, y) = (0x3D96u16, 0x2000u16, 0x2000u16);
+    for (o, v) in [(0xD806u16, WSEG), (0xCCD0, FSEG), (0xC38E, 0x20), (0xC398, 0), (0xC3D0, x + 0x40), (0xC3D4, y), (0x01A4, 0x4000), (0x01A8, 0x4000), (0x0DC4, 0), (0xCB5E, rec), (rec, x), (rec + 4, y)] {
+        m.mem.w16(DS, o, v);
+    }
+    m.mem.w8(DS, 0xC93B, 5);
+    m.mem.w8(DS, 0xC93C, 6);
+    m.mem.w8(DS, rec + 0xC, 0x25);
+    // A pick that can't fail: the player's bytes 2A, 2C and level high.
+    for (o, v) in [(0x2A, 0xFF), (0x2C, 0xFF), (5, 0), (6, 30)] {
+        m.mem.w8(DS, 0x01A4 + o, v);
+    }
+    let sq = ((y >> 7) << 8) | (x >> 7) << 1;
+    for i in 0..0x20 {
+        m.mem.w16(DS, 0x0F88 + 2 * i, if i == 0 { sq } else { 0xFFFF });
+    }
+    let mut sc = Script { cfs: vec![false; 64], ..Script::default() };
+    for _ in 0..20 {
+        m.mem.w16(DS, 0x05CA, 1);
+        assert_eq!(m.object_click(&mut files, &mut sc, rec), Some(true));
+        if m.mem.r8(WSEG, sq) == 6 {
+            return Some(true);
+        }
+    }
+    Some(false)
+}
+
+/// Fixed (kept bug #7): a chest whose pick failed is looked up under its
+/// own square, so it stays locked however often it is tried; the
+/// original looks it up under the player's and opens it.
+#[test]
+fn fixed_a_failed_chest_stays_locked() {
+    use arena::fixes::{CHEST_RETRIED, Fixes};
+    let Some(faithful) = failed_chest_opens(Fixes::NONE) else { return };
+    assert!(faithful, "the original retries the chest");
+    assert_eq!(failed_chest_opens(Fixes::only(CHEST_RETRIED)), Some(false));
+}

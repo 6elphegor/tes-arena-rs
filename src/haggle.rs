@@ -38,9 +38,11 @@
 //!
 //! Bugs kept: selling never reaches its acceptance roll (`and ax,ax`
 //! clears carry before a carry test); accepting the first price returns
-//! DGROUP 65B8 as left by an earlier haggle; an asking price equal to the
-//! limit divides by zero; the informant is paid before the player
-//! confirms, and a refusal then keeps the gold.
+//! DGROUP 65B8 as left by an earlier haggle; the informant is paid before
+//! the player confirms, and a refusal then keeps the gold. (An asking
+//! price equal to the limit would divide by zero, but the offer's tests
+//! before each divide leave nothing to divide with it.) Fixed mode
+//! (`crate::fixes`) makes the sale's roll (#10).
 
 use crate::bsa::Files;
 use crate::dice::roll;
@@ -302,15 +304,43 @@ impl Machine {
                     false
                 } else {
                     self.mem.w16(DS, OFFER_SEEN, ax);
-                    // The shifted difference is divided with DX cleared.
-                    let d = (limit.wrapping_sub(ax)) << 8;
-                    let div = price.wrapping_sub(limit);
-                    if div == 0 {
-                        return crate::giveup::original("0000:52F2: the haggle divides by zero");
+                    if self.fixed(crate::fixes::SELLING_ROLL) {
+                        // Fixed (#10): the sale's terms are the purchase's
+                        // mirrored (the share of the way from the limit to
+                        // the price the offer has come, x 256, the quality
+                        // term's sign turned), which the original means
+                        // signed: its unsigned divide by price - limit
+                        // (below 0) gives 0, and the XOR before it drops
+                        // the dividend's top. Worked out signed, it is
+                        // decided as a purchase is (820F): 0 or less a
+                        // counter, 100h or more a deal, else a deal on a
+                        // roll of 256 at or under it. (The sale's own
+                        // tail, 81F4, unreached, would roll against the
+                        // offer itself under 100h.) limit > price here
+                        // (the offer is between them): no divide by 0.
+                        let share = ((limit - ax) as i32) * 0x100 / (limit - price) as i32;
+                        let a = share + q_d as i16 as i32 + per_d as i16 as i32;
+                        if a <= 0 {
+                            true
+                        } else if a >= 0x100 || roll(&mut self.rng, 0x100)? as i32 <= a {
+                            return self.haggle_deal(files, io, ax);
+                        } else {
+                            true
+                        }
+                    } else {
+                        // The shifted difference is divided with DX cleared.
+                        let d = (limit.wrapping_sub(ax)) << 8;
+                        let div = price.wrapping_sub(limit);
+                        // Never 0: the offer is past the price and not
+                        // past the limit (#4 in docs/kept-bugs.md, which
+                        // isn't reached; nor is the purchase's below).
+                        if div == 0 {
+                            return crate::giveup::original("0000:52F2: the haggle divides by zero");
+                        }
+                        let _ = q_d.wrapping_sub(d / div).wrapping_add(per_d);
+                        // 81F0: AND clears carry, so JAE is always taken.
+                        true
                     }
-                    let _ = q_d.wrapping_sub(d / div).wrapping_add(per_d);
-                    // 81F0: AND clears carry, so JAE is always taken.
-                    true
                 }
             } else {
                 self.mem.w16(DS, OFFER_SEEN, ax);

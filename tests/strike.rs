@@ -76,3 +76,32 @@ fn matches_original() {
     assert!(counts.get("strike").copied().unwrap_or(0) > 2000);
     assert!(counts.get("quest").copied().unwrap_or(0) > 500);
 }
+
+/// How many of 1000 crimes (0000:3F50) are seen at the player's `level`,
+/// with `fixes`.
+fn crimes_seen(img: &arena::exe::Image, fixes: arena::fixes::Fixes, level: u8) -> usize {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w8(DS, 0x01A4 + 6, level);
+    m.rng.seed = 12345;
+    (0..1000).filter(|_| m.crime_seen()).count()
+}
+
+/// Fixed (kept bug #9): from level 5 on a crime is seen half the time,
+/// the floor the chance's MAX keeps; the original's unsigned chance wraps
+/// from level 11 on and every crime is seen.
+#[test]
+fn fixed_crimes_are_seen_half_the_time_at_high_levels() {
+    use arena::fixes::{CRIME_SEEN, Fixes};
+    let Some(img) = common::image() else { return };
+    let fixed = Fixes::only(CRIME_SEEN);
+    for level in [11, 20, 25] {
+        assert_eq!(crimes_seen(&img, Fixes::NONE, level), 1000, "the original at level {level}");
+        let n = crimes_seen(&img, fixed, level);
+        assert!((400..600).contains(&n), "level {level}: {n} of 1000 seen");
+    }
+    // Below level 11 the two agree.
+    for level in [1, 5, 10] {
+        assert_eq!(crimes_seen(&img, fixed, level), crimes_seen(&img, Fixes::NONE, level), "level {level}");
+    }
+}
