@@ -1753,16 +1753,6 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4"];
 
-/// FUZZ sessions `fuzz_sessions_as_the_original` leaves out (ARENA_CASE
-/// runs one): every frame, checkpoint and the end's state match, but the
-/// page the automap or logbook saves (SCREENSV.$$2, 0000:A69E) differs in
-/// its row 146, the line over the bar: black in the original's as its
-/// frame body opens the screen, in the port's the last frame's drawing
-/// (fuzztown3's automap, fuzztown4's and fuzzdungeon3's logbook; the
-/// sheet's, fuzzdungeon4's, matches). What clears and draws that row in
-/// the original's frame isn't found yet.
-const FUZZ_LEFT_OUT: &[&str] = &["fuzztown3", "fuzzdungeon3", "fuzztown4"];
-
 /// A FUZZ case's script, its `fuzz` line's tokens.
 fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
     let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
@@ -5307,9 +5297,7 @@ fn a_long_session_as_the_original() {
 #[test]
 fn fuzz_sessions_as_the_original() {
     for name in FUZZ {
-        if !FUZZ_LEFT_OUT.contains(name) || std::env::var("ARENA_CASE").is_ok_and(|c| c == *name) {
-            checkpointed(name);
-        }
+        checkpointed(name);
     }
 }
 

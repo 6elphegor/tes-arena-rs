@@ -416,6 +416,18 @@ impl Engine {
                 now == before
             });
             self.page_ems_prior = self.page_ems_wrote.clone();
+            // The row under the view the last frame body's end cleared
+            // (0000:4CC0) in the original's one draw page, which this page
+            // stands for: cleared here, before this drawing, so the page
+            // holds that row as this drawing leaves it (black where it
+            // draws nothing, the view not bobbed down to it), and keeps it
+            // so for the screens a frame body opens and saves (SCREENSV.$$2)
+            // until the next drawing.
+            if let Some(y) = m.row_cleared.take() {
+                if let Some(row) = page.get_mut(y as usize * 320..(y as usize + 1) * 320) {
+                    row.fill(0);
+                }
+            }
             let (p, gaps, wrote, creatures, walked, ems) = crate::render::draw(m, page, &crate::render::Lgts::of(files), &self.page_wrote, &self.page_ems_prior);
             // The copy started from the earlier drawings' changes (those
             // still standing), so what it holds otherwise than the machine
@@ -919,3 +931,4 @@ pub fn walk_order(reach: u16) -> Vec<(i16, i16)> {
     v.push((0, 0));
     v
 }
+
