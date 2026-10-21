@@ -13,7 +13,8 @@
 //! Plain items are finished (`finish_weapon`/`finish_armor`) only to run
 //! the class check; the finishers read the base price at 1391, which the
 //! shop loops never set, so that value carries over from item to item.
-//! The listed templates keep their table prices.
+//! The listed templates keep their table prices (so nothing shows it:
+//! #74 in docs/kept-bugs.md).
 
 use crate::loot::{ITEM, LEVEL, TEMPLATE, template as t};
 use crate::machine::Machine;

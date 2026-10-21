@@ -147,7 +147,9 @@ impl Machine {
     pub fn roll_material(&mut self) {
         self.add_key(10);
         self.set_tb(t::ENCHANT, 0xFF);
-        // 1..=99: the top threshold (101) can never be reached either.
+        // 1..=99 against the first 7 of the 8 thresholds (the eighth,
+        // 101, the end's sentinel): every material comes, the last on 98
+        // or 99 (#82 in docs/kept-bugs.md: not a bug).
         let r = self.rand(1, 100) as u8;
         let m = self.steps(MATERIAL_STEPS, 7, r);
         self.add_key(m as u8);
