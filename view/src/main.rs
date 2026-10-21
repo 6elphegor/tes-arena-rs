@@ -1667,6 +1667,10 @@ fn main() {
     NO_MUSIC.store(args.iter().any(|a| a == "--no-music"), std::sync::atomic::Ordering::Relaxed);
     GPU_WORLD.store(args.iter().any(|a| a == "--gpu-world"), std::sync::atomic::Ordering::Relaxed);
     args.retain(|a| a != "--mute" && a != "--sound-log" && a != "--no-music" && a != "--gpu-world");
+    // The original's kept bugs corrected (`arena::fixes`), unless
+    // --original: the game as ACD.EXE plays it, bugs and all.
+    world::set_fixed(!args.iter().any(|a| a == "--original"));
+    args.retain(|a| a != "--original");
     let fight = args.iter().any(|a| a == "--fight");
     let click = args.iter().any(|a| a == "--click");
     let people = args.iter().any(|a| a == "--people");
@@ -1753,7 +1757,7 @@ fn main() {
         args.drain(i..i + 4);
     }
     if args.len() < 3 {
-        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--new-game SPEC | --create [SCRIPT]] [--shot OUT.png [FRAMES [TURN]]]");
+        eprintln!("usage: arena-view GAME_DIR LEVEL.MIF [--original] [--fight] [--people] [--click] [--hour H] [--at COL ROW HEADING] [--wait N] [--do STEPS] [--picks N,..] [--save-dir DIR] [--slot N] [--new-game SPEC | --create [SCRIPT]] [--shot OUT.png [FRAMES [TURN]]]");
         std::process::exit(2);
     }
     let dir = PathBuf::from(&args[1]);

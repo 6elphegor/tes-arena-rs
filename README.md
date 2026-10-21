@@ -7,7 +7,9 @@ running under an emulator, and a new wgpu front end (`view/`) that plays it.
 The port keeps the original's behaviour exactly, bugs included: each ported
 routine is compared with the original on thousands of generated cases, and
 where the original faults or never returns, the port returns `None` rather
-than guessing.
+than guessing. A fixed mode (`src/fixes.rs`, off unless a front end asks)
+corrects the catalogued bugs (docs/kept-bugs.md), each behind its own
+switch; the view plays with it on unless given `--original`.
 
 ## Your own game files
 
@@ -65,6 +67,7 @@ Options:
 
 | Option | |
 |---|---|
+| `--original` | play the original's bugs as ACD.EXE has them; without it the view corrects the ones fixed so far (`src/fixes.rs`, docs/kept-bugs.md) |
 | `--hour H` | the clock set to that hour of the first day |
 | `--at COL ROW HEADING` | the player put in a square's centre (512 heading units a turn) |
 | `--fight`, `--people` | a random encounter at the start; roll until people come |

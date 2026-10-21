@@ -38,6 +38,26 @@ pub const DARK_SKY: u32 = 64;
 /// moved texture: 0000:BAC3 skips them).
 pub const SEE_THROUGH: u32 = 128;
 
+/// Whether the machines made here correct the original's kept bugs
+/// (`arena::fixes`, all of them): off, the original's behaviour, as the
+/// view's tests want it; main turns it on unless `--original`. Copies of
+/// a machine (a turn's, a save's base) keep what it was made with.
+static FIXED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The machines made from now on fixed (`FIXED`) or faithful.
+pub fn set_fixed(on: bool) {
+    FIXED.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// A machine for the game in `image`, its fixes as `FIXED` says.
+fn machine(image: &exe::Image) -> Machine {
+    let mut m = Machine::new(image);
+    if FIXED.load(std::sync::atomic::Ordering::Relaxed) {
+        m.fixes = arena::fixes::Fixes::ALL;
+    }
+    m
+}
+
 /// Vertex flags: a wall face's side as the original numbers it (CCF8),
 /// plus one, shifted by WALL_SHIFT: 0 its normal -y (north), 1 +x, 2 +y,
 /// 3 -x. Floors, caps and flats have none.
@@ -128,7 +148,7 @@ pub fn boot_music(dir: &Path, replay: arena::musicdrv::Replay) -> Engine {
 
 fn boot_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>, music: Option<arena::musicdrv::Replay>) -> Engine {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
-    let mut m = Machine::new(&image);
+    let mut m = machine(&image);
     let mut files = Files::new(dir).expect("game directory");
     m.memory_init().expect("the memory");
     m.program_start(&mut files, &mut arena::start::PortStart).expect("the program's start");
@@ -168,7 +188,7 @@ pub fn title_sound(dir: &Path, driver: &mut dyn arena::digital::DigitalDriver) -
 
 fn title_in(dir: &Path, driver: Option<&mut dyn arena::digital::DigitalDriver>) -> Option<Engine> {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).ok()?).ok()?;
-    let mut m = Machine::new(&image);
+    let mut m = machine(&image);
     let mut files = Files::new(dir).ok()?;
     m.memory_init()?;
     m.program_start(&mut files, &mut arena::start::PortStart)?;
@@ -224,7 +244,7 @@ fn arena_bat_sound(m: &mut Machine) {
 /// enters it, as examples/play.rs does.
 pub fn load(dir: &Path, level: &str) -> Engine {
     let image = exe::unpack(&std::fs::read(dir.join("ACD.EXE")).expect("ACD.EXE")).expect("unpack");
-    let mut m = Machine::new(&image);
+    let mut m = machine(&image);
     let mut files = Files::new(dir).expect("game directory");
     assert!(m.bsa_open(&mut files), "GLOBAL.BSA");
     heap(&mut m);
