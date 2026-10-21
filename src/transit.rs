@@ -661,6 +661,12 @@ impl Machine {
                     } else {
                         hooks.map_keep(self, files);
                         self.mem.w8(DS, 0x1A81, 1);
+                        // The map reads the mouse first (26F7:0011): in the
+                        // arrow keys' walk, the driver's buttons over the 1
+                        // their handler put in AFF9.
+                        if let Some(b) = self.arrows_buttons {
+                            self.mem.w8(DS, crate::controls::var::BUTTONS, b);
+                        }
                         let leave = hooks.ask_leave(self, files);
                         self.mem.w8(DS, 0x1A81, 0);
                         if leave {

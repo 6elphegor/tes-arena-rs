@@ -1747,11 +1747,14 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
     walk(a, d, seen, KeyCode::ArrowUp, 400, 20);
 }
 
-/// gen_worldframes.py's FUZZ: seeded random sessions, each played from
+/// gen_worldframes.py's FUZZ: seeded random sessions (the street, the
+/// start dungeon, the wilderness; a fight taking blows, the Crypt of
+/// Hearts' stairs, the street's people), each played from
 /// the script its `fuzz` line holds and measured every CHECKPOINT frames
 /// as `playlongrun` (`fuzz_sessions_as_the_original`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
-    "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4"];
+    "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
+    "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2"];
 
 /// FUZZ sessions `fuzz_sessions_as_the_original` leaves out (ARENA_CASE
 /// runs one): every frame, checkpoint and the end's state match, but the
@@ -1760,8 +1763,18 @@ const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "
 /// frame body opens the screen, in the port's the last frame's drawing
 /// (fuzztown3's automap, fuzztown4's and fuzzdungeon3's logbook; the
 /// sheet's, fuzzdungeon4's, matches). What clears and draws that row in
-/// the original's frame isn't found yet.
-const FUZZ_LEFT_OUT: &[&str] = &["fuzztown3", "fuzzdungeon3", "fuzztown4"];
+/// the original's frame isn't found yet. fuzzcrypt1's and fuzzcrypt2's
+/// automap and fuzzpeople1's logbook likewise: every frame and checkpoint
+/// matches, the saved page (SCREENSV.$$2) differs, its row not looked at.
+/// fuzzpeople2 parts at frame 187 (its first checkpoint, frame 250: the
+/// 8th actor's record, 0B9D..0BA2): the logbook opened by L (27E3:0088,
+/// from the menu keys) before the frame's townspeople, the original's
+/// person step (0000:26F5) finds AFF9 1 (the logbook's last read, the
+/// click that left it), 7A54 06A0h and CCBA 0Eh, the player busy, and
+/// turns the person a quarter at a blocked square (+0Ah 0180h to 0); the
+/// port's doesn't. What the rest of the frame the view runs after the
+/// logbook (`Talk::screen`) leaves those three isn't found yet.
+const FUZZ_LEFT_OUT: &[&str] = &["fuzztown3", "fuzzdungeon3", "fuzztown4", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2"];
 
 /// A FUZZ case's script, its `fuzz` line's tokens.
 fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
@@ -2187,14 +2200,25 @@ fn case(name: &str) -> Option<Case> {
     if let Some(tokens) = FUZZ.contains(&name).then(|| fuzz_tokens(name)).flatten() {
         let place = match name {
             n if n.starts_with("fuzztown") => Place::Street,
-            n if n.starts_with("fuzzdungeon") => Place::Dungeon,
+            n if n.starts_with("fuzzdungeon") || n.starts_with("fuzzfight") => Place::Dungeon,
+            n if n.starts_with("fuzzcrypt") => Place::Crypt,
+            n if n.starts_with("fuzzpeople") => Place::People,
             _ => Place::Wild,
         };
+        let (fight, crypt) = (name.starts_with("fuzzfight"), name.starts_with("fuzzcrypt"));
         // (The mouse captured, as `fought`: the window's first right press
         // would otherwise take it, and the swings' drags wouldn't reach
-        // the game.)
-        return Some((place, Box::new(|a: &mut App| {
+        // the game.) gen_worldframes.py's FUZZ_AT: `fight` with
+        // `playtakehits`' creature and no shield, `crypt` before the
+        // Crypt of Hearts' first down stairs, facing them.
+        return Some((place, Box::new(move |a: &mut App| {
             known(a, LIGHT);
+            if fight {
+                unshielded(a, None);
+            }
+            if crypt {
+                at_square(a, 4, 52, 0x80);
+            }
             captured(a);
         }), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| fuzz_play(&tokens, a, d, seen))));
     }
@@ -5306,8 +5330,10 @@ fn a_long_session_as_the_original() {
 /// as `a_long_session_as_the_original` measures playlongrun.
 #[test]
 fn fuzz_sessions_as_the_original() {
+    // (ARENA_CASE runs that one only, left out or not.)
+    let only = std::env::var("ARENA_CASE").ok();
     for name in FUZZ {
-        if !FUZZ_LEFT_OUT.contains(name) || std::env::var("ARENA_CASE").is_ok_and(|c| c == *name) {
+        if only.as_deref().map_or(!FUZZ_LEFT_OUT.contains(name), |c| c == *name) {
             checkpointed(name);
         }
     }
