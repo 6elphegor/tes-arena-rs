@@ -51,6 +51,9 @@ struct Script {
     file: Option<Vec<u8>>,
     n: [usize; 6],
     log: Vec<u32>,
+    /// The haggles' quality and factor, and the stock lists' counts.
+    haggled: Vec<(u16, u16)>,
+    stock_lists: Vec<u16>,
 }
 
 fn take<T: Copy>(q: &[T], n: &mut usize, default: T) -> T {
@@ -115,11 +118,13 @@ impl GuildHooks for Script {
     }
     fn stock_list(&mut self, _m: &mut Machine, _seg: u16, si: u16, cx: u16) -> u16 {
         self.log.extend([9, 2, si as u32, cx as u32]);
+        self.stock_lists.push(cx);
         let v = take(&self.lists, &mut self.n[1], 0xFFFF);
         if v == 0xFFFF { v } else { v % cx.max(1) }
     }
     fn haggle(&mut self, _m: &mut Machine, price: u32, quality: u16, factor: u16, per: u16) -> (u32, bool) {
         self.log.extend([14, price & 0xFFFF, price >> 16, quality as u32, factor as u32, per as u32]);
+        self.haggled.push((quality, factor));
         let (cf, eax) = take(&self.haggles, &mut self.n[4], (true, 0));
         (eax, cf)
     }
@@ -448,4 +453,98 @@ fn matches_original() {
     if only.is_none() {
         assert!(n > 3000, "{n} compared");
     }
+}
+
+/// The vectors' cases played with `fixes`: for each, the machine after
+/// (or the give-up's text where the port gave None) and the script.
+fn guild_cases(img: &arena::exe::Image, files: &mut Files, fixes: arena::fixes::Fixes) -> Vec<(Result<Machine, &'static str>, Script)> {
+    let mut base = Machine::new(img);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w8(DS, 0x8FA6, 1);
+    base.mem.w16(DS, 0x9032, 0x20);
+    base.mem.w16(DS, 0x8FA8, 0);
+    for b in 0..0x20u16 {
+        base.mem.w16(DS, 0x9036 + 4 * b, b * 2);
+        base.mem.w16(DS, 0x9038 + 4 * b, 0x0600);
+    }
+    assert!(base.bsa_open(files));
+    base.fixes = fixes;
+    let days = holidays(&base);
+    let mut out = Vec::new();
+    for line in include_str!("vectors/guild.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let mut m = base.clone();
+        let mut sc = setup(&mut m, seed, &days);
+        m.load_rng();
+        arena::giveup::take();
+        let r = match m.mages_guild(files, &mut sc) {
+            Some(()) => Ok(m),
+            None => Err(arena::giveup::take().map_or("", |g| g.why)),
+        };
+        out.push((r, sc));
+    }
+    out
+}
+
+/// Fixed (kept bugs #6 and #20): a caster's "Spells" without stock is
+/// the spells' list, not the magic items' on the empty stock (#20); and
+/// a pick on that empty list buys nothing (#6) instead of faulting in
+/// 1194:5ED1's removal after the purchase, nor does a pick clobbered by
+/// an item's long name (the entry taken out is the record bought).
+#[test]
+fn fixed_spells_without_stock_and_a_pick_past_it() {
+    use arena::fixes::{Fixes, GUILD_PICK_PAST, GUILD_SPELLS_PICK};
+    let Some(img) = common::image() else { return };
+    let Ok(mut files) = Files::new(&common::game_dir()) else { return };
+    let faithful = guild_cases(&img, &mut files, Fixes::NONE);
+    let spells = guild_cases(&img, &mut files, Fixes::only(GUILD_SPELLS_PICK));
+    let past = guild_cases(&img, &mut files, Fixes::only(GUILD_PICK_PAST));
+    let faults = |r: &Result<Machine, &str>| r.as_ref().err().is_some_and(|w| w.contains("5ED1"));
+    let (mut empty, mut faulted) = (0, 0);
+    for ((a, sa), ((b, sb), (c, sc))) in faithful.iter().zip(spells.iter().zip(&past)) {
+        if faults(a) {
+            faulted += 1;
+        }
+        // #6 never faults; #20 alone only where the original's pick is
+        // clobbered by a long name (1395 runs into 13C8), as before.
+        assert!(!faults(c), "#6 still faults");
+        assert!(!faults(b) || faults(a) && !sa.stock_lists.contains(&0), "#20 faults anew");
+        if sa.stock_lists.contains(&0) {
+            empty += 1;
+            assert!(!sb.stock_lists.contains(&0), "#20 still lists the empty stock");
+            assert!(sc.stock_lists.contains(&0), "#6 alone still lists it");
+        } else if !faults(a) {
+            // (#20 also changes a pick of "Spells" whose magic items'
+            // screen said the inventory was full before listing.)
+            assert_eq!(sa.log, sc.log, "only the empty stock's and the faults' cases change");
+        }
+    }
+    assert!(empty > 0, "no case listed the empty stock");
+    assert!(faulted > 0, "no case met the original's fault");
+}
+
+/// Fixed (kept bug #11): potions and spells are haggled with the guild's
+/// own quality and factor (13CA, 13CB), as magic items are; the original
+/// passes 44h for both.
+#[test]
+fn fixed_potions_and_spells_haggle_with_the_guilds_terms() {
+    use arena::fixes::{Fixes, GUILD_HAGGLE};
+    let Some(img) = common::image() else { return };
+    let Ok(mut files) = Files::new(&common::game_dir()) else { return };
+    let faithful = guild_cases(&img, &mut files, Fixes::NONE);
+    let fixed = guild_cases(&img, &mut files, Fixes::only(GUILD_HAGGLE));
+    let mut changed = 0;
+    for ((a, sa), (b, sb)) in faithful.iter().zip(&fixed) {
+        let (Ok(_), Ok(m)) = (a, b) else { continue };
+        assert_eq!(sa.haggled.len(), sb.haggled.len());
+        let terms = (m.mem.r8(DS, 0x13CA) as u16, m.mem.r8(DS, 0x13CB) as u16);
+        for (x, y) in sa.haggled.iter().zip(&sb.haggled) {
+            if x != y {
+                assert_eq!(*x, (0x44, 0x44), "the original's terms");
+                assert_eq!(*y, terms, "the guild's");
+                changed += 1;
+            }
+        }
+    }
+    assert!(changed > 50, "{changed} haggles changed");
 }

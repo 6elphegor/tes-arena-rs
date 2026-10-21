@@ -126,3 +126,29 @@ fn matches_original() {
     }
     assert!(n > 3500, "{n}");
 }
+
+/// Fixed (kept bug #41): a quest record's item missing from the list
+/// (0FD4, nine bytes) is not freed anywhere; the original's search runs
+/// past the list and writes FFh to its tenth byte, 0FDD, the main
+/// quest's step. An item in the list is freed as before.
+#[test]
+fn fixed_a_missing_quest_item_leaves_the_main_quest_alone() {
+    use arena::fixes::{Fixes, QUEST_ITEM_END};
+    let Some(img) = common::image() else { return };
+    let after = |fixes: Fixes, item: u8| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        for i in 0..9u16 {
+            m.mem.w8(DS, 0x0FD4 + i, 0x20 + i as u8);
+        }
+        m.mem.w8(DS, 0x0FDD, 4);
+        m.mem.w8(DS, 0x0E6E + 0x1C, item);
+        m.quest_item_free(0x0E6E);
+        (0..10u16).map(|i| m.mem.r8(DS, 0x0FD4 + i)).collect::<Vec<u8>>()
+    };
+    let fixed = Fixes::only(QUEST_ITEM_END);
+    assert_eq!(after(Fixes::NONE, 0x50)[9], 0xFF, "the original's step overwritten");
+    assert_eq!(after(fixed, 0x50), [0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 4]);
+    assert_eq!(after(fixed, 0x23), after(Fixes::NONE, 0x23));
+    assert_eq!(after(fixed, 0x23)[3], 0xFF);
+}

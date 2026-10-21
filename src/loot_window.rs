@@ -37,6 +37,13 @@
 //! saving what was mapped, then puts back the bank saved at 4D77, which
 //! the key and corpse paths never set.
 //!
+//! Fixed mode (`crate::fixes`) finds the pile picked among the piles of
+//! the kind of place listed and leaves the corpse's segment alone (#16),
+//! and puts back the bank mapped before the window (#61). (That the
+//! emptied corpse whose gold was shown says nothing is what the flag is
+//! for: it is set to keep "has nothing" from following the gold, and
+//! DGROUP's is cleared each time the window opens.)
+//!
 //! With EMS off the bank mapping does nothing and returns AX, so the bank
 //! saved at 4D77 is AX as earlier code left it; the port takes the click's
 //! AX there. The message box is taken as leaving SI as it was (it is the
@@ -388,7 +395,11 @@ impl Machine {
                 }
             } else {
                 at_level = false;
-                if self.mem.r8(frame, si.wrapping_add(4)) == level {
+                // Fixed (#16): the kind of place counted too, as the list
+                // (0637) shows only the piles of this kind, so the pick-th
+                // here is the pick-th shown.
+                let kind = !self.fixed(crate::fixes::LOOT_PICK) || self.mem.r8(frame, si.wrapping_add(1)) == self.pile_place();
+                if self.mem.r8(frame, si.wrapping_add(4)) == level && kind {
                     if bl == pick {
                         break;
                     }
@@ -605,7 +616,13 @@ impl Machine {
         let mut si = if gold != 0 { 0x9686 } else { rec };
         loop {
             let seg = self.mem.r16(DS, REC_SEG);
-            self.mem.w8(seg, GOLD_SHOWN, 0);
+            // Fixed (#16): not written: the original's DS here is the
+            // corpse's, so this clears a byte of a creature's segment
+            // (DGROUP's flag only for a corpse kept there). The flag stays
+            // set after the gold, as the list's test of it wants.
+            if !self.fixed(crate::fixes::LOOT_PICK) {
+                self.mem.w8(seg, GOLD_SHOWN, 0);
+            }
             if self.corpse_list(hooks, si)? || self.mem.r8(DS, ITEMS_LEFT) == 0 {
                 return Some(());
             }
@@ -690,7 +707,7 @@ impl Machine {
             self.mem.w8(DS, PILE + i, 0);
         }
         self.mem.w8(DS, GOLD_SHOWN, 0);
-        self.map_bank(BANK_PILES, ax);
+        let before = self.map_bank(BANK_PILES, ax);
         if ah == 3 {
             let mut at = KEYS;
             let mut n = 0u32;
@@ -736,7 +753,11 @@ impl Machine {
             }
             self.pile_list(hooks, ax)?;
         }
-        let bank = self.mem.r16(DS, BANK);
+        // Fixed (#61): the bank mapped before the window is put back, as
+        // the piles' routines put back theirs; the original's 4D77 is
+        // what they saved (bank 6, mapped by then) or, on the key and
+        // corpse paths, an earlier window's.
+        let bank = if self.fixed(crate::fixes::LOOT_BANK) { before } else { self.mem.r16(DS, BANK) };
         self.map_bank(bank, ax);
         Some(())
     }

@@ -927,12 +927,15 @@ impl Machine {
     /// left it at 1044h (1EB8, the quests' lines drawn), but the same
     /// line clicked again after a description or a note in the list's
     /// panel finds 5536h, their 223A's, and the lines go over DGROUP
-    /// there (bug kept). Both leave DI as they found it.
-    fn staff_line(&mut self, files: &mut Files) -> Option<()> {
+    /// there (bug kept). Both leave DI as they found it. Fixed (#55), the
+    /// lines go to 1044h, where the list's drawing writes them, whatever
+    /// DI the loop carries.
+    pub fn staff_line(&mut self, files: &mut Files) -> Option<()> {
         if self.mem.r8(DS, 0x0F77) == 0 {
             return Some(());
         }
-        let Some(di) = self.page_di else {
+        let di = if self.fixed(crate::fixes::STAFF_LINES) { Some(0x1044) } else { self.page_di };
+        let Some(di) = di else {
             return crate::giveup::not_ported("1194:1F56: its DI as a handler the port doesn't follow left it");
         };
         self.mem.w16(DS, 0x1272, 0);
@@ -1548,7 +1551,9 @@ impl Machine {
 
     /// 1194:745A with AX `ty`, BX `kind`, CX `n` from 0212: a worn item of
     /// the base type and kind among the slots 75D3 looks through (CX
-    /// counts the slots looked at, not the items: bug kept), its offset.
+    /// counts the slots looked at, not the items: bug kept, but not seen:
+    /// `n` is the items' count and the inventory is kept packed, #56 in
+    /// docs/kept-bugs.md), its offset.
     fn worn_find(&self, ty: u16, kind: u16, n: u16) -> Option<u16> {
         let (mut cx, mut si) = (n, ITEMS);
         loop {
@@ -1809,6 +1814,13 @@ impl Machine {
         self.page_rect_save((seg, 8), x, y, w, hh);
         if self.page_is_block() {
             self.page_image(DS, di);
+        }
+        if self.fixed(crate::fixes::HELMET_LEAK) {
+            // Fixed (#57): the background's block freed, as nothing puts
+            // it back (A83E/A840 are any picture's and others' scratch):
+            // the original leaks one a drawing, and once the heap is out
+            // writes the background at 0:0.
+            self.heap_free(seg);
         }
         self.map_bank(old, 0);
         Some(())

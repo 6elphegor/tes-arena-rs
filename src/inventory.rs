@@ -377,7 +377,10 @@ impl Machine {
     /// - accessories: yes.
     ///
     /// The Knight check also runs after a shield matched, but there the
-    /// class register has been doubled, so it never applies.
+    /// class register has been doubled, so it never applies. Fixed (#25),
+    /// it applies with the class and the shield's armour kind (AL is its
+    /// base type there, 7..10, which the test for 2 never meets either):
+    /// Knights can't use a kind-2 shield, as they can't kind-2 armour.
     pub fn class_can_use(&self, seg: u16, it: u16, class: u16) -> Option<bool> {
         let ty = self.inv_b(seg, it, item::TYPE);
         if ty >= 0x8D || self.mem.r16(seg, it.wrapping_add(item::HEALTH)) == 0 {
@@ -396,7 +399,11 @@ impl Machine {
                 if !self.inv_in_list(list, base as u8)? {
                     return Some(false);
                 }
-                (bx, base as u8)
+                if self.fixed(crate::fixes::KNIGHT_SHIELD) {
+                    (class, self.armor_kind(seg, it) as u8)
+                } else {
+                    (bx, base as u8)
+                }
             }
             category::ARMOR => {
                 let kind = self.armor_kind(seg, it) as u8;

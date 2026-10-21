@@ -261,6 +261,34 @@ fn changes(m: &Machine, before: &Machine, seg: u16) -> Vec<u8> {
         .collect()
 }
 
+/// Fixed (kept bug #54): a woman's province text without "his home"
+/// is left as it is; the original writes "her" at 1044 + 3E8h. With it,
+/// it is made "her home" as before.
+#[test]
+fn fixed_her_home_writes_nothing_without_his_home() {
+    use arena::fixes::{Fixes, HER_HOME};
+    let Some(img) = common::image() else { return };
+    let run = |fixes: Fixes, text: &[u8]| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w8(DS, 0x01A4 + 7, 1);
+        for (i, &b) in text.iter().enumerate() {
+            m.mem.w8(DS, 0x1044 + i as u16, b);
+        }
+        m.creation_her_home();
+        (0..0x500u16).map(|o| m.mem.r8(DS, 0x1044 + o)).collect::<Vec<u8>>()
+    };
+    let his: Vec<u8> = (0..8u16).map(|k| Machine::new(&img).mem.r8(DS, 0x3F1E + k)).collect();
+    let mut with = b"to return to ".to_vec();
+    with.extend(&his);
+    let plain = vec![b'x'; 0x400];
+    let fixed = Fixes::only(HER_HOME);
+    assert_ne!(run(Fixes::NONE, &plain)[0x3E8..0x3EB], plain[0x3E8..0x3EB], "the original's write past");
+    assert_eq!(run(fixed, &plain)[..0x400], plain[..]);
+    assert_eq!(run(fixed, &with), run(Fixes::NONE, &with));
+    assert_ne!(run(fixed, &with)[..with.len()], with[..], "made her home");
+}
+
 #[test]
 fn matches_original() {
     let Some(img) = common::image() else { return };

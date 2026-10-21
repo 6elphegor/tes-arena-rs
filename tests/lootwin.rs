@@ -330,3 +330,94 @@ fn matches_original() {
         assert!(n > 2500, "{n} compared");
     }
 }
+
+/// A machine for the loot window with EMS off: the piles' table at
+/// FRAME:A000, inside a town's building of kind 0 (kind of place 0) on
+/// level 2, the staff's flat EEh.
+fn loot_machine(img: &arena::exe::Image, fixes: arena::fixes::Fixes) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w16(DS, 0xD806, WSEG);
+    m.mem.w16(DS, 0xCCD0, FSEG);
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w8(DS, 0x05E6, 4);
+    m.mem.w8(DS, 0x0D48, 0);
+    m.mem.w8(DS, 0xBB0A, 2);
+    m.mem.w8(DS, 0xC941, 0xEE);
+    m
+}
+
+/// Fixed (kept bug #16), the pile picked: two piles on the clicked
+/// square, the first of another kind of place (3, 50 gold), the second of
+/// this one (0, 70 gold); the list shows the second only, and picking it
+/// gives its 70. The original counts the first too and gives its 50.
+#[test]
+fn fixed_the_pile_picked_is_the_one_listed() {
+    use arena::fixes::{Fixes, LOOT_PICK};
+    let Some(img) = common::image() else { return };
+    let mut files = Files::default();
+    let gold_from = |fixes: Fixes, files: &mut Files| {
+        let mut m = loot_machine(&img, fixes);
+        for (i, (kind, gold)) in [(3u8, 50u16), (0, 70)].into_iter().enumerate() {
+            let at = 0xA000 + 0x1C * i as u16;
+            put(&mut m, FRAME, at, &[1, kind, 0x10, 0x08, 2]);
+            put(&mut m, FRAME, at + 5, &gold.to_le_bytes());
+            m.mem.w8(FRAME, at + 7, 0xFF);
+        }
+        m.mem.w8(DS, 0x0FF2, 2);
+        let mut sc = Script { lists: vec![0], ..Default::default() };
+        m.loot_window(files, &mut sc, 0x0F01, 0, DS, 0x0810).expect("looted");
+        assert_eq!(sc.log[..3], [4, 0x9302, 1], "one pile listed");
+        m.mem.r32(DS, 0x05C2)
+    };
+    assert_eq!(gold_from(Fixes::NONE, &mut files), 50, "the original's other pile");
+    assert_eq!(gold_from(Fixes::only(LOOT_PICK), &mut files), 70);
+}
+
+/// Fixed (kept bug #16), a corpse's gold: shown, and no "has nothing"
+/// after it, in both; but the original clears the gold-shown flag at
+/// 4BF4 of the corpse's segment (here a creature's, CSEG), which fixed
+/// mode leaves alone.
+#[test]
+fn fixed_a_corpse_s_segment_is_left_alone() {
+    use arena::fixes::{Fixes, LOOT_PICK};
+    let Some(img) = common::image() else { return };
+    let mut files = Files::default();
+    let run = |fixes: Fixes, files: &mut Files| {
+        let mut m = loot_machine(&img, fixes);
+        m.mem.w16(CSEG, 0x0100 + 0x407, 30);
+        m.mem.w8(CSEG, 0x4BF4, 0xAB);
+        let mut sc = Script::default();
+        m.loot_window(files, &mut sc, 0x0000, 0x0100, CSEG, 0).expect("looted");
+        (m.mem.r8(CSEG, 0x4BF4), m.mem.r32(DS, 0x05C2), sc.log)
+    };
+    let (byte, gold, log) = run(Fixes::NONE, &mut files);
+    assert_eq!((byte, gold), (0, 30), "the original's write");
+    assert_eq!(log, [1, 0x9686], "the gold, not \"has nothing\"");
+    assert_eq!(run(Fixes::only(LOOT_PICK), &mut files), (0xAB, 30, vec![1, 0x9686]));
+}
+
+/// Fixed (kept bug #61): the window puts back the bank mapped before it
+/// (3 here); the original maps 4D77, which a key's path never sets (9,
+/// an earlier window's).
+#[test]
+fn fixed_the_loot_window_puts_its_bank_back() {
+    use arena::fixes::{Fixes, LOOT_BANK};
+    let Some(img) = common::image() else { return };
+    let mut files = Files::default();
+    let bank_after = |fixes: Fixes, files: &mut Files| {
+        let mut m = loot_machine(&img, fixes);
+        m.mem.w8(DS, 0x8FA6, 1);
+        m.mem.w16(DS, 0x9032, 0x20);
+        m.mem.w16(DS, 0x8FA8, 0);
+        m.ems_map(3);
+        m.mem.w16(DS, 0x4D77, 9);
+        m.mem.w8(DS, 0x0652, 0xC5);
+        let mut sc = Script::default();
+        m.loot_window(files, &mut sc, 0x0301, 0, DS, 0).expect("the key");
+        assert_eq!(m.mem.r8(DS, 0x0652), 1, "the key kept");
+        m.mem.r16(DS, 0x8FA8) >> 2
+    };
+    assert_eq!(bank_after(Fixes::NONE, &mut files), 9);
+    assert_eq!(bank_after(Fixes::only(LOOT_BANK), &mut files), 3);
+}

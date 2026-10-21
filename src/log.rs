@@ -6,7 +6,8 @@
 //! LOG.nn (27E3:0060..0087). Once the log reaches 2000 bytes the game
 //! means to drop its oldest entry first (27E3:0169..01AA), but writes the
 //! shorter log to a path DOS refuses, so the log only grows
-//! (`Machine::log_add`).
+//! (`Machine::log_add`). Fixed mode (`crate::fixes`) writes it to the
+//! log's own path (#33).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -212,7 +213,9 @@ impl Machine {
             }
         }
         let n = self.mem.r16(DS, crate::bsa::var::OPEN_SIZE).wrapping_sub(di);
-        let twice = self.save_path(path);
+        // Fixed (#33): the trimmed log written to the log's own path,
+        // built once from its name as the read's was.
+        let twice = if self.fixed(crate::fixes::LOG_TRIM) { self.save_path(NAME) } else { self.save_path(path) };
         if self.file_write(files, twice, seg, di, n) == 0 && self.error_hook_set() {
             return crate::giveup::not_ported("0000:9DD2: the trimmed log's create refused, the error hook set");
         }

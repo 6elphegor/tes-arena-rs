@@ -58,6 +58,12 @@
 //! The pixels (drawn only where the page is the game's own heap block,
 //! `Machine::page_is_block`), the fades (5E3E), the cursor's drawing and
 //! the page's showing (9466) are the front end's.
+//!
+//! Fixed mode (`crate::fixes`): Exit or Print on any page leaves, and a
+//! click off the buttons on the last page is taken as handled (#34); the
+//! lines' count is DGROUP's, not written into the log's text in the
+//! frame, and a count of 0 prints nothing (#35). (The form feed's write
+//! can't fall short: PRN's writes stop only at a ^Z.)
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -285,7 +291,11 @@ impl Machine {
             si = si.wrapping_add(1);
         }
         cx = cx.wrapping_add(1);
-        self.mem.w16(frame, var::COUNT, cx);
+        // Fixed (#35): the count goes to DGROUP's FF5, where 4E54's other
+        // callers (DS DGROUP's) have it; the frame's FF5 is the log's
+        // text, two bytes of which the original overwrites.
+        let seg = if self.fixed(crate::fixes::LOG_COUNT) { DS } else { frame };
+        self.mem.w16(seg, var::COUNT, cx);
         (cx, bx)
     }
 
@@ -387,19 +397,35 @@ impl Machine {
             (At::Pages { .. }, LogPoll::Print(false)) => {
                 run.at = At::After;
                 self.mem.w8(DS, BUTTONS, 0);
-                LogTurn::PrintFailed(false)
+                // Fixed (#34): as on the last page, the screen left after
+                // the key.
+                LogTurn::PrintFailed(self.fixed(crate::fixes::LOGBOOK_CLICKS))
             }
             (At::Pages { .. }, _) => {
                 // 03CB: the release wait, the pages' loop left.
                 run.at = At::After;
                 self.mem.w8(DS, BUTTONS, 0);
+                if self.fixed(crate::fixes::LOGBOOK_CLICKS) {
+                    // Fixed (#34): Exit, Print or Esc leaves the screen
+                    // from any page, as from the last; the loop after the
+                    // pages (0137) only asks again.
+                    return LogTurn::Left;
+                }
                 if esc {
                     // Esc still down: the loop after them leaves at once.
                     return self.log_turn(files, run, 0, x, y, esc);
                 }
                 LogTurn::PagesEnded
             }
-            (At::After, LogPoll::Next) => LogTurn::Waiting,
+            (At::After, LogPoll::Next) => {
+                if self.fixed(crate::fixes::LOGBOOK_CLICKS) {
+                    // Fixed (#34): the click off the buttons handled, its
+                    // bit cleared as a release wait would (the pages'
+                    // loop's do), so the cursor alone is no click.
+                    self.mem.w8(DS, BUTTONS, 0);
+                }
+                LogTurn::Waiting
+            }
             (At::After, LogPoll::Print(false)) => LogTurn::PrintFailed(true),
             (At::After, _) => LogTurn::Left,
         }
@@ -451,9 +477,14 @@ impl Machine {
             return None;
         }
         // A LOOP: one line at least, and a count of 0 is 10000h of them.
-        let mut count = self.mem.r16(frame, var::COUNT);
+        // Fixed (#35): the count DGROUP's (`log_split`), and 0 none.
+        let fixed = self.fixed(crate::fixes::LOG_COUNT);
+        let mut count = self.mem.r16(if fixed { DS } else { frame }, var::COUNT);
         let mut si = 0u16;
         loop {
+            if fixed && count == 0 {
+                break;
+            }
             if !self.log_print_line(files, (frame, si)) {
                 self.log_print_failed(files);
                 return Some(false);

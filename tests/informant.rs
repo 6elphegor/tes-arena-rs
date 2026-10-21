@@ -192,3 +192,45 @@ fn matches_original() {
     eprintln!("informant: {n} compared, {told} told the next dungeon, {stuck} stuck");
     assert!(n > 3500, "{n}");
 }
+
+/// Fixed (kept bug #50): the informant's line (1194:D105) is rolled with
+/// the game's RNG; the original's DS is the EMS frame there, so it rolls
+/// (and refills) a fake RNG made of the dialogue file's bytes at
+/// frame:91EE..91F9. Played over the vectors' cases: where the original
+/// rolls there, fixed mode leaves those bytes alone (and the line said,
+/// at 929E, is now and then another).
+#[test]
+fn fixed_the_informant_s_line_rolls_the_game_s_rng() {
+    use arena::fixes::{Fixes, INFORMANT_RNG};
+    let Some(img) = common::image() else { return };
+    let files = Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).expect("files");
+    let base = Machine::new(&img);
+    let fake = |m: &Machine| (0x91EE..0x91FAu16).map(|o| m.mem.r8(FSEG, o)).collect::<Vec<u8>>();
+    let (mut rolled, mut other) = (0, 0);
+    for line in include_str!("vectors/informant.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let run = |fixes: Fixes| {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut fs = files.clone();
+            let (cf, answer) = setup(&mut m, seed);
+            m.load_rng();
+            let before = (fake(&m), ());
+            let mut hooks = Log { log: Vec::new(), cf, answer };
+            m.quest_informant(&mut fs, &mut hooks, 0).map(|_| {
+                (before, fake(&m), m.mem.cstr(DS, 0x929E).to_vec())
+            })
+        };
+        let (Some(a), Some(b)) = (run(Fixes::NONE), run(Fixes::only(INFORMANT_RNG))) else { continue };
+        if a.1 == a.0.0 {
+            continue;
+        }
+        assert_eq!(b.1, b.0.0, "the file's bytes left alone\n{line}");
+        rolled += 1;
+        if b.2 != a.2 {
+            other += 1;
+        }
+    }
+    assert!(rolled > 0, "no case rolled the informant's line");
+    assert!(other > 0, "no line other than the file's bytes picked");
+}

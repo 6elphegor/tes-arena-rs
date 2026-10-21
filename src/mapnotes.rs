@@ -138,8 +138,10 @@ impl Machine {
     /// is under the click's square: x (bit 15 dropped) at least the
     /// click's column (signed), the click's row from y to y + 2, and the
     /// click's column at least x less the text's width / 3 (`div cl`:
-    /// a quotient past FFh faults, None).
-    fn note_hit(&self, x: u16, y: u16, si: u16) -> Option<bool> {
+    /// a quotient past FFh faults, None). Fixed (#3), the divide is a
+    /// word's, as the compare after it is: a wide text (one without its
+    /// NUL in its 3Ch bytes reads on) reaches further left.
+    pub fn note_hit(&self, x: u16, y: u16, si: u16) -> Option<bool> {
         let x = x & 0x7FFF;
         let col = self.mem.r16(DS, CLICK_COL) as i16;
         let row = self.mem.r16(DS, CLICK_ROW) as i16;
@@ -147,7 +149,7 @@ impl Machine {
             return Some(false);
         }
         let q = self.text_width(si) / 3;
-        if q > 0xFF {
+        if q > 0xFF && !self.fixed(crate::fixes::NOTE_DIVIDE) {
             return crate::giveup::original("0000:343C: the note's divide overflows");
         }
         Some(col >= x.wrapping_sub(q) as i16)

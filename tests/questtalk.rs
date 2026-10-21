@@ -195,3 +195,39 @@ fn matches_original() {
     eprintln!("questtalk: {n} compared, {logged} called a hook, {stuck} stuck");
     assert!(n > 3500, "{n}");
 }
+
+/// Fixed (kept bug #40): a find-a-person quest's deadline (1194:9162)
+/// doubles the journey's days unless the record's own stage is 6; the
+/// original reads the stage through the person's name (6D49: its fifth
+/// and sixth characters). The vectors' cases played both ways: where the
+/// offer's deadline differs, the two readings of the stage disagree.
+#[test]
+fn fixed_a_person_quest_s_deadline_reads_its_stage() {
+    use arena::fixes::{Fixes, OFFER_STAGE};
+    use arena::sidequest::var::CURRENT;
+    let Some(img) = common::image() else { return };
+    let files = Files::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))).expect("files");
+    let base = Machine::new(&img);
+    let stage = |m: &Machine, si: u16| (m.mem.r16(DS, si.wrapping_add(4)) & 0xE00) >> 9;
+    let mut differ = 0;
+    for line in include_str!("vectors/questtalk.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let run = |fixes: Fixes| {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut fs = files.clone();
+            let (answer, pick) = setup(&mut m, seed);
+            m.load_rng();
+            let mut hooks = Log { log: Vec::new(), answer, pick };
+            m.quests_talk(&mut fs, &mut hooks).map(|()| m)
+        };
+        let (Some(a), Some(b)) = (run(Fixes::NONE), run(Fixes::only(OFFER_STAGE))) else { continue };
+        let si = a.mem.r16(DS, CURRENT);
+        if a.mem.r32(DS, si + 0xC) == b.mem.r32(DS, si + 0xC) {
+            continue;
+        }
+        assert_ne!(stage(&a, 0x6D49) == 6, stage(&b, si) == 6, "{line}");
+        differ += 1;
+    }
+    assert!(differ > 0, "no offer's deadline changed");
+}

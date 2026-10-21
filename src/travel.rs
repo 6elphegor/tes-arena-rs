@@ -13,7 +13,9 @@
 //!
 //! Bugs kept: pixels are addressed from the start of the loaded file,
 //! 12 bytes of header included; the two 500-byte line buffers are not
-//! bounded, so a longer line writes on through the heap.
+//! bounded, so a longer line writes on through the heap (which a line
+//! across a 320-pixel map never is). Fixed mode (`crate::fixes`) reads
+//! the pixels past the header (#17).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -186,10 +188,12 @@ impl Machine {
     }
 
     /// 1194:3290: the pixel at `di` gets its terrain class and weather
-    /// zone appended to the two line buffers.
+    /// zone appended to the two line buffers. Fixed (#17), the pixel is
+    /// read past the IMG's 12-byte header, as the map it was drawn on.
     fn travel_pixel(&mut self, files: &mut Files, di: u16) -> Option<()> {
         let buf = self.mem.r16(DS, crate::mif::var::BUFFER_SEG);
-        let colour = self.mem.r8(buf, di);
+        let at = if self.fixed(crate::fixes::TRAVEL_HEADER) { di.wrapping_add(12) } else { di };
+        let colour = self.mem.r8(buf, at);
         let class = (0..7).find(|&i| self.mem.r8(DS, CLASS_COLOURS + i) == colour).unwrap_or(7) as u8;
         let zone = self.travel_zone(files, di)?;
         let c = self.mem.r16(DS, COUNT).wrapping_add(1);

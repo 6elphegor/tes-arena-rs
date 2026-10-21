@@ -182,3 +182,78 @@ fn matches_original() {
         assert!(n > 2500, "{n} compared");
     }
 }
+
+/// A temple visit with the menu picks `menus` (by their routine in the
+/// table at 759D, then leave), the list picks `lists` and the donations
+/// `typed`, with `fixes`, for a level-0 player with 5000 gold, afflicted
+/// by `ill` (05B1) on day 100 of year 0. The machine after, or None.
+fn temple_visit(img: &arena::exe::Image, fixes: arena::fixes::Fixes, ill: u16, menus: &[u16], lists: &[u16], typed: &[&'static [u8]]) -> Option<Machine> {
+    use arena::shops::var::*;
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w8(DS, LEVEL, 0);
+    m.mem.w16(DS, MAX_HEALTH, 30);
+    m.mem.w16(DS, HEALTH, 30);
+    m.mem.w32(DS, GOLD, 5000);
+    m.mem.w16(DS, AFFLICTIONS, ill);
+    m.mem.w32(DS, TIME, 100 * 0x5A0 + 0x100);
+    let pick = |routine: u16| (0..3).find(|&p| m.mem.r16(DS, 0x759D + 2 * p) == routine).expect("the temple's menu");
+    let menus = menus.iter().map(|&r| pick(r)).collect();
+    let mut sc = Script { menus, lists: lists.to_vec(), typed: typed.to_vec(), ..Default::default() };
+    m.temple(&mut arena::bsa::Files::default(), &mut sc)?;
+    Some(m)
+}
+
+/// Fixed (kept bug #2): "Cure all" (the list's last entry) pays the
+/// total it is listed with and ends every affliction; the original pays
+/// the entry's index, cures the first, and calls through the table with
+/// a record's offset (None).
+#[test]
+fn fixed_cure_all_pays_the_total_and_cures_each() {
+    use arena::fixes::{CURE_ALL, Fixes};
+    use arena::shops::var::*;
+    let Some(img) = common::image() else { return };
+    assert!(temple_visit(&img, Fixes::NONE, 7, &[0xC36E], &[3], &[]).is_none(), "the original's call into data");
+    let m = temple_visit(&img, Fixes::only(CURE_ALL), 7, &[0xC36E], &[3], &[]).expect("cured");
+    assert_eq!(m.mem.r16(DS, AFFLICTIONS) & 7, 0, "all three cured");
+    // 25 + 50 + 75 (the factors at 76A3, level 0 + 1), and the maximum
+    // health (30) each.
+    assert_eq!(m.mem.r16(DS, TOTAL), 240);
+    assert_eq!(m.mem.r32(DS, GOLD), 5000 - 240);
+    // Two afflictions: the list's third entry is "Cure all".
+    let m = temple_visit(&img, Fixes::only(CURE_ALL), 5, &[0xC36E], &[2], &[]).expect("cured");
+    assert_eq!(m.mem.r16(DS, AFFLICTIONS) & 7, 0);
+    assert_eq!(m.mem.r32(DS, GOLD), 5000 - (55 + 105));
+    // A single cure is as before.
+    let a = temple_visit(&img, Fixes::NONE, 5, &[0xC36E], &[1], &[]).expect("cured");
+    let b = temple_visit(&img, Fixes::only(CURE_ALL), 5, &[0xC36E], &[1], &[]).expect("cured");
+    assert_eq!((a.mem.r16(DS, AFFLICTIONS), a.mem.r32(DS, GOLD)), (1, 5000 - 105));
+    assert_eq!((b.mem.r16(DS, AFFLICTIONS), b.mem.r32(DS, GOLD)), (1, 5000 - 105));
+}
+
+/// Fixed (kept bug #12): a second donation within a day blesses when it
+/// is more than the day's last, the original's compare made before the
+/// new donation overwrites the old; one no more than it blesses nothing,
+/// as every second donation does in the original.
+#[test]
+fn fixed_a_larger_second_donation_blesses() {
+    use arena::fixes::{Fixes, SECOND_DONATION};
+    use arena::shops::var::*;
+    let Some(img) = common::image() else { return };
+    let blessing = |fixes: Fixes, typed: &[&'static [u8]]| {
+        let menus = vec![0xC58B; typed.len()];
+        let m = temple_visit(&img, fixes, 0, &menus, &[], typed).expect("blessed");
+        (m.mem.r16(DS, BLESSING), m.mem.r32(DS, GOLD))
+    };
+    let fixed = Fixes::only(SECOND_DONATION);
+    let first = blessing(Fixes::NONE, &[b"25"]);
+    assert!(first.0 > 0);
+    assert_eq!(blessing(fixed, &[b"25"]), first);
+    // The original takes the 60 and blesses nothing.
+    assert_eq!(blessing(Fixes::NONE, &[b"25", b"60"]), (first.0, first.1 - 60));
+    let more = blessing(fixed, &[b"25", b"60"]);
+    assert_eq!(more.1, first.1 - 60);
+    assert!(more.0 > first.0, "the larger donation's blessing added");
+    // No more than the last: nothing, as before.
+    assert_eq!(blessing(fixed, &[b"25", b"60", b"30"]), (more.0, more.1 - 30));
+}

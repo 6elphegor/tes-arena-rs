@@ -737,17 +737,23 @@ impl Machine {
     /// (from 3276:36EC) a woman's "his home" made "her home": the eight
     /// bytes at 3F1E sought from 1044 over 3E8h places (9C56), the three
     /// at 3F27 copied where they matched (7702), or at 1044 + 3E8h where
-    /// nothing did (the loop's end, bug kept).
+    /// nothing did (the loop's end, bug kept; fixed, #54, nothing is
+    /// written then).
     pub fn creation_her_home(&mut self) {
         if self.ng8(PLAYER + rec::SEX) == 0 {
             return;
         }
         let mut di = 0x1044u16;
+        let mut found = false;
         for _ in 0..0x3E8 {
             if (0..8u16).all(|k| self.mem.r8(DS, di.wrapping_add(k)) == self.mem.r8(DS, 0x3F1E + k)) {
+                found = true;
                 break;
             }
             di = di.wrapping_add(1);
+        }
+        if !found && self.fixed(crate::fixes::HER_HOME) {
+            return;
         }
         for k in 0..3u16 {
             let b = self.mem.r8(DS, 0x3F27 + k);

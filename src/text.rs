@@ -9,7 +9,7 @@
 //! `&`s, one picked at random; its characters are filtered (A643), its
 //! `%` codes substituted (`expand`), its runs of spaces collapsed (A559)
 //! and its lines wrapped at 137E (49FF; meant for the outermost level
-//! only, but the test is lost). Then it
+//! only, but the test is lost: fixed mode makes it, #48). Then it
 //! is shown in a window (mode 0), offered as a menu (1) or copied out (2).
 //!
 //! All of it works in the EMS bank at 1030 mapped into the frame (9030):
@@ -31,7 +31,8 @@
 //! leaves DS pushed, and its RET goes on in 2DA2 at the text's offset)
 //! and the loops where the
 //! original never ends (a key not in the index, a copy over its own
-//! source, codes coming back without end).
+//! source, codes coming back without end). Fixed mode (`crate::fixes`)
+//! names the town's first store for %en in the street (#1).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -397,9 +398,14 @@ impl Machine {
         }
         // 1194:A4B0 means to wrap only at the outermost level (or not
         // with 5C8 bit 10h), but A559 leaves AL 0 (the NUL it copied), so
-        // the wrap always runs.
+        // the wrap always runs. Fixed (#48), the test made on the level
+        // (AX before A559: 1 the outermost, 2 with 5C8 bit 10h): a nested
+        // text is wrapped with the text it goes into, not on its own.
+        let ax = if self.t16(0x05C8) & 0x10 != 0 { 2 } else { self.t8(LEVEL) as u16 };
         self.text_spaces(frame);
-        self.text_wrap(frame)?;
+        if ax <= 1 || !self.fixed(crate::fixes::TEXT_WRAP) {
+            self.text_wrap(frame)?;
+        }
         let res = match mode {
             0 => {
                 self.text_copy(frame, 0x95BE, DS, BOX)?;
@@ -1069,14 +1075,28 @@ impl Machine {
             // returns into the dispatch (0077) with DX 1 and BP FFFD, and
             // the rest of the text is read from FFFD:0001, the BIOS ROM's
             // last bytes on a PC: nothing a port can follow.
+            // Fixed (#1): outside a store the name is the town's first
+            // equipment store's (the list's first entry), worked out as
+            // the store's own is; with no store in the list, nothing. The
+            // street's texts that use it ("work for the owner of %en")
+            // speak of one of the town's stores, and the code DS pushed
+            // there is popped on the store's path only by mistake.
             0x05DC => {
-                if self.t8(0x0D48) != 6 {
-                    return self.original_fault("2DA2:05DC: %en outside an equipment store returns to 2DA2 at the text's offset");
-                }
-                let key = self.t16(0x0FD2);
-                let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
                 let (off, seg) = (self.t16(0x1008), self.t16(0x100A));
-                let si = self.place_lookup(seg, off, key, self.t16(0x138B));
+                let si = if self.t8(0x0D48) != 6 {
+                    if !self.fixed(crate::fixes::EN_OUTSIDE_STORE) {
+                        return self.original_fault("2DA2:05DC: %en outside an equipment store returns to 2DA2 at the text's offset");
+                    }
+                    if self.t16(0x138B) == 0 {
+                        self.mem.w8(c.es, c.di, 0);
+                        return Some(Res::Str(c.es, c.di));
+                    }
+                    off
+                } else {
+                    let key = self.t16(0x0FD2);
+                    let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+                    self.place_lookup(seg, off, key, self.t16(0x138B))
+                };
                 self.mem.w16(seg, 0x8A52, self.mem.r8(seg, si) as u16);
                 self.mem.w16(seg, 0x8A54, self.mem.r8(seg, si.wrapping_add(1)) as u16);
                 let (dl, dh) = (self.mem.r8(seg, si.wrapping_add(2)), self.mem.r8(seg, si.wrapping_add(3)));

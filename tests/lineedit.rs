@@ -257,3 +257,91 @@ fn matches_original() {
     eprintln!("{n:?} compared, {stuck} stuck");
     assert!(n.iter().all(|&c| c > 1900), "{n:?} cases");
 }
+
+/// A field opened on `text` (at DS:F800, as the original's click reads
+/// DGROUP whatever the text's segment) clicked `click` pixels in,
+/// every character 5 wide but A 3 and B 9, a space 4, with `fixes`.
+fn opened(img: &arena::exe::Image, fixes: arena::fixes::Fixes, text: &[u8], click: u16) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.heap_init(HEAP.0, HEAP.1).unwrap();
+    let mut f = vec![5u8; 0x60];
+    f[1] = 3;
+    f[0x21] = 3;
+    f[0x22] = 9;
+    set_font(&mut m, &f);
+    put(&mut m, DS, 0xF800, text);
+    let field = Field { x: 0, y: 0, click, max: 20, seg: DS, off: 0xF800, w: 0x40, h: 8 };
+    m.edit_open(&field).expect("opened");
+    m
+}
+
+/// Fixed (kept bug #36), the click: the cursor goes on the character
+/// clicked (on B, 3 + 9 wide, for a click 10 in), where the original
+/// counts how many of A's widths fit (3); a first space puts it at 0
+/// there.
+#[test]
+fn fixed_a_click_puts_the_cursor_on_its_character() {
+    use arena::fixes::{EDIT_TEXT, Fixes};
+    use arena::lineedit::var::CURSOR;
+    let Some(img) = common::image() else { return };
+    let cursor = |fixes: Fixes, text: &[u8], click: u16| opened(&img, fixes, text, click).mem.r16(DS, CURSOR);
+    let fixed = Fixes::only(EDIT_TEXT);
+    assert_eq!(cursor(Fixes::NONE, b"ABAA\0", 10), 3);
+    assert_eq!(cursor(fixed, b"ABAA\0", 10), 1);
+    assert_eq!(cursor(Fixes::NONE, b" AB\0", 6), 0);
+    assert_eq!(cursor(fixed, b" AB\0", 6), 1, "past the space (4), on A");
+    assert_eq!(cursor(fixed, b"AB\0", 100), 2, "past the end: at it");
+    assert_eq!(cursor(fixed, b"AB\0", 0), 0);
+}
+
+/// Fixed (kept bug #36), typing inside the text: a NUL follows the new
+/// end; the original moves the old NUL into the text and writes none, so
+/// the byte after it (X) becomes the text's.
+#[test]
+fn fixed_typing_inside_the_text_keeps_its_end() {
+    use arena::fixes::{EDIT_TEXT, Fixes};
+    let Some(img) = common::image() else { return };
+    let typed = |fixes: Fixes| {
+        let mut m = opened(&img, fixes, b"abc\0X\0", 0);
+        assert_eq!(m.edit_key(EditKey::Key(b'z')), Some(false));
+        m.mem.cstr(DS, 0xF800).to_vec()
+    };
+    assert_eq!(typed(Fixes::NONE), b"zabcX");
+    assert_eq!(typed(Fixes::only(EDIT_TEXT)), b"zabc");
+}
+
+/// Fixed (kept bug #37): with the ring full, a key pressed is down
+/// itself (the original marks the last key taken down instead); and the
+/// left Shift's press, or a key typed with it, leaves the right Shift's
+/// state alone (the original marks it down with the left's).
+#[test]
+fn fixed_the_key_states_are_the_keys_own() {
+    use arena::fixes::{Fixes, KEY_RING};
+    use arena::lineedit::var::{FULL, KEYS, LAST};
+    let Some(img) = common::image() else { return };
+    let full = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.key_flush();
+        m.mem.w16(DS, FULL, 0xFFFF);
+        m.mem.w8(DS, LAST, 0x10);
+        m.key_event(0x1E).unwrap();
+        (m.mem.r8(DS, KEYS + 0x10), m.mem.r8(DS, KEYS + 0x1E))
+    };
+    assert_eq!(full(Fixes::NONE), (0xFF, 0), "the last key's state");
+    assert_eq!(full(Fixes::only(KEY_RING)), (0, 0xFF));
+    let shifts = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.key_flush();
+        m.key_event(0x2A).unwrap();
+        let pressed = m.mem.r8(DS, KEYS + 0x36);
+        m.key_event(0x1E).unwrap();
+        (pressed, m.mem.r8(DS, KEYS + 0x36), m.key_read())
+    };
+    let (a, b) = (shifts(Fixes::NONE), shifts(Fixes::only(KEY_RING)));
+    assert_eq!((a.0, a.1), (0xFF, 0xFF), "the original's right Shift");
+    assert_eq!((b.0, b.1), (0, 0));
+    assert_eq!(a.2, b.2, "the key typed shifted either way");
+}

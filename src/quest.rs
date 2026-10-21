@@ -387,14 +387,17 @@ impl Machine {
     /// list at ITEMS (its first match set to FFh) and 0D39 bit 80h set.
     /// Without a match the search ends past the list and writes FFh to
     /// its tenth byte, 0FDD: the main quest's step (the original's bug,
-    /// kept).
+    /// kept). Fixed (#41), the search stops at the list's end and writes
+    /// nothing.
     pub fn quest_item_free(&mut self, si: u16) {
         let item = self.mem.r8(DS, si.wrapping_add(0x1C));
         if item == 0xFF {
             return;
         }
-        let i = (0..9u16).find(|&i| self.mem.r8(DS, ITEMS + i) == item).unwrap_or(9);
-        self.mem.w8(DS, ITEMS + i, 0xFF);
+        let found = (0..9u16).find(|&i| self.mem.r8(DS, ITEMS + i) == item);
+        if found.is_some() || !self.fixed(crate::fixes::QUEST_ITEM_END) {
+            self.mem.w8(DS, ITEMS + found.unwrap_or(9), 0xFF);
+        }
         let f = self.mem.r8(DS, 0x0D39) | 0x80;
         self.mem.w8(DS, 0x0D39, f);
     }

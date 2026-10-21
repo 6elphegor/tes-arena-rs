@@ -162,6 +162,32 @@ fn setup(m: &mut Machine, seed: u32) -> u32 {
     ticks
 }
 
+/// Fixed (kept bug #49): the failed quest of a place and a stage
+/// (1194:9B26) is found past a failed quest of the place with another
+/// stage; the original then compares the later records with that one's
+/// stage, and misses it.
+#[test]
+fn fixed_a_failed_quest_is_found_by_its_stage() {
+    use arena::fixes::{FAILED_STAGE, Fixes};
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    // Records 0 and 1 (34h bytes from 0E6E) failed (kind 3) at place 9,
+    // of stages 2 and 5.
+    for (i, stage) in [(0u16, 2u16), (1, 5)] {
+        let si = 0x0E6E + i * 0x34;
+        m.mem.w16(DS, si + 4, 3 << 6 | stage << 9);
+        m.mem.w8(DS, si + 0x25, 9);
+    }
+    assert_eq!(m.quest_failed_at(5, 9), None, "the original compares with 2");
+    assert_eq!(m.quest_failed_at(2, 9), Some(0x0E6E));
+    assert_eq!(m.quest_failed_at(0xFFFF, 9), Some(0x0E6E));
+    m.fixes = Fixes::only(FAILED_STAGE);
+    assert_eq!(m.quest_failed_at(5, 9), Some(0x0E6E + 0x34));
+    assert_eq!(m.quest_failed_at(2, 9), Some(0x0E6E));
+    assert_eq!(m.quest_failed_at(0xFFFF, 9), Some(0x0E6E));
+    assert_eq!(m.quest_failed_at(4, 9), None);
+}
+
 #[test]
 fn matches_original() {
     let Some(img) = common::image() else { return };

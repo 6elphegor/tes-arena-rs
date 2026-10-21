@@ -19,7 +19,9 @@
 //!
 //! The packing puts a group's first square in the top bits and the
 //! unpacking takes it from the bottom ones: each group of four squares
-//! comes back reversed (kept, as the original does it).
+//! comes back reversed (kept, as the original does it). Fixed mode
+//! (`crate::fixes`) unpacks a group's first square from the top bits,
+//! as the files are written (#32).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -268,11 +270,19 @@ impl Machine {
     }
 
     /// 23F1:037A. The map unpacked: each of the 1000h bytes at frame +4000h
-    /// to four squares, its bottom two bits first, through CODES.
+    /// to four squares, its bottom two bits first, through CODES. Fixed
+    /// (#32), its top two bits first, the order the packing (034E) and so
+    /// every AUTOMAP.nn, the original's too, has them in.
     fn automap_unpack(&mut self) {
         let (seg, off) = self.frame();
+        let fixed = self.fixed(crate::fixes::AUTOMAP_ORDER);
         for k in 0..0x1000u16 {
             let mut b = self.mem.r8(seg, off.wrapping_add(0x4000).wrapping_add(k));
+            if fixed {
+                // The bit pairs turned round, so the loop's bottom-first
+                // order takes the top pair first.
+                b = (b >> 6) | (b >> 2 & 0x0C) | (b << 2 & 0x30) | (b << 6);
+            }
             for j in 0..4u16 {
                 let v = self.mem.r8(DS, CODES + (b & 3) as u16);
                 self.mem.w8(seg, off.wrapping_add(k * 4 + j), v);

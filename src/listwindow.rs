@@ -181,7 +181,12 @@ impl Machine {
                 let dx = self.image_drawn_dx(frame, at)?;
                 self.page_image(frame, at);
                 self.mem.w16(DS, 0x1030, old);
-                self.mem.w16(DS, 0xA894, old);
+                // Fixed (#52): A894 keeps the bank before the list (5734
+                // saved it), which the list's end maps back; the load
+                // bank written over it stays mapped after the list.
+                if !self.fixed(crate::fixes::LIST_BANK) {
+                    self.mem.w16(DS, 0xA894, old);
+                }
                 let f = self.mem.r16(DS, 0x05CA) & 0xDFFF;
                 self.mem.w16(DS, 0x05CA, f);
                 let f = self.mem.r8(DS, 0x0D39) | 0x80;
@@ -402,8 +407,12 @@ impl Machine {
     /// places), then the names copied in the table's order after the
     /// table. Returns where they are (with one, `si` itself, 1044 as it
     /// was: bug kept, the pick read through it unsorted).
+    /// Fixed (#53), with one name the order is set too (0 at 1044).
     fn names_sorted(&mut self, si: u16, cx: u16) -> u16 {
         if cx <= 1 {
+            if cx == 1 && self.fixed(crate::fixes::ONE_NAME_SORTED) {
+                self.mem.w8(DS, 0x1044, 0);
+            }
             return si;
         }
         let table = 0x929Eu16 + 0x800;

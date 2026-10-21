@@ -31,6 +31,9 @@ struct Script {
     give_up_lines: bool,
     /// How often the weapons' lines were asked for.
     lines_asked: usize,
+    /// At each "You successfully stole" box: the records listed (weapons
+    /// and armour) and whether the record stolen was magic.
+    stolen: Vec<(u16, bool)>,
 }
 
 fn take<T: Copy>(q: &[T], n: &mut usize, default: T) -> T {
@@ -68,8 +71,12 @@ impl StoreHooks for Script {
     fn greeting(&mut self, _m: &mut Machine, si: u16) {
         self.log.extend([1, si as u32]);
     }
-    fn message_box(&mut self, _m: &mut Machine, si: u16) {
+    fn message_box(&mut self, m: &mut Machine, si: u16) {
         self.log.extend([7, si as u32]);
+        if si == 0x1044 {
+            let listed = m.mem.r8(DS, 0x12C6) as u16 + m.mem.r8(DS, 0x12CF) as u16;
+            self.stolen.push((listed, m.mem.r8(DS, arena::loot::TEMPLATE + 1) == 1));
+        }
     }
     fn haggle(&mut self, _m: &mut Machine, mode: u8, eax: u32, per: u16, name: u16) -> (u32, bool) {
         self.log.extend([8, mode as u32, eax & 0xFFFF, eax >> 16, per as u32, name as u32]);
@@ -505,4 +512,75 @@ fn a_store_given_up_leaves_as_it_ends() {
         }
     }
     assert!(tried > 0, "no case listed the weapons");
+}
+
+/// Fixed (kept bug #8), stealing: a magic record stolen leaves the list,
+/// as one bought does; a plain one stays (as one bought does). The
+/// original leaves every stolen record for sale. The vectors' cases are
+/// played both ways up to their first theft.
+#[test]
+fn fixed_a_stolen_magic_record_leaves_the_list() {
+    use arena::fixes::{Fixes, STORE_STOLEN};
+    let Some(img) = common::image() else { return };
+    let Ok(mut files) = Files::new(&common::game_dir()) else { return };
+    files.bsa_handle_taken();
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FSEG);
+    let (mut magic, mut plain) = (0, 0);
+    for line in include_str!("vectors/store.txt").lines() {
+        let seed = u32::from_str_radix(line.split(" | ").nth(1).unwrap(), 16).unwrap();
+        let run = |fixes: Fixes| {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut fs = files.clone();
+            let (mut sc, put) = setup(&mut m, seed);
+            for (k, v) in &put {
+                fs.put(k.as_bytes(), v);
+            }
+            m.load_rng();
+            let _ = m.equipment_store(&mut fs, &mut sc);
+            sc.stolen.first().copied()
+        };
+        let Some((before, was_magic)) = run(Fixes::NONE) else { continue };
+        let (after, fixed_magic) = run(Fixes::only(STORE_STOLEN)).expect("the same theft");
+        assert_eq!(fixed_magic, was_magic, "{line}");
+        if was_magic {
+            assert_eq!(after, before - 1, "{line}");
+            magic += 1;
+        } else {
+            assert_eq!(after, before, "{line}");
+            plain += 1;
+        }
+    }
+    assert!(magic > 0 && plain > 0, "{magic} magic, {plain} plain thefts");
+}
+
+/// Fixed (kept bug #8), a sold record's resale price (1194:FC78) with no
+/// enchantment: the table's price (times the material's over four with
+/// one), where the original leaves the type byte (no material).
+#[test]
+fn fixed_an_unenchanted_resale_is_the_tables_price() {
+    use arena::fixes::{Fixes, STORE_STOLEN};
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    let (prices, enchant) = (0x22D4u16, 0x23F7u16);
+    let item = 0x1100u16;
+    m.mem.w8(DS, item, 3);
+    m.mem.w8(DS, item + 0x0F, 0xFF);
+    m.mem.w8(DS, item + 0x10, 0xFF);
+    let table = m.mem.r8(DS, prices + 3) as u32;
+    assert_ne!(table, 3);
+    assert_eq!(m.store_price_from(item, prices, enchant), 3, "the original's type byte");
+    m.fixes = Fixes::only(STORE_STOLEN);
+    assert_eq!(m.store_price_from(item, prices, enchant), table);
+    // With a material, or an enchantment, as before.
+    for (material, e) in [(2u8, 0xFFu8), (0xFF, 1), (2, 1)] {
+        m.mem.w8(DS, item + 0x10, material);
+        m.mem.w8(DS, item + 0x0F, e);
+        m.fixes = Fixes::NONE;
+        let a = m.store_price_from(item, prices, enchant);
+        m.fixes = Fixes::only(STORE_STOLEN);
+        assert_eq!(m.store_price_from(item, prices, enchant), a, "{material} {e}");
+    }
 }

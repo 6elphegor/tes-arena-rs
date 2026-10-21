@@ -412,8 +412,14 @@ impl Machine {
 
     /// 0000:AAA2: the light table made (1000h bytes from the heap, CCC2,
     /// `render::shade_tables`); the old table isn't freed. None where the
-    /// allocation fails.
+    /// allocation fails. Fixed (#58), the old table (CCC2, unless 0) is
+    /// freed first, as leaving an area (0000:AB2A) frees it.
     pub fn light_table_make(&mut self) -> Option<u16> {
+        if self.fixed(crate::fixes::LIGHT_TABLE_LEAK) {
+            let old = self.mem.r16(DS, 0xCCC2);
+            self.heap_free(old);
+            self.mem.w16(DS, 0xCCC2, 0);
+        }
         let (seg, _) = self.heap_alloc_bytes(0x1000)?;
         self.mem.w16(DS, 0xCCC2, seg);
         crate::render::shade_tables(self, seg);

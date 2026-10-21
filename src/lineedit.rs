@@ -47,6 +47,11 @@
 //! key taken (ACB4), not its own; a key typed with the left Shift down
 //! marks the right Shift down too (cleared with the left's release); a
 //! byte F0h makes the next a release.
+//!
+//! Fixed mode (`crate::fixes`): the click puts the cursor on the
+//! character clicked, and a character typed inside the text keeps its
+//! NUL (#36); with the ring full a key is dropped but its own state kept,
+//! and the Shifts' states are their own (#37).
 
 use crate::machine::Machine;
 use crate::mem::DS;
@@ -155,7 +160,25 @@ impl Machine {
     /// than any click: DGROUP sits at 3BA0h past where DOS loaded the
     /// game, and the callers' clicks are within the screen's 140h). A
     /// first character of width 0 never ends (None).
-    fn edit_click(&self, mut cx: u16, si: u16) -> Option<u16> {
+    /// Fixed (#36): the characters of the text (at `seg`:`si`) counted
+    /// in turn, each by its own width, the cursor on the one the click is
+    /// on (at the end past the last); a width of 0 is passed over.
+    fn edit_click(&self, mut cx: u16, si: u16, seg: u16) -> Option<u16> {
+        if self.fixed(crate::fixes::EDIT_TEXT) {
+            let mut bx = 0u16;
+            loop {
+                let b = self.mem.r8(seg, si.wrapping_add(bx));
+                if cx as i16 <= 0 || b == 0 || bx == 0xFFFF {
+                    return Some(bx);
+                }
+                let w = if b == 0x20 { self.font_byte(1).wrapping_add(1) } else { self.font_byte(b.wrapping_sub(0x20) as u16) };
+                cx = cx.wrapping_sub(w as u16);
+                if cx as i16 <= 0 {
+                    return Some(bx);
+                }
+                bx = bx.wrapping_add(1);
+            }
+        }
         let mut bx = 0u16;
         let mut ah_clear = false;
         if cx as i16 <= 0 {
@@ -212,7 +235,7 @@ impl Machine {
         self.mem.w16(DS, var::TEXT_SEG, f.seg);
         self.mem.w16(DS, var::W, f.w);
         self.mem.w16(DS, var::H, f.h);
-        let cursor = self.edit_click(f.click, f.off)?;
+        let cursor = self.edit_click(f.click, f.off, f.seg)?;
         self.mem.w16(DS, var::CURSOR, cursor);
         let mut len = 0u16;
         while self.mem.r8(f.seg, f.off.wrapping_add(len)) != 0 {
@@ -351,6 +374,11 @@ impl Machine {
                 self.mem.w16(DS, var::LEN, len.wrapping_add(1));
                 if cursor == len {
                     self.mem.w8(seg, at.wrapping_add(1), 0);
+                } else if self.fixed(crate::fixes::EDIT_TEXT) {
+                    // Fixed (#36): the NUL after the new end, as at the
+                    // end; the move above takes the text's old NUL into
+                    // it and writes none.
+                    self.mem.w8(seg, off.wrapping_add(len).wrapping_add(1), 0);
                 }
             }
             _ => {}
@@ -508,10 +536,14 @@ impl Machine {
                 break 'state;
             }
             self.mem.w16(DS, var::PREFIX, 0);
+            let fixed = self.fixed(crate::fixes::KEY_RING);
             let (scan, down) = if al & 0x80 != 0 {
                 (al & 0x7F, 0u8)
             } else if self.mem.r16(DS, var::FULL) != 0 {
-                (self.mem.r8(DS, var::LAST), 0xFF)
+                // Fixed (#37): with the ring full the key's character is
+                // dropped, but the key is still down (its own state, not
+                // the last key taken's).
+                (if fixed { al } else { self.mem.r8(DS, var::LAST) }, 0xFF)
             } else {
                 self.mem.w8(DS, var::LAST, al);
                 if al == 0x58 {
@@ -527,7 +559,10 @@ impl Machine {
                 let shifted = if self.mem.r16(DS, var::FLAGS) & 0x20 != 0 {
                     false
                 } else if self.mem.r8(DS, var::KEYS + 0x2A) != 0 {
-                    self.mem.w8(DS, var::KEYS + 0x36, 0xFF);
+                    // Fixed (#37): the right Shift's state left its own.
+                    if !fixed {
+                        self.mem.w8(DS, var::KEYS + 0x36, 0xFF);
+                    }
                     true
                 } else {
                     self.mem.r8(DS, var::KEYS + 0x36) != 0
@@ -557,7 +592,7 @@ impl Machine {
             // with the ring full the last one), a full byte as the index.
             let at = var::KEYS.wrapping_add(scan as u16);
             self.mem.w8(DS, at, down);
-            if scan == 0x2A {
+            if scan == 0x2A && !self.fixed(crate::fixes::KEY_RING) {
                 self.mem.w8(DS, at + 0xC, down);
             }
         }

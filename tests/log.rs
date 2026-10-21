@@ -53,3 +53,105 @@ fn matches_original() {
     }
     eprintln!("{counts:?}");
 }
+
+/// Fixed (kept bug #33): a logbook of 2000 bytes or more has its oldest
+/// entry dropped before the new one is added; the original writes the
+/// trimmed log to "C:\ARENA_CD\C:\ARENA_CD\log.nn", which DOS refuses,
+/// so the log only grows.
+#[test]
+fn fixed_a_full_logbook_drops_its_oldest_entry() {
+    use arena::fixes::{Fixes, LOG_TRIM};
+    let Some(img) = common::image() else { return };
+    let mut old = Vec::new();
+    for i in 0..60 {
+        old.extend(format!("&Day {i}\r\nSomething happened today, number {i}. *").bytes());
+    }
+    assert!(old.len() >= 2000);
+    let after = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0x9030, 0x7000);
+        m.mem.w8(DS, 0x1A6C, 1);
+        for (i, &b) in b"A new entry\0".iter().enumerate() {
+            m.mem.w8(DS, 0xA800 + i as u16, b);
+        }
+        let mut files = arena::bsa::Files::default();
+        files.put(b"LOG.01", &old);
+        m.log_add(&mut files, 0xA800).expect("added");
+        files.written(b"LOG.01").expect("the log").to_vec()
+    };
+    let grown = after(Fixes::NONE);
+    assert_eq!(grown[..old.len()], old[..], "the original's log kept whole");
+    let trimmed = after(Fixes::only(LOG_TRIM));
+    let first = old.iter().position(|&c| c == b'*').unwrap() + 1;
+    assert_eq!(trimmed[..old.len() - first], old[first..], "the oldest entry dropped");
+    assert_eq!(trimmed[old.len() - first..], grown[old.len()..], "the new entry after");
+}
+
+/// The logbook opened (27E3:0088) on a LOG.01 of `entries` entries of
+/// two lines each, with `fixes`: the machine, its files and the run.
+fn logbook(img: &arena::exe::Image, fixes: arena::fixes::Fixes, entries: usize) -> Option<(Machine, arena::bsa::Files, arena::logbook::LogRun)> {
+    let mut files = arena::bsa::Files::new(&common::game_dir()).ok()?;
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    assert!(m.bsa_open(&mut files));
+    m.mem.w16(DS, 0x9030, 0x7000);
+    m.mem.w16(DS, 0xA900, 0x8000);
+    m.mem.w8(DS, 0x1A6C, 1);
+    let mut log = Vec::new();
+    for i in 0..entries {
+        log.extend(format!("&Day {i}\r\nSomething happened today, number {i}, and more besides. *").bytes());
+    }
+    files.put(b"LOG.01", &log);
+    let run = m.log_open(&mut files, None, 0, false).expect("opened");
+    Some((m, files, run))
+}
+
+/// Fixed (kept bug #34): Exit on a page before the last leaves the
+/// screen at once; the original ends only the pages' loop, and the loop
+/// after them waits for a second click.
+#[test]
+fn fixed_the_logbook_s_exit_takes_one_click() {
+    use arena::fixes::{Fixes, LOGBOOK_CLICKS};
+    use arena::logbook::LogTurn;
+    let Some(img) = common::image() else { return };
+    for (fixes, turn) in [(Fixes::NONE, LogTurn::PagesEnded), (Fixes::only(LOGBOOK_CLICKS), LogTurn::Left)] {
+        let Some((mut m, mut files, mut run)) = logbook(&img, fixes, 20) else { return };
+        assert!(run.paging(), "more than a page");
+        assert_eq!(m.log_turn(&mut files, &mut run, 1, 0x110, 0xBC, false), turn);
+    }
+}
+
+/// Fixed (kept bug #34): on the last page a click off the buttons is
+/// handled, so moving the cursor over Exit after it is no click; the
+/// original keeps the click's bit in AFF9 and leaves.
+#[test]
+fn fixed_a_logbook_click_is_not_held() {
+    use arena::fixes::{Fixes, LOGBOOK_CLICKS};
+    use arena::logbook::LogTurn;
+    let Some(img) = common::image() else { return };
+    for (fixes, turn) in [(Fixes::NONE, LogTurn::Left), (Fixes::only(LOGBOOK_CLICKS), LogTurn::Waiting)] {
+        let Some((mut m, mut files, mut run)) = logbook(&img, fixes, 2) else { return };
+        assert!(!run.paging(), "one page");
+        assert_eq!(m.log_turn(&mut files, &mut run, 1, 0x80, 0x40, false), LogTurn::Waiting);
+        assert_eq!(m.log_turn(&mut files, &mut run, 0, 0x110, 0xBC, false), turn);
+    }
+}
+
+/// Fixed (kept bug #35): the lines' count goes to DGROUP's FF5; the
+/// original writes it with DS the frame's, over two bytes of a log
+/// longer than FF5h bytes, which then show on its page.
+#[test]
+fn fixed_the_logbook_s_count_leaves_the_log_alone() {
+    use arena::fixes::{Fixes, LOG_COUNT};
+    let Some(img) = common::image() else { return };
+    let Some((m, _, _)) = logbook(&img, Fixes::NONE, 60) else { return };
+    let lines = m.mem.r16(DS, 0xA872);
+    assert_eq!(m.mem.r16(0x7000, 0x0FF5), lines, "the original's count in the text");
+    let (f, _, _) = logbook(&img, Fixes::only(LOG_COUNT), 60).unwrap();
+    assert_eq!(f.mem.r16(DS, 0x0FF5), lines);
+    let text = |m: &Machine| (0..0x2000u16).map(|i| m.mem.r8(0x7000, i)).collect::<Vec<u8>>();
+    let (a, b) = (text(&m), text(&f));
+    let differ: Vec<usize> = (0..a.len()).filter(|&i| a[i] != b[i]).collect();
+    assert!(!differ.is_empty() && differ.iter().all(|&i| i == 0xFF5 || i == 0xFF6), "only the original's two bytes: {differ:x?}");
+}

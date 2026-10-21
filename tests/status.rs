@@ -92,3 +92,40 @@ fn matches_original() {
     }
     assert!(n > 2500, "{n}");
 }
+
+/// Fixed (kept bug #39): with two effects fortifying the player (kind 4,
+/// strength and then agility), the status lists both; the original's
+/// pointer for the comparison is clobbered by the first line, so only
+/// the first effect's attribute is listed.
+#[test]
+fn fixed_every_fortified_attribute_is_listed() {
+    use arena::fixes::{Fixes, STATUS_FORTIFIED};
+    let Some(img) = common::image() else { return };
+    let lines = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        for i in 0..0x11u16 {
+            m.mem.w8(DS, 0x0660 + i * 0x3C + 0x3B, 0xFF);
+        }
+        for (i, attr) in [(0u16, 0u16), (1, 3)] {
+            let slot = 0x0660 + i * 0x3C;
+            m.mem.w16(DS, slot + 0x28, 0x01A4);
+            m.mem.w16(DS, slot + 0x2A, DS);
+            m.mem.w8(DS, slot + 0x3A, 4);
+            m.mem.w8(DS, slot + 0x3B, 0);
+            m.mem.w8(DS, slot + 6 + attr, 10);
+        }
+        m.mem.w16(DS, 0x01A4 + 0x59, 100);
+        m.mem.w16(DS, 0x01A4 + 0x5B, 100);
+        m.mem.w16(DS, 0x05B1, 0x10);
+        m.status_conditions(0x1044);
+        let text = String::from_utf8_lossy(m.mem.cstr(DS, 0x1044)).into_owned();
+        text.split('\r').filter(|l| l.contains("fortified")).map(String::from).collect::<Vec<_>>()
+    };
+    let faithful = lines(Fixes::NONE);
+    assert_eq!(faithful.len(), 1, "{faithful:?}");
+    let fixed = lines(Fixes::only(STATUS_FORTIFIED));
+    assert_eq!(fixed.len(), 2, "{fixed:?}");
+    assert_eq!(fixed[0], faithful[0]);
+    assert_ne!(fixed[1], fixed[0]);
+}

@@ -194,6 +194,39 @@ fn sales_taken(fixes: arena::fixes::Fixes, offer: &[u8]) -> Option<usize> {
     Some(taken)
 }
 
+/// Fixed (kept bug #14): the merchant's first price accepted is the
+/// deal's, doubled back when the prices were halved (over 65000); the
+/// original returns RESULT (65B8) as an earlier haggle left it unless the
+/// opening line had a %mm.
+#[test]
+fn fixed_the_first_price_accepted_is_the_deal() {
+    use arena::fixes::{FIRST_PRICE, Fixes};
+    let Some(img) = common::image() else { return };
+    let Ok(mut files) = Files::new(&game_dir()) else { return };
+    let mut base = Machine::new(&img);
+    assert!(base.bsa_open(&mut files));
+    base.mem.w16(DS, 0x9030, 0x7000);
+    let mut stale = 0;
+    for seed in 0..100u32 {
+        for price in [1000u32, 100_000] {
+            let deal = |fixes: Fixes, files: &mut Files| {
+                let mut m = base.clone();
+                m.fixes = fixes;
+                m.rng.seed = seed.wrapping_mul(0x9E37_79B9);
+                m.mem.w32(DS, 0x65B8, 12345);
+                let mut io = Script { menus: vec![0, 0], offers: Vec::new(), used: [0; 3] };
+                m.haggle(files, &mut io, price, 50, 0x80, 0x80, 0, 1, 0x1A4C).expect("a haggle")
+            };
+            match deal(Fixes::NONE, &mut files) {
+                Haggle::Deal(12345) => stale += 1,
+                d => assert_eq!(d, Haggle::Deal(price)),
+            }
+            assert_eq!(deal(Fixes::only(FIRST_PRICE), &mut files), Haggle::Deal(price));
+        }
+    }
+    assert!(stale > 0, "no opening line without %mm");
+}
+
 /// Fixed (kept bug #10): selling reaches the merchant's acceptance roll,
 /// the purchase's mirrored: an offer between his price and his limit is
 /// taken on a roll out of 256 at or under the share of the way from the

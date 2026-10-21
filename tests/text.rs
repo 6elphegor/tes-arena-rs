@@ -323,3 +323,92 @@ fn the_last_template_reads_on_into_the_welcome_box() {
     assert!(t.starts_with("As you approach the Palace Gates"), "{t:?}");
     assert!(t.trim_end().ends_with("complete..."), "{t:?}");
 }
+
+/// Fixed (kept bug #48): text 56h written out (mode 2) at a nesting
+/// level below the outermost (as a substitution's text is) isn't wrapped
+/// on its own, nor at the outermost with 5C8 bit 10h; the original wraps
+/// it always. At the outermost it is wrapped as before.
+#[test]
+fn fixed_a_nested_text_is_not_wrapped() {
+    use arena::fixes::{Fixes, TEXT_WRAP};
+    use arena::text::var::{BANK, LEVEL};
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut base = Machine::new(&img);
+    base.heap_init(HEAP.0, HEAP.1).unwrap();
+    assert!(base.bsa_open(&mut files));
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w8(DS, 0x8FA6, 1);
+    base.mem.w16(DS, 0x9032, 0x20);
+    base.mem.w16(DS, BANK, 0x1F);
+    base.ems_map(0x11);
+    let run = |fixes: Fixes, level: u8, flags: u16, files: &mut Files| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        m.rng.seed = 0x1234_5678;
+        m.mem.w8(DS, LEVEL, level);
+        m.mem.w16(DS, 0x05C8, flags);
+        m.mem.w16(DS, 0x137A, 0x56);
+        m.mem.w16(DS, 0x101C, 0xFF);
+        m.mem.w8(DS, 0x137E, 0x14);
+        m.text(files, &mut Count, 2, OUT_SEG, 0).unwrap_or_else(|| panic!("{level} {flags:x}: {}", arena::giveup::describe()));
+        m.mem.cstr(OUT_SEG, 0).to_vec()
+    };
+    let fixed = Fixes::only(TEXT_WRAP);
+    let wrapped = run(Fixes::NONE, 0, 0, &mut files);
+    assert_eq!(run(fixed, 0, 0, &mut files), wrapped, "the outermost, as before");
+    assert_eq!(run(Fixes::NONE, 1, 0, &mut files), wrapped, "the original wraps a nested text");
+    let nested = run(fixed, 1, 0, &mut files);
+    assert_ne!(nested, wrapped);
+    assert_eq!(run(fixed, 0, 0x10, &mut files), nested, "nor with 5C8 bit 10h");
+    let breaks = |t: &[u8]| t.iter().filter(|&&c| c == b'\n' || c == b'\r').count();
+    assert!(breaks(&nested) < breaks(&wrapped), "{:?}", String::from_utf8_lossy(&wrapped));
+}
+
+/// Fixed (kept bug #1): %en in the street (D48 not 6) names the town's
+/// first equipment store, as it is named inside it; the original returns
+/// into 2DA2 at the text's offset (None, its fault). With no store, the
+/// code is replaced by nothing.
+#[test]
+fn fixed_en_in_the_street_names_the_first_store() {
+    use arena::fixes::{EN_OUTSIDE_STORE, Fixes};
+    use arena::text::var::{BANK, SUB_LEVEL};
+    let Some(img) = common::image() else { return };
+    let dir = game_dir();
+    let Ok(mut files) = Files::new(&dir) else { return };
+    let mut base = Machine::new(&img);
+    base.heap_init(HEAP.0, HEAP.1).unwrap();
+    assert!(base.bsa_open(&mut files));
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w8(DS, 0x8FA6, 1);
+    base.mem.w16(DS, 0x9032, 0x20);
+    base.mem.w16(DS, BANK, 0x1F);
+    base.ems_map(0x11);
+    base.mem.w8(DATA, SUB_LEVEL, 0);
+    // The town's stores: two entries at 6000:0, the first (key 0105h)
+    // named by words 2 and 3.
+    base.mem.w16(DS, 0x1008, 0);
+    base.mem.w16(DS, 0x100A, 0x6000);
+    for (i, &b) in [0x05u8, 0x01, 2, 3, 0x07, 0x01, 4, 5].iter().enumerate() {
+        base.mem.w8(0x6000, i as u16, b);
+    }
+    let run = |fixes: Fixes, kind: u8, stores: u16, files: &mut Files| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        m.mem.w8(DS, 0x0D48, kind);
+        m.mem.w16(DS, 0x0FD2, 0x010A);
+        m.mem.w16(DS, 0x138B, stores);
+        for (i, &b) in b"owner of %en.\0".iter().enumerate() {
+            m.mem.w8(OUT_SEG, i as u16, b);
+        }
+        m.expand(files, &mut Count, OUT_SEG, 0).map(|_| String::from_utf8_lossy(m.mem.cstr(OUT_SEG, 0)).into_owned())
+    };
+    let inside = run(Fixes::NONE, 6, 2, &mut files).expect("inside the store");
+    assert!(inside.len() > "owner of .".len(), "{inside:?}");
+    assert_eq!(run(Fixes::NONE, 0, 2, &mut files), None, "the original's fault");
+    let fixed = Fixes::only(EN_OUTSIDE_STORE);
+    assert_eq!(run(fixed, 0, 2, &mut files).as_deref(), Some(inside.as_str()));
+    assert_eq!(run(fixed, 6, 2, &mut files).as_deref(), Some(inside.as_str()), "inside, as before");
+    assert_eq!(run(fixed, 0, 0, &mut files).as_deref(), Some("owner of ."));
+}
