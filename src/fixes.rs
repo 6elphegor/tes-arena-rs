@@ -128,5 +128,12 @@ pub const ONE_NAME_SORTED: u8 = 53;
 /// #54: "her" written past the text when "his home" isn't in it
 /// (1194:2945).
 pub const HER_HOME: u8 = 54;
+/// #55: the staff's quest lines written over DGROUP at 5536h (1194:1F56).
+pub const STAFF_LINES: u8 = 55;
+/// #57: an Argonian's helmet leaks a heap block each sheet drawn
+/// (1194:2020).
+pub const HELMET_LEAK: u8 = 57;
+/// #58: each light table made leaks the last (0000:AAA2).
+pub const LIGHT_TABLE_LEAK: u8 = 58;
 /// #61: the loot window puts back a bank it never saved (2433:0583).
 pub const LOOT_BANK: u8 = 61;

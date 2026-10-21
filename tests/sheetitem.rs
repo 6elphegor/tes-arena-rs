@@ -112,3 +112,81 @@ fn worn_items_on_the_doll_as_the_original_draws_them() {
         assert_eq!(after, f[4], "{name}: the bank mapped, the EMS banks and the page after");
     }
 }
+
+/// The heap's blocks: the chain from 157h (offset, segment), each block's
+/// segment.
+fn heap_blocks(m: &Machine) -> Vec<u16> {
+    let (mut off, mut seg) = (m.mem.r16(DS, 0x157), m.mem.r16(DS, 0x159));
+    let mut out = Vec::new();
+    while (seg | off) != 0 && out.len() < 500 {
+        out.push(seg);
+        (seg, off) = (m.mem.r16(seg, off.wrapping_add(2)), m.mem.r16(seg, off));
+    }
+    out
+}
+
+/// Fixed (kept bug #57): an Argonian's helmet drawn on the doll (race 7's
+/// own picture, 1194:2020) frees the block its background was kept in;
+/// the original takes one each drawing and never frees it.
+#[test]
+fn fixed_an_argonian_s_helmet_frees_its_block() {
+    use arena::fixes::{Fixes, HELMET_LEAK};
+    let Some(image) = common::image() else { return };
+    let Ok(mut files) = Files::new(&common::game_dir()) else { return };
+    let Ok(save) = std::env::var("ARENA_SAVE") else { return };
+    files.add_dir(&PathBuf::from(save)).expect("ARENA_SAVE");
+    let mut base = Machine::new(&image);
+    base.memory_init().expect("the memory");
+    base.program_start(&mut files, &mut arena::start::PortStart).expect("the start");
+    let frame = base.mem.r16(DS, 0x9030);
+    base.mem.w16(DS, 0xCB8A, frame);
+    base.mem.w8(DS, 0x1A80, 0x40);
+    base.mem.w8(DS, 0x1A6C, 0x40);
+    base.game_setup(&mut arena::start::SetupPort(&mut files)).expect("the set-up");
+    let blocks = |fixes: Fixes| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        let mut fs = files.clone();
+        m.mem.w8(DS, 0x1A8, 7);
+        m.mem.w8(DS, 0x212, 5);
+        m.mem.w8(DS, 0x212 + 0x0E, 0xC0);
+        m.sheet_clothes();
+        m.equip_frames(&mut fs).expect("the equipment's frames");
+        let before = heap_blocks(&m).len();
+        for _ in 0..3 {
+            m.sheet_item(&mut fs, 0x212, 0).expect("the helmet");
+        }
+        heap_blocks(&m).len() - before
+    };
+    assert_eq!(blocks(Fixes::NONE), 3, "the original's three blocks kept");
+    assert_eq!(blocks(Fixes::only(HELMET_LEAK)), 0);
+}
+
+/// Fixed (kept bug #55): the staff's quest lines counted again (1194:1F56)
+/// go to 1044h whatever DI the page's loop carries; the original writes
+/// them at that DI, 5536h after a description, over DGROUP there.
+#[test]
+fn fixed_the_staff_s_lines_stay_in_their_buffer() {
+    use arena::fixes::{Fixes, STAFF_LINES};
+    let Some(image) = common::image() else { return };
+    let mut files = Files::default();
+    let run = |fixes: Fixes, di: Option<u16>, files: &mut Files| {
+        let mut m = Machine::new(&image);
+        m.fixes = fixes;
+        m.page_di = di;
+        m.mem.w8(DS, 0x0F77, 1);
+        // An artifact quest under way (kind 1, stage 0) at 0DCA.
+        m.mem.w16(DS, 0x0DCA + 4, 1 << 6);
+        let before = m.clone();
+        m.staff_line(files).map(|()| {
+            let changed = |at: u16| (0..0x40u16).any(|o| m.mem.r8(DS, at + o) != before.mem.r8(DS, at + o));
+            (changed(0x5536), changed(0x1044), m.mem.r16(DS, 0x1272))
+        })
+    };
+    let (a, b) = (run(Fixes::NONE, Some(0x5536), &mut files).unwrap(), run(Fixes::only(STAFF_LINES), Some(0x5536), &mut files).unwrap());
+    assert_eq!((a.0, a.1), (true, false), "the original's lines at 5536h");
+    assert_eq!((b.0, b.1), (false, true));
+    assert_eq!(a.2, b.2, "the staff's line marked the same");
+    assert_eq!(run(Fixes::NONE, None, &mut files), None, "no DI the port follows");
+    assert_eq!(run(Fixes::only(STAFF_LINES), None, &mut files), Some((false, true, b.2)));
+}

@@ -194,3 +194,33 @@ fn matches_original() {
     eprintln!("load: {n} compared, {stuck} stuck in both");
     assert!(n > 2500, "{n} compared");
 }
+
+/// Fixed (kept bug #58): a light table made again (0000:AAA2) frees the
+/// one before; the original leaves it on the heap, a 1000h block a
+/// rebuild.
+#[test]
+fn fixed_a_light_table_rebuilt_frees_the_last() {
+    use arena::fixes::{Fixes, LIGHT_TABLE_LEAK};
+    let Some(img) = common::image() else { return };
+    let used = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.heap_init(0x2000, 0x9000).unwrap();
+        let free = |m: &mut Machine| {
+            // The heap's room: how many 1000h blocks it still gives.
+            let mut probe = m.clone();
+            let mut n = 0;
+            while probe.heap_alloc_bytes(0x1000).is_some() && n < 1000 {
+                n += 1;
+            }
+            n
+        };
+        let before = free(&mut m);
+        for _ in 0..4 {
+            m.light_table_make().expect("the table");
+        }
+        before - free(&mut m)
+    };
+    assert_eq!(used(Fixes::NONE), 4, "the original's four tables kept");
+    assert_eq!(used(Fixes::only(LIGHT_TABLE_LEAK)), 1);
+}
