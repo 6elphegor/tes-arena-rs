@@ -975,6 +975,21 @@ fn bowed(a: &mut App) {
     m.mem.w8(DS, 0x0D49, 6);
 }
 
+/// gen_worldframes.py's `barehanded`: the player's equipped weapon put
+/// away (its flags' 80h cleared, found as `bowed` finds it) and the
+/// weapon class (0D49) made from what is left (1194:7316).
+fn barehanded(a: &mut App) {
+    let m = &mut a.engine.m;
+    let at = (0..40u16).map(|i| 0x0212 + 0x13 * i).find(|&at| {
+        let f = m.mem.r8(DS, at + 0x0E);
+        f & 0xC0 == 0xC0 && (f & 0x0C) >> 2 == 1
+    });
+    let at = at.expect("no weapon equipped");
+    let f = m.mem.r8(DS, at + 0x0E);
+    m.mem.w8(DS, at + 0x0E, f & 0x7F);
+    m.player_weapon_class();
+}
+
 /// gen_worldframes.py's `boated`: a boat's record at FFE0h at the
 /// player's place, boarded (2294:0DD0, `Machine::board_boat`).
 fn boated(a: &mut App) {
@@ -1754,14 +1769,17 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 /// night, a level gained in a fight, the fog of a main quest dungeon;
 /// with screens given random inputs, inside a store, a tavern, a temple
 /// and the mages' guild before their keepers, the street at night and at
-/// noon with the travel map),
+/// noon with the travel map, the start dungeon's water and chasm, the
+/// crypt's lava (a death), a main quest dungeon; fought, the guards on
+/// the street, a fight with a bow and with bare hands),
 /// each played from the script its `fuzz` line holds and measured every
 /// CHECKPOINT frames as `playlongrun` (`fuzz_sessions_as_the_original`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
     "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2",
     "fuzzspell1", "fuzzspell2", "fuzzcamp1", "fuzzcamp2", "fuzzlevel1", "fuzzfog1",
-    "fuzzstore1", "fuzzstore2", "fuzztavern1", "fuzztemple1", "fuzzguild1", "fuzzguild2", "fuzznight1", "fuzzday1", "fuzzday2"];
+    "fuzzstore1", "fuzzstore2", "fuzztavern1", "fuzztemple1", "fuzzguild1", "fuzzguild2", "fuzznight1", "fuzzday1", "fuzzday2",
+    "fuzzpool1", "fuzzchasm1", "fuzzlava1", "fuzzguards1", "fuzzarcher1", "fuzzfists1", "fuzzcapped1"];
 
 /// gen_worldframes.py's CASTER_BOOK: the spells `caster` and
 /// `level_fight` add to the book (`booked`).
@@ -1794,12 +1812,28 @@ fn fuzz_tokens(name: &str) -> Option<Vec<String>> {
 /// view clicked with the mouse captured (its click at 164, 74, where the
 /// harness's at 160, 70 lands), N frames in all.
 fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
-    let key = |a: &mut App, code: KeyCode, down: bool| a.input(In::Key { code, down, text: None });
+    // (After a death (FUZZ_DEAD) nothing more is given: the original's
+    // case ends with the dying frame, its keys and buttons as they were.)
+    let live = || !FUZZ_DEAD.with(|f| f.get());
+    let key = |a: &mut App, code: KeyCode, down: bool| {
+        if live() {
+            a.input(In::Key { code, down, text: None });
+        }
+    };
+    let up = |a: &mut App, button: MouseButton| {
+        if live() {
+            a.input(In::Button { button, down: false });
+        }
+    };
     // Where the harness's mouse is: a screen's loop first reads it there
     // (back at the view's centre after a screen's clicks, gen_worldframes.py's
     // `play`; left where a held button or a step's click put it).
     let mut mouse = (160, 100);
+    FUZZ_DEAD.with(|f| f.set(false));
     for t in tokens {
+        if FUZZ_DEAD.with(|f| f.get()) {
+            break;
+        }
         let (kind, args) = t.split_at(1);
         let n: Vec<&str> = args.split(',').collect();
         let num = |i: usize| n[i].parse::<usize>().unwrap();
@@ -1843,15 +1877,22 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 fuzz_frames(a, d, seen, &mut mouse, num(0));
             }
             "s" => {
+                // (`swinging`, its frames the session's: a death among
+                // them ends it.)
                 recaptured(a);
-                swinging(a, d, seen, num(0));
+                a.input(In::Button { button: MouseButton::Right, down: true });
+                for _ in 0..num(0) {
+                    a.input(In::Motion(0.0, 96.0));
+                    fuzz_frames(a, d, seen, &mut mouse, 1);
+                }
+                up(a, MouseButton::Right);
                 fuzz_frames(a, d, seen, &mut mouse, num(1));
             }
             "c" => {
                 recaptured(a);
                 a.input(In::Button { button: MouseButton::Left, down: true });
                 fuzz_frames(a, d, seen, &mut mouse, 1);
-                a.input(In::Button { button: MouseButton::Left, down: false });
+                up(a, MouseButton::Left);
                 fuzz_frames(a, d, seen, &mut mouse, num(0) - 1);
                 // (A step's click leaves the harness's mouse where it was.)
                 mouse = (160, 70);
@@ -1866,7 +1907,7 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
                 a.input(In::Button { button: MouseButton::Left, down: true });
                 fuzz_frames(a, d, seen, &mut mouse, num(2));
-                a.input(In::Button { button: MouseButton::Left, down: false });
+                up(a, MouseButton::Left);
                 fuzz_frames(a, d, seen, &mut mouse, num(3));
             }
             // A screen opened in the frame after its key and left again
@@ -1963,7 +2004,7 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 mouse = (160, 70);
                 a.input(In::Button { button: MouseButton::Left, down: true });
                 fuzz_frames_acts(a, d, seen, &mut mouse, 1, &mut acts);
-                a.input(In::Button { button: MouseButton::Left, down: false });
+                up(a, MouseButton::Left);
                 fuzz_frames_acts(a, d, seen, &mut mouse, num(0) - 1, &mut acts);
                 if click {
                     mouse = (160, 100);
@@ -2095,7 +2136,17 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mu
 /// `acts` in turn first (`fuzz_script4`'s), then Esc.
 fn fuzz_frames_acts(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mut (i32, i32), n: usize, acts: &mut std::collections::VecDeque<FuzzAct>) {
     for _ in 0..n {
-        frames(a, d, seen, 1, |_| false);
+        // (A death, a blow's or the water's, ends the session with its
+        // frame, as gen_worldframes.py's `dead` ends the case: the
+        // original's frames stop there, before another top.)
+        if FUZZ_DEAD.with(|f| f.get()) {
+            return;
+        }
+        d.frame(a);
+        if fuzz_dead(a) {
+            return;
+        }
+        pushed(a, seen);
         if a.travel.is_some() {
             // (The map reads the harness's mouse, captured or not: after a
             // view's click, 160, 70, not where the window's click landed.)
@@ -2142,7 +2193,23 @@ fn fuzz_frames_acts(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse
     }
 }
 
+/// Whether the player died (2686:02B4's 5B1 bit 100h, or no health
+/// left: the view's way on from the death may have run), the session
+/// then over (FUZZ_DEAD).
+fn fuzz_dead(a: &App) -> bool {
+    use arena::character::{field, PLAYER};
+    let m = &a.engine.m;
+    let dead = m.mem.r16(DS, 0x05B1) & 0x100 != 0 || m.mem.r16(DS, PLAYER + field::HP) as i16 <= 0;
+    if dead {
+        FUZZ_DEAD.with(|f| f.set(true));
+    }
+    dead
+}
+
 thread_local! {
+    /// The player died in a session's frames (`fuzz_frames_acts`): the
+    /// session's other tokens left out.
+    static FUZZ_DEAD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// gen_worldframes.py's `let_go_at_map`, for `fuzz_script3`'s seeds.
     static LET_GO_AT_MAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
@@ -2514,7 +2581,10 @@ fn case(name: &str) -> Option<Case> {
             n if n.starts_with("fuzztavern") => Place::Tavern,
             n if n.starts_with("fuzztemple") => Place::Temple,
             n if n.starts_with("fuzzguild") => Place::Loaded,
-            n if n.starts_with("fuzznight") || n.starts_with("fuzzday") => Place::People,
+            n if n.starts_with("fuzznight") || n.starts_with("fuzzday") || n.starts_with("fuzzguards") => Place::People,
+            n if n.starts_with("fuzzpool") || n.starts_with("fuzzchasm") || n.starts_with("fuzzarcher") || n.starts_with("fuzzfists") => Place::Dungeon,
+            n if n.starts_with("fuzzlava") => Place::Crypt,
+            n if n.starts_with("fuzzcapped") => Place::Capped,
             _ => Place::Wild,
         };
         let (fight, crypt) = (name.starts_with("fuzzfight"), name.starts_with("fuzzcrypt"));
@@ -2524,6 +2594,7 @@ fn case(name: &str) -> Option<Case> {
             "fuzzcamp2" => Some(22),
             n if n.starts_with("fuzzday") => Some(12),
             n if n.starts_with("fuzznight") => Some(22),
+            n if n.starts_with("fuzzguards") => Some(12),
             _ => None,
         };
         // (`fuzz_script3`'s seeds, with the lists and the camp.)
@@ -2577,6 +2648,27 @@ fn case(name: &str) -> Option<Case> {
                     room(a);
                     seeded(a);
                     at_square(a, 7, 12, 0x80);
+                }
+                // (`fuzz_script4`'s and `fuzz_script5`'s places of
+                // gen_worldframes.py's FUZZ_AT: before the start
+                // dungeon's water (`pool`) and its chasm (`chasm`), the
+                // crypt's lava (`lava`); the street at noon with the
+                // guards called and no shield (`guards`); `fight` with a
+                // bow (`archer`) and bare hands (`fists`).)
+                "fuzzpool" => at_square(a, 3, 3, 0x100),
+                "fuzzchasm" => at_square(a, 6, 52, 0),
+                "fuzzlava" => at_square(a, 21, 7, 0),
+                "fuzzguards" => {
+                    guards_called(a);
+                    a.engine.m.mem.w16(DS, arena::character::PLAYER + arena::character::field::MAGIC_SHIELD, 0);
+                }
+                "fuzzarcher" => {
+                    unshielded(a, None);
+                    bowed(a);
+                }
+                "fuzzfists" => {
+                    unshielded(a, None);
+                    barehanded(a);
                 }
                 _ => {}
             }
@@ -5239,8 +5331,13 @@ fn busy_play_goes_as_the_originals() {
 /// (ARENA_CASE runs one): fuzzcrypt2, played there without the engine's
 /// page, walks onto the crypt's stairs by its 586th drawing where the
 /// original turns on (its heading 100h round, the stairs' turn); with the
-/// page (`fuzz_sessions_as_the_original`) every frame matches.
-const ROWS_LEFT_OUT: &[&str] = &["fuzzcrypt2"];
+/// page (`fuzz_sessions_as_the_original`) every frame matches. fuzzlava1
+/// likewise: without the page no creature flats are taken from the
+/// drawing (`Engine::frame`'s CD56 hook, 25CA:0271), so the crypt's
+/// creature the original's drawing wakes never comes, its blows never
+/// kill the player on the 930th frame, and the session runs its 1517
+/// drawings; with the page it matches in full.
+const ROWS_LEFT_OUT: &[&str] = &["fuzzcrypt2", "fuzzlava1"];
 
 /// Each case's drawings make their row tables from what the original's
 /// did (the `rows` lines: the inputs as the last 0000:DA8E found them,
