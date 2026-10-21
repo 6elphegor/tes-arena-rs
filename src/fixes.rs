@@ -78,8 +78,13 @@ pub const UNEQUIP_WRAP: u8 = 13;
 pub const FIRST_PRICE: u8 = 14;
 /// #15: a room sneaked into rests for the end time's low word in hours.
 pub const SNEAK_HOURS: u8 = 15;
+/// #16: the pile picked is found ignoring the kind of place; a corpse's
+/// segment written at 4BF4 (2433:0883, 0748).
+pub const LOOT_PICK: u8 = 16;
 /// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).
 pub const GUILD_SPELLS_PICK: u8 = 20;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
+/// #61: the loot window puts back a bank it never saved (2433:0583).
+pub const LOOT_BANK: u8 = 61;
