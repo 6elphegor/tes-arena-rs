@@ -402,7 +402,12 @@ impl Travel {
         {
             let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
-            // then the button's own refusals (03DC).
+            // then the button's own refusals (03DC). ARENAFNT ([102C],
+            // 0000:9AE6) and the tiles at [1036] (9AF8) selected first on
+            // either path (039E..03A9, 03C7..03D7): a refusal's box is
+            // sized by those tiles.
+            m.select_font(0x102C);
+            m.select_tiles(0x1036);
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
