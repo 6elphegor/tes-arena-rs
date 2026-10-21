@@ -156,11 +156,11 @@ the original routine:
 | `GuildHooks::stock_file` | src/guild.rs:83 | 25FD:0844, 0000:600C, 67C4 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::stock_list` | src/guild.rs:93 | 1194:5734 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
 | `GuildHooks::stock_write` | src/guild.rs:88 | 1194:A82D | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
-| `HaggleIo::expand` | src/haggle.rs:129 | 2DA2:000A | port | the default runs the port | |
-| `HaggleIo::picture` | src/haggle.rs:141 | 1194:4B8E | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
-| `HaggleIo::say` | src/haggle.rs:136 | 1194:49FF | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
-| `HaggleIo::shown` | src/haggle.rs:147 | 1194:4E54, 4E88, 5FC0 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's dialogs' state as the original's (worldframes.txt's playstore and playguild state lines) |
-| `HaggleIo::type_offer` | src/haggle.rs:120 | 1194:810D, 4E88 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::expand` | src/haggle.rs:131 | 2DA2:000A | port | the default runs the port | |
+| `HaggleIo::picture` | src/haggle.rs:143 | 1194:4B8E | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::say` | src/haggle.rs:138 | 1194:49FF | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
+| `HaggleIo::shown` | src/haggle.rs:149 | 1194:4E54, 4E88, 5FC0 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's dialogs' state as the original's (worldframes.txt's playstore and playguild state lines) |
+| `HaggleIo::type_offer` | src/haggle.rs:122 | 1194:810D, 4E88 | overridden | the view: questui.rs HaggleTalk<'_> | present: the haggle's lines and the player's offers (screens.txt) |
 | `LevelUpHooks::body` | src/levelup.rs:119 | 1194:2462 | port | the default runs the port (`equip_frames`); the stubbed levelup vectors stub it | |
 | `LevelUpHooks::dac` | src/levelup.rs:94 | 0000:6E3C | overridden | the view: main.rs Front<'_> | faithful: the colours shown, as the travel map's keep reads them (worldframes playlevelup) |
 | `LevelUpHooks::keep_screen` | src/levelup.rs:106 | 1194:158F | port | the default runs the port (`sheet_keep`) | |
@@ -450,7 +450,7 @@ the original routine:
 | `WeaponHooks::fire_bow` | src/weapon.rs:76 | 29CF:037F | port | the default runs the port | |
 | `WeaponHooks::surrender` | src/weapon.rs:81 | 2AA1:0819..083B | port | the default runs the port (`surrender_text`), then `surrender_box` | |
 | `WeaponHooks::surrender_box` | src/weapon.rs:87 | 1194:59C8 | overridden | the view's `Front` shows the box (`message_shown`) | faithful: playsurrender's DGROUP and EMS |
-| `KillHooks::surrender` | src/strike.rs:498 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; `strike::Words` makes the words and hands the box to `ClockHooks::surrender_box` (a spell's lingering effect), `TalkHooks::surrender_box` (a touch spell) or the cast's message box (an area spell); a creature's spell on itself passes `NoKillHooks` | faithful (playsurrender, playsurrenderspell) |
+| `KillHooks::surrender` | src/strike.rs:504 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; `strike::Words` makes the words and hands the box to `ClockHooks::surrender_box` (a spell's lingering effect), `TalkHooks::surrender_box` (a touch spell) or the cast's message box (an area spell); a creature's spell on itself passes `NoKillHooks` | faithful (playsurrender, playsurrenderspell) |
 | `WeaponHooks::wall_trigger` | src/weapon.rs:57 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |
