@@ -71,8 +71,10 @@ impl AreaHooks for Hooks {
     }
     fn ask_leave(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> bool {
         count(m, 0xFFA0);
-        count(m, 0xFFAA);
         m.mem.r8(DS, 0xFFDE) & 1 != 0
+    }
+    fn map_colours(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) {
+        count(m, 0xFFAA);
     }
     fn map_given_back(&mut self, m: &mut Machine, _files: &mut arena::bsa::Files) -> Option<()> {
         count(m, 0xFFA2);

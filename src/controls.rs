@@ -180,9 +180,11 @@ pub trait ControlHooks: crate::hooks::StairsHooks {
     fn wild_recentre(&mut self, _m: &mut Machine, _files: &mut Files) -> Option<()> {
         Some(())
     }
-    /// 2826:0BB2: the counters of a spell waiting for a target, drawn
-    /// over the view.
-    fn spell_counters(&mut self, _m: &mut Machine) {}
+    /// 2826:0BB2: the counters of a spell waiting for a target, printed
+    /// and drawn over the view (`Machine::spell_counters`).
+    fn spell_counters(&mut self, m: &mut Machine) {
+        m.spell_counters();
+    }
 }
 
 /// What a modern front end asks of the player in a frame, in place of
@@ -438,6 +440,12 @@ impl Machine {
             let d = self.turn_speed(fraction);
             self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
         }
+        // 2826:02E2's start, after the moves: the right button let go
+        // cancels a spell waiting for a target, as in the classic
+        // controls (a swing's end, a wall spell's counter gone).
+        if self.mem.r8(DS, RELEASED_RIGHT) != 0 {
+            self.cancel_target();
+        }
         // Where the classic controls take a click on the interface bar
         // (2826:02E2, `pick_region`, after the moves): the front end's, if
         // one is waiting. With the cursor on the bar the original's
@@ -454,6 +462,33 @@ impl Machine {
             self.jump(it.run);
         }
         Some(())
+    }
+
+    /// 2826:0BB2: the counter of a wall spell (0DC0: + walls to make, -
+    /// to unmake) or else of a floor spell (0DC2) printed into 1044 with
+    /// its text (0000:8D14: 7A7E "Create walls : %d", 7A90, 7AA3, 7AB6
+    /// for the others, the count negated for the second of each), then
+    /// drawn in [102C]'s font at (BEh, 2) in colour 70h and over it at
+    /// (BDh, 2) in 9Fh (0000:9E06), the colour left 9Fh.
+    pub fn spell_counters(&mut self) {
+        let (mut ax, mut si) = (self.mem.r16(DS, 0x0DC0), 0x7A7E);
+        if ax == 0 {
+            (ax, si) = (self.mem.r16(DS, 0x0DC2), 0x7AA3);
+            if ax == 0 {
+                return;
+            }
+            if (ax as i16) < 0 {
+                (ax, si) = (ax.wrapping_neg(), 0x7AB6);
+            }
+        } else if (ax as i16) < 0 {
+            (ax, si) = (ax.wrapping_neg(), 0x7A90);
+        }
+        self.sprintf((DS, 0x1044), (DS, si), &[crate::format::Arg::Int(ax)]);
+        self.select_font(crate::shops::font::ARENA);
+        self.mem.w8(DS, 0x9288, 0x70);
+        self.page_text_at(0xBE, 2, (DS, 0x1044));
+        self.mem.w8(DS, 0x9288, 0x9F);
+        self.page_text_at(0xBD, 2, (DS, 0x1044));
     }
 
     /// 2826:019D..01D5.

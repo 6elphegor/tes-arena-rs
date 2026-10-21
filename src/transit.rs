@@ -129,6 +129,12 @@ pub trait AreaHooks {
         m.view_window();
         m.world_back(files)
     }
+    /// 2542:0446 after that map, staying (0000:45AC) or after the screens
+    /// on leaving (4593): the colours of the file named at 1304 read to
+    /// 929E (0000:7530; their setting, 9B4E, the front end's).
+    fn map_colours(&mut self, m: &mut Machine, files: &mut Files) {
+        let _ = m.colours_load(files, 0x1304, 0x929E);
+    }
     /// The screen after leaving (0000:9426, 9466).
     fn leave_screen(&mut self, _m: &mut Machine) {}
     /// 1194:D55F and 2433:0199, leaving an interior: the staff's flags
@@ -674,9 +680,11 @@ impl Machine {
                         }
                         hooks.map_given_back(self, files)?;
                         if !leave {
+                            hooks.map_colours(self, files);
                             return Some(());
                         }
                         hooks.leave_screen(self);
+                        hooks.map_colours(self, files);
                         hooks.leave_dungeon(self);
                     }
                 }

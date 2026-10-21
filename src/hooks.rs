@@ -70,6 +70,12 @@ pub trait StairsHooks {
     fn map_keep(&mut self, m: &mut Machine, files: &mut Files) {
         m.map_keep(files, None);
     }
+    /// 2542:0446, after that map: the colours of the file named at 1304
+    /// read to 929E (0000:7530) and set from there (9B4E, the front end's:
+    /// whatever the level set in the DAC since, 71h a fog's grey, gone).
+    fn map_colours(&mut self, m: &mut Machine, files: &mut Files) {
+        let _ = m.colours_load(files, 0x1304, 0x929E);
+    }
 }
 
 /// `StairsHooks` that do nothing.

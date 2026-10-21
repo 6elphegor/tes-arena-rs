@@ -401,6 +401,14 @@ impl arena::hooks::StairsHooks for Front<'_> {
     fn map_keep(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         m.map_keep(files, self.dac.as_ref());
     }
+    /// 2542:0446: PAL.COL read to 929E and set, so the lamps' 71h is the
+    /// file's again (a fog's grey, 2294:0C36, gone till the level sets it).
+    fn map_colours(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        let _ = m.colours_load(files, 0x1304, 0x929E);
+        if let Some(l) = self.light.as_deref_mut() {
+            l.lamp = None;
+        }
+    }
 }
 /// How the sheet's drop came out (`App::sheet_drop`): a question asked
 /// (its text), "Drop what?" waiting in its loop (its lines and their first
@@ -4794,6 +4802,12 @@ impl App {
         if let (Some(page), true) = (&self.engine.page, self.engine.page_gaps.is_empty()) {
             let n = ((VIEW_ROWS + 1) * 320).min(s.len()).min(page.len());
             s[..n].copy_from_slice(&page[..n]);
+            // (The draw page itself where it is the game's block: the
+            // drawing put there, and over it what the frame drew before
+            // the list, the hand and the spells' counters, 2826:0BB2.)
+            if let Some(block) = game_page(&self.engine.m) {
+                s[..n].copy_from_slice(&block[..n]);
+            }
         }
         s
     }
@@ -5419,8 +5433,13 @@ impl App {
     fn dialog_key(&mut self, code: winit::keyboard::KeyCode) {
         use winit::keyboard::KeyCode;
         if !self.boxes.is_empty() {
-            let keys = matches!(code, KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space) && !self.status_box;
-            if keys || code == KeyCode::Escape {
+            // A box's wait (1194:5536) ends once the ring of keys typed,
+            // forgotten as it began, holds one (ACB0: the key interrupt
+            // gave the key a character, any but the arrows, the Shifts
+            // and their like); the status box's loop (2542:0530..0569)
+            // only on Esc.
+            let typed = self.engine.m.mem.r16(arena::mem::DS, arena::lineedit::var::COUNT) != 0;
+            if (typed && !self.status_box) || code == KeyCode::Escape {
                 self.box_read();
             }
             return;

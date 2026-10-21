@@ -42,12 +42,6 @@ and the 3D view itself, the page's pixels the drawing stages wrote last
 
   view3d | NAME | <digest>
 
-and the same from row 1 on (row 0 left 0): a ceiling's topmost row reads
-one entry past its row table (0000:DB78's), the next heap block's header,
-whose words are the original's heap's segments, which no other layout has:
-
-  view3d1 | NAME | <digest>
-
 and, where the case wrote files, each it created or changed (FILE:-
 deleted), by name (`written_line`: TEMPSAVE.$$$'s third plane zeros
 where D748 is 0):
@@ -1746,7 +1740,9 @@ FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1':
         'fuzztown3': ('street', 3, 2), 'fuzzdungeon3': ('dungeon', 4, 2), 'fuzzwild3': ('wild', 3, 2),
         'fuzztown4': ('street', 4, 2), 'fuzzdungeon4': ('dungeon', 5, 2), 'fuzzwild4': ('wild', 4, 2),
         'fuzzfight1': ('fight', 1, 2), 'fuzzfight2': ('fight', 2, 2), 'fuzzcrypt1': ('crypt', 1, 2),
-        'fuzzcrypt2': ('crypt', 2, 2), 'fuzzpeople1': ('people', 1, 2), 'fuzzpeople2': ('people', 2, 2)}
+        'fuzzcrypt2': ('crypt', 2, 2), 'fuzzpeople1': ('people', 1, 2), 'fuzzpeople2': ('people', 2, 2),
+        'fuzzspell1': ('caster', 1, 3), 'fuzzspell2': ('caster', 2, 3), 'fuzzcamp1': ('wildday', 1, 3),
+        'fuzzcamp2': ('wildnight', 1, 3), 'fuzzlevel1': ('levelup', 1, 3), 'fuzzfog1': ('fogged', 1, 3)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
 
@@ -1762,9 +1758,11 @@ def fuzz_script(where, seed, vocab=1, total=1500):
     view's middle clicked, N frames: at (160, 70), landing (4 on) where
     the view's click with the mouse captured lands, 164, 74 (the swings
     need it captured). No screens or boxes are opened. With `vocab` 2,
-    `fuzz_script2`'s."""
+    `fuzz_script2`'s; with 3, `fuzz_script3`'s."""
     if vocab == 2:
         return fuzz_script2(where, seed, total)
+    if vocab == 3:
+        return fuzz_script3(where, seed, total)
     rng = random.Random(f'{where}:{seed}')
     out, n, ready = [], 0, False
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
@@ -1864,6 +1862,90 @@ def fuzz_script2(where, seed, total):
     return out
 
 
+# The places where `fuzz_script3`'s `cN` clicks the view's middle.
+CLICKED3 = ('caster', 'levelup', 'fogged')
+
+
+def fuzz_script3(where, seed, total):
+    """`fuzz_script2`'s session with the bar's lists and the camp: `bK,Y,N`
+    the spellbook (C, 2542:026D) up in the bar's corner, its down arrow
+    clicked K times (5AF4+8: the next line marked), then (F0h, Y) inside
+    its lines (5AF4's text area, 9Ah..C2h) clicked twice: the line under
+    it marked, then picked (2542:06F8: cast, an aimed spell waiting for
+    its target), or picked at the first when marked already; N frames.
+    `uK,Y,N` the same in the use list (U, 034D: the item used). `rH,N`
+    camping (R, 01E6): its menu's C (camp for a while), H hours typed,
+    Enter; N frames of the rest. A box on the way (a refusal, the rest's
+    end) or a question takes what of these is left, then Esc
+    (`fuzz_steps`); `cN` clicks the view's middle in CLICKED3's places."""
+    rng = random.Random(f'v3:{where}:{seed}')
+    out, n, ready = [], 0, False
+    moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
+             ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60),
+             ((KEY_LCTRL, KEY_LEFT), 2, 40), ((KEY_LCTRL, KEY_RIGHT), 2, 40)]
+    while n < total:
+        r = rng.random()
+        if r < 0.30:
+            keys, lo, hi = rng.choice(moves)
+            k, m = rng.randint(lo, hi), rng.randint(1, 10)
+            out.append('h' + '+'.join(f'{c:x}' for c in keys) + f',{k},{m}')
+            n += k + m
+        elif r < 0.44:
+            while True:
+                x, y = rng.randint(0, 319), rng.randint(0, 146)
+                if not (0x57 <= x <= 0xEA and 0x29 <= y <= 0x73):
+                    break
+            k, m = rng.randint(3, 40), rng.randint(1, 15)
+            out.append(f'm{x},{y},{k},{m}')
+            n += k + m
+        elif r < 0.50:
+            k = rng.randint(1, 60)
+            out.append(f'w{k}')
+            n += k
+        elif r < 0.53:
+            k = rng.randint(5, 30)
+            out.append(f't{k}')
+            n += k
+        elif r < 0.55:
+            k = rng.randint(20, 60)
+            out.append(f'q{k}')
+            n += 1 + k
+        elif r < 0.60:
+            k = rng.randint(10, 30)
+            out.append(f'a{k}')
+            ready = not ready
+            n += 1 + k
+        elif r < 0.66 and ready:
+            k, m = rng.randint(5, 40), rng.randint(2, 10)
+            out.append(f's{k},{m}')
+            n += k + m
+        elif r < 0.69:
+            k = rng.randint(5, 20)
+            out.append(f'{rng.choice("ofl")}{k}')
+            n += 1 + k
+        elif r < 0.84:
+            kind = 'b' if r < 0.78 else 'u'
+            k, y, m = rng.choice((0, 0, 1, 2, 3)), rng.randint(0x9A, 0xC2), rng.randint(5, 40)
+            out.append(f'{kind}{k},{y},{m}')
+            n += 1 + m
+        elif r < 0.88:
+            h, m = rng.randint(1, 3), rng.randint(10, 40)
+            out.append(f'r{h},{m}')
+            n += 1 + m
+        elif where in CLICKED3:
+            k = rng.randint(5, 20)
+            out.append(f'c{k}')
+            n += k
+    return out
+
+
+# The bar's list's down arrow (the record at 5AF4's +8: x CFh, y BDh, 0Ah
+# by 8), at its centre.
+LIST_DOWN = (0xD4, 0xC1)
+# The digits 1..9's scan codes.
+KEY_DIGITS = {d: 0x01 + d for d in range(1, 10)}
+
+
 def fuzz_steps(tokens, spare=False):
     """`fuzz_script`'s tokens as a case's steps; with `spare`, each step
     but a screen's key gives its frames BOX_SPARE: a box or question that
@@ -1899,6 +1981,17 @@ def fuzz_steps(tokens, spare=False):
             captured = False
         elif kind in 'ofl':
             captured = False
+        elif kind in 'bu':
+            k, y, m = (int(v) for v in args)
+            key = KEY_C if kind == 'b' else KEY_U
+            clicks = [('click', *LIST_DOWN)] * k + [('click', 0xF0, y)] * 2
+            steps += [((key,), (), 1, None, [], {'script': clicks + BOX_SPARE}), ((), (key,), m, None)]
+            captured = False
+        elif kind == 'r':
+            h, m = (int(v) for v in args)
+            camp = [('keys', [KEY_C]), ('keys', [KEY_DIGITS[h]]), ('keys', [KEY_ENTER])]
+            steps += [((KEY_R,), (), 1, None, [], {'script': camp + BOX_SPARE}), ((), (KEY_R,), m, None)]
+            captured = False
         if kind == 'o':
             steps += [((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                       ((), (KEY_M,), int(args[0]), None)]
@@ -1931,15 +2024,82 @@ def fuzz_case(name):
         known(LIGHT)(a)
         if more:
             more(a)
+        if FUZZ[name][2:] == (3,):
+            # (`fuzz_script3`'s use list: a potion of healing in it.)
+            a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
+            let_go_at_map(a)
     return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
+
+
+def let_go_at_map(a):
+    """The mouse's buttons let go as the way out's travel map begins
+    (26F7:0000), for this case (`letting_go`): a walk by the mouse held
+    into the way out (`fuzz_script3`'s `m`) comes to the map with the
+    left button down, which the map's first read (0011) takes for a press
+    on the world map, opening the province under the cursor, whose own
+    press then waits for the button's release, which no step gives;
+    the view's map takes presses alone. The player lets go first."""
+    a.letting_go = True
+    if not hasattr(a, 'let_go_hook'):
+        def let_go(*_):
+            if a.letting_go:
+                a.buttons = 0
+        at = a.lin(LOAD_SEG + 0x26F7, 0x0000)
+        a.let_go_hook = a.mu.hook_add(UC_HOOK_CODE, let_go, None, at, at)
+
+
+def booked(*spells):
+    """`spells` added to the end of the player's book as `known` adds
+    them, the spell picked last (5CAE) left as it was."""
+    def put(a):
+        for spell in spells:
+            n = a.mu.mem_read(a.lin(a.ds, 0x01A4 + 0x366), 1)[0]
+            a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x367 + n), bytes([spell]))
+            a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x366), bytes([n + 1]))
+    return put
+
+
+# `caster`'s book: an aimed missile, a paralysing one, a touch, three on
+# the caster.
+CASTER_BOOK = (WIZARDS_FIRE, MEDUSAS_GAZE, SILENCE, HEAL, RESIST_FIRE, MIRROR)
+
+
+def caster(a):
+    """`playcreaturecast`'s creature (type Bh, three squares off: it casts
+    at the player; the save's magic shield kept, else its spells kill
+    the player in a few seconds), CASTER_BOOK in the book."""
+    brought(0xB, ahead=0x300)(a)
+    booked(*CASTER_BOOK)(a)
+
+
+def level_fight(a):
+    """`fight`'s creature and no shield, a level's experience gained
+    (`levelled`): the first minute tick brings up the level's notice and
+    the attribute screen; there (1194:122C) LEVEL_SCRIPT's clicks after
+    the notice's come before what the step had left (`levelling`)."""
+    unshielded()(a)
+    levelled(a)
+    booked(*CASTER_BOOK)(a)
+    a.levelling = LEVEL_SCRIPT[1:]
+    if not hasattr(a, 'level_hook'):
+        def points(*_):
+            if a.levelling:
+                a.script[:0] = a.levelling
+        at = a.lin(LOAD_SEG + 0x1194, 0x122C)
+        a.level_hook = a.mu.hook_add(UC_HOOK_CODE, points, None, at, at)
 
 
 # FUZZ's places that aren't CASES places, as (place, set-up): `fight`
 # the dungeon with `playtakehits`' creature and no magic shield (its blows
 # land: damage, the hurt palette, armour's wear); `crypt` the Crypt of
 # Hearts' first level before its down stairs, facing them (HEARTS_DOWN's
-# first), so a walk may take them and the levels below.
-FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4, 52, 0x80))}
+# first), so a walk may take them and the levels below. `fuzz_script3`'s:
+# `caster` a creature casting at the player (`caster`), `levelup` a fight
+# with a level due (`level_fight`), the wilderness at noon (`wildday`) and
+# at ten at night (`wildnight`: the camp's rest broken by encounters).
+FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4, 52, 0x80)),
+           'caster': ('dungeon', caster), 'levelup': ('dungeon', level_fight),
+           'wildday': ('wild', at_hour(12, 0x100)), 'wildnight': ('wild', at_hour(22, 0x100))}
 # FUZZ's places where `cN` clicks the view's middle (no door out at hand,
 # or the way out's question left with Esc).
 CLICKED = ('dungeon', 'fight', 'crypt')
@@ -1949,7 +2109,8 @@ CLICKED = ('dungeon', 'fight', 'crypt')
 # way (`checkpoint` lines), as at their end.
 CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2',
                     'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4',
-                    'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2')
+                    'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2',
+                    'fuzzspell1', 'fuzzspell2', 'fuzzcamp1', 'fuzzcamp2', 'fuzzlevel1', 'fuzzfog1')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -2088,6 +2249,12 @@ CASES = {
     'fuzzcrypt2': fuzz_case('fuzzcrypt2'),
     'fuzzpeople1': fuzz_case('fuzzpeople1'),
     'fuzzpeople2': fuzz_case('fuzzpeople2'),
+    'fuzzspell1': fuzz_case('fuzzspell1'),
+    'fuzzspell2': fuzz_case('fuzzspell2'),
+    'fuzzcamp1': fuzz_case('fuzzcamp1'),
+    'fuzzcamp2': fuzz_case('fuzzcamp2'),
+    'fuzzlevel1': fuzz_case('fuzzlevel1'),
+    'fuzzfog1': fuzz_case('fuzzfog1'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -2985,6 +3152,10 @@ def run_case(a, at, name, setup, steps, tracks):
     a.buttons = 0
     a.menu_loaded = False
     a.checkpoints = {}
+    # (`level_fight`'s clicks for the attribute screen and `let_go_at_map`,
+    # its own case's.)
+    a.levelling = None
+    a.letting_go = False
     if setup:
         setup(a)
     # The state the frames start from (for the state comparison's
@@ -3300,10 +3471,6 @@ def main():
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
-        # The 3D pixels from row 1 on: the topmost row of a ceiling reads
-        # past its row table (DB78's last entry, the next heap block's
-        # header), whose words are the original's heap's segments.
-        out.write(f'view3d1 | {name} | {fnv(bytes(x if not k and i >= 320 else 0 for i, (x, k) in enumerate(zip(full, mask)))):x}\n')
         if dump:
             os.makedirs(dump, exist_ok=True)
             for ext, data in (('page', page), ('mask', mask), ('dac', dac), ('full', full)):

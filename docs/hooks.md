@@ -48,6 +48,7 @@ the original routine:
 | `AreaHooks::leave_screen` | src/transit.rs:133 |  | present | the screens shown on the way out; the view draws its own | |
 | `AreaHooks::location` | src/transit.rs:92 | 1194:3AE8 | overridden | the view: areas.rs Areas<'_> | faithful: `city_location` (city vectors) |
 | `AreaHooks::map_keep` | src/transit.rs:121 | 0000:4564..4568 | overridden | the engine: Exit<'_> | faithful: `map_keep` with the stairs' hooks' colours |
+| `AreaHooks::map_colours` | src/transit.rs:135 | 2542:0446 (from 0000:45AC, 4593) | overridden | the engine: Exit<'_> | fixed: wasn't run, so the lamps' 71h kept a fog's grey after the way out's map where the original reads PAL.COL to 929E and sets it (fuzzfog1); now `colours_load`, and the view's lamp back to the file's |
 | `AreaHooks::map_given_back` | src/transit.rs:128 | 0000:457C..4586, 45A4..45A9 | port | the default runs the port (`view_window`, `world_back`); the transit vectors' stub counts it | |
 | `AreaHooks::mouse_wait` | src/transit.rs:160 | 0000:8FC4 | present | waiting for the buttons up; input only | |
 | `AreaHooks::normal_lgt` | src/transit.rs:89 | 0000:742C | overridden | the view: areas.rs Areas<'_> | faithful: NORMAL.LGT loaded as 0000:742C loads it |
@@ -84,7 +85,7 @@ the original routine:
 | `ControlHooks::floor_pick` | src/controls.rs:143 | 2826:0B52 | port | fixed by this audit: answered no floor, so wall and floor spells never took (`Machine::floor_pick`, 3000 vectors) | |
 | `ControlHooks::look` | src/controls.rs:170 | 2826:0C15 | elsewhere | the view looks from its own right click (`look_at`) | |
 | `ControlHooks::message_box` | src/controls.rs:167 | 1194:42EA, 59C8 | present | the box drawn; front ends with a screen override it | |
-| `ControlHooks::spell_counters` | src/controls.rs:185 | 2826:0BB2 | elsewhere | drawn by the view's HUD from DC0/DC2 | |
+| `ControlHooks::spell_counters` | src/controls.rs:185 | 2826:0BB2 | port | the default runs the port (`Machine::spell_counters`: the counter printed into 1044, drawn at (BEh, 2)); tests/input.rs's Pick stubs it as gen_input.py's RET | |
 | `ControlHooks::take_click` | src/controls.rs:153 | 2826:0128 | overridden | the view: main.rs Front<'_> | faithful: the window's click taken in the frame's input step, after the frame's actors, as the classic controls' centre handler takes it (`view_click`; areaplay vectors) |
 | `ControlHooks::wall_trigger` | src/controls.rs:157 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `ControlHooks::wild_recentre` | src/controls.rs:180 | 217B:0265 | overridden | the view: main.rs Front<'_> | faithful: `wild_shift` (wild vectors) |
@@ -352,6 +353,7 @@ the original routine:
 | `StairsHooks::level_piles` | src/hooks.rs:55 | 2433:0000 | port | the default runs the port | |
 | `StairsHooks::level_screen` | src/hooks.rs:60 | 0000:368E | overridden | the view: areas.rs Kept, main.rs Front<'_> | faithful: `automap_keep`, `automap_load` (playdown) |
 | `StairsHooks::light_table` | src/hooks.rs:40 | 2294:0B8A | overridden | the view: main.rs Front<'_> | faithful: NORMAL.LGT's table (playdown exact) |
+| `StairsHooks::map_colours` | src/hooks.rs:76 | 2542:0446 | overridden | the view: main.rs Front<'_> | faithful: `colours_load` of DS:1304 to 929E, the lamp (71h) the file's again (fuzzfog1) |
 | `StairsHooks::map_keep` | src/hooks.rs:70 | 0000:4564..4568 | overridden | the view: main.rs Front<'_> | faithful: `map_keep` with the screen's colours (A39E) |
 | `StairsHooks::quest_level` | src/hooks.rs:50 | 1194:9FAC | port | the default runs the port | |
 | `StoreHooks::armor_lines` | src/store.rs:124 | 1194:F204 | overridden | the view: shopui.rs ShopFront<'_, '_> | present: the shops' questions answered by the player and drawn as the screen tests check (screens.txt); the ports run as the default would |
