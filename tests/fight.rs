@@ -162,3 +162,43 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 2500);
 }
+
+/// Fixed (kept bug #26): a placed creature's speed comes from its
+/// record's +2Dh; the original reads the floor plane at that offset.
+#[test]
+fn fixed_placed_creatures_walk_at_their_own_speed() {
+    use arena::fixes::{CREATURE_SPEED, Fixes};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    for (o, v) in [(0xD806u16, WSEG), (0xCCD0, FSEG), (0x1042, CSEG), (0xCCC2, RSEG), (0x9030, FRAME), (0xCCCE, FRAME + 0xC00), (0x91F0, 0), (0x05C8, 0)] {
+        base.mem.w16(DS, o, v);
+    }
+    let mut files = Files::default();
+    let mut placed = 0;
+    for seed in 1..60u32 {
+        for fixes in [Fixes::NONE, Fixes::only(CREATURE_SPEED)] {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let (al, n) = setup(&mut m, seed);
+            m.load_rng();
+            let free: Vec<bool> = (0..8u16).map(|i| m.mem.r16(DS, 0x0C57 + i * 0x1C + 0xF) & 0x4000 != 0).collect();
+            if m.fight_prepare(&mut files, &mut Hooks, al).and_then(|()| m.place_creatures(n)).is_none() {
+                continue;
+            }
+            for i in (0..8u16).filter(|&i| free[i as usize]) {
+                let di = 0x0C57 + i * 0x1C;
+                if m.mem.r16(DS, di + 0xF) & 0x4000 != 0 {
+                    continue;
+                }
+                let rec = i * 0x41E + 0x2D;
+                let from = if fixes == Fixes::NONE { FSEG } else { CSEG };
+                let want = ((m.mem.r8(from, rec) as u16 * 20) >> 8) + 0x14;
+                assert_eq!(m.mem.r16(DS, di + 8), want, "seed {seed} slot {i} {fixes:?}");
+                if m.mem.r8(FSEG, rec) != m.mem.r8(CSEG, rec) {
+                    placed += 1;
+                }
+            }
+        }
+    }
+    assert!(placed > 20, "{placed} placings told apart");
+}

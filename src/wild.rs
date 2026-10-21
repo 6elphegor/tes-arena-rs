@@ -157,7 +157,8 @@ impl Machine {
     /// low four bits mark quadrants to fill with CITY_GROUND, 32 x 32
     /// bytes each. The quadrant offsets are taken from offset 0 of the
     /// buffer segment, not the grid at F000, so the grid is never
-    /// touched.
+    /// touched. No fix (#72): at F000 a quadrant is a quarter of the
+    /// wilderness grid, which would all become block 38h.
     fn wild_footprint(&mut self, buf: u16) {
         let (masks, at) = match self.mem.r8(DS, TEMPLATE) {
             b'c' => (MASKS, 4),

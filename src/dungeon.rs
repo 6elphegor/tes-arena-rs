@@ -267,7 +267,8 @@ impl Machine {
     /// cell for each level that differs from the one before it.
     ///
     /// The sizes are stored as tiles (<< 5) and shifted back for the
-    /// rolls, so their top 5 bits are lost. Each new cell is stored twice
+    /// rolls, so their top 5 bits are lost (never reached, #73: play sets
+    /// up 2x1 and 2x2 dungeons). Each new cell is stored twice
     /// (the level's down stairs and the next level's up stairs) except
     /// the last. None where the original faults (a size of 0) or loops
     /// forever (the RNG never yields a different cell), and for `levels`
@@ -485,7 +486,10 @@ impl Machine {
     /// offset is three times the count in 8 bits; targets that would take
     /// the list past 0x40 skip the chunk; a TARG of fewer than 2 bytes
     /// adjusts 65536 words. None where the original faults (a LOCK chunk
-    /// of 768 bytes or more) or the heap reports an error.
+    /// of 768 bytes or more) or the heap reports an error. No fix needed
+    /// (#42): 0000:2957 makes the lights again from the flats after the
+    /// build; the lock offset only wraps past the list's 64 entries; the
+    /// TARG test guards the target list.
     fn dun_load_chunk(&mut self, files: &mut Files, at: u16) -> Option<()> {
         self.mem.w16(DS, CHUNK_AT, at);
         self.mem.w16(DS, LIGHT_COUNT, 0);

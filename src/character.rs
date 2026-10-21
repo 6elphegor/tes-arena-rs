@@ -178,7 +178,12 @@ impl Machine {
         w(self, INT_MOD, int - 128);
         w(self, MAGIC_DEF, -(wil - 128));
         // Logical shift: negative modifiers become large positive values.
-        w(self, WIL_MOD_HALF, ((wil - 128) as u16 >> 1) as i16);
+        // Fixed (#24), an arithmetic shift: half the signed modifier.
+        if self.fixed(crate::fixes::ATTRIBUTE_MODIFIERS) {
+            w(self, WIL_MOD_HALF, (wil - 128) >> 1);
+        } else {
+            w(self, WIL_MOD_HALF, ((wil - 128) as u16 >> 1) as i16);
+        }
         for f in [ATTACK_MOD, DEFENCE_MOD, AGI_MOD_4B] {
             w(self, f, agi - 128);
         }
@@ -190,9 +195,18 @@ impl Machine {
         w(self, PER_MOD, per - 128);
         // The luck modifier is computed and discarded; the original then
         // doubles the divisor, so this is always 50.
-        let _ = lck;
-        w(self, LCK_MOD, 50);
-        // 8-bit sums that wrap, divided so they are always 0.
+        // Fixed (#24), the quotient is doubled instead (`add bx, bx` was
+        // meant for AX, which the store was to take): 2 x (LCK - 116) / 25,
+        // so the luck difference in the hit chance counts.
+        if self.fixed(crate::fixes::ATTRIBUTE_MODIFIERS) {
+            w(self, LCK_MOD, (lck - 128 + 12) / 25 * 2);
+        } else {
+            let _ = lck;
+            w(self, LCK_MOD, 50);
+        }
+        // 8-bit sums that wrap, divided so they are always 0. Fixed mode
+        // leaves them: summed in 16 bits the divisions still give 0 for
+        // any attributes (at most 1FEh + 200h < 400h, 1FEh + 400h < 800h).
         let (str_b, int_b, wil_b, end_b) = (b[0], b[1], b[2], b[5]);
         self.mem.w8(seg, rec.wrapping_add(B_5F), ((wil_b.wrapping_add(end_b) as u16 + 0x200) / 0x400) as u8);
         self.mem.w8(seg, rec.wrapping_add(B_6A), ((str_b.wrapping_add(int_b) as u16 + 0x400) / 0x800) as u8);
@@ -230,6 +244,28 @@ impl Machine {
 
         for i in 0..8 {
             self.mem.w8(DS, attrs + i, self.mem.r8(DS, ATTR_SCRATCH + i));
+        }
+    }
+
+    /// The player's modifiers from its percent attributes, as
+    /// `player_derived_stats` works them out (on the 256 scale, the
+    /// player-only bytes in percent) but leaving spell points and fatigue
+    /// as they are: what fixed mode's effect pulses use for the player
+    /// (#23) in place of 1194:361D on percent attributes.
+    pub fn player_modifiers(&mut self) {
+        let rec = PLAYER;
+        let attrs = rec + ATTRS;
+        let saved: [u8; 8] = std::array::from_fn(|i| self.mem.r8(DS, attrs + i as u16));
+        attrs_to256(&mut self.mem, attrs, attrs, 8);
+        self.attribute_modifiers(rec);
+        let b = |m: &Self, i: u16| m.mem.r8(DS, attrs + i);
+        let v = to100(self.mem.r16(DS, rec + MAGIC_DEF) as i16);
+        self.mem.w8(DS, rec + TIER_C, v as u8);
+        self.mem.w8(DS, rec + B_5F, (b(self, 2).wrapping_add(b(self, 5)) as u16 / 200) as u8);
+        self.mem.w8(DS, rec + B_6A, (b(self, 0).wrapping_add(b(self, 1)) as u16 / 400) as u8);
+        self.mem.w8(DS, rec + TIER_B, to100_u(b(self, 5) as u16 >> 2) as u8);
+        for (i, v) in saved.into_iter().enumerate() {
+            self.mem.w8(DS, attrs + i as u16, v);
         }
     }
 

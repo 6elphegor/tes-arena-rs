@@ -26,7 +26,9 @@ pub mod var {
     pub const TOP: u16 = 0x015D;
     /// Non-zero when startup shrinks the DOS block (int 21h AH 4Ah to
     /// the heap's top less this, 0000:00DF). 0 in the image, and no
-    /// instruction of the program writes it: the shrink never runs.
+    /// instruction of the program writes it: the shrink never runs. Not
+    /// a bug (#60): an option the build left off; the heap runs to the
+    /// top of memory, which the game keeps for itself either way.
     pub const SHRINK: u16 = 0x002B;
     /// Free paragraphs, kept loosely: an exact fit subtracts the size,
     /// a split the size plus the new header, a free the size plus one
@@ -80,8 +82,11 @@ impl Machine {
     /// error: a free block of 0xA000 paragraphs or more, a fitting block
     /// of size 0, or a next pointer whose segment ORed with its offset
     /// exceeds its segment (all CORRUPT), or nothing fits (NO_MEMORY);
-    /// also where a corrupted list cycles (WALK_LIMIT).
+    /// also where a corrupted list cycles (WALK_LIMIT). Fixed (#59), the
+    /// ordering check compares the header just left's segment with the
+    /// next one's, as meant: a list that runs backwards is CORRUPT.
     pub fn heap_alloc(&mut self, paras: u16) -> Option<(u16, u16)> {
+        let fixed = self.fixed(crate::fixes::HEAP_LINKS);
         let ax = paras;
         let (mut ds, mut si) = self.heap_far(DS, FIRST);
         // BX is 0 on the first check, then (segment | offset) of the
@@ -106,10 +111,14 @@ impl Machine {
                     break (ds, si);
                 }
             }
+            let prev = ds;
             (ds, si) = self.heap_far(ds, si.wrapping_add(NEXT));
             bx = ds | si;
             if bx == 0 {
                 return crate::giveup::error("0000:51F2: the heap reports an error");
+            }
+            if fixed {
+                bx = prev;
             }
         };
         let (ds, si) = found;
@@ -164,7 +173,8 @@ impl Machine {
     /// paragraphs) from the last free block in the list that fits, and
     /// returns the data segment (AX is 0), or 0 if none fits. The
     /// following block's back pointer is left as it was. None where a
-    /// corrupted list cycles (WALK_LIMIT).
+    /// corrupted list cycles (WALK_LIMIT). Fixed (#59), it points back at
+    /// the split's new block, as first fit's split makes it.
     pub fn heap_alloc_high(&mut self, bytes: u16) -> Option<u16> {
         let ax = bytes.wrapping_add(15) >> 4;
         let mut dx = 0u16;
@@ -192,7 +202,14 @@ impl Machine {
             self.mem.w8(ds, FLAGS, f);
             ax
         } else {
-            self.heap_split(ds, 0, ds.wrapping_add(ax).wrapping_add(1), ax);
+            let new = ds.wrapping_add(ax).wrapping_add(1);
+            self.heap_split(ds, 0, new, ax);
+            if self.fixed(crate::fixes::HEAP_LINKS) {
+                let next = self.mem.r16(new, NEXT + 2);
+                if next != 0 {
+                    self.mem.w16(next, PREV + 2, new);
+                }
+            }
             ax.wrapping_add(1)
         };
         let free = self.mem.r16(DS, FREE).wrapping_sub(taken);

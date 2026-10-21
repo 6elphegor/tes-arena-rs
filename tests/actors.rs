@@ -291,3 +291,33 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 100);
 }
+
+/// Fixed (kept bug #62): a creature leaving range hands the trigger
+/// waiting on it its square's column; the original writes a leftover
+/// loop count (8 - the mark's place, halved).
+#[test]
+fn fixed_leaving_creature_gives_the_trigger_its_column() {
+    use arena::fixes::{Fixes, TRIGGER_COLUMN};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(TRIGGER_COLUMN)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0x1042, 0x7800);
+        m.mem.w16(DS, 0xD806, 0x6800);
+        m.mem.w16(DS, 0x05C8, 0x1000);
+        let si = 0x0C57 + 2 * 0x1C;
+        m.mem.w8(DS, si + 0xC, 0x20);
+        m.mem.w16(DS, si, 23 * 0x80 + 0x40);
+        m.mem.w16(DS, si + 4, 9 * 0x80 + 0x40);
+        // The third mark waits on it, for trigger 6.
+        for k in 0..8u16 {
+            m.mem.w16(DS, 0x0622 + k * 6, if k == 2 { si } else { 0xFFFF });
+        }
+        m.mem.w16(DS, 0x0622 + 2 * 6 + 2, 6);
+        m.actor_leave(si);
+        let (col, row) = (m.mem.r8(DS, 0xC766 + 6), m.mem.r8(DS, 0xC766 + 7));
+        let want = if fixes == Fixes::NONE { (3, 9) } else { (23, 9) };
+        assert_eq!((col, row), want, "{fixes:?}");
+        assert_eq!(m.mem.r16(DS, 0x0622 + 2 * 6), 0xFFFF);
+    }
+}

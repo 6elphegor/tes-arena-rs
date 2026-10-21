@@ -65,3 +65,60 @@ fn matches_original() {
     assert!(counts.get("creature").copied().unwrap_or(0) > 2000);
     assert!(counts.get("special").copied().unwrap_or(0) > 500);
 }
+
+/// Fixed (kept bug #64): a player with HP below 0 counts as low after a
+/// blow (0D39 bit 80h); the original's unsigned compare doesn't. (The
+/// player starts at -5 HP; blows that set the bit otherwise, as a hit
+/// does, are skipped.)
+#[test]
+fn fixed_negative_hp_counts_as_low() {
+    use arena::fixes::{Fixes, LOW_HP_SIGNED};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x1042, CSEG);
+    base.mem.w16(DS, 0x91F0, 0);
+    let classes: Vec<u8> = (0..18).map(|i| base.mem.r8(DS, 0x2A50 + i)).collect();
+    let blow = |seed: u32, fixes: Fixes| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        setup(&mut m, seed, 0, &classes);
+        m.mem.w16(DS, 0x1400, 0);
+        m.mem.w16(DS, 0x1402, PLAYER);
+        m.load_rng();
+        m.mem.w8(DS, 0x0D39, 0);
+        m.mem.w16(DS, PLAYER + 0x59, (-5i16) as u16);
+        m.attack_player(0)?;
+        Some((m.mem.r16(DS, PLAYER + 0x59) as i16, m.mem.r8(DS, 0x0D39) & 0x80 != 0))
+    };
+    let mut seen = 0;
+    for seed in 1..400u32 {
+        let Some((hp, low)) = blow(seed, Fixes::NONE) else { continue };
+        if hp >= 0 || low {
+            continue;
+        }
+        seen += 1;
+        assert_eq!(blow(seed, Fixes::only(LOW_HP_SIGNED)), Some((hp, true)), "seed {seed}");
+    }
+    assert!(seen > 4, "{seen} blows left the HP below 0");
+}
+
+/// Fixed (kept bug #63): the bare-handed search walks the record's own
+/// slots for DGROUP's count of its items (left by 1194:7510); the
+/// original reads a count in the record's segment and walks from FFFF,
+/// so what it finds there is chance: here a worn item of base type 3,
+/// category 1 and armour kind 1 that makes the class 8.
+#[test]
+fn fixed_gauntlet_search_walks_the_records_slots() {
+    use arena::fixes::{Fixes, GAUNTLET_COUNT};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(GAUNTLET_COUNT)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w8(CSEG, 0x129D, 1);
+        m.mem.w8(CSEG, 0xFFFF, 3);
+        m.mem.w8(CSEG, 0x000D, 0x80 | 0x40 | 0x10 | 0x04);
+        // The record has no items: bare-handed, fists (7 + 2).
+        let want = if fixes == Fixes::NONE { 8 } else { 9 };
+        assert_eq!(m.weapon_class(CSEG, RSIZE), want, "{fixes:?}");
+    }
+}

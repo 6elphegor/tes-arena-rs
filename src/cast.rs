@@ -229,8 +229,11 @@ impl Machine {
             self.mem.w16(DS, AIM + 0xA, h);
             // DX comes from 00D2's last load: the heading's ax was not
             // it, so it is whatever the caller had; the launch only uses
-            // it for element 5, whose delay it sets.
-            self.launch_player(files, cast, AIM, 0)?;
+            // it for element 5, whose delay it sets. Fixed (#71), 1, as the
+            // other elements' launches from a creature have: no delay
+            // (the caller's 0 holds the projectile for FFFFh frames).
+            let dx = if self.fixed(crate::fixes::LAUNCH_DX) { 1 } else { 0 };
+            self.launch_player(files, cast, AIM, dx)?;
         }
         self.cast_done();
         Some(true)

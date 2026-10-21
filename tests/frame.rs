@@ -335,3 +335,33 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 2500);
 }
+
+/// Fixed (kept bug #46): a snowflake that comes back falls at the speed
+/// of its band by its count (the last 50 the slowest); the original bands
+/// it by the view's width left in CX (here the fastest).
+#[test]
+fn fixed_returning_snowflakes_keep_their_band() {
+    use arena::fixes::{Fixes, SNOW_BANDS};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(SNOW_BANDS)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        for (at, v) in [(0xA914u16, 0), (0xA916, 0x10), (0xA918, 0x140), (0xA91A, 0x80), (0xE2BA, 7), (0xE2B8, 5), (0xE2B6, 3)] {
+            m.mem.w16(DS, at, v);
+        }
+        for i in 0..100u16 {
+            let f = 0xE05E + 6 * i;
+            m.mem.w16(DS, f, 0x20 + i);
+            m.mem.w16(DS, f + 2, 0x30);
+            m.mem.w16(DS, f + 4, 2);
+        }
+        // The last flake (counted 1) is below the view: it comes back at
+        // the top.
+        let last = 0xE05E + 6 * 99;
+        m.mem.w16(DS, last + 2, 0x7E);
+        m.rng.seed = 12345;
+        m.snow_drops(None).unwrap();
+        let want = 0x10 + if fixes == Fixes::NONE { 7 } else { 3 };
+        assert_eq!(m.mem.r16(DS, last + 2), want, "{fixes:?}");
+    }
+}

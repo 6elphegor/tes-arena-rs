@@ -250,9 +250,10 @@ impl Machine {
         ((i as i16) < 0) as u16
     }
 
-    /// 3065:049C.
+    /// 3065:049C. Fixed (#77), EOF goes in as 0, as GetBit's does: the
+    /// test was meant to catch it.
     fn mif_getbyte(&self, io: &mut Io) -> u16 {
-        self.mif_fill(io, false);
+        self.mif_fill(io, self.fixed(crate::fixes::MIF_EOF));
         let i = io.getbuf;
         io.getbuf <<= 8;
         io.getlen = io.getlen.wrapping_sub(8);
@@ -291,7 +292,8 @@ impl Machine {
     /// 3065:0D2D. Decodes `len` bytes at `src_seg`:`src_off` into
     /// `dst_seg`:`dst_off` and returns the original's AX: the low word of
     /// the number of bytes written. The first input word is the size to
-    /// decode; 0 returns at once, leaking the tables. The size is only
+    /// decode; 0 returns at once, leaking the tables (fixed, #77: they are
+    /// freed, as after any other size). The size is only
     /// checked between matches, so a match can overshoot it, and output
     /// offsets wrap within the segment. The size word is read even when
     /// `len` < 2, which leaves the read pointer past the end, so the
@@ -356,6 +358,8 @@ impl Machine {
                     }
                 }
             }
+            self.mif_free_tables();
+        } else if self.fixed(crate::fixes::MIF_EOF) {
             self.mif_free_tables();
         }
         self.mem.w8(DS, lz::GETLEN, io.getlen);

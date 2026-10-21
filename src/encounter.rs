@@ -195,9 +195,11 @@ impl Machine {
             self.mem.w16(DS, di + 0xA, h);
             // The speed is meant to come from the record's +2Dh, but the
             // square test (0000:26DC) left FS at the floor plane: it is read
-            // there, at the record's offset.
+            // there, at the record's offset. Fixed (#26), it is read from
+            // the creature's record, whose speed attribute +2Dh is.
             let floors = self.mem.r16(DS, crate::movement::var::FLOOR_SEG);
-            let speed = ((self.mem.r8(floors, rec.wrapping_add(0x2D)) as u16 * 20) >> 8) + 0x14;
+            let from = if self.fixed(crate::fixes::CREATURE_SPEED) { seg } else { floors };
+            let speed = ((self.mem.r8(from, rec.wrapping_add(0x2D)) as u16 * 20) >> 8) + 0x14;
             self.mem.w16(DS, di + 8, speed);
             let mut bp = 0xCu16;
             if flyer {
@@ -885,8 +887,10 @@ impl Machine {
     /// less for each d100 at most level x 10 (classes 10h and 11h roll
     /// once; for the classes in the list at 5D78 the level is read at
     /// the list's place + 6 instead of the record's, in the record's
-    /// segment; others get 2).
-    fn npc_armor_quality(&mut self, seg: u16, rec: u16) -> u16 {
+    /// segment; others get 2). Fixed (#65), the level is the record's
+    /// for them too: the list search only reused SI, which held the
+    /// record.
+    pub fn npc_armor_quality(&mut self, seg: u16, rec: u16) -> u16 {
         let class = self.mem.r8(seg, rec.wrapping_add(5));
         let mut dx = 2u16;
         let at = if class == 0x10 || class == 0x11 {
@@ -894,6 +898,7 @@ impl Machine {
             rec
         } else {
             match (0..4u16).find(|&k| self.mem.r8(DS, 0x5D78 + k) == class) {
+                Some(_) if self.fixed(crate::fixes::NPC_ARMOR_LEVEL) => rec,
                 Some(k) => 0x5D78 + k,
                 None => return dx,
             }

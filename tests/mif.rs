@@ -246,3 +246,56 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert_eq!(counts.len(), 7);
 }
+
+/// A machine with the decoder's heap and `src` at SRC_SEG:0.
+fn mif_machine(img: &arena::exe::Image, fixes: arena::fixes::Fixes, src: &[u8]) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.heap_init(0xA000, 0xF000).unwrap();
+    put(&mut m, SRC_SEG, 0, src);
+    m
+}
+
+/// Fixed (kept bug #77): GetByte takes the end of the input as 0, as
+/// GetBit does, so a stream that runs out decodes as if zeros followed;
+/// the original's always-taken test lets FFFFh in. And a size of 0 frees
+/// the decoder's tables; the original leaks them.
+#[test]
+fn fixed_mif_end_of_input_and_empty_size() {
+    use arena::fixes::{Fixes, MIF_EOF};
+    let Some(img) = common::image() else { return };
+    let fixed = Fixes::only(MIF_EOF);
+    let decode = |fixes: Fixes, src: &[u8], len: u16| {
+        let mut m = mif_machine(&img, fixes, src);
+        let n = m.mif_decompress(SRC_SEG, 0, PLANES[3], 0, len).unwrap();
+        (n, (0..0x400u16).map(|o| m.mem.r8(PLANES[3], o)).collect::<Vec<u8>>())
+    };
+    let mut differ = 0;
+    for seed in 1..60u32 {
+        // A random stream claiming more output than it holds.
+        let mut s = common::blow::Stream(seed);
+        let mut src = vec![0x00, 0x03];
+        src.extend((0..40).map(|_| s.byte()));
+        let len = src.len() as u16;
+        let mut padded = src.clone();
+        padded.extend([0; 0x400]);
+        let want = decode(Fixes::NONE, &padded, padded.len() as u16);
+        assert_eq!(decode(fixed, &src, len), want, "seed {seed}");
+        if decode(Fixes::NONE, &src, len) != want {
+            differ += 1;
+        }
+    }
+    assert!(differ > 10, "{differ} streams told apart");
+    // A size of 0.
+    for fixes in [Fixes::NONE, fixed] {
+        let mut m = mif_machine(&img, fixes, &[0, 0, 1, 2]);
+        let free = m.mem.r16(DS, 0x8F6E);
+        m.mif_decompress(SRC_SEG, 0, PLANES[3], 0, 4).unwrap();
+        let after = m.mem.r16(DS, 0x8F6E);
+        if fixes == Fixes::NONE {
+            assert!(after < free, "{after:x} {free:x}");
+        } else {
+            assert_eq!(after, free);
+        }
+    }
+}

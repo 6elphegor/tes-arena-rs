@@ -56,8 +56,11 @@ impl Machine {
             self.blow(att, location)?;
         }
         // 2AA1:0166: unsigned, so a negative HP never counts as low.
+        // Fixed (#64), signed: HP below 0 is low too.
         let hp = self.mem.r16(DS, PLAYER + field::HP);
-        if hp <= self.mem.r16(DS, PLAYER + field::MAX_HP) / 10 {
+        let tenth = self.mem.r16(DS, PLAYER + field::MAX_HP) / 10;
+        let low = if self.fixed(crate::fixes::LOW_HP_SIGNED) { hp as i16 <= tenth as i16 } else { hp <= tenth };
+        if low {
             let c = self.mem.r8(DS, avar::CHANGED) | 0x80;
             self.mem.w8(DS, avar::CHANGED, c);
         }
@@ -179,12 +182,19 @@ impl Machine {
     /// whose condition is FFFF. Bare-handed, 7 plus the armour kind of
     /// equipped gauntlets (2 without), searched from SI = FFFF over the
     /// occupied-slot count, both read in `seg` (the count meant is
-    /// DGROUP's, the same for the player).
+    /// DGROUP's, the same for the player). Fixed (#63), the count is
+    /// read in DGROUP, where 1194:7510 just left the record's, and the
+    /// search starts at the record's slots, not at the FFFF that 7510
+    /// returns for no weapon. It looks for a worn category-1 (weapon)
+    /// item, which 7510 would have returned over the same slots, so a
+    /// bare-handed record is fists (9) and nothing is read at random.
     pub fn weapon_class(&mut self, seg: u16, rec: u16) -> u16 {
         let w = self.equipped_weapon(seg, rec);
         let class = if w == 0xFFFF {
-            let n = self.mem.r8(seg, LAST_COUNT) as u16;
-            let kind = match self.find_equipped(seg, 0xFFFF, n, 3, 1, false) {
+            let fixed = self.fixed(crate::fixes::GAUNTLET_COUNT);
+            let n = self.mem.r8(if fixed { DS } else { seg }, LAST_COUNT) as u16;
+            let from = if fixed { rec.wrapping_add(crate::inventory::SLOTS) } else { 0xFFFF };
+            let kind = match self.find_equipped(seg, from, n, 3, 1, false) {
                 (true, s) => self.armor_kind(seg, s),
                 _ => 2,
             };

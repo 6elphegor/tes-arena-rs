@@ -131,3 +131,29 @@ fn matches_original() {
     eprintln!("caps: {drawn} drawn, {blank} not, {faults} the original's faults");
     assert!(drawn > 900, "{drawn} drawn");
 }
+
+/// Fixed (kept bug #44): a floor or ceiling row's dark-run x step
+/// (0000:D865, kept at CS:D754) is the x step times D762, as the y
+/// step's is; the original's has CCCE (the EMS frame's segment + C00h)
+/// for its low word.
+#[test]
+fn fixed_dark_run_step_is_the_whole_x_step() {
+    use arena::fixes::{CEILING_STEP, Fixes};
+    let Some(img) = common::image() else { return };
+    let (xstep, ystep) = (0x0003_4567u32, 0xFFFE_1234u32);
+    for fixes in [Fixes::NONE, Fixes::only(CEILING_STEP)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0xCCCE, 0xA49F);
+        m.mem.w16(DS, 0xC398, 0);
+        m.mem.w16(0, 0xD77E, 0);
+        m.mem.w16(0, 0xD762, 4);
+        m.mem.w16(0, 0xD752, 4);
+        m.mem.w16(DS, 0xCD88, RSEG);
+        let (m, _) = arena::render::floor_row_alone(m, vec![0; 0x10000], 0, 0, xstep, ystep, 0, TSEG);
+        let low = if fixes == Fixes::NONE { 0xA49F } else { xstep & 0xFFFF };
+        let want = ((xstep & 0xFFFF_0000 | low) as i32).wrapping_mul(4) as u32;
+        assert_eq!(m.mem.r32(0, 0xD754), want, "{fixes:?}");
+        assert_eq!(m.mem.r32(0, 0xD758), (ystep as i32).wrapping_mul(4) as u32);
+    }
+}

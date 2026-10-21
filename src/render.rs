@@ -320,6 +320,17 @@ pub fn cap_alone(m: Machine, page: Vec<u8>, ax: u16, cx: u16) -> (Machine, Vec<u
     (r.m, r.page, r.gaps)
 }
 
+/// 0000:D78C alone (tests/capdraw.rs): one floor or ceiling row from
+/// (`x`, `y`) by the steps at the page's `di`, the floor plane `fs`, on
+/// `m` into `page` (64 KB); the machine and the page after.
+#[allow(clippy::too_many_arguments)]
+pub fn floor_row_alone(m: Machine, page: Vec<u8>, x: u32, y: u32, xstep: u32, ystep: u32, di: u16, fs: u16) -> (Machine, Vec<u8>) {
+    let mut r = Soft { m, page, gaps: Vec::new(), lgts: Lgts::default(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
+    r.page.resize(0x10000, 0);
+    r.floor_row(x, y, xstep, ystep, di, fs);
+    (r.m, r.page)
+}
+
 /// 0000:78A8 alone (tests/scaler.rs), its rows compiled by the routine
 /// CS:789E names on `m`: the arguments as pushed (x, y, the size drawn,
 /// the shade's offset and segment, the size, bits a pixel, the flags,
@@ -810,7 +821,9 @@ impl Soft {
         // CCCE is the EMS frame's segment plus C00h (A49F), so where the
         // ceiling has dark runs, its texels after them depend on where
         // the frame is (the harness's at F000h, the view's on its heap).
-        let xseg = (((xstep & 0xFFFF_0000) | thr as u32) as i32 as i64 * d762 as i32 as i64) as u32;
+        // Fixed (#44), the whole x step, as the y step's is.
+        let xs = if self.m.fixed(crate::fixes::CEILING_STEP) { xstep } else { (xstep & 0xFFFF_0000) | thr as u32 };
+        let xseg = (xs as i32 as i64 * d762 as i32 as i64) as u32;
         let yseg = (ystep as i32 as i64 * d762 as i32 as i64) as u32;
         self.cs32(0xD754, xseg);
         self.cs32(0xD758, yseg);

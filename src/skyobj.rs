@@ -419,7 +419,8 @@ impl Machine {
     /// flashes (FLASH's colour for the frame, `fill`), and the bolt, where
     /// it is seen, is drawn there standing on the horizon (its x left so;
     /// its y put back, by the original into DGROUP at the image's offset + 8,
-    /// not into the image: kept); after three frames, thunder (sound
+    /// not into the image: kept; fixed (#45), into the image, so the next
+    /// frame reads the image's own y); after three frames, thunder (sound
     /// 1Ch at the player's square, CB90). Otherwise one time in 32 or so
     /// (a roll up to 7D0h) a bolt starts: one of the six images, a heading
     /// on the circle.
@@ -464,7 +465,8 @@ impl Machine {
             self.mem.w16(fs, si.wrapping_add(8), bx);
             self.mem.w16(fs, si.wrapping_add(6), ax);
             hooks.bolt(self, fs, si, k);
-            self.mem.w16(DS, si.wrapping_add(8), y);
+            let back = if self.fixed(crate::fixes::BOLT_Y) { fs } else { DS };
+            self.mem.w16(back, si.wrapping_add(8), y);
         }
         let k = self.mem.r16(DS, BOLT_FRAME).wrapping_add(1);
         self.mem.w16(DS, BOLT_FRAME, k);

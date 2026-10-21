@@ -91,3 +91,28 @@ fn matches_original() {
     eprintln!("{count:?}");
     assert_eq!(count.len(), 14);
 }
+
+/// Fixed (kept bug #24): the Luck modifier is 2 x (LCK - 116) / 25 (the
+/// original's is always 50) and the Willpower half-modifier is signed
+/// (the original's logical shift makes a negative one huge).
+#[test]
+fn fixed_luck_and_willpower_modifiers() {
+    use arena::fixes::{ATTRIBUTE_MODIFIERS, Fixes};
+    let Some(img) = common::image() else { return };
+    let rec = 0x01A4;
+    let mods = |fixes: Fixes, wil: u8, lck: u8| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        for (i, v) in [128, 128, wil, 128, 128, 128, 128, lck].into_iter().enumerate() {
+            m.mem.w8(DS, rec + 0x29 + i as u16, v);
+        }
+        m.attribute_modifiers(rec);
+        (m.mem.r16(DS, rec + 0x45) as i16, m.mem.r16(DS, rec + 0x57) as i16)
+    };
+    assert_eq!(mods(Fixes::NONE, 100, 40), ((100u16.wrapping_sub(128) >> 1) as i16, 50));
+    assert_eq!(mods(Fixes::NONE, 200, 240), (36, 50));
+    let fixed = Fixes::only(ATTRIBUTE_MODIFIERS);
+    assert_eq!(mods(fixed, 100, 40), (-14, -6));
+    assert_eq!(mods(fixed, 200, 240), (36, 8));
+    assert_eq!(mods(fixed, 128, 128), (0, 0));
+}

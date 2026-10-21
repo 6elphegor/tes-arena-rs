@@ -146,7 +146,8 @@ impl Machine {
     /// starts at the shooter's position and height (negated), lives 30
     /// frames, and the original's step of C8h ahead is lost when the
     /// sprite is set up at the shooter's position. None where the slot
-    /// search runs away.
+    /// search runs away. Fixed (#31), the sprite is set up where the step
+    /// put it, C8h ahead, as the step was there for.
     pub fn fire_missile(&mut self, flat: u8, from: u16) -> Option<()> {
         let si = self.free_projectile()?;
         let w = |m: &mut Self, o: u16, v: u16| m.mem.w16(DS, si.wrapping_add(o), v);
@@ -179,6 +180,7 @@ impl Machine {
         w(self, f::X, nx);
         let ny = r(self, si + f::Y).wrapping_add(step(self, COS));
         w(self, f::Y, ny);
+        let (x, y) = if self.fixed(crate::fixes::ARROW_HEAD_START) { (nx, ny) } else { (x, y) };
         self.sprite_object(si, x, z, y, flat, 0)?;
         // 29CF:0415: the shot's sound at its square: 7, or 2 for an
         // arrow (the cast FFFEh).
@@ -627,8 +629,17 @@ impl Machine {
     /// an area spell (target types 3 and 4) on everyone in the area
     /// (2CDD:08D9), another on OCCUPANT: the player (01A4) or a creature
     /// slot's record, while nobody (FFFF) or a person (slots below 0Fh)
-    /// takes nothing and the cast is never applied (nor freed).
+    /// takes nothing and the cast is never applied (nor freed). Fixed
+    /// (#30), the cast record is freed then (+A bit 1 cleared, as
+    /// `cast_apply` does first), so casts that hit no creature don't use
+    /// the records up.
     pub fn impact(&mut self, cast: u16, x: u16, y: u16, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
+        let free = |m: &mut Self| {
+            if m.fixed(crate::fixes::CAST_RECORD_LEAK) {
+                let f = m.mem.r16(DS, cast.wrapping_add(0xA)) & !1;
+                m.mem.w16(DS, cast.wrapping_add(0xA), f);
+            }
+        };
         let (spell, seg) = (self.mem.r16(DS, cast), self.mem.r16(DS, cast.wrapping_add(2)));
         let ty = self.mem.r8(seg, spell.wrapping_add(0x24));
         if ty == 3 || ty == 4 {
@@ -637,12 +648,14 @@ impl Machine {
         } else {
             let o = self.mem.r16(DS, OCCUPANT);
             if o == 0xFFFF {
+                free(self);
                 return Some(());
             }
             if o == PLAYER {
                 self.mem.w16(DS, TARGETS + 2, PLAYER);
                 self.mem.w16(DS, TARGETS + 4, DS);
             } else if o < 0xF {
+                free(self);
                 return Some(());
             } else {
                 let a = ACTORS.wrapping_add(o.wrapping_mul(SIZE));

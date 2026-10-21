@@ -247,6 +247,9 @@ impl Machine {
             0x03C1 => self.sp_instant_death(x, kill),
             0x03F1 | 0x0712 => Some(()),
             // 03F2 zeroes DI before its call: always the first entry.
+            // Not a bug (#29): the sub-kind is an attribute and 843E has
+            // two entries, 0404 (raise) and 04A6 (a drain by sub-kind),
+            // so 0404 is the one meant for every attribute.
             0x03F2 => self.sp_sub(self.mem.r16(DS, 0x843E), x, kill).map(drop),
             0x0447 => self.sp_timed_flag_by_sub(x),
             0x0497 => self.sp_sub(0x04A6, x, kill).map(drop),
@@ -302,10 +305,12 @@ impl Machine {
     /// tables run on into handlers that can leave DS at the target's
     /// segment; for a target outside DGROUP the original then reads the
     /// next handler and 29CF:0941's variables through it and runs into
-    /// data: None.
+    /// data: None. Fixed (#69), DS is DGROUP again after the handler, as
+    /// every other kind's call saves it: the effect stands and the next
+    /// one is read from DGROUP's tables.
     fn sp_sub_leaky(&mut self, h: u16, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
         let (_, at_target) = self.sp_sub(h, x, kill)?;
-        if at_target && x.fs != DS {
+        if at_target && x.fs != DS && !self.fixed(crate::fixes::SUB_KIND_DS) {
             return crate::giveup::not_ported("29CF:0941: DS left at the target's segment: not followed");
         }
         Some(())
@@ -464,13 +469,16 @@ impl Machine {
     /// 2CDD:0B77. The success roll: a percent under `h089a` × +6 + +0.
     /// The player-target check meant for the messages compares DX after
     /// the multiply has clobbered it with the product's high word.
-    /// Returns (CF, that DX).
+    /// Returns (CF, that DX). Fixed (#21), the check is on the target (the
+    /// DX the handler was given), as the other handlers' messages are:
+    /// "Spell succeeded/failed" shows when the player is the target.
     fn sp_roll(&mut self, x: &Fx) -> Option<(bool, u16)> {
         let p = self.h089a(x)? as u32 * self.sw(x, 6) as u32;
         let chance = (p as u16).wrapping_add(self.sw(x, 0));
         let hi = (p >> 16) as u16;
         let cf = self.percent() < chance;
-        if hi == PLAYER {
+        let to_player = if self.fixed(crate::fixes::SPELL_MESSAGE) { x.dx == PLAYER } else { hi == PLAYER };
+        if to_player {
             self.msg(if cf { SUCCEEDED } else { FAILED });
         }
         Some((cf, hi))
@@ -557,7 +565,8 @@ impl Machine {
         if self.mem.r16(x.fs, x.dx.wrapping_add(field::FLAGS)) & 0x4000 != 0 {
             // The dice are rolled with DS at the target's segment, where
             // the random generator's state is read: only right for the
-            // player.
+            // player. Never reached otherwise (#68): only the player has
+            // flag 4000h.
             let r = crate::dice::roll(&mut self.rng, 0xE)?;
             let id = self.mem.r8(DS, svar::DISEASES.wrapping_add(r)) as u16;
             self.apply_disease(x.fs, x.dx, id)?;
@@ -632,10 +641,17 @@ impl Machine {
     /// the amount as phase A's fatigue (×64) or SP delta. 0180 tests the
     /// carry of its `shl ax, 6` instead of 2EBD:0102's, so it stores
     /// through DS:SI even when nothing was applied (into the target).
+    /// Fixed (#28), 0180 tests 2EBD:0102's carry as 019B does: the
+    /// fatigue delta goes into the new slot only, and nothing into the
+    /// target when the effect wasn't applied.
     fn sp_drain_points(&mut self, x: Fx, fatigue: bool) -> Option<bool> {
         let a = self.val_0bd7(&x)?;
         let (cf, seg, si) = self.sp_apply(&x, 0x200, a);
-        if fatigue {
+        if fatigue && self.fixed(crate::fixes::FATIGUE_DRAIN_CARRY) {
+            if !cf {
+                self.mem.w16(seg, si.wrapping_add(0x12), a.ax << 6);
+            }
+        } else if fatigue {
             if a.ax & 0x0400 == 0 {
                 self.mem.w16(seg, si.wrapping_add(0x12), a.ax << 6);
             }
@@ -714,7 +730,10 @@ impl Machine {
     /// 2CDD:030F. On a percent roll up to `h08b7` + +0 (signed): timed
     /// flag 1's timer (`h08c3`) and strength (FFFFh unless the spell's
     /// flags have 100h, then 0) are set, and the *player's* flag 2. The
-    /// flag itself is never set on the target.
+    /// flag itself is never set on the target. Fixed (#22), the flag goes
+    /// on the target, beside the timer that counts it down (flag n's timer
+    /// is the block's entry 4n, so flag 2's is +4): a monster given it no
+    /// longer hands the player the flag (with a timer never set) instead.
     fn sp_timed_flag1(&mut self, x: Fx) -> Option<()> {
         let chance = self.h08b7(&x)?.wrapping_add(self.sw(&x, 0));
         if self.percent() as i16 > chance as i16 {
@@ -727,6 +746,10 @@ impl Machine {
         let strength = if self.mem.r16(DS, svar::FLAGS) & 0x100 != 0 { 0 } else { 0xFFFF };
         self.mem.w16(seg, di.wrapping_add(6), strength);
         self.msg(SUCCEEDED);
+        if self.fixed(crate::fixes::TIMED_FLAG_PLAYER) {
+            self.sp_or_flags(&x, 2);
+            return Some(());
+        }
         let f = self.mem.r16(DS, 0x05BE) | 2;
         self.mem.w16(DS, 0x05BE, f);
         Some(())
@@ -737,15 +760,21 @@ impl Machine {
     /// the kill handler runs. It leaves DS at the target's segment; for
     /// a target outside DGROUP the original then reads its message and
     /// handler tables through that segment and runs into data: None.
+    /// Fixed (#18), it kills on a roll under the chance, as every other
+    /// handler's roll succeeds (a 10% spell kills one time in ten), and
+    /// DS is DGROUP again after the kill: the message is shown and the
+    /// next effect read from DGROUP's tables.
     fn sp_instant_death(&mut self, x: Fx, kill: &mut dyn crate::strike::KillHooks) -> Option<()> {
+        let fixed = self.fixed(crate::fixes::INSTANT_DEATH);
         let chance = self.h08b7(&x)?.wrapping_add(self.sw(&x, 0));
-        if chance > self.percent() {
+        let fails = if fixed { self.percent() >= chance } else { chance > self.percent() };
+        if fails {
             self.msg(FAILED);
             return Some(());
         }
         self.mem.w16(x.fs, x.dx.wrapping_add(field::HP), 0xFFFF);
         self.kill_check(x.fs, x.dx, kill)?;
-        if x.fs != DS {
+        if x.fs != DS && !fixed {
             // DS is left at the target's segment: the message and every
             // table read after it go through the wrong segment.
             return crate::giveup::not_ported("2CDD:03C1: DS left at the target's segment: not followed");
@@ -756,7 +785,8 @@ impl Machine {
 
     /// 2CDD:0404. Flag 200h moving attribute `bp & 0Fh`: phase A by -+0,
     /// phase B by +6. The success message's player check looks at the
-    /// slot pointer, so it always shows.
+    /// slot pointer, so it always shows. Fixed (#21), it shows when the
+    /// target is the player, as the other handlers' messages do.
     fn sp_attr_both(&mut self, x: Fx) -> Option<bool> {
         let a = self.val_0c23(&x, true);
         let (cf, seg, si) = self.sp_apply(&x, 0x200, Args { bx: a.cx, ..a });
@@ -767,7 +797,8 @@ impl Machine {
         self.mem.w8(seg, si.wrapping_add(b).wrapping_add(6), a.ax as u8);
         let si = si.wrapping_add(0x14);
         self.mem.w8(seg, si.wrapping_add(b).wrapping_add(6), a.bx as u8);
-        if si != PLAYER {
+        let show = if self.fixed(crate::fixes::SPELL_MESSAGE) { x.dx == PLAYER } else { si != PLAYER };
+        if show {
             self.msg(SUCCEEDED);
         }
         Some(false)
@@ -1093,6 +1124,8 @@ impl Machine {
     /// takes the diseases, 10 and up); the kind's counter is decremented
     /// in DGROUP at the record's offset (whatever its segment), and
     /// zeroed in the record when a slot was freed. Flag 100h only clears.
+    /// Fixed (#67), the counter decremented is the record's own, in its
+    /// segment, the one zeroed below.
     pub fn end_effect_flag(&mut self, seg: u16, off: u16, flag: u16) {
         let at = off.wrapping_add(field::FLAGS);
         let f = self.mem.r16(seg, at) & !flag;
@@ -1103,8 +1136,9 @@ impl Machine {
         let kind = self.effect_kind(flag as u8);
         if kind < 9 {
             let c = off.wrapping_add(kind).wrapping_add(0x40F);
-            let v = self.mem.r8(DS, c).wrapping_sub(1);
-            self.mem.w8(DS, c, v);
+            let cseg = if self.fixed(crate::fixes::END_EFFECT_COUNTER) { seg } else { DS };
+            let v = self.mem.r8(cseg, c).wrapping_sub(1);
+            self.mem.w8(cseg, c, v);
         }
         self.mem.w16(DS, svar::ENDED, 0);
         let bl = kind as u8;
