@@ -5331,8 +5331,13 @@ fn busy_play_goes_as_the_originals() {
 /// (ARENA_CASE runs one): fuzzcrypt2, played there without the engine's
 /// page, walks onto the crypt's stairs by its 586th drawing where the
 /// original turns on (its heading 100h round, the stairs' turn); with the
-/// page (`fuzz_sessions_as_the_original`) every frame matches.
-const ROWS_LEFT_OUT: &[&str] = &["fuzzcrypt2"];
+/// page (`fuzz_sessions_as_the_original`) every frame matches. fuzzlava1
+/// likewise: without the page no creature flats are taken from the
+/// drawing (`Engine::frame`'s CD56 hook, 25CA:0271), so the crypt's
+/// creature the original's drawing wakes never comes, its blows never
+/// kill the player on the 930th frame, and the session runs its 1517
+/// drawings; with the page it matches in full.
+const ROWS_LEFT_OUT: &[&str] = &["fuzzcrypt2", "fuzzlava1"];
 
 /// Each case's drawings make their row tables from what the original's
 /// did (the `rows` lines: the inputs as the last 0000:DA8E found them,
