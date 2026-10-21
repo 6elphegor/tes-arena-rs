@@ -376,3 +376,25 @@ fn fixed_sub_kind_handlers_restore_ds() {
         assert_eq!(got.is_some(), fixes != Fixes::NONE, "{fixes:?}");
     }
 }
+
+/// Fixed (kept bug #85): Spell Absorption's strength is its per-level
+/// part plus its base percent (+0), as Reflection's and Resistance's are;
+/// the original's leaves the base out, so "40% + 0 per level" absorbs
+/// nothing.
+#[test]
+fn fixed_absorption_counts_its_base_percent() {
+    use arena::fixes::{ABSORB_BASE, Fixes};
+    let Some(img) = common::image() else { return };
+    let m = Machine::new(&img);
+    // Absorption's kind: the one 83E2's table sends to 2CDD:0822.
+    let kind = (0..0x19u16).find(|&k| m.mem.r16(DS, 0x83E2 + 2 * k) == 0x0822).expect("Absorption's kind") as u8;
+    for fixes in [Fixes::NONE, Fixes::only(ABSORB_BASE)] {
+        // 40% + 0% a level, for a round a level.
+        let mut m = one_effect(&img, fixes, kind, 0, 0, [40, 0, 1, 0, 1, 1]);
+        m.spell_effects(SSEG, 0, DS, PLAYER, 1, &mut arena::strike::NoKillHooks).unwrap();
+        // The player's timers: block 0 of 1020's table; entry 28h, 400h's.
+        assert_ne!(m.mem.r16(DS, PLAYER + 0x41A) & 0x400, 0, "{fixes:?}: the flag");
+        let strength = m.mem.r16(TSEG, 0x28 + 2);
+        assert_eq!(strength, if fixes == Fixes::NONE { 0 } else { 40 }, "{fixes:?}");
+    }
+}

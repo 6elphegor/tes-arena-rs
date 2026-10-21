@@ -257,3 +257,56 @@ fn run() {
     eprintln!("levelup: {n} compared, {stuck} stuck in both");
     assert!(n > 2000, "{n} compared");
 }
+
+/// #87 fixed (`LEVEL_GAIN`): the level's points are added to the
+/// attributes as they were, so a drain under way stays (and its effect's
+/// snapshot moves by the gain, so its end gives back the level's
+/// attributes); the original's sets every attribute to its new base,
+/// the drain lost, and its effect's end then pulls the attribute back to
+/// its snapshot, from before the level.
+#[test]
+fn fixed_a_drained_attribute_stays_drained_through_a_level() {
+    use arena::effects::{slot, SLOTS, SLOT_SIZE};
+    use arena::fixes::{Fixes, LEVEL_GAIN};
+    const ATTRS: u16 = 0x01CD;
+    const BASE: u16 = 0x01D5;
+    let Some(img) = common::image() else { return };
+    let run = |fixes: Fixes| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0x1042, CSEG);
+        // Every attribute at 50% (80h) but the first, drained to 60h by
+        // the effect in slot 0 (its snapshot the attributes before it);
+        // nothing carried; the points (SPEND's second call) on attribute 1.
+        for i in 0..8 {
+            m.mem.w8(DS, BASE + i, 0x80);
+            m.mem.w8(DS, ATTRS + i, 0x80);
+        }
+        m.mem.w8(DS, ATTRS, 0x60);
+        for i in 0..40u16 {
+            m.mem.w8(DS, 0x0212 + i * 19 + 0xE, 0);
+        }
+        for k in 0..16 {
+            m.mem.w8(DS, SLOTS + k * SLOT_SIZE + slot::STATE, 0xFF);
+        }
+        m.mem.w8(DS, SLOTS + slot::STATE, 0);
+        m.mem.w16(DS, SLOTS + slot::TARGET_SEG, DS);
+        m.mem.w16(DS, SLOTS + slot::TARGET_OFF, arena::character::PLAYER);
+        for i in 0..8 {
+            m.mem.w8(DS, SLOTS + slot::SNAPSHOT + i, 0x80);
+        }
+        m.mem.w8(DS, 0x0FDD, 0);
+        m.mem.w16(DS, 0xFFDC, 1);
+        m.mem.w16(DS, 0xFFE0, 0);
+        m.mem.w16(DS, 0x05E0, 0x200);
+        m.level_up_screen(1, &mut Files::default(), &mut Stubs).unwrap();
+        let at = |o: u16| m.mem.r8(DS, o);
+        (at(ATTRS), at(ATTRS + 1), at(BASE + 1), at(SLOTS + slot::SNAPSHOT), at(SLOTS + slot::SNAPSHOT + 1))
+    };
+    let (drained, raised, base, snap0, snap1) = run(Fixes::NONE);
+    assert!(base > 0x80, "the points went on attribute 1");
+    assert_eq!((drained, raised, snap0, snap1), (0x80, base, 0x80, 0x80), "the original's: the drain lost, the snapshot as it was");
+    let (drained, raised, fixed_base, snap0, snap1) = run(Fixes::only(LEVEL_GAIN));
+    assert_eq!(fixed_base, base);
+    assert_eq!((drained, raised, snap0, snap1), (0x60, base, 0x80, base), "fixed: the drain kept, the snapshot raised by the gain");
+}

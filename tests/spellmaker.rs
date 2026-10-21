@@ -301,3 +301,39 @@ fn a_spellmaker_given_up_frees_its_blocks() {
     assert_eq!(m.spellmaker(&mut files, &mut Unknown, 0x2000), None);
     assert_eq!(m.heap_alloc_bytes(0xFFF0).map(|(s, _)| s), block, "the heap as it was");
 }
+
+/// #84 fixed (`SPELL_COST`): a spell's cost is its effects' costs times
+/// its targets' steps + 2, halved, kept whole up to FFFFh; the original's
+/// keeps the product's low word and adds the costs in 16 bits, so a big
+/// enough spell wraps to a cheap one.
+#[test]
+fn fixed_a_big_spells_cost_doesnt_wrap() {
+    use arena::fixes::{Fixes, SPELL_COST};
+    use arena::spellmaker::var::{COSTS, EFFECTS, LEVEL, LOWEST, TARGET};
+    let Some(img) = common::image() else { return };
+    // One effect, or two (a class without factors, 01A9 0, adds the three
+    // costs as they are), on the caster (target 0, the effects' lowest 0:
+    // steps 0, times 2), at level 1.
+    let cost = |fixes: Fixes, costs: [u16; 3]| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w8(DS, 0x01A9, 0);
+        for (i, &c) in costs.iter().enumerate() {
+            m.mem.w8(DS, EFFECTS + i as u16, if c == 0 { 0xFF } else { i as u8 });
+            m.mem.w16(DS, COSTS + 2 * i as u16, c);
+            m.mem.w16(DS, LOWEST + 2 * i as u16, 0);
+        }
+        m.mem.w8(DS, TARGET, 0);
+        m.mem.w16(DS, LEVEL, 1);
+        m.made_spell_cost()
+    };
+    // 9000h x 2 = 12000h: the original's low word 2000h, halved.
+    assert_eq!(cost(Fixes::NONE, [0x9000, 0, 0]), (0x1000, 0x1000));
+    assert_eq!(cost(Fixes::only(SPELL_COST), [0x9000, 0, 0]), (0x9000, 0x9000));
+    // 9000h + 9000h wraps to 2000h in the original; fixed it stops at
+    // FFFFh, and so does the cost.
+    assert_eq!(cost(Fixes::NONE, [0x9000, 0x9000, 0]), (0x2000, 0x2000));
+    assert_eq!(cost(Fixes::only(SPELL_COST), [0x9000, 0x9000, 0]), (0xFFFF, 0xFFFF));
+    // Small spells cost the same either way.
+    assert_eq!(cost(Fixes::NONE, [0x123, 0x45, 0]), cost(Fixes::only(SPELL_COST), [0x123, 0x45, 0]));
+}

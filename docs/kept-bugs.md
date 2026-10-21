@@ -85,6 +85,7 @@ does that, so a fix would have to go behind a "fixed" switch).
 | 15 | tavern.rs:30-35, 816-828 | 1194:BCEA | Sneaking into a tavern room gives a one-day room, but its hours counter (1019) is set to the low word of the absolute end time. "Rest" in that room can then run for thousands of hours, not 24. | gameplay | trivial: hours = 24. **Fixed** (`SNEAK_HOURS`) |
 | 16 | loot_window.rs:31-38 | 2433:0883, 4BF4 | Looting: after a corpse's gold is shown, the "gold shown" flag is cleared in the corpse's segment, not DGROUP's, so an emptied corpse that had gold shows no message. The picked pile is found again by counting piles on that square and level without checking the kind of place, so a pile of another kind there makes **you get a different pile than the one you clicked**. | UI/gameplay | small. **Fixed** (`LOOT_PICK`): the pile found is counted among the piles of the kind of place listed; the stray write to the corpse's segment is skipped. The message part is not a bug: the flag is set to keep "has nothing" from following the gold, DGROUP's is cleared each time the window opens, and clearing it before the first list (as meant by the stray write) would defeat it |
 | 17 | travel.rs:14-16 | 1194:2E69 | Fast-travel time: terrain pixels are read from the start of the loaded file, header included, so every sample is 12 pixels off the drawn route and journey lengths are slightly wrong. (The unbounded 500-byte line buffers cannot overflow on a 320-wide map, so that part is invisible.) | gameplay | trivial: add the 12-byte header offset. **Fixed** (`TRAVEL_HEADER`) |
+| 84 | spellmaker.rs `sm_total`, `sm_cost`, `sm_draw`, `sm_buy` | 1194:6AA9, 6AD8 (MUL BX), 6BD7 | **A big enough spell wraps to a cheap or free one** (Section D's "spellmaker cost overflow"): the effects' costs are added in 16 bits and the cost is the low word of (sum × (targets' steps + 2)), halved; the price shown and charged is twice that, again in 16 bits. Found checking section D (2026-10-21). | economy | small. **Fixed** (`SPELL_COST`): the sum and the product kept whole, stopping at FFFFh (the cost word's most), the price twice that in 32 bits, shown as the gold is (`dun_ultoa`). The per-effect formulas' own 16-bit steps are left as they are |
 
 ### A3. Combat and magic
 
@@ -104,6 +105,9 @@ does that, so a fix would have to go behind a "fixed" switch).
 | 29 | spell.rs:249 | 2CDD:03F2 (table 843E) | Spell kind 03F2 zeroes DI before its call, so it always applies the first entry of its sub-table, whatever the spell says. | combat | **Not a bug, no fix:** effect 9's sub-kind is an attribute (the spellmaker lists the eight for it), and 843E holds only two handlers (0404 raising an attribute, 04A6 the drain that takes its attribute from the sub-kind) before 8442's table, so indexing by it would run kind 0Ch's handlers for attributes 2-7; zeroing DI picks 0404, the only sensible one. (0404 reads the attribute from the parameter, not the sub-kind; the game's one kind-9 spell, Volendrung's, has both 0.) |
 | 30 | projectile.rs:626-631 | 29CF:09B8 | A targeted spell that hits a person (slot below 0Fh) does nothing, and its cast record is never freed. If cast records run out, the next cast "searches on through memory" (29CF:01C4). *(visibility unsure)* | combat | small: free the record. **Fixed** (`CAST_RECORD_LEAK`): the record is freed when a person or nobody is struck |
 | 31 | projectile.rs:143-148 | 29CF:037F | Arrows lose their C8h head start: the projectile starts at the shooter's own position. *(visibility unsure)* | combat | trivial. **Fixed** (`ARROW_HEAD_START`): the sprite is set up where the step put it |
+| 85 | spell.rs `sp_kind` 0822 | 2CDD:0822 | **Spell Absorption doesn't work as described** (Section D): its strength leaves out the spell's +0, the base percent SPELLMKR.TXT #40 gives first ("%0%% chance to absorb... +%1%% per %4 level(s)", the same wording as Reflection's #41 and Resistance's #42, whose handlers 0841/0863 add it), so a "50% + 0 per level" absorb never absorbs. Found checking section D. | combat | trivial. **Fixed** (`ABSORB_BASE`): +0 added as for Reflection and Resistance |
+| 86 | effects.rs `spell_stopped`; spell.rs `cast_apply` | 2CDD:0A38 with 29CF:0941 | Two targets of one area spell that both reflect it: each writes the caster into the same entry after the list (its count, 0D5A, is never raised), so the caster is struck once, and 0941, counting both, goes on into the entry after it, a target left from an earlier list (0:0 would write the interrupt table in the original). *(rare: two reflecting creatures in one area spell)* Found checking section D. | combat | small. **Fixed** (`REFLECT_LIST`): the count raised with each reflection, so each has its entry (0941 reads the count once, as it begins); at most ten entries, past which a reflection stops the spell but sends nothing back |
+| 87 | levelup.rs `level_up_screen` | 1194:1034, 1194:1012 | **A level gained during an effect loses its points** (Section D's "level-up attribute points lost"): the attributes as they were are saved on the 256 scale, scaled up again as if percents, and the gain taken from that, so every attribute comes out equal to its new base. A drain, fortification or disease under way is wiped, and when its effect ends it restores the attribute to its snapshot, from before the level: a raised attribute drops back. Found checking section D. | gameplay | small. **Fixed** (`LEVEL_GAIN`): the gain is the new bases less the old, added to the attributes as they were (0..FFh), and the player's effects' snapshots move by it, so their ends restore to the level's attributes |
 
 ### A4. UI, display and logbook
 
@@ -188,46 +192,49 @@ sound.rs:313 (no sound banks: a LOOP writes FFFFh over all of DGROUP), lineedit.
 
 | Category | Visible (A) | Invisible (B, numbered) |
 |---|---|---|
-| gameplay / economy | 16 (#2, 4, 5, 7-15, 17, 25, 42, 43) | 2 (#82, #83) |
-| combat | 12 (#18, 19, 21-24, 26-31) | 1 (#69, outcome undetermined) |
+| gameplay / economy | 18 (#2, 4, 5, 7-15, 17, 25, 42, 43, 84, 87) | 2 (#82, #83) |
+| combat | 14 (#18, 19, 21-24, 26-31, 85, 86) | 1 (#69, outcome undetermined) |
 | UI / display | 17 (#1, 3, 6, 16, 20, 32, 34-39, 44-48) | 0 |
 | quests | 2 (#40, 41; #14 is part quests) | 3 (#49, 50, 55) |
 | saves / log | 1 (#33) | 0 |
 | internal-only | 0 | 29 (#51-54, 56-68, 70-81) |
-| **Total** | **48** (#1-48) | **35** (#49-83) + ~143 fault sites |
+| **Total** | **52** (#1-48, 84-87) | **35** (#49-83) + ~143 fault sites |
 
 (Several rows hold two or three related bugs from one routine; counting those
 separately gives about 60 visible and 40 invisible.)
 
 ---
 
-## D. Community-documented Arena bugs (from memory, unverified)
+## D. Community-documented Arena bugs
 
-These come from general knowledge of UESP's Arena bug pages and community lore, **not checked
-against any source in this session**. "In port?" says whether the catalogue above has a
-matching bug.
+These come from general knowledge of UESP's Arena bug pages and community lore. They were first
+listed from memory, unverified; on 2026-10-21 each was checked against the port's routines (and
+their addresses in the original). "Verdict" says whether ACD.EXE has the bug: a catalogue entry
+above, a new entry found by this check (#84-#87, each fixed behind its bit), or not present in
+this version and why.
 
-| Community bug (from memory, unverified) | In port? |
+| Community bug | Verdict |
 |---|---|
 | Lockpicking a chest can be retried endlessly | **Yes**: #7 (talk.rs:1389) |
-| Haggling/selling exploits: merchants accept too easily, prices can be pushed | **Partly**: #10 (selling acceptance never rolled), #14 (stale price) |
+| Haggling/selling exploits: merchants accept too easily, prices can be pushed | **Yes**: #10 (selling's acceptance roll never reached), #14 (a stale first price). No other haggling bug in haggle.rs |
 | Temple "Cure all" crashes or charges oddly | **Yes**: #2 |
 | Stealing from shops can be repeated on the same item | **Yes**: #8 |
 | Guards always notice crimes at higher levels | **Yes**: #9 |
-| The Luck attribute does little or nothing | **Consistent with** #24 (Luck modifier hard-wired to 50) |
-| Attribute-max exploit by removing enchanted items while drained | **Consistent with** #13 |
-| Instant-death ("Doom"-style) spells too effective | **Consistent with** #18 |
+| The Luck attribute does little or nothing | **Yes**: #24 (the Luck modifier hard-wired to 50) |
+| Attribute-max exploit by removing enchanted items while drained | **Yes**: #13 |
+| Instant-death ("Doom"-style) spells too effective | **Yes**: #18 |
 | Log file grows without limit, saves slow down | **Yes**: #33 |
-| Random crashes talking to townspeople | **Consistent with** #1 (%en) |
-| Automap markings scrambled after leaving and returning | **Consistent with** #32 |
-| Spellmaker cost overflow giving very cheap or free spells | Not found as a "kept bug" note (spellmaker.rs only has divide-overflow faults at 1194:70BA) |
-| Falling through the floor / getting stuck in walls in the wilderness or while levitating | Not found |
-| Spell Absorption / Reflect not working as described | Not found |
-| Level-up attribute bonus points lost or wrong | Not found (levelup.rs has no bug notes) |
-| Character-creation reroll / bonus-point exploits | Not found (no bug notes in newgame.rs's rolls) |
-| Main quest broken by quest-item handling in some versions | **Possibly related** to #41 (0FDD overwritten), but unverified |
-| Dungeons missing lights or locks in large (multi-chunk) dungeons | **Possibly related** to #42 |
-| Wandering monsters with erratic speed | **Consistent with** #26 |
-| Archers' criticals don't scale | **Consistent with** #19 (not a known community report as far as I recall) |
-| Out-of-memory / EMS crashes after long play | **Possibly related** to the leaks #57, #58 |
-| Crashes at the travel screen on long journeys | Not found (travel.rs's buffer overrun can't happen at 320 px) |
+| Random crashes talking to townspeople | **Yes**: #1 (%en) |
+| Automap markings scrambled after leaving and returning | **Yes**: #32 |
+| Spellmaker cost overflow giving very cheap or free spells | **Yes, new: #84** (spellmaker.rs: the effects' costs summed in 16 bits, the cost the low word of sum × (steps + 2), the price twice that in 16 bits). Fixed (`SPELL_COST`) |
+| Falling through the floor / getting stuck in walls in the wilderness or while levitating | **Not found**: movement.rs (the collision and fall code) has no fault site or kept-bug note, and levitation (`sp_levitate`, spell.rs) only sets its flag and timer. Nothing in the code shows it; it would need a reproduction |
+| Spell Absorption not working as described | **Yes, new: #85** (2CDD:0822 leaves out the spell's base percent, which Reflection and Resistance add). Fixed (`ABSORB_BASE`) |
+| Spell Reflection not working as described | **Not present**: Reflection works (effects.rs `spell_stopped`: rolled on its strength, the caster queued back in the target list). Checking it found **#86** (two reflections in one cast share one entry, a stale target struck), rare, fixed (`REFLECT_LIST`) |
+| Level-up attribute bonus points lost or wrong | **Yes, new: #87** (levelup.rs: the attributes come out equal to their new bases, so an effect under way, ending, takes the level's points back). Fixed (`LEVEL_GAIN`). The points rolled (3..6 a level, 1194:1034) and their spending are as designed |
+| Character-creation reroll / bonus-point exploits | **Not present**: rerolling is the screen's own feature (newgame.rs `creation_roll`), and the down arrow (`creation_arrow`) only takes back a point from an attribute raised above its roll, so no points can be gained |
+| Main quest broken by quest-item handling in some versions | **Yes**: #41 (FFh written over the main quest's step at 0FDD) |
+| Dungeons missing lights or locks in large (multi-chunk) dungeons | **Not present**: #42, found not a bug (the lights are made again from the flats at 0000:2957; the lock offset doesn't wrap in practice) |
+| Wandering monsters with erratic speed | **Yes**: #26 |
+| Archers' criticals don't scale | **Yes**: #19 (not a known community report as far as I recall) |
+| Out-of-memory / EMS crashes after long play | **Yes**: the leaks #30 (cast records), #57, #58 and the heap links #59, all fixed. The fixed-mode play check (view/src/fixedtest.rs) saw travelkhuras run out of EMS room faithfully ("0000:7428: an empty file, or no room in EMS") and not with the fixes |
+| Crashes at the travel screen on long journeys | **Not present**: travel.rs's buffer overrun can't happen at 320 px |

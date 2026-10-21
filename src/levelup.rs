@@ -224,6 +224,10 @@ impl Machine {
         }
         self.worn_off();
         self.copy8(ATTRS, OLD_ATTRS);
+        // (Fixed, #87: the attributes as they are, the worn items off, and
+        // their bases.)
+        let now: [u8; 8] = std::array::from_fn(|i| self.l8(ATTRS + i as u16));
+        let was: [u8; 8] = std::array::from_fn(|i| self.l8(BASE + i as u16));
         crate::scale::attrs_to100(&mut self.mem, BASE, BASE, 8);
         self.copy8(BASE, ATTRS);
         self.mem.w16(DS, SHEET, 1);
@@ -269,17 +273,48 @@ impl Machine {
             }
             hooks.message_box(self, 0x3E17);
         }
+        // The attributes as they were (OLD_ATTRS, saved on the 256 scale)
+        // scaled up again as if they were percents, the gain the new bases
+        // less that, and the attributes that plus the gain: the new bases,
+        // whatever they were before (the original's, #87). A drain, a
+        // fortification or a disease under way is lost with it, and when
+        // its effect ends it pulls the attribute back to where it began
+        // (its snapshot, `fx_attr_step`), taking the level's points with
+        // it. The module's note, 1012's own GAIN and the add after say
+        // what was meant: the gain added to the attributes as they were.
+        // Fixed (`LEVEL_GAIN`), the gain is the new bases less the old
+        // (OLD_ATTRS the bases as they were), added to the attributes as
+        // they were (kept in 0..FFh); the player's effects' snapshots move
+        // by it too, so their ends restore to the level's attributes, not
+        // the last level's. (Unspent, an attribute's gain is what the
+        // bases' trip through the percents moves them, 0 or so: the
+        // attribute keeps to its base as the original's does.)
+        let fixed = self.fixed(crate::fixes::LEVEL_GAIN);
         crate::scale::attrs_to256(&mut self.mem, ATTRS, ATTRS, 8);
-        crate::scale::attrs_to256(&mut self.mem, OLD_ATTRS, OLD_ATTRS, 8);
+        if fixed {
+            for (i, &w) in was.iter().enumerate() {
+                self.mem.w8(DS, OLD_ATTRS + i as u16, w);
+            }
+        } else {
+            crate::scale::attrs_to256(&mut self.mem, OLD_ATTRS, OLD_ATTRS, 8);
+        }
         for i in 0..8 {
             let g = self.l8(ATTRS + i).wrapping_sub(self.l8(OLD_ATTRS + i));
             self.mem.w8(DS, GAIN + i, g);
         }
         self.copy8(ATTRS, BASE);
-        self.copy8(OLD_ATTRS, ATTRS);
-        for i in 0..8 {
-            let v = self.l8(ATTRS + i).wrapping_add(self.l8(GAIN + i));
-            self.mem.w8(DS, ATTRS + i, v);
+        if fixed {
+            let gain: [i16; 8] = std::array::from_fn(|i| self.l8(BASE + i as u16) as i16 - was[i] as i16);
+            for (i, (&v, &g)) in now.iter().zip(&gain).enumerate() {
+                self.mem.w8(DS, ATTRS + i as u16, (v as i16 + g).clamp(0, 0xFF) as u8);
+            }
+            self.level_gain_snapshots(gain);
+        } else {
+            self.copy8(OLD_ATTRS, ATTRS);
+            for i in 0..8 {
+                let v = self.l8(ATTRS + i).wrapping_add(self.l8(GAIN + i));
+                self.mem.w8(DS, ATTRS + i, v);
+            }
         }
         self.worn_on();
         self.attribute_modifiers(PLAYER);
@@ -420,6 +455,24 @@ impl Machine {
         self.mem.w8(DS, COLOUR, 0x60);
         hooks.message_box(self, 0x4F25);
         Some(())
+    }
+
+    /// Fixed (#87): each effect on the player (a slot in use whose target
+    /// is the player's record) has its attributes' snapshot moved by the
+    /// level's `gain` (kept in 0..FFh), so its end restores them to the
+    /// level's attributes.
+    fn level_gain_snapshots(&mut self, gain: [i16; 8]) {
+        use crate::effects::{slot, NSLOTS, SLOTS, SLOT_SIZE};
+        for k in 0..NSLOTS {
+            let s = SLOTS + k * SLOT_SIZE;
+            if self.l8(s + slot::STATE) == 0xFF || self.l16(s + slot::TARGET_SEG) != DS || self.l16(s + slot::TARGET_OFF) != PLAYER {
+                continue;
+            }
+            for (i, g) in (0..8).zip(gain) {
+                let v = self.l8(s + slot::SNAPSHOT + i) as i16 + g;
+                self.mem.w8(DS, s + slot::SNAPSHOT + i, v.clamp(0, 0xFF) as u8);
+            }
+        }
     }
 
     /// 1194:7FD3. The worn items taken off, listed at WORN: as many slots
