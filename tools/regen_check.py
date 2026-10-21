@@ -34,12 +34,15 @@ runs everything.
 
 The PER_CASE generators (worldframes) are cached case by case instead
 (tools/casecache.py): each case's block of lines is kept under a key over
-its own entry in CASES and the helpers only it reaches, the code every
-case runs, and everything outside the generator as above. Only the cases
-whose key changed run (through ARENA_CASES, sharded like the others when
-there are several), and the output is put together from the blocks in
-CASES order and compared with the committed vector; a change to the
-common code runs every case. The blocks live in git's common directory
+the generator's code that case ran last time (harness/casetrace.py
+records it: blocks it never entered cut out, the constants that code
+names, its own CASES entry), plus everything outside the generator as
+above. Only the cases whose key changed run (through ARENA_CASES, dealt
+to --shards processes longest first by their last times), and the output
+is put together from the blocks in CASES order and compared with the
+committed vector. So an edit to a branch or a script vocabulary reruns
+only the cases that ran it, and a comment reruns none. The blocks and
+each case's record of what it ran live in git's common directory
 (regen-cache/), shared by every worktree. The listing then has a line
 `NAME  N of M cases run` above the result.
 
@@ -278,53 +281,104 @@ def run(name, env, opts):
 
 
 def run_per_case(name, env, opts, vec, vecs, args, sharded):
-    """A PER_CASE generator: the cases whose blocks aren't cached run (all
-    of them, the header too, when the code every case runs changed, or with
-    --no-cache), and the output put together from the blocks in CASES order
-    is compared with the committed vector."""
+    """A PER_CASE generator: the cases whose code changed (or that never
+    ran here, or all with --no-cache) run, and the output put together
+    from the blocks in CASES order is compared with the committed vector.
+    A case's key is over the code it ran last time (casecache's `deps`,
+    kept beside the blocks); the cases that run are dealt out to the
+    processes longest first, by their last times."""
     gen = os.path.join(HARNESS, f'gen_{name}.py')
     cases = Cases(open(gen).read())
     base = cache_key(name, env, vecs, own=False)
-    hkey = hashlib.sha256((base + cases.common_digest()).encode()).hexdigest()
-    keys = {n: hashlib.sha256((hkey + cases.case_digest(n)).encode()).hexdigest() for n in cases.order}
     store = block_cache_dir(name)
-    header_path = os.path.join(store, hkey + '.header')
-    block_path = {n: os.path.join(store, k + '.lines') for n, k in keys.items()}
-    if opts.no_cache or not os.path.exists(header_path):
-        todo = list(cases.order)
-    else:
-        todo = [n for n in cases.order if not os.path.exists(block_path[n])]
+    deps_dir = os.path.join(store, 'deps')
+    os.makedirs(deps_dir, exist_ok=True)
+
+    def deps_path(case):
+        return os.path.join(deps_dir, (case or '_header') + '.json')
+
+    def path_of(case, key):
+        return os.path.join(store, key + ('.lines' if case else '.header'))
+
+    def keyed(case, deps):
+        k = cases.key(case, deps)
+        return k and hashlib.sha256((base + k).encode()).hexdigest()
+
+    last = {}
+    for case in [None] + cases.order:
+        try:
+            last[case] = json.load(open(deps_path(case)))
+        except (OSError, ValueError):
+            pass
+    keys = {}
+    for case in [None] + cases.order:
+        k = None if opts.no_cache or case not in last else keyed(case, last[case]['deps'])
+        keys[case] = k if k and os.path.exists(path_of(case, k)) else None
+    todo = [n for n in cases.order if keys[n] is None]
+    header = keys[None] is None
     out = os.path.join(opts.out, os.path.basename(vec))
     dt = 0.0
-    if todo:
-        full = todo == cases.order
-        run_env = dict(os.environ)
-        run_env.pop('ARENA_CASES', None)
-        if not full:
-            run_env['ARENA_CASES'] = ','.join(todo)
-        k = min(opts.shards, len(todo)) if sharded else 1
-        cmd = [sys.executable, os.path.join(HARNESS, 'par.py'), str(k), gen] if k > 1 else [sys.executable, gen]
+    if todo or header:
+        known = [last[n]['secs'] for n in cases.order if n in last]
+        guess = sum(known) / len(known) if known else 60.0
+        k = max(1, min(opts.shards, len(todo))) if sharded else 1
+        groups, loads = [[] for _ in range(k)], [0.0] * k
+        for n in sorted(todo, key=lambda n: -last.get(n, {}).get('secs', guess)):
+            i = loads.index(min(loads))
+            groups[i].append(n)
+            loads[i] += last.get(n, {}).get('secs', guess)
         log = open(out + '.log', 'w')
         print(f'{name}: running {len(todo)} of {len(cases.order)} cases on {k}', file=log, flush=True)
         t0 = time.time()
-        try:
-            rc = subprocess.run(cmd + args + [out], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
-                                timeout=opts.timeout, start_new_session=True, env=run_env).returncode
-        except subprocess.TimeoutExpired:
-            rc = 'timeout'
+        procs = []
+        for i, group in enumerate(groups):
+            run_env = dict(os.environ, ARENA_CASES=','.join(group) or '-', ARENA_TRACE=f'{out}.{i}.trace')
+            run_env.pop('SHARD', None)
+            run_env.pop('ARENA_HEADER', None)
+            if i == 0 and header:
+                run_env['ARENA_HEADER'] = '1'
+            procs.append(subprocess.Popen([sys.executable, gen] + args + [f'{out}.{i}'], cwd=ROOT, stdout=log,
+                                          stderr=subprocess.STDOUT, start_new_session=True, env=run_env))
+        codes = []
+        for p in procs:
+            try:
+                codes.append(p.wait(timeout=max(1, opts.timeout - (time.time() - t0))))
+            except subprocess.TimeoutExpired:
+                codes.append('timeout')
+        if 'timeout' in codes:
+            for p in procs:
+                if p.poll() is None:
+                    os.killpg(p.pid, 9)
+                    p.wait()
         dt = time.time() - t0
         log.close()
-        if rc != 0:
-            return name, dt, 'timeout' if rc == 'timeout' else f'rc={rc} (see {out}.log)'
-        header, blocks = split_blocks(open(out).read(), cases.order)
-        missing = [n for n in todo if n not in blocks]
-        if missing:
-            return name, dt, f'DIFFERENT (no lines for {", ".join(missing[:5])}; see {out}.log)'
-        if full:
-            write_atomic(header_path, ''.join(header))
-        for n in todo:
-            write_atomic(block_path[n], ''.join(blocks[n]))
-    text = open(header_path).read() + ''.join(open(block_path[n]).read() for n in cases.order)
+        if any(c != 0 for c in codes):
+            return name, dt, 'timeout' if 'timeout' in codes else f'rc={codes} (see {out}.log)'
+        for i, group in enumerate(groups):
+            part = f'{out}.{i}'
+            head, blocks = split_blocks(open(part).read(), cases.order)
+            trace = json.load(open(f'{part}.trace'))
+            mod = {int(c[4:]): set(t['lines']) for c, t in trace.items() if c.startswith('mod:')}
+
+            def ran(*ctxs):
+                return set().union(*(trace.get(c, {}).get('lines', ()) for c in ctxs))
+            if i == 0 and header:
+                deps = cases.deps(None, ran(''), mod)
+                keys[None] = keyed(None, deps)
+                write_atomic(path_of(None, keys[None]), ''.join(head))
+                write_atomic(deps_path(None), json.dumps({'deps': deps, 'secs': 0.0}))
+            missing = [n for n in group if n not in blocks]
+            if missing:
+                return name, dt, f'DIFFERENT (no lines for {", ".join(missing[:5])}; see {out}.log)'
+            for n in group:
+                own = trace.get('case:' + n, {})
+                deps = cases.deps(n, ran('', 'case:' + n, *own.get('uses', ())), mod)
+                keys[n] = keyed(n, deps)
+                write_atomic(path_of(n, keys[n]), ''.join(blocks[n]))
+                write_atomic(deps_path(n), json.dumps({'deps': deps, 'secs': own.get('secs', 0.0)}))
+            os.remove(part)
+            os.remove(f'{part}.trace')
+    text = open(path_of(None, keys[None])).read() + ''.join(open(path_of(n, keys[n])).read() for n in cases.order)
     note = f'{len(todo)} of {len(cases.order)} cases run'
     with open(out, 'w') as f:
         f.write(text)

@@ -104,11 +104,12 @@ and digest:
   printed | NAME | <length> <digest>
 """
 import os
-import random
-import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+import casetrace  # first: it records the lines each case runs
+import random
+import struct
 from emu import LOAD_SEG, STUB_SEG, fnv, mine
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_FS, UC_X86_REG_SI
@@ -3658,6 +3659,7 @@ def state_line(name, before, after, skip, kind='state'):
 def main():
     EXE, GAME, SAVE, OUT = sys.argv[1:5]
     dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else None
+    casetrace.begin('')
     a = SoundArena(EXE, GAME, SAVE)
     rows_watch(a)
     a.start()
@@ -3684,7 +3686,8 @@ def main():
     # tests/vectors/loadexclude.txt names zeroed (the port's in this form:
     # worldtest's `load_canonical`).
     skip_base = excluded('loadexclude.txt')
-    if not only and first_shard:
+    # (ARENA_HEADER: the header too, for regen_check's runs of a few cases.)
+    if (not only or os.environ.get('ARENA_HEADER')) and first_shard:
         out.write(f'loadstate | {fnv(bytes(0 if i in skip_base else b for i, b in enumerate(loaded))):x}\n')
         out.write(f'loadems | {fnv(loaded_ems):x}\n')
     skip = excluded()
@@ -3694,10 +3697,12 @@ def main():
         if not mine(n, total):
             continue
         where, setup, steps = CASES[name]
+        casetrace.begin('place:' + where)
         if where not in places:
             places[where] = {'dungeon': gd.dungeon, 'crypt': crypt, 'street': street, 'wetstreet': wet_street, 'snowstreet': weathered(3), 'wild': wild, 'capped': named(CAPPED), 'fogged': named(FOGGED),
                              'people': people, 'store': building('store'), 'tavern': building('tavern'), 'temple': building('temple'), 'guild': guild,
                              'palace': palace}[where](a, base)
+        casetrace.begin('case:' + name, uses=('place:' + where,))
         at = places[where]
         print(name, file=sys.stderr)
         seen = []
