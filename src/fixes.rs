@@ -81,6 +81,8 @@ pub const SNEAK_HOURS: u8 = 15;
 /// #16: the pile picked is found ignoring the kind of place; a corpse's
 /// segment written at 4BF4 (2433:0883, 0748).
 pub const LOOT_PICK: u8 = 16;
+/// #17: fast travel's terrain read 12 bytes early, the header (1194:3290).
+pub const TRAVEL_HEADER: u8 = 17;
 /// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).
 pub const GUILD_SPELLS_PICK: u8 = 20;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
