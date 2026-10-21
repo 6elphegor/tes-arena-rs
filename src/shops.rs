@@ -26,7 +26,10 @@
 //! the record's offset plus one as the index (2EBD:0004 leaves it in AX),
 //! which is not code: the port returns None there; a second donation
 //! within a day of the first is taken but blesses nothing; the
-//! single cure's price is added to the list's total (12BF) again.
+//! single cure's price is added to the list's total (12BF) again
+//! (unseen: the total is read only for the list, before). Fixed mode
+//! (`crate::fixes`) makes "Cure all" pay its total and cure each
+//! affliction (#2), and a day's second, larger donation bless (#12).
 
 use crate::format::Arg;
 use crate::machine::Machine;
@@ -516,6 +519,25 @@ impl Machine {
             self.cure_effect(mask, 0x01A4);
             return Some(());
         }
+        if self.fixed(crate::fixes::CURE_ALL) {
+            // Fixed (#2): "Cure all" pays the total it was listed with
+            // (TOTAL, the "Cure all %u gp" entry's) and ends each
+            // affliction listed by its own handler, as a single cure
+            // does; the original's loop walks the handlers with 2EBD:0004's
+            // AX (the record's offset after the slots), meant to be the
+            // next cure's index.
+            let total = self.mem.r16(DS, TOTAL) as u32;
+            if self.pay(hooks, total) {
+                return Some(());
+            }
+            for bx in 0..3u16 {
+                if self.mem.r8(DS, CURES + bx) != 0 {
+                    let mask = self.cure_handler(bx)?;
+                    self.cure_effect(mask, 0x01A4);
+                }
+            }
+            return Some(());
+        }
         if self.pay(hooks, pick as u32) {
             return Some(());
         }
@@ -616,6 +638,7 @@ impl Machine {
             if self.pay(hooks, ax as u32) {
                 return Some(());
             }
+            let before = self.mem.r16(DS, DONATED);
             self.mem.w16(DS, DONATED, ax);
             let bless = if self.mem.r32(DS, DONATED_AT) == 0 {
                 let t = self.mem.r32(DS, TIME);
@@ -624,6 +647,12 @@ impl Machine {
             } else if self.mem.r32(DS, TIME).wrapping_sub(self.mem.r32(DS, DONATED_AT)) > 0x5A0 {
                 self.mem.w32(DS, DONATED_AT, 0);
                 true
+            } else if self.fixed(crate::fixes::SECOND_DONATION) {
+                // Fixed (#12): within a day, a donation more than the
+                // day's last one blesses: the compare the original makes
+                // against DONATED, but before the new donation is written
+                // there.
+                ax > before
             } else {
                 // ax <= DONATED (it was just set to ax).
                 false

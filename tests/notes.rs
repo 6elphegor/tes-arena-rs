@@ -255,3 +255,34 @@ fn matches_original() {
     eprintln!("notes: {n} compared, {stuck} stuck in both");
     assert!(n > 2500, "{n} compared");
 }
+
+/// Fixed (kept bug #3): a note whose text is over 2FFh pixels wide is
+/// hit-tested with a word's divide: the original's `div cl` overflows
+/// (None, its fault).
+#[test]
+fn fixed_a_wide_note_is_hit_tested() {
+    use arena::fixes::{Fixes, NOTE_DIVIDE};
+    use arena::mapnotes::var::{CLICK_COL, CLICK_ROW};
+    let Some(img) = common::image() else { return };
+    let mut m = Machine::new(&img);
+    // Every character 7Fh wide: ten of them 1270, a third 423.
+    for i in 0..0x60u16 {
+        m.mem.w8(FONT_SEG, i, 0x7F);
+    }
+    m.mem.w16(DS, 0xB034, 0);
+    m.mem.w16(DS, 0xB036, FONT_SEG);
+    for (i, &b) in b"AAAAAAAAAA\0".iter().enumerate() {
+        m.mem.w8(DS, 0x1044 + i as u16, b);
+    }
+    m.mem.w16(DS, CLICK_ROW, 11);
+    m.mem.w16(DS, CLICK_COL, 400);
+    assert_eq!(m.note_hit(500, 10, 0x1044), None, "the original's overflow");
+    m.fixes = Fixes::only(NOTE_DIVIDE);
+    assert_eq!(m.note_hit(500, 10, 0x1044), Some(true), "500 - 423 <= 400");
+    m.mem.w16(DS, CLICK_COL, 70);
+    assert_eq!(m.note_hit(500, 10, 0x1044), Some(false), "left of it");
+    // A narrow text as before.
+    m.mem.w8(DS, 0x1045, 0);
+    m.mem.w16(DS, CLICK_COL, 480);
+    assert_eq!(m.note_hit(500, 10, 0x1044), Some(true));
+}

@@ -49,13 +49,26 @@ impl Fixes {
 
 // The bugs fixed so far, by their numbers in docs/kept-bugs.md, in order.
 
+/// #1: %en outside an equipment store returns into 2DA2 (2DA2:05DC).
+pub const EN_OUTSIDE_STORE: u8 = 1;
+/// #2: the temple's "Cure all" pays its index and crashes (1194:C36E).
+pub const CURE_ALL: u8 = 2;
+/// #3: an automap note's hit test overflows its divide (0000:343C).
+pub const NOTE_DIVIDE: u8 = 3;
+/// #5: a pile made in the wild reads its tables past their end (2433:0358).
+pub const WILD_PILES: u8 = 5;
 /// #7: a chest's failed lockpicking looked up under the player's square.
 pub const CHEST_RETRIED: u8 = 7;
 /// #9: from level 11 on every crime is seen (0000:3F50).
 pub const CRIME_SEEN: u8 = 9;
 /// #10: selling never reaches the merchant's acceptance roll (1194:81F0).
 pub const SELLING_ROLL: u8 = 10;
+/// #12: a donation within a day of the last blesses nothing (1194:C58B).
+pub const SECOND_DONATION: u8 = 12;
 /// #13: taking off an item wraps a drained attribute to its maximum.
 pub const UNEQUIP_WRAP: u8 = 13;
 /// #15: a room sneaked into rests for the end time's low word in hours.
 pub const SNEAK_HOURS: u8 = 15;
+/// #43: piles' odd halved gold dropped, magic types forced by a scratch
+/// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
+pub const PILE_QUIRKS: u8 = 43;

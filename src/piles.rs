@@ -38,7 +38,10 @@
 //! the frame's segment (frame:4D76, not DGROUP's); in the wild (kind 5)
 //! the routine tables are overread, and an item, a weapon or a magic
 //! pile there calls into a string (2433:7525): None, as the original
-//! runs off into data.
+//! runs off into data. Fixed mode (`crate::fixes`) rolls the wild's
+//! piles by the outdoors' tables (#5), and keeps an odd halved amount's
+//! pile, makes the magic piles' types unforced and reads the level's
+//! limit from DGROUP (#43).
 
 use crate::loot_window::var::{MAKING, PILE, PILE_COUNT, ROLLS};
 use crate::machine::Machine;
@@ -173,10 +176,11 @@ impl Machine {
     /// 2433:0101. Whether the level has its limit of piles already:
     /// counting the table's piles of this level, the count's low byte
     /// against the limit read through the frame's segment.
+    /// Fixed (#43), the limit is DGROUP's, where 02C3 has just put it.
     fn level_full(&self) -> bool {
         let frame = self.mem.r16(DS, FRAME_SEG);
         let level = self.mem.r8(DS, LEVEL);
-        let limit = self.mem.r8(frame, LIMIT);
+        let limit = if self.fixed(crate::fixes::PILE_QUIRKS) { self.mem.r8(DS, LIMIT) } else { self.mem.r8(frame, LIMIT) };
         let mut ax = 0u16;
         let mut si = TABLE;
         for _ in 0..self.mem.r8(DS, PILE_COUNT) {
@@ -195,7 +199,7 @@ impl Machine {
     /// chance (the kind of place's four bytes at CHANCES) marks it in
     /// ROLLS; a kind that misses keeps what ROLLS held.
     fn pile_rolls(&mut self) -> Option<()> {
-        let si = CHANCES + 4 * self.mem.r8(DS, KIND) as u16;
+        let si = CHANCES + 4 * self.pile_table_kind();
         for i in 0..4u16 {
             let roll = self.rng.range(1, 0x65)?;
             if roll as u8 <= self.mem.r8(DS, si + i) {
@@ -286,8 +290,21 @@ impl Machine {
     /// The routine at word `table` + 2 x the kind of place, by its
     /// address in segment 2433. None for one that isn't code.
     fn pile_routine(&self, table: u16) -> u16 {
-        let k = self.mem.r8(DS, KIND) as u16;
+        let k = self.pile_table_kind();
         self.mem.r16(DS, table.wrapping_add(k.wrapping_add(k)))
+    }
+
+    /// The kind of place the roll tables are read for: the pile's (KIND).
+    /// The tables have rows for kinds 0..4 only, so the wild's (5) reads
+    /// the next tables' bytes (its chances FINE's and SHARES', its gold
+    /// routine the first level routine's, its level routine a string).
+    /// Fixed (#5), the wild is read as the outdoors (3, where the town's
+    /// streets and the dungeons are: `pile_place` gives 3 for map flag 4
+    /// alone, 5 for it with the wild's level flag), the pile itself still
+    /// of kind 5.
+    fn pile_table_kind(&self) -> u16 {
+        let k = self.mem.r8(DS, KIND) as u16;
+        if k == 5 && self.fixed(crate::fixes::WILD_PILES) { 3 } else { k }
     }
 
     /// 2433:0358's routine from GOLD_ROUTINES: the amount, and the carry
@@ -319,10 +336,13 @@ impl Machine {
     }
 
     /// 2433:052A. 2..10, halved (`shr`, the low bit to the carry) in
-    /// climate 2, else doubled.
+    /// climate 2, else doubled. Fixed (#43), the halving leaves no carry:
+    /// the carry the callers test means an amount that overflowed (as
+    /// the other routines' do), not an odd one, so the pile is kept.
     fn gold_small(&mut self) -> Option<(u16, bool)> {
         let ax = self.rng.range(2, 0xB)?;
-        let r = if self.mem.r8(DS, CLIMATE) == 2 { (ax >> 1, ax & 1 != 0) } else { (ax.wrapping_add(ax), false) };
+        let odd = ax & 1 != 0 && !self.fixed(crate::fixes::PILE_QUIRKS);
+        let r = if self.mem.r8(DS, CLIMATE) == 2 { (ax >> 1, odd) } else { (ax.wrapping_add(ax), false) };
         self.mem.w16(DS, GOLD, r.0);
         Some(r)
     }
@@ -330,7 +350,7 @@ impl Machine {
     /// The routine from LEVEL_ROUTINES: an item's level, and the BX it
     /// leaves (6EEA leaves the span of its roll).
     fn pile_level(&mut self) -> Option<(u8, u16)> {
-        let k = self.mem.r8(DS, KIND) as u16;
+        let k = self.pile_table_kind();
         Some(match self.pile_routine(LEVEL_ROUTINES) {
             0x03D5 => (self.rng.range(1, 6)? as u8, 5),
             0x03ED => {
@@ -391,7 +411,7 @@ impl Machine {
         } else {
             self.loot_weapon(0x10, 0xFF)?;
         }
-        let k = self.mem.r8(DS, KIND) as u16;
+        let k = self.pile_table_kind();
         let i = if self.mem.r8(DS, FINE.wrapping_add(k)) != 0 {
             let a = self.rng.range(1, 4)?;
             if a == 3 { 2 } else { a }
@@ -412,9 +432,13 @@ impl Machine {
 
     /// 2433:04C8. A magic weapon or armour (a coin), level 10h; its forced
     /// type is the BX the level routine left. Flagged (+0Eh bit 2) unless
-    /// +0Fh is FFh.
+    /// +0Fh is FFh. Fixed (#43), no type is forced (FFFFh), as the plain
+    /// pile's isn't (041C passes FFh): the BX is the level routine's
+    /// scratch (its roll's span, or the doubled kind of place), and
+    /// forcing it also raises the level to 14h.
     fn pile_magic(&mut self) -> Option<()> {
         let (_, bx) = self.pile_level()?;
+        let bx = if self.fixed(crate::fixes::PILE_QUIRKS) { 0xFFFF } else { bx };
         self.mem.w8(DS, ITEM_LEVEL, 0x10);
         self.mem.w8(DS, NAME, 0xFF);
         self.mem.w16(DS, GOLD, 0xFFFF);

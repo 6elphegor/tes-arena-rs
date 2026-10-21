@@ -194,3 +194,159 @@ fn matches_original() {
         assert!(stuck < 400, "{stuck} stuck");
     }
 }
+
+/// A machine with EMS off (the piles' table at FRAME:A000), no piles,
+/// level 2, climate `climate`, inside a town's building of kind 0 (5E6
+/// 4, D48 0: kind of place 0) unless `wild` (the wild's level flag: 5),
+/// one round for the clicked square (MAKING 0), the dice seeded `seed`.
+fn pile_machine(img: &arena::exe::Image, fixes: arena::fixes::Fixes, seed: u32, climate: u8, wild: bool) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w16(DS, 0xD806, WSEG);
+    m.mem.w16(DS, 0x9030, FRAME);
+    m.mem.w8(DS, 0x8FA6, 0);
+    m.mem.w8(DS, 0x4C91, 0);
+    m.mem.w8(DS, 0x0FF2, 0);
+    m.mem.w8(DS, 0x05E6, 4);
+    m.mem.w8(DS, 0x0D48, 0);
+    m.mem.w16(DS, 0xC39A, if wild { 0x200 } else { 0 });
+    m.mem.w16(DS, 0xC398, if wild { 4 } else { 0 });
+    m.mem.w8(DS, 0xBB0A, 2);
+    m.mem.w8(DS, 0x0A47, climate);
+    m.mem.w16(DS, 0x12C0, 0x0810);
+    put(&mut m, 0x91F6, &seed.to_le_bytes());
+    m.load_rng();
+    m
+}
+
+/// The piles in the table: (kind of place, gold, the item's type).
+fn piles_made(m: &Machine) -> Vec<(u8, u16, u8)> {
+    (0..m.mem.r8(DS, 0x0FF2) as u16)
+        .map(|i| {
+            let at = 0xA000 + 0x1C * i;
+            (m.mem.r8(FRAME, at + 1), m.mem.r16(FRAME, at + 5), m.mem.r8(FRAME, at + 9))
+        })
+        .collect()
+}
+
+/// Fixed (kept bug #5): a pile made in the wild (kind of place 5) is
+/// rolled by the outdoors' tables (kind 3's): gold always, the others by
+/// their chances, the pile still of kind 5. The original reads the
+/// tables past their end: gold and items never, and a weapon or magic
+/// pile (1% each) calls into a string (None).
+#[test]
+fn fixed_wild_piles_read_the_outdoors_tables() {
+    use arena::fixes::{Fixes, WILD_PILES};
+    let Some(img) = common::image() else { return };
+    let (mut faulted, mut made) = (0, 0);
+    for seed in 0..600u32 {
+        let seed = seed.wrapping_mul(0x9E37_79B9);
+        let mut m = pile_machine(&img, Fixes::NONE, seed, 0, true);
+        arena::giveup::take();
+        match m.piles() {
+            None => {
+                let why = arena::giveup::take().expect("a give-up").why;
+                assert!(why.contains("string"), "{why}");
+                faulted += 1;
+            }
+            Some(()) => assert!(piles_made(&m).iter().all(|p| p.1 == 0xFFFF), "no gold in the original's wild"),
+        }
+        let mut m = pile_machine(&img, Fixes::only(WILD_PILES), seed, 0, true);
+        if m.piles().is_none() {
+            let why = arena::giveup::take().expect("a give-up").why;
+            assert!(!why.contains("string"), "{why}");
+            continue;
+        }
+        let p = piles_made(&m);
+        assert!(p.iter().all(|p| p.0 == 5), "{p:?}");
+        assert!(p.iter().any(|p| p.1 != 0xFFFF), "outdoors, gold always: {p:?}");
+        made += 1;
+    }
+    assert!(faulted > 0, "no case met the original's fault");
+    assert!(made > 500, "{made} made");
+    // A town's building is as before.
+    for seed in 0..50u32 {
+        let mut a = pile_machine(&img, Fixes::NONE, seed, 0, false);
+        let mut b = pile_machine(&img, Fixes::only(WILD_PILES), seed, 0, false);
+        assert_eq!(a.piles().map(|()| piles_made(&a)), b.piles().map(|()| piles_made(&b)));
+    }
+}
+
+/// Fixed (kept bug #43), the gold pile in climate 2: its amount (2..10)
+/// halved keeps the pile when odd, where the original's `shr` leaves the
+/// low bit in the carry that drops it.
+#[test]
+fn fixed_an_odd_halved_amount_keeps_its_pile() {
+    use arena::fixes::{Fixes, PILE_QUIRKS};
+    let Some(img) = common::image() else { return };
+    let gold_only = |m: &mut Machine| put(m, 0x4D5A, &[100, 0, 0, 0]);
+    let mut dropped = 0;
+    for seed in 0..100u32 {
+        let mut m = pile_machine(&img, Fixes::NONE, seed, 2, false);
+        gold_only(&mut m);
+        m.piles().expect("piles");
+        let faithful = piles_made(&m);
+        let mut m = pile_machine(&img, Fixes::only(PILE_QUIRKS), seed, 2, false);
+        gold_only(&mut m);
+        m.piles().expect("piles");
+        let fixed = piles_made(&m);
+        assert_eq!(fixed.len(), 1, "{fixed:?}");
+        assert!((1..=5).contains(&fixed[0].1), "{fixed:?}");
+        if faithful.is_empty() {
+            dropped += 1;
+        } else {
+            assert_eq!(faithful, fixed);
+        }
+    }
+    assert!(dropped > 20, "{dropped} dropped by the original");
+}
+
+/// Fixed (kept bug #43), the magic weapon or armour pile: its type isn't
+/// forced; the original forces the level routine's BX (kind of place 0's
+/// routine 03D5 leaves 5, the span of its roll), so every one is type 5.
+#[test]
+fn fixed_magic_piles_types_are_not_forced() {
+    use arena::fixes::{Fixes, PILE_QUIRKS};
+    use std::collections::BTreeSet;
+    let Some(img) = common::image() else { return };
+    let magic_only = |m: &mut Machine| put(m, 0x4D5A, &[0, 0, 0, 100]);
+    let (mut faithful, mut fixed) = (BTreeSet::new(), BTreeSet::new());
+    for seed in 0..100u32 {
+        for (fixes, types) in [(Fixes::NONE, &mut faithful), (Fixes::only(PILE_QUIRKS), &mut fixed)] {
+            let mut m = pile_machine(&img, fixes, seed, 0, false);
+            magic_only(&mut m);
+            if m.piles().is_some() {
+                types.extend(piles_made(&m).iter().map(|p| p.2));
+            }
+        }
+    }
+    assert_eq!(faithful, BTreeSet::from([5]), "the original's forced type");
+    assert!(fixed.len() > 3, "{fixed:?}");
+}
+
+/// Fixed (kept bug #43), the level's limit of piles (2433:0101) is read
+/// from DGROUP's LIMIT, which 02C3 has just set (half the level's spots),
+/// not through the frame's segment.
+#[test]
+fn fixed_a_full_level_gets_no_more_piles() {
+    use arena::fixes::{Fixes, PILE_QUIRKS};
+    let Some(img) = common::image() else { return };
+    let run = |fixes: Fixes| {
+        let mut m = pile_machine(&img, fixes, 7, 0, false);
+        // Entering a dungeon's level (kind of place 3) with four spots
+        // (a limit of 2) and two of its piles made already; the frame's
+        // byte at the limit's offset 9.
+        m.mem.w8(DS, 0x4C91, 0xFF);
+        m.mem.w8(DS, 0x05E6, 3);
+        m.mem.w8(DS, 0xC765, 4);
+        put(&mut m, 0xC6E5, &[2, 3, 4, 5, 6, 7, 8, 9]);
+        m.mem.w8(DS, 0x0FF2, 2);
+        m.mem.w8(FRAME, 0xA000 + 4, 2);
+        m.mem.w8(FRAME, 0xA000 + 0x1C + 4, 2);
+        m.mem.w8(FRAME, 0x4D76, 9);
+        m.piles().expect("piles");
+        m.mem.r8(DS, 0x0FF2)
+    };
+    assert!(run(Fixes::NONE) > 2, "the original reads 9");
+    assert_eq!(run(Fixes::only(PILE_QUIRKS)), 2, "full at 2");
+}

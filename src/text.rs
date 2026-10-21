@@ -31,7 +31,8 @@
 //! leaves DS pushed, and its RET goes on in 2DA2 at the text's offset)
 //! and the loops where the
 //! original never ends (a key not in the index, a copy over its own
-//! source, codes coming back without end).
+//! source, codes coming back without end). Fixed mode (`crate::fixes`)
+//! names the town's first store for %en in the street (#1).
 
 use crate::bsa::Files;
 use crate::machine::Machine;
@@ -1069,14 +1070,28 @@ impl Machine {
             // returns into the dispatch (0077) with DX 1 and BP FFFD, and
             // the rest of the text is read from FFFD:0001, the BIOS ROM's
             // last bytes on a PC: nothing a port can follow.
+            // Fixed (#1): outside a store the name is the town's first
+            // equipment store's (the list's first entry), worked out as
+            // the store's own is; with no store in the list, nothing. The
+            // street's texts that use it ("work for the owner of %en")
+            // speak of one of the town's stores, and the code DS pushed
+            // there is popped on the store's path only by mistake.
             0x05DC => {
-                if self.t8(0x0D48) != 6 {
-                    return self.original_fault("2DA2:05DC: %en outside an equipment store returns to 2DA2 at the text's offset");
-                }
-                let key = self.t16(0x0FD2);
-                let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
                 let (off, seg) = (self.t16(0x1008), self.t16(0x100A));
-                let si = self.place_lookup(seg, off, key, self.t16(0x138B));
+                let si = if self.t8(0x0D48) != 6 {
+                    if !self.fixed(crate::fixes::EN_OUTSIDE_STORE) {
+                        return self.original_fault("2DA2:05DC: %en outside an equipment store returns to 2DA2 at the text's offset");
+                    }
+                    if self.t16(0x138B) == 0 {
+                        self.mem.w8(c.es, c.di, 0);
+                        return Some(Res::Str(c.es, c.di));
+                    }
+                    off
+                } else {
+                    let key = self.t16(0x0FD2);
+                    let key = (key & 0xFF00) | ((key & 0xFF) >> 1);
+                    self.place_lookup(seg, off, key, self.t16(0x138B))
+                };
                 self.mem.w16(seg, 0x8A52, self.mem.r8(seg, si) as u16);
                 self.mem.w16(seg, 0x8A54, self.mem.r8(seg, si.wrapping_add(1)) as u16);
                 let (dl, dh) = (self.mem.r8(seg, si.wrapping_add(2)), self.mem.r8(seg, si.wrapping_add(3)));
