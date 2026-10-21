@@ -3842,7 +3842,23 @@ impl Soft {
                 self.m.mem.w8(seg, i, b);
             }
         }
-        // A561.
+        // A561. The row tables start as the machine's (CD82, CD7E): DA8E
+        // writes only the rows below the horizon the view has (the
+        // floor's from 2 to C3A2 - C3D8 + 1; the ceiling's the floor's 320h
+        // bytes again with the eye halfway up, DB78), but the ceiling's
+        // topmost row reads the entry after them, which holds what was in
+        // the original's buffer before: after a screen freed the world and
+        // gave it back (A611, A6B5), the words of the ceiling plane freed
+        // where the buffer was made again.
+        for (at, to) in [(0xCD82u16, floor), (0xCD7E, ceiling)] {
+            let (o, sg) = (self.g16(at), self.g16(at + 2));
+            if sg != 0 {
+                for i in 0..0x320u16 {
+                    let b = self.m.mem.r8(sg, o.wrapping_add(i));
+                    self.m.mem.w8(to, i, b);
+                }
+            }
+        }
         self.s16(0xCD86, 0);
         self.s16(0xCD88, lights);
         self.s16(0xCD82, 0);
