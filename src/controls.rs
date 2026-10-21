@@ -454,6 +454,12 @@ impl Machine {
         if hooks.bar_click(self, files)? {
             return Some(());
         }
+        // Otherwise the cursor is in the view's centre (2826:0384..03A3):
+        // 79AA cleared, and 79A9, set while the cursor was on the bar (a
+        // walk by the mouse there before the mouse was captured), cleared
+        // with the arrow cursor taken away.
+        self.mem.w8(DS, 0x79AA, 0);
+        self.mem.w8(DS, 0x79A9, 0);
         // Where the classic controls' centre handler takes a left click
         // (2826:00F6..0128, after the moves): the front end's click, if one
         // is waiting, in this frame's input step as the original's.

@@ -130,6 +130,10 @@ const SEARCH_PROMPT: u16 = 0x6AD1;
 
 pub struct Travel {
     start: MapStart,
+    /// The left button down as the screen began (26F7:0011's read: a
+    /// walk by the mouse held into the way out), not yet let go (`hold`,
+    /// `let_go`).
+    held: bool,
     /// A main quest's dungeon reached: its picture up until its button is
     /// clicked (292B:0362).
     picture: Option<Picture>,
@@ -398,7 +402,12 @@ impl Travel {
         {
             let mut h = Hooks { boxes: &mut boxes, typed: Vec::new(), pick: 0xFFFF, listed: None, failed: false, frames: Vec::new(), quest: None, answer: None, asked: false, menu_page: None, screen: None, journey_page: None, capture: false, reads: None, in_pass: false };
             // 2542:03BF: from here at all (038F), the colour 60h (03CF),
-            // then the button's own refusals (03DC).
+            // then the button's own refusals (03DC). ARENAFNT ([102C],
+            // 0000:9AE6) and the tiles at [1036] (9AF8) selected first on
+            // either path (039E..03A9, 03C7..03D7): a refusal's box is
+            // sized by those tiles.
+            m.select_font(0x102C);
+            m.select_tiles(0x1036);
             if !m.map_from_here(&mut h) {
                 return Err(boxes.pop().unwrap_or_default());
             }
@@ -438,6 +447,7 @@ impl Travel {
             .collect();
         Travel {
             start,
+            held: false,
             picture: None,
             fonts,
             shown: None,
@@ -471,6 +481,40 @@ impl Travel {
             idle_ticks: 0,
             box_page: None,
             answered_over: None,
+        }
+    }
+
+    /// The left button down as the screen begins: the map's read
+    /// (26F7:0011) finds it, and the world map's pass (3159:00F3, AFF9 as
+    /// it is, not a press) takes it as a click begun.
+    pub fn hold(&mut self) {
+        self.held = true;
+    }
+
+    /// Whether the button the screen began with is still down.
+    pub fn held(&self) -> bool {
+        self.held
+    }
+
+    /// The button the screen began with forgotten: let go before the
+    /// map's read.
+    #[cfg(test)]
+    pub fn forget_held(&mut self) {
+        self.held = false;
+    }
+
+    /// The button the screen began with let go at (x, y): on the world
+    /// map, a pass with it down over a region waits for its release
+    /// (3159:0432, the region found again at each read, 019A) and then
+    /// runs the region's handler, as a click there (a province's map
+    /// opened, or the Exit); over none, nothing.
+    pub fn let_go(&mut self, engine: &mut Engine, archive: &crate::archive::Archive, x: i32, y: i32) {
+        if !std::mem::take(&mut self.held) || self.shown.is_some() || self.asking.is_some() || self.done.is_some() {
+            return;
+        }
+        let (cx, cy) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
+        if engine.m.clone().travel_world_region(cx, cy).is_some() {
+            self.click(engine, archive, x, y, false);
         }
     }
 
@@ -697,8 +741,8 @@ impl Travel {
                 Some(live) => {
                     let (cx, cy) = (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16);
                     let b = if right { 2 } else { 1 };
-                    self.list_reads.push(arena::listwindow::ListRead { buttons: b, x: cx, y: cy, keys: 0, codes: [0; 2] });
-                    self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; 2] });
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: b, x: cx, y: cy, keys: 0, codes: [0; arena::listwindow::CODES] });
+                    self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; arena::listwindow::CODES] });
                     let (mark, top, end) = live.live(&self.list_reads);
                     menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };
                     menu.top = Some(top as usize);
@@ -1082,8 +1126,8 @@ impl Travel {
                     _ => return,
                 };
                 let (cx, cy) = (at.0.clamp(0, 319) as u16, at.1.clamp(0, 199) as u16);
-                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: bit, codes: [0; 2] });
-                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; 2] });
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: bit, codes: [0; arena::listwindow::CODES] });
+                self.list_reads.push(arena::listwindow::ListRead { buttons: 0, x: cx, y: cy, keys: 0, codes: [0; arena::listwindow::CODES] });
                 let Some(live) = self.list_live.as_ref() else { return };
                 let (mark, top, end) = live.live(&self.list_reads);
                 menu.selected = if mark == 0xFFFF { usize::MAX } else { mark as usize };

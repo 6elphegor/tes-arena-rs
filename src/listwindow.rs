@@ -36,17 +36,22 @@ use crate::mem::DS;
 /// One read of the mouse by the list's loop (0000:8FC4): its buttons
 /// (AFF9: bit 0 left, 1 right), the cursor's place (8F92, 8F94), the
 /// list's keys held then (`list_keys`), and the bytes the keyboard gave
-/// the key interrupt (0000:718A) since the read before (a make code, a
-/// break code; 0 none), as the front end saw them: the loop reads none
-/// of their characters, which stay in the ring.
+/// the key interrupt (0000:718A) since the read before (make and break
+/// codes, CODES of them at most; 0 none), as the front end saw them: the
+/// loop reads none of their characters, which stay in the ring.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ListRead {
     pub buttons: u8,
     pub x: u16,
     pub y: u16,
     pub keys: u8,
-    pub codes: [u8; 2],
+    pub codes: [u8; CODES],
 }
+
+/// The keyboard's bytes a `ListRead` holds at most: keys typed that are
+/// none of the list's (their characters in the ring all the same) come
+/// with the next read a list's key or a click makes.
+pub const CODES: usize = 8;
 
 /// A list's loop as it starts (`Machine::list_capture`): a copy of the
 /// game there and its record, for a front end to show what the loop makes

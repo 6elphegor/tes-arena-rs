@@ -334,6 +334,7 @@ KEY_C = 0x2E
 KEY_R = 0x13
 KEY_2 = 0x03
 KEY_ENTER = 0x1C
+KEY_P = 0x19
 # The left Shift (C with it: the last spell again, 2542:057D).
 KEY_LSHIFT = 0x2A
 
@@ -1734,7 +1735,8 @@ MOUSE_POINTS = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (
 
 # Seeded random sessions (`fuzz_script`): name: (where, seed). Each
 # writes its script (`fuzz` line) for worldtest to play the same.
-# A third field 2 draws from the wider vocabulary (`fuzz_script2`).
+# A third field 2 draws from the wider vocabulary (`fuzz_script2`), 3
+# from `fuzz_script3`'s, 4 from `fuzz_script4`'s.
 FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1),
         'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2),
         'fuzztown3': ('street', 3, 2), 'fuzzdungeon3': ('dungeon', 4, 2), 'fuzzwild3': ('wild', 3, 2),
@@ -1742,7 +1744,10 @@ FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1':
         'fuzzfight1': ('fight', 1, 2), 'fuzzfight2': ('fight', 2, 2), 'fuzzcrypt1': ('crypt', 1, 2),
         'fuzzcrypt2': ('crypt', 2, 2), 'fuzzpeople1': ('people', 1, 2), 'fuzzpeople2': ('people', 2, 2),
         'fuzzspell1': ('caster', 1, 3), 'fuzzspell2': ('caster', 2, 3), 'fuzzcamp1': ('wildday', 1, 3),
-        'fuzzcamp2': ('wildnight', 1, 3), 'fuzzlevel1': ('levelup', 1, 3), 'fuzzfog1': ('fogged', 1, 3)}
+        'fuzzcamp2': ('wildnight', 1, 3), 'fuzzlevel1': ('levelup', 1, 3), 'fuzzfog1': ('fogged', 1, 3),
+        'fuzzstore1': ('shop', 7, 4), 'fuzzstore2': ('shop', 4, 4), 'fuzztavern1': ('inn', 3, 4),
+        'fuzztemple1': ('shrine', 4, 4), 'fuzzguild1': ('mages', 3, 4), 'fuzzguild2': ('mages', 5, 4),
+        'fuzznight1': ('nighttown', 2, 4), 'fuzzday1': ('daytown', 1, 4), 'fuzzday2': ('daytown', 2, 4)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
 
@@ -1763,6 +1768,8 @@ def fuzz_script(where, seed, vocab=1, total=1500):
         return fuzz_script2(where, seed, total)
     if vocab == 3:
         return fuzz_script3(where, seed, total)
+    if vocab == 4:
+        return fuzz_script4(where, seed, total)
     rng = random.Random(f'{where}:{seed}')
     out, n, ready = [], 0, False
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
@@ -1939,6 +1946,131 @@ def fuzz_script3(where, seed, total):
     return out
 
 
+# The keys `fuzz_acts` presses on a screen: Enter, Y, N (the equipment
+# page from the sheet too), 1..3 and 0 (a price typed), Space, B, S, R.
+ACT_KEYS = (KEY_ENTER, KEY_Y, KEY_N, 0x02, 0x03, 0x04, 0x0B, KEY_SPACE, 0x30, KEY_S, KEY_R)
+# Where the game's screens have something to click (`fuzz_acts`): the
+# menus' entries (a box 18h high from 3Eh, 1194:F48E's and the others'),
+# the lists' lines (from 26h), a haggle's Accept and ...More, a box's
+# middle, the talk's "Where is" and its list's lines, the sheet's
+# equipment button, the equipment page's list, Drop and Spells.
+ACT_POINTS = ([(0xA0, y) for y in range(0x43, 0xA4, 0x0C)] + [(0x70, 0x26 + 8 * k) for k in range(7)]
+              + [ACCEPT[1:], MORE[1:], (0xA0, 0x60), (0xA0, 0x65), (100, 23), (100, 50), (100, 95),
+                 (0x80, 0xB8), (0x40, 0x36), (0x40, 0x46), (0x40, 0x56), (0x90, 0xC2), (0x4F, 0xC2)])
+# The places where `fuzz_script4`'s `gN` opens the travel map (outdoors).
+TRAVELLED4 = ('nighttown', 'daytown')
+# A point in each province's region of the world map (DATA:6D90).
+PROVINCE_POINTS = [(70, 45), (80, 90), (150, 50), (240, 70), (60, 155), (130, 140), (165, 145), (235, 150), (165, 110)]
+# The province map's Travel button (26F7:07CD, MAPBTNS' second).
+TRAVEL_BUTTON = (62, 180)
+# `fuzz_script4`'s places indoors: shorter walks, more clicks, so the
+# player stays near the keeper.
+INDOORS4 = ('shop', 'inn', 'shrine', 'mages')
+
+
+def fuzz_acts(rng, travel=False):
+    """What a screen a `fuzz_script4` token opens is given, 2..12 of
+    them: a click (`X.Y`) at one of ACT_POINTS or anywhere on the page,
+    or a key of ACT_KEYS (`kHH`, its scan code); then Esc for whatever is
+    left up (`fuzz_steps`). For the travel map (`travel`): a province's
+    region, places on its map, and Travel one time in two."""
+    acts = []
+    if travel:
+        acts.append('%d.%d' % rng.choice(PROVINCE_POINTS))
+        for _ in range(rng.randint(1, 3)):
+            acts.append(f'{rng.randint(20, 300)}.{rng.randint(20, 160)}')
+        if rng.random() < 0.5:
+            acts.append('%d.%d' % TRAVEL_BUTTON)
+        return acts
+    for _ in range(rng.randint(2, 12)):
+        r = rng.random()
+        if r < 0.45:
+            acts.append('%d.%d' % rng.choice(ACT_POINTS))
+        elif r < 0.7:
+            acts.append(f'{rng.randint(0, 319)}.{rng.randint(0, 199)}')
+        else:
+            acts.append(f'k{rng.choice(ACT_KEYS):x}')
+    return acts
+
+
+def fuzz_script4(where, seed, total):
+    """`fuzz_script3`'s walking and fighting with screens given random
+    inputs (`fuzz_acts`): `kN,A..` the view's middle clicked as `cN`
+    clicks it, whatever it opens (a keeper's services, a townsperson's
+    talk, a door's lock, a corpse's or a chest's loot) given the acts
+    A..; `eN,A..` the character sheet (F1) and its equipment page given
+    them; `gN,A..` outdoors the travel map (Shift+M) given them, a
+    journey made by its Travel and on into the place reached; `pN` P
+    (picking pockets and locks armed) a frame, let go, N frames. An area
+    left on the way (a door clicked, a journey) is gone on from, the
+    step's frames counted on there (`fuzz_steps`' `goes_on`)."""
+    rng = random.Random(f'v4:{where}:{seed}')
+    out, n, ready = [], 0, False
+    moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
+             ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60),
+             ((KEY_LCTRL, KEY_LEFT), 2, 40), ((KEY_LCTRL, KEY_RIGHT), 2, 40)]
+    if where in INDOORS4:
+        moves = [(keys, lo, min(hi, 12)) for keys, lo, hi in moves]
+    while n < total:
+        r = rng.random()
+        if r < 0.30:
+            keys, lo, hi = rng.choice(moves)
+            k, m = rng.randint(lo, hi), rng.randint(1, 10)
+            out.append('h' + '+'.join(f'{c:x}' for c in keys) + f',{k},{m}')
+            n += k + m
+        elif r < 0.40:
+            while True:
+                x, y = rng.randint(0, 319), rng.randint(0, 146)
+                if not (0x57 <= x <= 0xEA and 0x29 <= y <= 0x73):
+                    break
+            k, m = rng.randint(3, 40), rng.randint(1, 15)
+            out.append(f'm{x},{y},{k},{m}')
+            n += k + m
+        elif r < 0.45:
+            k = rng.randint(1, 60)
+            out.append(f'w{k}')
+            n += k
+        elif r < 0.47:
+            k = rng.randint(5, 30)
+            out.append(f't{k}')
+            n += k
+        elif r < 0.49:
+            k = rng.randint(20, 60)
+            out.append(f'q{k}')
+            n += 1 + k
+        elif r < 0.53:
+            k = rng.randint(10, 30)
+            out.append(f'a{k}')
+            ready = not ready
+            n += 1 + k
+        elif r < 0.57 and ready:
+            k, m = rng.randint(5, 40), rng.randint(2, 10)
+            out.append(f's{k},{m}')
+            n += k + m
+        elif r < 0.77:
+            k = rng.randint(5, 30)
+            out.append(f'k{k},' + ','.join(fuzz_acts(rng)))
+            n += k
+        elif r < 0.84:
+            k = rng.randint(5, 30)
+            out.append(f'e{k},' + ','.join(fuzz_acts(rng)))
+            n += 1 + k
+        elif r < 0.87:
+            k = rng.randint(5, 30)
+            out.append(f'p{k}')
+            n += 1 + k
+        elif r < 0.92 and where in TRAVELLED4:
+            k = rng.randint(5, 30)
+            out.append(f'g{k},' + ','.join(fuzz_acts(rng, travel=True)))
+            n += 1 + k
+    return out
+
+
+def acts_script(acts):
+    """`fuzz_acts`' tokens as a step's script."""
+    return [('keys', [int(t[1:], 16)]) if t[0] == 'k' else ('click', *(int(v) for v in t.split('.'))) for t in acts]
+
+
 # The bar's list's down arrow (the record at 5AF4's +8: x CFh, y BDh, 0Ah
 # by 8), at its centre.
 LIST_DOWN = (0xD4, 0xC1)
@@ -1946,13 +2078,15 @@ LIST_DOWN = (0xD4, 0xC1)
 KEY_DIGITS = {d: 0x01 + d for d in range(1, 10)}
 
 
-def fuzz_steps(tokens, spare=False):
+def fuzz_steps(tokens, spare=False, goes_on=False):
     """`fuzz_script`'s tokens as a case's steps; with `spare`, each step
     but a screen's key gives its frames BOX_SPARE: a box or question that
     comes up on the way (the way out walked onto) left with Esc; and a
     swing with the view's mouse let go (by a held button or a screen;
     worldtest captures it again) has the mouse back at the view's centre
-    first, where the view's controls take a captured mouse to be."""
+    first, where the view's controls take a captured mouse to be. With
+    `goes_on` (`fuzz_script4`'s), an area left in a step's frames is gone
+    on from (`play`'s `goes_on`)."""
     steps = []
     captured = True
     for t in tokens:
@@ -1992,6 +2126,17 @@ def fuzz_steps(tokens, spare=False):
             camp = [('keys', [KEY_C]), ('keys', [KEY_DIGITS[h]]), ('keys', [KEY_ENTER])]
             steps += [((KEY_R,), (), 1, None, [], {'script': camp + BOX_SPARE}), ((), (KEY_R,), m, None)]
             captured = False
+        elif kind == 'k':
+            # (The click's screen given the acts, then Esc; a click among
+            # them leaves the mouse at the view's centre after the step.)
+            steps.append(((), (), int(args[0]), None, [(160, 70)], {'script': acts_script(args[1:]) + BOX_SPARE}))
+            captured = False
+        elif kind in 'eg':
+            keys = (KEY_F1,) if kind == 'e' else (KEY_LSHIFT, KEY_M)
+            steps += [(keys, (), 1, None, [], {'script': acts_script(args[1:]) + BOX_SPARE}), ((), keys[::-1], int(args[0]), None)]
+            captured = False
+        elif kind == 'p':
+            steps += [((KEY_P,), (), 1, None), ((), (KEY_P,), int(args[0]), None)]
         if kind == 'o':
             steps += [((KEY_M,), (), 1, None, [], {'script': [('click', 0x100, 0xB0)], 'waits': {AUTOMAP_READ}}),
                       ((), (KEY_M,), int(args[0]), None)]
@@ -2004,6 +2149,8 @@ def fuzz_steps(tokens, spare=False):
     if spare:
         steps = [s if len(s) > 5 and 'script' in s[5] else
                  (*s[:4], s[4] if len(s) > 4 else [], dict(s[5] if len(s) > 5 else {}, spare=BOX_SPARE)) for s in steps]
+    if goes_on:
+        steps = [(*s[:4], s[4] if len(s) > 4 else [], dict(s[5] if len(s) > 5 else {}, goes_on=True)) for s in steps]
     return steps
 
 
@@ -2028,7 +2175,9 @@ def fuzz_case(name):
             # (`fuzz_script3`'s use list: a potion of healing in it.)
             a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
             let_go_at_map(a)
-    return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
+        if FUZZ[name][2:] == (4,):
+            let_go_in_map(a)
+    return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2, goes_on=FUZZ[name][2:] == (4,))
 
 
 def let_go_at_map(a):
@@ -2046,6 +2195,90 @@ def let_go_at_map(a):
                 a.buttons = 0
         at = a.lin(LOAD_SEG + 0x26F7, 0x0000)
         a.let_go_hook = a.mu.hook_add(UC_HOOK_CODE, let_go, None, at, at)
+
+
+def let_go_in_map(a):
+    """`fuzz_script4`'s seeds' release: a walk by the mouse held into the
+    way out comes to its travel map (26F7:0000) with the left button
+    down, as its first read (0011) finds it, which the world map's pass
+    takes as pressed (3159:00F3 asks AFF9 as it is): over a region (a
+    province, the Exit) it waits for the release (0432, the region found
+    again at each read) before the region's handler. There the player
+    lets go (`letting_go4`; the view's `Travel::let_go`). Over none the
+    button stays down, and the map's Esc ends it."""
+    a.in_map = False
+    if not hasattr(a, 'in_map_hooks'):
+        def begun(*_):
+            a.in_map = True
+
+        def ended(*_):
+            a.in_map = False
+
+        def let_go(*_):
+            if a.in_map and a.letting_go4 and a.buttons & 1 and not a.clicks:
+                a.buttons = 0
+        a.in_map_hooks = [a.mu.hook_add(UC_HOOK_CODE, f, None, at, at) for f, at in
+                          ((begun, a.lin(LOAD_SEG + 0x26F7, 0x0000)), (ended, a.lin(LOAD_SEG + 0x26F7, 0x00AE)),
+                           (let_go, a.lin(LOAD_SEG + 0x3159, 0x0432)))]
+    a.letting_go4 = True
+
+
+class SpareEsc(list):
+    """`fuzz_script4`'s steps' script: Esc (BOX_SPARE's, an act's left)
+    as the screen asking takes a way out, and an act's Enter on a list
+    held. The travel map's loop (its
+    mouse read, 3159:00B4) with a province's map up (B7E4 1, 26F7:01FF):
+    its Exit clicked (80, 180), Esc being none of that window's keys
+    (3159:0171 finds no region by it). A list's loop (06EB) asks the keys
+    held, not typed (0834): Esc held where its record lets Esc leave
+    (+20h bit 4000h, 0966), and let go at the wait for its release that
+    follows (0975); else Enter held, the line marked picked (its release
+    the list's own wait, 0932: `run_screen`'s). A shop dialog's page
+    waiting on the buttons alone (1194:4EF7): its "...More" clicked, its
+    last (4F3F) at the centre; its
+    picture's buttons (6001, clicks alone): the second, No; a spell's
+    page from the equipment page (5234, clicks alone) and the guild's
+    spellmaker (5651): their Exit; a field
+    typed in (0000:A172, Esc only with A902 bit 1000h): Enter, a 1 first
+    while it is empty; the strip's message (4D51, clicks alone): a click.
+    Otherwise Esc typed."""
+    def __init__(self, a, acts):
+        super().__init__(acts)
+        self.a = a
+
+    def pop(self, i=-1):
+        a = self.a
+        act = super().pop(i)
+        if i != 0 or act not in (('keys', [KEY_ESC]), ('keys', [KEY_ENTER])):
+            return act
+        ss, sp = a.mu.reg_read(x86.UC_X86_REG_SS), a.mu.reg_read(x86.UC_X86_REG_SP)
+        caller = (a.r16(sp + 2, seg=ss) - LOAD_SEG, a.r16(sp, seg=ss))
+        if act == ('keys', [KEY_ENTER]):
+            # (An act's Enter on a list held as a player holds it, for the
+            # loop's pass to find it down, its release the list's own wait,
+            # 0932; typed and let go between two reads it would never see
+            # it.)
+            return ('hold', [KEY_ENTER]) if caller == (0x3159, 0x06F0) else act
+        if caller == (0x3159, 0x00B9) and getattr(a, 'in_map', False) and a.mu.mem_read(a.lin(a.ds, 0xB7E4), 1)[0] == 1:
+            return ('click', 80, 180)
+        if caller == (0x3159, 0x06F0):
+            rec, seg = a.r16(0xB80A), a.r16(0xB80C)
+            return ('hold', [KEY_ESC]) if a.r16(rec + 0x20, seg=seg) & 0x4000 else ('hold', [KEY_ENTER])
+        if caller == (0x3159, 0x097A) and a.mu.mem_read(a.lin(a.ds, 0xACB5 + KEY_ESC), 1)[0]:
+            return ('up', [KEY_ESC])
+        if caller == (0x1194, 0x4EFC):
+            return ('click', 0x11D, 0xA9)
+        if caller == (0x1194, 0x6016):
+            return ('click', 0x9F, 0x85)
+        if caller in ((0x1194, 0x523E), (0x1194, 0x5656)):
+            return ('click', 0x128, 0xC0)
+        if caller == (0, 0xA177):
+            # (A field that takes no Enter while empty, a number's: a
+            # digit typed first.)
+            return ('keys', [KEY_ENTER] if a.r16(0xA840) else [0x02])
+        if caller in ((0x1194, 0x4D56), (0x1194, 0x4F44)):
+            return ('click', 160, 100)
+        return act
 
 
 def booked(*spells):
@@ -2097,9 +2330,20 @@ def level_fight(a):
 # `caster` a creature casting at the player (`caster`), `levelup` a fight
 # with a level due (`level_fight`), the wilderness at noon (`wildday`) and
 # at ten at night (`wildnight`: the camp's rest broken by encounters).
+# `fuzz_script4`'s: inside the town's first store (`shop`), tavern
+# (`inn`), temple (`shrine`, the player hurt) and the mages' guild
+# (`mages`), two squares before the keeper and facing him, so the first
+# clicks find him; the street with its people (`people`) at ten at night
+# (`nighttown`: the stores closed, the houses locked) and at noon
+# (`daytown`).
 FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4, 52, 0x80)),
            'caster': ('dungeon', caster), 'levelup': ('dungeon', level_fight),
-           'wildday': ('wild', at_hour(12, 0x100)), 'wildnight': ('wild', at_hour(22, 0x100))}
+           'wildday': ('wild', at_hour(12, 0x100)), 'wildnight': ('wild', at_hour(22, 0x100)),
+           'shop': ('store', lambda a: (shopping(a), at_square(15, 11, 0x100)(a))),
+           'inn': ('tavern', lambda a: (gs.seeded(a), at_square(7, 12, 0x100)(a))),
+           'shrine': ('temple', lambda a: (temple_hurt(a), at_square(10, 11, 0x100)(a))),
+           'mages': ('guild', lambda a: (guild_shopping(a), at_square(7, 12, 0x80)(a))),
+           'nighttown': ('people', at_hour(22, 0x100)), 'daytown': ('people', at_hour(12, 0x100))}
 # FUZZ's places where `cN` clicks the view's middle (no door out at hand,
 # or the way out's question left with Esc).
 CLICKED = ('dungeon', 'fight', 'crypt')
@@ -2110,7 +2354,9 @@ CLICKED = ('dungeon', 'fight', 'crypt')
 CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2',
                     'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4',
                     'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2',
-                    'fuzzspell1', 'fuzzspell2', 'fuzzcamp1', 'fuzzcamp2', 'fuzzlevel1', 'fuzzfog1')
+                    'fuzzspell1', 'fuzzspell2', 'fuzzcamp1', 'fuzzcamp2', 'fuzzlevel1', 'fuzzfog1',
+                    'fuzzstore1', 'fuzzstore2', 'fuzztavern1', 'fuzztemple1', 'fuzzguild1', 'fuzzguild2',
+                    'fuzznight1', 'fuzzday1', 'fuzzday2')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -2255,6 +2501,15 @@ CASES = {
     'fuzzcamp2': fuzz_case('fuzzcamp2'),
     'fuzzlevel1': fuzz_case('fuzzlevel1'),
     'fuzzfog1': fuzz_case('fuzzfog1'),
+    'fuzzstore1': fuzz_case('fuzzstore1'),
+    'fuzzstore2': fuzz_case('fuzzstore2'),
+    'fuzztavern1': fuzz_case('fuzztavern1'),
+    'fuzztemple1': fuzz_case('fuzztemple1'),
+    'fuzzguild1': fuzz_case('fuzzguild1'),
+    'fuzzguild2': fuzz_case('fuzzguild2'),
+    'fuzznight1': fuzz_case('fuzznight1'),
+    'fuzzday1': fuzz_case('fuzzday1'),
+    'fuzzday2': fuzz_case('fuzzday2'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -2629,6 +2884,15 @@ CASES = {
     # (26F7:0000, 1A81 set), Esc on it stays, the world given back (A5D1,
     # A6B5) and the frame runs on to its end (`exit_asked`).
     'playexitmapend': ('dungeon', exit_stairs, [((UP,), (), 30, exit_asked, [], {'script': [('keys', [KEY_ESC])], 'ends': True})]),
+    # The same stairs walked into by the mouse, the left button held with
+    # the cursor at (150, 35) (the view's top region: forward), so the way
+    # out's travel map begins with it down: the world map's pass takes it
+    # as pressed over Skyrim, waits for its release (3159:0432), where the
+    # player lets go (`let_go_in_map`), and opens Skyrim's map; its Exit
+    # clicked, the world map left by Esc; six frames after.
+    'playmapheld': ('dungeon', lambda a: (exit_stairs(a), let_go_in_map(a)),
+                    [((), (), 30, exit_asked, [], {'buttons': 1, 'do': mouse_at(150, 35), 'script': [('click', 80, 180), ('keys', [KEY_ESC])]}),
+                     ((), (), 6, None, [], {'buttons': 0})]),
     # The status box (S, 2542:037C -> 04B1) inside its frame, a click
     # closing it (0530..0569: the buttons let go, then a click or Esc
     # held), the rest of the frame after it.
@@ -3156,6 +3420,7 @@ def run_case(a, at, name, setup, steps, tracks):
     # its own case's.)
     a.levelling = None
     a.letting_go = False
+    a.letting_go4 = False
     if setup:
         setup(a)
     # The state the frames start from (for the state comparison's
@@ -3209,6 +3474,8 @@ def play(a, name, steps, tracks):
         if 'spare' in opts:
             a.waits = {MOUSE_READ}
             a.script = list(opts['spare'])
+        if opts.get('goes_on'):
+            a.script = SpareEsc(a, a.script)
         drag[0] = opts.get('drag')
         a.motion = (0, 0)
         # (`do`: something the player does between frames, before the
@@ -3240,7 +3507,16 @@ def play(a, name, steps, tracks):
         whooks = [a.mu.hook_add(UC_HOOK_CODE, f, None, a.lin(LOAD_SEG, o), a.lin(LOAD_SEG, o))
                   for f, o in ((frame_top, 0xA2AC), (frame_wait, 0xA428))]
         try:
-            why, _ = a.world_frames(n, until=until, each=each)
+            why, done = a.world_frames(n, until=until, each=each)
+            # (`goes_on`: an area left in the step's frames, a door or a
+            # journey, the outer loop on into the next (its boxes on the
+            # way in the step's script's or spare's) and the step's frames
+            # counted on there, the frame that left the first's.)
+            while why == ('ended',) and opts.get('goes_on'):
+                why = a.area_next()
+                assert why == ('world',), f'{name}: the next area stopped by {why}'
+                n -= done
+                why, done = a.world_frames(n, until=until, each=each)
         finally:
             for h in vhooks + whooks:
                 a.mu.hook_del(h)

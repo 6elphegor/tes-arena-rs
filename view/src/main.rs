@@ -1122,6 +1122,9 @@ struct Assets {
     /// lights and the sky's objects. Redraws between frames reuse it, so
     /// the sky's hook (lightning) steps once a frame, as in the original.
     frame_view: Option<(render::Sky, render::Lights, Vec<world::Vertex>)>,
+    /// The colours as the turn found them (`dac_menu`), for the screens
+    /// its frame body opens.
+    menu_dac: Option<[[u8; 4]; 256]>,
     /// The moons' phases' frames (0000:E6CB), kept until the day changes.
     moons: [usize; 2],
     palette: [[u8; 4]; 256],
@@ -1297,6 +1300,24 @@ impl Assets {
         Self::dac_with(self.palette, Some(&sky))
     }
 
+    /// The colours a screen the frame body opens finds (its menu keys
+    /// and the bar's buttons, 2542:0100, come before the frame's light,
+    /// 0000:0390 at 4B84): the last frame's (`dac`), or before the area's
+    /// first, the sky's window and 71h as the entry's light left them.
+    fn dac_menu(&mut self, m: &arena::machine::Machine) -> [[u8; 4]; 256] {
+        if self.frame_view.is_some() {
+            return self.dac();
+        }
+        let sky = self.sky(&mut m.clone());
+        Self::dac_with(self.palette, Some(&sky))
+    }
+
+    /// The colours a screen opened now reads (6E3C): as the turn found
+    /// them (`dac_menu`), else as shown.
+    fn screen_dac(&self) -> [[u8; 4]; 256] {
+        self.menu_dac.unwrap_or_else(|| self.dac())
+    }
+
     /// Also enters the area's sky (0000:464A: its objects made).
     fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
         prof::time("assets.new", || Self::make(dir, engine))
@@ -1362,6 +1383,7 @@ impl Assets {
             light,
             flash: std::cell::Cell::new(None),
             frame_view: None,
+            menu_dac: None,
             moons: [0, 0],
             shown: vec![0; 64000],
         }
@@ -2127,6 +2149,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     }
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
+    assets.menu_dac = Some(assets.dac_menu(&engine.m));
     let dac = assets.dac_turn(&mut engine.m).map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac), interface: Some(&mut assets.interface) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
@@ -3817,7 +3840,13 @@ impl App {
                 // The travel map from the game as the way out showed it.
                 self.engine.m.clone_from(&w.0 .0);
                 self.engine.files.clone_from(&w.0 .1);
-                forced = Some(travel::Travel::forced(&mut self.engine, &self.assets.archive));
+                let mut t = travel::Travel::forced(&mut self.engine, &self.assets.archive);
+                // (A walk by the mouse held into it: the button down as
+                // the map reads it, `Travel::hold`.)
+                if self.walk_mouse.is_some_and(|w| w.2) {
+                    t.hold();
+                }
+                forced = Some(t);
             }
             // The spellmaker's screen with its colours set (1194:6064,
             // 0000:57DD); the travel map as 26F7:0000 opens it, the screen
@@ -4283,7 +4312,7 @@ impl App {
     /// The map button (Shift+M, its right click): the travel map, or the
     /// box refusing it.
     fn open_travel(&mut self) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         match travel::Travel::open(&mut self.engine, &self.assets.archive, Some(&dac)) {
             Ok(t) => {
                 // 26F7:0000: the screen faded out in 8 steps, the map's
@@ -4498,7 +4527,12 @@ impl App {
                         KeyCode::Space => Some(b' '),
                         KeyCode::KeyD => Some(b'd'),
                         KeyCode::KeyS => Some(b's'),
-                        _ => text.and_then(|t| t.bytes().next()).filter(u8::is_ascii),
+                        _ => text.and_then(|t| t.bytes().next()).filter(u8::is_ascii).or_else(|| {
+                            // (Any other character the key interrupt typed,
+                            // Enter's among them: read, 5E13, and no record's.)
+                            use arena::lineedit::var::{COUNT, READ};
+                            (m.mem.r16(arena::mem::DS, COUNT) != 0).then(|| m.mem.r8(arena::mem::DS, m.mem.r16(arena::mem::DS, READ)))
+                        }),
                     };
                 }
             }
@@ -4546,7 +4580,14 @@ impl App {
                 KeyCode::KeyN => page = true,
                 KeyCode::Escape => self.sheet_end(Some(0x1B)),
                 KeyCode::KeyK => self.sheet_end(None),
-                _ => {}
+                // A key whose character no record takes: read (5E13) and
+                // the loop round to its next wait (5D12), whose 5DE2 forgets
+                // the ring; one that types nothing isn't read (5E1A).
+                _ => {
+                    if m.mem.r16(arena::mem::DS, arena::lineedit::var::COUNT) != 0 {
+                        m.key_flush();
+                    }
+                }
             },
             // 27E3:01FC reads no keys but Esc down (ACB6, which the key
             // interrupt has set already).
@@ -4967,7 +5008,9 @@ impl App {
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
                 Some(sheets::SheetClick::Equipment) => self.equipment_page(None),
                 Some(sheets::SheetClick::Done) => self.sheet_end(None),
-                None => {}
+                // No record under it: the loop round to its next wait,
+                // whose 5DE2 forgets the ring.
+                None => self.engine.m.key_flush(),
             },
             Some(panels::Panel::Log(_)) => log_poll = true,
             None => {}
@@ -5006,6 +5049,20 @@ impl App {
             PageInput::Key(k) => Some(k),
             PageInput::Click(..) => None,
         };
+        // The loop's read of the mouse (5DF1, 8FC4): where the cursor is,
+        // the click's place, within its limits (the list's Space takes
+        // the line under it, 1AC6's 8F94).
+        let (x, y) = match input {
+            PageInput::Click(x, y) => (x, y),
+            PageInput::Key(_) => {
+                let (x, y) = self.screen_point();
+                (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16)
+            }
+        };
+        let m = &mut self.engine.m;
+        let buttons = m.mem.r8(arena::mem::DS, arena::controls::var::BUTTONS);
+        m.set_mouse(x, y, buttons);
+        m.mouse_clamp();
         match self.engine.m.sheet_equipment_record(input) {
             Some(0) => {
                 let mut shown: Option<(Vec<(String, u8)>, u16)> = None;
@@ -5121,7 +5178,7 @@ impl App {
                 // centre while the window holds it).
                 let at = if self.captured { (160, 100) } else { self.screen_point() };
                 self.fade_open(12, 12, move |a| {
-                    automap::open(&mut a.engine, a.assets.dac(), at);
+                    automap::open(&mut a.engine, a.assets.screen_dac(), at);
                     a.map = true;
                 })
             }
@@ -5314,7 +5371,7 @@ impl App {
     /// to its buttons' loop: `Machine::sheet_open`), the colours read as
     /// shown.
     fn sheet_begin(&mut self) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         let e = &mut self.engine;
         self.sheet_run = e.m.sheet_open(&mut e.files, Some(&dac));
         if self.sheet_run.is_none() {
@@ -5326,7 +5383,7 @@ impl App {
     /// to its loop: `Machine::log_open`), the colours read as shown;
     /// `from_bar` by the bar's scroll button.
     fn log_begin(&mut self, from_bar: bool) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         let e = &mut self.engine;
         self.log_run = e.m.log_open(&mut e.files, Some(&dac), 0, from_bar);
         if self.log_run.is_none() {
@@ -5438,6 +5495,12 @@ impl App {
             // gave the key a character, any but the arrows, the Shifts
             // and their like); the status box's loop (2542:0530..0569)
             // only on Esc.
+            // A shop dialog's pages and the strip's message wait on the
+            // mouse's buttons alone (1194:4EF7..4F0B, 4F3F..4F53,
+            // 4D51..4D6A): no key reads them.
+            if self.boxes.front().is_some_and(|b| hud::clicks_only(b)) {
+                return;
+            }
             let typed = self.engine.m.mem.r16(arena::mem::DS, arena::lineedit::var::COUNT) != 0;
             if (typed && !self.status_box) || code == KeyCode::Escape {
                 self.box_read();
@@ -5724,9 +5787,9 @@ impl App {
     /// `keys` held (`arena::listwindow::list_keys`).
     fn list_read(&mut self, buttons: u8, keys: u8) {
         let (x, y) = self.screen_point();
-        // The keyboard's bytes since the read before (`list_codes`), two
-        // a read.
-        let mut codes = [0; 2];
+        // The keyboard's bytes since the read before (`list_codes`): a
+        // key no read was made for (none of the list's) comes with this.
+        let mut codes = [0; arena::listwindow::CODES];
         for c in codes.iter_mut() {
             if !self.list_codes.is_empty() {
                 *c = self.list_codes.remove(0);
@@ -6077,6 +6140,15 @@ impl App {
             In::Button { down: true, button } if self.travel.is_some() && self.boxes.is_empty() => {
                 let (x, y) = self.screen_point();
                 self.travel_input(|t, e, a| t.click(e, a, x, y, button == MouseButton::Right));
+            }
+            // The left button the map began with let go: a click begun
+            // there (`Travel::let_go`); the walk's button let go too.
+            In::Button { down: false, button: MouseButton::Left } if self.travel.as_ref().is_some_and(|t| t.held()) && self.boxes.is_empty() => {
+                if let Some((x, y, _)) = self.walk_mouse {
+                    self.walk_mouse = Some((x, y, false));
+                }
+                let (x, y) = self.screen_point();
+                self.travel_input(|t, e, a| t.let_go(e, a, x, y));
             }
             In::Button { down: true, button: MouseButton::Left } if self.waiting() => self.dialog_click(),
             // The right button on a menu leaves it (3159:10D6), and on a
