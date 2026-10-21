@@ -1751,13 +1751,17 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 /// start dungeon, the wilderness; a fight taking blows, the Crypt of
 /// Hearts' stairs, the street's people; with the bar's lists and the
 /// camp, a creature casting at the player, the wilderness by day and by
-/// night, a level gained in a fight, the fog of a main quest dungeon),
+/// night, a level gained in a fight, the fog of a main quest dungeon;
+/// with screens given random inputs, inside a store, a tavern, a temple
+/// and the mages' guild before their keepers, the street at night and at
+/// noon with the travel map),
 /// each played from the script its `fuzz` line holds and measured every
 /// CHECKPOINT frames as `playlongrun` (`fuzz_sessions_as_the_original`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",
     "fuzztown3", "fuzzdungeon3", "fuzzwild3", "fuzztown4", "fuzzdungeon4", "fuzzwild4",
     "fuzzfight1", "fuzzfight2", "fuzzcrypt1", "fuzzcrypt2", "fuzzpeople1", "fuzzpeople2",
-    "fuzzspell1", "fuzzspell2", "fuzzcamp1", "fuzzcamp2", "fuzzlevel1", "fuzzfog1"];
+    "fuzzspell1", "fuzzspell2", "fuzzcamp1", "fuzzcamp2", "fuzzlevel1", "fuzzfog1",
+    "fuzzstore1", "fuzztavern1", "fuzztemple1", "fuzzguild1", "fuzznight1", "fuzzday1"];
 
 /// gen_worldframes.py's CASTER_BOOK: the spells `caster` and
 /// `level_fight` add to the book (`booked`).
@@ -1948,9 +1952,134 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 pushed(a, seen);
                 fuzz_frames(a, d, seen, &mut mouse, num(if kind == "r" { 1 } else { 2 }));
             }
+            // `fuzz_script4`'s: the view's middle clicked as `c` clicks it,
+            // whatever it opens given the acts, then Esc (`fuzz_frames_acts`);
+            // a click among them leaves the harness's mouse at the centre
+            // after the step, where its step's script puts it.
+            "k" => {
+                recaptured(a);
+                let mut acts = fuzz_acts(&n[1..]);
+                let click = acts.iter().any(|x| matches!(x, FuzzAct::Click(..)));
+                mouse = (160, 70);
+                a.input(In::Button { button: MouseButton::Left, down: true });
+                fuzz_frames_acts(a, d, seen, &mut mouse, 1, &mut acts);
+                a.input(In::Button { button: MouseButton::Left, down: false });
+                fuzz_frames_acts(a, d, seen, &mut mouse, num(0) - 1, &mut acts);
+                if click {
+                    mouse = (160, 100);
+                    if !a.captured {
+                        a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+                    }
+                }
+            }
+            // The character sheet (F1) or the travel map (Shift+M) opened
+            // in the frame after its key, given the acts, then Esc; the
+            // frame that took the key ends with its screens.
+            "e" | "g" => {
+                if a.captured {
+                    a.release();
+                }
+                a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
+                a.compose();
+                let mut acts = fuzz_acts(&n[1..]);
+                let click = acts.iter().any(|x| matches!(x, FuzzAct::Click(..)));
+                if kind == "e" {
+                    key(a, KeyCode::F1, true);
+                    fuzz_screen(a, d, &mut acts, &mut mouse);
+                } else {
+                    a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
+                    a.input(In::Key { code: KeyCode::KeyM, down: true, text: Some("M".into()) });
+                    faded(a);
+                    fuzz_travel(a, d, &mut acts);
+                    faded(a);
+                }
+                faded(a);
+                // (A box the journey's end left, its arrival's words.)
+                fuzz_screen(a, d, &mut acts, &mut mouse);
+                if click {
+                    mouse = (160, 100);
+                    a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
+                }
+                // (The key let go after the frame is counted, as the
+                // harness's next step lets it go.)
+                pushed(a, seen);
+                if kind == "g" {
+                    key(a, KeyCode::KeyM, false);
+                    key(a, KeyCode::ShiftLeft, false);
+                } else {
+                    key(a, KeyCode::F1, false);
+                }
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
+            }
+            // P (picking armed, 2542:0279) a frame, let go.
+            "p" => {
+                a.input(In::Key { code: KeyCode::KeyP, down: true, text: Some("p".into()) });
+                pushed(a, seen);
+                key(a, KeyCode::KeyP, false);
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
+            }
             _ => panic!("fuzz token {t}"),
         }
     }
+}
+
+/// gen_worldframes.py's `fuzz_acts` (a `fuzz_script4` token's fields
+/// after its first): `X.Y` a click there, `kHH` the key of scan code HH
+/// (ACT_KEYS').
+fn fuzz_acts(fields: &[&str]) -> std::collections::VecDeque<FuzzAct> {
+    fields
+        .iter()
+        .map(|f| match f.strip_prefix('k') {
+            Some(scan) => {
+                let (code, text) = match scan {
+                    "1c" => (KeyCode::Enter, None),
+                    "15" => (KeyCode::KeyY, Some("y")),
+                    "31" => (KeyCode::KeyN, Some("n")),
+                    "2" => (KeyCode::Digit1, Some("1")),
+                    "3" => (KeyCode::Digit2, Some("2")),
+                    "4" => (KeyCode::Digit3, Some("3")),
+                    "39" => (KeyCode::Space, Some(" ")),
+                    "30" => (KeyCode::KeyB, Some("b")),
+                    "1f" => (KeyCode::KeyS, Some("s")),
+                    "13" => (KeyCode::KeyR, Some("r")),
+                    _ => panic!("fuzz act key {scan}"),
+                };
+                FuzzAct::Key(code, text)
+            }
+            None => {
+                let (x, y) = f.split_once('.').expect("a fuzz act");
+                FuzzAct::Click(x.parse().unwrap(), y.parse().unwrap())
+            }
+        })
+        .collect()
+}
+
+/// The travel map given `acts` in turn while it is up (a box over it
+/// among), then Esc, as a step's script and BOX_SPARE answer the original's
+/// passes; a journey's days waited out.
+fn fuzz_travel(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDeque<FuzzAct>) {
+    for _ in 0..1000 {
+        if a.travel.is_none() {
+            return;
+        }
+        match acts.pop_front() {
+            Some(FuzzAct::Click(x, y)) => d.click(a, x, y, MouseButton::Left),
+            Some(FuzzAct::Key(code, text)) => d.key(a, code, text),
+            // (On a province's map, which has no key for Esc, its Exit
+            // clicked instead, as gen_worldframes.py's ProvinceExit.)
+            None if a.boxes.is_empty() && a.travel.as_ref().is_some_and(|t| t.shown().is_some()) => d.click(a, 80, 180, MouseButton::Left),
+            None => {
+                d.key(a, KeyCode::Escape, None);
+                for _ in 0..100 {
+                    if a.travel.is_none() {
+                        break;
+                    }
+                    d.wait(a, 100);
+                }
+            }
+        }
+    }
+    panic!("the travel map still up");
 }
 
 /// `n` of a session's frames, a box or the way out's travel map that
@@ -1958,6 +2087,12 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
 /// `spare` (BOX_SPARE) leaves it; the window's cursor where the harness's
 /// `mouse` is for the map's reads.
 fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mut (i32, i32), n: usize) {
+    fuzz_frames_acts(a, d, seen, mouse, n, &mut Default::default());
+}
+
+/// `fuzz_frames` with a step's script: what comes up in its frames given
+/// `acts` in turn first (`fuzz_script4`'s), then Esc.
+fn fuzz_frames_acts(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mut (i32, i32), n: usize, acts: &mut std::collections::VecDeque<FuzzAct>) {
     for _ in 0..n {
         frames(a, d, seen, 1, |_| false);
         if a.travel.is_some() {
@@ -1970,13 +2105,7 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mu
             if LET_GO_AT_MAP.with(|l| l.get()) && a.walk_mouse.is_some_and(|w| w.2) {
                 a.input(In::Button { button: MouseButton::Left, down: false });
             }
-            d.key(a, KeyCode::Escape, None);
-            for _ in 0..100 {
-                if a.travel.is_none() {
-                    break;
-                }
-                d.wait(a, 100);
-            }
+            fuzz_travel(a, d, acts);
             assert!(a.travel.is_none(), "the way out's map still up");
             faded(a);
             // (The frame was seen with its turn waiting on the map, the
@@ -1989,7 +2118,11 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mu
             if a.creation.is_some() {
                 level_points(a, d, mouse);
             } else if a.waiting() {
-                d.key(a, KeyCode::Escape, None);
+                match acts.pop_front() {
+                    Some(FuzzAct::Click(x, y)) => d.click(a, x, y, MouseButton::Left),
+                    Some(FuzzAct::Key(code, text)) => d.key(a, code, text),
+                    None => d.key(a, KeyCode::Escape, None),
+                }
             } else {
                 break;
             }
@@ -2003,7 +2136,7 @@ thread_local! {
 }
 
 /// An input `fuzz_screen` gives a screen: a click at (x, y), a key.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum FuzzAct {
     Click(i32, i32),
     Key(KeyCode, Option<&'static str>),
@@ -2321,17 +2454,23 @@ fn case(name: &str) -> Option<Case> {
             n if n.starts_with("fuzzpeople") => Place::People,
             n if n.starts_with("fuzzspell") || n.starts_with("fuzzlevel") => Place::Dungeon,
             n if n.starts_with("fuzzfog") => Place::Fogged,
+            n if n.starts_with("fuzzstore") => Place::Store,
+            n if n.starts_with("fuzztavern") => Place::Tavern,
+            n if n.starts_with("fuzztemple") => Place::Temple,
+            n if n.starts_with("fuzzguild") => Place::Loaded,
+            n if n.starts_with("fuzznight") || n.starts_with("fuzzday") => Place::People,
             _ => Place::Wild,
         };
         let (fight, crypt) = (name.starts_with("fuzzfight"), name.starts_with("fuzzcrypt"));
         let (caster, level) = (name.starts_with("fuzzspell"), name.starts_with("fuzzlevel"));
         let hour = match name {
-            "fuzzcamp1" => Some(12),
-            "fuzzcamp2" => Some(22),
+            "fuzzcamp1" | "fuzzday1" => Some(12),
+            "fuzzcamp2" | "fuzznight1" => Some(22),
             _ => None,
         };
         // (`fuzz_script3`'s seeds, with the lists and the camp.)
-        let third = caster || level || hour.is_some() || name.starts_with("fuzzfog");
+        let third = caster || level || name.starts_with("fuzzcamp") || name.starts_with("fuzzfog");
+        let who = name.to_string();
         // (The mouse captured, as `fought`: the window's first right press
         // would otherwise take it, and the swings' drags wouldn't reach
         // the game.) gen_worldframes.py's FUZZ_AT: `fight` with
@@ -2359,6 +2498,29 @@ fn case(name: &str) -> Option<Case> {
             }
             if let Some(h) = hour {
                 at_hour(a, h, 0x100);
+            }
+            // (`fuzz_script4`'s indoors: two squares before the keeper,
+            // facing him; the store's shopping, the temple's hurt, the
+            // guild's room, the tavern's seed.)
+            match who.as_str() {
+                "fuzzstore1" => {
+                    shopping(a);
+                    at_square(a, 15, 11, 0x100);
+                }
+                "fuzztavern1" => {
+                    seeded(a);
+                    at_square(a, 7, 12, 0x100);
+                }
+                "fuzztemple1" => {
+                    temple_hurt(a);
+                    at_square(a, 10, 11, 0x100);
+                }
+                "fuzzguild1" => {
+                    room(a);
+                    seeded(a);
+                    at_square(a, 7, 12, 0x80);
+                }
+                _ => {}
             }
             LET_GO_AT_MAP.with(|l| l.set(third));
             if third {

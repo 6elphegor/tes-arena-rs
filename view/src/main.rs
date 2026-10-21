@@ -4546,7 +4546,14 @@ impl App {
                 KeyCode::KeyN => page = true,
                 KeyCode::Escape => self.sheet_end(Some(0x1B)),
                 KeyCode::KeyK => self.sheet_end(None),
-                _ => {}
+                // A key whose character no record takes: read (5E13) and
+                // the loop round to its next wait (5D12), whose 5DE2 forgets
+                // the ring; one that types nothing isn't read (5E1A).
+                _ => {
+                    if m.mem.r16(arena::mem::DS, arena::lineedit::var::COUNT) != 0 {
+                        m.key_flush();
+                    }
+                }
             },
             // 27E3:01FC reads no keys but Esc down (ACB6, which the key
             // interrupt has set already).
@@ -4967,7 +4974,9 @@ impl App {
             Some(panels::Panel::Sheet) => match sheets::sheet_click(x, y) {
                 Some(sheets::SheetClick::Equipment) => self.equipment_page(None),
                 Some(sheets::SheetClick::Done) => self.sheet_end(None),
-                None => {}
+                // No record under it: the loop round to its next wait,
+                // whose 5DE2 forgets the ring.
+                None => self.engine.m.key_flush(),
             },
             Some(panels::Panel::Log(_)) => log_poll = true,
             None => {}
@@ -5006,6 +5015,20 @@ impl App {
             PageInput::Key(k) => Some(k),
             PageInput::Click(..) => None,
         };
+        // The loop's read of the mouse (5DF1, 8FC4): where the cursor is,
+        // the click's place, within its limits (the list's Space takes
+        // the line under it, 1AC6's 8F94).
+        let (x, y) = match input {
+            PageInput::Click(x, y) => (x, y),
+            PageInput::Key(_) => {
+                let (x, y) = self.screen_point();
+                (x.clamp(0, 319) as u16, y.clamp(0, 199) as u16)
+            }
+        };
+        let m = &mut self.engine.m;
+        let buttons = m.mem.r8(arena::mem::DS, arena::controls::var::BUTTONS);
+        m.set_mouse(x, y, buttons);
+        m.mouse_clamp();
         match self.engine.m.sheet_equipment_record(input) {
             Some(0) => {
                 let mut shown: Option<(Vec<(String, u8)>, u16)> = None;

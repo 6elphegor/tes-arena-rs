@@ -208,8 +208,10 @@ pub enum SheetClick {
     Done,
 }
 
+/// A record takes the click with its right and bottom edges (1194:5D8D:
+/// x0 <= x <= x0 + w, y0 <= y <= y0 + h).
 pub fn sheet_click(x: i32, y: i32) -> Option<SheetClick> {
-    let inside = |x0, y0, w, h| x >= x0 && x < x0 + w && y >= y0 && y < y0 + h;
+    let inside = |x0, y0, w, h| x >= x0 && x <= x0 + w && y >= y0 && y <= y0 + h;
     if inside(0x6A, 0xB2, 0x34, 0xF) {
         Some(SheetClick::Equipment)
     } else if inside(0, 0xAA, 0x1F, 0x11) {
