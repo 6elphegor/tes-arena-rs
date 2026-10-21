@@ -4856,6 +4856,13 @@ fn busy_play_goes_as_the_originals() {
     }
 }
 
+/// Cases `the_row_tables_made_as_the_original_makes_them` leaves out
+/// (ARENA_CASE runs one): fuzzcrypt2, played there without the engine's
+/// page, walks onto the crypt's stairs by its 586th drawing where the
+/// original turns on (its heading 100h round, the stairs' turn); with the
+/// page (`fuzz_sessions_as_the_original`) every frame matches.
+const ROWS_LEFT_OUT: &[&str] = &["fuzzcrypt2"];
+
 /// Each case's drawings make their row tables from what the original's
 /// did (the `rows` lines: the inputs as the last 0000:DA8E found them,
 /// which the tables keep while the state changes on, `render::rows_read`
@@ -4870,7 +4877,7 @@ fn the_row_tables_made_as_the_original_makes_them() {
         let text = std::fs::read_to_string(path).expect(path);
         for f in text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).filter(|f| f.len() == 3 && f[0] == "rows") {
             let name = f[1];
-            if only.as_deref().is_some_and(|o| o != name) {
+            if only.as_deref().map_or(ROWS_LEFT_OUT.contains(&name), |o| o != name) {
                 continue;
             }
             let Some((place, setup, play)) = case(name).or_else(|| areaplaytest::transit_case(name)) else { continue };
