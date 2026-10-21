@@ -493,6 +493,7 @@ impl Travel {
 
     /// The button the screen began with forgotten: let go before the
     /// map's read.
+    #[cfg(test)]
     pub fn forget_held(&mut self) {
         self.held = false;
     }
