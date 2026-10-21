@@ -2225,7 +2225,8 @@ def let_go_in_map(a):
 
 class SpareEsc(list):
     """`fuzz_script4`'s steps' script: Esc (BOX_SPARE's, an act's left)
-    as the screen asking takes a way out. The travel map's loop (its
+    as the screen asking takes a way out, and an act's Enter on a list
+    held. The travel map's loop (its
     mouse read, 3159:00B4) with a province's map up (B7E4 1, 26F7:01FF):
     its Exit clicked (80, 180), Esc being none of that window's keys
     (3159:0171 finds no region by it). A list's loop (06EB) asks the keys
@@ -2248,10 +2249,16 @@ class SpareEsc(list):
     def pop(self, i=-1):
         a = self.a
         act = super().pop(i)
-        if i != 0 or act != ('keys', [KEY_ESC]):
+        if i != 0 or act not in (('keys', [KEY_ESC]), ('keys', [KEY_ENTER])):
             return act
         ss, sp = a.mu.reg_read(x86.UC_X86_REG_SS), a.mu.reg_read(x86.UC_X86_REG_SP)
         caller = (a.r16(sp + 2, seg=ss) - LOAD_SEG, a.r16(sp, seg=ss))
+        if act == ('keys', [KEY_ENTER]):
+            # (An act's Enter on a list held as a player holds it, for the
+            # loop's pass to find it down, its release the list's own wait,
+            # 0932; typed and let go between two reads it would never see
+            # it.)
+            return ('hold', [KEY_ENTER]) if caller == (0x3159, 0x06F0) else act
         if caller == (0x3159, 0x00B9) and getattr(a, 'in_map', False) and a.mu.mem_read(a.lin(a.ds, 0xB7E4), 1)[0] == 1:
             return ('click', 80, 180)
         if caller == (0x3159, 0x06F0):

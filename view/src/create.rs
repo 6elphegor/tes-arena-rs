@@ -1862,8 +1862,8 @@ impl Creation {
             _ => return,
         };
         self.cursor = at;
-        self.class_reads.push(ListRead { buttons, x: at.0, y: at.1, keys, codes: [0; 2] });
-        self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0, codes: [0; 2] });
+        self.class_reads.push(ListRead { buttons, x: at.0, y: at.1, keys, codes: [0; arena::listwindow::CODES] });
+        self.class_reads.push(ListRead { buttons: 0, x: at.0, y: at.1, keys: 0, codes: [0; arena::listwindow::CODES] });
     }
 
     /// The next question (number `asked` from 0): its window on the game

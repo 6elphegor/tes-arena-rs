@@ -4527,7 +4527,12 @@ impl App {
                         KeyCode::Space => Some(b' '),
                         KeyCode::KeyD => Some(b'd'),
                         KeyCode::KeyS => Some(b's'),
-                        _ => text.and_then(|t| t.bytes().next()).filter(u8::is_ascii),
+                        _ => text.and_then(|t| t.bytes().next()).filter(u8::is_ascii).or_else(|| {
+                            // (Any other character the key interrupt typed,
+                            // Enter's among them: read, 5E13, and no record's.)
+                            use arena::lineedit::var::{COUNT, READ};
+                            (m.mem.r16(arena::mem::DS, COUNT) != 0).then(|| m.mem.r8(arena::mem::DS, m.mem.r16(arena::mem::DS, READ)))
+                        }),
                     };
                 }
             }
@@ -5782,9 +5787,9 @@ impl App {
     /// `keys` held (`arena::listwindow::list_keys`).
     fn list_read(&mut self, buttons: u8, keys: u8) {
         let (x, y) = self.screen_point();
-        // The keyboard's bytes since the read before (`list_codes`), two
-        // a read.
-        let mut codes = [0; 2];
+        // The keyboard's bytes since the read before (`list_codes`): a
+        // key no read was made for (none of the list's) comes with this.
+        let mut codes = [0; arena::listwindow::CODES];
         for c in codes.iter_mut() {
             if !self.list_codes.is_empty() {
                 *c = self.list_codes.remove(0);
