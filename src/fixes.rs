@@ -89,6 +89,11 @@ pub const GUILD_SPELLS_PICK: u8 = 20;
 pub const AUTOMAP_ORDER: u8 = 32;
 /// #33: the logbook is never trimmed, its new path built twice (27E3:0169).
 pub const LOG_TRIM: u8 = 33;
+/// #34: the logbook's Exit takes two clicks off the last page, and a
+/// click stays held (27E3:0137, 01FC).
+pub const LOGBOOK_CLICKS: u8 = 34;
+/// #35: the logbook's line count written into the frame (1194:4E54).
+pub const LOG_COUNT: u8 = 35;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
