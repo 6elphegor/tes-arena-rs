@@ -399,7 +399,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('names', nargs='*')
     ap.add_argument('--jobs', type=int, default=2)
-    ap.add_argument('--shards', type=int, default=max(1, (os.cpu_count() or 2) // 2))
+    ap.add_argument('--shards', type=int, default=os.cpu_count() or 2)
     ap.add_argument('--timeout', type=int, default=1800, help='seconds per generator')
     ap.add_argument('--keep', action='store_true')
     ap.add_argument('--no-cache', action='store_true', help='run generators even when cached')
