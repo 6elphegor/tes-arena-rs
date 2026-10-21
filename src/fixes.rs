@@ -57,18 +57,24 @@ pub const CURE_ALL: u8 = 2;
 pub const NOTE_DIVIDE: u8 = 3;
 /// #5: a pile made in the wild reads its tables past their end (2433:0358).
 pub const WILD_PILES: u8 = 5;
+/// #6: a guild stock pick past the list's end faults (1194:5ED1).
+pub const GUILD_PICK_PAST: u8 = 6;
 /// #7: a chest's failed lockpicking looked up under the player's square.
 pub const CHEST_RETRIED: u8 = 7;
 /// #9: from level 11 on every crime is seen (0000:3F50).
 pub const CRIME_SEEN: u8 = 9;
 /// #10: selling never reaches the merchant's acceptance roll (1194:81F0).
 pub const SELLING_ROLL: u8 = 10;
+/// #11: the guild's potions and spells haggled with 44h, 44h (1194:B51A).
+pub const GUILD_HAGGLE: u8 = 11;
 /// #12: a donation within a day of the last blesses nothing (1194:C58B).
 pub const SECOND_DONATION: u8 = 12;
 /// #13: taking off an item wraps a drained attribute to its maximum.
 pub const UNEQUIP_WRAP: u8 = 13;
 /// #15: a room sneaked into rests for the end time's low word in hours.
 pub const SNEAK_HOURS: u8 = 15;
+/// #20: a caster's "Spells" without stock runs the magic items' (1194:AA8C).
+pub const GUILD_SPELLS_PICK: u8 = 20;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;

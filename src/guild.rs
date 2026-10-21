@@ -65,6 +65,11 @@
 //! the lists' clearing (1194:AE68) fills with the caller's AX's high
 //! byte, taken here as the original leaves it where the code shows it
 //! and 0 after the sorts.
+//!
+//! Fixed mode (`crate::fixes`): a pick past the stock buys nothing (#6),
+//! potions and spells are haggled with the guild's own quality and
+//! factor (#11), and a caster's "Spells" without stock is the spells'
+//! (#20).
 
 use crate::bsa::Files;
 use crate::format::Arg;
@@ -638,6 +643,10 @@ impl Machine {
             }
             None => 0,
         };
+        // Fixed (#20): the routine is the entry's, not the pick's: the
+        // caster's menu without stock is "Potions, Spells", and the table
+        // is potions, magic items, spells.
+        let pick = if !stock && caster && pick == 1 && self.fixed(crate::fixes::GUILD_SPELLS_PICK) { 2 } else { pick };
         match self.mem.r16(DS, BUY_ROUTINES.wrapping_add(pick.wrapping_add(pick))) {
             0xAFF9 => self.guild_potions(files, hooks),
             0xB327 => self.guild_items(files, hooks),
@@ -740,10 +749,20 @@ impl Machine {
     /// seller named (1194:080B, at 1A4C), the quality and factor 44h each
     /// (the original's bug); the holiday's price it works out first is
     /// lost. The price agreed and whether the player walked away.
+    /// Fixed (#11), the guild's quality and factor (13CA, 13CB), which
+    /// the code loads just before overwriting them, as the magic items'
+    /// haggle (1194:B362) passes them. The holiday's price stays unused:
+    /// the callers' prices have their holiday already (a potion's is its
+    /// holiday price, service 5; a spell on a holiday costs its cost, not
+    /// twice it), so using it would discount twice.
     fn guild_haggle(&mut self, files: &mut Files, hooks: &mut dyn GuildHooks) -> Option<(u32, bool)> {
         self.guild_seller(files)?;
         let per = Self::guild_percent(self.mem.r8(DS, 0x01D3) as u16);
         let price = self.mem.r32(DS, PRICE);
+        if self.fixed(crate::fixes::GUILD_HAGGLE) {
+            let (quality, factor) = (self.mem.r8(DS, QUALITY) as u16, self.mem.r8(DS, FACTOR) as u16);
+            return Some(hooks.haggle(self, price, quality, factor, per));
+        }
         Some(hooks.haggle(self, price, 0x44, 0x44, per))
     }
 
@@ -868,7 +887,11 @@ impl Machine {
         self.mem.w8(DS, PICK, pick as u8);
         // 1194:B358
         hooks.strip_back(self);
-        if (pick as i16) >= 0 {
+        // Fixed (#6): a pick past the stock (the empty stock #20 shows)
+        // is none, as the removal at 1194:5ED1 can only take out an entry
+        // the list has.
+        let past = pick >= n && self.fixed(crate::fixes::GUILD_PICK_PAST);
+        if (pick as i16) >= 0 && !past {
             self.guild_item_bought(files, hooks, pick)?;
         }
         // 1194:B40B: FONT_A selected.
@@ -908,7 +931,9 @@ impl Machine {
         }
         self.map_bank(0x18, 0);
         self.mem.w32(DS, PRICE, eax);
-        let si = (self.mem.r8(DS, PICK) as u16).wrapping_mul(0x0B);
+        // Fixed (#6): the record copied out above, the pick's; PICK read
+        // again may be a long name's byte (`stock_take_out`).
+        let si = if self.fixed(crate::fixes::GUILD_PICK_PAST) { rec } else { (self.mem.r8(DS, PICK) as u16).wrapping_mul(0x0B) };
         if !self.guild_take_item() {
             return Some(());
         }
@@ -939,6 +964,14 @@ impl Machine {
     /// runs 4-byte copies (0000:7736) across the frame's end, a general
     /// protection fault on the CPU.
     fn stock_take_out(&mut self, si: u16, cx: u16) -> Option<()> {
+        if self.fixed(crate::fixes::GUILD_PICK_PAST) {
+            // Fixed (#6): the entry taken out is the record bought or
+            // stolen (frame:`si`, 0Bh bytes each), not DGROUP's PICK
+            // read again: an item's name built at 1395 runs into it when
+            // it is over 33h bytes. (The empty stock's pick is none,
+            // `guild_items`.)
+            self.mem.w8(DS, PICK, (si / 0x0B) as u8);
+        }
         if self.mem.r8(DS, PICK) as u16 >= cx {
             return crate::giveup::original("1194:5ED1: a pick past the list: the original faults (#GP)");
         }
