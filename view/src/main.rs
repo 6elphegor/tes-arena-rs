@@ -401,6 +401,14 @@ impl arena::hooks::StairsHooks for Front<'_> {
     fn map_keep(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
         m.map_keep(files, self.dac.as_ref());
     }
+    /// 2542:0446: PAL.COL read to 929E and set, so the lamps' 71h is the
+    /// file's again (a fog's grey, 2294:0C36, gone till the level sets it).
+    fn map_colours(&mut self, m: &mut arena::machine::Machine, files: &mut arena::bsa::Files) {
+        let _ = m.colours_load(files, 0x1304, 0x929E);
+        if let Some(l) = self.light.as_deref_mut() {
+            l.lamp = None;
+        }
+    }
 }
 /// How the sheet's drop came out (`App::sheet_drop`): a question asked
 /// (its text), "Drop what?" waiting in its loop (its lines and their first

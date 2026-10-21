@@ -435,6 +435,12 @@ impl Machine {
             let d = self.turn_speed(fraction);
             self.turn(if it.turn < 0 { d.wrapping_neg() } else { d });
         }
+        // 2826:02E2's start, after the moves: the right button let go
+        // cancels a spell waiting for a target, as in the classic
+        // controls (a swing's end, a wall spell's counter gone).
+        if self.mem.r8(DS, RELEASED_RIGHT) != 0 {
+            self.cancel_target();
+        }
         // Where the classic controls take a click on the interface bar
         // (2826:02E2, `pick_region`, after the moves): the front end's, if
         // one is waiting. With the cursor on the bar the original's
