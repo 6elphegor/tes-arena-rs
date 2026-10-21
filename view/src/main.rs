@@ -3660,9 +3660,14 @@ impl App {
         if self.screen_up().is_some() || !self.fade.is_empty() || self.inside.is_some() {
             return;
         }
-        // The press a screen ended on let go by this frame's read.
+        // The press a screen ended on let go by this frame's read, in its
+        // physics (`mouse_poll`, the button the view holds then): its
+        // actors, before it, still find it (0000:26F5's busy player, the
+        // cursor's handler and speed as the frame before left them).
         if std::mem::take(&mut self.screen_press) {
-            self.engine.m.mem.w8(arena::mem::DS, arena::controls::var::BUTTONS, 0);
+            use arena::{controls::var::{MOUSE_X, MOUSE_Y}, mem::DS};
+            let m = &mut self.engine.m;
+            m.report_mouse(m.mem.r16(DS, MOUSE_X), m.mem.r16(DS, MOUSE_Y), (self.keys.swing as u8) << 1);
         }
         let k = &self.keys;
         let axis = |p: bool, n: bool| (p as i16 - n as i16) * 256;
