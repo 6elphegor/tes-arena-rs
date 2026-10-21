@@ -600,17 +600,7 @@ impl Engine {
             m.temp_walls_frame();
         }
         m.mem.w8(DS, STAGE, 0x0C);
-        m.row_cleared = None;
         world_hook(m, files, hooks, Step::FrameBody, 0xC3A8)?;
-        // The body's end cleared the row under the view (0000:4CC0) in the
-        // original's one draw page, which the drawing's page stands for:
-        // the next drawing leaves it black where it draws nothing, as the
-        // screens a frame body opens save it (SCREENSV.$$2).
-        if let (Some(y), Some(page)) = (m.row_cleared.take(), self.page.as_mut()) {
-            if let Some(row) = page.get_mut(y as usize * 320..(y as usize + 1) * 320) {
-                row.fill(0);
-            }
-        }
         m.mem.w8(DS, STAGE, 0x0D);
         m.view_window();
         let info = r(m, crate::info::var::INFO_PTR);

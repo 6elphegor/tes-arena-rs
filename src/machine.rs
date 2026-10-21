@@ -73,10 +73,6 @@ pub struct Machine {
     /// them), for the tests; a copy of the machine run again (a dialog's
     /// turn) takes it back with the rest.
     pub rows_drawn: Option<Vec<[u16; 11]>>,
-    /// The row 0000:4CC0 last cleared under the view (C3A2), for the
-    /// engine to clear in the drawing's page too, which is the original's
-    /// draw page (`Engine::frame`).
-    pub row_cleared: Option<u16>,
     /// DI as the equipment page's last handler left it, which its button
     /// loop (1194:5CF4) keeps for the next (1F56 counts the quests' lines
     /// into DS:DI): None where the port doesn't know it.
@@ -105,7 +101,7 @@ pub struct Machine {
 
 impl Clone for Machine {
     fn clone(&self) -> Self {
-        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = self;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = self;
         Machine {
             mem: mem.clone(),
             rng: rng.clone(),
@@ -122,7 +118,6 @@ impl Clone for Machine {
             music: music.clone(),
             rows_made: *rows_made,
             rows_drawn: rows_drawn.clone(),
-            row_cleared: *row_cleared,
             page_di: *page_di,
             spellmaker_di: *spellmaker_di,
             gave_up: *gave_up,
@@ -139,7 +134,7 @@ impl Clone for Machine {
     /// banks reused): what a front end copying the machine every turn
     /// wants, a fresh copy's megabytes being faulted in page by page.
     fn clone_from(&mut self, source: &Self) {
-        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, row_cleared, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = source;
+        let Machine { mem, rng, ems, mouse_motion, mouse_report, bios_ticks, sound_busy, sounds, digital, sound_names, songs, music_status, music, gave_up, list_kind, list_reads, rows_made, rows_drawn, page_di, spellmaker_di, menu_reads, list_capture, list_captured, fs_creatures } = source;
         self.mem.clone_from(mem);
         self.rng.clone_from(rng);
         self.ems.clone_from(ems);
@@ -158,7 +153,6 @@ impl Clone for Machine {
         self.list_reads.clone_from(list_reads);
         self.rows_made = *rows_made;
         self.rows_drawn.clone_from(rows_drawn);
-        self.row_cleared = *row_cleared;
         self.page_di = *page_di;
         self.spellmaker_di = *spellmaker_di;
         self.menu_reads.clone_from(menu_reads);
@@ -172,7 +166,7 @@ impl Machine {
     pub fn new(image: &Image) -> Self {
         let mem = Memory::new(image);
         let rng = ArenaRandom::from_mem(&mem);
-        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), mouse_report: None, bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, row_cleared: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false }
+        Self { mem, rng, ems: Vec::new(), mouse_motion: (0, 0), mouse_report: None, bios_ticks: 0, sound_busy: false, sounds: Vec::new(), digital: None, sound_names: Vec::new(), songs: Vec::new(), music_status: 0, music: None, gave_up: None, list_kind: 0, list_reads: None, rows_made: None, rows_drawn: None, page_di: None, spellmaker_di: None, menu_reads: None, list_capture: false, list_captured: None, fs_creatures: false }
     }
 
     /// None, noting `why`: where the original itself faults or hangs, so

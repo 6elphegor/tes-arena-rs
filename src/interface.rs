@@ -77,9 +77,8 @@ impl Machine {
     /// 0000:4CC0..4CDA: the row under the view (C3A2) cleared, its 140h
     /// bytes from the row table's offset (A6A0).
     pub fn view_row_clear(&mut self) {
-        let y = self.mem.r16(DS, 0xC3A2);
-        self.row_cleared = Some(y);
         let Some(seg) = self.page_seg() else { return };
+        let y = self.mem.r16(DS, 0xC3A2);
         let di = self.mem.r16(DS, ROWS.wrapping_add(y.wrapping_add(y)));
         for k in 0..0x140u16 {
             self.mem.w8(seg, di.wrapping_add(k), 0);
