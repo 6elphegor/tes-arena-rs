@@ -213,3 +213,29 @@ fn matches_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 2500);
 }
+
+/// Fixed (kept bug #65): a person of a class in the list at 5D78 rolls
+/// its armour quality (1194:7C1D) against its own level; the original
+/// reads the level at the list's place + 6 in the record's segment.
+#[test]
+fn fixed_npc_armor_quality_uses_the_level() {
+    use arena::fixes::{Fixes, NPC_ARMOR_LEVEL};
+    let Some(img) = common::image() else { return };
+    let base = Machine::new(&img);
+    let class = base.mem.r8(DS, 0x5D78);
+    let rec = 2 * 0x41E;
+    let quality = |fixes: Fixes| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        m.mem.w8(CSEG, rec + 5, class);
+        // Level 10: a d100 of at most 100 always lowers the quality.
+        m.mem.w8(CSEG, rec + 6, 10);
+        // What the original reads instead: level 0.
+        m.mem.w8(CSEG, 0x5D78 + 6, 0);
+        m.rng.seed = 99;
+        (0..200).map(|_| m.npc_armor_quality(CSEG, rec)).collect::<Vec<_>>()
+    };
+    assert!(quality(Fixes::only(NPC_ARMOR_LEVEL)).iter().all(|&q| q == 1));
+    let original = quality(Fixes::NONE);
+    assert!(original.iter().filter(|&&q| q == 2).count() > 180, "{original:?}");
+}

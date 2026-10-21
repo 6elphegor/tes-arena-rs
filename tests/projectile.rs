@@ -470,3 +470,104 @@ fn casts_match_original() {
     eprintln!("{counts:?}");
     assert!(counts.get("ran").copied().unwrap_or(0) > 1500);
 }
+
+/// Fixed (kept bug #31): an arrow starts a step ahead of the shooter
+/// (C8h times the half-scale sine table: 64h units); the
+/// original steps it ahead and then sets the sprite up at the shooter's
+/// position, losing the step.
+#[test]
+fn fixed_arrows_keep_their_head_start() {
+    use arena::fixes::{ARROW_HEAD_START, Fixes};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x1042, CSEG);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w16(DS, 0x91F0, 0);
+    base.mem.w16(DS, 0xC3D6, 0xA0);
+    base.mem.w16(DS, 0x1020, 0);
+    base.mem.w16(DS, 0x1022, 0x5C00);
+    let classes: Vec<u8> = (0..18).map(|i| base.mem.r8(DS, 0x2A50 + i)).collect();
+    let mut moved = 0;
+    for seed in 1..40u32 {
+        for fixes in [Fixes::NONE, Fixes::only(ARROW_HEAD_START)] {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut s = setup(&mut m, seed, 0, &classes);
+            strike(&mut m, &mut s, 0);
+            flight(&mut m, &mut s);
+            m.load_rng();
+            let Some(si) = (0..12u16).map(|i| 0x7DBC + i * 0x1C).find(|&si| m.mem.r8(DS, si + 0x11) == 0) else { continue };
+            let (px, py) = (m.mem.r16(DS, 0xC3D0), m.mem.r16(DS, 0xC3D4));
+            if m.fire_missile(0x1B, 0).is_none() {
+                continue;
+            }
+            let (x, y) = (m.mem.r16(DS, si), m.mem.r16(DS, si + 4));
+            let (dx, dy) = (x.wrapping_sub(px) as i16 as i32, y.wrapping_sub(py) as i16 as i32);
+            if fixes == Fixes::NONE {
+                assert_eq!((dx, dy), (0, 0), "seed {seed}");
+            } else {
+                let d2 = dx * dx + dy * dy;
+                assert!((0x58 * 0x58..=0x65 * 0x65).contains(&d2), "seed {seed}: ({dx}, {dy})");
+                moved += 1;
+            }
+        }
+    }
+    assert!(moved > 10, "{moved} arrows fired");
+}
+
+/// Fixed (kept bug #30): a spell striking a person (slot below 0Fh) or
+/// nobody frees its cast record; the original leaves it in use.
+#[test]
+fn fixed_casts_that_hit_no_creature_are_freed() {
+    use arena::fixes::{CAST_RECORD_LEAK, Fixes};
+    let Some(img) = common::image() else { return };
+    for occupant in [5u16, 0xFFFF] {
+        for fixes in [Fixes::NONE, Fixes::only(CAST_RECORD_LEAK)] {
+            let mut m = Machine::new(&img);
+            m.fixes = fixes;
+            let cast = 0x7F86 + 2 * 0x16;
+            m.mem.w16(DS, cast, 0);
+            m.mem.w16(DS, cast + 2, SPSEG);
+            m.mem.w8(SPSEG, 0x24, 1);
+            m.mem.w16(DS, cast + 0xA, 0x21);
+            m.mem.w16(DS, 0x7A44, occupant);
+            m.impact(cast, 0x400, 0x400, &mut arena::strike::NoKillHooks).unwrap();
+            let want = if fixes == Fixes::NONE { 0x21 } else { 0x20 };
+            assert_eq!(m.mem.r16(DS, cast + 0xA), want, "occupant {occupant:x} {fixes:?}");
+        }
+    }
+}
+
+/// Fixed (kept bug #71): a player's aimed spell of element 5 launches
+/// with no delay; the original's DX (the caller's 0) holds it FFFFh
+/// frames.
+#[test]
+fn fixed_element_five_launches_at_once() {
+    use arena::cast::Touch;
+    use arena::fixes::{Fixes, LAUNCH_DX};
+    let Some(img) = common::image() else { return };
+    let mut files = arena::bsa::Files::default();
+    for fixes in [Fixes::NONE, Fixes::only(LAUNCH_DX)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w16(DS, 0x1042, CSEG);
+        m.mem.w16(DS, 0xD806, WSEG);
+        m.mem.w16(DS, 0x9030, FRAME);
+        m.mem.w16(DS, 0xC3D6, 0xA0);
+        for i in 0..12u16 {
+            m.mem.w8(DS, 0x7DBC + i * 0x1C + 0x11, 0);
+        }
+        let cast = 0x7F86;
+        m.mem.w16(DS, cast, 0);
+        m.mem.w16(DS, cast + 2, SPSEG);
+        m.mem.w16(DS, cast + 0xA, 0x21);
+        m.mem.w8(SPSEG, 0x24, 2);
+        m.mem.w8(SPSEG, 0x26, 5);
+        m.mem.w16(SPSEG, 0x27, 0);
+        m.mem.w16(DS, 0x0620, cast);
+        assert_eq!(m.resolve_cast(&mut files, Touch::Record(DS, 0x1A4), &mut |_, _| {}), Some(true));
+        let delay = m.mem.r16(DS, 0x7DBC + 0x1A);
+        assert_eq!(delay, if fixes == Fixes::NONE { 0xFFFF } else { 0 }, "{fixes:?}");
+    }
+}

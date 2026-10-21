@@ -105,3 +105,39 @@ fn fixed_crimes_are_seen_half_the_time_at_high_levels() {
         assert_eq!(crimes_seen(&img, fixed, level), crimes_seen(&img, Fixes::NONE, level), "level {level}");
     }
 }
+
+/// Fixed (kept bug #27): striking an actor from behind passes AX = 1 to
+/// 2AA1:0000 (DGROUP 1298), from the front 0; the original's `xor ax, ax`
+/// clears the carry first and it is always 0.
+#[test]
+fn fixed_strike_from_behind_is_flagged() {
+    use arena::fixes::{Fixes, REAR_ATTACK};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x1042, CSEG);
+    base.mem.w16(DS, 0xD806, WSEG);
+    base.mem.w16(DS, 0x9030, FRAME);
+    base.mem.w16(DS, 0x91F0, 0);
+    let classes: Vec<u8> = (0..18).map(|i| base.mem.r8(DS, 0x2A50 + i)).collect();
+    for seed in 1..20u32 {
+        for (fixes, behind) in [(Fixes::NONE, false), (Fixes::NONE, true), (Fixes::only(REAR_ATTACK), false), (Fixes::only(REAR_ATTACK), true)] {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            let mut s = setup(&mut m, seed, 0, &classes);
+            let si = strike(&mut m, &mut s, 0);
+            m.mem.w16(DS, si + 0x12, 0);
+            let (x, z, px, pz) = (0x400 + seed as u16 * 0x20, 0x900, 0x700, 0x300 + seed as u16 * 0x40);
+            put(&mut m, DS, si, &[x as u8, (x >> 8) as u8, 0, 0, z as u8, (z >> 8) as u8]);
+            m.mem.w16(DS, 0xC3D0, px);
+            m.mem.w16(DS, 0xC3D4, pz);
+            m.mem.w16(DS, si + 6, 0xC3D0);
+            let h = arena::travel::travel_heading(x, z, px, pz);
+            m.mem.w16(DS, si + 0xA, if behind { (h + 0x100) & 0x1FF } else { h });
+            m.mem.w16(DS, 0x1298, 0xFFFF);
+            m.load_rng();
+            let _ = m.strike_actor(si, &mut arena::strike::NoKillHooks);
+            let want = (fixes != Fixes::NONE && behind) as u16;
+            assert_eq!(m.mem.r16(DS, 0x1298), want, "seed {seed} {fixes:?} behind {behind}");
+        }
+    }
+}

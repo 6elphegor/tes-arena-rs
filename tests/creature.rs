@@ -126,3 +126,27 @@ fn matches_original() {
     eprintln!("{count:?}");
     assert_eq!(count.len(), 16);
 }
+
+/// Fixed (kept bug #66): an NPC seed with a rolled level (level 0) keeps
+/// the class asked for; the original rolls the class anyway.
+#[test]
+fn fixed_npc_seed_keeps_the_class() {
+    use arena::fixes::{Fixes, NPC_SEED_CLASS};
+    use arena::mem::DS;
+    let Some(img) = common::image() else { return };
+    let classes = |fixes: Fixes, class: u16| {
+        (0..50u32)
+            .map(|seed| {
+                let mut m = Machine::new(&img);
+                m.fixes = fixes;
+                m.rng.seed = seed.wrapping_mul(0x9E37_79B9);
+                m.npc_seed(DS, 0xF000, class, 0).unwrap();
+                m.mem.r8(DS, 0xF005)
+            })
+            .collect::<Vec<u8>>()
+    };
+    assert!(classes(Fixes::only(NPC_SEED_CLASS), 7).iter().all(|&c| c == 7));
+    assert!(classes(Fixes::NONE, 7).iter().any(|&c| c != 7));
+    // 0xFFFF still rolls it, as the original does.
+    assert_eq!(classes(Fixes::only(NPC_SEED_CLASS), 0xFFFF), classes(Fixes::NONE, 0xFFFF));
+}

@@ -101,3 +101,26 @@ fn matches_original() {
     eprintln!("{count:?}");
     assert_eq!(count.len(), 10);
 }
+
+/// Fixed (kept bug #19): an Archer's critical chance with a missile
+/// weapon is 3 x level; the original uses what the missile-table search
+/// left in CX (here 0: never a critical).
+#[test]
+fn fixed_archer_crits_grow_with_level() {
+    use arena::fixes::{ARCHER_CRIT, Fixes};
+    let Some(img) = common::image() else { return };
+    let crits = |fixes: Fixes, level: u8| {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.mem.w8(MSEG, 5, 0x4D);
+        m.mem.w8(MSEG, 6, level);
+        m.rng.seed = 777;
+        let g = Gear { missile: true, missile_cx: 0, ..Gear::default() };
+        (0..1000).filter(|_| m.critical_multiplier(Ptr::new(MSEG, 0), &g) == 3).count()
+    };
+    assert_eq!(crits(Fixes::NONE, 20), 0);
+    let n = crits(Fixes::only(ARCHER_CRIT), 20);
+    assert!((520..680).contains(&n), "level 20: {n} of 1000");
+    let n = crits(Fixes::only(ARCHER_CRIT), 5);
+    assert!((100..200).contains(&n), "level 5: {n} of 1000");
+}

@@ -581,8 +581,8 @@ impl Machine {
     /// trigger waiting on it gets its square (the row; for the column a
     /// leftover loop count), and a flat (0x82, number at 05E2) is left
     /// at its square or a free one around it. Then its spell effects
-    /// end.
-    fn actor_leave(&mut self, si: u16) {
+    /// end. Fixed (#62), the trigger gets the creature's column too.
+    pub fn actor_leave(&mut self, si: u16) {
         if self.mem.r16(DS, 0x05C8) & 0x1000 != 0 && self.act8(si, f::SPRITE) != 0xC5 {
             let mut n = 0;
             for k in 0..8 {
@@ -599,8 +599,11 @@ impl Machine {
                 self.mem.w16(DS, m, 0xFFFF);
                 let t = self.mem.r16(DS, m + 2);
                 // The column byte is meant to be the square's, but CX
-                // still holds the search's loop count here.
-                self.mem.w8(DS, t.wrapping_add(TRIGGER_SQUARES), (8 - k) as u8 >> 1);
+                // still holds the search's loop count here. Fixed (#62),
+                // the square's column (its doubled byte halved, as the
+                // SHR was for).
+                let c = if self.fixed(crate::fixes::TRIGGER_COLUMN) { col } else { (8 - k) as u8 };
+                self.mem.w8(DS, t.wrapping_add(TRIGGER_SQUARES), c >> 1);
                 self.mem.w8(DS, t.wrapping_add(TRIGGER_SQUARES + 1), (row >> 8) as u8);
             }
             let walls = self.mem.r16(DS, MAP1_SEG);

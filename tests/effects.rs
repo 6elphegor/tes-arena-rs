@@ -180,3 +180,61 @@ fn matches_original() {
     eprintln!("{count:?}");
     assert_eq!(count.len(), 18);
 }
+
+/// A machine with every effect slot free.
+fn free_slots(img: &arena::exe::Image, fixes: arena::fixes::Fixes) -> Machine {
+    let mut m = Machine::new(img);
+    m.fixes = fixes;
+    m.mem.w16(DS, 0x1042, MSEG);
+    for i in 0..16 {
+        m.mem.w8(DS, 0x0660 + i * 0x3C + 0x3B, 0xFF);
+    }
+    m
+}
+
+/// Fixed (kept bug #23): an effect pulsing on the player works its
+/// modifiers out on the 256 scale (carry weight 2 x STR in 256ths); the
+/// original runs 1194:361D on the percent attributes.
+#[test]
+fn fixed_effect_pulse_scales_the_players_attributes() {
+    use arena::fixes::{EFFECT_SCALE, Fixes};
+    let Some(img) = common::image() else { return };
+    let p = 0x01A4;
+    for fixes in [Fixes::NONE, Fixes::only(EFFECT_SCALE)] {
+        let mut m = free_slots(&img, fixes);
+        for i in 0..8 {
+            m.mem.w8(DS, p + 0x29 + i, 50);
+            m.mem.w8(DS, p + 0x31 + i, 50);
+        }
+        m.mem.w8(DS, p + 0x38, 0xCC);
+        m.mem.w16(DS, p + 0x40D, 0);
+        let Applied::Slot(Some(s)) = m.apply_effect(DS, p, 0x10, 1, 5, 1, 0xFFFC) else { panic!("not applied") };
+        for o in 6..0x14 {
+            m.mem.w8(DS, s + o, 0);
+        }
+        m.tick_effects(&mut Hooks::default());
+        assert_eq!(m.mem.r8(DS, p + 0x29), 50, "{fixes:?}");
+        let weight = m.mem.r16(DS, p + 0x3B);
+        let want = if fixes == Fixes::NONE { 100 } else { 2 * arena::scale::to256(50) as u16 };
+        assert_eq!(weight, want, "{fixes:?}");
+    }
+}
+
+/// Fixed (kept bug #70): a new effect's deltas start at 0; the original
+/// keeps what the slot held.
+#[test]
+fn fixed_new_effects_start_with_no_deltas() {
+    use arena::fixes::{EFFECT_DELTAS, Fixes};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(EFFECT_DELTAS)] {
+        let mut m = free_slots(&img, fixes);
+        for o in 0..0x3B {
+            m.mem.w8(DS, 0x0660 + o, 0x5A);
+        }
+        let Applied::Slot(Some(s)) = m.apply_effect(MSEG, 0, 0x10, 1, 5, 1, 0xFFFC) else { panic!("not applied") };
+        assert_eq!(s, 0x0660);
+        let deltas: Vec<u8> = [0u16, 0x14].iter().flat_map(|&b| (6..0x14).map(move |o| b + o)).map(|o| m.mem.r8(DS, s + o)).collect();
+        let want = if fixes == Fixes::NONE { 0x5A } else { 0 };
+        assert!(deltas.iter().all(|&d| d == want), "{fixes:?}: {deltas:x?}");
+    }
+}

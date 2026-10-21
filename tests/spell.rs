@@ -242,7 +242,7 @@ fn one_effect(img: &arena::exe::Image, fixes: arena::fixes::Fixes, kind: u8, sub
     }
     // A creature at CSEG:0 with some HP.
     m.mem.w16(CSEG, 0x40D, 0x1000);
-    m.mem.w16(CSEG, 0x1A, 50);
+    m.mem.w16(CSEG, 0x59, 50);
     m
 }
 

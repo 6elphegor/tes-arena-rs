@@ -237,7 +237,8 @@ impl Machine {
     /// 0x100 refuse to stack). Phase A pulses every `period` ticks for
     /// `duration` pulses (at least 1); phase B pulses every `b_period`
     /// with `b_left` remaining (or one of the `B_*` modes). The deltas
-    /// start at whatever the slot held before.
+    /// start at whatever the slot held before. Fixed (#70), they start at
+    /// 0, so a delta the caller doesn't set is none, not a leftover.
     ///
     /// The effect message goes into DGROUP 1405 (`fx_message`).
     // The original's register arguments, one each.
@@ -276,6 +277,13 @@ impl Machine {
         w(self, slot::TARGET_SEG, seg);
         w(self, slot::TARGET_OFF, off);
         self.mem.w8(DS, s + slot::STATE, 0);
+        if self.fixed(crate::fixes::EFFECT_DELTAS) {
+            for blk in [slot::PHASE_A, slot::PHASE_B] {
+                for o in block::ATTRS..block::FATIGUE + 2 {
+                    self.mem.w8(DS, s + blk + o, 0);
+                }
+            }
+        }
         for i in 0..8 {
             let a = self.mem.r8(seg, off.wrapping_add(ATTRS + i));
             self.mem.w8(DS, s + slot::SNAPSHOT + i, a);
@@ -496,8 +504,14 @@ impl Machine {
             self.mem.w8(seg, at, v);
         }
         // 1194:361D on the record as it is: player attributes are in
-        // percent, not the 256 scale that routine expects.
-        self.attribute_modifiers_at(seg, off);
+        // percent, not the 256 scale that routine expects. Fixed (#23),
+        // the player's are worked out from its attributes on the 256
+        // scale, as 1194:1408 (`player_derived_stats`) does elsewhere.
+        if self.fixed(crate::fixes::EFFECT_SCALE) && (seg, off) == (DS, crate::character::PLAYER) {
+            self.player_modifiers();
+        } else {
+            self.attribute_modifiers_at(seg, off);
+        }
         self.level_tier_stats(seg, off);
 
         let d = self.mem.r16(DS, blk + block::SP);

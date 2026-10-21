@@ -180,11 +180,25 @@ impl Machine {
     /// slot). It works out whether the player is behind the actor
     /// (0000:3D17, from the heading to the actor's target pointer), but
     /// the `xor ax, ax` before its JAE clears that carry: AX is always 0.
+    /// Fixed (#27), AX is 1 when the player is behind the actor, as the
+    /// `inc ax` after the JAE was there to make it (DGROUP 1298; nothing
+    /// in the game reads it, so no rear-attack effect follows).
     pub fn strike_actor(&mut self, si: u16, kill: &mut dyn KillHooks) -> Option<()> {
+        let arg = if self.fixed(crate::fixes::REAR_ATTACK) { self.behind_actor(si) as u16 } else { 0 };
         self.mem.w16(DS, var::ATTACKER, PLAYER);
         let rec = self.mem.r16(DS, si + f::RECORD);
         self.mem.w16(DS, var::DEFENDER, rec);
-        self.player_attack(0, si, kill)
+        self.player_attack(arg, si, kill)
+    }
+
+    /// 0000:3D17. Whether the actor in slot `si` has the one it is after
+    /// (the position at its +6 pointer) behind it: the heading there
+    /// less the actor's (+A) is 80h..17Fh, or -17Fh..-80h, of 200h.
+    fn behind_actor(&self, si: u16) -> bool {
+        let di = self.mem.r16(DS, si + 6);
+        let h = travel_heading(self.mem.r16(DS, si), self.mem.r16(DS, si + 4), self.mem.r16(DS, di), self.mem.r16(DS, di.wrapping_add(4)));
+        let ax = h.wrapping_sub(self.mem.r16(DS, si + 0xA)) as i16;
+        if ax >= 0 { (0x80..0x180).contains(&ax) } else { (-0x17F..=-0x80).contains(&ax) }
     }
 
     /// 2AA1:0000. The player (DGROUP 1400 = 01A4) hits the record at 1402

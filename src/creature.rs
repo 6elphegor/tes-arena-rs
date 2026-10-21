@@ -243,13 +243,14 @@ impl Machine {
 
     /// 1194:38B9. Fills the 16-byte NPC seed record at seg:off. `level` 0
     /// rolls the level and then always rolls the class, ignoring `class`;
-    /// otherwise `class` 0xFFFF rolls it.
+    /// otherwise `class` 0xFFFF rolls it. Fixed (#66), a rolled level
+    /// keeps the class asked for too: only 0xFFFF rolls it.
     pub fn npc_seed(&mut self, seg: u16, off: u16, class: u16, level: u16) -> Option<()> {
         let w8 = |m: &mut Self, f: u16, v: u8| m.mem.w8(seg, off.wrapping_add(f), v);
         let class_byte = if level == 0 {
             let l = self.npc_roll_level();
             w8(self, seed::LEVEL, l as u8);
-            None
+            (self.fixed(crate::fixes::NPC_SEED_CLASS) && class != 0xFFFF).then_some(class as u8)
         } else {
             w8(self, seed::LEVEL, level as u8);
             (class != 0xFFFF).then_some(class as u8)
