@@ -248,3 +248,45 @@ fn matches_original() {
     eprintln!("celestial: {n} compared, {stuck} fault in both");
     assert!(n > 2000, "{n} compared");
 }
+
+/// The destinations the moons' phases are decoded to.
+#[derive(Default)]
+struct Phases(Vec<(u16, u16)>);
+
+impl CelestialHooks for Phases {
+    fn moon_phase(&mut self, _m: &mut Machine, name: u16, _frame: u16, dest: u16) {
+        self.0.push((name, dest));
+    }
+}
+
+/// Fixed (kept bug #47): the second moon's phase is decoded through its
+/// far pointer (CCAE), where it is drawn from; the original decodes it
+/// at the frame's offset CCAEh itself.
+#[test]
+fn fixed_second_moon_decoded_through_its_pointer() {
+    use arena::fixes::{Fixes, MOON2_PHASE};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x9030, FRAME);
+    let mut seen = 0;
+    for seed in 1..400u32 {
+        for fixes in [Fixes::NONE, Fixes::only(MOON2_PHASE)] {
+            let mut m = base.clone();
+            m.fixes = fixes;
+            if setup(&mut m, seed).is_none() {
+                break;
+            }
+            let pointer = m.mem.r16(DS, 0xCCAE);
+            let mut h = Phases::default();
+            if m.celestial(&mut h).is_none() || h.0.len() != 2 {
+                break;
+            }
+            let want = if fixes == Fixes::NONE { 0xCCAE } else { pointer };
+            assert_eq!(h.0[1], (0xD87C, want), "seed {seed} {fixes:?}");
+            if pointer != 0xCCAE {
+                seen += 1;
+            }
+        }
+    }
+    assert!(seen > 10, "{seen} phases decoded");
+}

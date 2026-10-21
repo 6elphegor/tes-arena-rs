@@ -284,3 +284,45 @@ fn matches_original() {
     }
     assert!(n > 3500);
 }
+
+/// Fixed (kept bug #45): the lightning puts the bolt image's y back into
+/// the image; the original writes it into DGROUP at the image's offset
+/// + 8 and leaves the image with the drawn y.
+#[test]
+fn fixed_lightning_puts_the_bolts_y_back() {
+    use arena::fixes::{BOLT_Y, Fixes};
+    let Some(img) = common::image() else { return };
+    let mut base = Machine::new(&img);
+    base.mem.w16(DS, 0x9030, FRAME);
+    // The image's y and DGROUP's word at its offset + 8, before and after.
+    let run = |seed: u32, fixes: Fixes| {
+        let mut m = base.clone();
+        m.fixes = fixes;
+        for o in 0..=0xFFFFu16 {
+            m.mem.w8(FRAME, o, 0);
+        }
+        let (op, mask) = setup(&mut m, seed);
+        if op != 2 {
+            return None;
+        }
+        m.load_rng();
+        let at = m.mem.r16(DS, 0x43C8).wrapping_add(8);
+        let was = (m.mem.r16(FRAME, at), m.mem.r16(DS, at));
+        let mut h = Hooks { log: Vec::new(), loads: 0, mask, fog: false };
+        m.lightning(&mut h)?;
+        Some((was, (m.mem.r16(FRAME, at), m.mem.r16(DS, at))))
+    };
+    let mut drawn = 0;
+    for seed in 1..3000u32 {
+        let Some((was, now)) = run(seed, Fixes::NONE) else { continue };
+        if now.0 == was.0 {
+            continue;
+        }
+        // The original: the image keeps the drawn y, DGROUP gets its own.
+        assert_eq!(now.1, was.0, "seed {seed}");
+        let (was, now) = run(seed, Fixes::only(BOLT_Y)).unwrap();
+        assert_eq!(now, was, "seed {seed}");
+        drawn += 1;
+    }
+    assert!(drawn > 5, "{drawn} bolts drawn");
+}

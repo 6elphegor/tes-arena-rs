@@ -253,6 +253,8 @@ impl Machine {
     /// clear), in the bank E41A maps (C8F3), the bank mapped before put
     /// back. The second moon's frame goes to the EMS frame at CCAEh, the
     /// offset E499 puts in DI, not the far pointer there: the original's.
+    /// Fixed (#47), through the pointer, where the moon is drawn from, as
+    /// the first moon's is.
     pub fn moon_phases(&mut self, files: &mut crate::bsa::Files) -> Option<()> {
         let flags = (self.mem.r16(DS, 0xC398), self.mem.r16(DS, 0xC39A));
         if flags.0 & 4 == 0 || flags.1 & 0x20 != 0 || self.mem.r8(DS, 0xBB09) != 0 {
@@ -266,7 +268,8 @@ impl Machine {
         self.ems_map(self.mem.r8(DS, 0xC8F3) as u16);
         self.mem.w8(DS, PHASE_DAY, day);
         let dest = self.mem.r16(DS, MOON1);
-        let r = self.moon_phase_load(files, MOON1_NAME, day as u16, dest).and_then(|()| self.moon_phase_load(files, MOON2_NAME, (day as u16 + 0xE) & 0x1F, MOON2));
+        let dest2 = if self.fixed(crate::fixes::MOON2_PHASE) { self.mem.r16(DS, MOON2) } else { MOON2 };
+        let r = self.moon_phase_load(files, MOON1_NAME, day as u16, dest).and_then(|()| self.moon_phase_load(files, MOON2_NAME, (day as u16 + 0xE) & 0x1F, dest2));
         self.ems_map(mapped);
         r
     }
@@ -277,8 +280,8 @@ impl Machine {
     /// past the header; then the moons (0000:E46D): their places, their
     /// pictures made again when the day of the month changed (the second
     /// decoded at the frame's offset CCAEh itself, not through its
-    /// pointer: kept), each drawn where seen. None where a projection's
-    /// division overflows (the original faults).
+    /// pointer: kept; fixed (#47), through it), each drawn where seen.
+    /// None where a projection's division overflows (the original faults).
     pub fn celestial(&mut self, hooks: &mut dyn CelestialHooks) -> Option<()> {
         if self.mem.r8(DS, 0xBB09) != 0 {
             return Some(());
@@ -305,7 +308,8 @@ impl Machine {
             self.mem.w8(DS, PHASE_DAY, day);
             let dest = self.mem.r16(DS, MOON1);
             hooks.moon_phase(self, MOON1_NAME, day as u16, dest);
-            hooks.moon_phase(self, MOON2_NAME, (day as u16 + 0xE) & 0x1F, MOON2);
+            let dest2 = if self.fixed(crate::fixes::MOON2_PHASE) { self.mem.r16(DS, MOON2) } else { MOON2 };
+            hooks.moon_phase(self, MOON2_NAME, (day as u16 + 0xE) & 0x1F, dest2);
         }
         for (at, size, si) in [(MOON1_AT, MOON1_SIZE, MOON1), (MOON2_AT, MOON2_SIZE, MOON2)] {
             let x = self.mem.r16(DS, at);

@@ -81,6 +81,18 @@ pub const FATIGUE_DRAIN_CARRY: u8 = 28;
 pub const CAST_RECORD_LEAK: u8 = 30;
 /// #31: an arrow's C8h head start is lost (29CF:037F).
 pub const ARROW_HEAD_START: u8 = 31;
+/// #44: a dark run's ceiling x step has the EMS frame's segment for its low word (0000:D865).
+pub const CEILING_STEP: u8 = 44;
+/// #45: the lightning bolt image's y put back into DGROUP, not the image (2294:05A6).
+pub const BOLT_Y: u8 = 45;
+/// #46: a returning snowflake banded by the view's width, not its count (0000:E26B).
+pub const SNOW_BANDS: u8 = 46;
+/// #47: the second moon's phase decoded at offset CCAEh, not through its pointer (0000:E499).
+pub const MOON2_PHASE: u8 = 47;
+/// #51: the dream speech maps back VISION.EMS's bank word >> 4, not >> 2 (2F75:014E).
+pub const VISION_BANK: u8 = 51;
+/// #59: last fit leaves a stale back pointer; first fit's order check tests seg | off (0000:9CD6, 51F2).
+pub const HEAP_LINKS: u8 = 59;
 /// #62: a creature leaving range gives its trigger a loop count for a column (0000:25CE).
 pub const TRIGGER_COLUMN: u8 = 62;
 /// #63: the bare-handed gauntlet search reads the slot count in the record's segment (1194:7316).
@@ -99,3 +111,5 @@ pub const SUB_KIND_DS: u8 = 69;
 pub const EFFECT_DELTAS: u8 = 70;
 /// #71: a player's element-5 launch takes the caller's DX for its delay (29CF:00D2).
 pub const LAUNCH_DX: u8 = 71;
+/// #77: GetByte lets the end of the input in as FFFFh; a size of 0 leaks the tables (3065:0D2D).
+pub const MIF_EOF: u8 = 77;

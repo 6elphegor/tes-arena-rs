@@ -505,7 +505,8 @@ impl Engine {
         let reach = r(m, 0xC394);
         m.mem.w16(DS, 0xC394, reach << 1);
         if (r(m, HEIGHT) as i16) >= 0 {
-            // shl then shr: bit 15 is lost for the draw.
+            // shl then shr: bit 15 is lost for the draw (never set, #75:
+            // the reach is the detail setting, a few dozen).
             m.mem.w16(DS, 0xC394, (reach << 1) >> 1);
             let f = r(m, MAP_FLAGS) | 0x20;
             m.mem.w16(DS, MAP_FLAGS, f);

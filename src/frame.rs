@@ -1168,7 +1168,8 @@ impl Machine {
     /// band's speed (E2BA, E2B8, E2B6) and drifts, the other way on a
     /// roll under 3A98h. A flake that came back is banded by what the
     /// original's division left in CX, the view's width, not the count
-    /// (kept). None where the view has no width.
+    /// (kept). None where the view has no width. Fixed (#46), it is banded
+    /// by its count, as every flake that stayed in view is.
     pub fn snow_drops(&mut self, mut page: Option<&mut [u8]>) -> Option<()> {
         let r = |m: &Machine, a: u16| m.mem.r16(DS, a);
         let mut si = 0xE05Eu16;
@@ -1188,7 +1189,7 @@ impl Machine {
                     self.mem.w16(DS, si, x);
                     let top = r(self, 0xA916);
                     self.mem.w16(DS, si.wrapping_add(2), top);
-                    cx = w;
+                    cx = if self.fixed(crate::fixes::SNOW_BANDS) { count } else { w };
                     continue;
                 }
                 let bx = r(self, 0xA6A0u16.wrapping_add(y.wrapping_add(y))).wrapping_add(x);

@@ -102,7 +102,8 @@ const PLANE_BYTES: u16 = 0x8000;
 /// the file, so the loop skips the same stale chunk until the 32-bit
 /// position wraps around GLOBAL.BSA and real bytes are read again. That
 /// can end (on a LEVL tag, or the position landing on the entry's end)
-/// after hundreds of thousands of chunks, or never.
+/// after hundreds of thousands of chunks, or never. Never reached in play
+/// (#81): the level is the header's or a stairway's, one of the file's.
 const CHUNK_LIMIT: u32 = 1 << 26;
 /// EMS page mapped before a plane is read.
 const PLANE_PAGE: u16 = 0x1F;

@@ -67,3 +67,59 @@ fn matches_original() {
     }
     eprintln!("{n} heap cases");
 }
+
+/// Fixed (kept bug #59), last fit: splitting a block points the block
+/// after it back at the split's new block; the original leaves it at the
+/// block split.
+#[test]
+fn fixed_last_fit_split_relinks_the_next_block() {
+    use arena::fixes::{Fixes, HEAP_LINKS};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(HEAP_LINKS)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.heap_init(0x2000, 0x3000).unwrap();
+        let (_a, _) = m.heap_alloc(0x100).unwrap();
+        let (b, _) = m.heap_alloc(0x100).unwrap();
+        let (c, _) = m.heap_alloc(0x100).unwrap();
+        // The rest taken, so only B's block is free once B goes.
+        let rest = m.mem.r16(c + 0x100, 8);
+        m.heap_alloc(rest).unwrap();
+        m.heap_free(b);
+        let got = m.heap_alloc_high(0x40 * 16).unwrap();
+        assert_eq!(got, b);
+        let new = b + 0x40;
+        let back = m.mem.r16(c - 1, 6);
+        assert_eq!(back, if fixes == Fixes::NONE { b - 1 } else { new }, "{fixes:?}");
+    }
+}
+
+/// Fixed (kept bug #59), first fit: a next pointer to a lower segment is
+/// reported as a corrupt list; the original's check compares a header's
+/// segment with itself and takes the block it points to.
+#[test]
+fn fixed_first_fit_checks_the_order() {
+    use arena::fixes::{Fixes, HEAP_LINKS};
+    let Some(img) = common::image() else { return };
+    for fixes in [Fixes::NONE, Fixes::only(HEAP_LINKS)] {
+        let mut m = Machine::new(&img);
+        m.fixes = fixes;
+        m.heap_init(0x2000, 0x3000).unwrap();
+        let (a, _) = m.heap_alloc(0x100).unwrap();
+        let rest = m.mem.r16(a + 0x100, 8);
+        m.heap_alloc(rest).unwrap();
+        // The last block's next pointer to a free block below the heap.
+        let last = a + 0x100;
+        m.mem.w16(last, 0, 0);
+        m.mem.w16(last, 2, 0x1000);
+        for (o, v) in [(0u16, 0u16), (2, 0), (4, 0), (6, last), (8, 0x80), (0xA, 0)] {
+            m.mem.w16(0x1000, o, v);
+        }
+        let got = m.heap_alloc(0x10);
+        if fixes == Fixes::NONE {
+            assert_eq!(got, Some((0x1001, 0)));
+        } else {
+            assert_eq!(got, None);
+        }
+    }
+}

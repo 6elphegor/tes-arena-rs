@@ -523,6 +523,15 @@ impl Machine {
         Some(first)
     }
 
+    /// The bank 2F75:014E maps back from the word VISION.EMS kept (read to
+    /// 8F41): that word shifted right by 4, though it was 8FA8's, the
+    /// bank times 4 (bug kept). Fixed (#51), shifted right by 2: the bank
+    /// mapped before the speech.
+    pub fn speech_bank(&self) -> u16 {
+        let kept = self.mem.r16(DS, SPEECH_NAME);
+        if self.fixed(crate::fixes::VISION_BANK) { kept >> 2 } else { kept >> 4 }
+    }
+
     /// 2F75:014E: the speech put away (see the module); first the sound
     /// stopped (23BA:000C: the driver's, where it says it plays).
     fn speech_close(&mut self, files: &mut Files, driver: &mut dyn DigitalDriver) -> Option<()> {
@@ -540,7 +549,7 @@ impl Machine {
                 self.file_read(files, frame, 0, 0xFFFF);
             }
             self.file_close(files);
-            self.map_bank(self.mem.r16(DS, SPEECH_NAME) >> 4, 0);
+            self.map_bank(self.speech_bank(), 0);
             self.heap_free(self.mem.r16(DS, SOUND_BUFFER + 2));
             self.speech_buffer(0x4E20)?;
             let (seg, off) = self.heap_alloc_bytes(0xFA04)?;

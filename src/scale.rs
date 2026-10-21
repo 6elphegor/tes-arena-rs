@@ -39,6 +39,7 @@ pub fn attrs_to100(mem: &mut Memory, src: u16, dst: u16, n: u16) {
 
 /// 1194:1012. Converts `n` percent attribute bytes to the 256 scale.
 /// The bytes are read signed, and exactly 100 maps to 255 rather than 256.
+/// Not bugs (#78): 256 doesn't fit the byte, and percents stay under 128.
 pub fn attrs_to256(mem: &mut Memory, src: u16, dst: u16, n: u16) {
     for i in 0..n {
         let a = mem.r8(DS, src.wrapping_add(i)) as i8 as i16;
