@@ -120,5 +120,13 @@ pub const FAILED_STAGE: u8 = 49;
 /// #50: the informant's line rolled on a fake RNG in the EMS frame
 /// (1194:D105).
 pub const INFORMANT_RNG: u8 = 50;
+/// #52: the "Where is" list leaves its picture's load bank mapped
+/// (1194:5884).
+pub const LIST_BANK: u8 = 52;
+/// #53: a one-name sort leaves the order table stale (0000:0B9C).
+pub const ONE_NAME_SORTED: u8 = 53;
+/// #54: "her" written past the text when "his home" isn't in it
+/// (1194:2945).
+pub const HER_HOME: u8 = 54;
 /// #61: the loot window puts back a bank it never saved (2433:0583).
 pub const LOOT_BANK: u8 = 61;

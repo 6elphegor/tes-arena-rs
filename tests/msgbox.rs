@@ -462,6 +462,56 @@ fn the_lists_kinds_as_the_original() {
     assert!(n >= 10, "{n} cases");
 }
 
+/// Fixed (kept bug #52): "Where is"'s list (kind 9) maps back the bank
+/// mapped before it; the original writes the picture's load bank over
+/// the bank it saved (A894), so that bank is left mapped.
+#[test]
+fn fixed_where_is_list_maps_its_bank_back() {
+    use arena::fixes::{Fixes, LIST_BANK};
+    let Some((base, files)) = set_up_files() else { return };
+    let bank_after = |fixes: Fixes| {
+        let mut m = case_start(&base, (0xA0, 0x64));
+        m.fixes = fixes;
+        let mut fs = files.clone();
+        m.ems_map(5);
+        for (i, &b) in b"Where is\0".iter().enumerate() {
+            m.mem.w8(DS, 0x1044 + i as u16, b);
+        }
+        for (i, &b) in b"one\0two\0".iter().enumerate() {
+            m.mem.w8(DS, 0x1100 + i as u16, b);
+        }
+        m.list_window(&mut fs, 9, (DS, 0x1100), 2, 0x1044, 0).expect("the list");
+        m.mem.r16(DS, 0x8FA8) >> 2
+    };
+    let load = base.mem.r16(DS, 0x1030);
+    assert_ne!(load, 5);
+    assert_eq!(bank_after(Fixes::NONE), load, "the original's load bank");
+    assert_eq!(bank_after(Fixes::only(LIST_BANK)), 5);
+}
+
+/// Fixed (kept bug #53): the spellbook's corner list (kind 9) of one
+/// spell gives that spell; the original's one-name sort leaves the order
+/// at 1044 as it was, and the pick is read through it (here 7: the
+/// eighth byte of the book, 22h).
+#[test]
+fn fixed_a_one_spell_book_gives_its_spell() {
+    use arena::fixes::{Fixes, ONE_NAME_SORTED};
+    let Some((base, files)) = set_up_files() else { return };
+    let cast = |fixes: Fixes| {
+        let mut m = case_start(&base, (0xA0, 0x64));
+        m.fixes = fixes;
+        let mut fs = files.clone();
+        m.mem.w16(DS, 0x8036, 9);
+        m.mem.w8(DS, 0x01A4 + 0x366, 1);
+        m.mem.w8(DS, 0x01A4 + 0x367, 3);
+        m.mem.w8(DS, 0x01A4 + 0x367 + 7, 0x22);
+        m.mem.w8(DS, 0x1044, 7);
+        m.spellbook_list(&mut fs, None, 0).expect("the list")
+    };
+    assert_eq!(cast(Fixes::NONE), Some(0x22), "the original's stale order");
+    assert_eq!(cast(Fixes::only(ONE_NAME_SORTED)), Some(3));
+}
+
 /// Creation's class list (1194:2678 whole, `Machine::class_list`) with
 /// FONT_C loaded at [102A], a line taken among the six first shown, or
 /// with the lines scrolled by the down arrow first (3159:09E8, 0E68: the
