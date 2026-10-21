@@ -450,7 +450,7 @@ the original routine:
 | `WeaponHooks::fire_bow` | src/weapon.rs:76 | 29CF:037F | port | the default runs the port | |
 | `WeaponHooks::surrender` | src/weapon.rs:81 | 2AA1:0819..083B | port | the default runs the port (`surrender_text`), then `surrender_box` | |
 | `WeaponHooks::surrender_box` | src/weapon.rs:87 | 1194:59C8 | overridden | the view's `Front` shows the box (`message_shown`) | faithful: playsurrender's DGROUP and EMS |
-| `KillHooks::surrender` | src/strike.rs:504 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; `strike::Words` makes the words and hands the box to `ClockHooks::surrender_box` (a spell's lingering effect), `TalkHooks::surrender_box` (a touch spell) or the cast's message box (an area spell); a creature's spell on itself passes `NoKillHooks` | faithful (playsurrender, playsurrenderspell) |
+| `KillHooks::surrender` | src/strike.rs:518 | 2AA1:0819..083B | overridden | `weapon::Kill` runs `WeaponHooks::surrender` for the swing and arrows; `strike::Words` makes the words and hands the box to `ClockHooks::surrender_box` (a spell's lingering effect), `TalkHooks::surrender_box` (a touch spell) or the cast's message box (an area spell); a creature's spell on itself passes `NoKillHooks` | faithful (playsurrender, playsurrenderspell) |
 | `WeaponHooks::wall_trigger` | src/weapon.rs:57 | 0000:43B1 | overridden | the view: main.rs Front<'_> | faithful: `wall_trigger` (trigger vectors) |
 | `WildHooks::load_block` | src/wild.rs:69 | 217B:0189 | port | the default runs the port | |
 | `WildHooks::weather` | src/wild.rs:79 | 0000:0F05 | overridden | the view: areas.rs Wild<'_> | faithful: `weather_set` |
