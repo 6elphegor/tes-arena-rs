@@ -94,6 +94,12 @@ pub const LOG_TRIM: u8 = 33;
 pub const LOGBOOK_CLICKS: u8 = 34;
 /// #35: the logbook's line count written into the frame (1194:4E54).
 pub const LOG_COUNT: u8 = 35;
+/// #36: a text field's click counts the first character's widths; a
+/// character typed inside the text leaves no NUL (0000:A1B9, 9EE9).
+pub const EDIT_TEXT: u8 = 36;
+/// #37: a full key ring marks the last key down; left Shift marks the
+/// right down (0000:718A).
+pub const KEY_RING: u8 = 37;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
