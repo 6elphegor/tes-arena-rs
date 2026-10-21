@@ -1736,7 +1736,7 @@ MOUSE_POINTS = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (
 # Seeded random sessions (`fuzz_script`): name: (where, seed). Each
 # writes its script (`fuzz` line) for worldtest to play the same.
 # A third field 2 draws from the wider vocabulary (`fuzz_script2`), 3
-# from `fuzz_script3`'s, 4 from `fuzz_script4`'s.
+# from `fuzz_script3`'s, 4 from `fuzz_script4`'s, 5 from `fuzz_script5`'s.
 FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1),
         'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2),
         'fuzztown3': ('street', 3, 2), 'fuzzdungeon3': ('dungeon', 4, 2), 'fuzzwild3': ('wild', 3, 2),
@@ -1747,7 +1747,10 @@ FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1':
         'fuzzcamp2': ('wildnight', 1, 3), 'fuzzlevel1': ('levelup', 1, 3), 'fuzzfog1': ('fogged', 1, 3),
         'fuzzstore1': ('shop', 7, 4), 'fuzzstore2': ('shop', 4, 4), 'fuzztavern1': ('inn', 3, 4),
         'fuzztemple1': ('shrine', 4, 4), 'fuzzguild1': ('mages', 3, 4), 'fuzzguild2': ('mages', 5, 4),
-        'fuzznight1': ('nighttown', 2, 4), 'fuzzday1': ('daytown', 1, 4), 'fuzzday2': ('daytown', 2, 4)}
+        'fuzznight1': ('nighttown', 2, 4), 'fuzzday1': ('daytown', 1, 4), 'fuzzday2': ('daytown', 2, 4),
+        'fuzzpool1': ('pool', 2, 4), 'fuzzchasm1': ('chasm', 1, 4), 'fuzzlava1': ('lava', 1, 4),
+        'fuzzguards1': ('guards', 3, 5), 'fuzzarcher1': ('archer', 1, 5), 'fuzzfists1': ('fists', 1, 5),
+        'fuzzcapped1': ('capped', 1, 4)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
 
@@ -1770,6 +1773,8 @@ def fuzz_script(where, seed, vocab=1, total=1500):
         return fuzz_script3(where, seed, total)
     if vocab == 4:
         return fuzz_script4(where, seed, total)
+    if vocab == 5:
+        return fuzz_script5(where, seed, total)
     rng = random.Random(f'{where}:{seed}')
     out, n, ready = [], 0, False
     moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
@@ -2066,6 +2071,73 @@ def fuzz_script4(where, seed, total):
     return out
 
 
+def fuzz_script5(where, seed, total):
+    """`fuzz_script4`'s session fought: the same tokens, but the weapon
+    readied (`a`) and swung (`s`: a bow shoots, bare hands punch) far
+    more often, a quarter of the draws swings once ready; fewer walks,
+    clicks and screens."""
+    rng = random.Random(f'v5:{where}:{seed}')
+    out, n, ready = [], 0, False
+    moves = [((UP,), 5, 120), ((KEY_DOWN,), 5, 40), ((KEY_LEFT,), 2, 30), ((KEY_RIGHT,), 2, 30),
+             ((UP, KEY_LEFT), 5, 60), ((UP, KEY_RIGHT), 5, 60),
+             ((KEY_LCTRL, KEY_LEFT), 2, 40), ((KEY_LCTRL, KEY_RIGHT), 2, 40)]
+    if where in INDOORS4:
+        moves = [(keys, lo, min(hi, 12)) for keys, lo, hi in moves]
+    while n < total:
+        r = rng.random()
+        if r < 0.22:
+            keys, lo, hi = rng.choice(moves)
+            k, m = rng.randint(lo, hi), rng.randint(1, 10)
+            out.append('h' + '+'.join(f'{c:x}' for c in keys) + f',{k},{m}')
+            n += k + m
+        elif r < 0.27:
+            while True:
+                x, y = rng.randint(0, 319), rng.randint(0, 146)
+                if not (0x57 <= x <= 0xEA and 0x29 <= y <= 0x73):
+                    break
+            k, m = rng.randint(3, 40), rng.randint(1, 15)
+            out.append(f'm{x},{y},{k},{m}')
+            n += k + m
+        elif r < 0.31:
+            k = rng.randint(1, 60)
+            out.append(f'w{k}')
+            n += k
+        elif r < 0.34:
+            k = rng.randint(5, 30)
+            out.append(f't{k}')
+            n += k
+        elif r < 0.37:
+            k = rng.randint(20, 60)
+            out.append(f'q{k}')
+            n += 1 + k
+        elif r < 0.45:
+            k = rng.randint(10, 30)
+            out.append(f'a{k}')
+            ready = not ready
+            n += 1 + k
+        elif r < 0.70 and ready:
+            k, m = rng.randint(5, 40), rng.randint(2, 10)
+            out.append(f's{k},{m}')
+            n += k + m
+        elif r < 0.82:
+            k = rng.randint(5, 30)
+            out.append(f'k{k},' + ','.join(fuzz_acts(rng)))
+            n += k
+        elif r < 0.86:
+            k = rng.randint(5, 30)
+            out.append(f'e{k},' + ','.join(fuzz_acts(rng)))
+            n += 1 + k
+        elif r < 0.89:
+            k = rng.randint(5, 30)
+            out.append(f'p{k}')
+            n += 1 + k
+        elif r < 0.92 and where in TRAVELLED4:
+            k = rng.randint(5, 30)
+            out.append(f'g{k},' + ','.join(fuzz_acts(rng, travel=True)))
+            n += 1 + k
+    return out
+
+
 def acts_script(acts):
     """`fuzz_acts`' tokens as a step's script."""
     return [('keys', [int(t[1:], 16)]) if t[0] == 'k' else ('click', *(int(v) for v in t.split('.'))) for t in acts]
@@ -2175,9 +2247,9 @@ def fuzz_case(name):
             # (`fuzz_script3`'s use list: a potion of healing in it.)
             a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
             let_go_at_map(a)
-        if FUZZ[name][2:] == (4,):
+        if FUZZ[name][2:] in ((4,), (5,)):
             let_go_in_map(a)
-    return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2, goes_on=FUZZ[name][2:] == (4,))
+    return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2, goes_on=FUZZ[name][2:] in ((4,), (5,)))
 
 
 def let_go_at_map(a):
@@ -2322,6 +2394,31 @@ def level_fight(a):
         a.level_hook = a.mu.hook_add(UC_HOOK_CODE, points, None, at, at)
 
 
+def barehanded(a):
+    """The player's equipped weapon put away (its flags' 80h, +0Eh, as
+    `bowed` finds it, cleared) and the weapon class (0D49) made by
+    1194:7316 from what is left: bare hands, 7 plus the gauntlets' armour
+    kind; the frame's 3C4C loads the fists."""
+    for i in range(40):
+        at = 0x0212 + 0x13 * i
+        f = a.mu.mem_read(a.lin(a.ds, at + 0x0E), 1)[0]
+        if f & 0xC0 == 0xC0 and (f & 0x0C) >> 2 == 1:
+            a.mu.mem_write(a.lin(a.ds, at + 0x0E), bytes([f & 0x7F]))
+            break
+    else:
+        raise AssertionError('no weapon equipped')
+    a.call_far(0x1194, 0x7316, esi=0x01A4)
+
+
+def guards_on(a):
+    """The street at noon (`at_hour`) with the guards called
+    (`guards_called`) and the player's magic shield (+41Ch) taken away, so
+    their blows land."""
+    at_hour(12, 0x100)(a)
+    guards_called(a)
+    a.w16(0x01A4 + 0x41C, 0)
+
+
 # FUZZ's places that aren't CASES places, as (place, set-up): `fight`
 # the dungeon with `playtakehits`' creature and no magic shield (its blows
 # land: damage, the hurt palette, armour's wear); `crypt` the Crypt of
@@ -2343,7 +2440,11 @@ FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4,
            'inn': ('tavern', lambda a: (gs.seeded(a), at_square(7, 12, 0x100)(a))),
            'shrine': ('temple', lambda a: (temple_hurt(a), at_square(10, 11, 0x100)(a))),
            'mages': ('guild', lambda a: (guild_shopping(a), at_square(7, 12, 0x80)(a))),
-           'nighttown': ('people', at_hour(22, 0x100)), 'daytown': ('people', at_hour(12, 0x100))}
+           'nighttown': ('people', at_hour(22, 0x100)), 'daytown': ('people', at_hour(12, 0x100)),
+           'pool': ('dungeon', at_square(3, 3, 0x100)), 'chasm': ('dungeon', at_square(6, 52, 0)),
+           'lava': ('crypt', at_square(21, 7, 0)), 'guards': ('people', guards_on),
+           'archer': ('dungeon', lambda a: (unshielded()(a), bowed(a))),
+           'fists': ('dungeon', lambda a: (unshielded()(a), barehanded(a)))}
 # FUZZ's places where `cN` clicks the view's middle (no door out at hand,
 # or the way out's question left with Esc).
 CLICKED = ('dungeon', 'fight', 'crypt')
@@ -2356,7 +2457,8 @@ CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fu
                     'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2',
                     'fuzzspell1', 'fuzzspell2', 'fuzzcamp1', 'fuzzcamp2', 'fuzzlevel1', 'fuzzfog1',
                     'fuzzstore1', 'fuzzstore2', 'fuzztavern1', 'fuzztemple1', 'fuzzguild1', 'fuzzguild2',
-                    'fuzznight1', 'fuzzday1', 'fuzzday2')
+                    'fuzznight1', 'fuzzday1', 'fuzzday2', 'fuzzpool1', 'fuzzchasm1', 'fuzzlava1', 'fuzzguards1',
+                    'fuzzarcher1', 'fuzzfists1', 'fuzzcapped1')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -2510,6 +2612,13 @@ CASES = {
     'fuzznight1': fuzz_case('fuzznight1'),
     'fuzzday1': fuzz_case('fuzzday1'),
     'fuzzday2': fuzz_case('fuzzday2'),
+    'fuzzpool1': fuzz_case('fuzzpool1'),
+    'fuzzchasm1': fuzz_case('fuzzchasm1'),
+    'fuzzlava1': fuzz_case('fuzzlava1'),
+    'fuzzguards1': fuzz_case('fuzzguards1'),
+    'fuzzarcher1': fuzz_case('fuzzarcher1'),
+    'fuzzfists1': fuzz_case('fuzzfists1'),
+    'fuzzcapped1': fuzz_case('fuzzcapped1'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on
@@ -3512,7 +3621,8 @@ def play(a, name, steps, tracks):
             # journey, the outer loop on into the next (its boxes on the
             # way in the step's script's or spare's) and the step's frames
             # counted on there, the frame that left the first's.)
-            while why == ('ended',) and opts.get('goes_on'):
+            # (Not a death's end, 5B1 bit 100h: `dead` below.)
+            while why == ('ended',) and opts.get('goes_on') and not a.r16(0x05B1) & 0x100:
                 why = a.area_next()
                 assert why == ('world',), f'{name}: the next area stopped by {why}'
                 n -= done
@@ -3522,7 +3632,10 @@ def play(a, name, steps, tracks):
                 a.mu.hook_del(h)
             if names is not None:
                 a.names = names
-        if opts.get('dies'):
+        # (`goes_on`'s steps end the world loop for a death too, a blow or
+        # the water's drain: the case ends there as `dies` ends it.)
+        dead = why == ('ended',) and opts.get('goes_on') and a.r16(0x05B1) & 0x100
+        if opts.get('dies') or dead:
             # (`dies`: the frames end the world loop, the player dead: the
             # outer loop's death followed, `died`; the case ends there.)
             assert why == ('ended',), f'{name}: stopped by {why}'
