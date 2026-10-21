@@ -1812,43 +1812,43 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 for &c in &codes {
                     key(a, c, true);
                 }
-                fuzz_frames(a, d, seen, mouse, num(1));
+                fuzz_frames(a, d, seen, &mut mouse, num(1));
                 for &c in &codes {
                     key(a, c, false);
                 }
-                fuzz_frames(a, d, seen, mouse, num(2));
+                fuzz_frames(a, d, seen, &mut mouse, num(2));
             }
-            "w" => fuzz_frames(a, d, seen, mouse, num(0)),
+            "w" => fuzz_frames(a, d, seen, &mut mouse, num(0)),
             "t" => {
                 minute_due(a);
-                fuzz_frames(a, d, seen, mouse, num(0));
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
             }
             "q" => {
                 a.input(In::Key { code: KeyCode::ShiftLeft, down: true, text: None });
                 a.input(In::Key { code: KeyCode::KeyC, down: true, text: Some("C".into()) });
                 // (A box the cast puts up inside the frame, a refusal, read
                 // with Esc before the frame ends, as BOX_SPARE reads it.)
-                fuzz_screen(a, d, &mut Default::default());
+                fuzz_screen(a, d, &mut Default::default(), &mut mouse);
                 pushed(a, seen);
                 key(a, KeyCode::KeyC, false);
                 key(a, KeyCode::ShiftLeft, false);
-                fuzz_frames(a, d, seen, mouse, num(0));
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
             }
             "a" => {
                 ready(a, seen);
-                fuzz_frames(a, d, seen, mouse, num(0));
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
             }
             "s" => {
                 recaptured(a);
                 swinging(a, d, seen, num(0));
-                fuzz_frames(a, d, seen, mouse, num(1));
+                fuzz_frames(a, d, seen, &mut mouse, num(1));
             }
             "c" => {
                 recaptured(a);
                 a.input(In::Button { button: MouseButton::Left, down: true });
-                fuzz_frames(a, d, seen, mouse, 1);
+                fuzz_frames(a, d, seen, &mut mouse, 1);
                 a.input(In::Button { button: MouseButton::Left, down: false });
-                fuzz_frames(a, d, seen, mouse, num(0) - 1);
+                fuzz_frames(a, d, seen, &mut mouse, num(0) - 1);
                 // (A step's click leaves the harness's mouse where it was.)
                 mouse = (160, 70);
             }
@@ -1861,9 +1861,9 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                 mouse = (num(0) as i32, num(1) as i32);
                 a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
                 a.input(In::Button { button: MouseButton::Left, down: true });
-                fuzz_frames(a, d, seen, mouse, num(2));
+                fuzz_frames(a, d, seen, &mut mouse, num(2));
                 a.input(In::Button { button: MouseButton::Left, down: false });
-                fuzz_frames(a, d, seen, mouse, num(3));
+                fuzz_frames(a, d, seen, &mut mouse, num(3));
             }
             // A screen opened in the frame after its key and left again
             // (as playscreens' and playlog's), the window's cursor first
@@ -1879,8 +1879,14 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                         d.click(a, 0x100, 0xB0, MouseButton::Left);
                     }
                     "f" => {
+                        // (A spell waiting for its target is cast on the
+                        // player instead, 2542:00BE: no sheet, nothing waits
+                        // for the script's Esc.)
+                        let waiting = a.engine.m.mem.r16(DS, arena::cast::var::PENDING) != 0;
                         d.key(a, KeyCode::F1, None);
-                        d.key(a, KeyCode::Escape, None);
+                        if !waiting {
+                            d.key(a, KeyCode::Escape, None);
+                        }
                     }
                     _ => {
                         d.key(a, KeyCode::KeyL, Some("l"));
@@ -1899,7 +1905,7 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                     a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
                 }
                 pushed(a, seen);
-                fuzz_frames(a, d, seen, mouse, num(0));
+                fuzz_frames(a, d, seen, &mut mouse, num(0));
             }
             // `fuzz_script3`'s: the spellbook (C) or the use list (U) in
             // the bar's corner, its down arrow clicked K times and a line
@@ -1932,7 +1938,7 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                         acts.extend(std::iter::repeat_n(FuzzAct::Click(0xF0, num(1) as i32), 2));
                     }
                 }
-                fuzz_screen(a, d, &mut acts);
+                fuzz_screen(a, d, &mut acts, &mut mouse);
                 // (A screen's clicks done, the harness's mouse back at the
                 // centre; the camp's keys leave it.)
                 if kind != "r" {
@@ -1940,7 +1946,7 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
                     a.input(In::Cursor(160.0 * 3.0 + 1.0, 100.0 * 3.0 + 1.0));
                 }
                 pushed(a, seen);
-                fuzz_frames(a, d, seen, mouse, num(if kind == "r" { 1 } else { 2 }));
+                fuzz_frames(a, d, seen, &mut mouse, num(if kind == "r" { 1 } else { 2 }));
             }
             _ => panic!("fuzz token {t}"),
         }
@@ -1951,12 +1957,18 @@ fn fuzz_play(tokens: &[String], a: &mut App, d: &mut Driver, seen: &mut Vec<[u16
 /// comes up in one left with Esc before the next, as gen_worldframes.py's
 /// `spare` (BOX_SPARE) leaves it; the window's cursor where the harness's
 /// `mouse` is for the map's reads.
-fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: (i32, i32), n: usize) {
+fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: &mut (i32, i32), n: usize) {
     for _ in 0..n {
         frames(a, d, seen, 1, |_| false);
         if a.travel.is_some() {
-            if !a.captured {
-                a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
+            // (The map reads the harness's mouse, captured or not: after a
+            // view's click, 160, 70, not where the window's click landed.)
+            a.input(In::Cursor(mouse.0 as f64 * 3.0 + 1.0, mouse.1 as f64 * 3.0 + 1.0));
+            // (`fuzz_script3`'s: a walk by the mouse held into the way out,
+            // the button let go as the map began, gen_worldframes.py's
+            // `let_go_at_map`; the map takes presses alone.)
+            if LET_GO_AT_MAP.with(|l| l.get()) && a.walk_mouse.is_some_and(|w| w.2) {
+                a.input(In::Button { button: MouseButton::Left, down: false });
             }
             d.key(a, KeyCode::Escape, None);
             for _ in 0..100 {
@@ -1975,7 +1987,7 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: (i3
         }
         loop {
             if a.creation.is_some() {
-                level_points(a, d);
+                level_points(a, d, mouse);
             } else if a.waiting() {
                 d.key(a, KeyCode::Escape, None);
             } else {
@@ -1983,6 +1995,11 @@ fn fuzz_frames(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, mouse: (i3
             }
         }
     }
+}
+
+thread_local! {
+    /// gen_worldframes.py's `let_go_at_map`, for `fuzz_script3`'s seeds.
+    static LET_GO_AT_MAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// An input `fuzz_screen` gives a screen: a click at (x, y), a key.
@@ -1996,10 +2013,10 @@ enum FuzzAct {
 /// comes up from it given `acts` in turn while one is up, then Esc, as
 /// gen_worldframes.py's script and BOX_SPARE answer the original's waits;
 /// the level's attribute screen `level_points`' clicks first.
-fn fuzz_screen(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDeque<FuzzAct>) {
+fn fuzz_screen(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDeque<FuzzAct>, mouse: &mut (i32, i32)) {
     loop {
         if a.creation.is_some() {
-            level_points(a, d);
+            level_points(a, d, mouse);
             continue;
         }
         if !a.waiting() && a.panel.is_none() {
@@ -2014,8 +2031,10 @@ fn fuzz_screen(a: &mut App, d: &mut Driver, acts: &mut std::collections::VecDequ
 }
 
 /// The level's attribute screen (1194:122C) given LEVEL_SCRIPT's clicks
-/// after the notice's, as gen_worldframes.py's `level_fight` gives them.
-fn level_points(a: &mut App, d: &mut Driver) {
+/// after the notice's, as gen_worldframes.py's `level_fight` gives them;
+/// the harness's mouse left at the last (a step's spare isn't its script:
+/// its clicks don't put the mouse back at the centre).
+fn level_points(a: &mut App, d: &mut Driver, mouse: &mut (i32, i32)) {
     for r in 0..8 {
         d.click(a, 10, 54 + 8 * r, MouseButton::Left);
         for _ in 0..6 {
@@ -2023,7 +2042,15 @@ fn level_points(a: &mut App, d: &mut Driver) {
         }
     }
     d.click(a, 10, 175, MouseButton::Left);
+    *mouse = (10, 175);
     assert!(a.creation.is_none(), "the level's attribute screen still up");
+    // (The original's controls on from there with the cursor on the bar,
+    // where the last click left it: no handler, 2826:02E2's carry.)
+    if a.captured {
+        a.release();
+    }
+    a.input(In::Cursor(10.0 * 3.0 + 1.0, 175.0 * 3.0 + 1.0));
+    a.walk_mouse = Some((10, 175, false));
 }
 
 /// The mouse captured again if a screen the session's frames opened let
@@ -2333,6 +2360,7 @@ fn case(name: &str) -> Option<Case> {
             if let Some(h) = hour {
                 at_hour(a, h, 0x100);
             }
+            LET_GO_AT_MAP.with(|l| l.set(third));
             if third {
                 // (A potion of healing in the use list.)
                 for (i, &b) in POTION.iter().enumerate() {

@@ -2027,7 +2027,25 @@ def fuzz_case(name):
         if FUZZ[name][2:] == (3,):
             # (`fuzz_script3`'s use list: a potion of healing in it.)
             a.mu.mem_write(a.lin(a.ds, 0x01A4 + 0x6E + 0x13 * 38), POTION)
+            let_go_at_map(a)
     return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
+
+
+def let_go_at_map(a):
+    """The mouse's buttons let go as the way out's travel map begins
+    (26F7:0000), for this case (`letting_go`): a walk by the mouse held
+    into the way out (`fuzz_script3`'s `m`) comes to the map with the
+    left button down, which the map's first read (0011) takes for a press
+    on the world map, opening the province under the cursor, whose own
+    press then waits for the button's release, which no step gives;
+    the view's map takes presses alone. The player lets go first."""
+    a.letting_go = True
+    if not hasattr(a, 'let_go_hook'):
+        def let_go(*_):
+            if a.letting_go:
+                a.buttons = 0
+        at = a.lin(LOAD_SEG + 0x26F7, 0x0000)
+        a.let_go_hook = a.mu.hook_add(UC_HOOK_CODE, let_go, None, at, at)
 
 
 def booked(*spells):
@@ -3134,8 +3152,10 @@ def run_case(a, at, name, setup, steps, tracks):
     a.buttons = 0
     a.menu_loaded = False
     a.checkpoints = {}
-    # (`level_fight`'s clicks for the attribute screen, its own case's.)
+    # (`level_fight`'s clicks for the attribute screen and `let_go_at_map`,
+    # its own case's.)
     a.levelling = None
+    a.letting_go = False
     if setup:
         setup(a)
     # The state the frames start from (for the state comparison's
