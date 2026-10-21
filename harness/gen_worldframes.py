@@ -1749,7 +1749,7 @@ FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1':
         'fuzztemple1': ('shrine', 4, 4), 'fuzzguild1': ('mages', 3, 4), 'fuzzguild2': ('mages', 5, 4),
         'fuzznight1': ('nighttown', 2, 4), 'fuzzday1': ('daytown', 1, 4), 'fuzzday2': ('daytown', 2, 4),
         'fuzzpool1': ('pool', 2, 4), 'fuzzchasm1': ('chasm', 1, 4), 'fuzzlava1': ('lava', 1, 4),
-        'fuzzguards1': ('guards', 3, 5), 'fuzzarcher1': ('archer', 1, 5), 'fuzzfists1': ('fists', 1, 5),
+        'fuzzguards1': ('guards', 3, 5), 'fuzzarcher1': ('archer', 2, 5), 'fuzzfists1': ('fists', 1, 5),
         'fuzzcapped1': ('capped', 1, 4)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
