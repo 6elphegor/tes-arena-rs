@@ -52,6 +52,7 @@ fn objects(a: &App) -> u64 {
 fn pushed(a: &App, seen: &mut Vec<[u16; 5]>) {
     seen.push(state(a));
     OBJECTS.with(|o| o.borrow_mut().push(objects(a)));
+    HANDS.with(|h| h.borrow_mut().push(a.engine.m.mem.r16(DS, arena::weapon::var::FRAME)));
     // (Every CHECKPOINT frames, when measuring: the state then, and the
     // offsets the drawing's copy wrote, as `state_compared` takes them.)
     let k = seen.len() - 1;
@@ -314,6 +315,9 @@ thread_local! {
     /// Beside each track entry `pushed` keeps, the frame's projectiles and
     /// actors (`objects`: gen_worldframes.py's `objects_digest`).
     static OBJECTS: std::cell::RefCell<Vec<u64>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// Beside each track entry, the swing's frame (1947: gen_worldframes.py's
+    /// `hands` lines).
+    static HANDS: std::cell::RefCell<Vec<u16>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The state as `played`'s load left it, before the place's entry
     /// (for `the_state_measured_against_the_originals`).
     static BASE: std::cell::RefCell<Option<(Vec<u8>, Vec<u8>)>> = const { std::cell::RefCell::new(None) };
@@ -447,6 +451,7 @@ fn played_in(place: Place, setup: impl FnOnce(&mut App), play: impl FnOnce(&mut 
     a.fade_old = None;
     setup(&mut a);
     OBJECTS.with(|o| o.borrow_mut().clear());
+    HANDS.with(|h| h.borrow_mut().clear());
     let mut seen = vec![];
     pushed(&a, &mut seen);
     ENDS.with(|e| e.set(false));
@@ -891,9 +896,15 @@ fn captured(a: &mut App) {
 /// gen_worldframes.py's `SWINGING` for `n` frames: the right button held,
 /// the mouse dragged down 60h mickeys before each frame.
 fn swinging(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize) {
+    swinging_by(a, d, seen, n, (0.0, 96.0));
+}
+
+/// `swinging` with the mouse moved `drag` before each frame
+/// (gen_worldframes.py's `swing_fight`).
+fn swinging_by(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>, n: usize, drag: (f64, f64)) {
     a.input(In::Button { button: MouseButton::Right, down: true });
     for _ in 0..n {
-        a.input(In::Motion(0.0, 96.0));
+        a.input(In::Motion(drag.0, drag.1));
         frames(a, d, seen, 1, |_| false);
     }
     a.input(In::Button { button: MouseButton::Right, down: false });
@@ -2225,6 +2236,26 @@ fn case(name: &str) -> Option<Case> {
             swinging(a, d, seen, 200);
             frames(a, d, seen, 20, |_| false);
         })),
+        // gen_worldframes.py's `swing_fight`: playfight dragged the other
+        // ways, each drag starting its own swing (67BA).
+        "swingup" | "swingleft" | "swingright" | "swingdownleft" | "swingdownright" => {
+            let drag = match name {
+                "swingup" => (0.0, -96.0),
+                "swingleft" => (-96.0, 0.0),
+                "swingright" => (96.0, 0.0),
+                "swingdownleft" => (-96.0, 96.0),
+                _ => (96.0, 96.0),
+            };
+            (Place::Dungeon, Box::new(|a: &mut App| {
+                brought(a, 1, 1, 0x180);
+                captured(a);
+            }), Box::new(move |a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>| {
+                ready(a, seen);
+                frames(a, d, seen, 30, |_| false);
+                swinging_by(a, d, seen, 200, drag);
+                frames(a, d, seen, 20, |_| false);
+            }))
+        }
         "playcast" => (Place::Dungeon, Box::new(|a: &mut App| {
             // gen_worldframes.py's `casting`: the creature four squares
             // off, Wizard's Fire (the spellbook's seventh) cast at it.
@@ -4656,6 +4687,11 @@ const BUSY: &[&str] = &[
     "playwildambush",
     "playwildhouse",
     "playwildnight",
+    "swingdownleft",
+    "swingdownright",
+    "swingleft",
+    "swingright",
+    "swingup",
 ];
 
 /// The logbook's Print in playlogprint hands PRN what the original's
@@ -4918,6 +4954,11 @@ const BUSY_STATE: &[&str] = &[
     "playwildambush",
     "playwildhouse",
     "playwildnight",
+    "swingdownleft",
+    "swingdownright",
+    "swingleft",
+    "swingright",
+    "swingup",
 ];
 
 /// The cases whose doors, locks or chests change the walls plane, which
@@ -4956,8 +4997,8 @@ fn the_walls_left_as_the_original() {
 /// The spell cases (gen_worldframes.py's SPELL_CASES): their effects
 /// land outside DGROUP and the EMS banks, so the creature segment and
 /// the timers are compared too.
-const SPELL_CASES: [&str; 26] = [
-    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak", "playtakehits", "playblowdeath", "playheartsriddle", "playheartswrong",
+const SPELL_CASES: [&str; 31] = [
+    "playheal", "playlight", "playopen", "playsilence", "playlightout", "playresist", "playfortify", "playinvisible", "playreflect", "playparalyse", "playcurepoison", "playpoisontick", "playdiseasebite", "playcreaturehex", "playcreaturemissile", "playguardsfight", "playpotionresist", "playusebreak", "playartifactheal", "playartifactparalyse", "playartifacttriple", "playweaponbreak", "playtakehits", "playblowdeath", "playheartsriddle", "playheartswrong", "swingup", "swingleft", "swingright", "swingdownleft", "swingdownright",
 ];
 
 /// The cases whose projectiles and actors are compared frame by frame
@@ -4981,6 +5022,11 @@ const OBJECT_CASES: &[&str] = &[
     "playsurrenderspell",
     "playtakehits",
     "playweaponbreak",
+    "swingdownleft",
+    "swingdownright",
+    "swingleft",
+    "swingright",
+    "swingup",
 ];
 
 /// The missile and fight cases' projectiles and actors, frame by frame,
@@ -5009,6 +5055,37 @@ fn missiles_and_actors_go_as_the_originals_frame_by_frame() {
         }
     }
     assert!(bad.is_empty(), "the projectiles or actors differ from the original's: {bad:#?}");
+}
+
+/// The fight cases whose hand is compared frame by frame
+/// (gen_worldframes.py's SWING_CASES).
+const SWING_CASES: [&str; 6] = ["playfight", "swingup", "swingleft", "swingright", "swingdownleft", "swingdownright"];
+
+/// The fights' swings run as the original's, frame by frame: the swing's
+/// frame (1947) at the top of each frame (the `hands` lines), where the
+/// drag's direction shows (its first frame by 67BA, 0000:3CE3), not in the
+/// state the fight ends with. With the engine's page, as the state
+/// comparison runs. (ARENA_CASE: that case alone.)
+#[test]
+fn the_swings_go_as_the_originals_frame_by_frame() {
+    let text = std::fs::read_to_string(VECTORS).expect(VECTORS);
+    let mut bad = vec![];
+    for name in SWING_CASES.into_iter().filter(|n| only_case(n)) {
+        let (place, setup, play) = case(name).unwrap();
+        let Some((_, seen)) = played(place, |a| {
+            a.engine.page = Some(vec![0; 64000]);
+            setup(a)
+        }, play) else { return };
+        let got = HANDS.with(|h| h.borrow().clone());
+        let want: Vec<u16> = text.lines().map(|l| l.split(" | ").collect::<Vec<_>>()).find(|f| f.len() == 3 && f[0] == "hands" && f[1] == name)
+            .unwrap_or_else(|| panic!("{name}: no hands line"))[2].split(' ').map(|x| u16::from_str_radix(x, 16).unwrap()).collect();
+        assert_eq!(got.len(), seen.len(), "{name}: a hands entry per track entry");
+        let differ: Vec<usize> = (0..got.len().max(want.len())).filter(|&k| got.get(k) != want.get(k)).collect();
+        if !differ.is_empty() {
+            bad.push(format!("{name}: frames {:?} of {} (the original's {})", &differ[..differ.len().min(8)], got.len(), want.len()));
+        }
+    }
+    assert!(bad.is_empty(), "the swings differ from the original's: {bad:#?}");
 }
 
 /// The spell cases leave the eight active creatures' records (0C57's

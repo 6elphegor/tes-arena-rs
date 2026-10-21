@@ -492,6 +492,13 @@ LET_GO = {'buttons': 0}
 FIGHT = [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None), ((), (), 200, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]
 
 
+def swing_fight(dx, dy):
+    """playfight with the mouse dragged (dx, dy) mickeys before each frame
+    of the swinging."""
+    return ('dungeon', brought(1), [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
+                                    ((), (), 200, None, [], dict(SWINGING, drag=(dx, dy))), ((), (), 20, None, [], LET_GO)])
+
+
 def wild_edge(a):
     """The wilderness's window at the grid's top row (origin y 0, 060A),
     the player just inside its second quarter (y 1008h: C3D4, BA66 and
@@ -1954,6 +1961,16 @@ CASES = {
     # kill (2AA1:06A0), its corpse.
     'playfight': ('dungeon', brought(1), [((KEY_A,), (), 1, None), ((), (KEY_A,), 30, None),
                                           ((), (), 200, None, [], SWINGING), ((), (), 20, None, [], LET_GO)]),
+    # The same fight with the mouse dragged the other ways (`swing_fight`):
+    # the drag's direction picks the swing's first frame (0000:3CE3, its
+    # sector of 16 into 67BA), the hand's pictures that run, and nothing
+    # else (67E4/67E6 are read only there). Up starts at 25, left 10,
+    # right 15, down-left 5, down-right 20; playfight's down is 0.
+    'swingup': swing_fight(0, -0x60),
+    'swingleft': swing_fight(-0x60, 0),
+    'swingright': swing_fight(0x60, 0),
+    'swingdownleft': swing_fight(-0x60, 0x60),
+    'swingdownright': swing_fight(0x60, 0x60),
     # The same creature four squares off, Wizard's Fire cast at it
     # (`casting`), the view clicked at its centre two frames on (the
     # frame's controls launch it from the player, 29CF:0000), and the
@@ -2782,7 +2799,7 @@ SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout
                'playreflect', 'playparalyse', 'playcurepoison', 'playpoisontick', 'playdiseasebite', 'playcreaturehex',
                'playcreaturemissile', 'playguardsfight', 'playpotionresist', 'playusebreak', 'playartifactheal',
                'playartifactparalyse', 'playartifacttriple', 'playweaponbreak', 'playtakehits', 'playblowdeath',
-               'playheartsriddle', 'playheartswrong')
+               'playheartsriddle', 'playheartswrong', 'swingup', 'swingleft', 'swingright', 'swingdownleft', 'swingdownright')
 
 
 # The cases whose projectiles and actors are compared frame by frame
@@ -2790,7 +2807,13 @@ SPELL_CASES = ('playheal', 'playlight', 'playopen', 'playsilence', 'playlightout
 # a frame late can still end where the original's ends.
 OBJECT_CASES = ('playcast', 'playcreaturecast', 'playfight', 'playparalyse', 'playquickcast', 'playsurrenderspell', 'playdiseasebite',
                 'playcreaturehex', 'playcreaturemissile', 'playguardsfight', 'playartifactheal', 'playartifactparalyse', 'playartifacttriple', 'playweaponbreak',
-                'playtakehits', 'playblowdeath', 'playheartsriddle', 'playheartswrong')
+                'playtakehits', 'playblowdeath', 'playheartsriddle', 'playheartswrong', 'swingup', 'swingleft', 'swingright', 'swingdownleft', 'swingdownright')
+
+
+# The fight cases whose hand is compared frame by frame (`hands` lines:
+# the swing's frame, 1947, as the top of each frame finds it): the drag's
+# direction shows nowhere else (`swing_fight`).
+SWING_CASES = ('playfight', 'swingup', 'swingleft', 'swingright', 'swingdownleft', 'swingdownright')
 
 
 def objects_digest(a):
@@ -2848,11 +2871,13 @@ def play(a, name, steps, tracks):
     # (Beside each track line, the frame's projectiles and actors: popped
     # with it, `objects_line`.)
     a.objects = []
+    a.hands = []
     frame = [0]
     drag = [None]
     def each(a):
         tracks.append(track_line(a, name, frame[0]))
         a.objects.append(objects_digest(a))
+        a.hands.append(a.r16(0x1947))
         # (A CHECKPOINT_CASES case's state every CHECKPOINT frames, as the
         # top of the frame first finds it: before a step's `do` there.)
         if name in CHECKPOINT_CASES and frame[0] and frame[0] % CHECKPOINT == 0 and frame[0] not in a.checkpoints:
@@ -2964,6 +2989,7 @@ def play(a, name, steps, tracks):
             # state as that frame leaves it, no frame after.)
             tracks.pop()
             a.objects.pop()
+            a.hands.pop()
             page = a.page()
             return page, page, bytes([1]) * 64000, bytes(a.dac)
         if clicked:
@@ -2977,6 +3003,7 @@ def play(a, name, steps, tracks):
         # The top of the frame is seen again as the next run's first.
         tracks.pop()
         a.objects.pop()
+        a.hands.pop()
         frame[0] -= 1
     drag[0] = None
     a.motion = (0, 0)
@@ -2997,6 +3024,7 @@ def play(a, name, steps, tracks):
     assert why == ('frames',), f'{name}: the last frame stopped by {why}'
     tracks.pop()
     a.objects.pop()
+    a.hands.pop()
     full = a.page()
     mask = bytes(int(k != 1) for k in last)
     page = bytes(x if k else 0 for x, k in zip(full, mask))
@@ -3126,6 +3154,8 @@ def main():
             out.write(creatures_line(a, name))
         if name in OBJECT_CASES:
             out.write(objects_line(a, name))
+        if name in SWING_CASES:
+            out.write(f'hands | {name} | {" ".join(f"{h:x}" for h in a.hands)}\n')
         if a.menu_loaded:
             out.write(f'interface | {name} | {interface_digest(full):x}\n')
         out.write(f'view3d | {name} | {fnv(bytes(x if not k else 0 for x, k in zip(full, mask))):x}\n')
