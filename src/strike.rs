@@ -163,10 +163,16 @@ impl Machine {
     /// 0000:3F50. Whether a crime was seen: a percent roll under 100 -
     /// 10 x the player's level, at least 50. The product is 8-bit times
     /// 8-bit but the subtraction is unsigned 16-bit, so from level 11 on
-    /// the chance wraps to over 65000: always seen.
-    pub(crate) fn crime_seen(&mut self) -> bool {
+    /// the chance wraps to over 65000: always seen. Fixed (#9), the
+    /// subtraction is signed, so the floor of 50 the MAX was there for
+    /// holds: a crime is seen half the time from level 5 on.
+    pub fn crime_seen(&mut self) -> bool {
         let level = self.mem.r8(DS, PLAYER + field::LEVEL) as u16;
-        let chance = 100u16.wrapping_sub(level * 10).max(50);
+        let chance = if self.fixed(crate::fixes::CRIME_SEEN) {
+            (100 - level as i16 * 10).max(50) as u16
+        } else {
+            100u16.wrapping_sub(level * 10).max(50)
+        };
         self.percent() < chance
     }
 

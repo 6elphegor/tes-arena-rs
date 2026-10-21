@@ -1389,8 +1389,15 @@ impl Machine {
             // The original's bug: 1194:53F9 left SI at the player's record
             // (01A4), so the square looked up among the failures is made
             // from its words, not the chest's; it is recorded below under
-            // the chest's own.
-            let sq = square_at(self.g16(0x01A4), self.g16(0x01A8));
+            // the chest's own. Fixed (#7), it is looked up under the
+            // square it is recorded under (the clicked chest's), so a
+            // chest failed once stays failed as a door does.
+            let sq = if self.fixed(crate::fixes::CHEST_RETRIED) {
+                let clicked = self.g16(CLICKED);
+                square_at(self.g16(clicked), self.g16(clicked.wrapping_add(4)))
+            } else {
+                square_at(self.g16(0x01A4), self.g16(0x01A8))
+            };
             if (0..0x20).any(|i| self.g16(PICK_FAILED + 2 * i) == sq) {
                 self.pick_outcome(false);
                 return Some(());

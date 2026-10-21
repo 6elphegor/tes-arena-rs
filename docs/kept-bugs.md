@@ -1,5 +1,27 @@
 # Original ACD.EXE bugs kept by arena-port
 
+## Fixed mode
+
+The port stays faithful by default; each bug below can also be corrected behind a switch.
+
+- **The switch:** `Machine::fixes` (`src/fixes.rs`), a set with one bit per entry here, bit n for #n.
+  `Machine::new` starts it at `Fixes::NONE`, so every test, vector and generator stays byte for
+  byte the original's. The view sets `Fixes::ALL` for the machines it makes (`view/src/world.rs`
+  `machine`) unless it is run with `--original`. A machine's copies (`Clone`, `clone_from`) keep
+  the set. A saved game doesn't store it.
+- **Adding a fix:**
+  1. Add a constant named after the bug to `src/fixes.rs`, set to its number here, in number order.
+  2. At the bug, branch on `self.fixed(fixes::NAME)` and leave the faithful code exactly as it
+     was. Keep the comment on the original's bug, and add one saying what fixed mode does and why
+     the surrounding code shows that was the intent.
+  3. Add a test named `fixed_...` to the routine's existing test file, next to its faithful
+     tests (which stay as they are). It sets `m.fixes = Fixes::only(NAME)`, checks the corrected
+     behaviour, and fails with the bit off; where it can, it also shows the original's behaviour
+     with `Fixes::NONE`.
+  4. Mark the entry's Fix cell here **Fixed** with the constant's name.
+  Don't regenerate vectors for a fix: faithful runs don't change.
+- `Fixes::ALL` sets every bit, so a new fix is on in the view as soon as it is added.
+
 Read-only survey of `arena-port/src`, `arena-port/view/src` and `arena-port/docs` (2026-10-21).
 Search terms: bug / bugs kept / the original's bug / (kept) / meant / wrong / never / always /
 instead of / leftover / garbage / overflow / clobber / lost / forgotten / never freed / quirk,
@@ -30,7 +52,7 @@ does that, so a fix would have to go behind a "fixed" switch).
 | 1 | text.rs:1054-1074 (also view/src/playtest.rs:43-48) | 2DA2:05DC | A townsperson's answer that contains `%en` ("work for the owner of %en", #0271, #0289, #0303...) outside an equipment store makes the text routine return into the middle of code segment 2DA2. Usually the game crashes or prints garbage. The port's playtest reaches this (seed 105, CITY:1:2, hour 10). | UI/display (crash) | small: on the non-store path, pop DS correctly (or name the nearest store) |
 | 2 | shops.rs:24-29, 437-442 | 1194:C36E, 2EBD:0004 | **Temple "Cure all":** it charges the list *index* (1-2 gold) instead of the total, cures only the first affliction, then calls through a table with a record offset as the index, which is not code, so it crashes. The port stops (None) at that point. | economy (crash) | small: charge TOTAL, loop the cure over each affliction, drop the bad indirect call |
 | 3 | mapnotes.rs:161-175; view/src/playtest.rs:49 | 0000:343C (31FE/32FE) | Clicking a note on the automap can overflow the divide in the hit test (`div cl`), which is a CPU fault and crashes the original. | UI/display (crash) | small: do the hit test with a wider divide |
-| 4 | haggle.rs:41, 304-309 | 0000:52F2 | When a merchant's asking price equals his limit, the next counter-offer divides by zero (crash). | economy (crash) | trivial: guard div == 0 |
+| 4 | haggle.rs:41, 304-309 | 0000:52F2 | When a merchant's asking price equals his limit, the next counter-offer divides by zero (crash). | economy (crash) | **Not reached, no fix needed:** the offer's tests before each divide (selling: past the price, not past the limit; buying: not under the limit, under the price) leave no offer to divide when price == limit, nor a quotient that overflows (haggle.rs comments) |
 | 5 | piles.rs:36-41, 315, 347 | 2433:0358, 2433:7525 | Treasure piles made in the wild (kind of place 5): the routine tables are read past their end, and an item, weapon or magic pile calls into a string, so the game crashes. *(visibility unsure: depends on whether play makes piles there)* | gameplay (crash) | small: give kind 5 proper table entries |
 | 6 | guild.rs:936-944 | 1194:5ED1 | Removing a guild stock entry with a pick past the end of the list copies 64K entries, a #GP crash. It follows from #20 (Spells with no stock). | UI (crash) | trivial: bounds check |
 
@@ -38,15 +60,15 @@ does that, so a fix would have to go behind a "fixed" switch).
 
 | # | Where | Original addr | What the player sees | Category | Fix |
 |---|---|---|---|---|---|
-| 7 | talk.rs:1368-1396 | 292B:0743, 1194:53F9, 2826:0B30 | **You can retry a locked chest forever.** The failed-pick list is checked against a square made from the player's position (SI left at 01A4) but recorded under the chest's square, so a chest never counts as "already failed". | gameplay | trivial: look up the chest's square, not 01A4's |
+| 7 | talk.rs:1368-1396 | 292B:0743, 1194:53F9, 2826:0B30 | **You can retry a locked chest forever.** The failed-pick list is checked against a square made from the player's position (SI left at 01A4) but recorded under the chest's square, so a chest never counts as "already failed". | gameplay | trivial: look up the chest's square, not 01A4's. **Fixed** (`CHEST_RETRIED`) |
 | 8 | store.rs:91-93 | 1194:FC78 | **A stolen equipment-store item stays for sale**, so you can steal it again and again. Also, the sell-back price of an unenchanted item (+0Fh = FFh) is the type byte or the material's scaled price, not table price + material, so sell prices come out odd. | economy | small: remove the record on a successful steal; compute the price as table + material |
-| 9 | strike.rs:163-170 | 0000:3F50 | **From level 11 on, every crime is witnessed** (killing townsfolk, failed steals): `100 - 10*level` is unsigned and wraps to over 65000, so the roll always succeeds. The intended floor is 50%. | gameplay | trivial: signed subtraction / clamp |
-| 10 | haggle.rs:39, 312 | 0000:81F0 | **Selling: the merchant always accepts any counter-offer within his limit.** `and ax,ax` clears carry before the JAE, so the acceptance roll is never reached. | economy | trivial: do the roll's compare before the JAE |
+| 9 | strike.rs:163-170 | 0000:3F50 | **From level 11 on, every crime is witnessed** (killing townsfolk, failed steals): `100 - 10*level` is unsigned and wraps to over 65000, so the roll always succeeds. The intended floor is 50%. | gameplay | trivial: signed subtraction / clamp. **Fixed** (`CRIME_SEEN`) |
+| 10 | haggle.rs:39, 312 | 0000:81F0 | **Selling: the merchant always accepts any counter-offer within his limit.** `and ax,ax` clears carry before the JAE, so the acceptance roll is never reached. | economy | trivial: do the roll's compare before the JAE. **Fixed** (`SELLING_ROLL`): the sale's terms worked out signed, as the purchase's mirrored, and decided as a purchase is (haggle.rs) |
 | 11 | guild.rs:30-33, 739-748 | 1194:B51A | Mages' guild potions and spells are haggled with quality and factor 44h instead of the guild's own values, and the holiday price worked out first is thrown away. Holiday discounts on potions and spells are lost. | economy | trivial: pass the guild's quality/factor and the holiday price |
 | 12 | shops.rs:27-29, 584-592 | 1194:C58B | Temple blessing: a second donation within a day of the first takes your gold and blesses nothing. The single cure's price is also added to the list's total a second time. | economy | small |
-| 13 | inventory.rs:485-512 | 1194:511A | Taking off an attribute-raising item when the attribute (in percent) is below the item's bonus (for example after a drain): the 8-bit subtraction wraps and clamps at 255, so **the attribute jumps to its maximum**. | gameplay/economy (exploit) | trivial: saturating subtract |
+| 13 | inventory.rs:485-512 | 1194:511A | Taking off an attribute-raising item when the attribute (in percent) is below the item's bonus (for example after a drain): the 8-bit subtraction wraps and clamps at 255, so **the attribute jumps to its maximum**. | gameplay/economy (exploit) | trivial: saturating subtract. **Fixed** (`UNEQUIP_WRAP`) |
 | 14 | haggle.rs:39-43, 15-27, 396-415; sidequest.rs:1253-1263 | 1194:8349, 1194:D019 | Informant: he is paid before you confirm, and a refusal keeps the gold. Accepting a merchant's *first* price returns RESULT (65B8) as an earlier haggle left it, unless that opening line contained `%mm`, so you can be charged or paid a previous haggle's price. With no days left on the informant, his flag is cleared and a return address is mapped as an EMS bank. | economy/quests | small each |
-| 15 | tavern.rs:30-35, 816-828 | 1194:BCEA | Sneaking into a tavern room gives a one-day room, but its hours counter (1019) is set to the low word of the absolute end time. "Rest" in that room can then run for thousands of hours, not 24. | gameplay | trivial: hours = 24 |
+| 15 | tavern.rs:30-35, 816-828 | 1194:BCEA | Sneaking into a tavern room gives a one-day room, but its hours counter (1019) is set to the low word of the absolute end time. "Rest" in that room can then run for thousands of hours, not 24. | gameplay | trivial: hours = 24. **Fixed** (`SNEAK_HOURS`) |
 | 16 | loot_window.rs:31-38 | 2433:0883, 4BF4 | Looting: after a corpse's gold is shown, the "gold shown" flag is cleared in the corpse's segment, not DGROUP's, so an emptied corpse that had gold shows no message. The picked pile is found again by counting piles on that square and level without checking the kind of place, so a pile of another kind there makes **you get a different pile than the one you clicked**. | UI/gameplay | small |
 | 17 | travel.rs:14-16 | 1194:2E69 | Fast-travel time: terrain pixels are read from the start of the loaded file, header included, so every sample is 12 pixels off the drawn route and journey lengths are slightly wrong. (The unbounded 500-byte line buffers cannot overflow on a 320-wide map, so that part is invisible.) | gameplay | trivial: add the 12-byte header offset |
 

@@ -815,7 +815,9 @@ impl Machine {
     }
 
     /// 1194:BCEA. A room of a random kind (0..4) for a day; its hours
-    /// are the end time's low word (the original's bug).
+    /// are the end time's low word (the original's bug). Fixed (#15),
+    /// the hours are the day's 24, as a room paid for a day gets (days x
+    /// 24, 1194:BD51).
     fn sneak_room(&mut self, files: &mut Files, hooks: &mut dyn TavernHooks) -> Option<()> {
         let kind = self.rng.range(0, 5)? as u8;
         self.mem.w8(DS, PICK, kind);
@@ -824,7 +826,8 @@ impl Machine {
         let ax = (self.mem.r8(DS, ROOM_DAYS) as u32 * 0x5A0) & 0xFFFF;
         let end = ax.wrapping_add(self.mem.r32(DS, TIME));
         self.mem.w32(DS, ROOM_END, end);
-        self.mem.w16(DS, ROOM_HOURS, end as u16);
+        let hours = if self.fixed(crate::fixes::SNEAK_HOURS) { self.mem.r8(DS, ROOM_DAYS) as u16 * 24 } else { end as u16 };
+        self.mem.w16(DS, ROOM_HOURS, hours);
         hooks.room_file(self, files);
         let name = self.skip_strings(DS, ROOM_NAMES, self.mem.r8(DS, PICK) as u16);
         self.sprintf((DS, NAME), (DS, text::SNEAK_ROOM), &[Arg::Str(DS, name)]);
