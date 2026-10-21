@@ -286,8 +286,11 @@ fn fixed_mode_plays_every_case() {
     assert!(bad.is_empty(), "fixed mode goes wrong in {} cases:\n{}", bad.len(), bad.join("\n"));
 }
 
+/// The colours a page's bytes name (`App::dac`'s).
+type Palette = [[u8; 4]; 256];
+
 /// A case's 3D page frame by frame, played with `fixes`, and the colours.
-fn pages(name: &str, fixes: Fixes) -> Option<(Vec<Vec<u8>>, [[u8; 4]; 256])> {
+fn pages(name: &str, fixes: Fixes) -> Option<(Vec<Vec<u8>>, Palette)> {
     thread_local! {
         static PAGES: std::cell::RefCell<Vec<Vec<u8>>> = const { std::cell::RefCell::new(Vec::new()) };
     }
