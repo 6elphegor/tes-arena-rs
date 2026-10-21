@@ -1769,7 +1769,9 @@ fn long_run(a: &mut App, d: &mut Driver, seen: &mut Vec<[u16; 5]>) {
 /// night, a level gained in a fight, the fog of a main quest dungeon;
 /// with screens given random inputs, inside a store, a tavern, a temple
 /// and the mages' guild before their keepers, the street at night and at
-/// noon with the travel map),
+/// noon with the travel map, the start dungeon's water and chasm, the
+/// crypt's lava (a death), a main quest dungeon; fought, the guards on
+/// the street, a fight with a bow and with bare hands),
 /// each played from the script its `fuzz` line holds and measured every
 /// CHECKPOINT frames as `playlongrun` (`fuzz_sessions_as_the_original`).
 const FUZZ: &[&str] = &["fuzztown1", "fuzzdungeon1", "fuzzwild1", "fuzztown2", "fuzzdungeon2", "fuzzwild2",

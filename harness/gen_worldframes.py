@@ -2432,7 +2432,11 @@ def guards_on(a):
 # (`mages`), two squares before the keeper and facing him, so the first
 # clicks find him; the street with its people (`people`) at ten at night
 # (`nighttown`: the stores closed, the houses locked) and at noon
-# (`daytown`).
+# (`daytown`); the start dungeon before its water (`pool`, row 2) and
+# its chasm (`chasm`, row 7), the crypt before its lava (`lava`, as
+# playswim). `fuzz_script5`'s: the street at noon with the guards called
+# and no shield (`guards_on`), `fight` with a short bow (`archer`) and
+# with bare hands (`fists`).
 FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4, 52, 0x80)),
            'caster': ('dungeon', caster), 'levelup': ('dungeon', level_fight),
            'wildday': ('wild', at_hour(12, 0x100)), 'wildnight': ('wild', at_hour(22, 0x100)),
