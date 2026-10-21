@@ -33,37 +33,37 @@ the original routine:
 |---|---|---|---|---|---|
 | `AreaHooks::ask_leave` | src/transit.rs:116 | 26F7:0000 | overridden | the engine: Exit<'_> | faithful: the engine's `Exit` runs the travel map's port (travelmap vectors) |
 | `AreaHooks::automap` | src/transit.rs:109 | 292B:095E | overridden | the view: areas.rs Areas<'_> | faithful: `states_keep` (states vectors) |
-| `AreaHooks::border` | src/transit.rs:163 | 0000:3503 | overridden | the view: areas.rs Areas<'_> | faithful: `automap_load` (automap vectors) |
+| `AreaHooks::border` | src/transit.rs:169 | 0000:3503 | overridden | the view: areas.rs Areas<'_> | faithful: `automap_load` (automap vectors) |
 | `AreaHooks::build_city` | src/transit.rs:96 | 1194:0292 | overridden | the view: areas.rs Areas<'_> | faithful: `mif_build_city` (city vectors) |
 | `AreaHooks::build_dungeon` | src/transit.rs:102 | 2294:0ED4 and 0000:28BC | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_create` with the seed (dungeon vectors) |
 | `AreaHooks::city_screen` | src/transit.rs:106 | 2294:11F2 | present | 2294:11F2 is the heap check (int3 on a bad heap); nothing to keep | |
-| `AreaHooks::ems_free` | src/transit.rs:180 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
+| `AreaHooks::ems_free` | src/transit.rs:186 | 0000:5D70 | port | fixed by this audit: was empty, so entering an area never freed the EMS bank table (`ems_reset`) | |
 | `AreaHooks::ending` | src/transit.rs:87 | 1194:D459 | overridden | the view: areas.rs Areas<'_> | faithful: `Machine::vision` (its pages clicked through, `ClickThrough`); the window shows the farewell's vision (`Creation::ending`, vision.txt frame by frame) |
-| `AreaHooks::entered` | src/transit.rs:196 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
-| `AreaHooks::hands` | src/transit.rs:173 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
-| `AreaHooks::hook_2631` | src/transit.rs:176 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
-| `AreaHooks::hook_2974` | src/transit.rs:153 | 0000:2974 | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_first_level` (dungeon vectors) |
-| `AreaHooks::leave_dungeon` | src/transit.rs:143 | 2433:0199 | port | the default runs the port | |
-| `AreaHooks::leave_interior` | src/transit.rs:137 | 1194:D55F and 2433:0199 | port | the default runs the port | |
-| `AreaHooks::leave_screen` | src/transit.rs:133 |  | present | the screens shown on the way out; the view draws its own | |
+| `AreaHooks::entered` | src/transit.rs:202 | 0000:468B | overridden | the view: areas.rs Areas<'_> | faithful: `area_entered_inside` / `city_entered` (entered, cityinfo vectors; state tests from the load); outdoors 46AF's `outdoor_light` with its loads (`LightNow`), the light handed to the assets (was the assets' own, after the load: savefiles.txt `loadplace` for the street and the wilderness) |
+| `AreaHooks::hands` | src/transit.rs:179 | 0000:068A | overridden | the view: areas.rs Areas<'_> | faithful: `sky_reset`, then 06B8's day's colours (`sky_colours_load`; was the assets' own, after the load) (state tests, savefiles.txt `loadplace`) |
+| `AreaHooks::hook_2631` | src/transit.rs:182 | 0000:2631 | port | fixed by this audit: was empty, so a player loaded or entering inside a wall stayed in it (`player_unstick`) | |
+| `AreaHooks::hook_2974` | src/transit.rs:159 | 0000:2974 | overridden | the view: areas.rs Areas<'_> | faithful: `dungeon_first_level` (dungeon vectors) |
+| `AreaHooks::leave_dungeon` | src/transit.rs:149 | 2433:0199 | port | the default runs the port | |
+| `AreaHooks::leave_interior` | src/transit.rs:143 | 1194:D55F and 2433:0199 | port | the default runs the port | |
+| `AreaHooks::leave_screen` | src/transit.rs:139 |  | present | the screens shown on the way out; the view draws its own | |
 | `AreaHooks::location` | src/transit.rs:92 | 1194:3AE8 | overridden | the view: areas.rs Areas<'_> | faithful: `city_location` (city vectors) |
 | `AreaHooks::map_keep` | src/transit.rs:121 | 0000:4564..4568 | overridden | the engine: Exit<'_> | faithful: `map_keep` with the stairs' hooks' colours |
 | `AreaHooks::map_colours` | src/transit.rs:135 | 2542:0446 (from 0000:45AC, 4593) | overridden | the engine: Exit<'_> | fixed: wasn't run, so the lamps' 71h kept a fog's grey after the way out's map where the original reads PAL.COL to 929E and sets it (fuzzfog1); now `colours_load`, and the view's lamp back to the file's |
 | `AreaHooks::map_given_back` | src/transit.rs:128 | 0000:457C..4586, 45A4..45A9 | port | the default runs the port (`view_window`, `world_back`); the transit vectors' stub counts it | |
-| `AreaHooks::mouse_wait` | src/transit.rs:160 | 0000:8FC4 | present | waiting for the buttons up; input only | |
+| `AreaHooks::mouse_wait` | src/transit.rs:166 | 0000:8FC4 | present | waiting for the buttons up; input only | |
 | `AreaHooks::normal_lgt` | src/transit.rs:89 | 0000:742C | overridden | the view: areas.rs Areas<'_> | faithful: NORMAL.LGT loaded as 0000:742C loads it |
-| `AreaHooks::restore_level` | src/transit.rs:165 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
-| `AreaHooks::sky` | src/transit.rs:151 | 0000:464A | overridden | the view: areas.rs Areas<'_> | faithful: `area_sky` with the game's loads (`file_load_ems`, 7428 with DI FFFDh), else PAL.COL to 929E; was the assets' own after the entry, with the view's reads |
-| `AreaHooks::slots_usable` | src/transit.rs:168 | 25CA:01E6 | port | the default runs the port | |
-| `AreaHooks::spawn` | src/transit.rs:148 | 0000:1793 | overridden | the view: areas.rs Areas<'_> | faithful: `spawn_actors` (actors vectors) |
+| `AreaHooks::restore_level` | src/transit.rs:171 | 25FD:034B and 0000:16F7 | unreached | only with 5C8 bit 4, which `title_load` clears after its own `save_restore` | |
+| `AreaHooks::sky` | src/transit.rs:157 | 0000:464A | overridden | the view: areas.rs Areas<'_> | faithful: `area_sky` with the game's loads (`file_load_ems`, 7428 with DI FFFDh), else PAL.COL to 929E; was the assets' own after the entry, with the view's reads |
+| `AreaHooks::slots_usable` | src/transit.rs:174 | 25CA:01E6 | port | the default runs the port | |
+| `AreaHooks::spawn` | src/transit.rs:154 | 0000:1793 | overridden | the view: areas.rs Areas<'_> | faithful: `spawn_actors` (actors vectors) |
 | `AreaHooks::sync` | src/transit.rs:82 | 2F9F:0438 | port | the default runs the port | |
 | `AreaHooks::townsfolk_graphics` | src/transit.rs:104 | 0000:17F9 | overridden | the view: areas.rs Areas<'_> | faithful: `townsfolk_load` (actors vectors; playsky exact) |
 | `AreaHooks::weather` | src/transit.rs:94 | 0000:0F05 | overridden | the view: areas.rs Areas<'_> | faithful: `weather_set` (state tests in rain and snow) |
 | `AreaHooks::wild_done` | src/transit.rs:100 | 217B:04DC | overridden | the view: areas.rs Areas<'_> | faithful: `wild_done` |
-| `AreaHooks::wild_empty` | src/transit.rs:156 | 217B:0184 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_shift`, `wild_quarter_ok` (wild vectors; playwild) |
+| `AreaHooks::wild_empty` | src/transit.rs:162 | 217B:0184 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_shift`, `wild_quarter_ok` (wild vectors; playwild) |
 | `AreaHooks::wild_setup` | src/transit.rs:98 | 217B:0084 | overridden | the view: areas.rs Areas<'_> | faithful: `wild_setup` (wild vectors) |
-| `AreaHooks::world_free` | src/transit.rs:189 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
-| `AreaHooks::world_screen` | src/transit.rs:185 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`, then the view cleared in the page (4EFD, `view_clear`: the farewell's SCREENSV.$$2, worldframes `playfarewell`); the screens' fades are the window's (areafade.txt) |
+| `AreaHooks::world_free` | src/transit.rs:195 | 0000:A5A0 | port | `draw_buffers_free`: the renderer's buffers (A561's, `draw_buffers_alloc`) and the light table freed, as the area's entry made them | |
+| `AreaHooks::world_screen` | src/transit.rs:191 |  | overridden | the view: areas.rs Areas<'_> | faithful: `automap_keep`, then the view cleared in the page (4EFD, `view_clear`: the farewell's SCREENSV.$$2, worldframes `playfarewell`); the screens' fades are the window's (areafade.txt) |
 | `AutomapScreenHooks::palette` | src/automapscreen.rs:20 | 0000:6E3C | overridden | the view: automap.rs Colours | faithful: the window's colours as the VGA's (playautomap's state) |
 | `CastHooks::message_box` | src/cast.rs:42 | 1194:59C8 | overridden | the view: panels.rs Said | present: the cast's box in the equipment page (screens.txt) |
 | `CelestialHooks::draw` | src/celestial.rs:35 | 0000:E4D2 | overridden | the view: main.rs CelestialDraw<'_> | gpu-only: the GPU world's sky only: with the page the drawing runs the sky itself |
@@ -260,8 +260,8 @@ the original routine:
 | `OptionsHooks::save_menu` | src/options.rs:105 |  | elsewhere | and its save menu | |
 | `OptionsHooks::show` | src/options.rs:90 |  | present | the screen shown | |
 | `OptionsHooks::unhide` | src/options.rs:89 |  | present | and shown | |
-| `PhysicsHooks::input` | src/movement.rs:819 |  | overridden | the engine: Classic<'_>, Physics<'_, '_> | faithful: the engine's controls |
-| `PhysicsHooks::transition` | src/movement.rs:824 |  | overridden | the engine: Physics<'_, '_> | faithful: the engine's |
+| `PhysicsHooks::input` | src/movement.rs:822 |  | overridden | the engine: Classic<'_>, Physics<'_, '_> | faithful: the engine's controls |
+| `PhysicsHooks::transition` | src/movement.rs:827 |  | overridden | the engine: Physics<'_, '_> | faithful: the engine's |
 | `QuestHooks::audience` | src/quest.rs:189 | 0000:41B6..4216 | overridden | the view: main.rs Audience<'_, '_>, questui.rs QuestFront<'_, '_> | fixed: the parts did nothing; now each runs `Machine::audience_part` (1194:DAF0, 2294:0895 with the movie's frames and colours, D459, 55B2, 55D5, DB26, 9A98) before the view shows its movies; worldframes playaudience8 |
 | `QuestHooks::dac` | src/quest.rs:178 | 0000:6E38 | overridden | the view: main.rs Audience<'_, '_> | faithful: the screen's colours (`Front::dac`); worldframes playaudience8 |
 | `QuestHooks::bios_ticks` | src/quest.rs:130 | 0000:9D60 | original | the machine's BIOS ticks | |
