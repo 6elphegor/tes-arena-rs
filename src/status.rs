@@ -147,7 +147,8 @@ impl Machine {
     ///   player fortifies (+6..+0Dh non-zero): "Your %s is fortified.\r"
     ///   with its name from 2B00 (2686:01C3, not counted); the original
     ///   keeps the player's pointer in EAX, which the first line printed
-    ///   clobbers, so only the first such slot is listed.
+    ///   clobbers, so only the first such slot is listed (fixed, #39:
+    ///   every one).
     ///
     /// The text ends with a NUL; more than 10 lines counted set D39 bit
     /// 80h. Returns DI, at that NUL.
@@ -267,10 +268,14 @@ impl Machine {
         // EAX holds the player's far pointer for the comparison; a line
         // printed leaves AX as the formatter does (AL 0, the format's
         // NUL), so no slot after one that printed is the player's.
+        // Fixed (#39): the comparison is the player's for every slot, as
+        // the pointer kept for it means, so each slot's attributes are
+        // listed.
         let mut printed = false;
+        let fixed = self.fixed(crate::fixes::STATUS_FORTIFIED);
         for i in 0..0x10u16 {
             let slot = EFFECT_SLOTS + i * 0x3C;
-            if printed || !self.slot_on_player(slot) || self.mem.r8(DS, slot + 0x3A) != 4 {
+            if (printed && !fixed) || !self.slot_on_player(slot) || self.mem.r8(DS, slot + 0x3A) != 4 {
                 continue;
             }
             for bx in 0..8u16 {

@@ -27,7 +27,8 @@
 //!   goes back one (not below 0), and then the next spell is shown as
 //!   the button would. Bug kept: with the last line deleted the mark is
 //!   already the last and nothing is shown again, the deleted spell's
-//!   page staying up.
+//!   page staying up. Fixed mode (`crate::fixes`) shows the spell now in
+//!   the deleted one's place, or the new last one (#38).
 //!
 //! The page opens by keeping the screen as it stands in SPELBOOK.$$$
 //! (51B8: the page at [A8FE], FA00h bytes). Exit fades to black
@@ -167,7 +168,19 @@ impl Machine {
             } else if x <= 0xCD {
                 continue;
             } else if x <= 0x103 {
+                let deleted = self.mem.r8(DS, var::MARK);
                 if !self.spell_page_delete(files, hooks)? {
+                    continue;
+                }
+                let count = self.mem.r8(DS, var::COUNT);
+                if self.fixed(crate::fixes::SPELL_DELETED) && count != 0 {
+                    // Fixed (#38): the spell that took the deleted one's
+                    // place shown, or the new last one when the last was
+                    // deleted: what the mark put back one then moved on
+                    // means, except at the ends (the last: nothing shown,
+                    // the deleted page left up; the first: the mark held
+                    // at 0 moves on past the one now there).
+                    self.spell_page_show(files, hooks, deleted.min(count - 1))?;
                     continue;
                 }
                 true

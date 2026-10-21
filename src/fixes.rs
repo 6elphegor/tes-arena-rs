@@ -100,6 +100,10 @@ pub const EDIT_TEXT: u8 = 36;
 /// #37: a full key ring marks the last key down; left Shift marks the
 /// right down (0000:718A).
 pub const KEY_RING: u8 = 37;
+/// #38: deleting the spellbook's last spell leaves its page up (1194:52DB).
+pub const SPELL_DELETED: u8 = 38;
+/// #39: the status lists only the first fortifying effect (2686:01C3).
+pub const STATUS_FORTIFIED: u8 = 39;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
