@@ -3828,16 +3828,21 @@ impl Soft {
         self.m.ems_map(first);
         // The fog's table (2294:0C36, once its bit 80h of CB5C or F81 is
         // set) is AAA2's with its last two rows the fill colour.
-        if (self.g8(0xCB5C) | self.g8(0x0F81)) & 0x80 != 0 {
+        let fogged = (self.g8(0xCB5C) | self.g8(0x0F81)) & 0x80 != 0;
+        if fogged {
             for i in 0..0x200u16 {
                 self.m.mem.w8(seg, 0xD00 + i, fog);
             }
         }
         // The rows E00h and F00h as the machine's table has them: a
         // remapped creature's colours (25CA:013A, `place_creatures`), which
-        // its light rows (953E) draw.
+        // its light rows (953E) draw. Out of fog D00h too: the clear
+        // weather's reset (2294:0B8A, the night's switch) fills it with
+        // the fill colour after AAA2 made it, until a screen's world given
+        // back makes the table again (A561), which a person's colours read
+        // at the darkest light (292B:0074).
         if machines != 0 {
-            for i in 0xE00..0x1000u16 {
+            for i in if fogged { 0xE00 } else { 0xD00 }..0x1000u16 {
                 let b = self.m.mem.r8(machines, i);
                 self.m.mem.w8(seg, i, b);
             }

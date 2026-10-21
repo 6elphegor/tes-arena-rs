@@ -1122,6 +1122,9 @@ struct Assets {
     /// lights and the sky's objects. Redraws between frames reuse it, so
     /// the sky's hook (lightning) steps once a frame, as in the original.
     frame_view: Option<(render::Sky, render::Lights, Vec<world::Vertex>)>,
+    /// The colours as the turn found them (`dac_menu`), for the screens
+    /// its frame body opens.
+    menu_dac: Option<[[u8; 4]; 256]>,
     /// The moons' phases' frames (0000:E6CB), kept until the day changes.
     moons: [usize; 2],
     palette: [[u8; 4]; 256],
@@ -1297,6 +1300,24 @@ impl Assets {
         Self::dac_with(self.palette, Some(&sky))
     }
 
+    /// The colours a screen the frame body opens finds (its menu keys
+    /// and the bar's buttons, 2542:0100, come before the frame's light,
+    /// 0000:0390 at 4B84): the last frame's (`dac`), or before the area's
+    /// first, the sky's window and 71h as the entry's light left them.
+    fn dac_menu(&mut self, m: &arena::machine::Machine) -> [[u8; 4]; 256] {
+        if self.frame_view.is_some() {
+            return self.dac();
+        }
+        let sky = self.sky(&mut m.clone());
+        Self::dac_with(self.palette, Some(&sky))
+    }
+
+    /// The colours a screen opened now reads (6E3C): as the turn found
+    /// them (`dac_menu`), else as shown.
+    fn screen_dac(&self) -> [[u8; 4]; 256] {
+        self.menu_dac.unwrap_or_else(|| self.dac())
+    }
+
     /// Also enters the area's sky (0000:464A: its objects made).
     fn new(dir: &std::path::Path, engine: &mut Engine) -> Self {
         prof::time("assets.new", || Self::make(dir, engine))
@@ -1362,6 +1383,7 @@ impl Assets {
             light,
             flash: std::cell::Cell::new(None),
             frame_view: None,
+            menu_dac: None,
             moons: [0, 0],
             shown: vec![0; 64000],
         }
@@ -2127,6 +2149,7 @@ fn run_turn(engine: &mut Engine, assets: &mut Assets, input: &TurnIn, talk: &mut
     }
     let level = engine.m.mem.r8(DS, arena::movement::var::LEVEL);
     let window = engine.m.mem.r32(DS, arena::wild::var::WINDOW);
+    assets.menu_dac = Some(assets.dac_menu(&engine.m));
     let dac = assets.dac_turn(&mut engine.m).map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
     let mut hooks = Front { sheet: Some(&assets.sheet), light: Some(&mut assets.light), tick: input.tick, clicked: input.clicked, talk: Some(talk), aspect: input.aspect, effect: None, shown: Some(&assets.shown), drawn: None, click: input.click, dac: Some(dac), interface: Some(&mut assets.interface) };
     if input.camp && engine.m.camp(&mut engine.files, &mut hooks).is_none() {
@@ -4289,7 +4312,7 @@ impl App {
     /// The map button (Shift+M, its right click): the travel map, or the
     /// box refusing it.
     fn open_travel(&mut self) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         match travel::Travel::open(&mut self.engine, &self.assets.archive, Some(&dac)) {
             Ok(t) => {
                 // 26F7:0000: the screen faded out in 8 steps, the map's
@@ -5150,7 +5173,7 @@ impl App {
                 // centre while the window holds it).
                 let at = if self.captured { (160, 100) } else { self.screen_point() };
                 self.fade_open(12, 12, move |a| {
-                    automap::open(&mut a.engine, a.assets.dac(), at);
+                    automap::open(&mut a.engine, a.assets.screen_dac(), at);
                     a.map = true;
                 })
             }
@@ -5343,7 +5366,7 @@ impl App {
     /// to its buttons' loop: `Machine::sheet_open`), the colours read as
     /// shown.
     fn sheet_begin(&mut self) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         let e = &mut self.engine;
         self.sheet_run = e.m.sheet_open(&mut e.files, Some(&dac));
         if self.sheet_run.is_none() {
@@ -5355,7 +5378,7 @@ impl App {
     /// to its loop: `Machine::log_open`), the colours read as shown;
     /// `from_bar` by the bar's scroll button.
     fn log_begin(&mut self, from_bar: bool) {
-        let dac = self.assets.dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
+        let dac = self.assets.screen_dac().map(|c| [c[0] >> 2, c[1] >> 2, c[2] >> 2]);
         let e = &mut self.engine;
         self.log_run = e.m.log_open(&mut e.files, Some(&dac), 0, from_bar);
         if self.log_run.is_none() {
