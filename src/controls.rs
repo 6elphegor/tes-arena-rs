@@ -386,6 +386,12 @@ impl Machine {
         if it.look != 0 {
             self.turn(it.look as u16);
         }
+        // AFF9 at 1 while the keys' handlers run, as 2826:0488 sets it
+        // (pushed, and put back at 0556); a walk into the way out reads
+        // the mouse (26F7:0011) and leaves the driver's buttons, so the
+        // turn after it (06B1, 0709: only with bit 0) does nothing.
+        let buttons = self.mem.r8(DS, BUTTONS);
+        let mut turns = true;
         if it.forward != 0 || it.strafe != 0 {
             let fraction = match (it.forward, it.strafe) {
                 // (`forward`, `back`, `strafe_right`, `strafe_left`'s.)
@@ -404,9 +410,11 @@ impl Machine {
             if it.strafe == 0 {
                 self.mem.w16(DS, 0x05DE, h);
             }
-            let buttons = self.mem.r8(DS, BUTTONS);
-            self.mem.w8(DS, BUTTONS, buttons | 1);
+            self.mem.w8(DS, BUTTONS, 1);
+            self.arrows_buttons = Some(buttons);
             let r = self.walk(files, hooks, speed, h);
+            self.arrows_buttons = None;
+            turns = self.mem.r8(DS, BUTTONS) & 1 != 0;
             self.mem.w8(DS, BUTTONS, buttons);
             r?;
             // As the arrow keys leave it (2826:0473 walks, then the
@@ -420,7 +428,7 @@ impl Machine {
         // The turn after the walk, as 2826:0473 runs Up or Down's handler
         // before Left or Right's: held together, the step is along the
         // heading the frame began with.
-        if it.turn != 0 {
+        if it.turn != 0 && turns {
             let fraction = match it.turn {
                 // (2826:06A0 and 06FA's regions, REGIONS + 28h and 40h.)
                 -0x100 => self.arrow_fraction(3, 4, None)?,
@@ -617,6 +625,18 @@ impl Machine {
             return Some(());
         }
         self.mem.w8(DS, BUTTONS, 1);
+        self.arrows_buttons = Some(buttons);
+        let r = self.arrow_moves(files, hooks);
+        self.arrows_buttons = None;
+        r?;
+        self.mem.w8(DS, BUTTONS, buttons);
+        Some(())
+    }
+
+    /// 2826:048D..0551: `arrow_keys`' handlers, AFF9 at 1 (a read of the
+    /// mouse in a walk, the way out's map's, puts the driver's buttons
+    /// back, and the turns, 06B1 and 0709, then do nothing).
+    fn arrow_moves(&mut self, files: &mut Files, hooks: &mut dyn ControlHooks) -> Option<()> {
         let held = |m: &mut Machine| {
             let f = m.mem.r16(DS, 0x05E0) | 0x2000;
             m.mem.w16(DS, 0x05E0, f);
@@ -646,7 +666,6 @@ impl Machine {
                 self.with_cursor(MOUSE_X, 0x13C, |m| m.turn_right(0x40, 0x44))?;
             }
         }
-        self.mem.w8(DS, BUTTONS, buttons);
         Some(())
     }
 

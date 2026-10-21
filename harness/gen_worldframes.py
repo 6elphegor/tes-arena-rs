@@ -1744,7 +1744,9 @@ MOUSE_POINTS = [(160, 0), (160, 38), (0, 20), (130, 20), (319, 20), (190, 20), (
 FUZZ = {'fuzztown1': ('street', 1), 'fuzzdungeon1': ('dungeon', 1), 'fuzzwild1': ('wild', 1),
         'fuzztown2': ('street', 2), 'fuzzdungeon2': ('dungeon', 3), 'fuzzwild2': ('wild', 2),
         'fuzztown3': ('street', 3, 2), 'fuzzdungeon3': ('dungeon', 4, 2), 'fuzzwild3': ('wild', 3, 2),
-        'fuzztown4': ('street', 4, 2), 'fuzzdungeon4': ('dungeon', 5, 2), 'fuzzwild4': ('wild', 4, 2)}
+        'fuzztown4': ('street', 4, 2), 'fuzzdungeon4': ('dungeon', 5, 2), 'fuzzwild4': ('wild', 4, 2),
+        'fuzzfight1': ('fight', 1, 2), 'fuzzfight2': ('fight', 2, 2), 'fuzzcrypt1': ('crypt', 1, 2),
+        'fuzzcrypt2': ('crypt', 2, 2), 'fuzzpeople1': ('people', 1, 2), 'fuzzpeople2': ('people', 2, 2)}
 KEY_DOWN = 0x50
 KEY_LCTRL = 0x1D
 
@@ -1855,7 +1857,7 @@ def fuzz_script2(where, seed, total):
             k = rng.randint(5, 20)
             out.append(f'{rng.choice("ofl")}{k}')
             n += 1 + k
-        elif where == 'dungeon':
+        elif where in CLICKED:
             k = rng.randint(5, 20)
             out.append(f'c{k}')
             n += k
@@ -1920,16 +1922,34 @@ BOX_SPARE = [('keys', [KEY_ESC])] * 128
 
 
 def fuzz_case(name):
-    """A FUZZ case's CASES entry: its place, the book's Light (`known`),
-    its script's steps."""
+    """A FUZZ case's CASES entry: its place, the book's Light (`known`)
+    and its FUZZ_AT set-up, its script's steps."""
     where = FUZZ[name][0]
-    return where, known(LIGHT), fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
+    place, more = FUZZ_AT.get(where, (where, None))
+
+    def setup(a):
+        known(LIGHT)(a)
+        if more:
+            more(a)
+    return place, setup, fuzz_steps(fuzz_script(*FUZZ[name]), spare=len(FUZZ[name]) > 2)
+
+
+# FUZZ's places that aren't CASES places, as (place, set-up): `fight`
+# the dungeon with `playtakehits`' creature and no magic shield (its blows
+# land: damage, the hurt palette, armour's wear); `crypt` the Crypt of
+# Hearts' first level before its down stairs, facing them (HEARTS_DOWN's
+# first), so a walk may take them and the levels below.
+FUZZ_AT = {'fight': ('dungeon', unshielded()), 'crypt': ('crypt', stairs_from(4, 52, 0x80))}
+# FUZZ's places where `cN` clicks the view's middle (no door out at hand,
+# or the way out's question left with Esc).
+CLICKED = ('dungeon', 'fight', 'crypt')
 
 
 # Cases whose DGROUP and EMS are measured every CHECKPOINT frames on the
 # way (`checkpoint` lines), as at their end.
 CHECKPOINT_CASES = ('playlongrun', 'fuzztown1', 'fuzzdungeon1', 'fuzzwild1', 'fuzztown2', 'fuzzdungeon2', 'fuzzwild2',
-                    'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4')
+                    'fuzztown3', 'fuzzdungeon3', 'fuzzwild3', 'fuzztown4', 'fuzzdungeon4', 'fuzzwild4',
+                    'fuzzfight1', 'fuzzfight2', 'fuzzcrypt1', 'fuzzcrypt2', 'fuzzpeople1', 'fuzzpeople2')
 CHECKPOINT = 250
 
 LEVEL_XP = 9_750_000
@@ -2062,6 +2082,12 @@ CASES = {
     'fuzztown4': fuzz_case('fuzztown4'),
     'fuzzdungeon4': fuzz_case('fuzzdungeon4'),
     'fuzzwild4': fuzz_case('fuzzwild4'),
+    'fuzzfight1': fuzz_case('fuzzfight1'),
+    'fuzzfight2': fuzz_case('fuzzfight2'),
+    'fuzzcrypt1': fuzz_case('fuzzcrypt1'),
+    'fuzzcrypt2': fuzz_case('fuzzcrypt2'),
+    'fuzzpeople1': fuzz_case('fuzzpeople1'),
+    'fuzzpeople2': fuzz_case('fuzzpeople2'),
     # A creature (type 1, level 1: `brought`) three squares down the
     # dungeon's corridor; the weapon readied (A held a frame), waited
     # for as the creature comes and strikes, then swung at it frame on

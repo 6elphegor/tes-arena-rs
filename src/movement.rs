@@ -529,9 +529,11 @@ impl Machine {
     /// chunks are reloaded (`level_change`), the player turns round and
     /// the new level's INF, if one was loaded, is loaded, the row tables
     /// made between (0000:DA8E, `rows_note`). The wait for the mouse
-    /// buttons to be released (8FC8) is skipped; it leaves BX the cursor's y, kept within
-    /// its limits (8F94, 8F78..8F7A), which the next candidate's test
-    /// reads (`regs`). Then the hook C3B8: a dungeon's level entered
+    /// buttons to be released (F894: 8FC8 till AFF9 is 0) is taken as
+    /// done: AFF9 0 (in the arrow keys' walk, over the 1 their handler put
+    /// there, so the turn after does nothing, 2826:06B1); it leaves BX the
+    /// cursor's y, kept within its limits (8F94, 8F78..8F7A), which the
+    /// next candidate's test reads (`regs`). Then the hook C3B8: a dungeon's level entered
     /// (`value::LEVEL_ENTERED`, `Machine::level_entered`; the view's
     /// rectangle saved and put back around it, 0000:A606/A5D1, is the
     /// renderer's). None where the reload or the INF load fails, or the
@@ -549,6 +551,7 @@ impl Machine {
             self.info_load(files, info)?;
             self.mem.w16(DS, crate::info::var::INFO_PTR, 0);
         }
+        self.mem.w8(DS, crate::controls::var::BUTTONS, 0);
         let y = self.mem.r16(DS, 0x8F94);
         let y = if (y as i16) < 0 { 0 } else { y };
         let y = y.max(self.mem.r16(DS, 0x8F78));
