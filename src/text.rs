@@ -9,7 +9,7 @@
 //! `&`s, one picked at random; its characters are filtered (A643), its
 //! `%` codes substituted (`expand`), its runs of spaces collapsed (A559)
 //! and its lines wrapped at 137E (49FF; meant for the outermost level
-//! only, but the test is lost). Then it
+//! only, but the test is lost: fixed mode makes it, #48). Then it
 //! is shown in a window (mode 0), offered as a menu (1) or copied out (2).
 //!
 //! All of it works in the EMS bank at 1030 mapped into the frame (9030):
@@ -398,9 +398,14 @@ impl Machine {
         }
         // 1194:A4B0 means to wrap only at the outermost level (or not
         // with 5C8 bit 10h), but A559 leaves AL 0 (the NUL it copied), so
-        // the wrap always runs.
+        // the wrap always runs. Fixed (#48), the test made on the level
+        // (AX before A559: 1 the outermost, 2 with 5C8 bit 10h): a nested
+        // text is wrapped with the text it goes into, not on its own.
+        let ax = if self.t16(0x05C8) & 0x10 != 0 { 2 } else { self.t8(LEVEL) as u16 };
         self.text_spaces(frame);
-        self.text_wrap(frame)?;
+        if ax <= 1 || !self.fixed(crate::fixes::TEXT_WRAP) {
+            self.text_wrap(frame)?;
+        }
         let res = match mode {
             0 => {
                 self.text_copy(frame, 0x95BE, DS, BOX)?;

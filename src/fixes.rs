@@ -107,9 +107,14 @@ pub const STATUS_FORTIFIED: u8 = 39;
 /// #40: a find-a-person quest's deadline reads the stage from the name
 /// (1194:9162).
 pub const OFFER_STAGE: u8 = 40;
+/// #41: a quest item not in the list writes FFh over the main quest's
+/// step (1194:9C74).
+pub const QUEST_ITEM_END: u8 = 41;
 /// #43: piles' odd halved gold dropped, magic types forced by a scratch
 /// register, the level's limit read from the frame (2433:0358, 04C8, 0101).
 pub const PILE_QUIRKS: u8 = 43;
+/// #48: nested texts are wrapped too, the level's test lost (1194:A4B0).
+pub const TEXT_WRAP: u8 = 48;
 /// #49: a failed quest's search compares with a stage left over (1194:9B26).
 pub const FAILED_STAGE: u8 = 49;
 /// #50: the informant's line rolled on a fake RNG in the EMS frame
