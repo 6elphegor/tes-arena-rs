@@ -1,4 +1,4 @@
-# arena-port
+# tes-arena-rs
 
 A routine-by-routine Rust port of The Elder Scrolls: Arena (ACD.EXE, CD
 version 1.07), checked instruction for instruction against the original
@@ -10,6 +10,10 @@ where the original faults or never returns, the port returns `None` rather
 than guessing. A fixed mode (`src/fixes.rs`, off unless a front end asks)
 corrects the catalogued bugs (docs/kept-bugs.md), each behind its own
 switch; the view plays with it on unless given `--original`.
+
+This is an unofficial fan project, not affiliated with or endorsed by
+Bethesda Softworks or ZeniMax Media, who own The Elder Scrolls. You need
+your own copy of the game (the CD version, 1.07) to run it.
 
 ## Your own game files
 
