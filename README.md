@@ -371,6 +371,12 @@ At the time of writing:
   writes the original's); it has not been listened to by a person, and
   there is no SoundFont fallback.
 
+## License
+
+MIT (LICENSE). The license covers this repository's code only; the game
+and its files stay Bethesda's, and the third-party code below keeps its own
+license.
+
 ## Third-party code
 
 The `arena` crate has no dependencies. The view uses:

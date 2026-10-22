@@ -2,6 +2,7 @@
 name = "arena-view"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 description = "A wgpu renderer for the arena port: the 3D world drawn from the engine's state."
 
 [dependencies]
