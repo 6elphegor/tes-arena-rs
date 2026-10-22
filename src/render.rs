@@ -179,10 +179,19 @@ fn ems_changes(before: &Machine, after: &Machine) -> Vec<EmsWrote> {
         if same && b != mapped(before) && b != mapped(after) {
             continue;
         }
-        let (x, y) = (before.ems_bank(b as u16), after.ems_bank(b as u16));
-        for (i, (&p, &q)) in x.iter().zip(&y).enumerate() {
-            if p != q {
-                out.push(((b as u32) << 16 | i as u32, p, q));
+        static ZEROS: [u8; 0x10000] = [0; 0x10000];
+        let (x, y) = (before.ems_bank_ref(b as u16).unwrap_or(&ZEROS), after.ems_bank_ref(b as u16).unwrap_or(&ZEROS));
+        if x == y {
+            continue;
+        }
+        for (c, (xc, yc)) in x.chunks(64).zip(y.chunks(64)).enumerate() {
+            if xc == yc {
+                continue;
+            }
+            for (i, (&p, &q)) in xc.iter().zip(yc).enumerate() {
+                if p != q {
+                    out.push(((b as u32) << 16 | (c * 64 + i) as u32, p, q));
+                }
             }
         }
     }
@@ -246,7 +255,12 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
             let _ = std::fs::write(p, m.mem.segment(DS));
         }
     }
-    let mut r = Soft { m: m.clone(), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
+    // The copy made in the last drawing's allocations (`Machine::clone_from`).
+    let copy = SCRATCH.with(|c| c.borrow_mut().take()).map(|mut c| {
+        c.clone_from(m);
+        c
+    });
+    let mut r = Soft { m: copy.unwrap_or_else(|| m.clone()), page: under.to_vec(), gaps: Vec::new(), lgts: lgts.clone(), table: 0, creatures: Vec::new(), odd: 0, rows_end: 0, stepped: Vec::new() };
     for (o, w) in prior.iter().enumerate() {
         let o = o as u16;
         if let Some((before, after)) = *w {
@@ -304,9 +318,16 @@ pub fn draw(m: &mut Machine, under: &[u8], lgts: &Lgts, prior: &[Option<(u8, u8)
             left.push((o, r.m.mem.r8(DS, o)));
         }
     }
-    let walked = Walked { stepped: r.stepped, left };
+    let walked = Walked { stepped: std::mem::take(&mut r.stepped), left };
     let ems = ems_changes(m, &r.m);
-    (r.page, r.gaps, wrote, r.creatures, walked, ems)
+    let Soft { m: copy, page, gaps, creatures, .. } = r;
+    SCRATCH.with(|c| *c.borrow_mut() = Some(copy));
+    (page, gaps, wrote, creatures, walked, ems)
+}
+
+thread_local! {
+    /// The last drawing's copy of the machine, for the next to copy into.
+    static SCRATCH: std::cell::RefCell<Option<Machine>> = const { std::cell::RefCell::new(None) };
 }
 
 /// 0000:CBFF alone (tests/capdraw.rs): the cap at height `ax` wound by
@@ -2237,18 +2258,39 @@ impl Soft {
             }
             return true;
         }
-        for _ in 0..n {
-            let al = self.m.mem.r8(tex, (esi >> 16) as u16);
-            if !see || al != 0 {
-                let c = self.m.mem.r8(tex, shade.wrapping_add(al as u16));
-                self.px(di, c);
+        // BAE8 and `shade` swap a pixel: held here and BAE8 written once
+        // after (as the last pixel's swap leaves it), unless the texture's
+        // segment holds BAE8, where the texels read would see the swaps.
+        let bae8 = crate::mem::lin(DS, 0xBAE8);
+        let base = crate::mem::lin(tex, 0);
+        if (base..base + 0x10000).contains(&bae8) || (base..base + 0x10000).contains(&(bae8 + 1)) || self.page.len() < 0x10000 {
+            for _ in 0..n {
+                let al = self.m.mem.r8(tex, (esi >> 16) as u16);
+                if !see || al != 0 {
+                    let c = self.m.mem.r8(tex, shade.wrapping_add(al as u16));
+                    self.px(di, c);
+                }
+                let other = self.g16(0xBAE8);
+                self.s16(0xBAE8, shade);
+                shade = other;
+                esi = esi.wrapping_add(step);
+                di = di.wrapping_add(0x140);
             }
-            let other = self.g16(0xBAE8);
-            self.s16(0xBAE8, shade);
-            shade = other;
+            return true;
+        }
+        let mut other = self.g16(0xBAE8);
+        let t = self.m.mem.segment(tex);
+        let page = &mut self.page[..0x10000];
+        for _ in 0..n {
+            let al = t[(esi >> 16) as u16 as usize];
+            if !see || al != 0 {
+                page[di as usize] = t[shade.wrapping_add(al as u16) as usize];
+            }
+            std::mem::swap(&mut shade, &mut other);
             esi = esi.wrapping_add(step);
             di = di.wrapping_add(0x140);
         }
+        self.s16(0xBAE8, other);
         true
     }
 
@@ -3789,6 +3831,9 @@ pub fn shade_tables(m: &mut Machine, seg: u16) {
     }
     let first = m.mem.r8(DS, 0xC8F0) as u16;
     let n = m.mem.r8(DS, 0xC8F1) as u16;
+    if shade_banks(m, seg, fog, first, n) {
+        return;
+    }
     for b in first..first + n {
         m.ems_map(b);
         let frame = m.mem.r16(DS, 0x9030);
@@ -3900,6 +3945,54 @@ impl Soft {
     fn row_tables(&mut self) {
         self.m.row_tables();
     }
+}
+
+/// `shade_tables`'s last step without mapping each bank in turn: the
+/// table's 16 rows (fog past FD00h) written at F000h of banks `first`..
+/// `first + n` as the program sees them, then the last mapped, as
+/// mapping them one by one leaves it (the same bytes, EMS_MAPPED written
+/// if any mapped, the banks made). A bank already holding them isn't
+/// copied, which mapping it would (the copy the drawing makes shares the
+/// machine's banks). False, nothing done, where the banks' mapping could
+/// read otherwise: EMS off, a bank past EMS_PAGES (not mapped, the rows
+/// going to the frame's bank), the frame over DGROUP or the table, or
+/// the frame's writes watched.
+fn shade_banks(m: &mut Machine, seg: u16, fog: u8, first: u16, n: u16) -> bool {
+    use crate::level::var::{EMS_MAPPED, EMS_ON, EMS_PAGES};
+    if n == 0 || m.mem.r8(DS, EMS_ON) == 0 || first + n > m.mem.r16(DS, EMS_PAGES) || m.mem.watching_frame() {
+        return false;
+    }
+    let frame = m.mem.r16(DS, crate::mif::var::BUFFER_SEG);
+    let lin = crate::mem::lin;
+    let over = |a: usize, al: usize, b: usize, bl: usize| a < b + bl && b < a + al;
+    if over(lin(frame, 0), 0x10000, lin(DS, 0), 0x10000) || over(lin(frame, 0), 0x10000, lin(seg, 0), 0xD00) {
+        return false;
+    }
+    let mut rows = [fog; 0x1000];
+    rows[..0xD00].copy_from_slice(&m.mem.segment(seg)[..0xD00]);
+    let mapped = m.mem.r16(DS, EMS_MAPPED);
+    let last = first + n - 1;
+    if n > 1 || first << 2 != mapped {
+        let need = ((mapped >> 2) as usize).max(last as usize) + 1;
+        if m.ems.len() < need {
+            m.ems.resize(need, std::sync::Arc::new(vec![0; 0x10000]));
+        }
+    }
+    for b in first..=last {
+        if b << 2 == mapped {
+            for (i, &v) in rows.iter().enumerate() {
+                m.mem.w8(frame, 0xF000 + i as u16, v);
+            }
+        } else if m.ems[b as usize][0xF000..] != rows[..] {
+            std::sync::Arc::make_mut(&mut m.ems[b as usize])[0xF000..].copy_from_slice(&rows);
+        }
+    }
+    if last << 2 != mapped {
+        m.ems_map(last);
+    } else if n > 1 {
+        m.mem.w16(DS, EMS_MAPPED, mapped);
+    }
+    true
 }
 
 /// What 0000:DA8E makes the row tables from: the flags (of C398 it reads

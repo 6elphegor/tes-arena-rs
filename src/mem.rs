@@ -50,7 +50,7 @@ impl Clone for Memory {
     }
 }
 
-fn lin(seg: u16, off: u16) -> usize {
+pub(crate) fn lin(seg: u16, off: u16) -> usize {
     seg as usize * 16 + off as usize
 }
 
@@ -66,6 +66,10 @@ impl Memory {
     }
 
     pub fn r16(&self, seg: u16, off: u16) -> u16 {
+        if off != 0xFFFF {
+            let at = lin(seg, off);
+            return u16::from_le_bytes([self.bytes[at], self.bytes[at + 1]]);
+        }
         u16::from_le_bytes([self.r8(seg, off), self.r8(seg, off.wrapping_add(1))])
     }
 
@@ -99,6 +103,11 @@ impl Memory {
     /// (`frame_written`), bank `bank` mapped there.
     pub fn watch_frame(&mut self, seg: u16, bank: u16) {
         self.frame = Some(FrameWatch { base: lin(seg, 0), bank, written: Default::default() });
+    }
+
+    /// Whether the EMS frame's writes are watched (`watch_frame`).
+    pub fn watching_frame(&self) -> bool {
+        self.frame.is_some()
     }
 
     /// Bank `bank` mapped into the watched frame (`Machine::ems_map`).
@@ -140,7 +149,15 @@ impl Memory {
     /// DGROUP's offsets written since `track` (written to whatever value,
     /// its own included).
     pub fn written_offsets(&self) -> Vec<u16> {
-        (0..self.written.len() * 64).filter(|&o| self.written[o >> 6] >> (o & 63) & 1 != 0).map(|o| o as u16).collect()
+        let mut out = Vec::new();
+        for (i, &w) in self.written.iter().enumerate() {
+            let mut w = w;
+            while w != 0 {
+                out.push((i * 64 + w.trailing_zeros() as usize) as u16);
+                w &= w - 1;
+            }
+        }
+        out
     }
 
     pub fn w16(&mut self, seg: u16, off: u16, v: u16) {

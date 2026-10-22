@@ -243,6 +243,15 @@ impl Machine {
         std::sync::Arc::make_mut(&mut self.ems[page as usize])[off as usize] = v;
     }
 
+    /// `ems_bank` borrowed (None: a bank never made, all zeros).
+    pub fn ems_bank_ref(&self, page: u16) -> Option<&[u8]> {
+        if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
+            let frame = self.mem.r16(DS, BUFFER_SEG);
+            return Some(self.mem.segment(frame));
+        }
+        self.ems.get(page as usize).map(|b| &b[..])
+    }
+
     /// Bank `page` as the program sees it: the frame when it is mapped.
     pub fn ems_bank(&self, page: u16) -> Vec<u8> {
         if self.mem.r16(DS, EMS_MAPPED) >> 2 == page && self.mem.r8(DS, EMS_ON) != 0 {
